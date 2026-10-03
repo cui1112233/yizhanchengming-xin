@@ -9,29 +9,45 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 )
 
+var ErrJobNotFound = errors.New("pipeline job not found")
+
 type jobTx interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 	Commit() error
 	Rollback() error
 }
 
+type jobRows interface {
+	Next() bool
+	Scan(...any) error
+	Close() error
+	Err() error
+}
+
 type beginJobTx func(context.Context) (jobTx, error)
+type queryJobs func(context.Context, string, ...any) (jobRows, error)
 
 type SQLJobStore struct {
 	begin beginJobTx
+	query queryJobs
 }
 
 func NewSQLJobStore(db *sql.DB) *SQLJobStore {
 	if db == nil {
 		return &SQLJobStore{}
 	}
-	return &SQLJobStore{begin: func(ctx context.Context) (jobTx, error) {
-		return db.BeginTx(ctx, nil)
-	}}
+	return &SQLJobStore{
+		begin: func(ctx context.Context) (jobTx, error) { return db.BeginTx(ctx, nil) },
+		query: func(ctx context.Context, query string, args ...any) (jobRows, error) { return db.QueryContext(ctx, query, args...) },
+	}
 }
 
 func newSQLJobStoreWithBegin(begin beginJobTx) *SQLJobStore {
 	return &SQLJobStore{begin: begin}
+}
+
+func newSQLJobStoreWithQuery(query queryJobs) *SQLJobStore {
+	return &SQLJobStore{query: query}
 }
 
 func (s *SQLJobStore) CreateJob(ctx context.Context, job pipeline.Job) error {
@@ -67,6 +83,52 @@ func (s *SQLJobStore) CreateJob(ctx context.Context, job pipeline.Job) error {
 		}
 	}
 	return tx.Commit()
+}
+
+func (s *SQLJobStore) LoadJob(ctx context.Context, jobID string) (pipeline.Job, error) {
+	if s == nil || s.query == nil {
+		return pipeline.Job{}, errors.New("sql job store database is required")
+	}
+	rows, err := s.query(ctx, `SELECT id, batch_id, status, run_at FROM pipeline_jobs WHERE id = ?`, jobID)
+	if err != nil {
+		return pipeline.Job{}, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return pipeline.Job{}, err
+		}
+		return pipeline.Job{}, ErrJobNotFound
+	}
+	var job pipeline.Job
+	var runAt sql.NullTime
+	if err := rows.Scan(&job.ID, &job.BatchID, &job.Status, &runAt); err != nil {
+		return pipeline.Job{}, err
+	}
+	if runAt.Valid {
+		job.RunAt = runAt.Time
+	}
+	if err := rows.Err(); err != nil {
+		return pipeline.Job{}, err
+	}
+
+	stageRows, err := s.query(ctx, `SELECT stage, ordinal_no FROM pipeline_stages WHERE job_id = ? ORDER BY ordinal_no ASC`, jobID)
+	if err != nil {
+		return pipeline.Job{}, err
+	}
+	defer stageRows.Close()
+	for stageRows.Next() {
+		var stage string
+		var ordinal int
+		if err := stageRows.Scan(&stage, &ordinal); err != nil {
+			return pipeline.Job{}, err
+		}
+		job.Stages = append(job.Stages, pipeline.Stage(stage))
+	}
+	if err := stageRows.Err(); err != nil {
+		return pipeline.Job{}, err
+	}
+	return job, nil
 }
 
 func nullableJobTime(value time.Time) any {
