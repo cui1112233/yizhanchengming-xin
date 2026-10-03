@@ -31,6 +31,13 @@ func TestConfigFromEnvRejectsMissingOwner(t *testing.T) {
 	if _, err := configFromEnv(); err == nil { t.Fatal("expected missing owner error") }
 }
 
+func TestNewAgentServiceWiresStoreAndResponder(t *testing.T) {
+	service := newAgentService(nil)
+	if service == nil || service.Store == nil || service.Responder == nil {
+		t.Fatalf("agent service not fully wired: %#v", service)
+	}
+}
+
 func TestComposeHTTPHandlerKeepsAPIRoutesSeparateFromFrontend(t *testing.T) {
 	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("api"))
@@ -46,8 +53,10 @@ func TestComposeHTTPHandlerKeepsAPIRoutesSeparateFromFrontend(t *testing.T) {
 	}{
 		{path: "/api/batch-factory/intakes", want: "api"},
 		{path: "/api/batch-factory/jobs", want: "api"},
+		{path: "/api/agent/threads", want: "api"},
 		{path: "/healthz", want: "api"},
 		{path: "/batch-factory", want: "frontend"},
+		{path: "/agent", want: "frontend"},
 		{path: "/", want: "frontend"},
 	}
 	for _, tc := range cases {
