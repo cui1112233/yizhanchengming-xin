@@ -20,9 +20,9 @@ type batchFactoryHandler struct {
 }
 
 type createJobRequest struct {
-	BatchID string `json:"batch_id"`
-	NeedsAI bool   `json:"needs_ai"`
-	RunAt   string `json:"run_at"`
+	IntakeID string `json:"intake_id"`
+	NeedsAI  bool   `json:"needs_ai"`
+	RunAt    string `json:"run_at"`
 }
 
 func NewBatchFactoryHandler(starter BatchStarter) http.Handler {
@@ -46,8 +46,8 @@ func (h *batchFactoryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(input.BatchID) == "" {
-		http.Error(w, "batch_id is required", http.StatusBadRequest)
+	if strings.TrimSpace(input.IntakeID) == "" {
+		http.Error(w, "intake_id is required", http.StatusBadRequest)
 		return
 	}
 	var runAt time.Time
@@ -60,9 +60,9 @@ func (h *batchFactoryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		runAt = parsed
 	}
 	job, err := h.starter.Start(r.Context(), batchfactory.StartInput{
-		BatchID: input.BatchID,
-		NeedsAI: input.NeedsAI,
-		RunAt:   runAt,
+		IntakeID: input.IntakeID,
+		NeedsAI:  input.NeedsAI,
+		RunAt:    runAt,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
