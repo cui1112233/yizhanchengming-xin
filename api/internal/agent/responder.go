@@ -5,12 +5,21 @@ import (
 	"strings"
 )
 
+type ResponseContext struct {
+	Owner         string
+	ThreadID      string
+	Input         string
+	MediaAssetIDs []string
+	Messages      []Message
+	Tasks         []Task
+}
+
 type Responder struct{}
 
 func NewResponder() *Responder { return &Responder{} }
 
-func (r *Responder) Respond(_ context.Context, _ string, _ string, input string) (AgentResponse, error) {
-	text := strings.TrimSpace(input)
+func (r *Responder) Respond(_ context.Context, input ResponseContext) (AgentResponse, error) {
+	text := strings.TrimSpace(input.Input)
 	lower := strings.ToLower(text)
 	if text == "" {
 		return AgentResponse{Content: "你可以直接告诉我想做什么，例如“帮我打开小说获取”或“图片模型在哪里设置”。"}, nil
@@ -71,6 +80,27 @@ func (r *Responder) Respond(_ context.Context, _ string, _ string, input string)
 	}
 
 	return AgentResponse{Content: "我可以直接帮你操作系统入口、解释设置位置、记录任务，并把后续执行结果放在同一个对话里。你可以更直接地说，例如“打开小说获取”“批量工厂在哪里”“创建任务：检查第 8 个视频失败原因”。"}, nil
+}
+
+func deterministicIntent(input string) bool {
+	text := strings.TrimSpace(input)
+	lower := strings.ToLower(text)
+	if text == "" || strings.Contains(lower, "http://") || strings.Contains(lower, "https://") {
+		return true
+	}
+	if _, ok := taskTitle(text); ok {
+		return true
+	}
+	for _, kind := range []string{"图片模型", "视频模型", "文本模型"} {
+		if strings.Contains(lower, kind) && (strings.Contains(text, "哪里") || strings.Contains(text, "设置") || strings.Contains(text, "打开")) {
+			return true
+		}
+	}
+	if destination, ok := destinationForText(text); ok && (wantsNavigation(text) || strings.Contains(text, "在哪里") || strings.Contains(text, "哪儿") || strings.Contains(text, "怎么进")) {
+		_ = destination
+		return true
+	}
+	return strings.Contains(text, "能做什么") || strings.Contains(lower, "help") || text == "帮助"
 }
 
 func wantsNavigation(text string) bool {
