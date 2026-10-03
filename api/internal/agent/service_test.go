@@ -40,10 +40,32 @@ func (m *memoryStore) ListTasks(_ context.Context, owner, threadID string) ([]Ta
 	for _, item := range m.tasks { if item.Owner == owner && (threadID == "" || item.ThreadID == threadID) { out = append(out, item) } }
 	return out, nil
 }
+func (m *memoryStore) UpdateTask(_ context.Context, owner, taskID string, input UpdateTaskInput) (Task, error) {
+	for index, item := range m.tasks {
+		if item.ID != taskID || item.Owner != owner { continue }
+		item.Status = input.Status
+		item.ProgressCurrent = input.ProgressCurrent
+		item.ProgressTotal = input.ProgressTotal
+		item.Detail = input.Detail
+		m.tasks[index] = item
+		return item, nil
+	}
+	return Task{}, ErrNotFound
+}
 func (m *memoryStore) CreateToolCall(_ context.Context, input CreateToolCallInput) (ToolCall, error) {
 	item := ToolCall{ID: "tool-1", ThreadID: input.ThreadID, MessageID: input.MessageID, Owner: input.Owner, ToolName: input.ToolName, Status: input.Status, Arguments: input.Arguments, Result: input.Result}
 	m.tools = append(m.tools, item)
 	return item, nil
+}
+func (m *memoryStore) UpdateToolCall(_ context.Context, owner, toolID string, input UpdateToolCallInput) (ToolCall, error) {
+	for index, item := range m.tools {
+		if item.ID != toolID || item.Owner != owner { continue }
+		item.Status = input.Status
+		item.Result = input.Result
+		m.tools[index] = item
+		return item, nil
+	}
+	return ToolCall{}, ErrNotFound
 }
 func (m *memoryStore) UpdateThreadTitle(_ context.Context, owner, id, title string) error {
 	if m.thread.Owner != owner || m.thread.ID != id { return ErrNotFound }
@@ -74,6 +96,23 @@ func TestServiceSendMessagePersistsTaskProposal(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if result.Task == nil || result.Task.Title != "检查视频" { t.Fatalf("task=%#v", result.Task) }
 	if len(store.tasks) != 1 { t.Fatalf("tasks=%d", len(store.tasks)) }
+}
+
+func TestServiceUpdatesToolLifecycle(t *testing.T) {
+	store := &memoryStore{tools: []ToolCall{{ID: "tool-1", Owner: "owner", Status: ToolProposed}}}
+	service := &Service{Store: store, Responder: fixedResponder{}}
+	resultBody := json.RawMessage(`{"path":"/novel-fetch"}`)
+	updated, err := service.UpdateToolCall(context.Background(), "owner", "tool-1", UpdateToolCallInput{Status: ToolCompleted, Result: resultBody})
+	if err != nil { t.Fatal(err) }
+	if updated.Status != ToolCompleted || string(updated.Result) != string(resultBody) { t.Fatalf("updated=%#v", updated) }
+}
+
+func TestServiceUpdatesTaskLifecycle(t *testing.T) {
+	store := &memoryStore{tasks: []Task{{ID: "task-1", Owner: "owner", Status: TaskInProgress}}}
+	service := &Service{Store: store, Responder: fixedResponder{}}
+	updated, err := service.UpdateTask(context.Background(), "owner", "task-1", UpdateTaskInput{Status: TaskCompleted, ProgressCurrent: 3, ProgressTotal: 3, Detail: "完成"})
+	if err != nil { t.Fatal(err) }
+	if updated.Status != TaskCompleted || updated.ProgressCurrent != 3 { t.Fatalf("updated=%#v", updated) }
 }
 
 func TestServiceRejectsCrossOwnerThread(t *testing.T) {
