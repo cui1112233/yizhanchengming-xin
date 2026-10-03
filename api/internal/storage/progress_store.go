@@ -43,11 +43,7 @@ func (s *SQLProgressStore) CompleteStage(ctx context.Context, jobID string, stag
 	if rows == 0 {
 		return errors.New("pipeline stage not found or already complete")
 	}
-	_, err = s.exec(ctx,
-		`UPDATE pipeline_jobs SET current_stage = ?, status = 'running', error_message = '' WHERE id = ?`,
-		string(stage), jobID,
-	)
-	return err
+	return nil
 }
 
 func (s *SQLProgressStore) CompleteJob(ctx context.Context, jobID string) error {
