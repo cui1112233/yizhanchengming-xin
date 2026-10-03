@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/novel"
@@ -26,6 +28,15 @@ type Plan struct {
 	Stages []Stage
 }
 
+type Job struct {
+	ID        string    `json:"id"`
+	BatchID   string    `json:"batch_id"`
+	RunAt     time.Time `json:"run_at"`
+	Stages    []Stage   `json:"stages"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 func BuildPlan(input PlanInput) Plan {
 	stages := []Stage{StageFetchBook, StageResolveMetadata}
 	if input.Gender.Gender == novel.GenderUnknown || !input.HasStyle {
@@ -33,4 +44,23 @@ func BuildPlan(input PlanInput) Plan {
 	}
 	stages = append(stages, StageCreateBatch)
 	return Plan{RunAt: input.RunAt, Stages: stages}
+}
+
+func NewJob(batchID string, plan Plan, now time.Time) Job {
+	return Job{
+		ID:        newID(),
+		BatchID:   batchID,
+		RunAt:     plan.RunAt,
+		Stages:    append([]Stage(nil), plan.Stages...),
+		Status:    "queued",
+		CreatedAt: now,
+	}
+}
+
+func newID() string {
+	var bytes [16]byte
+	if _, err := rand.Read(bytes[:]); err == nil {
+		return hex.EncodeToString(bytes[:])
+	}
+	return hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
 }
