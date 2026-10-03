@@ -51,11 +51,12 @@ func TestSQLStoreAppendMessageWritesMessageAndMediaAtomically(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if message.ID == "" { t.Fatal("expected message id") }
 	if !tx.commit { t.Fatal("expected transaction commit") }
-	if len(tx.queries) != 3 { t.Fatalf("queries=%d", len(tx.queries)) }
+	if len(tx.queries) != 4 { t.Fatalf("queries=%d", len(tx.queries)) }
 	if !strings.Contains(tx.queries[0], "INSERT INTO agent_messages") { t.Fatalf("message query=%s", tx.queries[0]) }
 	if !strings.Contains(tx.queries[1], "INSERT INTO agent_message_media") || !strings.Contains(tx.queries[2], "INSERT INTO agent_message_media") {
-		t.Fatalf("media queries=%#v", tx.queries[1:])
+		t.Fatalf("media queries=%#v", tx.queries[1:3])
 	}
+	if !strings.Contains(tx.queries[3], "UPDATE agent_threads") { t.Fatalf("thread query=%s", tx.queries[3]) }
 	if got := tx.args[1][1]; got != "asset_1" { t.Fatalf("first media=%v", got) }
 	if got := tx.args[2][1]; got != "asset_2" { t.Fatalf("second media=%v", got) }
 }
