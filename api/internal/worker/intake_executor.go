@@ -48,9 +48,14 @@ type IntakeBookFetcher interface {
 	FetchBook(context.Context, string, string, int) (one21.BookResponse, error)
 }
 
+type BatchCreator interface {
+	CreateFromIntake(context.Context, string, string) (string, error)
+}
+
 type IntakeExecutor struct {
 	Books            IntakeBookRepository
 	Fetcher          IntakeBookFetcher
+	Batches          BatchCreator
 	VerifiedGenreMap map[string]novel.Gender
 }
 
@@ -61,6 +66,15 @@ func (e IntakeExecutor) Execute(ctx context.Context, job pipeline.Job, stage pip
 	if strings.TrimSpace(job.IntakeID) == "" {
 		return errors.New("pipeline job intake id is required")
 	}
+
+	if stage == pipeline.StageCreateBatch {
+		if e.Batches == nil {
+			return errors.New("batch creator is required")
+		}
+		_, err := e.Batches.CreateFromIntake(ctx, job.IntakeID, job.ID)
+		return err
+	}
+
 	books, err := e.Books.ListBooks(ctx, job.IntakeID)
 	if err != nil {
 		return err
