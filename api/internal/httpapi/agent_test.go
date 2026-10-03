@@ -18,6 +18,8 @@ type fakeAgentAPI struct {
 	send agent.SendMessageResult
 	createOwner string
 	lastContent string
+	updatedTask agent.Task
+	updatedTool agent.ToolCall
 }
 
 func (f *fakeAgentAPI) ListThreads(context.Context, string, int) ([]agent.Thread, error) { return f.threads, nil }
@@ -35,6 +37,16 @@ func (f *fakeAgentAPI) SendMessage(_ context.Context, owner, threadID string, in
 	return f.send, nil
 }
 func (f *fakeAgentAPI) ListTasks(context.Context, string, string) ([]agent.Task, error) { return []agent.Task{}, nil }
+func (f *fakeAgentAPI) UpdateTask(_ context.Context, owner, taskID string, input agent.UpdateTaskInput) (agent.Task, error) {
+	if owner == "other" || taskID == "missing" { return agent.Task{}, agent.ErrNotFound }
+	f.updatedTask = agent.Task{ID: taskID, Status: input.Status, ProgressCurrent: input.ProgressCurrent, ProgressTotal: input.ProgressTotal, Detail: input.Detail}
+	return f.updatedTask, nil
+}
+func (f *fakeAgentAPI) UpdateToolCall(_ context.Context, owner, toolID string, input agent.UpdateToolCallInput) (agent.ToolCall, error) {
+	if owner == "other" || toolID == "missing" { return agent.ToolCall{}, agent.ErrNotFound }
+	f.updatedTool = agent.ToolCall{ID: toolID, Status: input.Status, Result: input.Result}
+	return f.updatedTool, nil
+}
 
 func testOwner(_ *http.Request) (string, error) { return "owner", nil }
 
@@ -67,6 +79,26 @@ func TestAgentHandlerPostsMessageAndReturnsToolCall(t *testing.T) {
 	var body agent.SendMessageResult
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil { t.Fatal(err) }
 	if body.ToolCall == nil || body.ToolCall.ToolName != agent.ToolNavigate { t.Fatalf("body=%s", rec.Body.String()) }
+}
+
+func TestAgentHandlerUpdatesToolLifecycle(t *testing.T) {
+	api := &fakeAgentAPI{}
+	handler := NewAgentHandler(api, testOwner)
+	req := httptest.NewRequest(http.MethodPatch, "/api/agent/tool-calls/tool-1", strings.NewReader(`{"status":"completed","result":{"path":"/novel-fetch"}}`))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK { t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String()) }
+	if api.updatedTool.Status != agent.ToolCompleted { t.Fatalf("tool=%#v", api.updatedTool) }
+}
+
+func TestAgentHandlerUpdatesTaskLifecycle(t *testing.T) {
+	api := &fakeAgentAPI{}
+	handler := NewAgentHandler(api, testOwner)
+	req := httptest.NewRequest(http.MethodPatch, "/api/agent/tasks/task-1", strings.NewReader(`{"status":"completed","progress_current":3,"progress_total":3,"detail":"完成"}`))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK { t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String()) }
+	if api.updatedTask.Status != agent.TaskCompleted || api.updatedTask.ProgressCurrent != 3 { t.Fatalf("task=%#v", api.updatedTask) }
 }
 
 func TestAgentHandlerRejectsUnauthorizedRequest(t *testing.T) {
