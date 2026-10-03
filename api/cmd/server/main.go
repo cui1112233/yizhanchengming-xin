@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/agent"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/batchfactory"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/queue"
@@ -61,6 +62,13 @@ func composeHTTPHandler(api, frontend http.Handler) http.Handler {
 	return mux
 }
 
+func newAgentService(db *sql.DB) *agent.Service {
+	return &agent.Service{
+		Store:     agent.NewSQLStore(db),
+		Responder: agent.NewResponder(),
+	}
+}
+
 func main() {
 	cfg, err := configFromEnv()
 	if err != nil {
@@ -100,7 +108,8 @@ func main() {
 		}
 		return cfg.SystemOwner, nil
 	}
-	apiHandler := httpapi.NewRouterWithIntakes(starter, intakes, ownerResolver)
+	agentService := newAgentService(db)
+	apiHandler := httpapi.NewRouterWithAgent(starter, intakes, ownerResolver, agentService)
 	frontendHandler, err := webui.Handler()
 	if err != nil {
 		log.Fatal(err)
