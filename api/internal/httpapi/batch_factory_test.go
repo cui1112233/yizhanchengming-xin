@@ -22,13 +22,13 @@ func (f *fakeStarter) Start(_ context.Context, input batchfactory.StartInput) (p
 func TestBatchFactoryCreateJobEndpoint(t *testing.T) {
     starter := &fakeStarter{}
     handler := NewBatchFactoryHandler(starter)
-    body := `{"intake_id":"intake-123","needs_ai":false,"run_at":"2026-10-04T09:00:00Z"}`
+    body := `{"intake_id":"intake-123","run_at":"2026-10-04T09:00:00Z"}`
     req := httptest.NewRequest(http.MethodPost, "/api/batch-factory/jobs", strings.NewReader(body))
     res := httptest.NewRecorder()
 
     handler.ServeHTTP(res, req)
     if res.Code != http.StatusCreated { t.Fatalf("status=%d body=%s", res.Code, res.Body.String()) }
-    if starter.input.IntakeID != "intake-123" || starter.input.NeedsAI { t.Fatalf("bad input: %#v", starter.input) }
+    if starter.input.IntakeID != "intake-123" { t.Fatalf("bad input: %#v", starter.input) }
     wantRunAt := time.Date(2026,10,4,9,0,0,0,time.UTC)
     if !starter.input.RunAt.Equal(wantRunAt) { t.Fatalf("run_at=%v", starter.input.RunAt) }
     var payload map[string]any
