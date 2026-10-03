@@ -30,7 +30,8 @@ type Plan struct {
 
 type Job struct {
 	ID        string    `json:"id"`
-	BatchID   string    `json:"batch_id"`
+	IntakeID  string    `json:"intake_id"`
+	BatchID   string    `json:"batch_id,omitempty"`
 	RunAt     time.Time `json:"run_at"`
 	Stages    []Stage   `json:"stages"`
 	Status    string    `json:"status"`
@@ -46,10 +47,10 @@ func BuildPlan(input PlanInput) Plan {
 	return Plan{RunAt: input.RunAt, Stages: stages}
 }
 
-func NewJob(batchID string, plan Plan, now time.Time) Job {
+func NewIntakeJob(intakeID string, plan Plan, now time.Time) Job {
 	return Job{
 		ID:        newID(),
-		BatchID:   batchID,
+		IntakeID:  intakeID,
 		RunAt:     plan.RunAt,
 		Stages:    append([]Stage(nil), plan.Stages...),
 		Status:    "queued",
