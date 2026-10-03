@@ -42,7 +42,7 @@ func (r *SQLIntakeRepository) ListBooks(ctx context.Context, intakeID string) ([
 	if r == nil || r.query == nil {
 		return nil, errors.New("intake repository database is required")
 	}
-	rows, err := r.query(ctx, `SELECT id, book_id, source_platform_id, manual_gender, category, genre, style, COALESCE(source_text, '') FROM intake_books WHERE intake_id = ? ORDER BY id ASC`, intakeID)
+	rows, err := r.query(ctx, `SELECT id, book_id, source_platform_id, max_txt, manual_gender, category, genre, style, COALESCE(source_text, '') FROM intake_books WHERE intake_id = ? ORDER BY id ASC`, intakeID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,14 +52,16 @@ func (r *SQLIntakeRepository) ListBooks(ctx context.Context, intakeID string) ([
 		var book IntakeBook
 		var manualGender string
 		var genre sql.NullInt64
-		if err := rows.Scan(&book.ID, &book.BookID, &book.PlatformID, &manualGender, &book.Category, &genre, &book.Style, &book.SourceText); err != nil {
+		if err := rows.Scan(&book.ID, &book.BookID, &book.PlatformID, &book.MaxTxt, &manualGender, &book.Category, &genre, &book.Style, &book.SourceText); err != nil {
 			return nil, err
 		}
 		book.ManualGender = novel.Gender(manualGender)
 		if genre.Valid {
 			book.Genre = int(genre.Int64)
 		}
-		book.MaxTxt = 4000
+		if book.MaxTxt <= 0 {
+			book.MaxTxt = 4000
+		}
 		books = append(books, book)
 	}
 	if err := rows.Err(); err != nil {
@@ -89,10 +91,8 @@ func (r *SQLIntakeRepository) SaveResolved(ctx context.Context, id int64, meta R
 	if meta.Style == "" {
 		styleSource = "unresolved"
 	}
-	if meta.Gender.Source == novel.GenderSourceAI || (meta.Style != "" && meta.NeedsAI == false) {
-		if meta.Gender.Source == novel.GenderSourceAI {
-			styleSource = "ai"
-		}
+	if meta.Gender.Source == novel.GenderSourceAI {
+		styleSource = "ai"
 	}
 	_, err := r.exec(ctx, `UPDATE intake_books SET resolved_gender = ?, gender_source = ?, style = ?, style_source = ? WHERE id = ?`,
 		string(meta.Gender.Gender), string(meta.Gender.Source), meta.Style, styleSource, id)
