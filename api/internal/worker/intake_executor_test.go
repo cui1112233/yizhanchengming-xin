@@ -29,6 +29,13 @@ func (f *fakeIntakeRepo) SaveResolved(_ context.Context, id int64, meta Resolved
 type fake121Fetcher struct{ response one21.BookResponse }
 func (f *fake121Fetcher) FetchBook(context.Context, string, string, int) (one21.BookResponse, error) { return f.response, nil }
 
+type fakeBatchCreator struct { intakeID string; jobID string; batchID string }
+func (f *fakeBatchCreator) CreateFromIntake(_ context.Context, intakeID, jobID string) (string, error) {
+    f.intakeID = intakeID; f.jobID = jobID
+    if f.batchID == "" { f.batchID = "batch-1" }
+    return f.batchID, nil
+}
+
 func TestIntakeExecutorFetchesBookThrough121AndStoresMetadata(t *testing.T) {
     repo := &fakeIntakeRepo{books: []IntakeBook{{ID:1, BookID:"7673480334440139800", PlatformID:"2", MaxTxt:2000}}}
     fetcher := &fake121Fetcher{response: one21.BookResponse{Code:200, Data:"正文", BookInfo:one21.BookInfo{BookID:"7673480334440139800", BookName:"测试书", Category:"男生生活", Genre:8}}}
@@ -61,4 +68,14 @@ func TestIntakeExecutorMarksAIDecisionOnlyForMissingMetadata(t *testing.T) {
     if err := exec.Execute(context.Background(), job, pipeline.StageAIClassify); err != nil { t.Fatal(err) }
     if repo.resolved[1].NeedsAI { t.Fatalf("deterministic book should skip AI: %#v", repo.resolved[1]) }
     if !repo.resolved[2].NeedsAI { t.Fatalf("missing metadata should require AI: %#v", repo.resolved[2]) }
+}
+
+func TestIntakeExecutorCreatesBatchFromPreparedIntake(t *testing.T) {
+    repo := &fakeIntakeRepo{}
+    creator := &fakeBatchCreator{batchID:"batch-9"}
+    exec := IntakeExecutor{Books:repo, Batches:creator}
+    job := pipeline.Job{ID:"job-1", IntakeID:"intake-1"}
+
+    if err := exec.Execute(context.Background(), job, pipeline.StageCreateBatch); err != nil { t.Fatal(err) }
+    if creator.intakeID != "intake-1" || creator.jobID != "job-1" { t.Fatalf("creator=%#v", creator) }
 }
