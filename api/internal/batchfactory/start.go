@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cui1112233/yizhanchengming-xin/api/internal/novel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 )
 
@@ -21,7 +20,6 @@ type JobQueue interface {
 type StartInput struct {
 	IntakeID string
 	RunAt    time.Time
-	NeedsAI  bool
 }
 
 type StartService struct {
@@ -38,14 +36,7 @@ func (s StartService) Start(ctx context.Context, input StartInput) (pipeline.Job
 	if intakeID == "" {
 		return pipeline.Job{}, errors.New("intake id is required")
 	}
-
-	gender := novel.GenderResult{Gender: novel.GenderMale}
-	hasStyle := true
-	if input.NeedsAI {
-		gender = novel.GenderResult{Gender: novel.GenderUnknown}
-		hasStyle = false
-	}
-	plan := pipeline.BuildPlan(pipeline.PlanInput{Gender: gender, HasStyle: hasStyle, RunAt: input.RunAt})
+	plan := pipeline.BuildPlan(pipeline.PlanInput{RunAt: input.RunAt})
 	now := time.Now().UTC()
 	if s.Now != nil {
 		now = s.Now().UTC()
