@@ -67,24 +67,16 @@ func (h *intakeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	input := batchfactory.CreateIntakeInput{Owner: strings.TrimSpace(owner), Title: request.Title}
-	for _, group := range request.Groups {
-		converted := batchfactory.IntakeGroupInput{
-			PlatformID: group.PlatformID, PlatformName: group.PlatformName, MaxTxt: group.MaxTxt,
-		}
-		for _, book := range group.Books {
-			gender, err := parseManualGender(book.ManualGender)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			converted.Books = append(converted.Books, batchfactory.IntakeBookInput{
-				BookID: book.BookID, ManualGender: gender, Style: book.Style,
-			})
-		}
-		input.Groups = append(input.Groups, converted)
+	groups, err := convertIntakeGroups(request.Groups)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-
+	input := batchfactory.CreateIntakeInput{
+		Owner: strings.TrimSpace(owner),
+		Title: request.Title,
+		Groups: groups,
+	}
 	result, err := h.creator.Create(r.Context(), input)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -93,6 +85,30 @@ func (h *intakeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(result)
+}
+
+func convertIntakeGroups(groups []intakeGroupRequest) ([]batchfactory.IntakeGroupInput, error) {
+	convertedGroups := make([]batchfactory.IntakeGroupInput, 0, len(groups))
+	for _, group := range groups {
+		converted := batchfactory.IntakeGroupInput{
+			PlatformID: group.PlatformID,
+			PlatformName: group.PlatformName,
+			MaxTxt: group.MaxTxt,
+		}
+		for _, book := range group.Books {
+			gender, err := parseManualGender(book.ManualGender)
+			if err != nil {
+				return nil, err
+			}
+			converted.Books = append(converted.Books, batchfactory.IntakeBookInput{
+				BookID: book.BookID,
+				ManualGender: gender,
+				Style: book.Style,
+			})
+		}
+		convertedGroups = append(convertedGroups, converted)
+	}
+	return convertedGroups, nil
 }
 
 func parseManualGender(value string) (novel.Gender, error) {
