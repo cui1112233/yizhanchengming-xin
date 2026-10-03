@@ -21,15 +21,26 @@ type StageExecutor interface {
 	Execute(context.Context, pipeline.Job, pipeline.Stage) error
 }
 
+type ProgressStore interface {
+	CompleteStage(context.Context, string, pipeline.Stage) error
+	CompleteJob(context.Context, string) error
+}
+
+type JobQueue interface {
+	Enqueue(context.Context, pipeline.Job) error
+}
+
 type Runner struct {
 	Source   JobSource
 	Jobs     JobLoader
 	Executor StageExecutor
+	Progress ProgressStore
+	Queue    JobQueue
 }
 
 func (r Runner) RunOnce(ctx context.Context) error {
-	if r.Source == nil || r.Jobs == nil || r.Executor == nil {
-		return errors.New("worker source, job loader and executor are required")
+	if r.Source == nil || r.Jobs == nil || r.Executor == nil || r.Progress == nil || r.Queue == nil {
+		return errors.New("worker source, job loader, executor, progress store and queue are required")
 	}
 	jobID, err := r.Source.Next(ctx)
 	if err != nil {
@@ -40,7 +51,17 @@ func (r Runner) RunOnce(ctx context.Context) error {
 		return err
 	}
 	if len(job.Stages) == 0 {
-		return errors.New("pipeline job has no stages")
+		return errors.New("pipeline job has no pending stages")
 	}
-	return r.Executor.Execute(ctx, job, job.Stages[0])
+	stage := job.Stages[0]
+	if err := r.Executor.Execute(ctx, job, stage); err != nil {
+		return err
+	}
+	if err := r.Progress.CompleteStage(ctx, job.ID, stage); err != nil {
+		return err
+	}
+	if len(job.Stages) == 1 {
+		return r.Progress.CompleteJob(ctx, job.ID)
+	}
+	return r.Queue.Enqueue(ctx, job)
 }
