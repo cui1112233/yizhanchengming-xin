@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -151,8 +152,8 @@ func decodeAgentJSON(w http.ResponseWriter, r *http.Request, target any) error {
 		return err
 	}
 	var extra any
-	if err := decoder.Decode(&extra); err == nil {
-		return errors.New("multiple json values")
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return errors.New("multiple or trailing json values")
 	}
 	return nil
 }
