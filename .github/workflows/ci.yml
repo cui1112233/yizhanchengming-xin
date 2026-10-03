@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
+          cache-dependency-path: api/go.sum
       - run: go test ./...
 
   frontend-test-build:
@@ -33,3 +34,44 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm test
       - run: npm run build
+
+  production-binaries:
+    runs-on: ubuntu-latest
+    needs:
+      - go-test
+      - frontend-test-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Build React frontend
+        working-directory: 前台
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Stage frontend for Go embed
+        run: |
+          rm -rf api/internal/webui/dist
+          mkdir -p api/internal/webui/dist
+          cp -a 前台/dist/. api/internal/webui/dist/
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache-dependency-path: api/go.sum
+      - name: Build Linux binaries
+        run: |
+          mkdir -p build
+          cd api
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../build/yizhanchengming-server ./cmd/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../build/yizhanchengming-worker ./cmd/worker
+          cd ../build
+          sha256sum yizhanchengming-server yizhanchengming-worker > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yizhanchengming-linux-amd64
+          path: |
+            build/yizhanchengming-server
+            build/yizhanchengming-worker
+            build/SHA256SUMS
+          if-no-files-found: error
