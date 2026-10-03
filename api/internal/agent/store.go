@@ -20,7 +20,9 @@ type Store interface {
 	AppendMessage(context.Context, AppendMessageInput) (Message, error)
 	CreateTask(context.Context, CreateTaskInput) (Task, error)
 	ListTasks(context.Context, string, string) ([]Task, error)
+	UpdateTask(context.Context, string, string, UpdateTaskInput) (Task, error)
 	CreateToolCall(context.Context, CreateToolCallInput) (ToolCall, error)
+	UpdateToolCall(context.Context, string, string, UpdateToolCallInput) (ToolCall, error)
 	UpdateThreadTitle(context.Context, string, string, string) error
 }
 
@@ -217,7 +219,9 @@ SELECT ?, id, ?, ?, ?, ? FROM agent_threads WHERE id=? AND owner=?`,
 		return Message{}, err
 	}
 	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
-		if err != nil { return Message{}, err }
+		if err != nil {
+			return Message{}, err
+		}
 		return Message{}, ErrNotFound
 	}
 	for ordinal, mediaID := range mediaIDs {
@@ -261,7 +265,9 @@ SELECT ?, id, ?, ?, ?, ?, ?, ? FROM agent_threads WHERE id=? AND owner=?`,
 		return Task{}, err
 	}
 	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
-		if err != nil { return Task{}, err }
+		if err != nil {
+			return Task{}, err
+		}
 		return Task{}, ErrNotFound
 	}
 	return task, nil
@@ -291,6 +297,33 @@ func (s *SQLStore) ListTasks(ctx context.Context, owner, threadID string) ([]Tas
 	return items, rows.Err()
 }
 
+func (s *SQLStore) UpdateTask(ctx context.Context, owner, taskID string, input UpdateTaskInput) (Task, error) {
+	if !validTaskStatus(input.Status) {
+		return Task{}, errors.New("invalid task status")
+	}
+	if input.ProgressTotal > 0 && input.ProgressCurrent > input.ProgressTotal {
+		return Task{}, errors.New("task progress_current cannot exceed progress_total")
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE agent_tasks SET status=?, progress_current=?, progress_total=?, detail=?, updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner=?`, input.Status, input.ProgressCurrent, input.ProgressTotal, strings.TrimSpace(input.Detail), taskID, owner)
+	if err != nil {
+		return Task{}, err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+		if err != nil {
+			return Task{}, err
+		}
+		return Task{}, ErrNotFound
+	}
+	var item Task
+	if err := s.db.QueryRowContext(ctx, `SELECT id, thread_id, owner, title, status, progress_current, progress_total, COALESCE(detail,''), created_at, updated_at FROM agent_tasks WHERE id=? AND owner=? LIMIT 1`, taskID, owner).Scan(&item.ID, &item.ThreadID, &item.Owner, &item.Title, &item.Status, &item.ProgressCurrent, &item.ProgressTotal, &item.Detail, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Task{}, ErrNotFound
+		}
+		return Task{}, err
+	}
+	return item, nil
+}
+
 func (s *SQLStore) CreateToolCall(ctx context.Context, input CreateToolCallInput) (ToolCall, error) {
 	input.Owner = strings.TrimSpace(input.Owner)
 	input.ThreadID = strings.TrimSpace(input.ThreadID)
@@ -312,7 +345,9 @@ func (s *SQLStore) CreateToolCall(ctx context.Context, input CreateToolCallInput
 	}
 	item := ToolCall{ID: newID("tool"), ThreadID: input.ThreadID, MessageID: strings.TrimSpace(input.MessageID), Owner: input.Owner, ToolName: input.ToolName, Status: input.Status, Arguments: append(json.RawMessage(nil), input.Arguments...), Result: append(json.RawMessage(nil), input.Result...), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 	var messageID any
-	if item.MessageID != "" { messageID = item.MessageID }
+	if item.MessageID != "" {
+		messageID = item.MessageID
+	}
 	result, err := s.db.ExecContext(ctx, `INSERT INTO agent_tool_calls (id, thread_id, message_id, owner, tool_name, status, arguments_json, result_json)
 SELECT ?, id, ?, ?, ?, ?, ?, ? FROM agent_threads WHERE id=? AND owner=?`,
 		item.ID, messageID, item.Owner, item.ToolName, item.Status, []byte(item.Arguments), nullableJSON(item.Result), item.ThreadID, item.Owner)
@@ -320,9 +355,41 @@ SELECT ?, id, ?, ?, ?, ?, ?, ? FROM agent_threads WHERE id=? AND owner=?`,
 		return ToolCall{}, err
 	}
 	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
-		if err != nil { return ToolCall{}, err }
+		if err != nil {
+			return ToolCall{}, err
+		}
 		return ToolCall{}, ErrNotFound
 	}
+	return item, nil
+}
+
+func (s *SQLStore) UpdateToolCall(ctx context.Context, owner, toolID string, input UpdateToolCallInput) (ToolCall, error) {
+	if input.Status != ToolCompleted && input.Status != ToolFailed {
+		return ToolCall{}, errors.New("invalid tool status transition")
+	}
+	if len(input.Result) > 0 && !json.Valid(input.Result) {
+		return ToolCall{}, errors.New("tool result must be valid json")
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE agent_tool_calls SET status=?, result_json=?, updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner=? AND status=?`, input.Status, nullableJSON(input.Result), toolID, owner, ToolProposed)
+	if err != nil {
+		return ToolCall{}, err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+		if err != nil {
+			return ToolCall{}, err
+		}
+		return ToolCall{}, ErrNotFound
+	}
+	var item ToolCall
+	var arguments, resultJSON []byte
+	if err := s.db.QueryRowContext(ctx, `SELECT id, thread_id, COALESCE(message_id,''), owner, tool_name, status, arguments_json, result_json, created_at, updated_at FROM agent_tool_calls WHERE id=? AND owner=? LIMIT 1`, toolID, owner).Scan(&item.ID, &item.ThreadID, &item.MessageID, &item.Owner, &item.ToolName, &item.Status, &arguments, &resultJSON, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ToolCall{}, ErrNotFound
+		}
+		return ToolCall{}, err
+	}
+	item.Arguments = append(json.RawMessage(nil), arguments...)
+	item.Result = append(json.RawMessage(nil), resultJSON...)
 	return item, nil
 }
 
