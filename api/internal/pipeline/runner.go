@@ -4,8 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"time"
-
-	"github.com/cui1112233/yizhanchengming-xin/api/internal/novel"
 )
 
 type Stage string
@@ -18,9 +16,7 @@ const (
 )
 
 type PlanInput struct {
-	Gender   novel.GenderResult
-	HasStyle bool
-	RunAt    time.Time
+	RunAt time.Time
 }
 
 type Plan struct {
@@ -39,12 +35,10 @@ type Job struct {
 }
 
 func BuildPlan(input PlanInput) Plan {
-	stages := []Stage{StageFetchBook, StageResolveMetadata}
-	if input.Gender.Gender == novel.GenderUnknown || !input.HasStyle {
-		stages = append(stages, StageAIClassify)
+	return Plan{
+		RunAt: input.RunAt,
+		Stages: []Stage{StageFetchBook, StageResolveMetadata, StageAIClassify, StageCreateBatch},
 	}
-	stages = append(stages, StageCreateBatch)
-	return Plan{RunAt: input.RunAt, Stages: stages}
 }
 
 func NewIntakeJob(intakeID string, plan Plan, now time.Time) Job {
