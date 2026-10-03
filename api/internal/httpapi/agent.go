@@ -18,6 +18,8 @@ type AgentAPI interface {
 	GetThread(context.Context, string, string) (agent.ThreadSnapshot, error)
 	SendMessage(context.Context, string, string, agent.SendMessageInput) (agent.SendMessageResult, error)
 	ListTasks(context.Context, string, string) ([]agent.Task, error)
+	UpdateTask(context.Context, string, string, agent.UpdateTaskInput) (agent.Task, error)
+	UpdateToolCall(context.Context, string, string, agent.UpdateToolCallInput) (agent.ToolCall, error)
 }
 
 type agentHandler struct {
@@ -46,6 +48,10 @@ func (h *agentHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.handleThreads(w, r, owner)
 	case r.URL.Path == "/api/agent/tasks":
 		h.handleTasks(w, r, owner)
+	case strings.HasPrefix(r.URL.Path, "/api/agent/tasks/"):
+		h.handleTaskResource(w, r, owner)
+	case strings.HasPrefix(r.URL.Path, "/api/agent/tool-calls/"):
+		h.handleToolCallResource(w, r, owner)
 	case strings.HasPrefix(r.URL.Path, "/api/agent/threads/"):
 		h.handleThreadResource(w, r, owner)
 	default:
@@ -145,6 +151,52 @@ func (h *agentHandler) handleTasks(w http.ResponseWriter, r *http.Request, owner
 	agentWriteJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 }
 
+func (h *agentHandler) handleTaskResource(w http.ResponseWriter, r *http.Request, owner string) {
+	if r.Method != http.MethodPatch {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	taskID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/agent/tasks/"), "/")
+	if taskID == "" || strings.Contains(taskID, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	var body agent.UpdateTaskInput
+	if err := decodeAgentJSON(w, r, &body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	updated, err := h.api.UpdateTask(r.Context(), owner, taskID, body)
+	if err != nil {
+		handleAgentError(w, err)
+		return
+	}
+	agentWriteJSON(w, http.StatusOK, map[string]any{"task": updated})
+}
+
+func (h *agentHandler) handleToolCallResource(w http.ResponseWriter, r *http.Request, owner string) {
+	if r.Method != http.MethodPatch {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	toolID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/agent/tool-calls/"), "/")
+	if toolID == "" || strings.Contains(toolID, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	var body agent.UpdateToolCallInput
+	if err := decodeAgentJSON(w, r, &body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	updated, err := h.api.UpdateToolCall(r.Context(), owner, toolID, body)
+	if err != nil {
+		handleAgentError(w, err)
+		return
+	}
+	agentWriteJSON(w, http.StatusOK, map[string]any{"tool_call": updated})
+}
+
 func decodeAgentJSON(w http.ResponseWriter, r *http.Request, target any) error {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	decoder.DisallowUnknownFields()
@@ -164,7 +216,7 @@ func handleAgentError(w http.ResponseWriter, err error) {
 		return
 	}
 	message := strings.ToLower(err.Error())
-	if strings.Contains(message, "required") || strings.Contains(message, "invalid") || strings.Contains(message, "exceeds") || strings.Contains(message, "too many") {
+	if strings.Contains(message, "required") || strings.Contains(message, "invalid") || strings.Contains(message, "exceeds") || strings.Contains(message, "too many") || strings.Contains(message, "cannot exceed") {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
