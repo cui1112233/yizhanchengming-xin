@@ -16,6 +16,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/queue"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/storage"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/webui"
 )
 
 type serverConfig struct {
@@ -50,6 +51,14 @@ func configFromEnv() (serverConfig, error) {
 		cfg.QueueKey = "qiantie:pipeline:ready"
 	}
 	return cfg, nil
+}
+
+func composeHTTPHandler(api, frontend http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/api/", api)
+	mux.Handle("/healthz", api)
+	mux.Handle("/", frontend)
+	return mux
 }
 
 func main() {
@@ -91,7 +100,12 @@ func main() {
 		}
 		return cfg.SystemOwner, nil
 	}
-	handler := httpapi.NewRouterWithIntakes(starter, intakes, ownerResolver)
+	apiHandler := httpapi.NewRouterWithIntakes(starter, intakes, ownerResolver)
+	frontendHandler, err := webui.Handler()
+	if err != nil {
+		log.Fatal(err)
+	}
+	handler := composeHTTPHandler(apiHandler, frontendHandler)
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           handler,
@@ -100,7 +114,7 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("unified Go API listening on %s", cfg.ListenAddr)
+	log.Printf("unified Go server listening on %s", cfg.ListenAddr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
