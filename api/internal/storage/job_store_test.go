@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,18 +27,19 @@ func (f *fakeTx) ExecContext(_ context.Context, query string, args ...any) (sql.
 func (f *fakeTx) Commit() error { f.commit = true; return nil }
 func (f *fakeTx) Rollback() error { return nil }
 
-func TestSQLJobStoreCreatesJobAndStagesInOneTransaction(t *testing.T) {
+func TestSQLJobStoreCreatesIntakeJobAndStagesInOneTransaction(t *testing.T) {
 	tx := &fakeTx{}
 	store := newSQLJobStoreWithBegin(func(context.Context) (jobTx, error) { return tx, nil })
 	runAt := time.Date(2026, 10, 4, 9, 0, 0, 0, time.UTC)
 	job := pipeline.Job{
-		ID: "job-1", BatchID: "batch-1", RunAt: runAt, Status: "queued",
+		ID: "job-1", IntakeID: "intake-1", RunAt: runAt, Status: "queued",
 		Stages: []pipeline.Stage{pipeline.StageFetchBook, pipeline.StageResolveMetadata, pipeline.StageCreateBatch},
 	}
 	if err := store.CreateJob(context.Background(), job); err != nil { t.Fatal(err) }
 	if !tx.commit { t.Fatal("transaction was not committed") }
 	if len(tx.queries) != 4 { t.Fatalf("query count=%d", len(tx.queries)) }
-	if tx.args[0][0] != "job-1" || tx.args[0][4] != "batch-1" { t.Fatalf("job args=%v", tx.args[0]) }
+	if !strings.Contains(tx.queries[0], "FROM intakes") || !strings.Contains(tx.queries[0], "intake_id") { t.Fatalf("wrong job insert: %s", tx.queries[0]) }
+	if tx.args[0][0] != "job-1" || tx.args[0][4] != "intake-1" { t.Fatalf("job args=%v", tx.args[0]) }
 	for i, stage := range job.Stages {
 		if tx.args[i+1][0] != "job-1" || tx.args[i+1][1] != string(stage) || tx.args[i+1][2] != i+1 {
 			t.Fatalf("stage %d args=%v", i, tx.args[i+1])
