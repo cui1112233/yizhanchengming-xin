@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 )
@@ -55,6 +56,9 @@ func (r Runner) RunOnce(ctx context.Context) error {
 	}
 	stage := job.Stages[0]
 	if err := r.Executor.Execute(ctx, job, stage); err != nil {
+		if queueErr := r.Queue.Enqueue(ctx, job); queueErr != nil {
+			return fmt.Errorf("execute stage %s: %v; requeue failed: %w", stage, err, queueErr)
+		}
 		return err
 	}
 	if err := r.Progress.CompleteStage(ctx, job.ID, stage); err != nil {
