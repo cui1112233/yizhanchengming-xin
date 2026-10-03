@@ -105,6 +105,13 @@ type CreateTaskInput struct {
 	Detail          string
 }
 
+type UpdateTaskInput struct {
+	Status          string `json:"status"`
+	ProgressCurrent uint   `json:"progress_current"`
+	ProgressTotal   uint   `json:"progress_total"`
+	Detail          string `json:"detail"`
+}
+
 type CreateToolCallInput struct {
 	ThreadID  string
 	MessageID string
@@ -113,6 +120,11 @@ type CreateToolCallInput struct {
 	Status    string
 	Arguments json.RawMessage
 	Result    json.RawMessage
+}
+
+type UpdateToolCallInput struct {
+	Status string          `json:"status"`
+	Result json.RawMessage `json:"result,omitempty"`
 }
 
 func validateMessageInput(input AppendMessageInput) error {
