@@ -25,6 +25,8 @@ func NewRouterWithAgent(starter BatchStarter, intakeCreator IntakeCreator, owner
 		mux.Handle("/api/agent/threads", agentHandler)
 		mux.Handle("/api/agent/threads/", agentHandler)
 		mux.Handle("/api/agent/tasks", agentHandler)
+		mux.Handle("/api/agent/tasks/", agentHandler)
+		mux.Handle("/api/agent/tool-calls/", agentHandler)
 	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
