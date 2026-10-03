@@ -2,6 +2,7 @@ package worker
 
 import (
     "context"
+    "errors"
     "testing"
 
     "github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
@@ -16,8 +17,8 @@ func (f *fakeLoader) LoadJob(_ context.Context, id string) (pipeline.Job, error)
     return f.job, nil
 }
 
-type fakeExecutor struct{ called pipeline.Stage }
-func (f *fakeExecutor) Execute(_ context.Context, _ pipeline.Job, stage pipeline.Stage) error { f.called = stage; return nil }
+type fakeExecutor struct{ called pipeline.Stage; err error }
+func (f *fakeExecutor) Execute(_ context.Context, _ pipeline.Job, stage pipeline.Stage) error { f.called = stage; return f.err }
 
 type fakeProgress struct {
     stage pipeline.Stage
@@ -55,4 +56,18 @@ func TestRunnerCompletesJobAfterLastStage(t *testing.T) {
     if err := runner.RunOnce(context.Background()); err != nil { t.Fatal(err) }
     if !progress.jobDone { t.Fatal("job should be complete") }
     if requeue.job.ID != "" { t.Fatalf("finished job must not be requeued: %#v", requeue.job) }
+}
+
+func TestRunnerRequeuesPendingJobWhenStageExecutionFails(t *testing.T) {
+    source := &fakeSource{id:"job-1"}
+    loader := &fakeLoader{job:pipeline.Job{ID:"job-1", IntakeID:"intake-1", Status:"queued", Stages:[]pipeline.Stage{pipeline.StageFetchBook}}}
+    exec := &fakeExecutor{err: errors.New("upstream failed")}
+    progress := &fakeProgress{}
+    requeue := &fakeRequeue{}
+    runner := Runner{Source:source, Jobs:loader, Executor:exec, Progress:progress, Queue:requeue}
+
+    err := runner.RunOnce(context.Background())
+    if err == nil { t.Fatal("expected execution error") }
+    if requeue.job.ID != "job-1" { t.Fatalf("failed job was lost instead of requeued: %#v", requeue.job) }
+    if progress.stage != "" || progress.jobDone { t.Fatalf("failed stage must remain pending: %#v", progress) }
 }
