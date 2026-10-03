@@ -23,12 +23,13 @@ var allowedStyles = map[string]struct{}{
 	"玄幻": {}, "历史": {}, "爆款BGM": {}, "家庭奇葩": {}, "家庭伤感": {}, "职场打脸": {},
 }
 
-const systemPrompt = `你负责判断小说的频道和处理风格。只返回一个 JSON 对象，不要解释，不要 Markdown。
-JSON 格式必须为：{"gender":"男或女","style":"风格名"}
-其中 style 只能从以下列表选择：古风虐文、古风甜文、古风通用、年代虐文、年代甜文、年代通用、现代虐文、现代甜文、现代悬疑、现代通用、男频都市、现代女主、玄幻、历史、爆款BGM、家庭奇葩、家庭伤感、职场打脸。`
+const systemPrompt = `你负责判断小说的频道和处理风格。只能依据提供的书籍信息与正文判断，不得改写正文。
+只返回一个 JSON 对象，不要解释，不要 Markdown。
+JSON 格式必须为：{"gender":"男或女","style":"一个适合的风格"}
+style 只能从以下列表选择：古风虐文、古风甜文、古风通用、年代虐文、年代甜文、年代通用、现代虐文、现代甜文、现代悬疑、现代通用、男频都市、现代女主、玄幻、历史、爆款BGM、家庭奇葩、家庭伤感、职场打脸。`
 
 type Config struct {
-	Endpoint   string
+	BaseURL    string
 	APIKey     string
 	Model      string
 	HTTPClient *http.Client
@@ -42,19 +43,46 @@ type Classifier struct {
 }
 
 func New(cfg Config) (*Classifier, error) {
-	endpoint := strings.TrimSpace(cfg.Endpoint)
+	baseURL := strings.TrimSpace(cfg.BaseURL)
 	model := strings.TrimSpace(cfg.Model)
-	if endpoint == "" {
-		return nil, errors.New("AI chat completions endpoint is required")
+	apiKey := strings.TrimSpace(cfg.APIKey)
+	if baseURL == "" {
+		return nil, errors.New("AI base URL is required")
 	}
 	if model == "" {
 		return nil, errors.New("AI model is required")
+	}
+	if apiKey == "" {
+		return nil, errors.New("AI API key is required")
+	}
+	endpoint, err := buildChatCompletionsURL(baseURL)
+	if err != nil {
+		return nil, err
 	}
 	client := cfg.HTTPClient
 	if client == nil {
 		client = &http.Client{Timeout: 120 * time.Second}
 	}
-	return &Classifier{endpoint: endpoint, apiKey: strings.TrimSpace(cfg.APIKey), model: model, client: client}, nil
+	return &Classifier{endpoint: endpoint, apiKey: apiKey, model: model, client: client}, nil
+}
+
+func buildChatCompletionsURL(baseURL string) (string, error) {
+	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if trimmed == "" {
+		return "", errors.New("AI base URL is required")
+	}
+	if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
+		return "", errors.New("AI base URL must use http or https")
+	}
+	lower := strings.ToLower(trimmed)
+	switch {
+	case strings.HasSuffix(lower, "/chat/completions"):
+		return trimmed, nil
+	case strings.HasSuffix(lower, "/v1"):
+		return trimmed + "/chat/completions", nil
+	default:
+		return trimmed + "/v1/chat/completions", nil
+	}
 }
 
 type chatRequest struct {
@@ -90,19 +118,25 @@ func (c *Classifier) Classify(ctx context.Context, book workerpkg.IntakeBook) (w
 	if text == "" {
 		return workerpkg.AIClassification{}, errors.New("AI metadata classification requires source text")
 	}
-	if len(text) > maxSourceText {
-		text = text[:maxSourceText]
-	}
+	text = truncateText(text, maxSourceText)
 
-	userContent := text
-	if strings.TrimSpace(book.BookID) != "" {
-		userContent = "书籍ID：" + strings.TrimSpace(book.BookID) + "\n\n正文：\n" + text
+	parts := make([]string, 0, 4)
+	if value := strings.TrimSpace(book.BookID); value != "" {
+		parts = append(parts, "书籍ID："+value)
 	}
+	if value := strings.TrimSpace(book.Category); value != "" {
+		parts = append(parts, "121 category："+value)
+	}
+	if book.Genre != 0 {
+		parts = append(parts, fmt.Sprintf("121 genre：%d", book.Genre))
+	}
+	parts = append(parts, "正文：\n"+text)
+
 	payload := chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
 			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userContent},
+			{Role: "user", Content: strings.Join(parts, "\n")},
 		},
 		MaxTokens:   256,
 		Temperature: 0.4,
@@ -116,9 +150,7 @@ func (c *Classifier) Classify(ctx context.Context, book workerpkg.IntakeBook) (w
 		return workerpkg.AIClassification{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -178,6 +210,17 @@ func parseClassification(content string) (workerpkg.AIClassification, error) {
 		return workerpkg.AIClassification{}, fmt.Errorf("AI classifier returned invalid style %q", style)
 	}
 	return workerpkg.AIClassification{Gender: gender, Style: style}, nil
+}
+
+func truncateText(text string, maxRunes int) string {
+	if maxRunes <= 0 {
+		return ""
+	}
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	return string(runes[:maxRunes])
 }
 
 func compact(body []byte) string {
