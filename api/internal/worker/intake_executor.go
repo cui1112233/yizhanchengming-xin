@@ -20,6 +20,7 @@ type IntakeBook struct {
 	Category     string
 	Genre        int
 	Style        string
+	SourceText   string
 }
 
 type FetchedBook struct {
@@ -38,6 +39,11 @@ type ResolvedMetadata struct {
 	NeedsAI bool
 }
 
+type AIClassification struct {
+	Gender novel.Gender
+	Style  string
+}
+
 type IntakeBookRepository interface {
 	ListBooks(context.Context, string) ([]IntakeBook, error)
 	SaveFetched(context.Context, int64, FetchedBook) error
@@ -48,6 +54,10 @@ type IntakeBookFetcher interface {
 	FetchBook(context.Context, string, string, int) (one21.BookResponse, error)
 }
 
+type MetadataClassifier interface {
+	Classify(context.Context, IntakeBook) (AIClassification, error)
+}
+
 type BatchCreator interface {
 	CreateFromIntake(context.Context, string, string) (string, error)
 }
@@ -55,6 +65,7 @@ type BatchCreator interface {
 type IntakeExecutor struct {
 	Books            IntakeBookRepository
 	Fetcher          IntakeBookFetcher
+	Classifier       MetadataClassifier
 	Batches          BatchCreator
 	VerifiedGenreMap map[string]novel.Gender
 }
@@ -107,13 +118,11 @@ func (e IntakeExecutor) Execute(ctx context.Context, job pipeline.Job, stage pip
 
 	case pipeline.StageResolveMetadata:
 		for _, book := range books {
-			gender := novel.ResolveGender(novel.GenderInput{
-				Manual: book.ManualGender, Category: book.Category,
-				Genre: strconv.Itoa(book.Genre), VerifiedGenreMap: e.VerifiedGenreMap,
-			})
+			gender := e.resolveGender(book)
+			style := strings.TrimSpace(book.Style)
 			if err := e.Books.SaveResolved(ctx, book.ID, ResolvedMetadata{
-				Gender: gender, Style: strings.TrimSpace(book.Style),
-				NeedsAI: gender.Gender == novel.GenderUnknown || strings.TrimSpace(book.Style) == "",
+				Gender: gender, Style: style,
+				NeedsAI: gender.Gender == novel.GenderUnknown || style == "",
 			}); err != nil {
 				return err
 			}
@@ -122,14 +131,34 @@ func (e IntakeExecutor) Execute(ctx context.Context, job pipeline.Job, stage pip
 
 	case pipeline.StageAIClassify:
 		for _, book := range books {
-			gender := novel.ResolveGender(novel.GenderInput{
-				Manual: book.ManualGender, Category: book.Category,
-				Genre: strconv.Itoa(book.Genre), VerifiedGenreMap: e.VerifiedGenreMap,
-			})
-			if err := e.Books.SaveResolved(ctx, book.ID, ResolvedMetadata{
-				Gender: gender, Style: strings.TrimSpace(book.Style),
-				NeedsAI: gender.Gender == novel.GenderUnknown || strings.TrimSpace(book.Style) == "",
-			}); err != nil {
+			gender := e.resolveGender(book)
+			style := strings.TrimSpace(book.Style)
+			if gender.Gender != novel.GenderUnknown && style != "" {
+				if err := e.Books.SaveResolved(ctx, book.ID, ResolvedMetadata{Gender: gender, Style: style, NeedsAI: false}); err != nil {
+					return err
+				}
+				continue
+			}
+			if e.Classifier == nil {
+				return errors.New("AI metadata classifier is required for unresolved book metadata")
+			}
+			classification, err := e.Classifier.Classify(ctx, book)
+			if err != nil {
+				return err
+			}
+			if gender.Gender == novel.GenderUnknown {
+				if classification.Gender != novel.GenderMale && classification.Gender != novel.GenderFemale {
+					return errors.New("AI classifier returned unresolved gender")
+				}
+				gender = novel.GenderResult{Gender: classification.Gender, Source: novel.GenderSourceAI}
+			}
+			if style == "" {
+				style = strings.TrimSpace(classification.Style)
+				if style == "" {
+					return errors.New("AI classifier returned empty style")
+				}
+			}
+			if err := e.Books.SaveResolved(ctx, book.ID, ResolvedMetadata{Gender: gender, Style: style, NeedsAI: false}); err != nil {
 				return err
 			}
 		}
@@ -137,4 +166,13 @@ func (e IntakeExecutor) Execute(ctx context.Context, job pipeline.Job, stage pip
 	default:
 		return errors.New("unsupported intake pipeline stage")
 	}
+}
+
+func (e IntakeExecutor) resolveGender(book IntakeBook) novel.GenderResult {
+	return novel.ResolveGender(novel.GenderInput{
+		Manual: book.ManualGender,
+		Category: book.Category,
+		Genre: strconv.Itoa(book.Genre),
+		VerifiedGenreMap: e.VerifiedGenreMap,
+	})
 }
