@@ -55,6 +55,20 @@ func (s *Service) ListTasks(ctx context.Context, owner, threadID string) ([]Task
 	return s.Store.ListTasks(ctx, owner, threadID)
 }
 
+func (s *Service) UpdateTask(ctx context.Context, owner, taskID string, input UpdateTaskInput) (Task, error) {
+	if s == nil || s.Store == nil {
+		return Task{}, errors.New("agent store unavailable")
+	}
+	return s.Store.UpdateTask(ctx, owner, taskID, input)
+}
+
+func (s *Service) UpdateToolCall(ctx context.Context, owner, toolID string, input UpdateToolCallInput) (ToolCall, error) {
+	if s == nil || s.Store == nil {
+		return ToolCall{}, errors.New("agent store unavailable")
+	}
+	return s.Store.UpdateToolCall(ctx, owner, toolID, input)
+}
+
 func (s *Service) SendMessage(ctx context.Context, owner, threadID string, input SendMessageInput) (SendMessageResult, error) {
 	if s == nil || s.Store == nil || s.Responder == nil {
 		return SendMessageResult{}, errors.New("agent service unavailable")
