@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -35,21 +36,25 @@ func (f *fakeRows) Scan(dest ...any) error {
 func (f *fakeRows) Close() error { return nil }
 func (f *fakeRows) Err() error { return nil }
 
-type fakeQueryer struct { calls int; runAt time.Time }
+type fakeQueryer struct { calls int; runAt time.Time; stageQuery string }
 func (f *fakeQueryer) QueryContext(_ context.Context, query string, args ...any) (jobRows, error) {
 	f.calls++
 	if f.calls == 1 {
 		return &fakeRows{values:[][]any{{"job-1","intake-1",nil,"queued",f.runAt}}}, nil
 	}
-	return &fakeRows{values:[][]any{{"fetch_book",1},{"resolve_metadata",2},{"create_batch",3}}}, nil
+	f.stageQuery = query
+	return &fakeRows{values:[][]any{{"resolve_metadata",2},{"ai_classify",3},{"create_batch",4}}}, nil
 }
 
-func TestSQLJobStoreLoadsIntakeJobAndOrderedStages(t *testing.T) {
+func TestSQLJobStoreLoadsOnlyUnfinishedStagesInOrder(t *testing.T) {
 	runAt := time.Date(2026,10,4,9,0,0,0,time.UTC)
 	queryer := &fakeQueryer{runAt:runAt}
 	store := newSQLJobStoreWithQuery(queryer.QueryContext)
 	job, err := store.LoadJob(context.Background(), "job-1")
 	if err != nil { t.Fatal(err) }
 	if job.ID != "job-1" || job.IntakeID != "intake-1" || job.BatchID != "" || !job.RunAt.Equal(runAt) { t.Fatalf("job=%#v", job) }
-	if len(job.Stages) != 3 || job.Stages[0] != "fetch_book" || job.Stages[2] != "create_batch" { t.Fatalf("stages=%#v", job.Stages) }
+	if len(job.Stages) != 3 || job.Stages[0] != "resolve_metadata" || job.Stages[2] != "create_batch" { t.Fatalf("stages=%#v", job.Stages) }
+	if !strings.Contains(jobStageQueryNormalized(queryer.stageQuery), "status <> 'succeeded'") { t.Fatalf("stage query does not exclude completed stages: %s", queryer.stageQuery) }
 }
+
+func jobStageQueryNormalized(value string) string { return strings.Join(strings.Fields(value), " ") }
