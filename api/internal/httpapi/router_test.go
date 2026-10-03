@@ -6,6 +6,7 @@ import (
     "strings"
     "testing"
 
+    "github.com/cui1112233/yizhanchengming-xin/api/internal/agent"
     "github.com/cui1112233/yizhanchengming-xin/api/internal/batchfactory"
 )
 
@@ -36,4 +37,19 @@ func TestRouterWithIntakesExposesGroupedIntakeAndRunRoutes(t *testing.T) {
     handler.ServeHTTP(run, httptest.NewRequest(http.MethodPost, "/api/batch-factory/runs", strings.NewReader(body)))
     if run.Code != http.StatusCreated { t.Fatalf("run route status=%d body=%s", run.Code, run.Body.String()) }
     if starter.input.IntakeID != "intake-1" { t.Fatalf("run did not start created intake: %+v", starter.input) }
+}
+
+func TestRouterWithAgentExposesAgentThreadsWithoutBreakingBatchRoutes(t *testing.T) {
+    starter := &fakeStarter{}
+    agentAPI := &fakeAgentAPI{threads: []agent.Thread{{ID: "thread-1", Title: "测试", Status: "active"}}}
+    owner := func(*http.Request) (string,error) { return "user-1", nil }
+    handler := NewRouterWithAgent(starter, nil, owner, agentAPI)
+
+    threads := httptest.NewRecorder()
+    handler.ServeHTTP(threads, httptest.NewRequest(http.MethodGet, "/api/agent/threads", nil))
+    if threads.Code != http.StatusOK { t.Fatalf("agent route status=%d body=%s", threads.Code, threads.Body.String()) }
+
+    batch := httptest.NewRecorder()
+    handler.ServeHTTP(batch, httptest.NewRequest(http.MethodGet, "/api/batch-factory/jobs", nil))
+    if batch.Code != http.StatusMethodNotAllowed { t.Fatalf("batch route status=%d", batch.Code) }
 }
