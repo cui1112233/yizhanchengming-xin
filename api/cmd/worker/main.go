@@ -14,6 +14,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	one21 "github.com/cui1112233/yizhanchengming-xin/api/internal/integrations/121"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/integrations/metadataai"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/queue"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/storage"
 	workerpkg "github.com/cui1112233/yizhanchengming-xin/api/internal/worker"
@@ -24,6 +25,9 @@ type workerConfig struct {
 	RedisURL      string
 	QueueKey      string
 	FetchEndpoint string
+	AIBaseURL     string
+	AIModel       string
+	AIAPIKey      string
 }
 
 func configFromEnv() (workerConfig, error) {
@@ -32,6 +36,9 @@ func configFromEnv() (workerConfig, error) {
 		RedisURL:      strings.TrimSpace(os.Getenv("REDIS_URL")),
 		QueueKey:      strings.TrimSpace(os.Getenv("PIPELINE_QUEUE_KEY")),
 		FetchEndpoint: strings.TrimSpace(os.Getenv("121_FETCH_ENDPOINT")),
+		AIBaseURL:     strings.TrimSpace(os.Getenv("AI_BASE_URL")),
+		AIModel:       strings.TrimSpace(os.Getenv("AI_MODEL")),
+		AIAPIKey:      strings.TrimSpace(os.Getenv("AI_API_KEY")),
 	}
 	if cfg.MySQLDSN == "" {
 		return workerConfig{}, errors.New("MYSQL_DSN is required")
@@ -44,6 +51,12 @@ func configFromEnv() (workerConfig, error) {
 	}
 	if cfg.FetchEndpoint == "" {
 		cfg.FetchEndpoint = "https://txt.121w.com/api.php"
+	}
+
+	aiConfigured := cfg.AIBaseURL != "" || cfg.AIModel != "" || cfg.AIAPIKey != ""
+	aiComplete := cfg.AIBaseURL != "" && cfg.AIModel != "" && cfg.AIAPIKey != ""
+	if aiConfigured && !aiComplete {
+		return workerConfig{}, errors.New("AI_BASE_URL, AI_MODEL and AI_API_KEY must be configured together")
 	}
 	return cfg, nil
 }
@@ -80,26 +93,39 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var classifier workerpkg.MetadataClassifier
+	if cfg.AIBaseURL != "" {
+		classifier, err = metadataai.New(metadataai.Config{
+			BaseURL: cfg.AIBaseURL,
+			Model:   cfg.AIModel,
+			APIKey:  cfg.AIAPIKey,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	jobStore := storage.NewSQLJobStore(db)
 	progress := storage.NewSQLProgressStore(db)
 	books := workerpkg.NewSQLIntakeRepository(db)
 	batches := workerpkg.NewSQLBatchCreator(db)
 	executor := workerpkg.IntakeExecutor{
-		Books:   books,
-		Fetcher: one21.NewClient(cfg.FetchEndpoint),
-		Batches: batches,
+		Books:      books,
+		Fetcher:    one21.NewClient(cfg.FetchEndpoint),
+		Classifier: classifier,
+		Batches:    batches,
 	}
 	runner := workerpkg.Runner{
-		Source: source,
-		Jobs: jobStore,
+		Source:   source,
+		Jobs:     jobStore,
 		Executor: executor,
 		Progress: progress,
-		Queue: jobQueue,
+		Queue:    jobQueue,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	log.Printf("unified Go worker started; queue=%s", cfg.QueueKey)
+	log.Printf("unified Go worker started; queue=%s ai_fallback=%t", cfg.QueueKey, classifier != nil)
 	for ctx.Err() == nil {
 		err := runner.RunOnce(ctx)
 		if err == nil {
