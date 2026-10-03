@@ -22,17 +22,21 @@ func TestSPAHandlerServesStaticAsset(t *testing.T) {
 	if recorder.Body.String() != "console.log('ok')" { t.Fatalf("body=%q", recorder.Body.String()) }
 }
 
-func TestSPAHandlerFallsBackToIndexForApplicationRoute(t *testing.T) {
+func TestSPAHandlerFallsBackToIndexForApplicationRoutes(t *testing.T) {
 	assets := fstest.MapFS{
-		"index.html": &fstest.MapFile{Data: []byte("<html>batch factory</html>")},
+		"index.html": &fstest.MapFile{Data: []byte("<html>workspace</html>")},
 	}
 	handler, err := newSPAHandler(fs.FS(assets))
 	if err != nil { t.Fatal(err) }
 
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/batch-factory", nil))
-	if recorder.Code != http.StatusOK { t.Fatalf("status=%d", recorder.Code) }
-	if recorder.Body.String() != "<html>batch factory</html>" { t.Fatalf("body=%q", recorder.Body.String()) }
+	for _, route := range []string{"/batch-factory", "/agent"} {
+		t.Run(route, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, route, nil))
+			if recorder.Code != http.StatusOK { t.Fatalf("status=%d", recorder.Code) }
+			if recorder.Body.String() != "<html>workspace</html>" { t.Fatalf("body=%q", recorder.Body.String()) }
+		})
+	}
 }
 
 func TestSPAHandlerRejectsMissingIndex(t *testing.T) {
