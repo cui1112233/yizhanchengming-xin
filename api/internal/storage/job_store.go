@@ -33,9 +33,7 @@ type SQLJobStore struct {
 }
 
 func NewSQLJobStore(db *sql.DB) *SQLJobStore {
-	if db == nil {
-		return &SQLJobStore{}
-	}
+	if db == nil { return &SQLJobStore{} }
 	return &SQLJobStore{
 		begin: func(ctx context.Context) (jobTx, error) { return db.BeginTx(ctx, nil) },
 		query: func(ctx context.Context, query string, args ...any) (jobRows, error) { return db.QueryContext(ctx, query, args...) },
@@ -87,7 +85,7 @@ func (s *SQLJobStore) LoadJob(ctx context.Context, jobID string) (pipeline.Job, 
 	if runAt.Valid { job.RunAt = runAt.Time }
 	if err := rows.Err(); err != nil { return pipeline.Job{}, err }
 
-	stageRows, err := s.query(ctx, `SELECT stage, ordinal_no FROM pipeline_stages WHERE job_id = ? ORDER BY ordinal_no ASC`, jobID)
+	stageRows, err := s.query(ctx, `SELECT stage, ordinal_no FROM pipeline_stages WHERE job_id = ? AND status <> 'succeeded' ORDER BY ordinal_no ASC`, jobID)
 	if err != nil { return pipeline.Job{}, err }
 	defer stageRows.Close()
 	for stageRows.Next() {
