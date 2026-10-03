@@ -19,7 +19,7 @@ type JobQueue interface {
 }
 
 type StartInput struct {
-	BatchID  string
+	IntakeID string
 	RunAt    time.Time
 	NeedsAI  bool
 }
@@ -34,9 +34,9 @@ func (s StartService) Start(ctx context.Context, input StartInput) (pipeline.Job
 	if s.Jobs == nil || s.Queue == nil {
 		return pipeline.Job{}, errors.New("job store and queue are required")
 	}
-	batchID := strings.TrimSpace(input.BatchID)
-	if batchID == "" {
-		return pipeline.Job{}, errors.New("batch id is required")
+	intakeID := strings.TrimSpace(input.IntakeID)
+	if intakeID == "" {
+		return pipeline.Job{}, errors.New("intake id is required")
 	}
 
 	gender := novel.GenderResult{Gender: novel.GenderMale}
@@ -50,7 +50,7 @@ func (s StartService) Start(ctx context.Context, input StartInput) (pipeline.Job
 	if s.Now != nil {
 		now = s.Now().UTC()
 	}
-	job := pipeline.NewJob(batchID, plan, now)
+	job := pipeline.NewIntakeJob(intakeID, plan, now)
 	if err := s.Jobs.CreateJob(ctx, job); err != nil {
 		return pipeline.Job{}, err
 	}
