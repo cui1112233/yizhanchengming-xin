@@ -64,3 +64,23 @@ export async function listAgentTasks({ fetchImpl = globalThis.fetch, threadId = 
   const result = await requestJSON(`/api/agent/tasks${query}`, {}, fetchImpl);
   return Array.isArray(result?.tasks) ? result.tasks : [];
 }
+
+export async function updateAgentTask(taskId, input, { fetchImpl = globalThis.fetch } = {}) {
+  const id = String(taskId || '').trim();
+  if (!id) throw new Error('task id is required');
+  const result = await requestJSON(`/api/agent/tasks/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input || {}),
+  }, fetchImpl);
+  return result?.task || result;
+}
+
+export async function updateAgentToolCall(toolId, input, { fetchImpl = globalThis.fetch } = {}) {
+  const id = String(toolId || '').trim();
+  if (!id) throw new Error('tool id is required');
+  const result = await requestJSON(`/api/agent/tool-calls/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input || {}),
+  }, fetchImpl);
+  return result?.tool_call || result;
+}
