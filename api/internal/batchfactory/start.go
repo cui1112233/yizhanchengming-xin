@@ -1,0 +1,61 @@
+package batchfactory
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/novel"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
+)
+
+type JobStore interface {
+	CreateJob(context.Context, pipeline.Job) error
+}
+
+type JobQueue interface {
+	Enqueue(context.Context, pipeline.Job) error
+}
+
+type StartInput struct {
+	BatchID  string
+	RunAt    time.Time
+	NeedsAI  bool
+}
+
+type StartService struct {
+	Jobs  JobStore
+	Queue JobQueue
+	Now   func() time.Time
+}
+
+func (s StartService) Start(ctx context.Context, input StartInput) (pipeline.Job, error) {
+	if s.Jobs == nil || s.Queue == nil {
+		return pipeline.Job{}, errors.New("job store and queue are required")
+	}
+	batchID := strings.TrimSpace(input.BatchID)
+	if batchID == "" {
+		return pipeline.Job{}, errors.New("batch id is required")
+	}
+
+	gender := novel.GenderResult{Gender: novel.GenderMale}
+	hasStyle := true
+	if input.NeedsAI {
+		gender = novel.GenderResult{Gender: novel.GenderUnknown}
+		hasStyle = false
+	}
+	plan := pipeline.BuildPlan(pipeline.PlanInput{Gender: gender, HasStyle: hasStyle, RunAt: input.RunAt})
+	now := time.Now().UTC()
+	if s.Now != nil {
+		now = s.Now().UTC()
+	}
+	job := pipeline.NewJob(batchID, plan, now)
+	if err := s.Jobs.CreateJob(ctx, job); err != nil {
+		return pipeline.Job{}, err
+	}
+	if err := s.Queue.Enqueue(ctx, job); err != nil {
+		return pipeline.Job{}, err
+	}
+	return job, nil
+}
