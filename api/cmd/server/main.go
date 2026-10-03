@@ -19,24 +19,29 @@ import (
 )
 
 type serverConfig struct {
-	MySQLDSN   string
-	RedisURL   string
-	ListenAddr string
-	QueueKey   string
+	MySQLDSN    string
+	RedisURL    string
+	ListenAddr  string
+	QueueKey    string
+	SystemOwner string
 }
 
 func configFromEnv() (serverConfig, error) {
 	cfg := serverConfig{
-		MySQLDSN:   strings.TrimSpace(os.Getenv("MYSQL_DSN")),
-		RedisURL:   strings.TrimSpace(os.Getenv("REDIS_URL")),
-		ListenAddr: strings.TrimSpace(os.Getenv("LISTEN_ADDR")),
-		QueueKey:   strings.TrimSpace(os.Getenv("PIPELINE_QUEUE_KEY")),
+		MySQLDSN:    strings.TrimSpace(os.Getenv("MYSQL_DSN")),
+		RedisURL:    strings.TrimSpace(os.Getenv("REDIS_URL")),
+		ListenAddr:  strings.TrimSpace(os.Getenv("LISTEN_ADDR")),
+		QueueKey:    strings.TrimSpace(os.Getenv("PIPELINE_QUEUE_KEY")),
+		SystemOwner: strings.TrimSpace(os.Getenv("SYSTEM_OWNER")),
 	}
 	if cfg.MySQLDSN == "" {
 		return serverConfig{}, errors.New("MYSQL_DSN is required")
 	}
 	if cfg.RedisURL == "" {
 		return serverConfig{}, errors.New("REDIS_URL is required")
+	}
+	if cfg.SystemOwner == "" {
+		return serverConfig{}, errors.New("SYSTEM_OWNER is required")
 	}
 	if cfg.ListenAddr == "" {
 		cfg.ListenAddr = ":8080"
@@ -77,7 +82,16 @@ func main() {
 		Jobs:  storage.NewSQLJobStore(db),
 		Queue: jobQueue,
 	}
-	handler := httpapi.NewRouter(starter)
+	intakes := &batchfactory.IntakeService{
+		Store: storage.NewSQLIntakeStore(db),
+	}
+	ownerResolver := func(*http.Request) (string, error) {
+		if cfg.SystemOwner == "" {
+			return "", errors.New("unauthorized")
+		}
+		return cfg.SystemOwner, nil
+	}
+	handler := httpapi.NewRouterWithIntakes(starter, intakes, ownerResolver)
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           handler,
