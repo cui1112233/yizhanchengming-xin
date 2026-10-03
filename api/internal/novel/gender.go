@@ -16,6 +16,7 @@ const (
 	GenderSourceManual      GenderSource = "manual"
 	GenderSource121Category GenderSource = "121_category"
 	GenderSource121Genre    GenderSource = "121_genre"
+	GenderSourceAI          GenderSource = "ai"
 	GenderSourceUnresolved  GenderSource = "unresolved"
 )
 
