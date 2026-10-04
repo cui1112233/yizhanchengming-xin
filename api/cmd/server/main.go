@@ -15,6 +15,8 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/agent"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/batchfactory"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/integrations/tosstore"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/media"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/queue"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/storage"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/webui"
@@ -29,18 +31,28 @@ type serverConfig struct {
 	AIBaseURL   string
 	AIModel     string
 	AIAPIKey    string
+	TOSEndpoint string
+	TOSRegion   string
+	TOSAccessKey string
+	TOSSecretKey string
+	TOSBucket   string
 }
 
 func configFromEnv() (serverConfig, error) {
 	cfg := serverConfig{
-		MySQLDSN:    strings.TrimSpace(os.Getenv("MYSQL_DSN")),
-		RedisURL:    strings.TrimSpace(os.Getenv("REDIS_URL")),
-		ListenAddr:  strings.TrimSpace(os.Getenv("LISTEN_ADDR")),
-		QueueKey:    strings.TrimSpace(os.Getenv("PIPELINE_QUEUE_KEY")),
-		SystemOwner: strings.TrimSpace(os.Getenv("SYSTEM_OWNER")),
-		AIBaseURL:   strings.TrimSpace(os.Getenv("AI_BASE_URL")),
-		AIModel:     strings.TrimSpace(os.Getenv("AI_MODEL")),
-		AIAPIKey:    strings.TrimSpace(os.Getenv("AI_API_KEY")),
+		MySQLDSN:     strings.TrimSpace(os.Getenv("MYSQL_DSN")),
+		RedisURL:     strings.TrimSpace(os.Getenv("REDIS_URL")),
+		ListenAddr:   strings.TrimSpace(os.Getenv("LISTEN_ADDR")),
+		QueueKey:     strings.TrimSpace(os.Getenv("PIPELINE_QUEUE_KEY")),
+		SystemOwner:  strings.TrimSpace(os.Getenv("SYSTEM_OWNER")),
+		AIBaseURL:    strings.TrimSpace(os.Getenv("AI_BASE_URL")),
+		AIModel:      strings.TrimSpace(os.Getenv("AI_MODEL")),
+		AIAPIKey:     strings.TrimSpace(os.Getenv("AI_API_KEY")),
+		TOSEndpoint:  strings.TrimSpace(os.Getenv("TOS_ENDPOINT")),
+		TOSRegion:    strings.TrimSpace(os.Getenv("TOS_REGION")),
+		TOSAccessKey: strings.TrimSpace(os.Getenv("TOS_ACCESS_KEY")),
+		TOSSecretKey: strings.TrimSpace(os.Getenv("TOS_SECRET_KEY")),
+		TOSBucket:    strings.TrimSpace(os.Getenv("TOS_BUCKET")),
 	}
 	if cfg.MySQLDSN == "" {
 		return serverConfig{}, errors.New("MYSQL_DSN is required")
@@ -61,6 +73,11 @@ func configFromEnv() (serverConfig, error) {
 	aiComplete := cfg.AIBaseURL != "" && cfg.AIModel != "" && cfg.AIAPIKey != ""
 	if aiConfigured && !aiComplete {
 		return serverConfig{}, errors.New("AI_BASE_URL, AI_MODEL and AI_API_KEY must be configured together")
+	}
+	tosConfigured := cfg.TOSEndpoint != "" || cfg.TOSRegion != "" || cfg.TOSAccessKey != "" || cfg.TOSSecretKey != "" || cfg.TOSBucket != ""
+	tosComplete := cfg.TOSEndpoint != "" && cfg.TOSRegion != "" && cfg.TOSAccessKey != "" && cfg.TOSSecretKey != "" && cfg.TOSBucket != ""
+	if tosConfigured && !tosComplete {
+		return serverConfig{}, errors.New("TOS_ENDPOINT, TOS_REGION, TOS_ACCESS_KEY, TOS_SECRET_KEY and TOS_BUCKET must be configured together")
 	}
 	return cfg, nil
 }
@@ -89,6 +106,21 @@ func newAgentService(db *sql.DB, cfg serverConfig) (*agent.Service, error) {
 		responder = agent.NewHybridResponder(rules, aiResponder)
 	}
 	return &agent.Service{Store: store, Responder: responder}, nil
+}
+
+func newMediaService(db *sql.DB, cfg serverConfig) (*media.Service, error) {
+	if cfg.TOSEndpoint == "" {
+		return nil, nil
+	}
+	tosClient, err := tosstore.New(tosstore.Config{
+		Endpoint: cfg.TOSEndpoint,
+		Region: cfg.TOSRegion,
+		AccessKey: cfg.TOSAccessKey,
+		SecretKey: cfg.TOSSecretKey,
+		Bucket: cfg.TOSBucket,
+	})
+	if err != nil { return nil, err }
+	return &media.Service{Assets: media.NewSQLStore(db), Signer: tosClient}, nil
 }
 
 func main() {
@@ -134,7 +166,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	apiHandler := httpapi.NewRouterWithAgent(starter, intakes, ownerResolver, agentService)
+	mediaService, err := newMediaService(db, cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var mediaResolver httpapi.MediaResolver
+	if mediaService != nil { mediaResolver = mediaService }
+	apiHandler := httpapi.NewRouterWithServices(starter, intakes, ownerResolver, agentService, mediaResolver)
 	frontendHandler, err := webui.Handler()
 	if err != nil {
 		log.Fatal(err)
@@ -148,7 +186,7 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("unified Go server listening on %s agent_ai=%t", cfg.ListenAddr, cfg.AIBaseURL != "")
+	log.Printf("unified Go server listening on %s agent_ai=%t tos_media=%t", cfg.ListenAddr, cfg.AIBaseURL != "", cfg.TOSEndpoint != "")
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
