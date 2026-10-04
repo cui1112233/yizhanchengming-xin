@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,7 @@ func (h *providerConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	if h == nil || h.store == nil || h.owner == nil { http.Error(w,"provider config unavailable",http.StatusServiceUnavailable); return }
 	owner, err := h.owner(r)
 	if err != nil || strings.TrimSpace(owner)=="" { http.Error(w,"unauthorized",http.StatusUnauthorized); return }
+	owner = strings.TrimSpace(owner)
 	prefix := "/api/provider-configs/video/"
 	if !strings.HasPrefix(r.URL.Path,prefix) { http.NotFound(w,r); return }
 	provider := videogen.NormalizeProvider(strings.Trim(strings.TrimPrefix(r.URL.Path,prefix),"/"))
@@ -49,25 +51,33 @@ func (h *providerConfigHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		resolved, err := h.store.Resolve(r.Context(),owner,providerconfig.KindVideo,provider)
 		if errors.Is(err,providerconfig.ErrNotFound) { http.NotFound(w,r); return }
 		if err != nil { http.Error(w,"load provider config",http.StatusInternalServerError); return }
-		writeJSON(w,http.StatusOK,resolved.Record)
+		providerWriteJSON(w,http.StatusOK,resolved.Record)
 	case http.MethodPut:
 		var body providerConfigPutRequest
 		decoder:=json.NewDecoder(http.MaxBytesReader(w,r.Body,64<<10))
 		decoder.DisallowUnknownFields()
 		if err:=decoder.Decode(&body);err!=nil { http.Error(w,"invalid json",http.StatusBadRequest); return }
+		var extra any
+		if err:=decoder.Decode(&extra);!errors.Is(err,io.EOF) { http.Error(w,"invalid trailing json",http.StatusBadRequest); return }
 		enabled:=true
 		if body.Enabled!=nil { enabled=*body.Enabled }
 		remote := provider != videogen.ProviderDoubaoLocal
-		if remote && strings.TrimSpace(body.APIKey)=="" { http.Error(w,"api_key is required",http.StatusBadRequest); return }
+		configured := strings.TrimSpace(body.APIKey)!=""
+		if remote && !configured {
+			existing, resolveErr := h.store.Resolve(r.Context(),owner,providerconfig.KindVideo,provider)
+			if resolveErr != nil || !existing.Configured { http.Error(w,"api_key is required for first configuration",http.StatusBadRequest); return }
+			configured = true
+		}
 		result,err:=h.store.Put(r.Context(),providerconfig.PutInput{Owner:owner,MediaKind:providerconfig.KindVideo,Provider:provider,Model:body.Model,APIKey:body.APIKey,CreateURL:body.CreateURL,TasksURL:body.TasksURL,ResultURL:body.ResultURL,Settings:body.Settings,Enabled:enabled})
-		if err!=nil { http.Error(w,err.Error(),http.StatusBadRequest); return }
-		writeJSON(w,http.StatusOK,result)
+		if err!=nil { http.Error(w,"invalid provider configuration",http.StatusBadRequest); return }
+		result.Configured = configured
+		providerWriteJSON(w,http.StatusOK,result)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
 
-func writeJSON(w http.ResponseWriter,status int,value any){
+func providerWriteJSON(w http.ResponseWriter,status int,value any){
 	w.Header().Set("Content-Type","application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
