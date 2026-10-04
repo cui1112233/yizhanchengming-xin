@@ -35,6 +35,7 @@ type UploadInput struct {
 
 type tosAPI interface {
 	PutObjectV2(context.Context, *tos.PutObjectV2Input) (*tos.PutObjectV2Output, error)
+	DeleteObjectV2(context.Context, *tos.DeleteObjectV2Input) (*tos.DeleteObjectV2Output, error)
 	PreSignedURL(*tos.PreSignedURLInput) (*tos.PreSignedURLOutput, error)
 }
 
@@ -66,6 +67,12 @@ func (c *Client) Bucket() string {
 	return c.bucket
 }
 
+func (c *Client) Put(ctx context.Context, key, contentType string, contentLength int64, body io.Reader) (string, string, error) {
+	object, err := c.Upload(ctx, UploadInput{Key: key, ContentType: contentType, ContentLength: contentLength, Body: body})
+	if err != nil { return "", "", err }
+	return object.Bucket, object.Key, nil
+}
+
 func (c *Client) Upload(ctx context.Context, input UploadInput) (StoredObject, error) {
 	if c == nil || c.sdk == nil || strings.TrimSpace(c.bucket) == "" {
 		return StoredObject{}, errors.New("TOS client unavailable")
@@ -82,6 +89,16 @@ func (c *Client) Upload(ctx context.Context, input UploadInput) (StoredObject, e
 	_, err := c.sdk.PutObjectV2(ctx, &tos.PutObjectV2Input{PutObjectBasicInput: basic, Content: input.Body})
 	if err != nil { return StoredObject{}, err }
 	return StoredObject{Bucket: c.bucket, Key: key}, nil
+}
+
+func (c *Client) Delete(ctx context.Context, key string) error {
+	if c == nil || c.sdk == nil || strings.TrimSpace(c.bucket) == "" {
+		return errors.New("TOS client unavailable")
+	}
+	key = strings.TrimLeft(strings.TrimSpace(key), "/")
+	if key == "" { return errors.New("TOS object key is required") }
+	_, err := c.sdk.DeleteObjectV2(ctx, &tos.DeleteObjectV2Input{Bucket: c.bucket, Key: key})
+	return err
 }
 
 func (c *Client) SignedGetURL(key string, expiresSeconds int64) (string, error) {
