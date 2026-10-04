@@ -26,6 +26,9 @@ type serverConfig struct {
 	ListenAddr  string
 	QueueKey    string
 	SystemOwner string
+	AIBaseURL   string
+	AIModel     string
+	AIAPIKey    string
 }
 
 func configFromEnv() (serverConfig, error) {
@@ -35,6 +38,9 @@ func configFromEnv() (serverConfig, error) {
 		ListenAddr:  strings.TrimSpace(os.Getenv("LISTEN_ADDR")),
 		QueueKey:    strings.TrimSpace(os.Getenv("PIPELINE_QUEUE_KEY")),
 		SystemOwner: strings.TrimSpace(os.Getenv("SYSTEM_OWNER")),
+		AIBaseURL:   strings.TrimSpace(os.Getenv("AI_BASE_URL")),
+		AIModel:     strings.TrimSpace(os.Getenv("AI_MODEL")),
+		AIAPIKey:    strings.TrimSpace(os.Getenv("AI_API_KEY")),
 	}
 	if cfg.MySQLDSN == "" {
 		return serverConfig{}, errors.New("MYSQL_DSN is required")
@@ -51,6 +57,11 @@ func configFromEnv() (serverConfig, error) {
 	if cfg.QueueKey == "" {
 		cfg.QueueKey = "qiantie:pipeline:ready"
 	}
+	aiConfigured := cfg.AIBaseURL != "" || cfg.AIModel != "" || cfg.AIAPIKey != ""
+	aiComplete := cfg.AIBaseURL != "" && cfg.AIModel != "" && cfg.AIAPIKey != ""
+	if aiConfigured && !aiComplete {
+		return serverConfig{}, errors.New("AI_BASE_URL, AI_MODEL and AI_API_KEY must be configured together")
+	}
 	return cfg, nil
 }
 
@@ -62,11 +73,22 @@ func composeHTTPHandler(api, frontend http.Handler) http.Handler {
 	return mux
 }
 
-func newAgentService(db *sql.DB) *agent.Service {
-	return &agent.Service{
-		Store:     agent.NewSQLStore(db),
-		Responder: agent.NewResponder(),
+func newAgentService(db *sql.DB, cfg serverConfig) (*agent.Service, error) {
+	store := agent.NewSQLStore(db)
+	rules := agent.NewResponder()
+	var responder agent.ResponseGenerator = rules
+	if cfg.AIBaseURL != "" {
+		aiResponder, err := agent.NewAIResponder(agent.AIResponderConfig{
+			BaseURL: cfg.AIBaseURL,
+			APIKey:  cfg.AIAPIKey,
+			Model:   cfg.AIModel,
+		})
+		if err != nil {
+			return nil, err
+		}
+		responder = agent.NewHybridResponder(rules, aiResponder)
 	}
+	return &agent.Service{Store: store, Responder: responder}, nil
 }
 
 func main() {
@@ -108,7 +130,10 @@ func main() {
 		}
 		return cfg.SystemOwner, nil
 	}
-	agentService := newAgentService(db)
+	agentService, err := newAgentService(db, cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	apiHandler := httpapi.NewRouterWithAgent(starter, intakes, ownerResolver, agentService)
 	frontendHandler, err := webui.Handler()
 	if err != nil {
@@ -123,7 +148,7 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("unified Go server listening on %s", cfg.ListenAddr)
+	log.Printf("unified Go server listening on %s agent_ai=%t", cfg.ListenAddr, cfg.AIBaseURL != "")
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
