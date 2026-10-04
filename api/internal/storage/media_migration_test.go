@@ -26,6 +26,9 @@ func TestMediaMigrationDefinesCanonicalTOSAssets(t *testing.T) {
 	} {
 		if !strings.Contains(sql, required) { t.Fatalf("migration missing %s", required) }
 	}
+	if !strings.Contains(sql, "source_task_id VARCHAR(64)") {
+		t.Fatal("source_task_id must match agent_tasks.id VARCHAR(64)")
+	}
 	if strings.Contains(sql, "local_path") || strings.Contains(sql, "file_path") {
 		t.Fatal("canonical media assets must not persist local file paths")
 	}
