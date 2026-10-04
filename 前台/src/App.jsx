@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button, ConfigProvider, Empty, Space, Typography, theme } from 'antd';
 import AgentWorkspace from './AgentWorkspace.jsx';
+import ApiConfigPage from './ApiConfigPage.jsx';
 import BatchFactoryPage from './BatchFactoryPage.jsx';
 
 const { Paragraph, Title } = Typography;
@@ -11,7 +12,6 @@ const MODULE_NAMES = {
   '/shuihuo-production': '水货生产',
   '/shuihuo-production/creative': '创作漫剧',
   '/settings': '设置',
-  '/api-config': 'API 配置',
 };
 
 function normalizedPathname() {
@@ -28,10 +28,7 @@ function MigrationPage({ pathname }) {
   return (
     <main className="migration-shell">
       <div className="migration-card">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={null}
-        />
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={null} />
         <Title level={2}>{name}</Title>
         <Paragraph>
           这个入口已经保留，但当前新 Go 主线还没有完成该模块的真实迁移。
@@ -52,6 +49,7 @@ function MigrationPage({ pathname }) {
 function AppRoute() {
   const pathname = normalizedPathname();
   if (pathname === '/' || pathname === '/agent') return <AgentWorkspace />;
+  if (pathname === '/api-config') return <ApiConfigPage />;
   if (pathname === '/batch-factory') return <BatchFactoryPage />;
   if (MODULE_NAMES[pathname]) return <MigrationPage pathname={pathname} />;
   return <MigrationPage pathname={pathname} />;
