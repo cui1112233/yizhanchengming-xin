@@ -75,7 +75,9 @@ type SQLStore struct {
 	exec executor
 }
 
-func NewSQLStore(db *sql.DB) *SQLStore { return newSQLStoreWithExecutor(db) }
+func NewSQLStore(db *sql.DB) *SQLStore {
+	return &SQLStore{db: db, exec: db}
+}
 
 func newSQLStoreWithExecutor(exec executor) *SQLStore { return &SQLStore{exec: exec} }
 
