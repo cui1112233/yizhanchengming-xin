@@ -19,3 +19,29 @@ jobs:
         with:
           go-version: '1.23.x'
       - run: go test ./...
+
+  admin-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: '后台'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+
+  user-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: '前台'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
