@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 )
@@ -10,9 +11,14 @@ type ResponseGenerator interface {
 	Respond(context.Context, ResponseContext) (AgentResponse, error)
 }
 
+type ToolQueue interface {
+	Enqueue(context.Context, string) error
+}
+
 type Service struct {
 	Store     Store
 	Responder ResponseGenerator
+	ToolQueue ToolQueue
 }
 
 type SendMessageInput struct {
@@ -138,6 +144,20 @@ func (s *Service) SendMessage(ctx context.Context, owner, threadID string, input
 			return SendMessageResult{}, err
 		}
 		result.ToolCall = &toolCall
+		if toolCall.ToolName != ToolNavigate {
+			if s.ToolQueue == nil {
+				body, _ := json.Marshal(map[string]string{"error": "agent creative tool queue unavailable"})
+				failed, _ := s.Store.UpdateToolCall(ctx, owner, toolCall.ID, UpdateToolCallInput{Status: ToolFailed, Result: body})
+				if failed.ID != "" { result.ToolCall = &failed }
+				return result, errors.New("agent creative tool queue unavailable")
+			}
+			if err := s.ToolQueue.Enqueue(ctx, toolCall.ID); err != nil {
+				body, _ := json.Marshal(map[string]string{"error": strings.TrimSpace(err.Error())})
+				failed, _ := s.Store.UpdateToolCall(ctx, owner, toolCall.ID, UpdateToolCallInput{Status: ToolFailed, Result: body})
+				if failed.ID != "" { result.ToolCall = &failed }
+				return result, err
+			}
+		}
 	}
 	return result, nil
 }
