@@ -73,13 +73,20 @@ func (m *memoryStore) UpdateThreadTitle(_ context.Context, owner, id, title stri
 	return nil
 }
 
-type fixedResponder struct { response AgentResponse }
-func (r fixedResponder) Respond(context.Context, string, string, string) (AgentResponse, error) { return r.response, nil }
+type fixedResponder struct {
+	response AgentResponse
+	last     ResponseContext
+}
+func (r *fixedResponder) Respond(_ context.Context, input ResponseContext) (AgentResponse, error) {
+	r.last = input
+	return r.response, nil
+}
 
 func TestServiceSendMessagePersistsUserAssistantAndTool(t *testing.T) {
 	store := &memoryStore{thread: Thread{ID: "thread-1", Owner: "owner", Title: "新对话", Status: "active"}}
 	args, _ := json.Marshal(NavigateArgs{Path: "/novel-fetch"})
-	service := &Service{Store: store, Responder: fixedResponder{response: AgentResponse{Content: "我来打开小说获取。", Tool: &ToolProposal{Name: ToolNavigate, Label: "打开小说获取", Arguments: args}}}}
+	responder := &fixedResponder{response: AgentResponse{Content: "我来打开小说获取。", Tool: &ToolProposal{Name: ToolNavigate, Label: "打开小说获取", Arguments: args}}}
+	service := &Service{Store: store, Responder: responder}
 	result, err := service.SendMessage(context.Background(), "owner", "thread-1", SendMessageInput{Content: "帮我打开小说获取", MediaAssetIDs: []string{"asset_1"}})
 	if err != nil { t.Fatal(err) }
 	if result.UserMessage.Role != RoleUser || result.AssistantMessage.Role != RoleAssistant { t.Fatalf("unexpected messages: %#v", result) }
@@ -87,11 +94,31 @@ func TestServiceSendMessagePersistsUserAssistantAndTool(t *testing.T) {
 	if len(store.tools) != 1 || store.tools[0].ToolName != ToolNavigate || store.tools[0].Status != ToolProposed { t.Fatalf("tools=%#v", store.tools) }
 	if result.ToolCall == nil || result.ToolCall.ID == "" { t.Fatal("expected tool call in result") }
 	if store.thread.Title == "新对话" { t.Fatal("first user message should title the thread") }
+	if responder.last.Owner != "owner" || responder.last.ThreadID != "thread-1" || responder.last.Input != "帮我打开小说获取" {
+		t.Fatalf("responder context=%#v", responder.last)
+	}
+	if len(responder.last.MediaAssetIDs) != 1 || responder.last.MediaAssetIDs[0] != "asset_1" {
+		t.Fatalf("media context=%#v", responder.last.MediaAssetIDs)
+	}
+}
+
+func TestServicePassesExistingConversationAndTasksToResponder(t *testing.T) {
+	store := &memoryStore{
+		thread: Thread{ID: "thread-1", Owner: "owner", Title: "测试", Status: "active"},
+		messages: []Message{{ID: "old", ThreadID: "thread-1", Owner: "owner", Role: RoleAssistant, Content: "上一轮回复"}},
+		tasks: []Task{{ID: "task-old", ThreadID: "thread-1", Owner: "owner", Title: "旧任务", Status: TaskWaiting}},
+	}
+	responder := &fixedResponder{response: AgentResponse{Content: "继续处理"}}
+	service := &Service{Store: store, Responder: responder}
+	if _, err := service.SendMessage(context.Background(), "owner", "thread-1", SendMessageInput{Content: "继续"}); err != nil { t.Fatal(err) }
+	if len(responder.last.Messages) != 1 || responder.last.Messages[0].Content != "上一轮回复" { t.Fatalf("messages=%#v", responder.last.Messages) }
+	if len(responder.last.Tasks) != 1 || responder.last.Tasks[0].Title != "旧任务" { t.Fatalf("tasks=%#v", responder.last.Tasks) }
 }
 
 func TestServiceSendMessagePersistsTaskProposal(t *testing.T) {
 	store := &memoryStore{thread: Thread{ID: "thread-1", Owner: "owner", Title: "测试", Status: "active"}}
-	service := &Service{Store: store, Responder: fixedResponder{response: AgentResponse{Content: "已记录", Task: &TaskProposal{Title: "检查视频", Status: TaskInProgress}}}}
+	responder := &fixedResponder{response: AgentResponse{Content: "已记录", Task: &TaskProposal{Title: "检查视频", Status: TaskInProgress}}}
+	service := &Service{Store: store, Responder: responder}
 	result, err := service.SendMessage(context.Background(), "owner", "thread-1", SendMessageInput{Content: "创建任务：检查视频"})
 	if err != nil { t.Fatal(err) }
 	if result.Task == nil || result.Task.Title != "检查视频" { t.Fatalf("task=%#v", result.Task) }
@@ -100,7 +127,7 @@ func TestServiceSendMessagePersistsTaskProposal(t *testing.T) {
 
 func TestServiceUpdatesToolLifecycle(t *testing.T) {
 	store := &memoryStore{tools: []ToolCall{{ID: "tool-1", Owner: "owner", Status: ToolProposed}}}
-	service := &Service{Store: store, Responder: fixedResponder{}}
+	service := &Service{Store: store, Responder: &fixedResponder{}}
 	resultBody := json.RawMessage(`{"path":"/novel-fetch"}`)
 	updated, err := service.UpdateToolCall(context.Background(), "owner", "tool-1", UpdateToolCallInput{Status: ToolCompleted, Result: resultBody})
 	if err != nil { t.Fatal(err) }
@@ -109,7 +136,7 @@ func TestServiceUpdatesToolLifecycle(t *testing.T) {
 
 func TestServiceUpdatesTaskLifecycle(t *testing.T) {
 	store := &memoryStore{tasks: []Task{{ID: "task-1", Owner: "owner", Status: TaskInProgress}}}
-	service := &Service{Store: store, Responder: fixedResponder{}}
+	service := &Service{Store: store, Responder: &fixedResponder{}}
 	updated, err := service.UpdateTask(context.Background(), "owner", "task-1", UpdateTaskInput{Status: TaskCompleted, ProgressCurrent: 3, ProgressTotal: 3, Detail: "完成"})
 	if err != nil { t.Fatal(err) }
 	if updated.Status != TaskCompleted || updated.ProgressCurrent != 3 { t.Fatalf("updated=%#v", updated) }
@@ -117,7 +144,7 @@ func TestServiceUpdatesTaskLifecycle(t *testing.T) {
 
 func TestServiceRejectsCrossOwnerThread(t *testing.T) {
 	store := &memoryStore{thread: Thread{ID: "thread-1", Owner: "alice", Title: "A", Status: "active"}}
-	service := &Service{Store: store, Responder: fixedResponder{response: AgentResponse{Content: "x"}}}
+	service := &Service{Store: store, Responder: &fixedResponder{response: AgentResponse{Content: "x"}}}
 	if _, err := service.SendMessage(context.Background(), "bob", "thread-1", SendMessageInput{Content: "hello"}); err != ErrNotFound {
 		t.Fatalf("err=%v", err)
 	}
