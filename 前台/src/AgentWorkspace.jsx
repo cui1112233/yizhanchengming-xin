@@ -20,9 +20,11 @@ import {
 import {
   createAgentThread,
   getAgentThread,
+  getMediaAsset,
   listAgentTasks,
   listAgentThreads,
   sendAgentMessage,
+  updateAgentToolCall,
 } from './agentApi.js';
 import {
   buildNavigationTarget,
@@ -78,13 +80,32 @@ function TaskCard({ task, compact = false, onInspect }) {
 }
 
 function MediaReferenceCard({ id, onInspect }) {
+  const [resolved, setResolved] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setResolved(null);
+    setFailed(false);
+    getMediaAsset(id)
+      .then(value => { if (!cancelled) setResolved(value); })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const mediaType = resolved?.asset?.media_type || '';
+  const previewURL = resolved?.preview_url || '';
   return (
-    <button type="button" className="agent-media-card" onClick={() => onInspect?.({ type: 'media', item: { id } })}>
-      <div className="agent-media-preview">◫</div>
+    <button type="button" className="agent-media-card" onClick={() => onInspect?.({ type: 'media', item: { id, resolved } })}>
+      <div className={`agent-media-preview${previewURL ? ' has-preview' : ''}`}>
+        {previewURL && mediaType === 'image' ? <img src={previewURL} alt="TOS 媒体资产" loading="lazy" /> : null}
+        {previewURL && mediaType === 'video' ? <video src={previewURL} muted playsInline preload="metadata" /> : null}
+        {!previewURL ? <span>{failed ? '!' : '◫'}</span> : null}
+      </div>
       <div className="agent-media-copy">
-        <strong>媒体资产</strong>
+        <strong>{mediaType === 'video' ? '视频资产' : mediaType === 'image' ? '图片资产' : '媒体资产'}</strong>
         <span>{id}</span>
-        <small>TOS 资产引用</small>
+        <small>{failed ? 'TOS 预览暂不可用' : previewURL ? 'TOS 私有签名预览' : '正在读取 TOS 资产…'}</small>
       </div>
     </button>
   );
@@ -99,7 +120,7 @@ function ToolCard({ toolCall, onInspect, onNavigate }) {
         <span className="agent-tool-icon">↗</span>
         <span className="agent-tool-copy"><strong>{meta.title}</strong><small>{meta.detail}</small></span>
       </button>
-      {target ? <Button size="small" type="primary" ghost onClick={() => onNavigate(target)}>{meta.actionLabel}</Button> : null}
+      {target ? <Button size="small" type="primary" ghost onClick={() => onNavigate(target, toolCall)}>{meta.actionLabel}</Button> : null}
     </div>
   );
 }
@@ -138,7 +159,10 @@ function InspectorContent({ selected }) {
     return <div className="agent-inspector-content"><Tag color="processing">工具执行</Tag><Title level={4}>{toolCardMeta(tool).title}</Title><Text type="secondary">工具</Text><code>{tool.tool_name}</code><Text type="secondary">状态</Text><code>{tool.status}</code><Text type="secondary">参数</Text><pre>{JSON.stringify(tool.arguments || {}, null, 2)}</pre></div>;
   }
   if (selected.type === 'media') {
-    return <div className="agent-inspector-content"><Tag color="purple">TOS 媒体</Tag><Title level={4}>媒体资产</Title><div className="agent-inspector-media">◫</div><Text type="secondary">media_asset_id</Text><code>{selected.item?.id}</code><Paragraph type="secondary">正式图片/视频只通过媒体资产 ID 被 Agent 引用；文件字节属于统一 TOS 媒体层。</Paragraph></div>;
+    const resolved = selected.item?.resolved;
+    const mediaType = resolved?.asset?.media_type;
+    const previewURL = resolved?.preview_url;
+    return <div className="agent-inspector-content"><Tag color="purple">TOS 媒体</Tag><Title level={4}>{mediaType === 'video' ? '视频资产' : mediaType === 'image' ? '图片资产' : '媒体资产'}</Title><div className="agent-inspector-media">{previewURL && mediaType === 'image' ? <img src={previewURL} alt="TOS 媒体预览" /> : null}{previewURL && mediaType === 'video' ? <video src={previewURL} controls playsInline preload="metadata" /> : null}{!previewURL ? '◫' : null}</div><Text type="secondary">media_asset_id</Text><code>{selected.item?.id}</code>{resolved?.asset?.storage_key ? <><Text type="secondary">TOS 对象</Text><code>{resolved.asset.storage_key}</code></> : null}<Paragraph type="secondary">正式图片/视频只通过媒体资产 ID 被业务引用；预览链接由服务端临时签名，不保存 AK/SK 到浏览器。</Paragraph></div>;
   }
   return null;
 }
@@ -234,8 +258,15 @@ export default function AgentWorkspace() {
     } catch (requestError) { messageApi.error(requestError?.message || '创建对话失败'); }
   }
 
-  function handleNavigation(target) {
+  async function handleNavigation(target, toolCall = null) {
     if (!target || !target.startsWith('/')) return;
+    if (toolCall?.id) {
+      try {
+        await updateAgentToolCall(toolCall.id, { status: 'completed', result: { target } });
+      } catch {
+        messageApi.warning('页面会继续打开，但工具执行状态暂时无法回写');
+      }
+    }
     window.location.assign(target);
   }
 
@@ -257,7 +288,7 @@ export default function AgentWorkspace() {
       setContextMedia([]);
       await Promise.all([loadThread(threadID), refreshTasks(), listAgentThreads().then(setThreads)]);
       const target = buildNavigationTarget(result?.tool_call);
-      if (target) window.setTimeout(() => handleNavigation(target), 650);
+      if (target) window.setTimeout(() => handleNavigation(target, result?.tool_call), 650);
     } catch (requestError) {
       setError(requestError?.message || '发送失败');
     } finally {
