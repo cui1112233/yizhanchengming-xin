@@ -15,6 +15,8 @@ type uploaderFake struct {
 	contentLength int64
 	body string
 	err error
+	deleteErr error
+	deleted []string
 }
 
 func (f *uploaderFake) Put(_ context.Context, key, contentType string, contentLength int64, body io.Reader) (string, string, error) {
@@ -22,6 +24,11 @@ func (f *uploaderFake) Put(_ context.Context, key, contentType string, contentLe
 	if body != nil { data, _ := io.ReadAll(body); f.body = string(data) }
 	if f.err != nil { return "", "", f.err }
 	return f.bucket, key, nil
+}
+
+func (f *uploaderFake) Delete(_ context.Context, key string) error {
+	f.deleted = append(f.deleted, key)
+	return f.deleteErr
 }
 
 type assetWriterFake struct {
@@ -58,6 +65,7 @@ func TestIngestUploadsToTOSBeforeCreatingAsset(t *testing.T) {
 	if writer.calls != 1 { t.Fatalf("asset creates=%d", writer.calls) }
 	if writer.input.TOSBucket != "prod-media" || writer.input.TOSKey != uploader.key || writer.input.SourceTaskID != "task_123" { t.Fatalf("asset input=%#v", writer.input) }
 	if asset.ID != "asset_1" { t.Fatalf("asset=%#v", asset) }
+	if len(uploader.deleted) != 0 { t.Fatalf("successful ingest must not delete object: %#v", uploader.deleted) }
 }
 
 func TestIngestNeverCreatesDatabaseAssetWhenTOSUploadFails(t *testing.T) {
@@ -67,6 +75,30 @@ func TestIngestNeverCreatesDatabaseAssetWhenTOSUploadFails(t *testing.T) {
 	_, err := service.Ingest(context.Background(), IngestInput{Owner: "owner", MediaType: TypeVideo, ContentType: "video/mp4", Body: strings.NewReader("video")})
 	if err == nil { t.Fatal("expected upload error") }
 	if writer.calls != 0 { t.Fatalf("database asset must not exist before TOS upload; calls=%d", writer.calls) }
+	if len(uploader.deleted) != 0 { t.Fatalf("failed upload must not delete a non-existent object: %#v", uploader.deleted) }
+}
+
+func TestIngestDeletesUploadedObjectWhenDatabaseCreateFails(t *testing.T) {
+	uploader := &uploaderFake{bucket: "prod-media"}
+	writer := &assetWriterFake{err: errors.New("mysql unavailable")}
+	service := IngestService{Uploader: uploader, Assets: writer}
+	_, err := service.Ingest(context.Background(), IngestInput{
+		Owner: "owner",
+		MediaType: TypeImage,
+		ContentType: "image/png",
+		Body: strings.NewReader("png"),
+		ObjectKey: "images/a.png",
+	})
+	if err == nil { t.Fatal("expected database error") }
+	if len(uploader.deleted) != 1 || uploader.deleted[0] != "images/a.png" { t.Fatalf("orphan cleanup=%#v", uploader.deleted) }
+}
+
+func TestIngestReportsDatabaseAndCleanupErrorsTogether(t *testing.T) {
+	uploader := &uploaderFake{bucket: "prod-media", deleteErr: errors.New("delete failed")}
+	writer := &assetWriterFake{err: errors.New("mysql failed")}
+	service := IngestService{Uploader: uploader, Assets: writer}
+	_, err := service.Ingest(context.Background(), IngestInput{Owner: "owner", MediaType: TypeImage, ContentType: "image/png", Body: strings.NewReader("png"), ObjectKey: "images/a.png"})
+	if err == nil || !strings.Contains(err.Error(), "mysql failed") || !strings.Contains(err.Error(), "delete failed") { t.Fatalf("err=%v", err) }
 }
 
 func TestIngestGeneratesNamespacedObjectKeyWhenMissing(t *testing.T) {
