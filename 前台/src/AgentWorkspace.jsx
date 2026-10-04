@@ -29,6 +29,7 @@ import {
 import {
   buildNavigationTarget,
   groupAgentTasks,
+  hasPendingCreativeTools,
   normalizeMediaAssetIds,
   taskStatusMeta,
   toolCardMeta,
@@ -41,8 +42,8 @@ const { TextArea } = Input;
 const QUICK_PROMPTS = [
   '帮我打开小说获取',
   '打开批量工厂',
-  '图片模型在哪里设置？',
-  '创建任务：检查今天的生产任务',
+  '视频模型在哪里设置？',
+  '用当前图片生成10秒视频',
 ];
 
 function timeLabel(value) {
@@ -156,7 +157,8 @@ function InspectorContent({ selected }) {
   }
   if (selected.type === 'tool') {
     const tool = selected.item || {};
-    return <div className="agent-inspector-content"><Tag color="processing">工具执行</Tag><Title level={4}>{toolCardMeta(tool).title}</Title><Text type="secondary">工具</Text><code>{tool.tool_name}</code><Text type="secondary">状态</Text><code>{tool.status}</code><Text type="secondary">参数</Text><pre>{JSON.stringify(tool.arguments || {}, null, 2)}</pre></div>;
+    const meta = toolCardMeta(tool);
+    return <div className="agent-inspector-content"><Tag color={meta.tone}>{meta.title}</Tag><Title level={4}>{meta.detail}</Title><Text type="secondary">工具</Text><code>{tool.tool_name}</code><Text type="secondary">状态</Text><code>{tool.status}</code><Text type="secondary">参数</Text><pre>{JSON.stringify(tool.arguments || {}, null, 2)}</pre>{tool.result ? <><Text type="secondary">结果</Text><pre>{JSON.stringify(tool.result, null, 2)}</pre></> : null}</div>;
   }
   if (selected.type === 'media') {
     const resolved = selected.item?.resolved;
@@ -190,6 +192,7 @@ export default function AgentWorkspace() {
   const threadTasks = snapshot?.tasks || [];
   const messages = snapshot?.messages || [];
   const tools = snapshot?.tool_calls || [];
+  const pendingCreativeTools = useMemo(() => hasPendingCreativeTools(tools), [tools]);
 
   const refreshTasks = useCallback(async () => {
     try { setAllTasks(await listAgentTasks()); } catch { /* Sidebar task failure must not blank chat. */ }
@@ -246,6 +249,33 @@ export default function AgentWorkspace() {
   }, []);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages.length, tools.length]);
+
+  useEffect(() => {
+    if (!activeThreadId || !pendingCreativeTools) return undefined;
+    let cancelled = false;
+    let polling = false;
+    const poll = async () => {
+      if (polling || cancelled) return;
+      polling = true;
+      try {
+        const data = await getAgentThread(activeThreadId);
+        if (cancelled) return;
+        setSnapshot(data);
+        if (!hasPendingCreativeTools(data?.tool_calls || [])) {
+          await refreshTasks();
+          const rows = await listAgentThreads();
+          if (!cancelled) setThreads(rows);
+        }
+      } catch {
+        // Temporary polling failures should not blank the active conversation.
+      } finally {
+        polling = false;
+      }
+    };
+    poll();
+    const timer = window.setInterval(poll, 3000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [activeThreadId, pendingCreativeTools, refreshTasks]);
 
   async function handleNewThread() {
     try {
@@ -335,7 +365,7 @@ export default function AgentWorkspace() {
           <div className="agent-header-left">
             <Button className="agent-mobile-menu" type="text" onClick={() => setMobileThreadsOpen(true)}>☰</Button>
             <div className="agent-header-avatar"><span>✦</span></div>
-            <div><div className="agent-title-row"><strong>一战 Agent</strong><Badge status="success" text="在线" /></div><span className="agent-header-thread">{snapshot?.thread?.title || '新对话'}</span></div>
+            <div><div className="agent-title-row"><strong>一战 Agent</strong><Badge status={pendingCreativeTools ? 'processing' : 'success'} text={pendingCreativeTools ? '正在执行' : '在线'} /></div><span className="agent-header-thread">{snapshot?.thread?.title || '新对话'}</span></div>
           </div>
           <Space><Tooltip title="当前对话任务"><Button onClick={() => setTaskDrawerOpen(true)}>任务 {threadTasks.length ? `· ${threadTasks.length}` : ''}</Button></Tooltip><Button onClick={handleNewThread}>新对话</Button></Space>
         </header>
@@ -343,16 +373,16 @@ export default function AgentWorkspace() {
         {error ? <Alert className="agent-error" type="error" showIcon closable message={error} onClose={() => setError('')} action={<Button size="small" onClick={() => activeThreadId ? loadThread(activeThreadId) : refreshThreads({ autoCreate: true })}>重试</Button>} /> : null}
 
         <section className="agent-chat">
-          {loading ? <div className="agent-center-state"><Spin size="large" /><span>正在打开 Agent 工作区…</span></div> : threadLoading ? <div className="agent-center-state"><Spin /><span>正在读取对话…</span></div> : !messages.length ? <div className="agent-welcome"><div className="agent-welcome-orb">✦</div><Title level={2}>今天想让我帮你做什么？</Title><Paragraph>不用记页面和按钮。你可以直接问设置在哪里、让我打开小说获取，或者把要做的事情记录成任务。</Paragraph><div className="agent-quick-grid">{QUICK_PROMPTS.map(prompt => <button type="button" key={prompt} onClick={() => handleSend(prompt)}><span>↗</span>{prompt}</button>)}</div></div> : <div className="agent-message-list">{messages.map(item => <ChatMessage key={item.id} item={item} tools={tools} onInspect={setSelected} onNavigate={handleNavigation} />)}<div ref={endRef} /></div>}
+          {loading ? <div className="agent-center-state"><Spin size="large" /><span>正在打开 Agent 工作区…</span></div> : threadLoading ? <div className="agent-center-state"><Spin /><span>正在读取对话…</span></div> : !messages.length ? <div className="agent-welcome"><div className="agent-welcome-orb">✦</div><Title level={2}>今天想让我帮你做什么？</Title><Paragraph>不用记页面和按钮。你可以直接问设置在哪里、让我打开小说获取，或者引用一张 TOS 图片让我生成视频。</Paragraph><div className="agent-quick-grid">{QUICK_PROMPTS.map(prompt => <button type="button" key={prompt} onClick={() => handleSend(prompt)}><span>↗</span>{prompt}</button>)}</div></div> : <div className="agent-message-list">{messages.map(item => <ChatMessage key={item.id} item={item} tools={tools} onInspect={setSelected} onNavigate={handleNavigation} />)}<div ref={endRef} /></div>}
         </section>
 
         <footer className="agent-composer-wrap">
           <div className="agent-composer">
             {contextMedia.length ? <div className="agent-context-row"><span>正在引用</span>{contextMedia.map(id => <Tag key={id} closable onClose={() => setContextMedia(current => current.filter(item => item !== id))}>◫ {id}</Tag>)}</div> : null}
-            <TextArea autoSize={{ minRows: 2, maxRows: 7 }} value={composer} onChange={event => setComposer(event.target.value)} placeholder="告诉 Agent 你想做什么… 例如：帮我打开小说获取" onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); } }} disabled={sending} />
+            <TextArea autoSize={{ minRows: 2, maxRows: 7 }} value={composer} onChange={event => setComposer(event.target.value)} placeholder="告诉 Agent 你想做什么… 例如：用这张图生成10秒视频" onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleSend(); } }} disabled={sending} />
             <div className="agent-composer-actions"><Space><Button type="text" onClick={() => setMediaModalOpen(true)}>＋ 媒体</Button><Button type="text" onClick={() => setComposer(current => current ? `${current} @资产` : '@资产 ')}>＠资产</Button></Space><div className="agent-send-side"><span>Enter 发送 · Shift+Enter 换行</span><Button className="agent-send" type="primary" loading={sending} disabled={!composer.trim() && !contextMedia.length} onClick={() => handleSend()}>↑</Button></div></div>
           </div>
-          <span className="agent-disclaimer">Agent 会调用系统真实能力；尚未接入的生成工具不会伪装成已完成。</span>
+          <span className="agent-disclaimer">Agent 会调用系统真实能力；生成结果统一写入 TOS，尚未接入的工具不会伪装完成。</span>
         </footer>
       </main>
 
