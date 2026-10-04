@@ -102,7 +102,7 @@ func (s *SQLStore) Put(ctx context.Context, input PutInput) (Record, error) {
 	_, err = s.exec.ExecContext(ctx, `INSERT INTO generation_provider_configs
 (id, owner, media_kind, provider, model, create_url, tasks_url, result_url, credential_nonce, credential_ciphertext, settings_json, enabled)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE model=VALUES(model), create_url=VALUES(create_url), tasks_url=VALUES(tasks_url), result_url=VALUES(result_url), credential_nonce=VALUES(credential_nonce), credential_ciphertext=VALUES(credential_ciphertext), settings_json=VALUES(settings_json), enabled=VALUES(enabled), updated_at=CURRENT_TIMESTAMP(6)`,
+ON DUPLICATE KEY UPDATE model=VALUES(model), create_url=VALUES(create_url), tasks_url=VALUES(tasks_url), result_url=VALUES(result_url), credential_nonce=COALESCE(VALUES(credential_nonce), credential_nonce), credential_ciphertext=COALESCE(VALUES(credential_ciphertext), credential_ciphertext), settings_json=VALUES(settings_json), enabled=VALUES(enabled), updated_at=CURRENT_TIMESTAMP(6)`,
 		id, input.Owner, input.MediaKind, input.Provider, input.Model, input.CreateURL, input.TasksURL, input.ResultURL, nullableBytes(nonce), nullableBytes(ciphertext), settings, input.Enabled)
 	if err != nil { return Record{}, err }
 	now := time.Now().UTC()
@@ -130,7 +130,6 @@ FROM generation_provider_configs WHERE owner=? AND media_kind=? AND provider=? L
 		plain, err := s.cipher.Decrypt(record.Owner, record.MediaKind, record.Provider, nonce, ciphertext)
 		if err != nil { return Resolved{}, err }
 		resolved.APIKey = string(plain)
-		record.Configured = true
 		resolved.Record.Configured = true
 	}
 	return resolved, nil
