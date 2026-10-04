@@ -5,6 +5,7 @@ import "context"
 type Store interface {
 	CreateIntake(ctx context.Context, name string) (Intake, error)
 	GetIntake(ctx context.Context, id int64) (Intake, error)
+	ListIntakes(ctx context.Context) ([]Intake, error)
 	UpdateIntakeStatus(ctx context.Context, id int64, status Status) error
 	UpsertBook(ctx context.Context, book Book) (Book, error)
 	ListBooks(ctx context.Context, intakeID int64) ([]Book, error)

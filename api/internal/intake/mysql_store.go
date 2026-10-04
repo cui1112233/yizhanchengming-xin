@@ -38,6 +38,28 @@ func (s *MySQLStore) GetIntake(ctx context.Context, id int64) (Intake, error) {
 	return value, nil
 }
 
+func (s *MySQLStore) ListIntakes(ctx context.Context) ([]Intake, error) {
+	const query = "SELECT id, name, status, created_at, updated_at FROM intakes ORDER BY id DESC LIMIT 100"
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list intakes: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]Intake, 0)
+	for rows.Next() {
+		var value Intake
+		if err := rows.Scan(&value.ID, &value.Name, &value.Status, &value.CreatedAt, &value.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan intake: %w", err)
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate intakes: %w", err)
+	}
+	return result, nil
+}
+
 func (s *MySQLStore) UpdateIntakeStatus(ctx context.Context, id int64, status Status) error {
 	result, err := s.db.ExecContext(ctx, "UPDATE intakes SET status = ? WHERE id = ?", status, id)
 	if err != nil {
