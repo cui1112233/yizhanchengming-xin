@@ -41,9 +41,11 @@ type Book struct {
 	ID             int64
 	IntakeID       int64
 	Source         string
+	PlatformID     string
 	ExternalBookID string
 	Title          string
 	BodyRef        string
+	OriginalText   string
 	Category       string
 	Genre          string
 	Gender         string

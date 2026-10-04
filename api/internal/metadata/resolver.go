@@ -4,7 +4,7 @@ import "strings"
 
 const (
 	SourceManual   = "manual"
-	SourceCategory = "category"
+	SourceCategory = "121_category"
 	SourceGenre    = "genre"
 	SourceProvider = "provider"
 	SourceAI       = "ai"
@@ -32,7 +32,7 @@ func ResolveGender(manual, category, genre, ai string) (string, string) {
 	if value := normalizeGender(manual); value != "" {
 		return value, SourceManual
 	}
-	if value := normalizeGender(category); value != "" {
+	if value := deriveCategoryGender(category); value != "" {
 		return value, SourceCategory
 	}
 	if value := verifiedGenreGender[strings.TrimSpace(genre)]; value != "" {
@@ -55,6 +55,22 @@ func ResolveStyle(manual, provider, ai string) (string, string) {
 		return value, SourceAI
 	}
 	return "", ""
+}
+
+func deriveCategoryGender(raw string) string {
+	value := strings.TrimSpace(raw)
+	if normalized := normalizeGender(value); normalized != "" {
+		return normalized
+	}
+	male := strings.Contains(value, "男频") || strings.Contains(value, "男生") || strings.Contains(value, "男性") || strings.Contains(value, "男向")
+	female := strings.Contains(value, "女频") || strings.Contains(value, "女生") || strings.Contains(value, "女性") || strings.Contains(value, "女向")
+	if male == female {
+		return ""
+	}
+	if male {
+		return "男频"
+	}
+	return "女频"
 }
 
 func normalizeGender(raw string) string {

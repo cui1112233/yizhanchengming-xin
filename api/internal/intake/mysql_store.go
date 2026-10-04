@@ -38,14 +38,27 @@ func (s *MySQLStore) GetIntake(ctx context.Context, id int64) (Intake, error) {
 	return value, nil
 }
 
+func (s *MySQLStore) UpdateIntakeStatus(ctx context.Context, id int64, status Status) error {
+	result, err := s.db.ExecContext(ctx, "UPDATE intakes SET status = ? WHERE id = ?", status, id)
+	if err != nil {
+		return fmt.Errorf("update intake status: %w", err)
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *MySQLStore) UpsertBook(ctx context.Context, book Book) (Book, error) {
-	const query = "INSERT INTO books (intake_id, source, external_book_id, title, body_ref, category, genre, gender, gender_source, style, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), title = VALUES(title), body_ref = VALUES(body_ref), category = VALUES(category), genre = VALUES(genre), gender = VALUES(gender), gender_source = VALUES(gender_source), style = VALUES(style), status = VALUES(status), error_message = VALUES(error_message)"
+	const query = "INSERT INTO books (intake_id, source, platform_id, external_book_id, title, body_ref, original_text, category, genre, gender, gender_source, style, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), platform_id = VALUES(platform_id), title = VALUES(title), body_ref = VALUES(body_ref), original_text = VALUES(original_text), category = VALUES(category), genre = VALUES(genre), gender = VALUES(gender), gender_source = VALUES(gender_source), style = VALUES(style), status = VALUES(status), error_message = VALUES(error_message)"
 	result, err := s.db.ExecContext(ctx, query,
 		book.IntakeID,
 		book.Source,
+		book.PlatformID,
 		book.ExternalBookID,
 		book.Title,
 		book.BodyRef,
+		book.OriginalText,
 		book.Category,
 		book.Genre,
 		book.Gender,
@@ -63,6 +76,45 @@ func (s *MySQLStore) UpsertBook(ctx context.Context, book Book) (Book, error) {
 	}
 	book.ID = id
 	return book, nil
+}
+
+func (s *MySQLStore) ListBooks(ctx context.Context, intakeID int64) ([]Book, error) {
+	const query = "SELECT id, intake_id, source, platform_id, external_book_id, title, body_ref, original_text, category, genre, gender, gender_source, style, status, error_message, created_at, updated_at FROM books WHERE intake_id = ? ORDER BY id ASC"
+	rows, err := s.db.QueryContext(ctx, query, intakeID)
+	if err != nil {
+		return nil, fmt.Errorf("list books: %w", err)
+	}
+	defer rows.Close()
+	books := make([]Book, 0)
+	for rows.Next() {
+		var book Book
+		if err := rows.Scan(
+			&book.ID,
+			&book.IntakeID,
+			&book.Source,
+			&book.PlatformID,
+			&book.ExternalBookID,
+			&book.Title,
+			&book.BodyRef,
+			&book.OriginalText,
+			&book.Category,
+			&book.Genre,
+			&book.Gender,
+			&book.GenderSource,
+			&book.Style,
+			&book.Status,
+			&book.ErrorMessage,
+			&book.CreatedAt,
+			&book.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan book: %w", err)
+		}
+		books = append(books, book)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate books: %w", err)
+	}
+	return books, nil
 }
 
 func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProject) (BatchProject, error) {

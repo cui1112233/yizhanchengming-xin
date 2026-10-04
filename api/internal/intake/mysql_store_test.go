@@ -47,7 +47,7 @@ func TestMySQLStoreCreateAndReadIntake(t *testing.T) {
 	}
 }
 
-func TestMySQLStoreUpsertBookIsIdempotentWithinIntakeAndPersistsMetadata(t *testing.T) {
+func TestMySQLStoreUpsertBookIsIdempotentWithinIntakeAndPersistsExecutionState(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -58,29 +58,66 @@ func TestMySQLStoreUpsertBookIsIdempotentWithinIntakeAndPersistsMetadata(t *test
 	book := Book{
 		IntakeID:       11,
 		Source:         "知乎",
-		ExternalBookID: "book-1001",
+		PlatformID:     "15",
+		ExternalBookID: "1001",
 		Title:          "林子深处有声音",
-		BodyRef:        "tos://novels/book-1001.txt",
-		Category:       "女频",
-		Genre:          "现代言情",
+		BodyRef:        "",
+		OriginalText:   "第一章\n正文",
+		Category:       "女生言情",
+		Genre:          "8",
 		Gender:         "女频",
-		GenderSource:   "category",
+		GenderSource:   "121_category",
 		Style:          "情感",
 		Status:         BookStatusFetched,
 	}
 
-	query := "INSERT INTO books (intake_id, source, external_book_id, title, body_ref, category, genre, gender, gender_source, style, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), title = VALUES(title), body_ref = VALUES(body_ref), category = VALUES(category), genre = VALUES(genre), gender = VALUES(gender), gender_source = VALUES(gender_source), style = VALUES(style), status = VALUES(status), error_message = VALUES(error_message)"
+	query := "INSERT INTO books (intake_id, source, platform_id, external_book_id, title, body_ref, original_text, category, genre, gender, gender_source, style, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), platform_id = VALUES(platform_id), title = VALUES(title), body_ref = VALUES(body_ref), original_text = VALUES(original_text), category = VALUES(category), genre = VALUES(genre), gender = VALUES(gender), gender_source = VALUES(gender_source), style = VALUES(style), status = VALUES(status), error_message = VALUES(error_message)"
 	mock.ExpectExec(regexp.QuoteMeta(query)).
-		WithArgs(book.IntakeID, book.Source, book.ExternalBookID, book.Title, book.BodyRef, book.Category, book.Genre, book.Gender, book.GenderSource, book.Style, book.Status, "").
+		WithArgs(book.IntakeID, book.Source, book.PlatformID, book.ExternalBookID, book.Title, book.BodyRef, book.OriginalText, book.Category, book.Genre, book.Gender, book.GenderSource, book.Style, book.Status, "").
 		WillReturnResult(sqlmock.NewResult(31, 1))
 
 	got, err := store.UpsertBook(context.Background(), book)
 	if err != nil {
 		t.Fatalf("UpsertBook: %v", err)
 	}
-	if got.ID != 31 || got.Gender != "女频" || got.GenderSource != "category" || got.Style != "情感" {
+	if got.ID != 31 || got.PlatformID != "15" || got.OriginalText == "" || got.GenderSource != "121_category" {
 		t.Fatalf("got = %+v", got)
 	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLStoreListBooksAndUpdateIntakeStatus(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	store := NewMySQLStore(db)
+	now := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+	query := "SELECT id, intake_id, source, platform_id, external_book_id, title, body_ref, original_text, category, genre, gender, gender_source, style, status, error_message, created_at, updated_at FROM books WHERE intake_id = ? ORDER BY id ASC"
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WithArgs(int64(11)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "source", "platform_id", "external_book_id", "title", "body_ref", "original_text", "category", "genre", "gender", "gender_source", "style", "status", "error_message", "created_at", "updated_at"}).
+			AddRow(31, 11, "番茄付费", "2", "2001", "测试书", "", "正文", "男生生活", "8", "男频", "121_category", "现代通用", BookStatusFetched, "", now, now))
+
+	books, err := store.ListBooks(context.Background(), 11)
+	if err != nil {
+		t.Fatalf("ListBooks: %v", err)
+	}
+	if len(books) != 1 || books[0].PlatformID != "2" || books[0].OriginalText != "正文" {
+		t.Fatalf("books = %+v", books)
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE intakes SET status = ? WHERE id = ?")).
+		WithArgs(StatusCompleted, int64(11)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := store.UpdateIntakeStatus(context.Background(), 11, StatusCompleted); err != nil {
+		t.Fatalf("UpdateIntakeStatus: %v", err)
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
