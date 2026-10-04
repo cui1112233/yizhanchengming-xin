@@ -12,6 +12,7 @@ import (
 
 type sdkFake struct {
 	putInput *tos.PutObjectV2Input
+	deleteInput *tos.DeleteObjectV2Input
 	signInput *tos.PreSignedURLInput
 }
 
@@ -19,6 +20,11 @@ func (f *sdkFake) PutObjectV2(_ context.Context, input *tos.PutObjectV2Input) (*
 	f.putInput = input
 	_, _ = io.ReadAll(input.Content)
 	return &tos.PutObjectV2Output{}, nil
+}
+
+func (f *sdkFake) DeleteObjectV2(_ context.Context, input *tos.DeleteObjectV2Input) (*tos.DeleteObjectV2Output, error) {
+	f.deleteInput = input
+	return &tos.DeleteObjectV2Output{}, nil
 }
 
 func (f *sdkFake) PreSignedURL(input *tos.PreSignedURLInput) (*tos.PreSignedURLOutput, error) {
@@ -56,6 +62,23 @@ func TestClientUploadsIntoConfiguredBucket(t *testing.T) {
 	}
 }
 
+func TestClientPutImplementsMediaUploaderContract(t *testing.T) {
+	fake := &sdkFake{}
+	client := newWithSDK(fake, "prod-media")
+	bucket, key, err := client.Put(context.Background(), "video/a.mp4", "video/mp4", 5, strings.NewReader("video"))
+	if err != nil { t.Fatal(err) }
+	if bucket != "prod-media" || key != "video/a.mp4" { t.Fatalf("bucket=%q key=%q", bucket, key) }
+}
+
+func TestClientDeleteRemovesObjectFromConfiguredBucket(t *testing.T) {
+	fake := &sdkFake{}
+	client := newWithSDK(fake, "prod-media")
+	if err := client.Delete(context.Background(), "images/a.png"); err != nil { t.Fatal(err) }
+	if fake.deleteInput == nil || fake.deleteInput.Bucket != "prod-media" || fake.deleteInput.Key != "images/a.png" {
+		t.Fatalf("delete input=%#v", fake.deleteInput)
+	}
+}
+
 func TestClientCreatesShortLivedSignedGetURL(t *testing.T) {
 	fake := &sdkFake{}
 	client := newWithSDK(fake, "prod-media")
@@ -70,5 +93,7 @@ func TestClientCreatesShortLivedSignedGetURL(t *testing.T) {
 func TestClientRejectsUnsafeEmptyObjectKey(t *testing.T) {
 	client := newWithSDK(&sdkFake{}, "prod-media")
 	if _, err := client.Upload(context.Background(), UploadInput{Body: strings.NewReader("x")}); err == nil { t.Fatal("expected empty key error") }
+	if _, _, err := client.Put(context.Background(), "", "image/png", 1, strings.NewReader("x")); err == nil { t.Fatal("expected empty put key error") }
+	if err := client.Delete(context.Background(), ""); err == nil { t.Fatal("expected empty delete key error") }
 	if _, err := client.SignedGetURL("", 600); err == nil { t.Fatal("expected empty key error") }
 }
