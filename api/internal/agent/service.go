@@ -7,7 +7,7 @@ import (
 )
 
 type ResponseGenerator interface {
-	Respond(context.Context, string, string, string) (AgentResponse, error)
+	Respond(context.Context, ResponseContext) (AgentResponse, error)
 }
 
 type Service struct {
@@ -91,7 +91,14 @@ func (s *Service) SendMessage(ctx context.Context, owner, threadID string, input
 		_ = s.Store.UpdateThreadTitle(ctx, owner, threadID, titleFromMessage(input.Content))
 	}
 
-	response, err := s.Responder.Respond(ctx, owner, threadID, input.Content)
+	response, err := s.Responder.Respond(ctx, ResponseContext{
+		Owner: owner,
+		ThreadID: threadID,
+		Input: input.Content,
+		MediaAssetIDs: append([]string(nil), input.MediaAssetIDs...),
+		Messages: append([]Message(nil), snapshot.Messages...),
+		Tasks: append([]Task(nil), snapshot.Tasks...),
+	})
 	if err != nil {
 		return SendMessageResult{}, err
 	}
