@@ -1,0 +1,25 @@
+.agent-media-preview.has-preview {
+  overflow: hidden;
+  background: #090c13;
+}
+
+.agent-media-preview img,
+.agent-media-preview video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.agent-inspector-media {
+  overflow: hidden;
+}
+
+.agent-inspector-media img,
+.agent-inspector-media video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #05070c;
+}
