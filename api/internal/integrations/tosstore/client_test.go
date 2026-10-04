@@ -29,15 +29,13 @@ func (f *sdkFake) PreSignedURL(input *tos.PreSignedURLInput) (*tos.PreSignedURLO
 func TestNewRequiresCompleteTOSConfig(t *testing.T) {
 	for _, cfg := range []Config{
 		{},
-		{Endpoint: "tos.example", Region: "cn-x", AccessKey: "ak", SecretKey: "sk"},
-		{Endpoint: "tos.example", Region: "cn-x", AccessKey: "ak", SecretKey: "sk", Bucket: "bucket"},
+		{Endpoint: "https://tos-cn-beijing.volces.com", Region: "cn-beijing", AccessKey: "ak", SecretKey: "sk"},
+		{Endpoint: "https://tos-cn-beijing.volces.com", Region: "cn-beijing", AccessKey: "ak", Bucket: "bucket"},
 	} {
-		_, err := New(cfg)
-		if cfg.Endpoint != "" && cfg.Bucket != "" && err == nil {
-			// endpoint without scheme is valid for the official SDK; complete config should pass.
-			continue
-		}
-		if err == nil { t.Fatalf("expected incomplete config to fail: %#v", cfg) }
+		if _, err := New(cfg); err == nil { t.Fatalf("expected incomplete config to fail: %#v", cfg) }
+	}
+	if _, err := New(Config{Endpoint: "https://tos-cn-beijing.volces.com", Region: "cn-beijing", AccessKey: "ak", SecretKey: "sk", Bucket: "bucket"}); err != nil {
+		t.Fatalf("complete config should construct client: %v", err)
 	}
 }
 
