@@ -17,6 +17,11 @@ func setBaseServerEnv(t *testing.T) {
 	t.Setenv("AI_BASE_URL", "")
 	t.Setenv("AI_MODEL", "")
 	t.Setenv("AI_API_KEY", "")
+	t.Setenv("TOS_ENDPOINT", "")
+	t.Setenv("TOS_REGION", "")
+	t.Setenv("TOS_ACCESS_KEY", "")
+	t.Setenv("TOS_SECRET_KEY", "")
+	t.Setenv("TOS_BUCKET", "")
 }
 
 func TestConfigFromEnvRequiresMySQLRedisAndOwner(t *testing.T) {
@@ -42,6 +47,24 @@ func TestConfigFromEnvRejectsPartialAgentAIConfig(t *testing.T) {
 	setBaseServerEnv(t)
 	t.Setenv("AI_BASE_URL", "https://api.example.com/v1")
 	if _, err := configFromEnv(); err == nil { t.Fatal("expected partial AI config error") }
+}
+
+func TestConfigFromEnvAcceptsCompleteTOSConfig(t *testing.T) {
+	setBaseServerEnv(t)
+	t.Setenv("TOS_ENDPOINT", "tos-cn-guangzhou.volces.com")
+	t.Setenv("TOS_REGION", "cn-guangzhou")
+	t.Setenv("TOS_ACCESS_KEY", "ak")
+	t.Setenv("TOS_SECRET_KEY", "sk")
+	t.Setenv("TOS_BUCKET", "prod-media")
+	cfg, err := configFromEnv()
+	if err != nil { t.Fatal(err) }
+	if cfg.TOSBucket != "prod-media" || cfg.TOSRegion != "cn-guangzhou" { t.Fatalf("TOS cfg=%#v", cfg) }
+}
+
+func TestConfigFromEnvRejectsPartialTOSConfig(t *testing.T) {
+	setBaseServerEnv(t)
+	t.Setenv("TOS_BUCKET", "prod-media")
+	if _, err := configFromEnv(); err == nil { t.Fatal("expected partial TOS config error") }
 }
 
 func TestConfigFromEnvRejectsMissingRedis(t *testing.T) {
@@ -91,6 +114,7 @@ func TestComposeHTTPHandlerKeepsAPIRoutesSeparateFromFrontend(t *testing.T) {
 		{path: "/api/batch-factory/intakes", want: "api"},
 		{path: "/api/batch-factory/jobs", want: "api"},
 		{path: "/api/agent/threads", want: "api"},
+		{path: "/api/media/assets/asset_1", want: "api"},
 		{path: "/healthz", want: "api"},
 		{path: "/batch-factory", want: "frontend"},
 		{path: "/agent", want: "frontend"},
