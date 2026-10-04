@@ -61,6 +61,11 @@ func newWithSDK(sdk tosAPI, bucket string) *Client {
 	return &Client{sdk: sdk, bucket: strings.TrimSpace(bucket)}
 }
 
+func (c *Client) Bucket() string {
+	if c == nil { return "" }
+	return c.bucket
+}
+
 func (c *Client) Upload(ctx context.Context, input UploadInput) (StoredObject, error) {
 	if c == nil || c.sdk == nil || strings.TrimSpace(c.bucket) == "" {
 		return StoredObject{}, errors.New("TOS client unavailable")
