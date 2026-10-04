@@ -8,6 +8,7 @@ import (
 
     "github.com/cui1112233/yizhanchengming-xin/api/internal/agent"
     "github.com/cui1112233/yizhanchengming-xin/api/internal/batchfactory"
+    "github.com/cui1112233/yizhanchengming-xin/api/internal/media"
 )
 
 func TestRouterExposesHealthAndBatchFactory(t *testing.T) {
@@ -52,4 +53,15 @@ func TestRouterWithAgentExposesAgentThreadsWithoutBreakingBatchRoutes(t *testing
     batch := httptest.NewRecorder()
     handler.ServeHTTP(batch, httptest.NewRequest(http.MethodGet, "/api/batch-factory/jobs", nil))
     if batch.Code != http.StatusMethodNotAllowed { t.Fatalf("batch route status=%d", batch.Code) }
+}
+
+func TestUnifiedRouterExposesMediaPreview(t *testing.T) {
+    starter := &fakeStarter{}
+    owner := func(*http.Request) (string,error) { return "user-1", nil }
+    resolver := &mediaResolverFake{result: media.ResolvedAsset{Asset: media.Reference{ID: "asset_1", MediaType: media.TypeImage}, PreviewURL: "https://signed.example/a.png"}}
+    handler := NewRouterWithServices(starter, nil, owner, nil, resolver)
+
+    preview := httptest.NewRecorder()
+    handler.ServeHTTP(preview, httptest.NewRequest(http.MethodGet, "/api/media/assets/asset_1", nil))
+    if preview.Code != http.StatusOK { t.Fatalf("media route status=%d body=%s", preview.Code, preview.Body.String()) }
 }
