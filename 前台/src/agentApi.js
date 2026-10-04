@@ -84,3 +84,9 @@ export async function updateAgentToolCall(toolId, input, { fetchImpl = globalThi
   }, fetchImpl);
   return result?.tool_call || result;
 }
+
+export async function getMediaAsset(mediaAssetId, { fetchImpl = globalThis.fetch } = {}) {
+  const id = String(mediaAssetId || '').trim();
+  if (!id) throw new Error('media asset id is required');
+  return requestJSON(`/api/media/assets/${encodeURIComponent(id)}`, {}, fetchImpl);
+}
