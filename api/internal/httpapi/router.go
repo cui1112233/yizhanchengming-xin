@@ -7,14 +7,18 @@ import (
 )
 
 func NewRouter(starter BatchStarter) http.Handler {
-	return NewRouterWithAgent(starter, nil, nil, nil)
+	return NewRouterWithServices(starter, nil, nil, nil, nil)
 }
 
 func NewRouterWithIntakes(starter BatchStarter, intakeCreator IntakeCreator, ownerResolver OwnerResolver) http.Handler {
-	return NewRouterWithAgent(starter, intakeCreator, ownerResolver, nil)
+	return NewRouterWithServices(starter, intakeCreator, ownerResolver, nil, nil)
 }
 
 func NewRouterWithAgent(starter BatchStarter, intakeCreator IntakeCreator, ownerResolver OwnerResolver, agentAPI AgentAPI) http.Handler {
+	return NewRouterWithServices(starter, intakeCreator, ownerResolver, agentAPI, nil)
+}
+
+func NewRouterWithServices(starter BatchStarter, intakeCreator IntakeCreator, ownerResolver OwnerResolver, agentAPI AgentAPI, mediaResolver MediaResolver) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/api/batch-factory/jobs", NewBatchFactoryHandler(starter))
 	mux.Handle("/api/batch-factory/intakes", NewIntakeHandler(intakeCreator, ownerResolver))
@@ -27,6 +31,9 @@ func NewRouterWithAgent(starter BatchStarter, intakeCreator IntakeCreator, owner
 		mux.Handle("/api/agent/tasks", agentHandler)
 		mux.Handle("/api/agent/tasks/", agentHandler)
 		mux.Handle("/api/agent/tool-calls/", agentHandler)
+	}
+	if mediaResolver != nil {
+		mux.Handle("/api/media/assets/", NewMediaHandler(mediaResolver, ownerResolver))
 	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
