@@ -24,6 +24,7 @@ func setBaseServerEnv(t *testing.T) {
 	t.Setenv("TOS_ACCESS_KEY", "")
 	t.Setenv("TOS_SECRET_KEY", "")
 	t.Setenv("TOS_BUCKET", "")
+	t.Setenv("PROVIDER_CREDENTIAL_KEY", "")
 }
 
 func TestConfigFromEnvRequiresMySQLRedisAndOwner(t *testing.T) {
@@ -68,6 +69,20 @@ func TestConfigFromEnvRejectsPartialTOSConfig(t *testing.T) {
 	if _, err := configFromEnv(); err == nil { t.Fatal("expected partial TOS config error") }
 }
 
+func TestConfigFromEnvAcceptsProviderCredentialKey(t *testing.T) {
+	setBaseServerEnv(t)
+	t.Setenv("PROVIDER_CREDENTIAL_KEY", "12345678901234567890123456789012")
+	cfg, err := configFromEnv()
+	if err != nil { t.Fatal(err) }
+	if len([]byte(cfg.ProviderCredentialKey)) != 32 { t.Fatalf("key length=%d", len([]byte(cfg.ProviderCredentialKey))) }
+}
+
+func TestConfigFromEnvRejectsInvalidProviderCredentialKey(t *testing.T) {
+	setBaseServerEnv(t)
+	t.Setenv("PROVIDER_CREDENTIAL_KEY", "short")
+	if _, err := configFromEnv(); err == nil { t.Fatal("expected invalid provider key error") }
+}
+
 func TestConfigFromEnvRejectsMissingRedis(t *testing.T) {
 	setBaseServerEnv(t)
 	t.Setenv("REDIS_URL", "")
@@ -98,7 +113,7 @@ func TestComposeHTTPHandlerKeepsAPIRoutesSeparateFromFrontend(t *testing.T) {
 	frontend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("frontend")) })
 	handler := composeHTTPHandler(api, frontend)
 	cases := []struct{ path, want string }{
-		{"/api/batch-factory/intakes","api"},{"/api/batch-factory/jobs","api"},{"/api/agent/threads","api"},{"/api/media/assets/asset_1","api"},{"/healthz","api"},{"/batch-factory","frontend"},{"/agent","frontend"},{"/","frontend"},
+		{"/api/batch-factory/intakes","api"},{"/api/batch-factory/jobs","api"},{"/api/agent/threads","api"},{"/api/media/assets/asset_1","api"},{"/api/provider-configs/video/personal_api","api"},{"/healthz","api"},{"/batch-factory","frontend"},{"/agent","frontend"},{"/","frontend"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
