@@ -4,37 +4,74 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/agent"
 )
 
-func TestConfigFromEnvRequiresMySQLRedisAndOwner(t *testing.T) {
+func setBaseServerEnv(t *testing.T) {
+	t.Helper()
 	t.Setenv("MYSQL_DSN", "user:pass@tcp(127.0.0.1:3306)/qiantie?parseTime=true")
 	t.Setenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 	t.Setenv("SYSTEM_OWNER", "user-1")
 	t.Setenv("LISTEN_ADDR", ":8080")
+	t.Setenv("AI_BASE_URL", "")
+	t.Setenv("AI_MODEL", "")
+	t.Setenv("AI_API_KEY", "")
+}
 
+func TestConfigFromEnvRequiresMySQLRedisAndOwner(t *testing.T) {
+	setBaseServerEnv(t)
 	cfg, err := configFromEnv()
 	if err != nil { t.Fatal(err) }
 	if cfg.MySQLDSN == "" || cfg.RedisURL == "" || cfg.SystemOwner != "user-1" || cfg.ListenAddr != ":8080" { t.Fatalf("cfg=%#v", cfg) }
 }
 
+func TestConfigFromEnvAcceptsCompleteAgentAIConfig(t *testing.T) {
+	setBaseServerEnv(t)
+	t.Setenv("AI_BASE_URL", "https://api.example.com/v1")
+	t.Setenv("AI_MODEL", "agent-model")
+	t.Setenv("AI_API_KEY", "secret")
+	cfg, err := configFromEnv()
+	if err != nil { t.Fatal(err) }
+	if cfg.AIBaseURL != "https://api.example.com/v1" || cfg.AIModel != "agent-model" || cfg.AIAPIKey != "secret" {
+		t.Fatalf("AI cfg=%#v", cfg)
+	}
+}
+
+func TestConfigFromEnvRejectsPartialAgentAIConfig(t *testing.T) {
+	setBaseServerEnv(t)
+	t.Setenv("AI_BASE_URL", "https://api.example.com/v1")
+	if _, err := configFromEnv(); err == nil { t.Fatal("expected partial AI config error") }
+}
+
 func TestConfigFromEnvRejectsMissingRedis(t *testing.T) {
-	t.Setenv("MYSQL_DSN", "dsn")
+	setBaseServerEnv(t)
 	t.Setenv("REDIS_URL", "")
-	t.Setenv("SYSTEM_OWNER", "user-1")
 	if _, err := configFromEnv(); err == nil { t.Fatal("expected missing redis error") }
 }
 
 func TestConfigFromEnvRejectsMissingOwner(t *testing.T) {
-	t.Setenv("MYSQL_DSN", "dsn")
-	t.Setenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+	setBaseServerEnv(t)
 	t.Setenv("SYSTEM_OWNER", "")
 	if _, err := configFromEnv(); err == nil { t.Fatal("expected missing owner error") }
 }
 
-func TestNewAgentServiceWiresStoreAndResponder(t *testing.T) {
-	service := newAgentService(nil)
+func TestNewAgentServiceUsesDeterministicResponderWithoutAI(t *testing.T) {
+	service, err := newAgentService(nil, serverConfig{})
+	if err != nil { t.Fatal(err) }
 	if service == nil || service.Store == nil || service.Responder == nil {
 		t.Fatalf("agent service not fully wired: %#v", service)
+	}
+	if _, ok := service.Responder.(*agent.Responder); !ok {
+		t.Fatalf("expected deterministic responder, got %T", service.Responder)
+	}
+}
+
+func TestNewAgentServiceUsesHybridResponderWithAI(t *testing.T) {
+	service, err := newAgentService(nil, serverConfig{AIBaseURL: "https://api.example.com", AIModel: "agent-model", AIAPIKey: "secret"})
+	if err != nil { t.Fatal(err) }
+	if _, ok := service.Responder.(*agent.HybridResponder); !ok {
+		t.Fatalf("expected hybrid responder, got %T", service.Responder)
 	}
 }
 
