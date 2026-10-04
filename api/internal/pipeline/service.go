@@ -62,8 +62,8 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (CreateResu
 		runAt = now
 	} else {
 		runAt = runAt.UTC()
-		if runAt.Before(now) {
-			return CreateResult{}, fmt.Errorf("run_at 不能早于当前时间")
+		if !runAt.After(now) {
+			return CreateResult{}, fmt.Errorf("run_at 必须晚于当前时间")
 		}
 	}
 
