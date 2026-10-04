@@ -1,0 +1,263 @@
+.api-config-page {
+  min-height: 100vh;
+  padding: 34px 28px 72px;
+  color: rgba(255, 255, 255, 0.92);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(85, 102, 255, 0.16), transparent 32%),
+    radial-gradient(circle at 92% 4%, rgba(122, 79, 255, 0.12), transparent 30%),
+    #070a12;
+}
+
+.api-config-page > * {
+  width: min(1280px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.api-config-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.api-config-header h1.ant-typography {
+  margin: 4px 0 8px;
+  color: #fff;
+  font-size: clamp(32px, 4vw, 48px);
+  letter-spacing: -0.035em;
+}
+
+.api-config-header p.ant-typography {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.56);
+  line-height: 1.7;
+}
+
+.api-config-eyebrow,
+.api-config-panel-head > div > span {
+  color: #8c97ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.api-config-alert {
+  margin-bottom: 18px;
+  border-radius: 14px;
+}
+
+.api-config-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.api-config-summary > div {
+  min-height: 96px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(14, 19, 31, 0.78);
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.api-config-summary strong {
+  color: #fff;
+  font-size: 22px;
+}
+
+.api-config-summary span {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 12px;
+}
+
+.api-config-panel {
+  margin-bottom: 18px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(13, 18, 30, 0.88);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+  scroll-margin-top: 20px;
+}
+
+.api-config-panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.api-config-panel-head h3.ant-typography {
+  margin: 5px 0 0;
+  color: #fff;
+}
+
+.api-config-panel-head > .ant-typography {
+  max-width: 540px;
+  text-align: right;
+}
+
+.api-platform-list {
+  display: grid;
+  gap: 12px;
+}
+
+.api-platform-card {
+  display: grid;
+  grid-template-columns: minmax(270px, 1.15fr) minmax(340px, 1.5fr) 100px;
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  transition: border-color .18s ease, background .18s ease;
+}
+
+.api-platform-card:hover {
+  border-color: rgba(124, 130, 255, 0.28);
+  background: rgba(124, 130, 255, 0.045);
+}
+
+.api-platform-card.is-migrating {
+  opacity: .78;
+}
+
+.api-platform-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.api-platform-icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #b5b9ff;
+  background: rgba(124, 130, 255, 0.13);
+  border: 1px solid rgba(124, 130, 255, 0.24);
+}
+
+.api-platform-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.api-platform-name-row strong {
+  color: #fff;
+  font-size: 15px;
+}
+
+.api-platform-info small,
+.api-platform-state small,
+.api-platform-security {
+  color: rgba(255, 255, 255, 0.46);
+  line-height: 1.55;
+}
+
+.api-platform-details {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.api-platform-details code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 7px;
+  color: #aeb8ff;
+  background: rgba(111, 125, 255, 0.08);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-platform-credential {
+  min-width: 0;
+}
+
+.api-platform-security {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 7px;
+  font-size: 11px;
+}
+
+.api-platform-state {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.api-config-secondary {
+  min-height: 150px;
+}
+
+.api-config-secondary p.ant-typography {
+  max-width: 840px;
+  margin-bottom: 0;
+  line-height: 1.7;
+}
+
+@media (max-width: 980px) {
+  .api-platform-card {
+    grid-template-columns: 1fr;
+  }
+
+  .api-platform-state {
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+  }
+
+  .api-config-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .api-config-panel-head > .ant-typography {
+    text-align: left;
+  }
+}
+
+@media (max-width: 700px) {
+  .api-config-page {
+    padding: 22px 14px 48px;
+  }
+
+  .api-config-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .api-config-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .api-config-panel {
+    padding: 18px 14px;
+  }
+
+  .api-platform-security {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
