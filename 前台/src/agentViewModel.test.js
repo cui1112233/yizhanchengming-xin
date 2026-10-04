@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildNavigationTarget,
   groupAgentTasks,
+  hasPendingCreativeTools,
   normalizeMediaAssetIds,
   taskStatusMeta,
   toolCardMeta,
@@ -42,6 +43,18 @@ test('creates product-language metadata for navigation tool cards', () => {
   const meta = toolCardMeta({ tool_name: 'ui.navigate', status: 'proposed', arguments: { path: '/batch-factory' } });
   assert.equal(meta.title, '打开批量工厂');
   assert.equal(meta.actionLabel, '打开');
+});
+
+test('creates product-language metadata for video generation states', () => {
+  assert.equal(toolCardMeta({ tool_name: 'video.generate', status: 'proposed', arguments: { model: 'yd2-mini-video' } }).detail, '视频生成中');
+  assert.equal(toolCardMeta({ tool_name: 'video.generate', status: 'completed' }).detail, '视频已生成并保存到 TOS');
+  assert.equal(toolCardMeta({ tool_name: 'video.generate', status: 'failed' }).detail, '视频生成失败');
+});
+
+test('polling is enabled only while creative tools are proposed', () => {
+  assert.equal(hasPendingCreativeTools([{ tool_name: 'ui.navigate', status: 'proposed' }]), false);
+  assert.equal(hasPendingCreativeTools([{ tool_name: 'video.generate', status: 'proposed' }]), true);
+  assert.equal(hasPendingCreativeTools([{ tool_name: 'video.generate', status: 'completed' }]), false);
 });
 
 test('normalizes opaque media asset ids and removes unsafe values', () => {
