@@ -14,6 +14,8 @@ func setBaseServerEnv(t *testing.T) {
 	t.Setenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 	t.Setenv("SYSTEM_OWNER", "user-1")
 	t.Setenv("LISTEN_ADDR", ":8080")
+	t.Setenv("PIPELINE_QUEUE_KEY", "")
+	t.Setenv("AGENT_TOOL_QUEUE_KEY", "")
 	t.Setenv("AI_BASE_URL", "")
 	t.Setenv("AI_MODEL", "")
 	t.Setenv("AI_API_KEY", "")
@@ -29,6 +31,7 @@ func TestConfigFromEnvRequiresMySQLRedisAndOwner(t *testing.T) {
 	cfg, err := configFromEnv()
 	if err != nil { t.Fatal(err) }
 	if cfg.MySQLDSN == "" || cfg.RedisURL == "" || cfg.SystemOwner != "user-1" || cfg.ListenAddr != ":8080" { t.Fatalf("cfg=%#v", cfg) }
+	if cfg.AgentToolQueueKey != "qiantie:agent:tools" { t.Fatalf("agent queue=%q", cfg.AgentToolQueueKey) }
 }
 
 func TestConfigFromEnvAcceptsCompleteAgentAIConfig(t *testing.T) {
@@ -38,9 +41,7 @@ func TestConfigFromEnvAcceptsCompleteAgentAIConfig(t *testing.T) {
 	t.Setenv("AI_API_KEY", "secret")
 	cfg, err := configFromEnv()
 	if err != nil { t.Fatal(err) }
-	if cfg.AIBaseURL != "https://api.example.com/v1" || cfg.AIModel != "agent-model" || cfg.AIAPIKey != "secret" {
-		t.Fatalf("AI cfg=%#v", cfg)
-	}
+	if cfg.AIBaseURL != "https://api.example.com/v1" || cfg.AIModel != "agent-model" || cfg.AIAPIKey != "secret" { t.Fatalf("AI cfg=%#v", cfg) }
 }
 
 func TestConfigFromEnvRejectsPartialAgentAIConfig(t *testing.T) {
@@ -80,51 +81,30 @@ func TestConfigFromEnvRejectsMissingOwner(t *testing.T) {
 }
 
 func TestNewAgentServiceUsesDeterministicResponderWithoutAI(t *testing.T) {
-	service, err := newAgentService(nil, serverConfig{})
+	service, err := newAgentService(nil, serverConfig{}, nil)
 	if err != nil { t.Fatal(err) }
-	if service == nil || service.Store == nil || service.Responder == nil {
-		t.Fatalf("agent service not fully wired: %#v", service)
-	}
-	if _, ok := service.Responder.(*agent.Responder); !ok {
-		t.Fatalf("expected deterministic responder, got %T", service.Responder)
-	}
+	if service == nil || service.Store == nil || service.Responder == nil { t.Fatalf("agent service not fully wired: %#v", service) }
+	if _, ok := service.Responder.(*agent.Responder); !ok { t.Fatalf("expected deterministic responder, got %T", service.Responder) }
 }
 
 func TestNewAgentServiceUsesHybridResponderWithAI(t *testing.T) {
-	service, err := newAgentService(nil, serverConfig{AIBaseURL: "https://api.example.com", AIModel: "agent-model", AIAPIKey: "secret"})
+	service, err := newAgentService(nil, serverConfig{AIBaseURL:"https://api.example.com",AIModel:"agent-model",AIAPIKey:"secret"}, nil)
 	if err != nil { t.Fatal(err) }
-	if _, ok := service.Responder.(*agent.HybridResponder); !ok {
-		t.Fatalf("expected hybrid responder, got %T", service.Responder)
-	}
+	if _, ok := service.Responder.(*agent.HybridResponder); !ok { t.Fatalf("expected hybrid responder, got %T", service.Responder) }
 }
 
 func TestComposeHTTPHandlerKeepsAPIRoutesSeparateFromFrontend(t *testing.T) {
-	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("api"))
-	})
-	frontend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("frontend"))
-	})
+	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("api")) })
+	frontend := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("frontend")) })
 	handler := composeHTTPHandler(api, frontend)
-
-	cases := []struct {
-		path string
-		want string
-	}{
-		{path: "/api/batch-factory/intakes", want: "api"},
-		{path: "/api/batch-factory/jobs", want: "api"},
-		{path: "/api/agent/threads", want: "api"},
-		{path: "/api/media/assets/asset_1", want: "api"},
-		{path: "/healthz", want: "api"},
-		{path: "/batch-factory", want: "frontend"},
-		{path: "/agent", want: "frontend"},
-		{path: "/", want: "frontend"},
+	cases := []struct{ path, want string }{
+		{"/api/batch-factory/intakes","api"},{"/api/batch-factory/jobs","api"},{"/api/agent/threads","api"},{"/api/media/assets/asset_1","api"},{"/healthz","api"},{"/batch-factory","frontend"},{"/agent","frontend"},{"/","frontend"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tc.path, nil))
-			if recorder.Body.String() != tc.want { t.Fatalf("path=%s body=%q", tc.path, recorder.Body.String()) }
+			if recorder.Body.String() != tc.want { t.Fatalf("path=%s body=%q",tc.path,recorder.Body.String()) }
 		})
 	}
 }
