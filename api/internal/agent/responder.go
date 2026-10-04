@@ -2,8 +2,13 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	"regexp"
+	"strconv"
 	"strings"
 )
+
+var videoDurationPattern = regexp.MustCompile(`(?i)(\d{1,2})\s*(?:秒|s|sec|seconds?)`)
 
 type ResponseContext struct {
 	Owner         string
@@ -27,6 +32,10 @@ func (r *Responder) Respond(_ context.Context, input ResponseContext) (AgentResp
 
 	if strings.Contains(lower, "http://") || strings.Contains(lower, "https://") {
 		return AgentResponse{Content: "为了安全，我不会把任意外部网址当成系统导航执行。你可以直接说要打开一战晟铭里的哪个功能，例如小说获取、剧本生成、创作漫剧或批量工厂。"}, nil
+	}
+
+	if tool, ok := videoToolForRequest(text, input.MediaAssetIDs); ok {
+		return AgentResponse{Content: "可以，我会按当前引用素材和你的要求生成视频。生成完成后会直接在这里展示，并保存到 TOS。", Tool: tool}, nil
 	}
 
 	if title, ok := taskTitle(text); ok {
@@ -72,20 +81,23 @@ func (r *Responder) Respond(_ context.Context, input ResponseContext) (AgentResp
 	}
 
 	if strings.Contains(text, "能做什么") || strings.Contains(lower, "help") || text == "帮助" {
-		return AgentResponse{Content: "当前 Agent 已经能帮你打开系统功能、回答常用位置问题、记录任务，并在聊天中携带媒体资产引用。你可以试着说：“帮我打开小说获取”“图片模型在哪里设置”“创建任务：检查今天的批量项目”。图片修改、直接生图、生视频等创作工具会继续接入同一个工具系统，不会另做第二套流程。"}, nil
+		return AgentResponse{Content: "当前 Agent 已经能帮你打开系统功能、回答常用位置问题、记录任务、携带媒体资产引用，并能把视频生成任务交给统一 Go Worker 执行。生成结果会统一保存到 TOS 并直接回到当前聊天。"}, nil
 	}
 
-	if strings.Contains(text, "图片") || strings.Contains(text, "视频") || strings.Contains(text, "生成") || strings.Contains(text, "修改") {
-		return AgentResponse{Content: "我已经理解这是一个创作执行请求，但当前这个 Agent V1 还没有把图片/视频生成 Provider 接到工具注册表里。我不会假装任务已经生成。你可以先把相关事项记录成任务，或者让我打开创作漫剧、批量工厂、API 配置等现有工作区。"}, nil
+	if strings.Contains(text, "图片") || strings.Contains(text, "修改") || strings.Contains(text, "生成") {
+		return AgentResponse{Content: "我理解这是一个创作执行请求。视频生成已经接入统一工具链；图片生成和图片修改仍在接入同一个 Tool Registry，我不会假装已经生成。"}, nil
 	}
 
-	return AgentResponse{Content: "我可以直接帮你操作系统入口、解释设置位置、记录任务，并把后续执行结果放在同一个对话里。你可以更直接地说，例如“打开小说获取”“批量工厂在哪里”“创建任务：检查第 8 个视频失败原因”。"}, nil
+	return AgentResponse{Content: "我可以直接帮你操作系统入口、解释设置位置、记录任务，并把执行结果放在同一个对话里。你可以更直接地说，例如“打开小说获取”“用这张图生成10秒视频”“创建任务：检查第 8 个视频失败原因”。"}, nil
 }
 
 func deterministicIntent(input string) bool {
 	text := strings.TrimSpace(input)
 	lower := strings.ToLower(text)
 	if text == "" || strings.Contains(lower, "http://") || strings.Contains(lower, "https://") {
+		return true
+	}
+	if _, ok := videoToolForRequest(text, nil); ok {
 		return true
 	}
 	if _, ok := taskTitle(text); ok {
@@ -101,6 +113,38 @@ func deterministicIntent(input string) bool {
 		return true
 	}
 	return strings.Contains(text, "能做什么") || strings.Contains(lower, "help") || text == "帮助"
+}
+
+func videoToolForRequest(text string, mediaAssetIDs []string) (*ToolProposal, bool) {
+	trimmed := strings.TrimSpace(text)
+	lower := strings.ToLower(trimmed)
+	if trimmed == "" { return nil, false }
+	videoIntent := strings.Contains(trimmed, "生成视频") || strings.Contains(trimmed, "生视频") || strings.Contains(trimmed, "做视频") || strings.Contains(lower, "generate video") || strings.Contains(lower, "video generate")
+	if !videoIntent { return nil, false }
+	model := "yd2-mini-video"
+	switch {
+	case strings.Contains(lower, "h3") || strings.Contains(lower, "minimax"):
+		model = "minimax-h3-video"
+	case strings.Contains(lower, "yfai") || strings.Contains(lower, "seedance"):
+		model = "seedance-2-0-official"
+	case strings.Contains(trimmed, "豆包") || strings.Contains(trimmed, "本地执行器") || strings.Contains(lower, "local"):
+		model = "local-doubao-executor-video"
+	}
+	duration := 5
+	if match := videoDurationPattern.FindStringSubmatch(trimmed); len(match) == 2 {
+		if parsed, err := strconv.Atoi(match[1]); err == nil && parsed > 0 { duration = parsed }
+	}
+	refs, _ := normalizeMediaAssetIDs(mediaAssetIDs)
+	args := videoGenerateArguments{
+		Model: model,
+		Prompt: trimmed,
+		Duration: duration,
+		AspectRatio: "9:16",
+		Resolution: "720p",
+		ReferenceMediaAssetIDs: refs,
+	}
+	body, _ := json.Marshal(args)
+	return &ToolProposal{Name: ToolVideoGenerate, Label: "生成视频", Arguments: body}, true
 }
 
 func wantsNavigation(text string) bool {
