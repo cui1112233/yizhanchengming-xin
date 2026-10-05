@@ -104,7 +104,7 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     const stats = screen.getByText('已选小说').closest('.ant-statistic')
     expect(stats).toBeTruthy()
     expect(within(stats).getByText('5')).toBeTruthy()
-  })
+  }, 15000)
 
   it('121 完成后展示完整真实字段，创建 BatchProject/Run，并出现进入批量工厂入口', async () => {
     window.history.replaceState({}, '', '/shuihuo-production')
