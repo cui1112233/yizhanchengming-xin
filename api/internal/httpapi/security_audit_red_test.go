@@ -11,6 +11,7 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 )
 
 // CanAccessBatchProject is intentionally declared on the existing publishing
@@ -20,6 +21,27 @@ import (
 // the project-ownership fact source.
 func (f *fakePublishingService) CanAccessBatchProject(context.Context, authn.User, int64) (bool, error) {
 	return false, nil
+}
+
+type failingUnifiedSettings struct{ err error }
+
+func (f *failingUnifiedSettings) GetCurrent(context.Context, int64) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, f.err
+}
+func (f *failingUnifiedSettings) SaveProduction(context.Context, int64, map[string]any) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, f.err
+}
+func (f *failingUnifiedSettings) SavePublishing(context.Context, int64, map[string]any) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, f.err
+}
+func (f *failingUnifiedSettings) SaveProfile(context.Context, int64, unifiedsettings.VersionProfile) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, f.err
+}
+func (f *failingUnifiedSettings) Sync121(context.Context, int64) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, f.err
+}
+func (f *failingUnifiedSettings) SyncStyleTypes(context.Context, int64) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, f.err
 }
 
 func authenticatedBatchRequest(method, path string) *http.Request {
