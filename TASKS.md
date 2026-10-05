@@ -155,7 +155,7 @@
 
 ## 9.1 v88 / ECS 盘点
 
-- [ ] 9.1.1 列出 V11 所有前端页面与组件
+- [x] 9.1.1 列出 V11 所有前端页面与组件 — `docs/migration/v88-batch-factory-v11-frontend-inventory.md`
 - [ ] 9.1.2 列出 V11 所有 Go/Node 历史后端接口
 - [ ] 9.1.3 列出 Batch / Book / Run / Item / VIDEO 状态字段
 - [ ] 9.1.4 列出 personal_api / provider 相关接口
@@ -378,4 +378,4 @@
 
 ## 当前执行点
 
-**下一任务：Task 9 — Batch Factory V11 主工作台。**
+**下一任务：Task 9.1.2 — 列出 V11 所有 Go/Node 历史后端接口。**
