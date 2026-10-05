@@ -20,6 +20,7 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
 }
 
 afterEach(() => {
+  if (typeof document === 'undefined') return
   cleanup()
   message.destroy()
   notification.destroy()
