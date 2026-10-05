@@ -5,6 +5,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
 
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: (query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+})
+
 vi.mock('./api.js', () => ({
   listBatchProjects: vi.fn(),
   getProjectGeneration: vi.fn(),
