@@ -112,6 +112,61 @@ describe('小说获取工作台行为', () => {
     expect(await screen.findByText('121 upstream error')).toBeTruthy()
   }, 15000)
 
+  it('创建 BatchProject 后提供立即进入批量工厂的入口', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => jsonResponse({ intake: { id: 18 }, books: [] }))
+      .mockImplementationOnce(() =>
+        jsonResponse({ intakeId: 18, status: 'completed', fetched: 1, failed: 0 }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          books: [
+            {
+              id: 3,
+              intakeId: 18,
+              source: '知乎',
+              platformId: '15',
+              bookId: '2001',
+              title: '刚创建的小说',
+              gender: '女频',
+              style: '情感',
+              status: 'fetched',
+              errorMessage: '',
+            },
+          ],
+        }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          project: { id: 88, intakeId: 18, name: '刚创建的批次' },
+          run: { id: 99, batchProjectId: 88, runAt: '2026-10-05T08:00:00Z', status: 'pending' },
+        }),
+      )
+
+    render(<IntakeWorkbench />)
+
+    fireEvent.change(screen.getByPlaceholderText('不填则自动生成'), {
+      target: { value: '刚创建的批次' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例如：阳光、常读、知乎'), {
+      target: { value: '知乎' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例如：4'), {
+      target: { value: '15' },
+    })
+    fireEvent.change(screen.getByPlaceholderText(/每行一个/), {
+      target: { value: '2001' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '添加书城' }))
+    fireEvent.click(screen.getByRole('button', { name: '立即执行' }))
+
+    expect(await screen.findByText('立即执行任务已创建。')).toBeTruthy()
+    const link = screen.getByRole('link', { name: '查看批量工厂' })
+    expect(link.getAttribute('href')).toBe('/batch-factory')
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4))
+  }, 15000)
+
   it('批量工厂列表展示真实项目汇总信息', async () => {
     window.history.replaceState({}, '', '/batch-factory')
     const fetchMock = vi
