@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 )
 
 const (
@@ -53,6 +54,7 @@ func (h handler) login(w http.ResponseWriter, r *http.Request) {
 	if h.deps.LoginLimiter != nil {
 		h.deps.LoginLimiter.Reset(key)
 	}
+	observability.SetUserID(r.Context(), user.ID)
 	h.setAuthCookies(w, credentials)
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
@@ -75,6 +77,7 @@ func (h handler) refreshAuth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
 		return
 	}
+	observability.SetUserID(r.Context(), user.ID)
 	h.setAuthCookies(w, credentials)
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
@@ -119,6 +122,7 @@ func (h handler) requireAuth(next http.Handler) http.Handler {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
 			return
 		}
+		observability.SetUserID(r.Context(), user.ID)
 		next.ServeHTTP(w, r.WithContext(authn.WithCurrentUser(r.Context(), user)))
 	})
 }
