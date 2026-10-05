@@ -19,6 +19,9 @@ type Store interface {
 	UpdateStageRun(context.Context, StageRun) (StageRun, error)
 	ListStageRuns(context.Context, int64) ([]StageRun, error)
 	LatestStageRun(context.Context, int64, Stage) (StageRun, error)
+	AudioMeasurementByAsset(context.Context, int64, int64, string) (AudioMeasurement, error)
+	LatestAudioMeasurement(context.Context, int64, int64) (AudioMeasurement, error)
+	CreateAudioMeasurement(context.Context, AudioMeasurement) (AudioMeasurement, error)
 }
 
 type Provider interface {
