@@ -46,7 +46,7 @@
 - ⚠️ Task 11：水货生产工作台
 - ⚠️ Task 12：剧本生成 / Director / Hook / 最终提示词（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - ⚠️ Task 13：音频 + matchAudio 分镜（仓库阶段已完成；公网/ECS 验收留到 Task 16）
-- [ ] Task 14：视频生成完整链路
+- ⚠️ Task 14：视频生成完整链路（仓库阶段已完成；等待 Task9.4 Runtime Adapter + Task16 ECS/公网验收）
 - ⚠️ Task 15：发布 / 权限 / 登录认证兼容（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 16：ECS 新仓库部署与公网全流程验收
 
@@ -298,22 +298,28 @@
 
 # Task 14：视频生成完整链路
 
-- [ ] 14.1 视频任务模型
-- [ ] 14.2 `VIDEO` 状态机
-- [ ] 14.3 personal_api provider
-- [ ] 14.4 yd2.0-mini
-- [ ] 14.5 豆包本地执行器
-- [ ] 14.6 provider 状态 API
-- [ ] 14.7 角色/场景/图片资产传递
-- [ ] 14.8 视频生成提交
-- [ ] 14.9 视频状态轮询
-- [ ] 14.10 失败重试
-- [ ] 14.11 TOS / 本地产物管理
-- [ ] 14.12 视频合并 Worker
-- [ ] 14.13 ffmpeg 合并链
-- [ ] 14.14 最终结果回写 BatchProject
-- [ ] 14.15 修复并验证 `personal_api` 状态接口不再 503
-- [ ] 14.16 测试 + CI + 合并 main
+- [x] 14.1 视频任务模型
+- [x] 14.2 `VIDEO` 状态机
+- [x] 14.3 personal_api provider
+- [x] 14.4 yd2.0-mini
+- [x] 14.5 豆包本地执行器
+- [x] 14.6 provider 状态 API
+- [x] 14.7 角色/场景/图片资产传递
+- [x] 14.8 视频生成提交
+- [x] 14.9 视频状态轮询
+- [x] 14.10 失败重试
+- [x] 14.11 TOS / 本地产物管理
+- [x] 14.12 视频合并 Worker
+- [x] 14.13 ffmpeg 合并链
+- [x] 14.14 最终结果回写 BatchProject
+- [x] 14.15 修复并验证 `personal_api` 状态接口不再 503
+- [x] 14.16 测试 + CI + 合并 main
+
+> 仓库阶段验收依据：PR #22 已合并到 `main`，合并提交 `6b60a62896000e1c37fb0c8ec11da35a89e45dcf`；Task 14 migration 为 `00007_task14_video.sql`。合并后发现 existing-main CI 基线仍假设 `main` 不含 00007，已用最小 CI 修复提交 `d38520c1f2eb968021259010db3a2315de78e994` 改为显式构造 00001–00006 的 pre-Task14 基线。最终 `main` CI run `37309539521` 中 Go tests/build、前台 tests/build、管理端 build、clean DB Goose Up/status/rollback、pre-Task14 `00004/00006 → 00007` 真实升级路径、Task14 restart recovery 与 Task10 audit 全绿。
+>
+> ⚠️ awaiting Task9.4 runtime adapter：`Claim / Renew / Release / RequeueExpired`、production queue coordination、local executor lease recovery、Merge async queue / lease。Task 14 不自行新增第二套 Redis Runtime / Scheduler，待 Task9.4 公共 Runtime 合并后仅做小型 `Task14 Runtime Adapter` 收尾。
+>
+> ⚠️ Task 16 仍需 ECS/Public 真实验收：真实 Provider（含 `personal_api / yd2.0-mini / yfai_seedance / autodl_comfyui / doubao_local_executor`）、TOS、ffmpeg、VIDEO/Merge、失败/重试及浏览器权限链路。因此 Task 14 总体保持 `⚠️`，不把仓库阶段通过冒充为公网完成。
 
 ---
 
