@@ -36,6 +36,44 @@ func loopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+func numericHostComponent(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return false
+	}
+	if strings.HasPrefix(value, "0x") {
+		if len(value) == 2 {
+			return false
+		}
+		for _, r := range value[2:] {
+			if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+				return false
+			}
+		}
+		return true
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func obfuscatedNumericHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	if host == "" || strings.Contains(host, ":") || net.ParseIP(host) != nil {
+		return false
+	}
+	parts := strings.Split(host, ".")
+	for _, part := range parts {
+		if !numericHostComponent(part) {
+			return false
+		}
+	}
+	return true
+}
+
 func validateRemoteMediaURL(raw string, allowInsecureLoopback bool) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
@@ -51,7 +89,7 @@ func validateRemoteMediaURL(raw string, allowInsecureLoopback bool) (*url.URL, e
 	if parsed.Scheme != "https" {
 		return nil, fmt.Errorf("video: remote media URL must use https")
 	}
-	if loopbackHost(host) {
+	if loopbackHost(host) || obfuscatedNumericHost(host) {
 		return nil, fmt.Errorf("video: remote media URL targets a blocked address")
 	}
 	if ip := net.ParseIP(host); ip != nil && unsafeOutboundIP(ip) {
