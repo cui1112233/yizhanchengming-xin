@@ -28,6 +28,9 @@ vi.mock('./api.js', () => ({
   retryGenerationStage: vi.fn(),
   getGenerationStage: vi.fn(),
   getAudioMeasurement: vi.fn(),
+  getProjectVideoStatus: vi.fn(),
+  retryVideoTask: vi.fn(),
+  cancelVideoTask: vi.fn(),
 }))
 
 import * as api from './api.js'
@@ -70,6 +73,7 @@ describe('BatchProjectListPage', () => {
       }],
     })
     api.getAudioMeasurement.mockRejectedValue(new Error('audio_measurement_required'))
+    api.getProjectVideoStatus.mockResolvedValue({ batchProjectId: 3, books: [] })
   })
 
   afterEach(() => cleanup())
