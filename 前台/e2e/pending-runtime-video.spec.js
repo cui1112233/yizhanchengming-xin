@@ -54,6 +54,7 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
       })
     })
     await routeRuntimeList(page, () => status)
+    await page.goto('/batch-factory')
 
     const response = await page.evaluate(async (runAt) => {
       const value = await fetch('/api/v1/intakes/51/batch-projects', {
@@ -64,7 +65,6 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
     expect(response.run.status).toBe('pending')
     expect(submittedRunAt).toBe(scheduledAt)
 
-    await page.goto('/batch-factory')
     await expect(page.getByText('待执行')).toBeVisible()
     status = 'running'
     await page.reload()
@@ -82,6 +82,8 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
         body: JSON.stringify({ project: runtimeProject('pending'), run: { id: logicalRunId, status: 'pending' } }),
       })
     })
+    await routeRuntimeList(page, () => 'pending')
+    await page.goto('/batch-factory')
 
     const ids = await page.evaluate(async () => Promise.all([0, 1].map(async () => {
       const response = await fetch('/api/v1/intakes/51/batch-projects', {
@@ -95,9 +97,8 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
   })
 
   test('@batch crashed worker recovers an in-flight task without corrupting status', async ({ page }) => {
-    const states = ['running', 'running', 'succeeded']
-    let read = 0
-    await routeRuntimeList(page, () => states[Math.min(read++, states.length - 1)])
+    let status = 'running'
+    await routeRuntimeList(page, () => status)
     await page.goto('/batch-factory')
     await expect(page.getByText('执行中')).toBeVisible()
 
@@ -105,6 +106,8 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
     // worker/process restart; it must remain running rather than regress.
     await page.reload()
     await expect(page.getByText('执行中')).toBeVisible()
+
+    status = 'succeeded'
     await page.reload()
     await expect(page.getByText('succeeded')).toBeVisible()
   })
