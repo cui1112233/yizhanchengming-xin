@@ -24,10 +24,15 @@ type ProviderConfigInput struct {
 type ConfigService struct {
 	store     ProviderConfigStore
 	masterKey []byte
+	providers ProviderFactory
 }
 
 func NewConfigService(store ProviderConfigStore, masterKey []byte) *ConfigService {
-	return &ConfigService{store: store, masterKey: append([]byte(nil), masterKey...)}
+	return NewConfigServiceWithProviders(store, masterKey, nil)
+}
+
+func NewConfigServiceWithProviders(store ProviderConfigStore, masterKey []byte, providers ProviderFactory) *ConfigService {
+	return &ConfigService{store: store, masterKey: append([]byte(nil), masterKey...), providers: providers}
 }
 
 func (s *ConfigService) Get(ctx context.Context, provider, model string) (ProviderConfigView, error) {
@@ -78,4 +83,68 @@ func (s *ConfigService) Save(ctx context.Context, input ProviderConfigInput) (Pr
 		return ProviderConfigView{}, err
 	}
 	return stored.View(), nil
+}
+
+func (s *ConfigService) Status(ctx context.Context, provider, model string) (ProviderStatusView, error) {
+	base := ProviderStatusView{ProviderKey: strings.TrimSpace(provider), Model: strings.TrimSpace(model), Status: ProviderStatusUnconfigured}
+	if s == nil || s.store == nil {
+		base.Status = ProviderStatusUnavailable
+		base.Message = "provider configuration service unavailable"
+		return base, nil
+	}
+	cfg, err := s.store.GetProviderConfig(ctx, base.ProviderKey, base.Model)
+	if err != nil {
+		var providerErr *ProviderError
+		if errors.As(err, &providerErr) && providerErr.Code == ErrorProviderUnconfigured {
+			return base, nil
+		}
+		return ProviderStatusView{}, err
+	}
+	base.Configured = len(cfg.EncryptedSecret) > 0 && len(cfg.SecretNonce) > 0
+	base.Enabled = cfg.Enabled
+	if !cfg.Enabled || !base.Configured {
+		return base, nil
+	}
+	if s.providers == nil {
+		base.Status = ProviderStatusUnavailable
+		base.Message = "provider adapter unavailable"
+		return base, nil
+	}
+	secret, err := DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
+	if err != nil {
+		base.Status = ProviderStatusUnavailable
+		base.Message = "provider credential unavailable"
+		return base, nil
+	}
+	adapter, err := s.providers.Build(cfg, secret)
+	if err != nil {
+		base.Status, base.Message = availabilityFromError(err)
+		return base, nil
+	}
+	prober, ok := adapter.(ProviderProber)
+	if !ok {
+		base.Status = ProviderStatusAvailable
+		return base, nil
+	}
+	if err := prober.Probe(ctx); err != nil {
+		base.Status, base.Message = availabilityFromError(err)
+		return base, nil
+	}
+	base.Status = ProviderStatusAvailable
+	return base, nil
+}
+
+func availabilityFromError(err error) (ProviderAvailability, string) {
+	var providerErr *ProviderError
+	if errors.As(err, &providerErr) {
+		switch providerErr.Code {
+		case ErrorProviderAuthFailed:
+			return ProviderStatusAuthFailed, truncateError(providerErr.Message)
+		case ErrorProviderUnconfigured:
+			return ProviderStatusUnconfigured, truncateError(providerErr.Message)
+		default:
+			return ProviderStatusUnavailable, truncateError(providerErr.Message)
+		}
+	}
+	return ProviderStatusUnavailable, "provider unavailable"
 }
