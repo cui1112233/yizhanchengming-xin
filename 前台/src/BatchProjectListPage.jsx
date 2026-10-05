@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Switch, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Table, Tag, Typography } from 'antd'
 import {
-  getAudioMeasurement,
+  getBatchProject,
   getGenerationStage,
   getProjectGeneration,
   listBatchProjects,
@@ -18,6 +18,19 @@ const STAGES = [
   ['FINAL_PROMPT', 'Final Prompt'],
 ]
 
+const RUN_STATUS_LABELS = {
+  pending: '待执行',
+  running: '执行中',
+  completed: '已完成',
+  failed: '失败',
+}
+
+const BOOK_STATUS_LABELS = {
+  pending: '待获取',
+  fetched: '已获取',
+  retryable_failed: '可重试失败',
+}
+
 function statusColor(status) {
   if (status === 'completed') return 'success'
   if (status === 'failed') return 'error'
@@ -30,16 +43,95 @@ function statusLabel(status) {
   return ({ pending: '待执行', running: '执行中', completed: '完成', failed: '失败', skipped: '已跳过' })[status] || '待执行'
 }
 
+function renderTags(values) {
+  const items = Array.isArray(values) ? values.filter(Boolean) : []
+  if (items.length === 0) return '-'
+  return (
+    <Space size={[4, 4]} wrap>
+      {items.map((value) => <Tag key={value}>{value}</Tag>)}
+    </Space>
+  )
+}
+
+function BatchProjectDetail({ projectId, onBack }) {
+  const [project, setProject] = useState(null)
+  const [books, setBooks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    getBatchProject(projectId)
+      .then((payload) => {
+        if (!active) return
+        setProject(payload?.project || null)
+        setBooks(payload?.books || [])
+      })
+      .catch((reason) => {
+        if (!active) return
+        setError(reason instanceof Error ? reason.message : '读取批量项目详情失败')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [projectId])
+
+  const columns = [
+    { title: 'Book ID', dataIndex: 'bookId', key: 'bookId', render: (value) => value || '-' },
+    { title: '书名', dataIndex: 'title', key: 'title', render: (value) => value || '-' },
+    { title: '书城', dataIndex: 'source', key: 'source', render: (value) => value || '-' },
+    { title: 'platformId', dataIndex: 'platformId', key: 'platformId', render: (value) => value || '-' },
+    { title: '男女频', dataIndex: 'gender', key: 'gender', render: (value) => value || '-' },
+    { title: '风格', dataIndex: 'style', key: 'style', render: (value) => value || '-' },
+    {
+      title: '正文获取状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (value) => <Tag>{BOOK_STATUS_LABELS[value] || value || '未知'}</Tag>,
+    },
+    { title: '错误信息', dataIndex: 'errorMessage', key: 'errorMessage', render: (value) => value || '-' },
+  ]
+
+  return (
+    <main className="page-shell">
+      <div className="page-heading">
+        <div>
+          <Typography.Text type="secondary">Batch Factory V11 工作台</Typography.Text>
+          <Typography.Title level={2}>{project?.name || '批量项目'}</Typography.Title>
+          <Typography.Paragraph type="secondary">
+            项目与小说数据直接读取 Go API / MySQL，不使用浏览器缓存作为事实源。
+          </Typography.Paragraph>
+        </div>
+        <Button onClick={onBack}>返回项目列表</Button>
+      </div>
+      {error && <Alert type="error" showIcon message={error} className="feedback" />}
+      <Card title="小说列表" className="result-card">
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={books}
+          loading={loading}
+          pagination={{ pageSize: 20, hideOnSinglePage: true }}
+          locale={{ emptyText: '该项目暂无小说' }}
+          scroll={{ x: 1100 }}
+        />
+      </Card>
+    </main>
+  )
+}
+
 export default function BatchProjectListPage() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(null)
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
   const [generationLoading, setGenerationLoading] = useState(false)
   const [resultModal, setResultModal] = useState(null)
-  const [audioMeasurements, setAudioMeasurements] = useState({})
-  const [matchAudioByBook, setMatchAudioByBook] = useState({})
 
   useEffect(() => {
     let active = true
@@ -50,33 +142,11 @@ export default function BatchProjectListPage() {
     return () => { active = false }
   }, [])
 
-  const refreshMeasurements = async (project, books = []) => {
-    if (!project) return
-    const values = await Promise.all((books || []).map(async (book) => {
-      try {
-        const measurement = await getAudioMeasurement(project.id, book.bookId)
-        return [book.bookId, measurement?.durationMs > 0 ? measurement : null]
-      } catch {
-        return [book.bookId, null]
-      }
-    }))
-    setAudioMeasurements(Object.fromEntries(values))
-    setMatchAudioByBook((current) => {
-      const next = { ...current }
-      for (const [bookId, measurement] of values) {
-        if (!measurement) next[bookId] = false
-      }
-      return next
-    })
-  }
-
   const refreshGeneration = async (project = selected) => {
     if (!project) return
     setGenerationLoading(true)
     try {
-      const nextSummary = await getProjectGeneration(project.id)
-      setSummary(nextSummary)
-      await refreshMeasurements(project, nextSummary?.books || [])
+      setSummary(await getProjectGeneration(project.id))
       setError('')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '读取生成状态失败')
@@ -88,8 +158,6 @@ export default function BatchProjectListPage() {
   const openGeneration = async (project) => {
     setSelected(project)
     setSummary(null)
-    setAudioMeasurements({})
-    setMatchAudioByBook({})
     await refreshGeneration(project)
   }
 
@@ -97,14 +165,10 @@ export default function BatchProjectListPage() {
     if (!selected) return
     setGenerationLoading(true)
     try {
-      // Batch execution keeps Task 12 behavior unless every book is explicitly
-      // executed with its own authoritative measurement. Per-book matchAudio is
-      // therefore never inferred from client state.
       await runProjectGeneration(selected.id, {
         hookEnabled: true,
         plotMode: false,
         directorMode: 'normal',
-        matchAudio: false,
         requestId: `batch-${Date.now()}`,
       })
       await refreshGeneration(selected)
@@ -118,17 +182,12 @@ export default function BatchProjectListPage() {
 
   const runOne = async (bookId) => {
     if (!selected) return
-    const measurement = audioMeasurements[bookId]
-    const matchAudio = Boolean(matchAudioByBook[bookId] && measurement?.durationMs > 0)
     setGenerationLoading(true)
     try {
       await runBookGeneration(selected.id, bookId, {
         hookEnabled: true,
         plotMode: false,
         directorMode: 'normal',
-        matchAudio,
-        audioDurationSec: matchAudio ? measurement.durationMs / 1000 : undefined,
-        shotDurationLimitSec: matchAudio ? 15 : undefined,
         requestId: `book-${bookId}-${Date.now()}`,
       })
       await refreshGeneration(selected)
@@ -164,13 +223,36 @@ export default function BatchProjectListPage() {
   }
 
   const projectColumns = [
-    { title: '项目名称', dataIndex: 'name', key: 'name' },
     {
-      title: '统一设置', key: 'settings', width: 420,
+      title: '项目名称',
+      dataIndex: 'name',
+      key: 'name',
+      render: (value, project) => (
+        <Button type="link" onClick={() => setSelectedDetailProjectId(project.id)}>
+          {value || '未命名项目'}
+        </Button>
+      ),
+    },
+    { title: '书城来源', key: 'sources', render: (_, project) => renderTags(project.sources) },
+    { title: '小说数量', dataIndex: 'bookCount', key: 'bookCount', render: (value) => value ?? 0 },
+    { title: '男女频', key: 'genders', render: (_, project) => renderTags(project.genders) },
+    { title: '风格', key: 'styles', render: (_, project) => renderTags(project.styles) },
+    {
+      title: '运行状态',
+      dataIndex: 'runStatus',
+      key: 'runStatus',
+      render: (value) => (value ? <Tag>{RUN_STATUS_LABELS[value] || value}</Tag> : '-'),
+    },
+    {
+      title: '统一设置',
+      key: 'settings',
+      width: 420,
       render: (_, row) => <UnifiedSettingsPanel project={row} />,
     },
     {
-      title: '生成', key: 'actions', width: 140,
+      title: '生成',
+      key: 'actions',
+      width: 140,
       render: (_, row) => <Button onClick={() => void openGeneration(row)}>生成状态</Button>,
     },
   ]
@@ -196,39 +278,19 @@ export default function BatchProjectListPage() {
     return [
       { title: 'Book ID', dataIndex: 'bookId', key: 'bookId', width: 90 },
       { title: '书名', dataIndex: 'title', key: 'title', width: 150, render: (value) => value || '-' },
-      {
-        title: '匹配音频',
-        key: 'matchAudio',
-        width: 230,
-        render: (_, row) => {
-          const measurement = audioMeasurements[row.bookId]
-          const enabled = Boolean(measurement?.durationMs > 0)
-          const checked = Boolean(enabled && matchAudioByBook[row.bookId])
-          return (
-            <Space direction="vertical" size={4}>
-              <Switch
-                aria-label={`匹配音频 Book ${row.bookId}`}
-                disabled={!enabled}
-                checked={checked}
-                checkedChildren="匹配音频"
-                unCheckedChildren="匹配音频"
-                onChange={(value) => setMatchAudioByBook((current) => ({ ...current, [row.bookId]: value }))}
-              />
-              {enabled
-                ? <Typography.Text type="secondary">已检测音频：{(measurement.durationMs / 1000).toFixed(2)} 秒</Typography.Text>
-                : <Typography.Text type="warning">请先生成或检测音频</Typography.Text>}
-              {checked && <Typography.Text type="success">最终分镜总时长将严格匹配音频时长</Typography.Text>}
-            </Space>
-          )
-        },
-      },
       ...stageColumns,
       {
-        title: '单本操作', key: 'bookAction', width: 120,
+        title: '单本操作',
+        key: 'bookAction',
+        width: 120,
         render: (_, row) => <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
       },
     ]
-  }, [selected, audioMeasurements, matchAudioByBook])
+  }, [selected])
+
+  if (selectedDetailProjectId != null) {
+    return <BatchProjectDetail projectId={selectedDetailProjectId} onBack={() => setSelectedDetailProjectId(null)} />
+  }
 
   return (
     <main className="page-shell">
@@ -237,7 +299,7 @@ export default function BatchProjectListPage() {
           <Typography.Text type="secondary">一战晟铭 · Batch Factory</Typography.Text>
           <Typography.Title level={2}>批量工厂</Typography.Title>
           <Typography.Paragraph type="secondary">
-            BatchProject、统一设置与 Script / Hook / Director / Final Prompt 状态均来自 Go + MySQL 事实源。
+            BatchProject、小说汇总、统一设置与 Script / Hook / Director / Final Prompt 状态均来自 Go + MySQL 事实源。
           </Typography.Paragraph>
         </div>
       </div>
@@ -245,14 +307,22 @@ export default function BatchProjectListPage() {
       {error && <Alert type="error" showIcon message={error} className="feedback" closable onClose={() => setError('')} />}
 
       <Card title="批量项目" className="result-card">
-        <Table rowKey="id" columns={projectColumns} dataSource={projects} loading={loading} pagination={{ pageSize: 20, hideOnSinglePage: true }} locale={{ emptyText: '暂无批量项目' }} />
+        <Table
+          rowKey="id"
+          columns={projectColumns}
+          dataSource={projects}
+          loading={loading}
+          pagination={{ pageSize: 20, hideOnSinglePage: true }}
+          locale={{ emptyText: '暂无批量项目' }}
+          scroll={{ x: 1800 }}
+        />
       </Card>
 
       <Drawer
         title={selected ? `${selected.name} · 剧本生成流水线` : '剧本生成流水线'}
         width="92vw"
         open={Boolean(selected)}
-        onClose={() => { setSelected(null); setSummary(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
+        onClose={() => { setSelected(null); setSummary(null) }}
         extra={<Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
       >
         {summary && (
@@ -263,7 +333,7 @@ export default function BatchProjectListPage() {
               <Descriptions.Item label="失败">{summary.failed || 0}</Descriptions.Item>
               <Descriptions.Item label="待执行">{summary.pending || 0}</Descriptions.Item>
             </Descriptions>
-            <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1280 }} />
+            <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1050 }} />
           </>
         )}
       </Drawer>
@@ -278,7 +348,6 @@ export default function BatchProjectListPage() {
         {resultModal && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Typography.Text type="secondary">Prompt: {resultModal.promptKey || '-'} v{resultModal.promptVersion || '-'}</Typography.Text>
-            {resultModal.validationResult && <Typography.Text type="secondary">Validation: {resultModal.validationResult}</Typography.Text>}
             {resultModal.errorMessage && <Alert type="error" showIcon message={resultModal.errorMessage} />}
             <Typography.Paragraph copyable style={{ whiteSpace: 'pre-wrap' }}>{resultModal.outputText || '暂无输出'}</Typography.Paragraph>
           </Space>
