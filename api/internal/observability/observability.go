@@ -28,6 +28,7 @@ var sensitiveAssignment = regexp.MustCompile(`(?i)\b(authorization|cookie|set-co
 var bearerValue = regexp.MustCompile(`(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+`)
 var urlUserInfo = regexp.MustCompile(`://[^/@\s]+@`)
 var mysqlLikeCredential = regexp.MustCompile(`\b[^:\s]+:[^@\s]+@tcp\(`)
+var nonAlphaNumeric = regexp.MustCompile(`[^a-z0-9]+`)
 
 func ValidRequestID(values []string) (string, bool) {
 	if len(values) != 1 {
@@ -63,14 +64,13 @@ func RequestID(ctx context.Context) string {
 }
 
 func IsSensitiveKey(key string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(key))
-	normalized = strings.NewReplacer("-", "_", " ", "_", ".", "_").Replace(normalized)
+	normalized := nonAlphaNumeric.ReplaceAllString(strings.ToLower(strings.TrimSpace(key)), "")
 	for _, marker := range []string{
-		"authorization", "cookie", "set_cookie", "password", "passwd", "token",
-		"access_token", "refresh_token", "api_key", "apikey", "secret", "credential",
-		"client_secret", "ciphertext", "nonce", "dsn",
+		"authorization", "cookie", "setcookie", "password", "passwd", "token",
+		"accesstoken", "refreshtoken", "apikey", "secret", "credential",
+		"clientsecret", "ciphertext", "nonce", "dsn",
 	} {
-		if normalized == marker || strings.HasSuffix(normalized, "_"+marker) || strings.HasPrefix(normalized, marker+"_") {
+		if strings.Contains(normalized, marker) {
 			return true
 		}
 	}
