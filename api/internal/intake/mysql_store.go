@@ -155,7 +155,7 @@ func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProjec
 }
 
 func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, error) {
-	const query = "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(b.source, '') ORDER BY b.source SEPARATOR ','), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.id DESC LIMIT 100"
+	const query = "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.id DESC LIMIT 100"
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list batch projects: %w", err)
@@ -165,23 +165,44 @@ func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, err
 	projects := make([]BatchProject, 0)
 	for rows.Next() {
 		var project BatchProject
-		var sources string
-		if err := rows.Scan(&project.ID, &project.IntakeID, &project.Name, &sources, &project.CreatedAt, &project.UpdatedAt); err != nil {
+		var sources, genders, styles, runStatus string
+		if err := rows.Scan(
+			&project.ID,
+			&project.IntakeID,
+			&project.Name,
+			&sources,
+			&project.BookCount,
+			&genders,
+			&styles,
+			&runStatus,
+			&project.CreatedAt,
+			&project.UpdatedAt,
+		); err != nil {
 			return nil, fmt.Errorf("scan batch project: %w", err)
 		}
-		if sources != "" {
-			for _, source := range strings.Split(sources, ",") {
-				if source = strings.TrimSpace(source); source != "" {
-					project.Sources = append(project.Sources, source)
-				}
-			}
-		}
+		project.Sources = splitBatchProjectSummary(sources)
+		project.Genders = splitBatchProjectSummary(genders)
+		project.Styles = splitBatchProjectSummary(styles)
+		project.RunStatus = RunStatus(strings.TrimSpace(runStatus))
 		projects = append(projects, project)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate batch projects: %w", err)
 	}
 	return projects, nil
+}
+
+func splitBatchProjectSummary(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return []string{}
+	}
+	result := make([]string, 0)
+	for _, item := range strings.Split(value, "|") {
+		if item = strings.TrimSpace(item); item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func (s *MySQLStore) CreateRun(ctx context.Context, run Run) (Run, error) {
