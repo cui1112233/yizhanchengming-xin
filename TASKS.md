@@ -44,7 +44,7 @@
 - [ ] Task 9：Batch Factory V11 主工作台
 - [ ] Task 10：批量工厂统一设置 / 版本对应配置档
 - ⚠️ Task 11：水货生产工作台
-- 🟡 Task 12：剧本生成 / Director / Hook / 最终提示词（PR #12 CI 全绿，待合并 main）
+- ⚠️ Task 12：剧本生成 / Director / Hook / 最终提示词（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 13：音频 + matchAudio 分镜
 - [ ] Task 14：视频生成完整链路
 - [ ] Task 15：发布 / 权限 / 登录认证兼容
@@ -256,18 +256,20 @@
 
 # Task 12：剧本生成 / Director / Hook / 最终提示词
 
-- 🟡 12.1 剧本生成 Go API — 已进入 PR #12，CI 全绿，待合并 main
-- 🟡 12.2 系统提示词后端管理 — MySQL Prompt key/version/content/enabled + Go resolver 已完成，待合并 main
-- 🟡 12.3 剧情模式通用元提示词 — 通用视觉化/强钩子/空间/动作/电影化/安全规则已完成，待合并 main
-- 🟡 12.4 Hook — 正式 Stage；关闭时 skipped，不记失败，待合并 main
-- 🟡 12.5 Director — normal/H3 接口与 H3 结构校验已完成；仅预留 matchAudio 字段，待合并 main
-- 🟡 12.6 最终提示词编译 — Go 后端确定性编译与上下文快照已完成，待合并 main
-- 🟡 12.7 单本生成状态 — BookRun/StageRun + MySQL 已完成，待合并 main
-- 🟡 12.8 批量生成状态 — 单本失败隔离与项目聚合已完成，待合并 main
-- 🟡 12.9 失败重试 — 目标 Stage 独立重试、复用前置结果已完成，待合并 main
-- 🟡 12.10 提示词版本持久化 — StageRun 记录 prompt_key/prompt_version，待合并 main
-- 🟡 12.11 v88 对标 — Hook skip/H3 schema/Final Prompt retry 等语义测试已通过，待合并 main
-- 🟡 12.12 测试 + CI + 合并 main — PR #12 最新 CI：Go tests/build、前台 tests/build、后台 build 全绿；尚未合并 main
+- [x] 12.1 剧本生成 Go API — 已合并 `main`
+- [x] 12.2 系统提示词后端管理 — MySQL Prompt key/version/content/enabled + Go resolver 已完成
+- [x] 12.3 剧情模式通用元提示词 — 通用视觉化/强钩子/空间/动作/电影化/安全规则已完成
+- [x] 12.4 Hook — 正式 Stage；关闭时 `skipped`，不记失败
+- [x] 12.5 Director — normal/H3 接口与 `h3-director/v1` 结构校验已完成；仅预留 matchAudio/audioDurationSec 兼容字段，不实现 Task 13 时长重排
+- [x] 12.6 最终提示词编译 — Go 后端确定性编译；Retry 保留完整编译上下文
+- [x] 12.7 单本生成状态 — BookRun/StageRun + MySQL 已完成
+- [x] 12.8 批量生成状态 — 单本失败隔离与项目聚合已完成
+- [x] 12.9 失败重试 — 目标 Stage 独立重试、复用已成功前置 Stage
+- [x] 12.10 提示词版本持久化 — StageRun 持久化 prompt_key/prompt_version
+- [x] 12.11 v88 对标 — Hook skip/H3 schema/Final Prompt retry/批量失败隔离/Stage Retry 等语义测试已通过
+- [x] 12.12 测试 + CI + 合并 main — PR #12 已合并；`main` CI run `37288311920`（#372）中 Go tests/build、前台 tests/build、管理端 build 全绿
+
+> 仓库阶段验收依据：PR #12 已合并到 `main`，合并提交 `73ab448c20337eb4cd0be1491c72fa973a3a57fc`；合并后的 `main` CI run `37288311920` 五项验证全绿。公网真实“剧本生成 / Director / Hook”仍需 Task 16 的 16.2.11–16.2.13 在 ECS/浏览器环境验收，因此 Task 12 总体保持 `⚠️`，不把仓库通过冒充为公网完成。
 
 ---
 
