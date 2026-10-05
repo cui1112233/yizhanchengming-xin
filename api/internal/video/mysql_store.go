@@ -48,10 +48,10 @@ FROM video_provider_configs WHERE provider_key=? AND model=? LIMIT 1`, provider,
 func (s *MySQLStore) CreateOrGetProductionJob(ctx context.Context, job ProductionJob) (ProductionJob, bool, error) {
 	result, err := s.db.ExecContext(ctx, `
 INSERT INTO video_production_jobs
-(batch_project_id, book_id, status, input_revision, final_prompt_stage_run_id, final_prompt_version, provider, model, idempotency_key, error_code, error_message)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+(batch_project_id, book_id, status, input_revision, final_prompt_stage_run_id, final_prompt_version, final_prompt_text, provider, model, idempotency_key, error_code, error_message)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		job.BatchProjectID, job.BookID, job.Status, job.InputRevision, job.FinalPromptStageRunID,
-		job.FinalPromptVersion, job.Provider, job.Model, job.IdempotencyKey, job.ErrorCode, job.ErrorMessage,
+		job.FinalPromptVersion, job.FinalPromptText, job.Provider, job.Model, job.IdempotencyKey, job.ErrorCode, job.ErrorMessage,
 	)
 	if err == nil {
 		job.ID, err = result.LastInsertId()
@@ -75,10 +75,10 @@ func (s *MySQLStore) getProductionJobByIdempotency(ctx context.Context, key stri
 	return job, err
 }
 
-const productionJobSelect = `SELECT id, batch_project_id, book_id, status, input_revision, final_prompt_stage_run_id, final_prompt_version, provider, model, idempotency_key, error_code, error_message, created_at, updated_at FROM video_production_jobs`
+const productionJobSelect = `SELECT id, batch_project_id, book_id, status, input_revision, final_prompt_stage_run_id, final_prompt_version, final_prompt_text, provider, model, idempotency_key, error_code, error_message, created_at, updated_at FROM video_production_jobs`
 
 func productionJobScanArgs(job *ProductionJob) []any {
-	return []any{&job.ID, &job.BatchProjectID, &job.BookID, &job.Status, &job.InputRevision, &job.FinalPromptStageRunID, &job.FinalPromptVersion, &job.Provider, &job.Model, &job.IdempotencyKey, &job.ErrorCode, &job.ErrorMessage, &job.CreatedAt, &job.UpdatedAt}
+	return []any{&job.ID, &job.BatchProjectID, &job.BookID, &job.Status, &job.InputRevision, &job.FinalPromptStageRunID, &job.FinalPromptVersion, &job.FinalPromptText, &job.Provider, &job.Model, &job.IdempotencyKey, &job.ErrorCode, &job.ErrorMessage, &job.CreatedAt, &job.UpdatedAt}
 }
 
 func (s *MySQLStore) GetProductionJob(ctx context.Context, id int64) (ProductionJob, error) {
