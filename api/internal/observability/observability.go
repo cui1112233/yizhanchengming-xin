@@ -55,7 +55,7 @@ func NewRequestID() string {
 }
 
 func WithRequestID(ctx context.Context, requestID string) context.Context {
-	return context.WithValue(ctx, requestIDKey, requestID)
+	return WithUserCorrelation(context.WithValue(ctx, requestIDKey, requestID))
 }
 
 func RequestID(ctx context.Context) string {
