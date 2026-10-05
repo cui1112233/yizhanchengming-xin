@@ -6,8 +6,26 @@ import (
 	"strings"
 )
 
+const qualifiedProductionJobSelect = `SELECT
+ video_production_jobs.id,
+ video_production_jobs.batch_project_id,
+ video_production_jobs.book_id,
+ video_production_jobs.status,
+ video_production_jobs.input_revision,
+ video_production_jobs.final_prompt_stage_run_id,
+ video_production_jobs.final_prompt_version,
+ video_production_jobs.final_prompt_text,
+ video_production_jobs.provider,
+ video_production_jobs.model,
+ video_production_jobs.idempotency_key,
+ video_production_jobs.error_code,
+ video_production_jobs.error_message,
+ video_production_jobs.created_at,
+ video_production_jobs.updated_at
+ FROM video_production_jobs`
+
 func (s *MySQLStore) ListLatestProductionJobsByProject(ctx context.Context, projectID int64) ([]ProductionJob, error) {
-	rows, err := s.db.QueryContext(ctx, productionJobSelect+`
+	rows, err := s.db.QueryContext(ctx, qualifiedProductionJobSelect+`
  JOIN (
    SELECT book_id, MAX(id) AS latest_id
    FROM video_production_jobs
