@@ -13,9 +13,10 @@ const (
 	ProviderAutoDLComfyUI       = "autodl_comfyui"
 	ProviderDoubaoLocalExecutor = "doubao_local_executor"
 
-	ModelYD20Mini            = "yd2.0-mini"
-	ModelSeedance20Official  = "seedance-2-0-official"
-	ModelMiniMaxH3Video      = "minimax-h3-video"
+	ModelYD20Mini           = "yd2.0-mini"
+	ModelSeedance20Official = "seedance-2-0-official"
+	ModelMiniMaxH3Video     = "minimax-h3-video"
+	ModelDoubaoSeedance     = "doubao-seedance"
 )
 
 type TaskStatus string
@@ -113,7 +114,7 @@ func (c ProviderConfig) View() ProviderConfigView {
 	return ProviderConfigView{
 		ID: c.ID, ProviderKey: c.ProviderKey, Model: c.Model,
 		CreateURL: c.CreateURL, TasksURL: c.TasksURL, ResultURL: c.ResultURL,
-		Enabled: c.Enabled, Configured: len(c.EncryptedSecret) > 0 && len(c.SecretNonce) > 0,
+		Enabled: c.Enabled, Configured: providerConfigConfigured(c),
 	}
 }
 
@@ -130,6 +131,7 @@ type SubmitRequest struct {
 	Model              string
 	Prompt             string
 	RequestID          string
+	SourceTaskID       string
 	DurationSeconds    int
 	AspectRatio        string
 	Resolution         string
