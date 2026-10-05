@@ -181,11 +181,11 @@ func TestMySQLStoreListsBatchProjectsFromDatabase(t *testing.T) {
 	}
 
 	now := time.Date(2026, 10, 5, 5, 0, 0, 0, time.UTC)
-	query := "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects ORDER BY id DESC LIMIT 100"
+	query := "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.id DESC LIMIT 100"
 	mock.ExpectQuery(regexp.QuoteMeta(query)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "created_at", "updated_at"}).
-			AddRow(52, 12, "点众批次", now, now).
-			AddRow(51, 11, "知乎批次", now, now))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "created_at", "updated_at"}).
+			AddRow(52, 12, "点众批次", "点众", 2, "女频", "情感", RunStatusPending, now, now).
+			AddRow(51, 11, "知乎批次", "知乎", 1, "男频", "悬疑", RunStatusRunning, now, now))
 
 	projects, err := lister.ListBatchProjects(context.Background())
 	if err != nil {
@@ -193,6 +193,9 @@ func TestMySQLStoreListsBatchProjectsFromDatabase(t *testing.T) {
 	}
 	if len(projects) != 2 || projects[0].ID != 52 || projects[0].Name != "点众批次" || projects[1].ID != 51 {
 		t.Fatalf("projects = %+v", projects)
+	}
+	if projects[0].BookCount != 2 || projects[0].RunStatus != RunStatusPending || len(projects[0].Sources) != 1 || projects[0].Sources[0] != "点众" {
+		t.Fatalf("project summary = %+v", projects[0])
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

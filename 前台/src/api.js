@@ -138,6 +138,10 @@ export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
 
+export function getBatchProject(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}`)
+}
+
 export function getUnifiedSettings(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/settings`)
 }
@@ -194,6 +198,17 @@ export function runBookGeneration(projectId, bookId, input) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/generation`, {
     method: 'POST',
     body: JSON.stringify(input),
+  })
+}
+
+export function getAudioMeasurement(projectId, bookId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/audio-measurement`)
+}
+
+export function measureAudio(projectId, bookId, audioAsset) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/audio-measurement`, {
+    method: 'POST',
+    body: JSON.stringify({ audioAsset }),
   })
 }
 
