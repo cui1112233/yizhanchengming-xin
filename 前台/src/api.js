@@ -6,12 +6,13 @@ let refreshFlight = null
 let authFailureNotified = false
 
 export class APIError extends Error {
-  constructor(message, { status = 0, code = 'API_ERROR', payload = null } = {}) {
+  constructor(message, { status = 0, code = 'API_ERROR', payload = null, requestId = '' } = {}) {
     super(message)
     this.name = 'APIError'
     this.status = status
     this.code = code
     this.payload = payload
+    this.requestId = requestId
   }
 }
 
@@ -23,12 +24,18 @@ async function parsePayload(response) {
   }
 }
 
+function responseRequestId(response, payload) {
+  const fromHeader = response?.headers?.get?.('X-Request-ID') || response?.headers?.get?.('x-request-id') || ''
+  return fromHeader || payload?.request_id || payload?.requestId || ''
+}
+
 function errorFrom(response, payload) {
   const message = payload?.message || payload?.error || `请求失败（HTTP ${response.status}）`
   return new APIError(message, {
     status: response.status,
     code: payload?.code || 'API_ERROR',
     payload,
+    requestId: responseRequestId(response, payload),
   })
 }
 
