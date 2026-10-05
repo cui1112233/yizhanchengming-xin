@@ -1,0 +1,43 @@
+name: performance-audit
+
+on:
+  push:
+    branches:
+      - test/performance-concurrency-capacity
+  workflow_dispatch:
+
+jobs:
+  mysql-concurrency-probe:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: perf_audit
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Install Goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
+      - name: Apply migrations
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true&multiStatements=true' up
+      - name: Run Task 9 idempotency RED probe
+        continue-on-error: true
+        env:
+          PERF_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true
+        run: go test ./internal/pipeline -run TestConcurrentCreateSameIntakeIsIdempotent -count=1 -v
+      - name: Run existing Go tests
+        run: go test ./...
