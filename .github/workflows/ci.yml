@@ -66,7 +66,7 @@ jobs:
         run: go test ./internal/video -run TestMySQLRestartRecoveryIntegration -count=1
       - name: Verify clean database Goose status includes Task14 00007
         run: |
-          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status | tee /tmp/task14-clean-status.txt
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task14-clean-status.txt
           grep -q '00007_task14_video.sql' /tmp/task14-clean-status.txt
       - name: Verify clean database Goose rollback
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
@@ -87,14 +87,14 @@ jobs:
         run: goose -dir /tmp/task14-main/api/db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
       - name: Verify existing-main database is at Task13/Task15 state
         run: |
-          goose -dir /tmp/task14-main/api/db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status | tee /tmp/task14-main-status.txt
+          goose -dir /tmp/task14-main/api/db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task14-main-status.txt
           grep -q '00004_task15_auth.sql' /tmp/task14-main-status.txt
           grep -q '00006_task13_match_audio.sql' /tmp/task14-main-status.txt
       - name: Upgrade existing-main database with Task14 00007
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
       - name: Verify existing-main upgrade appended Task14 00007
         run: |
-          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status | tee /tmp/task14-upgrade-status.txt
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task14-upgrade-status.txt
           grep -q '00004_task15_auth.sql' /tmp/task14-upgrade-status.txt
           grep -q '00006_task13_match_audio.sql' /tmp/task14-upgrade-status.txt
           grep -q '00007_task14_video.sql' /tmp/task14-upgrade-status.txt
