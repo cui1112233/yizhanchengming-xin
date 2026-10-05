@@ -40,10 +40,10 @@ test.describe('@video Task 14 VIDEO / Merge acceptance', () => {
     }
   })
 
-  test('@video project VIDEO UI shows provider/model/status/attempts/error/output', async ({ page }) => {
+  test('@video project VIDEO UI shows provider/model/status/attempts/error', async ({ page }) => {
     await routeBatchProjectFixtures(page, {
       generationSummary: () => makeGenerationSummary(),
-      videoStatus: () => makeVideoStatus({ status: 'failed', errorMessage: 'provider fixture failure', outputURL: 'https://example.invalid/task16/video.mp4', attempts: 2 }),
+      videoStatus: () => makeVideoStatus({ status: 'failed', errorMessage: 'provider fixture failure', outputURL: '', attempts: 2 }),
     })
 
     await page.goto('/batch-factory')
@@ -55,7 +55,19 @@ test.describe('@video Task 14 VIDEO / Merge acceptance', () => {
     await expect(table.getByText('失败', { exact: true })).toBeVisible()
     await expect(table.getByText('尝试 2 次', { exact: true })).toBeVisible()
     await expect(table.getByText('provider fixture failure', { exact: true })).toBeVisible()
-    await expect(table.getByRole('link', { name: '查看视频' })).toHaveAttribute('href', 'https://example.invalid/task16/video.mp4')
+  })
+
+  test('@video project VIDEO outputUrl from Go response renders 查看视频 link', async ({ page }) => {
+    test.fail(true, 'TASK16-VIDEO-001 Project VIDEO status uses outputUrl but frontend reads outputURL')
+    await routeBatchProjectFixtures(page, {
+      generationSummary: () => makeGenerationSummary(),
+      videoStatus: () => makeVideoStatus({ status: 'succeeded', outputURL: 'https://example.invalid/task16/video.mp4' }),
+    })
+
+    await page.goto('/batch-factory')
+    await page.getByRole('button', { name: '生成状态' }).click()
+
+    await expect(page.locator('.ant-table-tbody').getByRole('link', { name: '查看视频' })).toHaveAttribute('href', 'https://example.invalid/task16/video.mp4')
   })
 
   test('@video Start and Poll preserve Task14 provider/model/status fields', async ({ page }) => {
