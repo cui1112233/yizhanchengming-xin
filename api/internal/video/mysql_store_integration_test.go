@@ -95,6 +95,17 @@ func TestMySQLRestartRecoveryIntegration(t *testing.T) {
 		t.Fatalf("new store instance did not recover merge attempt: %+v", recoveredMerge)
 	}
 
+	projectJobs, err := store2.ListLatestProductionJobsByProject(ctx, projectID)
+	if err != nil { t.Fatal(err) }
+	if len(projectJobs) != 1 || projectJobs[0].ID != job.ID {
+		t.Fatalf("project video status jobs = %+v", projectJobs)
+	}
+	projectTasks, err := store2.ListProductionTasksByJobIDs(ctx, []int64{job.ID})
+	if err != nil { t.Fatal(err) }
+	if len(projectTasks[job.ID]) != 1 || projectTasks[job.ID][0].ID != task.ID {
+		t.Fatalf("project video status tasks = %+v", projectTasks)
+	}
+
 	recoverable, err := store2.ListRecoverableTasks(ctx, 100)
 	if err != nil { t.Fatal(err) }
 	for _, got := range recoverable {
