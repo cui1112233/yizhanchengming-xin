@@ -42,7 +42,9 @@ func (h handler) getPublishIntent(w http.ResponseWriter, r *http.Request) {
 func (h handler) listPublishAudits(w http.ResponseWriter, r *http.Request) {
 	var projectID int64
 	if raw := strings.TrimSpace(r.URL.Query().Get("batchProjectId")); raw != "" { value,err := strconv.ParseInt(raw,10,64); if err != nil || value<=0 { writeJSON(w,http.StatusBadRequest,map[string]any{"code":"PUBLISH_INVALID_REQUEST","message":"batchProjectId 无效"}); return }; projectID=value }
-	user,_ := authn.CurrentUser(r.Context()); audits,err := h.deps.Publishing.ListAudits(r.Context(),user,projectID); if err != nil { writePublishingError(w,err); return }; writeJSON(w,http.StatusOK,map[string]any{"audits":audits})
+	user,_ := authn.CurrentUser(r.Context()); audits,err := h.deps.Publishing.ListAudits(r.Context(),user,projectID); if err != nil { writePublishingError(w,err); return }
+	result:=make([]publishing.PublicAudit,0,len(audits)); for _,audit:=range audits { result=append(result,audit.Public()) }
+	writeJSON(w,http.StatusOK,map[string]any{"audits":result})
 }
 
 func writePublishingError(w http.ResponseWriter, err error) {
