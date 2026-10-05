@@ -106,6 +106,35 @@ func TestMatchAudioRequiresPersistedMeasurementAndDoesNotTrustRequestDuration(t 
 	}
 }
 
+func TestAuthoritativeAudioKeepsRawMeasurementButCanonicalizesDirectorToCentisecond(t *testing.T) {
+	service, _, provider := serviceFixture()
+	service.audioProber = &fakeAudioProber{durationMS: 28253}
+	measurement, err := service.MeasureAudio(context.Background(), AudioMeasurementRequest{BatchProjectID: 3, BookID: 11, AudioAsset: "/srv/audio/11-28253.mp3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if measurement.DurationMS != 28253 {
+		t.Fatalf("raw measurement changed: %d", measurement.DurationMS)
+	}
+	provider.responses = []string{"SCRIPT", "HOOK", `{"cards":[{"shot":"a","start":0.00,"end":14.00},{"shot":"b","start":14.00,"end":28.25}]}`}
+	_, err = service.RunBook(context.Background(), RunBookRequest{
+		BatchProjectID: 3,
+		BookID: 11,
+		HookEnabled: true,
+		DirectorMode: DirectorNormal,
+		MatchAudio: true,
+		AudioDurationSec: 999,
+		ShotDurationLimitSec: 15,
+		RequestID: "centisecond-canonical",
+	})
+	if err != nil {
+		t.Fatalf("RunBook: %v", err)
+	}
+	if got := provider.calls[2].AudioDurationSec; got != 28.25 {
+		t.Fatalf("Director audio duration = %.5f, want exactly 28.25", got)
+	}
+}
+
 func TestMatchAudioWithoutMeasurementFailsBeforeProviderExecution(t *testing.T) {
 	service, _, provider := serviceFixture()
 	_, err := service.RunBook(context.Background(), RunBookRequest{
