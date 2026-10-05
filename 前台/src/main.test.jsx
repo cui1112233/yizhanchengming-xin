@@ -21,6 +21,16 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+async function settleReactAfterUnmount() {
+  // Ant Design schedules some React work through animation-frame/macrotask queues.
+  // Keep jsdom alive until those callbacks have observed the unmount, otherwise
+  // Vitest can tear down `window` first and report a false unhandled error.
+  await act(async () => {
+    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 32))
+  })
+}
+
 describe('小说获取工作台', () => {
   it('提供书城分组、执行入口和书籍结果区', async () => {
     document.body.innerHTML = '<div id="root"></div>'
@@ -45,6 +55,8 @@ describe('小说获取工作台', () => {
       await act(async () => {
         appRoot.unmount()
       })
+      await settleReactAfterUnmount()
+      document.body.replaceChildren()
     }
   }, 15000)
 })
