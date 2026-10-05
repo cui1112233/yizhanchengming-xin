@@ -129,3 +129,14 @@ export function getGenerationStage(projectId, bookId, stage) {
 export function listGenerationPrompts() {
   return requestJSON(`${API_PREFIX}/generation/prompts`)
 }
+
+export function getAudioMeasurement(projectId, bookId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/audio-measurement`)
+}
+
+export function measureAudio(projectId, bookId, audioAsset) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/audio-measurement`, {
+    method: 'POST',
+    body: JSON.stringify({ audioAsset }),
+  })
+}
