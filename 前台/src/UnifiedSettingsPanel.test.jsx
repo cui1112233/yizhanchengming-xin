@@ -76,8 +76,9 @@ describe('UnifiedSettingsPanel', () => {
     expect(screen.getByText('同步批量风格类型')).toBeTruthy()
   }, 15000)
 
-  it('re-reads saved production and publishing values after close and remount', async () => {
+  it('re-reads saved production and publishing values after close and remount without losing workbench context', async () => {
     const api = createPersistentApi()
+    window.history.replaceState({}, '', '/batch-factory?project=9')
     const view = render(<UnifiedSettingsPanel project={{ id: 9, name: '项目九' }} api={api} />)
 
     fireEvent.click(screen.getByRole('button', { name: '生产统一设置' }))
@@ -86,6 +87,7 @@ describe('UnifiedSettingsPanel', () => {
     fireEvent.change(countInput, { target: { value: '5' } })
     fireEvent.click(screen.getByRole('button', { name: '保存生产统一设置' }))
     await waitFor(() => expect(api.saveProductionSettings).toHaveBeenCalledWith(9, expect.objectContaining({ aiCopyCount: 5 })))
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=9')
 
     fireEvent.click(screen.getByRole('button', { name: '生产统一设置' }))
     expect((await screen.findByRole('spinbutton', { name: 'AI 文案数量' })).value).toBe('5')
@@ -96,15 +98,18 @@ describe('UnifiedSettingsPanel', () => {
     fireEvent.change(profileInput, { target: { value: '保存后的发布档' } })
     fireEvent.click(screen.getByRole('button', { name: '保存发布统一设置' }))
     await waitFor(() => expect(api.savePublishingSettings).toHaveBeenCalledWith(9, expect.objectContaining({ versionProfile: '保存后的发布档' })))
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=9')
 
     view.unmount()
     render(<UnifiedSettingsPanel project={{ id: 9, name: '项目九' }} api={api} />)
     fireEvent.click(screen.getByRole('button', { name: '发布统一设置' }))
     expect((await screen.findByRole('textbox', { name: '发布网站配置档' })).value).toBe('保存后的发布档')
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=9')
   }, 15000)
 
   it('persists version profile and both sync actions through backend API results', async () => {
     const api = createPersistentApi()
+    window.history.replaceState({}, '', '/batch-factory?project=9')
     const view = render(<UnifiedSettingsPanel project={{ id: 9, name: '项目九' }} api={api} />)
 
     fireEvent.click(screen.getByRole('button', { name: '版本对应配置档' }))
@@ -117,6 +122,7 @@ describe('UnifiedSettingsPanel', () => {
       name: '女频短剧版',
       settings: expect.objectContaining({ processingRulePromptRef: 'processing-v3', knowledgePromptRef: 'knowledge-v7' }),
     })))
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=9')
 
     fireEvent.click(screen.getByRole('button', { name: '版本对应配置档' }))
     fireEvent.click(await screen.findByRole('tab', { name: '同步' }))
@@ -124,6 +130,7 @@ describe('UnifiedSettingsPanel', () => {
     await waitFor(() => expect(api.sync121Config).toHaveBeenCalledWith(9))
     fireEvent.click(screen.getByRole('button', { name: '同步批量风格类型' }))
     await waitFor(() => expect(api.syncStyleTypes).toHaveBeenCalledWith(9))
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=9')
 
     view.unmount()
     render(<UnifiedSettingsPanel project={{ id: 9, name: '项目九' }} api={api} />)
@@ -135,5 +142,6 @@ describe('UnifiedSettingsPanel', () => {
     expect(await screen.findByText('剧情')).toBeTruthy()
     expect(screen.getByText('都市')).toBeTruthy()
     expect(screen.getByText('女频')).toBeTruthy()
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=9')
   }, 30000)
 })
