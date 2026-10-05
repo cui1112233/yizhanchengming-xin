@@ -241,7 +241,7 @@ func (s *LocalExecutorService) FailTask(ctx context.Context, token, taskID strin
 	if code == "" {
 		code = ErrorProviderRequestFailed
 	}
-	return s.store.FailLocalExecutorTask(ctx, task.ID, executor.ID, code, truncateError(input.Message), s.now().UTC())
+	return s.store.FailLocalExecutorTask(ctx, task.ID, executor.ID, code, safeExecutorErrorMessage(input.Message), s.now().UTC())
 }
 
 func (s *LocalExecutorService) executorForToken(ctx context.Context, token string) (LocalExecutorRecord, error) {
