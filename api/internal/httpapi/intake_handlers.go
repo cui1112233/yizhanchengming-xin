@@ -110,7 +110,7 @@ func (h handler) createIntake(w http.ResponseWriter, r *http.Request) {
 	}
 	created, books, err := h.deps.Intakes.CreateIntake(r.Context(), input)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeError(w, http.StatusUnprocessableEntity, "创建 intake 失败")
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"intake": toIntakeResponse(created), "books": toBookResponses(books)})
@@ -156,7 +156,7 @@ func (h handler) executeIntake(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.deps.Intakes.ExecuteIntake(r.Context(), id, request.MaxText)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeError(w, http.StatusUnprocessableEntity, "执行 intake 失败")
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -208,7 +208,7 @@ func (h handler) createBatchProject(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.deps.Pipeline.Create(r.Context(), create)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writeError(w, http.StatusUnprocessableEntity, "创建批量项目失败")
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
