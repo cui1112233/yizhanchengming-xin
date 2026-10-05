@@ -7,6 +7,7 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 )
 
 type IntakeService interface {
@@ -32,6 +33,15 @@ type PipelineService interface {
 	Create(ctx context.Context, request pipeline.CreateRequest) (pipeline.CreateResult, error)
 }
 
+type VideoLocalExecutorService interface {
+	Register(context.Context, video.LocalExecutorRegistrationInput) (video.LocalExecutorRegistrationResult, error)
+	Identity(context.Context, string) (video.LocalExecutorIdentity, error)
+	Heartbeat(context.Context, string, video.LocalExecutorHeartbeatInput) error
+	List(context.Context) ([]video.LocalExecutorIdentity, error)
+	CompleteTask(context.Context, string, string, video.LocalExecutorCompleteInput) error
+	FailTask(context.Context, string, string, video.LocalExecutorFailInput) error
+}
+
 type Dependencies struct {
 	Intakes             IntakeService
 	Reader              IntakeReader
@@ -42,6 +52,7 @@ type Dependencies struct {
 	UnifiedSettings     UnifiedSettingsService
 	Video               VideoService
 	VideoConfig         VideoConfigService
+	VideoLocalExecutor  VideoLocalExecutorService
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -86,6 +97,13 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/poll", api.pollVideoTask)
 	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/cancel", api.cancelVideoTask)
 	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/retry", api.retryVideoTask)
+
+	mux.HandleFunc("POST /api/v1/video/local-executors/register", api.registerVideoLocalExecutor)
+	mux.HandleFunc("GET /api/v1/video/local-executors", api.listVideoLocalExecutors)
+	mux.HandleFunc("GET /api/v1/video/local-executors/me", api.getVideoLocalExecutorIdentity)
+	mux.HandleFunc("POST /api/v1/video/local-executors/heartbeat", api.heartbeatVideoLocalExecutor)
+	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/complete", api.completeVideoLocalExecutorTask)
+	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/fail", api.failVideoLocalExecutorTask)
 	return mux
 }
 
