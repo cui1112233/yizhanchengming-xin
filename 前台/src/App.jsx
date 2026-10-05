@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Button,
@@ -11,6 +11,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Result,
   Row,
   Space,
   Statistic,
@@ -42,6 +43,7 @@ function statusLabel(status) {
     failed: '失败',
     fetched: '已获取',
     retryable_failed: '可重试失败',
+    queued: '排队中',
   }
   return labels[status] || status || '-'
 }
@@ -50,7 +52,7 @@ function statusColor(status) {
   if (status === 'completed' || status === 'fetched') return 'success'
   if (status === 'partial_failed' || status === 'retryable_failed') return 'warning'
   if (status === 'failed') return 'error'
-  if (status === 'running') return 'processing'
+  if (status === 'running' || status === 'queued') return 'processing'
   return 'default'
 }
 
@@ -60,14 +62,69 @@ function buildBatchName(inputName) {
   return `小说获取批次 ${new Date().toLocaleString('zh-CN', { hour12: false })}`
 }
 
-export default function IntakeWorkbench() {
-  if (typeof window !== 'undefined' && window.location.pathname === '/batch-factory') {
-    return <BatchProjectListPage />
+function safeErrorMessage(error) {
+  const message = error instanceof Error ? error.message : '执行失败'
+  if (/(password|passwd|token|authorization|mysql:\/\/|dsn)/i.test(message)) {
+    return '请求失败，请稍后重试或查看服务端日志。'
   }
-  return <NovelIntakeWorkbench />
+  return message || '执行失败'
 }
 
-function NovelIntakeWorkbench() {
+class WorkbenchErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error) {
+    console.error('Task 11 page render failed', error)
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <Result
+          status="error"
+          title="页面加载失败"
+          subTitle="水货生产页面遇到异常，请刷新后重试。若问题持续，请查看服务端日志。"
+        />
+      )
+    }
+    return this.props.children
+  }
+}
+
+export default function IntakeWorkbench() {
+  const [pathname, setPathname] = useState(() => (
+    typeof window === 'undefined' ? '/shuihuo-production' : window.location.pathname
+  ))
+
+  useEffect(() => {
+    const handlePopState = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  const navigate = (path) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path)
+    }
+    setPathname(path)
+  }
+
+  let page = <NovelIntakeWorkbench onNavigate={navigate} />
+  if (pathname === '/batch-factory') {
+    page = <BatchProjectListPage />
+  }
+
+  return <WorkbenchErrorBoundary>{page}</WorkbenchErrorBoundary>
+}
+
+function NovelIntakeWorkbench({ onNavigate }) {
   const [groups, setGroups] = useState([])
   const [source, setSource] = useState('')
   const [platformId, setPlatformId] = useState('')
@@ -105,8 +162,13 @@ function NovelIntakeWorkbench() {
       setFeedback({ type: 'error', message: '请至少填写一个 Book ID。' })
       return
     }
-    if (totalBooks + ids.length > 200) {
-      setFeedback({ type: 'error', message: '单个批次最多 200 本小说。' })
+
+    const existingGroup = groups.find((group) => group.source === cleanSource)
+    if (existingGroup && existingGroup.platformId !== cleanPlatformId) {
+      setFeedback({
+        type: 'error',
+        message: `${cleanSource} 已使用 platformId ${existingGroup.platformId}，同一书城不能混用不同 platformId。`,
+      })
       return
     }
 
@@ -120,16 +182,31 @@ function NovelIntakeWorkbench() {
       setFeedback({ type: 'warning', message: '这些 Book ID 已经添加到同一书城，无需重复添加。' })
       return
     }
+    if (totalBooks + uniqueIds.length > 200) {
+      setFeedback({ type: 'error', message: '单个批次最多 200 本小说。' })
+      return
+    }
 
-    setGroups((current) => [
-      ...current,
-      {
-        key: `${Date.now()}-${current.length}`,
-        source: cleanSource,
-        platformId: cleanPlatformId,
-        books: uniqueIds.map((bookId) => ({ bookId })),
-      },
-    ])
+    setGroups((current) => {
+      const groupIndex = current.findIndex((group) => group.source === cleanSource)
+      if (groupIndex === -1) {
+        return [
+          ...current,
+          {
+            key: `${Date.now()}-${current.length}`,
+            source: cleanSource,
+            platformId: cleanPlatformId,
+            books: uniqueIds.map((bookId) => ({ bookId })),
+          },
+        ]
+      }
+
+      return current.map((group, index) => (
+        index === groupIndex
+          ? { ...group, books: [...group.books, ...uniqueIds.map((bookId) => ({ bookId }))] }
+          : group
+      ))
+    })
     setBookIdText('')
     setFeedback({
       type: 'success',
@@ -203,7 +280,7 @@ function NovelIntakeWorkbench() {
           // 保留主错误信息；结果读取失败不覆盖原始错误。
         }
       }
-      setFeedback({ type: 'error', message: error instanceof Error ? error.message : '执行失败' })
+      setFeedback({ type: 'error', message: safeErrorMessage(error) })
     } finally {
       setWorking(false)
     }
@@ -223,15 +300,24 @@ function NovelIntakeWorkbench() {
     void runWorkflow(date.toISOString())
   }
 
+  const textColumn = (title, dataIndex, width, options = {}) => ({
+    title,
+    dataIndex,
+    key: dataIndex,
+    width,
+    ...options,
+    render: (value) => value || '-',
+  })
+
   const columns = [
-    { title: '书城', dataIndex: 'source', key: 'source', width: 110, fixed: 'left' },
-    { title: '121平台', dataIndex: 'platformId', key: 'platformId', width: 90 },
-    { title: 'Book ID', dataIndex: 'bookId', key: 'bookId', width: 130 },
-    { title: '书名', dataIndex: 'title', key: 'title', width: 180, ellipsis: true },
-    { title: '分类', dataIndex: 'category', key: 'category', width: 120, render: (value) => value || '-' },
-    { title: '类型', dataIndex: 'genre', key: 'genre', width: 120, render: (value) => value || '-' },
-    { title: '男女频', dataIndex: 'gender', key: 'gender', width: 90, render: (value) => value || '-' },
-    { title: '风格', dataIndex: 'style', key: 'style', width: 120, render: (value) => value || '-' },
+    textColumn('书城', 'source', 110, { fixed: 'left' }),
+    textColumn('121平台', 'platformId', 90),
+    textColumn('Book ID', 'bookId', 130),
+    textColumn('书名', 'title', 180, { ellipsis: true }),
+    textColumn('分类', 'category', 120),
+    textColumn('类型', 'genre', 120),
+    textColumn('男女频', 'gender', 90),
+    textColumn('风格', 'style', 120),
     {
       title: '状态',
       dataIndex: 'status',
@@ -257,6 +343,7 @@ function NovelIntakeWorkbench() {
           <Typography.Paragraph type="secondary">
             按书城分组添加 Book ID，一次执行 121 正文获取、男女频/风格分析，并在全部成功后创建批量任务。
           </Typography.Paragraph>
+          <Button onClick={() => onNavigate('/batch-factory')}>批量工厂</Button>
         </div>
         <Space size="large" className="heading-stats">
           <Statistic title="已选书城" value={groups.length} suffix="组" />
@@ -404,12 +491,17 @@ function NovelIntakeWorkbench() {
                   </Descriptions>
                 )}
                 {project && run && (
-                  <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
-                    <Descriptions.Item label="BatchProject">#{project.id} · {project.name}</Descriptions.Item>
-                    <Descriptions.Item label="Run">
-                      #{run.id} · {statusLabel(run.status)} · {new Date(run.runAt).toLocaleString('zh-CN', { hour12: false })}
-                    </Descriptions.Item>
-                  </Descriptions>
+                  <>
+                    <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
+                      <Descriptions.Item label="BatchProject">#{project.id} · {project.name}</Descriptions.Item>
+                      <Descriptions.Item label="Run">
+                        #{run.id} · {statusLabel(run.status)} · {new Date(run.runAt).toLocaleString('zh-CN', { hour12: false })}
+                      </Descriptions.Item>
+                    </Descriptions>
+                    <Button type="primary" onClick={() => onNavigate('/batch-factory')}>
+                      进入批量工厂
+                    </Button>
+                  </>
                 )}
               </Space>
             )}
