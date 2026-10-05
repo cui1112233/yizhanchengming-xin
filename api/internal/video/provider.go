@@ -38,6 +38,12 @@ type DefaultProviderFactory struct {
 }
 
 func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Provider, error) {
+	client := f.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	client = hardenedHTTPClient(client, true)
+
 	switch config.ProviderKey {
 	case ProviderPersonalAPI:
 		if config.CreateURL == "" {
@@ -46,7 +52,7 @@ func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Pro
 		if config.TasksURL == "" {
 			config.TasksURL = DefaultPersonalVideoTasksURL
 		}
-		return NewPersonalAPIProvider(config, secret, f.HTTPClient)
+		return NewPersonalAPIProvider(config, secret, client)
 	case ProviderYFAISeedance:
 		if config.CreateURL == "" {
 			config.CreateURL = DefaultYFAISeedanceCreateURL
@@ -54,7 +60,7 @@ func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Pro
 		if config.TasksURL == "" {
 			config.TasksURL = DefaultYFAISeedanceTasksURL
 		}
-		return NewYFAISeedanceProvider(config, secret, f.HTTPClient)
+		return NewYFAISeedanceProvider(config, secret, client)
 	case ProviderAutoDLComfyUI:
 		if config.CreateURL == "" {
 			config.CreateURL = DefaultAutoDLH3CreateURL
@@ -62,7 +68,7 @@ func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Pro
 		if config.TasksURL == "" {
 			config.TasksURL = DefaultAutoDLH3TasksURL
 		}
-		return NewAutoDLComfyUIProvider(config, secret, f.HTTPClient)
+		return NewAutoDLComfyUIProvider(config, secret, client)
 	case ProviderDoubaoLocalExecutor:
 		if f.LocalJobs == nil {
 			return nil, providerError(ErrorProviderUnavailable, "local executor store unavailable", nil)
@@ -80,6 +86,7 @@ func probeHTTP(ctx context.Context, client *http.Client, endpoint, authorization
 	if client == nil {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
+	client = hardenedHTTPClient(client, true)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return providerError(ErrorProviderUnavailable, "create provider status request", err)
