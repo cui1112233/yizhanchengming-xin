@@ -15,6 +15,8 @@ type Store interface {
 	CreateAccountWithCredential(context.Context, Account, EncryptedCredential) (Account, error)
 	ListAccountsVisible(context.Context, int64, int64, bool) ([]Account, error)
 	GetAccount(context.Context, int64) (Account, error)
+	ClaimBatchProject(context.Context, int64, int64, int64) error
+	CanAccessBatchProject(context.Context, int64, int64, int64, bool) (bool, error)
 	CreateIntentWithAudit(context.Context, Intent, Audit) (Intent, error)
 	GetIntent(context.Context, int64) (Intent, error)
 	ListAuditsVisible(context.Context, int64, int64, int64, bool) ([]Audit, error)
@@ -50,9 +52,18 @@ func (s *Service) ListAccounts(ctx context.Context, actor authn.User) ([]Account
 	return s.store.ListAccountsVisible(ctx, actor.ID, actor.TeamID, elevated(actor))
 }
 
+func (s *Service) ClaimBatchProject(ctx context.Context, actor authn.User, projectID int64) error {
+	if s == nil || s.store == nil { return ErrUnavailable }
+	if actor.ID <= 0 || projectID <= 0 { return ErrInvalid }
+	return s.store.ClaimBatchProject(ctx, projectID, actor.ID, actor.TeamID)
+}
+
 func (s *Service) CreateIntent(ctx context.Context, actor authn.User, input CreateIntentInput) (Intent, error) {
 	if s == nil || s.store == nil { return Intent{}, ErrUnavailable }
 	if actor.ID <= 0 || input.BatchProjectID <= 0 || input.PublishingAccountID <= 0 || input.BookID < 0 { return Intent{}, ErrInvalid }
+	projectAllowed, err := s.store.CanAccessBatchProject(ctx, input.BatchProjectID, actor.ID, actor.TeamID, elevated(actor))
+	if err != nil { return Intent{}, err }
+	if !projectAllowed { return Intent{}, ErrForbidden }
 	account, err := s.store.GetAccount(ctx, input.PublishingAccountID); if err != nil { return Intent{}, err }
 	if !account.Active { return Intent{}, ErrForbidden }
 	if !ownsAccount(actor, account) { return Intent{}, ErrForbidden }
@@ -65,6 +76,9 @@ func (s *Service) CreateIntent(ctx context.Context, actor authn.User, input Crea
 func (s *Service) GetIntent(ctx context.Context, actor authn.User, id int64) (Intent, error) {
 	if s == nil || s.store == nil || id <= 0 { return Intent{}, ErrInvalid }
 	intent, err := s.store.GetIntent(ctx, id); if err != nil { return Intent{}, err }
+	projectAllowed, err := s.store.CanAccessBatchProject(ctx, intent.BatchProjectID, actor.ID, actor.TeamID, elevated(actor))
+	if err != nil { return Intent{}, err }
+	if !projectAllowed { return Intent{}, ErrForbidden }
 	account, err := s.store.GetAccount(ctx, intent.PublishingAccountID); if err != nil { return Intent{}, err }
 	if !ownsAccount(actor, account) { return Intent{}, ErrForbidden }
 	return intent, nil
@@ -72,6 +86,11 @@ func (s *Service) GetIntent(ctx context.Context, actor authn.User, id int64) (In
 
 func (s *Service) ListAudits(ctx context.Context, actor authn.User, batchProjectID int64) ([]Audit, error) {
 	if s == nil || s.store == nil || actor.ID <= 0 || batchProjectID < 0 { return nil, ErrInvalid }
+	if batchProjectID > 0 {
+		projectAllowed, err := s.store.CanAccessBatchProject(ctx, batchProjectID, actor.ID, actor.TeamID, elevated(actor))
+		if err != nil { return nil, err }
+		if !projectAllowed { return nil, ErrForbidden }
+	}
 	return s.store.ListAuditsVisible(ctx, actor.ID, actor.TeamID, batchProjectID, elevated(actor))
 }
 
