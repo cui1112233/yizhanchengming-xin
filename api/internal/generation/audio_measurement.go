@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -64,12 +65,26 @@ func audioAssetHash(asset string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func safeLocalAudioAsset(asset string) bool {
+	asset = strings.TrimSpace(asset)
+	if asset == "" || strings.HasPrefix(asset, "-") || strings.ContainsRune(asset, '\x00') {
+		return false
+	}
+	parsed, err := url.Parse(asset)
+	if err != nil {
+		return false
+	}
+	// ffprobe accepts network protocols directly. Browser-controlled audio
+	// measurement must only probe files already materialized by the server.
+	return parsed.Scheme == "" && parsed.Host == ""
+}
+
 func (s *Service) MeasureAudio(ctx context.Context, req AudioMeasurementRequest) (AudioMeasurement, error) {
 	if err := s.validate(); err != nil {
 		return AudioMeasurement{}, err
 	}
 	asset := strings.TrimSpace(req.AudioAsset)
-	if req.BatchProjectID <= 0 || req.BookID <= 0 || asset == "" {
+	if req.BatchProjectID <= 0 || req.BookID <= 0 || !safeLocalAudioAsset(asset) {
 		return AudioMeasurement{}, ErrInvalid
 	}
 	if _, err := s.store.GetBookForProject(ctx, req.BatchProjectID, req.BookID); err != nil {
