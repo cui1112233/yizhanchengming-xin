@@ -39,7 +39,10 @@ describe('BatchProject VIDEO status UI', () => {
       batchProjectId: 7,
       books: [
         { bookId: 11, provider: 'yfai_seedance', model: 'seedance-2-0-official', status: 'failed', errorMessage: '视频生成失败', attempts: [{ id: 101, attempt: 1, status: 'failed', errorMessage: '视频生成失败' }] },
-        { bookId: 12, provider: 'doubao_local_executor', model: 'doubao-seedance', status: 'running', attempts: [{ id: 202, attempt: 2, status: 'running' }] },
+        { bookId: 12, provider: 'doubao_local_executor', model: 'doubao-seedance', status: 'running', attempts: [
+          { id: 201, attempt: 1, status: 'failed', errorMessage: '首次失败' },
+          { id: 202, attempt: 2, status: 'running' },
+        ] },
       ],
     })
     api.retryVideoTask.mockResolvedValue({})
