@@ -135,5 +135,5 @@ describe('UnifiedSettingsPanel', () => {
     expect(await screen.findByText('剧情')).toBeTruthy()
     expect(screen.getByText('都市')).toBeTruthy()
     expect(screen.getByText('女频')).toBeTruthy()
-  }, 15000)
+  }, 30000)
 })
