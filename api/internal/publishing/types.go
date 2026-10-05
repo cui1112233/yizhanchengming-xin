@@ -2,6 +2,7 @@ package publishing
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -98,6 +99,56 @@ type Audit struct {
 	Platform       string    `json:"platform"`
 	Action         string    `json:"action"`
 	Result         string    `json:"result"`
+	ErrorSummary   string    `json:"-"`
+	CreatedAt      time.Time `json:"createdAt"`
+}
+
+type PublicAudit struct {
+	ID             int64     `json:"id"`
+	IntentID       int64     `json:"intentId"`
+	BatchProjectID int64     `json:"batchProjectId"`
+	AccountID      int64     `json:"publishingAccountId"`
+	ActorUserID    int64     `json:"actorUserId"`
+	Platform       string    `json:"platform"`
+	Action         string    `json:"action"`
+	Result         string    `json:"result"`
 	ErrorSummary   string    `json:"errorSummary,omitempty"`
 	CreatedAt      time.Time `json:"createdAt"`
+}
+
+func (a Audit) Public() PublicAudit {
+	return PublicAudit{
+		ID: a.ID,
+		IntentID: a.IntentID,
+		BatchProjectID: a.BatchProjectID,
+		AccountID: a.AccountID,
+		ActorUserID: a.ActorUserID,
+		Platform: a.Platform,
+		Action: a.Action,
+		Result: a.Result,
+		ErrorSummary: sanitizeAuditErrorSummary(a.ErrorSummary),
+		CreatedAt: a.CreatedAt,
+	}
+}
+
+func sanitizeAuditErrorSummary(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	lower := strings.ToLower(value)
+	for _, marker := range []string{
+		"password", "passwd", "token", "authorization", "bearer", "cookie",
+		"api key", "api_key", "apikey", "secret", "ciphertext", "nonce",
+		"master key", "refresh", "session", "mysql://", "dsn",
+	} {
+		if strings.Contains(lower, marker) {
+			return "敏感错误详情已脱敏"
+		}
+	}
+	runes := []rune(value)
+	if len(runes) > 256 {
+		return string(runes[:256]) + "…"
+	}
+	return value
 }
