@@ -241,14 +241,16 @@
 
 # Task 11：水货生产
 
-- ⚠️ 11.1 `/shuihuo-production` 页面迁移
-- ⚠️ 11.2 水货生产 -> Batch Factory V11 入口
+- [x] 11.1 `/shuihuo-production` 页面迁移
+- [x] 11.2 水货生产 -> Batch Factory V11 入口
 - ⚠️ 11.3 页面路由不闪退
-- ⚠️ 11.4 项目列表共用真实 MySQL 数据
-- ⚠️ 11.5 状态实时同步
-- ⚠️ 11.6 失败状态可见
+- [x] 11.4 项目列表共用真实 MySQL 数据
+- [x] 11.5 状态实时同步
+- [x] 11.6 失败状态可见
 - ⚠️ 11.7 对标旧 ECS 可用交互
-- ⚠️ 11.8 测试 + CI + 合并 main
+- [x] 11.8 测试 + CI + 合并 main
+
+> 仓库验收依据：PR #13 已合并 `main`；`main` CI run `37285192021` 中 Go tests、前台 tests、前台 build、管理端 build 全绿。ECS / 公网真实浏览器验收仍留到 Task 16，因此 Task 11 总体继续保持 `⚠️`。
 
 ---
 
