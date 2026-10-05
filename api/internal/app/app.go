@@ -18,9 +18,10 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	pipelineService := pipeline.NewService(store, now)
 
 	return httpapi.NewHandler(httpapi.Dependencies{
-		Intakes:       intakeService,
-		Reader:        store,
-		Pipeline:      pipelineService,
-		BatchProjects: store,
+		Intakes:             intakeService,
+		Reader:              store,
+		Pipeline:            pipelineService,
+		BatchProjects:       store,
+		BatchProjectDetails: store,
 	})
 }
