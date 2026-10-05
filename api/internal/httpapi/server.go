@@ -71,23 +71,25 @@ type VideoMergeService interface {
 }
 
 type Dependencies struct {
-	Intakes                    IntakeService
-	Reader                     IntakeReader
-	BatchProjects              BatchProjectReader
-	BatchProjectDetails        BatchProjectDetailReader
-	Pipeline                   PipelineService
-	Generation                 GenerationService
-	UnifiedSettings            UnifiedSettingsService
-	Auth                       AuthService
-	Publishing                 PublishingService
-	LoginLimiter               *LoginRateLimiter
-	SecureCookies              bool
-	AllowedOrigins             []string
-	Video                      VideoService
-	VideoConfig                VideoConfigService
-	VideoLocalExecutor         VideoLocalExecutorService
-	VideoStatus                VideoStatusService
-	VideoMerge                 VideoMergeService
+	Intakes                     IntakeService
+	Reader                      IntakeReader
+	BatchProjects               BatchProjectReader
+	BatchProjectDetails         BatchProjectDetailReader
+	Pipeline                    PipelineService
+	Generation                  GenerationService
+	UnifiedSettings             UnifiedSettingsService
+	Auth                        AuthService
+	Publishing                  PublishingService
+	LoginLimiter                *LoginRateLimiter
+	SecureCookies               bool
+	AllowedOrigins              []string
+	Video                       VideoService
+	VideoConfig                 VideoConfigService
+	VideoLocalExecutor          VideoLocalExecutorService
+	VideoStatus                 VideoStatusService
+	VideoMerge                  VideoMergeService
+	BatchProjectAccess          BatchProjectAccessChecker
+	VideoResourceProjects       VideoResourceProjectResolver
 	VideoExecutorBootstrapToken string
 }
 
@@ -149,19 +151,19 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/publishing/audits", api.requireCapability(CapabilityPublishAuditView, http.HandlerFunc(api.listPublishAudits)))
 
 	// Task 14 browser-facing VIDEO APIs reuse Task 15 authentication, capability,
-	// ownership-visible project policy and same-origin semantics. Provider secrets
-	// are configuration-only and therefore require batch.configure.
+	// project ownership and same-origin semantics. Provider secrets are
+	// configuration-only and therefore require batch.configure.
 	mux.Handle("GET /api/v1/video-providers/{provider}/models/{model}", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.getVideoProviderConfig)))
 	mux.Handle("PUT /api/v1/video-providers/{provider}/models/{model}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.putVideoProviderConfig))))
 	mux.Handle("GET /api/v1/video-providers/{provider}/models/{model}/status", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getVideoProviderStatus)))
-	mux.Handle("GET /api/v1/batch-projects/{projectId}/video", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.projectVideoStatus)))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.startVideo))))
-	mux.Handle("POST /api/v1/video-tasks/{taskId}/poll", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.pollVideoTask))))
-	mux.Handle("POST /api/v1/video-tasks/{taskId}/cancel", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.cancelVideoTask))))
-	mux.Handle("POST /api/v1/video-tasks/{taskId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.retryVideoTask))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/merge", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.startVideoMerge))))
-	mux.Handle("GET /api/v1/video-merge-jobs/{jobId}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getVideoMerge)))
-	mux.Handle("POST /api/v1/video-merge-attempts/{attemptId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.retryVideoMerge))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/video", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.projectVideoStatus))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.startVideo)))))
+	mux.Handle("POST /api/v1/video-tasks/{taskId}/poll", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(http.HandlerFunc(api.pollVideoTask)))))
+	mux.Handle("POST /api/v1/video-tasks/{taskId}/cancel", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(http.HandlerFunc(api.cancelVideoTask)))))
+	mux.Handle("POST /api/v1/video-tasks/{taskId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(http.HandlerFunc(api.retryVideoTask)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/merge", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.startVideoMerge)))))
+	mux.Handle("GET /api/v1/video-merge-jobs/{jobId}", api.requireCapability(CapabilityBatchView, api.requireVideoMergeJobAccess(http.HandlerFunc(api.getVideoMerge))))
+	mux.Handle("POST /api/v1/video-merge-attempts/{attemptId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoMergeAttemptAccess(http.HandlerFunc(api.retryVideoMerge)))))
 
 	// Local executor traffic has a distinct service identity. Registration uses a
 	// server-side bootstrap token; heartbeat/identity/complete/fail continue to
