@@ -1,261 +1,308 @@
 # Performance / Concurrency / Capacity Audit
 
-## Audit scope
+## Scope and guardrails
 
-This audit validates concurrency correctness and capacity of the new mainline without changing Task 9 Runtime or Task 14 Video/Merge business architecture merely to make load tests pass.
+This audit validates concurrency correctness and capacity without changing Task 9 Runtime or Task 14 business architecture merely to make load tests pass.
 
-Correctness priority:
+Priority: no duplicate execution -> no lost/stuck tasks -> bounded retry -> no resource leak -> throughput/latency.
 
-1. no duplicate execution;
-2. no lost tasks;
-3. no permanently stuck tasks;
-4. no unbounded retry;
-5. no resource leak;
-6. throughput/latency after correctness.
-
-Destructive load tests against production ECS are out of scope. Real paid providers remain explicit opt-in only.
+- Branch: `test/performance-concurrency-capacity`
+- Draft PR: #25; keep Draft until Task 9 Runtime merges and the final Runtime sweep is complete.
+- No destructive production ECS load.
+- No large real paid AI/video provider load.
+- Real provider load remains explicit opt-in only.
 
 ## Repository baseline
 
-- Audit branch: `test/performance-concurrency-capacity`
-- Current synced main SHA: `0548a17328ed699af2aea7536d85a2d3c0496710`
-- Current main commit: `docs(tasks): record Task14 repository acceptance`
-- Current main CI: run `37310103359`, conclusion `success`
-- Current migrations:
-  - `00001_phase1_intake.sql`
-  - `00002_task12_generation.sql`
-  - `00003_task10_unified_settings.sql`
-  - `00004_task15_auth.sql`
-  - `00006_task13_match_audio.sql`
-  - `00007_task14_video.sql`
-- Audit MySQL migration run reached Goose version `7`.
+- Synced main SHA: `0548a17328ed699af2aea7536d85a2d3c0496710`
+- Main commit: `docs(tasks): record Task14 repository acceptance`
+- Migrations through `00007_task14_video.sql`; Goose version `7`.
+- Task 9 Runtime: not accepted in main; 9.4/9.5 remain blockers.
+- Task 14: repository-accepted in main; Video/Provider/TOS/Merge/ffmpeg components are testable, while async Queue/Lease/Scheduler integration still waits for Task 9.4.
 
-### Task status at current main
-
-- Task 9: **not merged/accepted as Runtime**. `TASKS.md` still has 9.4.1–9.4.10 and 9.5 unchecked. Worker, Scheduler, Redis Queue/Lock, lease/recovery and Runtime idempotency are not available as accepted mainline capability.
-- Task 14: **merged and repository-accepted in main**. Video model/state machine, provider adapters, persistence, TOS/merge/ffmpeg components are present. However, application wiring explicitly does not create an async queue, Redis lease runtime or scheduler; that adapter still waits for Task 9.4.
-
-The audit branch was re-synced with main when Task 14 landed. No unmerged Task 9/14 implementation was cherry-picked.
-
-## Current connection/runtime configuration
+## Connection/runtime configuration
 
 ### MySQL
 
-`api/cmd/server/main.go` uses `sql.Open("mysql", dsn)` and does not call the Go `database/sql` pool setters.
+Server startup uses `sql.Open("mysql", dsn)` without pool setters. Effective Go defaults remain:
 
-Effective defaults:
+- `MaxOpenConns=0` (unlimited)
+- `MaxIdleConns=2` default
+- `ConnMaxLifetime=0`
+- `ConnMaxIdleTime=0`
 
-- `MaxOpenConns`: `0` (unlimited)
-- `MaxIdleConns`: default `2`
-- `ConnMaxLifetime`: `0`
-- `ConnMaxIdleTime`: `0`
-
-No tuning was made in this audit. The first load set records `DB.Stats()` before any tuning decision.
+No pool tuning was made. Current measured workloads show no pool waits, so there is not yet evidence for choosing 20/50/100 or another limit.
 
 ### Redis
 
-No Redis client dependency/configuration is present in current main, consistent with Task 9.4 still pending. Therefore Redis pool size, timeout, retry and active-connection limits are **not configured yet**, rather than configured as zero.
+No accepted Task 9 Redis Runtime/client configuration exists in current main. Pool size, timeout, retry, active-connection limits, queue depth, lease/fencing and recovery remain `BLOCKED_BY_TASK9_RUNTIME` rather than zero-valued configuration.
 
-## Test environment
+### HTTP server
 
-Primary measured baseline source:
+Startup still uses direct `http.ListenAndServe` with no visible explicit `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`, or graceful `Shutdown` path. This audit probes the risk but does not refactor server startup.
 
-- GitHub Actions run: `37310980711`
-- Job: `111766038496`
-- Audit test commit: `77cf9e128b3557fc68b5a80ac0d8be82ff8157f4`
-- Runner: Ubuntu `24.04.5`
-- Go: `1.23.12 linux/amd64`
-- MySQL: `8.4.11`
-- Goose database version: `7`
+## Primary measured environment
+
+Latest full metric source for the expanded workload before the slow-client/report-only follow-up commits:
+
+- Performance workflow run: `37313261537`
+- Job: `111773618137`
+- Commit: `879f102f56d911e1b9c19e676f4c00ed2e1e1fbd`
+- Ubuntu 24.04.5 GitHub runner
+- Go 1.23.12 linux/amd64
+- MySQL 8.4.11
+- Goose database version 7
 - no production ECS traffic
-- no real paid AI/video provider load
+- no real paid provider load
 
-The run completed migrations, baseline tests, controlled Task 14 probes, `go test ./...`, and `go build ./...` successfully. The Task 9 idempotency RED is intentionally executed as a diagnostic and preserved as a failing correctness assertion while the workflow continues to collect the remaining metrics.
+That run completed migrations, all expanded capacity probes, `go test ./...`, and `go build ./...` successfully. The Task 9 idempotency RED remains an intentional diagnostic known-failure while the workflow continues to collect other metrics.
 
-## First workload set
+## PERF-RUN-IDEMPOTENCY-001 — P0 CONFIRMED / BLOCKED_BY_TASK9_4
 
-### MySQL / HTTP baseline
+Reproduction is deliberately preserved unchanged:
 
-Standard project sizes:
+1. create one completed Intake;
+2. issue 20 simultaneous calls to the real pipeline Create path for the same logical execution;
+3. query MySQL for BatchProject and logical Run counts.
 
-- Small: 10 books / 10 concurrent HTTP requests
-- Medium: 50 books / 50 concurrent HTTP requests
-- Large: 100 books / 100 concurrent HTTP requests
+Latest measured reproduction:
 
-Measured paths:
-
-- Run creation;
-- BatchProject list query/API;
-- BatchProject detail query/API;
-- request counts, errors and throughput;
-- P50/P95/P99;
-- heap/RSS before, peak and post-GC;
-- goroutine before/after;
-- DB open connections and pool waits.
-
-### Task 9 idempotency RED
-
-20 goroutines simultaneously call the real pipeline Create path for the same Intake.
-
-Measured result:
-
-- concurrency: `20`
+- concurrent requests: `20`
 - successful calls: `20`
 - failed calls: `0`
 - BatchProjects: `1`
-- logical Runs: **`20`**, expected `1`
-- duration: `240.374857ms`
-- goroutines: `4 -> 5`
+- logical Runs: **`20`**
+- expected: **`1` logical Run**
+- duration: `73.532132ms`
 - DB open: `2`
-- DB wait count/duration: `0 / 0s`
+- DB waits: `0 / 0s`
 
-### Task 14 controlled provider load
+This branch does not fix the defect. After Task 9.4 idempotency merges into main, sync main and run the same test. Acceptance then becomes a hard CI gate: `20 concurrent requests -> 1 logical Run`.
 
-A controlled `httptest` provider is used; no paid provider is called. Each task performs exactly one submit + one poll.
+## MySQL / HTTP 10 / 50 / 100 baseline
 
-| Concurrency | Tasks | Success / failed | Provider requests | P50 | P95 | P99 |
+Latest expanded-run snapshot:
+
+| Workload | Run create | MySQL detail P95 | HTTP list P95 | HTTP detail P95 | HTTP detail P99 | HTTP errors | DB waits |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 books / 10 concurrent | 0.711 ms | 0.510 ms | 4.567 ms | 4.995 ms | 4.995 ms | 0 | 0 |
+| 50 books / 50 concurrent | 0.849 ms | 1.190 ms | 28.167 ms | 50.155 ms | 51.938 ms | 0 | 0 |
+| 100 books / 100 concurrent | 1.037 ms | 1.794 ms | 67.323 ms | 150.881 ms | 227.969 ms | 0 | 0 |
+
+At 100 concurrency the detail endpoint still completes without errors, but latency scales materially and remains a P2 regression signal rather than an SQL-tuning instruction.
+
+## Generation controlled load — 10 / 50 / 100
+
+Generation is tested against real MySQL plus a controlled in-process provider. No AI credits are consumed. Current `RunBatch` is synchronous and sequential; the tests explicitly record `provider_max_active=1` instead of pretending the current model is concurrent.
+
+| BookRuns | Success / failed | Duration | Throughput | P50 | P95 | P99 | Provider calls | Provider max active | DB waits |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 10 / 0 | 195.235 ms | 51.22 books/s | 14.771 ms | 48.588 ms | 48.588 ms | 20 | 1 | 0 |
+| 50 | 50 / 0 | 1.107 s | 45.15 books/s | 14.514 ms | 50.610 ms | 123.390 ms | 100 | 1 | 0 |
+| 100 | 100 / 0 | 3.467 s | 28.84 books/s | 17.653 ms | 102.104 ms | 138.574 ms | 200 | 1 | 0 |
+
+100-BookRun resource snapshot:
+
+- heap before / peak / post-GC: `241,888 / 1,258,160 / 217,304` bytes
+- RSS before / peak / post-GC: `14,163,968 / 15,634,432 / 14,979,072` bytes
+- goroutines: `5 -> 5`
+- DB: open `1`, in-use `0`, idle `1`, WaitCount `0`, WaitDuration `0s`
+
+The throughput drop at larger batch size is recorded as a scaling characteristic of the current synchronous path, not a justification to rewrite Generation concurrency in this audit.
+
+### Generation failure isolation
+
+Controlled 10-book batch with book 5 failing at Script stage:
+
+- total: `10`
+- completed: `9`
+- failed: `1`
+- provider calls: `19`
+- duration: `203.646ms`
+- a later book after the failed book still completed successfully.
+
+Result: current synchronous Generation batch correctly isolates one failed book and continues later books.
+
+## 10-round RSS / goroutine retention
+
+Workload: warm server, then 10 rounds of 100 concurrent 100-book project-detail requests; each round performs GC and an idle interval before sampling.
+
+| Round | HeapAlloc | HeapInuse | Sys | RSS | Goroutines | DB waits |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 | 10 | 10 / 0 | 20 | 0.824 ms | 1.159 ms | 1.159 ms |
-| 50 | 50 | 50 / 0 | 100 | 4.296 ms | 5.071 ms | 5.200 ms |
-| 100 | 100 | 100 / 0 | 200 | 5.808 ms | 7.280 ms | 7.529 ms |
+| 1 | 986,928 | 2,482,176 | 72,701,192 | 18,350,080 | 12 | 0 |
+| 2 | 963,848 | 2,605,056 | 89,809,176 | 33,185,792 | 12 | 0 |
+| 3 | 1,101,952 | 2,736,128 | 94,265,624 | 47,919,104 | 12 | 0 |
+| 4 | 1,057,608 | 2,768,896 | 94,265,624 | 40,361,984 | 12 | 0 |
+| 5 | 1,357,184 | 3,252,224 | 94,265,624 | 66,363,392 | 12 | 0 |
+| 6 | 966,640 | 2,605,056 | 94,265,624 | 63,823,872 | 12 | 0 |
+| 7 | 923,080 | 2,531,328 | 94,265,624 | 71,143,424 | 12 | 0 |
+| 8 | 893,200 | 2,449,408 | 94,265,624 | 24,580,096 | 12 | 0 |
+| 9 | 1,680,832 | 3,514,368 | 98,459,928 | 101,904,384 | 12 | 0 |
+| 10 | 1,343,344 | 3,104,768 | 98,591,000 | 85,557,248 | 12 | 0 |
 
-These numbers validate adapter concurrency behavior only; they are not a real provider SLA.
+Summary sample immediately after the series:
 
-### Task 14 ffmpeg executor concurrency boundary
+- base RSS: `28,028,928`
+- final RSS: `84,312,064`
+- delta: `+56,283,136`
+- strict RSS increase steps: `5/9`
+- goroutines: `12 -> 12`
 
-A fake command runner is used to measure executor-level concurrency without consuming real ffmpeg CPU/RAM.
+Interpretation: this does **not** prove a memory leak. RSS is strongly non-monotonic (for example round 8 falls to ~23.4 MiB), post-GC heap remains low, and Go `Sys` largely reaches a plateau around 94–99 MiB. Keep this as an allocator/runtime/OS retention signal. Escalate to heap/profile investigation only if longer repeated workloads show sustained growth rather than a plateau/oscillation.
 
-| Requested concurrency | Success / failed | Maximum simultaneously active executor calls |
-| ---: | ---: | ---: |
-| 1 | 1 / 0 | 1 |
-| 2 | 2 / 0 | 2 |
-| 4 | 4 / 0 | 4 |
+### Goroutine leak status
 
-This proves that the current executor does not impose an internal ffmpeg concurrency limit. Real CPU/RAM/disk capacity must still be measured in an approved isolated environment.
+No goroutine leak was reproduced in the 10-round loop: every measured round stayed at `12`, with summary delta `0`.
 
-## Baseline results
+This covers the HTTP project-detail loop. Task 9 Worker/Scheduler ticker lifecycle remains blocked until the Runtime exists in main.
 
-### Latency / errors
+## Project Detail P95 decomposition
 
-| Workload | Run create | MySQL list P50 / P95 / P99 | MySQL detail P50 / P95 / P99 | HTTP list P50 / P95 / P99 | HTTP detail P50 / P95 / P99 | HTTP errors |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 books / 10 concurrent | 0.916 ms | 0.242 / 0.374 / 0.567 ms | 0.323 / 0.592 / 0.683 ms | 3.634 / 4.669 / 4.669 ms | 3.648 / 5.238 / 5.238 ms | 0 / 20 |
-| 50 books / 50 concurrent | 0.807 ms | 0.278 / 0.338 / 0.432 ms | 0.769 / 1.021 / 1.141 ms | 13.202 / 21.904 / 22.721 ms | 35.996 / 44.704 / 46.441 ms | 0 / 100 |
-| 100 books / 100 concurrent | 0.923 ms | 0.375 / 0.579 / 0.597 ms | 1.283 / 1.656 / 1.949 ms | 46.078 / 65.410 / 66.066 ms | 101.869 / 116.894 / 119.217 ms | 0 / 200 |
+A 100-book response serializes to approximately `1,262,465` JSON bytes (~1.20 MiB). Under 100 simultaneous operations:
 
-### Throughput
+| Layer | P50 | P95 | P99 | Failures |
+| --- | ---: | ---: | ---: | ---: |
+| direct store / row materialization | 93.156 ms | 138.813 ms | 274.206 ms | 0 |
+| store + JSON marshal | 182.479 ms | 229.682 ms | 234.433 ms | 0 |
+| in-process HTTP handler | 93.446 ms | 128.550 ms | 130.331 ms | 0 |
+| httptest network HTTP | 109.151 ms | 177.396 ms | 180.377 ms | 0 |
 
-| Workload | Project list throughput | Project detail throughput |
-| --- | ---: | ---: |
-| 10 | 2086.07 req/s | 1875.62 req/s |
-| 50 | 2096.81 req/s | 1067.75 req/s |
-| 100 | 1487.06 req/s | 829.28 req/s |
+`auth/session` is not part of this benchmark handler and therefore is not a measured contributor here.
 
-These are short isolated-runner measurements for regression comparison, not production SLA commitments.
+Conclusion: the earlier low single-query latency does not mean SQL is the only or main 100-way-concurrency cost. At high concurrency, DB/row materialization itself rises substantially; serializing a ~1.20 MiB object adds meaningful CPU/allocation cost; network delivery adds more overhead. Do not optimize the SQL statement blindly from this evidence.
 
-### Memory / goroutines / DB waits
+## Task 14 controlled Provider failure behavior
 
-| Workload | Heap before | Heap peak | Heap post-GC | RSS before | RSS peak | RSS post-GC | Goroutines before -> after | DB open after | DB wait count / duration |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 | 0.33 MiB | 0.99 MiB | 0.44 MiB | 12.74 MiB | 15.86 MiB | 15.05 MiB | 6 -> 13 | 2 | 0 / 0s |
-| 50 | 0.42 MiB | 7.10 MiB | 0.59 MiB | 13.16 MiB | 24.81 MiB | 21.75 MiB | 13 -> 13 | 2 | 0 / 0s |
-| 100 | 0.59 MiB | 46.59 MiB | 1.27 MiB | 16.68 MiB | 78.91 MiB | 78.91 MiB | 13 -> 13 | 2 | 0 / 0s |
+20 simultaneous Submit calls per controlled failure mode:
 
-## First findings / risk register
+| Case | Requests | Hidden retries | Failed | Error classification | Duration |
+| --- | ---: | ---: | ---: | --- | ---: |
+| HTTP 429 | 20 | 0 | 20 | `provider_request_failed` | 2.113 ms |
+| HTTP 500 | 20 | 0 | 20 | `provider_request_failed` | 1.064 ms |
+| HTTP 401 | 20 | 0 | 20 | `provider_auth_failed` | 0.937 ms |
+| client timeout | 20 | 0 | 20 | `provider_unavailable` | 16.641 ms |
+| slow success | 20 | 0 | 0 | success | 21.417 ms |
+| unavailable endpoint | 1 | 0 | 1 | `provider_unavailable` | 0.241 ms |
 
-### PERF-RUN-IDEMPOTENCY-001 — P0 CONFIRMED
+The provider adapter itself does not create a retry storm. This does **not** validate final Runtime retry/backoff/lease policy; those tests remain blocked by Task 9. Poll storm testing also remains blocked until the shared Runtime exists.
 
-Concurrent double-click/API retry can create duplicate logical Runs. Twenty simultaneous calls for one Intake produced one BatchProject but twenty Runs, with all twenty calls reporting success.
+## Merge fragment capacity — controlled executor
 
-Current main has no Runtime idempotency guarantee for this path. This audit does not fix it because Task 9.4.6 owns that business behavior. The RED remains as regression evidence and must become green after Task 9 Runtime merges.
+These are deterministic executor tests using a fake downloader/command runner/artifact store; they validate ordering, workdir cleanup and control-flow scaling, not real ffmpeg CPU/RAM.
 
-### PERF-FFMPEG-001 — P1 CONFIRMED CAPACITY RISK
+| Fragments | Result | Duration | Controlled input bytes | Heap delta | Temp work dirs after | Ordered |
+| ---: | --- | ---: | ---: | ---: | ---: | --- |
+| 10 | PASS | 0.570 ms | 10,240 | 51,048 | 0 | yes |
+| 20 | PASS | 0.985 ms | 20,480 | 79,672 | 0 | yes |
+| 50 | PASS | 2.110 ms | 51,200 | 192,184 | 0 | yes |
 
-The current ffmpeg executor permits all tested merge calls to run simultaneously: requested concurrency 4 produced `max_active=4`.
+Merge retry probe:
 
-This is not itself a functional failure, but on an ECS it can allow CPU/RAM/disk saturation if many merge jobs are admitted concurrently. Per audit boundary, no new scheduler/semaphore is added here. Total-control should decide the production concurrency policy after real 1/2/4+ ffmpeg resource measurement.
+- attempt 1: controlled failure
+- retry attempt 2: succeeded
+- merge executor calls: `2`
+- `MergeService` has no Video Provider dependency; therefore retry has no path to resubmit an already-successful VIDEO production task (`video_submit_calls=0_by_service_boundary`).
 
-### PERF-DB-POOL-001 — P1 RISK, saturation not reproduced
+## Controlled artifact persistence / TOS adapter boundary
 
-The application leaves `MaxOpenConns` unlimited and uses default idle-pool behavior. First-stage loads showed `WaitCount=0` and `WaitDuration=0`, so there is no evidence yet for tuning values.
+No real TOS capacity traffic is used.
 
-The probe samples pool stats before/after the workload and does not continuously capture peak open connections. A peak sampler plus larger controlled load is required before pool changes.
+| Concurrent PersistFile calls | Success / failed | Uploader calls | Hidden retries | Max active | Duration | Heap delta |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 10 / 0 | 10 | 0 | 10 | 2.208 ms | 16,752 |
+| 50 | 50 / 0 | 50 | 0 | 50 | 2.324 ms | 81,184 |
 
-### PERF-HTTP-SERVER-001 — P1 RISK, not yet reproduced as a failure
+A controlled upload failure produced exactly one uploader call and zero hidden retry. Source files remain caller-owned; merge work-directory cleanup is tested separately and removes its temp directory.
 
-Server startup uses direct `http.ListenAndServe`. Explicit read/write/idle/header timeouts and graceful `Shutdown` are not visible in the startup path. Slow-client cancellation and SIGTERM/recovery remain pending tests.
+This shows the storage adapter does not impose a concurrency gate or hidden retry. Real TOS network throughput, throttling and large-file behavior remain manual/Task16 capacity work.
 
-### PERF-BATCH-DETAIL-SCALE-001 — P2 scaling trend
+## PERF-FFMPEG-001 — P1 CONFIRMED CAPACITY RISK
 
-Project-detail HTTP P95 increased from `5.238ms` at 10 concurrency to `44.704ms` at 50 and `116.894ms` at 100, with zero request errors.
+Executor-level fake-runner evidence remains:
 
-Direct MySQL detail P95 remained `0.592ms`, `1.021ms`, and `1.656ms`, so the observed HTTP scaling cost is not explained by the SQL query alone and includes response construction/serialization/concurrent delivery.
+- requested concurrency 1 -> `max_active=1`
+- requested concurrency 2 -> `max_active=2`
+- requested concurrency 4 -> `max_active=4`
 
-## Goroutine / memory status
+There is no internal ffmpeg concurrency gate. No semaphore/scheduler is added in this audit branch.
 
-No goroutine leak is confirmed in the first baseline. After reusable HTTP/server goroutines were initialized (`6 -> 13`), the 50- and 100-concurrency runs remained `13 -> 13`.
+A manual-only workflow, `.github/workflows/performance-ffmpeg-manual.yml`, is prepared to generate controlled synthetic fragments and measure real ffmpeg at concurrency 1/2/4:
 
-No heap leak is confirmed. At the 100-book workload, heap rose to about `46.59 MiB` and returned to about `1.27 MiB` after GC.
+- wall time
+- max RSS
+- user/system CPU time
+- temp disk usage
+- output bytes
+- failure count
+- cleanup
 
-RSS rose to about `78.91 MiB` and remained at that level immediately after GC. A single Go process sample is insufficient to call this a leak because RSS does not necessarily return to the OS with heap GC. This remains a retention signal requiring repeated cycles and profile evidence before filing a leak defect.
+It is intentionally `workflow_dispatch` only. It has **not yet been executed in this audit session**, so there are no real ffmpeg CPU/RAM numbers and no concurrency ceiling recommendation yet.
 
-## Generation status
+## PERF-HTTP-SERVER-001 — P1 RISK
 
-Generation code is in main and the repository-wide tests pass, but a dedicated 10/50/100 controlled-provider Generation throughput workload has not yet been completed in this first batch. No real AI load is enabled by default.
+A slow incomplete-header client probe is included to demonstrate connection retention when server timeouts are zero-valued. It is diagnostic only; server startup is not refactored in this PR.
+
+This risk should also be carried into Observability/Operations and final Release/Deployment closure for an explicit timeout/graceful-shutdown decision.
+
+## MySQL pool status
+
+Do not tune yet.
+
+Measured latest workloads:
+
+- 100-concurrent HTTP baseline: DB open `2`, WaitCount delta `0`, WaitDuration delta `0s`.
+- 10-round 100-concurrent detail loop: DB open `2`, in-use `0` at end-of-round samples, WaitCount `0`, WaitDuration `0s`.
+- Generation 100: DB open `1`, WaitCount delta `0`, WaitDuration delta `0s`.
+
+These end-of-workload samples do not establish the true instantaneous peak connection count, so the unlimited `MaxOpenConns=0` remains a capacity risk, but there is still no saturation evidence that justifies arbitrary tuning.
+
+## Risk register
+
+### P0
+
+- `PERF-RUN-IDEMPOTENCY-001` — CONFIRMED, `BLOCKED_BY_TASK9_4`. 20 concurrent creates -> 20 logical Runs instead of 1.
+
+### P1
+
+- `PERF-FFMPEG-001` — CONFIRMED capacity risk: no executor concurrency gate; real resource ceiling still unmeasured.
+- `PERF-DB-POOL-001` — risk only, saturation not reproduced; unlimited MaxOpenConns but zero waits in measured loads.
+- `PERF-HTTP-SERVER-001` — risk: no explicit production server timeouts/graceful-shutdown wiring; diagnostic slow-client probe added.
+
+### P2
+
+- `PERF-BATCH-DETAIL-SCALE-001` — high-concurrency response/materialization/serialization scaling trend; 100-book object is ~1.20 MiB and 100-way P95 is materially above single-query latency.
+- Generation current synchronous throughput declines at larger batch sizes; correctness remains intact and no business concurrency change is made in this PR.
+
+No new P0/P1 was created by the second workload set. RSS remains a retention signal, not a confirmed leak.
 
 ## Task 9 blocked tests
 
-Blocked until Task 9 Runtime enters `main`:
+Unchanged until Task 9 Runtime enters main:
 
 - 1/2/5/10 Worker claim distribution;
-- duplicate claim and claim contention;
-- lease renew / expiry / reclaim / fencing;
-- stale complete / fail / release;
+- duplicate claim / contention;
+- lease renew, expiry, reclaim and fencing;
+- stale complete/fail/release;
 - Worker crash storm and stale-running recovery;
-- Redis restart, wipe and temporary unavailability;
-- Redis connection pool capacity;
-- Scheduler 100 simultaneous/near-simultaneous `run_at` Runs and multi-Scheduler ownership;
-- Queue backpressure at 100/500 pending BookRuns;
+- Redis restart, wipe, temporary unavailability and connection-pool capacity;
+- 100 simultaneous/near-simultaneous scheduled Runs and multi-Scheduler ownership;
+- 100/500 queue-depth backpressure using the real Runtime;
 - graceful Worker shutdown and startup recovery;
-- Runtime-level 50/100-book partial failure isolation and failed-only Retry;
+- Runtime-level 50/100 partial failure + failed-only retry;
 - true 1/5/10 concurrent Run execution isolation;
-- production async Video scheduling/polling/lease recovery that depends on the shared Runtime.
+- final Runtime retry/backoff behavior for Provider failures;
+- 100-running-video poll storm / lease coordination.
 
-## Task 14 status / remaining capacity work
-
-Task 14 itself is no longer a merge blocker. Controlled Personal API concurrency and executor-level ffmpeg concurrency are now directly tested.
-
-Still pending as manual/isolated capacity work rather than Task 14 merge blockers:
-
-- 429/transient-5xx/slow-response rate-limit behavior under the final shared Runtime retry policy;
-- 100-running-video poll-storm request-rate measurement after Task 9 scheduler/worker exists;
-- TOS concurrent upload/retry/temp cleanup capacity;
-- real ffmpeg CPU/RAM/duration at 1/2/4+ concurrency;
-- 10/20/50-fragment real merge disk/duration/cleanup;
-- disk-full behavior;
-- real provider smoke, only with explicit `ENABLE_REAL_PROVIDER_LOAD_TEST=true`.
+The audit explicitly does not invent a fake Redis Runtime and call those scenarios accepted.
 
 ## CI layering
 
-- Existing normal repository CI remains unchanged.
-- `.github/workflows/performance-audit.yml` provides an isolated MySQL audit workflow for this branch and `workflow_dispatch`.
-- Known Task 9 idempotency RED is reported explicitly rather than converted to fake success; the workflow continues so the rest of the metrics can still be collected.
-- 10/50/100 MySQL/HTTP baseline and controlled Task 14 probes are lightweight.
-- 100/500 Runtime, long leak, real ffmpeg/TOS/disk and real-provider tests remain manual.
-
-## Verification evidence
-
-Audit run `37310980711` / job `111766038496` on test commit `77cf9e128b3557fc68b5a80ac0d8be82ff8157f4`:
-
-- MySQL service healthy;
-- migrations through `00007_task14_video.sql`: PASS;
-- Task 9 idempotency RED: reproduced, `20` logical Runs instead of `1`;
-- 10/50/100 MySQL + HTTP baseline: PASS, zero request errors;
-- controlled Task 14 provider 10/50/100: PASS;
-- ffmpeg executor 1/2/4 probe: PASS, maximum active matched requested concurrency;
-- `go test ./...`: PASS;
-- `go build ./...`: PASS.
+- Normal repository CI remains unchanged.
+- `performance-audit.yml` runs isolated MySQL + controlled provider/storage/merge workloads on the audit branch and via manual dispatch.
+- `PERF-RUN-IDEMPOTENCY-001` remains a diagnostic known-failure with explicit P0/BLOCKED status so other metrics can run. After Task 9 merges, the same assertion becomes a hard GREEN gate.
+- `.github/workflows/performance-ffmpeg-manual.yml` is manual-only for real ffmpeg resource measurement.
+- 100/500 real Runtime queue tests, long-duration profiling, real TOS, disk-full and real-provider smoke remain manual/blocked as appropriate.
 
 ## ECS recommendation
 
-No minimum ECS specification is recommended yet. The GitHub runner results establish correctness/regression baselines but do not supply real ffmpeg CPU/RAM/disk measurements. Task 16 ECS sizing must wait for approved isolated capacity measurement rather than guessing a machine size.
+No ECS machine size is recommended yet. Minimum/recommended/headroom tiers require actual Task 9 Worker concurrency plus real ffmpeg CPU/RAM/temp-disk and real storage throughput measurements. Do not infer 2C4G/4C8G/8C16G from the current GitHub-runner control-plane tests.
