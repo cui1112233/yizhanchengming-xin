@@ -106,6 +106,6 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
     await page.reload()
     await expect(page.getByText('执行中')).toBeVisible()
     await page.reload()
-    await expect(page.getByText('成功')).toBeVisible()
+    await expect(page.getByText('succeeded')).toBeVisible()
   })
 })
