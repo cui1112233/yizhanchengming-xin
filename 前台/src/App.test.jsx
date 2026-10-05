@@ -160,4 +160,85 @@ describe('小说获取工作台行为', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(String(fetchMock.mock.calls[0][0])).toBe('/api/v1/batch-projects')
   }, 15000)
+
+  it('Task 8 创建项目后下一次进入批量工厂会重新从列表 API 读取新项目', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() =>
+        jsonResponse({ intake: { id: 18 }, books: [] }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({ intakeId: 18, status: 'completed', fetched: 1, failed: 0 }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          books: [
+            {
+              id: 3,
+              intakeId: 18,
+              source: '知乎',
+              platformId: '15',
+              bookId: '2001',
+              title: '刚创建的小说',
+              gender: '女频',
+              style: '情感',
+              status: 'fetched',
+              errorMessage: '',
+            },
+          ],
+        }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          project: { id: 88, intakeId: 18, name: '刚创建的批次' },
+          run: { id: 99, batchProjectId: 88, runAt: '2026-10-05T08:00:00Z', status: 'pending' },
+        }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          projects: [
+            {
+              id: 88,
+              intakeId: 18,
+              name: '刚创建的批次',
+              sources: ['知乎'],
+              bookCount: 1,
+              genders: ['女频'],
+              styles: ['情感'],
+              runStatus: 'pending',
+            },
+          ],
+        }),
+      )
+
+    const intakeView = render(<IntakeWorkbench />)
+
+    fireEvent.change(screen.getByPlaceholderText('不填则自动生成'), {
+      target: { value: '刚创建的批次' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例如：阳光、常读、知乎'), {
+      target: { value: '知乎' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('例如：4'), {
+      target: { value: '15' },
+    })
+    fireEvent.change(screen.getByPlaceholderText(/每行一个/), {
+      target: { value: '2001' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '添加书城' }))
+    fireEvent.click(screen.getByRole('button', { name: '立即执行' }))
+
+    expect(await screen.findByText('立即执行任务已创建。')).toBeTruthy()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4))
+
+    intakeView.unmount()
+    cleanup()
+    window.history.replaceState({}, '', '/batch-factory')
+
+    render(<IntakeWorkbench />)
+
+    expect(await screen.findByText('刚创建的批次')).toBeTruthy()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+    expect(String(fetchMock.mock.calls[4][0])).toBe('/api/v1/batch-projects')
+  }, 15000)
 })
