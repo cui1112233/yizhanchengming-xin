@@ -135,8 +135,17 @@ func (s *Service) executeProviderStage(ctx context.Context, run BookRun, book in
 	prompt, err := s.resolver.Resolve(ctx, promptKey)
 	if err != nil { return StageRun{}, err }
 	started := s.now().UTC()
-	snapshot, _ := json.Marshal(map[string]any{"bookId": book.ID, "source": book.OriginalText, "request": req})
-	stageRun, err := s.store.CreateStageRun(ctx, StageRun{BookRunID: run.ID, BookID: book.ID, Stage: stage, Status: StatusRunning, Attempt: s.nextAttempt(ctx, run.ID, stage), RequestID: run.RequestID, PromptKey: prompt.Key, PromptVersion: prompt.Version, InputSnapshot: string(snapshot), StartedAt: &started})
+	var snapshot string
+	if stage == StageDirector {
+		// Director retry must be able to read matchAudio/audioDurationSec directly.
+		// Persist the frozen Director input itself instead of wrapping it as an
+		// escaped string inside another request envelope.
+		snapshot = req.UserPrompt
+	} else {
+		encoded, _ := json.Marshal(map[string]any{"bookId": book.ID, "source": book.OriginalText, "request": req})
+		snapshot = string(encoded)
+	}
+	stageRun, err := s.store.CreateStageRun(ctx, StageRun{BookRunID: run.ID, BookID: book.ID, Stage: stage, Status: StatusRunning, Attempt: s.nextAttempt(ctx, run.ID, stage), RequestID: run.RequestID, PromptKey: prompt.Key, PromptVersion: prompt.Version, InputSnapshot: snapshot, StartedAt: &started})
 	if err != nil { return StageRun{}, err }
 	req.SystemPrompt = prompt.Content
 	output, callErr := s.provider.Complete(ctx, req)
