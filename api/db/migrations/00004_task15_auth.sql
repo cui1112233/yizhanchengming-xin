@@ -43,6 +43,18 @@ CREATE TABLE auth_sessions (
     CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES auth_users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE auth_batch_project_ownership (
+    batch_project_id BIGINT NOT NULL,
+    owner_user_id BIGINT UNSIGNED NOT NULL,
+    team_id BIGINT UNSIGNED NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (batch_project_id),
+    KEY idx_auth_batch_project_owner (owner_user_id),
+    KEY idx_auth_batch_project_team (team_id),
+    CONSTRAINT fk_auth_batch_project_project FOREIGN KEY (batch_project_id) REFERENCES batch_projects(id) ON DELETE CASCADE,
+    CONSTRAINT fk_auth_batch_project_owner FOREIGN KEY (owner_user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE publishing_credentials (
     ref VARCHAR(191) NOT NULL,
     owner_user_id BIGINT UNSIGNED NOT NULL,
@@ -126,6 +138,7 @@ DROP TABLE IF EXISTS publish_audits;
 DROP TABLE IF EXISTS publish_intents;
 DROP TABLE IF EXISTS publishing_accounts;
 DROP TABLE IF EXISTS publishing_credentials;
+DROP TABLE IF EXISTS auth_batch_project_ownership;
 DROP TABLE IF EXISTS auth_sessions;
 DROP TABLE IF EXISTS auth_user_capabilities;
 DROP TABLE IF EXISTS auth_users;
