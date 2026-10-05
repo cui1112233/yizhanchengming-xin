@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,18 +42,17 @@ func NewArtifactStore(config ArtifactStoreConfig) (*HTTPArtifactStore, error) {
 	if config.HTTPClient == nil {
 		config.HTTPClient = &http.Client{Timeout: 10 * time.Minute}
 	}
-	return &HTTPArtifactStore{bucket: config.Bucket, publicBaseURL: config.PublicBaseURL, client: config.HTTPClient, uploader: config.Uploader, allowInsecureLoopback: config.AllowInsecureLoopback}, nil
+	return &HTTPArtifactStore{
+		bucket: config.Bucket, publicBaseURL: config.PublicBaseURL,
+		client: hardenedHTTPClient(config.HTTPClient, config.AllowInsecureLoopback),
+		uploader: config.Uploader, allowInsecureLoopback: config.AllowInsecureLoopback,
+	}, nil
 }
 
 func (s *HTTPArtifactStore) Persist(ctx context.Context, sourceURL, objectHint string) (Artifact, error) {
-	u, err := url.Parse(strings.TrimSpace(sourceURL))
-	if err != nil || u.Host == "" || u.User != nil {
-		return Artifact{}, fmt.Errorf("video: provider artifact URL is invalid")
-	}
-	secure := u.Scheme == "https"
-	loopback := u.Scheme == "http" && s.allowInsecureLoopback && (u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1")
-	if !secure && !loopback {
-		return Artifact{}, fmt.Errorf("video: provider artifact URL must use https")
+	u, err := validateRemoteMediaURL(sourceURL, s.allowInsecureLoopback)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("video: provider artifact URL rejected: %w", err)
 	}
 	key, err := validateArtifactObjectKey(objectHint)
 	if err != nil {
