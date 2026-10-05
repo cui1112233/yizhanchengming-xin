@@ -3,12 +3,26 @@ import { routeAuthenticated } from './support/fixtures.js'
 
 const SOURCE_INPUT = 'input[placeholder="例如：阳光、常读、知乎"]'
 const PLATFORM_INPUT = 'input[placeholder="例如：4"]'
+const isPublic = Boolean(process.env.PUBLIC_BASE_URL?.trim())
 
 async function addGroup(page, source, platformId, ids) {
   await page.locator(SOURCE_INPUT).fill(source)
   await page.locator(PLATFORM_INPUT).fill(String(platformId))
   await page.locator('textarea').fill(ids)
   await page.getByRole('button', { name: '添加书城' }).click()
+}
+
+async function loginPublic(page) {
+  const username = process.env.E2E_USERNAME?.trim()
+  const password = process.env.E2E_PASSWORD?.trim()
+  test.skip(!username || !password, 'Public smoke requires E2E_USERNAME and E2E_PASSWORD secrets')
+  await page.goto('/novel-fetch')
+  if (await page.getByText('一战晟铭登录').count()) {
+    await page.getByLabel('用户名').fill(username)
+    await page.getByLabel('密码').fill(password)
+    await page.getByRole('button', { name: '登录' }).click()
+  }
+  await expect(page.getByRole('heading', { name: '小说获取工作台' })).toBeVisible()
 }
 
 async function routeIntakeWorkflow(page, { executionStatus = 'completed', failed = 0, books } = {}) {
@@ -56,7 +70,7 @@ async function routeIntakeWorkflow(page, { executionStatus = 'completed', failed
 
 test.describe('@novel novel fetch acceptance', () => {
   test.beforeEach(async ({ page }) => {
-    await routeAuthenticated(page)
+    if (!isPublic) await routeAuthenticated(page)
   })
 
   test('@novel page opens and supports multi-store grouping, dedupe, clear input and N-book tags', async ({ page }) => {
@@ -138,7 +152,7 @@ test.describe('@novel novel fetch acceptance', () => {
     test.skip(!process.env.PUBLIC_BASE_URL, 'Real 121 smoke requires PUBLIC_BASE_URL')
     test.skip(!process.env.E2E_121_BOOK_ID || !process.env.E2E_121_SOURCE || !process.env.E2E_121_PLATFORM_ID, 'Real 121 smoke requires E2E_121_BOOK_ID/E2E_121_SOURCE/E2E_121_PLATFORM_ID')
 
-    await page.goto('/novel-fetch')
+    await loginPublic(page)
     await addGroup(page, process.env.E2E_121_SOURCE, process.env.E2E_121_PLATFORM_ID, process.env.E2E_121_BOOK_ID)
     await page.getByRole('button', { name: '立即执行' }).click()
 
