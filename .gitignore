@@ -6,3 +6,17 @@ dist/
 .DS_Store
 *.log
 coverage/
+
+# Local credentials / key material must never enter Git.
+secrets/
+credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.token
+*.credentials
+id_rsa
+id_ed25519

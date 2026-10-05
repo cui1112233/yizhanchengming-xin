@@ -37,16 +37,25 @@ func safeError(err error) string {
 	if err == nil {
 		return ""
 	}
-	text := strings.ToLower(err.Error())
-	for _, marker := range []string{"authorization", "bearer", "token", "api key", "apikey", "password", "secret", "dsn"} {
-		if strings.Contains(text, marker) {
-			return "上游生成服务请求失败，请稍后重试"
-		}
-	}
-	if len(err.Error()) > 300 {
+	// Only return stable domain errors to browser-facing/persisted result fields.
+	// Provider/network/storage errors may carry filesystem paths, SQL details,
+	// request payload fragments, or credentials, so unknown errors fail closed.
+	switch {
+	case errors.Is(err, ErrInvalid):
+		return "生成请求参数无效"
+	case errors.Is(err, ErrConflict):
+		return "生成状态冲突，请刷新后重试"
+	case errors.Is(err, ErrAudioMeasurementRequired):
+		return "audio_measurement_required"
+	case errors.Is(err, ErrAudioProbeUnavailable):
+		return "audio_probe_unavailable"
+	case errors.Is(err, ErrNotFound):
+		return "生成资源不存在"
+	case errors.Is(err, ErrUnavailable):
+		return "生成服务暂不可用，请稍后重试"
+	default:
 		return "生成阶段执行失败，请查看服务日志"
 	}
-	return err.Error()
 }
 
 func (s *Service) validate() error {

@@ -109,11 +109,11 @@ type LocalExecutorLeaseCoordinator interface {
 }
 
 type LocalExecutorLease struct {
-	TaskID       string    `json:"taskId"`
-	ExecutorID   string    `json:"executorId"`
-	Token        string    `json:"leaseToken"`
-	Generation   int64     `json:"generation"`
-	ExpiresAt    time.Time `json:"expiresAt"`
+	TaskID     string    `json:"taskId"`
+	ExecutorID string    `json:"executorId"`
+	Token      string    `json:"leaseToken"`
+	Generation int64     `json:"generation"`
+	ExpiresAt  time.Time `json:"expiresAt"`
 }
 
 type LocalExecutorService struct {
@@ -210,11 +210,15 @@ func (s *LocalExecutorService) CompleteTask(ctx context.Context, token, taskID s
 	if err != nil {
 		return err
 	}
+	now := s.now().UTC()
+	if !localExecutorOnline(executor, now) {
+		return ErrLocalExecutorUnauthorized
+	}
 	task, err := s.store.GetLocalExecutorTask(ctx, strings.TrimSpace(taskID))
 	if err != nil {
 		return err
 	}
-	if !localExecutorSupports(executor, task.ProviderKey, task.Model) {
+	if !localExecutorSupports(executor, task.ProviderKey, task.Model) || task.ExecutorID == "" || task.ExecutorID != executor.ID {
 		return ErrLocalExecutorUnauthorized
 	}
 	artifactURL := strings.TrimSpace(input.ArtifactURL)
@@ -222,7 +226,7 @@ func (s *LocalExecutorService) CompleteTask(ctx context.Context, token, taskID s
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
 		return ErrLocalExecutorInvalid
 	}
-	return s.store.CompleteLocalExecutorTask(ctx, task.ID, executor.ID, artifactURL, s.now().UTC())
+	return s.store.CompleteLocalExecutorTask(ctx, task.ID, executor.ID, artifactURL, now)
 }
 
 func (s *LocalExecutorService) FailTask(ctx context.Context, token, taskID string, input LocalExecutorFailInput) error {
@@ -230,18 +234,22 @@ func (s *LocalExecutorService) FailTask(ctx context.Context, token, taskID strin
 	if err != nil {
 		return err
 	}
+	now := s.now().UTC()
+	if !localExecutorOnline(executor, now) {
+		return ErrLocalExecutorUnauthorized
+	}
 	task, err := s.store.GetLocalExecutorTask(ctx, strings.TrimSpace(taskID))
 	if err != nil {
 		return err
 	}
-	if !localExecutorSupports(executor, task.ProviderKey, task.Model) {
+	if !localExecutorSupports(executor, task.ProviderKey, task.Model) || task.ExecutorID == "" || task.ExecutorID != executor.ID {
 		return ErrLocalExecutorUnauthorized
 	}
 	code := ErrorCode(strings.TrimSpace(input.Code))
 	if code == "" {
 		code = ErrorProviderRequestFailed
 	}
-	return s.store.FailLocalExecutorTask(ctx, task.ID, executor.ID, code, truncateError(input.Message), s.now().UTC())
+	return s.store.FailLocalExecutorTask(ctx, task.ID, executor.ID, code, safeExecutorErrorMessage(input.Message), now)
 }
 
 func (s *LocalExecutorService) executorForToken(ctx context.Context, token string) (LocalExecutorRecord, error) {
@@ -255,11 +263,15 @@ func (s *LocalExecutorService) executorForToken(ctx context.Context, token strin
 	return record, nil
 }
 
+func localExecutorOnline(record LocalExecutorRecord, now time.Time) bool {
+	return record.LastSeenAt.Add(LocalExecutorOnlineThreshold).After(now)
+}
+
 func localExecutorView(record LocalExecutorRecord, now time.Time) LocalExecutorIdentity {
 	return LocalExecutorIdentity{
 		ID: record.ID, Name: record.Name, ProviderKey: record.ProviderKey, Model: record.Model,
 		Capabilities: append([]string(nil), record.Capabilities...),
-		Online: record.LastSeenAt.Add(LocalExecutorOnlineThreshold).After(now),
+		Online: localExecutorOnline(record, now),
 		LastSeenAt: record.LastSeenAt, TokenConfigured: record.TokenHash != [32]byte{},
 	}
 }
@@ -359,7 +371,7 @@ func (p *doubaoLocalExecutorProvider) Probe(ctx context.Context) error {
 	}
 	now := p.now().UTC()
 	for _, record := range records {
-		if record.ProviderKey == ProviderDoubaoLocalExecutor && record.LastSeenAt.Add(LocalExecutorOnlineThreshold).After(now) {
+		if record.ProviderKey == ProviderDoubaoLocalExecutor && localExecutorOnline(record, now) {
 			return nil
 		}
 	}

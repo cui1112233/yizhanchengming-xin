@@ -86,8 +86,12 @@ func TestManagerAccessRefreshLogoutLifecycle(t *testing.T) {
 	now := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
 	user := User{ID: 7, Username: "alice", DisplayName: "Alice", Role: "member", TeamID: 3, Capabilities: []string{"batch.view"}}
 	store := newFakeSessionStore(user)
-	randomBytes := make([]byte, 0, 192)
-	for _, value := range []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66} {
+	// Access tokens use 32 bytes and refresh tokens use 48 bytes. Keep enough
+	// deterministic entropy for issue + successful rotation + replay attempt so
+	// the replay assertion reaches the session store instead of exhausting the
+	// test reader first.
+	randomBytes := make([]byte, 0, 320)
+	for _, value := range []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa} {
 		randomBytes = append(randomBytes, bytes.Repeat([]byte{value}, 32)...)
 	}
 	manager := NewManager(store, Options{

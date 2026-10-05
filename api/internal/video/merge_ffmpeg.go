@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -217,13 +216,13 @@ type HTTPMediaDownloader struct {
 }
 
 func (d *HTTPMediaDownloader) Download(ctx context.Context, rawURL, destination string) error {
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
-		return fmt.Errorf("video: merge input URL must use https")
+	parsed, err := validateRemoteMediaURL(rawURL, false)
+	if err != nil {
+		return fmt.Errorf("video: merge input URL rejected: %w", err)
 	}
-	client := d.Client
-	if client == nil {
-		client = &http.Client{Timeout: 10 * time.Minute}
+	client := hardenedHTTPClient(d.Client, false)
+	if client.Timeout == 0 {
+		client.Timeout = 10 * time.Minute
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {

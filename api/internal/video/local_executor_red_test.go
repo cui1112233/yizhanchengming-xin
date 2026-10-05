@@ -75,6 +75,19 @@ func TestLocalExecutorRegistrationRejectsWrongProviderModel(t *testing.T) {
 	}
 }
 
+func assignMemoryLocalExecutorTask(t *testing.T, store *memoryLocalExecutorStore, taskID, executorID string) {
+	t.Helper()
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	task, ok := store.tasks[taskID]
+	if !ok {
+		t.Fatalf("task %s missing", taskID)
+	}
+	task.ExecutorID = executorID
+	task.Status = TaskRunning
+	store.tasks[taskID] = task
+}
+
 func TestDoubaoLocalProviderCreatesDurableTaskAndPollsCompleteOrFail(t *testing.T) {
 	ctx := context.Background()
 	store := newMemoryLocalExecutorStore()
@@ -110,6 +123,7 @@ func TestDoubaoLocalProviderCreatesDurableTaskAndPollsCompleteOrFail(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
+	assignMemoryLocalExecutorTask(t, store, submitted.ProviderJobID, reg.Executor.ID)
 	if err := executorService.CompleteTask(ctx, reg.Token, submitted.ProviderJobID, LocalExecutorCompleteInput{ArtifactURL: "https://cdn.example/local.mp4"}); err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +139,7 @@ func TestDoubaoLocalProviderCreatesDurableTaskAndPollsCompleteOrFail(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
+	assignMemoryLocalExecutorTask(t, store, second.ProviderJobID, reg.Executor.ID)
 	if err := executorService.FailTask(ctx, reg.Token, second.ProviderJobID, LocalExecutorFailInput{Code: "doubao_submit_failed", Message: "provider rejected"}); err != nil {
 		t.Fatal(err)
 	}

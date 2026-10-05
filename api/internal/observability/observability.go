@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"regexp"
 	"runtime"
 	"strings"
@@ -156,6 +158,25 @@ func Redact(value any) any {
 		}
 		return out
 	default:
+		rv := reflect.ValueOf(value)
+		kind := rv.Kind()
+		if kind == reflect.Pointer {
+			if rv.IsNil() {
+				return nil
+			}
+			kind = rv.Elem().Kind()
+		}
+		if kind == reflect.Struct {
+			raw, err := json.Marshal(value)
+			if err != nil {
+				return "[REDACTED]"
+			}
+			var decoded any
+			if err := json.Unmarshal(raw, &decoded); err != nil {
+				return "[REDACTED]"
+			}
+			return Redact(decoded)
+		}
 		return v
 	}
 }

@@ -134,8 +134,8 @@ func TestLogoutRevokesServerSessionAndClearsCookies(t *testing.T) {
 	}
 }
 
-func TestRefreshFailureReturns401WithoutLeakingSecrets(t *testing.T) {
-	auth := &fakeAuthService{refreshErr: errors.New("database says refresh=super-secret")}
+func TestStaleRefreshReturns401WithoutLeakingSecrets(t *testing.T) {
+	auth := &fakeAuthService{refreshErr: authn.ErrUnauthenticated}
 	handler := NewHandler(Dependencies{Auth: auth})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
 	sameOrigin(req)
@@ -145,5 +145,18 @@ func TestRefreshFailureReturns401WithoutLeakingSecrets(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized { t.Fatalf("status=%d body=%s, want 401", rec.Code, rec.Body.String()) }
+}
+
+func TestRefreshBackendFailureReturnsSafe5xxWithoutLeakingSecrets(t *testing.T) {
+	auth := &fakeAuthService{refreshErr: errors.New("database says refresh=super-secret")}
+	handler := NewHandler(Dependencies{Auth: auth})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	sameOrigin(req)
+	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "present"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code < 500 { t.Fatalf("status=%d body=%s, want safe 5xx", rec.Code, rec.Body.String()) }
 	if strings.Contains(rec.Body.String(), "super-secret") { t.Fatalf("auth error leaked secret: %s", rec.Body.String()) }
 }

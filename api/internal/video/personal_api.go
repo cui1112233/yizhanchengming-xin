@@ -48,21 +48,15 @@ func NewPersonalAPIProvider(config ProviderConfig, secret string, client *http.C
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
+	client = hardenedHTTPClient(client, true)
 	return &personalAPIProvider{config: config, secret: secret, client: client}, nil
 }
 
 func validateProviderURL(raw string) error {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" || u.User != nil {
-		return providerError(ErrorProviderUnconfigured, "provider endpoint is invalid", err)
+	if _, err := validateRemoteMediaURL(raw, true); err != nil {
+		return providerError(ErrorProviderUnconfigured, "provider endpoint is invalid or targets a blocked address", err)
 	}
-	if u.Scheme == "https" {
-		return nil
-	}
-	if u.Scheme == "http" && (u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1") {
-		return nil
-	}
-	return providerError(ErrorProviderUnconfigured, "provider endpoint must use https", nil)
+	return nil
 }
 
 func (p *personalAPIProvider) Submit(ctx context.Context, input SubmitRequest) (SubmitResult, error) {

@@ -75,15 +75,15 @@ func TestAudioMeasurementGetReturnsAuthoritativeDuration(t *testing.T){
 func TestAudioMeasurementPostDoesNotAcceptClientDuration(t *testing.T){
 	fake:=&fakeGenerationService{measurement:generation.AudioMeasurement{ID:1,BatchProjectID:3,BookID:11,DurationMS:28000}}
 	h:=NewHandler(Dependencies{Generation:fake})
-	req:=httptest.NewRequest(http.MethodPost,"/api/v1/batch-projects/3/books/11/audio-measurement",bytes.NewBufferString(`{"audioAsset":"/audio/11.mp3","audioDurationSec":999}`));res:=httptest.NewRecorder();h.ServeHTTP(res,req)
+	req:=httptest.NewRequest(http.MethodPost,"/api/v1/batch-projects/3/books/11/audio-measurement",bytes.NewBufferString(`{"audioAsset":"audio/11.mp3","audioDurationSec":999}`));res:=httptest.NewRecorder();h.ServeHTTP(res,req)
 	if res.Code!=http.StatusOK{t.Fatalf("status=%d body=%s",res.Code,res.Body.String())}
-	if fake.measureReq.BatchProjectID!=3||fake.measureReq.BookID!=11||fake.measureReq.AudioAsset!="/audio/11.mp3"{t.Fatalf("measure req=%#v",fake.measureReq)}
+	if fake.measureReq.BatchProjectID!=3||fake.measureReq.BookID!=11||fake.measureReq.AudioAsset!="audio/11.mp3"{t.Fatalf("measure req=%#v",fake.measureReq)}
 }
 
 func TestAudioProbeUnavailableReturnsServiceUnavailableStableCode(t *testing.T){
 	fake:=&fakeGenerationService{measurementErr:generation.ErrAudioProbeUnavailable}
 	h:=NewHandler(Dependencies{Generation:fake})
-	req:=httptest.NewRequest(http.MethodPost,"/api/v1/batch-projects/3/books/11/audio-measurement",bytes.NewBufferString(`{"audioAsset":"/audio/11.mp3"}`));res:=httptest.NewRecorder();h.ServeHTTP(res,req)
+	req:=httptest.NewRequest(http.MethodPost,"/api/v1/batch-projects/3/books/11/audio-measurement",bytes.NewBufferString(`{"audioAsset":"audio/11.mp3"}`));res:=httptest.NewRecorder();h.ServeHTTP(res,req)
 	if res.Code!=http.StatusServiceUnavailable{t.Fatalf("status=%d body=%s",res.Code,res.Body.String())}
 	if !bytes.Contains(res.Body.Bytes(),[]byte("audio_probe_unavailable")){t.Fatalf("body=%s",res.Body.String())}
 }
