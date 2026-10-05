@@ -86,3 +86,33 @@ func TestNewHandlerWiresPipelineToSameMySQLStore(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNewHandlerWiresBatchProjectReaderToMySQLStore(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	now := time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
+	query := "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects ORDER BY id DESC LIMIT 100"
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "created_at", "updated_at"}).
+			AddRow(51, 11, "知乎批次", now, now))
+
+	handler := NewHandler(db, fakeFetcher{}, nil, func() time.Time { return now })
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s, want 200", rec.Code, rec.Body.String())
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"id":51`)) || !bytes.Contains(rec.Body.Bytes(), []byte(`"name":"知乎批次"`)) {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
