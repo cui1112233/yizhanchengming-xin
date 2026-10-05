@@ -19,6 +19,7 @@ import {
   Typography,
 } from 'antd'
 import { createBatchProject, createIntake, executeIntake, listBooks } from './api.js'
+import BatchProjectListPage from './BatchProjectListPage.jsx'
 import './app.css'
 
 const { TextArea } = Input
@@ -60,6 +61,13 @@ function buildBatchName(inputName) {
 }
 
 export default function IntakeWorkbench() {
+  if (typeof window !== 'undefined' && window.location.pathname === '/batch-factory') {
+    return <BatchProjectListPage />
+  }
+  return <NovelIntakeWorkbench />
+}
+
+function NovelIntakeWorkbench() {
   const [groups, setGroups] = useState([])
   const [source, setSource] = useState('')
   const [platformId, setPlatformId] = useState('')
