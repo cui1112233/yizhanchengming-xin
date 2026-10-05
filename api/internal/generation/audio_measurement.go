@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/url"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -68,6 +69,20 @@ func audioAssetHash(asset string) string {
 func safeLocalAudioAsset(asset string) bool {
 	asset = strings.TrimSpace(asset)
 	if asset == "" || strings.HasPrefix(asset, "-") || strings.ContainsRune(asset, '\x00') {
+		return false
+	}
+	// The browser may identify only a server-materialized relative asset. It may
+	// not choose an arbitrary local filesystem path for ffprobe to open.
+	if filepath.IsAbs(asset) || strings.HasPrefix(asset, "/") || strings.Contains(asset, "\\") {
+		return false
+	}
+	for _, segment := range strings.Split(filepath.ToSlash(asset), "/") {
+		if segment == ".." {
+			return false
+		}
+	}
+	cleaned := filepath.Clean(asset)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(filepath.ToSlash(cleaned), "../") {
 		return false
 	}
 	parsed, err := url.Parse(asset)
