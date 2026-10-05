@@ -64,6 +64,10 @@ func (h handler) audioMeasurement(w http.ResponseWriter, r *http.Request) {
 		AudioDurationSec *float64 `json:"audioDurationSec,omitempty"`
 	}
 	if err:=decodeJSON(w,r,&body);err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
+	if !generation.BrowserAudioAssetAllowed(body.AudioAsset) {
+		writeJSON(w,http.StatusBadRequest,map[string]string{"error":"invalid_request"})
+		return
+	}
 	// AudioDurationSec is compatibility/display input only. It is deliberately
 	// ignored here; ffprobe remains the sole duration fact source.
 	out,e:=h.deps.Generation.MeasureAudio(r.Context(),generation.AudioMeasurementRequest{BatchProjectID:projectID,BookID:bookID,AudioAsset:body.AudioAsset})
