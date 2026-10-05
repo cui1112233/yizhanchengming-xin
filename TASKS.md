@@ -159,7 +159,7 @@
 - [x] 9.1.2 列出 V11/V12 所有 Go/Node 历史后端接口 — `docs/migration/v88-batch-factory-v11-backend-api-inventory.md`
 - [x] 9.1.3 列出 Batch / Book / Run / Item / VIDEO 状态字段 — `docs/migration/v88-batch-factory-v11-status-model-inventory.md`
 - [x] 9.1.4 列出 personal_api / provider 相关接口 — `docs/migration/v88-batch-factory-video-provider-inventory.md`
-- [ ] 9.1.5 对照 ECS：存在 / 可用 / 已坏 / 未验证
+- [x] 9.1.5 对照 ECS：存在 / 可用 / 已坏 / 未验证 — `docs/migration/ecs-v88-capability-audit.md`
 - [ ] 9.1.6 建立旧 v88 -> 新 Go 模块迁移映射表
 
 ## 9.2 批量项目列表
@@ -378,4 +378,4 @@
 
 ## 当前执行点
 
-**下一任务：Task 9.1.5 — 对照 ECS：存在 / 可用 / 已坏 / 未验证。**
+**下一任务：Task 9.1.6 — 建立旧 v88 -> 新 Go/React 模块迁移映射表。**
