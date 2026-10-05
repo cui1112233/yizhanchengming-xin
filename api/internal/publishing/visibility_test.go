@@ -28,6 +28,44 @@ func TestMySQLAccountVisibilityIsScopedToOwnerOrTeam(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
 }
 
+func TestMySQLBatchProjectOwnershipIsPinnedAndCheckedByOwnerOrTeam(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil { t.Fatal(err) }
+	defer db.Close()
+	store := NewMySQLStore(db)
+
+	claim := `INSERT INTO auth_batch_project_ownership (batch_project_id, owner_user_id, team_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE batch_project_id = VALUES(batch_project_id)`
+	mock.ExpectExec(regexp.QuoteMeta(claim)).WithArgs(int64(21), int64(7), int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
+	if err := store.ClaimBatchProject(context.Background(), 21, 7, 3); err != nil { t.Fatal(err) }
+
+	access := `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (team_id IS NOT NULL AND team_id = ?)))`
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(7), int64(3)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(true))
+	allowed, err := store.CanAccessBatchProject(context.Background(), 21, 7, 3, false)
+	if err != nil { t.Fatal(err) }
+	if !allowed { t.Fatal("owner/team project access unexpectedly denied") }
+
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(88), int64(9)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(false))
+	allowed, err = store.CanAccessBatchProject(context.Background(), 21, 88, 9, false)
+	if err != nil { t.Fatal(err) }
+	if allowed { t.Fatal("foreign user/team unexpectedly gained project access") }
+
+	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
+}
+
+func TestMySQLElevatedProjectAccessStillRequiresExistingProject(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil { t.Fatal(err) }
+	defer db.Close()
+	store := NewMySQLStore(db)
+
+	query := `SELECT EXISTS(SELECT 1 FROM batch_projects WHERE id = ?)`
+	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(int64(21)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(true))
+	allowed, err := store.CanAccessBatchProject(context.Background(), 21, 1, 0, true)
+	if err != nil { t.Fatal(err) }
+	if !allowed { t.Fatal("admin should be able to access an existing legacy project") }
+	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
+}
+
 func TestMySQLAuditVisibilityCannotCrossOwnerOrTeamBoundary(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil { t.Fatal(err) }
