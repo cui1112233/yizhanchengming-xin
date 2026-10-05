@@ -153,6 +153,28 @@ func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProjec
 	return project, nil
 }
 
+func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, error) {
+	const query = "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects ORDER BY id DESC LIMIT 100"
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list batch projects: %w", err)
+	}
+	defer rows.Close()
+
+	projects := make([]BatchProject, 0)
+	for rows.Next() {
+		var project BatchProject
+		if err := rows.Scan(&project.ID, &project.IntakeID, &project.Name, &project.CreatedAt, &project.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan batch project: %w", err)
+		}
+		projects = append(projects, project)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate batch projects: %w", err)
+	}
+	return projects, nil
+}
+
 func (s *MySQLStore) CreateRun(ctx context.Context, run Run) (Run, error) {
 	result, err := s.db.ExecContext(ctx,
 		"INSERT INTO runs (batch_project_id, run_at, status) VALUES (?, ?, ?)",
