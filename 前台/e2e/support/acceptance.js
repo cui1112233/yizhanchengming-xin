@@ -1,5 +1,7 @@
 import { expect, test as base } from '@playwright/test'
 
+import { safeRequestIdFromHeaders } from './request-id.js'
+
 const SECRET_ASSIGNMENT = /(authorization|cookie|password|passwd|access[_-]?token|refresh[_-]?token|api[_-]?secret|client[_-]?secret|credential(?:_ciphertext)?|aes[_-]?nonce|dsn)\s*[:=]\s*["']?([^\s,;"'}]+)/ig
 const BEARER = /Bearer\s+[A-Za-z0-9._~+\/-]{10,}/ig
 const SECRET_JSON = /["']?(authorization|cookie|password|passwd|access[_-]?token|refresh[_-]?token|api[_-]?secret|client[_-]?secret|credential(?:_ciphertext)?|aes[_-]?nonce|dsn)["']?\s*:\s*["']([^"']{8,})["']/ig
@@ -41,6 +43,7 @@ export const test = base.extend({
     const pageErrors = []
     const failedRequests = []
     const httpFailures = []
+    const requestIds = []
     const secretFindings = []
 
     page.on('console', (message) => {
@@ -61,8 +64,12 @@ export const test = base.extend({
     page.on('response', async (response) => {
       const request = response.request()
       const url = new URL(response.url())
+      const requestId = safeRequestIdFromHeaders(response.headers())
+      if (requestId) {
+        requestIds.push({ method: request.method(), path: url.pathname, status: response.status(), requestId })
+      }
       if (response.status() >= 400) {
-        httpFailures.push({ method: request.method(), url: `${url.origin}${url.pathname}`, status: response.status() })
+        httpFailures.push({ method: request.method(), url: `${url.origin}${url.pathname}`, status: response.status(), requestId })
       }
       if (!url.pathname.startsWith('/api/')) return
       const contentType = response.headers()['content-type'] || ''
@@ -75,7 +82,7 @@ export const test = base.extend({
       }
     })
 
-    await use({ consoleErrors, pageErrors, failedRequests, httpFailures, secretFindings })
+    await use({ consoleErrors, pageErrors, failedRequests, httpFailures, requestIds, secretFindings })
 
     try {
       const bodyText = await page.locator('body').innerText({ timeout: 1000 })
@@ -94,6 +101,7 @@ export const test = base.extend({
       pageErrors,
       failedRequests,
       httpFailures,
+      requestIds,
       secretFindings: [...new Set(secretFindings)],
     }
 
