@@ -55,7 +55,7 @@ test.describe('@batch shuihuo / Batch Factory / settings acceptance', () => {
     const before = page.url()
 
     await page.getByRole('button', { name: '生产统一设置' }).click()
-    await expect(page.getByRole('heading', { name: '生产统一设置' })).toBeVisible()
+    await expect(page.locator('.ant-drawer-title').filter({ hasText: '生产统一设置' })).toBeVisible()
     await expect(page.getByText(/应用于当前 BatchProject/)).toBeVisible()
     await page.getByRole('button', { name: '保存生产统一设置' }).click()
     await expect(page.getByText('生产统一设置已保存')).toBeVisible()
@@ -67,7 +67,7 @@ test.describe('@batch shuihuo / Batch Factory / settings acceptance', () => {
     const before = page.url()
 
     await page.getByRole('button', { name: '发布统一设置' }).click()
-    await expect(page.getByRole('heading', { name: '发布统一设置' })).toBeVisible()
+    await expect(page.locator('.ant-drawer-title').filter({ hasText: '发布统一设置' })).toBeVisible()
     await page.getByRole('button', { name: '保存发布统一设置' }).click()
     await expect(page.getByText('发布统一设置已保存')).toBeVisible()
     expect(page.url()).toBe(before)
@@ -79,7 +79,7 @@ test.describe('@batch shuihuo / Batch Factory / settings acceptance', () => {
 
     await expect(page.getByRole('button', { name: '解析输入' })).toHaveCount(0)
     await page.getByRole('button', { name: '版本对应配置档' }).click()
-    await expect(page.getByRole('heading', { name: '版本对应配置档' })).toBeVisible()
+    await expect(page.locator('.ant-drawer-title').filter({ hasText: '版本对应配置档' })).toBeVisible()
     await page.getByRole('tab', { name: '同步' }).click()
     await expect(page.getByRole('button', { name: '同步 121 网站配置' })).toBeVisible()
     await expect(page.getByRole('button', { name: '同步批量风格类型' })).toBeVisible()
