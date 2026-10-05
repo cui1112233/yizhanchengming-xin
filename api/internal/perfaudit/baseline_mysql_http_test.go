@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
-	"github.com/cui1112233/yizhancheng-xin/api/internal/intake"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	_ "github.com/go-sql-driver/mysql"
 )
 
