@@ -44,7 +44,8 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		authStore := authn.NewMySQLStore(db)
 		authService = authn.NewService(authStore, authn.NewManager(authStore, authn.Options{}))
 	}
-	publishingService := publishing.NewService(publishing.NewMySQLStore(db), publishing.Options{CredentialKey: publishingCredentialKey()})
+	publishingStore := publishing.NewMySQLStore(db)
+	publishingService := publishing.NewService(publishingStore, publishing.Options{CredentialKey: publishingCredentialKey()})
 	allowedOrigins := make([]string, 0)
 	for _, value := range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"), ",") {
 		if value = strings.TrimSpace(value); value != "" {
@@ -96,6 +97,8 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		VideoLocalExecutor:          localExecutorService,
 		VideoStatus:                 videoService,
 		VideoMerge:                  mergeService,
+		BatchProjectAccess:          publishingStore,
+		VideoResourceProjects:       videoStore,
 		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
 	})
 }
