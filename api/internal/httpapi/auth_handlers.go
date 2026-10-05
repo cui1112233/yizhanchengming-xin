@@ -30,14 +30,28 @@ func (h handler) login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"code": "AUTH_INVALID_REQUEST", "message": "用户名和密码不能为空"})
 		return
 	}
+	input.Username = strings.TrimSpace(input.Username)
+	key := limiterKey(r.RemoteAddr, input.Username)
+	if h.deps.LoginLimiter != nil && !h.deps.LoginLimiter.Allow(key) {
+		w.Header().Set("Retry-After", "300")
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"code": "AUTH_RATE_LIMITED", "message": "登录尝试过于频繁，请稍后再试"})
+		return
+	}
+
 	credentials, user, err := h.deps.Auth.Login(r.Context(), input.Username, input.Password)
 	if err != nil {
 		if errors.Is(err, authn.ErrUnauthenticated) {
+			if h.deps.LoginLimiter != nil {
+				h.deps.LoginLimiter.RecordFailure(key)
+			}
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "用户名或密码错误"})
 			return
 		}
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"code": "AUTH_LOGIN_FAILED", "message": "登录失败，请稍后重试"})
 		return
+	}
+	if h.deps.LoginLimiter != nil {
+		h.deps.LoginLimiter.Reset(key)
 	}
 	h.setAuthCookies(w, credentials)
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})

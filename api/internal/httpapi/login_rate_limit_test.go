@@ -55,7 +55,8 @@ func TestLoginRateLimiterResetsAfterSuccessfulLogin(t *testing.T) {
 	handler := NewHandler(Dependencies{Auth: auth, LoginLimiter: limiter})
 
 	request := func(password string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"alice","password":"`+password+`"}`))
+		body := `{"username":"alice","password":"` + password + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
 		sameOrigin(req)
 		req.RemoteAddr = "203.0.113.11:4321"
 		rec := httptest.NewRecorder()
@@ -63,7 +64,7 @@ func TestLoginRateLimiterResetsAfterSuccessfulLogin(t *testing.T) {
 		return rec
 	}
 
-	if rec := request("wrong"); rec.Code != http.StatusUnauthorized { t.Fatalf("first failure status=%d", rec.Code) }
+	if rec := request("wrong"); rec.Code != http.StatusUnauthorized { t.Fatalf("first failure status=%d body=%s", rec.Code, rec.Body.String()) }
 	auth.loginErr = nil
 	auth.loginCreds = authn.Credentials{AccessToken: "access", RefreshToken: "refresh"}
 	if rec := request("correct-password"); rec.Code != http.StatusOK { t.Fatalf("success status=%d body=%s", rec.Code, rec.Body.String()) }

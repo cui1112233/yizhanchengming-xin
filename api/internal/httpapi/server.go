@@ -43,6 +43,7 @@ type Dependencies struct {
 	Generation      GenerationService
 	UnifiedSettings UnifiedSettingsService
 	Auth            AuthService
+	LoginLimiter    *LoginRateLimiter
 	SecureCookies   bool
 	AllowedOrigins  []string
 }
@@ -51,6 +52,9 @@ func NewHandler(values ...Dependencies) http.Handler {
 	var deps Dependencies
 	if len(values) > 0 {
 		deps = values[0]
+	}
+	if deps.Auth != nil && deps.LoginLimiter == nil {
+		deps.LoginLimiter = NewLoginRateLimiter(LoginRateLimitOptions{})
 	}
 
 	api := handler{deps: deps}
