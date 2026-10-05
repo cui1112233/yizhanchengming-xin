@@ -32,22 +32,40 @@ func (h handler) csrfSourceAllowed(r *http.Request) bool {
 		return false
 	}
 	parsed, err := url.Parse(source)
-	if err != nil || parsed.Host == "" {
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return false
 	}
 
-	// Host equality is the default same-site policy. Scheme is intentionally
-	// not inferred from the backend connection because production may terminate
-	// HTTPS at a reverse proxy while preserving the public Host header.
-	if strings.EqualFold(parsed.Host, r.Host) {
+	candidate := strings.ToLower(parsed.Scheme + "://" + parsed.Host)
+	expected := strings.ToLower(requestScheme(r) + "://" + r.Host)
+	if candidate == expected {
 		return true
 	}
-	candidate := strings.ToLower(parsed.Scheme + "://" + parsed.Host)
 	for _, allowed := range h.deps.AllowedOrigins {
-		value := strings.TrimSpace(strings.TrimRight(allowed, "/"))
-		if strings.EqualFold(candidate, value) {
+		value := strings.ToLower(strings.TrimSpace(strings.TrimRight(allowed, "/")))
+		if candidate == value {
 			return true
 		}
 	}
 	return false
+}
+
+func requestScheme(r *http.Request) string {
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwarded != "" {
+		if index := strings.IndexByte(forwarded, ','); index >= 0 {
+			forwarded = forwarded[:index]
+		}
+		if forwarded = strings.ToLower(strings.TrimSpace(forwarded)); forwarded == "http" || forwarded == "https" {
+			return forwarded
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	if r.URL != nil {
+		if scheme := strings.ToLower(strings.TrimSpace(r.URL.Scheme)); scheme == "http" || scheme == "https" {
+			return scheme
+		}
+	}
+	return "http"
 }

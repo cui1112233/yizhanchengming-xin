@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
 
 type fakeSessionStore struct {
+	mu       sync.Mutex
 	users    map[int64]User
 	sessions map[string]*SessionRecord
 	refresh  map[string]*SessionRecord
@@ -23,6 +25,8 @@ func newFakeSessionStore(user User) *fakeSessionStore {
 }
 
 func (s *fakeSessionStore) CreateSession(_ context.Context, record SessionRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	copy := record
 	s.sessions[record.AccessTokenHash] = &copy
 	s.refresh[record.RefreshTokenHash] = &copy
@@ -30,6 +34,8 @@ func (s *fakeSessionStore) CreateSession(_ context.Context, record SessionRecord
 }
 
 func (s *fakeSessionStore) ResolveAccess(_ context.Context, hash string, now time.Time) (User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	record, ok := s.sessions[hash]
 	if !ok || record.RevokedAt != nil || !now.Before(record.AccessExpiresAt) {
 		return User{}, ErrUnauthenticated
@@ -38,6 +44,8 @@ func (s *fakeSessionStore) ResolveAccess(_ context.Context, hash string, now tim
 }
 
 func (s *fakeSessionStore) RotateByRefresh(_ context.Context, oldHash string, next SessionRecord, now time.Time) (User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	record, ok := s.refresh[oldHash]
 	if !ok || record.RevokedAt != nil || !now.Before(record.RefreshExpiresAt) {
 		return User{}, ErrUnauthenticated
@@ -53,6 +61,8 @@ func (s *fakeSessionStore) RotateByRefresh(_ context.Context, oldHash string, ne
 }
 
 func (s *fakeSessionStore) RevokeByAccess(_ context.Context, hash string, now time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	record, ok := s.sessions[hash]
 	if !ok {
 		return nil
@@ -62,6 +72,8 @@ func (s *fakeSessionStore) RevokeByAccess(_ context.Context, hash string, now ti
 }
 
 func (s *fakeSessionStore) RevokeByRefresh(_ context.Context, hash string, now time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	record, ok := s.refresh[hash]
 	if !ok {
 		return nil
@@ -143,5 +155,54 @@ func TestManagerRejectsMissingCredentials(t *testing.T) {
 	}
 	if _, _, err := manager.Refresh(context.Background(), ""); !errors.Is(err, ErrUnauthenticated) {
 		t.Fatalf("empty refresh: got %v", err)
+	}
+}
+
+func TestManagerConcurrentRefreshAllowsExactlyOneRotation(t *testing.T) {
+	now := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
+	store := newFakeSessionStore(User{ID: 7, Username: "alice"})
+	manager := NewManager(store, Options{
+		AccessTTL: time.Minute,
+		RefreshTTL: time.Hour,
+		Now: func() time.Time { return now },
+	})
+	issued, err := manager.Issue(context.Background(), 7)
+	if err != nil { t.Fatalf("issue: %v", err) }
+
+	type result struct {
+		credentials Credentials
+		err error
+	}
+	start := make(chan struct{})
+	results := make(chan result, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			<-start
+			credentials, _, err := manager.Refresh(context.Background(), issued.RefreshToken)
+			results <- result{credentials: credentials, err: err}
+		}()
+	}
+	close(start)
+
+	successes := 0
+	unauthenticated := 0
+	var winner Credentials
+	for i := 0; i < 2; i++ {
+		item := <-results
+		switch {
+		case item.err == nil:
+			successes++
+			winner = item.credentials
+		case errors.Is(item.err, ErrUnauthenticated):
+			unauthenticated++
+		default:
+			t.Fatalf("unexpected refresh error: %v", item.err)
+		}
+	}
+	if successes != 1 || unauthenticated != 1 {
+		t.Fatalf("successes=%d unauthenticated=%d, want exactly one winner and one rejected stale refresh", successes, unauthenticated)
+	}
+	if _, err := manager.AuthenticateAccess(context.Background(), winner.AccessToken); err != nil {
+		t.Fatalf("winning rotated session must remain valid: %v", err)
 	}
 }

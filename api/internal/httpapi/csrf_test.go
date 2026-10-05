@@ -25,11 +25,27 @@ func TestCSRFBrowserMutationRejectsCrossSiteOriginBeforeBusinessAction(t *testin
 	if auth.refreshCalls != 0 { t.Fatalf("refresh calls=%d, cross-site request must be rejected before auth mutation", auth.refreshCalls) }
 }
 
-func TestCSRFBrowserMutationAllowsSameOrigin(t *testing.T) {
+func TestCSRFBrowserMutationAllowsSameOriginBehindHTTPSProxy(t *testing.T) {
 	auth := &fakeAuthService{
 		user: authn.User{ID: 7, Role: "admin"},
 		refreshCreds: authn.Credentials{AccessToken: "next-access", RefreshToken: "next-refresh"},
 	}
+	handler := NewHandler(Dependencies{Auth: auth})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	req.Host = "app.example"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("Origin", "https://app.example")
+	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "old-refresh"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK { t.Fatalf("status=%d body=%s, want 200", rec.Code, rec.Body.String()) }
+	if auth.refreshCalls != 1 { t.Fatalf("refresh calls=%d want 1", auth.refreshCalls) }
+}
+
+func TestCSRFBrowserMutationRejectsSameHostDifferentScheme(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 7, Role: "admin"}}
 	handler := NewHandler(Dependencies{Auth: auth})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
 	req.Host = "app.example"
@@ -39,8 +55,8 @@ func TestCSRFBrowserMutationAllowsSameOrigin(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK { t.Fatalf("status=%d body=%s, want 200", rec.Code, rec.Body.String()) }
-	if auth.refreshCalls != 1 { t.Fatalf("refresh calls=%d want 1", auth.refreshCalls) }
+	if rec.Code != http.StatusForbidden { t.Fatalf("status=%d body=%s, want 403 for scheme mismatch", rec.Code, rec.Body.String()) }
+	if auth.refreshCalls != 0 { t.Fatalf("refresh calls=%d, scheme mismatch must be rejected", auth.refreshCalls) }
 }
 
 func TestCSRFBrowserMutationRejectsMissingOriginAndReferer(t *testing.T) {
@@ -62,7 +78,7 @@ func TestRefreshRotationRaceFailureDoesNotClearPotentiallyNewerBrowserCookies(t 
 	handler := NewHandler(Dependencies{Auth: auth})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
 	req.Host = "app.example"
-	req.Header.Set("Origin", "https://app.example")
+	req.Header.Set("Origin", "http://app.example")
 	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "already-rotated-in-another-tab"})
 	rec := httptest.NewRecorder()
 

@@ -44,7 +44,7 @@ func (f *fakeAuthService) Logout(context.Context, string, string) error {
 
 func sameOrigin(req *http.Request) {
 	req.Host = "app.example"
-	req.Header.Set("Origin", "https://app.example")
+	req.Header.Set("Origin", "http://app.example")
 }
 
 func TestCurrentUserRequiresValidSession(t *testing.T) {
