@@ -15,7 +15,14 @@ const StoryModeMetaPrompt = `你是通用小说剧情视觉化编剧与分镜规
 6. 输出结构保持稳定：场景与空间 -> 人物与状态 -> 首镜头钩子 -> 关键动作与冲突 -> 镜头与光影 -> 连续性与安全说明。
 7. 安全要求：不得强化性暗示，不得色情化或性化未成年人，不做不必要的身体特写，不为了冲突强行增加违规行为。能用摔东西、离开、争吵、拒绝、对峙表达时优先使用这些动作。`
 
-const H3DirectorPrompt = `你是 H3 结构化导演。必须只输出可解析 JSON，schema_version 固定为 "h3-director/v1"，并提供结构化 director_cards。保持剧情连续、空间明确、动作可视化。matchAudio 与 audioDurationSec 仅作为兼容输入字段记录，本阶段不得执行精确音频时长重排。`
+const MatchAudioDirectorRules = `matchAudio=false 时保持原 Director 行为，不强制使用音频时长。
+matchAudio=true 时，后端提供的 audioDurationSec 是硬性总时长：第一镜 start 必须为 0.00；后一镜 start 必须等于前一镜 end；不得有 gap 或 overlap；最后一镜 end 必须严格等于 audioDurationSec。时间单位为秒并保留两位小数。shotDurationLimitSec 是单镜头硬上限，选择 15 秒表示每镜头 <=15 秒，不是固定 15 秒切片。必须按对白、旁白、停顿、动作复杂度、情绪节奏和镜头信息量分配现有镜头时间。禁止为了凑时长新增人物、剧情、对白、旁白或无关镜头。`
+
+const DirectorPrompt = `你是短视频导演分镜规划器。将剧本与 Hook 转成可继续用于视频提示词编译的导演 JSON 输出。保持剧情连续、空间明确、动作可视化。
+` + MatchAudioDirectorRules
+
+const H3DirectorPrompt = `你是 H3 结构化导演。必须只输出可解析 JSON，schema_version 固定为 "h3-director/v1"，并提供结构化 director_cards。保持剧情连续、空间明确、动作可视化。
+` + MatchAudioDirectorRules
 
 type PromptResolver struct{ store Store }
 
@@ -36,8 +43,8 @@ func DefaultPrompts() []Prompt {
 		{Key: PromptScript, Version: 1, Enabled: true, Content: "根据小说原文生成结构清晰、可继续进入 Hook/Director 的剧本。保留主要事实、人物和因果，不虚构关键剧情。"},
 		{Key: PromptScriptPlotMode, Version: 1, Enabled: true, Content: StoryModeMetaPrompt},
 		{Key: PromptHook, Version: 1, Enabled: true, Content: "基于已生成剧本提炼短视频开场 Hook。强化冲突与信息密度，但不得改变主剧情。"},
-		{Key: PromptDirector, Version: 1, Enabled: true, Content: "你是短视频导演分镜规划器。将剧本与 Hook 转成可继续用于视频提示词编译的导演输出。保持剧情连续、空间明确、动作可视化。"},
-		{Key: PromptDirectorH3, Version: 1, Enabled: true, Content: H3DirectorPrompt},
+		{Key: PromptDirector, Version: 2, Enabled: true, Content: DirectorPrompt},
+		{Key: PromptDirectorH3, Version: 2, Enabled: true, Content: H3DirectorPrompt},
 		{Key: PromptFinal, Version: 1, Enabled: true, Content: "按后端确定性顺序编译最终提示词，不在前端拼装。"},
 	}
 }
