@@ -34,7 +34,8 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 
 	videoStore := video.NewMySQLStore(db)
 	masterKey := []byte(os.Getenv("VIDEO_PROVIDER_MASTER_KEY"))
-	videoConfigService := video.NewConfigService(videoStore, masterKey)
+	providerFactory := video.DefaultProviderFactory{}
+	videoConfigService := video.NewConfigServiceWithProviders(videoStore, masterKey, providerFactory)
 
 	var artifactStore video.ArtifactStore
 	if endpoint, region, bucket, accessKey, secretKey, publicBase := os.Getenv("TOS_ENDPOINT"), os.Getenv("TOS_REGION"), os.Getenv("TOS_BUCKET"), os.Getenv("TOS_ACCESS_KEY"), os.Getenv("TOS_SECRET_KEY"), os.Getenv("TOS_PUBLIC_BASE_URL"); endpoint != "" && region != "" && bucket != "" && accessKey != "" && secretKey != "" && publicBase != "" {
@@ -45,7 +46,7 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	videoService := video.NewService(
 		videoStore,
 		video.NewGenerationFinalPromptSource(generationStore),
-		video.DefaultProviderFactory{},
+		providerFactory,
 		artifactStore,
 		masterKey,
 	)
