@@ -204,6 +204,44 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
   }, 15000)
 
+  it('单本错误包含敏感信息时会脱敏，不直接显示 Token/密码/DSN', async () => {
+    const sensitiveError = 'Authorization: Bearer secret-token password=supersecret mysql://user:pass@db/app'
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => jsonResponse({ intake: { id: 19 }, books: [] }))
+      .mockImplementationOnce(() =>
+        jsonResponse({ intakeId: 19, status: 'partial_failed', fetched: 0, failed: 1 }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          books: [
+            {
+              id: 3,
+              intakeId: 19,
+              source: '知乎',
+              platformId: '11',
+              bookId: '9001',
+              title: '',
+              category: '',
+              genre: '',
+              gender: '',
+              style: '',
+              status: 'retryable_failed',
+              errorMessage: sensitiveError,
+            },
+          ],
+        }),
+      )
+
+    render(<IntakeWorkbench />)
+    addStore('知乎', '11', '9001')
+    fireEvent.click(screen.getByRole('button', { name: '立即执行' }))
+
+    expect(await screen.findByText('请求失败，请稍后重试或查看服务端日志。')).toBeTruthy()
+    expect(screen.queryByText(sensitiveError)).toBeNull()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+  }, 15000)
+
   it('121 部分失败时显示真实成功/失败数量和每本错误，不创建 BatchProject', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
