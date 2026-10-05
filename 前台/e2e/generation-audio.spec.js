@@ -21,10 +21,10 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
 
     await expect(page.getByText('已检测音频：28.00 秒')).toBeVisible()
     await expect(page.locator('.ant-table-tbody').getByText('完成', { exact: true })).toHaveCount(4)
-    await expect(page.getByText('Script')).toBeVisible()
-    await expect(page.getByText('Hook')).toBeVisible()
-    await expect(page.getByText('Director')).toBeVisible()
-    await expect(page.getByText('Final Prompt')).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Script' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Hook' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Director' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Final Prompt' })).toBeVisible()
   })
 
   test('@generation Hook disabled is represented as skipped, not failed', async ({ page }) => {
