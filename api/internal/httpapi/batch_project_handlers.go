@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-
-	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 )
 
 func (h handler) listBatchProjects(w http.ResponseWriter, r *http.Request) {
@@ -63,5 +61,3 @@ func (h handler) getBatchProject(w http.ResponseWriter, r *http.Request) {
 		"books":   toBookResponses(books),
 	})
 }
-
-var _ intake.RunStatus
