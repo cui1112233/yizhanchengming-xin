@@ -48,7 +48,43 @@ export function settingsFixture() {
   }
 }
 
-export async function routeBatchProjectFixtures(page, { generationSummary, audioDurationMs = 28000 } = {}) {
+export function makeVideoStatus({
+  status = 'succeeded',
+  provider = 'personal_api',
+  model = 'yd2.0-mini',
+  errorMessage = '',
+  outputURL = 'https://example.invalid/task16/video.mp4',
+  attemptID = 701,
+  attempts = 1,
+} = {}) {
+  const values = []
+  for (let index = 1; index <= attempts; index += 1) {
+    const isLatest = index === attempts
+    values.push({
+      id: isLatest ? attemptID : attemptID - (attempts - index),
+      attempt: index,
+      status: isLatest ? status : 'failed',
+      errorCode: isLatest && errorMessage ? 'provider_request_failed' : '',
+      errorMessage: isLatest ? errorMessage : 'previous fixture failure',
+      outputUrl: isLatest ? outputURL : '',
+    })
+  }
+  return {
+    batchProjectId: 123,
+    books: [{
+      bookId: 1001,
+      jobId: 801,
+      provider,
+      model,
+      status,
+      attempts: values,
+      errorMessage,
+      outputUrl: outputURL,
+    }],
+  }
+}
+
+export async function routeBatchProjectFixtures(page, { generationSummary, audioDurationMs = 28000, videoStatus } = {}) {
   await page.route('**/api/v1/batch-projects', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ projects: [projectFixture] }) })
   })
@@ -57,8 +93,7 @@ export async function routeBatchProjectFixtures(page, { generationSummary, audio
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ project: projectFixture, books: projectBooksFixture }) })
   })
   await page.route('**/api/v1/batch-projects/123/settings', async (route) => {
-    const payload = settingsFixture()
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(settingsFixture()) })
   })
   await page.route('**/api/v1/batch-projects/123/settings/production', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(settingsFixture()) })
@@ -74,6 +109,12 @@ export async function routeBatchProjectFixtures(page, { generationSummary, audio
   })
   await page.route('**/api/v1/batch-projects/123/version-profile/sync-style-types', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(settingsFixture()) })
+  })
+  await page.route('**/api/v1/batch-projects/123/video', async (route) => {
+    const payload = typeof videoStatus === 'function'
+      ? videoStatus()
+      : (videoStatus || { batchProjectId: 123, books: [] })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
   })
 
   if (generationSummary) {
