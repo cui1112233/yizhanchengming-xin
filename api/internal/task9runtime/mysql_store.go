@@ -85,6 +85,12 @@ func (s *MySQLStore) Fail(ctx context.Context,e Execution,f Failure)(bool,error)
 	res,err:=s.db.ExecContext(ctx,`UPDATE book_runs SET status='failed',retryable=?,error_code=?,error_message=?,finished_at=?,lease_deadline=NULL,heartbeat_at=? WHERE id=? AND attempt=? AND execution_token=? AND execution_owner=? AND status='running'`,retryable,code,msg,time.Now(),time.Now(),e.BookRunID,e.Attempt,e.FencingToken,e.Owner);if err!=nil{return false,err};n,_:=res.RowsAffected();return n==1,nil
 }
 
+func (s *MySQLStore) ProjectIDForBookRun(ctx context.Context, bookRunID int64)(int64,error){
+	var projectID int64
+	if err:=s.db.QueryRowContext(ctx,`SELECT batch_project_id FROM book_runs WHERE id=?`,bookRunID).Scan(&projectID);err!=nil{return 0,err}
+	return projectID,nil
+}
+
 func (s *MySQLStore) RetryBookRun(ctx context.Context, failedBookRunID int64)(WorkItem,bool,error){
 	tx,err:=s.db.BeginTx(ctx,&sql.TxOptions{Isolation:sql.LevelReadCommitted});if err!=nil{return WorkItem{},false,err};defer tx.Rollback()
 	var runID sql.NullInt64;var projectID,bookID int64;var attempt,maxAttempts int;var retryable bool;var status string
@@ -93,14 +99,15 @@ func (s *MySQLStore) RetryBookRun(ctx context.Context, failedBookRunID int64)(Wo
 	next:=attempt+1
 	res,err:=tx.ExecContext(ctx,`INSERT INTO book_runs (run_id,batch_project_id,book_id,attempt,max_attempts,retryable,status) VALUES (?,?,?,?,?,1,'queued') ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,runID.Int64,projectID,bookID,next,maxAttempts);if err!=nil{return WorkItem{},false,err}
 	id,err:=res.LastInsertId();if err!=nil{return WorkItem{},false,err};affected,_:=res.RowsAffected();created:=affected==1
+	if created { if _,err:=tx.ExecContext(ctx,`UPDATE runs SET status='running',finished_at=NULL WHERE id=?`,runID.Int64);err!=nil{return WorkItem{},false,err} }
 	if err:=tx.Commit();err!=nil{return WorkItem{},false,err};return WorkItem{BookRunID:id,BookID:bookID,Attempt:next},created,nil
 }
 
 func (s *MySQLStore) AggregateRunStatus(ctx context.Context,runID int64)(RunState,error){
 	tx,err:=s.db.BeginTx(ctx,&sql.TxOptions{Isolation:sql.LevelRepeatableRead});if err!=nil{return RunRunning,err};defer tx.Rollback()
-	rows,err:=tx.QueryContext(ctx,`SELECT br.status,br.retryable,br.attempt,br.max_attempts FROM book_runs br JOIN (SELECT book_id,MAX(attempt) max_attempt FROM book_runs WHERE run_id=? GROUP BY book_id) latest ON latest.book_id=br.book_id AND latest.max_attempt=br.attempt WHERE br.run_id=?`,runID,runID);if err!=nil{return RunRunning,err}
+	rows,err:=tx.QueryContext(ctx,`SELECT br.status FROM book_runs br JOIN (SELECT book_id,MAX(attempt) max_attempt FROM book_runs WHERE run_id=? GROUP BY book_id) latest ON latest.book_id=br.book_id AND latest.max_attempt=br.attempt WHERE br.run_id=?`,runID,runID);if err!=nil{return RunRunning,err}
 	total,succeeded,failed:=0,0,0;active:=false
-	for rows.Next(){var status string;var retryable bool;var attempt,maxAttempts int;if err:=rows.Scan(&status,&retryable,&attempt,&maxAttempts);err!=nil{rows.Close();return RunRunning,err};total++;switch status{case "succeeded":succeeded++;case "failed":if retryable&&attempt<maxAttempts{active=true}else{failed++};default:active=true}}
+	for rows.Next(){var status string;if err:=rows.Scan(&status);err!=nil{rows.Close();return RunRunning,err};total++;switch status{case "succeeded":succeeded++;case "failed":failed++;default:active=true}}
 	if err:=rows.Close();err!=nil{return RunRunning,err}
 	state:=RunRunning;if total==0{state=RunRunning}else if active{state=RunRunning}else if succeeded==total{state=RunSucceeded}else if failed==total{state=RunFailed}else if succeeded>0&&failed>0{state=RunPartialFailed}
 	if state==RunSucceeded||state==RunPartialFailed||state==RunFailed{_,err=tx.ExecContext(ctx,`UPDATE runs SET status=?,finished_at=? WHERE id=?`,string(state),time.Now(),runID)}else{_,err=tx.ExecContext(ctx,`UPDATE runs SET status='running',finished_at=NULL WHERE id=?`,runID)};if err!=nil{return state,err}
