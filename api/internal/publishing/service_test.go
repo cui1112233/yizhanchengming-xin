@@ -11,11 +11,15 @@ import (
 )
 
 type fakeStore struct {
-	accounts       map[int64]Account
-	createdAccount Account
-	credential     EncryptedCredential
-	createdIntent  Intent
-	createdAudit   Audit
+	accounts          map[int64]Account
+	createdAccount    Account
+	credential        EncryptedCredential
+	createdIntent     Intent
+	createdAudit      Audit
+	claimedProjectID  int64
+	claimedOwnerID    int64
+	claimedTeamID     int64
+	denyProjectAccess bool
 }
 
 func (s *fakeStore) CreateAccountWithCredential(_ context.Context, account Account, credential EncryptedCredential) (Account, error) {
@@ -35,6 +39,15 @@ func (s *fakeStore) GetAccount(_ context.Context, id int64) (Account, error) {
 	account, ok := s.accounts[id]
 	if !ok { return Account{}, ErrNotFound }
 	return account, nil
+}
+func (s *fakeStore) ClaimBatchProject(_ context.Context, projectID, ownerUserID, teamID int64) error {
+	s.claimedProjectID = projectID
+	s.claimedOwnerID = ownerUserID
+	s.claimedTeamID = teamID
+	return nil
+}
+func (s *fakeStore) CanAccessBatchProject(context.Context, int64, int64, int64, bool) (bool, error) {
+	return !s.denyProjectAccess, nil
 }
 func (s *fakeStore) CreateIntentWithAudit(_ context.Context, intent Intent, audit Audit) (Intent, error) {
 	intent.ID = 73
@@ -77,6 +90,16 @@ func TestCreatePublishingAccountRequiresEncryptionKey(t *testing.T) {
 	if !errors.Is(err, ErrUnavailable) { t.Fatalf("err=%v want ErrUnavailable", err) }
 }
 
+func TestClaimBatchProjectPinsCreatorOwnership(t *testing.T) {
+	store := &fakeStore{}
+	service := publishingTestService(store, time.Now)
+	actor := authn.User{ID: 7, TeamID: 3}
+	if err := service.ClaimBatchProject(context.Background(), actor, 21); err != nil { t.Fatalf("claim project: %v", err) }
+	if store.claimedProjectID != 21 || store.claimedOwnerID != 7 || store.claimedTeamID != 3 {
+		t.Fatalf("claim = project:%d owner:%d team:%d", store.claimedProjectID, store.claimedOwnerID, store.claimedTeamID)
+	}
+}
+
 func TestCreatePublishIntentAllowsSameTeamAndDerivesPlatformFromAccount(t *testing.T) {
 	store := &fakeStore{accounts: map[int64]Account{11: {ID: 11, OwnerUserID: 99, TeamID: 3, Platform: "douyin", CredentialRefID: "cred-11", Active: true}}}
 	service := publishingTestService(store, func() time.Time { return time.Date(2026, 10, 5, 11, 5, 0, 0, time.UTC) })
@@ -87,6 +110,18 @@ func TestCreatePublishIntentAllowsSameTeamAndDerivesPlatformFromAccount(t *testi
 	if intent.RequestedByUserID != actor.ID || intent.Platform != "douyin" || intent.Status != IntentStatusPending { t.Fatalf("intent = %#v", intent) }
 	if store.createdAudit.ActorUserID != actor.ID || store.createdAudit.Result != AuditResultAccepted || store.createdAudit.AccountID != 11 { t.Fatalf("audit = %#v", store.createdAudit) }
 	if store.createdAudit.ErrorSummary != "" { t.Fatalf("unexpected audit error: %#v", store.createdAudit) }
+}
+
+func TestCreatePublishIntentRejectsForeignProjectWithoutPersistingIntent(t *testing.T) {
+	store := &fakeStore{
+		accounts: map[int64]Account{11: {ID: 11, OwnerUserID: 7, TeamID: 3, Platform: "douyin", CredentialRefID: "cred-11", Active: true}},
+		denyProjectAccess: true,
+	}
+	service := publishingTestService(store, time.Now)
+	actor := authn.User{ID: 7, TeamID: 3}
+	_, err := service.CreateIntent(context.Background(), actor, CreateIntentInput{BatchProjectID: 999, PublishingAccountID: 11})
+	if !errors.Is(err, ErrForbidden) { t.Fatalf("err=%v, want ErrForbidden", err) }
+	if store.createdIntent.ID != 0 || store.createdAudit.ID != 0 { t.Fatalf("foreign project persisted work: intent=%#v audit=%#v", store.createdIntent, store.createdAudit) }
 }
 
 func TestCreatePublishIntentRejectsForeignOwnershipWithoutPersistingIntent(t *testing.T) {
