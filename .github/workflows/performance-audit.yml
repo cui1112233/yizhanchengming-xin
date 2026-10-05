@@ -75,16 +75,16 @@ jobs:
           while IFS= read -r line; do
             echo "::notice title=PERF_GENERATION::$line"
           done < <(grep 'PERF_GENERATION' /tmp/perf-generation.log || true)
-      - name: Run repeated RSS goroutine and detail decomposition probes
+      - name: Run repeated RSS goroutine detail and slow-client probes
         env:
           PERF_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true
         shell: bash
         run: |
           set -o pipefail
-          go test ./internal/perfaudit -run 'TestPerformance(RepeatedRSSAndGoroutineRetention|ProjectDetailDecomposition)' -count=1 -v 2>&1 | tee /tmp/perf-retention.log
+          go test ./internal/perfaudit -run 'TestPerformance(RepeatedRSSAndGoroutineRetention|ProjectDetailDecomposition|SlowClientConnectionRetentionProbe)' -count=1 -v 2>&1 | tee /tmp/perf-retention.log
           while IFS= read -r line; do
             echo "::notice title=PERF_RETENTION_DETAIL::$line"
-          done < <(grep -E 'PERF_RETENTION|PERF_DETAIL_DECOMP' /tmp/perf-retention.log || true)
+          done < <(grep -E 'PERF_RETENTION|PERF_DETAIL_DECOMP|PERF_SLOW_CLIENT' /tmp/perf-retention.log || true)
       - name: Run controlled Task14 capacity and failure probes
         shell: bash
         run: |
