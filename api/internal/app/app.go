@@ -26,6 +26,7 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 
 func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock, authEnabled bool) http.Handler {
 	startedAt := time.Now().UTC()
+	logger := slog.Default()
 	store := intake.NewMySQLStore(db)
 	intakeService := intake.NewService(store, fetcher, classifier)
 	pipelineService := pipeline.NewService(store, now)
@@ -37,6 +38,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		textProvider = generation.NewHTTPProvider(baseURL, key, model)
 	}
 	generationService := generation.NewService(generationStore, textProvider, nil)
+	observedGeneration := observedGenerationService{next: generationService, logger: logger}
 	settingsService := unifiedsettings.NewService(settingsStore, unifiedsettings.StaticDefaults{Config: unifiedsettings.Settings{
 		Production: map[string]any{"productionMode": "original", "aiCopyEnabled": false, "aiCopyCount": float64(1)},
 		Publishing: map[string]any{"uploadVideoType": "merged", "materialReuse": false},
@@ -49,6 +51,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	}
 	publishingStore := publishing.NewMySQLStore(db)
 	publishingService := publishing.NewService(publishingStore, publishing.Options{CredentialKey: publishingCredentialKey()})
+	observedPublishing := observedPublishingService{next: publishingService, logger: logger}
 	allowedOrigins := make([]string, 0)
 	for _, value := range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"), ",") {
 		if value = strings.TrimSpace(value); value != "" {
@@ -61,6 +64,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	providerFactory := video.DefaultProviderFactory{LocalJobs: videoStore}
 	videoConfigService := video.NewConfigServiceWithProviders(videoStore, masterKey, providerFactory)
 	localExecutorService := video.NewLocalExecutorService(videoStore, nil)
+	observedLocalExecutor := observedLocalExecutorService{next: localExecutorService, logger: logger}
 
 	var artifactStore video.ArtifactStore
 	var fileArtifactStore video.FileArtifactStore
@@ -73,6 +77,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		}
 	}
 	videoService := video.NewService(videoStore, video.NewGenerationFinalPromptSource(generationStore), providerFactory, artifactStore, masterKey)
+	observedVideo := &observedVideoService{next: videoService, logger: logger}
 	mergeExecutor := video.NewFFmpegExecutor(video.FFmpegExecutorConfig{
 		Binary:    os.Getenv("FFMPEG_BINARY"),
 		TempRoot:  os.Getenv("VIDEO_MERGE_TEMP_ROOT"),
@@ -82,6 +87,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	// Redis lease runtime, or scheduler is created here; that adapter waits for
 	// the shared Task 9.4 runtime contract on main.
 	mergeService := video.NewMergeService(videoStore, mergeExecutor)
+	observedMerge := observedMergeService{next: mergeService, logger: logger}
 
 	return httpapi.NewHandler(httpapi.Dependencies{
 		Intakes:                     intakeService,
@@ -89,22 +95,22 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,
 		BatchProjectDetails:         store,
-		Generation:                  generationService,
+		Generation:                  observedGeneration,
 		UnifiedSettings:             settingsService,
 		Auth:                        authService,
-		Publishing:                  publishingService,
+		Publishing:                  observedPublishing,
 		SecureCookies:               secureCookiesEnabled(),
 		AllowedOrigins:              allowedOrigins,
-		Video:                       videoService,
+		Video:                       observedVideo,
 		VideoConfig:                 videoConfigService,
-		VideoLocalExecutor:          localExecutorService,
+		VideoLocalExecutor:          observedLocalExecutor,
 		VideoStatus:                 videoService,
-		VideoMerge:                  mergeService,
+		VideoMerge:                  observedMerge,
 		BatchProjectAccess:          publishingStore,
 		VideoResourceProjects:       videoStore,
 		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
 		Database:                    db,
-		Logger:                      slog.Default(),
+		Logger:                      logger,
 		StartedAt:                   startedAt,
 		AppInitialized:              true,
 	})
