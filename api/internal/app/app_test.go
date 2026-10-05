@@ -95,10 +95,10 @@ func TestNewHandlerWiresBatchProjectReaderToMySQLStore(t *testing.T) {
 	defer db.Close()
 
 	now := time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
-	query := "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects ORDER BY id DESC LIMIT 100"
+	query := "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.id DESC LIMIT 100"
 	mock.ExpectQuery(regexp.QuoteMeta(query)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "created_at", "updated_at"}).
-			AddRow(51, 11, "知乎批次", now, now))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "created_at", "updated_at"}).
+			AddRow(51, 11, "知乎批次", "知乎", 2, "男频", "悬疑", intake.RunStatusPending, now, now))
 
 	handler := NewHandler(db, fakeFetcher{}, nil, func() time.Time { return now })
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects", nil)
@@ -109,8 +109,16 @@ func TestNewHandlerWiresBatchProjectReaderToMySQLStore(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s, want 200", rec.Code, rec.Body.String())
 	}
-	if !bytes.Contains(rec.Body.Bytes(), []byte(`"id":51`)) || !bytes.Contains(rec.Body.Bytes(), []byte(`"name":"知乎批次"`)) {
-		t.Fatalf("body = %s", rec.Body.String())
+	for _, want := range [][]byte{
+		[]byte(`"id":51`),
+		[]byte(`"name":"知乎批次"`),
+		[]byte(`"sources":["知乎"]`),
+		[]byte(`"bookCount":2`),
+		[]byte(`"runStatus":"pending"`),
+	} {
+		if !bytes.Contains(rec.Body.Bytes(), want) {
+			t.Fatalf("body = %s missing %s", rec.Body.String(), want)
+		}
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

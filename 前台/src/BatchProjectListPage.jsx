@@ -1,6 +1,25 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Card, Table, Typography } from 'antd'
+import { Alert, Card, Space, Table, Tag, Typography } from 'antd'
 import { listBatchProjects } from './api.js'
+
+const RUN_STATUS_LABELS = {
+  pending: '待执行',
+  running: '执行中',
+  completed: '已完成',
+  failed: '失败',
+}
+
+function renderTags(values) {
+  const items = Array.isArray(values) ? values.filter(Boolean) : []
+  if (items.length === 0) return '-'
+  return (
+    <Space size={[4, 4]} wrap>
+      {items.map((value) => (
+        <Tag key={value}>{value}</Tag>
+      ))}
+    </Space>
+  )
+}
 
 export default function BatchProjectListPage() {
   const [projects, setProjects] = useState([])
@@ -34,6 +53,33 @@ export default function BatchProjectListPage() {
       dataIndex: 'name',
       key: 'name',
     },
+    {
+      title: '书城来源',
+      key: 'sources',
+      render: (_, project) => renderTags(project.sources),
+    },
+    {
+      title: '小说数量',
+      dataIndex: 'bookCount',
+      key: 'bookCount',
+      render: (value) => value ?? 0,
+    },
+    {
+      title: '男女频',
+      key: 'genders',
+      render: (_, project) => renderTags(project.genders),
+    },
+    {
+      title: '风格',
+      key: 'styles',
+      render: (_, project) => renderTags(project.styles),
+    },
+    {
+      title: '运行状态',
+      dataIndex: 'runStatus',
+      key: 'runStatus',
+      render: (value) => (value ? <Tag>{RUN_STATUS_LABELS[value] || value}</Tag> : '-'),
+    },
   ]
 
   return (
@@ -43,7 +89,7 @@ export default function BatchProjectListPage() {
           <Typography.Text type="secondary">一战晟铭 · Batch Factory</Typography.Text>
           <Typography.Title level={2}>批量工厂</Typography.Title>
           <Typography.Paragraph type="secondary">
-            这里展示由小说获取工作台创建的真实 BatchProject。后续任务会继续补充书城、小说数量、男女频、风格和运行状态。
+            这里展示由小说获取工作台创建的真实 BatchProject，以及书城来源、小说数量、男女频、风格和最新运行状态。
           </Typography.Paragraph>
         </div>
       </div>
