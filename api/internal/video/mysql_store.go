@@ -267,10 +267,17 @@ func (s *MySQLStore) CompleteLocalExecutorTask(ctx context.Context, id, executor
 	if err != nil {
 		return err
 	}
-	if affected == 0 {
-		return ErrLocalExecutorTaskNotFound
+	if affected > 0 {
+		return nil
 	}
-	return nil
+	existing, err := s.GetLocalExecutorTask(ctx, id)
+	if err != nil {
+		return err
+	}
+	if existing.Status == TaskSucceeded && existing.ExecutorID == executorID && existing.ArtifactURL == artifactURL {
+		return nil
+	}
+	return ErrLocalExecutorTaskNotFound
 }
 
 func (s *MySQLStore) FailLocalExecutorTask(ctx context.Context, id, executorID string, code ErrorCode, message string, now time.Time) error {
