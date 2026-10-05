@@ -32,11 +32,12 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	}}, settingsStore)
 
 	return httpapi.NewHandler(httpapi.Dependencies{
-		Intakes:         intakeService,
-		Reader:          store,
-		Pipeline:        pipelineService,
-		BatchProjects:   store,
-		Generation:      generationService,
-		UnifiedSettings: settingsService,
+		Intakes:             intakeService,
+		Reader:              store,
+		Pipeline:            pipelineService,
+		BatchProjects:       store,
+		BatchProjectDetails: store,
+		Generation:          generationService,
+		UnifiedSettings:     settingsService,
 	})
 }

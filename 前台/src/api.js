@@ -52,6 +52,10 @@ export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
 
+export function getBatchProject(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}`)
+}
+
 export function getUnifiedSettings(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/settings`)
 }

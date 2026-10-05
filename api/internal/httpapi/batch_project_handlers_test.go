@@ -36,7 +36,12 @@ func TestBatchProjectListRouteIsRegistered(t *testing.T) {
 
 func TestBatchProjectListReturnsReaderProjects(t *testing.T) {
 	reader := &fakeBatchProjectReader{projects: []intake.BatchProject{
-		{ID: 51, IntakeID: 11, Name: "知乎批次"},
+		{
+			ID: 51, IntakeID: 11, Name: "跨书城批次",
+			Sources: []string{"点众", "知乎"}, BookCount: 3,
+			Genders: []string{"女频", "男频"}, Styles: []string{"情感", "悬疑"},
+			RunStatus: intake.RunStatusRunning,
+		},
 		{ID: 52, IntakeID: 12, Name: "点众批次"},
 	}}
 	handler := NewHandler(Dependencies{BatchProjects: reader})
@@ -52,7 +57,12 @@ func TestBatchProjectListReturnsReaderProjects(t *testing.T) {
 		t.Fatalf("reader calls = %d, want 1", reader.calls)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{`"projects"`, `"id":51`, `"intakeId":11`, `"name":"知乎批次"`, `"id":52`, `"name":"点众批次"`} {
+	for _, want := range []string{
+		`"projects"`, `"id":51`, `"intakeId":11`, `"name":"跨书城批次"`,
+		`"sources":["点众","知乎"]`, `"bookCount":3`,
+		`"genders":["女频","男频"]`, `"styles":["情感","悬疑"]`,
+		`"runStatus":"running"`, `"id":52`, `"name":"点众批次"`,
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("body = %s, missing %s", body, want)
 		}

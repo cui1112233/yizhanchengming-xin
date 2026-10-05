@@ -20,8 +20,8 @@ type handler struct {
 }
 
 type createIntakeRequest struct {
-	Name   string             `json:"name"`
-	Groups []createBookGroup  `json:"groups"`
+	Name   string            `json:"name"`
+	Groups []createBookGroup `json:"groups"`
 }
 
 type createBookGroup struct {
@@ -73,9 +73,14 @@ type bookResponse struct {
 }
 
 type projectResponse struct {
-	ID       int64  `json:"id"`
-	IntakeID int64  `json:"intakeId"`
-	Name     string `json:"name"`
+	ID        int64            `json:"id"`
+	IntakeID  int64            `json:"intakeId"`
+	Name      string           `json:"name"`
+	Sources   []string         `json:"sources,omitempty"`
+	BookCount int              `json:"bookCount,omitempty"`
+	Genders   []string         `json:"genders,omitempty"`
+	Styles    []string         `json:"styles,omitempty"`
+	RunStatus intake.RunStatus `json:"runStatus,omitempty"`
 }
 
 type runResponse struct {
