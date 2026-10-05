@@ -77,7 +77,7 @@ func TestStaleWorkerFailRejected(t *testing.T) {
 }
 
 func TestRetryCreatesOnlyFailedBooksNextAttempt(t *testing.T) {
-	state := []BookAttempt{{BookID:1, Attempt:1, State:BookSucceeded}, {BookID:2, Attempt:1, State:BookFailed}}
+	state := []BookAttempt{{BookID:1, Attempt:1, State:BookSucceeded}, {BookID:2, Attempt:1, State:BookFailed, Retryable:true}}
 	got := PlanRetry(state, 3)
 	if len(got) != 1 || got[0].BookID != 2 || got[0].Attempt != 2 { t.Fatalf("retry plan=%+v", got) }
 }
@@ -104,15 +104,15 @@ func TestSchedulerNotDueAndTwoInstancesOnlyOneWins(t *testing.T) {
 
 func TestRedisWipeDoesNotImmediatelyRequeueActiveExecution(t *testing.T) {
 	now := time.Unix(100,0)
-	active := RecoveryCandidate{BookRunID:1, Attempt:1, FencingToken:7, RunningSince:now.Add(-time.Minute), LeaseDeadline:now.Add(time.Minute), MaxAttempts:3}
-	stale := RecoveryCandidate{BookRunID:2, Attempt:1, FencingToken:8, RunningSince:now.Add(-2*time.Minute), LeaseDeadline:now.Add(-time.Second), MaxAttempts:3}
+	active := RecoveryCandidate{BookRunID:1, Attempt:1, FencingToken:7, RunningSince:now.Add(-time.Minute), LeaseDeadline:now.Add(time.Minute), MaxAttempts:3, Retryable:true}
+	stale := RecoveryCandidate{BookRunID:2, Attempt:1, FencingToken:8, RunningSince:now.Add(-2*time.Minute), LeaseDeadline:now.Add(-time.Second), MaxAttempts:3, Retryable:true}
 	got := PlanRecovery([]RecoveryCandidate{active, stale}, now)
 	if len(got) != 1 || got[0].BookRunID != 2 { t.Fatalf("recovery=%+v", got) }
 }
 
 func TestGoRestartRecoveryUsesDurableMySQLFacts(t *testing.T) {
 	now := time.Unix(100,0)
-	candidate := RecoveryCandidate{BookRunID:4, Attempt:2, FencingToken:13, RunningSince:now.Add(-time.Hour), LeaseDeadline:now.Add(-time.Minute), MaxAttempts:3}
+	candidate := RecoveryCandidate{BookRunID:4, Attempt:2, FencingToken:13, RunningSince:now.Add(-time.Hour), LeaseDeadline:now.Add(-time.Minute), MaxAttempts:3, Retryable:true}
 	got := PlanRecovery([]RecoveryCandidate{candidate}, now)
 	if len(got) != 1 || got[0].Attempt != 3 { t.Fatalf("recovery=%+v", got) }
 }
