@@ -63,5 +63,6 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Video:               videoService,
 		VideoConfig:         videoConfigService,
 		VideoLocalExecutor:  localExecutorService,
+		VideoStatus:         videoService,
 	})
 }
