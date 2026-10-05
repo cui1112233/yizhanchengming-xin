@@ -45,8 +45,6 @@ const (
 	PromptDirector = "director.default"
 	PromptDirectorH3 = "director.h3"
 	PromptFinal = "final_prompt.default"
-
-	// Compatibility aliases used by newer tests/callers.
 	PromptKeyScript = PromptScript
 )
 
@@ -93,13 +91,13 @@ type StageRun struct {
 }
 
 type TextRequest struct {
-	BookID int64
-	Stage Stage
-	SystemPrompt string
-	UserPrompt string
-	DirectorMode DirectorMode
-	MatchAudio bool
-	AudioDurationSec float64
+	BookID int64 `json:"bookId"`
+	Stage Stage `json:"stage"`
+	SystemPrompt string `json:"systemPrompt"`
+	UserPrompt string `json:"userPrompt"`
+	DirectorMode DirectorMode `json:"directorMode"`
+	MatchAudio bool `json:"matchAudio"`
+	AudioDurationSec float64 `json:"audioDurationSec"`
 }
 
 type RunBookRequest struct {
@@ -166,6 +164,7 @@ type ProjectSummary struct {
 
 type BookGenerationSummary struct {
 	BookID int64 `json:"bookId"`
+	Title string `json:"title,omitempty"`
 	Run *BookRun `json:"run,omitempty"`
 	Stages map[Stage]StageRun `json:"stages"`
 }
