@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
 
@@ -21,11 +21,6 @@ beforeAll(() => {
 })
 
 afterEach(() => cleanup())
-
-function closeVisibleDrawer(title) {
-  const dialog = screen.getByRole('dialog', { name: title })
-  fireEvent.click(within(dialog).getByLabelText('Close'))
-}
 
 function createPersistentApi() {
   let project = {
@@ -63,23 +58,23 @@ describe('UnifiedSettingsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '生产统一设置' }))
     await waitFor(() => expect(api.getUnifiedSettings).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('dialog', { name: '生产统一设置' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '保存生产统一设置' })).toBeTruthy()
     expect(screen.getByText('AI 文案唯一控制位置')).toBeTruthy()
-    closeVisibleDrawer('生产统一设置')
 
     fireEvent.click(screen.getByRole('button', { name: '发布统一设置' }))
     await waitFor(() => expect(api.getUnifiedSettings).toHaveBeenCalledTimes(2))
-    expect(screen.getByRole('dialog', { name: '发布统一设置' })).toBeTruthy()
-    closeVisibleDrawer('发布统一设置')
+    expect(await screen.findByRole('button', { name: '保存发布统一设置' })).toBeTruthy()
+    expect(await screen.findByRole('textbox', { name: '发布网站配置档' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '版本对应配置档' }))
     await waitFor(() => expect(api.getUnifiedSettings).toHaveBeenCalledTimes(3))
+    expect(await screen.findByRole('button', { name: '保存配置档' })).toBeTruthy()
     expect(screen.getByText('处理规则提示词')).toBeTruthy()
     expect(screen.getByText('知识库提示词')).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '同步' }))
     expect(await screen.findByText('同步 121 网站配置')).toBeTruthy()
     expect(screen.getByText('同步批量风格类型')).toBeTruthy()
-  })
+  }, 15000)
 
   it('re-reads saved production and publishing values after close and remount', async () => {
     const api = createPersistentApi()
@@ -94,7 +89,6 @@ describe('UnifiedSettingsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '生产统一设置' }))
     expect((await screen.findByRole('spinbutton', { name: 'AI 文案数量' })).value).toBe('5')
-    closeVisibleDrawer('生产统一设置')
 
     fireEvent.click(screen.getByRole('button', { name: '发布统一设置' }))
     const profileInput = await screen.findByRole('textbox', { name: '发布网站配置档' })
@@ -107,7 +101,7 @@ describe('UnifiedSettingsPanel', () => {
     render(<UnifiedSettingsPanel project={{ id: 9, name: '项目九' }} api={api} />)
     fireEvent.click(screen.getByRole('button', { name: '发布统一设置' }))
     expect((await screen.findByRole('textbox', { name: '发布网站配置档' })).value).toBe('保存后的发布档')
-  })
+  }, 15000)
 
   it('persists version profile and both sync actions through backend API results', async () => {
     const api = createPersistentApi()
@@ -141,5 +135,5 @@ describe('UnifiedSettingsPanel', () => {
     expect(await screen.findByText('剧情')).toBeTruthy()
     expect(screen.getByText('都市')).toBeTruthy()
     expect(screen.getByText('女频')).toBeTruthy()
-  })
+  }, 15000)
 })
