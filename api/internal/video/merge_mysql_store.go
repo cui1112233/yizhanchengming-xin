@@ -4,10 +4,67 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 const mergeJobSelect = `SELECT id, batch_project_id, book_id, status, current_attempt, error_message, created_at, updated_at FROM video_merge_jobs`
 const mergeAttemptSelect = `SELECT id, merge_job_id, attempt, status, aspect_ratio, speed, output_bucket, output_object_key, output_url, error_message, created_at, updated_at FROM video_merge_attempts`
+
+func (s *MySQLStore) ResolveSucceededMergeInputs(ctx context.Context, projectID, bookID int64, taskIDs []int64) ([]MergeInputAsset, error) {
+	if projectID <= 0 || bookID <= 0 || len(taskIDs) == 0 {
+		return nil, ErrMergeInputNotReady
+	}
+	placeholders := make([]string, len(taskIDs))
+	args := make([]any, len(taskIDs))
+	seen := make(map[int64]struct{}, len(taskIDs))
+	for i, id := range taskIDs {
+		if id <= 0 {
+			return nil, ErrMergeInputNotReady
+		}
+		if _, duplicate := seen[id]; duplicate {
+			return nil, fmt.Errorf("%w: duplicate production task %d", ErrMergeInputNotReady, id)
+		}
+		seen[id] = struct{}{}
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT t.id, t.status, t.output_url, j.batch_project_id, j.book_id
+FROM video_production_tasks t
+JOIN video_production_jobs j ON j.id=t.production_job_id
+WHERE t.id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type resolved struct {
+		status    TaskStatus
+		outputURL string
+		projectID int64
+		bookID    int64
+	}
+	byID := make(map[int64]resolved, len(taskIDs))
+	for rows.Next() {
+		var id int64
+		var item resolved
+		if err := rows.Scan(&id, &item.status, &item.outputURL, &item.projectID, &item.bookID); err != nil {
+			return nil, err
+		}
+		byID[id] = item
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]MergeInputAsset, 0, len(taskIDs))
+	for index, id := range taskIDs {
+		item, ok := byID[id]
+		if !ok || item.projectID != projectID || item.bookID != bookID || item.status != TaskSucceeded || strings.TrimSpace(item.outputURL) == "" {
+			return nil, fmt.Errorf("%w: production task %d", ErrMergeInputNotReady, id)
+		}
+		out = append(out, MergeInputAsset{ProductionTaskID: id, URL: strings.TrimSpace(item.outputURL), Order: index + 1})
+	}
+	return out, nil
+}
 
 func (s *MySQLStore) CreateMergeJob(ctx context.Context, job MergeJob) (MergeJob, error) {
 	result, err := s.db.ExecContext(ctx, `INSERT INTO video_merge_jobs
