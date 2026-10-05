@@ -14,15 +14,6 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 )
 
-// CanAccessBatchProject is intentionally declared on the existing publishing
-// test double before the production HTTP dependency requires it. The security
-// audit RED tests below prove that BatchProject browser routes currently ignore
-// the Task 15 ownership boundary even though the publishing layer already owns
-// the project-ownership fact source.
-func (f *fakePublishingService) CanAccessBatchProject(context.Context, authn.User, int64) (bool, error) {
-	return false, nil
-}
-
 type failingUnifiedSettings struct{ err error }
 
 func (f *failingUnifiedSettings) GetCurrent(context.Context, int64) (unifiedsettings.Current, error) {
@@ -63,7 +54,7 @@ func TestSecurityAuditBatchProjectDetailBlocksCrossUserCrossTeamIDOR(t *testing.
 	}}
 	handler := NewHandler(Dependencies{
 		Auth:                auth,
-		Publishing:          &fakePublishingService{},
+		BatchProjectAccess:  task14ProjectAccessStub{allowed: false},
 		BatchProjectDetails: reader,
 	})
 
@@ -92,9 +83,9 @@ func TestSecurityAuditBatchProjectListHidesProjectsOutsideOwnershipBoundary(t *t
 		Capabilities: []string{CapabilityBatchView},
 	}}
 	handler := NewHandler(Dependencies{
-		Auth:          auth,
-		Publishing:    &fakePublishingService{},
-		BatchProjects: reader,
+		Auth:               auth,
+		BatchProjectAccess: task14ProjectAccessStub{allowed: false},
+		BatchProjects:      reader,
 	})
 
 	rec := httptest.NewRecorder()
@@ -114,9 +105,9 @@ func TestSecurityAuditBatchProjectListHidesProjectsOutsideOwnershipBoundary(t *t
 func TestSecurityAuditUnifiedSettingsBlocksCrossUserProjectRead(t *testing.T) {
 	auth := &fakeAuthService{user: authn.User{ID: 202, TeamID: 22, Role: "member", Capabilities: []string{CapabilityBatchView}}}
 	handler := NewHandler(Dependencies{
-		Auth:            auth,
-		Publishing:      &fakePublishingService{},
-		UnifiedSettings: &fakeUnifiedSettings{},
+		Auth:               auth,
+		BatchProjectAccess: task14ProjectAccessStub{allowed: false},
+		UnifiedSettings:    &fakeUnifiedSettings{},
 	})
 
 	rec := httptest.NewRecorder()
@@ -129,9 +120,9 @@ func TestSecurityAuditUnifiedSettingsBlocksCrossUserProjectRead(t *testing.T) {
 func TestSecurityAuditGenerationBlocksCrossUserProjectRead(t *testing.T) {
 	auth := &fakeAuthService{user: authn.User{ID: 202, TeamID: 22, Role: "member", Capabilities: []string{CapabilityBatchView}}}
 	handler := NewHandler(Dependencies{
-		Auth:       auth,
-		Publishing: &fakePublishingService{},
-		Generation: &fakeGenerationService{},
+		Auth:               auth,
+		BatchProjectAccess: task14ProjectAccessStub{allowed: false},
+		Generation:         &fakeGenerationService{},
 	})
 
 	rec := httptest.NewRecorder()
