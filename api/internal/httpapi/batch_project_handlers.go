@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 )
 
 func (h handler) listBatchProjects(w http.ResponseWriter, r *http.Request) {
@@ -16,8 +18,29 @@ func (h handler) listBatchProjects(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "读取批量项目列表失败")
 		return
 	}
+
+	var current authn.User
+	if h.deps.Auth != nil {
+		var ok bool
+		current, ok = authn.CurrentUser(r.Context())
+		if !ok || current.ID <= 0 {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			return
+		}
+	}
+
 	rows := make([]projectResponse, 0, len(projects))
 	for _, project := range projects {
+		if h.deps.Auth != nil {
+			allowed, accessErr := h.batchProjectAllowed(r.Context(), current, project.ID)
+			if accessErr != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
+				return
+			}
+			if !allowed {
+				continue
+			}
+		}
 		rows = append(rows, projectResponse{
 			ID:        project.ID,
 			IntakeID:  project.IntakeID,
