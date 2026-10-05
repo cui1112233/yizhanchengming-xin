@@ -47,3 +47,7 @@ export function createBatchProject(intakeId, input) {
     body: JSON.stringify(input),
   })
 }
+
+export function listBatchProjects() {
+  return requestJSON(`${API_PREFIX}/batch-projects`)
+}

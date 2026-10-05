@@ -29,6 +29,7 @@ function jsonResponse(payload) {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  window.history.replaceState({}, '', '/')
 })
 
 describe('小说获取工作台行为', () => {
@@ -109,5 +110,26 @@ describe('小说获取工作台行为', () => {
     ).toBe(false)
     expect(await screen.findByText('成功小说')).toBeTruthy()
     expect(await screen.findByText('121 upstream error')).toBeTruthy()
+  }, 15000)
+
+  it('批量工厂列表从 API 展示项目名称', async () => {
+    window.history.replaceState({}, '', '/batch-factory')
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          projects: [
+            { id: 52, intakeId: 12, name: '点众批次' },
+            { id: 51, intakeId: 11, name: '知乎批次' },
+          ],
+        }),
+      )
+
+    render(<IntakeWorkbench />)
+
+    expect(await screen.findByText('知乎批次')).toBeTruthy()
+    expect(screen.getByText('点众批次')).toBeTruthy()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/v1/batch-projects')
   }, 15000)
 })
