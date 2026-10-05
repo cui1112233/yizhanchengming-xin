@@ -23,7 +23,7 @@ func projectID(r *http.Request) (int64, error) { return strconv.ParseInt(r.PathV
 func (h handler) getUnifiedSettings(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
 	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
-	current, err := h.deps.UnifiedSettings.GetCurrent(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	current, err := h.deps.UnifiedSettings.GetCurrent(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, "读取统一设置失败"); return }
 	writeJSON(w, http.StatusOK, current)
 }
 
@@ -36,20 +36,23 @@ func decodeMap(r *http.Request) (map[string]any, error) {
 func (h handler) saveProductionSettings(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
 	value, err := decodeMap(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid production settings"); return }
-	current, err := h.deps.UnifiedSettings.SaveProduction(r.Context(), id, value); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
+	current, err := h.deps.UnifiedSettings.SaveProduction(r.Context(), id, value); if err != nil { writeError(w, http.StatusInternalServerError, "保存生产设置失败"); return }
 	writeJSON(w, http.StatusOK, current)
 }
 
 func (h handler) savePublishingSettings(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
 	value, err := decodeMap(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid publishing settings"); return }
-	current, err := h.deps.UnifiedSettings.SavePublishing(r.Context(), id, value); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
+	current, err := h.deps.UnifiedSettings.SavePublishing(r.Context(), id, value); if err != nil { writeError(w, http.StatusInternalServerError, "保存发布设置失败"); return }
 	writeJSON(w, http.StatusOK, current)
 }
 
 func (h handler) getVersionProfile(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
-	current, err := h.deps.UnifiedSettings.GetCurrent(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
+	current, err := h.deps.UnifiedSettings.GetCurrent(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, "读取版本配置档失败"); return }
 	writeJSON(w, http.StatusOK, map[string]any{"projectId": id, "profile": current.Profile})
 }
 
@@ -57,18 +60,21 @@ func (h handler) saveVersionProfile(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
 	var profile unifiedsettings.VersionProfile
 	if err := json.NewDecoder(r.Body).Decode(&profile); err != nil { writeError(w, http.StatusBadRequest, "invalid version profile"); return }
-	current, err := h.deps.UnifiedSettings.SaveProfile(r.Context(), id, profile); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
+	current, err := h.deps.UnifiedSettings.SaveProfile(r.Context(), id, profile); if err != nil { writeError(w, http.StatusInternalServerError, "保存版本配置档失败"); return }
 	writeJSON(w, http.StatusOK, current)
 }
 
 func (h handler) sync121Settings(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
-	current, err := h.deps.UnifiedSettings.Sync121(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
+	current, err := h.deps.UnifiedSettings.Sync121(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, "同步 121 配置失败"); return }
 	writeJSON(w, http.StatusOK, current)
 }
 
 func (h handler) syncStyleTypes(w http.ResponseWriter, r *http.Request) {
 	id, err := projectID(r); if err != nil { writeError(w, http.StatusBadRequest, "invalid batch project id"); return }
-	current, err := h.deps.UnifiedSettings.SyncStyleTypes(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, err.Error()); return }
+	if h.deps.UnifiedSettings == nil { writeError(w, http.StatusServiceUnavailable, "unified settings unavailable"); return }
+	current, err := h.deps.UnifiedSettings.SyncStyleTypes(r.Context(), id); if err != nil { writeError(w, http.StatusInternalServerError, "同步风格类型失败"); return }
 	writeJSON(w, http.StatusOK, current)
 }
