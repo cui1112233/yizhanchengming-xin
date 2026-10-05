@@ -52,7 +52,7 @@ func TestMySQLRestartRecoveryIntegration(t *testing.T) {
 	job, created, err := store1.CreateOrGetProductionJob(ctx, ProductionJob{BatchProjectID: projectID, BookID: bookID, Status: JobRunning, InputRevision: "rev-restart", FinalPromptStageRunID: stageRunID, FinalPromptVersion: 1, FinalPromptText: "compiled prompt", Provider: ProviderPersonalAPI, Model: ModelYD20Mini, IdempotencyKey: "restart-contract-integration"})
 	if err != nil { t.Fatal(err) }
 	if !created { t.Fatal("expected a new production job") }
-	task, err := store1.CreateProductionTask(ctx, ProductionTask{ProductionJobID: job.ID, Attempt: 1, Provider: ProviderPersonalAPI, Model: ModelYD20Mini, ProviderJobID: "remote-restart", Status: TaskRunning})
+	task, err := store1.CreateProductionTask(ctx, ProductionTask{ProductionJobID: job.ID, Attempt: 1, Provider: ProviderPersonalAPI, Model: ModelYD20Mini, ProviderJobID: "remote-restart", Status: TaskRunning, OutputURL: "https://tos.example/segment.mp4"})
 	if err != nil { t.Fatal(err) }
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
@@ -70,6 +70,14 @@ func TestMySQLRestartRecoveryIntegration(t *testing.T) {
 	}
 	if err := store1.CreateLocalExecutorTask(ctx, localTask); err != nil { t.Fatal(err) }
 
+	mergeJob, err := store1.CreateMergeJob(ctx, MergeJob{BatchProjectID: projectID, BookID: bookID, Status: MergeQueued, CurrentAttempt: 1, CreatedAt: now, UpdatedAt: now})
+	if err != nil { t.Fatal(err) }
+	mergeAttempt, err := store1.CreateMergeAttempt(ctx, MergeAttempt{
+		MergeJobID: mergeJob.ID, Attempt: 1, Status: MergeQueued, AspectRatio: "9:16", Speed: 1,
+		Inputs: []MergeInputAsset{{ProductionTaskID: task.ID, URL: "https://tos.example/segment.mp4", Order: 1}}, CreatedAt: now, UpdatedAt: now,
+	})
+	if err != nil { t.Fatal(err) }
+
 	store2 := NewMySQLStore(db)
 	recoveredExecutor, err := store2.GetLocalExecutorByTokenHash(ctx, tokenHash)
 	if err != nil { t.Fatal(err) }
@@ -80,6 +88,11 @@ func TestMySQLRestartRecoveryIntegration(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if recoveredLocalTask.ID != localTask.ID || recoveredLocalTask.Status != TaskQueued || recoveredLocalTask.Prompt != localTask.Prompt {
 		t.Fatalf("new store instance did not recover local task: %+v", recoveredLocalTask)
+	}
+	recoveredMerge, err := store2.GetMergeAttempt(ctx, mergeAttempt.ID)
+	if err != nil { t.Fatal(err) }
+	if recoveredMerge.MergeJobID != mergeJob.ID || recoveredMerge.Status != MergeQueued || len(recoveredMerge.Inputs) != 1 || recoveredMerge.Inputs[0].ProductionTaskID != task.ID {
+		t.Fatalf("new store instance did not recover merge attempt: %+v", recoveredMerge)
 	}
 
 	recoverable, err := store2.ListRecoverableTasks(ctx, 100)
