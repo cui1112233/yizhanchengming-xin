@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { message } from 'antd'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
 
@@ -20,7 +21,10 @@ beforeAll(() => {
   })
 })
 
-afterEach(() => cleanup())
+afterEach(() => {
+  message.destroy()
+  cleanup()
+})
 
 function createPersistentApi() {
   let project = {

@@ -6,9 +6,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/app"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/provider121"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -25,10 +27,25 @@ func main() {
 	}
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := db.PingContext(pingCtx); err != nil {
+		pingCancel()
 		log.Fatalf("ping mysql: %v", err)
+	}
+	pingCancel()
+
+	bootstrapCtx, bootstrapCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	created, err := authn.NewMySQLStore(db).EnsureInitialAdmin(
+		bootstrapCtx,
+		strings.TrimSpace(os.Getenv("QIANTIE_BOOTSTRAP_ADMIN_USERNAME")),
+		os.Getenv("QIANTIE_BOOTSTRAP_ADMIN_PASSWORD"),
+	)
+	bootstrapCancel()
+	if err != nil {
+		log.Fatalf("initialize auth administrator: %v", err)
+	}
+	if created {
+		log.Printf("initial auth administrator created; remove QIANTIE_BOOTSTRAP_ADMIN_PASSWORD from the runtime environment after first startup")
 	}
 
 	fetcher, err := provider121.NewClient(provider121.Config{})
