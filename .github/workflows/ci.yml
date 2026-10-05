@@ -107,7 +107,7 @@ jobs:
       - name: Apply clean Task9 migrations
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9?parseTime=true&multiStatements=true' up
       - name: Run real Redis and MySQL runtime integration
-        run: go test ./internal/taskruntime ./internal/task9runtime -count=1
+        run: go test -p=1 ./internal/taskruntime ./internal/task9runtime -count=1
       - name: Verify historical Task12 book_runs migrate to 00008
         shell: bash
         run: |
