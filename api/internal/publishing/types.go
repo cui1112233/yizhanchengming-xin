@@ -24,20 +24,20 @@ type CredentialInput struct {
 }
 
 type CredentialRef struct {
-	ID        string
-	Platform  string
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        string    `json:"-"`
+	Platform  string    `json:"-"`
+	Name      string    `json:"-"`
+	CreatedAt time.Time `json:"-"`
+	UpdatedAt time.Time `json:"-"`
 }
 
 type EncryptedCredential struct {
-	Ref         CredentialRef
-	OwnerUserID int64
-	TeamID      int64
-	KeyID       string
-	Nonce       []byte
-	Ciphertext  []byte
+	Ref         CredentialRef `json:"-"`
+	OwnerUserID int64         `json:"-"`
+	TeamID      int64         `json:"-"`
+	KeyID       string        `json:"-"`
+	Nonce       []byte        `json:"-"`
+	Ciphertext  []byte        `json:"-"`
 }
 
 type Account struct {
