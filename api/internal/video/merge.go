@@ -21,6 +21,7 @@ const (
 
 var (
 	ErrMergeRetryNotAllowed = errors.New("video: merge retry not allowed")
+	ErrMergeInputNotReady   = errors.New("video: merge input video is not ready")
 	ErrMergeTimeout         = errors.New("video: merge execution timed out")
 	ErrFFmpegUnavailable    = errors.New("video: ffmpeg unavailable")
 )
@@ -66,6 +67,14 @@ type MergeStartRequest struct {
 	Speed          float64           `json:"speed"`
 }
 
+type MergeProductionStartRequest struct {
+	BatchProjectID    int64   `json:"batchProjectId"`
+	BookID            int64   `json:"bookId"`
+	ProductionTaskIDs []int64 `json:"productionTaskIds"`
+	AspectRatio       string  `json:"aspectRatio"`
+	Speed             float64 `json:"speed"`
+}
+
 type MergeResult struct {
 	Job     MergeJob     `json:"job"`
 	Attempt MergeAttempt `json:"attempt"`
@@ -93,6 +102,10 @@ type MergeStore interface {
 	ListMergeAttempts(context.Context, int64) ([]MergeAttempt, error)
 }
 
+type MergeInputResolver interface {
+	ResolveSucceededMergeInputs(context.Context, int64, int64, []int64) ([]MergeInputAsset, error)
+}
+
 // MergeWorkCoordinator is only the domain consumption boundary for the future
 // Task 9.4 shared queue/lease runtime. Task 14 intentionally provides no Redis,
 // scheduler, or global queue implementation.
@@ -111,6 +124,30 @@ type MergeService struct {
 
 func NewMergeService(store MergeStore, executor MergeExecutor) *MergeService {
 	return &MergeService{store: store, executor: executor, now: time.Now}
+}
+
+func (s *MergeService) StartFromProductionTasks(ctx context.Context, req MergeProductionStartRequest) (MergeResult, error) {
+	if s == nil || s.store == nil {
+		return MergeResult{}, providerError(ErrorProviderUnavailable, "merge store unavailable", nil)
+	}
+	resolver, ok := s.store.(MergeInputResolver)
+	if !ok {
+		return MergeResult{}, providerError(ErrorProviderUnavailable, "merge input resolver unavailable", nil)
+	}
+	if req.BatchProjectID <= 0 || req.BookID <= 0 || len(req.ProductionTaskIDs) == 0 {
+		return MergeResult{}, fmt.Errorf("video: merge project, book and production tasks are required")
+	}
+	inputs, err := resolver.ResolveSucceededMergeInputs(ctx, req.BatchProjectID, req.BookID, req.ProductionTaskIDs)
+	if err != nil {
+		return MergeResult{}, err
+	}
+	return s.Start(ctx, MergeStartRequest{
+		BatchProjectID: req.BatchProjectID,
+		BookID: req.BookID,
+		Inputs: inputs,
+		AspectRatio: req.AspectRatio,
+		Speed: req.Speed,
+	})
 }
 
 func (s *MergeService) Start(ctx context.Context, req MergeStartRequest) (MergeResult, error) {
@@ -140,6 +177,21 @@ func (s *MergeService) Start(ctx context.Context, req MergeStartRequest) (MergeR
 		return MergeResult{Job: job}, err
 	}
 	return MergeResult{Job: job, Attempt: attempt}, nil
+}
+
+func (s *MergeService) Get(ctx context.Context, jobID int64) (MergeJob, []MergeAttempt, error) {
+	if s == nil || s.store == nil || jobID <= 0 {
+		return MergeJob{}, nil, ErrNotFound
+	}
+	job, err := s.store.GetMergeJob(ctx, jobID)
+	if err != nil {
+		return MergeJob{}, nil, err
+	}
+	attempts, err := s.store.ListMergeAttempts(ctx, jobID)
+	if err != nil {
+		return MergeJob{}, nil, err
+	}
+	return job, attempts, nil
 }
 
 func (s *MergeService) RetryAttempt(ctx context.Context, attemptID int64) (MergeResult, error) {
