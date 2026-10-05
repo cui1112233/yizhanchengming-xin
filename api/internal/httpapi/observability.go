@@ -275,7 +275,7 @@ func (h handler) diagnostics(w http.ResponseWriter, r *http.Request) {
 			}
 			result.Providers = append(result.Providers, providerDiagnosticsDTO{
 				Provider: view.ProviderKey, Model: view.Model, Configured: view.Configured, Enabled: view.Enabled,
-				Status: string(view.Status), LatestSafeError: observability.SanitizeString(view.Message),
+				Status: string(view.Status), LatestSafeError: safeProviderDiagnosticError(view.Status, view.Message),
 				RecentFailureCount: h.recentProviderFailures(r.Context(), view.ProviderKey, view.Model, now.Add(-time.Hour)),
 			})
 		}
@@ -299,6 +299,22 @@ func (h handler) diagnostics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+func safeProviderDiagnosticError(status video.ProviderAvailability, message string) string {
+	if strings.TrimSpace(message) == "" {
+		return ""
+	}
+	switch status {
+	case video.ProviderStatusAuthFailed:
+		return "provider authentication failed"
+	case video.ProviderStatusUnconfigured:
+		return "provider unconfigured"
+	case video.ProviderStatusUnavailable:
+		return "provider unavailable"
+	default:
+		return "provider diagnostic detail withheld"
+	}
 }
 
 func (h handler) recentProviderFailures(ctx context.Context, provider, model string, since time.Time) int64 {
