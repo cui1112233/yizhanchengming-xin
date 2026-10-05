@@ -47,8 +47,8 @@ type Options struct {
 }
 
 type Credentials struct {
-	AccessToken  string
-	RefreshToken string
+	AccessToken  string `json:"-"`
+	RefreshToken string `json:"-"`
 }
 
 type Manager struct {
