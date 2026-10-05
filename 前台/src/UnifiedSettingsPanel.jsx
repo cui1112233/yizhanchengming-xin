@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Alert, Button, Card, Drawer, Form, Input, InputNumber, Select, Space, Switch, Tabs, Tag, message } from 'antd'
 import * as defaultApi from './api.js'
 
@@ -15,7 +15,7 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
 
   const projectId = project?.id
   const reload = async () => {
-    if (!projectId) return
+    if (!projectId) return null
     const value = await api.getUnifiedSettings(projectId)
     setCurrent(value)
     productionForm.setFieldsValue(asObject(value?.project?.production))
@@ -26,19 +26,32 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
       processingRulePromptRef: value?.profile?.settings?.processingRulePromptRef || '',
       knowledgePromptRef: value?.profile?.settings?.knowledgePromptRef || '',
     })
+    return value
   }
 
-  useEffect(() => { void reload().catch(() => {}) }, [projectId])
+  const openDrawer = async (kind) => {
+    setOpen(kind)
+    setLoading(true)
+    try {
+      await reload()
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '读取统一设置失败')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const save = async (kind) => {
     setLoading(true)
     try {
       if (kind === 'production') {
         const saved = await api.saveProductionSettings(projectId, await productionForm.validateFields())
-        setCurrent(saved); message.success('生产统一设置已保存')
+        setCurrent(saved)
+        message.success('生产统一设置已保存')
       } else if (kind === 'publishing') {
         const saved = await api.savePublishingSettings(projectId, await publishingForm.validateFields())
-        setCurrent(saved); message.success('发布统一设置已保存')
+        setCurrent(saved)
+        message.success('发布统一设置已保存')
       } else {
         const values = await profileForm.validateFields()
         const saved = await api.saveVersionProfile(projectId, {
@@ -50,10 +63,16 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
             knowledgePromptRef: values.knowledgePromptRef || '',
           },
         })
-        setCurrent(saved); message.success('版本对应配置档已保存')
+        setCurrent(saved)
+        message.success('版本对应配置档已保存')
       }
       setOpen('')
-    } finally { setLoading(false) }
+    } catch (error) {
+      if (error?.errorFields) return
+      message.error(error instanceof Error ? error.message : '保存统一设置失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const sync = async (type) => {
@@ -61,8 +80,18 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
     try {
       const saved = type === '121' ? await api.sync121Config(projectId) : await api.syncStyleTypes(projectId)
       setCurrent(saved)
+      profileForm.setFieldsValue({
+        name: saved?.profile?.name || '默认版本配置档',
+        version: saved?.profile?.version || 'v1',
+        processingRulePromptRef: saved?.profile?.settings?.processingRulePromptRef || '',
+        knowledgePromptRef: saved?.profile?.settings?.knowledgePromptRef || '',
+      })
       message.success(type === '121' ? '121 网站配置已同步' : '批量风格类型已同步')
-    } finally { setLoading(false) }
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '同步失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const styleTags = useMemo(() => {
@@ -72,9 +101,9 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
 
   return <>
     <Space wrap>
-      <Button onClick={() => setOpen('production')}>生产统一设置</Button>
-      <Button onClick={() => setOpen('publishing')}>发布统一设置</Button>
-      <Button type="primary" onClick={() => setOpen('profile')}>版本对应配置档</Button>
+      <Button onClick={() => void openDrawer('production')}>生产统一设置</Button>
+      <Button onClick={() => void openDrawer('publishing')}>发布统一设置</Button>
+      <Button type="primary" onClick={() => void openDrawer('profile')}>版本对应配置档</Button>
     </Space>
 
     <Drawer title="生产统一设置" width={drawerWidth} open={open === 'production'} onClose={() => setOpen('')} destroyOnClose={false}
@@ -84,7 +113,7 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
         <Card size="small" title="生产参数">
           <Form.Item name="productionMode" label="生产方式"><Select allowClear placeholder="继承版本/系统" options={[{ value: 'original', label: '原文直转' }, { value: 'viral', label: '爆款开头' }]} /></Form.Item>
           <Form.Item name="aiCopyEnabled" label="AI 文案处理" valuePropName="checked"><Switch /></Form.Item>
-          <Form.Item noStyle shouldUpdate={(a,b) => a.aiCopyEnabled !== b.aiCopyEnabled}>{({ getFieldValue }) => getFieldValue('aiCopyEnabled') ? <Form.Item name="aiCopyCount" label="AI 文案数量"><InputNumber min={1} max={20} precision={0} style={{ width: '100%' }} /></Form.Item> : null}</Form.Item>
+          <Form.Item noStyle shouldUpdate={(a, b) => a.aiCopyEnabled !== b.aiCopyEnabled}>{({ getFieldValue }) => getFieldValue('aiCopyEnabled') ? <Form.Item name="aiCopyCount" label="AI 文案数量"><InputNumber min={1} max={20} precision={0} style={{ width: '100%' }} /></Form.Item> : null}</Form.Item>
           <Alert type="warning" showIcon message="AI 文案唯一控制位置" description="数量只在生产统一设置中配置；不再提供重复的‘默认数量/处理优先方案’入口。" />
         </Card>
       </Form>
@@ -114,7 +143,7 @@ export default function UnifiedSettingsPanel({ project, api = defaultApi }) {
         { key: 'sync', label: '同步', children: <Space direction="vertical" size={16} style={{ width: '100%' }}>
           <Alert type="info" showIcon message="同步只更新当前版本配置档快照" description="同步来源是服务端当前项目数据；前端不会自行推断 121 或风格配置。" />
           <Card size="small" title="121 网站配置"><Button loading={loading} onClick={() => void sync('121')}>同步 121 网站配置</Button></Card>
-          <Card size="small" title="批量风格 / 类型"><Space direction="vertical"><Button loading={loading} onClick={() => void sync('style')}>同步批量风格类型</Button><Space wrap>{styleTags.map(tag => <Tag key={tag}>{tag}</Tag>)}</Space></Space></Card>
+          <Card size="small" title="批量风格 / 类型"><Space direction="vertical"><Button loading={loading} onClick={() => void sync('style')}>同步批量风格类型</Button><Space wrap>{styleTags.map((tag) => <Tag key={tag}>{tag}</Tag>)}</Space></Space></Card>
         </Space> },
       ]} />
     </Drawer>
