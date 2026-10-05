@@ -21,6 +21,38 @@ jobs:
       - run: go test ./...
       - run: go build ./...
 
+  goose-migration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: task10
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Install Goose compatible with Go 1.23
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
+      - name: Apply Goose migrations
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
+      - name: Verify Goose status
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status
+      - name: Verify Goose rollback
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
+
   admin-build:
     runs-on: ubuntu-latest
     defaults:
