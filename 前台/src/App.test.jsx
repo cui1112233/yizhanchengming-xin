@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import IntakeWorkbench, { parseBookIds } from './App.jsx'
 
@@ -41,6 +41,7 @@ function addStore(source, platformId, ids) {
 }
 
 afterEach(() => {
+  cleanup()
   vi.restoreAllMocks()
   window.history.replaceState({}, '', '/')
 })
