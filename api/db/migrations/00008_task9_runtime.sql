@@ -42,6 +42,13 @@ ALTER TABLE book_runs
     DROP COLUMN attempt,
     DROP COLUMN run_id;
 
+-- MySQL may choose uq_runs_project_idempotency as the supporting index for
+-- the pre-existing fk_runs_batch_project constraint and discard the older
+-- implicit FK index. Recreate the FK after removing the Task 9 index so the
+-- pre-Task9 schema remains rollback-safe.
+ALTER TABLE runs
+    DROP FOREIGN KEY fk_runs_batch_project;
+
 ALTER TABLE runs
     DROP INDEX uq_runs_project_idempotency,
     DROP INDEX idx_runs_status_run_at,
@@ -51,3 +58,6 @@ ALTER TABLE runs
     DROP COLUMN error_code,
     DROP COLUMN max_attempts,
     DROP COLUMN idempotency_key;
+
+ALTER TABLE runs
+    ADD CONSTRAINT fk_runs_batch_project FOREIGN KEY (batch_project_id) REFERENCES batch_projects(id) ON DELETE CASCADE;
