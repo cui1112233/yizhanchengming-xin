@@ -23,15 +23,21 @@ type BatchProjectReader interface {
 	ListBatchProjects(ctx context.Context) ([]intake.BatchProject, error)
 }
 
+type BatchProjectDetailReader interface {
+	GetBatchProject(ctx context.Context, id int64) (intake.BatchProject, error)
+	ListBooks(ctx context.Context, intakeID int64) ([]intake.Book, error)
+}
+
 type PipelineService interface {
 	Create(ctx context.Context, request pipeline.CreateRequest) (pipeline.CreateResult, error)
 }
 
 type Dependencies struct {
-	Intakes       IntakeService
-	Reader        IntakeReader
-	BatchProjects BatchProjectReader
-	Pipeline      PipelineService
+	Intakes             IntakeService
+	Reader              IntakeReader
+	BatchProjects       BatchProjectReader
+	BatchProjectDetails BatchProjectDetailReader
+	Pipeline            PipelineService
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -51,6 +57,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/intakes/{id}/books", api.listBooks)
 	mux.HandleFunc("POST /api/v1/intakes/{id}/batch-projects", api.createBatchProject)
 	mux.HandleFunc("GET /api/v1/batch-projects", api.listBatchProjects)
+	mux.HandleFunc("GET /api/v1/batch-projects/{id}", api.getBatchProject)
 	return mux
 }
 
