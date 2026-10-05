@@ -47,7 +47,7 @@
 - ⚠️ Task 12：剧本生成 / Director / Hook / 最终提示词（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - ⚠️ Task 13：音频 + matchAudio 分镜（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 14：视频生成完整链路
-- [ ] Task 15：发布 / 权限 / 登录认证兼容
+- ⚠️ Task 15：发布 / 权限 / 登录认证兼容（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 16：ECS 新仓库部署与公网全流程验收
 
 ---
@@ -319,17 +319,19 @@
 
 # Task 15：发布 / 权限 / 登录认证
 
-- [ ] 15.1 登录 Token 体系统一
-- [ ] 15.2 Token 刷新
-- [ ] 15.3 修复“当前登录状态已过期”闪退
-- [ ] 15.4 API 白名单梳理
-- [ ] 15.5 `/api/script-constraint-prompts` 权限兼容
-- [ ] 15.6 发布权限验证
-- [ ] 15.7 用户权限
-- [ ] 15.8 团队权限
-- [ ] 15.9 发布任务状态
-- [ ] 15.10 权限失败不影响其他任务
-- [ ] 15.11 测试 + CI + 合并 main
+- [x] 15.1 登录 Token 体系统一
+- [x] 15.2 Token 刷新
+- [x] 15.3 修复“当前登录状态已过期”闪退
+- [x] 15.4 API 白名单梳理
+- [x] 15.5 `/api/script-constraint-prompts` 权限兼容
+- [x] 15.6 发布权限验证
+- [x] 15.7 用户权限
+- [x] 15.8 团队权限
+- [x] 15.9 发布任务状态
+- [x] 15.10 权限失败不影响其他任务
+- [x] 15.11 测试 + CI + 合并 main
+
+> 仓库阶段验收依据：PR #20 已合并到 `main`，合并提交 `2cee78c48a44ae4471c75261542a52f5bd98843b`；合并后的 `main` CI run `37303943125` 中 Go tests/build、前台 tests/build、管理端 build、Goose Up/status/rollback、Publishing 真实事务 rollback/retry 与 Task10 audit 全绿。Auth/Publishing 仓库代码阶段完成，但公网真实登录、Token/session 恢复、发布和权限仍需 Task 16 的 16.2.20、16.2.21、16.2.23 在 ECS/浏览器环境验收，因此 Task 15 总体保持 `⚠️`。
 
 ---
 
