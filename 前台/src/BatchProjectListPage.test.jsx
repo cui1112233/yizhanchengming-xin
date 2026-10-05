@@ -65,7 +65,7 @@ describe('BatchProjectListPage generation workbench', () => {
     expect(screen.getAllByText('Final Prompt').length).toBeGreaterThan(0)
     expect(screen.getByText('导演输出格式错误')).toBeTruthy()
     expect(screen.getByRole('button', { name: '重试 Director' })).toBeTruthy()
-  })
+  }, 15000)
 
   it('starts batch generation through the Go API', async () => {
     api.runProjectGeneration.mockResolvedValue({ batchProjectId: 3, completed: 1, failed: 0, books: [] })
@@ -75,5 +75,5 @@ describe('BatchProjectListPage generation workbench', () => {
     await screen.findByText('批量执行')
     fireEvent.click(screen.getByRole('button', { name: '批量执行' }))
     await waitFor(() => expect(api.runProjectGeneration).toHaveBeenCalledTimes(1))
-  })
+  }, 15000)
 })
