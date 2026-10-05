@@ -55,8 +55,6 @@ func (c *QueueCoordinator) Enqueue(ctx context.Context,item WorkItem)error{retur
 type Worker struct { store Store; leases taskruntime.LeaseStore; executor Executor; owner string; leaseTTL time.Duration; now func() time.Time }
 func NewWorker(store Store, leases taskruntime.LeaseStore, executor Executor, owner string, leaseTTL time.Duration, now func() time.Time) *Worker { if now==nil{now=time.Now};return &Worker{store:store,leases:leases,executor:executor,owner:owner,leaseTTL:leaseTTL,now:now} }
 
-// Process is the direct execution seam used by unit tests and internal callers.
-// Claim is always the MySQL authorization gate; Redis never grants execution.
 func (w *Worker) Process(ctx context.Context, item WorkItem) error {
 	execution, ok, err := w.store.Claim(ctx, item, w.owner, w.now().Add(w.leaseTTL)); if err != nil || !ok { return err }
 	if err := w.executor.Execute(ctx, execution); err != nil { code,message:=SafeError(err);_,failErr:=w.store.Fail(ctx,execution,Failure{Code:code,Message:message,Retryable:retryableError(err)});return failErr }
@@ -99,9 +97,8 @@ func (w *Worker) Run(ctx context.Context,q taskruntime.Queue,poll time.Duration)
 }
 
 func AggregateRunStatus(states []BookState) RunState { if len(states)==0{return RunPending};succeeded,failed:=0,0;for _,state:=range states{switch state{case BookPending,BookQueued,BookRunning,BookRetryableFailed:return RunRunning;case BookSucceeded:succeeded++;case BookFailed:failed++}};if succeeded==len(states){return RunSucceeded};if failed==len(states){return RunFailed};if succeeded>0&&failed>0{return RunPartialFailed};return RunRunning }
-
 func SafeError(err error)(string,string){if err==nil{return "",""};message:=err.Error();lower:=strings.ToLower(message);for _,marker:=range []string{"authorization","bearer ","password","cookie","access_token","refresh_token","api key","apikey","secret","dsn=","@tcp("}{if strings.Contains(lower,marker){return "internal_error","internal provider error"}};if len(message)>1024{message=message[:1024]};return "execution_error",message}
-func PlanRetry(attempts []BookAttempt,maxAttempts int)[]WorkItem{latest:=map[int64]BookAttempt{};for _,a:=range attempts{if prev,ok:=latest[a.BookID];!ok||a.Attempt>prev.Attempt{latest[a.BookID]=a}};out:=make([]WorkItem,0);for _,a:=range latest{if a.State==BookFailed&&a.Attempt<maxAttempts{out=append(out,WorkItem{BookRunID:a.BookRunID,BookID:a.BookID,Attempt:a.Attempt+1})}};return out}
+func PlanRetry(attempts []BookAttempt,maxAttempts int)[]WorkItem{latest:=map[int64]BookAttempt{};for _,a:=range attempts{if prev,ok:=latest[a.BookID];!ok||a.Attempt>prev.Attempt{latest[a.BookID]=a}};out:=make([]WorkItem,0);for _,a:=range latest{if a.State==BookFailed&&a.Retryable&&a.Attempt<maxAttempts{out=append(out,WorkItem{BookRunID:a.BookRunID,BookID:a.BookID,Attempt:a.Attempt+1})}};return out}
 func ShouldRetry(a BookAttempt,maxAttempts int)bool{return a.State==BookFailed&&a.Retryable&&a.Attempt<maxAttempts}
 func PlanRecovery(candidates []RecoveryCandidate,now time.Time)[]WorkItem{out:=make([]WorkItem,0);for _,c:=range candidates{if c.LeaseDeadline.IsZero()||!c.LeaseDeadline.Before(now)||c.Attempt>=c.MaxAttempts||!c.Retryable{continue};out=append(out,WorkItem{BookRunID:c.BookRunID,BookID:c.BookID,Attempt:c.Attempt+1})};return out}
 
