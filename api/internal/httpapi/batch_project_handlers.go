@@ -14,7 +14,16 @@ func (h handler) listBatchProjects(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := make([]projectResponse, 0, len(projects))
 	for _, project := range projects {
-		rows = append(rows, projectResponse{ID: project.ID, IntakeID: project.IntakeID, Name: project.Name})
+		rows = append(rows, projectResponse{
+			ID:        project.ID,
+			IntakeID:  project.IntakeID,
+			Name:      project.Name,
+			Sources:   project.Sources,
+			BookCount: project.BookCount,
+			Genders:   project.Genders,
+			Styles:    project.Styles,
+			RunStatus: project.RunStatus,
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"projects": rows})
 }
