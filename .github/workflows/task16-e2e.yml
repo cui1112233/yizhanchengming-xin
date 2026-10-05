@@ -21,8 +21,42 @@ on:
         required: false
         default: false
         type: boolean
+      real_video_provider:
+        description: 'Also run opt-in paid/real VIDEO provider smoke'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
+  go-regression:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.public_smoke }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - run: go test ./...
+      - run: go build ./...
+
+  frontend-regression:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.public_smoke }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: '前台'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+
   local-e2e:
     if: ${{ github.event_name != 'workflow_dispatch' || !inputs.public_smoke }}
     runs-on: ubuntu-latest
@@ -59,6 +93,7 @@ jobs:
       E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_REAL_121: ${{ inputs.real_121 && '1' || '0' }}
+      E2E_REAL_VIDEO_PROVIDER: ${{ inputs.real_video_provider && '1' || '0' }}
       E2E_121_BOOK_ID: ${{ secrets.E2E_121_BOOK_ID }}
       E2E_121_SOURCE: ${{ secrets.E2E_121_SOURCE }}
       E2E_121_PLATFORM_ID: ${{ secrets.E2E_121_PLATFORM_ID }}
