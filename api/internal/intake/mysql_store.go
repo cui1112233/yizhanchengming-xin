@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 type MySQLStore struct {
@@ -154,7 +155,7 @@ func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProjec
 }
 
 func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, error) {
-	const query = "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects ORDER BY id DESC LIMIT 100"
+	const query = "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(b.source, '') ORDER BY b.source SEPARATOR ','), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.id DESC LIMIT 100"
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("list batch projects: %w", err)
@@ -164,8 +165,16 @@ func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, err
 	projects := make([]BatchProject, 0)
 	for rows.Next() {
 		var project BatchProject
-		if err := rows.Scan(&project.ID, &project.IntakeID, &project.Name, &project.CreatedAt, &project.UpdatedAt); err != nil {
+		var sources string
+		if err := rows.Scan(&project.ID, &project.IntakeID, &project.Name, &sources, &project.CreatedAt, &project.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan batch project: %w", err)
+		}
+		if sources != "" {
+			for _, source := range strings.Split(sources, ",") {
+				if source = strings.TrimSpace(source); source != "" {
+					project.Sources = append(project.Sources, source)
+				}
+			}
 		}
 		projects = append(projects, project)
 	}
