@@ -1,0 +1,154 @@
+package publishing
+
+import (
+	"errors"
+	"strings"
+	"time"
+)
+
+var (
+	ErrInvalid     = errors.New("invalid publishing input")
+	ErrForbidden   = errors.New("publishing access forbidden")
+	ErrNotFound    = errors.New("publishing resource not found")
+	ErrUnavailable = errors.New("publishing service unavailable")
+)
+
+const (
+	IntentStatusPending = "pending"
+	AuditResultAccepted = "accepted"
+)
+
+type CredentialInput struct {
+	Name   string `json:"name"`
+	Secret string `json:"secret"`
+}
+
+type CredentialRef struct {
+	ID        string    `json:"-"`
+	Platform  string    `json:"-"`
+	Name      string    `json:"-"`
+	CreatedAt time.Time `json:"-"`
+	UpdatedAt time.Time `json:"-"`
+}
+
+type EncryptedCredential struct {
+	Ref         CredentialRef `json:"-"`
+	OwnerUserID int64         `json:"-"`
+	TeamID      int64         `json:"-"`
+	KeyID       string        `json:"-"`
+	Nonce       []byte        `json:"-"`
+	Ciphertext  []byte        `json:"-"`
+}
+
+type Account struct {
+	ID              int64     `json:"id"`
+	OwnerUserID     int64     `json:"-"`
+	TeamID          int64     `json:"-"`
+	Platform        string    `json:"platform"`
+	DisplayName     string    `json:"displayName"`
+	CredentialRefID string    `json:"-"`
+	Active          bool      `json:"active"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
+}
+
+type PublicAccount struct {
+	ID                   int64     `json:"id"`
+	Platform             string    `json:"platform"`
+	DisplayName          string    `json:"displayName"`
+	CredentialConfigured bool      `json:"credentialConfigured"`
+	Active               bool      `json:"active"`
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+}
+
+func (a Account) Public() PublicAccount {
+	return PublicAccount{ID: a.ID, Platform: a.Platform, DisplayName: a.DisplayName, CredentialConfigured: a.CredentialRefID != "", Active: a.Active, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt}
+}
+
+type CreateAccountInput struct {
+	Platform    string          `json:"platform"`
+	DisplayName string          `json:"displayName"`
+	Credential  CredentialInput `json:"credential"`
+}
+
+type Intent struct {
+	ID                  int64     `json:"id"`
+	BatchProjectID      int64     `json:"batchProjectId"`
+	BookID              int64     `json:"bookId,omitempty"`
+	PublishingAccountID int64     `json:"publishingAccountId"`
+	RequestedByUserID   int64     `json:"requestedByUserId"`
+	Platform            string    `json:"platform"`
+	Status              string    `json:"status"`
+	RequestedAt         time.Time `json:"requestedAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
+}
+
+type CreateIntentInput struct {
+	BatchProjectID      int64 `json:"batchProjectId"`
+	BookID              int64 `json:"bookId,omitempty"`
+	PublishingAccountID int64 `json:"publishingAccountId"`
+}
+
+type Audit struct {
+	ID             int64     `json:"id"`
+	IntentID       int64     `json:"intentId"`
+	BatchProjectID int64     `json:"batchProjectId"`
+	AccountID      int64     `json:"publishingAccountId"`
+	ActorUserID    int64     `json:"actorUserId"`
+	Platform       string    `json:"platform"`
+	Action         string    `json:"action"`
+	Result         string    `json:"result"`
+	ErrorSummary   string    `json:"-"`
+	CreatedAt      time.Time `json:"createdAt"`
+}
+
+type PublicAudit struct {
+	ID             int64     `json:"id"`
+	IntentID       int64     `json:"intentId"`
+	BatchProjectID int64     `json:"batchProjectId"`
+	AccountID      int64     `json:"publishingAccountId"`
+	ActorUserID    int64     `json:"actorUserId"`
+	Platform       string    `json:"platform"`
+	Action         string    `json:"action"`
+	Result         string    `json:"result"`
+	ErrorSummary   string    `json:"errorSummary,omitempty"`
+	CreatedAt      time.Time `json:"createdAt"`
+}
+
+func (a Audit) Public() PublicAudit {
+	return PublicAudit{
+		ID: a.ID,
+		IntentID: a.IntentID,
+		BatchProjectID: a.BatchProjectID,
+		AccountID: a.AccountID,
+		ActorUserID: a.ActorUserID,
+		Platform: a.Platform,
+		Action: a.Action,
+		Result: a.Result,
+		ErrorSummary: sanitizeAuditErrorSummary(a.ErrorSummary),
+		CreatedAt: a.CreatedAt,
+	}
+}
+
+func sanitizeAuditErrorSummary(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	lower := strings.ToLower(value)
+	for _, marker := range []string{
+		"password", "passwd", "token", "authorization", "bearer", "cookie",
+		"api key", "api_key", "apikey", "secret", "ciphertext", "nonce",
+		"master key", "refresh", "session", "mysql://", "dsn",
+	} {
+		if strings.Contains(lower, marker) {
+			return "敏感错误详情已脱敏"
+		}
+	}
+	runes := []rune(value)
+	if len(runes) > 256 {
+		return string(runes[:256]) + "…"
+	}
+	return value
+}

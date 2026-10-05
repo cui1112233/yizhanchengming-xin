@@ -3,12 +3,15 @@ import { createRoot } from 'react-dom/client'
 import { App as AntApp, ConfigProvider } from 'antd'
 import 'antd/dist/reset.css'
 import IntakeWorkbench from './App.jsx'
+import AuthBoundary from './AuthBoundary.jsx'
 
 export function UserApp() {
   return (
     <ConfigProvider>
       <AntApp>
-        <IntakeWorkbench />
+        <AuthBoundary>
+          <IntakeWorkbench />
+        </AuthBoundary>
       </AntApp>
     </ConfigProvider>
   )

@@ -45,9 +45,9 @@
 - ⚠️ Task 10：批量工厂统一设置 / 版本对应配置档（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - ⚠️ Task 11：水货生产工作台
 - ⚠️ Task 12：剧本生成 / Director / Hook / 最终提示词（仓库阶段已完成；公网/ECS 验收留到 Task 16）
-- [ ] Task 13：音频 + matchAudio 分镜
+- ⚠️ Task 13：音频 + matchAudio 分镜（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 14：视频生成完整链路
-- [ ] Task 15：发布 / 权限 / 登录认证兼容
+- ⚠️ Task 15：发布 / 权限 / 登录认证兼容（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 16：ECS 新仓库部署与公网全流程验收
 
 ---
@@ -277,20 +277,22 @@
 
 # Task 13：音频 + matchAudio
 
-- [ ] 13.1 第三步生成音频
-- [ ] 13.2 获取真实 `audioDurationSec`
-- [ ] 13.3 第四步加入“匹配音频”开关
-- [ ] 13.4 `matchAudio=true` 时总时长严格等于音频时长
-- [ ] 13.5 第一镜从 0 秒开始
-- [ ] 13.6 镜头之间无空缺
-- [ ] 13.7 镜头之间无重叠
-- [ ] 13.8 最后一镜结束时间 = `audioDurationSec`
-- [ ] 13.9 10s 规则保留
-- [ ] 13.10 15s 规则按“≤15s”执行
-- [ ] 13.11 `matchAudio=false` 保留原 Director 逻辑
-- [ ] 13.12 时间统一为秒并保留两位小数
-- [ ] 13.13 不允许为了凑时长添加无关剧情
-- [ ] 13.14 测试 + CI + 合并 main
+- [x] 13.1 第三步生成音频
+- [x] 13.2 获取真实 `audioDurationSec`
+- [x] 13.3 第四步加入“匹配音频”开关
+- [x] 13.4 `matchAudio=true` 时总时长严格等于音频时长
+- [x] 13.5 第一镜从 0 秒开始
+- [x] 13.6 镜头之间无空缺
+- [x] 13.7 镜头之间无重叠
+- [x] 13.8 最后一镜结束时间 = `audioDurationSec`
+- [x] 13.9 10s 规则保留
+- [x] 13.10 15s 规则按“≤15s”执行
+- [x] 13.11 `matchAudio=false` 保留原 Director 逻辑
+- [x] 13.12 时间统一为秒并保留两位小数
+- [x] 13.13 不允许为了凑时长添加无关剧情
+- [x] 13.14 测试 + CI + 合并 main
+
+> 仓库阶段验收依据：PR #18 已合并到 `main`，合并提交 `ce10e3ea0ca4114dd30a14b03eed19e034cb710f`；Task 13 migration 使用 `00006_task13_match_audio.sql`。合并后的 `main` CI run `37298187716` 中 Go tests/build、前台 tests/build、管理端 build、Goose Up/status/rollback、Task10 audit 全绿。服务端权威音频测量、matchAudio 严格时间轴、Normal/H3 Director、`matchAudio=false` Task 12 回归均已完成仓库阶段验收。公网/ECS 真实音频测量、matchAudio 与 Director 全流程仍留到 Task 16 的 16.2.12、16.2.14–16.2.15，因此 Task 13 总体保持 `⚠️`。
 
 ---
 
@@ -317,17 +319,19 @@
 
 # Task 15：发布 / 权限 / 登录认证
 
-- [ ] 15.1 登录 Token 体系统一
-- [ ] 15.2 Token 刷新
-- [ ] 15.3 修复“当前登录状态已过期”闪退
-- [ ] 15.4 API 白名单梳理
-- [ ] 15.5 `/api/script-constraint-prompts` 权限兼容
-- [ ] 15.6 发布权限验证
-- [ ] 15.7 用户权限
-- [ ] 15.8 团队权限
-- [ ] 15.9 发布任务状态
-- [ ] 15.10 权限失败不影响其他任务
-- [ ] 15.11 测试 + CI + 合并 main
+- [x] 15.1 登录 Token 体系统一
+- [x] 15.2 Token 刷新
+- [x] 15.3 修复“当前登录状态已过期”闪退
+- [x] 15.4 API 白名单梳理
+- [x] 15.5 `/api/script-constraint-prompts` 权限兼容
+- [x] 15.6 发布权限验证
+- [x] 15.7 用户权限
+- [x] 15.8 团队权限
+- [x] 15.9 发布任务状态
+- [x] 15.10 权限失败不影响其他任务
+- [x] 15.11 测试 + CI + 合并 main
+
+> 仓库阶段验收依据：PR #20 已合并到 `main`，合并提交 `2cee78c48a44ae4471c75261542a52f5bd98843b`；合并后的 `main` CI run `37303943125` 中 Go tests/build、前台 tests/build、管理端 build、Goose Up/status/rollback、Publishing 真实事务 rollback/retry 与 Task10 audit 全绿。Auth/Publishing 仓库代码阶段完成，但公网真实登录、Token/session 恢复、发布和权限仍需 Task 16 的 16.2.20、16.2.21、16.2.23 在 ECS/浏览器环境验收，因此 Task 15 总体保持 `⚠️`。
 
 ---
 

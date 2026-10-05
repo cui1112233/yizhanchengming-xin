@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Switch, Table, Tag, Typography } from 'antd'
 import {
   cancelVideoTask,
+  getAudioMeasurement,
   getBatchProject,
   getGenerationStage,
   getProjectGeneration,
@@ -136,6 +137,8 @@ export default function BatchProjectListPage() {
   const [videoStatus, setVideoStatus] = useState(null)
   const [generationLoading, setGenerationLoading] = useState(false)
   const [resultModal, setResultModal] = useState(null)
+  const [audioMeasurements, setAudioMeasurements] = useState({})
+  const [matchAudioByBook, setMatchAudioByBook] = useState({})
 
   useEffect(() => {
     let active = true
@@ -145,6 +148,26 @@ export default function BatchProjectListPage() {
       .finally(() => active && setLoading(false))
     return () => { active = false }
   }, [])
+
+  const refreshMeasurements = async (project, books = []) => {
+    if (!project) return
+    const values = await Promise.all((books || []).map(async (book) => {
+      try {
+        const measurement = await getAudioMeasurement(project.id, book.bookId)
+        return [book.bookId, measurement?.durationMs > 0 ? measurement : null]
+      } catch {
+        return [book.bookId, null]
+      }
+    }))
+    setAudioMeasurements(Object.fromEntries(values))
+    setMatchAudioByBook((current) => {
+      const next = { ...current }
+      for (const [bookId, measurement] of values) {
+        if (!measurement) next[bookId] = false
+      }
+      return next
+    })
+  }
 
   const refreshGeneration = async (project = selected) => {
     if (!project) return
@@ -156,6 +179,7 @@ export default function BatchProjectListPage() {
       ])
       setSummary(generationPayload)
       setVideoStatus(videoPayload)
+      await refreshMeasurements(project, generationPayload?.books || [])
       setError('')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '读取生成状态失败')
@@ -168,6 +192,8 @@ export default function BatchProjectListPage() {
     setSelected(project)
     setSummary(null)
     setVideoStatus(null)
+    setAudioMeasurements({})
+    setMatchAudioByBook({})
     await refreshGeneration(project)
   }
 
@@ -179,6 +205,7 @@ export default function BatchProjectListPage() {
         hookEnabled: true,
         plotMode: false,
         directorMode: 'normal',
+        matchAudio: false,
         requestId: `batch-${Date.now()}`,
       })
       await refreshGeneration(selected)
@@ -192,12 +219,17 @@ export default function BatchProjectListPage() {
 
   const runOne = async (bookId) => {
     if (!selected) return
+    const measurement = audioMeasurements[bookId]
+    const matchAudio = Boolean(matchAudioByBook[bookId] && measurement?.durationMs > 0)
     setGenerationLoading(true)
     try {
       await runBookGeneration(selected.id, bookId, {
         hookEnabled: true,
         plotMode: false,
         directorMode: 'normal',
+        matchAudio,
+        audioDurationSec: matchAudio ? measurement.durationMs / 1000 : undefined,
+        shotDurationLimitSec: matchAudio ? 15 : undefined,
         requestId: `book-${bookId}-${Date.now()}`,
       })
       await refreshGeneration(selected)
@@ -319,6 +351,32 @@ export default function BatchProjectListPage() {
     return [
       { title: 'Book ID', dataIndex: 'bookId', key: 'bookId', width: 90 },
       { title: '书名', dataIndex: 'title', key: 'title', width: 150, render: (value) => value || '-' },
+      {
+        title: '匹配音频',
+        key: 'matchAudio',
+        width: 230,
+        render: (_, row) => {
+          const measurement = audioMeasurements[row.bookId]
+          const enabled = Boolean(measurement?.durationMs > 0)
+          const checked = Boolean(enabled && matchAudioByBook[row.bookId])
+          return (
+            <Space direction="vertical" size={4}>
+              <Switch
+                aria-label={`匹配音频 Book ${row.bookId}`}
+                disabled={!enabled}
+                checked={checked}
+                checkedChildren="匹配音频"
+                unCheckedChildren="匹配音频"
+                onChange={(value) => setMatchAudioByBook((current) => ({ ...current, [row.bookId]: value }))}
+              />
+              {enabled
+                ? <Typography.Text type="secondary">已检测音频：{(measurement.durationMs / 1000).toFixed(2)} 秒</Typography.Text>
+                : <Typography.Text type="warning">请先生成或检测音频</Typography.Text>}
+              {checked && <Typography.Text type="success">最终分镜总时长将严格匹配音频时长</Typography.Text>}
+            </Space>
+          )
+        },
+      },
       ...stageColumns,
       {
         title: 'VIDEO',
@@ -357,7 +415,7 @@ export default function BatchProjectListPage() {
         render: (_, row) => <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
       },
     ]
-  }, [selected, videoByBook])
+  }, [selected, audioMeasurements, matchAudioByBook, videoByBook])
 
   if (selectedDetailProjectId != null) {
     return <BatchProjectDetail projectId={selectedDetailProjectId} onBack={() => setSelectedDetailProjectId(null)} />
@@ -393,7 +451,7 @@ export default function BatchProjectListPage() {
         title={selected ? `${selected.name} · 剧本与 VIDEO 流水线` : '剧本与 VIDEO 流水线'}
         width="92vw"
         open={Boolean(selected)}
-        onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null) }}
+        onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
         extra={<Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
       >
         {summary && (
@@ -404,7 +462,7 @@ export default function BatchProjectListPage() {
               <Descriptions.Item label="失败">{summary.failed || 0}</Descriptions.Item>
               <Descriptions.Item label="待执行">{summary.pending || 0}</Descriptions.Item>
             </Descriptions>
-            <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1450 }} />
+            <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1680 }} />
           </>
         )}
       </Drawer>
@@ -419,6 +477,7 @@ export default function BatchProjectListPage() {
         {resultModal && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Typography.Text type="secondary">Prompt: {resultModal.promptKey || '-'} v{resultModal.promptVersion || '-'}</Typography.Text>
+            {resultModal.validationResult && <Typography.Text type="secondary">Validation: {resultModal.validationResult}</Typography.Text>}
             {resultModal.errorMessage && <Alert type="error" showIcon message={resultModal.errorMessage} />}
             <Typography.Paragraph copyable style={{ whiteSpace: 'pre-wrap' }}>{resultModal.outputText || '暂无输出'}</Typography.Paragraph>
           </Space>

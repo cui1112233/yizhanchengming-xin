@@ -39,8 +39,9 @@ func TestLocalExecutorHTTPRegistrationDoesNotExposeTokenHash(t *testing.T) {
 		Token: "one-time-secret",
 		Executor: video.LocalExecutorIdentity{ID: "lex_1", Name: "mac", ProviderKey: video.ProviderDoubaoLocalExecutor, Model: video.ModelDoubaoSeedance, Online: true, LastSeenAt: time.Now(), TokenConfigured: true},
 	}}
-	h := NewHandler(Dependencies{VideoLocalExecutor: stub})
+	h := NewHandler(Dependencies{VideoLocalExecutor: stub, VideoExecutorBootstrapToken: "bootstrap-secret"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/video/local-executors/register", strings.NewReader(`{"name":"mac","providerKey":"doubao_local_executor","model":"doubao-seedance"}`))
+	req.Header.Set("Authorization", "Bearer bootstrap-secret")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
