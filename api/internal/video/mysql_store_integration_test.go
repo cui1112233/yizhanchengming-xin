@@ -2,9 +2,11 @@ package video
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"os"
 	"testing"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -47,13 +49,39 @@ func TestMySQLRestartRecoveryIntegration(t *testing.T) {
 	if err := store1.UpsertProviderConfig(ctx, config); err != nil { t.Fatal(err) }
 	defer db.ExecContext(context.Background(), `DELETE FROM video_provider_configs WHERE provider_key=? AND model=?`, ProviderPersonalAPI, ModelYD20Mini)
 
-	job, created, err := store1.CreateOrGetProductionJob(ctx, ProductionJob{BatchProjectID: projectID, BookID: bookID, Status: JobRunning, InputRevision: "rev-restart", FinalPromptStageRunID: stageRunID, FinalPromptVersion: 1, Provider: ProviderPersonalAPI, Model: ModelYD20Mini, IdempotencyKey: "restart-contract-integration"})
+	job, created, err := store1.CreateOrGetProductionJob(ctx, ProductionJob{BatchProjectID: projectID, BookID: bookID, Status: JobRunning, InputRevision: "rev-restart", FinalPromptStageRunID: stageRunID, FinalPromptVersion: 1, FinalPromptText: "compiled prompt", Provider: ProviderPersonalAPI, Model: ModelYD20Mini, IdempotencyKey: "restart-contract-integration"})
 	if err != nil { t.Fatal(err) }
 	if !created { t.Fatal("expected a new production job") }
 	task, err := store1.CreateProductionTask(ctx, ProductionTask{ProductionJobID: job.ID, Attempt: 1, Provider: ProviderPersonalAPI, Model: ModelYD20Mini, ProviderJobID: "remote-restart", Status: TaskRunning})
 	if err != nil { t.Fatal(err) }
 
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	tokenHash := sha256.Sum256([]byte("restart-local-executor-token"))
+	executor := LocalExecutorRecord{
+		ID: "lex_restart", Name: "restart executor", ProviderKey: ProviderDoubaoLocalExecutor, Model: ModelDoubaoSeedance,
+		Capabilities: []string{"text_to_video"}, TokenHash: tokenHash, LastSeenAt: now, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := store1.CreateLocalExecutor(ctx, executor); err != nil { t.Fatal(err) }
+	defer db.ExecContext(context.Background(), `DELETE FROM video_local_executor_tasks WHERE executor_id=? OR id=?`, executor.ID, "let_restart")
+	defer db.ExecContext(context.Background(), `DELETE FROM video_local_executors WHERE id=?`, executor.ID)
+	localTask := LocalExecutorTask{
+		ID: "let_restart", SourceTaskID: "video-task-restart", ProviderKey: ProviderDoubaoLocalExecutor, Model: ModelDoubaoSeedance,
+		Prompt: "durable prompt", RequestID: "local-restart", Status: TaskQueued, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := store1.CreateLocalExecutorTask(ctx, localTask); err != nil { t.Fatal(err) }
+
 	store2 := NewMySQLStore(db)
+	recoveredExecutor, err := store2.GetLocalExecutorByTokenHash(ctx, tokenHash)
+	if err != nil { t.Fatal(err) }
+	if recoveredExecutor.ID != executor.ID || recoveredExecutor.ProviderKey != ProviderDoubaoLocalExecutor || recoveredExecutor.Model != ModelDoubaoSeedance {
+		t.Fatalf("new store instance did not recover executor: %+v", recoveredExecutor)
+	}
+	recoveredLocalTask, err := store2.GetLocalExecutorTask(ctx, localTask.ID)
+	if err != nil { t.Fatal(err) }
+	if recoveredLocalTask.ID != localTask.ID || recoveredLocalTask.Status != TaskQueued || recoveredLocalTask.Prompt != localTask.Prompt {
+		t.Fatalf("new store instance did not recover local task: %+v", recoveredLocalTask)
+	}
+
 	recoverable, err := store2.ListRecoverableTasks(ctx, 100)
 	if err != nil { t.Fatal(err) }
 	for _, got := range recoverable {
