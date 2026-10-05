@@ -23,18 +23,18 @@ func TestMatchAudioTimelineRepairsSmallClosingDriftToExactlyTwentyEightSeconds(t
 }
 
 func TestMatchAudioRepairOnlyChangesTimingAndNeverAddsStoryContent(t *testing.T) {
-	input := `{"cards":[{"shot":"她推开门","dialogue":"你来了","start":0.00,"end":9.00},{"shot":"他放下信封","narration":"房间安静下来","start":9.00,"end":27.96}]}`
-	got, result, err := validateAndRepairDirectorOutput(input, 28000, 20000)
+	input := `{"cards":[{"shot":"她推开门","dialogue":"你来了","start":0.00,"end":9.00},{"shot":"他放下信封","narration":"房间安静下来","start":9.00,"end":18.00},{"shot":"她看向窗外","start":18.00,"end":27.96}]}`
+	got, result, err := validateAndRepairDirectorOutput(input, 28000, 15000)
 	if err != nil {
 		t.Fatalf("validateAndRepairDirectorOutput: %v", err)
 	}
 	if !result.Repaired {
 		t.Fatal("expected closing repair")
 	}
-	if strings.Count(got, `"shot"`) != 2 {
+	if strings.Count(got, `"shot"`) != 3 {
 		t.Fatalf("repair changed shot count: %s", got)
 	}
-	for _, original := range []string{"她推开门", "你来了", "他放下信封", "房间安静下来"} {
+	for _, original := range []string{"她推开门", "你来了", "他放下信封", "房间安静下来", "她看向窗外"} {
 		if !strings.Contains(got, original) {
 			t.Fatalf("repair lost original story content %q: %s", original, got)
 		}
