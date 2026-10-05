@@ -23,12 +23,12 @@ type User struct {
 }
 
 type SessionRecord struct {
-	UserID           int64
-	AccessTokenHash  string
-	RefreshTokenHash string
-	AccessExpiresAt  time.Time
-	RefreshExpiresAt time.Time
-	RevokedAt        *time.Time
+	UserID           int64      `json:"userId,omitempty"`
+	AccessTokenHash  string     `json:"-"`
+	RefreshTokenHash string     `json:"-"`
+	AccessExpiresAt  time.Time  `json:"accessExpiresAt,omitempty"`
+	RefreshExpiresAt time.Time  `json:"refreshExpiresAt,omitempty"`
+	RevokedAt        *time.Time `json:"revokedAt,omitempty"`
 }
 
 type SessionStore interface {
@@ -120,26 +120,25 @@ func (m *Manager) Logout(ctx context.Context, accessToken, refreshToken string) 
 		return nil
 	}
 	now := m.now().UTC()
-	var errs []error
 	if accessToken != "" {
-		if err := m.store.RevokeByAccess(ctx, hashToken(accessToken), now); err != nil {
-			errs = append(errs, err)
+		if err := m.store.RevokeByAccess(ctx, hashToken(accessToken), now); err != nil && !errors.Is(err, ErrUnauthenticated) {
+			return err
 		}
 	}
 	if refreshToken != "" {
-		if err := m.store.RevokeByRefresh(ctx, hashToken(refreshToken), now); err != nil {
-			errs = append(errs, err)
+		if err := m.store.RevokeByRefresh(ctx, hashToken(refreshToken), now); err != nil && !errors.Is(err, ErrUnauthenticated) {
+			return err
 		}
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
 func (m *Manager) newSessionRecord(userID int64) (Credentials, SessionRecord, error) {
-	accessToken, err := randomToken(m.random)
+	accessToken, err := randomToken(m.random, 32)
 	if err != nil {
 		return Credentials{}, SessionRecord{}, err
 	}
-	refreshToken, err := randomToken(m.random)
+	refreshToken, err := randomToken(m.random, 48)
 	if err != nil {
 		return Credentials{}, SessionRecord{}, err
 	}
@@ -153,15 +152,15 @@ func (m *Manager) newSessionRecord(userID int64) (Credentials, SessionRecord, er
 	}, nil
 }
 
-func randomToken(source io.Reader) (string, error) {
-	buffer := make([]byte, 32)
-	if _, err := io.ReadFull(source, buffer); err != nil {
+func randomToken(reader io.Reader, size int) (string, error) {
+	value := make([]byte, size)
+	if _, err := io.ReadFull(reader, value); err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(buffer), nil
+	return base64.RawURLEncoding.EncodeToString(value), nil
 }
 
-func hashToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(sum[:])
+func hashToken(value string) string {
+	digest := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(digest[:])
 }
