@@ -56,6 +56,16 @@ Real 121 mutation is opt-in with `E2E_REAL_121=1` plus `E2E_121_BOOK_ID`, `E2E_1
 
 Code inspection and acceptance test show `AuthBoundary` currently maps any `getCurrentUser()` rejection to `unauthenticated`. The required semantics are: 403 must not trigger refresh and must not automatically become Login. The E2E remains expected-failure until Task 15 Auth owns the behavior change.
 
+### TASK16-VIDEO-001 Project VIDEO outputUrl is not rendered by the frontend
+
+**Expected:** A succeeded Project VIDEO status containing `outputUrl` renders the `查看视频` link.
+
+**Actual:** Task 14 Go `ProjectVideoStatus` / `VideoAttemptView` serialize the field as `outputUrl`, while `BatchProjectListPage.jsx` reads `video.outputURL` / `latest.outputURL`. Provider/model/status/attempt/error rendering works, but the persisted Project Status output link is lost.
+
+**Reproduction:** Open Batch Factory generation status for a book whose `GET /api/v1/batch-projects/{projectId}/video` response contains a succeeded attempt with `outputUrl`.
+
+**Test:** `@video project VIDEO outputUrl from Go response renders 查看视频 link` executes with Playwright `test.fail` and must become normal GREEN after Task 14 business code owns the contract fix.
+
 ## Evidence and redaction
 
 Every Playwright test automatically attaches `task16-evidence.json` containing:
@@ -96,7 +106,7 @@ Task 14 merged to `main` in PR #22 (`6b60a62896000e1c37fb0c8ec11da35a89e45dcf`) 
 - Merge retry without VIDEO regeneration
 - explicit ffmpeg failure reporting
 
-Real paid-provider execution remains an explicit Tier 2 public smoke and is not a pending implementation blocker.
+The output link field-contract defect is tracked as expected-failure `TASK16-VIDEO-001`, not pending. Real paid-provider execution remains an explicit Tier 2 public smoke.
 
 ## CI layers
 
@@ -141,7 +151,7 @@ Manual public smoke:
 | Audio measurement | Playwright UI/API | yes | GREEN |
 | matchAudio | Playwright UI/API + timeline validator | yes | GREEN |
 | Provider status | browser API acceptance | yes | GREEN Tier 1 |
-| VIDEO | Playwright UI/API | yes | GREEN Tier 1; paid provider is opt-in Tier 2 |
+| VIDEO | Playwright UI/API | yes | GREEN Tier 1 except TASK16-VIDEO-001; paid provider opt-in Tier 2 |
 | Merge | browser API acceptance | yes | GREEN Tier 1 |
 | Publishing | browser API permission acceptance | yes | GREEN locally; public permission smoke still required |
 | Permissions | auth/publishing API acceptance | yes | 403 auth bootstrap has TASK16-AUTH-002 |
