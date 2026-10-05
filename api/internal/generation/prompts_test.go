@@ -6,13 +6,9 @@ import (
 	"testing"
 )
 
-func TestPromptResolverUsesEnabledLatestVersionAndRecordsVersion(t *testing.T) {
+func TestPromptResolverReturnsEnabledPersistedVersion(t *testing.T) {
 	store := newMemoryStore()
-	store.prompts = []Prompt{
-		{Key: PromptKeyScript, Version: 1, Content: "old", Enabled: true},
-		{Key: PromptKeyScript, Version: 2, Content: "new", Enabled: true},
-		{Key: PromptKeyScript, Version: 3, Content: "disabled", Enabled: false},
-	}
+	store.prompts[PromptKeyScript] = Prompt{Key: PromptKeyScript, Version: 2, Content: "new", Enabled: true}
 	resolver := NewPromptResolver(store)
 	prompt, err := resolver.Resolve(context.Background(), PromptKeyScript)
 	if err != nil { t.Fatal(err) }
