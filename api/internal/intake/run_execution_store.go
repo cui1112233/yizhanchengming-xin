@@ -23,7 +23,7 @@ func (s *MySQLStore) StartRun(ctx context.Context, runID int64) (bool, error) {
 }
 
 func (s *MySQLStore) EnsureBookRuns(ctx context.Context, runID int64) error {
-	const query = "INSERT INTO book_runs (run_id, book_id, status, idempotency_key) SELECT r.id, b.id, 'pending', CONCAT('run:', r.id, ':book:', b.id) FROM runs r JOIN batch_projects bp ON bp.id = r.batch_project_id JOIN books b ON b.intake_id = bp.intake_id WHERE r.id = ? ON DUPLICATE KEY UPDATE id = id"
+	const query = "INSERT INTO run_book_executions (run_id, book_id, status, idempotency_key) SELECT r.id, b.id, 'pending', CONCAT('run:', r.id, ':book:', b.id) FROM runs r JOIN batch_projects bp ON bp.id = r.batch_project_id JOIN books b ON b.intake_id = bp.intake_id WHERE r.id = ? ON DUPLICATE KEY UPDATE id = id"
 	if _, err := s.db.ExecContext(ctx, query, runID); err != nil {
 		return fmt.Errorf("ensure book runs: %w", err)
 	}
@@ -32,7 +32,7 @@ func (s *MySQLStore) EnsureBookRuns(ctx context.Context, runID int64) error {
 
 func (s *MySQLStore) RecoverExpiredBookRuns(ctx context.Context, runID int64, now time.Time) (int64, error) {
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE book_runs SET status = 'pending', lease_until = NULL WHERE run_id = ? AND status = 'running' AND lease_until IS NOT NULL AND lease_until < ?",
+		"UPDATE run_book_executions SET status = 'pending', lease_until = NULL WHERE run_id = ? AND status = 'running' AND lease_until IS NOT NULL AND lease_until < ?",
 		runID, now,
 	)
 	if err != nil {
@@ -47,7 +47,7 @@ func (s *MySQLStore) RecoverExpiredBookRuns(ctx context.Context, runID int64, no
 
 func (s *MySQLStore) RetryBookRun(ctx context.Context, bookRunID int64) (bool, error) {
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE book_runs SET status = 'pending', error_message = '', lease_until = NULL WHERE id = ? AND status = 'failed'",
+		"UPDATE run_book_executions SET status = 'pending', error_message = '', lease_until = NULL WHERE id = ? AND status = 'failed'",
 		bookRunID,
 	)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *MySQLStore) ListPendingBookRuns(ctx context.Context, runID int64, limit
 	if limit <= 0 {
 		limit = 100
 	}
-	const query = "SELECT id, run_id, book_id, status, attempt, error_message, idempotency_key, lease_until, created_at, updated_at FROM book_runs WHERE run_id = ? AND status = 'pending' ORDER BY id ASC LIMIT ?"
+	const query = "SELECT id, run_id, book_id, status, attempt, error_message, idempotency_key, lease_until, created_at, updated_at FROM run_book_executions WHERE run_id = ? AND status = 'pending' ORDER BY id ASC LIMIT ?"
 	rows, err := s.db.QueryContext(ctx, query, runID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list pending book runs: %w", err)
@@ -92,7 +92,7 @@ func (s *MySQLStore) ListPendingBookRuns(ctx context.Context, runID int64, limit
 
 func (s *MySQLStore) ClaimBookRun(ctx context.Context, bookRunID int64, leaseUntil time.Time) (bool, error) {
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE book_runs SET status = 'running', attempt = attempt + 1, error_message = '', lease_until = ? WHERE id = ? AND status = 'pending'",
+		"UPDATE run_book_executions SET status = 'running', attempt = attempt + 1, error_message = '', lease_until = ? WHERE id = ? AND status = 'pending'",
 		leaseUntil, bookRunID,
 	)
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *MySQLStore) ClaimBookRun(ctx context.Context, bookRunID int64, leaseUnt
 
 func (s *MySQLStore) CompleteBookRun(ctx context.Context, bookRunID int64) error {
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE book_runs SET status = 'completed', error_message = '', lease_until = NULL WHERE id = ? AND status = 'running'",
+		"UPDATE run_book_executions SET status = 'completed', error_message = '', lease_until = NULL WHERE id = ? AND status = 'running'",
 		bookRunID,
 	)
 	if err != nil {
@@ -123,7 +123,7 @@ func (s *MySQLStore) CompleteBookRun(ctx context.Context, bookRunID int64) error
 
 func (s *MySQLStore) FailBookRun(ctx context.Context, bookRunID int64, message string) error {
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE book_runs SET status = 'failed', error_message = ?, lease_until = NULL WHERE id = ? AND status = 'running'",
+		"UPDATE run_book_executions SET status = 'failed', error_message = ?, lease_until = NULL WHERE id = ? AND status = 'running'",
 		message, bookRunID,
 	)
 	if err != nil {
@@ -138,7 +138,7 @@ func (s *MySQLStore) FailBookRun(ctx context.Context, bookRunID int64, message s
 }
 
 func (s *MySQLStore) FinalizeRun(ctx context.Context, runID int64) error {
-	const query = "UPDATE runs r SET status = CASE WHEN EXISTS (SELECT 1 FROM book_runs br WHERE br.run_id = r.id AND br.status IN ('pending', 'running')) THEN 'running' WHEN EXISTS (SELECT 1 FROM book_runs br WHERE br.run_id = r.id AND br.status = 'failed') THEN 'failed' ELSE 'completed' END WHERE r.id = ?"
+	const query = "UPDATE runs r SET status = CASE WHEN EXISTS (SELECT 1 FROM run_book_executions rbe WHERE rbe.run_id = r.id AND rbe.status IN ('pending', 'running')) THEN 'running' WHEN EXISTS (SELECT 1 FROM run_book_executions rbe WHERE rbe.run_id = r.id AND rbe.status = 'failed') THEN 'failed' ELSE 'completed' END WHERE r.id = ?"
 	result, err := s.db.ExecContext(ctx, query, runID)
 	if err != nil {
 		return fmt.Errorf("finalize run: %w", err)
