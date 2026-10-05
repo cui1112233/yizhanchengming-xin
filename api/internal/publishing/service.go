@@ -55,7 +55,11 @@ func (s *Service) ListAccounts(ctx context.Context, actor authn.User) ([]Account
 func (s *Service) ClaimBatchProject(ctx context.Context, actor authn.User, projectID int64) error {
 	if s == nil || s.store == nil { return ErrUnavailable }
 	if actor.ID <= 0 || projectID <= 0 { return ErrInvalid }
-	return s.store.ClaimBatchProject(ctx, projectID, actor.ID, actor.TeamID)
+	if err := s.store.ClaimBatchProject(ctx, projectID, actor.ID, actor.TeamID); err != nil { return err }
+	allowed, err := s.store.CanAccessBatchProject(ctx, projectID, actor.ID, actor.TeamID, elevated(actor))
+	if err != nil { return err }
+	if !allowed { return ErrForbidden }
+	return nil
 }
 
 func (s *Service) CreateIntent(ctx context.Context, actor authn.User, input CreateIntentInput) (Intent, error) {
