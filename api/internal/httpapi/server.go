@@ -40,6 +40,8 @@ type Dependencies struct {
 	Pipeline            PipelineService
 	Generation          GenerationService
 	UnifiedSettings     UnifiedSettingsService
+	Video               VideoService
+	VideoConfig         VideoConfigService
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -76,6 +78,11 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", api.retryGenerationStage)
 	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}", api.generationStage)
 	mux.HandleFunc("GET /api/v1/generation/prompts", api.generationPrompts)
+
+	mux.HandleFunc("GET /api/v1/video-providers/{provider}/models/{model}", api.getVideoProviderConfig)
+	mux.HandleFunc("PUT /api/v1/video-providers/{provider}/models/{model}", api.putVideoProviderConfig)
+	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", api.startVideo)
+	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/poll", api.pollVideoTask)
 	return mux
 }
 
