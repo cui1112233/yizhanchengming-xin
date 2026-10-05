@@ -61,6 +61,11 @@ type BatchProject struct {
 	ID        int64
 	IntakeID  int64
 	Name      string
+	Sources   []string
+	BookCount int
+	Genders   []string
+	Styles    []string
+	RunStatus RunStatus
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

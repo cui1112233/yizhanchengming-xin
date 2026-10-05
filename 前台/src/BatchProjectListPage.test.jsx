@@ -21,6 +21,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 vi.mock('./api.js', () => ({
   listBatchProjects: vi.fn(),
+  getBatchProject: vi.fn(),
   getProjectGeneration: vi.fn(),
   runProjectGeneration: vi.fn(),
   runBookGeneration: vi.fn(),
@@ -30,10 +31,27 @@ vi.mock('./api.js', () => ({
 
 import * as api from './api.js'
 
-describe('BatchProjectListPage generation workbench', () => {
+describe('BatchProjectListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    api.listBatchProjects.mockResolvedValue({ projects: [{ id: 3, name: '测试项目' }] })
+    api.listBatchProjects.mockResolvedValue({
+      projects: [{
+        id: 3,
+        name: '测试项目',
+        sources: ['知乎', '点众'],
+        bookCount: 2,
+        genders: ['女频', '男频'],
+        styles: ['情感', '悬疑'],
+        runStatus: 'running',
+      }],
+    })
+    api.getBatchProject.mockResolvedValue({
+      project: { id: 3, intakeId: 9, name: '测试项目' },
+      books: [
+        { id: 31, bookId: '1001', title: '成功小说', source: '知乎', platformId: '15', gender: '女频', style: '情感', status: 'fetched', errorMessage: '' },
+        { id: 32, bookId: '1002', title: '失败小说', source: '点众', platformId: '7', gender: '男频', style: '悬疑', status: 'retryable_failed', errorMessage: '121 upstream error' },
+      ],
+    })
     api.getProjectGeneration.mockResolvedValue({
       batchProjectId: 3,
       completed: 0,
@@ -53,6 +71,36 @@ describe('BatchProjectListPage generation workbench', () => {
   })
 
   afterEach(() => cleanup())
+
+  it('展示真实 BatchProject 汇总字段', async () => {
+    render(<BatchProjectListPage />)
+    await screen.findByText('测试项目')
+    expect(screen.getByText('知乎')).toBeTruthy()
+    expect(screen.getByText('点众')).toBeTruthy()
+    expect(screen.getByText('2')).toBeTruthy()
+    expect(screen.getByText('女频')).toBeTruthy()
+    expect(screen.getByText('男频')).toBeTruthy()
+    expect(screen.getByText('情感')).toBeTruthy()
+    expect(screen.getByText('悬疑')).toBeTruthy()
+    expect(screen.getByText('执行中')).toBeTruthy()
+  })
+
+  it('点击真实项目进入 V11 工作台并展示全部小说状态与错误', async () => {
+    render(<BatchProjectListPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '测试项目' }))
+
+    expect(await screen.findByText('Batch Factory V11 工作台')).toBeTruthy()
+    expect(screen.getByText('1001')).toBeTruthy()
+    expect(screen.getByText('成功小说')).toBeTruthy()
+    expect(screen.getByText('15')).toBeTruthy()
+    expect(screen.getByText('已获取')).toBeTruthy()
+    expect(screen.getByText('1002')).toBeTruthy()
+    expect(screen.getByText('失败小说')).toBeTruthy()
+    expect(screen.getByText('7')).toBeTruthy()
+    expect(screen.getByText('可重试失败')).toBeTruthy()
+    expect(screen.getByText('121 upstream error')).toBeTruthy()
+    await waitFor(() => expect(api.getBatchProject).toHaveBeenCalledWith(3))
+  })
 
   it('shows four real stage statuses and retry for failed stage', async () => {
     render(<BatchProjectListPage />)
