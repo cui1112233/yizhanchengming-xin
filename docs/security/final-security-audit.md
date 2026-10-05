@@ -1,189 +1,235 @@
 # Security / Secrets / Permission Final Audit
 
-Status: **Stage A complete against main `eb911e6a2249d58685e4bafe6ede52de154bb91f`; Stage B is blocked on Task9 Runtime merge. PR #21 must remain Draft.**
+Status: **Stage A repository security audit complete against main `eb911e6a2249d58685e4bafe6ede52de154bb91f`; Stage B pending / blocked by Task9 Runtime merge. PR #21 must remain Draft.**
 
-This report never contains real secret values. A future confirmed credential exposure must be recorded only by secret type and file/commit location, plus rotation status.
+This report intentionally contains no real secret values. Secret findings, if any, are recorded only by type, path, commit/hash, severity and rotation status.
 
-## 1. Stage A baseline and synchronization
+## 1. Scope and baseline
 
-- Initial audit baseline: `9f136e16deb2ea46bba4e2ececb1e63c829047eb`.
-- Stage A Observability baseline: `eb911e6a2249d58685e4bafe6ede52de154bb91f` (`Observability / Logging / Operations Finalization`).
-- Stage A sync commit: `204619604b0a4a30a93753bc3e33bedec8d49064`.
-- GitHub reported conflicts for a direct main-to-audit merge. No force-push was used. A two-parent merge preserved both histories; post-sync CI then exposed security regressions from conflict resolution, which were restored with targeted fixes and retested.
-- Post-cleanup code/security tree: `2abce456512b9caae91c3410123945bdd613e147`.
-- At that tree, comparison with `eb911e6...` was `behind=0` / `ahead=71`.
-- Normal CI run `37322619232` completed successfully: Go tests/build, frontend tests/build, admin build, Goose migration/restart/rollback coverage, and Task10 audit all passed.
-- The temporary security workflow was removed before that final normal-CI evidence was recorded.
-- PR #21 remains **Draft** and must not be marked Ready or merged until Stage B completes.
+Stage A covers repository security from:
 
-## 2. Stage A attack surface
+- base: `main` at `eb911e6a2249d58685e4bafe6ede52de154bb91f`;
+- branch: `audit/security-permission-final`;
+- sync commit: `204619604b0a4a30a93753bc3e33bedec8d49064`;
+- post-cleanup code/security tree: `2abce456512b9caae91c3410123945bdd613e147`;
+- subsequent changes before final exact-head verification are audit-document-only changes and do not modify production code or secret-bearing configuration.
 
-Stage A reviewed current main plus Task14 Video and the Observability additions:
+The branch was synchronized to the Observability main without force-push. Conflict resolution briefly reintroduced several security regressions; those regressions were reproduced by tests, restored with targeted fixes, and reverified.
 
-- Task15 login, refresh, logout, session cookies, capability checks, ownership and same-origin boundaries.
-- BatchProject, Intake, Generation, unified settings and version-profile routes.
-- Publishing account/credential/intent/audit authorization.
-- Task14 provider configuration, outbound HTTP, artifact download, local executor identity/assignment, merge and ffmpeg execution.
-- Request IDs, structured logging/redaction, access logs, diagnostics, health/readiness, panic/500 handling and lifecycle decorators.
-- Current tree and full Git history for secrets, browser credential persistence and dependency vulnerabilities.
+Stage A reviewed:
 
-Task9 Runtime is not finalized in Stage A. Redis queue/lease/fencing, Scheduler, Worker, Recovery, idempotency and runtime-internal paths require Stage B after Task9 lands on main.
+- Task15 login, refresh, logout, session cookies, capability checks and BatchProject ownership boundaries;
+- Publishing account / credential / intent / audit authorization;
+- Task14 provider configuration, outbound HTTP, artifact download, Local Executor identity/assignment and ffmpeg execution;
+- Request IDs, structured logging/redaction, access logs, diagnostics, health/readiness, panic/500 handling and observability decorators;
+- current-tree and Git-history secret exposure risk;
+- repository ignore rules as preventive controls only.
 
-## 3. Findings and RED/GREEN evidence
+Task9 Runtime is explicitly outside final Stage A closure. Redis queue/lease/fencing, Worker, Scheduler, Recovery, idempotency, retry authorization and runtime-internal paths remain Stage B work after Task9 enters main.
 
-| ID | Severity | Boundary | RED | Minimal fix | GREEN |
-|---|---|---|---|---|---|
-| SEC-A-001 | HIGH | BatchProject cross-user/cross-team IDOR | `ecf62bdcfc00399cd91742114d3b1f429a4402a7` | `fead0912...`, `0474b47b...`, `4a8232ed...`; sync restoration `cb6032f7cf1ab537a4353445a98ae244cd8a790f` | CI `37322619232` |
-| SEC-A-002 | HIGH | Auth backend failure incorrectly treated as 401; logout revoke false-success | security RED tests; re-exposed by sync CI `37318185434` | `3a4be84c...`; sync restoration `0c0562104430a63f8dacd7f817bcb36735533866` | CI `37322619232` |
-| SEC-A-003 | MEDIUM | Internal service error leakage | service error/redaction tests | `6a0370a8...`, `0c035699...`, `0117473d...`, `8a1e2e17...` | CI `37322619232` |
-| SEC-A-004 | MEDIUM | ffprobe/local audio path traversal | `03a8b0a71c2698f9eef0da6339e9dedf39c3867a` | `59ca14d1...`, `58cfefeb...` | CI `37322619232` |
-| SEC-A-005 | HIGH | Provider/media SSRF, including obfuscated numeric loopback | `b62a96e5...`; final numeric-host RED `75dad55feeaa7de499f206d9360ba440b0b29702` | `e7652f17...`, `e8b8588c...`, `b4ca63db...`, `30713a93...`, `c6ff598131502b4c82f6f349e5a6e2e17ea688c5` | CI `37322619232` |
-| SEC-A-006 | HIGH | Local Executor assignment isolation | `31b3f449...`, `20502b51...` | `ee097bff...`, `cb758878...` | CI `37322619232` |
-| SEC-A-007 | MEDIUM | Stale executor could complete/fail an assigned task | `fdf0b9b39a48fba977406be384d6d68e033aa139` | `2fbf429eaace3f3cb6f3178d10d1d115e89013cc` | CI `37322619232` and Task16 Go regression |
-| SEC-A-008 | MEDIUM | `slog.Any` struct/object redaction bypass | `b37029fe6a5930622d891492f53169e18e7e911c` | `0bfd17a3e2bc217fbde4d54c40c096f8fd1f8920` | full redaction regression set and CI `37322619232` |
-| SEC-A-009 | MEDIUM | Diagnostics echoed provider upstream error/path text | `fd9db3cd50f9e21208f5f9f04a5c63dce93159cd` | `3bf8952df9c2b572bc96a7062353213727b6ea76` | CI `37322619232` |
-| SEC-A-010 | MEDIUM | Observability performed a logging-only resource read | `29046584ae5879ff10116d1418e8520d1f7b8401` | `67fd661ff994d9ebbfdd919b9963ebfcc1f0bea0` | CI `37322619232` |
-| SEC-A-011 | MEDIUM | Provider secret configuration capability separation | `8dba8006d3beefb7553f39d63353bb05e57a1926` | `35a4070b2201898f8ed843b0498f593e9183486f` | CI `37322619232` |
+## 2. Findings summary
 
-## 4. Observability security verification
+| ID | Severity | Component | Status | RED evidence | Fix commit | Residual risk |
+|---|---|---|---|---|---|---|
+| SEC-A-001 | HIGH | BatchProject ownership / project-scoped routes | FIXED | `ecf62bdcfc00399cd91742114d3b1f429a4402a7`: User B could access User A's project and receive HTTP 200 with project/book data | ownership boundary fixes plus post-sync restoration `cb6032f7cf1ab537a4353445a98ae244cd8a790f` | New project-scoped endpoints must reuse the same access boundary; Stage B must recheck new Task9 runtime routes |
+| SEC-A-002 | HIGH | Auth backend failure semantics / logout revocation | FIXED | security RED suite and sync-regression CI showed backend failure mapped to 401 and revoke failure reported as 204 | targeted auth fixes plus sync restoration `0c0562104430a63f8dacd7f817bcb36735533866` | Future auth stores must preserve 401 vs 5xx distinction and fail closed on revoke errors |
+| SEC-A-003 | MEDIUM | HTTP internal error leakage | FIXED | service error/redaction regressions | `6a0370a8...`, `0c035699...`, `0117473d...`, `8a1e2e17...` | New handlers must continue using safe error mapping rather than raw `err.Error()` |
+| SEC-A-004 | MEDIUM | Audio / ffprobe path trust boundary | FIXED | `03a8b0a71c2698f9eef0da6339e9dedf39c3867a` | `59ca14d1...`, `58cfefeb...` | Any future browser-provided media path must remain constrained to server-managed assets |
+| SEC-A-005 | HIGH | Provider/media SSRF | FIXED WITH DOCUMENTED BOUNDARY | provider SSRF RED tests including numeric/obfuscated loopback; final numeric-host RED `75dad55feeaa7de499f206d9360ba440b0b29702` | `e7652f17...`, `e8b8588c...`, `b4ca63db...`, `30713a93...`, `c6ff598131502b4c82f6f349e5a6e2e17ea688c5` | DNS/custom-transport changes remain security-sensitive; no claim of “100% SSRF safe” |
+| SEC-A-006 | HIGH | Local Executor assignment isolation | FIXED | `31b3f449...`, `20502b51...` | `ee097bff...`, `cb758878...` | Stage B must combine this boundary with Task9 lease/fencing semantics |
+| SEC-A-007 | MEDIUM | Stale Local Executor task mutation | FIXED; STAGE B RECHECK | `fdf0b9b39a48fba977406be384d6d68e033aa139` | `2fbf429eaace3f3cb6f3178d10d1d115e89013cc` | Task14 has no full executor credential revocation subsystem; Task9 fencing/lease generation must be audited in Stage B |
+| SEC-A-008 | MEDIUM | Observability `slog.Any(struct/object)` redaction | FIXED | `b37029fe6a5930622d891492f53169e18e7e911c` | `0bfd17a3e2bc217fbde4d54c40c096f8fd1f8920` | Future logger encoders/custom object types must preserve recursive sanitization |
+| SEC-A-009 | MEDIUM | Diagnostics provider error/path disclosure | FIXED | `fd9db3cd50f9e21208f5f9f04a5c63dce93159cd` | `3bf8952df9c2b572bc96a7062353213727b6ea76` | New diagnostics fields require explicit DTO review and safe provider-error mapping |
+| SEC-A-010 | MEDIUM | Observability-created resource read / IDOR risk | FIXED | `29046584ae5879ff10116d1418e8520d1f7b8401` | `67fd661ff994d9ebbfdd919b9963ebfcc1f0bea0` | Telemetry decorators must never add authorization-relevant resource reads |
+| SEC-A-011 | MEDIUM | Provider secret configuration capability separation | FIXED | `8dba8006d3beefb7553f39d63353bb05e57a1926` | `35a4070b2201898f8ed843b0498f593e9183486f` | New provider configuration APIs must retain separate secret-management authorization |
+
+## 3. Required HIGH finding: BatchProject cross-user IDOR
+
+### RED
+
+A regression test proved that an authenticated User B with the generic batch-view capability could request User A's BatchProject and receive HTTP 200. The response exposed the foreign project and associated book information.
+
+RED commit: `ecf62bdcfc00399cd91742114d3b1f429a4402a7`.
+
+### Minimal fix
+
+Project-scoped HTTP routes were moved behind a reusable BatchProject access boundary that evaluates global/elevated access plus ownership/team authorization instead of capability-only access.
+
+### GREEN
+
+Cross-user / cross-team access is denied by the regression suite. List/detail and other project-scoped security tests remain in the normal Go test tree.
+
+## 4. Observability finding: `slog.Any(struct/object)` redaction bypass
+
+Finding ID: **SEC-A-008**.
+
+Affected sensitive field-name examples include:
+
+- `clientSecret`;
+- `accessToken`;
+- `refreshToken`.
+
+The original sanitizer recursively handled maps and nested maps, but its default path returned unknown object types unchanged. A struct/object passed through `slog.Any(...)` could therefore bypass the map-oriented field-name redaction path.
+
+RED commit: `b37029fe6a5930622d891492f53169e18e7e911c`.
+
+Minimal fix: `0bfd17a3e2bc217fbde4d54c40c096f8fd1f8920` extended object sanitization into a generic recursively redacted representation and avoids logging the original object if conversion cannot be made safe.
+
+GREEN coverage includes case variants and nested values for `secret`, `Secret`, `SECRET`, `clientSecret`, `client_secret`, `accessToken`, `refreshToken`, DSN-like strings, Basic-Auth URLs, Bearer strings and query-like credentials.
+
+## 5. Local Executor stale credential finding
+
+Finding ID: **SEC-A-007**.
+
+RED proved that a stale/offline Local Executor identity could still attempt terminal task mutation.
+
+Fix commit: `2fbf429eaace3f3cb6f3178d10d1d115e89013cc`.
+
+After the fix, stale/offline executor identity/credential state cannot `complete` or `fail` a task. Existing assignment-owner checks also prevent an old or foreign executor identity from overwriting the current assignment owner.
+
+This control is deliberately marked for Stage B recheck: once Task9 Runtime is in main, the same guarantee must be proven together with lease generation/fencing so an old worker/executor token cannot Complete, Fail, Renew or Release after a newer owner takes the lease.
+
+## 6. Observability security verification
 
 ### Request ID
 
-Only one `X-Request-ID` value is accepted. It is capped at 128 characters and must match `[A-Za-z0-9._:-]`. CR/LF, tabs/control characters, invalid punctuation, overlong IDs and multi-value headers are rejected and replaced by a server-generated ID. This prevents attacker-controlled request IDs from forging multiline structured logs.
+Only one `X-Request-ID` value is accepted. It is capped at 128 characters and must use the accepted bounded character set. CR/LF, control characters, invalid punctuation, overlong IDs and multi-value headers are rejected and replaced by a server-generated request ID.
 
 ### Access log
 
-The access logger records bounded metadata only: request ID, method, URL path, status, duration, remote-address class and authenticated user ID when present. It does not read/log query strings, request or response bodies, `Authorization`, `Cookie`, `Set-Cookie`, password, provider secret, publishing credential or executor bearer token.
-
-### Redaction bypass coverage
-
-Regression coverage includes `secret`, `Secret`, `SECRET`, `clientSecret`, `client_secret`, `accessToken`, `refreshToken`, nested maps/objects, `slog.Any` structs, error strings, DSN-like credentials, Basic-Auth URLs, Bearer strings and query-like credentials. Structured objects are converted to a generic JSON shape and recursively redacted; failed conversion does not write the original object.
+The access logger records bounded request metadata only. It does not intentionally log query strings, request/response bodies, `Authorization`, `Cookie`, `Set-Cookie`, passwords, provider secrets, publishing credentials or executor bearer credentials.
 
 ### Diagnostics authorization
 
-`GET /api/v1/diagnostics` requires authentication plus a **global** role:
+`GET /api/v1/diagnostics` requires authentication plus a global privileged role. Regression coverage pins:
 
 - anonymous -> 401;
 - ordinary authenticated user -> 403;
 - `batch.view` only -> 403;
-- global `admin` -> allowed;
-- global `owner` -> allowed.
+- global admin -> allowed;
+- global owner -> allowed.
 
-The diagnostics `owner` is `auth_users.role`. BatchProject ownership lives separately in `auth_batch_project_ownership`; being a project owner does not grant global diagnostics.
+BatchProject ownership is stored separately from the global user role. Owning a project does not grant system diagnostics access.
 
-### Diagnostics DTO / health / readiness / panic
+### Safe diagnostics / health / panic
 
-Diagnostics uses an explicit DTO and excludes token/token-hash, credential, ciphertext, nonce, DSN, environment and raw provider configuration. Provider `latest_safe_error` maps status to a fixed safe message and never returns raw upstream response text or sensitive filesystem path.
+Diagnostics uses an explicit DTO and excludes token/token-hash, credentials, ciphertext, nonce, DSN, raw provider configuration and environment material. Provider `latest_safe_error` is sanitized instead of reflecting raw upstream bodies or sensitive paths.
 
-`/healthz` exposes only simple health state. `/readyz` returns safe code/message/request ID and does not return DB host, DSN, SQL error or provider/Redis/TOS configuration. Panic recovery returns a generic `INTERNAL_ERROR` plus request ID; stack/source path/SQL/env/credential material is not returned to the browser, and server-side panic text is sanitized.
+`/healthz` and `/readyz` return safe status information. Panic/500 responses return a generic error plus request ID rather than stack/source path/SQL/environment/credential material.
 
 ### No observability-created IDOR
 
-A RED test proved that intake lifecycle logging performed an extra `ListBooks` query solely for telemetry. That query was removed. Observability now logs already-authorized operation results instead of expanding resource reads.
+A RED test proved that a logging-only lifecycle path performed an unnecessary resource read. That telemetry-only read was removed; observability now records already-authorized operation results rather than widening the data-access surface.
 
-## 5. Secret and history scan
+## 7. Secret scan — Current Tree
 
-The temporary Stage A workflow used a full-history checkout (`fetch-depth: 0`) and Gitleaks with redacted output and a failing exit code. It also ran Go reachable-vulnerability checks, frontend/admin production dependency audits and a browser-persistence source scan.
+Scope: the Stage A branch tree, including source, `.env`/`.env.*` paths, YAML, JSON, scripts, documentation, workflows, test fixtures, Provider configuration, Publishing configuration, Redis/MySQL/TOS/Auth-related strings and common key/token file types.
 
-Result:
+Evidence:
+
+- the temporary audit workflow ran Gitleaks with redaction and a non-zero leak exit code policy;
+- the scan used a full-history checkout (`fetch-depth: 0`), therefore it also covered the tracked tree represented by the PR merge ref at scan time;
+- after that scan, the only branch changes were removal of the temporary audit workflow and audit-report edits; those diffs contain no credential values;
+- the final tree contains no tracked `.env` file according to the exact-head tree listing;
+- `.gitignore` prevents common local secret/key artifacts from being added, but is treated only as prevention.
+
+Current-tree result:
 
 **No confirmed production secret requiring rotation found**
 
-No secret value is reproduced here. If a future scan confirms that a real production credential was committed, mark it `ROTATION_REQUIRED`. Deleting a string from history or adding `.gitignore` is not sufficient; the credential must be rotated/revoked at its source.
+| Finding type | Path | Commit/hash | Severity | Rotation status |
+|---|---|---|---|---|
+| Confirmed production secret | none | n/a | n/a | NOT REQUIRED |
+| Test/example credential requiring action | none identified by the final secret scan | n/a | n/a | NOT REQUIRED |
+| Unconfirmed secret-like material requiring escalation | none identified by the final secret scan | n/a | n/a | NOT REQUIRED |
 
-`.gitignore` covers common `.env` variants, secret/credential files, private keys, token files and common key-store formats. These are preventive controls only, not historical-secret remediation.
+## 8. Secret scan — Git History
 
-## 6. SSRF controls and capability boundary
+The temporary audit workflow checked out complete repository history and executed Gitleaks with redaction:
 
-The current outbound policy:
+`gitleaks git --redact --exit-code 1 .`
 
-- requires HTTPS for remote media;
-- blocks literal loopback, RFC1918/private, link-local, unspecified, multicast and carrier-grade NAT addresses;
-- blocks metadata-style link-local targets;
-- normalizes/blocks IPv4-in-IPv6 private/loopback forms;
-- rejects non-canonical all-numeric/hex-style host forms that can encode loopback;
-- revalidates redirects;
-- with the normal production `http.Transport`, resolves the host, rejects unsafe resolved addresses at dial time, and dials the approved numeric IP.
+Evidence from the completed history job:
 
-There is an explicit local-development provider exception for HTTP loopback (`localhost` / literal loopback). Remote media download does not use this exception.
+- **834 commits scanned**;
+- approximately **2.20 MB** of Git content scanned;
+- result: **no leaks found**;
+- job conclusion: SUCCESS.
 
-This is **not** claimed to be “100% SSRF safe.” DNS behavior, custom injected transports and future networking changes remain security-sensitive. Any new outbound transport must preserve resolved-address validation and redirect validation.
+Git-history result:
 
-## 7. Local Executor controls and limit
+**No confirmed production secret requiring rotation found**
 
-Verified:
+`ROTATION_REQUIRED`: **No**.
 
-- registration is protected by a server-side bootstrap token;
-- executor credentials are random and only token hashes are persisted;
-- unknown credentials cannot mutate guessed task IDs;
-- executor A cannot complete/fail executor B's assignment;
-- completion/failure requires a non-empty matching `ExecutorID`;
-- executor failure text is sanitized;
-- stale/offline executors beyond the heartbeat threshold cannot complete/fail assigned tasks.
+If a future investigation proves that a real production credential was committed, it must be classified `ROTATION_REQUIRED`. Removing a value from Git history or adding an ignore rule is not credential remediation; the credential must be rotated/revoked at its authoritative source.
 
-Capability limit: Task14 currently has no first-class `revoked_at`/disabled/rotation state for executor credentials. Liveness gating blocks stale task mutation and unknown/deleted credentials are denied, but this is not a complete credential-revocation subsystem.
+## 9. `.gitignore` prevention boundary
 
-## 8. ffmpeg / process execution
+The current ignore rules cover common `.env` variants, secret/credential directories, private key formats, token/credential files and common key-store formats.
 
-The merge runner uses `exec.CommandContext(binary, args...)`. It does not construct a shell command or invoke `sh -c`/`bash -c`. Hostile filename content remains a literal argv value in regression tests.
+This is preventive control only. It does not make any previously committed credential safe and is not counted as historical-secret remediation.
 
-Remote inputs are downloaded to server-generated temporary names before ffmpeg, output paths are server-generated, audio measurement accepts server-managed relative assets rather than arbitrary browser-supplied absolute paths, and remote downloads remain subject to SSRF and size limits.
+## 10. SSRF control and residual boundary
 
-## 9. Stage A completion checklist
+Outbound provider/media controls reject loopback/private/link-local/metadata-style targets, IPv4-in-IPv6 private forms and non-canonical numeric/hex host forms; redirects are revalidated. Production transport resolution validates the resolved address before dialing an approved numeric IP.
 
-- [x] sync Observability main `eb911e6...` without force-push;
-- [x] resolve sync conflicts and restore security regressions with RED/GREEN evidence;
-- [x] request ID, access-log, redaction, diagnostics, health/readiness, panic and observability-IDOR sweep;
-- [x] full-history/current-tree secret scan;
-- [x] SSRF regression including obfuscated numeric host forms;
-- [x] Local Executor assignment/unknown/stale-credential regression;
-- [x] ffmpeg shell/path/argument boundary review;
-- [x] audit report created;
-- [x] temporary security workflow removed;
-- [x] main confirmed at `eb911e6...` and audit branch confirmed `behind=0` after cleanup;
-- [x] normal CI `37322619232` fully green on the post-cleanup code/security tree;
-- [x] PR #21 remains Draft.
+There is an explicit local-development provider exception for loopback HTTP. Remote media download does not use that exception.
 
-## 10. Stage B gate: Task9 Runtime Final Security Sweep
+This report does **not** claim “100% SSRF safe.” DNS behavior, custom transports and future networking changes remain security-sensitive and require preservation of resolved-address and redirect validation.
 
-Stage B starts **only after Task9 Runtime is merged to main**. Before any Stage B conclusion, sync the audit branch to that new main again.
+## 11. ffmpeg / process execution
 
-Required Stage B checks:
+The merge path uses parameterized `exec.CommandContext(binary, args...)`. It does not build a shell string or invoke `sh -c` / `bash -c`.
 
-### Redis
+Remote input is first downloaded to server-generated temporary names, output paths are server-controlled, and audio measurement accepts server-managed relative assets rather than arbitrary browser-supplied absolute paths. Path/argv regression tests remain in the normal Go suite.
 
-- credentials never enter logs or diagnostics;
-- config/passwords are excluded from diagnostics;
-- queue payload contains no unnecessary secret;
-- Redis is coordination, not authorization fact;
-- replay/flush/reconstruction cannot bypass MySQL authorization.
+## 12. Temporary security workflow cleanup
 
-### Worker
+`.github/workflows/security-audit-temp.yml` was removed in commit:
 
-A Redis message must never authorize execution by itself. Validate:
+`2abce456512b9caae91c3410123945bdd613e147`.
 
-`Redis claim -> MySQL CAS -> current execution token/owner -> execute`
+The temporary workflow is not part of the final Stage A tree.
 
-Forged or duplicated queue messages must fail unless MySQL state authorizes the claim.
+Security regression tests themselves remain in normal package test files and are executed by the normal CI `go test ./...` job. Deleting the temporary workflow therefore does not remove the regression tests that protect the implemented security fixes.
 
-### Lease / fencing
+## 13. Stage A final gate
 
-After Worker B obtains a newer lease/fencing generation, Worker A's old token must not be able to Complete, Fail, Renew or Release.
+Before freezing Stage A, the exact final branch head must satisfy all of the following on that same SHA:
 
-### Scheduler
+- `go test ./...`;
+- `go build ./...`;
+- frontend tests;
+- frontend build;
+- admin build;
+- Goose clean migration / reload / rollback;
+- Task14 migration and restart/recovery coverage;
+- Task16 E2E / Go regression;
+- security regression tests through the normal Go suite;
+- comparison with latest main reports `behind=0`;
+- PR #21 remains Draft.
 
-Two schedulers must produce only one effective claim. User-controlled `run_at` may schedule only a resource already authorized to that user and must not authorize another project.
+The authoritative `STAGE_A_HEAD=<sha>` is the final branch SHA after this report commit and is recorded in the Stage A completion status for PR #21. Earlier GREEN runs are supporting evidence only, not the final exact-head gate.
 
-### Idempotency
+## 14. Stage B gate — Task9 Runtime Final Security Sweep
 
-Idempotency keys must be scoped inside the correct authorization/resource boundary. Knowing another user's key must not expose or reuse that user's Run.
+Stage B starts **only after Task9 Runtime is merged into main**. The audit branch must then sync latest main again before any new conclusion.
 
-### Retry
+Stage B must cover:
 
-A user may retry only a project/BookRun for which current `batch.execute` authorization exists. Guessing a BookRun ID must not retry another user's task.
+- Redis credential/log/diagnostic safety and queue payload minimization;
+- Redis as coordination only, never authorization truth;
+- forged/replayed queue messages versus MySQL CAS authorization;
+- Worker execution ownership/tokens;
+- lease/fencing generation and stale Complete/Fail/Renew/Release denial;
+- two-Scheduler duplicate-claim behavior;
+- `run_at` authorization;
+- idempotency-key authorization scope;
+- retry authorization for project/BookRun;
+- Redis wipe/replay recovery safety;
+- Worker/Scheduler/internal endpoints;
+- runtime diagnostics;
+- Task14 Runtime Adapter interaction.
 
-### Internal runtime paths
-
-Review all Worker/Scheduler/internal endpoints for authentication, replay resistance, ownership binding, safe errors, request logging and secret handling.
-
-Only after Stage B is RED/GREEN complete, latest main is synchronized, final CI is green, and this report is updated may PR #21 be considered for Ready / Merge.
+Until Stage B is complete, PR #21 must remain **Draft** and must not be marked Ready or merged.
