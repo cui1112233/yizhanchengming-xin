@@ -44,6 +44,7 @@ type AuthService interface {
 type PublishingService interface {
 	CreateAccount(context.Context, authn.User, publishing.CreateAccountInput) (publishing.Account, error)
 	ListAccounts(context.Context, authn.User) ([]publishing.Account, error)
+	ClaimBatchProject(context.Context, authn.User, int64) error
 	CreateIntent(context.Context, authn.User, publishing.CreateIntentInput) (publishing.Intent, error)
 	GetIntent(context.Context, authn.User, int64) (publishing.Intent, error)
 	ListAudits(context.Context, authn.User, int64) ([]publishing.Audit, error)
