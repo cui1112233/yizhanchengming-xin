@@ -112,23 +112,50 @@ describe('小说获取工作台行为', () => {
     expect(await screen.findByText('121 upstream error')).toBeTruthy()
   }, 15000)
 
-  it('批量工厂列表从 API 展示项目名称', async () => {
+  it('批量工厂列表展示真实项目汇总信息', async () => {
     window.history.replaceState({}, '', '/batch-factory')
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() =>
         jsonResponse({
           projects: [
-            { id: 52, intakeId: 12, name: '点众批次' },
-            { id: 51, intakeId: 11, name: '知乎批次' },
+            {
+              id: 52,
+              intakeId: 12,
+              name: '跨书城批次',
+              sources: ['点众', '知乎'],
+              bookCount: 3,
+              genders: ['女频', '男频'],
+              styles: ['情感', '悬疑'],
+              runStatus: 'running',
+            },
+            {
+              id: 51,
+              intakeId: 11,
+              name: '知乎批次',
+              sources: ['知乎'],
+              bookCount: 1,
+              genders: ['男频'],
+              styles: ['都市'],
+              runStatus: 'pending',
+            },
           ],
         }),
       )
 
     render(<IntakeWorkbench />)
 
-    expect(await screen.findByText('知乎批次')).toBeTruthy()
-    expect(screen.getByText('点众批次')).toBeTruthy()
+    expect(await screen.findByText('跨书城批次')).toBeTruthy()
+    expect(screen.getByText('知乎批次')).toBeTruthy()
+    expect(screen.getByText('点众')).toBeTruthy()
+    expect(screen.getAllByText('知乎').length).toBeGreaterThan(0)
+    expect(screen.getByText('3')).toBeTruthy()
+    expect(screen.getByText('女频')).toBeTruthy()
+    expect(screen.getAllByText('男频').length).toBeGreaterThan(0)
+    expect(screen.getByText('情感')).toBeTruthy()
+    expect(screen.getByText('悬疑')).toBeTruthy()
+    expect(screen.getByText('执行中')).toBeTruthy()
+    expect(screen.getByText('待执行')).toBeTruthy()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(String(fetchMock.mock.calls[0][0])).toBe('/api/v1/batch-projects')
   }, 15000)
