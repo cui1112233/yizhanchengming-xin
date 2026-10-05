@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE book_runs (
+CREATE TABLE run_book_executions (
     id BIGINT NOT NULL AUTO_INCREMENT,
     run_id BIGINT NOT NULL,
     book_id BIGINT NOT NULL,
@@ -11,13 +11,13 @@ CREATE TABLE book_runs (
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (id),
-    UNIQUE KEY uq_book_runs_run_book (run_id, book_id),
-    UNIQUE KEY uq_book_runs_idempotency (idempotency_key),
-    KEY idx_book_runs_run_status (run_id, status),
-    KEY idx_book_runs_lease (status, lease_until),
-    CONSTRAINT fk_book_runs_run FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
-    CONSTRAINT fk_book_runs_book FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+    UNIQUE KEY uq_run_book_executions_run_book (run_id, book_id),
+    UNIQUE KEY uq_run_book_executions_idempotency (idempotency_key),
+    KEY idx_run_book_executions_run_status (run_id, status),
+    KEY idx_run_book_executions_lease (status, lease_until),
+    CONSTRAINT fk_run_book_executions_run FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
+    CONSTRAINT fk_run_book_executions_book FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- +goose Down
-DROP TABLE IF EXISTS book_runs;
+DROP TABLE IF EXISTS run_book_executions;
