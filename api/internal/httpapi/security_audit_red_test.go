@@ -172,3 +172,39 @@ func TestSecurityAuditUnifiedSettingsServiceErrorIsRedacted(t *testing.T) {
 		t.Fatalf("internal settings error leaked to browser: %s", rec.Body.String())
 	}
 }
+
+func TestSecurityAuditAuthBackendFailureDoesNotMasqueradeAs401(t *testing.T) {
+	auth := &fakeAuthService{authErr: errors.New("mysql dsn=audit-fixture-secret")}
+	handler := NewHandler(Dependencies{Auth: auth, BatchProjects: &fakeBatchProjectReader{}})
+	req := authenticatedBatchRequest(http.MethodGet, "/api/v1/batch-projects")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	if rec.Code == http.StatusUnauthorized {
+		t.Fatalf("status=%d body=%s: backend/auth-store failure must not trigger browser refresh/login recovery", rec.Code, rec.Body.String())
+	}
+	if rec.Code < 500 {
+		t.Fatalf("status=%d body=%s, want safe 5xx for authentication backend failure", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(strings.ToLower(rec.Body.String()), "audit-fixture-secret") {
+		t.Fatalf("auth backend error leaked: %s", rec.Body.String())
+	}
+}
+
+func TestSecurityAuditLogoutRevocationFailureIsNotReportedAsSuccess(t *testing.T) {
+	auth := &fakeAuthService{logoutErr: errors.New("session store unavailable")}
+	handler := NewHandler(Dependencies{Auth: auth})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	sameOrigin(req)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access"})
+	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "refresh"})
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	if rec.Code == http.StatusNoContent {
+		t.Fatalf("status=%d: logout must not claim success when server-side revocation failed", rec.Code)
+	}
+	if rec.Code < 500 {
+		t.Fatalf("status=%d body=%s, want safe 5xx when session revocation fails", rec.Code, rec.Body.String())
+	}
+}
