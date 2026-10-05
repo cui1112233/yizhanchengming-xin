@@ -71,8 +71,23 @@ func safeLocalAudioAsset(asset string) bool {
 	if asset == "" || strings.HasPrefix(asset, "-") || strings.ContainsRune(asset, '\x00') {
 		return false
 	}
-	// The browser may identify only a server-materialized relative asset. It may
-	// not choose an arbitrary local filesystem path for ffprobe to open.
+	parsed, err := url.Parse(asset)
+	if err != nil {
+		return false
+	}
+	// Service-internal callers may pass an absolute server-materialized temp
+	// file. Network protocols are never accepted by ffprobe.
+	return parsed.Scheme == "" && parsed.Host == ""
+}
+
+// BrowserAudioAssetAllowed is the HTTP trust boundary for audio measurement.
+// A browser may identify only a server-managed relative asset; it may not make
+// ffprobe open an arbitrary absolute/traversal path on the server.
+func BrowserAudioAssetAllowed(asset string) bool {
+	asset = strings.TrimSpace(asset)
+	if !safeLocalAudioAsset(asset) {
+		return false
+	}
 	if filepath.IsAbs(asset) || strings.HasPrefix(asset, "/") || strings.Contains(asset, "\\") {
 		return false
 	}
@@ -81,17 +96,8 @@ func safeLocalAudioAsset(asset string) bool {
 			return false
 		}
 	}
-	cleaned := filepath.Clean(asset)
-	if cleaned == "." || cleaned == ".." || strings.HasPrefix(filepath.ToSlash(cleaned), "../") {
-		return false
-	}
-	parsed, err := url.Parse(asset)
-	if err != nil {
-		return false
-	}
-	// ffprobe accepts network protocols directly. Browser-controlled audio
-	// measurement must only probe files already materialized by the server.
-	return parsed.Scheme == "" && parsed.Host == ""
+	cleaned := filepath.ToSlash(filepath.Clean(asset))
+	return cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, "../")
 }
 
 func (s *Service) MeasureAudio(ctx context.Context, req AudioMeasurementRequest) (AudioMeasurement, error) {
