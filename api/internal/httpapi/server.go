@@ -32,6 +32,7 @@ type Dependencies struct {
 	Reader        IntakeReader
 	BatchProjects BatchProjectReader
 	Pipeline      PipelineService
+	Generation    GenerationService
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -51,6 +52,14 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/intakes/{id}/books", api.listBooks)
 	mux.HandleFunc("POST /api/v1/intakes/{id}/batch-projects", api.createBatchProject)
 	mux.HandleFunc("GET /api/v1/batch-projects", api.listBatchProjects)
+
+	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/generation", api.projectGeneration)
+	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/generation", api.projectGeneration)
+	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.bookGeneration)
+	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.bookGeneration)
+	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", api.retryGenerationStage)
+	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}", api.generationStage)
+	mux.HandleFunc("GET /api/v1/generation/prompts", api.generationPrompts)
 	return mux
 }
 
