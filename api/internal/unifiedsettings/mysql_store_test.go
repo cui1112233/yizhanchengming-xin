@@ -15,8 +15,7 @@ func TestMySQLStorePersistsProjectSettings(t *testing.T) {
 	store := NewMySQLStore(db)
 	settings := Settings{Production: map[string]any{"aiCopyEnabled": true, "aiCopyCount": float64(3)}, ProcessingRulePromptRef: "processing-v3"}
 
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO batch_project_settings (batch_project_id, settings_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_json = VALUES(settings_json), updated_at = CURRENT_TIMESTAMP(6)"))
-		.WithArgs(int64(9), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO batch_project_settings (batch_project_id, settings_json) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_json = VALUES(settings_json), updated_at = CURRENT_TIMESTAMP(6)")).WithArgs(int64(9), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 	if _, err := store.SaveProjectSettings(context.Background(), 9, settings); err != nil { t.Fatal(err) }
 
 	rows := sqlmock.NewRows([]string{"settings_json"}).AddRow(`{"production":{"aiCopyCount":3,"aiCopyEnabled":true},"processingRulePromptRef":"processing-v3"}`)
