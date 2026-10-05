@@ -1,0 +1,72 @@
+name: task16-e2e
+
+on:
+  push:
+    branches:
+      - 'test/**'
+  workflow_dispatch:
+    inputs:
+      public_base_url:
+        description: 'Optional public base URL for manual smoke run'
+        required: false
+        type: string
+      public_smoke:
+        description: 'Run only @public-smoke tests against PUBLIC_BASE_URL'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  local-e2e:
+    if: ${{ github.event_name == 'push' || !inputs.public_smoke }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: '前台'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task16-playwright-local
+          path: |
+            前台/test-results
+            前台/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
+
+  public-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.public_smoke && inputs.public_base_url != '' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: '前台'
+    env:
+      PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+      E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:public
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task16-playwright-public
+          path: |
+            前台/test-results
+            前台/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
