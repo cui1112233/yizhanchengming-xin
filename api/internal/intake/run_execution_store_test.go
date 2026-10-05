@@ -50,7 +50,7 @@ func TestMySQLStoreEnsuresOneBookRunPerRunAndBook(t *testing.T) {
 	defer db.Close()
 	store := NewMySQLStore(db)
 
-	query := "INSERT INTO book_runs (run_id, book_id, status, idempotency_key) SELECT r.id, b.id, 'pending', CONCAT('run:', r.id, ':book:', b.id) FROM runs r JOIN batch_projects bp ON bp.id = r.batch_project_id JOIN books b ON b.intake_id = bp.intake_id WHERE r.id = ? ON DUPLICATE KEY UPDATE id = id"
+	query := "INSERT INTO run_book_executions (run_id, book_id, status, idempotency_key) SELECT r.id, b.id, 'pending', CONCAT('run:', r.id, ':book:', b.id) FROM runs r JOIN batch_projects bp ON bp.id = r.batch_project_id JOIN books b ON b.intake_id = bp.intake_id WHERE r.id = ? ON DUPLICATE KEY UPDATE id = id"
 	mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(int64(71)).WillReturnResult(sqlmock.NewResult(0, 2))
 	if err := store.EnsureBookRuns(context.Background(), 71); err != nil { t.Fatal(err) }
 	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
@@ -63,12 +63,12 @@ func TestMySQLStoreRecoversExpiredBookRunsAndRetriesFailedBook(t *testing.T) {
 	store := NewMySQLStore(db)
 	now := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
 
-	recoverSQL := "UPDATE book_runs SET status = 'pending', lease_until = NULL WHERE run_id = ? AND status = 'running' AND lease_until IS NOT NULL AND lease_until < ?"
+	recoverSQL := "UPDATE run_book_executions SET status = 'pending', lease_until = NULL WHERE run_id = ? AND status = 'running' AND lease_until IS NOT NULL AND lease_until < ?"
 	mock.ExpectExec(regexp.QuoteMeta(recoverSQL)).WithArgs(int64(71), now).WillReturnResult(sqlmock.NewResult(0, 1))
 	recovered, err := store.RecoverExpiredBookRuns(context.Background(), 71, now)
 	if err != nil || recovered != 1 { t.Fatalf("recovered=%d err=%v", recovered, err) }
 
-	retrySQL := "UPDATE book_runs SET status = 'pending', error_message = '', lease_until = NULL WHERE id = ? AND status = 'failed'"
+	retrySQL := "UPDATE run_book_executions SET status = 'pending', error_message = '', lease_until = NULL WHERE id = ? AND status = 'failed'"
 	mock.ExpectExec(regexp.QuoteMeta(retrySQL)).WithArgs(int64(901)).WillReturnResult(sqlmock.NewResult(0, 1))
 	retried, err := store.RetryBookRun(context.Background(), 901)
 	if err != nil || !retried { t.Fatalf("retried=%v err=%v", retried, err) }
