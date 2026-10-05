@@ -42,7 +42,7 @@
 - [x] Task 7：Intake HTTP API 与运行时接线
 - [x] Task 8：小说获取工作台 + v88 对标 + 合并 main
 - [ ] Task 9：Batch Factory V11 主工作台
-- [ ] Task 10：批量工厂统一设置 / 版本对应配置档
+- 🟡 Task 10：批量工厂统一设置 / 版本对应配置档
 - ⚠️ Task 11：水货生产工作台
 - [ ] Task 12：剧本生成 / Director / Hook / 最终提示词
 - [ ] Task 13：音频 + matchAudio 分镜
@@ -388,4 +388,4 @@
 
 ## 当前执行点
 
-**下一任务：Task 9.2.4 — 展示书城来源。**
+**当前任务：Task 10 — 批量工厂统一设置 / 版本对应配置档。**
