@@ -29,3 +29,24 @@ func TestProductionHandlerRequiresAuthenticationForBusinessAPI(t *testing.T) {
 		t.Fatalf("body = %s, want stable auth error code", rec.Body.String())
 	}
 }
+
+func TestSecureCookiesDefaultToTrueOutsideDevelopment(t *testing.T) {
+	t.Setenv("QIANTIE_ENV", "")
+	t.Setenv("QIANTIE_COOKIE_SECURE", "false")
+	if !secureCookiesEnabled() {
+		t.Fatal("production-like environment must keep Secure cookies even when a stale false override exists")
+	}
+}
+
+func TestDevelopmentCanExplicitlyDisableSecureCookiesForHTTP(t *testing.T) {
+	t.Setenv("QIANTIE_ENV", "development")
+	t.Setenv("QIANTIE_COOKIE_SECURE", "false")
+	if secureCookiesEnabled() {
+		t.Fatal("development environment should allow HTTP-compatible Secure=false")
+	}
+
+	t.Setenv("QIANTIE_COOKIE_SECURE", "true")
+	if !secureCookiesEnabled() {
+		t.Fatal("development environment should still allow opting into Secure cookies")
+	}
+}
