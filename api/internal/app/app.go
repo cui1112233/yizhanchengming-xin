@@ -2,19 +2,26 @@ package app
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 )
 
-// NewHandler wires intake, pipeline, generation and unified settings services to MySQL.
-// React/localStorage never becomes the source of truth for persisted configuration.
 func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock) http.Handler {
+	return newHandler(db, fetcher, classifier, now, true)
+}
+
+func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock, authEnabled bool) http.Handler {
 	store := intake.NewMySQLStore(db)
 	intakeService := intake.NewService(store, fetcher, classifier)
 	pipelineService := pipeline.NewService(store, now)
@@ -31,6 +38,19 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Publishing: map[string]any{"uploadVideoType": "merged", "materialReuse": false},
 	}}, settingsStore)
 
+	var authService httpapi.AuthService
+	if authEnabled {
+		authStore := authn.NewMySQLStore(db)
+		authService = authn.NewService(authStore, authn.NewManager(authStore, authn.Options{}))
+	}
+	publishingService := publishing.NewService(publishing.NewMySQLStore(db), publishing.Options{CredentialKey: publishingCredentialKey()})
+	allowedOrigins := make([]string, 0)
+	for _, value := range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"), ",") {
+		if value = strings.TrimSpace(value); value != "" {
+			allowedOrigins = append(allowedOrigins, value)
+		}
+	}
+
 	return httpapi.NewHandler(httpapi.Dependencies{
 		Intakes:             intakeService,
 		Reader:              store,
@@ -39,5 +59,39 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		BatchProjectDetails: store,
 		Generation:          generationService,
 		UnifiedSettings:     settingsService,
+		Auth:                authService,
+		Publishing:          publishingService,
+		SecureCookies:       secureCookiesEnabled(),
+		AllowedOrigins:      allowedOrigins,
 	})
+}
+
+func secureCookiesEnabled() bool {
+	environment := strings.ToLower(strings.TrimSpace(os.Getenv("QIANTIE_ENV")))
+	development := environment == "dev" || environment == "development" || environment == "local" || environment == "test"
+	if !development {
+		return true
+	}
+
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_COOKIE_SECURE"))
+	if raw == "" {
+		return false
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false
+	}
+	return value
+}
+
+func publishingCredentialKey() []byte {
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_PUBLISH_CREDENTIAL_KEY_B64"))
+	if raw == "" {
+		return nil
+	}
+	value, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil || len(value) != 32 {
+		return nil
+	}
+	return value
 }

@@ -36,9 +36,9 @@ func TestNewHandlerWiresIntakeServiceToMySQLStore(t *testing.T) {
 		WithArgs(int64(11), "知乎付费", "15", "1001", "测试书", "", "", "", "", "", "", "", intake.BookStatusPending, "").
 		WillReturnResult(sqlmock.NewResult(21, 1))
 
-	handler := NewHandler(db, fakeFetcher{}, nil, func() time.Time {
+	handler := newHandler(db, fakeFetcher{}, nil, func() time.Time {
 		return time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
-	})
+	}, false)
 	body := []byte(`{"name":"知乎测试","groups":[{"source":"知乎付费","platformId":"15","books":[{"bookId":"1001","title":"测试书"}]}]}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/intakes", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -73,7 +73,7 @@ func TestNewHandlerWiresPipelineToSameMySQLStore(t *testing.T) {
 		WithArgs(int64(51), now, intake.RunStatusPending).
 		WillReturnResult(sqlmock.NewResult(71, 1))
 
-	handler := NewHandler(db, fakeFetcher{}, nil, func() time.Time { return now })
+	handler := newHandler(db, fakeFetcher{}, nil, func() time.Time { return now }, false)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/intakes/11/batch-projects", bytes.NewBufferString(`{}`))
 	rec := httptest.NewRecorder()
 
@@ -100,7 +100,7 @@ func TestNewHandlerWiresBatchProjectReaderToMySQLStore(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "created_at", "updated_at"}).
 			AddRow(51, 11, "知乎批次", "知乎", 2, "男频", "悬疑", intake.RunStatusPending, now, now))
 
-	handler := NewHandler(db, fakeFetcher{}, nil, func() time.Time { return now })
+	handler := newHandler(db, fakeFetcher{}, nil, func() time.Time { return now }, false)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects", nil)
 	rec := httptest.NewRecorder()
 
