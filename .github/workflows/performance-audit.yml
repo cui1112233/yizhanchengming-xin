@@ -35,9 +35,31 @@ jobs:
       - name: Apply migrations
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true&multiStatements=true' up
       - name: Run Task 9 idempotency RED probe
-        continue-on-error: true
         env:
           PERF_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true
-        run: go test ./internal/pipeline -run TestConcurrentCreateSameIntakeIsIdempotent -count=1 -v
+        shell: bash
+        run: |
+          set +e
+          go test ./internal/pipeline -run TestConcurrentCreateSameIntakeIsIdempotent -count=1 -v 2>&1 | tee /tmp/perf-red.log
+          test_status=${PIPESTATUS[0]}
+          while IFS= read -r line; do
+            echo "::warning title=PERF_TASK9_IDEMPOTENCY_RED::$line"
+          done < <(grep 'PERF_RED' /tmp/perf-red.log || true)
+          if [ "$test_status" -eq 0 ]; then
+            echo "::notice title=PERF_TASK9_IDEMPOTENCY_RED::Probe passed; re-check whether Task 9 idempotency entered main."
+          else
+            echo "::warning title=PERF_TASK9_IDEMPOTENCY_RED::Expected RED reproduced with exit code $test_status; Task 9.4.6 remains a blocker."
+          fi
+          exit 0
+      - name: Run 10/50/100 MySQL and HTTP baseline
+        env:
+          PERF_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./internal/perfaudit -run TestMySQLAndHTTPBaseline -count=1 -v 2>&1 | tee /tmp/perf-baseline.log
+          while IFS= read -r line; do
+            echo "::notice title=PERF_BASELINE::$line"
+          done < <(grep 'PERF_BASELINE' /tmp/perf-baseline.log || true)
       - name: Run existing Go tests
         run: go test ./...
