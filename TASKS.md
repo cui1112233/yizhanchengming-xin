@@ -175,48 +175,56 @@
 - [x] 9.2.1 BatchProject 列表 API
 - [x] 9.2.2 从 MySQL 读取真实项目
 - [x] 9.2.3 展示项目名称
-- 🟡 9.2.4 展示书城来源
-- 🟡 9.2.5 展示小说数量
-- 🟡 9.2.6 展示男女频
-- 🟡 9.2.7 展示风格
-- 🟡 9.2.8 展示运行状态
-- 🟡 9.2.9 Task 8 新建项目能立刻出现在列表
+- [x] 9.2.4 展示书城来源
+- [x] 9.2.5 展示小说数量
+- [x] 9.2.6 展示男女频
+- [x] 9.2.7 展示风格
+- [x] 9.2.8 展示运行状态
+- [x] 9.2.9 Task 8 新建项目能立刻出现在列表
+
+> 9.2 仓库证据：BatchProject MySQL 汇总测试 + `BatchProjectListPage.test.jsx` 覆盖来源/数量/男女频/风格/运行状态；`task9-list-visibility.spec.js` 覆盖 Task8 完成后立即进入批量工厂并看到新项目。
 
 ## 9.3 项目详情
 
-- 🟡 9.3.1 点击项目进入 V11 工作台
-- 🟡 9.3.2 展示项目所有小说
-- 🟡 9.3.3 展示 Book ID
-- 🟡 9.3.4 展示书名
-- 🟡 9.3.5 展示书城
-- 🟡 9.3.6 展示男女频
-- 🟡 9.3.7 展示风格
-- 🟡 9.3.8 展示正文获取状态
-- 🟡 9.3.9 展示真实错误原因
+- [x] 9.3.1 点击项目进入 V11 工作台
+- [x] 9.3.2 展示项目所有小说
+- [x] 9.3.3 展示 Book ID
+- [x] 9.3.4 展示书名
+- [x] 9.3.5 展示书城
+- [x] 9.3.6 展示男女频
+- [x] 9.3.7 展示风格
+- [x] 9.3.8 展示正文获取状态
+- [x] 9.3.9 展示真实错误原因
+
+> 9.3 仓库证据：`BatchProjectListPage.test.jsx` 点击真实项目进入 `Batch Factory V11 工作台`，同时验证 Book ID、书名、书城/平台、男女频、风格、正文状态及 `121 upstream error` 等真实安全错误展示。
 
 ## 9.4 Run 执行框架
 
-- [ ] 9.4.1 pending -> running 状态转换
-- [ ] 9.4.2 单本独立状态
-- [ ] 9.4.3 一本失败不阻断其他书
-- [ ] 9.4.4 错误持久化
-- [ ] 9.4.5 单本重试
-- [ ] 9.4.6 防重复点击 / 幂等保护
-- [ ] 9.4.7 自动化到点执行 Worker
-- [ ] 9.4.8 Redis Queue
-- [ ] 9.4.9 Redis Lock
-- [ ] 9.4.10 Worker 崩溃/重启后的任务恢复策略
+- [x] 9.4.1 pending -> running 状态转换
+- [x] 9.4.2 单本独立状态
+- [x] 9.4.3 一本失败不阻断其他书
+- [x] 9.4.4 错误持久化
+- [x] 9.4.5 单本重试
+- [x] 9.4.6 防重复点击 / 幂等保护
+- [x] 9.4.7 自动化到点执行 Worker
+- [x] 9.4.8 Redis Queue
+- [x] 9.4.9 Redis Lock
+- [x] 9.4.10 Worker 崩溃/重启后的任务恢复策略
+
+> 9.4 仓库证据：真实 MySQL/Redis 集成覆盖 Worker CAS、Scheduler due claim、BookRun 独立执行、3 本书失败隔离/只重试失败书、safe `error_code/error_message` 脱敏持久化、20 并发真实 `pipeline.Service.Create` 幂等、Redis Queue、FLUSHDB/Go restart recovery、stale Worker fencing。9.4.9 的 Redis Lock 要求由 **owner-safe Lease + fencing token semantics** 满足；不新增 dumb Redis mutex。
 
 ## 9.5 Task 9 验收
 
-- [ ] 9.5.1 Go tests
-- [ ] 9.5.2 前台 tests
-- [ ] 9.5.3 前台 build
-- [ ] 9.5.4 后台 build
-- [ ] 9.5.5 v88 行为对标
+- [x] 9.5.1 Go tests
+- [x] 9.5.2 前台 tests
+- [x] 9.5.3 前台 build
+- [x] 9.5.4 后台 build
+- [x] 9.5.5 v88 行为对标
 - [ ] 9.5.6 PR CI 全绿
 - [ ] 9.5.7 合并 main
 - [ ] 9.5.8 合并后 CI 全绿
+
+> 9.5.5 对标结论见 `docs/migration/task9-runtime-v88-final-audit.md`：旧 v88 的 JSON/local scheduler + process-local running set 被替换为 MySQL authoritative facts + Redis Queue/Lease + fencing + crash recovery，属于**语义继承 + Go 化增强**，不是照搬旧实现。
 
 ---
 
@@ -402,4 +410,4 @@
 
 ## 当前执行点
 
-**当前任务：Task 9.2 + 9.3 收口；9.4 尚未进入本分支。**
+**当前任务：Task 9.2 / 9.3 / 9.4 / 9.5 仓库阶段收口；等待 PR CI 与 Task16 PR E2E，暂不合并 main。**
