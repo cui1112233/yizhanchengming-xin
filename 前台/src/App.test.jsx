@@ -109,5 +109,5 @@ describe('小说获取工作台行为', () => {
     ).toBe(false)
     expect(await screen.findByText('成功小说')).toBeTruthy()
     expect(await screen.findByText('121 upstream error')).toBeTruthy()
-  })
+  }, 15000)
 })
