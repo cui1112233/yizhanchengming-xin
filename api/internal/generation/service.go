@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -14,18 +15,22 @@ import (
 type Clock func() time.Time
 
 type Service struct {
-	store    Store
-	provider Provider
-	resolver *PromptResolver
-	now      Clock
-	compiler FinalPromptCompiler
+	store       Store
+	provider    Provider
+	resolver    *PromptResolver
+	now         Clock
+	compiler    FinalPromptCompiler
+	audioProber AudioProber
 }
 
 func NewService(store Store, provider Provider, now Clock) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{store: store, provider: provider, resolver: NewPromptResolver(store), now: now, compiler: FinalPromptCompiler{}}
+	return &Service{
+		store: store, provider: provider, resolver: NewPromptResolver(store), now: now,
+		compiler: FinalPromptCompiler{}, audioProber: FFprobeAudioProber{Binary: "ffprobe"},
+	}
 }
 
 func safeError(err error) string {
@@ -49,6 +54,41 @@ func (s *Service) validate() error {
 		return ErrUnavailable
 	}
 	return nil
+}
+
+func normalizeShotDurationLimit(seconds int64) (int64, error) {
+	if seconds == 0 {
+		seconds = 15
+	}
+	if seconds != 10 && seconds != 15 {
+		return 0, fmt.Errorf("%w: shotDurationLimitSec must be 10 or 15", ErrInvalid)
+	}
+	return seconds, nil
+}
+
+func (s *Service) applyAuthoritativeAudio(ctx context.Context, req *RunBookRequest) (int64, error) {
+	if req == nil || !req.MatchAudio {
+		return 0, nil
+	}
+	limit, err := normalizeShotDurationLimit(req.ShotDurationLimitSec)
+	if err != nil {
+		return 0, err
+	}
+	measurement, err := s.store.LatestAudioMeasurement(ctx, req.BatchProjectID, req.BookID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return 0, ErrAudioMeasurementRequired
+		}
+		return 0, err
+	}
+	if measurement.DurationMS <= 0 {
+		return 0, ErrAudioMeasurementRequired
+	}
+	// The client field is display/compatibility information only. The value sent
+	// to Director is always rebuilt from the server-side persisted measurement.
+	req.AudioDurationSec = float64(measurement.DurationMS) / 1000
+	req.ShotDurationLimitSec = limit
+	return measurement.DurationMS, nil
 }
 
 func (s *Service) result(ctx context.Context, run BookRun) (BookGenerationResult, error) {
@@ -88,6 +128,10 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 		return BookGenerationResult{}, err
 	}
 
+	if _, err := s.applyAuthoritativeAudio(ctx, &req); err != nil {
+		return BookGenerationResult{}, err
+	}
+
 	book, err := s.store.GetBookForProject(ctx, req.BatchProjectID, req.BookID)
 	if err != nil {
 		return BookGenerationResult{}, err
@@ -115,8 +159,6 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 		}
 		hookText = hook.OutputText
 	} else {
-		// Disabled is a product decision, not a failed generation and not a
-		// dependency on a currently enabled Hook prompt revision.
 		if _, skipErr := s.createSkippedStage(ctx, run, book, StageHook, PromptHook); skipErr != nil {
 			return s.failRun(ctx, run, skipErr)
 		}
@@ -129,10 +171,11 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	directorInput, _ := json.Marshal(map[string]any{
 		"script": script.OutputText, "hook": hookText, "directorMode": req.DirectorMode,
 		"matchAudio": req.MatchAudio, "audioDurationSec": req.AudioDurationSec,
+		"shotDurationLimitSec": req.ShotDurationLimitSec,
 	})
 	director, err := s.executeProviderStage(ctx, run, book, StageDirector, directorKey, TextRequest{
 		BookID: book.ID, Stage: StageDirector, UserPrompt: string(directorInput), DirectorMode: req.DirectorMode,
-		MatchAudio: req.MatchAudio, AudioDurationSec: req.AudioDurationSec,
+		MatchAudio: req.MatchAudio, AudioDurationSec: req.AudioDurationSec, ShotDurationLimitSec: req.ShotDurationLimitSec,
 	})
 	if err != nil {
 		return s.failRun(ctx, run, err)
@@ -208,6 +251,18 @@ func validateProviderOutput(req TextRequest, output string) error {
 	return nil
 }
 
+func validationJSON(valid bool, req TextRequest, result TimelineValidationResult, err error) string {
+	payload := map[string]any{
+		"valid": valid, "matchAudio": req.MatchAudio, "audioDurationSec": req.AudioDurationSec,
+		"durationMs": result.DurationMS, "repaired": result.Repaired, "directorMode": req.DirectorMode,
+	}
+	if err != nil {
+		payload["error"] = safeError(err)
+	}
+	encoded, _ := json.Marshal(payload)
+	return string(encoded)
+}
+
 func (s *Service) executeProviderStage(ctx context.Context, run BookRun, book intake.Book, stage Stage, promptKey string, req TextRequest) (StageRun, error) {
 	prompt, err := s.resolver.Resolve(ctx, promptKey)
 	if err != nil {
@@ -230,9 +285,23 @@ func (s *Service) executeProviderStage(ctx context.Context, run BookRun, book in
 	if callErr == nil {
 		callErr = validateProviderOutput(req, output)
 	}
+	if callErr == nil && stage == StageDirector && req.MatchAudio {
+		targetMS := int64(math.Round(req.AudioDurationSec * 1000))
+		limitSec, limitErr := normalizeShotDurationLimit(req.ShotDurationLimitSec)
+		if limitErr != nil {
+			callErr = limitErr
+		} else {
+			var result TimelineValidationResult
+			output, result, callErr = validateAndRepairDirectorOutput(output, targetMS, limitSec*1000)
+			stageRun.ValidationResult = validationJSON(callErr == nil, req, result, callErr)
+		}
+	}
 	finished := s.now().UTC()
 	stageRun.FinishedAt = &finished
 	if callErr != nil {
+		if stage == StageDirector && req.MatchAudio && stageRun.ValidationResult == "" {
+			stageRun.ValidationResult = validationJSON(false, req, TimelineValidationResult{}, callErr)
+		}
 		stageRun.Status, stageRun.ErrorMessage = StatusFailed, safeError(callErr)
 		stageRun, err = s.store.UpdateStageRun(ctx, stageRun)
 		if err != nil {
@@ -267,7 +336,11 @@ func (s *Service) RunBatch(ctx context.Context, req RunBatchRequest) (BatchGener
 	result := BatchGenerationResult{BatchProjectID: req.BatchProjectID, Books: make([]BatchBookResult, 0, len(books))}
 	var failures []string
 	for _, book := range books {
-		bookReq := RunBookRequest{BatchProjectID: req.BatchProjectID, BookID: book.ID, HookEnabled: req.HookEnabled, PlotMode: req.PlotMode, DirectorMode: req.DirectorMode, MatchAudio: req.MatchAudio, AudioDurationSec: req.AudioDurationSec, RequestID: req.RequestID}
+		bookReq := RunBookRequest{
+			BatchProjectID: req.BatchProjectID, BookID: book.ID, HookEnabled: req.HookEnabled, PlotMode: req.PlotMode,
+			DirectorMode: req.DirectorMode, MatchAudio: req.MatchAudio, AudioDurationSec: req.AudioDurationSec,
+			ShotDurationLimitSec: req.ShotDurationLimitSec, RequestID: req.RequestID,
+		}
 		generated, runErr := s.RunBook(ctx, bookReq)
 		item := BatchBookResult{BookID: book.ID, Run: &generated.Run}
 		if runErr != nil {
@@ -336,12 +409,29 @@ func (s *Service) RetryStage(ctx context.Context, req RetryStageRequest) (BookGe
 		_ = json.Unmarshal([]byte(latest.InputSnapshot), &payload)
 		matchAudio, _ := payload["matchAudio"].(bool)
 		audio, _ := payload["audioDurationSec"].(float64)
+		limit := int64(0)
+		if raw, ok := payload["shotDurationLimitSec"].(float64); ok {
+			limit = int64(raw)
+		}
 		mode := DirectorNormal
 		if latest.PromptKey == PromptDirectorH3 {
 			mode = DirectorH3
 		}
-		body, _ := json.Marshal(map[string]any{"script": script.OutputText, "hook": hookText, "directorMode": mode, "matchAudio": matchAudio, "audioDurationSec": audio})
-		_, retryErr = s.executeProviderStage(ctx, run, book, StageDirector, latest.PromptKey, TextRequest{BookID: book.ID, Stage: StageDirector, UserPrompt: string(body), DirectorMode: mode, MatchAudio: matchAudio, AudioDurationSec: audio})
+		if matchAudio {
+			measurement, measurementErr := s.store.LatestAudioMeasurement(ctx, req.BatchProjectID, req.BookID)
+			if measurementErr != nil || measurement.DurationMS <= 0 {
+				retryErr = ErrAudioMeasurementRequired
+				break
+			}
+			audio = float64(measurement.DurationMS) / 1000
+			limit, e = normalizeShotDurationLimit(limit)
+			if e != nil {
+				retryErr = e
+				break
+			}
+		}
+		body, _ := json.Marshal(map[string]any{"script": script.OutputText, "hook": hookText, "directorMode": mode, "matchAudio": matchAudio, "audioDurationSec": audio, "shotDurationLimitSec": limit})
+		_, retryErr = s.executeProviderStage(ctx, run, book, StageDirector, latest.PromptKey, TextRequest{BookID: book.ID, Stage: StageDirector, UserPrompt: string(body), DirectorMode: mode, MatchAudio: matchAudio, AudioDurationSec: audio, ShotDurationLimitSec: limit})
 	case StageFinalPrompt:
 		prompt, e := s.resolver.Resolve(ctx, latest.PromptKey)
 		if e != nil {

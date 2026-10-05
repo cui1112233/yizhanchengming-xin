@@ -73,6 +73,8 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/generation", api.projectGeneration)
 	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.bookGeneration)
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.bookGeneration)
+	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/books/{bookId}/audio-measurement", api.audioMeasurement)
+	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/audio-measurement", api.audioMeasurement)
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", api.retryGenerationStage)
 	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}", api.generationStage)
 	mux.HandleFunc("GET /api/v1/generation/prompts", api.generationPrompts)
