@@ -29,6 +29,15 @@ const (
 	RunStatusFailed    RunStatus = "failed"
 )
 
+type BookRunStatus string
+
+const (
+	BookRunStatusPending   BookRunStatus = "pending"
+	BookRunStatusRunning   BookRunStatus = "running"
+	BookRunStatusCompleted BookRunStatus = "completed"
+	BookRunStatusFailed    BookRunStatus = "failed"
+)
+
 type Intake struct {
 	ID        int64
 	Name      string
@@ -75,6 +84,19 @@ type Run struct {
 	BatchProjectID int64
 	RunAt          time.Time
 	Status         RunStatus
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type BookRun struct {
+	ID             int64
+	RunID          int64
+	BookID         int64
+	Status         BookRunStatus
+	Attempt        int
+	ErrorMessage   string
+	IdempotencyKey string
+	LeaseUntil     *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
