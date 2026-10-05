@@ -26,7 +26,7 @@ test.describe('@batch Task 9 project-list acceptance', () => {
     await page.getByRole('button', { name: '立即执行' }).click()
     await expect(page.getByText('立即执行任务已创建。')).toBeVisible()
 
-    await page.getByRole('button', { name: '批量工厂' }).click()
+    await page.getByRole('button', { name: '批量工厂', exact: true }).click()
     await expect(page.getByRole('heading', { name: '批量工厂' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Task8完成批次' })).toBeVisible()
     await expect(page.getByText('知乎')).toBeVisible()
