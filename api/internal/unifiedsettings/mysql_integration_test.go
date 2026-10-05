@@ -10,6 +10,16 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type integrationSnapshotSource struct{}
+
+func (integrationSnapshotSource) Get121Snapshot(context.Context, int64) (map[string]any, error) {
+	return map[string]any{"sources": []map[string]string{{"source": "知乎", "platformId": "4"}}}, nil
+}
+
+func (integrationSnapshotSource) GetStyleTypeSnapshot(context.Context, int64) (map[string]any, error) {
+	return map[string]any{"styles": []string{"剧情"}, "genres": []string{"都市"}, "genders": []string{"女频"}}, nil
+}
+
 func TestMySQLPersistenceSurvivesStoreReload(t *testing.T) {
 	dsn := os.Getenv("TASK10_MYSQL_DSN")
 	if dsn == "" {
@@ -50,6 +60,10 @@ func TestMySQLPersistenceSurvivesStoreReload(t *testing.T) {
 	}
 	if _, err := store.SaveVersionProfile(ctx, profile); err != nil { t.Fatal(err) }
 
+	service := NewService(store, StaticDefaults{}, integrationSnapshotSource{})
+	if _, err := service.Sync121(ctx, projectID); err != nil { t.Fatalf("sync 121: %v", err) }
+	if _, err := service.SyncStyleTypes(ctx, projectID); err != nil { t.Fatalf("sync style types: %v", err) }
+
 	// Simulate a page refresh/new request by constructing a fresh store and reading from MySQL again.
 	reloaded := NewMySQLStore(db)
 	gotProject, err := reloaded.GetProjectSettings(ctx, projectID)
@@ -64,5 +78,11 @@ func TestMySQLPersistenceSurvivesStoreReload(t *testing.T) {
 	}
 	if gotProfile.Settings.ProcessingRulePromptRef != "processing-v3" || gotProfile.Settings.KnowledgePromptRef != "knowledge-v7" {
 		t.Fatalf("reloaded prompt refs = %#v", gotProfile.Settings)
+	}
+	if len(gotProfile.Settings.Website121) == 0 {
+		t.Fatalf("121 snapshot did not survive MySQL reload: %#v", gotProfile.Settings.Website121)
+	}
+	if len(gotProfile.Settings.StyleTypes) == 0 {
+		t.Fatalf("style/type snapshot did not survive MySQL reload: %#v", gotProfile.Settings.StyleTypes)
 	}
 }
