@@ -8,12 +8,14 @@ import (
 )
 
 const (
-	ProviderPersonalAPI        = "personal_api"
-	ProviderYFAISeedance       = "yfai_seedance"
-	ProviderAutoDLComfyUI      = "autodl_comfyui"
+	ProviderPersonalAPI         = "personal_api"
+	ProviderYFAISeedance        = "yfai_seedance"
+	ProviderAutoDLComfyUI       = "autodl_comfyui"
 	ProviderDoubaoLocalExecutor = "doubao_local_executor"
 
-	ModelYD20Mini = "yd2.0-mini"
+	ModelYD20Mini            = "yd2.0-mini"
+	ModelSeedance20Official  = "seedance-2-0-official"
+	ModelMiniMaxH3Video      = "minimax-h3-video"
 )
 
 type TaskStatus string
@@ -36,16 +38,26 @@ const (
 	JobCancelled JobStatus = "cancelled"
 )
 
+type ProviderAvailability string
+
+const (
+	ProviderStatusUnconfigured ProviderAvailability = "unconfigured"
+	ProviderStatusAvailable    ProviderAvailability = "available"
+	ProviderStatusUnavailable  ProviderAvailability = "unavailable"
+	ProviderStatusAuthFailed   ProviderAvailability = "auth_failed"
+)
+
 type ErrorCode string
 
 const (
-	ErrorProviderUnconfigured       ErrorCode = "provider_unconfigured"
-	ErrorProviderUnavailable        ErrorCode = "provider_unavailable"
-	ErrorProviderAuthFailed         ErrorCode = "provider_auth_failed"
-	ErrorProviderRequestFailed      ErrorCode = "provider_request_failed"
-	ErrorProviderInvalidResponse    ErrorCode = "provider_invalid_response"
-	ErrorProviderCancelUnsupported  ErrorCode = "provider_cancel_unsupported"
+	ErrorProviderUnconfigured        ErrorCode = "provider_unconfigured"
+	ErrorProviderUnavailable         ErrorCode = "provider_unavailable"
+	ErrorProviderAuthFailed          ErrorCode = "provider_auth_failed"
+	ErrorProviderRequestFailed       ErrorCode = "provider_request_failed"
+	ErrorProviderInvalidResponse     ErrorCode = "provider_invalid_response"
+	ErrorProviderCancelUnsupported   ErrorCode = "provider_cancel_unsupported"
 	ErrorProviderConfigDecryptFailed ErrorCode = "provider_config_decrypt_failed"
+	ErrorVideoRetryNotAllowed        ErrorCode = "video_retry_not_allowed"
 )
 
 type ProviderError struct {
@@ -73,15 +85,15 @@ func providerError(code ErrorCode, message string, err error) error {
 var ErrNotFound = errors.New("video: not found")
 
 type ProviderConfig struct {
-	ID              int64  `json:"id"`
-	ProviderKey     string `json:"providerKey"`
-	Model           string `json:"model"`
-	CreateURL       string `json:"createUrl,omitempty"`
-	TasksURL        string `json:"tasksUrl,omitempty"`
-	ResultURL       string `json:"resultUrl,omitempty"`
-	EncryptedSecret []byte `json:"-"`
-	SecretNonce     []byte `json:"-"`
-	Enabled         bool   `json:"enabled"`
+	ID              int64     `json:"id"`
+	ProviderKey     string    `json:"providerKey"`
+	Model           string    `json:"model"`
+	CreateURL       string    `json:"createUrl,omitempty"`
+	TasksURL        string    `json:"tasksUrl,omitempty"`
+	ResultURL       string    `json:"resultUrl,omitempty"`
+	EncryptedSecret []byte    `json:"-"`
+	SecretNonce     []byte    `json:"-"`
+	Enabled         bool      `json:"enabled"`
 	CreatedAt       time.Time `json:"createdAt,omitempty"`
 	UpdatedAt       time.Time `json:"updatedAt,omitempty"`
 }
@@ -103,6 +115,15 @@ func (c ProviderConfig) View() ProviderConfigView {
 		CreateURL: c.CreateURL, TasksURL: c.TasksURL, ResultURL: c.ResultURL,
 		Enabled: c.Enabled, Configured: len(c.EncryptedSecret) > 0 && len(c.SecretNonce) > 0,
 	}
+}
+
+type ProviderStatusView struct {
+	ProviderKey string               `json:"providerKey"`
+	Model       string               `json:"model"`
+	Configured  bool                 `json:"configured"`
+	Enabled     bool                 `json:"enabled"`
+	Status      ProviderAvailability `json:"status"`
+	Message     string               `json:"message,omitempty"`
 }
 
 type SubmitRequest struct {
@@ -139,15 +160,19 @@ type Provider interface {
 	Cancel(context.Context, string) (CancelResult, error)
 }
 
+type ProviderProber interface {
+	Probe(context.Context) error
+}
+
 type ProviderFactory interface {
 	Build(ProviderConfig, string) (Provider, error)
 }
 
 type FinalPrompt struct {
-	StageRunID     int64
-	PromptVersion  int
-	InputRevision  string
-	Text           string
+	StageRunID    int64
+	PromptVersion int
+	InputRevision string
+	Text          string
 }
 
 type FinalPromptSource interface {
@@ -165,39 +190,40 @@ type ArtifactStore interface {
 }
 
 type ProductionJob struct {
-	ID                    int64
-	BatchProjectID        int64
-	BookID                 int64
-	Status                 JobStatus
-	InputRevision          string
-	FinalPromptStageRunID  int64
-	FinalPromptVersion     int
-	Provider               string
-	Model                  string
-	IdempotencyKey         string
-	ErrorCode              ErrorCode
-	ErrorMessage           string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                   int64
+	BatchProjectID       int64
+	BookID                int64
+	Status                JobStatus
+	InputRevision         string
+	FinalPromptStageRunID int64
+	FinalPromptVersion    int
+	FinalPromptText       string
+	Provider              string
+	Model                 string
+	IdempotencyKey        string
+	ErrorCode             ErrorCode
+	ErrorMessage          string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type ProductionTask struct {
-	ID               int64
-	ProductionJobID  int64
-	Attempt          int
-	Provider         string
-	Model            string
-	RequestID        string
-	ProviderJobID    string
-	Status           TaskStatus
-	ErrorCode        ErrorCode
-	ErrorMessage     string
+	ID                int64
+	ProductionJobID   int64
+	Attempt           int
+	Provider          string
+	Model             string
+	RequestID         string
+	ProviderJobID     string
+	Status            TaskStatus
+	ErrorCode         ErrorCode
+	ErrorMessage      string
 	ArtifactSourceURL string
-	OutputBucket     string
-	OutputObjectKey  string
-	OutputURL        string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	OutputBucket      string
+	OutputObjectKey   string
+	OutputURL         string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type StartRequest struct {
