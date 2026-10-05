@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Table, Tag, Typography } from 'antd'
 import {
+  cancelVideoTask,
   getBatchProject,
   getGenerationStage,
   getProjectGeneration,
+  getProjectVideoStatus,
   listBatchProjects,
   retryGenerationStage,
+  retryVideoTask,
   runBookGeneration,
   runProjectGeneration,
 } from './api.js'
@@ -32,15 +35,15 @@ const BOOK_STATUS_LABELS = {
 }
 
 function statusColor(status) {
-  if (status === 'completed') return 'success'
+  if (status === 'completed' || status === 'succeeded') return 'success'
   if (status === 'failed') return 'error'
   if (status === 'running') return 'processing'
-  if (status === 'skipped') return 'default'
+  if (status === 'skipped' || status === 'cancelled') return 'default'
   return 'warning'
 }
 
 function statusLabel(status) {
-  return ({ pending: '待执行', running: '执行中', completed: '完成', failed: '失败', skipped: '已跳过' })[status] || '待执行'
+  return ({ pending: '待执行', queued: '排队中', running: '执行中', completed: '完成', succeeded: '成功', failed: '失败', cancelled: '已取消', skipped: '已跳过' })[status] || '待执行'
 }
 
 function renderTags(values) {
@@ -130,6 +133,7 @@ export default function BatchProjectListPage() {
   const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(null)
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
+  const [videoStatus, setVideoStatus] = useState(null)
   const [generationLoading, setGenerationLoading] = useState(false)
   const [resultModal, setResultModal] = useState(null)
 
@@ -146,7 +150,12 @@ export default function BatchProjectListPage() {
     if (!project) return
     setGenerationLoading(true)
     try {
-      setSummary(await getProjectGeneration(project.id))
+      const [generationPayload, videoPayload] = await Promise.all([
+        getProjectGeneration(project.id),
+        getProjectVideoStatus(project.id),
+      ])
+      setSummary(generationPayload)
+      setVideoStatus(videoPayload)
       setError('')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '读取生成状态失败')
@@ -158,6 +167,7 @@ export default function BatchProjectListPage() {
   const openGeneration = async (project) => {
     setSelected(project)
     setSummary(null)
+    setVideoStatus(null)
     await refreshGeneration(project)
   }
 
@@ -212,6 +222,32 @@ export default function BatchProjectListPage() {
     }
   }
 
+  const retryVideo = async (bookId, taskId) => {
+    if (!selected || !taskId) return
+    setGenerationLoading(true)
+    try {
+      await retryVideoTask(taskId, `video-retry-${bookId}-${Date.now()}`)
+      await refreshGeneration(selected)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'VIDEO 重试失败')
+    } finally {
+      setGenerationLoading(false)
+    }
+  }
+
+  const cancelVideo = async (taskId) => {
+    if (!selected || !taskId) return
+    setGenerationLoading(true)
+    try {
+      await cancelVideoTask(taskId)
+      await refreshGeneration(selected)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'VIDEO 取消失败')
+    } finally {
+      setGenerationLoading(false)
+    }
+  }
+
   const showStage = async (bookId, stage) => {
     if (!selected) return
     try {
@@ -221,6 +257,11 @@ export default function BatchProjectListPage() {
       setError(reason instanceof Error ? reason.message : '读取 Stage 结果失败')
     }
   }
+
+  const videoByBook = useMemo(() => {
+    const items = Array.isArray(videoStatus?.books) ? videoStatus.books : []
+    return new Map(items.map((item) => [String(item.bookId), item]))
+  }, [videoStatus])
 
   const projectColumns = [
     {
@@ -280,13 +321,43 @@ export default function BatchProjectListPage() {
       { title: '书名', dataIndex: 'title', key: 'title', width: 150, render: (value) => value || '-' },
       ...stageColumns,
       {
+        title: 'VIDEO',
+        key: 'video',
+        width: 280,
+        render: (_, row) => {
+          const video = videoByBook.get(String(row.bookId))
+          if (!video) return <Typography.Text type="secondary">未生成</Typography.Text>
+          const attempts = Array.isArray(video.attempts) ? video.attempts : []
+          const latest = attempts.length > 0 ? attempts[attempts.length - 1] : null
+          const status = latest?.status || video.status || 'queued'
+          const errorMessage = latest?.errorMessage || video.errorMessage || ''
+          const outputURL = latest?.outputURL || video.outputURL || ''
+          return (
+            <Space direction="vertical" size={4}>
+              <Typography.Text>{video.provider || '-'}</Typography.Text>
+              <Typography.Text type="secondary">{video.model || '-'}</Typography.Text>
+              <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>
+              <Typography.Text type="secondary">尝试 {attempts.length} 次</Typography.Text>
+              {errorMessage && <Typography.Text type="danger">{errorMessage}</Typography.Text>}
+              {outputURL && <Button type="link" size="small" href={outputURL} target="_blank" rel="noreferrer">查看视频</Button>}
+              {(status === 'failed' || status === 'cancelled') && latest?.id && (
+                <Button size="small" danger onClick={() => void retryVideo(row.bookId, latest.id)}>重试 VIDEO</Button>
+              )}
+              {(status === 'queued' || status === 'running') && latest?.id && (
+                <Button size="small" onClick={() => void cancelVideo(latest.id)}>取消 VIDEO</Button>
+              )}
+            </Space>
+          )
+        },
+      },
+      {
         title: '单本操作',
         key: 'bookAction',
         width: 120,
         render: (_, row) => <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
       },
     ]
-  }, [selected])
+  }, [selected, videoByBook])
 
   if (selectedDetailProjectId != null) {
     return <BatchProjectDetail projectId={selectedDetailProjectId} onBack={() => setSelectedDetailProjectId(null)} />
@@ -299,7 +370,7 @@ export default function BatchProjectListPage() {
           <Typography.Text type="secondary">一战晟铭 · Batch Factory</Typography.Text>
           <Typography.Title level={2}>批量工厂</Typography.Title>
           <Typography.Paragraph type="secondary">
-            BatchProject、小说汇总、统一设置与 Script / Hook / Director / Final Prompt 状态均来自 Go + MySQL 事实源。
+            BatchProject、小说汇总、统一设置以及 Script / Hook / Director / Final Prompt / VIDEO 状态均来自 Go + MySQL 事实源。
           </Typography.Paragraph>
         </div>
       </div>
@@ -319,10 +390,10 @@ export default function BatchProjectListPage() {
       </Card>
 
       <Drawer
-        title={selected ? `${selected.name} · 剧本生成流水线` : '剧本生成流水线'}
+        title={selected ? `${selected.name} · 剧本与 VIDEO 流水线` : '剧本与 VIDEO 流水线'}
         width="92vw"
         open={Boolean(selected)}
-        onClose={() => { setSelected(null); setSummary(null) }}
+        onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null) }}
         extra={<Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
       >
         {summary && (
@@ -333,7 +404,7 @@ export default function BatchProjectListPage() {
               <Descriptions.Item label="失败">{summary.failed || 0}</Descriptions.Item>
               <Descriptions.Item label="待执行">{summary.pending || 0}</Descriptions.Item>
             </Descriptions>
-            <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1050 }} />
+            <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1450 }} />
           </>
         )}
       </Drawer>
