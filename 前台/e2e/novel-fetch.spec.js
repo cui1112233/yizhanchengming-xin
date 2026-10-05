@@ -139,7 +139,7 @@ test.describe('@novel novel fetch acceptance', () => {
     await page.goto('/novel-fetch')
     await addGroup(page, '常读', 2, '501')
     await page.getByRole('button', { name: '自动化' }).click()
-    await expect(page.getByText('自动化执行')).toBeVisible()
+    await expect(page.getByText('自动化执行', { exact: true })).toBeVisible()
     await page.locator('input[type="datetime-local"]').fill('2030-01-01T12:00')
     await page.getByRole('button', { name: '确认创建' }).click()
 
