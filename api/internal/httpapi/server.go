@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
@@ -91,6 +94,10 @@ type Dependencies struct {
 	BatchProjectAccess          BatchProjectAccessChecker
 	VideoResourceProjects       VideoResourceProjectResolver
 	VideoExecutorBootstrapToken string
+	Database                    *sql.DB
+	Logger                      *slog.Logger
+	StartedAt                   time.Time
+	AppInitialized              bool
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -106,6 +113,8 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("GET /readyz", api.readyz)
+	mux.Handle("GET /api/v1/diagnostics", api.requireOperationsAdmin(http.HandlerFunc(api.diagnostics)))
 
 	mux.Handle("POST /api/auth/login", api.requireSameOrigin(http.HandlerFunc(api.login)))
 	mux.Handle("POST /api/auth/refresh", api.requireSameOrigin(http.HandlerFunc(api.refreshAuth)))
@@ -174,7 +183,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/video/local-executors/heartbeat", api.heartbeatVideoLocalExecutor)
 	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/complete", api.completeVideoLocalExecutorTask)
 	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/fail", api.failVideoLocalExecutorTask)
-	return mux
+	return api.withObservability(mux)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
