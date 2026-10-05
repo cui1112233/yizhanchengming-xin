@@ -10,11 +10,11 @@ import (
 )
 
 type Service struct {
-	store     Store
-	prompts   FinalPromptSource
-	providers ProviderFactory
-	artifacts ArtifactStore
-	masterKey []byte
+	store      Store
+	prompts    FinalPromptSource
+	providers  ProviderFactory
+	artifacts  ArtifactStore
+	masterKey  []byte
 }
 
 func NewService(store Store, prompts FinalPromptSource, providers ProviderFactory, artifacts ArtifactStore, masterKey []byte) *Service {
@@ -36,32 +36,22 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResult, err
 	if prompt.StageRunID <= 0 || prompt.PromptVersion <= 0 || strings.TrimSpace(prompt.InputRevision) == "" || strings.TrimSpace(prompt.Text) == "" {
 		return StartResult{}, fmt.Errorf("video: completed FINAL_PROMPT is required")
 	}
-	cfg, err := s.store.GetProviderConfig(ctx, req.Provider, req.Model)
-	if err != nil {
-		return StartResult{}, normalizeProviderConfigError(err)
-	}
-	if !cfg.Enabled || len(cfg.EncryptedSecret) == 0 || len(cfg.SecretNonce) == 0 {
-		return StartResult{}, providerError(ErrorProviderUnconfigured, "provider is not configured", nil)
-	}
-	secret, err := DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
-	if err != nil {
-		return StartResult{}, err
-	}
-	provider, err := s.providers.Build(cfg, secret)
+	provider, err := s.buildProvider(ctx, req.Provider, req.Model)
 	if err != nil {
 		return StartResult{}, err
 	}
 
 	job := ProductionJob{
-		BatchProjectID: req.BatchProjectID,
-		BookID: req.BookID,
-		Status: JobQueued,
-		InputRevision: prompt.InputRevision,
+		BatchProjectID:       req.BatchProjectID,
+		BookID:                req.BookID,
+		Status:                JobQueued,
+		InputRevision:         prompt.InputRevision,
 		FinalPromptStageRunID: prompt.StageRunID,
-		FinalPromptVersion: prompt.PromptVersion,
-		Provider: req.Provider,
-		Model: req.Model,
-		IdempotencyKey: logicalIdempotencyKey(req, prompt),
+		FinalPromptVersion:    prompt.PromptVersion,
+		FinalPromptText:       prompt.Text,
+		Provider:              req.Provider,
+		Model:                 req.Model,
+		IdempotencyKey:        logicalIdempotencyKey(req, prompt),
 	}
 	job, created, err := s.store.CreateOrGetProductionJob(ctx, job)
 	if err != nil {
@@ -77,17 +67,116 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResult, err
 
 	task, err := s.store.CreateProductionTask(ctx, ProductionTask{
 		ProductionJobID: job.ID,
-		Attempt: 1,
-		Provider: req.Provider,
-		Model: req.Model,
-		RequestID: req.RequestID,
-		Status: TaskQueued,
+		Attempt:          1,
+		Provider:         req.Provider,
+		Model:            req.Model,
+		RequestID:        req.RequestID,
+		Status:           TaskQueued,
 	})
 	if err != nil {
 		return StartResult{Job: job}, err
 	}
+	return s.submitAttempt(ctx, job, task, provider, prompt.Text)
+}
 
-	submit, err := provider.Submit(ctx, SubmitRequest{Model: req.Model, Prompt: prompt.Text, RequestID: req.RequestID})
+func (s *Service) RetryTask(ctx context.Context, taskID int64, requestID string) (StartResult, error) {
+	if s == nil || s.store == nil || s.providers == nil {
+		return StartResult{}, providerError(ErrorProviderUnavailable, "video service is unavailable", nil)
+	}
+	previous, err := s.store.GetProductionTask(ctx, taskID)
+	if err != nil {
+		return StartResult{}, err
+	}
+	job, err := s.store.GetProductionJob(ctx, previous.ProductionJobID)
+	if err != nil {
+		return StartResult{}, err
+	}
+	latest, err := s.store.LatestTaskForJob(ctx, job.ID)
+	if err != nil {
+		return StartResult{}, err
+	}
+	if latest.ID != previous.ID {
+		return StartResult{Job: job, Task: latest}, providerError(ErrorVideoRetryNotAllowed, "only the latest video attempt can be retried", nil)
+	}
+	if latest.Status != TaskFailed && latest.Status != TaskCancelled {
+		return StartResult{Job: job, Task: latest}, providerError(ErrorVideoRetryNotAllowed, "video retry requires a failed or cancelled attempt", nil)
+	}
+	if strings.TrimSpace(job.FinalPromptText) == "" {
+		return StartResult{Job: job, Task: latest}, providerError(ErrorVideoRetryNotAllowed, "frozen FINAL_PROMPT snapshot is unavailable", nil)
+	}
+	provider, err := s.buildProvider(ctx, job.Provider, job.Model)
+	if err != nil {
+		return StartResult{Job: job, Task: latest}, err
+	}
+	task, err := s.store.CreateProductionTask(ctx, ProductionTask{
+		ProductionJobID: job.ID,
+		Attempt:          latest.Attempt + 1,
+		Provider:         job.Provider,
+		Model:            job.Model,
+		RequestID:        strings.TrimSpace(requestID),
+		Status:           TaskQueued,
+	})
+	if err != nil {
+		return StartResult{Job: job, Task: latest}, err
+	}
+	job.Status = JobQueued
+	job.ErrorCode = ""
+	job.ErrorMessage = ""
+	if err := s.store.UpdateProductionJob(ctx, job); err != nil {
+		return StartResult{Job: job, Task: task}, err
+	}
+	return s.submitAttempt(ctx, job, task, provider, job.FinalPromptText)
+}
+
+func (s *Service) CancelTask(ctx context.Context, taskID int64) (ProductionTask, error) {
+	if s == nil || s.store == nil || s.providers == nil {
+		return ProductionTask{}, providerError(ErrorProviderUnavailable, "video service is unavailable", nil)
+	}
+	task, err := s.store.GetProductionTask(ctx, taskID)
+	if err != nil {
+		return ProductionTask{}, err
+	}
+	if task.Status == TaskCancelled {
+		return task, nil
+	}
+	if task.Status == TaskSucceeded || task.Status == TaskFailed {
+		return task, providerError(ErrorProviderCancelUnsupported, "terminal video attempt cannot be cancelled", nil)
+	}
+	if strings.TrimSpace(task.ProviderJobID) == "" {
+		return task, providerError(ErrorProviderCancelUnsupported, "provider task has not been created", nil)
+	}
+	job, err := s.store.GetProductionJob(ctx, task.ProductionJobID)
+	if err != nil {
+		return task, err
+	}
+	provider, err := s.buildProvider(ctx, task.Provider, task.Model)
+	if err != nil {
+		return task, err
+	}
+	result, err := provider.Cancel(ctx, task.ProviderJobID)
+	if err != nil {
+		return task, err
+	}
+	if !result.Accepted {
+		return task, providerError(ErrorProviderCancelUnsupported, "provider did not accept cancellation", nil)
+	}
+	task.Status = TaskCancelled
+	task.ErrorCode = ""
+	task.ErrorMessage = ""
+	job.Status = JobCancelled
+	job.ErrorCode = ""
+	job.ErrorMessage = ""
+	if err := s.store.UpdateProductionTask(ctx, task); err != nil {
+		return task, err
+	}
+	if err := s.store.UpdateProductionJob(ctx, job); err != nil {
+		return task, err
+	}
+	return task, nil
+}
+
+func (s *Service) submitAttempt(ctx context.Context, job ProductionJob, task ProductionTask, provider Provider, prompt string) (StartResult, error) {
+	submit, err := provider.Submit(ctx, SubmitRequest{Model: task.Model, Prompt: prompt, RequestID: task.RequestID})
 	if err != nil {
 		code, message := safeProviderFailure(err)
 		task.Status = TaskFailed
@@ -107,6 +196,8 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResult, err
 		task.Status = TaskQueued
 	}
 	job.Status = JobRunning
+	job.ErrorCode = ""
+	job.ErrorMessage = ""
 	if submit.Status == TaskSucceeded {
 		if err := s.persistSucceededArtifact(ctx, &job, &task, submit.ArtifactURL); err != nil {
 			return StartResult{Job: job, Task: task}, err
@@ -130,15 +221,7 @@ func (s *Service) PollTask(ctx context.Context, taskID int64) (ProductionTask, e
 	if err != nil {
 		return ProductionTask{}, err
 	}
-	cfg, err := s.store.GetProviderConfig(ctx, task.Provider, task.Model)
-	if err != nil {
-		return task, normalizeProviderConfigError(err)
-	}
-	secret, err := DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
-	if err != nil {
-		return task, err
-	}
-	provider, err := s.providers.Build(cfg, secret)
+	provider, err := s.buildProvider(ctx, task.Provider, task.Model)
 	if err != nil {
 		return task, err
 	}
@@ -186,6 +269,21 @@ func (s *Service) RecoverPending(ctx context.Context, limit int) ([]ProductionTa
 		out = append(out, polled)
 	}
 	return out, nil
+}
+
+func (s *Service) buildProvider(ctx context.Context, providerKey, model string) (Provider, error) {
+	cfg, err := s.store.GetProviderConfig(ctx, providerKey, model)
+	if err != nil {
+		return nil, normalizeProviderConfigError(err)
+	}
+	if !cfg.Enabled || len(cfg.EncryptedSecret) == 0 || len(cfg.SecretNonce) == 0 {
+		return nil, providerError(ErrorProviderUnconfigured, "provider is not configured", nil)
+	}
+	secret, err := DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
+	if err != nil {
+		return nil, err
+	}
+	return s.providers.Build(cfg, secret)
 }
 
 func (s *Service) persistSucceededArtifact(ctx context.Context, job *ProductionJob, task *ProductionTask, sourceURL string) error {
