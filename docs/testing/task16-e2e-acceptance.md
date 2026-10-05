@@ -19,13 +19,14 @@ Run against public/ECS:
 PUBLIC_BASE_URL=https://example.invalid E2E_USERNAME=... E2E_PASSWORD=... npm run test:e2e:public
 ```
 
-Real 121 mutation is opt-in with `E2E_REAL_121=1` plus `E2E_121_BOOK_ID`, `E2E_121_SOURCE`, and `E2E_121_PLATFORM_ID`. Paid/real VIDEO providers remain Tier 2 and must never be required by ordinary PR CI.
+Real 121 mutation is opt-in with `E2E_REAL_121=1` plus `E2E_121_BOOK_ID`, `E2E_121_SOURCE`, and `E2E_121_PLATFORM_ID`. Paid/real VIDEO providers are Tier 2 and run only when `E2E_REAL_VIDEO_PROVIDER=1`; they are never required by ordinary PR CI.
 
 ## Result classes
 
 - **GREEN**: capability exists in current `main` and must pass.
 - **expected-failure**: capability exists, a real defect is proven, and the test still runs with Playwright `test.fail`. If it unexpectedly passes, CI fails so the blocker annotation can be removed.
 - **pending/skip**: capability is not yet present in `main`; the test names the owning Task/subtask and must be activated after that Task merges.
+- **opt-in smoke**: real third-party/public mutation intentionally excluded from normal PR CI.
 
 ## Known blockers
 
@@ -82,16 +83,38 @@ The collector does **not** record request headers, response headers, cookies, Au
 
 These remain `test.skip` with Task 9.4 subtask IDs until the runtime implementation merges to `main`.
 
-### Task 14 VIDEO / Merge — 6 pending
+### Task 14 VIDEO / Merge — 0 pending
 
-1. provider status model and secret-safe response.
-2. VIDEO Start/Poll fields and state machine.
-3. VIDEO Retry/Cancel.
-4. unconfigured provider resilience.
-5. Merge queued → running → succeeded without re-generating successful VIDEO.
-6. explicit ffmpeg-missing Merge error without API startup failure.
+Task 14 merged to `main` in PR #22 (`6b60a62896000e1c37fb0c8ec11da35a89e45dcf`) and the Task16 branch was synchronized with the subsequent main CI fix `d38520c1f2eb968021259010db3a2315de78e994`. The previous six Task14 skips were removed and replaced with executable acceptance for:
 
-These remain `test.skip` with Task 14 subtask IDs until Task 14 merges to `main`.
+- provider status: `unconfigured / available / unavailable / auth_failed`
+- secret-safe provider status response
+- VIDEO provider/model/status/attempts/error/output UI
+- Start / Poll / Retry / Cancel
+- provider-unconfigured page resilience
+- Merge queued → running → succeeded
+- Merge retry without VIDEO regeneration
+- explicit ffmpeg failure reporting
+
+Real paid-provider execution remains an explicit Tier 2 public smoke and is not a pending implementation blocker.
+
+## CI layers
+
+Normal Task16 push/PR:
+
+- `go test ./...`
+- `go build ./...`
+- frontend `npm test`
+- frontend `npm run build`
+- local Playwright acceptance with controlled API fixtures
+
+Manual public smoke:
+
+- requires `PUBLIC_BASE_URL`
+- uses `E2E_USERNAME` / `E2E_PASSWORD` GitHub Secrets
+- does not run automatically for ordinary commits
+- real 121 only when explicitly enabled
+- paid/real VIDEO only when explicitly enabled
 
 ## Acceptance matrix
 
@@ -101,7 +124,10 @@ These remain `test.skip` with Task 14 subtask IDs until Task 14 merges to `main`
 | Session restore | Playwright UI | yes | GREEN |
 | 401 refresh | controlled browser API fixture | yes | GREEN |
 | 403 semantics | controlled browser API fixture | yes | expected-failure TASK16-AUTH-002 |
+| Logout / refresh-loop protection | Playwright UI/API | yes | GREEN |
 | Novel fetch grouping/dedupe | Playwright UI | yes | GREEN |
+| Partial failure | Playwright UI | yes | GREEN |
+| Immediate / automation creation | Playwright UI | yes | GREEN; due-time execution pending Task 9 |
 | Real 121 | opt-in public smoke | yes | opt-in public |
 | Shuihuo page safety | Playwright UI | yes | GREEN |
 | BatchProject list/detail | Playwright UI | yes | GREEN |
@@ -114,7 +140,8 @@ These remain `test.skip` with Task 14 subtask IDs until Task 14 merges to `main`
 | Retry Stage | Playwright UI/API | yes | GREEN at Stage level; Runtime worker semantics pending Task 9 |
 | Audio measurement | Playwright UI/API | yes | GREEN |
 | matchAudio | Playwright UI/API + timeline validator | yes | GREEN |
-| VIDEO | structure registered | yes | pending Task 14 |
-| Merge | structure registered | yes | pending Task 14 |
-| Publishing | repository/API permissions | yes | public acceptance still required |
-| Permissions | auth/public API acceptance | yes | 403 bootstrap has TASK16-AUTH-002 |
+| Provider status | browser API acceptance | yes | GREEN Tier 1 |
+| VIDEO | Playwright UI/API | yes | GREEN Tier 1; paid provider is opt-in Tier 2 |
+| Merge | browser API acceptance | yes | GREEN Tier 1 |
+| Publishing | browser API permission acceptance | yes | GREEN locally; public permission smoke still required |
+| Permissions | auth/publishing API acceptance | yes | 403 auth bootstrap has TASK16-AUTH-002 |
