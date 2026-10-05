@@ -65,6 +65,14 @@ jobs:
           while IFS= read -r line; do
             echo "::notice title=PERF_BASELINE::$line"
           done < <(grep 'PERF_BASELINE' /tmp/perf-baseline.log || true)
+      - name: Run controlled Task14 video and ffmpeg probes
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./internal/video -run '^TestPerformance' -count=1 -v 2>&1 | tee /tmp/perf-video.log
+          while IFS= read -r line; do
+            echo "::notice title=PERF_TASK14::$line"
+          done < <(grep -E 'PERF_VIDEO|PERF_FFMPEG' /tmp/perf-video.log || true)
       - name: Publish compact performance statuses
         if: always()
         env:
