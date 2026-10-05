@@ -1,0 +1,75 @@
+name: performance-ffmpeg-manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      fragments:
+        description: Synthetic fragments per merge
+        required: false
+        default: '10'
+
+permissions:
+  contents: read
+
+jobs:
+  ffmpeg-capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm ffmpeg
+        run: ffmpeg -version | head -1
+      - name: Generate controlled fragments
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/perf-ffmpeg/fragments
+          fragments='${{ inputs.fragments }}'
+          for i in $(seq -w 1 "$fragments"); do
+            ffmpeg -hide_banner -loglevel error -y \
+              -f lavfi -i "color=c=black:s=360x640:d=0.4:r=24" \
+              -f lavfi -i "anullsrc=r=44100:cl=stereo" \
+              -shortest -c:v libx264 -preset ultrafast -c:a aac \
+              "/tmp/perf-ffmpeg/fragments/${i}.mp4"
+          done
+          printf "file '%s'\n" /tmp/perf-ffmpeg/fragments/*.mp4 > /tmp/perf-ffmpeg/concat.txt
+          echo "PERF_FFMPEG_RESOURCE fixture_fragments=$fragments fixture_disk_bytes=$(du -sb /tmp/perf-ffmpeg/fragments | cut -f1)"
+      - name: Measure real ffmpeg at 1 2 4 concurrent merges
+        shell: bash
+        run: |
+          set -euo pipefail
+          for concurrency in 1 2 4; do
+            work="/tmp/perf-ffmpeg/run-${concurrency}"
+            mkdir -p "$work"
+            start_ns=$(date +%s%N)
+            pids=()
+            for i in $(seq 1 "$concurrency"); do
+              (
+                /usr/bin/time -v -o "$work/time-${i}.txt" \
+                  ffmpeg -hide_banner -loglevel error -y \
+                    -f concat -safe 0 -i /tmp/perf-ffmpeg/concat.txt \
+                    -c copy "$work/output-${i}.mp4"
+              ) &
+              pids+=("$!")
+            done
+            failed=0
+            for pid in "${pids[@]}"; do
+              if ! wait "$pid"; then failed=$((failed+1)); fi
+            done
+            end_ns=$(date +%s%N)
+            wall_ms=$(( (end_ns-start_ns)/1000000 ))
+            max_rss_kb=$(awk -F: '/Maximum resident set size/ {gsub(/ /,"",$2); if ($2>m) m=$2} END {print m+0}' "$work"/time-*.txt)
+            cpu_user_s=$(awk -F: '/User time \(seconds\)/ {sum+=$2} END {printf "%.3f",sum}' "$work"/time-*.txt)
+            cpu_sys_s=$(awk -F: '/System time \(seconds\)/ {sum+=$2} END {printf "%.3f",sum}' "$work"/time-*.txt)
+            output_bytes=$(du -cb "$work"/output-*.mp4 | tail -1 | awk '{print $1}')
+            temp_peak_bytes=$(du -sb "$work" | cut -f1)
+            echo "PERF_FFMPEG_RESOURCE concurrency=$concurrency success=$((concurrency-failed)) failed=$failed wall_ms=$wall_ms max_rss_kb=$max_rss_kb cpu_user_s=$cpu_user_s cpu_sys_s=$cpu_sys_s temp_peak_bytes=$temp_peak_bytes output_bytes=$output_bytes"
+          done
+      - name: Cleanup verification
+        shell: bash
+        run: |
+          before=$(du -sb /tmp/perf-ffmpeg | cut -f1)
+          rm -rf /tmp/perf-ffmpeg
+          after=0
+          if [ -e /tmp/perf-ffmpeg ]; then after=$(du -sb /tmp/perf-ffmpeg | cut -f1); fi
+          echo "PERF_FFMPEG_CLEANUP before_bytes=$before after_bytes=$after"
