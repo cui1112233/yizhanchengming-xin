@@ -11,7 +11,12 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 )
 
-type fakePublishingService struct { createAccountCalls, createIntentCalls, listAuditCalls int }
+type fakePublishingService struct {
+	createAccountCalls int
+	createIntentCalls  int
+	listAuditCalls     int
+	audits             []publishing.Audit
+}
 func (f *fakePublishingService) CreateAccount(_ context.Context, actor authn.User, input publishing.CreateAccountInput) (publishing.Account, error) {
 	f.createAccountCalls++
 	return publishing.Account{ID: 41, OwnerUserID: actor.ID, TeamID: actor.TeamID, Platform: input.Platform, DisplayName: input.DisplayName, CredentialRefID: "cred-internal", Active: true}, nil
@@ -22,14 +27,31 @@ func (f *fakePublishingService) CreateIntent(_ context.Context, actor authn.User
 	return publishing.Intent{ID: 73, BatchProjectID: input.BatchProjectID, PublishingAccountID: input.PublishingAccountID, RequestedByUserID: actor.ID, Platform: "douyin", Status: publishing.IntentStatusPending}, nil
 }
 func (f *fakePublishingService) GetIntent(context.Context, authn.User, int64) (publishing.Intent, error) { return publishing.Intent{}, nil }
-func (f *fakePublishingService) ListAudits(context.Context, authn.User, int64) ([]publishing.Audit, error) { f.listAuditCalls++; return nil, nil }
+func (f *fakePublishingService) ListAudits(context.Context, authn.User, int64) ([]publishing.Audit, error) { f.listAuditCalls++; return f.audits, nil }
 
 func publishingRequest(method, path, body string) *http.Request {
 	req := httptest.NewRequest(method, path, strings.NewReader(body)); req.Host = "app.example"; req.Header.Set("Origin", "http://app.example"); req.Header.Set("Content-Type", "application/json"); req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access"}); return req
 }
 
+func TestPublishingEndpointReturns401WhenUnauthenticated(t *testing.T) {
+	service := &fakePublishingService{}
+	handler := NewHandler(Dependencies{Auth: &fakeAuthService{}, Publishing: service})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/publishing/accounts", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized { t.Fatalf("status=%d body=%s, want 401", rec.Code, rec.Body.String()) }
+	if !strings.Contains(rec.Body.String(), `"code":"AUTH_UNAUTHENTICATED"`) { t.Fatalf("body=%s", rec.Body.String()) }
+}
+
 func TestPublishingAccountCreateRequiresDedicatedCapability(t *testing.T) {
 	service := &fakePublishingService{}; auth := &fakeAuthService{user: authn.User{ID: 7, Capabilities: []string{CapabilityBatchView}}}; handler := NewHandler(Dependencies{Auth: auth, Publishing: service})
+	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodPost, "/api/v1/publishing/accounts", `{"platform":"douyin","displayName":"Alice 抖音","credential":{"name":"alice","secret":"platform-secret"}}`))
+	if rec.Code != http.StatusForbidden { t.Fatalf("status=%d body=%s, want 403", rec.Code, rec.Body.String()) }
+	if service.createAccountCalls != 0 { t.Fatalf("service calls=%d", service.createAccountCalls) }
+}
+
+func TestPublishExecuteDoesNotGrantAccountConfigure(t *testing.T) {
+	service := &fakePublishingService{}; auth := &fakeAuthService{user: authn.User{ID: 7, Capabilities: []string{CapabilityPublishExecute}}}; handler := NewHandler(Dependencies{Auth: auth, Publishing: service})
 	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodPost, "/api/v1/publishing/accounts", `{"platform":"douyin","displayName":"Alice 抖音","credential":{"name":"alice","secret":"platform-secret"}}`))
 	if rec.Code != http.StatusForbidden { t.Fatalf("status=%d body=%s, want 403", rec.Code, rec.Body.String()) }
 	if service.createAccountCalls != 0 { t.Fatalf("service calls=%d", service.createAccountCalls) }
@@ -40,7 +62,7 @@ func TestPublishingAccountCreateHidesCredentialMaterial(t *testing.T) {
 	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodPost, "/api/v1/publishing/accounts", `{"platform":"douyin","displayName":"Alice 抖音","credential":{"name":"alice","secret":"platform-secret"}}`))
 	if rec.Code != http.StatusCreated { t.Fatalf("status=%d body=%s, want 201", rec.Code, rec.Body.String()) }
 	body := strings.ToLower(rec.Body.String())
-	for _, forbidden := range []string{"platform-secret", "credentialref", "cred-internal", "ciphertext", "nonce"} { if strings.Contains(body, strings.ToLower(forbidden)) { t.Fatalf("credential material leaked to browser: %s", rec.Body.String()) } }
+	for _, forbidden := range []string{"platform-secret", "credentialref", "cred-internal", "ciphertext", "nonce", "keyid", "master key", "refresh token", "session token", "cookie", "api secret"} { if strings.Contains(body, strings.ToLower(forbidden)) { t.Fatalf("credential material leaked to browser: %s", rec.Body.String()) } }
 }
 
 func TestPublishIntentRequiresExecuteCapability(t *testing.T) {
@@ -62,4 +84,15 @@ func TestPublishAuditRequiresAuditCapability(t *testing.T) {
 	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodGet, "/api/v1/publishing/audits?batchProjectId=21", ""))
 	if rec.Code != http.StatusForbidden { t.Fatalf("status=%d body=%s, want 403", rec.Code, rec.Body.String()) }
 	if service.listAuditCalls != 0 { t.Fatalf("service calls=%d", service.listAuditCalls) }
+}
+
+func TestPublishAuditResponseRedactsSensitiveErrorMaterial(t *testing.T) {
+	service := &fakePublishingService{audits: []publishing.Audit{{ID: 1, IntentID: 2, BatchProjectID: 21, AccountID: 11, ActorUserID: 7, Platform: "douyin", Action: "publish.failed", Result: "failed", ErrorSummary: "provider returned refresh_token=very-secret cookie=session-value"}}}
+	auth := &fakeAuthService{user: authn.User{ID: 7, Capabilities: []string{CapabilityPublishAuditView}}}
+	handler := NewHandler(Dependencies{Auth: auth, Publishing: service})
+	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodGet, "/api/v1/publishing/audits?batchProjectId=21", ""))
+	if rec.Code != http.StatusOK { t.Fatalf("status=%d body=%s, want 200", rec.Code, rec.Body.String()) }
+	body := strings.ToLower(rec.Body.String())
+	for _, forbidden := range []string{"very-secret", "session-value", "refresh_token="} { if strings.Contains(body, forbidden) { t.Fatalf("sensitive audit material leaked: %s", rec.Body.String()) } }
+	if !strings.Contains(rec.Body.String(), "敏感错误详情已脱敏") { t.Fatalf("expected safe redaction marker, body=%s", rec.Body.String()) }
 }
