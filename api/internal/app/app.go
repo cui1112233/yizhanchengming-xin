@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 	"os"
+	"strconv"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
@@ -12,9 +14,13 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 )
 
-// NewHandler wires intake, pipeline, generation and unified settings services to MySQL.
-// React/localStorage never becomes the source of truth for persisted configuration.
+// NewHandler wires production services to MySQL. Authentication is enabled by default;
+// tests that only exercise business-store wiring use newHandler(..., false).
 func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock) http.Handler {
+	return newHandler(db, fetcher, classifier, now, true)
+}
+
+func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock, authEnabled bool) http.Handler {
 	store := intake.NewMySQLStore(db)
 	intakeService := intake.NewService(store, fetcher, classifier)
 	pipelineService := pipeline.NewService(store, now)
@@ -31,6 +37,13 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Publishing: map[string]any{"uploadVideoType": "merged", "materialReuse": false},
 	}}, settingsStore)
 
+	var authService httpapi.AuthService
+	if authEnabled {
+		authStore := authn.NewMySQLStore(db)
+		authService = authn.NewService(authStore, authn.NewManager(authStore, authn.Options{}))
+	}
+	secureCookies, _ := strconv.ParseBool(os.Getenv("QIANTIE_COOKIE_SECURE"))
+
 	return httpapi.NewHandler(httpapi.Dependencies{
 		Intakes:         intakeService,
 		Reader:          store,
@@ -38,5 +51,7 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		BatchProjects:   store,
 		Generation:      generationService,
 		UnifiedSettings: settingsService,
+		Auth:            authService,
+		SecureCookies:   secureCookies,
 	})
 }
