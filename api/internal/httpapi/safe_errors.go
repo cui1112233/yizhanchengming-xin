@@ -6,8 +6,15 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 )
 
+func requestIDFromRequest(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	return observability.RequestID(r.Context())
+}
+
 func (h handler) writeServiceError(w http.ResponseWriter, r *http.Request, status int, code, message, subsystem, operation string, err error) {
-	requestID := observability.RequestID(r.Context())
+	requestID := requestIDFromRequest(r)
 	args := []any{
 		"request_id", requestID,
 		"error_code", code,
