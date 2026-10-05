@@ -40,11 +40,9 @@ describe('UnifiedSettingsPanel', () => {
     expect(await screen.findByText('保存生产统一设置')).toBeTruthy()
     expect(screen.getByText('AI 文案唯一控制位置')).toBeTruthy()
 
-    fireEvent.click(screen.getByLabelText('Close'))
     fireEvent.click(screen.getByRole('button', { name: '发布统一设置' }))
     expect(await screen.findByText('保存发布统一设置')).toBeTruthy()
 
-    fireEvent.click(screen.getByLabelText('Close'))
     fireEvent.click(screen.getByRole('button', { name: '版本对应配置档' }))
     expect(await screen.findByText('处理规则提示词')).toBeTruthy()
     expect(screen.getByText('知识库提示词')).toBeTruthy()
