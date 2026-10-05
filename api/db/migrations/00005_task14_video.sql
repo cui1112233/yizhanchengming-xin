@@ -64,7 +64,45 @@ CREATE TABLE video_production_tasks (
     CONSTRAINT fk_video_tasks_job FOREIGN KEY (production_job_id) REFERENCES video_production_jobs(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE video_local_executors (
+    id VARCHAR(64) NOT NULL,
+    name VARCHAR(191) NOT NULL,
+    provider_key VARCHAR(64) NOT NULL,
+    model VARCHAR(128) NOT NULL,
+    capabilities_json JSON NOT NULL,
+    token_hash BINARY(32) NOT NULL,
+    last_seen_at DATETIME(6) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_video_local_executors_token_hash (token_hash),
+    KEY idx_video_local_executors_provider_model_seen (provider_key, model, last_seen_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE video_local_executor_tasks (
+    id VARCHAR(64) NOT NULL,
+    source_task_id VARCHAR(64) NOT NULL,
+    provider_key VARCHAR(64) NOT NULL,
+    model VARCHAR(128) NOT NULL,
+    prompt MEDIUMTEXT NOT NULL,
+    request_id VARCHAR(191) NOT NULL DEFAULT '',
+    status VARCHAR(32) NOT NULL DEFAULT 'queued',
+    executor_id VARCHAR(64) NULL,
+    artifact_url VARCHAR(2048) NOT NULL DEFAULT '',
+    error_code VARCHAR(64) NOT NULL DEFAULT '',
+    error_message VARCHAR(1024) NOT NULL DEFAULT '',
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_video_local_executor_tasks_source (source_task_id),
+    KEY idx_video_local_executor_tasks_status (status, created_at),
+    KEY idx_video_local_executor_tasks_executor (executor_id, status),
+    CONSTRAINT fk_video_local_executor_tasks_executor FOREIGN KEY (executor_id) REFERENCES video_local_executors(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- +goose Down
+DROP TABLE IF EXISTS video_local_executor_tasks;
+DROP TABLE IF EXISTS video_local_executors;
 DROP TABLE IF EXISTS video_production_tasks;
 DROP TABLE IF EXISTS video_production_jobs;
 DROP TABLE IF EXISTS video_provider_configs;
