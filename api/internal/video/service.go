@@ -10,11 +10,11 @@ import (
 )
 
 type Service struct {
-	store      Store
-	prompts    FinalPromptSource
-	providers  ProviderFactory
-	artifacts  ArtifactStore
-	masterKey  []byte
+	store     Store
+	prompts   FinalPromptSource
+	providers ProviderFactory
+	artifacts ArtifactStore
+	masterKey []byte
 }
 
 func NewService(store Store, prompts FinalPromptSource, providers ProviderFactory, artifacts ArtifactStore, masterKey []byte) *Service {
@@ -176,7 +176,9 @@ func (s *Service) CancelTask(ctx context.Context, taskID int64) (ProductionTask,
 }
 
 func (s *Service) submitAttempt(ctx context.Context, job ProductionJob, task ProductionTask, provider Provider, prompt string) (StartResult, error) {
-	submit, err := provider.Submit(ctx, SubmitRequest{Model: task.Model, Prompt: prompt, RequestID: task.RequestID})
+	submit, err := provider.Submit(ctx, SubmitRequest{
+		Model: task.Model, Prompt: prompt, RequestID: task.RequestID, SourceTaskID: fmt.Sprintf("%d", task.ID),
+	})
 	if err != nil {
 		code, message := safeProviderFailure(err)
 		task.Status = TaskFailed
@@ -276,12 +278,15 @@ func (s *Service) buildProvider(ctx context.Context, providerKey, model string) 
 	if err != nil {
 		return nil, normalizeProviderConfigError(err)
 	}
-	if !cfg.Enabled || len(cfg.EncryptedSecret) == 0 || len(cfg.SecretNonce) == 0 {
+	if !cfg.Enabled || !providerConfigConfigured(cfg) {
 		return nil, providerError(ErrorProviderUnconfigured, "provider is not configured", nil)
 	}
-	secret, err := DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
-	if err != nil {
-		return nil, err
+	secret := ""
+	if providerConfigNeedsSecret(cfg.ProviderKey) {
+		secret, err = DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return s.providers.Build(cfg, secret)
 }
