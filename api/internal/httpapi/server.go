@@ -89,7 +89,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/intakes", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIntakes)))
 	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.executeIntake))))
 	mux.Handle("GET /api/v1/intakes/{id}/books", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBooks)))
-	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createBatchProject))))
+	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))
 
