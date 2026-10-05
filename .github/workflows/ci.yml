@@ -49,7 +49,6 @@ jobs:
       - name: Install Goose compatible with Go 1.23
         run: go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
 
-      # A. Clean-database path: final branch from zero -> latest -> rollback.
       - name: Apply Goose migrations on clean database
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
       - name: Verify MySQL settings survive reload
@@ -71,7 +70,6 @@ jobs:
       - name: Verify clean database Goose rollback
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
 
-      # B. Real upgrade path: current main (00001/2/3/4/6) -> final Task14 00007.
       - name: Snapshot current main migrations
         shell: bash
         run: |
@@ -79,7 +77,7 @@ jobs:
           git fetch origin main --depth=1
           rm -rf /tmp/task14-main
           mkdir -p /tmp/task14-main
-          git archive origin/main api/db/migrations | tar -x -C /tmp/task14-main
+          git archive origin/main -- ':(top)api/db/migrations' | tar -x -C /tmp/task14-main
           test -f /tmp/task14-main/api/db/migrations/00004_task15_auth.sql
           test -f /tmp/task14-main/api/db/migrations/00006_task13_match_audio.sql
           test ! -f /tmp/task14-main/api/db/migrations/00007_task14_video.sql
