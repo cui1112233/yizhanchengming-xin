@@ -15,9 +15,7 @@ func TestRuntimeInterfacesRemainDomainAgnostic(t *testing.T) {
 
 func TestStaleOwnerCannotReleaseNewOwnerLease(t *testing.T) {
 	addr := os.Getenv("TASK9_REDIS_ADDR")
-	if addr == "" {
-		t.Skip("TASK9_REDIS_ADDR is required for Redis integration")
-	}
+	if addr == "" { t.Skip("TASK9_REDIS_ADDR is required for Redis integration") }
 	ctx := context.Background()
 	leases, err := NewRedisLeaseStore(addr, "task9-test-stale-release-"+time.Now().Format("150405.000000000"))
 	if err != nil { t.Fatal(err) }
@@ -53,6 +51,30 @@ func TestStaleOwnerCannotRenewNewOwnerLease(t *testing.T) {
 	if err != nil || !ok { t.Fatalf("claim new ok=%v err=%v", ok, err) }
 	if renewed, err := leases.Renew(ctx, oldLease, time.Second); !errors.Is(err, ErrLeaseNotOwner) || renewed {
 		t.Fatalf("stale renew renewed=%v err=%v", renewed, err)
+	}
+}
+
+func TestLeaseRequeueExpiredUsesRealRedis(t *testing.T) {
+	addr := os.Getenv("TASK9_REDIS_ADDR")
+	if addr == "" { t.Skip("TASK9_REDIS_ADDR is required for Redis integration") }
+	ctx := context.Background()
+	leases, err := NewRedisLeaseStore(addr, "task9-test-expired-"+time.Now().Format("150405.000000000"))
+	if err != nil { t.Fatal(err) }
+	defer leases.Close()
+
+	lease, ok, err := leases.Claim(ctx, "book:expired", "worker-a", 41, 80*time.Millisecond)
+	if err != nil || !ok { t.Fatalf("claim ok=%v err=%v", ok, err) }
+	live, ok, err := leases.Claim(ctx, "book:live", "worker-b", 42, time.Second)
+	if err != nil || !ok { t.Fatalf("live claim ok=%v err=%v", ok, err) }
+	time.Sleep(120 * time.Millisecond)
+
+	expired, err := leases.RequeueExpired(ctx, time.Now(), 10)
+	if err != nil { t.Fatal(err) }
+	if len(expired) != 1 || expired[0].TaskKey != lease.TaskKey || expired[0].FencingToken != lease.FencingToken {
+		t.Fatalf("expired=%+v want task=%s token=%d", expired, lease.TaskKey, lease.FencingToken)
+	}
+	if renewed, err := leases.Renew(ctx, live, time.Second); err != nil || !renewed {
+		t.Fatalf("live lease was disturbed: renewed=%v err=%v", renewed, err)
 	}
 }
 
