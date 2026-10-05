@@ -7,12 +7,8 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      public_base_url:
-        description: 'Public/ECS base URL for manual smoke run'
-        required: false
-        type: string
       public_smoke:
-        description: 'Run only @public-smoke tests against PUBLIC_BASE_URL'
+        description: 'Run only @public-smoke tests against the repository-controlled E2E_PUBLIC_BASE_URL variable'
         required: false
         default: false
         type: boolean
@@ -83,13 +79,15 @@ jobs:
           retention-days: 14
 
   public-smoke:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.public_smoke && inputs.public_base_url != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.public_smoke && vars.E2E_PUBLIC_BASE_URL != '' }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: '前台'
     env:
-      PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
+      # The target origin is repository-controlled. A workflow dispatcher must
+      # never be able to redirect real E2E credentials to an arbitrary site.
+      PUBLIC_BASE_URL: ${{ vars.E2E_PUBLIC_BASE_URL }}
       E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
       E2E_REAL_121: ${{ inputs.real_121 && '1' || '0' }}
