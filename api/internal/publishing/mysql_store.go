@@ -41,6 +41,25 @@ func (s *MySQLStore) GetAccount(ctx context.Context, id int64) (Account, error) 
 	if errors.Is(err, sql.ErrNoRows) { return Account{}, ErrNotFound }; return a, err
 }
 
+func (s *MySQLStore) ClaimBatchProject(ctx context.Context, projectID, ownerUserID, teamID int64) error {
+	if s == nil || s.db == nil { return ErrUnavailable }
+	var team any
+	if teamID > 0 { team = teamID }
+	_, err := s.db.ExecContext(ctx, `INSERT INTO auth_batch_project_ownership (batch_project_id, owner_user_id, team_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE batch_project_id = VALUES(batch_project_id)`, projectID, ownerUserID, team)
+	return err
+}
+
+func (s *MySQLStore) CanAccessBatchProject(ctx context.Context, projectID, userID, teamID int64, elevated bool) (bool, error) {
+	if s == nil || s.db == nil { return false, ErrUnavailable }
+	var allowed bool
+	if elevated {
+		err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM batch_projects WHERE id = ?)`, projectID).Scan(&allowed)
+		return allowed, err
+	}
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (team_id IS NOT NULL AND team_id = ?)))`, projectID, userID, teamID).Scan(&allowed)
+	return allowed, err
+}
+
 func (s *MySQLStore) CreateIntentWithAudit(ctx context.Context, intent Intent, audit Audit) (Intent, error) {
 	tx, err := s.db.BeginTx(ctx, nil); if err != nil { return Intent{}, err }; defer tx.Rollback()
 	var book any; if intent.BookID > 0 { book = intent.BookID }
