@@ -56,9 +56,9 @@ func (s *HTTPArtifactStore) Persist(ctx context.Context, sourceURL, objectHint s
 	if !secure && !loopback {
 		return Artifact{}, fmt.Errorf("video: provider artifact URL must use https")
 	}
-	key := strings.TrimLeft(strings.TrimSpace(objectHint), "/")
-	if key == "" || strings.Contains(key, "..") {
-		return Artifact{}, fmt.Errorf("video: artifact object key is invalid")
+	key, err := validateArtifactObjectKey(objectHint)
+	if err != nil {
+		return Artifact{}, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -91,10 +91,44 @@ func (s *HTTPArtifactStore) Persist(ctx context.Context, sourceURL, objectHint s
 	if written > maxArtifactBytes {
 		return Artifact{}, fmt.Errorf("video: provider artifact exceeds 2 GiB phase-1 limit")
 	}
-	if err := s.uploader.PutObjectFromFile(ctx, s.bucket, key, filepath.Clean(tmpPath)); err != nil {
-		return Artifact{}, fmt.Errorf("video: upload provider artifact to TOS: %w", err)
+	return s.persistFile(ctx, tmpPath, key)
+}
+
+// PersistFile uploads an already materialized local artifact to TOS. It is used
+// by the merge executor so ffmpeg output does not need to be exposed through a
+// temporary public URL before becoming durable.
+func (s *HTTPArtifactStore) PersistFile(ctx context.Context, sourcePath, objectHint string) (Artifact, error) {
+	key, err := validateArtifactObjectKey(objectHint)
+	if err != nil {
+		return Artifact{}, err
+	}
+	cleanPath := filepath.Clean(strings.TrimSpace(sourcePath))
+	if cleanPath == "." || cleanPath == "" {
+		return Artifact{}, fmt.Errorf("video: artifact source file is invalid")
+	}
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("video: stat artifact source file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return Artifact{}, fmt.Errorf("video: artifact source must be a regular file")
+	}
+	return s.persistFile(ctx, cleanPath, key)
+}
+
+func (s *HTTPArtifactStore) persistFile(ctx context.Context, sourcePath, key string) (Artifact, error) {
+	if err := s.uploader.PutObjectFromFile(ctx, s.bucket, key, sourcePath); err != nil {
+		return Artifact{}, fmt.Errorf("video: upload artifact to TOS: %w", err)
 	}
 	return Artifact{Bucket: s.bucket, ObjectKey: key, URL: s.publicBaseURL + "/" + key}, nil
+}
+
+func validateArtifactObjectKey(objectHint string) (string, error) {
+	key := strings.TrimLeft(strings.TrimSpace(objectHint), "/")
+	if key == "" || strings.Contains(key, "..") {
+		return "", fmt.Errorf("video: artifact object key is invalid")
+	}
+	return key, nil
 }
 
 type TOSUploader struct{ client *tos.ClientV2 }
