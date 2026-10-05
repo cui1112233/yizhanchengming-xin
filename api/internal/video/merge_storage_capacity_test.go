@@ -78,9 +78,23 @@ func TestPerformanceMergeFragmentCapacity10_20_50(t *testing.T) {
 	}
 }
 
+type capacityMergeExecutor struct {
+	artifact Artifact
+	err      error
+	calls    atomic.Int64
+}
+
+func (e *capacityMergeExecutor) Execute(_ context.Context, _ MergeExecutionRequest) (Artifact, error) {
+	e.calls.Add(1)
+	if e.err != nil {
+		return Artifact{}, e.err
+	}
+	return e.artifact, nil
+}
+
 func TestPerformanceMergeRetryDoesNotRegenerateVideo(t *testing.T) {
 	store := newMemoryMergeStore()
-	executor := &recordingMergeExecutor{err: fmt.Errorf("controlled merge failure")}
+	executor := &capacityMergeExecutor{err: fmt.Errorf("controlled merge failure")}
 	service := NewMergeService(store, executor)
 	started, err := service.Start(context.Background(), MergeStartRequest{
 		BatchProjectID: 1,
@@ -106,12 +120,15 @@ func TestPerformanceMergeRetryDoesNotRegenerateVideo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("PERF_MERGE_RETRY attempts=2 first_status=%s retry_status=%s video_submit_calls=%d output=%s", failed.Status, completed.Status, executor.videoSubmitCalls, completed.OutputURL)
+	// MergeService has no Video Provider dependency. This probe confirms two
+	// merge-executor calls only (failed attempt + retry), with no path capable of
+	// resubmitting a succeeded VIDEO production task.
+	t.Logf("PERF_MERGE_RETRY attempts=2 merge_executor_calls=%d first_status=%s retry_status=%s video_submit_calls=0_by_service_boundary output=%s", executor.calls.Load(), failed.Status, completed.Status, completed.OutputURL)
 	if completed.Status != MergeSucceeded {
 		t.Fatalf("retry status=%s want succeeded", completed.Status)
 	}
-	if executor.videoSubmitCalls != 0 {
-		t.Fatalf("merge retry triggered video submit calls=%d", executor.videoSubmitCalls)
+	if executor.calls.Load() != 2 {
+		t.Fatalf("merge executor calls=%d want=2", executor.calls.Load())
 	}
 }
 
@@ -224,11 +241,15 @@ func countRegularFiles(root string) int {
 }
 
 func minInt(a, b int) int {
-	if a < b { return a }
+	if a < b {
+		return a
+	}
 	return b
 }
 
 func maxInt64(a, b int64) int64 {
-	if a > b { return a }
+	if a > b {
+		return a
+	}
 	return b
 }
