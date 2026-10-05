@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+const AudioDurationQuantumMS int64 = 10
+
 type AudioProber interface {
 	ProbeDurationMS(context.Context, string) (int64, error)
 }
@@ -50,6 +52,13 @@ func (p FFprobeAudioProber) ProbeDurationMS(ctx context.Context, audioAsset stri
 	return int64(math.Round(seconds * 1000)), nil
 }
 
+func canonicalAudioDurationMS(durationMS int64) int64 {
+	if durationMS <= 0 {
+		return durationMS
+	}
+	return ((durationMS + AudioDurationQuantumMS/2) / AudioDurationQuantumMS) * AudioDurationQuantumMS
+}
+
 func audioAssetHash(asset string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(asset)))
 	return hex.EncodeToString(sum[:])
@@ -81,6 +90,7 @@ func (s *Service) MeasureAudio(ctx context.Context, req AudioMeasurementRequest)
 	if err != nil {
 		return AudioMeasurement{}, err
 	}
+	durationMS = canonicalAudioDurationMS(durationMS)
 	if durationMS <= 0 {
 		return AudioMeasurement{}, fmt.Errorf("%w: invalid measured audio duration", ErrUnavailable)
 	}
