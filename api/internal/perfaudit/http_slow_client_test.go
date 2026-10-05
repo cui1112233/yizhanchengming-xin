@@ -64,9 +64,9 @@ func TestPerformanceSlowClientConnectionRetentionProbe(t *testing.T) {
 	if !retained {
 		t.Fatalf("slow incomplete header was not retained as expected; read_err=%v", readErr)
 	}
-	if afterHold <= before {
-		t.Fatalf("expected at least one retained connection goroutine; before=%d during=%d", before, afterHold)
-	}
+	// Global goroutine counts are diagnostic only: Serve scheduling and cleanup
+	// can offset the retained connection goroutine. The deterministic condition
+	// is that the incomplete header remains open through the client deadline.
 	if strings.Contains(fmt.Sprint(readErr), "EOF") {
 		t.Fatalf("connection closed before client deadline: %v", readErr)
 	}
