@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - 'test/**'
+  pull_request:
   workflow_dispatch:
     inputs:
       public_base_url:
-        description: 'Optional public base URL for manual smoke run'
+        description: 'Public/ECS base URL for manual smoke run'
         required: false
         type: string
       public_smoke:
@@ -15,10 +16,15 @@ on:
         required: false
         default: false
         type: boolean
+      real_121:
+        description: 'Also run the opt-in real 121 mutation smoke'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   local-e2e:
-    if: ${{ github.event_name == 'push' || !inputs.public_smoke }}
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.public_smoke }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,6 +58,10 @@ jobs:
       PUBLIC_BASE_URL: ${{ inputs.public_base_url }}
       E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_REAL_121: ${{ inputs.real_121 && '1' || '0' }}
+      E2E_121_BOOK_ID: ${{ secrets.E2E_121_BOOK_ID }}
+      E2E_121_SOURCE: ${{ secrets.E2E_121_SOURCE }}
+      E2E_121_PLATFORM_ID: ${{ secrets.E2E_121_PLATFORM_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
