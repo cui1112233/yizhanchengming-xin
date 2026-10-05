@@ -3,10 +3,12 @@ package app
 import (
 	"database/sql"
 	"encoding/base64"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
@@ -23,6 +25,7 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 }
 
 func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock, authEnabled bool) http.Handler {
+	startedAt := time.Now().UTC()
 	store := intake.NewMySQLStore(db)
 	intakeService := intake.NewService(store, fetcher, classifier)
 	pipelineService := pipeline.NewService(store, now)
@@ -100,6 +103,10 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		BatchProjectAccess:          publishingStore,
 		VideoResourceProjects:       videoStore,
 		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
+		Database:                    db,
+		Logger:                      slog.Default(),
+		StartedAt:                   startedAt,
+		AppInitialized:              true,
 	})
 }
 
