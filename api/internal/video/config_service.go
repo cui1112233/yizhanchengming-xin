@@ -58,7 +58,10 @@ func (s *ConfigService) Save(ctx context.Context, input ProviderConfigInput) (Pr
 		ResultURL: strings.TrimSpace(input.ResultURL),
 		Enabled: input.Enabled,
 	}
-	if strings.TrimSpace(input.Secret) != "" {
+	if !providerConfigNeedsSecret(input.ProviderKey) {
+		cfg.EncryptedSecret = []byte{}
+		cfg.SecretNonce = []byte{}
+	} else if strings.TrimSpace(input.Secret) != "" {
 		ciphertext, nonce, err := EncryptSecret(s.masterKey, strings.TrimSpace(input.Secret))
 		if err != nil {
 			return ProviderConfigView{}, err
@@ -100,7 +103,7 @@ func (s *ConfigService) Status(ctx context.Context, provider, model string) (Pro
 		}
 		return ProviderStatusView{}, err
 	}
-	base.Configured = len(cfg.EncryptedSecret) > 0 && len(cfg.SecretNonce) > 0
+	base.Configured = providerConfigConfigured(cfg)
 	base.Enabled = cfg.Enabled
 	if !cfg.Enabled || !base.Configured {
 		return base, nil
@@ -110,11 +113,14 @@ func (s *ConfigService) Status(ctx context.Context, provider, model string) (Pro
 		base.Message = "provider adapter unavailable"
 		return base, nil
 	}
-	secret, err := DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
-	if err != nil {
-		base.Status = ProviderStatusUnavailable
-		base.Message = "provider credential unavailable"
-		return base, nil
+	secret := ""
+	if providerConfigNeedsSecret(cfg.ProviderKey) {
+		secret, err = DecryptSecret(s.masterKey, cfg.EncryptedSecret, cfg.SecretNonce)
+		if err != nil {
+			base.Status = ProviderStatusUnavailable
+			base.Message = "provider credential unavailable"
+			return base, nil
+		}
 	}
 	adapter, err := s.providers.Build(cfg, secret)
 	if err != nil {
