@@ -8,6 +8,7 @@ import {
   runBookGeneration,
   runProjectGeneration,
 } from './api.js'
+import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
 
 const STAGES = [
   ['SCRIPT', 'Script'],
@@ -129,7 +130,13 @@ export default function BatchProjectListPage() {
   const projectColumns = [
     { title: '项目名称', dataIndex: 'name', key: 'name' },
     {
-      title: '操作',
+      title: '统一设置',
+      key: 'settings',
+      width: 420,
+      render: (_, row) => <UnifiedSettingsPanel project={row} />,
+    },
+    {
+      title: '生成',
       key: 'actions',
       width: 140,
       render: (_, row) => <Button onClick={() => void openGeneration(row)}>生成状态</Button>,
@@ -174,7 +181,7 @@ export default function BatchProjectListPage() {
           <Typography.Text type="secondary">一战晟铭 · Batch Factory</Typography.Text>
           <Typography.Title level={2}>批量工厂</Typography.Title>
           <Typography.Paragraph type="secondary">
-            BatchProject 与 Script / Hook / Director / Final Prompt 状态均来自 Go + MySQL 事实源。
+            BatchProject、统一设置与 Script / Hook / Director / Final Prompt 状态均来自 Go + MySQL 事实源。
           </Typography.Paragraph>
         </div>
       </div>

@@ -14,8 +14,14 @@ export function UserApp() {
   )
 }
 
-createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <UserApp />
-  </React.StrictMode>,
-)
+export function mountUserApp(container) {
+  const root = createRoot(container)
+  root.render(
+    <React.StrictMode>
+      <UserApp />
+    </React.StrictMode>,
+  )
+  return root
+}
+
+export const appRoot = mountUserApp(document.getElementById('root'))

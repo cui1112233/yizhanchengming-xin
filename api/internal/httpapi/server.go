@@ -28,11 +28,12 @@ type PipelineService interface {
 }
 
 type Dependencies struct {
-	Intakes       IntakeService
-	Reader        IntakeReader
-	BatchProjects BatchProjectReader
-	Pipeline      PipelineService
-	Generation    GenerationService
+	Intakes         IntakeService
+	Reader          IntakeReader
+	BatchProjects   BatchProjectReader
+	Pipeline        PipelineService
+	Generation      GenerationService
+	UnifiedSettings UnifiedSettingsService
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -52,6 +53,14 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/intakes/{id}/books", api.listBooks)
 	mux.HandleFunc("POST /api/v1/intakes/{id}/batch-projects", api.createBatchProject)
 	mux.HandleFunc("GET /api/v1/batch-projects", api.listBatchProjects)
+
+	mux.HandleFunc("GET /api/v1/batch-projects/{id}/settings", api.getUnifiedSettings)
+	mux.HandleFunc("PUT /api/v1/batch-projects/{id}/settings/production", api.saveProductionSettings)
+	mux.HandleFunc("PUT /api/v1/batch-projects/{id}/settings/publishing", api.savePublishingSettings)
+	mux.HandleFunc("GET /api/v1/batch-projects/{id}/version-profile", api.getVersionProfile)
+	mux.HandleFunc("PUT /api/v1/batch-projects/{id}/version-profile", api.saveVersionProfile)
+	mux.HandleFunc("POST /api/v1/batch-projects/{id}/version-profile/sync-121", api.sync121Settings)
+	mux.HandleFunc("POST /api/v1/batch-projects/{id}/version-profile/sync-style-types", api.syncStyleTypes)
 
 	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/generation", api.projectGeneration)
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/generation", api.projectGeneration)

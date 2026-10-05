@@ -52,6 +52,43 @@ export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
 
+export function getUnifiedSettings(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/settings`)
+}
+
+export function saveProductionSettings(projectId, settings) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/settings/production`, {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  })
+}
+
+export function savePublishingSettings(projectId, settings) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/settings/publishing`, {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  })
+}
+
+export function getVersionProfile(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/version-profile`)
+}
+
+export function saveVersionProfile(projectId, profile) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/version-profile`, {
+    method: 'PUT',
+    body: JSON.stringify(profile),
+  })
+}
+
+export function sync121Config(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/version-profile/sync-121`, { method: 'POST' })
+}
+
+export function syncStyleTypes(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/version-profile/sync-style-types`, { method: 'POST' })
+}
+
 export function getProjectGeneration(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/generation`)
 }

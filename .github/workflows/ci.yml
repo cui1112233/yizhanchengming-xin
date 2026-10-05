@@ -21,6 +21,76 @@ jobs:
       - run: go test ./...
       - run: go build ./...
 
+  goose-migration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: task10
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Install Goose compatible with Go 1.23
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
+      - name: Apply Goose migrations
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
+      - name: Verify MySQL settings survive reload
+        env:
+          TASK10_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/task10?parseTime=true
+        run: go test ./internal/unifiedsettings -run TestMySQLPersistenceSurvivesStoreReload -count=1
+      - name: Verify Goose status
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status
+      - name: Verify Goose rollback
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
+
+  task10-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify legacy parse-input entry is not user reachable
+        shell: bash
+        run: |
+          if grep -RInE --exclude='*.test.*' --exclude-dir=node_modules '解析输入|parse[-_ ]?input' '前台/src'; then
+            echo 'Legacy parse-input entry remains in frontend source.'
+            exit 1
+          fi
+      - name: Verify AI copy controls have one frontend owner
+        shell: bash
+        run: |
+          mapfile -t owners < <(grep -RIlE --exclude='*.test.*' --exclude-dir=node_modules 'aiCopyEnabled|aiCopyCount' '前台/src' || true)
+          if [ "${#owners[@]}" -ne 1 ] || [ "${owners[0]}" != '前台/src/UnifiedSettingsPanel.jsx' ]; then
+            printf 'Unexpected AI copy control owners: %s\n' "${owners[*]}"
+            exit 1
+          fi
+      - name: Verify Task 10 does not use LocalStorage as config source
+        shell: bash
+        run: |
+          if grep -In 'localStorage' '前台/src/UnifiedSettingsPanel.jsx' '前台/src/api.js'; then
+            echo 'Task 10 frontend must use Go API/MySQL, not LocalStorage.'
+            exit 1
+          fi
+      - name: Verify duplicate legacy AI copy labels are absent
+        shell: bash
+        run: |
+          if grep -RInE --exclude='*.test.*' --exclude-dir=node_modules '默认 AI 文案数量|AI ?文案处理优先方案' '前台/src'; then
+            echo 'Duplicate legacy AI copy settings remain.'
+            exit 1
+          fi
+
   admin-build:
     runs-on: ubuntu-latest
     defaults:
