@@ -27,6 +27,9 @@ vi.mock('./api.js', () => ({
   runBookGeneration: vi.fn(),
   retryGenerationStage: vi.fn(),
   getGenerationStage: vi.fn(),
+  getProjectVideoStatus: vi.fn(),
+  retryVideoTask: vi.fn(),
+  cancelVideoTask: vi.fn(),
 }))
 
 import * as api from './api.js'
@@ -68,6 +71,9 @@ describe('BatchProjectListPage', () => {
         },
       }],
     })
+    api.getProjectVideoStatus.mockResolvedValue({ batchProjectId: 3, books: [] })
+    api.retryVideoTask.mockResolvedValue({})
+    api.cancelVideoTask.mockResolvedValue({})
   })
 
   afterEach(() => cleanup())
