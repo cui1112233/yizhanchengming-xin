@@ -25,7 +25,7 @@ func ProviderForModel(model string) (string, bool) {
 		return ProviderYFAISeedance, true
 	case ModelMiniMaxH3Video:
 		return ProviderAutoDLComfyUI, true
-	case "local-doubao-executor-video", "doubao-seedance":
+	case "local-doubao-executor-video", ModelDoubaoSeedance:
 		return ProviderDoubaoLocalExecutor, true
 	default:
 		return "", false
@@ -34,6 +34,7 @@ func ProviderForModel(model string) (string, bool) {
 
 type DefaultProviderFactory struct {
 	HTTPClient *http.Client
+	LocalJobs  LocalExecutorStore
 }
 
 func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Provider, error) {
@@ -62,6 +63,11 @@ func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Pro
 			config.TasksURL = DefaultAutoDLH3TasksURL
 		}
 		return NewAutoDLComfyUIProvider(config, secret, f.HTTPClient)
+	case ProviderDoubaoLocalExecutor:
+		if f.LocalJobs == nil {
+			return nil, providerError(ErrorProviderUnavailable, "local executor store unavailable", nil)
+		}
+		return NewDoubaoLocalExecutorProvider(f.LocalJobs), nil
 	default:
 		return nil, providerError(ErrorProviderUnavailable, "provider adapter unavailable", nil)
 	}
