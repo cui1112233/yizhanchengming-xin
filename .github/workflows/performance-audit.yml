@@ -6,6 +6,10 @@ on:
       - test/performance-concurrency-capacity
   workflow_dispatch:
 
+permissions:
+  contents: read
+  statuses: write
+
 jobs:
   mysql-concurrency-probe:
     runs-on: ubuntu-latest
@@ -61,5 +65,70 @@ jobs:
           while IFS= read -r line; do
             echo "::notice title=PERF_BASELINE::$line"
           done < <(grep 'PERF_BASELINE' /tmp/perf-baseline.log || true)
+      - name: Publish compact performance statuses
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          status_url="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA"
+          post_status() {
+            local state="$1" context="$2" description="$3"
+            description="${description:0:140}"
+            jq -n --arg state "$state" --arg context "$context" --arg description "$description" \
+              '{state:$state,context:$context,description:$description}' \
+              | curl --fail-with-body -sS -X POST \
+                  -H "Authorization: Bearer $GH_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  "$status_url" -d @-
+          }
+          extract() {
+            local line="$1" key="$2"
+            printf '%s\n' "$line" | grep -oE "${key}=[^ ]+" | tail -1 | cut -d= -f2-
+          }
+
+          red_line=$(grep 'PERF_RED' /tmp/perf-red.log | tail -1 || true)
+          if [ -n "$red_line" ]; then
+            red_runs=$(extract "$red_line" logical_runs)
+            red_ok=$(extract "$red_line" succeeded)
+            red_err=$(extract "$red_line" failed)
+            red_wait=$(extract "$red_line" db_wait_count)
+            red_state=success
+            if [ "$red_runs" != "1" ] || [ "$red_err" != "0" ]; then red_state=failure; fi
+            post_status "$red_state" "perf/idempotency-red" "20 concurrent: ok=$red_ok err=$red_err logical_runs=$red_runs want=1 db_wait=$red_wait"
+          else
+            post_status error "perf/idempotency-red" "No PERF_RED metric emitted"
+          fi
+
+          for books in 10 50 100; do
+            line=$(grep "PERF_BASELINE books=$books " /tmp/perf-baseline.log | tail -1 || true)
+            if [ -z "$line" ]; then
+              post_status error "perf/baseline-$books" "No PERF_BASELINE metric emitted for books=$books"
+              continue
+            fi
+            list95=$(extract "$line" http_list_p95)
+            detail95=$(extract "$line" http_detail_p95)
+            list_err=$(extract "$line" http_list_failed)
+            detail_err=$(extract "$line" http_detail_failed)
+            db_wait=$(extract "$line" db_wait_count_delta)
+            state=success
+            if [ "$list_err" != "0" ] || [ "$detail_err" != "0" ]; then state=failure; fi
+            post_status "$state" "perf/baseline-$books" "books=$books list_p95=$list95 detail_p95=$detail95 errors=$list_err/$detail_err db_wait=$db_wait"
+          done
+
+          line=$(grep 'PERF_BASELINE books=100 ' /tmp/perf-baseline.log | tail -1 || true)
+          if [ -n "$line" ]; then
+            rss_peak=$(extract "$line" rss_after_load)
+            rss_post=$(extract "$line" rss_post_gc)
+            gor_before=$(extract "$line" goroutines_before)
+            gor_after=$(extract "$line" goroutines_after)
+            db_open=$(extract "$line" db_open_after)
+            post_status success "perf/resources-100" "rss_peak=$rss_peak rss_post_gc=$rss_post goroutines=$gor_before->$gor_after db_open=$db_open"
+          else
+            post_status error "perf/resources-100" "No 100-book resource metric emitted"
+          fi
       - name: Run existing Go tests
         run: go test ./...
+      - name: Build Go packages
+        run: go build ./...
