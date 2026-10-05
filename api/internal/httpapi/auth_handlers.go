@@ -72,7 +72,11 @@ func (h handler) refreshAuth(w http.ResponseWriter, r *http.Request) {
 		// Do not emit cookie deletion here. A concurrent browser tab may already
 		// have rotated the same old refresh token and installed newer cookies;
 		// a late 401 must not erase that valid session.
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+		if errors.Is(err, authn.ErrUnauthenticated) {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			return
+		}
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_UNAVAILABLE", "message": "登录服务暂不可用"})
 		return
 	}
 	h.setAuthCookies(w, credentials)
@@ -97,7 +101,10 @@ func (h handler) logout(w http.ResponseWriter, r *http.Request) {
 		refreshToken = cookie.Value
 	}
 	if h.deps.Auth != nil {
-		_ = h.deps.Auth.Logout(r.Context(), accessToken, refreshToken)
+		if err := h.deps.Auth.Logout(r.Context(), accessToken, refreshToken); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_UNAVAILABLE", "message": "退出登录暂不可用，请稍后重试"})
+			return
+		}
 	}
 	h.clearAuthCookies(w)
 	w.WriteHeader(http.StatusNoContent)
@@ -116,7 +123,11 @@ func (h handler) requireAuth(next http.Handler) http.Handler {
 		}
 		user, err := h.deps.Auth.AuthenticateAccess(r.Context(), cookie.Value)
 		if err != nil {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			if errors.Is(err, authn.ErrUnauthenticated) {
+				writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+				return
+			}
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_UNAVAILABLE", "message": "登录服务暂不可用"})
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(authn.WithCurrentUser(r.Context(), user)))
