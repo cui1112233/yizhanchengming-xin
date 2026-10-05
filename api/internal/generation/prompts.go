@@ -15,6 +15,8 @@ const StoryModeMetaPrompt = `你是通用小说剧情视觉化编剧与分镜规
 6. 输出结构保持稳定：场景与空间 -> 人物与状态 -> 首镜头钩子 -> 关键动作与冲突 -> 镜头与光影 -> 连续性与安全说明。
 7. 安全要求：不得强化性暗示，不得色情化或性化未成年人，不做不必要的身体特写，不为了冲突强行增加违规行为。能用摔东西、离开、争吵、拒绝、对峙表达时优先使用这些动作。`
 
+const H3DirectorPrompt = `你是 H3 结构化导演。必须只输出可解析 JSON，schema_version 固定为 "h3-director/v1"，并提供结构化 director_cards。保持剧情连续、空间明确、动作可视化。matchAudio 与 audioDurationSec 仅作为兼容输入字段记录，本阶段不得执行精确音频时长重排。`
+
 type PromptResolver struct{ store Store }
 
 func NewPromptResolver(store Store) *PromptResolver { return &PromptResolver{store: store} }
@@ -35,7 +37,7 @@ func DefaultPrompts() []Prompt {
 		{Key: PromptScriptPlotMode, Version: 1, Enabled: true, Content: StoryModeMetaPrompt},
 		{Key: PromptHook, Version: 1, Enabled: true, Content: "基于已生成剧本提炼短视频开场 Hook。强化冲突与信息密度，但不得改变主剧情。"},
 		{Key: PromptDirector, Version: 1, Enabled: true, Content: "你是短视频导演分镜规划器。将剧本与 Hook 转成可继续用于视频提示词编译的导演输出。保持剧情连续、空间明确、动作可视化。"},
-		{Key: PromptDirectorH3, Version: 1, Enabled: true, Content: "你是 H3 结构化导演。输出稳定结构的导演结果。matchAudio 与 audioDurationSec 仅作为兼容输入字段记录，本阶段不得执行精确音频时长重排。"},
+		{Key: PromptDirectorH3, Version: 1, Enabled: true, Content: H3DirectorPrompt},
 		{Key: PromptFinal, Version: 1, Enabled: true, Content: "按后端确定性顺序编译最终提示词，不在前端拼装。"},
 	}
 }
