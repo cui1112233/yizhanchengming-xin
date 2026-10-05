@@ -104,14 +104,7 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
+      # Public smoke uses real credentials/session cookies. Playwright config
+      # disables trace/video/screenshots/report artifacts for this mode, and
+      # this job deliberately does not upload browser evidence artifacts.
       - run: npm run test:e2e:public
-      - name: Upload Playwright evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: task16-playwright-public
-          path: |
-            前台/test-results
-            前台/playwright-report
-          if-no-files-found: ignore
-          retention-days: 14
