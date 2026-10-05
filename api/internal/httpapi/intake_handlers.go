@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 )
 
@@ -110,9 +111,10 @@ func (h handler) createIntake(w http.ResponseWriter, r *http.Request) {
 	}
 	created, books, err := h.deps.Intakes.CreateIntake(r.Context(), input)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "创建 intake 失败")
+		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "INTAKE_CREATE_FAILED", "创建小说获取批次失败", "intake", "create", err)
 		return
 	}
+	h.logger().Info("intake created", "request_id", requestIDFromRequest(r), "subsystem", "intake", "intake_id", created.ID, "book_count", len(books))
 	writeJSON(w, http.StatusCreated, map[string]any{"intake": toIntakeResponse(created), "books": toBookResponses(books)})
 }
 
@@ -123,7 +125,7 @@ func (h handler) listIntakes(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.deps.Reader.ListIntakes(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取 intake 列表失败")
+		h.writeServiceError(w, r, http.StatusInternalServerError, "INTAKE_LIST_FAILED", "读取 intake 列表失败", "intake", "list", err)
 		return
 	}
 	result := make([]intakeResponse, 0, len(rows))
@@ -154,11 +156,34 @@ func (h handler) executeIntake(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "maxText 必须在 100–100000 之间")
 		return
 	}
+	requestID := requestIDFromRequest(r)
+	h.logger().Info("intake execute started", "request_id", requestID, "subsystem", "intake", "intake_id", id)
 	result, err := h.deps.Intakes.ExecuteIntake(r.Context(), id, request.MaxText)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "执行 intake 失败")
+		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "INTAKE_EXECUTE_FAILED", "小说获取执行失败", "intake", "execute", err)
 		return
 	}
+	if h.deps.Reader != nil {
+		if books, listErr := h.deps.Reader.ListBooks(r.Context(), id); listErr != nil {
+			h.logger().Warn("intake per-book outcome unavailable", "request_id", requestID, "subsystem", "intake", "operation", "list_books_after_execute", "intake_id", id, "safe_error", observability.SafeError(listErr))
+		} else {
+			for _, book := range books {
+				attrs := []any{"request_id", requestID, "subsystem", "intake", "intake_id", id, "book_id", book.ID, "status", book.Status}
+				switch book.Status {
+				case intake.BookStatusFetched:
+					h.logger().Info("intake book succeeded", attrs...)
+				case intake.BookStatusRetryableFailed:
+					attrs = append(attrs, "safe_error", observability.SanitizeString(book.ErrorMessage))
+					h.logger().Warn("intake book failed", attrs...)
+				}
+			}
+		}
+	}
+	levelMessage := "intake completed"
+	if result.Failed > 0 {
+		levelMessage = "intake partial failed"
+	}
+	h.logger().Info(levelMessage, "request_id", requestID, "subsystem", "intake", "intake_id", id, "status", result.Status, "fetched", result.Fetched, "failed", result.Failed)
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -174,7 +199,7 @@ func (h handler) listBooks(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.deps.Reader.ListBooks(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取书籍列表失败")
+		h.writeServiceError(w, r, http.StatusInternalServerError, "BOOK_LIST_FAILED", "读取书籍列表失败", "intake", "list_books", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"books": toBookResponses(rows)})
@@ -208,9 +233,17 @@ func (h handler) createBatchProject(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.deps.Pipeline.Create(r.Context(), create)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "创建批量项目失败")
+		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "BATCH_PROJECT_CREATE_FAILED", "创建批量项目失败", "batch_project", "create", err)
 		return
 	}
+	h.logger().Info("batch project run created",
+		"request_id", requestIDFromRequest(r),
+		"subsystem", "batch_project",
+		"batch_project_id", result.Project.ID,
+		"run_id", result.Run.ID,
+		"intake_id", id,
+		"status", result.Run.Status,
+	)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"project": projectResponse{ID: result.Project.ID, IntakeID: result.Project.IntakeID, Name: result.Project.Name},
 		"run": runResponse{ID: result.Run.ID, BatchProjectID: result.Run.BatchProjectID, RunAt: result.Run.RunAt, Status: result.Run.Status},

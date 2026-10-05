@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 )
 
 const (
@@ -53,6 +54,7 @@ func (h handler) login(w http.ResponseWriter, r *http.Request) {
 	if h.deps.LoginLimiter != nil {
 		h.deps.LoginLimiter.Reset(key)
 	}
+	observability.SetUserID(r.Context(), user.ID)
 	h.setAuthCookies(w, credentials)
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
@@ -72,13 +74,10 @@ func (h handler) refreshAuth(w http.ResponseWriter, r *http.Request) {
 		// Do not emit cookie deletion here. A concurrent browser tab may already
 		// have rotated the same old refresh token and installed newer cookies;
 		// a late 401 must not erase that valid session.
-		if errors.Is(err, authn.ErrUnauthenticated) {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
-			return
-		}
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_UNAVAILABLE", "message": "登录服务暂不可用"})
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
 		return
 	}
+	observability.SetUserID(r.Context(), user.ID)
 	h.setAuthCookies(w, credentials)
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
@@ -101,10 +100,7 @@ func (h handler) logout(w http.ResponseWriter, r *http.Request) {
 		refreshToken = cookie.Value
 	}
 	if h.deps.Auth != nil {
-		if err := h.deps.Auth.Logout(r.Context(), accessToken, refreshToken); err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_UNAVAILABLE", "message": "退出登录暂不可用，请稍后重试"})
-			return
-		}
+		_ = h.deps.Auth.Logout(r.Context(), accessToken, refreshToken)
 	}
 	h.clearAuthCookies(w)
 	w.WriteHeader(http.StatusNoContent)
@@ -123,13 +119,10 @@ func (h handler) requireAuth(next http.Handler) http.Handler {
 		}
 		user, err := h.deps.Auth.AuthenticateAccess(r.Context(), cookie.Value)
 		if err != nil {
-			if errors.Is(err, authn.ErrUnauthenticated) {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
-				return
-			}
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_UNAVAILABLE", "message": "登录服务暂不可用"})
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
 			return
 		}
+		observability.SetUserID(r.Context(), user.ID)
 		next.ServeHTTP(w, r.WithContext(authn.WithCurrentUser(r.Context(), user)))
 	})
 }
