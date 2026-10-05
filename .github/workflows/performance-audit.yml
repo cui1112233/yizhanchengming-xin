@@ -52,7 +52,7 @@ jobs:
           if [ "$test_status" -eq 0 ]; then
             echo "::notice title=PERF_TASK9_IDEMPOTENCY_RED::Probe passed; re-check whether Task 9 idempotency entered main."
           else
-            echo "::warning title=PERF_TASK9_IDEMPOTENCY_RED::Expected RED reproduced with exit code $test_status; Task 9.4.6 remains a blocker."
+            echo "::warning title=PERF_TASK9_IDEMPOTENCY_RED::PERF-RUN-IDEMPOTENCY-001 / P0 / BLOCKED_BY_TASK9_4 reproduced with exit code $test_status."
           fi
           exit 0
       - name: Run 10/50/100 MySQL and HTTP baseline
@@ -65,14 +65,34 @@ jobs:
           while IFS= read -r line; do
             echo "::notice title=PERF_BASELINE::$line"
           done < <(grep 'PERF_BASELINE' /tmp/perf-baseline.log || true)
-      - name: Run controlled Task14 video and ffmpeg probes
+      - name: Run Generation 10/50/100 and failure isolation
+        env:
+          PERF_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./internal/generation -run '^TestPerformanceGeneration' -count=1 -v 2>&1 | tee /tmp/perf-generation.log
+          while IFS= read -r line; do
+            echo "::notice title=PERF_GENERATION::$line"
+          done < <(grep 'PERF_GENERATION' /tmp/perf-generation.log || true)
+      - name: Run repeated RSS goroutine and detail decomposition probes
+        env:
+          PERF_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/perf_audit?parseTime=true
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./internal/perfaudit -run 'TestPerformance(RepeatedRSSAndGoroutineRetention|ProjectDetailDecomposition)' -count=1 -v 2>&1 | tee /tmp/perf-retention.log
+          while IFS= read -r line; do
+            echo "::notice title=PERF_RETENTION_DETAIL::$line"
+          done < <(grep -E 'PERF_RETENTION|PERF_DETAIL_DECOMP' /tmp/perf-retention.log || true)
+      - name: Run controlled Task14 capacity and failure probes
         shell: bash
         run: |
           set -o pipefail
           go test ./internal/video -run '^TestPerformance' -count=1 -v 2>&1 | tee /tmp/perf-video.log
           while IFS= read -r line; do
             echo "::notice title=PERF_TASK14::$line"
-          done < <(grep -E 'PERF_VIDEO|PERF_FFMPEG' /tmp/perf-video.log || true)
+          done < <(grep -E 'PERF_VIDEO|PERF_FFMPEG|PERF_PROVIDER_FAILURE|PERF_MERGE|PERF_ARTIFACT' /tmp/perf-video.log || true)
       - name: Publish compact performance statuses
         if: always()
         env:
@@ -104,7 +124,7 @@ jobs:
             red_wait=$(extract "$red_line" db_wait_count)
             red_state=success
             if [ "$red_runs" != "1" ] || [ "$red_err" != "0" ]; then red_state=failure; fi
-            post_status "$red_state" "perf/idempotency-red" "20 concurrent: ok=$red_ok err=$red_err logical_runs=$red_runs want=1 db_wait=$red_wait"
+            post_status "$red_state" "perf/idempotency-red" "P0/BLOCKED_BY_TASK9_4: ok=$red_ok err=$red_err logical_runs=$red_runs want=1 db_wait=$red_wait"
           else
             post_status error "perf/idempotency-red" "No PERF_RED metric emitted"
           fi
@@ -124,6 +144,32 @@ jobs:
             if [ "$list_err" != "0" ] || [ "$detail_err" != "0" ]; then state=failure; fi
             post_status "$state" "perf/baseline-$books" "books=$books list_p95=$list95 detail_p95=$detail95 errors=$list_err/$detail_err db_wait=$db_wait"
           done
+
+          for books in 10 50 100; do
+            line=$(grep "PERF_GENERATION books=$books " /tmp/perf-generation.log | tail -1 || true)
+            if [ -z "$line" ]; then
+              post_status error "perf/generation-$books" "No Generation metric emitted for books=$books"
+              continue
+            fi
+            ok=$(extract "$line" success)
+            err=$(extract "$line" failed)
+            p95=$(extract "$line" p95)
+            throughput=$(extract "$line" throughput)
+            max_active=$(extract "$line" provider_max_active)
+            state=success
+            if [ "$err" != "0" ]; then state=failure; fi
+            post_status "$state" "perf/generation-$books" "books=$books ok=$ok err=$err p95=$p95 throughput=$throughput/s provider_max_active=$max_active"
+          done
+
+          retention=$(grep 'PERF_RETENTION_SUMMARY' /tmp/perf-retention.log | tail -1 || true)
+          if [ -n "$retention" ]; then
+            rss_delta=$(extract "$retention" rss_delta)
+            gor_delta=$(extract "$retention" goroutine_delta)
+            increases=$(extract "$retention" strict_rss_increase_steps)
+            post_status success "perf/retention-10round" "100-book x10: rss_delta=$rss_delta strict_increases=$increases goroutine_delta=$gor_delta"
+          else
+            post_status error "perf/retention-10round" "No retention summary metric emitted"
+          fi
 
           line=$(grep 'PERF_BASELINE books=100 ' /tmp/perf-baseline.log | tail -1 || true)
           if [ -n "$line" ]; then
