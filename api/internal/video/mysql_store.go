@@ -58,7 +58,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		if err != nil {
 			return ProductionJob{}, false, err
 		}
-		return s.GetProductionJob(ctx, job.ID)
+		loaded, err := s.GetProductionJob(ctx, job.ID)
+		return loaded, true, err
 	}
 	var mysqlErr *mysqlDriver.MySQLError
 	if !errors.As(err, &mysqlErr) || mysqlErr.Number != 1062 {
