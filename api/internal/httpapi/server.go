@@ -42,6 +42,10 @@ type VideoLocalExecutorService interface {
 	FailTask(context.Context, string, string, video.LocalExecutorFailInput) error
 }
 
+type VideoStatusService interface {
+	ProjectStatus(context.Context, int64) (video.ProjectVideoStatus, error)
+}
+
 type Dependencies struct {
 	Intakes             IntakeService
 	Reader              IntakeReader
@@ -53,6 +57,7 @@ type Dependencies struct {
 	Video               VideoService
 	VideoConfig         VideoConfigService
 	VideoLocalExecutor  VideoLocalExecutorService
+	VideoStatus         VideoStatusService
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -93,6 +98,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/video-providers/{provider}/models/{model}", api.getVideoProviderConfig)
 	mux.HandleFunc("PUT /api/v1/video-providers/{provider}/models/{model}", api.putVideoProviderConfig)
 	mux.HandleFunc("GET /api/v1/video-providers/{provider}/models/{model}/status", api.getVideoProviderStatus)
+	mux.HandleFunc("GET /api/v1/batch-projects/{projectId}/video", api.projectVideoStatus)
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", api.startVideo)
 	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/poll", api.pollVideoTask)
 	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/cancel", api.cancelVideoTask)
