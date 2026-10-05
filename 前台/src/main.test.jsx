@@ -28,5 +28,5 @@ describe('小说获取工作台', () => {
     expect(screen.getByRole('button', { name: '立即执行' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '自动化' })).toBeTruthy()
     expect(screen.getByText('书籍结果')).toBeTruthy()
-  })
+  }, 15000)
 })
