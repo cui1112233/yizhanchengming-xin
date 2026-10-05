@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
@@ -51,21 +53,27 @@ func TestBatchProjectListReturnsReaderProjects(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{`"projects"`, `"id":51`, `"intakeId":11`, `"name":"知乎批次"`, `"id":52`, `"name":"点众批次"`} {
-		if !contains(body, want) {
+		if !strings.Contains(body, want) {
 			t.Fatalf("body = %s, missing %s", body, want)
 		}
 	}
 }
 
-func contains(value, part string) bool {
-	return len(part) == 0 || len(value) >= len(part) && index(value, part) >= 0
-}
+func TestBatchProjectListDoesNotLeakReaderError(t *testing.T) {
+	reader := &fakeBatchProjectReader{err: errors.New("mysql password=secret")}
+	handler := NewHandler(Dependencies{BatchProjects: reader})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects", nil)
+	rec := httptest.NewRecorder()
 
-func index(value, part string) int {
-	for i := 0; i+len(part) <= len(value); i++ {
-		if value[i:i+len(part)] == part {
-			return i
-		}
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d body=%s, want 500", rec.Code, rec.Body.String())
 	}
-	return -1
+	if strings.Contains(rec.Body.String(), "password=secret") {
+		t.Fatalf("reader error leaked to response: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "读取批量项目列表失败") {
+		t.Fatalf("body = %s, want generic list error", rec.Body.String())
+	}
 }
