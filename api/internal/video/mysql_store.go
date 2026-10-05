@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -155,4 +156,151 @@ func (s *MySQLStore) ListRecoverableTasks(ctx context.Context, limit int) ([]Pro
 		out = append(out, task)
 	}
 	return out, rows.Err()
+}
+
+func (s *MySQLStore) CreateLocalExecutor(ctx context.Context, record LocalExecutorRecord) error {
+	capabilities, err := json.Marshal(record.Capabilities)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO video_local_executors
+(id, name, provider_key, model, capabilities_json, token_hash, last_seen_at, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, record.ID, record.Name, record.ProviderKey, record.Model, capabilities, record.TokenHash[:], record.LastSeenAt, record.CreatedAt, record.UpdatedAt)
+	return err
+}
+
+const localExecutorSelect = `SELECT id, name, provider_key, model, capabilities_json, token_hash, last_seen_at, created_at, updated_at FROM video_local_executors`
+
+func scanLocalExecutor(scan func(...any) error) (LocalExecutorRecord, error) {
+	var record LocalExecutorRecord
+	var capabilities []byte
+	var tokenHash []byte
+	if err := scan(&record.ID, &record.Name, &record.ProviderKey, &record.Model, &capabilities, &tokenHash, &record.LastSeenAt, &record.CreatedAt, &record.UpdatedAt); err != nil {
+		return LocalExecutorRecord{}, err
+	}
+	if len(tokenHash) != len(record.TokenHash) {
+		return LocalExecutorRecord{}, fmt.Errorf("video: invalid local executor token hash")
+	}
+	copy(record.TokenHash[:], tokenHash)
+	if err := json.Unmarshal(capabilities, &record.Capabilities); err != nil {
+		return LocalExecutorRecord{}, err
+	}
+	return record, nil
+}
+
+func (s *MySQLStore) GetLocalExecutorByTokenHash(ctx context.Context, hash [32]byte) (LocalExecutorRecord, error) {
+	record, err := scanLocalExecutor(s.db.QueryRowContext(ctx, localExecutorSelect+` WHERE token_hash=? LIMIT 1`, hash[:]).Scan)
+	if errors.Is(err, sql.ErrNoRows) {
+		return LocalExecutorRecord{}, ErrLocalExecutorUnauthorized
+	}
+	return record, err
+}
+
+func (s *MySQLStore) UpdateLocalExecutorHeartbeat(ctx context.Context, id string, capabilities []string, now time.Time) error {
+	payload, err := json.Marshal(capabilities)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE video_local_executors SET capabilities_json=?, last_seen_at=?, updated_at=? WHERE id=?`, payload, now, now, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrLocalExecutorUnauthorized
+	}
+	return nil
+}
+
+func (s *MySQLStore) ListLocalExecutors(ctx context.Context) ([]LocalExecutorRecord, error) {
+	rows, err := s.db.QueryContext(ctx, localExecutorSelect+` ORDER BY created_at ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]LocalExecutorRecord, 0)
+	for rows.Next() {
+		record, err := scanLocalExecutor(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, record)
+	}
+	return out, rows.Err()
+}
+
+func (s *MySQLStore) CreateLocalExecutorTask(ctx context.Context, task LocalExecutorTask) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO video_local_executor_tasks
+(id, source_task_id, provider_key, model, prompt, request_id, status, executor_id, artifact_url, error_code, error_message, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`, task.ID, task.SourceTaskID, task.ProviderKey, task.Model, task.Prompt, task.RequestID, task.Status, task.ArtifactURL, task.ErrorCode, task.ErrorMessage, task.CreatedAt, task.UpdatedAt)
+	return err
+}
+
+const localExecutorTaskSelect = `SELECT id, source_task_id, provider_key, model, prompt, request_id, status, COALESCE(executor_id,''), artifact_url, error_code, error_message, created_at, updated_at FROM video_local_executor_tasks`
+
+func scanLocalExecutorTask(scan func(...any) error) (LocalExecutorTask, error) {
+	var task LocalExecutorTask
+	if err := scan(&task.ID, &task.SourceTaskID, &task.ProviderKey, &task.Model, &task.Prompt, &task.RequestID, &task.Status, &task.ExecutorID, &task.ArtifactURL, &task.ErrorCode, &task.ErrorMessage, &task.CreatedAt, &task.UpdatedAt); err != nil {
+		return LocalExecutorTask{}, err
+	}
+	return task, nil
+}
+
+func (s *MySQLStore) GetLocalExecutorTask(ctx context.Context, id string) (LocalExecutorTask, error) {
+	task, err := scanLocalExecutorTask(s.db.QueryRowContext(ctx, localExecutorTaskSelect+` WHERE id=? LIMIT 1`, id).Scan)
+	if errors.Is(err, sql.ErrNoRows) {
+		return LocalExecutorTask{}, ErrLocalExecutorTaskNotFound
+	}
+	return task, err
+}
+
+func (s *MySQLStore) CompleteLocalExecutorTask(ctx context.Context, id, executorID, artifactURL string, now time.Time) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE video_local_executor_tasks SET status=?, executor_id=?, artifact_url=?, error_code='', error_message='', updated_at=? WHERE id=? AND status IN ('queued','running')`, TaskSucceeded, executorID, artifactURL, now, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrLocalExecutorTaskNotFound
+	}
+	return nil
+}
+
+func (s *MySQLStore) FailLocalExecutorTask(ctx context.Context, id, executorID string, code ErrorCode, message string, now time.Time) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE video_local_executor_tasks SET status=?, executor_id=?, error_code=?, error_message=?, updated_at=? WHERE id=? AND status IN ('queued','running')`, TaskFailed, executorID, code, message, now, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrLocalExecutorTaskNotFound
+	}
+	return nil
+}
+
+func (s *MySQLStore) CancelLocalExecutorTask(ctx context.Context, id string, now time.Time) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `UPDATE video_local_executor_tasks SET status=?, updated_at=? WHERE id=? AND status IN ('queued','running')`, TaskCancelled, now, id)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if affected > 0 {
+		return true, nil
+	}
+	if _, err := s.GetLocalExecutorTask(ctx, id); err != nil {
+		return false, err
+	}
+	return false, nil
 }
