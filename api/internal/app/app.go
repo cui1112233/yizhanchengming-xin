@@ -32,9 +32,29 @@ func newHandler(db *sql.DB,fetcher intake.Fetcher,classifier intake.Classifier,n
 	var authService httpapi.AuthService
 	if authEnabled { authStore:=authn.NewMySQLStore(db); authService=authn.NewService(authStore,authn.NewManager(authStore,authn.Options{})) }
 	publishingService:=publishing.NewService(publishing.NewMySQLStore(db),publishing.Options{CredentialKey:publishingCredentialKey()})
-	secureCookies,_:=strconv.ParseBool(os.Getenv("QIANTIE_COOKIE_SECURE")); allowedOrigins:=make([]string,0)
+	allowedOrigins:=make([]string,0)
 	for _,value:=range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"),","){if value=strings.TrimSpace(value);value!=""{allowedOrigins=append(allowedOrigins,value)}}
-	return httpapi.NewHandler(httpapi.Dependencies{Intakes:intakeService,Reader:store,Pipeline:pipelineService,BatchProjects:store,Generation:generationService,UnifiedSettings:settingsService,Auth:authService,Publishing:publishingService,SecureCookies:secureCookies,AllowedOrigins:allowedOrigins})
+	return httpapi.NewHandler(httpapi.Dependencies{Intakes:intakeService,Reader:store,Pipeline:pipelineService,BatchProjects:store,Generation:generationService,UnifiedSettings:settingsService,Auth:authService,Publishing:publishingService,SecureCookies:secureCookiesEnabled(),AllowedOrigins:allowedOrigins})
+}
+
+func secureCookiesEnabled() bool {
+	environment := strings.ToLower(strings.TrimSpace(os.Getenv("QIANTIE_ENV")))
+	development := environment == "dev" || environment == "development" || environment == "local" || environment == "test"
+	if !development {
+		// Fail safe: an unset or production-like environment always emits Secure cookies.
+		// A stray QIANTIE_COOKIE_SECURE=false must not silently weaken production auth.
+		return true
+	}
+
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_COOKIE_SECURE"))
+	if raw == "" {
+		return false
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false
+	}
+	return value
 }
 
 func publishingCredentialKey() []byte {
