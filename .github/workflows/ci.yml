@@ -48,6 +48,10 @@ jobs:
         run: go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
       - name: Apply Goose migrations
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
+      - name: Verify MySQL settings survive reload
+        env:
+          TASK10_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/task10?parseTime=true
+        run: go test ./internal/unifiedsettings -run TestMySQLPersistenceSurvivesStoreReload -count=1
       - name: Verify Goose status
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status
       - name: Verify Goose rollback
