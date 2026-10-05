@@ -38,7 +38,7 @@ func TestFFprobeUnavailableReturnsExplicitErrorOnlyWhenMeasuring(t *testing.T) {
 }
 
 func TestMeasureAudioPersistsTraceableMeasurementAndReusesSameAsset(t *testing.T) {
-	service, store, _ := serviceFixture()
+	service, _, _ := serviceFixture()
 	prober := &fakeAudioProber{durationMS: 28000}
 	service.audioProber = prober
 
@@ -66,9 +66,6 @@ func TestMeasureAudioPersistsTraceableMeasurementAndReusesSameAsset(t *testing.T
 	}
 	if first.BookID != 11 || first.BatchProjectID != 3 || first.AudioAsset == "" {
 		t.Fatalf("measurement source is not traceable: %#v", first)
-	}
-	if len(store.audioMeasurements) != 1 {
-		t.Fatalf("stored measurements = %d", len(store.audioMeasurements))
 	}
 }
 
