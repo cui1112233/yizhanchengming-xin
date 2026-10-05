@@ -40,9 +40,9 @@ type memoryStore struct {
 func newMemoryStore() *memoryStore {
 	return &memoryStore{
 		books: map[int64]intake.Book{
-		11: {ID: 11, IntakeID: 7, Title: "甲书", OriginalText: "她推开门，发现桌上的信不见了。"},
-		12: {ID: 12, IntakeID: 7, Title: "乙书", OriginalText: "他转身离开医院。"},
-		13: {ID: 13, IntakeID: 7, Title: "丙书", OriginalText: "雨夜里她攥紧手机。"},
+			11: {ID: 11, IntakeID: 7, Title: "甲书", OriginalText: "她推开门，发现桌上的信不见了。"},
+			12: {ID: 12, IntakeID: 7, Title: "乙书", OriginalText: "他转身离开医院。"},
+			13: {ID: 13, IntakeID: 7, Title: "丙书", OriginalText: "雨夜里她攥紧手机。"},
 		},
 		projectBook: map[int64][]int64{3: {11, 12, 13}},
 		prompts: map[string]Prompt{},
@@ -220,10 +220,14 @@ func TestHookDisabledIsSkippedNotFailed(t *testing.T) {
 	}
 }
 
-func TestH3DirectorUsesDedicatedPromptAndPersistsCompatibilityFields(t *testing.T) {
+func TestH3DirectorUsesDedicatedPromptAndAuthoritativeAudio(t *testing.T) {
 	service, store, provider := serviceFixture()
-	provider.responses = []string{"SCRIPT", "HOOK", `{"schema_version":"h3-director/v1","director_cards":[]}`}
-	result, err := service.RunBook(context.Background(), RunBookRequest{BatchProjectID: 3, BookID: 11, HookEnabled: true, DirectorMode: DirectorH3, MatchAudio: true, AudioDurationSec: 28.25, RequestID: "h3-1"})
+	service.audioProber = &fakeAudioProber{durationMS: 28250}
+	if _, err := service.MeasureAudio(context.Background(), AudioMeasurementRequest{BatchProjectID: 3, BookID: 11, AudioAsset: "/audio/11.mp3"}); err != nil {
+		t.Fatal(err)
+	}
+	provider.responses = []string{"SCRIPT", "HOOK", `{"schema_version":"h3-director/v1","director_cards":[{"shot":"a","start":0.00,"end":14.00},{"shot":"b","start":14.00,"end":28.25}]}`}
+	result, err := service.RunBook(context.Background(), RunBookRequest{BatchProjectID: 3, BookID: 11, HookEnabled: true, DirectorMode: DirectorH3, MatchAudio: true, AudioDurationSec: 999, ShotDurationLimitSec: 15, RequestID: "h3-1"})
 	if err != nil {
 		t.Fatalf("RunBook: %v", err)
 	}
@@ -232,7 +236,10 @@ func TestH3DirectorUsesDedicatedPromptAndPersistsCompatibilityFields(t *testing.
 		t.Fatalf("prompt key = %s", director.PromptKey)
 	}
 	if !strings.Contains(director.InputSnapshot, `"matchAudio":true`) || !strings.Contains(director.InputSnapshot, `"audioDurationSec":28.25`) {
-		t.Fatalf("compatibility fields missing: %s", director.InputSnapshot)
+		t.Fatalf("authoritative audio fields missing: %s", director.InputSnapshot)
+	}
+	if director.PromptVersion != 2 || !strings.Contains(director.ValidationResult, `"valid":true`) {
+		t.Fatalf("prompt/validation not recorded: %#v", director)
 	}
 	if len(provider.calls) != 3 {
 		t.Fatalf("provider calls = %d", len(provider.calls))
