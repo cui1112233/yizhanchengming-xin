@@ -64,14 +64,18 @@ func (h handler) withObservability(next http.Handler) http.Handler {
 			if status == 0 {
 				status = http.StatusOK
 			}
-			logger.Info("http request completed",
+			attrs := []any{
 				"request_id", requestID,
 				"method", r.Method,
 				"path", r.URL.Path,
 				"status", status,
 				"duration_ms", time.Since(started).Milliseconds(),
 				"remote_class", remoteClass(r.RemoteAddr),
-			)
+			}
+			if userID := observability.UserID(r.Context()); userID > 0 {
+				attrs = append(attrs, "user_id", userID)
+			}
+			logger.Info("http request completed", attrs...)
 		}()
 
 		next.ServeHTTP(recorder, r)
@@ -143,14 +147,14 @@ func (h handler) readyz(w http.ResponseWriter, r *http.Request) {
 }
 
 type diagnosticsDTO struct {
-	RequestID string                    `json:"request_id"`
-	APIReady  bool                      `json:"api_ready"`
-	Database  databaseDiagnosticsDTO    `json:"database"`
-	Runtime   runtimeDiagnosticsDTO     `json:"runtime"`
-	Process   observability.ProcessStats `json:"process"`
-	Providers []providerDiagnosticsDTO  `json:"providers"`
-	Executors executorFleetDiagnosticsDTO `json:"executors"`
-	Jobs      jobDiagnosticsDTO         `json:"jobs"`
+	RequestID string                       `json:"request_id"`
+	APIReady  bool                         `json:"api_ready"`
+	Database  databaseDiagnosticsDTO       `json:"database"`
+	Runtime   runtimeDiagnosticsDTO        `json:"runtime"`
+	Process   observability.ProcessStats   `json:"process"`
+	Providers []providerDiagnosticsDTO     `json:"providers"`
+	Executors executorFleetDiagnosticsDTO  `json:"executors"`
+	Jobs      jobDiagnosticsDTO            `json:"jobs"`
 }
 
 type databaseDiagnosticsDTO struct {
@@ -179,12 +183,12 @@ type providerDiagnosticsDTO struct {
 }
 
 type executorDiagnosticsDTO struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Provider     string    `json:"provider"`
-	Model        string    `json:"model"`
-	Capabilities []string  `json:"capabilities"`
-	Online       bool      `json:"online"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Provider      string    `json:"provider"`
+	Model         string    `json:"model"`
+	Capabilities  []string  `json:"capabilities"`
+	Online        bool      `json:"online"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
 }
 
@@ -285,7 +289,11 @@ func (h handler) diagnostics(w http.ResponseWriter, r *http.Request) {
 			for _, item := range items {
 				safe := executorDiagnosticsDTO{ID: item.ID, Name: item.Name, Provider: item.ProviderKey, Model: item.Model, Capabilities: append([]string(nil), item.Capabilities...), Online: item.Online, LastHeartbeat: item.LastSeenAt}
 				result.Executors.Items = append(result.Executors.Items, safe)
-				if item.Online { result.Executors.OnlineCount++ } else { result.Executors.OfflineCount++ }
+				if item.Online {
+					result.Executors.OnlineCount++
+				} else {
+					result.Executors.OfflineCount++
+				}
 			}
 		}
 	}
