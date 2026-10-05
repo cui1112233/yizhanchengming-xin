@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -17,9 +17,22 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 })
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('小说获取工作台', () => {
   it('提供书城分组、执行入口和书籍结果区', async () => {
     document.body.innerHTML = '<div id="root"></div>'
+    global.fetch = vi.fn(async (url) => {
+      if (url === '/api/auth/current-user') {
+        return new Response(JSON.stringify({ user: { id: 7, name: 'Test User', role: 'admin' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
 
     const { appRoot } = await import('./main.jsx')
     try {

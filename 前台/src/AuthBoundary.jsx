@@ -1,0 +1,96 @@
+import React, { useEffect, useState } from 'react'
+import { Alert, Button, Card, Form, Input, Spin, Typography } from 'antd'
+import * as defaultApi from './api.js'
+
+export default function AuthBoundary({ children, api = defaultApi }) {
+  const [status, setStatus] = useState('initializing')
+  const [user, setUser] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    const markUnauthenticated = () => {
+      if (!active) return
+      setUser(null)
+      setStatus('unauthenticated')
+    }
+
+    const handleExpired = () => {
+      if (!active) return
+      setError('当前登录状态已过期，请重新登录。')
+      markUnauthenticated()
+    }
+
+    window.addEventListener('ycm:auth-unauthenticated', handleExpired)
+    Promise.resolve(api.getCurrentUser())
+      .then((payload) => {
+        if (!active) return
+        setUser(payload?.user || null)
+        setError('')
+        setStatus(payload?.user ? 'authenticated' : 'unauthenticated')
+      })
+      .catch(() => {
+        markUnauthenticated()
+      })
+
+    return () => {
+      active = false
+      window.removeEventListener('ycm:auth-unauthenticated', handleExpired)
+    }
+  }, [api])
+
+  const submitLogin = async (values) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      const payload = await api.login(values)
+      if (!payload?.user) {
+        throw new Error('登录响应缺少用户信息')
+      }
+      setUser(payload.user)
+      setStatus('authenticated')
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : '登录失败，请重试。')
+      setStatus('unauthenticated')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (status === 'initializing') {
+    return (
+      <main className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <Spin size="large" />
+          <Typography.Paragraph style={{ marginTop: 16 }}>正在恢复登录状态…</Typography.Paragraph>
+        </div>
+      </main>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <main className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <Card title="一战晟铭登录" style={{ width: 'min(420px, 92vw)' }}>
+          {error ? <Alert type="warning" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
+          <Form layout="vertical" onFinish={submitLogin}>
+            <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
+              <Input autoComplete="username" />
+            </Form.Item>
+            <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
+              <Input.Password autoComplete="current-password" />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={submitting} block>登录</Button>
+          </Form>
+          <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
+            登录成功后会继续停留在你原本访问的页面。
+          </Typography.Paragraph>
+        </Card>
+      </main>
+    )
+  }
+
+  return React.cloneElement(<>{children}</>, { 'data-auth-user': user?.id || undefined })
+}
