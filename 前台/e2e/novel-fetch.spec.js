@@ -3,12 +3,13 @@ import { routeAuthenticated } from './support/fixtures.js'
 
 const SOURCE_INPUT = 'input[placeholder="例如：阳光、常读、知乎"]'
 const PLATFORM_INPUT = 'input[placeholder="例如：4"]'
+const BOOK_IDS_INPUT = 'textarea:not([aria-hidden="true"])'
 const isPublic = Boolean(process.env.PUBLIC_BASE_URL?.trim())
 
 async function addGroup(page, source, platformId, ids) {
   await page.locator(SOURCE_INPUT).fill(source)
   await page.locator(PLATFORM_INPUT).fill(String(platformId))
-  await page.locator('textarea').fill(ids)
+  await page.locator(BOOK_IDS_INPUT).fill(ids)
   await page.getByRole('button', { name: '添加书城' }).click()
 }
 
@@ -20,7 +21,7 @@ async function loginPublic(page) {
   if (await page.getByText('一战晟铭登录').count()) {
     await page.getByLabel('用户名').fill(username)
     await page.getByLabel('密码').fill(password)
-    await page.getByRole('button', { name: '登录' }).click()
+    await page.locator('button[type="submit"]').click()
   }
   await expect(page.getByRole('heading', { name: '小说获取工作台' })).toBeVisible()
 }
@@ -79,7 +80,7 @@ test.describe('@novel novel fetch acceptance', () => {
 
     await addGroup(page, '阳光', 4, '101 101 102')
     await expect(page.getByText('阳光 2本 · P4')).toBeVisible()
-    await expect(page.locator('textarea')).toHaveValue('')
+    await expect(page.locator(BOOK_IDS_INPUT)).toHaveValue('')
 
     await addGroup(page, '阳光', 4, '102 103')
     await expect(page.getByText('阳光 3本 · P4')).toBeVisible()
