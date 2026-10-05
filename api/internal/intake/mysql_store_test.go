@@ -162,3 +162,39 @@ func TestMySQLStoreCreateBatchProjectAndScheduledRun(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+type batchProjectLister interface {
+	ListBatchProjects(context.Context) ([]BatchProject, error)
+}
+
+func TestMySQLStoreListsBatchProjectsFromDatabase(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	store := NewMySQLStore(db)
+	lister, ok := any(store).(batchProjectLister)
+	if !ok {
+		t.Fatalf("MySQLStore must implement ListBatchProjects")
+	}
+
+	now := time.Date(2026, 10, 5, 5, 0, 0, 0, time.UTC)
+	query := "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects ORDER BY id DESC LIMIT 100"
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "created_at", "updated_at"}).
+			AddRow(52, 12, "点众批次", now, now).
+			AddRow(51, 11, "知乎批次", now, now))
+
+	projects, err := lister.ListBatchProjects(context.Background())
+	if err != nil {
+		t.Fatalf("ListBatchProjects: %v", err)
+	}
+	if len(projects) != 2 || projects[0].ID != 52 || projects[0].Name != "点众批次" || projects[1].ID != 51 {
+		t.Fatalf("projects = %+v", projects)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
