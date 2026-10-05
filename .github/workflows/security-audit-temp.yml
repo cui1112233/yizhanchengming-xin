@@ -1,0 +1,58 @@
+name: security-audit-temp
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Install gitleaks
+        run: go install github.com/zricethezav/gitleaks/v8@v8.24.2
+      - name: Scan complete Git history with redaction
+        run: gitleaks git --redact --exit-code 1 .
+
+  go-vulnerability-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Audit reachable Go vulnerabilities
+        run: govulncheck ./...
+
+  frontend-production-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: ['前台', '后台']
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve dependency graph without running package scripts
+        run: npm install --package-lock-only --ignore-scripts --no-fund
+      - name: Audit production dependencies at high severity
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit all dependencies at critical severity
+        run: npm audit --audit-level=critical
