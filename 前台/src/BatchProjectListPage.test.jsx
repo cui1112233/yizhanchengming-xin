@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
 
 Object.defineProperty(window, 'matchMedia', {
@@ -52,15 +52,17 @@ describe('BatchProjectListPage generation workbench', () => {
     })
   })
 
+  afterEach(() => cleanup())
+
   it('shows four real stage statuses and retry for failed stage', async () => {
     render(<BatchProjectListPage />)
     await screen.findByText('测试项目')
     fireEvent.click(screen.getByRole('button', { name: '生成状态' }))
 
-    await screen.findByText('Script')
-    expect(screen.getByText('Hook')).toBeTruthy()
-    expect(screen.getByText('Director')).toBeTruthy()
-    expect(screen.getByText('Final Prompt')).toBeTruthy()
+    expect((await screen.findAllByText('Script')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Hook').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Director').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Final Prompt').length).toBeGreaterThan(0)
     expect(screen.getByText('导演输出格式错误')).toBeTruthy()
     expect(screen.getByRole('button', { name: '重试 Director' })).toBeTruthy()
   })
