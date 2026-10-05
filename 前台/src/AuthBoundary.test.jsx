@@ -51,12 +51,12 @@ describe('AuthBoundary', () => {
 
     render(<AuthBoundary api={api}><div>受保护工作台</div></AuthBoundary>)
 
-    expect(await screen.findByRole('button', { name: '登录' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /登\s*录/ })).toBeTruthy()
     expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=123')
 
     fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'secret' } })
-    fireEvent.click(screen.getByRole('button', { name: '登录' }))
+    fireEvent.click(screen.getByRole('button', { name: /登\s*录/ }))
 
     await waitFor(() => expect(api.login).toHaveBeenCalledWith({ username: 'alice', password: 'secret' }))
     expect(await screen.findByText('受保护工作台')).toBeTruthy()
@@ -74,7 +74,7 @@ describe('AuthBoundary', () => {
 
     window.dispatchEvent(new CustomEvent('ycm:auth-unauthenticated'))
 
-    expect(await screen.findByRole('button', { name: '登录' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /登\s*录/ })).toBeTruthy()
     expect(screen.queryByText('受保护工作台')).toBeNull()
   })
 })
