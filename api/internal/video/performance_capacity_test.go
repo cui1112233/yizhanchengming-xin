@@ -134,7 +134,7 @@ func TestPerformanceFFmpegExecutorConcurrencyBoundary(t *testing.T) {
 						AttemptID:   int64(i + 1),
 						AspectRatio: "9:16",
 						Speed:       1,
-						Inputs: []MergeInput{{Order: 1, URL: "https://example.invalid/input.mp4"}},
+						Inputs: []MergeInputAsset{{Order: 1, URL: "https://example.invalid/input.mp4"}},
 					})
 					errs <- err
 				}()
