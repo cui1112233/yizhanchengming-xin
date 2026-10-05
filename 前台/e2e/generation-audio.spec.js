@@ -20,7 +20,7 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
     await page.getByRole('button', { name: '生成状态' }).click()
 
     await expect(page.getByText('已检测音频：28.00 秒')).toBeVisible()
-    await expect(page.getByText('完成', { exact: true })).toHaveCount(4)
+    await expect(page.locator('.ant-table-tbody').getByText('完成', { exact: true })).toHaveCount(4)
     await expect(page.getByText('Script')).toBeVisible()
     await expect(page.getByText('Hook')).toBeVisible()
     await expect(page.getByText('Director')).toBeVisible()
@@ -60,7 +60,7 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
 
     await expect(page.getByText('fixture script failure')).toHaveCount(0)
     expect(retryPath).toBe('/api/v1/batch-projects/123/books/1001/generation/stages/SCRIPT/retry')
-    await expect(page.getByText('完成', { exact: true })).toHaveCount(4)
+    await expect(page.locator('.ant-table-tbody').getByText('完成', { exact: true })).toHaveCount(4)
   })
 
   test('@generation H3 Director API accepts explicit h3 mode without replacing the real app', async ({ page }) => {
@@ -115,7 +115,7 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
     ]
     expect(validateTimeline(valid, 28, 15)).toBe(true)
     expect(() => validateTimeline([{ start: 0, end: 16 }, { start: 16, end: 28 }], 28, 15)).toThrow(/exceeds 15s/)
-    expect(() => validateTimeline([{ start: 0, end: 10 }, { start: 11, end: 28 }], 28, 15)).toThrow(/gap\/overlap/)
+    expect(() => validateTimeline([{ start: 0, end: 10 }, { start: 11, end: 20 }, { start: 20, end: 28 }], 28, 15)).toThrow(/gap\/overlap/)
     expect(() => validateTimeline([{ start: 0, end: 14 }, { start: 14, end: 27.99 }], 28, 15)).toThrow(/expected 28/)
   })
 
