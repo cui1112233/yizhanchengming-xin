@@ -14,6 +14,7 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -41,6 +42,12 @@ func TestReadyzFailsWhenDatabasePingFails(t *testing.T) {
 	if body["request_id"] == "" || rec.Header().Get(observability.RequestIDHeader) == "" {
 		t.Fatal("readiness failure is missing request correlation")
 	}
+	lower := strings.ToLower(rec.Body.String())
+	for _, forbidden := range []string{"127.0.0.1", "user:password", "dial tcp", "dsn", "mysql"} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("readiness response leaked %q: %s", forbidden, rec.Body.String())
+		}
+	}
 }
 
 func TestHealthzIgnoresOptionalSubsystemAvailability(t *testing.T) {
@@ -57,6 +64,12 @@ func TestHealthzIgnoresOptionalSubsystemAvailability(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("healthz status = %d, want 200 despite DB/provider/executor/ffmpeg/runtime state", rec.Code)
 	}
+	lower := strings.ToLower(rec.Body.String())
+	for _, forbidden := range []string{"database", "redis", "provider", "tos", "password", "dsn"} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("healthz leaked subsystem detail %q: %s", forbidden, rec.Body.String())
+		}
+	}
 }
 
 func TestDiagnosticsRequireAdminNotBatchView(t *testing.T) {
@@ -71,6 +84,35 @@ func TestDiagnosticsRequireAdminNotBatchView(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsAuthorizationMatrix(t *testing.T) {
+	tests := []struct {
+		name string
+		user authn.User
+		cookie bool
+		want int
+	}{
+		{name: "anonymous", want: http.StatusUnauthorized},
+		{name: "ordinary authenticated user", user: authn.User{ID: 2, Role: "member"}, cookie: true, want: http.StatusForbidden},
+		{name: "batch view capability is insufficient", user: authn.User{ID: 3, Role: "member", Capabilities: []string{CapabilityBatchView}}, cookie: true, want: http.StatusForbidden},
+		{name: "system admin", user: authn.User{ID: 4, Role: "admin"}, cookie: true, want: http.StatusOK},
+		{name: "system owner role", user: authn.User{ID: 5, Role: "owner"}, cookie: true, want: http.StatusOK},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			auth := opsAuthService{user: tt.user}
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/diagnostics", nil)
+			if tt.cookie {
+				req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+			}
+			rec := httptest.NewRecorder()
+			NewHandler(Dependencies{Auth: auth}).ServeHTTP(rec, req)
+			if rec.Code != tt.want {
+				t.Fatalf("diagnostics status = %d, want %d: %s", rec.Code, tt.want, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestDiagnosticsAdminDTOHasNoSecretLikeFields(t *testing.T) {
 	auth := opsAuthService{user: authn.User{ID: 1, Role: "admin"}}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/diagnostics", nil)
@@ -82,9 +124,35 @@ func TestDiagnosticsAdminDTOHasNoSecretLikeFields(t *testing.T) {
 		t.Fatalf("admin diagnostics status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
 	lower := strings.ToLower(rec.Body.String())
-	for _, forbidden := range []string{"authorization", "set-cookie", "ciphertext", "nonce", "client_secret", "access_token", "refresh_token", "token_hash", "dsn"} {
+	for _, forbidden := range []string{"authorization", "set-cookie", "ciphertext", "nonce", "client_secret", "access_token", "refresh_token", "token_hash", "dsn", "environment"} {
 		if strings.Contains(lower, forbidden) {
 			t.Fatalf("diagnostics DTO contains forbidden field %q: %s", forbidden, rec.Body.String())
+		}
+	}
+}
+
+func TestDiagnosticsProviderErrorDoesNotEchoUntrustedMessage(t *testing.T) {
+	auth := opsAuthService{user: authn.User{ID: 1, Role: "admin"}}
+	providers := opsVideoConfigService{status: video.ProviderStatusView{
+		ProviderKey: video.ProviderPersonalAPI,
+		Model:       video.ModelYD20Mini,
+		Configured:  true,
+		Enabled:     true,
+		Status:      video.ProviderStatusUnavailable,
+		Message:     "upstream-body-marker /srv/private/provider.json Secret=synthetic-provider-secret",
+	}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/diagnostics", nil)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	NewHandler(Dependencies{Auth: auth, VideoConfig: providers}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("admin diagnostics status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, forbidden := range []string{"upstream-body-marker", "/srv/private/provider.json", "synthetic-provider-secret"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("diagnostics provider latest_safe_error leaked %q: %s", forbidden, body)
 		}
 	}
 }
@@ -150,6 +218,20 @@ func (s opsAuthService) Refresh(context.Context, string) (authn.Credentials, aut
 	return authn.Credentials{}, authn.User{}, authn.ErrUnauthenticated
 }
 func (s opsAuthService) Logout(context.Context, string, string) error { return nil }
+
+type opsVideoConfigService struct {
+	status video.ProviderStatusView
+}
+
+func (s opsVideoConfigService) Get(context.Context, string, string) (video.ProviderConfigView, error) {
+	return video.ProviderConfigView{}, nil
+}
+func (s opsVideoConfigService) Save(context.Context, video.ProviderConfigInput) (video.ProviderConfigView, error) {
+	return video.ProviderConfigView{}, nil
+}
+func (s opsVideoConfigService) Status(context.Context, string, string) (video.ProviderStatusView, error) {
+	return s.status, nil
+}
 
 func TestProcessDiagnosticsRemainAggregateOnly(t *testing.T) {
 	stats := observability.ReadProcessStats(time.Now().Add(-time.Minute), time.Now())
