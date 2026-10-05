@@ -15,6 +15,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 )
 
 func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock) http.Handler {
@@ -43,7 +44,8 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		authStore := authn.NewMySQLStore(db)
 		authService = authn.NewService(authStore, authn.NewManager(authStore, authn.Options{}))
 	}
-	publishingService := publishing.NewService(publishing.NewMySQLStore(db), publishing.Options{CredentialKey: publishingCredentialKey()})
+	publishingStore := publishing.NewMySQLStore(db)
+	publishingService := publishing.NewService(publishingStore, publishing.Options{CredentialKey: publishingCredentialKey()})
 	allowedOrigins := make([]string, 0)
 	for _, value := range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"), ",") {
 		if value = strings.TrimSpace(value); value != "" {
@@ -51,18 +53,53 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		}
 	}
 
+	videoStore := video.NewMySQLStore(db)
+	masterKey := []byte(os.Getenv("VIDEO_PROVIDER_MASTER_KEY"))
+	providerFactory := video.DefaultProviderFactory{LocalJobs: videoStore}
+	videoConfigService := video.NewConfigServiceWithProviders(videoStore, masterKey, providerFactory)
+	localExecutorService := video.NewLocalExecutorService(videoStore, nil)
+
+	var artifactStore video.ArtifactStore
+	var fileArtifactStore video.FileArtifactStore
+	if endpoint, region, bucket, accessKey, secretKey, publicBase := os.Getenv("TOS_ENDPOINT"), os.Getenv("TOS_REGION"), os.Getenv("TOS_BUCKET"), os.Getenv("TOS_ACCESS_KEY"), os.Getenv("TOS_SECRET_KEY"), os.Getenv("TOS_PUBLIC_BASE_URL"); endpoint != "" && region != "" && bucket != "" && accessKey != "" && secretKey != "" && publicBase != "" {
+		if uploader, err := video.NewTOSUploader(endpoint, region, accessKey, secretKey); err == nil {
+			if durableArtifacts, err := video.NewArtifactStore(video.ArtifactStoreConfig{Bucket: bucket, PublicBaseURL: publicBase, Uploader: uploader}); err == nil {
+				artifactStore = durableArtifacts
+				fileArtifactStore = durableArtifacts
+			}
+		}
+	}
+	videoService := video.NewService(videoStore, video.NewGenerationFinalPromptSource(generationStore), providerFactory, artifactStore, masterKey)
+	mergeExecutor := video.NewFFmpegExecutor(video.FFmpegExecutorConfig{
+		Binary:    os.Getenv("FFMPEG_BINARY"),
+		TempRoot:  os.Getenv("VIDEO_MERGE_TEMP_ROOT"),
+		Artifacts: fileArtifactStore,
+	})
+	// Merge jobs are durable and HTTP can create/retry them now. No async queue,
+	// Redis lease runtime, or scheduler is created here; that adapter waits for
+	// the shared Task 9.4 runtime contract on main.
+	mergeService := video.NewMergeService(videoStore, mergeExecutor)
+
 	return httpapi.NewHandler(httpapi.Dependencies{
-		Intakes:             intakeService,
-		Reader:              store,
-		Pipeline:            pipelineService,
-		BatchProjects:       store,
-		BatchProjectDetails: store,
-		Generation:          generationService,
-		UnifiedSettings:     settingsService,
-		Auth:                authService,
-		Publishing:          publishingService,
-		SecureCookies:       secureCookiesEnabled(),
-		AllowedOrigins:      allowedOrigins,
+		Intakes:                     intakeService,
+		Reader:                      store,
+		Pipeline:                    pipelineService,
+		BatchProjects:               store,
+		BatchProjectDetails:         store,
+		Generation:                  generationService,
+		UnifiedSettings:             settingsService,
+		Auth:                        authService,
+		Publishing:                  publishingService,
+		SecureCookies:               secureCookiesEnabled(),
+		AllowedOrigins:              allowedOrigins,
+		Video:                       videoService,
+		VideoConfig:                 videoConfigService,
+		VideoLocalExecutor:          localExecutorService,
+		VideoStatus:                 videoService,
+		VideoMerge:                  mergeService,
+		BatchProjectAccess:          publishingStore,
+		VideoResourceProjects:       videoStore,
+		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
 	})
 }
 

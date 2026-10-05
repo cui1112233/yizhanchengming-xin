@@ -226,3 +226,20 @@ export function getGenerationStage(projectId, bookId, stage) {
 export function listGenerationPrompts() {
   return requestJSON(`${API_PREFIX}/generation/prompts`)
 }
+
+export function getProjectVideoStatus(projectId) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${encodeURIComponent(projectId)}/video`)
+}
+
+export function retryVideoTask(taskId, requestId) {
+  return requestJSON(`${API_PREFIX}/video-tasks/${encodeURIComponent(taskId)}/retry`, {
+    method: 'POST',
+    body: JSON.stringify({ requestId }),
+  })
+}
+
+export function cancelVideoTask(taskId) {
+  return requestJSON(`${API_PREFIX}/video-tasks/${encodeURIComponent(taskId)}/cancel`, {
+    method: 'POST',
+  })
+}

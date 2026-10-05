@@ -1,38 +1,23 @@
-# 一战晟铭新盘
+# 一战晟铭 · 新主线
 
-这是新主线工程仓库。
+这是从现有公网/v88 功能重新收敛出来的新主线。
 
-- 后端：Go
-- 用户端：React + Ant Design
-- 管理端：React + Ant Design
-- 数据库：MySQL + Goose
-- Redis：任务 / 队列 / 锁
-- 对象存储：TOS
-- 部署：Go embed + 单二进制
+## 迁移任务清单
 
-## Phase 1 当前范围
+- [查看 TASKS.md：公网/v88 → 新主线完整迁移进度](./TASKS.md)
+- 后续每完成一个子任务，必须在同一次提交或 PR 中同步更新 `TASKS.md`；没有勾选并附验收依据，不算正式完成。
 
-当前第一阶段已经落地：
+## 核心原则
 
-1. 小说 Intake API
-2. TXT / Excel 上传
-3. 121 文本抓取客户端与 Go provider
-4. 元数据识别
-5. 分类 / 类型 / 男女频 / 风格基础识别
-6. BatchProject 创建
-7. Run 创建
-8. MySQL + Goose
-9. React Novel Fetch 页面（输入书城 → 添加书城 → 标签 → 立即执行 / 自动化 → 新建批量）
-10. 前后端生产镜像与 `docker compose`
-11. GitHub Actions CI
+- 生产后端统一使用 Go。
+- React + Ant Design 仅负责前端；Node/npm 只允许用于前端构建，不作为生产服务。
+- 业务主链统一为：React → Go API → MySQL/Redis → Go Worker → 外部 API/TOS。
+- MySQL 是任务与业务状态的唯一事实来源；Redis 只用于队列、延迟任务、锁和短期运行态。
+- 立即执行与自动化执行共用同一个 Pipeline，仅 `run_at` 不同。
+- 121 优先使用官方 HTTP API，不以 Browser Worker 作为正常业务路径。
+- 男女频优先级：用户手工填写 > 121 `bookinfo.category` > 已验证的 `genre` 映射 > AI 兜底。
+- 确定性数据不得被 AI 覆盖。
 
-## 本地启动
+## 第一阶段目标
 
-```bash
-docker compose up --build
-```
-
-- 用户端 / API：`http://127.0.0.1:8080`
-- 管理端：`http://127.0.0.1:8081`
-- MySQL：`127.0.0.1:3306`
-- Redis：`127.0.0.1:6379`
+跑通：添加书城/书籍 → 创建 Intake → 121 获取正文与 bookinfo → 男女频/风格元数据解析 → 创建批量项目 → MySQL 持久化 → 前端读取。
