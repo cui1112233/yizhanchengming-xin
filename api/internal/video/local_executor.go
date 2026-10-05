@@ -214,7 +214,7 @@ func (s *LocalExecutorService) CompleteTask(ctx context.Context, token, taskID s
 	if err != nil {
 		return err
 	}
-	if !localExecutorSupports(executor, task.ProviderKey, task.Model) {
+	if !localExecutorSupports(executor, task.ProviderKey, task.Model) || (task.ExecutorID != "" && task.ExecutorID != executor.ID) {
 		return ErrLocalExecutorUnauthorized
 	}
 	artifactURL := strings.TrimSpace(input.ArtifactURL)
@@ -234,7 +234,7 @@ func (s *LocalExecutorService) FailTask(ctx context.Context, token, taskID strin
 	if err != nil {
 		return err
 	}
-	if !localExecutorSupports(executor, task.ProviderKey, task.Model) {
+	if !localExecutorSupports(executor, task.ProviderKey, task.Model) || (task.ExecutorID != "" && task.ExecutorID != executor.ID) {
 		return ErrLocalExecutorUnauthorized
 	}
 	code := ErrorCode(strings.TrimSpace(input.Code))
