@@ -94,7 +94,9 @@ func (s observedGenerationService) MeasureAudio(ctx context.Context, req generat
 	out, err := s.next.MeasureAudio(ctx, req)
 	if err != nil {
 		code := "audio_measurement_failed"
-		if errors.Is(err, generation.ErrAudioProbeUnavailable) { code = "audio_probe_unavailable" }
+		if errors.Is(err, generation.ErrAudioProbeUnavailable) {
+			code = "audio_probe_unavailable"
+		}
 		logSafeFailure(s.logger, ctx, "audio", "measure", code, err, "batch_project_id", req.BatchProjectID, "book_id", req.BookID)
 		return out, err
 	}
@@ -142,18 +144,22 @@ func (s *observedVideoService) CancelTask(ctx context.Context, taskID int64) (vi
 	s.states.Store(taskID, out.Status)
 	return out, nil
 }
-func (s *observedVideoService) RetryTask(ctx context.Context, taskID int64, generationRequestID string) (video.StartResult, error) {
-	out, err := s.next.RetryTask(ctx, taskID, generationRequestID)
+func (s *observedVideoService) RetryTask(ctx context.Context, taskID int64, retryRequestID string) (video.StartResult, error) {
+	out, err := s.next.RetryTask(ctx, taskID, retryRequestID)
 	if err != nil {
-		logSafeFailure(s.logger, ctx, "video", "retry", "video_retry_failed", err, "production_task_id", taskID, "generation_request_id", generationRequestID)
+		logSafeFailure(s.logger, ctx, "video", "retry", "video_retry_failed", err, "production_task_id", taskID)
 		return out, err
 	}
-	requestLogger(s.logger, ctx).Info("video retry submitted", "subsystem", "video", "production_job_id", out.Job.ID, "production_task_id", out.Task.ID, "provider", out.Task.Provider, "model", out.Task.Model, "provider_job_id", out.Task.ProviderJobID, "status", out.Task.Status, "generation_request_id", generationRequestID)
+	requestLogger(s.logger, ctx).Info("video retry submitted", "subsystem", "video", "production_job_id", out.Job.ID, "production_task_id", out.Task.ID, "provider", out.Task.Provider, "model", out.Task.Model, "provider_job_id", out.Task.ProviderJobID, "idempotency_key", out.Job.IdempotencyKey, "status", out.Task.Status)
 	s.states.Store(out.Task.ID, out.Task.Status)
 	return out, nil
 }
 
-type observedMergeService struct { next httpapi.VideoMergeService; logger *slog.Logger }
+type observedMergeService struct {
+	next   httpapi.VideoMergeService
+	logger *slog.Logger
+}
+
 func (s observedMergeService) StartFromProductionTasks(ctx context.Context, req video.MergeProductionStartRequest) (video.MergeResult, error) {
 	requestLogger(s.logger, ctx).Info("merge queued", "subsystem", "merge", "batch_project_id", req.BatchProjectID, "book_id", req.BookID)
 	out, err := s.next.StartFromProductionTasks(ctx, req)
@@ -164,55 +170,97 @@ func (s observedMergeService) StartFromProductionTasks(ctx context.Context, req 
 	requestLogger(s.logger, ctx).Info("merge state", "subsystem", "merge", "batch_project_id", out.Job.BatchProjectID, "book_id", out.Job.BookID, "merge_job_id", out.Job.ID, "merge_attempt_id", out.Attempt.ID, "status", out.Job.Status)
 	return out, nil
 }
-func (s observedMergeService) Get(ctx context.Context, jobID int64) (video.MergeJob, []video.MergeAttempt, error) { return s.next.Get(ctx, jobID) }
+func (s observedMergeService) Get(ctx context.Context, jobID int64) (video.MergeJob, []video.MergeAttempt, error) {
+	return s.next.Get(ctx, jobID)
+}
 func (s observedMergeService) RetryAttempt(ctx context.Context, attemptID int64) (video.MergeResult, error) {
 	out, err := s.next.RetryAttempt(ctx, attemptID)
-	if err != nil { logSafeFailure(s.logger, ctx, "merge", "retry", "merge_retry_failed", err, "merge_attempt_id", attemptID); return out, err }
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "merge", "retry", "merge_retry_failed", err, "merge_attempt_id", attemptID)
+		return out, err
+	}
 	requestLogger(s.logger, ctx).Info("merge retry state", "subsystem", "merge", "merge_job_id", out.Job.ID, "merge_attempt_id", out.Attempt.ID, "status", out.Job.Status)
 	return out, nil
 }
 
-type observedPublishingService struct { next httpapi.PublishingService; logger *slog.Logger }
+type observedPublishingService struct {
+	next   httpapi.PublishingService
+	logger *slog.Logger
+}
+
 func (s observedPublishingService) CreateAccount(ctx context.Context, user authn.User, input publishing.CreateAccountInput) (publishing.Account, error) {
 	out, err := s.next.CreateAccount(ctx, user, input)
-	if err != nil { logSafeFailure(s.logger, ctx, "publishing", "create_account", "publishing_account_failed", err, "user_id", user.ID, "platform", input.Platform); return out, err }
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "publishing", "create_account", "publishing_account_failed", err, "user_id", user.ID, "platform", input.Platform)
+		return out, err
+	}
 	requestLogger(s.logger, ctx).Info("publishing account configured", "subsystem", "publishing", "user_id", user.ID, "publishing_account_id", out.ID, "platform", out.Platform)
 	return out, nil
 }
-func (s observedPublishingService) ListAccounts(ctx context.Context, user authn.User) ([]publishing.Account, error) { return s.next.ListAccounts(ctx, user) }
-func (s observedPublishingService) ClaimBatchProject(ctx context.Context, user authn.User, projectID int64) error { return s.next.ClaimBatchProject(ctx, user, projectID) }
+func (s observedPublishingService) ListAccounts(ctx context.Context, user authn.User) ([]publishing.Account, error) {
+	return s.next.ListAccounts(ctx, user)
+}
+func (s observedPublishingService) ClaimBatchProject(ctx context.Context, user authn.User, projectID int64) error {
+	return s.next.ClaimBatchProject(ctx, user, projectID)
+}
 func (s observedPublishingService) CreateIntent(ctx context.Context, user authn.User, input publishing.CreateIntentInput) (publishing.Intent, error) {
 	out, err := s.next.CreateIntent(ctx, user, input)
 	if err != nil {
-		code := "publish_intent_failed"; if errors.Is(err, publishing.ErrForbidden) { code = "publishing_permission_denied" }
+		code := "publish_intent_failed"
+		if errors.Is(err, publishing.ErrForbidden) {
+			code = "publishing_permission_denied"
+		}
 		logSafeFailure(s.logger, ctx, "publishing", "create_intent", code, err, "user_id", user.ID, "batch_project_id", input.BatchProjectID, "book_id", input.BookID, "publishing_account_id", input.PublishingAccountID)
 		return out, err
 	}
 	requestLogger(s.logger, ctx).Info("publish intent created", "subsystem", "publishing", "user_id", user.ID, "publish_intent_id", out.ID, "batch_project_id", out.BatchProjectID, "book_id", out.BookID, "publishing_account_id", out.PublishingAccountID, "status", out.Status)
 	return out, nil
 }
-func (s observedPublishingService) GetIntent(ctx context.Context, user authn.User, id int64) (publishing.Intent, error) { return s.next.GetIntent(ctx, user, id) }
-func (s observedPublishingService) ListAudits(ctx context.Context, user authn.User, id int64) ([]publishing.Audit, error) { return s.next.ListAudits(ctx, user, id) }
+func (s observedPublishingService) GetIntent(ctx context.Context, user authn.User, id int64) (publishing.Intent, error) {
+	return s.next.GetIntent(ctx, user, id)
+}
+func (s observedPublishingService) ListAudits(ctx context.Context, user authn.User, id int64) ([]publishing.Audit, error) {
+	return s.next.ListAudits(ctx, user, id)
+}
 
-type observedLocalExecutorService struct { next httpapi.VideoLocalExecutorService; logger *slog.Logger }
+type observedLocalExecutorService struct {
+	next   httpapi.VideoLocalExecutorService
+	logger *slog.Logger
+}
+
 func (s observedLocalExecutorService) Register(ctx context.Context, input video.LocalExecutorRegistrationInput) (video.LocalExecutorRegistrationResult, error) {
 	out, err := s.next.Register(ctx, input)
-	if err != nil { logSafeFailure(s.logger, ctx, "local_executor", "register", "executor_register_failed", err, "provider", input.ProviderKey, "model", input.Model); return out, err }
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "local_executor", "register", "executor_register_failed", err, "provider", input.ProviderKey, "model", input.Model)
+		return out, err
+	}
 	requestLogger(s.logger, ctx).Info("local executor registered", "subsystem", "local_executor", "executor_id", out.Executor.ID, "provider", out.Executor.ProviderKey, "model", out.Executor.Model, "online", out.Executor.Online)
 	return out, nil
 }
-func (s observedLocalExecutorService) Identity(ctx context.Context, token string) (video.LocalExecutorIdentity, error) { return s.next.Identity(ctx, token) }
-func (s observedLocalExecutorService) Heartbeat(ctx context.Context, token string, input video.LocalExecutorHeartbeatInput) error { return s.next.Heartbeat(ctx, token, input) }
-func (s observedLocalExecutorService) List(ctx context.Context) ([]video.LocalExecutorIdentity, error) { return s.next.List(ctx) }
+func (s observedLocalExecutorService) Identity(ctx context.Context, token string) (video.LocalExecutorIdentity, error) {
+	return s.next.Identity(ctx, token)
+}
+func (s observedLocalExecutorService) Heartbeat(ctx context.Context, token string, input video.LocalExecutorHeartbeatInput) error {
+	return s.next.Heartbeat(ctx, token, input)
+}
+func (s observedLocalExecutorService) List(ctx context.Context) ([]video.LocalExecutorIdentity, error) {
+	return s.next.List(ctx)
+}
 func (s observedLocalExecutorService) CompleteTask(ctx context.Context, token, taskID string, input video.LocalExecutorCompleteInput) error {
 	err := s.next.CompleteTask(ctx, token, taskID, input)
-	if err != nil { logSafeFailure(s.logger, ctx, "local_executor", "complete_task", "executor_task_complete_failed", err, "production_task_id", taskID); return err }
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "local_executor", "complete_task", "executor_task_complete_failed", err, "production_task_id", taskID)
+		return err
+	}
 	requestLogger(s.logger, ctx).Info("local executor task completed", "subsystem", "local_executor", "production_task_id", taskID)
 	return nil
 }
 func (s observedLocalExecutorService) FailTask(ctx context.Context, token, taskID string, input video.LocalExecutorFailInput) error {
 	err := s.next.FailTask(ctx, token, taskID, input)
-	if err != nil { logSafeFailure(s.logger, ctx, "local_executor", "fail_task", "executor_task_fail_failed", err, "production_task_id", taskID); return err }
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "local_executor", "fail_task", "executor_task_fail_failed", err, "production_task_id", taskID)
+		return err
+	}
 	requestLogger(s.logger, ctx).Error("local executor task failed", "subsystem", "local_executor", "production_task_id", taskID, "error_code", observability.SanitizeString(input.Code), "safe_error", observability.SanitizeString(input.Message))
 	return nil
 }
