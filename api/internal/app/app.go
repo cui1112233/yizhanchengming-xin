@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
@@ -43,6 +44,12 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		authService = authn.NewService(authStore, authn.NewManager(authStore, authn.Options{}))
 	}
 	secureCookies, _ := strconv.ParseBool(os.Getenv("QIANTIE_COOKIE_SECURE"))
+	allowedOrigins := make([]string, 0)
+	for _, value := range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"), ",") {
+		if value = strings.TrimSpace(value); value != "" {
+			allowedOrigins = append(allowedOrigins, value)
+		}
+	}
 
 	return httpapi.NewHandler(httpapi.Dependencies{
 		Intakes:         intakeService,
@@ -53,5 +60,6 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		UnifiedSettings: settingsService,
 		Auth:            authService,
 		SecureCookies:   secureCookies,
+		AllowedOrigins:  allowedOrigins,
 	})
 }

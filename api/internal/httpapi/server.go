@@ -44,6 +44,7 @@ type Dependencies struct {
 	UnifiedSettings UnifiedSettingsService
 	Auth            AuthService
 	SecureCookies   bool
+	AllowedOrigins  []string
 }
 
 func NewHandler(values ...Dependencies) http.Handler {
@@ -58,34 +59,38 @@ func NewHandler(values ...Dependencies) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	mux.HandleFunc("POST /api/auth/login", api.login)
-	mux.HandleFunc("POST /api/auth/refresh", api.refreshAuth)
+	mux.Handle("POST /api/auth/login", api.requireSameOrigin(http.HandlerFunc(api.login)))
+	mux.Handle("POST /api/auth/refresh", api.requireSameOrigin(http.HandlerFunc(api.refreshAuth)))
 	mux.Handle("GET /api/auth/current-user", api.requireAuth(http.HandlerFunc(api.currentUser)))
-	mux.HandleFunc("POST /api/auth/logout", api.logout)
+	mux.Handle("POST /api/auth/logout", api.requireSameOrigin(http.HandlerFunc(api.logout)))
 
-	mux.Handle("POST /api/v1/intakes", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createIntake)))
+	// Stage 1: Shuihuo/Batch Factory intake and project access.
+	mux.Handle("POST /api/v1/intakes", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createIntake))))
 	mux.Handle("GET /api/v1/intakes", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIntakes)))
-	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.executeIntake)))
+	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.executeIntake))))
 	mux.Handle("GET /api/v1/intakes/{id}/books", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBooks)))
-	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createBatchProject)))
+	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 
+	// Stage 2: unified settings/version profile.
 	mux.Handle("GET /api/v1/batch-projects/{id}/settings", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getUnifiedSettings)))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/production", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveProductionSettings)))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/publishing", api.requireCapability(CapabilityPublishConfigure, http.HandlerFunc(api.savePublishingSettings)))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/production", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveProductionSettings))))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/publishing", api.requireSameOrigin(api.requireCapability(CapabilityPublishConfigure, http.HandlerFunc(api.savePublishingSettings))))
 	mux.Handle("GET /api/v1/batch-projects/{id}/version-profile", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getVersionProfile)))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/version-profile", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveVersionProfile)))
-	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-121", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.sync121Settings)))
-	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-style-types", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.syncStyleTypes)))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/version-profile", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveVersionProfile))))
+	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-121", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.sync121Settings))))
+	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-style-types", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.syncStyleTypes))))
 
+	// Stage 3: generation reads and mutations.
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/generation", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.projectGeneration)))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/generation", api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.projectGeneration)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/generation", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.projectGeneration))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.bookGeneration)))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.bookGeneration)))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.retryGenerationStage)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.bookGeneration))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.retryGenerationStage))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.generationStage)))
 
-	// System generation presets are public read-only data. User/project-private prompt APIs must use authenticated routes instead of broad whitelisting.
+	// Only true system presets are public and read-only. Private/project prompt APIs
+	// must be registered behind auth/capability checks rather than added here.
 	mux.HandleFunc("GET /api/v1/generation/prompts", api.generationPrompts)
 	return mux
 }

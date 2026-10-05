@@ -42,6 +42,11 @@ func (f *fakeAuthService) Logout(context.Context, string, string) error {
 	return f.logoutErr
 }
 
+func sameOrigin(req *http.Request) {
+	req.Host = "app.example"
+	req.Header.Set("Origin", "https://app.example")
+}
+
 func TestCurrentUserRequiresValidSession(t *testing.T) {
 	auth := &fakeAuthService{authErr: authn.ErrUnauthenticated}
 	handler := NewHandler(Dependencies{Auth: auth})
@@ -87,6 +92,7 @@ func TestRefreshRotatesHttpOnlyCookiesWithoutReturningRawCredentials(t *testing.
 	}
 	handler := NewHandler(Dependencies{Auth: auth})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	sameOrigin(req)
 	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "old-refresh"})
 	rec := httptest.NewRecorder()
 
@@ -112,6 +118,7 @@ func TestLogoutRevokesServerSessionAndClearsCookies(t *testing.T) {
 	auth := &fakeAuthService{}
 	handler := NewHandler(Dependencies{Auth: auth})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	sameOrigin(req)
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access"})
 	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "refresh"})
 	rec := httptest.NewRecorder()
@@ -127,10 +134,11 @@ func TestLogoutRevokesServerSessionAndClearsCookies(t *testing.T) {
 	}
 }
 
-func TestRefreshFailureReturns401AndClearsAuthCookies(t *testing.T) {
+func TestRefreshFailureReturns401WithoutLeakingSecrets(t *testing.T) {
 	auth := &fakeAuthService{refreshErr: errors.New("database says refresh=super-secret")}
 	handler := NewHandler(Dependencies{Auth: auth})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	sameOrigin(req)
 	req.AddCookie(&http.Cookie{Name: RefreshCookieName, Value: "stale"})
 	rec := httptest.NewRecorder()
 

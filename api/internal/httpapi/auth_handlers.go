@@ -50,13 +50,14 @@ func (h handler) refreshAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	cookie, err := r.Cookie(RefreshCookieName)
 	if err != nil || cookie.Value == "" {
-		h.clearAuthCookies(w)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
 		return
 	}
 	credentials, user, err := h.deps.Auth.Refresh(r.Context(), cookie.Value)
 	if err != nil {
-		h.clearAuthCookies(w)
+		// Do not emit cookie deletion here. A concurrent browser tab may already
+		// have rotated the same old refresh token and installed newer cookies;
+		// a late 401 must not erase that valid session.
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
 		return
 	}
