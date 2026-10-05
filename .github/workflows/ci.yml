@@ -74,10 +74,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main --depth=1
+          git fetch origin main
           rm -rf /tmp/task14-main
-          mkdir -p /tmp/task14-main
-          git archive origin/main -- ':(top)api/db/migrations' | tar -x -C /tmp/task14-main
+          git worktree add --detach /tmp/task14-main origin/main
           test -f /tmp/task14-main/api/db/migrations/00004_task15_auth.sql
           test -f /tmp/task14-main/api/db/migrations/00006_task13_match_audio.sql
           test ! -f /tmp/task14-main/api/db/migrations/00007_task14_video.sql
