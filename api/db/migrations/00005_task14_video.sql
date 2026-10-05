@@ -23,6 +23,7 @@ CREATE TABLE video_production_jobs (
     input_revision VARCHAR(64) NOT NULL,
     final_prompt_stage_run_id BIGINT NOT NULL,
     final_prompt_version INT NOT NULL,
+    final_prompt_text MEDIUMTEXT NOT NULL,
     provider VARCHAR(64) NOT NULL,
     model VARCHAR(128) NOT NULL,
     idempotency_key VARCHAR(128) NOT NULL,
