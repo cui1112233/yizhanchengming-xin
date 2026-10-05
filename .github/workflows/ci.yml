@@ -70,17 +70,17 @@ jobs:
       - name: Verify clean database Goose rollback
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
 
-      - name: Snapshot current main migrations
+      - name: Prepare pre-Task14 main migration baseline
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main
           rm -rf /tmp/task14-main
-          git worktree add --detach /tmp/task14-main origin/main
+          mkdir -p /tmp/task14-main/api/db/migrations
+          cp db/migrations/0000[1-6]_*.sql /tmp/task14-main/api/db/migrations/
           test -f /tmp/task14-main/api/db/migrations/00004_task15_auth.sql
           test -f /tmp/task14-main/api/db/migrations/00006_task13_match_audio.sql
           test ! -f /tmp/task14-main/api/db/migrations/00007_task14_video.sql
-      - name: Apply current main migrations first
+      - name: Apply pre-Task14 main migrations first
         run: goose -dir /tmp/task14-main/api/db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
       - name: Verify existing-main database is at Task13/Task15 state
         run: |
