@@ -74,16 +74,15 @@ func TestManagerAccessRefreshLogoutLifecycle(t *testing.T) {
 	now := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
 	user := User{ID: 7, Username: "alice", DisplayName: "Alice", Role: "member", TeamID: 3, Capabilities: []string{"batch.view"}}
 	store := newFakeSessionStore(user)
-	random := bytes.NewReader(append(append(append(
-		bytes.Repeat([]byte{0x11}, 32),
-		bytes.Repeat([]byte{0x22}, 32)...),
-		bytes.Repeat([]byte{0x33}, 32)...),
-		bytes.Repeat([]byte{0x44}, 32)...))
+	randomBytes := make([]byte, 0, 192)
+	for _, value := range []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66} {
+		randomBytes = append(randomBytes, bytes.Repeat([]byte{value}, 32)...)
+	}
 	manager := NewManager(store, Options{
 		AccessTTL:  time.Minute,
 		RefreshTTL: time.Hour,
 		Now:        func() time.Time { return now },
-		Random:     random,
+		Random:     bytes.NewReader(randomBytes),
 	})
 
 	issued, err := manager.Issue(context.Background(), user.ID)
