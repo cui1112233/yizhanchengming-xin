@@ -154,6 +154,18 @@ func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProjec
 	return project, nil
 }
 
+func (s *MySQLStore) GetBatchProject(ctx context.Context, id int64) (BatchProject, error) {
+	var project BatchProject
+	err := s.db.QueryRowContext(ctx,
+		"SELECT id, intake_id, name, created_at, updated_at FROM batch_projects WHERE id = ?",
+		id,
+	).Scan(&project.ID, &project.IntakeID, &project.Name, &project.CreatedAt, &project.UpdatedAt)
+	if err != nil {
+		return BatchProject{}, fmt.Errorf("get batch project: %w", err)
+	}
+	return project, nil
+}
+
 func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, error) {
 	const query = "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.id DESC LIMIT 100"
 	rows, err := s.db.QueryContext(ctx, query)
