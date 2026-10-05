@@ -56,3 +56,43 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
       - name: Audit all dependencies at critical severity
         run: npm audit --audit-level=critical
+
+  browser-secret-storage-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject auth secrets in browser persistent storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          matches="$(grep -RInE --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' --exclude='*.test.*' --exclude-dir=node_modules '(localStorage|sessionStorage|indexedDB|IndexedDB)' '前台/src' '后台/src' || true)"
+          if printf '%s\n' "$matches" | grep -Ei '(auth|token|password|secret|credential|session)' >/dev/null; then
+            printf '%s\n' "$matches"
+            echo 'Browser persistent storage must not contain auth/session/credential material.'
+            exit 1
+          fi
+
+  public-e2e-secret-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public smoke target is repository-controlled
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'vars.E2E_PUBLIC_BASE_URL' '.github/workflows/task16-e2e.yml'
+          if grep -q 'inputs.public_base_url' '.github/workflows/task16-e2e.yml'; then
+            echo 'Public E2E must not accept an arbitrary dispatch target while real credentials are available.'
+            exit 1
+          fi
+      - name: Verify real-auth Playwright artifacts are disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'task16-playwright-public' '.github/workflows/task16-e2e.yml'; then
+            echo 'Public E2E must not upload traces/videos/reports containing real auth state.'
+            exit 1
+          fi
+          grep -q "trace: publicSmoke ? 'off'" '前台/playwright.config.js'
+          grep -q "video: publicSmoke ? 'off'" '前台/playwright.config.js'
+          grep -q "screenshot: publicSmoke ? 'off'" '前台/playwright.config.js'
