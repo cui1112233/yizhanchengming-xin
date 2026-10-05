@@ -70,6 +70,36 @@ func TestJSONLoggerRedactsSensitiveAttributesAndControls(t *testing.T) {
 	}
 }
 
+func TestJSONLoggerRedactsSlogAnyStructSecrets(t *testing.T) {
+	type nestedPayload struct {
+		AccessToken string `json:"accessToken"`
+		Safe        string `json:"safe"`
+	}
+	type payload struct {
+		ClientSecret string        `json:"clientSecret"`
+		RefreshToken string        `json:"refreshToken"`
+		Nested       nestedPayload `json:"nested"`
+	}
+
+	var buf bytes.Buffer
+	logger := NewJSONLogger(&buf)
+	logger.Info("structured payload", "payload", payload{
+		ClientSecret: "struct-client-secret-value",
+		RefreshToken: "struct-refresh-token-value",
+		Nested: nestedPayload{AccessToken: "struct-access-token-value", Safe: "visible"},
+	})
+
+	out := buf.String()
+	for _, secret := range []string{"struct-client-secret-value", "struct-refresh-token-value", "struct-access-token-value"} {
+		if strings.Contains(out, secret) {
+			t.Fatalf("slog.Any struct leaked %q: %s", secret, out)
+		}
+	}
+	if !strings.Contains(out, "visible") {
+		t.Fatalf("safe struct field disappeared: %s", out)
+	}
+}
+
 func TestRequestIDValidation(t *testing.T) {
 	if got, ok := ValidRequestID([]string{"abc_123:run.4"}); !ok || got != "abc_123:run.4" {
 		t.Fatalf("safe request id rejected: %q %v", got, ok)
