@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -84,5 +86,67 @@ func TestSecurityAuditBatchProjectListHidesProjectsOutsideOwnershipBoundary(t *t
 		if strings.Contains(body, strings.ToLower(forbidden)) {
 			t.Fatalf("project outside ownership boundary leaked in list: %s", rec.Body.String())
 		}
+	}
+}
+
+func TestSecurityAuditUnifiedSettingsBlocksCrossUserProjectRead(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 202, TeamID: 22, Role: "member", Capabilities: []string{CapabilityBatchView}}}
+	handler := NewHandler(Dependencies{
+		Auth:            auth,
+		Publishing:      &fakePublishingService{},
+		UnifiedSettings: &fakeUnifiedSettings{},
+	})
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, authenticatedBatchRequest(http.MethodGet, "/api/v1/batch-projects/51/settings"))
+	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s, want 403 or 404 for cross-user settings read", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSecurityAuditGenerationBlocksCrossUserProjectRead(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 202, TeamID: 22, Role: "member", Capabilities: []string{CapabilityBatchView}}}
+	handler := NewHandler(Dependencies{
+		Auth:       auth,
+		Publishing: &fakePublishingService{},
+		Generation: &fakeGenerationService{},
+	})
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, authenticatedBatchRequest(http.MethodGet, "/api/v1/batch-projects/51/generation"))
+	if rec.Code != http.StatusForbidden && rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s, want 403 or 404 for cross-user generation read", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSecurityAuditIntakeServiceErrorIsRedacted(t *testing.T) {
+	const sensitiveDetail = "mysql dsn contains audit-fixture-secret"
+	service := &fakeIntakeAPI{createErr: errors.New(sensitiveDetail)}
+	handler := NewHandler(Dependencies{Intakes: service})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/intakes", bytes.NewBufferString(`{"name":"test","groups":[{"source":"x","platformId":"1","books":[{"bookId":"1"}]}]}`))
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	if rec.Code < 400 {
+		t.Fatalf("status=%d body=%s, want error status", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), sensitiveDetail) || strings.Contains(strings.ToLower(rec.Body.String()), "dsn") {
+		t.Fatalf("internal credential/database detail leaked to browser: %s", rec.Body.String())
+	}
+}
+
+func TestSecurityAuditUnifiedSettingsServiceErrorIsRedacted(t *testing.T) {
+	service := &failingUnifiedSettings{err: errors.New("redis password=audit-fixture-secret")}
+	handler := NewHandler(Dependencies{UnifiedSettings: service})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects/51/settings", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d body=%s, want 500", rec.Code, rec.Body.String())
+	}
+	body := strings.ToLower(rec.Body.String())
+	if strings.Contains(body, "audit-fixture-secret") || strings.Contains(body, "redis password") {
+		t.Fatalf("internal settings error leaked to browser: %s", rec.Body.String())
 	}
 }
