@@ -81,8 +81,11 @@ func NewHandler(values ...Dependencies) http.Handler {
 
 	mux.HandleFunc("GET /api/v1/video-providers/{provider}/models/{model}", api.getVideoProviderConfig)
 	mux.HandleFunc("PUT /api/v1/video-providers/{provider}/models/{model}", api.putVideoProviderConfig)
+	mux.HandleFunc("GET /api/v1/video-providers/{provider}/models/{model}/status", api.getVideoProviderStatus)
 	mux.HandleFunc("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", api.startVideo)
 	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/poll", api.pollVideoTask)
+	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/cancel", api.cancelVideoTask)
+	mux.HandleFunc("POST /api/v1/video-tasks/{taskId}/retry", api.retryVideoTask)
 	return mux
 }
 
