@@ -2,6 +2,11 @@ package video
 
 import "net/http"
 
+const (
+	DefaultPersonalVideoCreateURL = "https://ydapi.yadiai.cn/openapi/v1/video/create"
+	DefaultPersonalVideoTasksURL  = "https://ydapi.yadiai.cn/openapi/v1/video/tasks"
+)
+
 func ProviderForModel(model string) (string, bool) {
 	switch model {
 	case ModelYD20Mini, "yd2-mini-video":
@@ -24,6 +29,12 @@ type DefaultProviderFactory struct {
 func (f DefaultProviderFactory) Build(config ProviderConfig, secret string) (Provider, error) {
 	switch config.ProviderKey {
 	case ProviderPersonalAPI:
+		if config.CreateURL == "" {
+			config.CreateURL = DefaultPersonalVideoCreateURL
+		}
+		if config.TasksURL == "" {
+			config.TasksURL = DefaultPersonalVideoTasksURL
+		}
 		return NewPersonalAPIProvider(config, secret, f.HTTPClient)
 	default:
 		return nil, providerError(ErrorProviderUnavailable, "provider adapter unavailable", nil)
