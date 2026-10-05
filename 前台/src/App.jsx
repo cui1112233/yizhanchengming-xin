@@ -63,7 +63,7 @@ function buildBatchName(inputName) {
 }
 
 function safeErrorMessage(error) {
-  const message = error instanceof Error ? error.message : '执行失败'
+  const message = error instanceof Error ? error.message : String(error || '执行失败')
   if (/(password|passwd|token|authorization|mysql:\/\/|dsn)/i.test(message)) {
     return '请求失败，请稍后重试或查看服务端日志。'
   }
@@ -330,7 +330,7 @@ function NovelIntakeWorkbench({ onNavigate }) {
       dataIndex: 'errorMessage',
       key: 'errorMessage',
       width: 240,
-      render: (value) => value ? <Typography.Text type="danger">{value}</Typography.Text> : '-',
+      render: (value) => value ? <Typography.Text type="danger">{safeErrorMessage(value)}</Typography.Text> : '-',
     },
   ]
 
