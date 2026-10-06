@@ -103,7 +103,23 @@ func (s *Service) result(ctx context.Context, run BookRun) (BookGenerationResult
 			latest[value.Stage] = value
 		}
 	}
-	return BookGenerationResult{Run: run, Stages: stages, Latest: latest}, nil
+	editableOutput, compiledPrompt := generationOutputs(latest)
+	return BookGenerationResult{
+		Run: run, Stages: stages, Latest: latest,
+		EditableOutput: editableOutput, CompiledPrompt: compiledPrompt,
+	}, nil
+}
+
+func generationOutputs(latest map[Stage]StageRun) (string, string) {
+	editableOutput := ""
+	compiledPrompt := ""
+	if value, ok := latest[StageScript]; ok && value.Status == StatusCompleted {
+		editableOutput = value.OutputText
+	}
+	if value, ok := latest[StageFinalPrompt]; ok && value.Status == StatusCompleted {
+		compiledPrompt = value.OutputText
+	}
+	return editableOutput, compiledPrompt
 }
 
 func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerationResult, error) {
@@ -473,6 +489,9 @@ func (s *Service) RetryStage(ctx context.Context, req RetryStageRequest) (BookGe
 		}
 		var payload map[string]any
 		_ = json.Unmarshal([]byte(latest.InputSnapshot), &payload)
+		if payload == nil {
+			payload = map[string]any{}
+		}
 		matchAudio, _ := payload["matchAudio"].(bool)
 		audio, _ := payload["audioDurationSec"].(float64)
 		limit := int64(0)
@@ -496,7 +515,13 @@ func (s *Service) RetryStage(ctx context.Context, req RetryStageRequest) (BookGe
 				break
 			}
 		}
-		body, _ := json.Marshal(map[string]any{"script": script.OutputText, "hook": hookText, "directorMode": mode, "matchAudio": matchAudio, "audioDurationSec": audio, "shotDurationLimitSec": limit})
+		payload["script"] = script.OutputText
+		payload["hook"] = hookText
+		payload["directorMode"] = mode
+		payload["matchAudio"] = matchAudio
+		payload["audioDurationSec"] = audio
+		payload["shotDurationLimitSec"] = limit
+		body, _ := json.Marshal(payload)
 		_, retryErr = s.executeProviderStage(ctx, run, book, StageDirector, latest.PromptKey, TextRequest{BookID: book.ID, Stage: StageDirector, UserPrompt: string(body), DirectorMode: mode, MatchAudio: matchAudio, AudioDurationSec: audio, ShotDurationLimitSec: limit})
 	case StageFinalPrompt:
 		prompt, e := s.resolver.Resolve(ctx, latest.PromptKey)
