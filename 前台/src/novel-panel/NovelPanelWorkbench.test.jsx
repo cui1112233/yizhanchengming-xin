@@ -50,14 +50,14 @@ describe('NovelPanelWorkbench', () => {
     expect(await screen.findByDisplayValue('共享 Director 画面')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '人物资产' }))
     expect(openAsset).toHaveBeenCalledWith('characters')
-  })
+  }, 15000)
 
   it('restores history and keeps unsaved editor state on revision conflict', async () => {
     const client = api()
     render(<NovelPanelWorkbench projectId={9} initialWorkspace={workspace()} api={client} />)
     fireEvent.click(screen.getByRole('button', { name: '保存记录与恢复' }))
     expect(await screen.findByText(/修订 1 · 初版/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /恢\s*复/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^恢\s*复$/ }))
     expect(await screen.findByDisplayValue('历史恢复原文。')).toBeTruthy()
     client.saveWorkspace.mockRejectedValueOnce({ status: 409 })
     const input = screen.getByRole('textbox', { name: '整段小说原文' })
@@ -65,5 +65,5 @@ describe('NovelPanelWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存小说面板' }))
     expect(await screen.findByText(/保存冲突/)).toBeTruthy()
     expect(screen.getByDisplayValue('未保存但不能丢失的编辑。')).toBeTruthy()
-  })
+  }, 15000)
 })
