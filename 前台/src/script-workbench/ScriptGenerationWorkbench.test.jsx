@@ -1,4 +1,4 @@
-import React from 'react'
+// @vitest-environment jsdom\n\nimport React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ScriptGenerationWorkbench from './ScriptGenerationWorkbench.jsx'
