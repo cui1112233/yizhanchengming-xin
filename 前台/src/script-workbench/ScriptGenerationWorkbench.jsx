@@ -18,7 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { getBookGeneration, runBookGeneration } from '../api.js'
+import * as api from '../api.js'
 import {
   joinShotCards,
   loadWorkbenchRecord,
@@ -46,7 +46,10 @@ const OUTPUT_OPTIONS = [
 
 const STAGES = ['SCRIPT', 'HOOK', 'DIRECTOR', 'FINAL_PROMPT']
 
-const defaultApiClient = { getBookGeneration, runBookGeneration }
+const defaultApiClient = {
+  getBookGeneration: (...args) => api.getBookGeneration(...args),
+  runBookGeneration: (...args) => api.runBookGeneration(...args),
+}
 
 function emptyEntity(kind, index) {
   return {
