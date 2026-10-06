@@ -6,12 +6,10 @@ import {
   Col,
   Descriptions,
   Divider,
-  Empty,
   Form,
   Input,
   InputNumber,
   Modal,
-  Result,
   Row,
   Space,
   Statistic,
@@ -21,6 +19,8 @@ import {
 } from 'antd'
 import { createBatchProject, createIntake, executeIntake, listBooks } from './api.js'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
+import StatusTag from './ui/StatusTag.jsx'
+import PageState from './ui/PageState.jsx'
 import './app.css'
 
 const { TextArea } = Input
@@ -32,28 +32,6 @@ export function parseBookIds(raw) {
       .map((value) => value.trim())
       .filter(Boolean),
   )]
-}
-
-function statusLabel(status) {
-  const labels = {
-    pending: '待处理',
-    running: '处理中',
-    completed: '已完成',
-    partial_failed: '部分失败',
-    failed: '失败',
-    fetched: '已获取',
-    retryable_failed: '可重试失败',
-    queued: '排队中',
-  }
-  return labels[status] || status || '-'
-}
-
-function statusColor(status) {
-  if (status === 'completed' || status === 'fetched') return 'success'
-  if (status === 'partial_failed' || status === 'retryable_failed') return 'warning'
-  if (status === 'failed') return 'error'
-  if (status === 'running' || status === 'queued') return 'processing'
-  return 'default'
 }
 
 function buildBatchName(inputName) {
@@ -87,11 +65,7 @@ class WorkbenchErrorBoundary extends React.Component {
   render() {
     if (this.state.error) {
       return (
-        <Result
-          status="error"
-          title="页面加载失败"
-          subTitle="水货生产页面遇到异常，请刷新后重试。若问题持续，请查看服务端日志。"
-        />
+        <PageState state="failed" title="页面加载失败" description="水货生产页面遇到异常，请刷新后重试。若问题持续，请查看服务端日志。" onRetry={() => window.location.reload()} />
       )
     }
     return this.props.children
@@ -323,7 +297,7 @@ function NovelIntakeWorkbench({ onNavigate }) {
       dataIndex: 'status',
       key: 'status',
       width: 110,
-      render: (value) => <Tag color={statusColor(value)}>{statusLabel(value)}</Tag>,
+      render: (value) => <StatusTag status={value} />,
     },
     {
       title: '错误',
@@ -419,7 +393,7 @@ function NovelIntakeWorkbench({ onNavigate }) {
             <Divider />
             <Typography.Title level={5}>所选书城</Typography.Title>
             {groups.length === 0 ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有添加书城" />
+              <PageState title="还没有添加书城" />
             ) : (
               <Space wrap size={[8, 10]}>
                 {groups.map((group) => (
@@ -477,14 +451,14 @@ function NovelIntakeWorkbench({ onNavigate }) {
             <Divider />
             <Typography.Title level={5}>执行结果</Typography.Title>
             {!summary && !project ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="执行后这里会显示批次与 Run 状态" />
+              <PageState title="执行后这里会显示批次与 Run 状态" />
             ) : (
               <Space direction="vertical" size={14} style={{ width: '100%' }}>
                 {summary && (
                   <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 4 }}>
                     <Descriptions.Item label="Intake ID">{summary.intakeId}</Descriptions.Item>
                     <Descriptions.Item label="批次状态">
-                      <Tag color={statusColor(summary.status)}>{statusLabel(summary.status)}</Tag>
+                      <StatusTag status={summary.status} />
                     </Descriptions.Item>
                     <Descriptions.Item label="获取成功">{summary.fetched}</Descriptions.Item>
                     <Descriptions.Item label="获取失败">{summary.failed}</Descriptions.Item>
@@ -495,7 +469,7 @@ function NovelIntakeWorkbench({ onNavigate }) {
                     <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }}>
                       <Descriptions.Item label="BatchProject">#{project.id} · {project.name}</Descriptions.Item>
                       <Descriptions.Item label="Run">
-                        #{run.id} · {statusLabel(run.status)} · {new Date(run.runAt).toLocaleString('zh-CN', { hour12: false })}
+                        #{run.id} · <StatusTag status={run.status} /> · {new Date(run.runAt).toLocaleString('zh-CN', { hour12: false })}
                       </Descriptions.Item>
                     </Descriptions>
                     <Button type="primary" onClick={() => onNavigate('/batch-factory')}>

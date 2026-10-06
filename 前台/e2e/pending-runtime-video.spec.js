@@ -108,7 +108,12 @@ test.describe('@batch Task 9 Runtime acceptance', () => {
     await expect(page.getByText('执行中')).toBeVisible()
 
     status = 'succeeded'
+    const raw = await page.evaluate(async () => {
+      const response = await fetch('/api/v1/batch-projects')
+      return response.json()
+    })
+    expect(raw.projects[0].runStatus).toBe('succeeded')
     await page.reload()
-    await expect(page.getByText('succeeded')).toBeVisible()
+    await expect(page.getByText('已完成')).toBeVisible()
   })
 })

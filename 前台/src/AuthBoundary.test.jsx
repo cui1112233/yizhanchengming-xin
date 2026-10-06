@@ -52,6 +52,7 @@ describe('AuthBoundary', () => {
     render(<AuthBoundary api={api}><div>受保护工作台</div></AuthBoundary>)
 
     expect(await screen.findByRole('button', { name: /登\s*录/ })).toBeTruthy()
+    expect(screen.getByRole('img', { name: '一战晟铭' }).getAttribute('src')).toBe('/assets/brand-logo-black.png')
     expect(screen.queryByText('当前登录状态已过期，请重新登录。')).toBeNull()
     expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=123')
 

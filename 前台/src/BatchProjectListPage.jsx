@@ -14,6 +14,7 @@ import {
   runProjectGeneration,
 } from './api.js'
 import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
+import StatusTag from './ui/StatusTag.jsx'
 
 const STAGES = [
   ['SCRIPT', 'Script'],
@@ -21,31 +22,6 @@ const STAGES = [
   ['DIRECTOR', 'Director'],
   ['FINAL_PROMPT', 'Final Prompt'],
 ]
-
-const RUN_STATUS_LABELS = {
-  pending: '待执行',
-  running: '执行中',
-  completed: '已完成',
-  failed: '失败',
-}
-
-const BOOK_STATUS_LABELS = {
-  pending: '待获取',
-  fetched: '已获取',
-  retryable_failed: '可重试失败',
-}
-
-function statusColor(status) {
-  if (status === 'completed' || status === 'succeeded') return 'success'
-  if (status === 'failed') return 'error'
-  if (status === 'running') return 'processing'
-  if (status === 'skipped' || status === 'cancelled') return 'default'
-  return 'warning'
-}
-
-function statusLabel(status) {
-  return ({ pending: '待执行', queued: '排队中', running: '执行中', completed: '完成', succeeded: '成功', failed: '失败', cancelled: '已取消', skipped: '已跳过' })[status] || '待执行'
-}
 
 function renderTags(values) {
   const items = Array.isArray(values) ? values.filter(Boolean) : []
@@ -94,7 +70,7 @@ function BatchProjectDetail({ projectId, onBack }) {
       title: '正文获取状态',
       dataIndex: 'status',
       key: 'status',
-      render: (value) => <Tag>{BOOK_STATUS_LABELS[value] || value || '未知'}</Tag>,
+      render: (value) => <StatusTag status={value} />,
     },
     { title: '错误信息', dataIndex: 'errorMessage', key: 'errorMessage', render: (value) => value || '-' },
   ]
@@ -314,7 +290,7 @@ export default function BatchProjectListPage() {
       title: '运行状态',
       dataIndex: 'runStatus',
       key: 'runStatus',
-      render: (value) => (value ? <Tag>{RUN_STATUS_LABELS[value] || value}</Tag> : '-'),
+      render: (value) => (value ? <StatusTag status={value} /> : '-'),
     },
     {
       title: '统一设置',
@@ -340,7 +316,7 @@ export default function BatchProjectListPage() {
         const status = stage?.status || 'pending'
         return (
           <Space direction="vertical" size={4}>
-            <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>
+            <StatusTag status={status} />
             {stage?.errorMessage && <Typography.Text type="danger">{stage.errorMessage}</Typography.Text>}
             {stage?.outputText && <Button size="small" onClick={() => void showStage(row.bookId, key)}>查看结果</Button>}
             {status === 'failed' && <Button size="small" danger onClick={() => void retryStage(row.bookId, key)}>重试 {label}</Button>}
@@ -394,7 +370,7 @@ export default function BatchProjectListPage() {
             <Space direction="vertical" size={4}>
               <Typography.Text>{video.provider || '-'}</Typography.Text>
               <Typography.Text type="secondary">{video.model || '-'}</Typography.Text>
-              <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>
+              <StatusTag status={status} />
               <Typography.Text type="secondary">尝试 {attempts.length} 次</Typography.Text>
               {errorMessage && <Typography.Text type="danger">{errorMessage}</Typography.Text>}
               {outputUrl && <Button type="link" size="small" href={outputUrl} target="_blank" rel="noreferrer">查看视频</Button>}

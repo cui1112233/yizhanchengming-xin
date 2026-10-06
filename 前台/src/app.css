@@ -6,7 +6,8 @@ body,
 }
 
 body {
-  background: #f5f7fb;
+  background: #f6f7fb;
+  color: #1f2430;
 }
 
 .page-shell {
@@ -38,6 +39,47 @@ body {
 .panel-card {
   height: 100%;
 }
+
+.panel-card,
+.result-card {
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(33, 43, 79, 0.06);
+}
+
+.page-state {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 18% 5%, rgba(117, 105, 255, 0.22), transparent 38%),
+    radial-gradient(circle at 88% 100%, rgba(244, 79, 138, 0.18), transparent 38%),
+    #171927;
+}
+
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 24px !important;
+  background: linear-gradient(145deg, rgba(35, 37, 65, 0.96), rgba(19, 22, 43, 0.98)) !important;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.28), 0 0 58px rgba(100, 92, 244, 0.15);
+}
+
+.login-card .ant-card-body { padding: 40px; }
+.login-brand { margin-bottom: 26px; min-height: 30px; }
+.login-brand img { display: block; width: 126px; height: 30px; object-fit: contain; }
+.login-card .ant-typography { color: #fbfbff; }
+.login-card .ant-typography-secondary,
+.login-card .ant-form-item-label > label { color: rgba(230, 232, 248, 0.8) !important; }
+.login-subtitle { margin: 10px 0 28px !important; }
+.login-card .ant-input,
+.login-card .ant-input-affix-wrapper { min-height: 48px; border-radius: 12px; background: #727786 !important; color: #fff !important; }
+.login-card .ant-btn-primary { height: 48px; border: 0; border-radius: 12px; background: linear-gradient(100deg, #ed5966, #ee649d 46%, #6488f4); font-weight: 700; }
 
 .inline-note {
   margin: -4px 0 18px;
