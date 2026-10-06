@@ -17,7 +17,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { createBatchProject, createIntake, executeIntake, listBooks } from './api.js'
+import { createBatchProject, createIntake, executeIntake, listBooks, retryIntakeBook } from './api.js'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
 import StatusTag from './ui/StatusTag.jsx'
 import PageState from './ui/PageState.jsx'
@@ -46,6 +46,24 @@ function safeErrorMessage(error) {
     return '请求失败，请稍后重试或查看服务端日志。'
   }
   return message || '执行失败'
+}
+
+function summarizeBooks(intakeId, rows) {
+  const books = Array.isArray(rows) ? rows : []
+  const fetched = books.filter((book) => book.status === 'fetched').length
+  const failed = books.filter((book) => book.status === 'retryable_failed').length
+  let status = 'pending'
+  if (books.length > 0 && fetched === books.length) status = 'completed'
+  else if (failed > 0 && fetched > 0) status = 'partial_failed'
+  else if (failed > 0) status = 'failed'
+  return { intakeId, status, fetched, failed }
+}
+
+function rememberIntakeInURL(intakeId) {
+  if (typeof window === 'undefined' || !intakeId) return
+  const url = new URL(window.location.href)
+  url.searchParams.set('intake', String(intakeId))
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
 class WorkbenchErrorBoundary extends React.Component {
@@ -118,6 +136,27 @@ function NovelIntakeWorkbench({ onNavigate }) {
     () => groups.reduce((total, group) => total + group.books.length, 0),
     [groups],
   )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const raw = new URLSearchParams(window.location.search).get('intake')
+    const intakeId = Number(raw)
+    if (!Number.isInteger(intakeId) || intakeId <= 0) return undefined
+
+    let active = true
+    listBooks(intakeId)
+      .then((payload) => {
+        if (!active) return
+        const restored = payload.books || []
+        setBooks(restored)
+        setSummary(summarizeBooks(intakeId, restored))
+        setFeedback({ type: 'info', message: `已从 MySQL 恢复 Intake #${intakeId} 的书籍状态。` })
+      })
+      .catch((error) => {
+        if (active) setFeedback({ type: 'warning', message: `恢复最近批次失败：${safeErrorMessage(error)}` })
+      })
+    return () => { active = false }
+  }, [])
 
   const addGroup = () => {
     const cleanSource = source.trim()
@@ -217,6 +256,7 @@ function NovelIntakeWorkbench({ onNavigate }) {
         })),
       })
       intakeId = created.intake.id
+      rememberIntakeInURL(intakeId)
       setBooks(created.books || [])
 
       setFeedback({ type: 'info', message: '批次已创建，正在通过 121 获取正文并分析信息…' })
@@ -253,6 +293,32 @@ function NovelIntakeWorkbench({ onNavigate }) {
         } catch {
           // 保留主错误信息；结果读取失败不覆盖原始错误。
         }
+      }
+      setFeedback({ type: 'error', message: safeErrorMessage(error) })
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const retryBook = async (book) => {
+    const intakeId = Number(summary?.intakeId)
+    if (!Number.isInteger(intakeId) || intakeId <= 0 || !book?.id) return
+    setWorking(true)
+    try {
+      const retried = await retryIntakeBook(intakeId, book.id, maxText)
+      const payload = await listBooks(intakeId)
+      const restored = payload.books || []
+      setBooks(restored)
+      setSummary(retried.summary || summarizeBooks(intakeId, restored))
+      setFeedback({ type: 'success', message: `${book.title || book.bookId || '小说'} 重试成功。` })
+    } catch (error) {
+      try {
+        const payload = await listBooks(intakeId)
+        const restored = payload.books || []
+        setBooks(restored)
+        setSummary(summarizeBooks(intakeId, restored))
+      } catch {
+        // 保留重试主错误；刷新失败不覆盖它。
       }
       setFeedback({ type: 'error', message: safeErrorMessage(error) })
     } finally {
@@ -305,6 +371,17 @@ function NovelIntakeWorkbench({ onNavigate }) {
       key: 'errorMessage',
       width: 240,
       render: (value) => value ? <Typography.Text type="danger">{safeErrorMessage(value)}</Typography.Text> : '-',
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 120,
+      fixed: 'right',
+      render: (_, book) => (
+        book.status === 'retryable_failed'
+          ? <Button size="small" loading={working} onClick={() => void retryBook(book)}>重试失败书</Button>
+          : '-'
+      ),
     },
   ]
 
@@ -488,7 +565,7 @@ function NovelIntakeWorkbench({ onNavigate }) {
           rowKey={(record) => record.id || `${record.source}-${record.bookId}`}
           columns={columns}
           dataSource={books}
-          scroll={{ x: 1320 }}
+          scroll={{ x: 1440 }}
           pagination={{ pageSize: 20, hideOnSinglePage: true }}
           locale={{ emptyText: '执行后显示 ID、书名、书城、男女频、风格和状态' }}
         />
