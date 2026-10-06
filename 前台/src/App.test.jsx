@@ -299,6 +299,63 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     ).toBe(false)
   }, 15000)
 
+  it('刷新后按 intake 查询 MySQL 状态，并可只重试失败书', async () => {
+    window.history.replaceState({}, '', '/novel-fetch?intake=17')
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          books: [
+            {
+              id: 2,
+              intakeId: 17,
+              source: '阳光',
+              platformId: '4',
+              bookId: '1002',
+              title: '失败小说',
+              status: 'retryable_failed',
+              errorMessage: '121 timeout',
+            },
+          ],
+        }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          book: { id: 2, intakeId: 17, status: 'fetched' },
+          summary: { intakeId: 17, status: 'completed', fetched: 1, failed: 0 },
+        }),
+      )
+      .mockImplementationOnce(() =>
+        jsonResponse({
+          books: [
+            {
+              id: 2,
+              intakeId: 17,
+              source: '阳光',
+              platformId: '4',
+              bookId: '1002',
+              title: '失败小说',
+              status: 'fetched',
+              errorMessage: '',
+            },
+          ],
+        }),
+      )
+
+    render(<IntakeWorkbench />)
+
+    expect(await screen.findByText('已从 MySQL 恢复 Intake #17 的书籍状态。')).toBeTruthy()
+    expect(await screen.findByText('121 timeout')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '重试失败书' }))
+
+    expect(await screen.findByText('失败小说 重试成功。')).toBeTruthy()
+    expect(screen.queryByText('121 timeout')).toBeNull()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/v1/intakes/17/books')
+    expect(String(fetchMock.mock.calls[1][0])).toBe('/api/v1/intakes/17/books/2/retry')
+    expect(fetchMock.mock.calls[1][1]?.method).toBe('POST')
+  }, 15000)
+
   it('成功创建后点击进入批量工厂，列表会重新从 API 读取最新项目', async () => {
     window.history.replaceState({}, '', '/shuihuo-production')
     const fetchMock = vi
