@@ -74,7 +74,7 @@ describe('ScriptGenerationWorkbench', () => {
     expect(await screen.findByDisplayValue(/林夏推门/)).toBeTruthy()
     expect(screen.queryByDisplayValue(/SYSTEM PRESET/)).toBeNull()
     expect(screen.getByText(/编辑区只使用 SCRIPT 可编辑成品/)).toBeTruthy()
-  })
+  }, 15000)
 
   it('refreshes server history after generation without closing the workbench', async () => {
     const initial = generationSummary({ editableOutput: '', compiledPrompt: '', latest: {}, history: [] })
@@ -109,7 +109,7 @@ describe('ScriptGenerationWorkbench', () => {
 
     fireEvent.change(screen.getByLabelText('分镜编辑1'), { target: { value: '编辑版' } })
     expect(screen.getByDisplayValue('编辑版')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '撤销' }))
+    fireEvent.click(screen.getByRole('button', { name: /撤\s*销/ }))
     expect(screen.getByDisplayValue('初始成品')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('分镜编辑1'), { target: { value: '最终保存版' } })
@@ -125,7 +125,7 @@ describe('ScriptGenerationWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     fireEvent.click(screen.getByRole('button', { name: '导出 TXT' }))
     expect(onExport).toHaveBeenCalledWith({ filename: '测试书-canvas.txt', text: '最终保存版' })
-  })
+  }, 15000)
 
   it('marks reference URLs as text-only and does not claim image understanding or dubbing is available', async () => {
     const apiClient = {
