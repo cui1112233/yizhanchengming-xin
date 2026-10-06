@@ -119,22 +119,58 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	if req.DirectorMode != DirectorNormal && req.DirectorMode != DirectorH3 {
 		return BookGenerationResult{}, ErrInvalid
 	}
-
-	if existing, err := s.store.LatestBookRun(ctx, req.BatchProjectID, req.BookID); err == nil {
-		if existing.Status == StatusCompleted || existing.Status == StatusRunning {
-			return s.result(ctx, existing)
-		}
-	} else if !errors.Is(err, ErrNotFound) {
+	if err := normalizeWorkbenchRequest(&req); err != nil {
 		return BookGenerationResult{}, err
+	}
+
+	var book intake.Book
+	var err error
+	var sourceText string
+	if req.Workbench {
+		book, err = s.store.GetBookForProject(ctx, req.BatchProjectID, req.BookID)
+		if err != nil {
+			return BookGenerationResult{}, err
+		}
+		sourceText, err = effectiveWorkbenchSource(req, book.OriginalText)
+		if err != nil {
+			return BookGenerationResult{}, err
+		}
+		if req.Action == WorkbenchActionExtract {
+			extraction, extractionErr := s.extractWorkbenchEntities(ctx, book.ID, sourceText)
+			if extractionErr != nil {
+				return BookGenerationResult{SourceText: sourceText, Latest: map[Stage]StageRun{}}, extractionErr
+			}
+			return BookGenerationResult{SourceText: sourceText, Extraction: &extraction, Latest: map[Stage]StageRun{}}, nil
+		}
+	}
+
+	if existing, existingErr := s.store.LatestBookRun(ctx, req.BatchProjectID, req.BookID); existingErr == nil {
+		if existing.Status == StatusRunning || (existing.Status == StatusCompleted && !req.Force) {
+			result, resultErr := s.result(ctx, existing)
+			if resultErr == nil && req.Workbench {
+				result.SourceText = sourceText
+			}
+			return result, resultErr
+		}
+	} else if !errors.Is(existingErr, ErrNotFound) {
+		return BookGenerationResult{}, existingErr
 	}
 
 	if _, err := s.applyAuthoritativeAudio(ctx, &req); err != nil {
 		return BookGenerationResult{}, err
 	}
 
-	book, err := s.store.GetBookForProject(ctx, req.BatchProjectID, req.BookID)
-	if err != nil {
-		return BookGenerationResult{}, err
+	if book.ID == 0 {
+		book, err = s.store.GetBookForProject(ctx, req.BatchProjectID, req.BookID)
+		if err != nil {
+			return BookGenerationResult{}, err
+		}
+	}
+	if sourceText == "" {
+		sourceText, err = effectiveWorkbenchSource(req, book.OriginalText)
+		if err != nil {
+			return BookGenerationResult{}, err
+		}
 	}
 	now := s.now().UTC()
 	run, err := s.store.CreateBookRun(ctx, BookRun{BatchProjectID: req.BatchProjectID, BookID: req.BookID, Status: StatusRunning, RequestID: strings.TrimSpace(req.RequestID), StartedAt: &now})
@@ -146,7 +182,11 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	if req.PlotMode {
 		scriptKey = PromptScriptPlotMode
 	}
-	script, err := s.executeProviderStage(ctx, run, book, StageScript, scriptKey, TextRequest{BookID: book.ID, Stage: StageScript, UserPrompt: book.OriginalText})
+	scriptInput := sourceText
+	if req.Workbench {
+		scriptInput = buildScriptWorkbenchUserPrompt(req, sourceText)
+	}
+	script, err := s.executeProviderStage(ctx, run, book, StageScript, scriptKey, TextRequest{BookID: book.ID, Stage: StageScript, UserPrompt: scriptInput})
 	if err != nil {
 		return s.failRun(ctx, run, err)
 	}
@@ -168,11 +208,19 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	if req.DirectorMode == DirectorH3 {
 		directorKey = PromptDirectorH3
 	}
-	directorInput, _ := json.Marshal(map[string]any{
+	directorPayload := map[string]any{
 		"script": script.OutputText, "hook": hookText, "directorMode": req.DirectorMode,
 		"matchAudio": req.MatchAudio, "audioDurationSec": req.AudioDurationSec,
 		"shotDurationLimitSec": req.ShotDurationLimitSec,
-	})
+	}
+	if req.Workbench {
+		directorPayload["openingMode"] = req.OpeningMode
+		directorPayload["outputMode"] = req.OutputMode
+		directorPayload["characters"] = req.Characters
+		directorPayload["scenes"] = req.Scenes
+		directorPayload["constraints"] = req.Constraints
+	}
+	directorInput, _ := json.Marshal(directorPayload)
 	director, err := s.executeProviderStage(ctx, run, book, StageDirector, directorKey, TextRequest{
 		BookID: book.ID, Stage: StageDirector, UserPrompt: string(directorInput), DirectorMode: req.DirectorMode,
 		MatchAudio: req.MatchAudio, AudioDurationSec: req.AudioDurationSec, ShotDurationLimitSec: req.ShotDurationLimitSec,
@@ -185,9 +233,13 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	if err != nil {
 		return s.failRun(ctx, run, err)
 	}
+	processingRules := req.ProcessingRules
+	if req.Workbench {
+		processingRules = mergeWorkbenchRules(processingRules, workbenchConstraintText(req.Constraints))
+	}
 	compileInput := FinalPromptInput{
 		SystemPreset: finalPrompt.Content, Script: script.OutputText, Hook: hookText, Director: director.OutputText,
-		ProcessingRules: req.ProcessingRules, KnowledgeBase: req.KnowledgeBase, ProjectConfig: req.ProjectConfig,
+		ProcessingRules: processingRules, KnowledgeBase: req.KnowledgeBase, ProjectConfig: req.ProjectConfig,
 		UserConfig: req.UserConfig, ModelConfig: req.ModelConfig,
 	}
 	compiled := s.compiler.Compile(compileInput)
@@ -202,7 +254,11 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	if err != nil {
 		return BookGenerationResult{}, err
 	}
-	return s.result(ctx, run)
+	result, resultErr := s.result(ctx, run)
+	if resultErr == nil && req.Workbench {
+		result.SourceText = sourceText
+	}
+	return result, resultErr
 }
 
 func (s *Service) failRun(ctx context.Context, run BookRun, cause error) (BookGenerationResult, error) {
@@ -386,7 +442,17 @@ func (s *Service) RetryStage(ctx context.Context, req RetryStageRequest) (BookGe
 	var retryErr error
 	switch req.Stage {
 	case StageScript:
-		_, retryErr = s.executeProviderStage(ctx, run, book, StageScript, latest.PromptKey, TextRequest{BookID: book.ID, Stage: StageScript, UserPrompt: book.OriginalText})
+		retryRequest := TextRequest{BookID: book.ID, Stage: StageScript, UserPrompt: book.OriginalText}
+		var saved struct {
+			Request TextRequest `json:"request"`
+		}
+		if json.Unmarshal([]byte(latest.InputSnapshot), &saved) == nil && strings.TrimSpace(saved.Request.UserPrompt) != "" {
+			retryRequest = saved.Request
+			retryRequest.BookID = book.ID
+			retryRequest.Stage = StageScript
+			retryRequest.SystemPrompt = ""
+		}
+		_, retryErr = s.executeProviderStage(ctx, run, book, StageScript, latest.PromptKey, retryRequest)
 	case StageHook:
 		script, e := s.store.LatestStageRun(ctx, run.ID, StageScript)
 		if e != nil {

@@ -17,6 +17,7 @@ var (
 type Stage string
 
 const (
+	StageExtract     Stage = "EXTRACT"
 	StageScript      Stage = "SCRIPT"
 	StageHook        Stage = "HOOK"
 	StageDirector    Stage = "DIRECTOR"
@@ -39,6 +40,57 @@ const (
 	DirectorNormal DirectorMode = "normal"
 	DirectorH3     DirectorMode = "h3"
 )
+
+type WorkbenchAction string
+
+const (
+	WorkbenchActionGenerate WorkbenchAction = "generate"
+	WorkbenchActionExtract  WorkbenchAction = "extract"
+)
+
+type OpeningMode string
+
+const (
+	OpeningContinuous OpeningMode = "continuous"
+	OpeningHook       OpeningMode = "hook"
+	OpeningSegmented  OpeningMode = "segmented"
+)
+
+type OutputMode string
+
+const (
+	OutputCanvas   OutputMode = "canvas"
+	OutputScript   OutputMode = "script"
+	OutputStory    OutputMode = "story"
+	OutputShotlist OutputMode = "shotlist"
+	OutputQ        OutputMode = "q"
+)
+
+type ScriptEntity struct {
+	ID              string   `json:"id,omitempty"`
+	Kind            string   `json:"kind,omitempty"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description,omitempty"`
+	Protagonist     bool     `json:"protagonist,omitempty"`
+	ReferenceImages []string `json:"referenceImages,omitempty"`
+}
+
+type ScriptConstraints struct {
+	VisualPrefix  string `json:"visualPrefix,omitempty"`
+	Quality       string `json:"quality,omitempty"`
+	PictureLimit  string `json:"pictureLimit,omitempty"`
+	NegativePrompt string `json:"negativePrompt,omitempty"`
+}
+
+type EntityExtractionResult struct {
+	Characters []ScriptEntity `json:"characters"`
+	Scenes     []ScriptEntity `json:"scenes"`
+}
+
+type GenerationHistoryEntry struct {
+	Run    BookRun            `json:"run"`
+	Latest map[Stage]StageRun `json:"latest"`
+}
 
 const (
 	PromptScript         = "script.default"
@@ -122,20 +174,29 @@ type TextRequest struct {
 }
 
 type RunBookRequest struct {
-	BatchProjectID       int64        `json:"batchProjectId"`
-	BookID               int64        `json:"bookId"`
-	HookEnabled          bool         `json:"hookEnabled"`
-	PlotMode             bool         `json:"plotMode"`
-	DirectorMode         DirectorMode `json:"directorMode"`
-	MatchAudio           bool         `json:"matchAudio,omitempty"`
-	AudioDurationSec     float64      `json:"audioDurationSec,omitempty"`
-	ShotDurationLimitSec int64        `json:"shotDurationLimitSec,omitempty"`
-	RequestID            string       `json:"requestId"`
-	ProcessingRules      string       `json:"processingRules,omitempty"`
-	KnowledgeBase        string       `json:"knowledgeBase,omitempty"`
-	ProjectConfig        string       `json:"projectConfig,omitempty"`
-	UserConfig           string       `json:"userConfig,omitempty"`
-	ModelConfig          string       `json:"modelConfig,omitempty"`
+	BatchProjectID       int64             `json:"batchProjectId"`
+	BookID               int64             `json:"bookId"`
+	Workbench            bool              `json:"workbench,omitempty"`
+	Action               WorkbenchAction   `json:"action,omitempty"`
+	Force                bool              `json:"force,omitempty"`
+	SourceText           string            `json:"sourceText,omitempty"`
+	OpeningMode          OpeningMode       `json:"openingMode,omitempty"`
+	OutputMode           OutputMode        `json:"outputMode,omitempty"`
+	Characters           []ScriptEntity    `json:"characters,omitempty"`
+	Scenes               []ScriptEntity    `json:"scenes,omitempty"`
+	Constraints          ScriptConstraints `json:"constraints,omitempty"`
+	HookEnabled          bool              `json:"hookEnabled"`
+	PlotMode             bool              `json:"plotMode"`
+	DirectorMode         DirectorMode      `json:"directorMode"`
+	MatchAudio           bool              `json:"matchAudio,omitempty"`
+	AudioDurationSec     float64           `json:"audioDurationSec,omitempty"`
+	ShotDurationLimitSec int64             `json:"shotDurationLimitSec,omitempty"`
+	RequestID            string            `json:"requestId"`
+	ProcessingRules      string            `json:"processingRules,omitempty"`
+	KnowledgeBase        string            `json:"knowledgeBase,omitempty"`
+	ProjectConfig        string            `json:"projectConfig,omitempty"`
+	UserConfig           string            `json:"userConfig,omitempty"`
+	ModelConfig          string            `json:"modelConfig,omitempty"`
 }
 
 type RetryStageRequest struct {
@@ -157,10 +218,13 @@ type RunBatchRequest struct {
 }
 
 type BookGenerationResult struct {
-	Run    BookRun            `json:"run"`
-	Stages []StageRun         `json:"stages"`
-	Latest map[Stage]StageRun `json:"latest,omitempty"`
-	Error  string             `json:"error,omitempty"`
+	Run        BookRun                  `json:"run"`
+	Stages     []StageRun               `json:"stages"`
+	Latest     map[Stage]StageRun       `json:"latest,omitempty"`
+	SourceText string                   `json:"sourceText,omitempty"`
+	Extraction *EntityExtractionResult  `json:"extraction,omitempty"`
+	History    []GenerationHistoryEntry `json:"history,omitempty"`
+	Error      string                   `json:"error,omitempty"`
 }
 
 type BatchBookResult struct {

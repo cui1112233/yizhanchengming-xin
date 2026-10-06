@@ -15,6 +15,7 @@ import {
 } from './api.js'
 import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
 import StatusTag from './ui/StatusTag.jsx'
+import ScriptGenerationWorkbench from './script-workbench/ScriptGenerationWorkbench.jsx'
 
 const STAGES = [
   ['SCRIPT', 'Script'],
@@ -115,6 +116,7 @@ export default function BatchProjectListPage() {
   const [resultModal, setResultModal] = useState(null)
   const [audioMeasurements, setAudioMeasurements] = useState({})
   const [matchAudioByBook, setMatchAudioByBook] = useState({})
+  const [workbenchBook, setWorkbenchBook] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -387,8 +389,13 @@ export default function BatchProjectListPage() {
       {
         title: '单本操作',
         key: 'bookAction',
-        width: 120,
-        render: (_, row) => <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
+        width: 210,
+        render: (_, row) => (
+          <Space>
+            <Button type="primary" onClick={() => setWorkbenchBook(row)}>剧本工作台</Button>
+            <Button onClick={() => void runOne(row.bookId)}>快速执行</Button>
+          </Space>
+        ),
       },
     ]
   }, [selected, audioMeasurements, matchAudioByBook, videoByBook])
@@ -427,7 +434,7 @@ export default function BatchProjectListPage() {
         title={selected ? `${selected.name} · 剧本与 VIDEO 流水线` : '剧本与 VIDEO 流水线'}
         width="92vw"
         open={Boolean(selected)}
-        onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
+        onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}); setWorkbenchBook(null) }}
         extra={<Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
       >
         {summary && (
@@ -440,6 +447,23 @@ export default function BatchProjectListPage() {
             </Descriptions>
             <Table rowKey="bookId" columns={generationColumns} dataSource={summary.books || []} loading={generationLoading} pagination={false} scroll={{ x: 1680 }} />
           </>
+        )}
+      </Drawer>
+
+      <Drawer
+        title={workbenchBook ? (workbenchBook.title || ('Book ' + workbenchBook.bookId)) + ' · 剧本生成工作台' : '剧本生成工作台'}
+        width="96vw"
+        open={Boolean(selected && workbenchBook)}
+        onClose={() => setWorkbenchBook(null)}
+        destroyOnClose
+      >
+        {selected && workbenchBook && (
+          <ScriptGenerationWorkbench
+            projectId={selected.id}
+            bookId={workbenchBook.bookId}
+            bookTitle={workbenchBook.title}
+            onGenerated={() => void refreshGeneration(selected)}
+          />
         )}
       </Drawer>
 

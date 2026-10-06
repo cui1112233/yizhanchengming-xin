@@ -7,13 +7,43 @@ import (
 
 func (s *Service) BookSummary(ctx context.Context, projectID, bookID int64) (BookGenerationResult, error) {
 	if projectID <= 0 || bookID <= 0 { return BookGenerationResult{}, ErrInvalid }
-	if _, err := s.store.GetBookForProject(ctx, projectID, bookID); err != nil { return BookGenerationResult{}, err }
+	book, err := s.store.GetBookForProject(ctx, projectID, bookID)
+	if err != nil { return BookGenerationResult{}, err }
+	history, err := s.bookHistory(ctx, projectID, bookID)
+	if err != nil { return BookGenerationResult{}, err }
 	run, err := s.store.LatestBookRun(ctx, projectID, bookID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) { return BookGenerationResult{Latest: map[Stage]StageRun{}}, nil }
+		if errors.Is(err, ErrNotFound) {
+			return BookGenerationResult{SourceText: book.OriginalText, Latest: map[Stage]StageRun{}, History: history}, nil
+		}
 		return BookGenerationResult{}, err
 	}
-	return s.result(ctx, run)
+	result, err := s.result(ctx, run)
+	if err != nil { return BookGenerationResult{}, err }
+	result.SourceText = book.OriginalText
+	result.History = history
+	return result, nil
+}
+
+func (s *Service) bookHistory(ctx context.Context, projectID, bookID int64) ([]GenerationHistoryEntry, error) {
+	runs, err := s.store.ListBookRunsByProject(ctx, projectID)
+	if err != nil { return nil, err }
+	out := make([]GenerationHistoryEntry, 0, 20)
+	for index := len(runs) - 1; index >= 0 && len(out) < 20; index-- {
+		run := runs[index]
+		if run.BookID != bookID { continue }
+		stages, stageErr := s.store.ListStageRuns(ctx, run.ID)
+		if stageErr != nil { return nil, stageErr }
+		latest := map[Stage]StageRun{}
+		for _, value := range stages {
+			current, ok := latest[value.Stage]
+			if !ok || value.Attempt > current.Attempt || (value.Attempt == current.Attempt && value.ID > current.ID) {
+				latest[value.Stage] = value
+			}
+		}
+		out = append(out, GenerationHistoryEntry{Run: run, Latest: latest})
+	}
+	return out, nil
 }
 
 func (s *Service) StageResult(ctx context.Context, projectID, bookID int64, stage Stage) (StageRun, error) {

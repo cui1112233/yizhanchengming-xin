@@ -127,3 +127,57 @@ body {
     margin-bottom: 12px;
   }
 }
+
+
+.script-workbench {
+  padding-bottom: 24px;
+}
+
+.script-workbench-panel {
+  margin-bottom: 16px;
+}
+
+.script-entity-grid,
+.script-canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.script-entity-card,
+.script-shot-card {
+  min-width: 0;
+}
+
+.script-file-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.script-file-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.script-workbench-stage-output {
+  max-height: 360px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.035);
+}
+
+@media (max-width: 767px) {
+  .script-entity-grid,
+  .script-canvas-grid {
+    grid-template-columns: 1fr;
+  }
+}
