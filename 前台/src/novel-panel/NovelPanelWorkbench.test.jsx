@@ -58,7 +58,7 @@ describe('NovelPanelWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存记录与恢复' }))
     expect(await screen.findByText(/修订 1 · 初版/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^恢\s*复$/ }))
-    expect(await screen.findByDisplayValue('历史恢复原文。')).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toBe('历史恢复原文。'))
     client.saveWorkspace.mockRejectedValueOnce({ status: 409 })
     const input = screen.getByRole('textbox', { name: '整段小说原文' })
     fireEvent.change(input, { target: { value: '未保存但不能丢失的编辑。' } })
