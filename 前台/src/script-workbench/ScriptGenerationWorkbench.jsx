@@ -20,12 +20,13 @@ import {
 } from 'antd'
 import * as api from '../api.js'
 import {
-  joinShotCards,
+  joinShotDocument,
   loadWorkbenchRecord,
   replaceInText,
   saveWorkbenchDraft,
   saveWorkbenchVersion,
-  splitShotCards,
+  splitShotDocument,
+  workbenchExportArtifact,
 } from './scriptWorkbenchState.js'
 
 const { TextArea } = Input
@@ -78,15 +79,19 @@ function safeStage(summary, stage) {
 }
 
 function outputFromSummary(summary) {
-  return safeStage(summary, 'FINAL_PROMPT')?.outputText
-    || safeStage(summary, 'DIRECTOR')?.outputText
+  return summary?.editableOutput
     || safeStage(summary, 'SCRIPT')?.outputText
     || ''
 }
 
+function compiledPromptFromSummary(summary) {
+  return summary?.compiledPrompt
+    || safeStage(summary, 'FINAL_PROMPT')?.outputText
+    || ''
+}
+
 function historyOutput(entry) {
-  return entry?.latest?.FINAL_PROMPT?.outputText
-    || entry?.latest?.DIRECTOR?.outputText
+  return entry?.editableOutput
     || entry?.latest?.SCRIPT?.outputText
     || ''
 }
@@ -98,6 +103,7 @@ export default function ScriptGenerationWorkbench({
   apiClient = defaultApiClient,
   onGenerated,
   onRequestReferenceImage,
+  onExport,
 }) {
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
@@ -206,7 +212,7 @@ export default function ScriptGenerationWorkbench({
 
   const requestReferenceImage = async (index) => {
     if (typeof onRequestReferenceImage !== 'function') {
-      setNotice({ type: 'warning', message: '参考图生成需由共享图片服务接入；本模块不会创建第二套供应商配置。当前可直接粘贴已有参考图 URL。' })
+      setNotice({ type: 'warning', message: '共享图片服务尚未注入。当前参考图 URL 只会作为文本元数据写入提示词，不会进行图片理解，也不会触发图片生成。' })
       return
     }
     try {
@@ -270,7 +276,7 @@ export default function ScriptGenerationWorkbench({
     }
     setWorking(true)
     try {
-      const payload = await apiClient.runBookGeneration(projectId, bookId, {
+      const generated = await apiClient.runBookGeneration(projectId, bookId, {
         workbench: true,
         action: 'generate',
         force: true,
@@ -286,12 +292,13 @@ export default function ScriptGenerationWorkbench({
         matchAudio: false,
         requestId: 'script-workbench-' + String(Date.now()),
       })
-      const nextOutput = outputFromSummary(payload)
-      setSummary(payload)
+      const refreshed = await apiClient.getBookGeneration(projectId, bookId)
+      const nextOutput = outputFromSummary(refreshed) || outputFromSummary(generated)
+      setSummary(refreshed)
       setUndoStack((current) => editorOutput ? [...current, editorOutput].slice(-30) : current)
       setEditorOutput(nextOutput)
-      setNotice({ type: 'success', message: '生成链已返回结果。结果来自现有 SCRIPT / HOOK / DIRECTOR / FINAL_PROMPT Stage；是否满足真实模型质量仍需集成环境验证。' })
-      if (typeof onGenerated === 'function') onGenerated(payload)
+      setNotice({ type: 'success', message: '生成链已返回并回读服务端历史。可编辑成品来自 SCRIPT；FINAL_PROMPT 仅作为后续模型编译输入，不参与画布拆卡。真实模型质量仍需集成环境验证。' })
+      if (typeof onGenerated === 'function') onGenerated(refreshed)
     } catch (error) {
       setNotice({ type: 'error', message: error?.message || '剧本生成失败' })
     } finally {
@@ -315,7 +322,7 @@ export default function ScriptGenerationWorkbench({
   const saveVersion = () => {
     const versions = saveWorkbenchVersion(window.localStorage, projectId, bookId, draftSnapshot)
     setLocalVersions(versions)
-    setNotice({ type: 'success', message: '当前工作台版本已保存到本机。服务端模型生成版本同时保留在已有 StageRun 历史中。' })
+    setNotice({ type: 'success', message: '当前完整工作台快照仅保存到本机 localStorage。服务端 StageRun 历史目前只用于恢复可编辑输出；输入、人物/场景、模式和约束的完整服务端版本恢复仍需与 A 协调持久化接口。' })
   }
 
   const applyReplace = (all) => {
@@ -326,22 +333,28 @@ export default function ScriptGenerationWorkbench({
   }
 
   const exportText = () => {
-    const blob = new Blob([editorOutput || sourceText], { type: 'text/plain;charset=utf-8' })
+    const artifact = workbenchExportArtifact({ editorOutput, sourceText, bookTitle, outputMode })
+    if (typeof onExport === 'function') {
+      onExport(artifact)
+      return
+    }
+    const blob = new Blob([artifact.text], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = (bookTitle || '剧本') + '-' + outputMode + '.txt'
+    anchor.download = artifact.filename
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
     URL.revokeObjectURL(url)
   }
 
-  const shotCards = useMemo(() => splitShotCards(editorOutput), [editorOutput])
+  const shotDocument = useMemo(() => splitShotDocument(editorOutput), [editorOutput])
+  const shotCards = shotDocument.cards
   const updateShot = (index, body) => {
     setUndoStack((current) => [...current, editorOutput].slice(-30))
     const cards = shotCards.map((card, cardIndex) => cardIndex === index ? { ...card, body } : card)
-    setEditorOutput(joinShotCards(cards))
+    setEditorOutput(joinShotDocument({ ...shotDocument, cards }))
   }
 
   const stageItems = STAGES.map((stage) => {
@@ -401,7 +414,10 @@ export default function ScriptGenerationWorkbench({
                 placeholder="每行一个参考图 URL；最多 8 张"
                 onChange={(event) => addReferenceImage(index, event.target.value)}
               />
-              <Button onClick={() => void requestReferenceImage(index)}>通过共享图片服务补参考图</Button>
+              <Typography.Text type="secondary">参考图 URL 仅作为文本元数据进入提示词；当前文本生成链不会读取图片像素。</Typography.Text>
+              <Button onClick={() => void requestReferenceImage(index)}>
+                {typeof onRequestReferenceImage === 'function' ? '通过共享图片服务补参考图' : '共享图片服务未注入'}
+              </Button>
             </>
           )}
         </Space>
@@ -419,7 +435,7 @@ export default function ScriptGenerationWorkbench({
         showIcon
         type="info"
         message="模块边界"
-        description="文本生成复用现有生成 Provider；图片与配音只通过共享服务接入，本模块不维护供应商、账号或模型密钥。当前分支测试不会调用真实付费模型。"
+        description="文本生成复用现有 Provider。参考图 URL 当前仅作为提示词文本元数据，不代表图片理解；共享图片按钮尚未注入真实图片服务。配音/音频生成也未接入本工作台。本模块不维护供应商、账号或模型密钥，测试不会调用真实付费模型。"
         style={{ marginBottom: 16 }}
       />
       {notice && <Alert showIcon closable type={notice.type} message={notice.message} onClose={() => setNotice(null)} style={{ marginBottom: 16 }} />}
@@ -536,11 +552,30 @@ export default function ScriptGenerationWorkbench({
             onChange={(event) => editOutput(event.target.value)}
           />
         )}
-        <Divider orientation="left">Stage 原始结果</Divider>
+        <Divider orientation="left">Stage 原始结果 / 编译输入</Divider>
+        <Alert
+          type="warning"
+          showIcon
+          message="编辑区与 FINAL_PROMPT 已分离"
+          description="编辑区只使用 SCRIPT 可编辑成品；FINAL_PROMPT 是系统预设、SCRIPT、HOOK、DIRECTOR 和处理规则的确定性编译输入，仅用于后续模型链路，不参与分镜拆卡。"
+          style={{ marginBottom: 12 }}
+        />
+        {compiledPromptFromSummary(summary) && (
+          <Typography.Paragraph type="secondary" ellipsis={{ rows: 3, expandable: true, symbol: '展开编译输入' }}>
+            {compiledPromptFromSummary(summary)}
+          </Typography.Paragraph>
+        )}
         <Tabs items={stageItems} />
       </Card>
 
       <Drawer title="历史恢复" width={720} open={historyOpen} onClose={() => setHistoryOpen(false)}>
+        <Alert
+          type="warning"
+          showIcon
+          message="历史恢复范围"
+          description="本机手工版本保存在 localStorage，可恢复输入、实体、模式、约束和编辑稿；服务端生成历史当前只恢复可编辑输出。服务端完整版本恢复仍待与 A 协调持久化接口。"
+          style={{ marginBottom: 16 }}
+        />
         <Typography.Title level={5}>本机手工版本</Typography.Title>
         {localVersions.length ? localVersions.map((entry) => (
           <Card size="small" key={entry.id} style={{ marginBottom: 10 }}>
