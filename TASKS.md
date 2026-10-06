@@ -41,7 +41,7 @@
 - [x] Task 6：立即执行 / 自动化统一任务链
 - [x] Task 7：Intake HTTP API 与运行时接线
 - [x] Task 8：小说获取工作台 + v88 对标 + 合并 main
-- [ ] Task 9：Batch Factory V11 主工作台
+- [x] Task 9：Batch Factory V11 主工作台
 - ⚠️ Task 10：批量工厂统一设置 / 版本对应配置档（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - ⚠️ Task 11：水货生产工作台
 - ⚠️ Task 12：剧本生成 / Director / Hook / 最终提示词（仓库阶段已完成；公网/ECS 验收留到 Task 16）
@@ -221,8 +221,8 @@
 - [x] 9.5.4 后台 build
 - [x] 9.5.5 v88 行为对标
 - [x] 9.5.6 PR CI 全绿
-- [ ] 9.5.7 合并 main
-- [ ] 9.5.8 合并后 CI 全绿
+- [x] 9.5.7 合并 main
+- [x] 9.5.8 合并后 CI 全绿
 
 > 9.5.5 对标结论见 `docs/migration/task9-runtime-v88-final-audit.md`：旧 v88 的 JSON/local scheduler + process-local running set 被替换为 MySQL authoritative facts + Redis Queue/Lease + fencing + crash recovery，属于**语义继承 + Go 化增强**，不是照搬旧实现。
 
@@ -410,4 +410,4 @@
 
 ## 当前执行点
 
-**当前任务：Task 9.2 / 9.3 / 9.4 / 9.5 仓库阶段收口；PR CI 与 Task16 PR E2E 已全绿，等待 merge 决策，暂不合并 main。**
+**当前任务：Task 9 已正式完成并进入 `main`；下一阶段第一优先为 Task14 Runtime Adapter。**
