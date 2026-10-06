@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
+      - run: go mod tidy
       - run: go test ./...
       - run: go build ./...
 
@@ -46,6 +47,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23.x'
+      - run: go mod tidy
       - name: Install Goose compatible with Go 1.23
         run: go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
 
@@ -63,10 +65,11 @@ jobs:
         env:
           TASK14_INTEGRATION_DSN: root:root@tcp(127.0.0.1:3306)/task10?parseTime=true
         run: go test ./internal/video -run TestMySQLRestartRecoveryIntegration -count=1
-      - name: Verify clean database Goose status includes Task14 00007
+      - name: Verify clean database Goose status includes Task14 00007 and Task9 00008
         run: |
-          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task14-clean-status.txt
-          grep -q '00007_task14_video.sql' /tmp/task14-clean-status.txt
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/clean-status.txt
+          grep -q '00007_task14_video.sql' /tmp/clean-status.txt
+          grep -q '00008_task9_runtime.sql' /tmp/clean-status.txt
       - name: Verify clean database Goose rollback
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
 
@@ -80,6 +83,7 @@ jobs:
           test -f /tmp/task14-main/api/db/migrations/00004_task15_auth.sql
           test -f /tmp/task14-main/api/db/migrations/00006_task13_match_audio.sql
           test ! -f /tmp/task14-main/api/db/migrations/00007_task14_video.sql
+          test ! -f /tmp/task14-main/api/db/migrations/00008_task9_runtime.sql
       - name: Apply pre-Task14 main migrations first
         run: goose -dir /tmp/task14-main/api/db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
       - name: Verify existing-main database is at Task13/Task15 state
@@ -87,20 +91,100 @@ jobs:
           goose -dir /tmp/task14-main/api/db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task14-main-status.txt
           grep -q '00004_task15_auth.sql' /tmp/task14-main-status.txt
           grep -q '00006_task13_match_audio.sql' /tmp/task14-main-status.txt
-      - name: Upgrade existing-main database with Task14 00007
+      - name: Upgrade pre-Task14 database through Task14 00007 and Task9 00008
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' up
-      - name: Verify existing-main upgrade appended Task14 00007
+      - name: Verify upgrade appended Task14 00007 before Task9 00008
         run: |
           goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task14-upgrade-status.txt
           grep -q '00004_task15_auth.sql' /tmp/task14-upgrade-status.txt
           grep -q '00006_task13_match_audio.sql' /tmp/task14-upgrade-status.txt
           grep -q '00007_task14_video.sql' /tmp/task14-upgrade-status.txt
+          grep -q '00008_task9_runtime.sql' /tmp/task14-upgrade-status.txt
       - name: Verify Task14 restart recovery after existing-main upgrade
         env:
           TASK14_INTEGRATION_DSN: root:root@tcp(127.0.0.1:3306)/task10?parseTime=true
         run: go test ./internal/video -run TestMySQLRestartRecoveryIntegration -count=1
       - name: Verify upgraded database Goose rollback
         run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task10?parseTime=true&multiStatements=true' down-to 0
+
+  task9-runtime-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: task9
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: api
+    env:
+      TASK9_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/task9?parseTime=true
+      TASK9_REDIS_ADDR: 127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - run: go mod tidy
+      - name: Install Goose and MySQL client
+        run: |
+          go install github.com/pressly/goose/v3/cmd/goose@v3.24.3
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+      - name: Apply clean migrations through Task14 00007 and Task9 00008
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9?parseTime=true&multiStatements=true' up
+      - name: Run real Redis and MySQL runtime integration
+        run: go test -p=1 ./internal/taskruntime ./internal/task9runtime -count=1
+      - name: Verify existing-main 00007 to 00008 migration with historical Task12 BookRun
+        shell: bash
+        run: |
+          set -euo pipefail
+          mysql -h127.0.0.1 -uroot -proot -e 'CREATE DATABASE task9_existing_main CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9_existing_main?parseTime=true&multiStatements=true' up-to 7
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9_existing_main?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task9-before-00008.txt
+          grep -q '00007_task14_video.sql' /tmp/task9-before-00008.txt
+          if grep -q 'Applied.*00008_task9_runtime.sql' /tmp/task9-before-00008.txt; then
+            echo '00008 must not be applied before existing-main upgrade test'
+            exit 1
+          fi
+          mysql -h127.0.0.1 -uroot -proot task9_existing_main <<'SQL'
+          INSERT INTO intakes (name,status) VALUES ('history','completed');
+          SET @i=LAST_INSERT_ID();
+          INSERT INTO batch_projects (intake_id,name) VALUES (@i,'history-project');
+          SET @p=LAST_INSERT_ID();
+          INSERT INTO books (intake_id,source,platform_id,external_book_id,title,original_text) VALUES (@i,'test','1','history-book','history','body');
+          SET @b=LAST_INSERT_ID();
+          INSERT INTO book_runs (batch_project_id,book_id,status,request_id) VALUES (@p,@b,'completed','legacy-task12');
+          SQL
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9_existing_main?parseTime=true&multiStatements=true' up
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9_existing_main?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task9-after-00008.txt
+          grep -q '00007_task14_video.sql' /tmp/task9-after-00008.txt
+          grep -q '00008_task9_runtime.sql' /tmp/task9-after-00008.txt
+          test "$(mysql -N -B -h127.0.0.1 -uroot -proot task9_existing_main -e "SELECT COUNT(*) FROM book_runs WHERE request_id='legacy-task12' AND run_id IS NULL AND attempt=1 AND execution_token=0;")" = "1"
+      - name: Verify Task9 Goose status
+        run: |
+          goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9?parseTime=true&multiStatements=true' status 2>&1 | tee /tmp/task9-status.txt
+          grep -q '00007_task14_video.sql' /tmp/task9-status.txt
+          grep -q '00008_task9_runtime.sql' /tmp/task9-status.txt
+      - name: Verify Task9 Goose rollback
+        run: goose -dir db/migrations mysql 'root:root@tcp(127.0.0.1:3306)/task9?parseTime=true&multiStatements=true' down-to 0
 
   task10-audit:
     runs-on: ubuntu-latest

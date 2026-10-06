@@ -15,6 +15,10 @@ type Store interface {
 	CreateRun(ctx context.Context, run intake.Run) (intake.Run, error)
 }
 
+type idempotentRunStore interface {
+	CreateRunIdempotent(ctx context.Context, run intake.Run, idempotencyKey string) (intake.Run, error)
+}
+
 type Clock func() time.Time
 
 type Service struct {
@@ -23,9 +27,10 @@ type Service struct {
 }
 
 type CreateRequest struct {
-	IntakeID int64
-	Name     string
-	RunAt    time.Time
+	IntakeID       int64
+	Name           string
+	RunAt          time.Time
+	IdempotencyKey string
 }
 
 type CreateResult struct {
@@ -58,7 +63,8 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (CreateResu
 
 	now := s.now().UTC()
 	runAt := request.RunAt
-	if runAt.IsZero() {
+	immediate := runAt.IsZero()
+	if immediate {
 		runAt = now
 	} else {
 		runAt = runAt.UTC()
@@ -83,14 +89,26 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (CreateResu
 		return CreateResult{}, fmt.Errorf("创建批量项目: %w", err)
 	}
 
-	run, err := s.store.CreateRun(ctx, intake.Run{
-		BatchProjectID: project.ID,
-		RunAt:          runAt,
-		Status:         intake.RunStatusPending,
-	})
+	runInput := intake.Run{BatchProjectID: project.ID, RunAt: runAt, Status: intake.RunStatusPending}
+	if idempotent, ok := s.store.(idempotentRunStore); ok {
+		key := strings.TrimSpace(request.IdempotencyKey)
+		if key == "" {
+			if immediate {
+				key = fmt.Sprintf("pipeline:intake:%d:immediate", request.IntakeID)
+			} else {
+				key = fmt.Sprintf("pipeline:intake:%d:scheduled:%s", request.IntakeID, runAt.Format(time.RFC3339Nano))
+			}
+		}
+		run, err := idempotent.CreateRunIdempotent(ctx, runInput, key)
+		if err != nil {
+			return CreateResult{}, fmt.Errorf("创建执行记录: %w", err)
+		}
+		return CreateResult{Project: project, Run: run}, nil
+	}
+
+	run, err := s.store.CreateRun(ctx, runInput)
 	if err != nil {
 		return CreateResult{}, fmt.Errorf("创建执行记录: %w", err)
 	}
-
 	return CreateResult{Project: project, Run: run}, nil
 }

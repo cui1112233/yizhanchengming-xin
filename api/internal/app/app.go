@@ -16,6 +16,8 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 )
@@ -83,13 +85,30 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		TempRoot:  os.Getenv("VIDEO_MERGE_TEMP_ROOT"),
 		Artifacts: fileArtifactStore,
 	})
-	// Merge jobs are durable and HTTP can create/retry them now. No async queue,
-	// Redis lease runtime, or scheduler is created here; that adapter waits for
-	// the shared Task 9.4 runtime contract on main.
 	mergeService := video.NewMergeService(videoStore, mergeExecutor)
 	observedMerge := observedMergeService{next: mergeService, logger: logger}
 
-	return httpapi.NewHandler(httpapi.Dependencies{
+	// Browser Runtime mutations reuse the same durable BookRun store and Redis
+	// queue contract as Scheduler/Worker. If Redis is unavailable the handler
+	// remains bootable but retry returns an explicit queue-unavailable response;
+	// no new BookRun attempt is created without successful coordination.
+	runtimeStore := task9runtime.NewMySQLStore(db)
+	var runtimeCoordinator task9runtime.RuntimeCoordinator
+	redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
+	if redisAddr == "" {
+		redisAddr = strings.TrimSpace(os.Getenv("QIANTIE_REDIS_ADDR"))
+	}
+	if redisAddr == "" {
+		redisAddr = strings.TrimSpace(os.Getenv("TASK9_REDIS_ADDR"))
+	}
+	if redisAddr != "" {
+		if queue, err := taskruntime.NewRedisQueue(redisAddr, "task9"); err == nil {
+			runtimeCoordinator = task9runtime.NewQueueCoordinator(queue)
+		}
+	}
+	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
+
+	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,
 		Reader:                      store,
 		Pipeline:                    pipelineService,
@@ -113,7 +132,8 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Logger:                      logger,
 		StartedAt:                   startedAt,
 		AppInitialized:              true,
-	})
+	}
+	return httpapi.NewHandlerWithRuntime(deps, runtimeService)
 }
 
 func secureCookiesEnabled() bool {
