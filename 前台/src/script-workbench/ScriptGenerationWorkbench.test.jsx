@@ -38,10 +38,10 @@ describe('ScriptGenerationWorkbench', () => {
 
     render(<ScriptGenerationWorkbench projectId={3} bookId={11} bookTitle="测试书" apiClient={apiClient} />)
 
-    expect(await screen.findByDisplayValue('林夏来到医院。')).toBeInTheDocument()
+    expect(await screen.findByDisplayValue('林夏来到医院。')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '提取人物与场景' }))
-    expect(await screen.findByDisplayValue('林夏')).toBeInTheDocument()
-    expect(screen.getByText('设为主角')).toBeInTheDocument()
+    expect(await screen.findByDisplayValue('林夏')).toBeTruthy()
+    expect(screen.getByText('设为主角')).toBeTruthy()
 
     fireEvent.click(screen.getByText('爆款开头'))
     fireEvent.mouseDown(screen.getByLabelText('输出模式'))
@@ -63,7 +63,7 @@ describe('ScriptGenerationWorkbench', () => {
     })
     expect(generateInput.characters[0]).toMatchObject({ name: '林夏', protagonist: true })
     expect(generateInput.constraints.visualPrefix).toBe('写实电影感')
-    expect(await screen.findByDisplayValue(/林夏推门/)).toBeInTheDocument()
+    expect(await screen.findByDisplayValue(/林夏推门/)).toBeTruthy()
   })
 
   it('does not invent a provider configuration when shared image service is not injected', async () => {
@@ -76,6 +76,6 @@ describe('ScriptGenerationWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加人物' }))
     fireEvent.change(screen.getByLabelText('人物名称1'), { target: { value: '林夏' } })
     fireEvent.click(screen.getByRole('button', { name: '通过共享图片服务补参考图' }))
-    expect(await screen.findByText(/共享图片服务接入/)).toBeInTheDocument()
+    expect(await screen.findByText(/共享图片服务接入/)).toBeTruthy()
   })
 })
