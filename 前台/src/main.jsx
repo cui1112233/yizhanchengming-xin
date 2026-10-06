@@ -7,7 +7,7 @@ import AuthBoundary from './AuthBoundary.jsx'
 
 export function UserApp() {
   return (
-    <ConfigProvider>
+    <ConfigProvider theme={{ token: { colorPrimary: '#5b62d9', borderRadius: 10, controlHeight: 40, fontSize: 14 }, components: { Card: { headerHeight: 52 }, Table: { cellPaddingBlock: 14 }, Drawer: { footerPaddingBlock: 16, footerPaddingInline: 24 } } }}>
       <AntApp>
         <AuthBoundary>
           <IntakeWorkbench />

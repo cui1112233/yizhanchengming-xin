@@ -87,8 +87,13 @@ export default function AuthBoundary({ children, api = defaultApi }) {
 
   if (status === 'unauthenticated') {
     return (
-      <main className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        <Card title="一战晟铭登录" style={{ width: 'min(420px, 92vw)' }}>
+      <main className="login-page">
+        <Card className="login-card" style={{ width: 'min(440px, 92vw)' }}>
+          <div className="login-brand">
+            <img src="/assets/brand-logo-black.png" alt="一战晟铭" />
+          </div>
+          <Typography.Title level={2}>一战晟铭登录</Typography.Title>
+          <Typography.Paragraph type="secondary" className="login-subtitle">继续你的创作工作流</Typography.Paragraph>
           {error ? <Alert type="warning" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
           <Form layout="vertical" onFinish={submitLogin}>
             <Form.Item name="username" label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
@@ -97,7 +102,7 @@ export default function AuthBoundary({ children, api = defaultApi }) {
             <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
               <Input.Password autoComplete="current-password" />
             </Form.Item>
-            <Button type="primary" htmlType="submit" loading={submitting} block>登录</Button>
+            <Button type="primary" htmlType="submit" loading={submitting} block>登录并进入工作台</Button>
           </Form>
           <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
             登录成功后会继续停留在你原本访问的页面。
