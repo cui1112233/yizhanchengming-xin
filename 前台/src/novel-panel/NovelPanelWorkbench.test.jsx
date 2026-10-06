@@ -64,6 +64,6 @@ describe('NovelPanelWorkbench', () => {
     fireEvent.change(input, { target: { value: '未保存但不能丢失的编辑。' } })
     fireEvent.click(screen.getByRole('button', { name: '保存小说面板' }))
     expect(await screen.findByText(/保存冲突/)).toBeTruthy()
-    expect(screen.getByDisplayValue('未保存但不能丢失的编辑。')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toBe('未保存但不能丢失的编辑。')
   }, 15000)
 })
