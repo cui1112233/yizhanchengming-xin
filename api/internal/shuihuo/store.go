@@ -20,3 +20,9 @@ type Store interface {
 type SmartSegmenter interface {
 	Segment(context.Context, string) ([]Candidate, error)
 }
+
+type SmartSegmenterFunc func(context.Context, string) ([]Candidate, error)
+
+func (fn SmartSegmenterFunc) Segment(ctx context.Context, text string) ([]Candidate, error) {
+	return fn(ctx, text)
+}
