@@ -3,6 +3,7 @@ package intake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -138,6 +139,24 @@ func (s *MySQLStore) ListBooks(ctx context.Context, intakeID int64) ([]Book, err
 		return nil, fmt.Errorf("iterate books: %w", err)
 	}
 	return books, nil
+}
+
+func (s *MySQLStore) GetBook(ctx context.Context, intakeID, bookID int64) (Book, error) {
+	const query = "SELECT id, intake_id, source, platform_id, external_book_id, title, body_ref, original_text, category, genre, gender, gender_source, style, status, error_message, created_at, updated_at FROM books WHERE intake_id = ? AND id = ? LIMIT 1"
+	var book Book
+	err := s.db.QueryRowContext(ctx, query, intakeID, bookID).Scan(
+		&book.ID, &book.IntakeID, &book.Source, &book.PlatformID, &book.ExternalBookID,
+		&book.Title, &book.BodyRef, &book.OriginalText, &book.Category, &book.Genre,
+		&book.Gender, &book.GenderSource, &book.Style, &book.Status, &book.ErrorMessage,
+		&book.CreatedAt, &book.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Book{}, ErrNotFound
+	}
+	if err != nil {
+		return Book{}, fmt.Errorf("get intake book: %w", err)
+	}
+	return book, nil
 }
 
 func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProject) (BatchProject, error) {

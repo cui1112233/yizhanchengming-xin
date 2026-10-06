@@ -239,6 +239,116 @@ func (s *Service) ExecuteIntake(ctx context.Context, intakeID int64, maxText int
 	return result, nil
 }
 
+type bookLookupStore interface {
+	GetBook(context.Context, int64, int64) (Book, error)
+}
+
+func (s *Service) RetryBook(ctx context.Context, intakeID, bookID int64, maxText int) (Book, ExecuteResult, error) {
+	result := ExecuteResult{IntakeID: intakeID}
+	if s == nil || s.store == nil || s.fetcher == nil {
+		return Book{}, result, fmt.Errorf("intake store and 121 fetcher are required")
+	}
+	lookup, ok := s.store.(bookLookupStore)
+	if !ok {
+		return Book{}, result, fmt.Errorf("intake book lookup is unavailable")
+	}
+	book, err := lookup.GetBook(ctx, intakeID, bookID)
+	if err != nil {
+		return Book{}, result, err
+	}
+	if book.Status == BookStatusFetched {
+		return book, result, ErrBookNotRetryable
+	}
+
+	if strings.TrimSpace(book.OriginalText) == "" {
+		fetched, fetchErr := s.fetcher.Fetch(ctx, provider121.Request{
+			BookID: book.ExternalBookID, PlatformID: book.PlatformID, MaxText: maxText,
+		})
+		if fetchErr != nil {
+			book.Status = BookStatusRetryableFailed
+			book.ErrorMessage = fetchErr.Error()
+			stored, saveErr := s.store.UpsertBook(ctx, book)
+			if saveErr != nil {
+				return book, result, fmt.Errorf("记录 121 重试失败: %w", saveErr)
+			}
+			result, _ = s.recomputeIntakeStatus(ctx, intakeID)
+			return stored, result, fetchErr
+		}
+		book.OriginalText = fetched.Text
+		book.Category = strings.TrimSpace(fetched.BookInfo.Category)
+		book.Genre = normalizeGenre(fetched.BookInfo.Genre)
+		if incoming := strings.TrimSpace(fetched.BookInfo.BookName); incoming != "" && isGeneratedTitle(book.Title, book.ExternalBookID) {
+			book.Title = incoming
+		}
+	}
+
+	manualGender := ""
+	if book.GenderSource == metadata.SourceManual || book.GenderSource == "input" {
+		manualGender = book.Gender
+	}
+	resolvedGender, genderSource := metadata.ResolveGender(manualGender, book.Category, book.Genre, "")
+	manualStyle := strings.TrimSpace(book.Style)
+	ai := ClassificationResult{}
+	if s.classifier != nil && (resolvedGender == "" || manualStyle == "") {
+		ai, err = s.classifier.Classify(ctx, ClassificationInput{
+			BookID: book.ExternalBookID, Title: book.Title, Text: book.OriginalText,
+			Category: book.Category, Genre: book.Genre, Gender: resolvedGender,
+		})
+		if err != nil {
+			book.Gender = resolvedGender
+			book.GenderSource = genderSource
+			book.Status = BookStatusRetryableFailed
+			book.ErrorMessage = "AI 分类失败: " + err.Error()
+			stored, saveErr := s.store.UpsertBook(ctx, book)
+			if saveErr != nil {
+				return book, result, fmt.Errorf("记录 AI 分类重试失败: %w", saveErr)
+			}
+			result, _ = s.recomputeIntakeStatus(ctx, intakeID)
+			return stored, result, err
+		}
+	}
+	book.Gender, book.GenderSource = metadata.ResolveGender(manualGender, book.Category, book.Genre, ai.Gender)
+	book.Style, _ = metadata.ResolveStyle(manualStyle, "", ai.Style)
+	book.Status = BookStatusFetched
+	book.ErrorMessage = ""
+	stored, err := s.store.UpsertBook(ctx, book)
+	if err != nil {
+		return book, result, fmt.Errorf("保存重试成功书籍: %w", err)
+	}
+	result, err = s.recomputeIntakeStatus(ctx, intakeID)
+	return stored, result, err
+}
+
+func (s *Service) recomputeIntakeStatus(ctx context.Context, intakeID int64) (ExecuteResult, error) {
+	result := ExecuteResult{IntakeID: intakeID}
+	books, err := s.store.ListBooks(ctx, intakeID)
+	if err != nil {
+		return result, err
+	}
+	for _, book := range books {
+		switch book.Status {
+		case BookStatusFetched:
+			result.Fetched++
+		case BookStatusRetryableFailed:
+			result.Failed++
+		}
+	}
+	switch {
+	case len(books) > 0 && result.Failed == 0 && result.Fetched == len(books):
+		result.Status = StatusCompleted
+	case result.Fetched == 0 && result.Failed > 0:
+		result.Status = StatusFailed
+	case result.Failed > 0:
+		result.Status = StatusPartial
+	default:
+		result.Status = StatusPending
+	}
+	if err := s.store.UpdateIntakeStatus(ctx, intakeID, result.Status); err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
 func normalizeGenre(value any) string {
 	if value == nil {
 		return ""

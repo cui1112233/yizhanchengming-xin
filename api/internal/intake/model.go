@@ -1,6 +1,14 @@
 package intake
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrNotFound = errors.New("intake: not found")
+	ErrBookNotRetryable = errors.New("intake: book is not retryable")
+)
 
 type Status string
 
