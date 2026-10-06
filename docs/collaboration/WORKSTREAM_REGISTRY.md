@@ -19,13 +19,13 @@
 | 任务 | 固定分支 | 起始 SHA | 当前远端 HEAD（登记时） | 实际可验证操作方式 | Worktree 状态 | 写入边界 |
 | --- | --- | --- | --- | --- | --- | --- |
 | A 共享基础/总集成 | `feat/shared-platform-foundation-20261007` | `19df4c4ce8f446df856ec0f0eb1558fd913de51d` | 最新登记提交前已到 `480e1590c654a67e348dc153bba674cd146b0fb5`；本文件提交后以 A 分支 HEAD 为准 | ChatGPT 云端 GitHub connector / GitHub API 远端操作 | 无法核验 | 共享基础、全局接线、迁移编号、CI/部署配置、最终集成 |
-| B 小说获取 | `feat/novel-fetch-public-parity` | `19df4c4ce8f446df856ec0f0eb1558fd913de51d` | `13691e112388846734738ddebfe2f79bb3887448` | 当前只能通过 GitHub 远端验证分支状态；任务执行机器/worktree 未暴露 | 无法核验 | 小说获取模块 |
+| B 小说获取 | `feat/novel-fetch-public-parity` | `19df4c4ce8f446df856ec0f0eb1558fd913de51d` | `2eea26b28744237848179932f0111f60ca182aa1` | 当前只能通过 GitHub 远端验证分支状态；任务执行机器/worktree 未暴露 | 无法核验 | 小说获取模块 |
 | C 剧本生成 | `feat/script-generation-parity-20261007` | `19df4c4ce8f446df856ec0f0eb1558fd913de51d` | `15a09e1de4c1577434dab6a1f0185094e2d3bd7e` | 当前只能通过 GitHub 远端验证分支状态；任务执行机器/worktree 未暴露 | 无法核验 | generation + script-workbench |
 | D 小说面板 | `feat/novel-panel-module-20261007` | `19df4c4ce8f446df856ec0f0eb1558fd913de51d` | `19df4c4ce8f446df856ec0f0eb1558fd913de51d` | 当前只能通过 GitHub 远端验证分支状态；任务执行机器/worktree 未暴露 | 无法核验 | 小说面板模块 |
 
 登记刷新时的远端事实：
 
-- B：`13691e112388846734738ddebfe2f79bb3887448 feat(novel-fetch): add isolated public-parity module core`；相对 `main` ahead=2 / behind=0；该 SHA workflow runs=0。
+- B：`2eea26b28744237848179932f0111f60ca182aa1 feat(novel-fetch): expose module task readback`；相对 `main` ahead=2 / behind=0；该 SHA workflow runs=0。该提交新增的是 Novel Fetch 模块内 `GET /runs/{id}/books` 读回能力，不视为共享 Task submit/get/cancel facade；是否挂到全局路由仍由 A 集成。
 - C：`15a09e1de4c1577434dab6a1f0185094e2d3bd7e fix(script): preserve existing single-book action label`；相对 `main` ahead=5 / behind=0；该 SHA workflow runs=0。C 的 `e1411da…` 是其中较早的 workbench 提交，不再称为当前 HEAD。
 - D：仍为 `19df4c4ce8f446df856ec0f0eb1558fd913de51d`，ahead=0 / behind=0。
 - A：本协作登记已在固定 A 分支继续提交；最终 HEAD 以本轮报告的 commit SHA 为准。
