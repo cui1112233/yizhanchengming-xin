@@ -71,7 +71,7 @@ C 固定维护：
 - `前台/src/script-workbench/**`；
 - 对应模块测试。
 
-C 当前远端提交 `e1411daac834589fde31c5777ecf44f1139cfbed` 已包含对 `前台/src/BatchProjectListPage.jsx` 的集成 hunk；该提交保留，但后续该共享文件的最终挂载由 A 收口，C 不继续扩大共享文件改动范围。
+C 的提交 `e1411daac834589fde31c5777ecf44f1139cfbed` 已引入对 `前台/src/BatchProjectListPage.jsx` 的集成 hunk；后续 C 仍可能在固定分支追加提交。该已有 hunk 保留，但共享文件的最终挂载由 A 收口，C 不继续扩大共享文件改动范围。
 
 ### D：小说面板
 
