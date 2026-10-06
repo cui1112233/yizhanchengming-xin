@@ -21,13 +21,14 @@ const (
 )
 
 var (
-	ErrNotFound           = errors.New("novel fetch resource not found")
-	ErrInvalid            = errors.New("invalid novel fetch input")
-	ErrNotDue             = errors.New("novel fetch run is not due")
-	ErrRuntimeUnavailable = errors.New("novel fetch runtime unavailable")
-	ErrModelUnavailable   = errors.New("novel fetch text model unavailable")
-	ErrPublishUnavailable = errors.New("novel fetch publish boundary unavailable")
-	ErrHandoffUnavailable = errors.New("novel fetch batch factory boundary unavailable")
+	ErrNotFound                = errors.New("novel fetch resource not found")
+	ErrInvalid                 = errors.New("invalid novel fetch input")
+	ErrNotDue                  = errors.New("novel fetch run is not due")
+	ErrRuntimeUnavailable      = errors.New("novel fetch runtime unavailable")
+	ErrModelUnavailable        = errors.New("novel fetch text model unavailable")
+	ErrPublishUnavailable      = errors.New("novel fetch publish boundary unavailable")
+	ErrHandoffUnavailable      = errors.New("novel fetch batch factory boundary unavailable")
+	ErrMultipleRunsUnsupported = errors.New("multiple novel fetch runs per batch are not supported before shared persistence integration")
 )
 
 type Metadata struct {
@@ -63,14 +64,14 @@ type Batch struct {
 }
 
 type Config struct {
-	TextModelID          string            `json:"textModelId"`
-	MaxText              int               `json:"maxText"`
-	TargetVersions       []string          `json:"targetVersions"`
-	RewriteProfiles      map[string]string `json:"rewriteProfiles,omitempty"`
+	TextModelID           string            `json:"textModelId"`
+	MaxText               int               `json:"maxText"`
+	TargetVersions        []string          `json:"targetVersions"`
+	RewriteProfiles       map[string]string `json:"rewriteProfiles,omitempty"`
 	SensitiveReplacements map[string]string `json:"sensitiveReplacements,omitempty"`
 	ChapterRemovePrefixes []string          `json:"chapterRemovePrefixes,omitempty"`
-	TrimLines            bool              `json:"trimLines"`
-	DropBlankLines       bool              `json:"dropBlankLines"`
+	TrimLines             bool              `json:"trimLines"`
+	DropBlankLines        bool              `json:"dropBlankLines"`
 }
 
 type Run struct {
@@ -92,6 +93,11 @@ type Record struct {
 	Error      string    `json:"error,omitempty"`
 	StartedAt  time.Time `json:"startedAt"`
 	FinishedAt time.Time `json:"finishedAt"`
+}
+
+type HistoryItem struct {
+	Batch Batch `json:"batch"`
+	Run   Run   `json:"run"`
 }
 
 type KnowledgeEntry struct {
@@ -146,6 +152,12 @@ type RunDispatch struct {
 	AvailableAt time.Time
 }
 
+type RetryDispatch struct {
+	RunID       string
+	BookKey     string
+	AvailableAt time.Time
+}
+
 type HandoffRequest struct {
 	Batch Batch
 	Run   Run
@@ -172,6 +184,7 @@ type SubmitIntentResult struct {
 type Store interface {
 	CreateBatch(context.Context, Batch) (Batch, error)
 	GetBatch(context.Context, string) (Batch, error)
+	ListBatches(context.Context) ([]Batch, error)
 	PutBook(context.Context, Book) error
 	UpdateBook(context.Context, Book) error
 	GetBook(context.Context, string, string) (Book, error)
@@ -179,6 +192,7 @@ type Store interface {
 	CreateRun(context.Context, Run) (Run, error)
 	UpdateRun(context.Context, Run) error
 	GetRun(context.Context, string) (Run, error)
+	ListRuns(context.Context, string) ([]Run, error)
 	AppendRecord(context.Context, Record) error
 	ListRecords(context.Context, string) ([]Record, error)
 	GetConfig(context.Context) (Config, error)
@@ -198,6 +212,7 @@ type TextModel interface {
 
 type Dispatcher interface {
 	EnqueueRun(context.Context, RunDispatch) error
+	EnqueueBookRetry(context.Context, RetryDispatch) error
 }
 
 type BatchFactoryBoundary interface {

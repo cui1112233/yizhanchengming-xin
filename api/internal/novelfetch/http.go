@@ -20,16 +20,18 @@ func NewModuleHandler(service *Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /batches", handler.createBatch)
 	mux.HandleFunc("POST /batches/{id}/runs", handler.startRun)
+	mux.HandleFunc("GET /runs/{id}", handler.runState)
 	mux.HandleFunc("POST /runs/{id}/execute", handler.executeRun)
 	mux.HandleFunc("POST /runs/{id}/books/{bookKey}/retry", handler.retryBook)
-	mux.HandleFunc("GET /runs/{id}/books", handler.runBooks)
 	mux.HandleFunc("GET /runs/{id}/records", handler.records)
 	mux.HandleFunc("POST /runs/{id}/handoff", handler.handoff)
 	mux.HandleFunc("POST /runs/{id}/books/{bookKey}/submit-intents", handler.submitIntent)
+	mux.HandleFunc("GET /history", handler.history)
 	mux.HandleFunc("GET /config", handler.getConfig)
 	mux.HandleFunc("PUT /config", handler.saveConfig)
 	mux.HandleFunc("GET /knowledge", handler.listKnowledge)
-	mux.HandleFunc("PUT /knowledge/{id}", handler.upsertKnowledge)
+	mux.HandleFunc("POST /knowledge", handler.createKnowledge)
+	mux.HandleFunc("PUT /knowledge/{id}", handler.updateKnowledge)
 	mux.HandleFunc("DELETE /knowledge/{id}", handler.deleteKnowledge)
 	mux.HandleFunc("POST /rules/preview", handler.previewRules)
 	return mux
@@ -74,6 +76,15 @@ func (h *ModuleHandler) startRun(w http.ResponseWriter, r *http.Request) {
 	writeModuleJSON(w, http.StatusCreated, map[string]any{"run": run})
 }
 
+func (h *ModuleHandler) runState(w http.ResponseWriter, r *http.Request) {
+	run, books, err := h.service.RunState(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeModuleError(w, err)
+		return
+	}
+	writeModuleJSON(w, http.StatusOK, map[string]any{"run": run, "books": books})
+}
+
 func (h *ModuleHandler) executeRun(w http.ResponseWriter, r *http.Request) {
 	run, err := h.service.ExecuteRun(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -85,21 +96,12 @@ func (h *ModuleHandler) executeRun(w http.ResponseWriter, r *http.Request) {
 
 func (h *ModuleHandler) retryBook(w http.ResponseWriter, r *http.Request) {
 	bookKey, _ := url.PathUnescape(r.PathValue("bookKey"))
-	book, err := h.service.RetryBook(r.Context(), r.PathValue("id"), bookKey)
+	run, book, err := h.service.RetryBook(r.Context(), r.PathValue("id"), bookKey)
 	if err != nil {
 		writeModuleError(w, err)
 		return
 	}
-	writeModuleJSON(w, http.StatusOK, map[string]any{"book": book})
-}
-
-func (h *ModuleHandler) runBooks(w http.ResponseWriter, r *http.Request) {
-	books, err := h.service.RunBooks(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeModuleError(w, err)
-		return
-	}
-	writeModuleJSON(w, http.StatusOK, map[string]any{"books": books})
+	writeModuleJSON(w, http.StatusAccepted, map[string]any{"run": run, "book": book})
 }
 
 func (h *ModuleHandler) records(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +111,15 @@ func (h *ModuleHandler) records(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeModuleJSON(w, http.StatusOK, map[string]any{"records": records})
+}
+
+func (h *ModuleHandler) history(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.History(r.Context())
+	if err != nil {
+		writeModuleError(w, err)
+		return
+	}
+	writeModuleJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (h *ModuleHandler) handoff(w http.ResponseWriter, r *http.Request) {
@@ -173,13 +184,33 @@ func (h *ModuleHandler) listKnowledge(w http.ResponseWriter, r *http.Request) {
 	writeModuleJSON(w, http.StatusOK, map[string]any{"items": entries})
 }
 
-func (h *ModuleHandler) upsertKnowledge(w http.ResponseWriter, r *http.Request) {
+func (h *ModuleHandler) createKnowledge(w http.ResponseWriter, r *http.Request) {
 	var entry KnowledgeEntry
 	if err := decodeBody(w, r, &entry); err != nil {
 		writeModuleError(w, err)
 		return
 	}
-	entry.ID = r.PathValue("id")
+	entry.ID = ""
+	entry, err := h.service.UpsertKnowledge(r.Context(), entry)
+	if err != nil {
+		writeModuleError(w, err)
+		return
+	}
+	writeModuleJSON(w, http.StatusCreated, map[string]any{"item": entry})
+}
+
+func (h *ModuleHandler) updateKnowledge(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" || id == "new" {
+		writeModuleError(w, ErrInvalid)
+		return
+	}
+	var entry KnowledgeEntry
+	if err := decodeBody(w, r, &entry); err != nil {
+		writeModuleError(w, err)
+		return
+	}
+	entry.ID = id
 	entry, err := h.service.UpsertKnowledge(r.Context(), entry)
 	if err != nil {
 		writeModuleError(w, err)
@@ -228,7 +259,7 @@ func writeModuleError(w http.ResponseWriter, err error) {
 		status = http.StatusBadRequest
 	case errors.Is(err, ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, ErrNotDue):
+	case errors.Is(err, ErrNotDue), errors.Is(err, ErrMultipleRunsUnsupported):
 		status = http.StatusConflict
 	case errors.Is(err, ErrRuntimeUnavailable), errors.Is(err, ErrModelUnavailable), errors.Is(err, ErrPublishUnavailable), errors.Is(err, ErrHandoffUnavailable):
 		status = http.StatusServiceUnavailable

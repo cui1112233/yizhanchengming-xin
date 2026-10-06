@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -105,8 +106,16 @@ func (s *Service) StartRun(ctx context.Context, batchID string, runAt time.Time)
 	if s == nil || s.store == nil || s.dispatcher == nil {
 		return Run{}, ErrRuntimeUnavailable
 	}
-	if _, err := s.store.GetBatch(ctx, strings.TrimSpace(batchID)); err != nil {
+	batchID = strings.TrimSpace(batchID)
+	if _, err := s.store.GetBatch(ctx, batchID); err != nil {
 		return Run{}, err
+	}
+	existing, err := s.store.ListRuns(ctx, batchID)
+	if err != nil {
+		return Run{}, err
+	}
+	if len(existing) > 0 {
+		return Run{}, ErrMultipleRunsUnsupported
 	}
 	config, err := s.store.GetConfig(ctx)
 	if err != nil {
@@ -162,38 +171,72 @@ func (s *Service) ExecuteRun(ctx context.Context, runID string) (Run, error) {
 	for _, book := range books {
 		_ = s.executeBook(ctx, run, book)
 	}
-	books, err = s.store.ListBooks(ctx, run.BatchID)
-	if err != nil {
-		return run, err
-	}
-	run.Status = aggregateRunStatus(books)
-	run.UpdatedAt = s.now().UTC()
-	if err := s.store.UpdateRun(ctx, run); err != nil {
-		return run, err
-	}
-	return run, nil
+	return s.recomputeRun(ctx, run)
 }
 
-func (s *Service) RetryBook(ctx context.Context, runID, bookKey string) (Book, error) {
+func (s *Service) RetryBook(ctx context.Context, runID, bookKey string) (Run, Book, error) {
+	if s == nil || s.store == nil || s.dispatcher == nil {
+		return Run{}, Book{}, ErrRuntimeUnavailable
+	}
 	run, err := s.store.GetRun(ctx, strings.TrimSpace(runID))
 	if err != nil {
-		return Book{}, err
+		return Run{}, Book{}, err
 	}
 	book, err := s.store.GetBook(ctx, run.BatchID, strings.TrimSpace(bookKey))
 	if err != nil {
-		return Book{}, err
+		return run, Book{}, err
 	}
 	if book.Status != StatusRetryableFailed && book.Status != StatusPartialFailed && book.Status != StatusFailed {
-		return book, fmt.Errorf("%w: 当前书籍没有失败阶段", ErrInvalid)
+		return run, book, fmt.Errorf("%w: 当前书籍没有失败阶段", ErrInvalid)
 	}
-	if err := s.executeBook(ctx, run, book); err != nil {
-		latest, getErr := s.store.GetBook(ctx, run.BatchID, book.Key)
-		if getErr == nil {
-			return latest, err
-		}
-		return book, err
+
+	previousBook := book
+	previousRun := run
+	book.Status = StatusQueued
+	book.CurrentStage = "retry_queued"
+	book.Error = ""
+	if err := s.store.UpdateBook(ctx, book); err != nil {
+		return run, book, err
 	}
-	return s.store.GetBook(ctx, run.BatchID, book.Key)
+	run.Status = StatusQueued
+	run.UpdatedAt = s.now().UTC()
+	if err := s.store.UpdateRun(ctx, run); err != nil {
+		_ = s.store.UpdateBook(ctx, previousBook)
+		return previousRun, previousBook, err
+	}
+	if err := s.dispatcher.EnqueueBookRetry(ctx, RetryDispatch{RunID: run.ID, BookKey: book.Key, AvailableAt: s.now().UTC()}); err != nil {
+		_ = s.store.UpdateBook(ctx, previousBook)
+		_ = s.store.UpdateRun(ctx, previousRun)
+		return previousRun, previousBook, fmt.Errorf("%w: %v", ErrRuntimeUnavailable, err)
+	}
+	return run, book, nil
+}
+
+func (s *Service) ExecuteBookRetry(ctx context.Context, runID, bookKey string) (Run, Book, error) {
+	if s == nil || s.store == nil || s.fetcher == nil {
+		return Run{}, Book{}, ErrRuntimeUnavailable
+	}
+	run, err := s.store.GetRun(ctx, strings.TrimSpace(runID))
+	if err != nil {
+		return Run{}, Book{}, err
+	}
+	if run.RunAt.After(s.now().UTC()) {
+		return run, Book{}, ErrNotDue
+	}
+	book, err := s.store.GetBook(ctx, run.BatchID, strings.TrimSpace(bookKey))
+	if err != nil {
+		return run, Book{}, err
+	}
+	execErr := s.executeBook(ctx, run, book)
+	latestBook, getErr := s.store.GetBook(ctx, run.BatchID, book.Key)
+	if getErr != nil {
+		return run, book, getErr
+	}
+	latestRun, statusErr := s.recomputeRun(ctx, run)
+	if statusErr != nil {
+		return run, latestBook, statusErr
+	}
+	return latestRun, latestBook, execErr
 }
 
 func (s *Service) executeBook(ctx context.Context, run Run, book Book) error {
@@ -227,6 +270,7 @@ func (s *Service) executeBook(ctx context.Context, run Run, book Book) error {
 		}
 		s.record(ctx, run.ID, book.Key, "fetch", StatusSucceeded, "", started)
 	}
+
 	started := s.now().UTC()
 	book.CurrentStage = "rules"
 	book.ProcessedText = applyRules(book.OriginalRaw, run.ConfigSnapshot)
@@ -248,6 +292,7 @@ func (s *Service) executeBook(ctx context.Context, run Run, book Book) error {
 		s.record(ctx, run.ID, book.Key, "knowledge", StatusFailed, book.Error, s.now().UTC())
 		return err
 	}
+
 	var firstErr error
 	for _, version := range run.ConfigSnapshot.TargetVersions {
 		if version == "original" || strings.TrimSpace(book.Versions[version]) != "" {
@@ -294,6 +339,19 @@ func (s *Service) executeBook(ctx context.Context, run Run, book Book) error {
 	book.CurrentStage = "completed"
 	book.Error = ""
 	return s.store.UpdateBook(ctx, book)
+}
+
+func (s *Service) recomputeRun(ctx context.Context, run Run) (Run, error) {
+	books, err := s.store.ListBooks(ctx, run.BatchID)
+	if err != nil {
+		return run, err
+	}
+	run.Status = aggregateRunStatus(books)
+	run.UpdatedAt = s.now().UTC()
+	if err := s.store.UpdateRun(ctx, run); err != nil {
+		return run, err
+	}
+	return run, nil
 }
 
 func (s *Service) PreviewRules(ctx context.Context, text string, config Config) string {
@@ -347,15 +405,41 @@ func (s *Service) DeleteKnowledge(ctx context.Context, kind, id string) error {
 	return s.store.DeleteKnowledge(ctx, strings.TrimSpace(kind), strings.TrimSpace(id))
 }
 
-func (s *Service) RunBooks(ctx context.Context, runID string) ([]Book, error) {
+func (s *Service) RunState(ctx context.Context, runID string) (Run, []Book, error) {
 	if s == nil || s.store == nil {
-		return nil, ErrRuntimeUnavailable
+		return Run{}, nil, ErrRuntimeUnavailable
 	}
 	run, err := s.store.GetRun(ctx, strings.TrimSpace(runID))
 	if err != nil {
+		return Run{}, nil, err
+	}
+	books, err := s.store.ListBooks(ctx, run.BatchID)
+	if err != nil {
+		return run, nil, err
+	}
+	return run, books, nil
+}
+
+func (s *Service) History(ctx context.Context) ([]HistoryItem, error) {
+	if s == nil || s.store == nil {
+		return nil, ErrRuntimeUnavailable
+	}
+	runs, err := s.store.ListRuns(ctx, "")
+	if err != nil {
 		return nil, err
 	}
-	return s.store.ListBooks(ctx, run.BatchID)
+	items := make([]HistoryItem, 0, len(runs))
+	for _, run := range runs {
+		batch, err := s.store.GetBatch(ctx, run.BatchID)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, HistoryItem{Batch: batch, Run: run})
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].Run.CreatedAt.After(items[j].Run.CreatedAt)
+	})
+	return items, nil
 }
 
 func (s *Service) Records(ctx context.Context, runID string) ([]Record, error) {
@@ -473,17 +557,50 @@ func applyRules(raw string, config Config) string {
 		if remove {
 			continue
 		}
-		for from, to := range config.SensitiveReplacements {
-			if from != "" {
-				line = strings.ReplaceAll(line, from, to)
-			}
-		}
+		line = replaceSensitiveDeterministic(line, config.SensitiveReplacements)
 		if config.DropBlankLines && strings.TrimSpace(line) == "" {
 			continue
 		}
 		out = append(out, line)
 	}
 	return strings.Join(out, "\n")
+}
+
+func replaceSensitiveDeterministic(text string, replacements map[string]string) string {
+	keys := make([]string, 0, len(replacements))
+	for key := range replacements {
+		if key = strings.TrimSpace(key); key != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if len(keys[i]) == len(keys[j]) {
+			return keys[i] < keys[j]
+		}
+		return len(keys[i]) > len(keys[j])
+	})
+	var out strings.Builder
+	for index := 0; index < len(text); {
+		matched := ""
+		for _, key := range keys {
+			if strings.HasPrefix(text[index:], key) {
+				matched = key
+				break
+			}
+		}
+		if matched != "" {
+			out.WriteString(replacements[matched])
+			index += len(matched)
+			continue
+		}
+		_, size := utf8.DecodeRuneInString(text[index:])
+		if size <= 0 {
+			size = 1
+		}
+		out.WriteString(text[index : index+size])
+		index += size
+	}
+	return out.String()
 }
 
 func truncateRunes(value string, max int) string {
