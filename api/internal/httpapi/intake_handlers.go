@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
@@ -73,6 +75,11 @@ type bookResponse struct {
 	UpdatedAt      time.Time         `json:"updatedAt,omitempty"`
 }
 
+type bookDetailResponse struct {
+	bookResponse
+	OriginalText string `json:"originalText"`
+}
+
 type projectResponse struct {
 	ID        int64            `json:"id"`
 	IntakeID  int64            `json:"intakeId"`
@@ -114,6 +121,17 @@ func (h handler) createIntake(w http.ResponseWriter, r *http.Request) {
 		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "INTAKE_CREATE_FAILED", "创建小说获取批次失败", "intake", "create", err)
 		return
 	}
+	if h.deps.Auth != nil {
+		actor, ok := authn.CurrentUser(r.Context())
+		if !ok || h.deps.IntakeAccess == nil {
+			h.writeServiceError(w, r, http.StatusServiceUnavailable, "AUTH_POLICY_UNAVAILABLE", "Intake 权限归属暂不可用", "auth", "claim_intake", nil)
+			return
+		}
+		if err := h.deps.IntakeAccess.ClaimIntake(r.Context(), created.ID, actor.ID, actor.TeamID); err != nil {
+			h.writeServiceError(w, r, http.StatusServiceUnavailable, "AUTH_POLICY_UNAVAILABLE", "Intake 权限归属暂不可用", "auth", "claim_intake", err)
+			return
+		}
+	}
 	h.logger().Info("intake created", "request_id", requestIDFromRequest(r), "subsystem", "intake", "intake_id", created.ID, "book_count", len(books))
 	writeJSON(w, http.StatusCreated, map[string]any{"intake": toIntakeResponse(created), "books": toBookResponses(books)})
 }
@@ -129,7 +147,26 @@ func (h handler) listIntakes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := make([]intakeResponse, 0, len(rows))
+	var actor authn.User
+	if h.deps.Auth != nil {
+		var ok bool
+		actor, ok = authn.CurrentUser(r.Context())
+		if !ok || h.deps.IntakeAccess == nil {
+			h.writeServiceError(w, r, http.StatusServiceUnavailable, "AUTH_POLICY_UNAVAILABLE", "Intake 权限校验暂不可用", "auth", "list_intakes", nil)
+			return
+		}
+	}
 	for _, row := range rows {
+		if h.deps.Auth != nil {
+			allowed, accessErr := h.deps.IntakeAccess.CanAccessIntake(r.Context(), row.ID, actor.ID, actor.TeamID, isElevatedUser(actor))
+			if accessErr != nil {
+				h.writeServiceError(w, r, http.StatusServiceUnavailable, "AUTH_POLICY_UNAVAILABLE", "Intake 权限校验暂不可用", "auth", "list_intakes", accessErr)
+				return
+			}
+			if !allowed {
+				continue
+			}
+		}
 		result = append(result, toIntakeResponse(row))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"intakes": result})
@@ -203,6 +240,74 @@ func (h handler) listBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"books": toBookResponses(rows)})
+}
+
+func (h handler) getIntakeBook(w http.ResponseWriter, r *http.Request) {
+	if h.deps.IntakeBooks == nil {
+		h.writeServiceError(w, r, http.StatusServiceUnavailable, "INTAKE_BOOK_READER_UNAVAILABLE", "小说正文查询暂不可用", "intake", "get_book", nil)
+		return
+	}
+	intakeID, err := parsePositiveID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	bookID, err := parsePositiveID(r.PathValue("bookId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	book, err := h.deps.IntakeBooks.GetBook(r.Context(), intakeID, bookID)
+	if errors.Is(err, intake.ErrNotFound) {
+		h.writeServiceError(w, r, http.StatusNotFound, "INTAKE_BOOK_NOT_FOUND", "小说不存在", "intake", "get_book", err)
+		return
+	}
+	if err != nil {
+		h.writeServiceError(w, r, http.StatusInternalServerError, "INTAKE_BOOK_READ_FAILED", "读取小说正文失败", "intake", "get_book", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"book": toBookDetailResponse(book)})
+}
+
+func (h handler) retryIntakeBook(w http.ResponseWriter, r *http.Request) {
+	if h.deps.IntakeRetry == nil {
+		h.writeServiceError(w, r, http.StatusServiceUnavailable, "INTAKE_RETRY_UNAVAILABLE", "小说失败重试暂不可用", "intake", "retry_book", nil)
+		return
+	}
+	intakeID, err := parsePositiveID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	bookID, err := parsePositiveID(r.PathValue("bookId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	request := executeRequest{MaxText: 4000}
+	if r.ContentLength != 0 {
+		if err := decodeJSON(w, r, &request); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	if request.MaxText < 100 || request.MaxText > 100000 {
+		writeError(w, http.StatusBadRequest, "maxText 必须在 100–100000 之间")
+		return
+	}
+	book, summary, err := h.deps.IntakeRetry.RetryBook(r.Context(), intakeID, bookID, request.MaxText)
+	switch {
+	case errors.Is(err, intake.ErrNotFound):
+		h.writeServiceError(w, r, http.StatusNotFound, "INTAKE_BOOK_NOT_FOUND", "小说不存在", "intake", "retry_book", err)
+		return
+	case errors.Is(err, intake.ErrBookNotRetryable):
+		h.writeServiceError(w, r, http.StatusConflict, "INTAKE_BOOK_NOT_RETRYABLE", "该小说当前不需要重试", "intake", "retry_book", err)
+		return
+	case err != nil:
+		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "INTAKE_RETRY_FAILED", "小说重试仍然失败，可稍后再次重试", "intake", "retry_book", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"book": toBookResponses([]intake.Book{book})[0], "summary": summary})
 }
 
 func (h handler) createBatchProject(w http.ResponseWriter, r *http.Request) {
@@ -293,4 +398,11 @@ func toBookResponses(rows []intake.Book) []bookResponse {
 		})
 	}
 	return result
+}
+
+func toBookDetailResponse(value intake.Book) bookDetailResponse {
+	return bookDetailResponse{
+		bookResponse:  toBookResponses([]intake.Book{value})[0],
+		OriginalText: value.OriginalText,
+	}
 }
