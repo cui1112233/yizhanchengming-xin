@@ -393,7 +393,7 @@ export default function BatchProjectListPage() {
         render: (_, row) => (
           <Space>
             <Button type="primary" onClick={() => setWorkbenchBook(row)}>剧本工作台</Button>
-            <Button onClick={() => void runOne(row.bookId)}>快速执行</Button>
+            <Button onClick={() => void runOne(row.bookId)}>单本执行</Button>
           </Space>
         ),
       },
