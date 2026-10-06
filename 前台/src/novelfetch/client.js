@@ -12,14 +12,17 @@ export function createNovelFetchClient(request = requestJSON, prefix = '/api/v1/
         body: JSON.stringify(runAt ? { runAt } : {}),
       })
     },
-    runBooks(runId) {
-      return request(path(`/runs/${encodeURIComponent(runId)}/books`))
+    getRun(runId) {
+      return request(path(`/runs/${encodeURIComponent(runId)}`))
     },
     retryBook(runId, bookKey) {
       return request(path(`/runs/${encodeURIComponent(runId)}/books/${encodeURIComponent(bookKey)}/retry`), { method: 'POST' })
     },
     records(runId) {
       return request(path(`/runs/${encodeURIComponent(runId)}/records`))
+    },
+    history() {
+      return request(path('/history'))
     },
     handoff(runId) {
       return request(path(`/runs/${encodeURIComponent(runId)}/handoff`), { method: 'POST' })
@@ -40,8 +43,16 @@ export function createNovelFetchClient(request = requestJSON, prefix = '/api/v1/
       const suffix = kind ? `?kind=${encodeURIComponent(kind)}` : ''
       return request(path(`/knowledge${suffix}`))
     },
-    upsertKnowledge(item) {
-      return request(path(`/knowledge/${encodeURIComponent(item.id || 'new')}`), {
+    createKnowledge(item) {
+      const { id: _id, ...payload } = item || {}
+      return request(path('/knowledge'), {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+    },
+    updateKnowledge(item) {
+      if (!item?.id) throw new Error('知识条目 ID 不能为空')
+      return request(path(`/knowledge/${encodeURIComponent(item.id)}`), {
         method: 'PUT',
         body: JSON.stringify(item),
       })
