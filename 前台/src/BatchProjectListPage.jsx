@@ -389,7 +389,7 @@ export default function BatchProjectListPage() {
           const latest = attempts.length > 0 ? attempts[attempts.length - 1] : null
           const status = latest?.status || video.status || 'queued'
           const errorMessage = latest?.errorMessage || video.errorMessage || ''
-          const outputURL = latest?.outputURL || video.outputURL || ''
+          const outputUrl = latest?.outputUrl || video.outputUrl || ''
           return (
             <Space direction="vertical" size={4}>
               <Typography.Text>{video.provider || '-'}</Typography.Text>
@@ -397,7 +397,7 @@ export default function BatchProjectListPage() {
               <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>
               <Typography.Text type="secondary">尝试 {attempts.length} 次</Typography.Text>
               {errorMessage && <Typography.Text type="danger">{errorMessage}</Typography.Text>}
-              {outputURL && <Button type="link" size="small" href={outputURL} target="_blank" rel="noreferrer">查看视频</Button>}
+              {outputUrl && <Button type="link" size="small" href={outputUrl} target="_blank" rel="noreferrer">查看视频</Button>}
               {(status === 'failed' || status === 'cancelled') && latest?.id && (
                 <Button size="small" danger onClick={() => void retryVideo(row.bookId, latest.id)}>重试 VIDEO</Button>
               )}
