@@ -16,6 +16,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/sharedplatform"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
@@ -34,6 +35,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	pipelineService := pipeline.NewService(store, now)
 	generationStore := generation.NewMySQLStore(db)
 	settingsStore := unifiedsettings.NewMySQLStore(db)
+	intakeAccessStore := sharedplatform.NewMySQLIntakeAccessStore(db)
 
 	var textProvider generation.Provider = generation.UnavailableProvider{}
 	if baseURL, key, model := os.Getenv("QIANTIE_TEXT_API_BASE_URL"), os.Getenv("QIANTIE_TEXT_API_KEY"), os.Getenv("QIANTIE_TEXT_MODEL"); baseURL != "" && key != "" && model != "" {
@@ -111,6 +113,9 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,
 		Reader:                      store,
+		IntakeBooks:                 store,
+		IntakeRetry:                 intakeService,
+		IntakeAccess:                intakeAccessStore,
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,
 		BatchProjectDetails:         store,
