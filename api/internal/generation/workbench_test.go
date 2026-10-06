@@ -2,7 +2,9 @@ package generation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -97,5 +99,89 @@ func TestRetryScriptReusesWorkbenchSnapshot(t *testing.T) {
 	if err != nil { t.Fatalf("retry: %v", err) }
 	if len(provider.calls) < 2 || !strings.Contains(provider.calls[1].UserPrompt, "编辑后的原文") || !strings.Contains(provider.calls[1].UserPrompt, "【开头模式】分段开头") {
 		t.Fatalf("retry did not preserve workbench input: %#v", provider.calls)
+	}
+}
+
+
+func TestWorkbenchResultSeparatesEditableOutputFromCompiledPrompt(t *testing.T) {
+	service, store, provider := serviceFixture()
+	scriptOutput := "开场说明\n### 分镜一\n00:00-00:03 | 推门\n\n---\n\n### 分镜二\n00:00-00:02 | 回头\n收束说明"
+	hookOutput := "HOOK"
+	directorOutput := "{\"cards\":[{\"shot\":\"推门\"}]}"
+	provider.responses = []string{scriptOutput, hookOutput, directorOutput}
+
+	result, err := service.RunBook(context.Background(), RunBookRequest{
+		BatchProjectID: 3, BookID: 11, Workbench: true, Force: true,
+		Action: WorkbenchActionGenerate, SourceText: "林夏推开病房门。",
+		OpeningMode: OpeningHook, OutputMode: OutputCanvas, DirectorMode: DirectorNormal,
+		Constraints: ScriptConstraints{VisualPrefix: "写实电影感", NegativePrompt: "不要水印"},
+	})
+	if err != nil { t.Fatalf("generate: %v", err) }
+	if result.EditableOutput != scriptOutput {
+		t.Fatalf("editable output must be SCRIPT exactly, got: %s", result.EditableOutput)
+	}
+	finalPrompt := store.prompts[PromptFinal]
+	wantCompiled := service.compiler.Compile(FinalPromptInput{
+		SystemPreset: finalPrompt.Content,
+		Script: scriptOutput,
+		Hook: hookOutput,
+		Director: directorOutput,
+		ProcessingRules: "画面前缀：写实电影感\n负面提示词：不要水印",
+	})
+	if result.CompiledPrompt != wantCompiled {
+		t.Fatalf("compiled prompt mismatch\nwant: %s\n got: %s", wantCompiled, result.CompiledPrompt)
+	}
+	if result.EditableOutput == result.CompiledPrompt || strings.Contains(result.EditableOutput, "SYSTEM PRESET:") {
+		t.Fatalf("editable output leaked compiler envelope: %s", result.EditableOutput)
+	}
+
+	summary, err := service.BookSummary(context.Background(), 3, 11)
+	if err != nil { t.Fatal(err) }
+	if len(summary.History) != 1 || summary.History[0].EditableOutput != scriptOutput || summary.History[0].CompiledPrompt != wantCompiled {
+		t.Fatalf("history output contract mismatch: %#v", summary.History)
+	}
+}
+
+func TestDirectorRetryPreservesWorkbenchSnapshot(t *testing.T) {
+	service, _, provider := serviceFixture()
+	provider.responses = []string{"SCRIPT", "HOOK", ""}
+	provider.errors[2] = errors.New("director temporary failure")
+
+	_, err := service.RunBook(context.Background(), RunBookRequest{
+		BatchProjectID: 3, BookID: 11, Workbench: true, Force: true,
+		Action: WorkbenchActionGenerate, SourceText: "林夏推开病房门。",
+		OpeningMode: OpeningHook, OutputMode: OutputShotlist, DirectorMode: DirectorNormal,
+		Characters: []ScriptEntity{{Name: "林夏", Description: "记者", Protagonist: true, ReferenceImages: []string{"https://example.invalid/ref.jpg"}}},
+		Scenes: []ScriptEntity{{Name: "病房", Description: "夜间病房"}},
+		Constraints: ScriptConstraints{VisualPrefix: "写实", Quality: "电影光影", PictureLimit: "不加字幕", NegativePrompt: "不要水印"},
+		RequestID: "director-fail",
+	})
+	if err == nil { t.Fatal("expected director failure") }
+	if len(provider.calls) != 3 { t.Fatalf("initial calls = %d", len(provider.calls)) }
+
+	var first map[string]any
+	if err := json.Unmarshal([]byte(provider.calls[2].UserPrompt), &first); err != nil {
+		t.Fatalf("decode first director payload: %v", err)
+	}
+
+	delete(provider.errors, 2)
+	provider.responses = append(provider.responses, "{\"cards\":[]}")
+	_, err = service.RetryStage(context.Background(), RetryStageRequest{
+		BatchProjectID: 3, BookID: 11, Stage: StageDirector, RequestID: "director-retry",
+	})
+	if err != nil { t.Fatalf("retry director: %v", err) }
+	if len(provider.calls) != 4 { t.Fatalf("retry calls = %d", len(provider.calls)) }
+
+	var retried map[string]any
+	if err := json.Unmarshal([]byte(provider.calls[3].UserPrompt), &retried); err != nil {
+		t.Fatalf("decode retried director payload: %v", err)
+	}
+	for _, key := range []string{"openingMode", "outputMode", "characters", "scenes", "constraints"} {
+		if !reflect.DeepEqual(first[key], retried[key]) {
+			t.Fatalf("director retry changed %s\nfirst=%#v\nretry=%#v", key, first[key], retried[key])
+		}
+	}
+	if retried["script"] != "SCRIPT" || retried["hook"] != "HOOK" {
+		t.Fatalf("retry lost upstream outputs: %#v", retried)
 	}
 }
