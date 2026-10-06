@@ -169,6 +169,10 @@ export function createIntake(input) {
   })
 }
 
+export function listIntakes() {
+  return requestJSON(`${API_PREFIX}/intakes`)
+}
+
 export function executeIntake(intakeId, maxText) {
   return requestJSON(`${API_PREFIX}/intakes/${intakeId}/execute`, {
     method: 'POST',
@@ -178,6 +182,17 @@ export function executeIntake(intakeId, maxText) {
 
 export function listBooks(intakeId) {
   return requestJSON(`${API_PREFIX}/intakes/${intakeId}/books`)
+}
+
+export function getIntakeBook(intakeId, bookId) {
+  return requestJSON(`${API_PREFIX}/intakes/${encodeURIComponent(intakeId)}/books/${encodeURIComponent(bookId)}`)
+}
+
+export function retryIntakeBook(intakeId, bookId, maxText = 4000) {
+  return requestJSON(`${API_PREFIX}/intakes/${encodeURIComponent(intakeId)}/books/${encodeURIComponent(bookId)}/retry`, {
+    method: 'POST',
+    body: JSON.stringify({ maxText }),
+  })
 }
 
 export function createBatchProject(intakeId, input) {
