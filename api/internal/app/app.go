@@ -16,6 +16,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
@@ -45,6 +46,12 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Production: map[string]any{"productionMode": "original", "aiCopyEnabled": false, "aiCopyCount": float64(1)},
 		Publishing: map[string]any{"uploadVideoType": "merged", "materialReuse": false},
 	}}, settingsStore)
+
+	// Shuihuo B1 owns only Project/Segment facts. Smart segmentation consumes the
+	// already-wired shared text provider and therefore does not introduce any
+	// Shuihuo-private model catalog, provider registry or credential store.
+	shuihuoStore := shuihuo.NewMySQLStore(db)
+	shuihuoService := shuihuo.NewService(shuihuoStore, newShuihuoSmartSegmenter(textProvider))
 
 	var authService httpapi.AuthService
 	if authEnabled {
@@ -114,6 +121,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,
 		BatchProjectDetails:         store,
+		Shuihuo:                     shuihuoService,
 		Generation:                  observedGeneration,
 		UnifiedSettings:             settingsService,
 		Auth:                        authService,
