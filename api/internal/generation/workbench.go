@@ -182,7 +182,7 @@ func buildScriptWorkbenchUserPrompt(req RunBookRequest, source string) string {
 	if constraints := workbenchConstraintText(req.Constraints); constraints != "" {
 		sections = append(sections, "【本次约束】\n"+constraints)
 	}
-	sections = append(sections, "只输出最终可编辑成品，不复述分析过程。人物、场景、参考图仅作为一致性事实；主角标记只影响镜头关注优先级，不允许把未出场主角强行写入剧情。")
+	sections = append(sections, "只输出最终可编辑成品，不复述分析过程。人物与场景仅作为一致性事实；referenceImages 当前只是文本 URL 元数据，文本 Provider 不读取图片像素，不能视为图片理解输入。主角标记只影响镜头关注优先级，不允许把未出场主角强行写入剧情。")
 	return strings.Join(sections, "\n\n")
 }
 
