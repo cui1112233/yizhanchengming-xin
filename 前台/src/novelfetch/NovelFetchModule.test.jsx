@@ -93,7 +93,7 @@ describe('NovelFetchModule', () => {
     await screen.findByText(/Run：r1/)
 
     fireEvent.change(screen.getByPlaceholderText('发布账号 ID'), { target: { value: '5' } })
-    fireEvent.click(screen.getByRole('button', { name: '提交网络' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '提交网络' })[0])
     await waitFor(() => expect(client.submitIntent).toHaveBeenCalledWith('r1', '4_1001', { version: 'original', publishingAccountId: 5 }))
 
     fireEvent.click(screen.getByRole('button', { name: '转入批量工厂' }))
