@@ -34,6 +34,7 @@ func newMemoryStore() *memoryStore {
 }
 func (m *memoryStore) CreateBatch(_ context.Context, value Batch) (Batch,error){m.mu.Lock();defer m.mu.Unlock();m.batches[value.ID]=value;if m.books[value.ID]==nil{m.books[value.ID]=map[string]Book{}};return value,nil}
 func (m *memoryStore) GetBatch(_ context.Context,id string)(Batch,error){m.mu.Lock();defer m.mu.Unlock();v,ok:=m.batches[id];if !ok{return Batch{},ErrNotFound};return v,nil}
+func (m *memoryStore) ListBatches(context.Context)([]Batch,error){m.mu.Lock();defer m.mu.Unlock();out:=make([]Batch,0,len(m.batches));for _,v:=range m.batches{out=append(out,v)};return out,nil}
 func (m *memoryStore) PutBook(_ context.Context,v Book)error{m.mu.Lock();defer m.mu.Unlock();if m.books[v.BatchID]==nil{m.books[v.BatchID]=map[string]Book{}};m.books[v.BatchID][v.Key]=v;return nil}
 func (m *memoryStore) UpdateBook(ctx context.Context,v Book)error{return m.PutBook(ctx,v)}
 func (m *memoryStore) GetBook(_ context.Context,batchID,key string)(Book,error){m.mu.Lock();defer m.mu.Unlock();v,ok:=m.books[batchID][key];if !ok{return Book{},ErrNotFound};return v,nil}
@@ -41,6 +42,7 @@ func (m *memoryStore) ListBooks(_ context.Context,batchID string)([]Book,error){
 func (m *memoryStore) CreateRun(_ context.Context,v Run)(Run,error){m.mu.Lock();defer m.mu.Unlock();m.runs[v.ID]=v;return v,nil}
 func (m *memoryStore) UpdateRun(_ context.Context,v Run)error{m.mu.Lock();defer m.mu.Unlock();m.runs[v.ID]=v;return nil}
 func (m *memoryStore) GetRun(_ context.Context,id string)(Run,error){m.mu.Lock();defer m.mu.Unlock();v,ok:=m.runs[id];if !ok{return Run{},ErrNotFound};return v,nil}
+func (m *memoryStore) ListRuns(_ context.Context,batchID string)([]Run,error){m.mu.Lock();defer m.mu.Unlock();out:=[]Run{};for _,v:=range m.runs{if batchID==""||v.BatchID==batchID{out=append(out,v)}};return out,nil}
 func (m *memoryStore) AppendRecord(_ context.Context,v Record)error{m.mu.Lock();defer m.mu.Unlock();m.records[v.RunID]=append(m.records[v.RunID],v);return nil}
 func (m *memoryStore) ListRecords(_ context.Context,id string)([]Record,error){m.mu.Lock();defer m.mu.Unlock();return append([]Record(nil),m.records[id]...),nil}
 func (m *memoryStore) GetConfig(context.Context)(Config,error){m.mu.Lock();defer m.mu.Unlock();return m.config,nil}
@@ -55,8 +57,9 @@ func (f *fakeFetcher) Fetch(context.Context,FetchRequest)(FetchResult,error){f.c
 type flakyModel struct{mu sync.Mutex; calls map[string]int; failVersion string}
 func (m *flakyModel) Rewrite(_ context.Context,req RewriteRequest)(string,error){m.mu.Lock();defer m.mu.Unlock();if m.calls==nil{m.calls=map[string]int{}};m.calls[req.Version]++;if req.Version==m.failVersion&&m.calls[req.Version]==1{return "",errors.New("temporary model failure")};return req.Version+"::"+req.Profile+"::"+req.Book.ProcessedText,nil}
 
-type fakeDispatcher struct{items []RunDispatch; err error}
-func (d *fakeDispatcher) EnqueueRun(_ context.Context,item RunDispatch)error{d.items=append(d.items,item);return d.err}
+type fakeDispatcher struct{runs []RunDispatch; retries []RetryDispatch; err error}
+func (d *fakeDispatcher) EnqueueRun(_ context.Context,item RunDispatch)error{d.runs=append(d.runs,item);return d.err}
+func (d *fakeDispatcher) EnqueueBookRetry(_ context.Context,item RetryDispatch)error{d.retries=append(d.retries,item);return d.err}
 
 type fakeHandoff struct{calls int}
 func (f *fakeHandoff) CreateFromNovelFetch(_ context.Context,request HandoffRequest)(HandoffResult,error){f.calls++;if len(request.Books)==0{return HandoffResult{},errors.New("books required")};return HandoffResult{BatchProjectID:99},nil}
@@ -91,12 +94,11 @@ func TestFullOriginalIsPreservedWhileProcessingUsesMaxTextAndRules(t *testing.T)
 	book,err:=store.GetBook(context.Background(),batch.ID,"4_1001");if err!=nil{t.Fatal(err)}
 	if book.OriginalRaw!="第一章\n敏感内容ABCDEF\n后文保留XYZ"{t.Fatalf("raw changed: %q",book.OriginalRaw)}
 	if book.OriginalChars<=book.ProcessedChars{t.Fatalf("expected processed truncation: raw=%d processed=%d",book.OriginalChars,book.ProcessedChars)}
-	if book.ProcessedText=="book.OriginalRaw"{t.Fatal("processed text must be independent")}
 	if book.Versions["original"]!=book.ProcessedText{t.Fatalf("original version must use processed text")}
 	if fetcher.calls!=1{t.Fatalf("fetch calls=%d",fetcher.calls)}
 }
 
-func TestPartialRewriteRetryDoesNotRefetchSuccessfulOriginalOrVersion(t *testing.T){
+func TestPartialRewriteRetryIsScheduledThenWorkerRecomputesRunWithoutRefetch(t *testing.T){
 	store:=newMemoryStore()
 	fetcher:=&fakeFetcher{result:FetchResult{OriginalRaw:"正文足够长1234567890"}}
 	model:=&flakyModel{calls:map[string]int{},failVersion:"ai2"}
@@ -107,16 +109,28 @@ func TestPartialRewriteRetryDoesNotRefetchSuccessfulOriginalOrVersion(t *testing
 	run,err=service.ExecuteRun(context.Background(),run.ID);if err!=nil{t.Fatal(err)}
 	book,_:=store.GetBook(context.Background(),batch.ID,"4_1")
 	if book.Status!=StatusPartialFailed{t.Fatalf("book status=%s",book.Status)}
-	if model.calls["ai1"]!=1||model.calls["ai2"]!=1{t.Fatalf("calls=%v",model.calls)}
-	book,err=service.RetryBook(context.Background(),run.ID,"4_1");if err!=nil{t.Fatal(err)}
-	if book.Status!=StatusSucceeded{t.Fatalf("book status=%s error=%s",book.Status,book.Error)}
+
+	queuedRun,queuedBook,err:=service.RetryBook(context.Background(),run.ID,"4_1");if err!=nil{t.Fatal(err)}
+	if queuedRun.Status!=StatusQueued||queuedBook.Status!=StatusQueued{t.Fatalf("queued run=%s book=%s",queuedRun.Status,queuedBook.Status)}
+	if len(dispatcher.retries)!=1{t.Fatalf("retry dispatches=%d",len(dispatcher.retries))}
+	if model.calls["ai2"]!=1{t.Fatalf("HTTP scheduling must not execute model: %v",model.calls)}
+
+	finalRun,book,err:=service.ExecuteBookRetry(context.Background(),run.ID,"4_1");if err!=nil{t.Fatal(err)}
+	if finalRun.Status!=StatusSucceeded||book.Status!=StatusSucceeded{t.Fatalf("run=%s book=%s",finalRun.Status,book.Status)}
 	if fetcher.calls!=1{t.Fatalf("fetch repeated: %d",fetcher.calls)}
 	if model.calls["ai1"]!=1{t.Fatalf("successful ai1 repeated: %d",model.calls["ai1"])}
 	if model.calls["ai2"]!=2{t.Fatalf("failed ai2 not retried: %d",model.calls["ai2"])}
-	records,_:=service.Records(context.Background(),run.ID)
-	attempts:=0
-	for _,record:=range records{if record.Stage=="rewrite:ai2"{attempts++}}
-	if attempts!=2{t.Fatalf("ai2 records=%d",attempts)}
+}
+
+func TestSecondRunForSameBatchIsExplicitlyRejected(t *testing.T){
+	store:=newMemoryStore();dispatcher:=&fakeDispatcher{}
+	service:=NewService(Options{Store:store,Dispatcher:dispatcher,Now:fixedNow})
+	batch,_,_:=service.CreateBatch(context.Background(),CreateBatchInput{Groups:[]GroupInput{{Source:"阳光",PlatformID:"4",Books:[]BookInput{{BookID:"1"}}}}})
+	first,err:=service.StartRun(context.Background(),batch.ID,time.Time{});if err!=nil{t.Fatal(err)}
+	store.config.TextModelID="different-model"
+	if _,err:=service.StartRun(context.Background(),batch.ID,time.Time{});!errors.Is(err,ErrMultipleRunsUnsupported){t.Fatalf("err=%v",err)}
+	stored,_:=store.GetRun(context.Background(),first.ID)
+	if stored.ConfigSnapshot.TextModelID!="text-model-1"{t.Fatalf("first snapshot mutated: %s",stored.ConfigSnapshot.TextModelID)}
 }
 
 func TestScheduledRunOnlyEnqueuesAndRejectsEarlyExecution(t *testing.T){
@@ -126,8 +140,24 @@ func TestScheduledRunOnlyEnqueuesAndRejectsEarlyExecution(t *testing.T){
 	when:=fixedNow().Add(time.Hour)
 	run,err:=service.StartRun(context.Background(),batch.ID,when);if err!=nil{t.Fatal(err)}
 	if run.Status!=StatusScheduled{t.Fatalf("status=%s",run.Status)}
-	if len(dispatcher.items)!=1||!dispatcher.items[0].AvailableAt.Equal(when){t.Fatalf("dispatch=%+v",dispatcher.items)}
+	if len(dispatcher.runs)!=1||!dispatcher.runs[0].AvailableAt.Equal(when){t.Fatalf("dispatch=%+v",dispatcher.runs)}
 	if _,err:=service.ExecuteRun(context.Background(),run.ID);!errors.Is(err,ErrNotDue){t.Fatalf("err=%v",err)}
+}
+
+func TestSensitiveReplacementPriorityIsLongestThenLexicalAndNonCascading(t *testing.T){
+	cfg:=Config{MaxText:100,SensitiveReplacements:map[string]string{"敏感词":"X","敏感":"Y","X":"Z"}}
+	got:=applyRules("敏感词敏感X",normalizeConfig(cfg))
+	if got!="XYZ"{t.Fatalf("got=%q want XYZ",got)}
+	for i:=0;i<100;i++{if next:=applyRules("敏感词敏感X",normalizeConfig(cfg));next!=got{t.Fatalf("nondeterministic %q vs %q",next,got)}}
+}
+
+func TestHistoryReturnsStoredRunAndBatch(t *testing.T){
+	store:=newMemoryStore();dispatcher:=&fakeDispatcher{}
+	service:=NewService(Options{Store:store,Dispatcher:dispatcher,Now:fixedNow})
+	batch,_,_:=service.CreateBatch(context.Background(),CreateBatchInput{Name:"history",Groups:[]GroupInput{{Source:"阳光",PlatformID:"4",Books:[]BookInput{{BookID:"1"}}}}})
+	run,err:=service.StartRun(context.Background(),batch.ID,time.Time{});if err!=nil{t.Fatal(err)}
+	items,err:=service.History(context.Background());if err!=nil{t.Fatal(err)}
+	if len(items)!=1||items[0].Run.ID!=run.ID||items[0].Batch.Name!="history"{t.Fatalf("history=%+v",items)}
 }
 
 func TestNetworkSubmitCreatesIntentOnlyAndHandoffUsesBoundary(t *testing.T){
