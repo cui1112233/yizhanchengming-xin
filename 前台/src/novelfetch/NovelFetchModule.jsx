@@ -18,6 +18,7 @@ import {
   Typography,
 } from 'antd'
 import { novelFetchClient } from './client.js'
+import { formatSensitiveReplacementLines, parseChapterPrefixLines, parseSensitiveReplacementLines } from './state.js'
 
 const { TextArea } = Input
 
@@ -36,6 +37,8 @@ const defaultConfig = {
   dropBlankLines: true,
 }
 
+const emptyKnowledge = { id: '', kind: 'rewrite', title: '', content: '', enabled: true }
+
 function errorText(error) {
   const message = error instanceof Error ? error.message : String(error || '操作失败')
   return /(password|token|authorization|cookie|secret|dsn|mysql:\/\/)/i.test(message)
@@ -47,7 +50,7 @@ function statusTag(status) {
   const value = String(status || 'pending')
   const color = value === 'succeeded' ? 'success'
     : value.includes('failed') ? 'error'
-      : value === 'scheduled' ? 'processing'
+      : value === 'scheduled' || value === 'queued' ? 'processing'
         : value === 'blocked' ? 'warning'
           : 'default'
   return <Tag color={color}>{value}</Tag>
@@ -68,25 +71,34 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
   const [feedback, setFeedback] = useState(null)
   const [config, setConfig] = useState(defaultConfig)
   const [knowledge, setKnowledge] = useState([])
-  const [knowledgeDraft, setKnowledgeDraft] = useState({ kind: 'rewrite', title: '', content: '', enabled: true })
+  const [knowledgeDraft, setKnowledgeDraft] = useState(emptyKnowledge)
   const [ruleInput, setRuleInput] = useState('')
   const [ruleOutput, setRuleOutput] = useState('')
   const [records, setRecords] = useState([])
+  const [history, setHistory] = useState([])
   const [publishingAccountId, setPublishingAccountId] = useState('')
   const [submitVersion, setSubmitVersion] = useState('original')
 
   const totalBooks = useMemo(() => groups.reduce((sum, group) => sum + group.books.length, 0), [groups])
 
+  const loadHistory = async () => {
+    const payload = await client.history()
+    const items = payload?.items || []
+    setHistory(items)
+    return items
+  }
+
   useEffect(() => {
     let active = true
-    Promise.all([client.getConfig(), client.listKnowledge()])
-      .then(([configPayload, knowledgePayload]) => {
+    Promise.all([client.getConfig(), client.listKnowledge(), client.history()])
+      .then(([configPayload, knowledgePayload, historyPayload]) => {
         if (!active) return
         setConfig({ ...defaultConfig, ...(configPayload?.config || {}) })
         setKnowledge(knowledgePayload?.items || [])
+        setHistory(historyPayload?.items || [])
       })
       .catch((error) => {
-        if (active) setFeedback({ type: 'warning', message: `共享配置尚未接通：${errorText(error)}` })
+        if (active) setFeedback({ type: 'warning', message: `共享配置/历史尚未接通：${errorText(error)}` })
       })
     return () => { active = false }
   }, [client])
@@ -128,18 +140,13 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
     }
     setWorking(true)
     try {
-      const created = await client.createBatch({
-        name: batchName.trim() || '小说获取批次',
-        groups,
-      })
+      const created = await client.createBatch({ name: batchName.trim() || '小说获取批次', groups })
       setBatch(created.batch)
       setBooks(created.books || [])
       const started = await client.startRun(created.batch.id, iso)
       setRun(started.run)
-      setFeedback({
-        type: 'success',
-        message: scheduled ? '定时 Run 已创建并等待统一 Runtime 派发。' : 'Run 已进入统一 Runtime 队列。',
-      })
+      await loadHistory()
+      setFeedback({ type: 'success', message: scheduled ? '定时 Run 已创建并等待统一 Runtime 派发。' : 'Run 已进入统一 Runtime 队列。' })
       setTab('tasks')
     } catch (error) {
       setFeedback({ type: 'error', message: errorText(error) })
@@ -148,10 +155,11 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
     }
   }
 
-  const refreshTasks = async () => {
-    if (!run?.id) return
+  const refreshTasks = async (runId = run?.id) => {
+    if (!runId) return
     try {
-      const payload = await client.runBooks(run.id)
+      const payload = await client.getRun(runId)
+      setRun(payload.run || null)
       setBooks(payload.books || [])
     } catch (error) {
       setFeedback({ type: 'error', message: errorText(error) })
@@ -162,13 +170,29 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
     if (!run?.id) return
     setWorking(true)
     try {
-      await client.retryBook(run.id, book.key)
-      await refreshTasks()
-      setFeedback({ type: 'success', message: `${book.title || book.bookId} 已只重试失败阶段。` })
+      const payload = await client.retryBook(run.id, book.key)
+      if (payload?.run) setRun(payload.run)
+      await refreshTasks(run.id)
+      setFeedback({ type: 'success', message: `${book.title || book.bookId} 已进入统一 Runtime 的失败阶段重试队列。` })
     } catch (error) {
       setFeedback({ type: 'error', message: errorText(error) })
     } finally {
       setWorking(false)
+    }
+  }
+
+  const restoreRun = async (item) => {
+    try {
+      const payload = await client.getRun(item.run.id)
+      setBatch(item.batch)
+      setRun(payload.run)
+      setBooks(payload.books || [])
+      const audit = await client.records(item.run.id)
+      setRecords(audit.records || [])
+      setTab('tasks')
+      setFeedback({ type: 'success', message: `已恢复历史 Run ${item.run.id} 的当前持久化状态。` })
+    } catch (error) {
+      setFeedback({ type: 'error', message: errorText(error) })
     }
   }
 
@@ -196,9 +220,9 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
     }
   }
 
-  const saveConfig = async () => {
+  const saveConfig = async (nextConfig = config) => {
     try {
-      const payload = await client.saveConfig(config)
+      const payload = await client.saveConfig(nextConfig)
       setConfig({ ...defaultConfig, ...(payload.config || {}) })
       setFeedback({ type: 'success', message: '版本与处理配置已保存。' })
     } catch (error) {
@@ -208,10 +232,32 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
 
   const saveKnowledge = async () => {
     try {
-      const payload = await client.upsertKnowledge({ ...knowledgeDraft, id: '' })
+      const payload = knowledgeDraft.id
+        ? await client.updateKnowledge(knowledgeDraft)
+        : await client.createKnowledge(knowledgeDraft)
       setKnowledge((current) => [...current.filter((item) => item.id !== payload.item.id), payload.item])
-      setKnowledgeDraft({ kind: 'rewrite', title: '', content: '', enabled: true })
-      setFeedback({ type: 'success', message: '知识条目已保存。' })
+      setKnowledgeDraft(emptyKnowledge)
+      setFeedback({ type: 'success', message: knowledgeDraft.id ? '知识条目已更新。' : '知识条目已新增。' })
+    } catch (error) {
+      setFeedback({ type: 'error', message: errorText(error) })
+    }
+  }
+
+  const toggleKnowledge = async (item) => {
+    try {
+      const payload = await client.updateKnowledge({ ...item, enabled: !item.enabled })
+      setKnowledge((current) => current.map((entry) => entry.id === item.id ? payload.item : entry))
+    } catch (error) {
+      setFeedback({ type: 'error', message: errorText(error) })
+    }
+  }
+
+  const removeKnowledge = async (item) => {
+    try {
+      await client.deleteKnowledge(item.kind, item.id)
+      setKnowledge((current) => current.filter((entry) => entry.id !== item.id))
+      if (knowledgeDraft.id === item.id) setKnowledgeDraft(emptyKnowledge)
+      setFeedback({ type: 'success', message: '知识条目已删除。' })
     } catch (error) {
       setFeedback({ type: 'error', message: errorText(error) })
     }
@@ -232,8 +278,8 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
       return
     }
     try {
-      const payload = await client.records(run.id)
-      setRecords(payload.records || [])
+      const [audit] = await Promise.all([client.records(run.id), loadHistory()])
+      setRecords(audit.records || [])
     } catch (error) {
       setFeedback({ type: 'error', message: errorText(error) })
     }
@@ -291,6 +337,7 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
             <Button loading={working} onClick={() => start(true)}>开始定时</Button>
           </Space>
           <Alert style={{ marginTop: 16 }} type="info" showIcon message="立即与定时都只进入统一 Runtime；本页面不会在浏览器里直接跑后台任务。" />
+          <Alert style={{ marginTop: 8 }} type="warning" showIcon message="在 A 提供 Run 级结果持久化结构前，同一批次只允许创建一个 Run；第二个 Run 会明确拒绝，避免结果串用。" />
         </Card>
       </Col>
     </Row>
@@ -299,13 +346,13 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
   const tasksView = (
     <Card
       title="任务中心"
-      extra={<Space><Button onClick={refreshTasks} disabled={!run?.id}>刷新</Button><Button type="primary" onClick={handoff} disabled={!run?.id}>转入批量工厂</Button></Space>}
+      extra={<Space><Button onClick={() => refreshTasks()} disabled={!run?.id}>刷新</Button><Button type="primary" onClick={handoff} disabled={!run?.id}>转入批量工厂</Button></Space>}
     >
       <Space wrap style={{ marginBottom: 12 }}>
         <span>Run：{run?.id || '-'}</span>
         {run && statusTag(run.status)}
         <Input value={publishingAccountId} onChange={(e) => setPublishingAccountId(e.target.value)} placeholder="发布账号 ID" style={{ width: 150 }} />
-        <Select value={submitVersion} onChange={setSubmitVersion} style={{ width: 130 }} options={(config.targetVersions || ['original']).map((value) => ({ value, label: value }))} />
+        <Select value={submitVersion} onChange={setSubmitVersion} style={{ width: 130 }} options={(run?.configSnapshot?.targetVersions || config.targetVersions || ['original']).map((value) => ({ value, label: value }))} />
       </Space>
       <Table rowKey="key" columns={taskColumns} dataSource={books} scroll={{ x: 1300 }} pagination={false} />
     </Card>
@@ -319,11 +366,7 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
           <Col xs={24} md={8}><Form.Item label="处理最大字数"><InputNumber min={100} max={100000} value={config.maxText} onChange={(value) => setConfig((c) => ({ ...c, maxText: value || 4000 }))} style={{ width: '100%' }} /></Form.Item></Col>
           <Col xs={24} md={8}>
             <Form.Item label="目标版本">
-              <Checkbox.Group
-                value={config.targetVersions}
-                onChange={(value) => setConfig((c) => ({ ...c, targetVersions: value }))}
-                options={['original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5']}
-              />
+              <Checkbox.Group value={config.targetVersions} onChange={(value) => setConfig((c) => ({ ...c, targetVersions: value }))} options={['original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5']} />
             </Form.Item>
           </Col>
         </Row>
@@ -331,15 +374,12 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
           {['ai1', 'ai2', 'ai3'].map((version) => (
             <Col xs={24} md={8} key={version}>
               <Form.Item label={`${version} 改文配置档`}>
-                <Input
-                  value={config.rewriteProfiles?.[version] || ''}
-                  onChange={(e) => setConfig((c) => ({ ...c, rewriteProfiles: { ...(c.rewriteProfiles || {}), [version]: e.target.value } }))}
-                />
+                <Input value={config.rewriteProfiles?.[version] || ''} onChange={(e) => setConfig((c) => ({ ...c, rewriteProfiles: { ...(c.rewriteProfiles || {}), [version]: e.target.value } }))} />
               </Form.Item>
             </Col>
           ))}
         </Row>
-        <Button type="primary" onClick={saveConfig}>保存配置</Button>
+        <Button type="primary" onClick={() => saveConfig()}>保存配置</Button>
       </Form>
     </Card>
   )
@@ -347,13 +387,16 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
   const knowledgeView = (
     <Row gutter={[16, 16]}>
       <Col xs={24} lg={10}>
-        <Card title="新增知识">
+        <Card title={knowledgeDraft.id ? '编辑知识' : '新增知识'}>
           <Form layout="vertical">
             <Form.Item label="类型"><Input value={knowledgeDraft.kind} onChange={(e) => setKnowledgeDraft((v) => ({ ...v, kind: e.target.value }))} /></Form.Item>
             <Form.Item label="标题"><Input value={knowledgeDraft.title} onChange={(e) => setKnowledgeDraft((v) => ({ ...v, title: e.target.value }))} /></Form.Item>
             <Form.Item label="内容"><TextArea rows={8} value={knowledgeDraft.content} onChange={(e) => setKnowledgeDraft((v) => ({ ...v, content: e.target.value }))} /></Form.Item>
             <Checkbox checked={knowledgeDraft.enabled} onChange={(e) => setKnowledgeDraft((v) => ({ ...v, enabled: e.target.checked }))}>启用</Checkbox>
-            <Button type="primary" onClick={saveKnowledge} style={{ marginLeft: 12 }}>保存知识</Button>
+            <Space style={{ marginLeft: 12 }}>
+              <Button type="primary" onClick={saveKnowledge}>{knowledgeDraft.id ? '保存修改' : '新增知识'}</Button>
+              {knowledgeDraft.id && <Button onClick={() => setKnowledgeDraft(emptyKnowledge)}>取消编辑</Button>}
+            </Space>
           </Form>
         </Card>
       </Col>
@@ -364,10 +407,18 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
             dataSource={knowledge}
             pagination={false}
             columns={[
-              { title: '类型', dataIndex: 'kind', width: 120 },
-              { title: '标题', dataIndex: 'title', width: 180 },
+              { title: '类型', dataIndex: 'kind', width: 100 },
+              { title: '标题', dataIndex: 'title', width: 150 },
               { title: '内容', dataIndex: 'content', ellipsis: true },
-              { title: '状态', dataIndex: 'enabled', width: 90, render: (value) => value ? <Tag color="success">启用</Tag> : <Tag>停用</Tag> },
+              { title: '状态', dataIndex: 'enabled', width: 80, render: (value) => value ? <Tag color="success">启用</Tag> : <Tag>停用</Tag> },
+              {
+                title: '操作', key: 'actions', width: 210,
+                render: (_, item) => <Space>
+                  <Button size="small" onClick={() => setKnowledgeDraft(item)}>编辑</Button>
+                  <Button size="small" onClick={() => toggleKnowledge(item)}>{item.enabled ? '停用' : '启用'}</Button>
+                  <Button size="small" danger onClick={() => removeKnowledge(item)}>删除</Button>
+                </Space>,
+              },
             ]}
           />
         </Card>
@@ -377,26 +428,73 @@ export default function NovelFetchModule({ client = novelFetchClient }) {
 
   const rulesView = (
     <Row gutter={[16, 16]}>
-      <Col span={12}><Card title="规则预览输入"><TextArea rows={16} value={ruleInput} onChange={(e) => setRuleInput(e.target.value)} /><Button type="primary" onClick={previewRules} style={{ marginTop: 12 }}>预览处理</Button></Card></Col>
-      <Col span={12}><Card title="处理结果"><TextArea rows={16} readOnly value={ruleOutput} /></Card></Col>
+      <Col xs={24} lg={10}>
+        <Card title="规则编辑">
+          <Form layout="vertical">
+            <Form.Item label="敏感词替换（每行：原词=>替换词）">
+              <TextArea
+                rows={7}
+                value={formatSensitiveReplacementLines(config.sensitiveReplacements)}
+                onChange={(e) => setConfig((c) => ({ ...c, sensitiveReplacements: parseSensitiveReplacementLines(e.target.value) }))}
+              />
+            </Form.Item>
+            <Form.Item label="章节移除前缀（每行一个）">
+              <TextArea
+                rows={5}
+                value={(config.chapterRemovePrefixes || []).join('\n')}
+                onChange={(e) => setConfig((c) => ({ ...c, chapterRemovePrefixes: parseChapterPrefixLines(e.target.value) }))}
+              />
+            </Form.Item>
+            <Space>
+              <Checkbox checked={config.trimLines} onChange={(e) => setConfig((c) => ({ ...c, trimLines: e.target.checked }))}>裁剪行首尾空白</Checkbox>
+              <Checkbox checked={config.dropBlankLines} onChange={(e) => setConfig((c) => ({ ...c, dropBlankLines: e.target.checked }))}>删除空行</Checkbox>
+            </Space>
+            <Button type="primary" onClick={() => saveConfig()} style={{ marginTop: 12 }}>保存规则</Button>
+          </Form>
+          <Alert style={{ marginTop: 12 }} type="info" showIcon message="敏感词固定优先级：最长原词优先；同长度按字典序；单次扫描，替换结果不再二次命中。" />
+        </Card>
+      </Col>
+      <Col xs={24} lg={14}>
+        <Card title="规则预览">
+          <TextArea rows={8} value={ruleInput} onChange={(e) => setRuleInput(e.target.value)} placeholder="输入待预览正文" />
+          <Button type="primary" onClick={previewRules} style={{ marginTop: 12 }}>预览处理</Button>
+          <TextArea rows={8} readOnly value={ruleOutput} style={{ marginTop: 12 }} />
+        </Card>
+      </Col>
     </Row>
   )
 
   const recordsView = (
-    <Card title="处理记录" extra={<Button onClick={loadRecords} disabled={!run?.id}>刷新记录</Button>}>
-      <Table
-        rowKey={(item) => `${item.bookKey}-${item.stage}-${item.attempt}`}
-        dataSource={records}
-        pagination={false}
-        columns={[
-          { title: 'Book', dataIndex: 'bookKey', width: 130 },
-          { title: '阶段', dataIndex: 'stage', width: 150 },
-          { title: '尝试', dataIndex: 'attempt', width: 70 },
-          { title: '状态', dataIndex: 'status', width: 120, render: statusTag },
-          { title: '错误', dataIndex: 'error' },
-        ]}
-      />
-    </Card>
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Card title="历史 Run" extra={<Button onClick={loadHistory}>刷新历史</Button>}>
+        <Table
+          rowKey={(item) => item.run.id}
+          dataSource={history}
+          pagination={false}
+          columns={[
+            { title: '批次', render: (_, item) => item.batch.name || item.batch.id },
+            { title: 'Run', render: (_, item) => item.run.id },
+            { title: '状态', render: (_, item) => statusTag(item.run.status) },
+            { title: '创建时间', render: (_, item) => item.run.createdAt ? new Date(item.run.createdAt).toLocaleString('zh-CN', { hour12: false }) : '-' },
+            { title: '操作', render: (_, item) => <Button size="small" onClick={() => restoreRun(item)}>恢复查看</Button> },
+          ]}
+        />
+      </Card>
+      <Card title="处理记录" extra={<Button onClick={loadRecords} disabled={!run?.id}>刷新记录</Button>}>
+        <Table
+          rowKey={(item) => `${item.bookKey}-${item.stage}-${item.attempt}`}
+          dataSource={records}
+          pagination={false}
+          columns={[
+            { title: 'Book', dataIndex: 'bookKey', width: 130 },
+            { title: '阶段', dataIndex: 'stage', width: 150 },
+            { title: '尝试', dataIndex: 'attempt', width: 70 },
+            { title: '状态', dataIndex: 'status', width: 120, render: statusTag },
+            { title: '错误', dataIndex: 'error' },
+          ]}
+        />
+      </Card>
+    </Space>
   )
 
   const items = [
