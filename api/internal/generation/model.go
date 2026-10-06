@@ -88,8 +88,10 @@ type EntityExtractionResult struct {
 }
 
 type GenerationHistoryEntry struct {
-	Run    BookRun            `json:"run"`
-	Latest map[Stage]StageRun `json:"latest"`
+	Run            BookRun            `json:"run"`
+	Latest         map[Stage]StageRun `json:"latest"`
+	EditableOutput string              `json:"editableOutput,omitempty"`
+	CompiledPrompt string              `json:"compiledPrompt,omitempty"`
 }
 
 const (
@@ -218,13 +220,15 @@ type RunBatchRequest struct {
 }
 
 type BookGenerationResult struct {
-	Run        BookRun                  `json:"run"`
-	Stages     []StageRun               `json:"stages"`
-	Latest     map[Stage]StageRun       `json:"latest,omitempty"`
-	SourceText string                   `json:"sourceText,omitempty"`
-	Extraction *EntityExtractionResult  `json:"extraction,omitempty"`
-	History    []GenerationHistoryEntry `json:"history,omitempty"`
-	Error      string                   `json:"error,omitempty"`
+	Run            BookRun                  `json:"run"`
+	Stages         []StageRun               `json:"stages"`
+	Latest         map[Stage]StageRun       `json:"latest,omitempty"`
+	SourceText     string                   `json:"sourceText,omitempty"`
+	EditableOutput string                   `json:"editableOutput,omitempty"`
+	CompiledPrompt string                   `json:"compiledPrompt,omitempty"`
+	Extraction     *EntityExtractionResult  `json:"extraction,omitempty"`
+	History        []GenerationHistoryEntry `json:"history,omitempty"`
+	Error          string                   `json:"error,omitempty"`
 }
 
 type BatchBookResult struct {
