@@ -41,7 +41,11 @@ func (s *Service) bookHistory(ctx context.Context, projectID, bookID int64) ([]G
 				latest[value.Stage] = value
 			}
 		}
-		out = append(out, GenerationHistoryEntry{Run: run, Latest: latest})
+		editableOutput, compiledPrompt := generationOutputs(latest)
+		out = append(out, GenerationHistoryEntry{
+			Run: run, Latest: latest,
+			EditableOutput: editableOutput, CompiledPrompt: compiledPrompt,
+		})
 	}
 	return out, nil
 }
