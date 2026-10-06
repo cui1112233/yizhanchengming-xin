@@ -1,6 +1,7 @@
 const API_PREFIX = '/api/v1'
 const REFRESH_PATH = '/api/auth/refresh'
 const AUTH_PATHS = new Set(['/api/auth/login', REFRESH_PATH, '/api/auth/logout'])
+const AUTH_SESSION_HINT_KEY = 'ycm:auth-session-seen'
 
 let refreshFlight = null
 let authFailureNotified = false
@@ -39,6 +40,36 @@ function errorFrom(response, payload) {
   })
 }
 
+function authSessionStorage() {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function hasKnownSession() {
+  return authSessionStorage()?.getItem(AUTH_SESSION_HINT_KEY) === '1'
+}
+
+function rememberKnownSession() {
+  try {
+    authSessionStorage()?.setItem(AUTH_SESSION_HINT_KEY, '1')
+  } catch {
+    // The hint is UX-only. Authentication remains server-authoritative.
+  }
+  authFailureNotified = false
+}
+
+function forgetKnownSession() {
+  try {
+    authSessionStorage()?.removeItem(AUTH_SESSION_HINT_KEY)
+  } catch {
+    // Ignore storage failures; logout remains server-authoritative.
+  }
+}
+
 function notifyUnauthenticated(error) {
   if (authFailureNotified) return
   authFailureNotified = true
@@ -61,7 +92,7 @@ async function refreshSession() {
         notifyUnauthenticated(error)
         throw error
       }
-      authFailureNotified = false
+      rememberKnownSession()
       return payload
     })().finally(() => {
       refreshFlight = null
@@ -95,25 +126,34 @@ export async function requestJSON(path, options = {}) {
 export function __resetAuthRecoveryForTests() {
   refreshFlight = null
   authFailureNotified = false
+  forgetKnownSession()
 }
 
-export function login(input) {
-  return requestJSON('/api/auth/login', {
+export async function login(input) {
+  const payload = await requestJSON('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(input),
     skipAuthRecovery: true,
   })
+  if (payload?.user) rememberKnownSession()
+  return payload
 }
 
-export function getCurrentUser() {
-  return requestJSON('/api/auth/current-user')
+export async function getCurrentUser() {
+  const payload = await requestJSON('/api/auth/current-user', {
+    skipAuthRecovery: !hasKnownSession(),
+  })
+  if (payload?.user) rememberKnownSession()
+  return payload
 }
 
-export function logout() {
-  return requestJSON('/api/auth/logout', {
+export async function logout() {
+  const payload = await requestJSON('/api/auth/logout', {
     method: 'POST',
     skipAuthRecovery: true,
   })
+  forgetKnownSession()
+  return payload
 }
 
 export function createIntake(input) {
