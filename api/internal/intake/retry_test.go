@@ -73,6 +73,18 @@ func TestRetryBookDoesNotRefetchBodyAfterClassifierFailure(t *testing.T) {
 	}
 }
 
+func TestRetryBookRejectsPendingBook(t *testing.T) {
+	base := newFakeServiceStore()
+	store := retryFakeStore{base}
+	value, _ := base.CreateIntake(context.Background(), "未执行批次")
+	book, _ := base.UpsertBook(context.Background(), Book{IntakeID: value.ID, Source: "阳光", PlatformID: "4", ExternalBookID: "3000", Status: BookStatusPending})
+	service := NewService(store, &fake121Fetcher{}, nil)
+	_, _, err := service.RetryBook(context.Background(), value.ID, book.ID, 4000)
+	if !errors.Is(err, ErrBookNotRetryable) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
 func TestRetryBookRejectsAlreadyFetchedBook(t *testing.T) {
 	base := newFakeServiceStore()
 	store := retryFakeStore{base}
