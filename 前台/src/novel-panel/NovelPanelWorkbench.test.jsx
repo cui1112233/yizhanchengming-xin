@@ -57,7 +57,7 @@ describe('NovelPanelWorkbench', () => {
     render(<NovelPanelWorkbench projectId={9} initialWorkspace={workspace()} api={client} />)
     fireEvent.click(screen.getByRole('button', { name: '保存记录与恢复' }))
     expect(await screen.findByText(/修订 1 · 初版/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '恢复' }))
+    fireEvent.click(screen.getByRole('button', { name: /恢\s*复/ }))
     expect(await screen.findByDisplayValue('历史恢复原文。')).toBeTruthy()
     client.saveWorkspace.mockRejectedValueOnce({ status: 409 })
     const input = screen.getByRole('textbox', { name: '整段小说原文' })
