@@ -79,6 +79,7 @@ type Dependencies struct {
 	BatchProjects               BatchProjectReader
 	BatchProjectDetails         BatchProjectDetailReader
 	Pipeline                    PipelineService
+	Shuihuo                     ShuihuoService
 	Generation                  GenerationService
 	UnifiedSettings             UnifiedSettingsService
 	Auth                        AuthService
@@ -129,6 +130,23 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))
+
+	// B1: ordinary Shuihuo project/source/segmentation/segment core. These routes
+	// reuse the existing browser Auth, capability and same-origin boundaries.
+	mux.Handle("GET /api/v1/shuihuo-production/projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listShuihuoProjects)))
+	mux.Handle("POST /api/v1/shuihuo-production/projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createShuihuoProject))))
+	mux.Handle("GET /api/v1/shuihuo-production/projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getShuihuoProject)))
+	mux.Handle("DELETE /api/v1/shuihuo-production/projects/{id}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.deleteShuihuoProject))))
+	mux.Handle("PUT /api/v1/shuihuo-production/projects/{id}/source", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.replaceShuihuoSource))))
+	mux.Handle("POST /api/v1/shuihuo-production/projects/{id}/segmentation/paragraphs", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.shuihuoParagraphSegmentation))))
+	mux.Handle("POST /api/v1/shuihuo-production/projects/{id}/segmentation/fixed", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.shuihuoFixedSegmentation))))
+	mux.Handle("POST /api/v1/shuihuo-production/projects/{id}/segmentation/import", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.shuihuoImportSegmentation))))
+	mux.Handle("POST /api/v1/shuihuo-production/projects/{id}/segmentation/smart", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.shuihuoSmartSegmentation))))
+	mux.Handle("POST /api/v1/shuihuo-production/projects/{id}/segmentation/confirm", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.confirmShuihuoSegmentation))))
+	mux.Handle("POST /api/v1/shuihuo-production/projects/{id}/segments", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createShuihuoSegment))))
+	mux.Handle("PUT /api/v1/shuihuo-production/segments/{id}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.updateShuihuoSegment))))
+	mux.Handle("DELETE /api/v1/shuihuo-production/segments/{id}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.deleteShuihuoSegment))))
+	mux.Handle("PUT /api/v1/shuihuo-production/projects/{id}/segments/order", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.reorderShuihuoSegments))))
 
 	// Stage 2: unified settings/version profile.
 	mux.Handle("GET /api/v1/batch-projects/{id}/settings", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getUnifiedSettings)))
