@@ -52,6 +52,7 @@ describe('AuthBoundary', () => {
     render(<AuthBoundary api={api}><div>受保护工作台</div></AuthBoundary>)
 
     expect(await screen.findByRole('button', { name: /登\s*录/ })).toBeTruthy()
+    expect(screen.queryByText('当前登录状态已过期，请重新登录。')).toBeNull()
     expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=123')
 
     fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'alice' } })
@@ -61,6 +62,20 @@ describe('AuthBoundary', () => {
     await waitFor(() => expect(api.login).toHaveBeenCalledWith({ username: 'alice', password: 'secret' }))
     expect(await screen.findByText('受保护工作台')).toBeTruthy()
     expect(`${window.location.pathname}${window.location.search}`).toBe('/batch-factory?project=123')
+  })
+
+  it('renders Forbidden for a 403 bootstrap without falling back to Login', async () => {
+    const api = {
+      getCurrentUser: vi.fn(async () => { throw Object.assign(new Error('forbidden'), { status: 403 }) }),
+      login: vi.fn(),
+    }
+
+    render(<AuthBoundary api={api}><div>受保护工作台</div></AuthBoundary>)
+
+    expect(await screen.findByText('Forbidden')).toBeTruthy()
+    expect(screen.getByText('无权限访问此页面。')).toBeTruthy()
+    expect(screen.queryByText('一战晟铭登录')).toBeNull()
+    expect(screen.queryByText('当前登录状态已过期，请重新登录。')).toBeNull()
   })
 
   it('moves to unauthenticated once when global recovery reports session expiry', async () => {
@@ -75,6 +90,7 @@ describe('AuthBoundary', () => {
     window.dispatchEvent(new CustomEvent('ycm:auth-unauthenticated'))
 
     expect(await screen.findByRole('button', { name: /登\s*录/ })).toBeTruthy()
+    expect(screen.getByText('当前登录状态已过期，请重新登录。')).toBeTruthy()
     expect(screen.queryByText('受保护工作台')).toBeNull()
   })
 })

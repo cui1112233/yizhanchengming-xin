@@ -58,7 +58,6 @@ test.describe('@video Task 14 VIDEO / Merge acceptance', () => {
   })
 
   test('@video project VIDEO outputUrl from Go response renders 查看视频 link', async ({ page }) => {
-    test.fail(true, 'TASK16-VIDEO-001 Project VIDEO status uses outputUrl but frontend reads outputURL')
     await routeBatchProjectFixtures(page, {
       generationSummary: () => makeGenerationSummary(),
       videoStatus: () => makeVideoStatus({ status: 'succeeded', outputURL: 'https://example.invalid/task16/video.mp4' }),

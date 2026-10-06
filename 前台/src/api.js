@@ -1,6 +1,8 @@
 const API_PREFIX = '/api/v1'
 const REFRESH_PATH = '/api/auth/refresh'
 const AUTH_PATHS = new Set(['/api/auth/login', REFRESH_PATH, '/api/auth/logout'])
+const AUTH_SESSION_HINT_COOKIE = 'ycm_auth_session_hint'
+const AUTH_SESSION_HINT_MAX_AGE = 30 * 24 * 60 * 60
 
 let refreshFlight = null
 let authFailureNotified = false
@@ -39,6 +41,41 @@ function errorFrom(response, payload) {
   })
 }
 
+function browserCookies() {
+  if (typeof document === 'undefined') return ''
+  try {
+    return document.cookie || ''
+  } catch {
+    return ''
+  }
+}
+
+function hasKnownSession() {
+  return browserCookies()
+    .split(';')
+    .some((cookie) => cookie.trim() === `${AUTH_SESSION_HINT_COOKIE}=1`)
+}
+
+function rememberKnownSession() {
+  if (typeof document !== 'undefined') {
+    try {
+      document.cookie = `${AUTH_SESSION_HINT_COOKIE}=1; Path=/; Max-Age=${AUTH_SESSION_HINT_MAX_AGE}; SameSite=Lax`
+    } catch {
+      // The hint is UX-only. Authentication remains server-authoritative.
+    }
+  }
+  authFailureNotified = false
+}
+
+function forgetKnownSession() {
+  if (typeof document === 'undefined') return
+  try {
+    document.cookie = `${AUTH_SESSION_HINT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
+  } catch {
+    // Ignore hint cleanup failures; logout remains server-authoritative.
+  }
+}
+
 function notifyUnauthenticated(error) {
   if (authFailureNotified) return
   authFailureNotified = true
@@ -61,7 +98,7 @@ async function refreshSession() {
         notifyUnauthenticated(error)
         throw error
       }
-      authFailureNotified = false
+      rememberKnownSession()
       return payload
     })().finally(() => {
       refreshFlight = null
@@ -95,25 +132,34 @@ export async function requestJSON(path, options = {}) {
 export function __resetAuthRecoveryForTests() {
   refreshFlight = null
   authFailureNotified = false
+  forgetKnownSession()
 }
 
-export function login(input) {
-  return requestJSON('/api/auth/login', {
+export async function login(input) {
+  const payload = await requestJSON('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(input),
     skipAuthRecovery: true,
   })
+  if (payload?.user) rememberKnownSession()
+  return payload
 }
 
-export function getCurrentUser() {
-  return requestJSON('/api/auth/current-user')
+export async function getCurrentUser() {
+  const payload = await requestJSON('/api/auth/current-user', {
+    skipAuthRecovery: !hasKnownSession(),
+  })
+  if (payload?.user) rememberKnownSession()
+  return payload
 }
 
-export function logout() {
-  return requestJSON('/api/auth/logout', {
+export async function logout() {
+  const payload = await requestJSON('/api/auth/logout', {
     method: 'POST',
     skipAuthRecovery: true,
   })
+  forgetKnownSession()
+  return payload
 }
 
 export function createIntake(input) {

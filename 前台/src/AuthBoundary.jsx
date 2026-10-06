@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Card, Form, Input, Spin, Typography } from 'antd'
+import { Alert, Button, Card, Form, Input, Result, Spin, Typography } from 'antd'
 import * as defaultApi from './api.js'
 
 export default function AuthBoundary({ children, api = defaultApi }) {
@@ -31,7 +31,14 @@ export default function AuthBoundary({ children, api = defaultApi }) {
         setError('')
         setStatus(payload?.user ? 'authenticated' : 'unauthenticated')
       })
-      .catch(() => {
+      .catch((reason) => {
+        if (!active) return
+        if (reason?.status === 403) {
+          setUser(null)
+          setError('')
+          setStatus('forbidden')
+          return
+        }
         markUnauthenticated()
       })
 
@@ -66,6 +73,14 @@ export default function AuthBoundary({ children, api = defaultApi }) {
           <Spin size="large" />
           <Typography.Paragraph style={{ marginTop: 16 }}>正在恢复登录状态…</Typography.Paragraph>
         </div>
+      </main>
+    )
+  }
+
+  if (status === 'forbidden') {
+    return (
+      <main className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <Result status="403" title="Forbidden" subTitle="无权限访问此页面。" />
       </main>
     )
   }
