@@ -256,7 +256,7 @@ func (s *Service) RetryBook(ctx context.Context, intakeID, bookID int64, maxText
 	if err != nil {
 		return Book{}, result, err
 	}
-	if book.Status == BookStatusFetched {
+	if book.Status != BookStatusRetryableFailed {
 		return book, result, ErrBookNotRetryable
 	}
 
