@@ -90,6 +90,7 @@ Migration：
 - capability：`batch.view`
 - ownership：必须通过
 - 新接口错误格式：`{ code, message, request_id }`
+- `{bookId}` 是 MySQL `books.id`（内部数值 ID），不是外部小说 Book ID；外部 ID 仍在响应字段 `bookId` 中。
 - 返回：`{ book: { ...列表字段, originalText } }`
 
 ### 单书失败重试
@@ -114,7 +115,9 @@ Migration：
 
 ## 4. B 如何接入
 
-B 不要实现第二套 MySQL Store 作为公网最小流程事实源。B 的 UI/client 可以先把“处理/任务”最小链路映射到：
+B 不要实现第二套 MySQL Store 作为公网最小流程事实源。B 最新 `前台/src/novelfetch/client.js` 仍默认请求 `/api/v1/novel-fetch`。最小完整流程不要把该 prefix 注册成第二套事实 API；B 的 UI/client 应直接从 `前台/src/api.js` 引用下列共享函数。完整 config/knowledge/history/handoff/submit-intent 能力继续留在 B 模块等待后续集成。
+
+“处理/任务”最小链路映射到：
 
 - `createIntake(...)`
 - `executeIntake(intakeId, maxText)`
