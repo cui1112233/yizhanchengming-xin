@@ -347,6 +347,17 @@ func (s *Service) DeleteKnowledge(ctx context.Context, kind, id string) error {
 	return s.store.DeleteKnowledge(ctx, strings.TrimSpace(kind), strings.TrimSpace(id))
 }
 
+func (s *Service) RunBooks(ctx context.Context, runID string) ([]Book, error) {
+	if s == nil || s.store == nil {
+		return nil, ErrRuntimeUnavailable
+	}
+	run, err := s.store.GetRun(ctx, strings.TrimSpace(runID))
+	if err != nil {
+		return nil, err
+	}
+	return s.store.ListBooks(ctx, run.BatchID)
+}
+
 func (s *Service) Records(ctx context.Context, runID string) ([]Record, error) {
 	if s == nil || s.store == nil {
 		return nil, ErrRuntimeUnavailable

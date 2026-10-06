@@ -22,6 +22,7 @@ func NewModuleHandler(service *Service) http.Handler {
 	mux.HandleFunc("POST /batches/{id}/runs", handler.startRun)
 	mux.HandleFunc("POST /runs/{id}/execute", handler.executeRun)
 	mux.HandleFunc("POST /runs/{id}/books/{bookKey}/retry", handler.retryBook)
+	mux.HandleFunc("GET /runs/{id}/books", handler.runBooks)
 	mux.HandleFunc("GET /runs/{id}/records", handler.records)
 	mux.HandleFunc("POST /runs/{id}/handoff", handler.handoff)
 	mux.HandleFunc("POST /runs/{id}/books/{bookKey}/submit-intents", handler.submitIntent)
@@ -90,6 +91,15 @@ func (h *ModuleHandler) retryBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeModuleJSON(w, http.StatusOK, map[string]any{"book": book})
+}
+
+func (h *ModuleHandler) runBooks(w http.ResponseWriter, r *http.Request) {
+	books, err := h.service.RunBooks(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeModuleError(w, err)
+		return
+	}
+	writeModuleJSON(w, http.StatusOK, map[string]any{"books": books})
 }
 
 func (h *ModuleHandler) records(w http.ResponseWriter, r *http.Request) {
