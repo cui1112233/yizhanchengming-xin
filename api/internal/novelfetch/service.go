@@ -456,11 +456,8 @@ func normalizeConfig(config Config) Config {
 }
 
 func applyRules(raw string, config Config) string {
-	text := truncateRunes(strings.ReplaceAll(raw, "
-", "
-"), config.MaxText)
-	lines := strings.Split(text, "
-")
+	text := truncateRunes(strings.ReplaceAll(raw, "\r\n", "\n"), config.MaxText)
+	lines := strings.Split(text, "\n")
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
 		if config.TrimLines {
@@ -486,8 +483,7 @@ func applyRules(raw string, config Config) string {
 		}
 		out = append(out, line)
 	}
-	return strings.Join(out, "
-")
+	return strings.Join(out, "\n")
 }
 
 func truncateRunes(value string, max int) string {
