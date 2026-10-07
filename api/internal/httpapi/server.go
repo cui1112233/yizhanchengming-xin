@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
@@ -53,6 +54,13 @@ type BatchProjectDetailReader interface {
 
 type ScriptBookEditor interface {
 	UpdateBookOriginalText(context.Context, int64, int64, string) (intake.Book, error)
+}
+type ScriptStoryboardService interface {
+	Storyboard(context.Context, int64, int64) (generation.StoryboardDocument, error)
+	SaveStoryboardCard(context.Context, int64, int64, generation.SaveStoryboardCardRequest) (generation.StoryboardDocument, error)
+	DeleteStoryboardCard(context.Context, int64, int64, int64, int) (generation.StoryboardDocument, error)
+	ReorderStoryboard(context.Context, int64, int64, []int64, int) (generation.StoryboardDocument, error)
+	RecompileStoryboard(context.Context, int64, int64, string) (generation.BookGenerationResult, error)
 }
 
 type PipelineService interface {
@@ -115,6 +123,7 @@ type Dependencies struct {
 	BatchProjects               BatchProjectReader
 	BatchProjectDetails         BatchProjectDetailReader
 	ScriptBooks                 ScriptBookEditor
+	ScriptStoryboards           ScriptStoryboardService
 	Pipeline                    PipelineService
 	Generation                  GenerationService
 	Workshop                    WorkshopService
@@ -173,6 +182,12 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))
 	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/original-text", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveScriptOriginalText))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.scriptStoryboard)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.scriptStoryboard))))
+	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards/{cardId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.scriptStoryboard))))
+	mux.Handle("DELETE /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards/{cardId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.scriptStoryboard))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/reorder", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.scriptStoryboard))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/recompile", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.scriptStoryboard))))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.getNovelPanel))))
 	mux.Handle("PUT /api/v1/batch-projects/{id}/novel-panel", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.saveNovelPanel)))))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel/history", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.listNovelPanelHistory))))

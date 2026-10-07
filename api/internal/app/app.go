@@ -128,6 +128,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		BatchProjects:               store,
 		BatchProjectDetails:         store,
 		ScriptBooks:                 store,
+		ScriptStoryboards:           generationService,
 		Generation:                  observedGeneration,
 		Workshop:                    workshopService,
 		NovelPanel:                  novelPanelService,

@@ -309,6 +309,12 @@ export function getGenerationStage(projectId, bookId, stage) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/generation/stages/${stage}`)
 }
 
+export function getScriptStoryboard(projectId, bookId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard`) }
+export function saveScriptStoryboardCard(projectId, bookId, input) { const id = input.card?.id; return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/cards${id ? `/${id}` : ''}`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) }) }
+export function deleteScriptStoryboardCard(projectId, bookId, cardId, expectedVersion) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/cards/${cardId}`, { method: 'DELETE', body: JSON.stringify({ expectedVersion }) }) }
+export function reorderScriptStoryboard(projectId, bookId, cardIds, expectedVersion) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/reorder`, { method: 'POST', body: JSON.stringify({ cardIds, expectedVersion }) }) }
+export function recompileScriptStoryboard(projectId, bookId, requestId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/recompile`, { method: 'POST', body: JSON.stringify({ requestId }) }) }
+
 export function listGenerationPrompts() {
   return requestJSON(`${API_PREFIX}/generation/prompts`)
 }
