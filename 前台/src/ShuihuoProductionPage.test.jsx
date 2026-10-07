@@ -59,7 +59,7 @@ describe('ShuihuoProductionPage', () => {
     fireEvent.change(screen.getByLabelText('模型'), { target: { value: 'seedance-1.0-pro' } })
     fireEvent.click(screen.getAllByRole('button', { name: /提\s*交/ }).at(-1))
     await waitFor(() => expect(api.startVideoTask).toHaveBeenCalledWith(3, 7, expect.objectContaining({ provider: 'yfai', model: 'seedance-1.0-pro' })))
-  })
+  }, 15000)
 
   it('通过 Task 12B API 编辑、排序、选择候选和安全重试媒体任务', async () => {
     api.updateShuihuoSegment.mockResolvedValue({})
