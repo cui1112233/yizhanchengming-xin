@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/metadata"
@@ -229,5 +230,87 @@ func TestServiceExecuteIntakeClassifierFailureIsRetryableAndDoesNotClaimSuccess(
 	books, _ := store.ListBooks(context.Background(), intake.ID)
 	if books[0].Status != BookStatusRetryableFailed || books[0].OriginalText != "正文" {
 		t.Fatalf("book = %+v", books[0])
+	}
+}
+
+
+func TestServiceExecuteIntakeRetryOnlyFailedBooksAndCompletes(t *testing.T) {
+	store := newFakeServiceStore()
+	intakeValue, _ := store.CreateIntake(context.Background(), "可重试批次")
+	_, _ = store.UpsertBook(context.Background(), Book{IntakeID: intakeValue.ID, Source: "番茄付费", PlatformID: "2", ExternalBookID: "5001", Status: BookStatusPending})
+	_, _ = store.UpsertBook(context.Background(), Book{IntakeID: intakeValue.ID, Source: "知乎付费", PlatformID: "15", ExternalBookID: "5002", Status: BookStatusPending})
+
+	fetcher := &fake121Fetcher{
+		results: map[string]provider121.Result{
+			"2:5001": {Text: "正文 A", BookInfo: provider121.BookInfo{BookName: "成功书", Category: "男生生活"}},
+		},
+		errors: map[string]error{"15:5002": errors.New("temporary upstream timeout")},
+	}
+	service := NewService(store, fetcher, nil)
+
+	first, err := service.ExecuteIntake(context.Background(), intakeValue.ID, 4000)
+	if err != nil {
+		t.Fatalf("first ExecuteIntake: %v", err)
+	}
+	if first.Status != StatusPartial || first.Fetched != 1 || first.Failed != 1 {
+		t.Fatalf("first = %+v", first)
+	}
+
+	delete(fetcher.errors, "15:5002")
+	fetcher.results["15:5002"] = provider121.Result{Text: "正文 B", BookInfo: provider121.BookInfo{BookName: "重试成功书", Category: "现代言情"}}
+
+	second, err := service.ExecuteIntake(context.Background(), intakeValue.ID, 4000)
+	if err != nil {
+		t.Fatalf("second ExecuteIntake: %v", err)
+	}
+	if second.Status != StatusCompleted || second.Fetched != 2 || second.Failed != 0 {
+		t.Fatalf("second = %+v", second)
+	}
+
+	firstBookRequests := 0
+	secondBookRequests := 0
+	for _, request := range fetcher.requests {
+		switch request.BookID {
+		case "5001":
+			firstBookRequests++
+		case "5002":
+			secondBookRequests++
+		}
+	}
+	if firstBookRequests != 1 || secondBookRequests != 2 {
+		t.Fatalf("request counts = first:%d second:%d, want 1/2", firstBookRequests, secondBookRequests)
+	}
+	books, _ := store.ListBooks(context.Background(), intakeValue.ID)
+	if books[0].Status != BookStatusFetched || books[1].Status != BookStatusFetched {
+		t.Fatalf("books after retry = %+v", books)
+	}
+}
+
+func TestServiceExecuteIntakeSanitizesSensitiveFailureBeforePersistence(t *testing.T) {
+	store := newFakeServiceStore()
+	intakeValue, _ := store.CreateIntake(context.Background(), "敏感错误批次")
+	_, _ = store.UpsertBook(context.Background(), Book{IntakeID: intakeValue.ID, Source: "番茄付费", PlatformID: "2", ExternalBookID: "6001", Status: BookStatusPending})
+	fetcher := &fake121Fetcher{
+		results: map[string]provider121.Result{},
+		errors: map[string]error{
+			"2:6001": errors.New("provider failed token=secret-123 dsn=user:pass@tcp(127.0.0.1:3306)/novels"),
+		},
+	}
+	service := NewService(store, fetcher, nil)
+
+	result, err := service.ExecuteIntake(context.Background(), intakeValue.ID, 4000)
+	if err != nil {
+		t.Fatalf("ExecuteIntake: %v", err)
+	}
+	if result.Status != StatusFailed {
+		t.Fatalf("result = %+v", result)
+	}
+	books, _ := store.ListBooks(context.Background(), intakeValue.ID)
+	message := books[0].ErrorMessage
+	if strings.Contains(message, "secret-123") || strings.Contains(message, "user:pass") {
+		t.Fatalf("sensitive error leaked into persistence: %q", message)
+	}
+	if !strings.Contains(message, "[REDACTED]") {
+		t.Fatalf("sanitized marker missing: %q", message)
 	}
 }

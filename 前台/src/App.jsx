@@ -19,6 +19,7 @@ import {
 } from 'antd'
 import { createBatchProject, createIntake, executeIntake, listBooks } from './api.js'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
+import NovelFetchPage from './NovelFetchPage.jsx'
 import StatusTag from './ui/StatusTag.jsx'
 import PageState from './ui/PageState.jsx'
 import './app.css'
@@ -91,7 +92,9 @@ export default function IntakeWorkbench() {
   }
 
   let page = <NovelIntakeWorkbench onNavigate={navigate} />
-  if (pathname === '/batch-factory') {
+  if (pathname === '/novel-fetch') {
+    page = <NovelFetchPage />
+  } else if (pathname === '/batch-factory') {
     page = <BatchProjectListPage />
   }
 

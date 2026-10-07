@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/metadata"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/provider121"
 )
 
@@ -171,7 +172,7 @@ func (s *Service) ExecuteIntake(ctx context.Context, intakeID int64, maxText int
 		})
 		if fetchErr != nil {
 			book.Status = BookStatusRetryableFailed
-			book.ErrorMessage = fetchErr.Error()
+			book.ErrorMessage = observability.SafeError(fetchErr)
 			if _, err := s.store.UpsertBook(ctx, book); err != nil {
 				return result, fmt.Errorf("记录 121 获取失败: %w", err)
 			}
@@ -207,7 +208,7 @@ func (s *Service) ExecuteIntake(ctx context.Context, intakeID int64, maxText int
 				book.Gender = resolvedGender
 				book.GenderSource = genderSource
 				book.Status = BookStatusRetryableFailed
-				book.ErrorMessage = "AI 分类失败: " + err.Error()
+				book.ErrorMessage = "AI 分类失败: " + observability.SafeError(err)
 				if _, saveErr := s.store.UpsertBook(ctx, book); saveErr != nil {
 					return result, fmt.Errorf("记录 AI 分类失败: %w", saveErr)
 				}

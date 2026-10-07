@@ -411,3 +411,26 @@
 ## 当前执行点
 
 **当前任务：Task 9 已正式完成并进入 `main`；下一阶段第一优先为 Task14 Runtime Adapter。**
+
+---
+
+# 2026-10-07 · 本轮恢复任务 2：Novel Fetch 主页面
+
+> 状态：⚠️ 仓库实现已写入 main；当前 ChatGPT 执行容器无法解析 github.com，无法取得完整工作树和依赖，因此本轮新增测试尚未在独立本地环境实际执行。没有使用 GitHub Actions 代替本地验收。
+
+已实现：
+- /novel-fetch 独立 React + Ant Design 主页面，不复用 iframe、Node 后端、/api/chat，也不使用 localStorage/sessionStorage 保存小说、任务、状态或结果。
+- 复用现有 Go intake、provider121、BatchProject；任务创建、执行、书籍结果和刷新恢复继续以现有 MySQL intakes/books/batch_projects/runs 为事实源。
+- 恢复来源 / 平台选择、一次添加多本小说和多个来源、Book ID 批量录入。
+- 页面加载时通过 GET /api/v1/intakes + GET /api/v1/intakes/{id}/books 恢复已创建任务、进度、状态、失败原因和书籍结果。
+- 失败任务使用同一 POST /api/v1/intakes/{id}/execute 链路重试；已 fetched 书籍不会重复抓取，不新建第二套任务或队列。
+- 书籍结果展示 Book ID、书名、分类、类型、男女频、风格、状态和安全错误。
+- 持久化单书 provider / AI 分类错误前使用服务端统一脱敏，避免 Token、密码、DSN 等敏感内容写入 MySQL 后再暴露到前台。
+- 403 在 Novel Fetch 页面仅显示无权限；401 继续沿用现有 AuthBoundary / session refresh 进入登录流程。
+- AI 处理配置、处理规则入口均指向 /novel-fetch-workshop。
+- 新增回归测试覆盖：刷新恢复、部分失败展示、失败重试、403 不强制退出、服务端敏感错误脱敏与重试只处理失败书。
+
+本轮未完成：
+- /novel-fetch-workshop 页面本体未迁移；本轮只提供正确跳转入口。
+- 未新增 MySQL migration：现有 00001_phase1_intake.sql 已包含本轮持久化所需 intakes/books/batch_projects/runs 字段，避免为同一事实重复建表。
+- Go test、前台 test、前台 build 仍需在能取得完整仓库与依赖的本地/独立开发环境执行后，才能按本文件“完成标准”把本轮状态从 ⚠️ 提升为已验收。

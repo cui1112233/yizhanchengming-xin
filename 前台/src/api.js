@@ -162,6 +162,10 @@ export async function logout() {
   return payload
 }
 
+export function listIntakes() {
+  return requestJSON(`${API_PREFIX}/intakes`)
+}
+
 export function createIntake(input) {
   return requestJSON(`${API_PREFIX}/intakes`, {
     method: 'POST',
