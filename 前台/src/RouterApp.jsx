@@ -10,12 +10,12 @@ import TtsPage from './TtsPage.jsx'
 import HistoryPage from './HistoryPage.jsx'
 import AccountCenterPage from './AccountCenterPage.jsx'
 import IssuesPage from './IssuesPage.jsx'
+import SettingsPage from './SettingsPage.jsx'
 import { getNovelPanel, listNovelPanelHistory, restoreNovelPanelHistory, saveNovelPanel } from './api.js'
 import './home.css'
 
 const routeFoundations = {
   '/agent': { title: 'Agent 工作区', description: '路由基础已恢复；Agent 实际业务由对应迁移任务接入。' },
-  '/settings': { title: '设置', description: '设置入口已恢复；实际设置页不属于本任务范围。' },
 }
 
 function RouteFoundation({ title, description, onNavigate }) {
@@ -71,6 +71,8 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
     page = <HistoryPage />
   } else if (pathname === '/issues') {
     page = <IssuesPage />
+  } else if (pathname === '/settings') {
+    page = <SettingsPage onTheme={onToggleTheme} />
   } else if (pathname === '/profile') {
     page = <AccountCenterPage user={currentUser} onLogout={onLogout} />
   } else if (pathname === '/member') {

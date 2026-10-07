@@ -38,7 +38,7 @@ export function UserApp() {
     >
       <AntApp>
         <AuthBoundary>
-          <RouterApp theme={theme} onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} />
+          <RouterApp theme={theme} onToggleTheme={(nextTheme) => setTheme((current) => nextTheme === 'dark' || nextTheme === 'light' ? nextTheme : (current === 'dark' ? 'light' : 'dark'))} />
         </AuthBoundary>
       </AntApp>
     </ConfigProvider>
