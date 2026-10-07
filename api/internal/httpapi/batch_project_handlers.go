@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 )
 
@@ -18,6 +19,26 @@ func (h handler) listBatchProjects(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "读取批量项目列表失败")
 		return
+	}
+	if h.deps.BatchProjectAccess != nil {
+		user, ok := authn.CurrentUser(r.Context())
+		if !ok || user.ID <= 0 {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			return
+		}
+		elevated := strings.EqualFold(user.Role, "admin") || strings.EqualFold(user.Role, "owner")
+		visible := projects[:0]
+		for _, project := range projects {
+			allowed, accessErr := h.deps.BatchProjectAccess.CanAccessBatchProject(r.Context(), project.ID, user.ID, user.TeamID, elevated)
+			if accessErr != nil {
+				h.writeServiceError(w, r, http.StatusServiceUnavailable, "AUTH_POLICY_UNAVAILABLE", "项目权限校验暂不可用", "batch_project", "list_access", accessErr)
+				return
+			}
+			if allowed {
+				visible = append(visible, project)
+			}
+		}
+		projects = visible
 	}
 	rows := make([]projectResponse, 0, len(projects))
 	for _, project := range projects {

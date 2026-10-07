@@ -40,7 +40,7 @@ describe('Task 1 首页与用户路由基础', () => {
     const actionLinks = screen.getAllByRole('link').filter((node) => expectedRoutes.includes(node.getAttribute('href')))
     expect(new Set(actionLinks.map((node) => node.getAttribute('href')))).toEqual(new Set(expectedRoutes))
     expect(screen.getByRole('heading', { name: '最近创作项目' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: /进入最近创作项目/ }).getAttribute('href')).toBe('/history')
+    expect(screen.getByText('正在读取你的最近项目…')).toBeTruthy()
   })
 
   it('用户导航保留全部基础入口、主题、设置和用户入口', () => {

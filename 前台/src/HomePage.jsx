@@ -1,5 +1,6 @@
-import React from 'react'
-import { Button, Typography } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Alert, Button, Empty, Spin, Typography } from 'antd'
+import { listBatchProjects } from './api.js'
 
 const quickActions = [
   { href: '/script', icon: '✎', title: '新建剧本项目', desc: '导入小说，生成可编辑剧本与制作素材' },
@@ -20,6 +21,17 @@ function RouteLink({ href, onNavigate, className, children, ...rest }) {
 }
 
 export default function HomePage({ onNavigate }) {
+  const [recent, setRecent] = useState({ loading: true, error: '', projects: [] })
+  const loadRecent = async () => {
+    setRecent((value) => ({ ...value, loading: true, error: '' }))
+    try {
+      const payload = await listBatchProjects()
+      setRecent({ loading: false, error: '', projects: (payload.projects || []).slice(0, 6) })
+    } catch (error) {
+      setRecent((value) => ({ ...value, loading: false, error: error?.message || '读取最近项目失败' }))
+    }
+  }
+  useEffect(() => { void loadRecent() }, [])
   return (
     <main className="home-page">
       <section className="home-video-hero" aria-labelledby="home-title">
@@ -68,14 +80,10 @@ export default function HomePage({ onNavigate }) {
           </div>
           <Button onClick={() => onNavigate('/history')}>查看全部历史记录</Button>
         </div>
-        <RouteLink href="/history" onNavigate={onNavigate} className="recent-project-entry">
-          <span className="recent-project-mark" aria-hidden="true">◫</span>
-          <span>
-            <strong>进入最近创作项目</strong>
-            <small>真实项目列表由历史/项目聚合接口接入；本任务不使用 LocalStorage 伪造业务数据。</small>
-          </span>
-          <span aria-hidden="true">→</span>
-        </RouteLink>
+        {recent.loading ? <div className="recent-project-entry"><Spin size="small" /> <span>正在读取你的最近项目…</span></div> : null}
+        {recent.error ? <Alert type="error" showIcon message={recent.error} action={<Button size="small" onClick={() => void loadRecent()}>重试</Button>} /> : null}
+        {!recent.loading && !recent.error && recent.projects.length === 0 ? <Empty description="暂无可访问的最近项目" /> : null}
+        {!recent.loading && !recent.error ? recent.projects.map((project) => <RouteLink key={project.id} href={`/shuihuo-production?projectId=${project.id}`} onNavigate={onNavigate} className="recent-project-entry"><span className="recent-project-mark" aria-hidden="true">◫</span><span><strong>{project.name || `项目 #${project.id}`}</strong><small>{project.bookCount || 0} 本小说 · {project.runStatus || '尚未执行'}</small></span><span aria-hidden="true">→</span></RouteLink>) : null}
       </section>
     </main>
   )
