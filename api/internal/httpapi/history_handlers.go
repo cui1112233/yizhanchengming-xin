@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 )
@@ -63,7 +64,7 @@ func (h handler) listWorkspaceHistory(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var projectID, bookID int64
 		var projectName, title, runStatus string
-		var updated any
+		var updated time.Time
 		if err := rows.Scan(&projectID, &bookID, &projectName, &title, &runStatus, &updated); err != nil {
 			h.writeServiceError(w, r, http.StatusInternalServerError, "HISTORY_READ_FAILED", "读取项目历史失败", "history", "scan", err)
 			return
