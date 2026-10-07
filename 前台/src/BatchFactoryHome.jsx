@@ -96,7 +96,7 @@ export default function BatchFactoryHome({ onOpenProject }) {
         <Form.Item name="projectName" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}><Input /></Form.Item>
         <Form.List name="groups">
           {(fields, { add, remove }) => <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            {fields.map((field, index) => <Card key={field.key} size="small" title={`书城分组 ${index + 1}`} extra={fields.length > 1 ? <Button type="link" danger onClick={() => remove(field.name)}>删除分组</Button> : null}>
+            {fields.map(({ key, ...field }, index) => <Card key={key} size="small" title={`书城分组 ${index + 1}`} extra={fields.length > 1 ? <Button type="link" danger onClick={() => remove(field.name)}>删除分组</Button> : null}>
               <Form.Item {...field} name={[field.name, 'source']} label="书城来源" rules={[{ required: true, message: '请选择书城来源' }]}><Select options={sourceOptions.map(({ value, label }) => ({ value, label }))} /></Form.Item>
               <Form.Item {...field} name={[field.name, 'bookIds']} label="Book ID" rules={[{ required: true, message: '请输入至少一个 Book ID' }]} extra="可用空格、逗号或换行批量录入；同组重复 ID 会自动去重。"><Input.TextArea aria-label={`Book ID 分组 ${index + 1}`} rows={3} placeholder="例如：1001, 1002\n1003" /></Form.Item>
             </Card>)}
