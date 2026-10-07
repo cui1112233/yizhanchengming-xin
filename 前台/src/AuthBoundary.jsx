@@ -118,5 +118,9 @@ export default function AuthBoundary({ children, api = defaultApi }) {
     )
   }
 
-  return React.isValidElement(children) ? React.cloneElement(children, { currentUser: user, onLogout: submitLogout }) : children
+  // Test and embedding callers may supply a DOM element. Do not leak account
+  // objects or event props onto it; only workspace components receive them.
+  return React.isValidElement(children) && typeof children.type !== 'string'
+    ? React.cloneElement(children, { currentUser: user, onLogout: submitLogout })
+    : children
 }

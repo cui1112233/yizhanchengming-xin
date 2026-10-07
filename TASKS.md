@@ -580,6 +580,7 @@
 - [x] 六个创作入口固定跳转：`/script`、`/novel-panel`、`/batch-factory`、`/shuihuo-production`、`/agent`、`/tts`。
 - [x] `/novel-fetch` 继续进入当前 main 已存在的 Novel Fetch 页面，没有用首页覆盖。
 - [x] 用户导航保留：首页、剧本生成、小说获取、小说面板、水货生产、Agent 工作区、历史、问题日志、配音、主题、设置、用户入口。
+- [x] 认证边界只向工作区 React 组件注入当前用户与安全退出回调；DOM 子元素不会收到用户对象或事件属性。
 - [x] 保持 React + Ant Design；没有恢复 Node 生产后端、`/api/chat` 或 Bearer Token。
 - [x] 仅主题允许使用 LocalStorage；本任务没有新增项目、任务、脚本或历史等业务数据的 LocalStorage 持久化。
 - [x] 没有修改 Batch Factory、Novel Fetch、Script、TTS 的实际业务实现；现有 Batch Factory / Novel Fetch 继续复用当前 main 组件。
