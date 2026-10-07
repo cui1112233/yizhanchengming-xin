@@ -165,6 +165,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("GET /readyz", api.readyz)
 	mux.Handle("GET /api/v1/diagnostics", api.requireOperationsAdmin(http.HandlerFunc(api.diagnostics)))
 	mux.Handle("GET /api/v1/issues", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIssues)))
+	mux.Handle("GET /api/v1/history", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listWorkspaceHistory)))
 	mux.Handle("GET /api/v1/workspace/settings", api.requireAuth(http.HandlerFunc(api.workspaceSettings)))
 	mux.Handle("PUT /api/v1/workspace/settings", api.requireSameOrigin(api.requireAuth(http.HandlerFunc(api.workspaceSettings))))
 

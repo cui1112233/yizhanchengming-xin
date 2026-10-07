@@ -213,6 +213,7 @@ export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
 export function listIssues(input = {}) { const query = new URLSearchParams(); for (const [key,value] of Object.entries(input)) if (value !== undefined && value !== null && value !== '') query.set(key,String(value)); return requestJSON(`${API_PREFIX}/issues${query.size ? `?${query}` : ''}`) }
+export function listWorkspaceHistory(input = {}) { const query = new URLSearchParams(); for (const [key,value] of Object.entries(input)) if (value !== undefined && value !== null && value !== '') query.set(key,String(value)); return requestJSON(`${API_PREFIX}/history${query.size ? `?${query}` : ''}`) }
 export function getWorkspaceSettings(){return requestJSON(`${API_PREFIX}/workspace/settings`)} export function saveWorkspaceSettings(settings){return requestJSON(`${API_PREFIX}/workspace/settings`,{method:'PUT',body:JSON.stringify(settings)})}
 
 export function getBatchProject(projectId) {
