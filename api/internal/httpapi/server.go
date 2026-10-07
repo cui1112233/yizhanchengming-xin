@@ -49,6 +49,10 @@ type BatchProjectDetailReader interface {
 	ListBooks(ctx context.Context, intakeID int64) ([]intake.Book, error)
 }
 
+type ScriptBookEditor interface {
+	UpdateBookOriginalText(context.Context, int64, int64, string) (intake.Book, error)
+}
+
 type PipelineService interface {
 	Create(context.Context, pipeline.CreateRequest) (pipeline.CreateResult, error)
 }
@@ -93,6 +97,7 @@ type Dependencies struct {
 	Reader                      IntakeReader
 	BatchProjects               BatchProjectReader
 	BatchProjectDetails         BatchProjectDetailReader
+	ScriptBooks                 ScriptBookEditor
 	Pipeline                    PipelineService
 	Generation                  GenerationService
 	Workshop                    WorkshopService
@@ -149,6 +154,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))
+	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/original-text", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveScriptOriginalText))))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.getNovelPanel))))
 	mux.Handle("PUT /api/v1/batch-projects/{id}/novel-panel", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.saveNovelPanel)))))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel/history", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.listNovelPanelHistory))))

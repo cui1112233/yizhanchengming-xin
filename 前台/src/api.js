@@ -274,6 +274,12 @@ export function getBookGeneration(projectId, bookId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/generation`)
 }
 
+export function saveScriptOriginalText(projectId, bookId, originalText) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/original-text`, {
+    method: 'PUT', body: JSON.stringify({ originalText }),
+  })
+}
+
 export function runBookGeneration(projectId, bookId, input) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/generation`, {
     method: 'POST',

@@ -140,6 +140,28 @@ func (s *MySQLStore) ListBooks(ctx context.Context, intakeID int64) ([]Book, err
 	return books, nil
 }
 
+// UpdateBookOriginalText keeps Script Workspace edits in the canonical Intake
+// book record instead of creating a second script document store.
+func (s *MySQLStore) UpdateBookOriginalText(ctx context.Context, intakeID, bookID int64, text string) (Book, error) {
+	result, err := s.db.ExecContext(ctx, "UPDATE books SET original_text = ? WHERE id = ? AND intake_id = ?", text, bookID, intakeID)
+	if err != nil {
+		return Book{}, fmt.Errorf("update book original text: %w", err)
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return Book{}, sql.ErrNoRows
+	}
+	rows, err := s.ListBooks(ctx, intakeID)
+	if err != nil {
+		return Book{}, err
+	}
+	for _, book := range rows {
+		if book.ID == bookID {
+			return book, nil
+		}
+	}
+	return Book{}, sql.ErrNoRows
+}
+
 func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProject) (BatchProject, error) {
 	const query = "INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = VALUES(name)"
 	result, err := s.db.ExecContext(ctx, query, project.IntakeID, project.Name)
