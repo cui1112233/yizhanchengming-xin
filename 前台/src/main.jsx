@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App as AntApp, ConfigProvider, theme as antdTheme } from 'antd'
 import 'antd/dist/reset.css'
 import RouterApp from './RouterApp.jsx'
 import AuthBoundary from './AuthBoundary.jsx'
+import { getWorkspaceSettings } from './api.js'
 
 const THEME_STORAGE_KEY = 'yizhan-theme'
 
@@ -18,6 +19,15 @@ function readInitialTheme() {
 
 export function UserApp() {
   const [theme, setTheme] = useState(readInitialTheme)
+  const restoreServerTheme = useCallback(async () => {
+    try {
+      const payload = await getWorkspaceSettings()
+      if (payload?.settings?.theme === 'dark' || payload?.settings?.theme === 'light') setTheme(payload.settings.theme)
+    } catch {
+      // The session has already been authenticated. A transient preferences read
+      // failure keeps the permitted non-sensitive UI fallback without changing facts.
+    }
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -37,7 +47,7 @@ export function UserApp() {
       }}
     >
       <AntApp>
-        <AuthBoundary>
+        <AuthBoundary onAuthenticated={restoreServerTheme}>
           <RouterApp theme={theme} onToggleTheme={(nextTheme) => setTheme((current) => nextTheme === 'dark' || nextTheme === 'light' ? nextTheme : (current === 'dark' ? 'light' : 'dark'))} />
         </AuthBoundary>
       </AntApp>

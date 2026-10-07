@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Alert, Button, Card, Form, Input, Result, Spin, Typography } from 'antd'
 import * as defaultApi from './api.js'
 
-export default function AuthBoundary({ children, api = defaultApi }) {
+export default function AuthBoundary({ children, api = defaultApi, onAuthenticated }) {
   const [status, setStatus] = useState('initializing')
   const [user, setUser] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -28,6 +28,7 @@ export default function AuthBoundary({ children, api = defaultApi }) {
       .then((payload) => {
         if (!active) return
         setUser(payload?.user || null)
+        if (payload?.user) onAuthenticated?.(payload.user)
         setError('')
         setStatus(payload?.user ? 'authenticated' : 'unauthenticated')
       })
@@ -46,7 +47,7 @@ export default function AuthBoundary({ children, api = defaultApi }) {
       active = false
       window.removeEventListener('ycm:auth-unauthenticated', handleExpired)
     }
-  }, [api])
+  }, [api, onAuthenticated])
 
   const submitLogin = async (values) => {
     setSubmitting(true)
@@ -57,6 +58,7 @@ export default function AuthBoundary({ children, api = defaultApi }) {
         throw new Error('登录响应缺少用户信息')
       }
       setUser(payload.user)
+      onAuthenticated?.(payload.user)
       setStatus('authenticated')
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : '登录失败，请重试。')

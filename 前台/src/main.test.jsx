@@ -41,6 +41,9 @@ describe('用户前台入口', () => {
           headers: { 'Content-Type': 'application/json' },
         })
       }
+      if (url === '/api/v1/workspace/settings') {
+        return new Response(JSON.stringify({ settings: { theme: 'light' }, executors: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
       return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
 
@@ -50,6 +53,8 @@ describe('用户前台入口', () => {
       expect(screen.queryByRole('heading', { name: '小说获取工作台' })).toBeNull()
       expect(screen.getByRole('button', { name: '开始生成' })).toBeTruthy()
       expect(screen.getByRole('link', { name: '小说获取' }).getAttribute('href')).toBe('/novel-fetch')
+      await act(async () => { await Promise.resolve() })
+      expect(document.documentElement.dataset.theme).toBe('light')
     } finally {
       await act(async () => {
         appRoot.unmount()

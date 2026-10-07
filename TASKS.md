@@ -503,6 +503,7 @@
 ### 2026-10-07 · 用户工作区迁移：设置（仓库阶段）
 
 - [x] `/settings` 的主题、提醒和存储偏好以当前认证用户为边界写入 MySQL `user_workspace_preferences`；前端不保存业务设置事实。
+- [x] 每次 Cookie Session 认证成功后，应用重新读取服务端主题偏好并实际应用；LocalStorage 仅在读取偏好失败时作为非敏感界面回退。
 - [x] 读取与保存均复用 Cookie Session、CSRF 同源保护和现有认证用户，不返回任何密钥、Cookie、Session 或 Provider 凭据。
 - [x] 本地执行器列表直接使用现有 Go `LocalExecutorService`；无设备或离线时明确显示不可用，不伪造实际生效状态。
 - [ ] 仍需在 Task 16 以登录态浏览器验证 MySQL migration、实际执行器心跳与偏好跨会话恢复；存储偏好尚未改变媒体写入策略，页面明确只展示已选择配置。
