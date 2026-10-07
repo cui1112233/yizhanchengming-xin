@@ -434,3 +434,36 @@
 - /novel-fetch-workshop 页面本体未迁移；本轮只提供正确跳转入口。
 - 未新增 MySQL migration：现有 00001_phase1_intake.sql 已包含本轮持久化所需 intakes/books/batch_projects/runs 字段，避免为同一事实重复建表。
 - Go test、前台 test、前台 build 仍需在能取得完整仓库与依赖的本地/独立开发环境执行后，才能按本文件“完成标准”把本轮状态从 ⚠️ 提升为已验收。
+
+---
+
+## 2026-10-07 · 并行迁移任务 1：公网首页与用户路由基础
+
+> 状态：⚠️ 本任务代码随本提交进入 main；当前执行环境无法从 npm registry 安装前台依赖，因此 Vitest / Vite 实际测试与构建未完成。没有使用 GitHub Actions 代替本地验收。
+
+### 本次真实完成范围
+
+- [x] `/` 不再渲染“小说获取工作台”，恢复独立首页。
+- [x] 首页恢复公网历史源码对应的主标题、主视觉结构、“开始生成”“进入配音”、六个创作入口和“最近创作项目”入口。
+- [x] 六个创作入口固定跳转：`/script`、`/novel-panel`、`/batch-factory`、`/shuihuo-production`、`/agent`、`/tts`。
+- [x] `/novel-fetch` 继续进入当前 main 已存在的 Novel Fetch 页面，没有用首页覆盖。
+- [x] 用户导航保留：首页、剧本生成、小说获取、小说面板、水货生产、Agent 工作区、历史、问题日志、配音、主题、设置、用户入口。
+- [x] 保持 React + Ant Design；没有恢复 Node 生产后端、`/api/chat` 或 Bearer Token。
+- [x] 仅主题允许使用 LocalStorage；本任务没有新增项目、任务、脚本或历史等业务数据的 LocalStorage 持久化。
+- [x] 没有修改 Batch Factory、Novel Fetch、Script、TTS 的实际业务实现；现有 Batch Factory / Novel Fetch 继续复用当前 main 组件。
+- [x] 新增 Task 1 路由回归测试，覆盖首页、六入口、导航、Novel Fetch 保留与主题按钮行为。
+
+### 本次测试 / 构建结果
+
+- [ ] `npm install --ignore-scripts --no-audit --no-fund --fetch-timeout=5000 --fetch-retries=0`：失败，`EAI_AGAIN registry.npmjs.org`，当前执行环境无法解析 npm registry。
+- [ ] `npm test`：未能实际运行测试，退出码 127，`vitest: not found`。
+- [ ] `npm run build`：未能实际构建，退出码 127，`vite: not found`。
+- [x] 对本任务新增 / 修改 JSX 使用本机 TypeScript `transpileModule` 做语法解析检查，HomePage、RouterApp、RouterApp.test、UserShell、main、main.test 均无语法诊断；该检查不替代 Vitest / Vite。
+
+### 本次明确未完成 / 与公网仍不一致
+
+- [ ] 当前执行环境无法直接访问 `http://115.190.156.223:3000/` 做浏览器逐项验收；历史 SHA `27fa2e12f9401d378d1e6d6298a9d50a27581512` 仅作源码对标线索，不冒充 2026-10-07 已重新确认的公网部署版本。
+- [ ] 历史公网首页的 `home-hero.mp4` 二进制素材未迁入新仓：当前 GitHub 连接器不能把旧仓二进制 blob 安全复制到目标仓，所以本次先恢复全屏深色主视觉、渐变光效、标题和操作区，不提交失效视频引用。
+- [ ] “最近创作项目”本次恢复入口和空态说明，没有使用 LocalStorage 伪造项目；真实最近项目卡片仍需统一历史 / 项目聚合接口接入。
+- [ ] Script、Novel Panel、Agent、TTS、历史、问题日志、设置、用户中心的实际业务页面不属于任务 1；当前仅保留稳定路由基础，等待各自模块提交。
+- [ ] `/shuihuo-production` 继续保持当前 main 已有组件行为，本任务没有重写水货生产实际业务页。

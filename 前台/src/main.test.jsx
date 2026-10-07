@@ -19,21 +19,21 @@ Object.defineProperty(window, 'matchMedia', {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  window.history.replaceState({}, '', '/')
+  window.localStorage.clear()
 })
 
 async function settleReactAfterUnmount() {
-  // Ant Design schedules some React work through animation-frame/macrotask queues.
-  // Keep jsdom alive until those callbacks have observed the unmount, otherwise
-  // Vitest can tear down `window` first and report a false unhandled error.
   await act(async () => {
     await Promise.resolve()
     await new Promise((resolve) => setTimeout(resolve, 32))
   })
 }
 
-describe('小说获取工作台', () => {
-  it('提供书城分组、执行入口和书籍结果区', async () => {
+describe('用户前台入口', () => {
+  it('认证恢复后根路由展示首页而不是小说获取工作台', async () => {
     document.body.innerHTML = '<div id="root"></div>'
+    window.history.replaceState({}, '', '/')
     global.fetch = vi.fn(async (url) => {
       if (url === '/api/auth/current-user') {
         return new Response(JSON.stringify({ user: { id: 7, name: 'Test User', role: 'admin' } }), {
@@ -46,11 +46,10 @@ describe('小说获取工作台', () => {
 
     const { appRoot } = await import('./main.jsx')
     try {
-      expect(await screen.findByText('小说获取工作台')).toBeTruthy()
-      expect(screen.getByRole('button', { name: '添加书城' })).toBeTruthy()
-      expect(screen.getByRole('button', { name: '立即执行' })).toBeTruthy()
-      expect(screen.getByRole('button', { name: '自动化' })).toBeTruthy()
-      expect(screen.getByText('书籍结果')).toBeTruthy()
+      expect(await screen.findByRole('heading', { name: '让小说章节直接进入可视化剧本工作流' })).toBeTruthy()
+      expect(screen.queryByRole('heading', { name: '小说获取工作台' })).toBeNull()
+      expect(screen.getByRole('button', { name: '开始生成' })).toBeTruthy()
+      expect(screen.getByRole('link', { name: '小说获取' }).getAttribute('href')).toBe('/novel-fetch')
     } finally {
       await act(async () => {
         appRoot.unmount()
