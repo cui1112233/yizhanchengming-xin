@@ -20,6 +20,7 @@ import {
 import { createBatchProject, createIntake, executeIntake, listBooks } from './api.js'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
 import ShuihuoProductionPage from './ShuihuoProductionPage.jsx'
+import BatchFactoryHome from './BatchFactoryHome.jsx'
 import NovelFetchPage from './NovelFetchPage.jsx'
 import StatusTag from './ui/StatusTag.jsx'
 import PageState from './ui/PageState.jsx'
@@ -96,7 +97,10 @@ export default function IntakeWorkbench() {
   if (pathname === '/novel-fetch') {
     page = <NovelFetchPage />
   } else if (pathname === '/batch-factory') {
-    page = <BatchProjectListPage />
+    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'))
+    page = projectId > 0
+      ? <BatchProjectListPage initialProjectId={projectId} />
+      : <BatchFactoryHome onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
   } else if (pathname === '/shuihuo-production') {
     page = <ShuihuoProductionPage />
   }

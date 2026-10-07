@@ -460,6 +460,21 @@
 
 ---
 
+# 2026-10-07 · Task 4A：Batch Factory 首页、列表与单书创建链路
+
+> 状态：⚠️ 4A 已在 macOS 本地验证；不是 Batch Factory 全量公网对标完成，未部署。
+
+已验证：
+- `/batch-factory` 首页使用 Go API / MySQL 的真实 BatchProject、书籍数量、来源、属性和 Run 状态；支持搜索、来源/运行状态筛选、刷新、空态、失败态、无权限态和明确进入项目入口。
+- 单书创建入口严格复用 `POST /api/v1/intakes`、`POST /api/v1/intakes/{id}/execute`、`POST /api/v1/intakes/{id}/batch-projects`；只有 Intake 完成才创建 BatchProject，浏览器不保存业务事实。
+- macOS 本地验证：`npm install --no-package-lock --prefer-offline --no-audit`、`npm test`（15 文件 / 53 测试）和 `npm run build` 均通过，退出码均为 0。
+
+仍未完成（4B / Task 16）：
+- 多书分组创建、深层生产工作台完整 UI、候选/主版本与视频操作对标。
+- 登录后公网浏览器、真实 provider、刷新恢复和逐像素 UI 验收；不得以本地构建替代。
+
+---
+
 ## 2026-10-07 · 并行迁移任务 1：公网首页与用户路由基础
 
 > 状态：⚠️ 本任务代码随本提交进入 main；当前执行环境无法从 npm registry 安装前台依赖，因此 Vitest / Vite 实际测试与构建未完成。没有使用 GitHub Actions 代替本地验收。

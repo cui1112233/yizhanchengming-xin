@@ -103,11 +103,11 @@ function BatchProjectDetail({ projectId, onBack }) {
   )
 }
 
-export default function BatchProjectListPage() {
+export default function BatchProjectListPage({ initialProjectId = null }) {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(null)
+  const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(initialProjectId)
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
   const [videoStatus, setVideoStatus] = useState(null)
