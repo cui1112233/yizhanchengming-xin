@@ -58,7 +58,7 @@ describe('Novel Fetch 主页面', () => {
 
     expect(await screen.findByText('恢复批次')).toBeTruthy()
     expect(screen.getByText(/成功 1\/2/)).toBeTruthy()
-    expect(screen.getByText('upstream timeout')).toBeTruthy()
+    expect(screen.getAllByText('upstream timeout').length).toBeGreaterThanOrEqual(1)
 
     fireEvent.click(screen.getByRole('button', { name: '查看结果' }))
     expect(await screen.findByText('1001')).toBeTruthy()

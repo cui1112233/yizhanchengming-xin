@@ -416,7 +416,7 @@
 
 # 2026-10-07 · 本轮恢复任务 2：Novel Fetch 主页面
 
-> 状态：⚠️ 仓库实现已写入 main；当前 ChatGPT 执行容器无法解析 github.com，无法取得完整工作树和依赖，因此本轮新增测试尚未在独立本地环境实际执行。没有使用 GitHub Actions 代替本地验收。
+> 状态：⚠️ 仓库实现已写入 main；本轮前台真实测试与构建已在 macOS 本地环境执行通过。没有使用 GitHub Actions 代替本地验收；ECS / 公网逐页面验收仍未完成。
 
 已实现：
 - /novel-fetch 独立 React + Ant Design 主页面，不复用 iframe、Node 后端、/api/chat，也不使用 localStorage/sessionStorage 保存小说、任务、状态或结果。
@@ -430,10 +430,15 @@
 - AI 处理配置、处理规则入口均指向 /novel-fetch-workshop。
 - 新增回归测试覆盖：刷新恢复、部分失败展示、失败重试、403 不强制退出、服务端敏感错误脱敏与重试只处理失败书。
 
+本次 macOS 真实前台验证（2026-10-07）：
+- `npm test`：13 个测试文件、50 条测试全部通过，退出码 `0`。
+- `npm run build`：通过，退出码 `0`。
+- 此证据仅覆盖仓库内前台测试与构建；不替代 Task 16 的 ECS / 公网逐页面 UI 与功能验收。
+
 本轮未完成：
 - /novel-fetch-workshop 页面本体未迁移；本轮只提供正确跳转入口。
 - 未新增 MySQL migration：现有 00001_phase1_intake.sql 已包含本轮持久化所需 intakes/books/batch_projects/runs 字段，避免为同一事实重复建表。
-- Go test、前台 test、前台 build 仍需在能取得完整仓库与依赖的本地/独立开发环境执行后，才能按本文件“完成标准”把本轮状态从 ⚠️ 提升为已验收。
+- Go test 不属于本次仅前台测试断言修复的验证范围；ECS / 公网真实浏览器验收仍未完成，不能仅凭本地前台测试与构建将本轮状态从 ⚠️ 提升为已验收。
 
 ---
 
