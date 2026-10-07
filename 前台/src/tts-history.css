@@ -1,0 +1,13 @@
+.tts-history-page { max-width: 1440px; margin: 0 auto; padding: 30px clamp(18px, 3vw, 42px) 52px; }
+.tts-history-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 20px; }
+.tts-history-heading .ant-typography { margin-top: 0; }
+.tts-history-filters, .history-table-card { margin-bottom: 18px; }
+.tts-task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.tts-task-card { height: 100%; }
+.tts-task-meta { min-height: 44px; margin-bottom: 12px !important; }
+.tts-audio-player { width: 100%; margin: 16px 0; }
+.tts-audio-unavailable { min-height: 44px; padding: 12px; border-radius: 8px; background: var(--surface-secondary, rgba(127, 127, 127, .08)); }
+.tts-history-empty, .tts-history-state { padding: 72px 20px; }
+.tts-history-controls { margin-bottom: 16px; }
+.tts-history-controls .ant-input-affix-wrapper { width: min(360px, 80vw); }
+@media (max-width: 640px) { .tts-history-heading { display: block; } .tts-history-heading > .ant-btn { margin-top: 8px; } }

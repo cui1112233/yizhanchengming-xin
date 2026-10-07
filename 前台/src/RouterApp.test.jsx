@@ -90,4 +90,16 @@ describe('Task 1 首页与用户路由基础', () => {
     fireEvent.click(screen.getByRole('button', { name: '主题' }))
     expect(onToggleTheme).toHaveBeenCalledTimes(1)
   })
+
+  it('/tts 与 /history 渲染真实服务端投影页面而不是基础占位页', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ projects: [] }) })
+    window.history.replaceState({}, '', '/tts')
+    const { unmount } = render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByRole('heading', { name: '配音' })).toBeTruthy()
+    expect(screen.queryByText(/路由基础已恢复/)).toBeNull()
+    unmount()
+    window.history.replaceState({}, '', '/history')
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByRole('heading', { name: '历史记录' })).toBeTruthy()
+  })
 })

@@ -6,13 +6,13 @@ import UserShell from './UserShell.jsx'
 import NovelFetchWorkshop from './NovelFetchWorkshop.jsx'
 import ScriptWorkspace from './ScriptWorkspace.jsx'
 import NovelPanelWorkbench from './novel-panel/NovelPanelWorkbench.jsx'
+import TtsPage from './TtsPage.jsx'
+import HistoryPage from './HistoryPage.jsx'
 import { getNovelPanel, listNovelPanelHistory, restoreNovelPanelHistory, saveNovelPanel } from './api.js'
 import './home.css'
 
 const routeFoundations = {
   '/agent': { title: 'Agent 工作区', description: '路由基础已恢复；Agent 实际业务由对应迁移任务接入。' },
-  '/tts': { title: '配音', description: '路由基础已恢复；配音实际业务由对应迁移任务接入。' },
-  '/history': { title: '历史', description: '历史入口已恢复；真实历史项目读取由后续项目聚合接口接入。' },
   '/issues': { title: '问题日志', description: '问题日志入口已恢复；实际日志页面不属于本任务范围。' },
   '/settings': { title: '设置', description: '设置入口已恢复；实际设置页不属于本任务范围。' },
   '/member': { title: '用户入口', description: '用户入口已恢复；账号中心页面不属于本任务范围。' },
@@ -65,6 +65,10 @@ export default function RouterApp({ theme, onToggleTheme }) {
     page = <NovelFetchWorkshop />
   } else if (pathname === '/script') {
     page = <ScriptWorkspace />
+  } else if (pathname === '/tts') {
+    page = <TtsPage />
+  } else if (pathname === '/history') {
+    page = <HistoryPage />
   } else if (pathname === '/novel-panel') {
     page = !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0
       ? <RouteFoundation title="小说面板" description="请从批量项目进入小说面板（需要 projectId）。" onNavigate={navigate} />

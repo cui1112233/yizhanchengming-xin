@@ -365,7 +365,9 @@ export function listShuihuoSegments(projectId, bookId) { return requestJSON(`${s
 export function updateShuihuoSegment(projectId, bookId, segmentId, input) { return requestJSON(`${shuihuoBase(projectId, bookId)}/segments/${encodeURIComponent(segmentId)}`, { method: 'PUT', body: JSON.stringify(input) }) }
 export function reorderShuihuoSegments(projectId, bookId, segmentIds) { return requestJSON(`${shuihuoBase(projectId, bookId)}/segments/reorder`, { method: 'POST', body: JSON.stringify({ segmentIds }) }) }
 export function listShuihuoAssets(projectId, bookId) { return requestJSON(`${shuihuoBase(projectId, bookId)}/assets`) }
+export function shuihuoAssetContentURL(projectId, bookId, assetId) { return `${shuihuoBase(projectId, bookId)}/assets/${encodeURIComponent(assetId)}/content` }
 export function listShuihuoMediaTasks(projectId, bookId) { return requestJSON(`${shuihuoBase(projectId, bookId)}/media-tasks`) }
+export function createShuihuoMediaTask(projectId, bookId, input) { return requestJSON(`${shuihuoBase(projectId, bookId)}/media-tasks`, { method: 'POST', body: JSON.stringify(input) }) }
 export function listShuihuoCandidates(projectId, bookId, taskId) { return requestJSON(`${shuihuoBase(projectId, bookId)}/media-tasks/${encodeURIComponent(taskId)}/candidates`) }
 export function selectShuihuoCandidate(projectId, bookId, taskId, candidateId) { return requestJSON(`${shuihuoBase(projectId, bookId)}/media-tasks/${encodeURIComponent(taskId)}/candidates/${encodeURIComponent(candidateId)}/select`, { method: 'POST' }) }
 export function retryShuihuoMediaTask(projectId, bookId, taskId) { return requestJSON(`${shuihuoBase(projectId, bookId)}/media-tasks/${encodeURIComponent(taskId)}/retry`, { method: 'POST' }) }
