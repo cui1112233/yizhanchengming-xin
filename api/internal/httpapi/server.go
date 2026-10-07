@@ -13,6 +13,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/workshop"
 )
@@ -91,6 +92,15 @@ type VideoMergeService interface {
 	Get(context.Context, int64) (video.MergeJob, []video.MergeAttempt, error)
 	RetryAttempt(context.Context, int64) (video.MergeResult, error)
 }
+type ShuihuoMediaService interface {
+	CreateSegment(context.Context, shuihuo.CreateSegmentInput) (shuihuo.Segment, error)
+	UpdateSegment(context.Context, int64, int64, int64, shuihuo.UpdateSegmentInput) (shuihuo.Segment, error)
+	ListSegments(context.Context, int64, int64) ([]shuihuo.Segment, error)
+	CreateAsset(context.Context, shuihuo.CreateAssetInput) (shuihuo.Asset, error)
+	ListAssets(context.Context, int64, int64, int64) ([]shuihuo.Asset, error)
+	CreateMediaTask(context.Context, shuihuo.CreateMediaTaskInput) (shuihuo.MediaTask, error)
+	ListMediaTasks(context.Context, int64, int64) ([]shuihuo.MediaTask, error)
+}
 
 type Dependencies struct {
 	Intakes                     IntakeService
@@ -113,6 +123,7 @@ type Dependencies struct {
 	VideoLocalExecutor          VideoLocalExecutorService
 	VideoStatus                 VideoStatusService
 	VideoMerge                  VideoMergeService
+	ShuihuoMedia                ShuihuoMediaService
 	BatchProjectAccess          BatchProjectAccessChecker
 	VideoResourceProjects       VideoResourceProjectResolver
 	VideoExecutorBootstrapToken string
@@ -159,6 +170,12 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("PUT /api/v1/batch-projects/{id}/novel-panel", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.saveNovelPanel)))))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel/history", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.listNovelPanelHistory))))
 	mux.Handle("POST /api/v1/batch-projects/{id}/novel-panel/history/{historyId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.restoreNovelPanelHistory)))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoSegments))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoSegments)))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets)))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks)))))
 
 	// Stage 2: unified settings/version profile.
 	mux.Handle("GET /api/v1/batch-projects/{id}/settings", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getUnifiedSettings)))

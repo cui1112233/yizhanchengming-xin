@@ -263,6 +263,8 @@
 
 > 2026-10-07 补齐：`/shuihuo-production` 已不再复用小说获取页，改为独立 React 生产工作台，复用 BatchProject、generation、video、统一设置、Cookie Session/CSRF 与权限边界；前台完整测试 15 files / 54 tests、相关 Go tests、前台 build 均通过。ECS / 公网真实浏览器验收，以及旧页分镜素材编辑、图片/音频任务与本地执行器能力的 Go 迁移仍留到后续任务，因此 Task 11 总体继续保持 `⚠️`。
 
+> 2026-10-07 媒体基础：additive Goose migration 已提供项目/书 scoped 分镜、媒体资产、媒体意图任务和候选结果关联。图片/音频意图保持 `pending_executor`，没有真实执行器时不伪造 Provider 调用或结果；视频意图只允许关联现有 `video_production_tasks`。完整 5B 前端和图片/音频执行器适配仍待后续任务。
+
 ---
 
 # Task 12：剧本生成 / Director / Hook / 最终提示词

@@ -17,6 +17,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
@@ -66,6 +67,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	}
 
 	videoStore := video.NewMySQLStore(db)
+	shuihuoMediaService := shuihuo.NewService(shuihuo.NewMySQLStore(db))
 	masterKey := []byte(os.Getenv("VIDEO_PROVIDER_MASTER_KEY"))
 	providerFactory := video.DefaultProviderFactory{LocalJobs: videoStore}
 	videoConfigService := video.NewConfigServiceWithProviders(videoStore, masterKey, providerFactory)
@@ -132,6 +134,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		VideoLocalExecutor:          observedLocalExecutor,
 		VideoStatus:                 videoService,
 		VideoMerge:                  observedMerge,
+		ShuihuoMedia:                shuihuoMediaService,
 		BatchProjectAccess:          publishingStore,
 		VideoResourceProjects:       videoStore,
 		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
