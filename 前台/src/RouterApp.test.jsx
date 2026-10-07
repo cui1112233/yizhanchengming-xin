@@ -70,12 +70,18 @@ describe('Task 1 首页与用户路由基础', () => {
     expect(window.location.pathname).toBe('/novel-fetch')
   })
 
-  it('首页开始生成进入 /script；未迁移业务只显示路由基础占位', () => {
+  it('首页开始生成进入 /script', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => '' },
+      json: async () => ({ projects: [] }),
+    })
     render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
 
     fireEvent.click(screen.getByRole('button', { name: '开始生成' }))
     expect(window.location.pathname).toBe('/script')
-    expect(screen.getByText('路由基础已恢复；剧本生成实际业务由对应迁移任务接入。')).toBeTruthy()
+    expect(await screen.findByText('暂无项目。请先在小说获取中保存原文，再创建项目。')).toBeTruthy()
   })
 
   it('主题按钮只调用主题切换，不保存任何项目业务数据', () => {

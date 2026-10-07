@@ -63,6 +63,7 @@ type bookResponse struct {
 	ExternalBookID string            `json:"bookId"`
 	Title          string            `json:"title"`
 	BodyRef        string            `json:"bodyRef,omitempty"`
+	OriginalText   string            `json:"originalText,omitempty"`
 	Category       string            `json:"category,omitempty"`
 	Genre          string            `json:"genre,omitempty"`
 	Gender         string            `json:"gender,omitempty"`
@@ -291,6 +292,17 @@ func toBookResponses(rows []intake.Book) []bookResponse {
 			Category: value.Category, Genre: value.Genre, Gender: value.Gender, GenderSource: value.GenderSource,
 			Style: value.Style, Status: value.Status, ErrorMessage: value.ErrorMessage, UpdatedAt: value.UpdatedAt,
 		})
+	}
+	return result
+}
+
+// Project detail is explicitly protected by the project-view capability and is
+// the only read used by Script Workspace. Keep raw novel text out of generic
+// intake list responses, which are often used for lightweight tables.
+func toBookDetailResponses(rows []intake.Book) []bookResponse {
+	result := toBookResponses(rows)
+	for index, value := range rows {
+		result[index].OriginalText = value.OriginalText
 	}
 	return result
 }

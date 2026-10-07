@@ -278,6 +278,7 @@
 - [x] 12.10 提示词版本持久化 — StageRun 持久化 prompt_key/prompt_version
 - [x] 12.11 v88 对标 — Hook skip/H3 schema/Final Prompt retry/批量失败隔离/Stage Retry 等语义测试已通过
 - [x] 12.12 测试 + CI + 合并 main — PR #12 已合并；`main` CI run `37288311920`（#372）中 Go tests/build、前台 tests/build、管理端 build 全绿
+- [x] 12.13 `/script` Script Workspace — 复用 BatchProject/Book/StageRun/视频状态；人物、场景、约束与生成参数保存到既有项目 MySQL 设置；前台 57 项测试、相关 Go 测试与前台构建通过（公网/ECS 实测仍留 Task 16）
 
 > 仓库阶段验收依据：PR #12 已合并到 `main`，合并提交 `73ab448c20337eb4cd0be1491c72fa973a3a57fc`；合并后的 `main` CI run `37288311920` 五项验证全绿。公网真实“剧本生成 / Director / Hook”仍需 Task 16 的 16.2.11–16.2.13 在 ECS/浏览器环境验收，因此 Task 12 总体保持 `⚠️`，不把仓库通过冒充为公网完成。
 

@@ -302,6 +302,19 @@ export function listGenerationPrompts() {
   return requestJSON(`${API_PREFIX}/generation/prompts`)
 }
 
+// Script Workspace is deliberately a projection of the existing persisted
+// intake / BatchProject / generation graph.  It does not introduce a second
+// browser-side project or task store.
+export function getScriptWorkspace(projectId) {
+  return Promise.all([
+    getBatchProject(projectId),
+    getProjectGeneration(projectId),
+    getUnifiedSettings(projectId),
+    getProjectVideoStatus(projectId),
+    listGenerationPrompts(),
+  ]).then(([project, generation, settings, video, prompts]) => ({ project, generation, settings, video, prompts }))
+}
+
 export function getProjectVideoStatus(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${encodeURIComponent(projectId)}/video`)
 }

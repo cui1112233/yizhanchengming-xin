@@ -4,10 +4,10 @@ import IntakeWorkbench from './App.jsx'
 import HomePage from './HomePage.jsx'
 import UserShell from './UserShell.jsx'
 import NovelFetchWorkshop from './NovelFetchWorkshop.jsx'
+import ScriptWorkspace from './ScriptWorkspace.jsx'
 import './home.css'
 
 const routeFoundations = {
-  '/script': { title: '剧本生成', description: '路由基础已恢复；剧本生成实际业务由对应迁移任务接入。' },
   '/novel-panel': { title: '小说面板', description: '路由基础已恢复；小说面板实际业务由对应迁移任务接入。' },
   '/agent': { title: 'Agent 工作区', description: '路由基础已恢复；Agent 实际业务由对应迁移任务接入。' },
   '/tts': { title: '配音', description: '路由基础已恢复；配音实际业务由对应迁移任务接入。' },
@@ -55,6 +55,8 @@ export default function RouterApp({ theme, onToggleTheme }) {
     page = <IntakeWorkbench />
   } else if (pathname === '/novel-fetch-workshop') {
     page = <NovelFetchWorkshop />
+  } else if (pathname === '/script') {
+    page = <ScriptWorkspace />
   } else if (routeFoundations[pathname]) {
     page = <RouteFoundation {...routeFoundations[pathname]} onNavigate={navigate} />
   } else {

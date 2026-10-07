@@ -58,6 +58,6 @@ func (h handler) getBatchProject(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"project": projectResponse{ID: project.ID, IntakeID: project.IntakeID, Name: project.Name},
-		"books":   toBookResponses(books),
+		"books":   toBookDetailResponses(books),
 	})
 }
