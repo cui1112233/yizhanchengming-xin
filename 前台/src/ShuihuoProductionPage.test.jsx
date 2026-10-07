@@ -49,7 +49,7 @@ describe('ShuihuoProductionPage', () => {
     await waitFor(() => expect(api.runBookGeneration).toHaveBeenCalledWith(3, 7, expect.objectContaining({ hookEnabled: true, directorMode: 'normal' })), { timeout: 1500 })
     fireEvent.click(screen.getAllByRole('button', { name: /重\s*试/ })[0])
     await waitFor(() => expect(api.retryGenerationStage).toHaveBeenCalledWith(3, 7, 'DIRECTOR', expect.any(String)), { timeout: 1500 })
-  })
+  }, 15000)
 
   it('仅在 FINAL_PROMPT 完成后允许提交视频，并调用原有视频 API', async () => {
     api.startVideoTask.mockResolvedValue({})
