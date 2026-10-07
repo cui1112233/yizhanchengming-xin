@@ -46,12 +46,17 @@ func (h handler) workspaceSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	executors := []any{}
+	executorStatus := map[string]any{"available": true}
 	if h.deps.VideoLocalExecutor != nil {
 		if rows, e := h.deps.VideoLocalExecutor.List(r.Context()); e == nil {
 			for _, x := range rows {
 				executors = append(executors, x)
 			}
+		} else {
+			executorStatus = map[string]any{"available": false, "reason": "执行器状态暂不可用，请稍后刷新。"}
 		}
+	} else {
+		executorStatus = map[string]any{"available": false, "reason": "当前环境未配置本地执行器服务。"}
 	}
-	writeJSON(w, 200, map[string]any{"settings": map[string]any{"theme": theme, "notificationsEnabled": notify, "storagePreference": storage}, "executors": executors})
+	writeJSON(w, 200, map[string]any{"settings": map[string]any{"theme": theme, "notificationsEnabled": notify, "storagePreference": storage}, "executors": executors, "executorStatus": executorStatus})
 }
