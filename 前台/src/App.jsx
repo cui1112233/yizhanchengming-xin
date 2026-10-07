@@ -19,6 +19,7 @@ import {
 } from 'antd'
 import { createBatchProject, createIntake, executeIntake, listBooks } from './api.js'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
+import ShuihuoProductionPage from './ShuihuoProductionPage.jsx'
 import NovelFetchPage from './NovelFetchPage.jsx'
 import StatusTag from './ui/StatusTag.jsx'
 import PageState from './ui/PageState.jsx'
@@ -96,6 +97,8 @@ export default function IntakeWorkbench() {
     page = <NovelFetchPage />
   } else if (pathname === '/batch-factory') {
     page = <BatchProjectListPage />
+  } else if (pathname === '/shuihuo-production') {
+    page = <ShuihuoProductionPage />
   }
 
   return <WorkbenchErrorBoundary>{page}</WorkbenchErrorBoundary>

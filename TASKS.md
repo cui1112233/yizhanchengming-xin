@@ -253,14 +253,14 @@
 
 - [x] 11.1 `/shuihuo-production` 页面迁移
 - [x] 11.2 水货生产 -> Batch Factory V11 入口
-- ⚠️ 11.3 页面路由不闪退
+- [x] 11.3 `/shuihuo-production` 独立生产工作台路由、状态恢复与失败恢复入口
 - [x] 11.4 项目列表共用真实 MySQL 数据
 - [x] 11.5 状态实时同步
 - [x] 11.6 失败状态可见
 - ⚠️ 11.7 对标旧 ECS 可用交互
 - [x] 11.8 测试 + CI + 合并 main
 
-> 仓库验收依据：PR #13 已合并 `main`；`main` CI run `37285192021` 中 Go tests、前台 tests、前台 build、管理端 build 全绿。ECS / 公网真实浏览器验收仍留到 Task 16，因此 Task 11 总体继续保持 `⚠️`。
+> 2026-10-07 补齐：`/shuihuo-production` 已不再复用小说获取页，改为独立 React 生产工作台，复用 BatchProject、generation、video、统一设置、Cookie Session/CSRF 与权限边界；前台完整测试 15 files / 54 tests、相关 Go tests、前台 build 均通过。ECS / 公网真实浏览器验收，以及旧页分镜素材编辑、图片/音频任务与本地执行器能力的 Go 迁移仍留到后续任务，因此 Task 11 总体继续保持 `⚠️`。
 
 ---
 

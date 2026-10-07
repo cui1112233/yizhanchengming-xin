@@ -306,6 +306,13 @@ export function getProjectVideoStatus(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${encodeURIComponent(projectId)}/video`)
 }
 
+export function startVideoTask(projectId, bookId, input) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${encodeURIComponent(projectId)}/books/${encodeURIComponent(bookId)}/video`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 export function retryVideoTask(taskId, requestId) {
   return requestJSON(`${API_PREFIX}/video-tasks/${encodeURIComponent(taskId)}/retry`, {
     method: 'POST',

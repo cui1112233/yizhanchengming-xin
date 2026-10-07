@@ -58,16 +58,16 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     ])
   })
 
-  it('/shuihuo-production 可以直接渲染，并且不再出现“解析输入”', () => {
+  it('/shuihuo-production 直接渲染独立生产工作台，而不是小说获取页', () => {
     window.history.replaceState({}, '', '/shuihuo-production')
     render(<IntakeWorkbench />)
 
-    expect(screen.getByRole('heading', { name: '小说获取工作台' })).toBeTruthy()
-    expect(screen.queryByText('解析输入')).toBeNull()
+    expect(screen.getByRole('heading', { name: '水货生产' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '小说获取工作台' })).toBeNull()
   })
 
-  it('水货生产可直接进入 Batch Factory，且列表从真实 API 契约读取', async () => {
-    window.history.replaceState({}, '', '/shuihuo-production')
+  it('批量工厂独立读取真实项目 API', async () => {
+    window.history.replaceState({}, '', '/batch-factory')
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() =>
       jsonResponse({
         projects: [{ id: 52, intakeId: 12, name: '刚创建的批量项目' }],
@@ -75,17 +75,14 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     )
 
     render(<IntakeWorkbench />)
-    fireEvent.click(screen.getByRole('button', { name: '批量工厂' }))
-
     expect(await screen.findByRole('heading', { name: '批量工厂' })).toBeTruthy()
     expect(await screen.findByText('刚创建的批量项目')).toBeTruthy()
-    expect(window.location.pathname).toBe('/batch-factory')
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(String(fetchMock.mock.calls[0][0])).toBe('/api/v1/batch-projects')
   }, 15000)
 
   it('多书城可顺序添加；同书城 Book ID 去重并合并标签；添加后输入框清空；总数正确', () => {
-    window.history.replaceState({}, '', '/shuihuo-production')
+    window.history.replaceState({}, '', '/')
     render(<IntakeWorkbench />)
 
     let bookInput = addStore('知乎', '11', '1001\n1002\n1002')
@@ -107,7 +104,7 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
   }, 15000)
 
   it('121 完成后展示完整真实字段，创建 BatchProject/Run，并出现进入批量工厂入口', async () => {
-    window.history.replaceState({}, '', '/shuihuo-production')
+    window.history.replaceState({}, '', '/')
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() => jsonResponse({ intake: { id: 17 }, books: [] }))
@@ -300,7 +297,7 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
   }, 15000)
 
   it('成功创建后点击进入批量工厂，列表会重新从 API 读取最新项目', async () => {
-    window.history.replaceState({}, '', '/shuihuo-production')
+    window.history.replaceState({}, '', '/')
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() => jsonResponse({ intake: { id: 20 }, books: [] }))
