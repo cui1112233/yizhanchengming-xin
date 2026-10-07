@@ -100,6 +100,10 @@ type ShuihuoMediaService interface {
 	ListAssets(context.Context, int64, int64, int64) ([]shuihuo.Asset, error)
 	CreateMediaTask(context.Context, shuihuo.CreateMediaTaskInput) (shuihuo.MediaTask, error)
 	ListMediaTasks(context.Context, int64, int64) ([]shuihuo.MediaTask, error)
+	ReorderSegments(context.Context, int64, int64, []int64) ([]shuihuo.Segment, error)
+	ListCandidates(context.Context, int64, int64, int64) ([]shuihuo.Candidate, error)
+	SelectCandidate(context.Context, int64, int64, int64, int64) (shuihuo.Candidate, error)
+	RetryMediaTask(context.Context, int64, int64, int64) (shuihuo.MediaTask, error)
 }
 
 type Dependencies struct {
@@ -172,10 +176,15 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/batch-projects/{id}/novel-panel/history/{historyId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.restoreNovelPanelHistory)))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoSegments))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoSegments)))))
+	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/{segmentId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.updateShuihuoSegment)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/reorder", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.reorderShuihuoSegments)))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets)))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks)))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/candidates", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.listShuihuoCandidates))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/candidates/{candidateId}/select", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.selectShuihuoCandidate)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.retryShuihuoMediaTask)))))
 
 	// Stage 2: unified settings/version profile.
 	mux.Handle("GET /api/v1/batch-projects/{id}/settings", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getUnifiedSettings)))

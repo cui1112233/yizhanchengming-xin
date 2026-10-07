@@ -33,6 +33,18 @@ func (f *shuihuoHTTPFake) CreateMediaTask(_ context.Context, i shuihuo.CreateMed
 func (*shuihuoHTTPFake) ListMediaTasks(context.Context, int64, int64) ([]shuihuo.MediaTask, error) {
 	return nil, nil
 }
+func (*shuihuoHTTPFake) ReorderSegments(context.Context, int64, int64, []int64) ([]shuihuo.Segment, error) {
+	return nil, nil
+}
+func (*shuihuoHTTPFake) ListCandidates(context.Context, int64, int64, int64) ([]shuihuo.Candidate, error) {
+	return nil, nil
+}
+func (*shuihuoHTTPFake) SelectCandidate(context.Context, int64, int64, int64, int64) (shuihuo.Candidate, error) {
+	return shuihuo.Candidate{}, nil
+}
+func (*shuihuoHTTPFake) RetryMediaTask(context.Context, int64, int64, int64) (shuihuo.MediaTask, error) {
+	return shuihuo.MediaTask{}, nil
+}
 func TestShuihuoMediaTaskHTTPIsProjectScopedAndPending(t *testing.T) {
 	f := &shuihuoHTTPFake{}
 	h := NewHandler(Dependencies{ShuihuoMedia: f})

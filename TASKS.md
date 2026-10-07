@@ -265,6 +265,8 @@
 
 > 2026-10-07 媒体基础：additive Goose migration 已提供项目/书 scoped 分镜、媒体资产、媒体意图任务和候选结果关联。图片/音频意图保持 `pending_executor`，没有真实执行器时不伪造 Provider 调用或结果；视频意图只允许关联现有 `video_production_tasks`。完整 5B 前端和图片/音频执行器适配仍待后续任务。
 
+> 2026-10-07 12B：补齐分镜 PUT 乐观锁、事务式同书全量排序、候选读取/单主候选选择、媒体任务读取与 `pending_executor`/`retryable_failed` 重试 API。现有 schema 已能表达这些语义，未新增 migration；视频关联任务继续读取既有 video task 状态，不复制为 Shuihuo 事实。
+
 ---
 
 # Task 12：剧本生成 / Director / Hook / 最终提示词
