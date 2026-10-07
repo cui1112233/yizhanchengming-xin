@@ -1,0 +1,12 @@
+.shuihuo-storyboard { margin-top: 16px; }
+.shuihuo-media-layout { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(320px, .88fr); gap: 18px; }
+.shuihuo-media-layout section { min-width: 0; }
+.shuihuo-media-layout h4 { margin-top: 0; }
+.shuihuo-segment, .shuihuo-media-tasks article, .shuihuo-assets { border: 1px solid var(--ant-color-border-secondary, #edf0f5); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--ant-color-bg-container, #fff); }
+.shuihuo-segment header, .shuihuo-segment footer, .shuihuo-media-tasks article header { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.shuihuo-segment footer { margin: 9px 0 0; }
+.shuihuo-assets > div, .shuihuo-candidate { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0); }
+.shuihuo-assets > div:last-child, .shuihuo-candidate:last-child { border-bottom: 0; }
+.shuihuo-media-tasks article > .ant-space { margin-top: 9px; }
+.shuihuo-candidate { margin-top: 7px; font-size: 12px; }
+@media (max-width: 900px) { .shuihuo-media-layout { grid-template-columns: 1fr; } }

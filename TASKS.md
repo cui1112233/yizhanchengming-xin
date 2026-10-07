@@ -267,6 +267,8 @@
 
 > 2026-10-07 12B：补齐分镜 PUT 乐观锁、事务式同书全量排序、候选读取/单主候选选择、媒体任务读取与 `pending_executor`/`retryable_failed` 重试 API。现有 schema 已能表达这些语义，未新增 migration；视频关联任务继续读取既有 video task 状态，不复制为 Shuihuo 事实。
 
+> 2026-10-07 5B 前端接入：`/shuihuo-production` 已接入分镜编辑及 409 冲突刷新、同书排序、资产/媒体任务/候选读取、主候选选择和安全重试；前端不使用浏览器业务缓存，且在无 TOS 上传 API 或真实图片/TTS 执行器时明确显示空态或 `pending_executor`，不伪造结果。Task 11 仍为 `⚠️`，公网浏览器验收、TOS 上传和真实图片/TTS 执行器适配待后续任务。
+
 ---
 
 # Task 12：剧本生成 / Director / Hook / 最终提示词
