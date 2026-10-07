@@ -13,16 +13,23 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/workshop"
 )
 
 type IntakeService interface {
 	CreateIntake(ctx context.Context, input intake.CreateIntakeInput) (intake.Intake, []intake.Book, error)
 	ExecuteIntake(ctx context.Context, intakeID int64, maxText int) (intake.ExecuteResult, error)
+	RestoreBook(ctx context.Context, intakeID, bookID int64, maxText int) (intake.Book, error)
 }
 
 type IntakeReader interface {
 	ListIntakes(context.Context) ([]intake.Intake, error)
 	ListBooks(context.Context, int64) ([]intake.Book, error)
+}
+
+type WorkshopService interface {
+	Snapshot(context.Context, int64) (workshop.Snapshot, error)
+	Save(context.Context, int64, json.RawMessage) (json.RawMessage, error)
 }
 
 type BatchProjectReader interface {
@@ -80,6 +87,7 @@ type Dependencies struct {
 	BatchProjectDetails         BatchProjectDetailReader
 	Pipeline                    PipelineService
 	Generation                  GenerationService
+	Workshop                    WorkshopService
 	UnifiedSettings             UnifiedSettingsService
 	Auth                        AuthService
 	Publishing                  PublishingService
@@ -126,6 +134,9 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/intakes", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIntakes)))
 	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.executeIntake))))
 	mux.Handle("GET /api/v1/intakes/{id}/books", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBooks)))
+	mux.Handle("GET /api/v1/intakes/{id}/workshop", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getWorkshop)))
+	mux.Handle("PUT /api/v1/intakes/{id}/workshop", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveWorkshop))))
+	mux.Handle("POST /api/v1/intakes/{id}/books/{bookId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.restoreWorkshopBook))))
 	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))

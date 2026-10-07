@@ -134,3 +134,7 @@ func (f failingIntakeService) CreateIntake(context.Context, intake.CreateIntakeI
 func (f failingIntakeService) ExecuteIntake(context.Context, int64, int) (intake.ExecuteResult, error) {
 	return intake.ExecuteResult{}, f.err
 }
+
+func (f failingIntakeService) RestoreBook(context.Context, int64, int64, int) (intake.Book, error) {
+	return intake.Book{}, f.err
+}

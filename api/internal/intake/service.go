@@ -70,6 +70,105 @@ type ExecuteResult struct {
 	Status   Status `json:"status"`
 }
 
+// RestoreBook refreshes one existing book through the same provider121 and
+// persistence path used by ExecuteIntake. It deliberately creates no task,
+// queue, run, or worker of its own.
+func (s *Service) RestoreBook(ctx context.Context, intakeID, bookID int64, maxText int) (Book, error) {
+	if s.store == nil || s.fetcher == nil {
+		return Book{}, fmt.Errorf("intake store and 121 fetcher are required")
+	}
+	books, err := s.store.ListBooks(ctx, intakeID)
+	if err != nil {
+		return Book{}, fmt.Errorf("读取 intake 书籍: %w", err)
+	}
+	var book Book
+	found := false
+	for _, value := range books {
+		if value.ID == bookID {
+			book = value
+			found = true
+			break
+		}
+	}
+	if !found {
+		return Book{}, fmt.Errorf("书籍不属于当前 intake")
+	}
+	if err := s.store.UpdateIntakeStatus(ctx, intakeID, StatusRunning); err != nil {
+		return Book{}, fmt.Errorf("更新 intake 状态: %w", err)
+	}
+	fetched, fetchErr := s.fetcher.Fetch(ctx, provider121.Request{BookID: book.ExternalBookID, PlatformID: book.PlatformID, MaxText: maxText})
+	if fetchErr != nil {
+		book.Status = BookStatusRetryableFailed
+		book.ErrorMessage = observability.SafeError(fetchErr)
+		if _, err := s.store.UpsertBook(ctx, book); err != nil {
+			return Book{}, fmt.Errorf("记录 121 获取失败: %w", err)
+		}
+		_ = s.refreshStatus(ctx, intakeID)
+		return book, nil
+	}
+	book.OriginalText = fetched.Text
+	book.Category = strings.TrimSpace(fetched.BookInfo.Category)
+	book.Genre = normalizeGenre(fetched.BookInfo.Genre)
+	if incoming := strings.TrimSpace(fetched.BookInfo.BookName); incoming != "" && isGeneratedTitle(book.Title, book.ExternalBookID) {
+		book.Title = incoming
+	}
+	manualGender := ""
+	if book.GenderSource == metadata.SourceManual || book.GenderSource == "input" {
+		manualGender = book.Gender
+	}
+	resolvedGender, genderSource := metadata.ResolveGender(manualGender, book.Category, book.Genre, "")
+	manualStyle := strings.TrimSpace(book.Style)
+	ai := ClassificationResult{}
+	if s.classifier != nil && (resolvedGender == "" || manualStyle == "") {
+		ai, err = s.classifier.Classify(ctx, ClassificationInput{BookID: book.ExternalBookID, Title: book.Title, Text: fetched.Text, Category: book.Category, Genre: book.Genre, Gender: resolvedGender})
+		if err != nil {
+			book.Gender = resolvedGender
+			book.GenderSource = genderSource
+			book.Status = BookStatusRetryableFailed
+			book.ErrorMessage = "AI 分类失败: " + observability.SafeError(err)
+			_, saveErr := s.store.UpsertBook(ctx, book)
+			if saveErr != nil {
+				return Book{}, fmt.Errorf("记录 AI 分类失败: %w", saveErr)
+			}
+			_ = s.refreshStatus(ctx, intakeID)
+			return book, nil
+		}
+	}
+	book.Gender, book.GenderSource = metadata.ResolveGender(manualGender, book.Category, book.Genre, ai.Gender)
+	book.Style, _ = metadata.ResolveStyle(manualStyle, "", ai.Style)
+	book.Status = BookStatusFetched
+	book.ErrorMessage = ""
+	stored, err := s.store.UpsertBook(ctx, book)
+	if err != nil {
+		return Book{}, fmt.Errorf("保存已获取书籍: %w", err)
+	}
+	_ = s.refreshStatus(ctx, intakeID)
+	return stored, nil
+}
+
+func (s *Service) refreshStatus(ctx context.Context, intakeID int64) error {
+	books, err := s.store.ListBooks(ctx, intakeID)
+	if err != nil {
+		return err
+	}
+	fetched, failed := 0, 0
+	for _, book := range books {
+		if book.Status == BookStatusFetched {
+			fetched++
+		}
+		if book.Status == BookStatusRetryableFailed {
+			failed++
+		}
+	}
+	status := StatusCompleted
+	if failed > 0 && fetched == 0 {
+		status = StatusFailed
+	} else if failed > 0 {
+		status = StatusPartial
+	}
+	return s.store.UpdateIntakeStatus(ctx, intakeID, status)
+}
+
 func NewService(store serviceStore, fetcher Fetcher, classifier Classifier) *Service {
 	return &Service{store: store, fetcher: fetcher, classifier: classifier}
 }
@@ -197,12 +296,12 @@ func (s *Service) ExecuteIntake(ctx context.Context, intakeID int64, maxText int
 		ai := ClassificationResult{}
 		if s.classifier != nil && (resolvedGender == "" || manualStyle == "") {
 			ai, err = s.classifier.Classify(ctx, ClassificationInput{
-				BookID: book.ExternalBookID,
-				Title: book.Title,
-				Text: fetched.Text,
+				BookID:   book.ExternalBookID,
+				Title:    book.Title,
+				Text:     fetched.Text,
 				Category: book.Category,
-				Genre: book.Genre,
-				Gender: resolvedGender,
+				Genre:    book.Genre,
+				Gender:   resolvedGender,
 			})
 			if err != nil {
 				book.Gender = resolvedGender

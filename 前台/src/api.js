@@ -180,8 +180,26 @@ export function executeIntake(intakeId, maxText) {
   })
 }
 
+export function restoreIntakeBook(intakeId, bookId, maxText = 4000) {
+  return requestJSON(`${API_PREFIX}/intakes/${intakeId}/books/${bookId}/restore`, {
+    method: 'POST',
+    body: JSON.stringify({ maxText }),
+  })
+}
+
 export function listBooks(intakeId) {
   return requestJSON(`${API_PREFIX}/intakes/${intakeId}/books`)
+}
+
+export function getNovelFetchWorkshop(intakeId) {
+  return requestJSON(`${API_PREFIX}/intakes/${intakeId}/workshop`)
+}
+
+export function saveNovelFetchWorkshop(intakeId, settings) {
+  return requestJSON(`${API_PREFIX}/intakes/${intakeId}/workshop`, {
+    method: 'PUT',
+    body: JSON.stringify({ settings }),
+  })
 }
 
 export function createBatchProject(intakeId, input) {

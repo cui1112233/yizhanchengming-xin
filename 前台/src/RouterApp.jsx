@@ -3,6 +3,7 @@ import { Button, Result } from 'antd'
 import IntakeWorkbench from './App.jsx'
 import HomePage from './HomePage.jsx'
 import UserShell from './UserShell.jsx'
+import NovelFetchWorkshop from './NovelFetchWorkshop.jsx'
 import './home.css'
 
 const routeFoundations = {
@@ -52,6 +53,8 @@ export default function RouterApp({ theme, onToggleTheme }) {
     page = <HomePage onNavigate={navigate} />
   } else if (pathname === '/novel-fetch' || pathname === '/batch-factory' || pathname === '/shuihuo-production') {
     page = <IntakeWorkbench />
+  } else if (pathname === '/novel-fetch-workshop') {
+    page = <NovelFetchWorkshop />
   } else if (routeFoundations[pathname]) {
     page = <RouteFoundation {...routeFoundations[pathname]} onNavigate={navigate} />
   } else {

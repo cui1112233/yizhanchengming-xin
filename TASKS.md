@@ -442,6 +442,23 @@
 
 ---
 
+# 2026-10-07 · Task 3：Novel Fetch Workshop
+
+> 状态：⚠️ 仓库实现和本地真实验证已完成；未部署，也没有把 Task 16 的 ECS / 公网逐页面验收标记为完成。
+
+本次实现与验证：
+- 新增 `/novel-fetch-workshop`，从 `/novel-fetch?intakeId=<id>` 进入并在刷新或重新登录后继续由服务端 `intakes`、`books` 和 `generation_prompts` 恢复事实数据。
+- 复用既有 `intakes`、`books`、`batch_projects`、`runs`，未创建第二套 Task、Book、Run、Queue 或 Worker；失败重试继续调用既有 `POST /api/v1/intakes/{id}/execute`。
+- 新增最小 migration `00009_task3_novel_fetch_workshop.sql`，仅为 `intakes` 增加 `workshop_settings_json`，以持久化尚未生成 BatchProject 时的处理设置。
+- 原文查看和单书恢复使用 Go `intake.Service` 与 provider121，恢复结果持久化回既有 `books.original_text`；不恢复 Node 后端、`/api/chat`、iframe 或前端 API Key / 业务 LocalStorage。
+- Workshop 提示词/知识库入口读取既有 Go `generation` prompt 模块；前端不硬编码系统提示词。接口按既有 batch capability 控制：读取需 `batch.view`，保存设置与恢复原文需同源请求及 `batch.configure` / `batch.execute`。
+- macOS 本地真实验证：相关 Go 包 `go test ./internal/intake ./internal/workshop ./internal/httpapi` 通过（退出码 0）；`npm install --no-package-lock --prefer-offline --no-audit` 通过（退出码 0）；`npm test` 14 个测试文件、51 条测试全通过（退出码 0）；`npm run build` 通过（退出码 0）。
+
+仍未完成：
+- Task 16 的 ECS 部署、登录后公网浏览器全链路、真实 provider121 凭据/网络与跨刷新权限验收仍保持未完成；不能以本地测试或公网应用壳 HTTP 200 代替。
+
+---
+
 ## 2026-10-07 · 并行迁移任务 1：公网首页与用户路由基础
 
 > 状态：⚠️ 本任务代码随本提交进入 main；当前执行环境无法从 npm registry 安装前台依赖，因此 Vitest / Vite 实际测试与构建未完成。没有使用 GitHub Actions 代替本地验收。

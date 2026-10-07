@@ -15,14 +15,14 @@ import (
 )
 
 type fakeIntakeAPI struct {
-	createInput  intake.CreateIntakeInput
-	createResult intake.Intake
-	createBooks  []intake.Book
-	createErr    error
-	executeID    int64
-	executeMax   int
+	createInput   intake.CreateIntakeInput
+	createResult  intake.Intake
+	createBooks   []intake.Book
+	createErr     error
+	executeID     int64
+	executeMax    int
 	executeResult intake.ExecuteResult
-	executeErr   error
+	executeErr    error
 }
 
 func (f *fakeIntakeAPI) CreateIntake(_ context.Context, input intake.CreateIntakeInput) (intake.Intake, []intake.Book, error) {
@@ -34,6 +34,10 @@ func (f *fakeIntakeAPI) ExecuteIntake(_ context.Context, id int64, maxText int) 
 	f.executeID = id
 	f.executeMax = maxText
 	return f.executeResult, f.executeErr
+}
+
+func (f *fakeIntakeAPI) RestoreBook(_ context.Context, intakeID, bookID int64, _ int) (intake.Book, error) {
+	return intake.Book{ID: bookID, IntakeID: intakeID}, f.executeErr
 }
 
 type fakeReader struct {
@@ -67,7 +71,7 @@ func (f *fakePipelineAPI) Create(_ context.Context, request pipeline.CreateReque
 func TestCreateIntakeEndpoint(t *testing.T) {
 	api := &fakeIntakeAPI{
 		createResult: intake.Intake{ID: 11, Name: "知乎+黑岩", Status: intake.StatusPending},
-		createBooks: []intake.Book{{ID: 21, IntakeID: 11, Source: "知乎付费", PlatformID: "15", ExternalBookID: "1001", Title: "测试书", Status: intake.BookStatusPending}},
+		createBooks:  []intake.Book{{ID: 21, IntakeID: 11, Source: "知乎付费", PlatformID: "15", ExternalBookID: "1001", Title: "测试书", Status: intake.BookStatusPending}},
 	}
 	handler := NewHandler(Dependencies{Intakes: api})
 	body := []byte(`{"name":"知乎+黑岩","groups":[{"source":"知乎付费","platformId":"15","books":[{"bookId":"1001","title":"测试书","gender":"女频","style":"情感"}]}]}`)
@@ -114,7 +118,7 @@ func TestCreateIntakeRejectsMalformedJSON(t *testing.T) {
 func TestListIntakesAndBooksEndpoints(t *testing.T) {
 	reader := &fakeReader{
 		intakes: []intake.Intake{{ID: 11, Name: "知乎+黑岩", Status: intake.StatusCompleted}},
-		books: map[int64][]intake.Book{11: {{ID: 21, IntakeID: 11, Source: "知乎付费", PlatformID: "15", ExternalBookID: "1001", Title: "测试书", OriginalText: "不应出现在列表接口", Gender: "女频", Style: "情感", Status: intake.BookStatusFetched}}},
+		books:   map[int64][]intake.Book{11: {{ID: 21, IntakeID: 11, Source: "知乎付费", PlatformID: "15", ExternalBookID: "1001", Title: "测试书", OriginalText: "不应出现在列表接口", Gender: "女频", Style: "情感", Status: intake.BookStatusFetched}}},
 	}
 	handler := NewHandler(Dependencies{Reader: reader})
 
@@ -175,7 +179,7 @@ func TestCreateBatchProjectEndpointSupportsImmediateAndScheduled(t *testing.T) {
 	now := time.Date(2026, 10, 5, 9, 0, 0, 0, time.UTC)
 	pipelineAPI := &fakePipelineAPI{result: pipeline.CreateResult{
 		Project: intake.BatchProject{ID: 51, IntakeID: 11, Name: "项目"},
-		Run: intake.Run{ID: 71, BatchProjectID: 51, RunAt: now, Status: intake.RunStatusPending},
+		Run:     intake.Run{ID: 71, BatchProjectID: 51, RunAt: now, Status: intake.RunStatusPending},
 	}}
 	handler := NewHandler(Dependencies{Pipeline: pipelineAPI})
 

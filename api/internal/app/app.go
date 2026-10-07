@@ -20,6 +20,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/workshop"
 )
 
 func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock) http.Handler {
@@ -40,6 +41,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		textProvider = generation.NewHTTPProvider(baseURL, key, model)
 	}
 	generationService := generation.NewService(generationStore, textProvider, nil)
+	workshopService := workshop.NewService(workshop.NewMySQLStore(db), store, generationService)
 	observedGeneration := observedGenerationService{next: generationService, logger: logger}
 	settingsService := unifiedsettings.NewService(settingsStore, unifiedsettings.StaticDefaults{Config: unifiedsettings.Settings{
 		Production: map[string]any{"productionMode": "original", "aiCopyEnabled": false, "aiCopyCount": float64(1)},
@@ -115,6 +117,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		BatchProjects:               store,
 		BatchProjectDetails:         store,
 		Generation:                  observedGeneration,
+		Workshop:                    workshopService,
 		UnifiedSettings:             settingsService,
 		Auth:                        authService,
 		Publishing:                  observedPublishing,

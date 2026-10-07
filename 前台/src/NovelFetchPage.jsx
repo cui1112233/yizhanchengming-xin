@@ -510,8 +510,8 @@ export default function NovelFetchPage() {
               Workshop 本轮不迁移；这里只保留正确入口，不在 Novel Fetch 主页面复制第二套 AI 配置或规则数据。
             </Typography.Paragraph>
             <Space wrap>
-              <Button href="/novel-fetch-workshop">AI 处理配置</Button>
-              <Button href="/novel-fetch-workshop">处理规则</Button>
+              <Button href={selectedIntakeId ? `/novel-fetch-workshop?intakeId=${selectedIntakeId}` : '/novel-fetch-workshop'}>AI 处理配置</Button>
+              <Button href={selectedIntakeId ? `/novel-fetch-workshop?intakeId=${selectedIntakeId}` : '/novel-fetch-workshop'}>处理规则</Button>
             </Space>
           </Card>
         </Col>

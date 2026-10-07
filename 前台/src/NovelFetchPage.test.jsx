@@ -64,8 +64,8 @@ describe('Novel Fetch 主页面', () => {
     expect(await screen.findByText('1001')).toBeTruthy()
     expect(screen.getByText('成功书')).toBeTruthy()
     expect(screen.getByText('1002')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'AI 处理配置' }).getAttribute('href')).toBe('/novel-fetch-workshop')
-    expect(screen.getByRole('link', { name: '处理规则' }).getAttribute('href')).toBe('/novel-fetch-workshop')
+    expect(screen.getByRole('link', { name: 'AI 处理配置' }).getAttribute('href')).toBe('/novel-fetch-workshop?intakeId=42')
+    expect(screen.getByRole('link', { name: '处理规则' }).getAttribute('href')).toBe('/novel-fetch-workshop?intakeId=42')
   })
 
   it('重试复用同一 Intake execute 链路，并在成功后恢复完成状态', async () => {
