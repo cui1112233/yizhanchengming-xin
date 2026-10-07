@@ -48,7 +48,7 @@ export default function IssuesPage() {
       columns={[
         { title: '来源', dataIndex: 'source', render: value => <Tag>{value}</Tag> },
         { title: '状态', dataIndex: 'status', render: value => <Tag color="red">{value}</Tag> },
-        { title: '问题', dataIndex: 'message' },
+        { title: '问题', render: (_, row) => <Space direction="vertical" size={0}><span>{row.message}</span>{row.code && <Typography.Text type="secondary">错误码：{row.code}</Typography.Text>}{row.requestId && <Typography.Text type="secondary">请求 ID：{row.requestId}</Typography.Text>}</Space> },
         { title: '项目 / 小说', render: (_, row) => `#${row.projectId} / #${row.bookId}` },
         { title: '时间', dataIndex: 'at', render: value => new Date(value).toLocaleString('zh-CN', { hour12: false }) },
         { title: '操作', render: (_, row) => <Button size="small" href={`/shuihuo-production?projectId=${row.projectId}`}>打开项目</Button> },

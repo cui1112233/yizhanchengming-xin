@@ -22,8 +22,8 @@ func TestIssuesProjectionScopesAndRedactsFacts(t *testing.T) {
 	h := NewHandler(Dependencies{Database: db, Auth: &fakeAuthService{user: authn.User{ID: 7, TeamID: 3, Capabilities: []string{CapabilityBatchView}}}})
 	count := regexp.QuoteMeta("SELECT COUNT(*) FROM (") + ".*"
 	mock.ExpectQuery(count).WithArgs(int64(7), int64(3)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	rows := sqlmock.NewRows([]string{"id", "project_id", "book_id", "source", "status", "error_code", "error_message", "at"}).
-		AddRow(9, 12, 23, "stage_run", "failed", "", "provider token=secret-value failed", time.Date(2026, 10, 7, 1, 2, 3, 0, time.UTC))
+	rows := sqlmock.NewRows([]string{"id", "project_id", "book_id", "source", "status", "error_code", "request_id", "error_message", "at"}).
+		AddRow(9, 12, 23, "stage_run", "failed", "", "request-9", "provider token=secret-value failed", time.Date(2026, 10, 7, 1, 2, 3, 0, time.UTC))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM (")+".*").WithArgs(int64(7), int64(3), 20, 0).WillReturnRows(rows)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/issues?page=1", nil)
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access"})
@@ -38,13 +38,14 @@ func TestIssuesProjectionScopesAndRedactsFacts(t *testing.T) {
 	var body struct {
 		Total   int `json:"total"`
 		Entries []struct {
-			ID string `json:"id"`
+			ID        string `json:"id"`
+			RequestID string `json:"requestId"`
 		} `json:"entries"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Total != 1 || len(body.Entries) != 1 || body.Entries[0].ID != "stage_run-9" {
+	if body.Total != 1 || len(body.Entries) != 1 || body.Entries[0].ID != "stage_run-9" || body.Entries[0].RequestID != "request-9" {
 		t.Fatalf("unexpected projection: %s", rec.Body.String())
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

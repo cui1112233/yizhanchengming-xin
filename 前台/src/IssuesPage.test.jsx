@@ -16,10 +16,11 @@ afterEach(() => {
 
 describe('IssuesPage', () => {
   it('renders only the server issue projection with source, status and search filters', async () => {
-    listIssues.mockResolvedValue({ page: 1, entries: [{ id: 'stage_run-4', source: 'stage_run', status: 'failed', message: 'safe failure', projectId: 2, bookId: 8, at: '2026-10-07T00:00:00Z' }] })
+    listIssues.mockResolvedValue({ page: 1, entries: [{ id: 'stage_run-4', source: 'stage_run', status: 'failed', message: 'safe failure', requestId: 'request-4', projectId: 2, bookId: 8, at: '2026-10-07T00:00:00Z' }] })
     render(<IssuesPage />)
 
     expect(await screen.findByText('safe failure')).toBeTruthy()
+    expect(screen.getByText('请求 ID：request-4')).toBeTruthy()
     expect(screen.getByRole('link', { name: '打开项目' }).getAttribute('href')).toBe('/shuihuo-production?projectId=2')
     await waitFor(() => expect(listIssues).toHaveBeenCalledWith(expect.objectContaining({ page: 1, status: '' })))
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '筛选问题状态' }))
