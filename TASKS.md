@@ -355,6 +355,37 @@
 
 # Task 16：ECS 部署与最终公网验收
 
+## 16.0 全站公网验收执行矩阵（Task 11，2026-10-07）
+
+> 状态：`[ ]` 表示尚未在登录后的公网/ECS 环境执行，不能以本地单测、构建或 HTTP 200 代替。本矩阵是 Task 16 的执行清单；真实截图、请求 ID、账号角色与 Provider 任务 ID 必须在执行时填写。
+
+| 路由 / 页面 | 核心功能与状态 | 权限与刷新恢复 | UI 截图 | 真实 Provider / 外部结果 |
+| --- | --- | --- | --- | --- |
+| `/` 首页 | 创作入口、最近项目空态/有数据态、深浅主题 | 未登录跳转、登录后返回原地址、刷新不丢主题 | [ ] | 不适用 |
+| `/novel-fetch` | 多来源、多书添加、获取正文、部分失败与重试 | `batch.view/configure/execute`、刷新后 Intake/Book 恢复 | [ ] | [ ] provider121 正文与分类 |
+| `/novel-fetch-workshop` | 处理规则、知识库说明、原文查看/恢复、失败书重试 | `batch.view/configure/execute`、刷新后 Workshop 设置/原文恢复 | [ ] | [ ] provider121 原文恢复 |
+| `/batch-factory` | 项目列表、筛选、创建、项目进入、空/错/加载态 | `batch.view/configure/execute`、刷新后 BatchProject/Run 恢复 | [ ] | [ ] Intake/Run 真实结果 |
+| `/batch-factory?projectId={id}` | 书籍、阶段状态、统一设置、版本配置、音频、视频、合成与重试 | 项目归属/Capability、刷新后 StageRun/视频/合成状态恢复 | [ ] | [ ] generation、TTS、视频、TOS、ffmpeg |
+| `/shuihuo-production` | 生产项目、单书继续执行、阶段重试、视频提交/取消/重试 | `batch.view/execute`、刷新后生成与视频任务恢复 | [ ] | [ ] generation、视频 Provider、TOS |
+| `/script` | 原文、人物/场景/约束保存、SCRIPT/HOOK/DIRECTOR/FINAL_PROMPT、音频入口 | `batch.view/configure/execute`、刷新后 MySQL 设置与 StageRun 恢复 | [ ] | [ ] generation、TTS、matchAudio |
+| `/novel-panel` | 核对真实页面、工作台桥接与安全通信 | 登录/权限/刷新恢复 | [ ] | [ ] 关联项目/媒体结果 |
+| `/agent` | 核对 Agent 工作区会话、画布、版本与任务状态 | 登录/会话恢复/权限 | [ ] | [ ] 已配置模型与 TOS 输出 |
+| `/tts` | 配音创建、进度、试听、失败重试 | 能力权限、刷新后音频任务恢复 | [ ] | [ ] TTS Provider、音频 TOS URL |
+| `/history` | 项目/作品历史、空态与进入详情 | 仅本人可见、刷新恢复 | [ ] | 不适用（验证聚合 API 真实结果） |
+| `/issues` | 问题日志、筛选、错误详情与请求 ID | 运维/角色边界、刷新恢复 | [ ] | [ ] 真实失败任务可追溯 |
+| `/settings` | 用户可见设置与保存反馈 | 本人权限、刷新后服务端设置恢复 | [ ] | 不适用 |
+| `/member` | 账号资料、会话、退出登录 | 本人/管理员边界、刷新与重新登录 | [ ] | 不适用 |
+| `/api/v1/diagnostics`（非页面） | 健康、依赖与脱敏诊断 | 仅 operations admin，禁止普通用户访问 | 不适用 | [ ] MySQL、Redis、TOS 连通性 |
+
+### Task 11 测试稳定性验证（仓库阶段）
+
+- [x] 已复现 Workshop 测试不稳定：原单测把首屏恢复、Drawer 渲染和保存请求串在同一条默认 5 秒超时断言内；一次实测为 `5.72s`，另一次在 `5.234s` 时触发 Vitest timeout，并非产品 API、权限或业务失败。
+- [x] 仅调整测试同步与测试环境：拆分为“恢复事实 / 查看原文 Drawer / 保存配置”三条独立断言；jsdom 测试环境忽略其不支持的 `getComputedStyle` 伪元素参数，保留元素自身计算样式；Script 测试选择器与现有“按已保存原文生成剧本”按钮文案同步。未改产品 UI、业务语义、权限或 API。
+- [x] Workshop 定向回归连续 5 次通过；三条断言单次最长 `1.940s`，未修改 Vitest 默认超时。
+- [x] 最新 `main` 上前台全量 `npm test` 连续三次通过：均为 `18` 个测试文件、`66` 条测试、退出码 `0`；总时长依次为 `129.76s`、`121.58s`、`125.45s`。
+- [x] `npm run build` 通过，退出码 `0`（产物：`dist/`）；仅有 Ant Design/Rollup 的既有 `use client` 与大 chunk 警告，无构建失败。
+- [ ] 本次未部署、未运行 GitHub Actions、未执行公网登录或 Provider 调用；上表所有 `[ ]` 仍须在 Task 16 的真实 ECS/浏览器验收中逐项留存证据。
+
 ## 16.1 构建与部署
 
 - [ ] 16.1.1 GitHub 自动构建部署产物

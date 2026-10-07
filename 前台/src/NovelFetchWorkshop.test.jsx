@@ -23,8 +23,19 @@ describe('Novel Fetch Workshop', () => {
     render(<NovelFetchWorkshop />)
     expect(await screen.findByTitle('#7 · 恢复任务 · partial_failed')).toBeTruthy()
     expect(screen.getByText('script.default v2')).toBeTruthy()
+    expect(screen.getByLabelText('处理规则').value).toBe('规则')
+  })
+
+  it('opens the restored original text in its own drawer', async () => {
+    render(<NovelFetchWorkshop />)
+    await screen.findByTitle('#7 · 恢复任务 · partial_failed')
     fireEvent.click(screen.getAllByRole('button', { name:'查看原文' })[0])
     expect(await screen.findByText('服务端原文')).toBeTruthy()
+  })
+
+  it('saves edited settings through the workshop API', async () => {
+    render(<NovelFetchWorkshop />)
+    await screen.findByTitle('#7 · 恢复任务 · partial_failed')
     fireEvent.change(screen.getByLabelText('处理规则'), { target:{ value:'新规则' } })
     fireEvent.click(screen.getByRole('button', { name:'保存配置' }))
     await waitFor(() => expect(global.fetch.mock.calls.some(([url,options]) => url === '/api/v1/intakes/7/workshop' && options.method === 'PUT')).toBe(true))
