@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Space, Tag, Typography } from 'antd'
 import { createBatchProject, createIntake, executeIntake, listBatchProjects } from './api.js'
 import { NOVEL_FETCH_PLATFORMS } from './NovelFetchPage.jsx'
 import PageState from './ui/PageState.jsx'
@@ -10,6 +10,13 @@ const sourceOptions = NOVEL_FETCH_PLATFORMS.map((item) => ({ value: item.label, 
 function safeError(error) {
   if (error?.status === 403) return '无权限访问批量工厂。'
   return error instanceof Error ? error.message : '请求失败，请稍后重试。'
+}
+
+function parseBookIDs(value) {
+  return [...new Set(String(value || '')
+    .split(/[\s,，;；\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean))]
 }
 
 export default function BatchFactoryHome({ onOpenProject }) {
@@ -45,13 +52,23 @@ export default function BatchFactoryHome({ onOpenProject }) {
   }), [projects, query, source, runStatus])
 
   const submit = async (values) => {
-    const selected = sourceOptions.find((item) => item.value === values.source)
-    if (!selected) return
+    const groups = (values.groups || []).map((group) => {
+      const selected = sourceOptions.find((item) => item.value === group.source)
+      return {
+        source: selected?.label || '',
+        platformId: selected?.platformId || '',
+        books: parseBookIDs(group.bookIds).map((bookId) => ({ bookId, title: '', gender: '', style: '' })),
+      }
+    }).filter((group) => group.source && group.platformId && group.books.length > 0)
+    if (groups.length === 0) {
+      setError('请至少添加一个书城分组及一本 Book ID。')
+      return
+    }
     setCreating(true); setError('')
     try {
       const created = await createIntake({
         name: values.intakeName || values.projectName,
-        groups: [{ source: selected.label, platformId: selected.platformId, books: [{ bookId: String(values.bookId).trim(), title: '', gender: '', style: '' }] }],
+        groups,
       })
       const intake = created?.intake
       if (!intake?.id) throw new Error('创建 Intake 后未返回 ID')
@@ -75,7 +92,19 @@ export default function BatchFactoryHome({ onOpenProject }) {
     </Card>
     <Modal title="新建批量" open={open} confirmLoading={creating} onCancel={() => !creating && setOpen(false)} onOk={() => form.submit()} okText="获取并创建项目">
       <Alert type="info" showIcon message="将依次创建 Intake、执行正文获取；只有全部完成后才创建 BatchProject。" style={{ marginBottom: 16 }} />
-      <Form form={form} layout="vertical" onFinish={submit} initialValues={{ maxText: 4000 }}><Form.Item name="projectName" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}><Input /></Form.Item><Form.Item name="source" label="书城来源" rules={[{ required: true, message: '请选择书城来源' }]}><Select options={sourceOptions.map(({ value, label }) => ({ value, label }))} /></Form.Item><Form.Item name="bookId" label="Book ID" rules={[{ required: true, message: '请输入一个 Book ID' }]}><Input /></Form.Item><Form.Item name="maxText" label="单书正文长度"><InputNumber min={100} max={100000} style={{ width: '100%' }} /></Form.Item></Form>
+      <Form form={form} layout="vertical" onFinish={submit} initialValues={{ maxText: 4000, groups: [{ source: undefined, bookIds: '' }] }}>
+        <Form.Item name="projectName" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}><Input /></Form.Item>
+        <Form.List name="groups">
+          {(fields, { add, remove }) => <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            {fields.map((field, index) => <Card key={field.key} size="small" title={`书城分组 ${index + 1}`} extra={fields.length > 1 ? <Button type="link" danger onClick={() => remove(field.name)}>删除分组</Button> : null}>
+              <Form.Item {...field} name={[field.name, 'source']} label="书城来源" rules={[{ required: true, message: '请选择书城来源' }]}><Select options={sourceOptions.map(({ value, label }) => ({ value, label }))} /></Form.Item>
+              <Form.Item {...field} name={[field.name, 'bookIds']} label="Book ID" rules={[{ required: true, message: '请输入至少一个 Book ID' }]} extra="可用空格、逗号或换行批量录入；同组重复 ID 会自动去重。"><Input.TextArea aria-label={`Book ID 分组 ${index + 1}`} rows={3} placeholder="例如：1001, 1002\n1003" /></Form.Item>
+            </Card>)}
+            <Button onClick={() => add({ source: undefined, bookIds: '' })}>添加书城分组</Button>
+          </Space>}
+        </Form.List>
+        <Form.Item name="maxText" label="单书正文长度"><InputNumber min={100} max={100000} style={{ width: '100%' }} /></Form.Item>
+      </Form>
     </Modal>
   </main>
 }

@@ -108,6 +108,16 @@ describe('BatchProjectListPage', () => {
     await waitFor(() => expect(api.getBatchProject).toHaveBeenCalledWith(3))
   })
 
+  it('from project books opens the persisted production workbench', async () => {
+    render(<BatchProjectListPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '测试项目' }))
+    fireEvent.click(await screen.findByRole('button', { name: '进入生产工作台' }))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(screen.getAllByText('Script').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Final Prompt').length).toBeGreaterThan(0)
+    expect(screen.getByText('导演输出格式错误')).toBeTruthy()
+  }, 15000)
+
   it('shows four real stage statuses and retry for failed stage', async () => {
     render(<BatchProjectListPage />)
     await screen.findByText('测试项目')

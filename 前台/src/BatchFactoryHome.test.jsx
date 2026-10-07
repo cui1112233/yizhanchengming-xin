@@ -21,7 +21,7 @@ describe('BatchFactoryHome', () => {
     fireEvent.click(screen.getByRole('button', { name: '进入项目' }))
     expect(open).toHaveBeenCalledWith(6)
   })
-  it('creates intake, executes it, then creates project only after completed', async () => {
+  it('creates a grouped multi-book intake, executes it, then creates project only after completed', async () => {
     api.createIntake.mockResolvedValue({ intake: { id: 22 } })
     api.executeIntake.mockResolvedValue({ status: 'completed' })
     api.createBatchProject.mockResolvedValue({ project: { id: 9 } })
@@ -31,8 +31,19 @@ describe('BatchFactoryHome', () => {
     fireEvent.change(screen.getByLabelText('项目名称'), { target: { value: '新项目' } })
     fireEvent.mouseDown(screen.getByLabelText('书城来源'))
     fireEvent.click((await screen.findAllByText('知乎付费')).at(-1))
-    fireEvent.change(screen.getByLabelText('Book ID'), { target: { value: '1001' } })
+    fireEvent.change(screen.getByLabelText('Book ID 分组 1'), { target: { value: '1001, 1002\n1001' } })
+    fireEvent.click(screen.getByRole('button', { name: '添加书城分组' }))
+    const sources = screen.getAllByLabelText('书城来源')
+    fireEvent.mouseDown(sources.at(-1))
+    fireEvent.click((await screen.findAllByText('番茄免费')).at(-1))
+    fireEvent.change(screen.getByLabelText('Book ID 分组 2'), { target: { value: '2001 2002' } })
     fireEvent.click(screen.getByRole('button', { name: '获取并创建项目' }))
     await waitFor(() => expect(api.createBatchProject).toHaveBeenCalledWith(22, { name: '新项目' }))
-  })
+    expect(api.createIntake).toHaveBeenCalledWith(expect.objectContaining({
+      groups: [
+        expect.objectContaining({ source: '知乎付费', books: [{ bookId: '1001', title: '', gender: '', style: '' }, { bookId: '1002', title: '', gender: '', style: '' }] }),
+        expect.objectContaining({ source: '番茄免费', books: [{ bookId: '2001', title: '', gender: '', style: '' }, { bookId: '2002', title: '', gender: '', style: '' }] }),
+      ],
+    }))
+  }, 15000)
 })

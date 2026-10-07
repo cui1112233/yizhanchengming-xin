@@ -33,7 +33,7 @@ function renderTags(values) {
   )
 }
 
-function BatchProjectDetail({ projectId, onBack }) {
+function BatchProjectDetail({ projectId, onBack, onOpenProduction }) {
   const [project, setProject] = useState(null)
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
@@ -85,7 +85,10 @@ function BatchProjectDetail({ projectId, onBack }) {
             项目与小说数据直接读取 Go API / MySQL，不使用浏览器缓存作为事实源。
           </Typography.Paragraph>
         </div>
-        <Button onClick={onBack}>返回项目列表</Button>
+        <Space>
+          <Button type="primary" onClick={() => onOpenProduction(project)}>进入生产工作台</Button>
+          <Button onClick={onBack}>返回项目列表</Button>
+        </Space>
       </div>
       {error && <Alert type="error" showIcon message={error} className="feedback" />}
       <Card title="小说列表" className="result-card">
@@ -394,7 +397,15 @@ export default function BatchProjectListPage({ initialProjectId = null }) {
   }, [selected, audioMeasurements, matchAudioByBook, videoByBook])
 
   if (selectedDetailProjectId != null) {
-    return <BatchProjectDetail projectId={selectedDetailProjectId} onBack={() => setSelectedDetailProjectId(null)} />
+    return <BatchProjectDetail
+      projectId={selectedDetailProjectId}
+      onBack={() => setSelectedDetailProjectId(null)}
+      onOpenProduction={(project) => {
+        if (!project) return
+        setSelectedDetailProjectId(null)
+        void openGeneration(project)
+      }}
+    />
   }
 
   return (
