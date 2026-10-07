@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/agentstudio"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
@@ -61,6 +62,14 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	publishingStore := publishing.NewMySQLStore(db)
 	publishingService := publishing.NewService(publishingStore, publishing.Options{CredentialKey: publishingCredentialKey()})
 	observedPublishing := observedPublishingService{next: publishingService, logger: logger}
+	// Test-only handlers deliberately omit authentication. Do not attach the
+	// ownership checker in that mode: it correctly requires an authenticated
+	// actor, while the store-wiring tests exercise the unauthenticated fixture.
+	// Production handlers always enable both auth and ownership checks together.
+	var batchProjectAccess httpapi.BatchProjectAccessChecker
+	if authEnabled {
+		batchProjectAccess = publishingStore
+	}
 	allowedOrigins := make([]string, 0)
 	for _, value := range strings.Split(os.Getenv("QIANTIE_ALLOWED_ORIGINS"), ",") {
 		if value = strings.TrimSpace(value); value != "" {
@@ -150,9 +159,12 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		}()
 	}
 	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
+	agentService := agentstudio.NewService(agentstudio.NewMySQLStore(db), agentstudio.UnavailableExecutor{})
+	agentService.SetObjects(tosUploader, tosBucket)
 
 	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,
+		AgentStudio:                 agentService,
 		Reader:                      store,
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,
@@ -173,7 +185,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		VideoStatus:                 videoService,
 		VideoMerge:                  observedMerge,
 		ShuihuoMedia:                shuihuoMediaService,
-		BatchProjectAccess:          publishingStore,
+		BatchProjectAccess:          batchProjectAccess,
 		VideoResourceProjects:       videoStore,
 		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
 		Database:                    db,

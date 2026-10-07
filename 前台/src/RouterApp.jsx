@@ -11,11 +11,14 @@ import HistoryPage from './HistoryPage.jsx'
 import AccountCenterPage from './AccountCenterPage.jsx'
 import IssuesPage from './IssuesPage.jsx'
 import SettingsPage from './SettingsPage.jsx'
+import AgentStudioPage from './AgentStudioPage.jsx'
+import AgentCanvasPage from './AgentCanvasPage.jsx'
 import { getNovelPanel, listNovelPanelHistory, restoreNovelPanelHistory, saveNovelPanel } from './api.js'
 import './home.css'
 
 const routeFoundations = {
-  '/agent': { title: 'Agent 工作区', description: '路由基础已恢复；Agent 实际业务由对应迁移任务接入。' },
+  '/issues': { title: '问题日志', description: '问题日志入口已恢复；实际日志页面不属于本任务范围。' },
+  '/settings': { title: '设置', description: '设置入口已恢复；实际设置页不属于本任务范围。' },
 }
 
 function RouteFoundation({ title, description, onNavigate }) {
@@ -77,6 +80,10 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
     page = <AccountCenterPage user={currentUser} onLogout={onLogout} />
   } else if (pathname === '/member') {
     page = <AccountCenterPage user={currentUser} onLogout={onLogout} mode="member" />
+  } else if (pathname === '/agent') {
+    page = <AgentStudioPage onNavigate={navigate} />
+  } else if (pathname === '/agent/canvas') {
+    page = <AgentCanvasPage />
   } else if (pathname === '/novel-panel') {
     page = !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0
       ? <RouteFoundation title="小说面板" description="请从批量项目进入小说面板（需要 projectId）。" onNavigate={navigate} />

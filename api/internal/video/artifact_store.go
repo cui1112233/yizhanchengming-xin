@@ -160,3 +160,8 @@ func (u *TOSUploader) GetObject(ctx context.Context, bucket, key string) (io.Rea
 	}
 	return output.Content, nil
 }
+
+func (u *TOSUploader) DeleteObject(ctx context.Context, bucket, key string) error {
+	_, err := u.client.DeleteObjectV2(ctx, &tos.DeleteObjectV2Input{Bucket: bucket, Key: key})
+	return err
+}

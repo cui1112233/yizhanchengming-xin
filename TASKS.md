@@ -617,3 +617,18 @@
 - [x] 历史投影契约测试覆盖成员 owner/team 归属参数、关键词/状态筛选、分页参数、总数和 RFC3339 更新时间响应。
 - [ ] Script、Novel Panel、Agent、TTS、历史、问题日志、设置、用户中心的实际业务页面不属于任务 1；当前仅保留稳定路由基础，等待各自模块提交。
 - [ ] `/shuihuo-production` 继续保持当前 main 已有组件行为，本任务没有重写水货生产实际业务页。
+
+---
+
+# 2026-10-07 · Task 16：Agent Studio
+
+> 状态：⚠️ 本地实现与测试完成；未部署，真实 Provider 与公网登录验收未完成。
+
+- [x] Agent 独立项目、最近项目搜索/创建/进入/删除，以及服务端会话、消息、画布、附件和执行记录恢复。
+- [x] 画布使用 MySQL revision 乐观锁、版本历史与安全恢复；附件内容使用 TOS、元数据使用 MySQL。
+- [x] 用户技能版本由 MySQL 持久化并按所有者读取和选择；系统提示词仍在 Go `agentstudio` prompt 模块，前端不保存提示词事实。
+- [x] API 复用 Cookie Session、CSRF、capability 与项目归属校验；未引入 Bearer、`/api/chat`、Node 后端或第二套队列/Worker。
+- [x] 未配置执行器会持久化并返回 `executor_unavailable`，不会伪造助手消息。
+- [x] 本地验证：`go test ./...` 通过；`npm test -- --run` 为 24 文件、80 测试通过（153.39 秒）；`npm run build` 通过。
+
+仍未完成：真实 Provider、TOS 凭据联通、部署与登录后公网浏览器验收。
