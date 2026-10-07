@@ -5,10 +5,11 @@ import HomePage from './HomePage.jsx'
 import UserShell from './UserShell.jsx'
 import NovelFetchWorkshop from './NovelFetchWorkshop.jsx'
 import ScriptWorkspace from './ScriptWorkspace.jsx'
+import NovelPanelWorkbench from './novel-panel/NovelPanelWorkbench.jsx'
+import { getNovelPanel, listNovelPanelHistory, restoreNovelPanelHistory, saveNovelPanel } from './api.js'
 import './home.css'
 
 const routeFoundations = {
-  '/novel-panel': { title: '小说面板', description: '路由基础已恢复；小说面板实际业务由对应迁移任务接入。' },
   '/agent': { title: 'Agent 工作区', description: '路由基础已恢复；Agent 实际业务由对应迁移任务接入。' },
   '/tts': { title: '配音', description: '路由基础已恢复；配音实际业务由对应迁移任务接入。' },
   '/history': { title: '历史', description: '历史入口已恢复；真实历史项目读取由后续项目聚合接口接入。' },
@@ -47,6 +48,13 @@ export default function RouterApp({ theme, onToggleTheme }) {
     }
     setPathname(path)
   }
+  const [novelPanel, setNovelPanel] = useState({ loading: false, loadedProject: 0, workspace: null, error: null })
+  const panelProjectId = Number(new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('projectId'))
+  useEffect(() => {
+    if (pathname !== '/novel-panel' || !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0 || novelPanel.loadedProject === panelProjectId || novelPanel.loading) return
+    setNovelPanel((value) => ({ ...value, loading: true, error: null }))
+    getNovelPanel(panelProjectId).then((result) => setNovelPanel({ loading: false, loadedProject: panelProjectId, workspace: result.workspace, error: null })).catch((error) => setNovelPanel({ loading: false, loadedProject: panelProjectId, workspace: null, error }))
+  }, [pathname, panelProjectId, novelPanel.loadedProject, novelPanel.loading])
 
   let page
   if (pathname === '/') {
@@ -57,6 +65,12 @@ export default function RouterApp({ theme, onToggleTheme }) {
     page = <NovelFetchWorkshop />
   } else if (pathname === '/script') {
     page = <ScriptWorkspace />
+  } else if (pathname === '/novel-panel') {
+    page = !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0
+      ? <RouteFoundation title="小说面板" description="请从批量项目进入小说面板（需要 projectId）。" onNavigate={navigate} />
+      : novelPanel.loading ? <RouteFoundation title="小说面板" description="正在读取工作区…" onNavigate={navigate} />
+        : novelPanel.error ? <RouteFoundation title="小说面板" description={novelPanel.error.message || '读取失败，请重试。'} onNavigate={navigate} />
+          : <NovelPanelWorkbench projectId={panelProjectId} initialWorkspace={novelPanel.workspace} api={{ saveWorkspace: saveNovelPanel, listHistory: listNovelPanelHistory, restoreHistory: restoreNovelPanelHistory }} />
   } else if (routeFoundations[pathname]) {
     page = <RouteFoundation {...routeFoundations[pathname]} onNavigate={navigate} />
   } else {

@@ -49,6 +49,7 @@
 - ⚠️ Task 14：视频生成完整链路（仓库阶段已完成；等待 Task9.4 Runtime Adapter + Task16 ECS/公网验收）
 - ⚠️ Task 15：发布 / 权限 / 登录认证兼容（仓库阶段已完成；公网/ECS 验收留到 Task 16）
 - [ ] Task 16：ECS 新仓库部署与公网全流程验收
+- ⚠️ Task 17：Novel Panel（仓库实现、Go/前台测试与构建已通过；ECS 公网逐按钮验收待 Task 16）
 
 ---
 

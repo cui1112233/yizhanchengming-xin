@@ -14,6 +14,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
@@ -42,6 +43,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	}
 	generationService := generation.NewService(generationStore, textProvider, nil)
 	workshopService := workshop.NewService(workshop.NewMySQLStore(db), store, generationService)
+	novelPanelService := novelpanel.NewService(novelpanel.NewMySQLStore(db))
 	observedGeneration := observedGenerationService{next: generationService, logger: logger}
 	settingsService := unifiedsettings.NewService(settingsStore, unifiedsettings.StaticDefaults{Config: unifiedsettings.Settings{
 		Production: map[string]any{"productionMode": "original", "aiCopyEnabled": false, "aiCopyCount": float64(1)},
@@ -118,6 +120,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		BatchProjectDetails:         store,
 		Generation:                  observedGeneration,
 		Workshop:                    workshopService,
+		NovelPanel:                  novelPanelService,
 		UnifiedSettings:             settingsService,
 		Auth:                        authService,
 		Publishing:                  observedPublishing,

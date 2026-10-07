@@ -217,6 +217,11 @@ export function getBatchProject(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}`)
 }
 
+export function getNovelPanel(projectId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/novel-panel`) }
+export function saveNovelPanel(projectId, input) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/novel-panel`, { method: 'PUT', body: JSON.stringify(input) }) }
+export function listNovelPanelHistory(projectId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/novel-panel/history`) }
+export function restoreNovelPanelHistory(projectId, historyId, input = {}) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/novel-panel/history/${encodeURIComponent(historyId)}/restore`, { method: 'POST', body: JSON.stringify({ expectedRevision: Number(input.expectedRevision || 0) }) }) }
+
 export function getUnifiedSettings(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/settings`)
 }

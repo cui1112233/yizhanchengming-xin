@@ -10,6 +10,7 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
@@ -30,6 +31,13 @@ type IntakeReader interface {
 type WorkshopService interface {
 	Snapshot(context.Context, int64) (workshop.Snapshot, error)
 	Save(context.Context, int64, json.RawMessage) (json.RawMessage, error)
+}
+type NovelPanelService interface {
+	GetWorkspace(context.Context, int64) (novelpanel.Workspace, error)
+	Save(context.Context, novelpanel.SaveRequest) (novelpanel.SaveResult, error)
+	ListHistory(context.Context, int64, int) ([]novelpanel.HistoryRecord, error)
+	Restore(context.Context, novelpanel.RestoreRequest) (novelpanel.SaveResult, error)
+	PrepareStoryboardRequest(novelpanel.Workspace) (novelpanel.StoryboardRequest, error)
 }
 
 type BatchProjectReader interface {
@@ -88,6 +96,7 @@ type Dependencies struct {
 	Pipeline                    PipelineService
 	Generation                  GenerationService
 	Workshop                    WorkshopService
+	NovelPanel                  NovelPanelService
 	UnifiedSettings             UnifiedSettingsService
 	Auth                        AuthService
 	Publishing                  PublishingService
@@ -140,6 +149,10 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))
+	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.getNovelPanel))))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/novel-panel", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.saveNovelPanel)))))
+	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel/history", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("id", http.HandlerFunc(api.listNovelPanelHistory))))
+	mux.Handle("POST /api/v1/batch-projects/{id}/novel-panel/history/{historyId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("id", http.HandlerFunc(api.restoreNovelPanelHistory)))))
 
 	// Stage 2: unified settings/version profile.
 	mux.Handle("GET /api/v1/batch-projects/{id}/settings", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getUnifiedSettings)))

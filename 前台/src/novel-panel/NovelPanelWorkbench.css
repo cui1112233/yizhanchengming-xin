@@ -1,0 +1,71 @@
+.novel-panel-workbench {
+  width: 100%;
+  padding: 16px;
+}
+
+.novel-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.novel-panel-notice {
+  margin-bottom: 16px;
+}
+
+.novel-panel-card {
+  margin-bottom: 16px;
+}
+
+.novel-panel-field-gap {
+  margin-top: 8px;
+}
+
+.novel-panel-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.novel-panel-inline-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.novel-panel-shot-card,
+.novel-panel-character-card {
+  margin-bottom: 10px;
+}
+
+.novel-panel-relation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ant-color-border-secondary, rgba(128, 128, 128, 0.25));
+  border-radius: 8px;
+}
+
+.novel-panel-shared-note {
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .novel-panel-workbench {
+    padding: 10px;
+  }
+
+  .novel-panel-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .novel-panel-relation {
+    grid-template-columns: 1fr;
+  }
+}
