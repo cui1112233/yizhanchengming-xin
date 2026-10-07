@@ -99,7 +99,7 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   }
 
   return (
-    <UserShell pathname={pathname} theme={theme} onToggleTheme={onToggleTheme} onNavigate={navigate}>
+    <UserShell pathname={pathname} theme={theme} onToggleTheme={onToggleTheme} onNavigate={navigate} currentUser={currentUser} onLogout={onLogout}>
       {page}
     </UserShell>
   )

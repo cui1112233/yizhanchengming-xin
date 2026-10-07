@@ -51,7 +51,7 @@ describe('Task 1 首页与用户路由基础', () => {
     }
     expect(screen.getByRole('button', { name: '主题' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '设置' }).getAttribute('href')).toBe('/settings')
-    expect(screen.getByRole('link', { name: '用户入口' }).getAttribute('href')).toBe('/member')
+    expect(screen.getByRole('button', { name: '用户入口' })).toBeTruthy()
   })
 
   it('/novel-fetch 继续渲染现有小说获取页面', async () => {

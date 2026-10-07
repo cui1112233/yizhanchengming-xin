@@ -1,5 +1,5 @@
-import React from 'react'
-import { Button } from 'antd'
+import React, { useState } from 'react'
+import { Button, Drawer, Dropdown } from 'antd'
 
 const primaryNavItems = [
   { href: '/', label: '首页' },
@@ -26,26 +26,30 @@ function ShellLink({ href, active, onNavigate, className = '', children }) {
   )
 }
 
-export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, children }) {
+export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, currentUser, onLogout, children }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
   const isHome = pathname === '/'
   const logo = theme === 'dark' || isHome ? '/assets/brand-logo-white.png' : '/assets/brand-logo-black.png'
+  const navigate = (href) => { setMobileOpen(false); onNavigate(href) }
+  const navigation = <nav className="user-shell-nav" aria-label="用户导航">{primaryNavItems.map((item) => <ShellLink key={item.href} href={item.href} active={pathname === item.href} onNavigate={navigate}>{item.label}</ShellLink>)}</nav>
+  const menuItems = [{ key: 'profile', label: '个人资料' }, { key: 'member', label: '会员与权限' }, { type: 'divider' }, { key: 'logout', danger: true, label: '退出登录' }]
   return (
     <div className={`user-shell ${isHome ? 'user-shell-home' : ''}`}>
       <header className="user-shell-header">
         <ShellLink href="/" active={isHome} onNavigate={onNavigate} className="user-shell-brand">
           <img src={logo} alt="一战晟铭" /><strong>一战晟铭</strong>
         </ShellLink>
-        <nav className="user-shell-nav" aria-label="用户导航">
-          {primaryNavItems.map((item) => (
-            <ShellLink key={item.href} href={item.href} active={pathname === item.href} onNavigate={onNavigate}>{item.label}</ShellLink>
-          ))}
-        </nav>
+        {navigation}
         <div className="user-shell-actions">
+          <Button type="text" className="shell-mobile-menu" aria-label="打开导航" onClick={() => setMobileOpen(true)}>导航</Button>
           <Button type="text" className="shell-action-button" onClick={onToggleTheme} aria-label="主题">主题</Button>
           <ShellLink href="/settings" active={pathname === '/settings'} onNavigate={onNavigate} className="shell-action-link">设置</ShellLink>
-          <ShellLink href="/member" active={pathname === '/member'} onNavigate={onNavigate} className="shell-user-entry">用户入口</ShellLink>
+          <Dropdown menu={{ items: menuItems, onClick: ({ key }) => { if (key === 'logout') void onLogout?.(); else navigate(`/${key}`) } }} trigger={['click']}>
+            <Button className="shell-user-entry">{currentUser?.displayName || currentUser?.username || '用户入口'}</Button>
+          </Dropdown>
         </div>
       </header>
+      <Drawer title="工作区导航" placement="left" open={mobileOpen} onClose={() => setMobileOpen(false)} className="shell-mobile-drawer">{navigation}</Drawer>
       <div className="user-shell-content">{children}</div>
     </div>
   )

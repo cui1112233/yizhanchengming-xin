@@ -144,6 +144,10 @@ body {
   border: 1px solid var(--shell-border);
 }
 
+.shell-mobile-menu { display: none; }
+.shell-mobile-drawer .user-shell-nav { display: grid; gap: 6px; overflow: visible; }
+.shell-mobile-drawer .user-shell-nav a { padding: 12px; color: var(--shell-text); }
+
 .home-page {
   min-height: 100vh;
   background: var(--shell-bg);
@@ -420,10 +424,11 @@ body {
     display: none;
   }
 
-  .user-shell-actions {
-    justify-content: flex-start;
-    overflow-x: auto;
-  }
+  .user-shell-header { grid-template-columns: auto 1fr; }
+  .user-shell-header > .user-shell-nav { display: none; }
+  .user-shell-actions { grid-column: auto; justify-content: flex-end; overflow: visible; }
+  .shell-mobile-menu { display: inline-flex; }
+  .shell-action-link { display: none; }
 
   .home-video-hero {
     min-height: 88vh;
