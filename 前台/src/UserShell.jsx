@@ -19,38 +19,49 @@ function ShellLink({ href, active, onNavigate, className = '', children }) {
     event.preventDefault()
     onNavigate(href)
   }
-  return (
-    <a href={href} className={`${className} ${active ? 'is-active' : ''}`.trim()} aria-current={active ? 'page' : undefined} onClick={handleClick}>
-      {children}
-    </a>
-  )
+  return <a href={href} className={`${className} ${active ? 'is-active' : ''}`.trim()} aria-current={active ? 'page' : undefined} onClick={handleClick}>{children}</a>
 }
 
 export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, currentUser, onLogout, children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isHome = pathname === '/'
   const logo = theme === 'dark' || isHome ? '/assets/brand-logo-white.png' : '/assets/brand-logo-black.png'
   const navigate = (href) => { setMobileOpen(false); onNavigate(href) }
-  const navigation = <nav className="user-shell-nav" aria-label="用户导航">{primaryNavItems.map((item) => <ShellLink key={item.href} href={item.href} active={pathname === item.href} onNavigate={navigate}>{item.label}</ShellLink>)}</nav>
+  const renderNavigation = (className, label) => <nav className={className} aria-label={label}>{primaryNavItems.map((item) => <ShellLink key={item.href} href={item.href} active={pathname === item.href} onNavigate={navigate}>{item.label}</ShellLink>)}</nav>
   const menuItems = [{ key: 'profile', label: '个人资料' }, { key: 'member', label: '会员与权限' }, { type: 'divider' }, { key: 'logout', danger: true, label: '退出登录' }]
+  const accountName = currentUser?.name || currentUser?.username || '用户入口'
+
   return (
-    <div className={`user-shell ${isHome ? 'user-shell-home' : ''}`}>
-      <header className="user-shell-header">
-        <ShellLink href="/" active={isHome} onNavigate={onNavigate} className="user-shell-brand">
-          <img src={logo} alt="一战晟铭" /><strong>一战晟铭</strong>
-        </ShellLink>
-        {navigation}
-        <div className="user-shell-actions">
-          <Button type="text" className="shell-mobile-menu" aria-label="打开导航" onClick={() => setMobileOpen(true)}>导航</Button>
-          <Button type="text" className="shell-action-button" onClick={onToggleTheme} aria-label="主题">主题</Button>
-          <ShellLink href="/settings" active={pathname === '/settings'} onNavigate={onNavigate} className="shell-action-link">设置</ShellLink>
-          <Dropdown menu={{ items: menuItems, onClick: ({ key }) => { if (key === 'logout') void onLogout?.(); else navigate(`/${key}`) } }} trigger={['click']}>
-            <Button className="shell-user-entry">{currentUser?.name || currentUser?.username || '用户入口'}</Button>
-          </Dropdown>
+    <div className={`user-shell ${isHome ? 'user-shell-home' : 'user-shell-workspace'}`}>
+      {!isHome && <aside className={`workspace-sidebar ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
+        <div className="workspace-sidebar-brand">
+          <ShellLink href="/" active={false} onNavigate={navigate} className="workspace-sidebar-brand-link"><img src={logo} alt="一战晟铭" /><strong>一战晟铭</strong></ShellLink>
+          <Button type="text" aria-label={sidebarCollapsed ? '展开侧边导航' : '收起侧边导航'} onClick={() => setSidebarCollapsed(value => !value)}>{sidebarCollapsed ? '›' : '‹'}</Button>
         </div>
-      </header>
-      <Drawer title="工作区导航" placement="left" open={mobileOpen} onClose={() => setMobileOpen(false)} className="shell-mobile-drawer">{navigation}</Drawer>
-      <div className="user-shell-content">{children}</div>
+        {renderNavigation('workspace-sidebar-nav', '工作区侧边导航')}
+        <div className="workspace-sidebar-tools">
+          <Button type="text" onClick={onToggleTheme} aria-label="切换主题">主题</Button>
+          <ShellLink href="/settings" active={pathname === '/settings'} onNavigate={navigate}>设置</ShellLink>
+        </div>
+        <button type="button" className="workspace-sidebar-account" onClick={() => navigate('/profile')} aria-label="进入个人资料"><span>{accountName.slice(0, 1)}</span><strong>{accountName}</strong></button>
+      </aside>}
+      <div className="user-shell-stage">
+        <header className="user-shell-header">
+          <ShellLink href="/" active={isHome} onNavigate={navigate} className="user-shell-brand"><img src={logo} alt="一战晟铭" /><strong>一战晟铭</strong></ShellLink>
+          {renderNavigation('user-shell-nav', '用户导航')}
+          <div className="user-shell-actions">
+            <Button type="text" className="shell-mobile-menu" aria-label="打开导航" onClick={() => setMobileOpen(true)}>导航</Button>
+            <Button type="text" className="shell-action-button" onClick={onToggleTheme} aria-label="主题">主题</Button>
+            <ShellLink href="/settings" active={pathname === '/settings'} onNavigate={navigate} className="shell-action-link">设置</ShellLink>
+            <Dropdown menu={{ items: menuItems, onClick: ({ key }) => { if (key === 'logout') void onLogout?.(); else navigate(`/${key}`) } }} trigger={['click']}>
+              <Button className="shell-user-entry">{accountName}</Button>
+            </Dropdown>
+          </div>
+        </header>
+        <Drawer title="工作区导航" placement="left" open={mobileOpen} onClose={() => setMobileOpen(false)} className="shell-mobile-drawer">{renderNavigation('user-shell-nav', '移动端工作区导航')}</Drawer>
+        <div className="user-shell-content">{children}</div>
+      </div>
     </div>
   )
 }
