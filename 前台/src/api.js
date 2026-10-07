@@ -212,6 +212,7 @@ export function createBatchProject(intakeId, input) {
 export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
+export function listIssues(input = {}) { const query = new URLSearchParams(); for (const [key,value] of Object.entries(input)) if (value !== undefined && value !== null && value !== '') query.set(key,String(value)); return requestJSON(`${API_PREFIX}/issues${query.size ? `?${query}` : ''}`) }
 
 export function getBatchProject(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}`)

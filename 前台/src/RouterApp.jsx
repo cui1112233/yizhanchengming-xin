@@ -9,12 +9,12 @@ import NovelPanelWorkbench from './novel-panel/NovelPanelWorkbench.jsx'
 import TtsPage from './TtsPage.jsx'
 import HistoryPage from './HistoryPage.jsx'
 import AccountCenterPage from './AccountCenterPage.jsx'
+import IssuesPage from './IssuesPage.jsx'
 import { getNovelPanel, listNovelPanelHistory, restoreNovelPanelHistory, saveNovelPanel } from './api.js'
 import './home.css'
 
 const routeFoundations = {
   '/agent': { title: 'Agent 工作区', description: '路由基础已恢复；Agent 实际业务由对应迁移任务接入。' },
-  '/issues': { title: '问题日志', description: '问题日志入口已恢复；实际日志页面不属于本任务范围。' },
   '/settings': { title: '设置', description: '设置入口已恢复；实际设置页不属于本任务范围。' },
 }
 
@@ -69,6 +69,8 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
     page = <TtsPage />
   } else if (pathname === '/history') {
     page = <HistoryPage />
+  } else if (pathname === '/issues') {
+    page = <IssuesPage />
   } else if (pathname === '/profile') {
     page = <AccountCenterPage user={currentUser} onLogout={onLogout} />
   } else if (pathname === '/member') {
