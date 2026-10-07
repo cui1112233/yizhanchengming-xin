@@ -6,6 +6,9 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
 
 type testStore struct {
@@ -99,5 +102,57 @@ func TestImageAndAudioTasksTruthfullyReportMissingExecutor(t *testing.T) {
 		if err != nil || got.Status != MediaFailed || got.ErrorCode != "executor_unavailable" {
 			t.Fatalf("kind=%s task=%+v err=%v", kind, got, err)
 		}
+	}
+}
+
+type configuredProvider struct{}
+
+func (configuredProvider) Available(kind MediaKind) bool { return kind == MediaImage }
+func (configuredProvider) Generate(context.Context, MediaTask, string) (GeneratedMedia, error) {
+	return GeneratedMedia{}, nil
+}
+
+type queueFake struct{ message taskruntime.Message }
+
+func (q *queueFake) Enqueue(_ context.Context, m taskruntime.Message) error {
+	q.message = m
+	return nil
+}
+func (*queueFake) Claim(context.Context, string, time.Duration) (taskruntime.Delivery, error) {
+	return taskruntime.Delivery{}, taskruntime.ErrQueueEmpty
+}
+func (*queueFake) Ack(context.Context, taskruntime.Delivery) error                 { return nil }
+func (*queueFake) Nack(context.Context, taskruntime.Delivery, time.Duration) error { return nil }
+
+type configuredStore struct {
+	testStore
+	queued int64
+}
+
+func (*configuredStore) CreateMediaTask(context.Context, CreateMediaTaskInput) (MediaTask, error) {
+	return MediaTask{ID: 42, Kind: MediaImage, Status: MediaPendingExecutor, BatchProjectID: 1, BookID: 2}, nil
+}
+func (s *configuredStore) QueueMediaTask(_ context.Context, id int64) (MediaTask, error) {
+	s.queued = id
+	return MediaTask{ID: id, Kind: MediaImage, Status: MediaQueued}, nil
+}
+func (*configuredStore) MediaTaskForExecution(context.Context, int64) (MediaTask, Segment, error) {
+	return MediaTask{}, Segment{}, nil
+}
+func (*configuredStore) StartMediaTask(context.Context, int64) (bool, error) { return false, nil }
+func (*configuredStore) CompleteMediaTask(context.Context, int64, int64) (bool, error) {
+	return false, nil
+}
+func (*configuredStore) FailMediaTask(context.Context, int64, string, string, bool) (bool, error) {
+	return false, nil
+}
+
+func TestConfiguredImageProviderQueuesSharedRuntimeTask(t *testing.T) {
+	store, queue := &configuredStore{}, &queueFake{}
+	service := NewService(store)
+	service.SetMediaExecutor(configuredProvider{}, queue)
+	task, err := service.CreateMediaTask(context.Background(), CreateMediaTaskInput{BatchProjectID: 1, BookID: 2, Kind: MediaImage})
+	if err != nil || task.Status != MediaQueued || store.queued != 42 || queue.message.TaskKey != "shuihuo-media:42" {
+		t.Fatalf("task=%+v queued=%d message=%+v err=%v", task, store.queued, queue.message, err)
 	}
 }

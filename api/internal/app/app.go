@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -118,6 +120,34 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		if queue, err := taskruntime.NewRedisQueue(redisAddr, "task9"); err == nil {
 			runtimeCoordinator = task9runtime.NewQueueCoordinator(queue)
 		}
+	}
+	// Image/TTS credentials remain server-only. Each adapter uses the same small
+	// HTTP contract and writes its durable output back through the existing TOS
+	// media service; no browser provider configuration is exposed.
+	imageProvider := shuihuo.NewHTTPProvider(shuihuo.HTTPProviderConfig{BaseURL: os.Getenv("SHUIHUO_IMAGE_PROVIDER_BASE_URL"), APIKey: os.Getenv("SHUIHUO_IMAGE_PROVIDER_API_KEY"), ImageModel: os.Getenv("SHUIHUO_IMAGE_PROVIDER_MODEL")})
+	ttsProvider := shuihuo.NewHTTPProvider(shuihuo.HTTPProviderConfig{BaseURL: os.Getenv("SHUIHUO_TTS_PROVIDER_BASE_URL"), APIKey: os.Getenv("SHUIHUO_TTS_PROVIDER_API_KEY"), TTSModel: os.Getenv("SHUIHUO_TTS_PROVIDER_MODEL")})
+	var mediaQueue taskruntime.Queue
+	if redisAddr != "" {
+		if queue, err := taskruntime.NewRedisQueue(redisAddr, "shuihuo-media"); err == nil {
+			mediaQueue = queue
+		}
+	}
+	mediaProvider := shuihuo.ProviderSet{Image: imageProvider, Audio: ttsProvider}
+	// A provider output is not a successful media result until it is durable in
+	// TOS. Keep the truthful executor_unavailable state when storage is absent.
+	if tosUploader != nil && tosBucket != "" {
+		shuihuoMediaService.SetMediaExecutor(mediaProvider, mediaQueue)
+	}
+	if mediaQueue != nil && (mediaProvider.Available(shuihuo.MediaImage) || mediaProvider.Available(shuihuo.MediaAudio)) && tosUploader != nil && tosBucket != "" {
+		owner := "api"
+		if hostname, err := os.Hostname(); err == nil && hostname != "" {
+			owner = fmt.Sprintf("api-%s", hostname)
+		}
+		go func() {
+			if err := shuihuo.NewWorker(shuihuoMediaService, mediaQueue, owner).Run(context.Background()); err != nil {
+				logger.Error("shuihuo media worker stopped", "subsystem", "shuihuo_media", "safe_error", err.Error())
+			}
+		}()
 	}
 	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
 

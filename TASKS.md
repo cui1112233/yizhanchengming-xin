@@ -327,6 +327,16 @@
 
 > 未宣称公网完成：真实 TOS 凭据、图片 Provider 和 TTS Provider 均须在 Go 服务端统一配置后，才能进行 ECS 端到端验收；浏览器不接触密钥。
 
+## 15B：Shuihuo 图片 / TTS Provider 执行器（仓库阶段）
+
+- [x] 15B.1 使用现有 `taskruntime` Redis queue 消费图片/TTS 媒体任务；不新增 Worker、Queue、Scheduler、Runtime 或 Auth。
+- [x] 15B.2 服务端环境变量分别配置图片与 TTS HTTP Provider；Provider 密钥不进入前端或响应。
+- [x] 15B.3 Provider 结果必须下载并通过既有受控 TOS 上传持久化，随后创建候选并回写 `queued → running → succeeded`。
+- [x] 15B.4 Provider、Redis 或 TOS 缺失时保留明确失败/可重试状态；没有 Provider 时固定 `executor_unavailable`，不伪造成功。
+- [x] 15B.5 fake Provider、Service queue、HTTP scope 与 Go build 测试已通过；未调用付费 Provider。
+
+> ECS 仍需配置真实环境变量并按 Provider HTTP 契约完成端到端验收；本项不宣称真实图片/TTS 账户、TOS 或 Redis 已在公网验证。
+
 ---
 
 # Task 14：视频生成完整链路

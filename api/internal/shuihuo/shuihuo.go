@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
 
 type AssetType string
@@ -134,9 +136,11 @@ type Store interface {
 	GetAsset(context.Context, int64, int64, int64) (Asset, error)
 }
 type Service struct {
-	store   Store
-	objects ObjectStore
-	bucket  string
+	store    Store
+	objects  ObjectStore
+	bucket   string
+	provider MediaProvider
+	queue    taskruntime.Queue
 }
 
 func NewService(s Store, objects ...ObjectStore) *Service {
@@ -150,6 +154,13 @@ func (s *Service) SetBucket(bucket string) {
 	if s != nil {
 		s.bucket = strings.TrimSpace(bucket)
 	}
+}
+
+// SetMediaExecutor attaches the configured server-side Provider and shared
+// taskruntime queue. Neither credentials nor provider configuration are exposed
+// through the HTTP API.
+func (s *Service) SetMediaExecutor(provider MediaProvider, queue taskruntime.Queue) {
+	s.configureMediaExecutor(provider, queue)
 }
 func (s *Service) CreateSegment(c context.Context, i CreateSegmentInput) (Segment, error) {
 	if s == nil || s.store == nil || i.BatchProjectID <= 0 || i.BookID <= 0 || i.Position < 0 || strings.TrimSpace(i.Text) == "" {
@@ -291,7 +302,7 @@ func (s *Service) CreateMediaTask(c context.Context, i CreateMediaTaskInput) (Me
 	if err != nil || i.Kind == MediaVideo {
 		return task, err
 	}
-	return s.store.MarkExecutorUnavailable(c, task.ID, "executor_unavailable", "configure a Go image or TTS executor before running this media task")
+	return s.enqueueMediaTask(c, task)
 }
 func (s *Service) ListMediaTasks(c context.Context, p, b int64) ([]MediaTask, error) {
 	return s.store.ListMediaTasks(c, p, b)
@@ -318,7 +329,11 @@ func (s *Service) RetryMediaTask(c context.Context, p, b, task int64) (MediaTask
 	if p <= 0 || b <= 0 || task <= 0 {
 		return MediaTask{}, ErrNotFound
 	}
-	return s.store.RetryMediaTask(c, p, b, task)
+	item, err := s.store.RetryMediaTask(c, p, b, task)
+	if err != nil || item.Kind == MediaVideo {
+		return item, err
+	}
+	return s.enqueueMediaTask(c, item)
 }
 
 type MySQLStore struct{ db *sql.DB }
@@ -549,6 +564,91 @@ func (s *MySQLStore) MarkExecutorUnavailable(c context.Context, id int64, code, 
 		return MediaTask{}, ErrNotFound
 	}
 	return s.task(c, id)
+}
+func (s *MySQLStore) QueueMediaTask(c context.Context, id int64) (MediaTask, error) {
+	r, err := s.db.ExecContext(c, `UPDATE shuihuo_media_tasks SET status='queued',error_code='',error_message='' WHERE id=? AND production_task_id IS NULL AND status='pending_executor'`, id)
+	if err != nil {
+		return MediaTask{}, err
+	}
+	n, _ := r.RowsAffected()
+	if n == 0 {
+		return MediaTask{}, ErrNotFound
+	}
+	return s.task(c, id)
+}
+func (s *MySQLStore) StartMediaTask(c context.Context, id int64) (bool, error) {
+	r, err := s.db.ExecContext(c, `UPDATE shuihuo_media_tasks SET status='running',error_code='',error_message='' WHERE id=? AND production_task_id IS NULL AND status='queued'`, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := r.RowsAffected()
+	return n == 1, nil
+}
+func (s *MySQLStore) MediaTaskForExecution(c context.Context, id int64) (MediaTask, Segment, error) {
+	task, err := s.task(c, id)
+	if err != nil {
+		return MediaTask{}, Segment{}, err
+	}
+	if task.ProductionTaskID != 0 || (task.Kind != MediaImage && task.Kind != MediaAudio) || task.Status != MediaRunning || task.SegmentID <= 0 {
+		return MediaTask{}, Segment{}, ErrNotFound
+	}
+	segment, err := s.segment(c, task.SegmentID)
+	if err != nil {
+		return MediaTask{}, Segment{}, err
+	}
+	if segment.BatchProjectID != task.BatchProjectID || segment.BookID != task.BookID || strings.TrimSpace(segment.Text) == "" {
+		return MediaTask{}, Segment{}, ErrNotFound
+	}
+	return task, segment, nil
+}
+func (s *MySQLStore) CompleteMediaTask(c context.Context, taskID, assetID int64) (bool, error) {
+	tx, err := s.db.BeginTx(c, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var projectID, bookID int64
+	err = tx.QueryRowContext(c, `SELECT batch_project_id,book_id FROM shuihuo_media_tasks WHERE id=? AND production_task_id IS NULL AND status='running' FOR UPDATE`, taskID).Scan(&projectID, &bookID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var exists int
+	if err = tx.QueryRowContext(c, `SELECT 1 FROM shuihuo_media_assets WHERE id=? AND batch_project_id=? AND book_id=? AND status='ready'`, assetID, projectID, bookID).Scan(&exists); err != nil {
+		return false, err
+	}
+	if _, err = tx.ExecContext(c, `INSERT INTO shuihuo_media_candidates(media_task_id,asset_id,position,selected) VALUES(?,?,(SELECT COALESCE(MAX(c.position),-1)+1 FROM (SELECT position FROM shuihuo_media_candidates WHERE media_task_id=?) c),1)`, taskID, assetID, taskID); err != nil {
+		return false, err
+	}
+	if _, err = tx.ExecContext(c, `UPDATE shuihuo_media_candidates SET selected=0 WHERE media_task_id=? AND asset_id<>?`, taskID, assetID); err != nil {
+		return false, err
+	}
+	r, err := tx.ExecContext(c, `UPDATE shuihuo_media_tasks SET status='succeeded',error_code='',error_message='' WHERE id=? AND status='running'`, taskID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := r.RowsAffected()
+	if n != 1 {
+		return false, nil
+	}
+	if err = tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+func (s *MySQLStore) FailMediaTask(c context.Context, id int64, code, message string, retryable bool) (bool, error) {
+	state := MediaFailed
+	if retryable {
+		state = MediaRetryableFailed
+	}
+	r, err := s.db.ExecContext(c, `UPDATE shuihuo_media_tasks SET status=?,error_code=?,error_message=? WHERE id=? AND production_task_id IS NULL AND status IN ('queued','running')`, state, code, message, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := r.RowsAffected()
+	return n == 1, nil
 }
 func (s *MySQLStore) task(c context.Context, id int64) (v MediaTask, e error) {
 	var a, b, d sql.NullInt64

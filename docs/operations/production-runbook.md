@@ -53,6 +53,32 @@ GET /api/v1/diagnostics
 
 当前 Runtime 区域会明确返回 `pending_task9_runtime`；不是 Redis 健康结论。
 
+### Shuihuo 图片 / TTS Provider 配置
+
+图片和 TTS 都由 Go 服务进程读取环境变量；浏览器不会获得 Provider Key。两个 Provider 使用相同的 HTTP 适配契约：服务端 `POST {BASE_URL}/generate`，带 `Authorization: Bearer {API_KEY}` 与 JSON `{kind, model, prompt, requestId}`；成功响应必须返回 `{url, contentType}`（`contentUrl` 也兼容）。URL 是短期下载来源，不是最终业务 URL：Go 会受控下载后上传既有 TOS bucket，再写入媒体资产与候选记录。
+
+```bash
+# 图片
+SHUIHUO_IMAGE_PROVIDER_BASE_URL=https://provider.example/api
+SHUIHUO_IMAGE_PROVIDER_API_KEY=<server-only-secret>
+SHUIHUO_IMAGE_PROVIDER_MODEL=<provider-image-model>
+
+# TTS
+SHUIHUO_TTS_PROVIDER_BASE_URL=https://provider.example/api
+SHUIHUO_TTS_PROVIDER_API_KEY=<server-only-secret>
+SHUIHUO_TTS_PROVIDER_MODEL=<provider-tts-model>
+
+# 已有依赖：TOS 与共享 Redis runtime
+TOS_ENDPOINT=<existing-tos-endpoint>
+TOS_REGION=<existing-tos-region>
+TOS_BUCKET=<existing-private-bucket>
+TOS_ACCESS_KEY=<server-only-key>
+TOS_SECRET_KEY=<server-only-secret>
+REDIS_ADDR=<existing-redis-host:port>
+```
+
+缺少任一图片/TTS Provider 或 TOS 时，新建任务会如实写成 `executor_unavailable`；Provider 已配置但 Redis 不可用时写 `retryable_failed / queue_unavailable`。正常状态流为 `pending_executor → queued → running → succeeded`，Provider 或 TOS 下载失败则为 `retryable_failed`，可通过原有重试接口重新进入同一队列。
+
 ---
 
 ## 1. 网站打不开
