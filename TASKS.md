@@ -479,7 +479,14 @@
 
 ## 当前执行点
 
-**当前任务：Task 9 已正式完成并进入 `main`；下一阶段第一优先为 Task14 Runtime Adapter。**
+**当前任务：用户工作区完整迁移与公网 UI 对标。**
+
+### 2026-10-07 · 用户工作区迁移：账户入口（仓库阶段）
+
+- [x] `/member` 和 `/profile` 已移除路由占位，复用现有 Cookie Session 的服务端用户资料、角色、团队 ID、capability 与安全登出接口。
+- [x] 页面明确不读取、不显示密码、Cookie、Session、MFA、恢复码或任何 Provider 密钥；没有新增认证体系或浏览器业务存储。
+- [x] 前台定向回归：`AccountCenterPage` 2 条、`RouterApp` 6 条均通过；`npm run build` 通过。
+- [ ] 仍需迁移服务端资料编辑、账号安全会话管理、团队事实模型、MySQL 用户偏好与公网浏览器验收；不得以本项仓库验证宣称账户中心整体完成。
 
 ---
 

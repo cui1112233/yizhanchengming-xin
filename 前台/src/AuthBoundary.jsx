@@ -66,6 +66,12 @@ export default function AuthBoundary({ children, api = defaultApi }) {
     }
   }
 
+  const submitLogout = async () => {
+    await api.logout()
+    setUser(null)
+    setStatus('unauthenticated')
+  }
+
   if (status === 'initializing') {
     return (
       <main className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
@@ -112,5 +118,5 @@ export default function AuthBoundary({ children, api = defaultApi }) {
     )
   }
 
-  return React.cloneElement(<>{children}</>, { 'data-auth-user': user?.id || undefined })
+  return React.isValidElement(children) ? React.cloneElement(children, { currentUser: user, onLogout: submitLogout }) : children
 }

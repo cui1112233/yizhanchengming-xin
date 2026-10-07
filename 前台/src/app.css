@@ -63,6 +63,11 @@ body {
     #171927;
 }
 
+.account-center-page { max-width: 1080px; margin: 0 auto; padding: 32px 24px 56px; }
+.account-center-heading { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+.account-center-heading h2 { margin: 4px 0 8px !important; }
+@media (max-width: 640px) { .account-center-page { padding: 20px 16px 36px; } .account-center-heading { display: block; } .account-center-heading > button { margin-top: 8px; } }
+
 .login-card {
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 24px !important;
