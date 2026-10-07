@@ -45,7 +45,7 @@ export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, 
           <Button type="text" className="shell-action-button" onClick={onToggleTheme} aria-label="主题">主题</Button>
           <ShellLink href="/settings" active={pathname === '/settings'} onNavigate={onNavigate} className="shell-action-link">设置</ShellLink>
           <Dropdown menu={{ items: menuItems, onClick: ({ key }) => { if (key === 'logout') void onLogout?.(); else navigate(`/${key}`) } }} trigger={['click']}>
-            <Button className="shell-user-entry">{currentUser?.displayName || currentUser?.username || '用户入口'}</Button>
+            <Button className="shell-user-entry">{currentUser?.name || currentUser?.username || '用户入口'}</Button>
           </Dropdown>
         </div>
       </header>
