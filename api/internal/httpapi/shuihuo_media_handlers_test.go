@@ -1,15 +1,21 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-type shuihuoHTTPFake struct{ got shuihuo.CreateMediaTaskInput }
+type shuihuoHTTPFake struct {
+	got    shuihuo.CreateMediaTaskInput
+	upload shuihuo.UploadAssetInput
+}
 
 func (*shuihuoHTTPFake) CreateSegment(context.Context, shuihuo.CreateSegmentInput) (shuihuo.Segment, error) {
 	return shuihuo.Segment{}, nil
@@ -44,6 +50,35 @@ func (*shuihuoHTTPFake) SelectCandidate(context.Context, int64, int64, int64, in
 }
 func (*shuihuoHTTPFake) RetryMediaTask(context.Context, int64, int64, int64) (shuihuo.MediaTask, error) {
 	return shuihuo.MediaTask{}, nil
+}
+func (f *shuihuoHTTPFake) UploadAsset(_ context.Context, in shuihuo.UploadAssetInput) (shuihuo.Asset, error) {
+	f.upload = in
+	return shuihuo.Asset{ID: 9, ObjectKey: "server-generated"}, nil
+}
+
+func TestShuihuoAssetUploadUsesScopedMultipartInput(t *testing.T) {
+	f := &shuihuoHTTPFake{}
+	h := NewHandler(Dependencies{ShuihuoMedia: f})
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	_ = writer.WriteField("type", "image")
+	_ = writer.WriteField("segmentId", "12")
+	part, err := writer.CreateFormFile("file", "still.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = part.Write([]byte("image data"))
+	_ = writer.Close()
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/7/books/8/shuihuo/assets/upload", body)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated || f.upload.BatchProjectID != 7 || f.upload.BookID != 8 || f.upload.SegmentID != 12 || f.upload.Type != shuihuo.AssetImage || f.upload.Filename != "still.png" {
+		t.Fatalf("code=%d upload=%+v", w.Code, f.upload)
+	}
+}
+func (*shuihuoHTTPFake) OpenAsset(context.Context, int64, int64, int64) (shuihuo.Asset, io.ReadCloser, error) {
+	return shuihuo.Asset{}, nil, shuihuo.ErrNotFound
 }
 func TestShuihuoMediaTaskHTTPIsProjectScopedAndPending(t *testing.T) {
 	f := &shuihuoHTTPFake{}

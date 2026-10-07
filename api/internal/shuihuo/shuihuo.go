@@ -2,9 +2,16 @@ package shuihuo
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -46,9 +53,11 @@ const (
 )
 
 var (
-	ErrConflict       = errors.New("shuihuo: version conflict")
-	ErrNotFound       = errors.New("shuihuo: not found")
-	ErrInvalidReorder = errors.New("shuihuo: reorder must contain every segment exactly once")
+	ErrConflict           = errors.New("shuihuo: version conflict")
+	ErrNotFound           = errors.New("shuihuo: not found")
+	ErrInvalidReorder     = errors.New("shuihuo: reorder must contain every segment exactly once")
+	ErrStorageUnavailable = errors.New("shuihuo: object storage is unavailable")
+	ErrInvalidUpload      = errors.New("shuihuo: invalid upload")
 )
 
 type Segment struct {
@@ -99,6 +108,16 @@ type CreateMediaTaskInput struct {
 	Kind                                                               MediaKind
 	Provider, Model, RequestID                                         string
 }
+type ObjectStore interface {
+	PutObjectFromFile(context.Context, string, string, string) error
+	GetObject(context.Context, string, string) (io.ReadCloser, error)
+}
+type UploadAssetInput struct {
+	BatchProjectID, BookID, SegmentID int64
+	Type                              AssetType
+	Filename, ContentType             string
+	Body                              io.Reader
+}
 type Store interface {
 	CreateSegment(context.Context, CreateSegmentInput) (Segment, error)
 	UpdateSegment(context.Context, int64, int64, int64, UpdateSegmentInput) (Segment, error)
@@ -111,10 +130,27 @@ type Store interface {
 	ListCandidates(context.Context, int64, int64, int64) ([]Candidate, error)
 	SelectCandidate(context.Context, int64, int64, int64, int64) (Candidate, error)
 	RetryMediaTask(context.Context, int64, int64, int64) (MediaTask, error)
+	MarkExecutorUnavailable(context.Context, int64, string, string) (MediaTask, error)
+	GetAsset(context.Context, int64, int64, int64) (Asset, error)
 }
-type Service struct{ store Store }
+type Service struct {
+	store   Store
+	objects ObjectStore
+	bucket  string
+}
 
-func NewService(s Store) *Service { return &Service{s} }
+func NewService(s Store, objects ...ObjectStore) *Service {
+	out := &Service{store: s}
+	if len(objects) > 0 {
+		out.objects = objects[0]
+	}
+	return out
+}
+func (s *Service) SetBucket(bucket string) {
+	if s != nil {
+		s.bucket = strings.TrimSpace(bucket)
+	}
+}
 func (s *Service) CreateSegment(c context.Context, i CreateSegmentInput) (Segment, error) {
 	if s == nil || s.store == nil || i.BatchProjectID <= 0 || i.BookID <= 0 || i.Position < 0 || strings.TrimSpace(i.Text) == "" {
 		return Segment{}, fmt.Errorf("shuihuo: invalid segment")
@@ -142,11 +178,120 @@ func (s *Service) CreateAsset(c context.Context, i CreateAssetInput) (Asset, err
 func (s *Service) ListAssets(c context.Context, p, b, seg int64) ([]Asset, error) {
 	return s.store.ListAssets(c, p, b, seg)
 }
+
+// UploadAsset is the only browser upload path. Bucket and key are generated
+// server-side, after scope and media validation, so a client cannot overwrite
+// another project's TOS object.
+func (s *Service) UploadAsset(c context.Context, in UploadAssetInput) (Asset, error) {
+	if s == nil || s.store == nil || s.objects == nil || s.bucket == "" {
+		return Asset{}, ErrStorageUnavailable
+	}
+	if in.BatchProjectID <= 0 || in.BookID <= 0 || in.Body == nil {
+		return Asset{}, ErrInvalidUpload
+	}
+	contentType, extension, limit, err := uploadRules(in.Type, in.ContentType)
+	if err != nil {
+		return Asset{}, err
+	}
+	tmp, err := os.CreateTemp("", "shuihuo-upload-*")
+	if err != nil {
+		return Asset{}, fmt.Errorf("shuihuo: create temp file: %w", err)
+	}
+	path := tmp.Name()
+	defer os.Remove(path)
+	hash := sha256.New()
+	written, copyErr := io.Copy(io.MultiWriter(tmp, hash), io.LimitReader(in.Body, limit+1))
+	closeErr := tmp.Close()
+	if copyErr != nil || closeErr != nil || written <= 0 || written > limit {
+		return Asset{}, ErrInvalidUpload
+	}
+	probe, err := os.Open(path)
+	if err != nil {
+		return Asset{}, err
+	}
+	header := make([]byte, 512)
+	n, _ := probe.Read(header)
+	_ = probe.Close()
+	if !contentMatches(in.Type, contentType, http.DetectContentType(header[:n])) {
+		return Asset{}, ErrInvalidUpload
+	}
+	random := make([]byte, 16)
+	if _, err := rand.Read(random); err != nil {
+		return Asset{}, err
+	}
+	key := fmt.Sprintf("shuihuo/project-%d/book-%d/%s.%s", in.BatchProjectID, in.BookID, hex.EncodeToString(random), extension)
+	if err := s.objects.PutObjectFromFile(c, s.bucket, key, path); err != nil {
+		return Asset{}, fmt.Errorf("shuihuo: upload TOS object: %w", err)
+	}
+	metadata := []byte(fmt.Sprintf(`{"filename":%q,"contentType":%q,"bytes":%d,"sha256":%q}`, filepath.Base(in.Filename), contentType, written, hex.EncodeToString(hash.Sum(nil))))
+	return s.store.CreateAsset(c, CreateAssetInput{BatchProjectID: in.BatchProjectID, BookID: in.BookID, SegmentID: in.SegmentID, Type: in.Type, Bucket: s.bucket, ObjectKey: key, Metadata: metadata, Status: AssetReady})
+}
+func (s *Service) OpenAsset(c context.Context, p, b, id int64) (Asset, io.ReadCloser, error) {
+	if s == nil || s.objects == nil {
+		return Asset{}, nil, ErrStorageUnavailable
+	}
+	asset, err := s.store.GetAsset(c, p, b, id)
+	if err != nil {
+		return Asset{}, nil, err
+	}
+	if asset.Status != AssetReady || asset.Bucket == "" || asset.ObjectKey == "" {
+		return Asset{}, nil, ErrNotFound
+	}
+	body, err := s.objects.GetObject(c, asset.Bucket, asset.ObjectKey)
+	if err != nil {
+		return Asset{}, nil, fmt.Errorf("shuihuo: fetch TOS object: %w", err)
+	}
+	return asset, body, nil
+}
+func uploadRules(kind AssetType, supplied string) (string, string, int64, error) {
+	supplied = strings.ToLower(strings.TrimSpace(strings.Split(supplied, ";")[0]))
+	switch kind {
+	case AssetImage, AssetReferenceImage:
+		switch supplied {
+		case "image/jpeg":
+			return supplied, "jpg", 20 << 20, nil
+		case "image/png":
+			return supplied, "png", 20 << 20, nil
+		case "image/webp":
+			return supplied, "webp", 20 << 20, nil
+		}
+	case AssetAudio:
+		switch supplied {
+		case "audio/mpeg":
+			return supplied, "mp3", 200 << 20, nil
+		case "audio/wav", "audio/x-wav":
+			return "audio/wav", "wav", 200 << 20, nil
+		case "audio/mp4":
+			return supplied, "m4a", 200 << 20, nil
+		}
+	case AssetVideo:
+		switch supplied {
+		case "video/mp4":
+			return supplied, "mp4", 2 << 30, nil
+		case "video/webm":
+			return supplied, "webm", 2 << 30, nil
+		}
+	}
+	return "", "", 0, ErrInvalidUpload
+}
+func contentMatches(kind AssetType, supplied, detected string) bool {
+	if kind == AssetImage || kind == AssetReferenceImage {
+		return (supplied == "image/jpeg" && detected == "image/jpeg") || (supplied == "image/png" && detected == "image/png") || (supplied == "image/webp" && detected == "image/webp")
+	}
+	if kind == AssetAudio {
+		return strings.HasPrefix(detected, "audio/") || detected == "application/octet-stream"
+	}
+	return kind == AssetVideo && (detected == "video/mp4" || detected == "application/octet-stream")
+}
 func (s *Service) CreateMediaTask(c context.Context, i CreateMediaTaskInput) (MediaTask, error) {
 	if i.BatchProjectID <= 0 || i.BookID <= 0 || i.Kind == "" || (i.Kind == MediaVideo && i.ProductionTaskID <= 0) {
 		return MediaTask{}, fmt.Errorf("shuihuo: invalid media task")
 	}
-	return s.store.CreateMediaTask(c, i)
+	task, err := s.store.CreateMediaTask(c, i)
+	if err != nil || i.Kind == MediaVideo {
+		return task, err
+	}
+	return s.store.MarkExecutorUnavailable(c, task.ID, "executor_unavailable", "configure a Go image or TTS executor before running this media task")
 }
 func (s *Service) ListMediaTasks(c context.Context, p, b int64) ([]MediaTask, error) {
 	return s.store.ListMediaTasks(c, p, b)
@@ -330,9 +475,19 @@ func (s *MySQLStore) CreateAsset(c context.Context, i CreateAssetInput) (Asset, 
 	if len(m) == 0 {
 		m = []byte(`{}`)
 	}
-	r, e := s.db.ExecContext(c, `INSERT INTO shuihuo_media_assets(batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status) VALUES(?,?,?,?,?,?,?,?)`, i.BatchProjectID, i.BookID, n(i.SegmentID), i.Type, i.Bucket, i.ObjectKey, m, i.Status)
+	// Both the book and optional segment must be inside this project scope.
+	// This also prevents callers from attaching an uploaded object to another
+	// user's storyboard by guessing a segment id.
+	r, e := s.db.ExecContext(c, `INSERT INTO shuihuo_media_assets(batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status)
+SELECT ?,?,?,?,?,?,?,? FROM batch_projects p JOIN books b ON b.intake_id=p.intake_id
+WHERE p.id=? AND b.id=? AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_storyboard_segments s WHERE s.id=? AND s.batch_project_id=? AND s.book_id=?))`,
+		i.BatchProjectID, i.BookID, n(i.SegmentID), i.Type, i.Bucket, i.ObjectKey, m, i.Status,
+		i.BatchProjectID, i.BookID, i.SegmentID, i.SegmentID, i.BatchProjectID, i.BookID)
 	if e != nil {
 		return Asset{}, e
+	}
+	if affected, _ := r.RowsAffected(); affected == 0 {
+		return Asset{}, ErrNotFound
 	}
 	id, _ := r.LastInsertId()
 	return s.asset(c, id)
@@ -342,6 +497,15 @@ func (s *MySQLStore) asset(c context.Context, id int64) (v Asset, e error) {
 	e = s.db.QueryRowContext(c, `SELECT id,batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status,created_at,updated_at FROM shuihuo_media_assets WHERE id=?`, id).Scan(&v.ID, &v.BatchProjectID, &v.BookID, &q, &v.Type, &v.Bucket, &v.ObjectKey, &v.Metadata, &v.Status, &v.CreatedAt, &v.UpdatedAt)
 	v.SegmentID = q.Int64
 	return
+}
+func (s *MySQLStore) GetAsset(c context.Context, p, b, id int64) (v Asset, e error) {
+	var q sql.NullInt64
+	e = s.db.QueryRowContext(c, `SELECT id,batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status,created_at,updated_at FROM shuihuo_media_assets WHERE id=? AND batch_project_id=? AND book_id=?`, id, p, b).Scan(&v.ID, &v.BatchProjectID, &v.BookID, &q, &v.Type, &v.Bucket, &v.ObjectKey, &v.Metadata, &v.Status, &v.CreatedAt, &v.UpdatedAt)
+	if errors.Is(e, sql.ErrNoRows) {
+		return Asset{}, ErrNotFound
+	}
+	v.SegmentID = q.Int64
+	return v, e
 }
 func (s *MySQLStore) ListAssets(c context.Context, p, b, seg int64) (out []Asset, e error) {
 	q := `SELECT id,batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status,created_at,updated_at FROM shuihuo_media_assets WHERE batch_project_id=? AND book_id=?`
@@ -373,6 +537,17 @@ func (s *MySQLStore) CreateMediaTask(c context.Context, i CreateMediaTaskInput) 
 		return MediaTask{}, e
 	}
 	id, _ := r.LastInsertId()
+	return s.task(c, id)
+}
+func (s *MySQLStore) MarkExecutorUnavailable(c context.Context, id int64, code, message string) (MediaTask, error) {
+	r, e := s.db.ExecContext(c, `UPDATE shuihuo_media_tasks SET status='failed',error_code=?,error_message=? WHERE id=? AND production_task_id IS NULL AND status='pending_executor'`, code, message, id)
+	if e != nil {
+		return MediaTask{}, e
+	}
+	changed, _ := r.RowsAffected()
+	if changed == 0 {
+		return MediaTask{}, ErrNotFound
+	}
 	return s.task(c, id)
 }
 func (s *MySQLStore) task(c context.Context, id int64) (v MediaTask, e error) {

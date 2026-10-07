@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -104,6 +105,8 @@ type ShuihuoMediaService interface {
 	ListCandidates(context.Context, int64, int64, int64) ([]shuihuo.Candidate, error)
 	SelectCandidate(context.Context, int64, int64, int64, int64) (shuihuo.Candidate, error)
 	RetryMediaTask(context.Context, int64, int64, int64) (shuihuo.MediaTask, error)
+	UploadAsset(context.Context, shuihuo.UploadAssetInput) (shuihuo.Asset, error)
+	OpenAsset(context.Context, int64, int64, int64) (shuihuo.Asset, io.ReadCloser, error)
 }
 
 type Dependencies struct {
@@ -179,7 +182,8 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/{segmentId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.updateShuihuoSegment)))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/reorder", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.reorderShuihuoSegments)))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets/upload", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.uploadShuihuoAsset)))))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets/{assetId}/content", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.readShuihuoAsset))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks)))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/candidates", api.requireCapability(CapabilityBatchView, api.requireVideoProjectAccess("projectId", http.HandlerFunc(api.listShuihuoCandidates))))

@@ -310,6 +310,16 @@
 
 > 仓库阶段验收依据：PR #18 已合并到 `main`，合并提交 `ce10e3ea0ca4114dd30a14b03eed19e034cb710f`；Task 13 migration 使用 `00006_task13_match_audio.sql`。合并后的 `main` CI run `37298187716` 中 Go tests/build、前台 tests/build、管理端 build、Goose Up/status/rollback、Task10 audit 全绿。服务端权威音频测量、matchAudio 严格时间轴、Normal/H3 Director、`matchAudio=false` Task 12 回归均已完成仓库阶段验收。公网/ECS 真实音频测量、matchAudio 与 Director 全流程仍留到 Task 16 的 16.2.12、16.2.14–16.2.15，因此 Task 13 总体保持 `⚠️`。
 
+## 13B：Shuihuo TOS 资产与媒体执行桥接（仓库阶段）
+
+- [x] 13B.1 服务端受控 multipart 上传：按项目/书/可选分镜校验，服务端生成 TOS key，校验类型、内容和大小；TOS 成功后才写入 MySQL。
+- [x] 13B.2 受权限保护的资产读取代理：不向浏览器暴露 bucket credential、任意 key 或公共 TOS URL。
+- [x] 13B.3 视频媒体任务继续以既有 `video_production_tasks` 为唯一执行状态来源；不新增 Worker、Queue 或 Runtime。
+- [x] 13B.4 图片/TTS 尚无已配置的 Go Provider/执行器时，持久化明确 `executor_unavailable` 错误，不伪造 Provider、URL 或成功结果。
+- [x] 13B.5 以 fake TOS adapter、Service 与 HTTP scope 测试覆盖上传、安全边界和状态桥接。
+
+> 未宣称公网完成：真实 TOS 凭据、图片 Provider 和 TTS Provider 均须在 Go 服务端统一配置后，才能进行 ECS 端到端验收；浏览器不接触密钥。
+
 ---
 
 # Task 14：视频生成完整链路

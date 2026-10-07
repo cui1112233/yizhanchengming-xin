@@ -150,3 +150,13 @@ func (u *TOSUploader) PutObjectFromFile(ctx context.Context, bucket, key, filena
 	_, err := u.client.PutObjectFromFile(ctx, &tos.PutObjectFromFileInput{PutObjectBasicInput: tos.PutObjectBasicInput{Bucket: bucket, Key: key}, FilePath: filename})
 	return err
 }
+
+// GetObject is used by the protected Shuihuo asset proxy. The returned stream
+// is never exposed as a bucket URL and must be closed by the caller.
+func (u *TOSUploader) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, error) {
+	output, err := u.client.GetObjectV2(ctx, &tos.GetObjectV2Input{Bucket: bucket, Key: key})
+	if err != nil {
+		return nil, err
+	}
+	return output.Content, nil
+}

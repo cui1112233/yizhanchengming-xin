@@ -67,7 +67,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	}
 
 	videoStore := video.NewMySQLStore(db)
-	shuihuoMediaService := shuihuo.NewService(shuihuo.NewMySQLStore(db))
+	shuihuoStore := shuihuo.NewMySQLStore(db)
 	masterKey := []byte(os.Getenv("VIDEO_PROVIDER_MASTER_KEY"))
 	providerFactory := video.DefaultProviderFactory{LocalJobs: videoStore}
 	videoConfigService := video.NewConfigServiceWithProviders(videoStore, masterKey, providerFactory)
@@ -76,14 +76,21 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 
 	var artifactStore video.ArtifactStore
 	var fileArtifactStore video.FileArtifactStore
-	if endpoint, region, bucket, accessKey, secretKey, publicBase := os.Getenv("TOS_ENDPOINT"), os.Getenv("TOS_REGION"), os.Getenv("TOS_BUCKET"), os.Getenv("TOS_ACCESS_KEY"), os.Getenv("TOS_SECRET_KEY"), os.Getenv("TOS_PUBLIC_BASE_URL"); endpoint != "" && region != "" && bucket != "" && accessKey != "" && secretKey != "" && publicBase != "" {
+	var tosUploader *video.TOSUploader
+	tosBucket := ""
+	if endpoint, region, bucket, accessKey, secretKey, publicBase := os.Getenv("TOS_ENDPOINT"), os.Getenv("TOS_REGION"), os.Getenv("TOS_BUCKET"), os.Getenv("TOS_ACCESS_KEY"), os.Getenv("TOS_SECRET_KEY"), os.Getenv("TOS_PUBLIC_BASE_URL"); endpoint != "" && region != "" && bucket != "" && accessKey != "" && secretKey != "" {
 		if uploader, err := video.NewTOSUploader(endpoint, region, accessKey, secretKey); err == nil {
-			if durableArtifacts, err := video.NewArtifactStore(video.ArtifactStoreConfig{Bucket: bucket, PublicBaseURL: publicBase, Uploader: uploader}); err == nil {
-				artifactStore = durableArtifacts
-				fileArtifactStore = durableArtifacts
+			tosUploader, tosBucket = uploader, bucket
+			if publicBase != "" {
+				if durableArtifacts, err := video.NewArtifactStore(video.ArtifactStoreConfig{Bucket: bucket, PublicBaseURL: publicBase, Uploader: uploader}); err == nil {
+					artifactStore = durableArtifacts
+					fileArtifactStore = durableArtifacts
+				}
 			}
 		}
 	}
+	shuihuoMediaService := shuihuo.NewService(shuihuoStore, tosUploader)
+	shuihuoMediaService.SetBucket(tosBucket)
 	videoService := video.NewService(videoStore, video.NewGenerationFinalPromptSource(generationStore), providerFactory, artifactStore, masterKey)
 	observedVideo := &observedVideoService{next: videoService, logger: logger}
 	mergeExecutor := video.NewFFmpegExecutor(video.FFmpegExecutorConfig{
