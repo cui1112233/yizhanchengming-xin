@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
 	"io"
 	"mime/multipart"
@@ -13,8 +14,9 @@ import (
 )
 
 type shuihuoHTTPFake struct {
-	got    shuihuo.CreateMediaTaskInput
-	upload shuihuo.UploadAssetInput
+	got         shuihuo.CreateMediaTaskInput
+	upload      shuihuo.UploadAssetInput
+	listedMedia []shuihuo.MediaTask
 }
 
 func (*shuihuoHTTPFake) CreateSegment(context.Context, shuihuo.CreateSegmentInput) (shuihuo.Segment, error) {
@@ -36,8 +38,8 @@ func (f *shuihuoHTTPFake) CreateMediaTask(_ context.Context, i shuihuo.CreateMed
 	f.got = i
 	return shuihuo.MediaTask{ID: 1, Status: shuihuo.MediaPendingExecutor}, nil
 }
-func (*shuihuoHTTPFake) ListMediaTasks(context.Context, int64, int64) ([]shuihuo.MediaTask, error) {
-	return nil, nil
+func (f *shuihuoHTTPFake) ListMediaTasks(context.Context, int64, int64) ([]shuihuo.MediaTask, error) {
+	return f.listedMedia, nil
 }
 func (*shuihuoHTTPFake) ReorderSegments(context.Context, int64, int64, []int64) ([]shuihuo.Segment, error) {
 	return nil, nil
@@ -88,5 +90,26 @@ func TestShuihuoMediaTaskHTTPIsProjectScopedAndPending(t *testing.T) {
 	h.ServeHTTP(w, r)
 	if w.Code != http.StatusAccepted || f.got.BatchProjectID != 7 || f.got.BookID != 8 || f.got.Kind != shuihuo.MediaImage {
 		t.Fatalf("code=%d input=%+v", w.Code, f.got)
+	}
+}
+
+func TestShuihuoMediaTaskHTTPUsesFrontendJSONContract(t *testing.T) {
+	f := &shuihuoHTTPFake{listedMedia: []shuihuo.MediaTask{{
+		ID: 18, BatchProjectID: 7, BookID: 8, Kind: shuihuo.MediaAudio,
+		Status: shuihuo.MediaFailed, ErrorCode: "executor_unavailable",
+	}}}
+	h := NewHandler(Dependencies{ShuihuoMedia: f})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects/7/books/8/shuihuo/media-tasks", nil)
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var body []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body) != 1 || body[0]["id"] != float64(18) || body[0]["status"] != "failed" || body[0]["errorCode"] != "executor_unavailable" {
+		t.Fatalf("frontend media contract=%v", body)
 	}
 }

@@ -13,7 +13,7 @@ describe('TtsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.listBatchProjects.mockResolvedValue({ projects: [{ id: 3, name: '声音项目' }] })
-    api.getBatchProject.mockResolvedValue({ books: [{ bookId: 7, title: '配音小说' }] })
+    api.getBatchProject.mockResolvedValue({ books: [{ id: 7, bookId: 'external-7', title: '配音小说' }] })
     api.listShuihuoMediaTasks.mockResolvedValue([{ id: 18, kind: 'audio', status: 'failed', errorMessage: 'provider timeout', provider: 'tts', model: 'voice-1' }])
     api.listShuihuoAssets.mockResolvedValue([])
     api.listShuihuoCandidates.mockResolvedValue([])

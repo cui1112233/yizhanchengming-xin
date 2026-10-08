@@ -63,31 +63,53 @@ var (
 )
 
 type Segment struct {
-	ID, BatchProjectID, BookID int64
-	Position, Version          int
-	Text, EditRevision         string
-	CreatedAt, UpdatedAt       time.Time
+	ID             int64     `json:"id"`
+	BatchProjectID int64     `json:"batchProjectId"`
+	BookID         int64     `json:"bookId"`
+	Position       int       `json:"position"`
+	Version        int       `json:"version"`
+	Text           string    `json:"text"`
+	EditRevision   string    `json:"editRevision"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 type Asset struct {
-	ID, BatchProjectID, BookID, SegmentID int64
-	Type                                  AssetType
-	Bucket, ObjectKey                     string
-	Metadata                              []byte
-	Status                                AssetStatus
-	CreatedAt, UpdatedAt                  time.Time
+	ID             int64       `json:"id"`
+	BatchProjectID int64       `json:"batchProjectId"`
+	BookID         int64       `json:"bookId"`
+	SegmentID      int64       `json:"segmentId"`
+	Type           AssetType   `json:"type"`
+	Bucket         string      `json:"bucket"`
+	ObjectKey      string      `json:"objectKey"`
+	Metadata       []byte      `json:"metadata"`
+	Status         AssetStatus `json:"status"`
+	CreatedAt      time.Time   `json:"createdAt"`
+	UpdatedAt      time.Time   `json:"updatedAt"`
 }
 type MediaTask struct {
-	ID, BatchProjectID, BookID, SegmentID, SourceAssetID, ProductionTaskID int64
-	Kind                                                                   MediaKind
-	Status                                                                 MediaTaskStatus
-	Provider, Model, RequestID, ErrorCode, ErrorMessage                    string
-	CreatedAt, UpdatedAt                                                   time.Time
+	ID               int64           `json:"id"`
+	BatchProjectID   int64           `json:"batchProjectId"`
+	BookID           int64           `json:"bookId"`
+	SegmentID        int64           `json:"segmentId"`
+	SourceAssetID    int64           `json:"sourceAssetId"`
+	ProductionTaskID int64           `json:"productionTaskId"`
+	Kind             MediaKind       `json:"kind"`
+	Status           MediaTaskStatus `json:"status"`
+	Provider         string          `json:"provider"`
+	Model            string          `json:"model"`
+	RequestID        string          `json:"requestId"`
+	ErrorCode        string          `json:"errorCode"`
+	ErrorMessage     string          `json:"errorMessage"`
+	CreatedAt        time.Time       `json:"createdAt"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
 }
 type Candidate struct {
-	ID, MediaTaskID, AssetID int64
-	Position                 int
-	Selected                 bool
-	CreatedAt                time.Time
+	ID          int64     `json:"id"`
+	MediaTaskID int64     `json:"mediaTaskId"`
+	AssetID     int64     `json:"assetId"`
+	Position    int       `json:"position"`
+	Selected    bool      `json:"selected"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 type CreateSegmentInput struct {
 	BatchProjectID, BookID int64

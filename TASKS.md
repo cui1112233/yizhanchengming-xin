@@ -529,6 +529,7 @@
 - [x] 无 Provider 时媒体任务真实持久化为 `executor_unavailable`；未配置 TOS 时上传真实返回安全的 `503 storage_unavailable`，未发起任何 Provider/TOS 调用。
 - [x] `/issues` UNION 投影在本机 MySQL 默认 collation 下已修复，浏览器返回脱敏空态而非 500；不改写历史业务表或新增错误事实表。
 - [x] Agent Studio migration 与已存在的工作区偏好 migration 的 `00013` 版本冲突已修正为 `00014`；本机 Goose 可读取并应用完整序列，避免 `duplicate version` panic。
+- [x] 本机真实失败媒体任务暴露了 Shuihuo DTO 大写 JSON 字段与 TTS 外部书号误作数据库主键的问题；已用 HTTP 契约测试锁定 camelCase 响应，前台统一使用 `books.id` 调用受项目范围保护的媒体接口，未改动 MySQL 事实或伪造 Provider 成功。
 - [ ] 本机验收不替代 Task 16：未连接 ECS、未修改公网、未运行 GitHub Actions、未验证真实 Provider/TOS 或公网视觉对标。
 
 ---
