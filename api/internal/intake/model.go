@@ -37,6 +37,13 @@ type Intake struct {
 	UpdatedAt time.Time
 }
 
+// ActorScope is the authenticated ownership context attached to newly created
+// intake facts. TeamID zero means that only the creating user owns the intake.
+type ActorScope struct {
+	UserID int64
+	TeamID int64
+}
+
 type Book struct {
 	ID             int64
 	IntakeID       int64

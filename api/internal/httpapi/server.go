@@ -153,6 +153,7 @@ type Dependencies struct {
 	VideoStatus                 VideoStatusService
 	VideoMerge                  VideoMergeService
 	ShuihuoMedia                ShuihuoMediaService
+	IntakeAccess                IntakeAccessChecker
 	BatchProjectAccess          BatchProjectAccessChecker
 	VideoResourceProjects       VideoResourceProjectResolver
 	VideoExecutorBootstrapToken string
@@ -193,12 +194,12 @@ func NewHandler(values ...Dependencies) http.Handler {
 	// Stage 1: Shuihuo/Batch Factory intake and project access.
 	mux.Handle("POST /api/v1/intakes", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createIntake))))
 	mux.Handle("GET /api/v1/intakes", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIntakes)))
-	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.executeIntake))))
-	mux.Handle("GET /api/v1/intakes/{id}/books", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBooks)))
-	mux.Handle("GET /api/v1/intakes/{id}/workshop", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getWorkshop)))
-	mux.Handle("PUT /api/v1/intakes/{id}/workshop", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveWorkshop))))
-	mux.Handle("POST /api/v1/intakes/{id}/books/{bookId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.restoreWorkshopBook))))
-	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
+	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireIntakeAccess("id", http.HandlerFunc(api.executeIntake)))))
+	mux.Handle("GET /api/v1/intakes/{id}/books", api.requireCapability(CapabilityBatchView, api.requireIntakeAccess("id", http.HandlerFunc(api.listBooks))))
+	mux.Handle("GET /api/v1/intakes/{id}/workshop", api.requireCapability(CapabilityBatchView, api.requireIntakeAccess("id", http.HandlerFunc(api.getWorkshop))))
+	mux.Handle("PUT /api/v1/intakes/{id}/workshop", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireIntakeAccess("id", http.HandlerFunc(api.saveWorkshop)))))
+	mux.Handle("POST /api/v1/intakes/{id}/books/{bookId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireIntakeAccess("id", http.HandlerFunc(api.restoreWorkshopBook)))))
+	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireIntakeAccess("id", http.HandlerFunc(api.createOwnedBatchProject)))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.getBatchProject))))
 	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/original-text", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveScriptOriginalText))))

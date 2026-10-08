@@ -15,14 +15,35 @@ func NewMySQLStore(db *sql.DB) *MySQLStore {
 	return &MySQLStore{db: db}
 }
 
-func (s *MySQLStore) CreateIntake(ctx context.Context, name string) (Intake, error) {
-	result, err := s.db.ExecContext(ctx, "INSERT INTO intakes (name, status) VALUES (?, ?)", name, StatusPending)
+// CreateOwnedIntake commits the intake row and its access boundary atomically.
+// Books deliberately remain outside this transaction so their existing
+// partial-failure/status semantics are preserved.
+func (s *MySQLStore) CreateOwnedIntake(ctx context.Context, name string, actor ActorScope) (Intake, error) {
+	if s == nil || s.db == nil || actor.UserID <= 0 {
+		return Intake{}, fmt.Errorf("create owned intake: authenticated owner is required")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Intake{}, fmt.Errorf("begin create intake: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, "INSERT INTO intakes (name, status) VALUES (?, ?)", name, StatusPending)
 	if err != nil {
 		return Intake{}, fmt.Errorf("create intake: %w", err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
 		return Intake{}, fmt.Errorf("read intake id: %w", err)
+	}
+	var teamID any
+	if actor.TeamID > 0 {
+		teamID = actor.TeamID
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO auth_intake_ownership (intake_id, owner_user_id, team_id) VALUES (?, ?, ?)", id, actor.UserID, teamID); err != nil {
+		return Intake{}, fmt.Errorf("create intake ownership: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Intake{}, fmt.Errorf("commit create intake: %w", err)
 	}
 	return Intake{ID: id, Name: name, Status: StatusPending}, nil
 }
@@ -59,6 +80,46 @@ func (s *MySQLStore) ListIntakes(ctx context.Context) ([]Intake, error) {
 		return nil, fmt.Errorf("iterate intakes: %w", err)
 	}
 	return result, nil
+}
+
+// ListVisibleIntakes filters at the SQL boundary. Elevated callers have
+// already passed the route capability check and may inspect legacy-unowned
+// rows; ordinary users only receive owner/team rows.
+func (s *MySQLStore) ListVisibleIntakes(ctx context.Context, userID, teamID int64, elevated bool) ([]Intake, error) {
+	if elevated {
+		return s.ListIntakes(ctx)
+	}
+	const query = "SELECT i.id, i.name, i.status, i.created_at, i.updated_at FROM intakes i JOIN auth_intake_ownership o ON o.intake_id = i.id WHERE o.owner_user_id = ? OR (? > 0 AND o.team_id IS NOT NULL AND o.team_id = ?) ORDER BY i.id DESC LIMIT 100"
+	rows, err := s.db.QueryContext(ctx, query, userID, teamID, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("list visible intakes: %w", err)
+	}
+	defer rows.Close()
+	result := make([]Intake, 0)
+	for rows.Next() {
+		var value Intake
+		if err := rows.Scan(&value.ID, &value.Name, &value.Status, &value.CreatedAt, &value.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan visible intake: %w", err)
+		}
+		result = append(result, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate visible intakes: %w", err)
+	}
+	return result, nil
+}
+
+func (s *MySQLStore) CanAccessIntake(ctx context.Context, intakeID, userID, teamID int64, elevated bool) (bool, error) {
+	if s == nil || s.db == nil {
+		return false, fmt.Errorf("intake access store unavailable")
+	}
+	var allowed bool
+	if elevated {
+		err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM intakes WHERE id = ?)", intakeID).Scan(&allowed)
+		return allowed, err
+	}
+	err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM auth_intake_ownership WHERE intake_id = ? AND (owner_user_id = ? OR (? > 0 AND team_id IS NOT NULL AND team_id = ?)))", intakeID, userID, teamID, teamID).Scan(&allowed)
+	return allowed, err
 }
 
 func (s *MySQLStore) UpdateIntakeStatus(ctx context.Context, id int64, status Status) error {

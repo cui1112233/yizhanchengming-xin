@@ -18,6 +18,7 @@ type fakeServiceStore struct {
 	intakes      map[int64]Intake
 	books        map[int64][]Book
 	statuses     []Status
+	createdActor ActorScope
 }
 
 func newFakeServiceStore() *fakeServiceStore {
@@ -30,6 +31,11 @@ func (s *fakeServiceStore) CreateIntake(_ context.Context, name string) (Intake,
 	value := Intake{ID: id, Name: name, Status: StatusPending}
 	s.intakes[id] = value
 	return value, nil
+}
+
+func (s *fakeServiceStore) CreateOwnedIntake(ctx context.Context, name string, actor ActorScope) (Intake, error) {
+	s.createdActor = actor
+	return s.CreateIntake(ctx, name)
 }
 
 func (s *fakeServiceStore) GetIntake(_ context.Context, id int64) (Intake, error) {
@@ -101,7 +107,8 @@ func TestServiceCreateIntakePreservesBookstoreGroupsAndDedupesWithinGroup(t *tes
 	service := NewService(store, nil, nil)
 
 	created, books, err := service.CreateIntake(context.Background(), CreateIntakeInput{
-		Name: "知乎 + 黑岩",
+		Name:  "知乎 + 黑岩",
+		Actor: ActorScope{UserID: 7, TeamID: 3},
 		Groups: []BookGroup{
 			{
 				Source: "知乎付费", PlatformID: "15",
@@ -119,6 +126,9 @@ func TestServiceCreateIntakePreservesBookstoreGroupsAndDedupesWithinGroup(t *tes
 	}
 	if created.ID == 0 || created.Status != StatusPending {
 		t.Fatalf("created = %+v", created)
+	}
+	if store.createdActor != (ActorScope{UserID: 7, TeamID: 3}) {
+		t.Fatalf("created actor = %+v", store.createdActor)
 	}
 	if len(books) != 3 {
 		t.Fatalf("len(books) = %d, want 3", len(books))
@@ -143,7 +153,7 @@ func TestServiceExecuteIntakeFetches121ResolvesMetadataAndKeepsPartialFailureRet
 
 	fetcher := &fake121Fetcher{
 		results: map[string]provider121.Result{
-			"2:2001": {Text: "第一章\n正文 A", BookInfo: provider121.BookInfo{BookName: "港岛雨停，再无爱意", Category: "男生生活", Genre: float64(8)}},
+			"2:2001":  {Text: "第一章\n正文 A", BookInfo: provider121.BookInfo{BookName: "港岛雨停，再无爱意", Category: "男生生活", Genre: float64(8)}},
 			"15:2002": {Text: "正文 B", BookInfo: provider121.BookInfo{BookName: "121 标题不应覆盖手工标题", Category: "男生生活", Genre: "现代言情"}},
 		},
 		errors: map[string]error{"1:2003": errors.New("upstream timeout")},
@@ -232,7 +242,6 @@ func TestServiceExecuteIntakeClassifierFailureIsRetryableAndDoesNotClaimSuccess(
 		t.Fatalf("book = %+v", books[0])
 	}
 }
-
 
 func TestServiceExecuteIntakeRetryOnlyFailedBooksAndCompletes(t *testing.T) {
 	store := newFakeServiceStore()

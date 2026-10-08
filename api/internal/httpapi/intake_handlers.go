@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
@@ -103,6 +104,14 @@ func (h handler) createIntake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input := intake.CreateIntakeInput{Name: request.Name, Groups: make([]intake.BookGroup, 0, len(request.Groups))}
+	if h.deps.Auth != nil {
+		actor, ok := authn.CurrentUser(r.Context())
+		if !ok || actor.ID <= 0 {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			return
+		}
+		input.Actor = intake.ActorScope{UserID: actor.ID, TeamID: actor.TeamID}
+	}
 	for _, group := range request.Groups {
 		converted := intake.BookGroup{Source: group.Source, PlatformID: group.PlatformID, Books: make([]intake.BookInput, 0, len(group.Books))}
 		for _, book := range group.Books {
@@ -120,12 +129,31 @@ func (h handler) createIntake(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) listIntakes(w http.ResponseWriter, r *http.Request) {
-	if h.deps.Reader == nil {
-		writeError(w, http.StatusServiceUnavailable, "intake reader unavailable")
-		return
+	var rows []intake.Intake
+	var err error
+	if h.deps.Auth != nil {
+		if h.deps.IntakeAccess == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "Intake 权限校验暂不可用"})
+			return
+		}
+		user, ok := authn.CurrentUser(r.Context())
+		if !ok || user.ID <= 0 {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			return
+		}
+		rows, err = h.deps.IntakeAccess.ListVisibleIntakes(r.Context(), user.ID, user.TeamID, intakeElevated(user))
+	} else {
+		if h.deps.Reader == nil {
+			writeError(w, http.StatusServiceUnavailable, "intake reader unavailable")
+			return
+		}
+		rows, err = h.deps.Reader.ListIntakes(r.Context())
 	}
-	rows, err := h.deps.Reader.ListIntakes(r.Context())
 	if err != nil {
+		if h.deps.Auth != nil {
+			h.writeServiceError(w, r, http.StatusServiceUnavailable, "AUTH_POLICY_UNAVAILABLE", "Intake 权限校验暂不可用", "intake", "list_access", err)
+			return
+		}
 		h.writeServiceError(w, r, http.StatusInternalServerError, "INTAKE_LIST_FAILED", "读取 intake 列表失败", "intake", "list", err)
 		return
 	}

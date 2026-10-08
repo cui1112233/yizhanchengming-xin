@@ -11,7 +11,7 @@ import (
 )
 
 type serviceStore interface {
-	CreateIntake(ctx context.Context, name string) (Intake, error)
+	CreateOwnedIntake(ctx context.Context, name string, actor ActorScope) (Intake, error)
 	UpsertBook(ctx context.Context, book Book) (Book, error)
 	ListBooks(ctx context.Context, intakeID int64) ([]Book, error)
 	UpdateIntakeStatus(ctx context.Context, id int64, status Status) error
@@ -61,6 +61,7 @@ type BookGroup struct {
 type CreateIntakeInput struct {
 	Name   string
 	Groups []BookGroup
+	Actor  ActorScope
 }
 
 type ExecuteResult struct {
@@ -228,7 +229,10 @@ func (s *Service) CreateIntake(ctx context.Context, input CreateIntakeInput) (In
 		return Intake{}, nil, fmt.Errorf("至少添加一本小说")
 	}
 
-	intakeValue, err := s.store.CreateIntake(ctx, name)
+	if input.Actor.UserID <= 0 {
+		return Intake{}, nil, fmt.Errorf("authenticated intake owner is required")
+	}
+	intakeValue, err := s.store.CreateOwnedIntake(ctx, name, input.Actor)
 	if err != nil {
 		return Intake{}, nil, err
 	}

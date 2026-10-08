@@ -683,3 +683,17 @@
 - [x] 本地验证：`go test ./...` 通过；`npm test -- --run` 为 24 文件、80 测试通过（153.39 秒）；`npm run build` 通过。
 
 仍未完成：真实 Provider、TOS 凭据联通、部署与登录后公网浏览器验收。
+
+---
+
+## 2026-10-09 · Intake 对象级归属安全边界
+
+> 状态：⚠️ 仓库代码与 Go 测试完成；真实 MySQL migration、登录态浏览器和公网验收未执行。
+
+- [x] 新增最小 additive migration `00019_intake_ownership.sql`：`auth_intake_ownership` 以 `intake_id` 为唯一事实键，记录创建用户与可选团队；旧数据只通过 `batch_projects JOIN auth_batch_project_ownership` 确定性回填，无法证明归属的旧 Intake 保持无归属。
+- [x] 新 Intake 与 owner/team 归属在同一 MySQL transaction 创建；归属写入失败时回滚 Intake。后续 books 继续沿用既有部分失败与状态恢复语义。
+- [x] `GET /api/v1/intakes` 在 SQL 内按 owner 或非零同团队过滤，不先读取全局 100 条再逐项校验；只有已通过对应 batch capability 的 `admin/owner` 可读取全部及 legacy-unowned，`dev/manager/member` 不按角色绕过。
+- [x] execute、books、Workshop GET/PUT、单书 restore 和 create-project 在业务 service 前统一检查 Intake 归属；跨用户/无归属普通账号返回 403，缺少权限策略返回 503 fail-closed，Workshop 原文与 create-project Pipeline 不会在拒绝前被调用。
+- [x] 新建 Intake 的 owner/team 只来自当前 Cookie Session 的 `authn.CurrentUser`；没有新增自动 claim/adopt、Bearer、浏览器业务存储或第二套事实表。
+- [x] 仓库验证：受影响 Go 包与 `go test ./...` 均退出码 0。
+- [ ] 尚未对本机 `ycm_staging` 执行 Goose migration，未做真实登录/换账号/刷新恢复与公网 UI 验收；不得用 sqlmock 或路由单测冒充这些运行时结果。

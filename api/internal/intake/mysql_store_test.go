@@ -17,11 +17,16 @@ func TestMySQLStoreCreateAndReadIntake(t *testing.T) {
 	defer db.Close()
 
 	store := NewMySQLStore(db)
+	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO intakes (name, status) VALUES (?, ?)")).
 		WithArgs("知乎+黑岩", StatusPending).
 		WillReturnResult(sqlmock.NewResult(11, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO auth_intake_ownership (intake_id, owner_user_id, team_id) VALUES (?, ?, ?)")).
+		WithArgs(int64(11), int64(7), nil).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
-	created, err := store.CreateIntake(context.Background(), "知乎+黑岩")
+	created, err := store.CreateOwnedIntake(context.Background(), "知乎+黑岩", ActorScope{UserID: 7})
 	if err != nil {
 		t.Fatalf("CreateIntake: %v", err)
 	}
