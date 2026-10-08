@@ -697,3 +697,18 @@
 - [x] 新建 Intake 的 owner/team 只来自当前 Cookie Session 的 `authn.CurrentUser`；没有新增自动 claim/adopt、Bearer、浏览器业务存储或第二套事实表。
 - [x] 仓库验证：受影响 Go 包与 `go test ./...` 均退出码 0。
 - [ ] 尚未对本机 `ycm_staging` 执行 Goose migration，未做真实登录/换账号/刷新恢复与公网 UI 验收；不得用 sqlmock 或路由单测冒充这些运行时结果。
+
+---
+
+## 2026-10-09 · BatchProject 全路由对象级归属安全边界
+
+> 状态：⚠️ 本安全切片随本提交进入 `main`；仓库 Go 测试完成，真实登录态浏览器与公网验收仍未执行。本切片不包含列表分页或软归档。
+
+- [x] 所有直接携带 BatchProject `{id}` / `{projectId}` 的详情、原文、分镜读写/排序/重编译、统一设置/版本配置、生成/音频/阶段、Novel Panel、水火、项目视频与合成路由，均在业务 service/store 调用前复用同一 `requireBatchProjectAccess` 边界。
+- [x] 读取与写入继续先要求各自 capability；写操作继续要求同源 CSRF。只有 `admin/owner` 作为 elevated 角色，`dev/manager/member` 不按角色绕过，普通 owner 或非零同团队归属由 MySQL `auth_batch_project_ownership` 判定，`teamId=0` 不参与团队匹配。
+- [x] 认证启用但 BatchProject 策略缺失或查询失败时返回带 request id 的 503；跨归属返回 403。表驱动路由测试覆盖新增收口接口，并断言拒绝时对应业务 fake 零调用。
+- [x] BookRun 重试、VIDEO task / merge resource 路由继续先把资源 ID 解析为所属项目再授权；发布意图、详情与审计继续保留 publishing service 的项目归属与账号归属双重校验，没有重复建立第二套授权规则。
+- [x] 项目列表在认证启用但归属策略缺失时于读取全局项目列表前 fail-closed；原有服务层归属校验继续作为 defense-in-depth。
+- [x] 仓库验证：`go test ./internal/httpapi -count=1` 与 `go test ./... -count=1` 均退出码 0。
+- [ ] BatchProject 列表服务端分页、搜索/筛选契约仍未实现；不得把当前全量读取后过滤视为分页完成。
+- [ ] BatchProject 软归档、恢复、归档数据可见性与删除语义仍未设计/实现；本切片没有新增 schema 或伪造归档状态。

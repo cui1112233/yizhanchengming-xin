@@ -38,12 +38,6 @@ func (h handler) requireBatchProjectAccess(pathKey string, next http.Handler) ht
 	})
 }
 
-// requireVideoProjectAccess keeps the video routes on the shared batch-project
-// authorization boundary while their names are migrated incrementally.
-func (h handler) requireVideoProjectAccess(pathKey string, next http.Handler) http.Handler {
-	return h.requireBatchProjectAccess(pathKey, next)
-}
-
 func (h handler) requireVideoTaskAccess(next http.Handler) http.Handler {
 	return h.requireVideoResourceAccess("taskId", func(ctx context.Context, id int64) (int64, error) {
 		if h.deps.VideoResourceProjects == nil {
@@ -102,6 +96,9 @@ func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProject
 }
 
 func (h handler) authorizeBatchProject(w http.ResponseWriter, r *http.Request, projectID int64) bool {
+	if h.deps.Auth == nil {
+		return true
+	}
 	if h.deps.BatchProjectAccess == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
 		return false

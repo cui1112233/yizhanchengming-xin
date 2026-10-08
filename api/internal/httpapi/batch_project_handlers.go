@@ -15,6 +15,10 @@ func (h handler) listBatchProjects(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "batch project reader unavailable")
 		return
 	}
+	if h.deps.Auth != nil && h.deps.BatchProjectAccess == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
+		return
+	}
 	projects, err := h.deps.BatchProjects.ListBatchProjects(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "读取批量项目列表失败")
