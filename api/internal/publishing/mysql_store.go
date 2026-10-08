@@ -60,6 +60,13 @@ func (s *MySQLStore) CanAccessBatchProject(ctx context.Context, projectID, userI
 	return allowed, err
 }
 
+func (s *MySQLStore) BookBelongsToBatchProject(ctx context.Context, projectID, bookID int64) (bool, error) {
+	if s == nil || s.db == nil { return false, ErrUnavailable }
+	var allowed bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM batch_projects p JOIN books b ON b.intake_id = p.intake_id WHERE p.id = ? AND b.id = ?)`, projectID, bookID).Scan(&allowed)
+	return allowed, err
+}
+
 func (s *MySQLStore) CreateIntentWithAudit(ctx context.Context, intent Intent, audit Audit) (Intent, error) {
 	tx, err := s.db.BeginTx(ctx, nil); if err != nil { return Intent{}, err }; defer tx.Rollback()
 	var book any; if intent.BookID > 0 { book = intent.BookID }

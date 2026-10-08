@@ -79,6 +79,10 @@ func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProject
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "VIDEO_INVALID_REQUEST", "message": "VIDEO resource ID 无效"})
 			return
 		}
+		if h.deps.BatchProjectAccess == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
+			return
+		}
 		projectID, err := resolve(r.Context(), resourceID)
 		if errors.Is(err, video.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]any{"code": "VIDEO_NOT_FOUND", "message": "VIDEO resource 不存在"})

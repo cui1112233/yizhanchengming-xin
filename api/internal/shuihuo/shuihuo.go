@@ -136,6 +136,7 @@ type CreateMediaTaskInput struct {
 type ObjectStore interface {
 	PutObjectFromFile(context.Context, string, string, string) error
 	GetObject(context.Context, string, string) (io.ReadCloser, error)
+	DeleteObject(context.Context, string, string) error
 }
 type UploadAssetInput struct {
 	BatchProjectID, BookID, SegmentID int64
@@ -147,6 +148,7 @@ type Store interface {
 	CreateSegment(context.Context, CreateSegmentInput) (Segment, error)
 	UpdateSegment(context.Context, int64, int64, int64, UpdateSegmentInput) (Segment, error)
 	ListSegments(context.Context, int64, int64) ([]Segment, error)
+	ValidateAssetScope(context.Context, int64, int64, int64) error
 	CreateAsset(context.Context, CreateAssetInput) (Asset, error)
 	ListAssets(context.Context, int64, int64, int64) ([]Asset, error)
 	CreateMediaTask(context.Context, CreateMediaTaskInput) (MediaTask, error)
@@ -230,6 +232,9 @@ func (s *Service) UploadAsset(c context.Context, in UploadAssetInput) (Asset, er
 	if in.BatchProjectID <= 0 || in.BookID <= 0 || in.Body == nil {
 		return Asset{}, ErrInvalidUpload
 	}
+	if err := s.store.ValidateAssetScope(c, in.BatchProjectID, in.BookID, in.SegmentID); err != nil {
+		return Asset{}, err
+	}
 	contentType, extension, limit, err := uploadRules(in.Type, in.ContentType)
 	if err != nil {
 		return Asset{}, err
@@ -269,7 +274,14 @@ func (s *Service) UploadAsset(c context.Context, in UploadAssetInput) (Asset, er
 		return Asset{}, fmt.Errorf("shuihuo: upload TOS object: %w", err)
 	}
 	metadata := []byte(fmt.Sprintf(`{"filename":%q,"contentType":%q,"bytes":%d,"sha256":%q}`, filepath.Base(in.Filename), contentType, written, hex.EncodeToString(hash.Sum(nil))))
-	return s.store.CreateAsset(c, CreateAssetInput{BatchProjectID: in.BatchProjectID, BookID: in.BookID, SegmentID: in.SegmentID, Type: in.Type, Bucket: s.bucket, ObjectKey: key, Metadata: metadata, Status: AssetReady})
+	asset, err := s.store.CreateAsset(c, CreateAssetInput{BatchProjectID: in.BatchProjectID, BookID: in.BookID, SegmentID: in.SegmentID, Type: in.Type, Bucket: s.bucket, ObjectKey: key, Metadata: metadata, Status: AssetReady})
+	if err == nil {
+		return asset, nil
+	}
+	if cleanupErr := s.objects.DeleteObject(c, s.bucket, key); cleanupErr != nil {
+		return Asset{}, fmt.Errorf("shuihuo: persist asset: %w (new object cleanup failed: %v)", err, cleanupErr)
+	}
+	return Asset{}, err
 }
 func (s *Service) OpenAsset(c context.Context, p, b, id int64) (Asset, io.ReadCloser, error) {
 	if s == nil || s.objects == nil {
@@ -519,6 +531,21 @@ func (s *MySQLStore) ListSegments(c context.Context, p, b int64) (out []Segment,
 	e = rows.Err()
 	return
 }
+func (s *MySQLStore) ValidateAssetScope(c context.Context, p, b, segmentID int64) error {
+	var valid bool
+	e := s.db.QueryRowContext(c, `SELECT EXISTS(
+	SELECT 1 FROM batch_projects p JOIN books b ON b.intake_id=p.intake_id
+	WHERE p.id=? AND b.id=?
+	AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_storyboard_segments s WHERE s.id=? AND s.batch_project_id=? AND s.book_id=?)))`,
+		p, b, segmentID, segmentID, p, b).Scan(&valid)
+	if e != nil {
+		return e
+	}
+	if !valid {
+		return ErrNotFound
+	}
+	return nil
+}
 func (s *MySQLStore) CreateAsset(c context.Context, i CreateAssetInput) (Asset, error) {
 	m := i.Metadata
 	if len(m) == 0 {
@@ -581,30 +608,27 @@ func (s *MySQLStore) ListAssets(c context.Context, p, b, seg int64) (out []Asset
 	return
 }
 func (s *MySQLStore) CreateMediaTask(c context.Context, i CreateMediaTaskInput) (MediaTask, error) {
-	var (
-		r sql.Result
-		e error
-	)
-	if i.ProductionTaskID > 0 {
-		r, e = s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)
+	r, e := s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)
 SELECT ?,?,?,?,?,?,?,?,?
-FROM video_production_tasks linked_vpt
-JOIN video_production_jobs linked_vpj ON linked_vpj.id=linked_vpt.production_job_id
-WHERE linked_vpt.id=? AND linked_vpj.batch_project_id=? AND linked_vpj.book_id=?`, i.BatchProjectID, i.BookID, n(i.SegmentID), n(i.SourceAssetID), i.ProductionTaskID, i.Kind, i.Provider, i.Model, i.RequestID, i.ProductionTaskID, i.BatchProjectID, i.BookID)
-	} else {
-		r, e = s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)VALUES(?,?,?,?,?,?,?,?,?)`, i.BatchProjectID, i.BookID, n(i.SegmentID), n(i.SourceAssetID), nil, i.Kind, i.Provider, i.Model, i.RequestID)
-	}
+FROM batch_projects p JOIN books b ON b.intake_id=p.intake_id
+WHERE p.id=? AND b.id=?
+AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_storyboard_segments s WHERE s.id=? AND s.batch_project_id=? AND s.book_id=?))
+AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_media_assets a WHERE a.id=? AND a.batch_project_id=? AND a.book_id=?))
+AND (?=0 OR EXISTS(SELECT 1 FROM video_production_tasks linked_vpt JOIN video_production_jobs linked_vpj ON linked_vpj.id=linked_vpt.production_job_id WHERE linked_vpt.id=? AND linked_vpj.batch_project_id=? AND linked_vpj.book_id=?))`,
+		i.BatchProjectID, i.BookID, n(i.SegmentID), n(i.SourceAssetID), n(i.ProductionTaskID), i.Kind, i.Provider, i.Model, i.RequestID,
+		i.BatchProjectID, i.BookID,
+		i.SegmentID, i.SegmentID, i.BatchProjectID, i.BookID,
+		i.SourceAssetID, i.SourceAssetID, i.BatchProjectID, i.BookID,
+		i.ProductionTaskID, i.ProductionTaskID, i.BatchProjectID, i.BookID)
 	if e != nil {
 		return MediaTask{}, e
 	}
-	if i.ProductionTaskID > 0 {
-		changed, changedErr := r.RowsAffected()
-		if changedErr != nil {
-			return MediaTask{}, changedErr
-		}
-		if changed != 1 {
-			return MediaTask{}, ErrNotFound
-		}
+	changed, changedErr := r.RowsAffected()
+	if changedErr != nil {
+		return MediaTask{}, changedErr
+	}
+	if changed != 1 {
+		return MediaTask{}, ErrNotFound
 	}
 	id, _ := r.LastInsertId()
 	return s.task(c, id)

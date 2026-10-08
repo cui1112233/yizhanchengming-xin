@@ -3,6 +3,7 @@ package shuihuo
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -15,8 +16,12 @@ import (
 )
 
 type testStore struct {
-	input CreateMediaTaskInput
-	asset CreateAssetInput
+	input            CreateMediaTaskInput
+	asset            CreateAssetInput
+	scopeErr         error
+	createAssetErr   error
+	scopeCalls       int
+	createAssetCalls int
 }
 
 func (*testStore) CreateSegment(context.Context, CreateSegmentInput) (Segment, error) {
@@ -26,8 +31,16 @@ func (*testStore) UpdateSegment(context.Context, int64, int64, int64, UpdateSegm
 	return Segment{}, nil
 }
 func (*testStore) ListSegments(context.Context, int64, int64) ([]Segment, error) { return nil, nil }
+func (t *testStore) ValidateAssetScope(context.Context, int64, int64, int64) error {
+	t.scopeCalls++
+	return t.scopeErr
+}
 func (t *testStore) CreateAsset(_ context.Context, input CreateAssetInput) (Asset, error) {
+	t.createAssetCalls++
 	t.asset = input
+	if t.createAssetErr != nil {
+		return Asset{}, t.createAssetErr
+	}
 	return Asset{ID: 7, ObjectKey: input.ObjectKey, Bucket: input.Bucket, Status: input.Status}, nil
 }
 func (*testStore) ListAssets(context.Context, int64, int64, int64) ([]Asset, error) { return nil, nil }
@@ -39,19 +52,90 @@ func (t *testStore) CreateMediaTask(_ context.Context, i CreateMediaTaskInput) (
 type memoryObjects struct {
 	putBucket, putKey string
 	getKey            string
+	deletedKey        string
+	putCalls          int
+	deleteCalls       int
 	contents          []byte
 }
 
 func (m *memoryObjects) PutObjectFromFile(_ context.Context, bucket, key, filename string) error {
+	m.putCalls++
 	data, err := os.ReadFile(filename)
 	if err == nil {
 		m.putBucket, m.putKey, m.contents = bucket, key, data
 	}
 	return err
 }
+func (m *memoryObjects) DeleteObject(_ context.Context, _ string, key string) error {
+	m.deleteCalls++
+	m.deletedKey = key
+	return nil
+}
 func (m *memoryObjects) GetObject(_ context.Context, _ string, key string) (io.ReadCloser, error) {
 	m.getKey = key
 	return io.NopCloser(bytes.NewReader(m.contents)), nil
+}
+
+type countingReader struct {
+	reads int
+	data  []byte
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	r.reads++
+	if len(r.data) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(p, r.data)
+	r.data = r.data[n:]
+	return n, nil
+}
+
+func TestUploadAssetRejectsInvalidScopeBeforeReadingOrUploading(t *testing.T) {
+	store := &testStore{scopeErr: ErrNotFound}
+	objects := &memoryObjects{}
+	service := NewService(store, objects)
+	service.SetBucket("private-assets")
+	body := &countingReader{data: []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}}
+
+	_, err := service.UploadAsset(context.Background(), UploadAssetInput{BatchProjectID: 4, BookID: 99, SegmentID: 8, Type: AssetImage, Filename: "output.png", ContentType: "image/png", Body: body})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err=%v, want ErrNotFound", err)
+	}
+	if store.scopeCalls != 1 || store.createAssetCalls != 0 || body.reads != 0 || objects.putCalls != 0 || objects.deleteCalls != 0 {
+		t.Fatalf("scope=%d create=%d reads=%d put=%d delete=%d", store.scopeCalls, store.createAssetCalls, body.reads, objects.putCalls, objects.deleteCalls)
+	}
+}
+
+func TestUploadAssetDeletesNewObjectWhenDatabaseInsertFails(t *testing.T) {
+	insertErr := errors.New("database insert failed")
+	store := &testStore{createAssetErr: insertErr}
+	objects := &memoryObjects{}
+	service := NewService(store, objects)
+	service.SetBucket("private-assets")
+	png := []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}
+
+	_, err := service.UploadAsset(context.Background(), UploadAssetInput{BatchProjectID: 4, BookID: 9, SegmentID: 8, Type: AssetImage, Filename: "output.png", ContentType: "image/png", Body: bytes.NewReader(png)})
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("err=%v, want insert failure", err)
+	}
+	if store.scopeCalls != 1 || store.createAssetCalls != 1 || objects.putCalls != 1 || objects.deleteCalls != 1 || objects.deletedKey == "" || objects.deletedKey != objects.putKey {
+		t.Fatalf("scope=%d create=%d object=%+v", store.scopeCalls, store.createAssetCalls, objects)
+	}
+}
+
+func TestUploadAssetWithoutConfiguredObjectStoreStillFailsTruthfully(t *testing.T) {
+	store := &testStore{}
+	service := NewService(store)
+	service.SetBucket("private-assets")
+
+	_, err := service.UploadAsset(context.Background(), UploadAssetInput{BatchProjectID: 4, BookID: 9, Type: AssetImage, Body: bytes.NewReader([]byte("png"))})
+	if !errors.Is(err, ErrStorageUnavailable) {
+		t.Fatalf("err=%v, want ErrStorageUnavailable", err)
+	}
+	if store.scopeCalls != 0 || store.createAssetCalls != 0 {
+		t.Fatalf("scope=%d create=%d", store.scopeCalls, store.createAssetCalls)
+	}
 }
 
 func TestUploadAssetKeyPrefixAndSavedReadback(t *testing.T) {
@@ -212,9 +296,13 @@ func (configuredProvider) Generate(context.Context, MediaTask, string) (Generate
 	return GeneratedMedia{}, nil
 }
 
-type queueFake struct{ message taskruntime.Message }
+type queueFake struct {
+	message taskruntime.Message
+	calls   int
+}
 
 func (q *queueFake) Enqueue(_ context.Context, m taskruntime.Message) error {
+	q.calls++
 	q.message = m
 	return nil
 }
@@ -226,10 +314,16 @@ func (*queueFake) Nack(context.Context, taskruntime.Delivery, time.Duration) err
 
 type configuredStore struct {
 	testStore
-	queued int64
+	queued      int64
+	createCalls int
+	taskErr     error
 }
 
-func (*configuredStore) CreateMediaTask(context.Context, CreateMediaTaskInput) (MediaTask, error) {
+func (s *configuredStore) CreateMediaTask(context.Context, CreateMediaTaskInput) (MediaTask, error) {
+	s.createCalls++
+	if s.taskErr != nil {
+		return MediaTask{}, s.taskErr
+	}
 	return MediaTask{ID: 42, Kind: MediaImage, Status: MediaPendingExecutor, BatchProjectID: 1, BookID: 2}, nil
 }
 func (s *configuredStore) QueueMediaTask(_ context.Context, id int64) (MediaTask, error) {
@@ -254,5 +348,27 @@ func TestConfiguredImageProviderQueuesSharedRuntimeTask(t *testing.T) {
 	task, err := service.CreateMediaTask(context.Background(), CreateMediaTaskInput{BatchProjectID: 1, BookID: 2, Kind: MediaImage})
 	if err != nil || task.Status != MediaQueued || store.queued != 42 || queue.message.TaskKey != "shuihuo-media:42" {
 		t.Fatalf("task=%+v queued=%d message=%+v err=%v", task, store.queued, queue.message, err)
+	}
+}
+
+func TestRejectedMediaTaskScopeNeverQueues(t *testing.T) {
+	for _, kind := range []MediaKind{MediaImage, MediaAudio, MediaVideo} {
+		t.Run(string(kind), func(t *testing.T) {
+			store, queue := &configuredStore{taskErr: ErrNotFound}, &queueFake{}
+			service := NewService(store)
+			service.SetMediaExecutor(configuredProvider{}, queue)
+			input := CreateMediaTaskInput{BatchProjectID: 1, BookID: 2, SegmentID: 3, SourceAssetID: 4, Kind: kind}
+			if kind == MediaVideo {
+				input.ProductionTaskID = 5
+			}
+
+			_, err := service.CreateMediaTask(context.Background(), input)
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("err=%v, want ErrNotFound", err)
+			}
+			if store.createCalls != 1 || store.queued != 0 || queue.calls != 0 {
+				t.Fatalf("create=%d queued=%d enqueue=%d", store.createCalls, store.queued, queue.calls)
+			}
+		})
 	}
 }

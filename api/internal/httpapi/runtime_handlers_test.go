@@ -13,21 +13,103 @@ import (
 )
 
 type fakeRuntimeService struct {
-	projectID  int64
-	item       task9runtime.WorkItem
-	created    bool
-	err        error
-	retryCalls int
+	projectID    int64
+	item         task9runtime.WorkItem
+	created      bool
+	err          error
+	resolveErr   error
+	retryErr     error
+	resolveCalls int
+	retryCalls   int
 }
 
 func (f *fakeRuntimeService) ProjectIDForBookRun(context.Context, int64) (int64, error) {
+	f.resolveCalls++
+	if f.resolveErr != nil {
+		return 0, f.resolveErr
+	}
 	if f.err != nil {
 		return 0, f.err
 	}
 	return f.projectID, nil
 }
+
+func TestRuntimeRetryRejectsForeignURLProjectBeforeResolvingBookRun(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
+	access := &fakeRuntimeAccess{allowed: false}
+	runtime := &fakeRuntimeService{projectID: 7}
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	req := runtimeRetryRequest()
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "AUTH_FORBIDDEN") || !strings.Contains(rec.Body.String(), "request_id") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if access.calls != 1 || runtime.resolveCalls != 0 || runtime.retryCalls != 0 {
+		t.Fatalf("access=%d resolve=%d retry=%d", access.calls, runtime.resolveCalls, runtime.retryCalls)
+	}
+}
+
+func TestRuntimeRetryMissingProjectPolicyFailsBeforeResolvingBookRun(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
+	runtime := &fakeRuntimeService{projectID: 7}
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth}, runtime)
+	req := runtimeRetryRequest()
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "AUTH_POLICY_UNAVAILABLE") || !strings.Contains(rec.Body.String(), "request_id") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if runtime.resolveCalls != 0 || runtime.retryCalls != 0 {
+		t.Fatalf("resolve=%d retry=%d", runtime.resolveCalls, runtime.retryCalls)
+	}
+}
+
+func TestRuntimeRetryRejectsBookRunWhoseResolvedProjectDoesNotMatchURL(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
+	access := &fakeRuntimeAccess{allowed: true}
+	runtime := &fakeRuntimeService{projectID: 99}
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	req := runtimeRetryRequest()
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "RUNTIME_NOT_FOUND") || !strings.Contains(rec.Body.String(), "request_id") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if access.calls != 1 || runtime.resolveCalls != 1 || runtime.retryCalls != 0 {
+		t.Fatalf("access=%d resolve=%d retry=%d", access.calls, runtime.resolveCalls, runtime.retryCalls)
+	}
+}
+
+func TestRuntimeRetryResolverFailureIsSafeAndDoesNotMutate(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
+	access := &fakeRuntimeAccess{allowed: true}
+	runtime := &fakeRuntimeService{resolveErr: errors.New("mysql password=secret")}
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	req := runtimeRetryRequest()
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "RUNTIME_UNAVAILABLE") || !strings.Contains(rec.Body.String(), "request_id") || strings.Contains(rec.Body.String(), "password=secret") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if access.calls != 1 || runtime.resolveCalls != 1 || runtime.retryCalls != 0 {
+		t.Fatalf("access=%d resolve=%d retry=%d", access.calls, runtime.resolveCalls, runtime.retryCalls)
+	}
+}
+
 func (f *fakeRuntimeService) RetryBookRun(context.Context, int64) (task9runtime.WorkItem, bool, error) {
 	f.retryCalls++
+	if f.retryErr != nil {
+		return f.item, f.created, f.retryErr
+	}
 	return f.item, f.created, f.err
 }
 
@@ -134,13 +216,13 @@ func TestRuntimeRetryRejectsBadOriginBeforeMutation(t *testing.T) {
 func TestRuntimeRetryMapsNonRetryableWithoutLeakingInternalError(t *testing.T) {
 	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "admin", Capabilities: authn.EffectiveCapabilities("admin", []string{CapabilityBatchExecute})}}
 	access := &fakeRuntimeAccess{allowed: true}
-	runtime := &fakeRuntimeService{projectID: 7, err: task9runtime.ErrBookRunNotRetryable}
+	runtime := &fakeRuntimeService{projectID: 7, retryErr: task9runtime.ErrBookRunNotRetryable}
 	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
 	req := runtimeRetryRequest()
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusServiceUnavailable && rec.Code != http.StatusConflict {
+	if rec.Code != http.StatusConflict {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	if strings.Contains(strings.ToLower(rec.Body.String()), "secret") {

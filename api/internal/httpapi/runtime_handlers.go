@@ -47,6 +47,10 @@ func (h runtimeHTTP) retryBookRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	boundary := handler{deps: h.deps}
+	if !boundary.authorizeBatchProject(w, r, projectID) {
+		return
+	}
 
 	actualProjectID, err := h.runtime.ProjectIDForBookRun(r.Context(), bookRunID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -61,11 +65,6 @@ func (h runtimeHTTP) retryBookRun(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"code": "RUNTIME_NOT_FOUND", "message": "BookRun 不属于该项目"})
 		return
 	}
-	boundary := handler{deps: h.deps}
-	if !boundary.authorizeBatchProject(w, r, projectID) {
-		return
-	}
-
 	item, created, err := h.runtime.RetryBookRun(r.Context(), bookRunID)
 	if errors.Is(err, task9runtime.ErrBookRunNotRetryable) {
 		writeJSON(w, http.StatusConflict, map[string]any{"code": "RUNTIME_NOT_RETRYABLE", "message": "该 BookRun 当前不可重试"})

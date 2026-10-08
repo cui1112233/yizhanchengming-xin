@@ -2,12 +2,14 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 )
 
 type task14ProjectAccessStub struct {
@@ -20,9 +22,109 @@ func (s task14ProjectAccessStub) CanAccessBatchProject(context.Context, int64, i
 
 type task14VideoResourceProjectStub struct{}
 
-func (task14VideoResourceProjectStub) ProjectIDForProductionTask(context.Context, int64) (int64, error) { return 77, nil }
-func (task14VideoResourceProjectStub) ProjectIDForMergeJob(context.Context, int64) (int64, error)       { return 77, nil }
-func (task14VideoResourceProjectStub) ProjectIDForMergeAttempt(context.Context, int64) (int64, error)   { return 77, nil }
+func (task14VideoResourceProjectStub) ProjectIDForProductionTask(context.Context, int64) (int64, error) {
+	return 77, nil
+}
+func (task14VideoResourceProjectStub) ProjectIDForMergeJob(context.Context, int64) (int64, error) {
+	return 77, nil
+}
+func (task14VideoResourceProjectStub) ProjectIDForMergeAttempt(context.Context, int64) (int64, error) {
+	return 77, nil
+}
+
+type videoResourceResolverSpy struct {
+	projectID int64
+	err       error
+	calls     int
+}
+
+func (s *videoResourceResolverSpy) resolve() (int64, error) {
+	s.calls++
+	return s.projectID, s.err
+}
+func (s *videoResourceResolverSpy) ProjectIDForProductionTask(context.Context, int64) (int64, error) {
+	return s.resolve()
+}
+func (s *videoResourceResolverSpy) ProjectIDForMergeJob(context.Context, int64) (int64, error) {
+	return s.resolve()
+}
+func (s *videoResourceResolverSpy) ProjectIDForMergeAttempt(context.Context, int64) (int64, error) {
+	return s.resolve()
+}
+
+type videoBusinessSpy struct{ calls int }
+
+func (s *videoBusinessSpy) Start(context.Context, video.StartRequest) (video.StartResult, error) {
+	s.calls++
+	return video.StartResult{}, nil
+}
+func (s *videoBusinessSpy) PollTask(context.Context, int64) (video.ProductionTask, error) {
+	s.calls++
+	return video.ProductionTask{}, nil
+}
+func (s *videoBusinessSpy) CancelTask(context.Context, int64) (video.ProductionTask, error) {
+	s.calls++
+	return video.ProductionTask{}, nil
+}
+func (s *videoBusinessSpy) RetryTask(context.Context, int64, string) (video.StartResult, error) {
+	s.calls++
+	return video.StartResult{}, nil
+}
+
+func videoResourceRequest() *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/video-tasks/31/poll", strings.NewReader(`{}`))
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access-token"})
+	req.Header.Set("Origin", "http://example.com")
+	return req
+}
+
+func TestVideoResourceAccessFailsBeforeResolverWhenProjectPolicyIsMissing(t *testing.T) {
+	resolver := &videoResourceResolverSpy{projectID: 77}
+	business := &videoBusinessSpy{}
+	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchExecute}}}
+	h := NewHandler(Dependencies{Auth: auth, VideoResourceProjects: resolver, Video: business})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, videoResourceRequest())
+
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "AUTH_POLICY_UNAVAILABLE") || !strings.Contains(rec.Body.String(), "request_id") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if resolver.calls != 0 || business.calls != 0 {
+		t.Fatalf("resolver=%d business=%d", resolver.calls, business.calls)
+	}
+}
+
+func TestVideoResourceAccessSafelyRejectsResolverFailureBeforeBusiness(t *testing.T) {
+	resolver := &videoResourceResolverSpy{err: errors.New("mysql dsn=secret")}
+	business := &videoBusinessSpy{}
+	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchExecute}}}
+	h := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: true}, VideoResourceProjects: resolver, Video: business})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, videoResourceRequest())
+
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "AUTH_POLICY_UNAVAILABLE") || !strings.Contains(rec.Body.String(), "request_id") || strings.Contains(rec.Body.String(), "dsn=secret") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if resolver.calls != 1 || business.calls != 0 {
+		t.Fatalf("resolver=%d business=%d", resolver.calls, business.calls)
+	}
+}
+
+func TestVideoResourceAccessRejectsForeignResolvedProjectBeforeBusiness(t *testing.T) {
+	resolver := &videoResourceResolverSpy{projectID: 77}
+	business := &videoBusinessSpy{}
+	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchExecute}}}
+	h := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: false}, VideoResourceProjects: resolver, Video: business})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, videoResourceRequest())
+
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "AUTH_FORBIDDEN") || !strings.Contains(rec.Body.String(), "request_id") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if resolver.calls != 1 || business.calls != 0 {
+		t.Fatalf("resolver=%d business=%d", resolver.calls, business.calls)
+	}
+}
 
 func TestTask14ProjectRoutesEnforceTask15OwnershipPolicy(t *testing.T) {
 	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchView, CapabilityBatchExecute}}}
