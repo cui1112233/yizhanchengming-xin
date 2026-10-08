@@ -17,4 +17,7 @@ FROM batch_projects AS bp
 JOIN auth_batch_project_ownership AS ownership ON ownership.batch_project_id = bp.id;
 
 -- +goose Down
-DROP TABLE IF EXISTS auth_intake_ownership;
+-- +goose StatementBegin
+SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'intake ownership migration is irreversible';
+-- +goose StatementEnd
