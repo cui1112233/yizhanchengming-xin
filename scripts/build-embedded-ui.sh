@@ -11,11 +11,14 @@ admin_embed_dir="$embed_dir/admin"
 npm --prefix "$frontend_dir" run build
 npm --prefix "$admin_dir" run build
 mkdir -p "$embed_dir"
-find "$embed_dir" -mindepth 1 -maxdepth 1 ! -name placeholder.txt -exec rm -rf {} +
+rm -rf "$user_embed_dir" "$admin_embed_dir"
 mkdir -p "$user_embed_dir" "$admin_embed_dir"
 cp -R "$frontend_dir/dist/." "$user_embed_dir/"
 cp -R "$admin_dir/dist/." "$admin_embed_dir/"
 
 git_sha=$(git -C "$repo_root" rev-parse HEAD)
+if [[ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal)" ]]; then
+  git_sha="${git_sha}-dirty"
+fi
 mkdir -p "$repo_root/api/.staging-bin"
 (cd "$repo_root/api" && go build -trimpath -ldflags "-X main.BuildGitSHA=$git_sha" -o .staging-bin/ycm-server ./cmd/server)
