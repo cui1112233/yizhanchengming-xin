@@ -671,6 +671,19 @@
 
 ---
 
+### 2026-10-09 · Production Task 4：统一用户历史投影
+
+- [x] `GET /api/v1/history` 通过专用 `WorkspaceHistoryReader` 读取 `workspace.MySQLStore.ListHistory`，复用已有 Intake、BatchProject、BookRun、SCRIPT StageRun、Novel Panel 修订/当前工作区 fallback、Shuihuo 图片/音频/视频、音频测量、视频生产尝试与合并尝试；没有新 History 表或 migration。
+- [x] 普通用户必须符合 Intake 与父项目各自 owner/非零 team scope，BookRun/Stage/媒体/视频/合并再校验 book 属于父项目 Intake；`teamId=0` 不共享、`dev` 不提升，只有 admin/owner 使用固定 elevated scope。linked video 只在同 project/book 的有效视频引用下拼接状态和去重。
+- [x] 安全 DTO 只含 19 个标识/摘要字段，状态白名单 normalization、未知状态保留 unknown；不返回正文、Provider 错误、Prompt、secret、object key 或 signed URL。COUNT/list 共享 scoped CTE，支持服务端 page/limit/q/kind/status/archived，归档默认 all，顺序固定。
+- [x] `/history` 具备真实加载/空/错误态、401/403/503、requestId、保留旧数据的失败刷新、慢响应保护、服务端搜索/类型/状态/归档筛选和分页；独立 `.history-page` 样式、五列表格和窄屏横向可达。Batch 精确 projectId 可查看，其余来源诚实标记暂不支持精确进入；无删除/清空/restore 操作，所有 GET 只读。
+- [x] History 后端目标测试、HistoryPage 10 项测试与全量 Go 25 packages 自然退出码 0；SQL mock 仅验证发出的查询边界、参数和 DTO，不宣称执行了真实数据库归属谓词。
+- [x] 完整前台 `CI=1 npm test -- --run` 在同一 PTY 自然退出码 0：28 files / 217 tests，300.33 秒；未使用后台、nohup 或临时 exit 文件替代退出证据。
+- [x] `npm run build` 退出码 0，1463 modules，4.84 秒；只生成当前本地前台构建，不代表 Go embed 或部署完成。
+- [ ] 真实 MySQL 数据与 EXPLAIN、登录后的桌面/390px 截图、Provider/readback、部署与公网验收尚未进行；未连接 ECS、未调用 Provider。
+
+---
+
 # 2026-10-07 · Task 16：Agent Studio
 
 > 状态：历史证据，已被 2026-10-09 范围决策 superseded。当前只保留 Agent 占位路由、Go 领域包、migration 和既有数据引用；旧前端与 HTTP API 已退役。以下勾选不代表当前产品可用。

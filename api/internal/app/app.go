@@ -176,6 +176,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,
 		WorkspaceRecent:             recentStore,
+		WorkspaceHistory:            recentStore,
 		BatchProjectDetails:         store,
 		ScriptBooks:                 store,
 		ScriptStoryboards:           generationService,

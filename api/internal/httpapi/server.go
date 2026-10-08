@@ -54,6 +54,10 @@ type WorkspaceRecentReader interface {
 	ListRecentElevated(context.Context, int) ([]workspace.RecentItem, error)
 }
 
+type WorkspaceHistoryReader interface {
+	ListHistory(context.Context, workspace.HistoryQuery) (workspace.HistoryPage, error)
+}
+
 type BatchProjectDetailReader interface {
 	GetBatchProject(ctx context.Context, id int64) (intake.BatchProject, error)
 	ListBooks(ctx context.Context, intakeID int64) ([]intake.Book, error)
@@ -140,6 +144,7 @@ type Dependencies struct {
 	Reader                      IntakeReader
 	BatchProjects               BatchProjectReader
 	WorkspaceRecent             WorkspaceRecentReader
+	WorkspaceHistory            WorkspaceHistoryReader
 	BatchProjectDetails         BatchProjectDetailReader
 	ScriptBooks                 ScriptBookEditor
 	ScriptStoryboards           ScriptStoryboardService
