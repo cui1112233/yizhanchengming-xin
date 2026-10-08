@@ -107,8 +107,8 @@ production build 也不证明 Vite dev-server 对根目录相对 import 的 fs �
 - 路由与外壳：`前台/src/RouterApp.jsx`、`前台/src/UserShell.jsx`。
 - 首页/剧本/改文/面板：`HomePage.jsx`、`ScriptWorkspace.jsx`、`NovelFetchWorkshop.jsx`、`novel-panel/NovelPanelWorkbench.jsx`。
 - 生产页：`App.jsx`、`BatchFactoryHome.jsx`、`BatchProjectListPage.jsx`、`BatchProjectVideo.jsx`、`ShuihuoProductionPage.jsx`。
-- 账户与工作区：`TtsPage.jsx`、`HistoryPage.jsx`、`IssuesPage.jsx`、`SettingsPage.jsx`、`AccountCenterPage.jsx`、`AgentStudioPage.jsx`、`AgentCanvasPage.jsx`。
-- API/权限：`前台/src/api.js`、`api/internal/httpapi/server.go`、`api/internal/httpapi/issues_handlers.go`、`api/internal/httpapi/history_handlers.go`。
+- 账户与工作区：`TtsPage.jsx`、`HistoryPage.jsx`、`SettingsPage.jsx`、`AccountCenterPage.jsx`、`AgentReservedPage.jsx`。`/issues` 没有当前页面，`/agent` 与 `/agent/canvas` 共用占位页。
+- API/权限：`前台/src/api.js`、`api/internal/httpapi/server.go`、`api/internal/httpapi/history_handlers.go`、`api/internal/authn/capabilities.go`。`/api/v1/issues` 与旧 `/api/v1/agent/*` 未注册并由 `retired_routes_test.go` 锁定安全 JSON 404；Agent 数据恢复边界仅保留在 `api/internal/agentstudio/` 与 `api/db/migrations/00014_task16_agent_studio.sql`。
 
 ### V88 源码候选（只读参考）
 
