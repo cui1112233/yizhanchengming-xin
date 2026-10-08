@@ -200,7 +200,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/intakes/{id}/books/{bookId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.restoreWorkshopBook))))
 	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject))))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
-	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getBatchProject)))
+	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.getBatchProject))))
 	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/original-text", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.saveScriptOriginalText))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.scriptStoryboard)))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.scriptStoryboard))))

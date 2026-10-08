@@ -21,7 +21,7 @@ type VideoResourceProjectResolver interface {
 	ProjectIDForMergeAttempt(context.Context, int64) (int64, error)
 }
 
-func (h handler) requireVideoProjectAccess(pathKey string, next http.Handler) http.Handler {
+func (h handler) requireBatchProjectAccess(pathKey string, next http.Handler) http.Handler {
 	if h.deps.Auth == nil {
 		return next
 	}
@@ -31,11 +31,17 @@ func (h handler) requireVideoProjectAccess(pathKey string, next http.Handler) ht
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "VIDEO_INVALID_REQUEST", "message": "batch project ID 无效"})
 			return
 		}
-		if !h.authorizeVideoProject(w, r, projectID) {
+		if !h.authorizeBatchProject(w, r, projectID) {
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// requireVideoProjectAccess keeps the video routes on the shared batch-project
+// authorization boundary while their names are migrated incrementally.
+func (h handler) requireVideoProjectAccess(pathKey string, next http.Handler) http.Handler {
+	return h.requireBatchProjectAccess(pathKey, next)
 }
 
 func (h handler) requireVideoTaskAccess(next http.Handler) http.Handler {
@@ -88,14 +94,14 @@ func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProject
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
 			return
 		}
-		if !h.authorizeVideoProject(w, r, projectID) {
+		if !h.authorizeBatchProject(w, r, projectID) {
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func (h handler) authorizeVideoProject(w http.ResponseWriter, r *http.Request, projectID int64) bool {
+func (h handler) authorizeBatchProject(w http.ResponseWriter, r *http.Request, projectID int64) bool {
 	if h.deps.BatchProjectAccess == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
 		return false

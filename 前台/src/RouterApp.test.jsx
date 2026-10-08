@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import RouterApp from './RouterApp.jsx'
 
@@ -139,6 +139,59 @@ describe('Task 1 首页与用户路由基础', () => {
     expect(window.location.pathname).toBe('/agent/canvas')
     expect(window.location.search).toBe('?projectId=17')
   })
+
+  it('ignores a delayed novel-panel A response after popstate switches to project B', async () => {
+    let resolveA
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const path = String(url)
+      if (path.endsWith('/batch-projects/1/novel-panel')) {
+        return new Promise((resolve) => { resolveA = () => resolve({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ workspace: { projectId: 1, revision: 1, originalText: 'A 的未完成响应' } }) }) })
+      }
+      if (path.endsWith('/batch-projects/2/novel-panel')) {
+        return Promise.resolve({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ workspace: { projectId: 2, revision: 2, originalText: 'B 的工作区' } }) })
+      }
+      return Promise.resolve({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({}) })
+    })
+    window.history.replaceState({}, '', '/novel-panel?projectId=1')
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/batch-projects/1/novel-panel'))).toBe(true))
+
+    window.history.pushState({}, '', '/novel-panel?projectId=2')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect((await screen.findByRole('textbox', { name: '整段小说原文' })).value).toBe('B 的工作区')
+    expect(screen.getByText(/项目 #2 · 修订 2/)).toBeTruthy()
+
+    resolveA()
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toBe('B 的工作区'))
+    expect(screen.getByText(/项目 #2 · 修订 2/)).toBeTruthy()
+  })
+
+  it('remounts the novel-panel editor on popstate so project A state cannot be saved as B', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, options = {}) => {
+      const path = String(url)
+      if (options.method === 'PUT' && path.endsWith('/batch-projects/2/novel-panel')) {
+        const payload = JSON.parse(options.body)
+        return { ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ workspace: { ...payload.workspace, revision: 3 } }) }
+      }
+      const projectId = path.endsWith('/batch-projects/1/novel-panel') ? 1 : 2
+      return { ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ workspace: { projectId, revision: projectId, originalText: `项目 ${projectId} 原文` } }) }
+    })
+    window.history.replaceState({}, '', '/novel-panel?projectId=1')
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    const editorA = await screen.findByRole('textbox', { name: '整段小说原文' })
+    expect(editorA.value).toBe('项目 1 原文')
+    fireEvent.change(editorA, { target: { value: 'A 的未保存编辑' } })
+
+    window.history.pushState({}, '', '/novel-panel?projectId=2')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toBe('项目 2 原文'))
+    fireEvent.click(screen.getByRole('button', { name: '保存小说面板' }))
+
+    await waitFor(() => expect(fetch.mock.calls.some(([url, options]) => String(url).endsWith('/batch-projects/2/novel-panel') && options?.method === 'PUT')).toBe(true))
+    const saveCall = fetch.mock.calls.find(([url, options]) => String(url).endsWith('/batch-projects/2/novel-panel') && options?.method === 'PUT')
+    expect(saveCall[1].body).toContain('项目 2 原文')
+    expect(saveCall[1].body).not.toContain('A 的未保存编辑')
+  }, 15000)
 
   it('rejects malformed batch project queries without guessing a project', async () => {
     window.history.replaceState({}, '', '/batch-factory?projectId=3&next=/admin')

@@ -581,9 +581,30 @@ func (s *MySQLStore) ListAssets(c context.Context, p, b, seg int64) (out []Asset
 	return
 }
 func (s *MySQLStore) CreateMediaTask(c context.Context, i CreateMediaTaskInput) (MediaTask, error) {
-	r, e := s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)VALUES(?,?,?,?,?,?,?,?,?)`, i.BatchProjectID, i.BookID, n(i.SegmentID), n(i.SourceAssetID), n(i.ProductionTaskID), i.Kind, i.Provider, i.Model, i.RequestID)
+	var (
+		r sql.Result
+		e error
+	)
+	if i.ProductionTaskID > 0 {
+		r, e = s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)
+SELECT ?,?,?,?,?,?,?,?,?
+FROM video_production_tasks linked_vpt
+JOIN video_production_jobs linked_vpj ON linked_vpj.id=linked_vpt.production_job_id
+WHERE linked_vpt.id=? AND linked_vpj.batch_project_id=? AND linked_vpj.book_id=?`, i.BatchProjectID, i.BookID, n(i.SegmentID), n(i.SourceAssetID), i.ProductionTaskID, i.Kind, i.Provider, i.Model, i.RequestID, i.ProductionTaskID, i.BatchProjectID, i.BookID)
+	} else {
+		r, e = s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)VALUES(?,?,?,?,?,?,?,?,?)`, i.BatchProjectID, i.BookID, n(i.SegmentID), n(i.SourceAssetID), nil, i.Kind, i.Provider, i.Model, i.RequestID)
+	}
 	if e != nil {
 		return MediaTask{}, e
+	}
+	if i.ProductionTaskID > 0 {
+		changed, changedErr := r.RowsAffected()
+		if changedErr != nil {
+			return MediaTask{}, changedErr
+		}
+		if changed != 1 {
+			return MediaTask{}, ErrNotFound
+		}
 	}
 	id, _ := r.LastInsertId()
 	return s.task(c, id)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button, Result } from 'antd'
 import NovelFetchPage from './NovelFetchPage.jsx'
 import BatchFactoryHome from './BatchFactoryHome.jsx'
@@ -56,12 +56,25 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
     setLocation({ pathname: target.pathname, search: target.search })
   }
   const [novelPanel, setNovelPanel] = useState({ loading: false, loadedProject: 0, workspace: null, error: null })
+  const novelPanelRequest = useRef(0)
   const panelProjectId = Number(new URLSearchParams(search).get('projectId'))
   useEffect(() => {
-    if (pathname !== '/novel-panel' || !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0 || novelPanel.loadedProject === panelProjectId || novelPanel.loading) return
-    setNovelPanel((value) => ({ ...value, loading: true, error: null }))
-    getNovelPanel(panelProjectId).then((result) => setNovelPanel({ loading: false, loadedProject: panelProjectId, workspace: result.workspace, error: null })).catch((error) => setNovelPanel({ loading: false, loadedProject: panelProjectId, workspace: null, error }))
-  }, [pathname, panelProjectId, novelPanel.loadedProject, novelPanel.loading])
+    const requestID = ++novelPanelRequest.current
+    if (pathname !== '/novel-panel' || !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0) {
+      setNovelPanel({ loading: false, loadedProject: 0, workspace: null, error: null })
+      return undefined
+    }
+    let active = true
+    setNovelPanel({ loading: true, loadedProject: 0, workspace: null, error: null })
+    getNovelPanel(panelProjectId)
+      .then((result) => {
+        if (active && requestID === novelPanelRequest.current) setNovelPanel({ loading: false, loadedProject: panelProjectId, workspace: result?.workspace || null, error: null })
+      })
+      .catch((error) => {
+        if (active && requestID === novelPanelRequest.current) setNovelPanel({ loading: false, loadedProject: panelProjectId, workspace: null, error })
+      })
+    return () => { active = false }
+  }, [pathname, panelProjectId])
 
   let page
   if (pathname === '/') {
@@ -94,9 +107,9 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   } else if (pathname === '/novel-panel') {
     page = !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0
       ? <RouteFoundation title="小说面板" description="请从批量项目进入小说面板（需要 projectId）。" onNavigate={navigate} />
-      : novelPanel.loading ? <RouteFoundation title="小说面板" description="正在读取工作区…" onNavigate={navigate} />
+      : novelPanel.loading || novelPanel.loadedProject !== panelProjectId ? <RouteFoundation title="小说面板" description="正在读取工作区…" onNavigate={navigate} />
         : novelPanel.error ? <RouteFoundation title="小说面板" description={novelPanel.error.message || '读取失败，请重试。'} onNavigate={navigate} />
-          : <NovelPanelWorkbench projectId={panelProjectId} initialWorkspace={novelPanel.workspace} api={{ saveWorkspace: saveNovelPanel, listHistory: listNovelPanelHistory, restoreHistory: restoreNovelPanelHistory }} />
+          : <NovelPanelWorkbench key={`novel-panel-${panelProjectId}`} projectId={panelProjectId} initialWorkspace={novelPanel.workspace} api={{ saveWorkspace: saveNovelPanel, listHistory: listNovelPanelHistory, restoreHistory: restoreNovelPanelHistory }} />
   } else if (routeFoundations[pathname]) {
     page = <RouteFoundation {...routeFoundations[pathname]} onNavigate={navigate} />
   } else {

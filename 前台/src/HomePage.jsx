@@ -14,7 +14,6 @@ const quickActions = [
 
 const kindLabels = {
   batch: '批量项目',
-  intake: '小说获取',
   script: '剧本生成',
   novel_panel: '小说面板',
   tts: '配音',
@@ -71,8 +70,8 @@ function RecentEntry({ item, onNavigate }) {
   const href = safeRecentHref(item?.href)
   const icon = item?.kind === 'tts' ? 'tts' : item?.kind === 'script' ? 'script' : item?.kind === 'novel_panel' ? 'novel' : item?.kind?.includes('shuihuo') ? 'shuihuo' : 'batch'
   const content = <><span className="recent-project-mark"><WorkspaceIcon name={icon} /></span><span className="recent-project-copy"><strong>{item?.title || '未命名项目'}</strong><small>{kindLabels[item?.kind] || '创作项目'} · {statusLabels[item?.status] || item?.status || '状态未知'}</small><time dateTime={item?.updatedAt || undefined}>{displayUpdatedAt(item?.updatedAt)}</time></span>{href ? <WorkspaceIcon name="arrow" className="recent-project-arrow" /> : <Tag>入口不可用</Tag>}</>
-  if (!href) return <article className="recent-project-entry is-disabled">{content}</article>
-  return <RouteLink href={href} onNavigate={onNavigate} className="recent-project-entry">{content}</RouteLink>
+  if (!href) return <article className="recent-project-entry is-disabled" data-recent-id={item?.id || undefined}>{content}</article>
+  return <RouteLink href={href} onNavigate={onNavigate} className="recent-project-entry" data-recent-id={item?.id || undefined}>{content}</RouteLink>
 }
 
 export default function HomePage({ onNavigate }) {

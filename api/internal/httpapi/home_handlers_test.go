@@ -169,3 +169,18 @@ func TestWorkspaceRecentReadFailureIsSafeAndCorrelated(t *testing.T) {
 		t.Fatalf("body=%s", rec.Body.String())
 	}
 }
+
+func TestWorkspaceRecentMissingReaderIsSafeAndCorrelated(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 7, Capabilities: []string{CapabilityBatchView}}}
+	rec := recentRequest(NewHandler(Dependencies{Auth: auth}), "/api/v1/workspace/recent", true)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["code"] != "RECENT_UNAVAILABLE" || body["request_id"] == "" {
+		t.Fatalf("body=%s", rec.Body.String())
+	}
+}

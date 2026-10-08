@@ -656,12 +656,16 @@
 
 ### 2026-10-09 · 首页真实最近创作投影与公网呈现收口
 
-- [x] `GET /api/v1/workspace/recent?limit=6` 以单条 MySQL 8 查询聚合已有 BatchProject/Intake、Script StageRun、Novel Panel、音频测量、Shuihuo 图片/音频/视频和 VIDEO 任务；没有新增 recent/history 表或 migration，也不返回错误原文、Provider、TOS key、输入或输出正文。
+- [x] `GET /api/v1/workspace/recent?limit=6` 以单条 MySQL 8 查询聚合已有 BatchProject、Script StageRun、Novel Panel、音频测量、Shuihuo 图片/音频/视频和 VIDEO 任务；没有新增 recent/history 表或 migration，也不返回错误原文、Provider、TOS key、输入或输出正文。Intake 尚无直接归属事实，已从 recent 对外 kind 移除，明确延期到 `auth_intake_ownership` 建立后再评估接入，避免借项目归属暴露或为每个项目重复生成 Intake 卡片。
 - [x] 普通账号只读取 owner 或当前非零 team 归属项目；`teamId=0` 不参与团队匹配。只有 `admin/owner` 使用独立固定 elevated 查询，`dev` 不自动提升；接口继续要求 Cookie Session 与 `batch.view`。
 - [x] 首页使用服务端 recent 投影，具备首次加载、保留旧数据的刷新、空态、安全错误、request id、重试和慢响应防覆盖；服务端入口只允许严格的 `/batch-factory?projectId=正整数`，非法/外域/额外 query 记录不可点击。
 - [x] Router 同时维护 pathname/search；pushState、popstate 与修饰键链接行为保留 query。Batch Factory 只在 projectId 出现在服务端可见项目列表后读取详情，非法或不可见深链保留安全列表，不猜测访问成功。
+- [x] TTS 音频测量与 Shuihuo 音频使用来源命名空间 ID（如 `tts:measurement:44` / `tts:media:44`），不会因不同事实表主键相同产生 React key 冲突。
+- [x] recent 的 Shuihuo↔VIDEO 状态、时间和去重都同时核验 `video_production_jobs.batch_project_id/book_id`；Shuihuo 写入带 `productionTaskId` 的媒体任务也用同一项目/书 scope 的 `INSERT … SELECT` 校验，错 scope 返回未找到。
+- [x] recent 深链使用的 `GET /api/v1/batch-projects/{id}` 已在业务 handler 前强制执行共享 BatchProjectAccess：跨用户 403，缺少策略 503 fail-closed，错误带 request id 且不会读取/泄漏 `originalText`。其余 Batch mutation 的统一归属收口仍属于后续 P0。
+- [x] Novel Panel 路由读取采用请求序列和卸载保护，仅在 `loadedProject===projectId` 时渲染，并按项目 key 重建编辑器；延迟 A 响应、popstate 切换 B 和未保存 A 状态不会覆盖/保存为 B。
 - [x] 首页继续使用同源 `/assets/home-hero.mp4`，并按 2026-10-09 公网实测收口 86px 桌面 Hero 标题、42px 按钮、三列 116px 快捷卡/24px gap、auto-fill 138px 最近卡/20px gap、900px 以下单列；图标改为仓库内共享受测 SVG，未复制公网 hash CSS、Pixiu/WebGL 或旧 Node/localStorage 链路。
-- [x] 仓库验证：`go test ./...` 退出码 0；前台 `npm install --no-package-lock --prefer-offline --no-audit` 退出码 0；前台全量 27 files / 182 tests 退出码 0；`npm run build` 退出码 0。
+- [x] 仓库验证：`go test ./...` 退出码 0；前台 `npm install --no-package-lock --prefer-offline --no-audit` 退出码 0；本轮前台全量 27 files / 185 tests 退出码 0；`npm run build` 退出码 0。
 - [ ] 尚未启动本机 Go embed 服务进行登录态截图、桌面/390px 视觉比对和真实 MySQL 数据验收；未连接 ECS/公网、未运行 GitHub Actions、未调用真实 Provider/TOS，因此不把仓库验证宣称为浏览器或公网完成。
 
 ---

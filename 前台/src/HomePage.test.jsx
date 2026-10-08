@@ -6,7 +6,7 @@ vi.mock('./api.js', () => ({ listWorkspaceRecent: vi.fn() }))
 import { listWorkspaceRecent } from './api.js'
 import HomePage from './HomePage.jsx'
 
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks() })
 describe('HomePage recent projects', () => {
   it('keeps the Agent product entrance marked for redesign and opens only the reserved route', async () => {
     listWorkspaceRecent.mockResolvedValue({ items: [] })
@@ -28,6 +28,20 @@ describe('HomePage recent projects', () => {
     expect(screen.getByText(/剧本生成 · 执行中/)).toBeTruthy()
     fireEvent.click(link)
     expect(onNavigate).toHaveBeenCalledWith('/batch-factory?projectId=18')
+  })
+
+  it('uses source-namespaced identities as distinct React keys for colliding TTS row ids', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    listWorkspaceRecent.mockResolvedValue({ items: [
+      { kind: 'tts', id: 'tts:measurement:44', title: '测量配音', status: 'measured', updatedAt: '2026-10-09T04:05:06Z', href: '/batch-factory?projectId=12' },
+      { kind: 'tts', id: 'tts:media:44', title: '水货音频', status: 'completed', updatedAt: '2026-10-09T04:04:06Z', href: '/batch-factory?projectId=12' },
+    ] })
+    render(<HomePage onNavigate={() => {}} />)
+    await screen.findByText('测量配音')
+    expect(screen.getByText('水货音频')).toBeTruthy()
+    expect(document.querySelector('[data-recent-id="tts:measurement:44"]')).toBeTruthy()
+    expect(document.querySelector('[data-recent-id="tts:media:44"]')).toBeTruthy()
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('same key')
   })
 
   it('keeps server supplied recent work visible while refresh is pending', async () => {

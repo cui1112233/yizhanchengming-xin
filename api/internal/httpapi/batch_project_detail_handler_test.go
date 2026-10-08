@@ -7,15 +7,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 )
 
 type fakeBatchProjectDetailReader struct {
 	project intake.BatchProject
 	books   []intake.Book
+	called  int
 }
 
 func (f *fakeBatchProjectDetailReader) GetBatchProject(context.Context, int64) (intake.BatchProject, error) {
+	f.called++
 	return f.project, nil
 }
 
@@ -61,5 +64,42 @@ func TestBatchProjectDetailReturnsRealProjectBooksAndErrors(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("body = %s, missing %s", body, want)
 		}
+	}
+}
+
+func TestBatchProjectDetailRejectsForeignProjectBeforeReadingSensitiveBooks(t *testing.T) {
+	reader := &fakeBatchProjectDetailReader{
+		project: intake.BatchProject{ID: 51, IntakeID: 11, Name: "别人的项目"},
+		books:   []intake.Book{{ID: 31, IntakeID: 11, OriginalText: "绝不能泄漏的原文"}},
+	}
+	auth := &fakeAuthService{user: authn.User{ID: 7, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchView}}}
+	handler := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: false}, BatchProjectDetails: reader})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects/51", nil)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access-token"})
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "AUTH_FORBIDDEN") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if reader.called != 0 || strings.Contains(rec.Body.String(), "绝不能泄漏的原文") {
+		t.Fatalf("detail reader crossed policy boundary: called=%d body=%s", reader.called, rec.Body.String())
+	}
+}
+
+func TestBatchProjectDetailFailsClosedWhenAccessPolicyIsMissing(t *testing.T) {
+	reader := &fakeBatchProjectDetailReader{project: intake.BatchProject{ID: 51, IntakeID: 11}}
+	auth := &fakeAuthService{user: authn.User{ID: 7, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchView}}}
+	handler := NewHandler(Dependencies{Auth: auth, BatchProjectDetails: reader})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects/51", nil)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access-token"})
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "AUTH_POLICY_UNAVAILABLE") || !strings.Contains(rec.Body.String(), "request_id") {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if reader.called != 0 {
+		t.Fatalf("detail reader called %d times before fail-closed policy", reader.called)
 	}
 }

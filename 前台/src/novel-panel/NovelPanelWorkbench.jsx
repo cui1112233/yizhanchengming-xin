@@ -15,6 +15,7 @@ const defaults = (projectId) => ({
 })
 
 function normalize(projectId, value = {}) {
+  value = value || {}
   const base = defaults(projectId)
   return {
     ...base, ...value, projectId: Number(value.projectId || projectId || 0),
