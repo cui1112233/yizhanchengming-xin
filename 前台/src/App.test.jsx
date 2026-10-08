@@ -70,7 +70,7 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     window.history.replaceState({}, '', '/batch-factory')
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() =>
       jsonResponse({
-        projects: [{ id: 52, intakeId: 12, name: '刚创建的批量项目' }],
+        projects: [{ id: 52, intakeId: 12, name: '刚创建的批量项目', sources: [], bookCount: 1, genders: [], styles: [], runStatus: 'pending', failureCount: 0, createdAt: '2026-10-09T04:05:06Z', updatedAt: '2026-10-09T04:05:06Z' }], page: 1, limit: 12, total: 1,
       }),
     )
 
@@ -78,7 +78,9 @@ describe('Task 11 水货生产 / 小说获取入口衔接', () => {
     expect(await screen.findByRole('heading', { name: '批量工厂' })).toBeTruthy()
     expect(await screen.findByText('刚创建的批量项目')).toBeTruthy()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
-    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/v1/batch-projects')
+    const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
+    expect(url.pathname).toBe('/api/v1/batch-projects')
+    expect(Object.fromEntries(url.searchParams)).toEqual({ archived: 'active', page: '1', limit: '12', sort: 'updated_desc' })
   }, 15000)
 
   it('多书城可顺序添加；同书城 Book ID 去重并合并标签；添加后输入框清空；总数正确', () => {

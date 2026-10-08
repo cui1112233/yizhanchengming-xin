@@ -21,6 +21,7 @@ vi.mock('./api.js', () => ({
   getProjectVideoStatus: vi.fn(),
   retryVideoTask: vi.fn(),
   cancelVideoTask: vi.fn(),
+  restoreBatchProject: vi.fn(),
 }))
 
 import * as api from './api.js'
@@ -29,6 +30,7 @@ describe('BatchProject VIDEO status UI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.listBatchProjects.mockResolvedValue({ projects: [{ id: 7, name: '视频项目', bookCount: 2, sources: [], genders: [], styles: [], runStatus: 'running' }] })
+    api.getBatchProject.mockResolvedValue({ project: { id: 7, name: '视频项目' }, books: [] })
     api.getProjectGeneration.mockResolvedValue({
       batchProjectId: 7, completed: 0, failed: 0, pending: 2, running: 0,
       books: [
@@ -51,7 +53,7 @@ describe('BatchProject VIDEO status UI', () => {
   afterEach(() => cleanup())
 
   it('shows provider model status attempts errors and VIDEO actions without secrets', async () => {
-    render(<BatchProjectListPage />)
+    render(<BatchProjectListPage initialProjectId={7} />)
     await screen.findByText('视频项目')
     fireEvent.click(screen.getByRole('button', { name: '生成状态' }))
 

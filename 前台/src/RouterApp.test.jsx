@@ -198,8 +198,19 @@ describe('Task 1 首页与用户路由基础', () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ projects: [] }) })
     render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
     expect(await screen.findByText('项目入口无效')).toBeTruthy()
-    expect(fetch).toHaveBeenCalledWith('/api/v1/batch-projects', expect.any(Object))
+    expect(fetch.mock.calls.some(([url]) => String(url).startsWith('/api/v1/batch-projects?'))).toBe(true)
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/batch-projects/3'))).toBe(false)
+  })
+
+  it('uses the archived catalog URL and keeps strict project query validation', async () => {
+    window.history.replaceState({}, '', '/batch-factory?archived=archived')
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ projects: [], total: 0 }) })
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByText('暂无匹配的批量项目')).toBeTruthy()
+    expect(screen.queryByText('项目入口无效')).toBeNull()
+    expect(new URL(fetch.mock.calls[0][0], 'http://localhost').searchParams.get('archived')).toBe('archived')
+    fireEvent.click(screen.getByRole('button', { name: '活跃项目' }))
+    expect(window.location.search).toBe('')
   })
 
   it('首页开始生成进入 /script', async () => {

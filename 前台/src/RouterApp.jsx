@@ -84,8 +84,8 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   } else if (pathname === '/batch-factory') {
     const parsed = parseBatchProjectSearch(search)
     page = parsed.projectId
-      ? <BatchProjectListPage initialProjectId={parsed.projectId} onClearProject={() => navigate('/batch-factory')} />
-      : <BatchFactoryHome initialError={parsed.error} onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
+      ? <BatchProjectListPage key={parsed.projectId} initialProjectId={parsed.projectId} onClearProject={() => navigate('/batch-factory')} />
+      : <BatchFactoryHome initialError={parsed.error} initialArchived={parsed.archived || 'active'} onArchivedChange={(archived) => navigate(archived === 'archived' ? '/batch-factory?archived=archived' : '/batch-factory')} onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
   } else if (pathname === '/shuihuo-production') {
     page = <ShuihuoProductionPage />
   } else if (pathname === '/novel-fetch-workshop') {
@@ -134,6 +134,7 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
 
 function parseBatchProjectSearch(search) {
   if (!search) return { projectId: null, error: '' }
+  if (search === '?archived=archived') return { projectId: null, archived: 'archived', error: '' }
   const matched = search.match(/^\?projectId=([1-9]\d*)$/)
   if (!matched) return { projectId: null, error: '项目入口无效' }
   const projectId = Number(matched[1])

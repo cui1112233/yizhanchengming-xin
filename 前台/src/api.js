@@ -209,9 +209,15 @@ export function createBatchProject(intakeId, input) {
   })
 }
 
-export function listBatchProjects() {
-  return requestJSON(`${API_PREFIX}/batch-projects`)
+export function listBatchProjects(input = {}) {
+  const query = new URLSearchParams()
+  for (const key of ['q', 'source', 'status', 'archived', 'page', 'limit', 'sort']) {
+    if (input[key] !== undefined && input[key] !== null && input[key] !== '') query.set(key, String(input[key]))
+  }
+  return requestJSON(`${API_PREFIX}/batch-projects${query.size ? `?${query}` : ''}`)
 }
+export function archiveBatchProject(projectId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/archive`, { method: 'POST' }) }
+export function restoreBatchProject(projectId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/restore`, { method: 'POST' }) }
 export function listWorkspaceRecent(limit = 6) {
   return requestJSON(`${API_PREFIX}/workspace/recent?limit=${encodeURIComponent(limit)}`)
 }

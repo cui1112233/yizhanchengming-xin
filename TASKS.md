@@ -659,7 +659,7 @@
 - [x] `GET /api/v1/workspace/recent?limit=6` 以单条 MySQL 8 查询聚合已有 BatchProject、Script StageRun、Novel Panel、音频测量、Shuihuo 图片/音频/视频和 VIDEO 任务；没有新增 recent/history 表或 migration，也不返回错误原文、Provider、TOS key、输入或输出正文。Intake 尚无直接归属事实，已从 recent 对外 kind 移除，明确延期到 `auth_intake_ownership` 建立后再评估接入，避免借项目归属暴露或为每个项目重复生成 Intake 卡片。
 - [x] 普通账号只读取 owner 或当前非零 team 归属项目；`teamId=0` 不参与团队匹配。只有 `admin/owner` 使用独立固定 elevated 查询，`dev` 不自动提升；接口继续要求 Cookie Session 与 `batch.view`。
 - [x] 首页使用服务端 recent 投影，具备首次加载、保留旧数据的刷新、空态、安全错误、request id、重试和慢响应防覆盖；服务端入口只允许严格的 `/batch-factory?projectId=正整数`，非法/外域/额外 query 记录不可点击。
-- [x] Router 同时维护 pathname/search；pushState、popstate 与修饰键链接行为保留 query。Batch Factory 只在 projectId 出现在服务端可见项目列表后读取详情，非法或不可见深链保留安全列表，不猜测访问成功。
+- [x] Router 同时维护 pathname/search；pushState、popstate 与修饰键链接行为保留 query。2026-10-09 Task 1 前台收尾后，Batch Factory 正整数 projectId 直接读取受对象归属保护的 detail API，不再依赖目录当前分页；非法 query 保留安全目录，不可访问详情显示安全错误与 requestId。
 - [x] TTS 音频测量与 Shuihuo 音频使用来源命名空间 ID（如 `tts:measurement:44` / `tts:media:44`），不会因不同事实表主键相同产生 React key 冲突。
 - [x] recent 的 Shuihuo↔VIDEO 状态、时间和去重都同时核验 `video_production_jobs.batch_project_id/book_id`；Shuihuo 写入带 `productionTaskId` 的媒体任务也用同一项目/书 scope 的 `INSERT … SELECT` 校验，错 scope 返回未找到。
 - [x] recent 深链使用的 `GET /api/v1/batch-projects/{id}` 已在业务 handler 前强制执行共享 BatchProjectAccess：跨用户 403，缺少策略 503 fail-closed，错误带 request id 且不会读取/泄漏 `originalText`。其余 Batch mutation 的统一归属收口仍属于后续 P0。
@@ -702,7 +702,7 @@
 
 ## 2026-10-09 · BatchProject 全路由对象级归属安全边界
 
-> 状态：⚠️ BatchProject 后端归属、SQL 列表投影与软归档合同已在仓库实现；真实 MySQL migration、前端 UI、登录态浏览器与公网验收仍未执行。
+> 状态：⚠️ BatchProject 后端归属、SQL 列表投影、软归档合同和 Task 1 前台 UI 已在仓库实现；真实 MySQL migration、登录态浏览器与公网验收仍未执行。
 
 - [x] 所有直接携带 BatchProject `{id}` / `{projectId}` 的详情、原文、分镜读写/排序/重编译、统一设置/版本配置、生成/音频/阶段、Novel Panel、水火、项目视频与合成路由，均在业务 service/store 调用前复用同一 `requireBatchProjectAccess` 边界。
 - [x] 读取与写入继续先要求各自 capability；写操作继续要求同源 CSRF。只有 `admin/owner` 作为 elevated 角色，`dev/manager/member` 不按角色绕过，普通 owner 或非零同团队归属由 MySQL `auth_batch_project_ownership` 判定，`teamId=0` 不参与团队匹配。
@@ -712,4 +712,8 @@
 - [x] 仓库验证：`go test ./internal/httpapi -count=1` 与 `go test ./... -count=1` 均退出码 0。
 - [x] `GET /api/v1/batch-projects` 已在 MySQL SQL 层完成 owner/非零 team 范围、`q/source/status/archived`、`page/limit`、`updated_desc/name_asc` 筛选与 COUNT，返回真实 latest run status、failure count 及稳定二级 ID 排序；未再全局 LIMIT 后用 Go N+1 过滤。
 - [x] additive migration `00020_batch_project_archive.sql` 与 archive/restore API 已实现软归档；保留 books/runs/stages/media/publishing/TOS 事实，活跃任务冲突返回 `BATCH_PROJECT_ACTIVE`。Pipeline run、BookRun 生成/重试、水火媒体、视频/合成与发布意图在写事务内锁定同一项目行；归档后新建/修改/重试/发布返回 `BATCH_PROJECT_ARCHIVED`，读取、恢复与已有任务 cancel 仍允许。
-- [ ] `00020` 尚未对本机 `ycm_staging` 执行；归档列表/UI、真实登录换账号、刷新恢复与公网视觉验收仍属后续任务。
+- [x] Task 1 前台目录使用服务端 `q/source/status/archived/page/limit=12/sort` 查询，搜索延迟 300ms，慢响应不覆盖新结果；显示真实书籍数、来源/属性、运行状态、失败数和最近更新时间。URL 支持活跃目录、归档目录和严格正整数项目深链。
+- [x] 确认后归档、归档目录只读打开/恢复均通过共享 `api.js`，失败保留固定安全文案与 requestId，成功重读目录；详情直接读取归属保护接口，提供加载/空态/失败重试/刷新。小说表保留序号、小说、内容、风格、男女频、状态、操作七列及移动端横向滚动，不显示 errorMessage 原文。
+- [x] 归档详情保留只读横幅和历史结果/正文查询，隐藏设置与流水线写入口，禁用音频匹配；恢复后重读服务端 detail 再开放写入口。Batch CSS 独立局部作用域，移除 Shuihuo 中的 Batch 假渐变封面规则。
+- [x] Task 1 仓库验证：目标页面、Router、VIDEO 与 API 回归通过；前台 `CI=1 npm test -- --run` 在同一 PTY 自然退出码 0（28 files / 197 tests）；`go test ./internal/intake ./internal/httpapi -run 'BatchProject'` 两包退出码 0；`npm run build` 退出码 0，构建后自审与 `git diff --check` 通过。既有 AntD 提示与 Vite 大包警告仍保留。
+- [ ] `00020` 尚未对本机 `ycm_staging` 执行；真实登录换账号/跨团队、刷新恢复、浏览器截图、公网登录与视觉、Provider/TOS/readback 和部署验收仍属后续任务。本次没有连接公网/ECS、部署、运行/修改 GitHub Actions 或 push。

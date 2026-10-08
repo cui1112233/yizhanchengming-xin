@@ -1,0 +1,13 @@
+.batch-factory-page .batch-project-filters { margin-bottom: 16px; }
+.batch-factory-page .batch-project-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 290px)); gap: 16px; }
+.batch-factory-page .batch-project-card { display: flex; flex-direction: column; gap: 8px; min-height: 158px; padding: 18px; border: 1px solid var(--ant-color-border-secondary, #e5e7eb); border-radius: 10px; background: var(--ant-color-bg-container, #fff); }
+.batch-factory-page .batch-project-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.batch-factory-page .batch-project-card-heading .ant-typography { margin: 0; overflow-wrap: anywhere; }
+.batch-factory-page .batch-project-card-actions { margin-top: auto; }
+.batch-factory-page .batch-project-card-grid.is-list { grid-template-columns: 1fr; }
+.batch-factory-page .batch-project-pagination { margin-top: 20px; }
+.batch-factory-page .batch-project-detail-summary, .batch-factory-page .batch-project-detail-actions { margin-bottom: 16px; }
+@media (max-width: 575px) {
+  .batch-factory-page .batch-project-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .batch-factory-page .ant-table-content { overflow-x: auto; }
+}

@@ -1,34 +1,108 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BatchFactoryHome from './BatchFactoryHome.jsx'
 
-vi.mock('./api.js', () => ({ listBatchProjects: vi.fn(), createIntake: vi.fn(), executeIntake: vi.fn(), createBatchProject: vi.fn() }))
+vi.mock('./api.js', () => ({ listBatchProjects: vi.fn(), archiveBatchProject: vi.fn(), restoreBatchProject: vi.fn(), createIntake: vi.fn(), executeIntake: vi.fn(), createBatchProject: vi.fn() }))
 import * as api from './api.js'
 
 describe('BatchFactoryHome', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    api.listBatchProjects.mockResolvedValue({ projects: [{ id: 6, name: '来源测试', sources: ['知乎付费'], bookCount: 2, genders: ['女频'], runStatus: 'completed' }, { id: 7, name: '另一个', sources: ['番茄免费'], bookCount: 1, runStatus: 'failed' }] })
+    vi.resetAllMocks()
+    api.listBatchProjects.mockResolvedValue({ page: 1, limit: 12, total: 2, projects: [{ id: 6, name: '来源测试', sources: ['知乎付费'], bookCount: 2, genders: ['女频'], runStatus: 'completed', failureCount: 0, updatedAt: '2026-10-09T04:05:06Z' }, { id: 7, name: '另一个', sources: ['番茄免费'], bookCount: 1, runStatus: 'failed', failureCount: 1, updatedAt: '2026-10-09T04:05:06Z' }] })
   })
-  afterEach(() => vi.restoreAllMocks())
-  it('uses server project facts, filters them and opens the chosen project', async () => {
+  afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks() })
+  it('requests twelve server-owned projects and opens the chosen card', async () => {
     const open = vi.fn(); render(<BatchFactoryHome onOpenProject={open} />)
     await screen.findByText('来源测试')
-    fireEvent.change(screen.getByRole('textbox', { name: '搜索批量项目' }), { target: { value: '来源' } })
-    expect(screen.queryByText('另一个')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '进入项目' }))
+    expect(api.listBatchProjects).toHaveBeenCalledWith({ q: '', source: '', status: '', archived: 'active', page: 1, limit: 12, sort: 'updated_desc' })
+    expect(screen.getByText('失败：1')).toBeTruthy()
+    expect(screen.getAllByText(/最近更新：/)).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: '进入项目' })[0])
     expect(open).toHaveBeenCalledWith(6)
   })
-  it('offers real project cards in grid or list order without inventing cover URLs', async () => {
+  it('offers grid or list view without fabricated covers', async () => {
     render(<BatchFactoryHome onOpenProject={() => {}} />)
     await screen.findByText('来源测试')
     expect(screen.getByRole('button', { name: '列表视图' })).toBeTruthy()
     expect(screen.getAllByLabelText('排序方式').length).toBeGreaterThan(0)
-    expect(screen.getByLabelText('来源测试 封面').getAttribute('data-cover-fallback')).toBe('true')
+    expect(screen.queryByLabelText('来源测试 封面')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '列表视图' }))
     expect(screen.getByRole('button', { name: '网格视图' })).toBeTruthy()
+  })
+  it('debounces search for 300ms and keeps the response in server order', async () => {
+    render(<BatchFactoryHome onOpenProject={() => {}} />)
+    await screen.findByText('来源测试')
+    vi.useFakeTimers()
+    fireEvent.change(screen.getByRole('textbox', { name: '搜索批量项目' }), { target: { value: '另' } })
+    await act(async () => { vi.advanceTimersByTime(299) })
+    expect(api.listBatchProjects).toHaveBeenCalledTimes(1)
+    api.listBatchProjects.mockResolvedValueOnce({ projects: [{ id: 8, name: '服务端匹配结果', sources: [] }], total: 1, page: 1, limit: 12 })
+    await act(async () => { vi.advanceTimersByTime(1) })
+    expect(api.listBatchProjects).toHaveBeenLastCalledWith(expect.objectContaining({ q: '另', page: 1, limit: 12 }))
+    expect(screen.getByText('服务端匹配结果')).toBeTruthy()
+  })
+  it('uses server pagination and resets the page for filters and sort', async () => {
+    api.listBatchProjects.mockResolvedValue({ projects: [{ id: 6, name: '来源测试', sources: [] }], total: 25, page: 1, limit: 12 })
+    render(<BatchFactoryHome onOpenProject={() => {}} />)
+    await screen.findByText('来源测试')
+    fireEvent.click(screen.getByTitle('2'))
+    await waitFor(() => expect(api.listBatchProjects).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })))
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '来源筛选' }))
+    fireEvent.click((await screen.findAllByText('番茄免费')).at(-1))
+    await waitFor(() => expect(api.listBatchProjects).toHaveBeenLastCalledWith(expect.objectContaining({ source: '番茄免费', page: 1 })))
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '运行状态筛选' }))
+    fireEvent.click((await screen.findAllByText('失败')).at(-1))
+    await waitFor(() => expect(api.listBatchProjects).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'failed' })))
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '排序方式' }))
+    fireEvent.click((await screen.findAllByText('名称排序')).at(-1))
+    await waitFor(() => expect(api.listBatchProjects).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name_asc', page: 1 })))
+  })
+  it('discards a stale response after refreshing', async () => {
+    let resolveOld
+    api.listBatchProjects.mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+    render(<BatchFactoryHome onOpenProject={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: /刷\s*新/ }))
+    await screen.findByText('来源测试')
+    await act(async () => resolveOld({ projects: [{ id: 90, name: '过期结果' }], total: 1 }))
+    expect(screen.queryByText('过期结果')).toBeNull()
+  })
+  it('confirms archive and retains safe mutation failure with correlation across refresh', async () => {
+    api.archiveBatchProject.mockRejectedValueOnce(Object.assign(new Error('secret-provider-canary'), { code: 'BATCH_PROJECT_ACTIVE', requestId: 'req-archive' }))
+    render(<BatchFactoryHome onOpenProject={() => {}} />)
+    await screen.findByText('来源测试')
+    fireEvent.click(screen.getAllByRole('button', { name: /^归\s*档$/ })[0])
+    expect(api.archiveBatchProject).not.toHaveBeenCalled()
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认归档' }))
+    expect(await screen.findByText(/项目有进行中的任务/)).toBeTruthy()
+    expect(screen.getByText(/req-archive/)).toBeTruthy()
+    expect(document.body.textContent).not.toContain('secret-provider-canary')
+    fireEvent.click(screen.getByRole('button', { name: /刷\s*新/ }))
+    await waitFor(() => expect(api.listBatchProjects).toHaveBeenCalledTimes(2))
+    expect(screen.getByText(/req-archive/)).toBeTruthy()
+  })
+  it('opens archived projects readonly and reloads after restore', async () => {
+    api.listBatchProjects.mockResolvedValue({ projects: [{ id: 6, name: '归档项目', archivedAt: '2026-10-09T04:05:06Z' }], total: 1 })
+    api.restoreBatchProject.mockResolvedValue({})
+    const open = vi.fn()
+    render(<BatchFactoryHome initialArchived="archived" onOpenProject={open} />)
+    await screen.findByText('归档项目')
+    expect(api.listBatchProjects).toHaveBeenCalledWith(expect.objectContaining({ archived: 'archived' }))
+    expect(screen.queryByRole('button', { name: /^归\s*档$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '只读查看' }))
+    expect(open).toHaveBeenCalledWith(6)
+    fireEvent.click(screen.getByRole('button', { name: /恢\s*复/ }))
+    await waitFor(() => expect(api.restoreBatchProject).toHaveBeenCalledWith(6))
+    await waitFor(() => expect(api.listBatchProjects).toHaveBeenCalledTimes(2))
+  })
+  it('shows safe list errors with retry and the empty result from the server', async () => {
+    api.listBatchProjects.mockRejectedValueOnce(Object.assign(new Error('sql-secret-canary'), { requestId: 'req-list' })).mockResolvedValueOnce({ projects: [], total: 0 })
+    render(<BatchFactoryHome onOpenProject={() => {}} />)
+    expect(await screen.findByText(/req-list/)).toBeTruthy()
+    expect(document.body.textContent).not.toContain('sql-secret-canary')
+    fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }))
+    expect(await screen.findByText('暂无匹配的批量项目')).toBeTruthy()
   })
   it('creates a grouped multi-book intake, executes it, then creates project only after completed', async () => {
     api.createIntake.mockResolvedValue({ intake: { id: 22 } })

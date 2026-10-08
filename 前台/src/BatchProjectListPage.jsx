@@ -1,118 +1,30 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { generationOutcomeMessage, generationValidationSummary } from './ui/generationOutcome.js'
 import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Switch, Table, Tag, Typography } from 'antd'
-import {
-  cancelVideoTask,
-  getAudioMeasurement,
-  getBatchProject,
-  getGenerationStage,
-  getProjectGeneration,
-  getProjectVideoStatus,
-  listBatchProjects,
-  retryGenerationStage,
-  retryVideoTask,
-  runBookGeneration,
-  runProjectGeneration,
-} from './api.js'
+import { cancelVideoTask, getAudioMeasurement, getBatchProject, getGenerationStage, getProjectGeneration, getProjectVideoStatus, restoreBatchProject, retryGenerationStage, retryVideoTask, runBookGeneration, runProjectGeneration } from './api.js'
 import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
 import StatusTag from './ui/StatusTag.jsx'
+import PageState from './ui/PageState.jsx'
+import { batchError, batchUpdatedAt } from './batchFactoryPresentation.js'
+import './batch-factory.css'
 
-const STAGES = [
-  ['SCRIPT', 'Script'],
-  ['HOOK', 'Hook'],
-  ['DIRECTOR', 'Director'],
-  ['FINAL_PROMPT', 'Final Prompt'],
-]
-
+const STAGES = [['SCRIPT', 'Script'], ['HOOK', 'Hook'], ['DIRECTOR', 'Director'], ['FINAL_PROMPT', 'Final Prompt']]
 function renderTags(values) {
   const items = Array.isArray(values) ? values.filter(Boolean) : []
-  if (items.length === 0) return '-'
-  return (
-    <Space size={[4, 4]} wrap>
-      {items.map((value) => <Tag key={value}>{value}</Tag>)}
-    </Space>
-  )
-}
-
-function BatchProjectDetail({ projectId, onBack, onOpenProduction }) {
-  const [project, setProject] = useState(null)
-  const [books, setBooks] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError('')
-    getBatchProject(projectId)
-      .then((payload) => {
-        if (!active) return
-        setProject(payload?.project || null)
-        setBooks(payload?.books || [])
-      })
-      .catch((reason) => {
-        if (!active) return
-        setError(reason instanceof Error ? reason.message : '读取批量项目详情失败')
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => { active = false }
-  }, [projectId])
-
-  const columns = [
-    { title: 'Book ID', dataIndex: 'bookId', key: 'bookId', render: (value) => value || '-' },
-    { title: '书名', dataIndex: 'title', key: 'title', render: (value) => value || '-' },
-    { title: '书城', dataIndex: 'source', key: 'source', render: (value) => value || '-' },
-    { title: 'platformId', dataIndex: 'platformId', key: 'platformId', render: (value) => value || '-' },
-    { title: '男女频', dataIndex: 'gender', key: 'gender', render: (value) => value || '-' },
-    { title: '风格', dataIndex: 'style', key: 'style', render: (value) => value || '-' },
-    {
-      title: '正文获取状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (value) => <StatusTag status={value} />,
-    },
-    { title: '错误信息', dataIndex: 'errorMessage', key: 'errorMessage', render: (value) => value || '-' },
-  ]
-
-  return (
-    <main className="page-shell">
-      <div className="page-heading">
-        <div>
-          <Typography.Text type="secondary">Batch Factory V11 工作台</Typography.Text>
-          <Typography.Title level={2}>{project?.name || '批量项目'}</Typography.Title>
-          <Typography.Paragraph type="secondary">
-            项目与小说数据直接读取 Go API / MySQL，不使用浏览器缓存作为事实源。
-          </Typography.Paragraph>
-        </div>
-        <Space>
-          <Button type="primary" onClick={() => onOpenProduction(project)}>进入生产工作台</Button>
-          <Button onClick={onBack}>返回项目列表</Button>
-        </Space>
-      </div>
-      {error && <Alert type="error" showIcon message={error} className="feedback" />}
-      <Card title="小说列表" className="result-card">
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={books}
-          loading={loading}
-          pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          locale={{ emptyText: '该项目暂无小说' }}
-          scroll={{ x: 1100 }}
-        />
-      </Card>
-    </main>
-  )
+  return items.length ? <Space size={[4, 4]} wrap>{items.map((value) => <Tag key={value}>{value}</Tag>)}</Space> : '-'
 }
 
 export default function BatchProjectListPage({ initialProjectId = null, onClearProject }) {
-  const [projects, setProjects] = useState([])
+  const [project, setProject] = useState(null)
+  const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [detailError, setDetailError] = useState(null)
+  const [restoreError, setRestoreError] = useState(null)
+  const [restoring, setRestoring] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [contentBook, setContentBook] = useState(null)
+  const request = useRef(0)
   const [error, setError] = useState('')
-  const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(null)
-  const [entryError, setEntryError] = useState('')
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
   const [videoStatus, setVideoStatus] = useState(null)
@@ -120,26 +32,35 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   const [resultModal, setResultModal] = useState(null)
   const [audioMeasurements, setAudioMeasurements] = useState({})
   const [matchAudioByBook, setMatchAudioByBook] = useState({})
+  const readonly = Boolean(project?.archivedAt)
+  const refreshDetail = () => setRefreshKey((value) => value + 1)
 
   useEffect(() => {
-    let active = true
-    setLoading(true)
-    setSelectedDetailProjectId(null)
-    setEntryError('')
-    listBatchProjects()
-      .then((payload) => {
-        if (!active) return
-        const visibleProjects = Array.isArray(payload?.projects) ? payload.projects : []
-        setProjects(visibleProjects)
-        if (initialProjectId != null) {
-          if (visibleProjects.some((project) => Number(project.id) === Number(initialProjectId))) setSelectedDetailProjectId(initialProjectId)
-          else setEntryError('项目不可访问')
-        }
-      })
-      .catch((reason) => active && setError(reason instanceof Error ? reason.message : '读取批量项目失败'))
-      .finally(() => active && setLoading(false))
-    return () => { active = false }
-  }, [initialProjectId])
+    const id = ++request.current
+    setLoading(true); setDetailError(null); setProject(null); setBooks([])
+    setSelected(null); setSummary(null); setVideoStatus(null); setContentBook(null); setResultModal(null)
+    if (!Number.isSafeInteger(Number(initialProjectId)) || Number(initialProjectId) <= 0) {
+      setDetailError({ message: '项目入口无效' }); setLoading(false)
+      return () => { request.current++ }
+    }
+    getBatchProject(initialProjectId).then((payload) => {
+      if (id !== request.current) return
+      if (!payload?.project?.id || Number(payload.project.id) !== Number(initialProjectId)) throw new Error('invalid project detail')
+      setProject(payload.project)
+      setBooks(Array.isArray(payload.books) ? payload.books : [])
+    }).catch((reason) => {
+      if (id === request.current) setDetailError(batchError(reason, '项目详情读取失败，请稍后重试。'))
+    }).finally(() => { if (id === request.current) setLoading(false) })
+    return () => { request.current++ }
+  }, [initialProjectId, refreshKey])
+
+  const restoreProject = async () => {
+    if (!project || !readonly) return
+    setRestoring(true); setRestoreError(null)
+    try { await restoreBatchProject(project.id); refreshDetail() }
+    catch (reason) { setRestoreError(batchError(reason, '恢复项目失败，请稍后重试。')) }
+    finally { setRestoring(false) }
+  }
 
   const refreshMeasurements = async (project, books = []) => {
     if (!project) return
@@ -174,7 +95,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       await refreshMeasurements(project, generationPayload?.books || [])
       setError('')
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '读取生成状态失败')
+      setError(batchError(reason).message || '读取生成状态失败')
     } finally {
       setGenerationLoading(false)
     }
@@ -190,7 +111,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   }
 
   const runBatch = async () => {
-    if (!selected) return
+    if (!selected || selected.archivedAt) return
     setGenerationLoading(true)
     try {
       await runProjectGeneration(selected.id, {
@@ -202,7 +123,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       })
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '批量执行失败')
+      setError(batchError(reason).message || '批量执行失败')
       await refreshGeneration(selected)
     } finally {
       setGenerationLoading(false)
@@ -210,7 +131,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   }
 
   const runOne = async (bookId) => {
-    if (!selected) return
+    if (!selected || selected.archivedAt) return
     const measurement = audioMeasurements[bookId]
     const matchAudio = Boolean(matchAudioByBook[bookId] && measurement?.durationMs > 0)
     setGenerationLoading(true)
@@ -226,7 +147,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       })
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '单本执行失败')
+      setError(batchError(reason).message || '单本执行失败')
       await refreshGeneration(selected)
     } finally {
       setGenerationLoading(false)
@@ -234,39 +155,39 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   }
 
   const retryStage = async (bookId, stage) => {
-    if (!selected) return
+    if (!selected || selected.archivedAt) return
     setGenerationLoading(true)
     try {
       await retryGenerationStage(selected.id, bookId, stage, `retry-${bookId}-${stage}-${Date.now()}`)
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '重试失败')
+      setError(batchError(reason).message || '重试失败')
     } finally {
       setGenerationLoading(false)
     }
   }
 
   const retryVideo = async (bookId, taskId) => {
-    if (!selected || !taskId) return
+    if (!selected || selected.archivedAt || !taskId) return
     setGenerationLoading(true)
     try {
       await retryVideoTask(taskId, `video-retry-${bookId}-${Date.now()}`)
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'VIDEO 重试失败')
+      setError(batchError(reason).message || 'VIDEO 重试失败')
     } finally {
       setGenerationLoading(false)
     }
   }
 
   const cancelVideo = async (taskId) => {
-    if (!selected || !taskId) return
+    if (!selected || selected.archivedAt || !taskId) return
     setGenerationLoading(true)
     try {
       await cancelVideoTask(taskId)
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'VIDEO 取消失败')
+      setError(batchError(reason).message || 'VIDEO 取消失败')
     } finally {
       setGenerationLoading(false)
     }
@@ -278,7 +199,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       const result = await getGenerationStage(selected.id, bookId, stage)
       setResultModal(result)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '读取 Stage 结果失败')
+      setError(batchError(reason).message || '读取 Stage 结果失败')
     }
   }
 
@@ -286,41 +207,6 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
     const items = Array.isArray(videoStatus?.books) ? videoStatus.books : []
     return new Map(items.map((item) => [String(item.bookId), item]))
   }, [videoStatus])
-
-  const projectColumns = [
-    {
-      title: '项目名称',
-      dataIndex: 'name',
-      key: 'name',
-      render: (value, project) => (
-        <Button type="link" onClick={() => setSelectedDetailProjectId(project.id)}>
-          {value || '未命名项目'}
-        </Button>
-      ),
-    },
-    { title: '书城来源', key: 'sources', render: (_, project) => renderTags(project.sources) },
-    { title: '小说数量', dataIndex: 'bookCount', key: 'bookCount', render: (value) => value ?? 0 },
-    { title: '男女频', key: 'genders', render: (_, project) => renderTags(project.genders) },
-    { title: '风格', key: 'styles', render: (_, project) => renderTags(project.styles) },
-    {
-      title: '运行状态',
-      dataIndex: 'runStatus',
-      key: 'runStatus',
-      render: (value) => (value ? <StatusTag status={value} /> : '-'),
-    },
-    {
-      title: '统一设置',
-      key: 'settings',
-      width: 420,
-      render: (_, row) => <UnifiedSettingsPanel project={row} />,
-    },
-    {
-      title: '生成',
-      key: 'actions',
-      width: 140,
-      render: (_, row) => <Button onClick={() => void openGeneration(row)}>生成状态</Button>,
-    },
-  ]
 
   const generationColumns = useMemo(() => {
     const stageColumns = STAGES.map(([key, label]) => ({
@@ -335,7 +221,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
             <StatusTag status={status} />
             {stage?.errorMessage && <Typography.Text type="danger">{generationOutcomeMessage(stage)}</Typography.Text>}
             {stage?.outputText && <Button size="small" onClick={() => void showStage(row.bookId, key)}>查看结果</Button>}
-            {status === 'failed' && <Button size="small" danger onClick={() => void retryStage(row.bookId, key)}>重试 {label}</Button>}
+            {!readonly && status === 'failed' && <Button size="small" danger onClick={() => void retryStage(row.bookId, key)}>重试 {label}</Button>}
           </Space>
         )
       },
@@ -355,7 +241,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
             <Space direction="vertical" size={4}>
               <Switch
                 aria-label={`匹配音频 Book ${row.bookId}`}
-                disabled={!enabled}
+                disabled={readonly || !enabled}
                 checked={checked}
                 checkedChildren="匹配音频"
                 unCheckedChildren="匹配音频"
@@ -388,12 +274,12 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
               <Typography.Text type="secondary">{video.model || '-'}</Typography.Text>
               <StatusTag status={status} />
               <Typography.Text type="secondary">尝试 {attempts.length} 次</Typography.Text>
-              {errorMessage && <Typography.Text type="danger">{errorMessage}</Typography.Text>}
+              {errorMessage && <Typography.Text type="danger">视频生成失败</Typography.Text>}
               {outputUrl && <Button type="link" size="small" href={outputUrl} target="_blank" rel="noreferrer">查看视频</Button>}
-              {(status === 'failed' || status === 'cancelled') && latest?.id && (
+              {!readonly && (status === 'failed' || status === 'cancelled') && latest?.id && (
                 <Button size="small" danger onClick={() => void retryVideo(row.bookId, latest.id)}>重试 VIDEO</Button>
               )}
-              {(status === 'queued' || status === 'running') && latest?.id && (
+              {!readonly && (status === 'queued' || status === 'running') && latest?.id && (
                 <Button size="small" onClick={() => void cancelVideo(latest.id)}>取消 VIDEO</Button>
               )}
             </Space>
@@ -404,56 +290,42 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
         title: '单本操作',
         key: 'bookAction',
         width: 120,
-        render: (_, row) => <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
+        render: (_, row) => readonly ? null : <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
       },
     ]
-  }, [selected, audioMeasurements, matchAudioByBook, videoByBook])
+  }, [selected, readonly, audioMeasurements, matchAudioByBook, videoByBook])
 
-  if (selectedDetailProjectId != null) {
-    return <BatchProjectDetail
-      projectId={selectedDetailProjectId}
-      onBack={() => { setSelectedDetailProjectId(null); onClearProject?.() }}
-      onOpenProduction={(project) => {
-        if (!project) return
-        setSelectedDetailProjectId(null)
-        void openGeneration(project)
-      }}
-    />
-  }
 
-  return (
-    <main className="page-shell">
-      <div className="page-heading">
-        <div>
-          <Typography.Text type="secondary">一战晟铭 · Batch Factory</Typography.Text>
-          <Typography.Title level={2}>批量工厂</Typography.Title>
-          <Typography.Paragraph type="secondary">
-            BatchProject、小说汇总、统一设置以及 Script / Hook / Director / Final Prompt / VIDEO 状态均来自 Go + MySQL 事实源。
-          </Typography.Paragraph>
-        </div>
-      </div>
+  const bookColumns = [
+    { title: '序号', key: 'index', width: 65, render: (_, row, index) => index + 1 },
+    { title: '小说', key: 'novel', width: 220, render: (_, row) => <Space direction="vertical" size={2}><Typography.Text>{row.title || '未命名小说'}</Typography.Text><Typography.Text type="secondary">{row.bookId || '-'}</Typography.Text><Typography.Text type="secondary">{row.source || '-'}</Typography.Text></Space> },
+    { title: '内容', key: 'content', width: 260, render: (_, row) => <Typography.Paragraph ellipsis={{ rows: 3 }}>{row.originalText || '暂无正文'}</Typography.Paragraph> },
+    { title: '风格', dataIndex: 'style', key: 'style', width: 120, render: (value) => value || '-' },
+    { title: '男女频', dataIndex: 'gender', key: 'gender', width: 100, render: (value) => value || '-' },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 130, render: (value) => <StatusTag status={value} /> },
+    { title: '操作', key: 'actions', width: 160, render: (_, row) => <Space direction="vertical"><Button disabled={!row.originalText} onClick={() => setContentBook(row)}>查看正文</Button>{!readonly && <Button onClick={() => void openGeneration(project)}>生产详情</Button>}</Space> },
+  ]
 
-      {entryError && <Alert type="warning" showIcon message={entryError} description="该项目不在当前账号可见范围内；已保留可访问项目列表。" className="feedback" />}
-      {error && <Alert type="error" showIcon message={error} className="feedback" closable onClose={() => setError('')} />}
-
-      <Card title="批量项目" className="result-card">
-        <Table
-          rowKey="id"
-          columns={projectColumns}
-          dataSource={projects}
-          loading={loading}
-          pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          locale={{ emptyText: '暂无批量项目' }}
-          scroll={{ x: 1800 }}
-        />
-      </Card>
-
+  return <main className="page-shell batch-factory-page">
+    <div className="page-heading"><div><Typography.Text type="secondary">Batch Factory V11 工作台</Typography.Text><Typography.Title level={2}>{project?.name || '批量项目'}</Typography.Title><Typography.Paragraph type="secondary">查看小说内容、生成阶段与生产进度。</Typography.Paragraph></div><Space wrap><Button onClick={refreshDetail}>刷新项目</Button><Button onClick={onClearProject}>返回项目列表</Button></Space></div>
+    {detailError && <PageState state="failed" title={detailError.message} requestId={detailError.requestId} onRetry={refreshDetail} />}
+    {loading && <div role="status">正在读取项目详情</div>}
+    {restoreError && <Alert type="error" showIcon message={restoreError.message} description={restoreError.requestId ? `请求编号：${restoreError.requestId}` : undefined} className="feedback" />}
+    {project && <>
+      {readonly && <Alert type="warning" showIcon message="项目已归档，当前为只读查看。恢复后才能修改或执行。" action={<Button loading={restoring} onClick={() => void restoreProject()}>恢复项目</Button>} className="feedback" />}
+      <Space wrap className="batch-project-detail-summary"><Typography.Text>小说数量：{books.length}</Typography.Text>{renderTags(project.sources || [...new Set(books.map((book) => book.source))])}{renderTags(project.genders || [...new Set(books.map((book) => book.gender))])}{renderTags(project.styles || [...new Set(books.map((book) => book.style))])}{project.runStatus && <StatusTag status={project.runStatus} />}<Typography.Text type="secondary">最近更新：{batchUpdatedAt(project.updatedAt || project.createdAt)}</Typography.Text></Space>
+      {readonly && <Button className="batch-project-detail-actions" onClick={() => void openGeneration(project)}>查看生成状态</Button>}
+      {!readonly && <Space wrap className="batch-project-detail-actions"><UnifiedSettingsPanel project={project} /><Button type="primary" onClick={() => void openGeneration(project)}>进入生产工作台</Button><Button onClick={() => void openGeneration(project)}>生成状态</Button></Space>}
+      {error && <Alert type="error" showIcon message={error} className="feedback" />}
+      <Card title="小说列表" className="result-card"><Table rowKey="id" columns={bookColumns} dataSource={books} pagination={false} locale={{ emptyText: '该项目暂无小说' }} scroll={{ x: 1055 }} /></Card>
+    </>}
+    <Modal title={contentBook?.title || '小说正文'} open={Boolean(contentBook)} onCancel={() => setContentBook(null)} footer={null}><Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{contentBook?.originalText || '暂无正文'}</Typography.Paragraph></Modal>
       <Drawer
         title={selected ? `${selected.name} · 剧本与 VIDEO 流水线` : '剧本与 VIDEO 流水线'}
         width="92vw"
         open={Boolean(selected)}
         onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
-        extra={<Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
+        extra={readonly ? null : <Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
       >
         {summary && (
           <>
@@ -484,6 +356,6 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
           </Space>
         )}
       </Modal>
-    </main>
-  )
+
+  </main>
 }
