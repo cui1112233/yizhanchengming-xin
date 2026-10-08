@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Empty, Spin, Typography } from 'antd'
+import { Alert, Button, Empty, Spin, Tag, Typography } from 'antd'
 import { listBatchProjects } from './api.js'
 
 const quickActions = [
@@ -7,7 +7,7 @@ const quickActions = [
   { href: '/novel-panel', icon: '▦', title: '小说面板', desc: '分析人物、场景与分镜，保存完整项目' },
   { href: '/batch-factory', icon: '↯', title: '批量工厂', desc: '多篇小说批量导演、审核并生成视频方案' },
   { href: '/shuihuo-production', icon: '▶', title: '水货生产', desc: '分段、提示词、素材和视频任务生产' },
-  { href: '/agent', icon: '◇', title: 'AI 智能 Agent', desc: '专属助手对话，辅助精细化剧本包装' },
+  { href: '/agent', icon: '◇', title: 'AI 智能 Agent', desc: 'Agent 将重新设计，当前不可用', status: '待重新设计' },
   { href: '/tts', icon: '♫', title: '声音配音工坊', desc: '多音色情感合成，让你的画面声临其境' },
 ]
 
@@ -66,7 +66,7 @@ export default function HomePage({ onNavigate }) {
           {quickActions.map((action) => (
             <RouteLink key={action.href} href={action.href} onNavigate={onNavigate} className="quick-action-card">
               <span className="quick-action-icon" aria-hidden="true">{action.icon}</span>
-              <span className="quick-action-copy"><strong>{action.title}</strong><span>{action.desc}</span></span>
+              <span className="quick-action-copy"><strong>{action.title}</strong>{action.status ? <Tag>{action.status}</Tag> : null}<span>{action.desc}</span></span>
               <span className="quick-action-arrow" aria-hidden="true">→</span>
             </RouteLink>
           ))}

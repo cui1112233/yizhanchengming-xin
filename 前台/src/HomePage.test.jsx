@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('./api.js', () => ({ listBatchProjects: vi.fn() }))
 import { listBatchProjects } from './api.js'
@@ -8,6 +8,17 @@ import HomePage from './HomePage.jsx'
 
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 describe('HomePage recent projects', () => {
+  it('keeps the Agent product entrance marked for redesign and opens only the reserved route', async () => {
+    listBatchProjects.mockResolvedValue({ projects: [] })
+    const onNavigate = vi.fn()
+    render(<HomePage onNavigate={onNavigate} />)
+    const agent = screen.getByRole('link', { name: /AI 智能 Agent/ })
+    expect(within(agent).getByText('待重新设计')).toBeTruthy()
+    expect(agent.getAttribute('href')).toBe('/agent')
+    fireEvent.click(agent)
+    expect(onNavigate).toHaveBeenCalledWith('/agent')
+    await screen.findByText('暂无可访问的最近项目')
+  })
   it('renders only server supplied accessible projects and opens the selected project', async () => {
     listBatchProjects.mockResolvedValue({ projects: [{ id: 18, name: '已授权项目', bookCount: 2, runStatus: 'running' }] })
     render(<HomePage onNavigate={() => {}} />)

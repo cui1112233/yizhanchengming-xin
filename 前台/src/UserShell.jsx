@@ -9,7 +9,6 @@ const primaryNavItems = [
   { href: '/shuihuo-production', label: '水货生产' },
   { href: '/agent', label: 'Agent 工作区' },
   { href: '/history', label: '历史' },
-  { href: '/issues', label: '问题日志' },
   { href: '/tts', label: '配音' },
 ]
 
@@ -29,7 +28,7 @@ export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, 
   const isHome = pathname === '/'
   const logo = theme === 'dark' || isHome ? '/assets/brand-logo-white.png' : '/assets/brand-logo-black.png'
   const navigate = (href) => { setMobileOpen(false); onNavigate(href) }
-  const renderNavigation = (className, label) => <nav className={className} aria-label={label}>{primaryNavItems.map((item) => <ShellLink key={item.href} href={item.href} active={pathname === item.href} onNavigate={navigate}>{item.label}</ShellLink>)}</nav>
+  const renderNavigation = (className, label) => <nav className={className} aria-label={label}>{primaryNavItems.map((item) => <ShellLink key={item.href} href={item.href} active={pathname === item.href || (item.href === '/agent' && pathname === '/agent/canvas')} onNavigate={navigate}>{item.label}</ShellLink>)}</nav>
   const menuItems = [{ key: 'profile', label: '个人资料' }, { key: 'member', label: '会员与权限' }, { type: 'divider' }, { key: 'logout', danger: true, label: '退出登录' }]
   const accountName = currentUser?.name || currentUser?.username || '用户入口'
 

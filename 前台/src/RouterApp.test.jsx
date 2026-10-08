@@ -46,9 +46,10 @@ describe('Task 1 首页与用户路由基础', () => {
   it('用户导航保留全部基础入口、主题、设置和用户入口', () => {
     render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
 
-    for (const label of ['首页', '剧本生成', '小说获取', '小说面板', '水货生产', 'Agent 工作区', '历史', '问题日志', '配音']) {
+    for (const label of ['首页', '剧本生成', '小说获取', '小说面板', '水货生产', 'Agent 工作区', '历史', '配音']) {
       expect(screen.getByRole('link', { name: label })).toBeTruthy()
     }
+    expect(screen.queryByRole('link', { name: '问题日志' })).toBeNull()
     expect(screen.getByRole('button', { name: '主题' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '设置' }).getAttribute('href')).toBe('/settings')
     expect(screen.getByRole('button', { name: '用户入口' })).toBeTruthy()
@@ -68,6 +69,24 @@ describe('Task 1 首页与用户路由基础', () => {
     expect(await screen.findByRole('heading', { name: '小说获取' })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: '让小说章节直接进入可视化剧本工作流' })).toBeNull()
     expect(window.location.pathname).toBe('/novel-fetch')
+  })
+
+  it('/issues renders the 404 page without requesting issue data', async () => {
+    window.history.replaceState({}, '', '/issues')
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ issues: [] }) })
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByText('页面不存在')).toBeTruthy()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each(['/agent', '/agent/canvas?projectId=17'])('%s renders the reserved Agent page without requesting Agent data', async (path) => {
+    window.history.replaceState({}, '', path)
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ projects: [], messages: [], executions: [], skills: [], attachments: [], versions: [], canvas: {} }) })
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByText('Agent 工作区待重新设计')).toBeTruthy()
+    expect(screen.getByText('Agent 将重新设计，当前不可用')).toBeTruthy()
+    expect(screen.getByText('当前版本不执行 Agent 任务，也不会创建项目或调用 Provider。')).toBeTruthy()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('three production URLs mount distinct roots instead of IntakeWorkbench', async () => {
