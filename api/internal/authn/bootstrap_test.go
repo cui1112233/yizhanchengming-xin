@@ -16,7 +16,7 @@ func TestEnsureInitialAdminCreatesFirstUserFromDeploymentCredentials(t *testing.
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM auth_users")).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO auth_users (username, display_name, password_hash, role, active) VALUES (?, ?, ?, 'admin', TRUE)")).
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO auth_users (username, display_name, password_hash, role, active) VALUES (?, ?, ?, 'owner', TRUE)")).
 		WithArgs("bootstrap-admin", "bootstrap-admin", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 

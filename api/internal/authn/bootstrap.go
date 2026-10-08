@@ -32,7 +32,7 @@ func (s *MySQLStore) EnsureInitialAdmin(ctx context.Context, username, password 
 	if err != nil {
 		return false, fmt.Errorf("hash bootstrap admin password: %w", err)
 	}
-	_, err = s.db.ExecContext(ctx, `INSERT INTO auth_users (username, display_name, password_hash, role, active) VALUES (?, ?, ?, 'admin', TRUE)`, username, username, hash)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO auth_users (username, display_name, password_hash, role, active) VALUES (?, ?, ?, 'owner', TRUE)`, username, username, hash)
 	if err != nil {
 		// A second process may have won the first-start race. If a user now
 		// exists, treat bootstrap as already completed rather than overwriting it.

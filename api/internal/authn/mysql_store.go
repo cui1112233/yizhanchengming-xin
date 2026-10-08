@@ -40,7 +40,7 @@ func (s *MySQLStore) FindLoginCredential(ctx context.Context, username string) (
 	if err != nil {
 		return LoginCredential{}, err
 	}
-	credential.User.Capabilities = capabilities
+	credential.User.Capabilities = EffectiveCapabilities(credential.User.Role, capabilities)
 	return credential, nil
 }
 
@@ -83,7 +83,7 @@ func (s *MySQLStore) ResolveAccess(ctx context.Context, accessHash string, now t
 	if err != nil {
 		return User{}, err
 	}
-	user.Capabilities = capabilities
+	user.Capabilities = EffectiveCapabilities(user.Role, capabilities)
 	return user, nil
 }
 
@@ -205,6 +205,6 @@ func loadActiveUserByID(ctx context.Context, queryer rowQuerier, userID int64) (
 	if err != nil {
 		return User{}, err
 	}
-	user.Capabilities = capabilities
+	user.Capabilities = EffectiveCapabilities(user.Role, capabilities)
 	return user, nil
 }

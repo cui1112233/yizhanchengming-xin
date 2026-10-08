@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 )
@@ -21,16 +20,7 @@ const (
 )
 
 func userHasCapability(user authn.User, capability string) bool {
-	role := strings.ToLower(strings.TrimSpace(user.Role))
-	if role == "admin" || role == "owner" {
-		return true
-	}
-	for _, item := range user.Capabilities {
-		if item == capability {
-			return true
-		}
-	}
-	return false
+	return authn.HasCapability(user.Capabilities, capability)
 }
 
 func (h handler) requireCapability(capability string, next http.Handler) http.Handler {
