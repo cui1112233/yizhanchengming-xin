@@ -20,6 +20,7 @@ type testStore struct {
 	asset            CreateAssetInput
 	scopeErr         error
 	createAssetErr   error
+	createAssetHook  func()
 	scopeCalls       int
 	createAssetCalls int
 }
@@ -38,6 +39,9 @@ func (t *testStore) ValidateAssetScope(context.Context, int64, int64, int64) err
 func (t *testStore) CreateAsset(_ context.Context, input CreateAssetInput) (Asset, error) {
 	t.createAssetCalls++
 	t.asset = input
+	if t.createAssetHook != nil {
+		t.createAssetHook()
+	}
 	if t.createAssetErr != nil {
 		return Asset{}, t.createAssetErr
 	}
@@ -56,6 +60,9 @@ type memoryObjects struct {
 	putCalls          int
 	deleteCalls       int
 	contents          []byte
+	deleteErr         error
+	deleteContextErr  error
+	deleteHasDeadline bool
 }
 
 func (m *memoryObjects) PutObjectFromFile(_ context.Context, bucket, key, filename string) error {
@@ -66,10 +73,12 @@ func (m *memoryObjects) PutObjectFromFile(_ context.Context, bucket, key, filena
 	}
 	return err
 }
-func (m *memoryObjects) DeleteObject(_ context.Context, _ string, key string) error {
+func (m *memoryObjects) DeleteObject(ctx context.Context, _ string, key string) error {
 	m.deleteCalls++
 	m.deletedKey = key
-	return nil
+	m.deleteContextErr = ctx.Err()
+	_, m.deleteHasDeadline = ctx.Deadline()
+	return m.deleteErr
 }
 func (m *memoryObjects) GetObject(_ context.Context, _ string, key string) (io.ReadCloser, error) {
 	m.getKey = key
@@ -109,7 +118,7 @@ func TestUploadAssetRejectsInvalidScopeBeforeReadingOrUploading(t *testing.T) {
 
 func TestUploadAssetDeletesNewObjectWhenDatabaseInsertFails(t *testing.T) {
 	insertErr := errors.New("database insert failed")
-	store := &testStore{createAssetErr: insertErr}
+	store := &testStore{createAssetErr: assetNotPersistedError(insertErr)}
 	objects := &memoryObjects{}
 	service := NewService(store, objects)
 	service.SetBucket("private-assets")
@@ -121,6 +130,68 @@ func TestUploadAssetDeletesNewObjectWhenDatabaseInsertFails(t *testing.T) {
 	}
 	if store.scopeCalls != 1 || store.createAssetCalls != 1 || objects.putCalls != 1 || objects.deleteCalls != 1 || objects.deletedKey == "" || objects.deletedKey != objects.putKey {
 		t.Fatalf("scope=%d create=%d object=%+v", store.scopeCalls, store.createAssetCalls, objects)
+	}
+}
+
+func TestUploadAssetCleanupUsesDetachedBoundedContextAfterRequestCancellation(t *testing.T) {
+	insertErr := errors.New("database insert failed")
+	requestContext, cancel := context.WithCancel(context.Background())
+	store := &testStore{createAssetErr: assetNotPersistedError(insertErr), createAssetHook: cancel}
+	objects := &memoryObjects{}
+	service := NewService(store, objects)
+	service.SetBucket("private-assets")
+	png := []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}
+
+	_, err := service.UploadAsset(requestContext, UploadAssetInput{BatchProjectID: 4, BookID: 9, SegmentID: 8, Type: AssetImage, Filename: "output.png", ContentType: "image/png", Body: bytes.NewReader(png)})
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("err=%v, want insert failure", err)
+	}
+	if objects.deleteCalls != 1 || objects.deletedKey != objects.putKey {
+		t.Fatalf("deleteCalls=%d deleted=%q uploaded=%q", objects.deleteCalls, objects.deletedKey, objects.putKey)
+	}
+	if objects.deleteContextErr != nil {
+		t.Fatalf("cleanup context err=%v, want a context detached from request cancellation", objects.deleteContextErr)
+	}
+	if !objects.deleteHasDeadline {
+		t.Fatal("cleanup context has no deadline; want bounded compensation")
+	}
+}
+
+func TestUploadAssetCleanupFailurePreservesOriginalPersistenceError(t *testing.T) {
+	insertErr := errors.New("database insert failed")
+	cleanupErr := errors.New("tos delete unavailable")
+	store := &testStore{createAssetErr: assetNotPersistedError(insertErr)}
+	objects := &memoryObjects{deleteErr: cleanupErr}
+	service := NewService(store, objects)
+	service.SetBucket("private-assets")
+	png := []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}
+
+	_, err := service.UploadAsset(context.Background(), UploadAssetInput{BatchProjectID: 4, BookID: 9, SegmentID: 8, Type: AssetImage, Filename: "output.png", ContentType: "image/png", Body: bytes.NewReader(png)})
+	if !errors.Is(err, insertErr) {
+		t.Fatalf("err=%v, want original persistence error", err)
+	}
+	if !strings.Contains(err.Error(), "cleanup") || !strings.Contains(err.Error(), cleanupErr.Error()) {
+		t.Fatalf("err=%v, want truthful cleanup failure boundary", err)
+	}
+	if objects.deleteCalls != 1 || objects.deletedKey != objects.putKey {
+		t.Fatalf("deleteCalls=%d deleted=%q uploaded=%q", objects.deleteCalls, objects.deletedKey, objects.putKey)
+	}
+}
+
+func TestUploadAssetDoesNotDeleteObjectWhenDatabaseCommitOutcomeIsUnknown(t *testing.T) {
+	commitErr := errors.New("commit outcome unknown")
+	store := &testStore{createAssetErr: assetCommitOutcomeUnknownError(commitErr)}
+	objects := &memoryObjects{}
+	service := NewService(store, objects)
+	service.SetBucket("private-assets")
+	png := []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}
+
+	_, err := service.UploadAsset(context.Background(), UploadAssetInput{BatchProjectID: 4, BookID: 9, SegmentID: 8, Type: AssetImage, Filename: "output.png", ContentType: "image/png", Body: bytes.NewReader(png)})
+	if !errors.Is(err, commitErr) {
+		t.Fatalf("err=%v, want commit failure", err)
+	}
+	if objects.putCalls != 1 || objects.deleteCalls != 0 {
+		t.Fatalf("put=%d delete=%d; uncertain commit must retain the referenced object", objects.putCalls, objects.deleteCalls)
 	}
 }
 

@@ -62,7 +62,7 @@ func (h runtimeHTTP) retryBookRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if actualProjectID != projectID {
-		writeJSON(w, http.StatusNotFound, map[string]any{"code": "RUNTIME_NOT_FOUND", "message": "BookRun 不属于该项目"})
+		writeJSON(w, http.StatusNotFound, map[string]any{"code": "RUNTIME_NOT_FOUND", "message": "BookRun 不存在"})
 		return
 	}
 	item, created, err := h.runtime.RetryBookRun(r.Context(), bookRunID)

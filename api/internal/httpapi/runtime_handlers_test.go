@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -84,6 +85,35 @@ func TestRuntimeRetryRejectsBookRunWhoseResolvedProjectDoesNotMatchURL(t *testin
 	}
 	if access.calls != 1 || runtime.resolveCalls != 1 || runtime.retryCalls != 0 {
 		t.Fatalf("access=%d resolve=%d retry=%d", access.calls, runtime.resolveCalls, runtime.retryCalls)
+	}
+}
+
+func TestRuntimeRetryDoesNotRevealWhetherBookRunIsMissingOrBelongsToAnotherProject(t *testing.T) {
+	serve := func(runtime *fakeRuntimeService) *httptest.ResponseRecorder {
+		auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
+		access := &fakeRuntimeAccess{allowed: true}
+		h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+		req := runtimeRetryRequest()
+		req.Header.Set(testRequestIDHeader, "runtime-oracle-test")
+		req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if access.calls != 1 || runtime.resolveCalls != 1 || runtime.retryCalls != 0 {
+			t.Fatalf("access=%d resolve=%d retry=%d", access.calls, runtime.resolveCalls, runtime.retryCalls)
+		}
+		return rec
+	}
+
+	missing := serve(&fakeRuntimeService{resolveErr: sql.ErrNoRows})
+	mismatch := serve(&fakeRuntimeService{projectID: 99})
+	if missing.Code != http.StatusNotFound || mismatch.Code != http.StatusNotFound {
+		t.Fatalf("missing=%d mismatch=%d", missing.Code, mismatch.Code)
+	}
+	if missing.Body.String() != mismatch.Body.String() {
+		t.Fatalf("resource oracle differs:\nmissing=%s\nmismatch=%s", missing.Body.String(), mismatch.Body.String())
+	}
+	if !strings.Contains(missing.Body.String(), `"code":"RUNTIME_NOT_FOUND"`) || !strings.Contains(missing.Body.String(), `"message":"BookRun 不存在"`) {
+		t.Fatalf("unexpected envelope: %s", missing.Body.String())
 	}
 }
 

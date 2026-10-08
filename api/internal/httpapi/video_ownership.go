@@ -69,6 +69,15 @@ var errVideoAccessUnavailable = errors.New("video access policy unavailable")
 
 type videoProjectResolverFunc func(context.Context, int64) (int64, error)
 
+type batchProjectAccessDecision uint8
+
+const (
+	batchProjectAccessAllowed batchProjectAccessDecision = iota
+	batchProjectAccessUnauthenticated
+	batchProjectAccessForbidden
+	batchProjectAccessUnavailable
+)
+
 func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProjectResolverFunc, next http.Handler) http.Handler {
 	if h.deps.Auth == nil {
 		return next
@@ -92,7 +101,19 @@ func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProject
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
 			return
 		}
-		if !h.authorizeBatchProject(w, r, projectID) {
+		switch h.evaluateBatchProjectAccess(r, projectID) {
+		case batchProjectAccessAllowed:
+			// Continue to the business handler.
+		case batchProjectAccessUnauthenticated:
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+			return
+		case batchProjectAccessForbidden:
+			// Resource-only URLs intentionally collapse a foreign project into the
+			// same envelope as an absent resource to avoid an ownership oracle.
+			writeJSON(w, http.StatusNotFound, map[string]any{"code": "VIDEO_NOT_FOUND", "message": "VIDEO resource 不存在"})
+			return
+		default:
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -100,28 +121,41 @@ func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProject
 }
 
 func (h handler) authorizeBatchProject(w http.ResponseWriter, r *http.Request, projectID int64) bool {
-	if h.deps.Auth == nil {
+	switch h.evaluateBatchProjectAccess(r, projectID) {
+	case batchProjectAccessAllowed:
 		return true
+	case batchProjectAccessUnavailable:
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
+	case batchProjectAccessUnauthenticated:
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
+	case batchProjectAccessForbidden:
+		writeJSON(w, http.StatusForbidden, map[string]any{"code": "AUTH_FORBIDDEN", "message": "你没有访问此批量项目的权限"})
+	}
+	return false
+}
+
+// evaluateBatchProjectAccess has no response side effects. Direct project URLs
+// map forbidden to 403, while indirect resource URLs may safely collapse it to
+// their domain-specific 404 envelope.
+func (h handler) evaluateBatchProjectAccess(r *http.Request, projectID int64) batchProjectAccessDecision {
+	if h.deps.Auth == nil {
+		return batchProjectAccessAllowed
 	}
 	if h.deps.BatchProjectAccess == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
-		return false
+		return batchProjectAccessUnavailable
 	}
 	user, ok := authn.CurrentUser(r.Context())
 	if !ok || user.ID <= 0 {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"code": "AUTH_UNAUTHENTICATED", "message": "登录状态无效或已过期"})
-		return false
+		return batchProjectAccessUnauthenticated
 	}
 	role := strings.ToLower(strings.TrimSpace(user.Role))
 	elevated := role == "admin" || role == "owner"
 	allowed, err := h.deps.BatchProjectAccess.CanAccessBatchProject(r.Context(), projectID, user.ID, user.TeamID, elevated)
 	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
-		return false
+		return batchProjectAccessUnavailable
 	}
 	if !allowed {
-		writeJSON(w, http.StatusForbidden, map[string]any{"code": "AUTH_FORBIDDEN", "message": "你没有访问此批量项目的权限"})
-		return false
+		return batchProjectAccessForbidden
 	}
-	return true
+	return batchProjectAccessAllowed
 }

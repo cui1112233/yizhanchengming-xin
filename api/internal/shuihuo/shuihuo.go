@@ -63,6 +63,45 @@ var (
 	ErrInvalidUpload      = errors.New("shuihuo: invalid upload")
 )
 
+const uploadedObjectCleanupTimeout = 5 * time.Second
+
+// assetPersistenceError records whether a failed CreateAsset transaction is
+// known not to have committed. A Commit error is deliberately marked unknown:
+// deleting the just-uploaded object in that case could break a row that the
+// database actually committed before the connection failed.
+type assetPersistenceError struct {
+	cause                  error
+	definitelyNotPersisted bool
+}
+
+func (e *assetPersistenceError) Error() string { return e.cause.Error() }
+func (e *assetPersistenceError) Unwrap() error { return e.cause }
+
+func assetNotPersistedError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &assetPersistenceError{cause: err, definitelyNotPersisted: true}
+}
+
+func assetCommitOutcomeUnknownError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &assetPersistenceError{cause: err}
+}
+
+func isAssetDefinitelyNotPersisted(err error) bool {
+	var persistenceErr *assetPersistenceError
+	if errors.As(err, &persistenceErr) {
+		return persistenceErr.definitelyNotPersisted
+	}
+	// An unclassified store failure has an unknown commit outcome. Leaking one
+	// newly uploaded object is safer than deleting media that a committed row
+	// may already reference.
+	return false
+}
+
 type Segment struct {
 	ID             int64     `json:"id"`
 	BatchProjectID int64     `json:"batchProjectId"`
@@ -278,7 +317,16 @@ func (s *Service) UploadAsset(c context.Context, in UploadAssetInput) (Asset, er
 	if err == nil {
 		return asset, nil
 	}
-	if cleanupErr := s.objects.DeleteObject(c, s.bucket, key); cleanupErr != nil {
+	if !isAssetDefinitelyNotPersisted(err) {
+		return Asset{}, err
+	}
+	cleanupBase := context.Background()
+	if c != nil {
+		cleanupBase = context.WithoutCancel(c)
+	}
+	cleanupContext, cancelCleanup := context.WithTimeout(cleanupBase, uploadedObjectCleanupTimeout)
+	defer cancelCleanup()
+	if cleanupErr := s.objects.DeleteObject(cleanupContext, s.bucket, key); cleanupErr != nil {
 		return Asset{}, fmt.Errorf("shuihuo: persist asset: %w (new object cleanup failed: %v)", err, cleanupErr)
 	}
 	return Asset{}, err
@@ -551,26 +599,58 @@ func (s *MySQLStore) CreateAsset(c context.Context, i CreateAssetInput) (Asset, 
 	if len(m) == 0 {
 		m = []byte(`{}`)
 	}
+	tx, e := s.db.BeginTx(c, nil)
+	if e != nil {
+		return Asset{}, assetNotPersistedError(e)
+	}
+	rollback := func(cause error) error {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			return assetCommitOutcomeUnknownError(fmt.Errorf("%w (transaction rollback failed: %v)", cause, rollbackErr))
+		}
+		return assetNotPersistedError(cause)
+	}
 	// Both the book and optional segment must be inside this project scope.
 	// This also prevents callers from attaching an uploaded object to another
 	// user's storyboard by guessing a segment id.
-	r, e := s.db.ExecContext(c, `INSERT INTO shuihuo_media_assets(batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status)
+	r, e := tx.ExecContext(c, `INSERT INTO shuihuo_media_assets(batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status)
 SELECT ?,?,?,?,?,?,?,? FROM batch_projects p JOIN books b ON b.intake_id=p.intake_id
 WHERE p.id=? AND b.id=? AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_storyboard_segments s WHERE s.id=? AND s.batch_project_id=? AND s.book_id=?))`,
 		i.BatchProjectID, i.BookID, n(i.SegmentID), i.Type, i.Bucket, i.ObjectKey, m, i.Status,
 		i.BatchProjectID, i.BookID, i.SegmentID, i.SegmentID, i.BatchProjectID, i.BookID)
 	if e != nil {
-		return Asset{}, e
+		return Asset{}, rollback(e)
 	}
-	if affected, _ := r.RowsAffected(); affected == 0 {
-		return Asset{}, ErrNotFound
+	affected, e := r.RowsAffected()
+	if e != nil {
+		return Asset{}, rollback(e)
 	}
-	id, _ := r.LastInsertId()
-	return s.asset(c, id)
+	if affected != 1 {
+		return Asset{}, rollback(ErrNotFound)
+	}
+	id, e := r.LastInsertId()
+	if e != nil {
+		return Asset{}, rollback(e)
+	}
+	asset, e := scanAsset(tx.QueryRowContext(c, `SELECT id,batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status,created_at,updated_at FROM shuihuo_media_assets WHERE id=?`, id))
+	if e != nil {
+		return Asset{}, rollback(e)
+	}
+	if e = tx.Commit(); e != nil {
+		return Asset{}, assetCommitOutcomeUnknownError(e)
+	}
+	return asset, nil
 }
 func (s *MySQLStore) asset(c context.Context, id int64) (v Asset, e error) {
+	return scanAsset(s.db.QueryRowContext(c, `SELECT id,batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status,created_at,updated_at FROM shuihuo_media_assets WHERE id=?`, id))
+}
+
+type assetRowScanner interface {
+	Scan(...any) error
+}
+
+func scanAsset(row assetRowScanner) (v Asset, e error) {
 	var q sql.NullInt64
-	e = s.db.QueryRowContext(c, `SELECT id,batch_project_id,book_id,segment_id,asset_type,bucket,object_key,metadata_json,status,created_at,updated_at FROM shuihuo_media_assets WHERE id=?`, id).Scan(&v.ID, &v.BatchProjectID, &v.BookID, &q, &v.Type, &v.Bucket, &v.ObjectKey, &v.Metadata, &v.Status, &v.CreatedAt, &v.UpdatedAt)
+	e = row.Scan(&v.ID, &v.BatchProjectID, &v.BookID, &q, &v.Type, &v.Bucket, &v.ObjectKey, &v.Metadata, &v.Status, &v.CreatedAt, &v.UpdatedAt)
 	v.SegmentID = q.Int64
 	return
 }
