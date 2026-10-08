@@ -66,6 +66,8 @@ test -x api/.staging-bin/ycm-server
 ```bash
 export QIANTIE_GO_LISTEN_ADDR='127.0.0.1:18080'
 export QIANTIE_ENV='local'
+export QIANTIE_COOKIE_SECURE='false'
+unset REDIS_ADDR TASK9_REDIS_ADDR
 export QIANTIE_REDIS_ADDR='127.0.0.1:6379'
 export QIANTIE_REDIS_PREFIX='ycm:staging:'
 export TOS_KEY_PREFIX='staging/'
@@ -82,6 +84,8 @@ set -o pipefail
 ```
 
 保持该前台进程运行，在另一个终端执行下面的检查。验收结束后回到服务终端按 `Ctrl-C` 停止；不要使用后台 `&`、`nohup` 或复用 Vite 端口。
+
+应用选择 Redis 地址的优先级是 `REDIS_ADDR`、`QIANTIE_REDIS_ADDR`、`TASK9_REDIS_ADDR`。因此启动前必须清除前后两个兼容变量，再显式设置 `QIANTIE_REDIS_ADDR`；本机验收只允许 `127.0.0.1:<port>`，不得使用主机名、局域网地址、公网地址或生产 Redis。`QIANTIE_COOKIE_SECURE=false` 也必须显式设置，防止父 shell 中遗留的 `true` 让本机 HTTP 无法保存 Cookie。
 
 此时需要外部执行器的操作必须显示真实的 `executor_unavailable` 或安全错误；不得为了验收触发任何付费 Provider。没有 TOS 配置时上传必须真实失败，不能伪造成功。
 
@@ -133,14 +137,48 @@ curl -i -b "$YCM_STAGING_LOG_DIR/cookies.txt" \
   http://127.0.0.1:18080/api/auth/current-user
 ```
 
-真正的 capability `403` 必须使用隔离数据库中的非管理员账号及其 Cookie，访问其没有 capability 的管理 API，例如 `GET /api/v1/admin/prompts`；不能把匿名 401 或 CSRF 403 写成权限验收通过。
+真正的 capability `403` 必须使用隔离数据库中的非管理员账号及其 Cookie；不能把匿名 401 或 CSRF 403 写成权限验收通过。服务首次启动并创建 bootstrap owner 后，在另一个终端加载相同的本机 `QIANTIE_MYSQL_DSN` 和 `QIANTIE_ENV=local`，再用受保护的维护命令创建一次性 member。该命令会拒绝非 `ycm_staging` 数据库、非 `127.0.0.1` MySQL、非 local 环境以及不带 `ycm-staging-member-` 前缀的用户名，并由 Go 代码生成密码哈希：
+
+```bash
+export QIANTIE_ENV='local'
+export QIANTIE_AUTH_ADMIN_ACTION='local-create-member'
+export QIANTIE_AUTH_ADMIN_USERNAME='ycm-staging-member-review'
+export QIANTIE_AUTH_ADMIN_DISPLAY_NAME='Local acceptance member'
+export QIANTIE_AUTH_ADMIN_PASSWORD='<local-member-password-at-least-12-characters>'
+(cd api && go run ./cmd/auth-admin)
+unset QIANTIE_AUTH_ADMIN_ACTION QIANTIE_AUTH_ADMIN_DISPLAY_NAME QIANTIE_AUTH_ADMIN_PASSWORD
+```
+
+不要在 bootstrap owner 之前创建 fixture，否则空库首次启动不会再创建 owner。创建完成后，用该 member 登录到独立 cookie jar，并访问它没有 capability 的管理 API：
+
+```bash
+export YCM_STAGING_MEMBER_USERNAME='ycm-staging-member-review'
+export YCM_STAGING_MEMBER_PASSWORD='<local-member-password-at-least-12-characters>'
+jq -n --arg username "$YCM_STAGING_MEMBER_USERNAME" --arg password "$YCM_STAGING_MEMBER_PASSWORD" \
+  '{username:$username,password:$password}' | \
+  curl -i -c "$YCM_STAGING_LOG_DIR/member-cookies.txt" \
+    -H 'Origin: http://127.0.0.1:18080' \
+    -H 'Content-Type: application/json' \
+    --data-binary @- http://127.0.0.1:18080/api/auth/login
+curl -i -b "$YCM_STAGING_LOG_DIR/member-cookies.txt" \
+  http://127.0.0.1:18080/api/v1/admin/prompts
+```
+
+最后一个请求必须返回 `403` 和 `AUTH_FORBIDDEN`。密码只存在于当前本机 shell，不作为命令参数、日志或文档内容输出。
 
 ## 7. 清理
 
 停止 Go 进程后，删除本机 cookie jar，并仅清理本次专用 Redis namespace 与 `ycm_staging` 数据库。删除数据库前再次人工核对名称；不要使用通配符，不要清理生产或共享实例。因为默认不配置 TOS，本流程不产生 TOS 对象。
 
 ```bash
-rm -f "$YCM_STAGING_LOG_DIR/cookies.txt"
+rm -f "$YCM_STAGING_LOG_DIR/cookies.txt" "$YCM_STAGING_LOG_DIR/member-cookies.txt"
+export QIANTIE_ENV='local'
+export QIANTIE_AUTH_ADMIN_ACTION='local-delete-member'
+export QIANTIE_AUTH_ADMIN_USERNAME='ycm-staging-member-review'
+(cd api && go run ./cmd/auth-admin)
+unset QIANTIE_AUTH_ADMIN_ACTION QIANTIE_AUTH_ADMIN_USERNAME
+unset YCM_STAGING_USERNAME YCM_STAGING_PASSWORD YCM_STAGING_MEMBER_USERNAME YCM_STAGING_MEMBER_PASSWORD
+unset QIANTIE_BOOTSTRAP_ADMIN_USERNAME QIANTIE_BOOTSTRAP_ADMIN_PASSWORD
 ```
 
-数据库和 Redis 的删除属于破坏性动作，按实际本机工具逐个确认后执行；本手册不提供可误操作生产资源的一键删除命令。
+`local-delete-member` 只会删除 `ycm_staging` 本机库中匹配保留前缀、角色仍为 `member` 且未加入团队的 fixture；条件不匹配时失败，不会扩大删除范围。数据库和 Redis 的整体删除属于破坏性动作，按实际本机工具逐个确认后执行；本手册不提供可误操作生产资源的一键删除命令。
