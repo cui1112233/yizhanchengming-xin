@@ -13,8 +13,12 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/provider121"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/webui"
 	_ "github.com/go-sql-driver/mysql"
 )
+
+// BuildGitSHA is injected by scripts/build-embedded-ui.sh at package time.
+var BuildGitSHA = "development"
 
 func main() {
 	logger := observability.NewJSONLogger(os.Stdout)
@@ -67,7 +71,9 @@ func main() {
 	}
 
 	logger.Info("api listening", "subsystem", "http", "operation", "listen", "address", observability.SanitizeString(addr))
-	if err := http.ListenAndServe(addr, app.NewHandler(db, fetcher, nil, nil)); err != nil {
+	api := app.NewHandler(db, fetcher, nil, nil)
+	ui := webui.NewHandler(api, webui.EmbeddedFiles(), webui.BuildInfo{GitSHA: BuildGitSHA})
+	if err := http.ListenAndServe(addr, ui); err != nil {
 		fatal(logger, "http server stopped", "http", "listen", err)
 	}
 }

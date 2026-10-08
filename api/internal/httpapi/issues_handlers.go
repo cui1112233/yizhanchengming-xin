@@ -11,10 +11,15 @@ import (
 )
 
 type issueRow struct {
-	ID, ProjectID, BookID              int64
+	ID, ProjectID, BookID                         int64
 	Source, Status, ErrorCode, RequestID, Message string
-	At                                 time.Time
+	At                                            time.Time
 }
+
+// The task tables span migrations created with different MySQL default
+// collations. Normalize every textual UNION column so an empty staging schema
+// and an upgraded production schema both produce the same read-only projection.
+const issueProjectionSQL = `SELECT br.id id,br.batch_project_id project_id,br.book_id book_id,_utf8mb4'book_run' COLLATE utf8mb4_unicode_ci source,CONVERT(br.status USING utf8mb4) COLLATE utf8mb4_unicode_ci status,CONVERT(COALESCE(br.error_code,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci error_code,CONVERT(COALESCE(br.request_id,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci request_id,CONVERT(COALESCE(br.error_message,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci error_message,COALESCE(br.finished_at,br.updated_at) at FROM book_runs br UNION ALL SELECT sr.id,sr2.batch_project_id,sr.book_id,_utf8mb4'stage_run' COLLATE utf8mb4_unicode_ci,CONVERT(sr.status USING utf8mb4) COLLATE utf8mb4_unicode_ci,_utf8mb4'' COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(sr.request_id,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(sr.error_message,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,COALESCE(sr.finished_at,sr.updated_at) FROM stage_runs sr JOIN book_runs sr2 ON sr2.id=sr.book_run_id UNION ALL SELECT vt.id,vj.batch_project_id,vj.book_id,_utf8mb4'video_task' COLLATE utf8mb4_unicode_ci,CONVERT(vt.status USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(vt.error_code,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(vt.request_id,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(vt.error_message,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,vt.updated_at FROM video_production_tasks vt JOIN video_production_jobs vj ON vj.id=vt.production_job_id UNION ALL SELECT mt.id,mt.batch_project_id,mt.book_id,_utf8mb4'media_task' COLLATE utf8mb4_unicode_ci,CONVERT(mt.status USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(mt.error_code,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(mt.request_id,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,CONVERT(COALESCE(mt.error_message,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci,mt.updated_at FROM shuihuo_media_tasks mt`
 
 // listIssues is a read-only projection of durable execution facts. It never
 // creates a second error-log store and scopes every row through project ownership.
@@ -60,15 +65,14 @@ func (h handler) listIssues(w http.ResponseWriter, r *http.Request) {
 		like := "%" + search + "%"
 		args = append(args, like, like, like)
 	}
-	base := `SELECT br.id id,br.batch_project_id project_id,br.book_id book_id,'book_run' source,br.status,COALESCE(br.error_code,'') error_code,br.request_id,br.error_message,COALESCE(br.finished_at,br.updated_at) at FROM book_runs br UNION ALL SELECT sr.id,sr2.batch_project_id,sr.book_id,'stage_run',sr.status,'',sr.request_id,sr.error_message,COALESCE(sr.finished_at,sr.updated_at) FROM stage_runs sr JOIN book_runs sr2 ON sr2.id=sr.book_run_id UNION ALL SELECT vt.id,vj.batch_project_id,vj.book_id,'video_task',vt.status,vt.error_code,vt.request_id,vt.error_message,vt.updated_at FROM video_production_tasks vt JOIN video_production_jobs vj ON vj.id=vt.production_job_id UNION ALL SELECT mt.id,mt.batch_project_id,mt.book_id,'media_task',mt.status,mt.error_code,mt.request_id,mt.error_message,mt.updated_at FROM shuihuo_media_tasks mt`
 	predicate := filters + where + " AND (status IN ('failed','retryable_failed') OR error_message <> '')"
-	countQuery := "SELECT COUNT(*) FROM (" + base + ") x" + predicate
+	countQuery := "SELECT COUNT(*) FROM (" + issueProjectionSQL + ") x" + predicate
 	var total int
 	if err := h.deps.Database.QueryRowContext(r.Context(), countQuery, args...).Scan(&total); err != nil {
 		h.writeServiceError(w, r, http.StatusInternalServerError, "ISSUES_READ_FAILED", "读取问题记录失败", "issues", "count", err)
 		return
 	}
-	query := "SELECT * FROM (" + base + ") x" + predicate + " ORDER BY at DESC,id DESC LIMIT ? OFFSET ?"
+	query := "SELECT * FROM (" + issueProjectionSQL + ") x" + predicate + " ORDER BY at DESC,id DESC LIMIT ? OFFSET ?"
 	queryArgs := append(append([]any{}, args...), limit, (page-1)*limit)
 	rows, err := h.deps.Database.QueryContext(r.Context(), query, queryArgs...)
 	if err != nil {

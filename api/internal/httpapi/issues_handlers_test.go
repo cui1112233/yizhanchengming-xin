@@ -52,3 +52,15 @@ func TestIssuesProjectionScopesAndRedactsFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIssuesProjectionNormalizesUnionTextCollation(t *testing.T) {
+	for _, want := range []string{
+		"CONVERT(COALESCE(br.error_message,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci",
+		"CONVERT(COALESCE(mt.error_message,'') USING utf8mb4) COLLATE utf8mb4_unicode_ci",
+		"_utf8mb4'media_task' COLLATE utf8mb4_unicode_ci",
+	} {
+		if !strings.Contains(issueProjectionSQL, want) {
+			t.Fatalf("issues UNION must normalize text collation; missing %q", want)
+		}
+	}
+}

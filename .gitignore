@@ -6,3 +6,5 @@ dist/
 .DS_Store
 *.log
 coverage/
+/.staging-logs/
+/api/.staging-bin/

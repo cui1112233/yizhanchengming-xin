@@ -126,7 +126,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		redisAddr = strings.TrimSpace(os.Getenv("TASK9_REDIS_ADDR"))
 	}
 	if redisAddr != "" {
-		if queue, err := taskruntime.NewRedisQueue(redisAddr, "task9"); err == nil {
+		if queue, err := taskruntime.NewRedisQueue(redisAddr, runtimeRedisPrefix(os.Getenv("QIANTIE_REDIS_PREFIX"), "task9")); err == nil {
 			runtimeCoordinator = task9runtime.NewQueueCoordinator(queue)
 		}
 	}
@@ -137,7 +137,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	ttsProvider := shuihuo.NewHTTPProvider(shuihuo.HTTPProviderConfig{BaseURL: os.Getenv("SHUIHUO_TTS_PROVIDER_BASE_URL"), APIKey: os.Getenv("SHUIHUO_TTS_PROVIDER_API_KEY"), TTSModel: os.Getenv("SHUIHUO_TTS_PROVIDER_MODEL")})
 	var mediaQueue taskruntime.Queue
 	if redisAddr != "" {
-		if queue, err := taskruntime.NewRedisQueue(redisAddr, "shuihuo-media"); err == nil {
+		if queue, err := taskruntime.NewRedisQueue(redisAddr, runtimeRedisPrefix(os.Getenv("QIANTIE_REDIS_PREFIX"), "shuihuo-media")); err == nil {
 			mediaQueue = queue
 		}
 	}
@@ -194,6 +194,14 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		AppInitialized:              true,
 	}
 	return httpapi.NewHandlerWithRuntime(deps, runtimeService)
+}
+
+func runtimeRedisPrefix(namespace, name string) string {
+	namespace = strings.Trim(strings.TrimSpace(namespace), ":")
+	if namespace == "" {
+		return name
+	}
+	return namespace + ":" + name
 }
 
 func secureCookiesEnabled() bool {
