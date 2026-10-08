@@ -23,32 +23,19 @@ import {
 } from 'antd'
 import 'antd/dist/reset.css'
 import './admin.css'
+import { requestJSON } from './api.js'
 
 const { Header, Sider, Content } = Layout
 const { TextArea } = Input
 
-async function adminFetch(path, options = {}) {
-  const headers = new Headers(options.headers || {})
-  if (options.body !== undefined) headers.set('Content-Type', 'application/json')
-  const response = await fetch(path, { ...options, headers, credentials: 'include' })
-  let payload = null
-  try {
-    payload = await response.json()
-  } catch {
-    payload = null
-  }
-  if (!response.ok) {
-    const error = new Error(payload?.message || '后台请求失败')
-    error.status = response.status
-    error.code = payload?.code
-    throw error
-  }
-  return payload
+function errorMessage(error, fallback) {
+  const message = error.message || fallback
+  return error.requestId ? `${message}（请求编号：${error.requestId}）` : message
 }
 
 function CapabilityBoundary({ status, children }) {
   if (status === 'loading') return <div className="admin-state"><Spin size="large" tip="正在读取后台权限…" /></div>
-  if (status === 'unauthorized') return <Result status="401" title="登录已过期" subTitle="请重新登录后访问管理端。" />
+  if (status === 'unauthorized') return <Result status="warning" title="登录已过期" subTitle="请重新登录后访问管理端。" />
   if (status === 'forbidden') return <Result status="403" title="没有后台访问权限" subTitle="后台入口仅对拥有 admin.* capability 的账号开放。" />
   if (status === 'error') return <Result status="error" title="后台权限加载失败" subTitle="请稍后重试。" />
   return children
@@ -73,7 +60,7 @@ function PromptPage({ capabilities }) {
     setLoading(true)
     setError(null)
     try {
-      const payload = await adminFetch('/api/v1/admin/prompts')
+      const payload = await requestJSON('/api/v1/admin/prompts')
       setPrompts(Array.isArray(payload?.prompts) ? payload.prompts : [])
     } catch (err) {
       setError(err)
@@ -91,7 +78,7 @@ function PromptPage({ capabilities }) {
     setDetailLoading(true)
     setDetail(null)
     try {
-      const payload = await adminFetch(`/api/v1/admin/prompts/${encodeURIComponent(record.key)}/versions/${record.version}`)
+      const payload = await requestJSON(`/api/v1/admin/prompts/${encodeURIComponent(record.key)}/versions/${record.version}`)
       setDetail(payload?.prompt || null)
     } catch (err) {
       setDetail({ error: err })
@@ -116,16 +103,16 @@ function PromptPage({ capabilities }) {
   const saveDraft = async (values) => {
     try {
       if (editing) {
-        await adminFetch(`/api/v1/admin/prompts/${encodeURIComponent(editing.key)}/drafts/${editing.version}`, { method: 'PUT', body: JSON.stringify({ content: values.content }) })
+        await requestJSON(`/api/v1/admin/prompts/${encodeURIComponent(editing.key)}/drafts/${editing.version}`, { method: 'PUT', body: JSON.stringify({ content: values.content }) })
         message.success('草稿已保存')
       } else {
-        await adminFetch(`/api/v1/admin/prompts/${encodeURIComponent(values.key)}/drafts`, { method: 'POST', body: JSON.stringify({ content: values.content }) })
+        await requestJSON(`/api/v1/admin/prompts/${encodeURIComponent(values.key)}/drafts`, { method: 'POST', body: JSON.stringify({ content: values.content }) })
         message.success('草稿已创建')
       }
       setEditorOpen(false)
       await loadPrompts()
     } catch (err) {
-      message.error(err.message || '草稿保存失败')
+      message.error(errorMessage(err, '草稿保存失败'))
     }
   }
 
@@ -137,11 +124,11 @@ function PromptPage({ capabilities }) {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await adminFetch(`/api/v1/admin/prompts/${encodeURIComponent(record.key)}/versions/${record.version}/publish`, { method: 'POST' })
+          await requestJSON(`/api/v1/admin/prompts/${encodeURIComponent(record.key)}/versions/${record.version}/publish`, { method: 'POST' })
           message.success('提示词已发布')
           await loadPrompts()
         } catch (err) {
-          message.error(err.message || '发布失败')
+          message.error(errorMessage(err, '发布失败'))
         }
       },
     })
@@ -155,11 +142,11 @@ function PromptPage({ capabilities }) {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await adminFetch(`/api/v1/admin/prompts/${encodeURIComponent(record.key)}/versions/${record.version}/restore`, { method: 'POST' })
+          await requestJSON(`/api/v1/admin/prompts/${encodeURIComponent(record.key)}/versions/${record.version}/restore`, { method: 'POST' })
           message.success('历史版本已恢复为新版本')
           await loadPrompts()
         } catch (err) {
-          message.error(err.message || '恢复失败')
+          message.error(errorMessage(err, '恢复失败'))
         }
       },
     })
@@ -197,14 +184,14 @@ function PromptPage({ capabilities }) {
           {canEdit && <Button type="primary" onClick={openCreate}>新建草稿</Button>}
         </Space>
       </div>
-      {error && <Alert type="error" showIcon message="提示词加载失败" description="请检查登录状态或稍后重试。" action={<Button size="small" onClick={() => void loadPrompts()}>重新加载</Button>} />}
+      {error && <Alert type="error" showIcon message="提示词加载失败" description={errorMessage(error, '请检查登录状态或稍后重试。')} action={<Button size="small" onClick={() => void loadPrompts()}>重新加载</Button>} />}
       <Card className="admin-card" bordered={false}>
         <Table rowKey={(record) => `${record.key}-${record.version}`} loading={loading} columns={columns} dataSource={prompts} locale={{ emptyText: <Empty description="暂无提示词版本" /> }} pagination={{ pageSize: 10 }} />
       </Card>
 
       <Drawer title={detail ? `${detail.key} · v${detail.version}` : '提示词详情'} width={620} open={drawerOpen} onClose={() => setDrawerOpen(false)} extra={detail && !detail.error && canEdit && detail.lifecycle === 'draft' ? <Button onClick={openEdit}>编辑草稿</Button> : null}>
         {detailLoading && <Spin />}
-        {!detailLoading && detail?.error && <Alert type="error" message="正文加载失败" description="请关闭后重试。" />}
+        {!detailLoading && detail?.error && <Alert type="error" message="正文加载失败" description={errorMessage(detail.error, '请关闭后重试。')} />}
         {!detailLoading && detail && !detail.error && <>
           <Descriptions bordered size="small" column={1} items={[
             { key: 'key', label: 'Prompt Key', children: detail.key },
@@ -242,7 +229,7 @@ export function AdminShell() {
 
   useEffect(() => {
     let active = true
-    adminFetch('/api/v1/admin/capabilities').then((payload) => {
+    requestJSON('/api/v1/admin/capabilities').then((payload) => {
       if (!active) return
       const values = Array.isArray(payload?.capabilities) ? payload.capabilities : []
       setCapabilities(values)
