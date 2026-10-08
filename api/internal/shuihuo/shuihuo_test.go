@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/objectkey"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
 
@@ -35,6 +38,7 @@ func (t *testStore) CreateMediaTask(_ context.Context, i CreateMediaTaskInput) (
 
 type memoryObjects struct {
 	putBucket, putKey string
+	getKey            string
 	contents          []byte
 }
 
@@ -45,8 +49,101 @@ func (m *memoryObjects) PutObjectFromFile(_ context.Context, bucket, key, filena
 	}
 	return err
 }
-func (m *memoryObjects) GetObject(context.Context, string, string) (io.ReadCloser, error) {
+func (m *memoryObjects) GetObject(_ context.Context, _ string, key string) (io.ReadCloser, error) {
+	m.getKey = key
 	return io.NopCloser(bytes.NewReader(m.contents)), nil
+}
+
+func TestUploadAssetKeyPrefixAndSavedReadback(t *testing.T) {
+	for _, raw := range []string{"", "staging/"} {
+		t.Run(raw, func(t *testing.T) {
+			store, objects := &testStore{}, &memoryObjects{}
+			service := NewService(store, objects)
+			service.SetBucket("private-assets")
+			prefix, err := objectkey.ParsePrefix(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			service.SetKeyPrefix(prefix)
+			png := []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}
+			asset, err := service.UploadAsset(context.Background(), UploadAssetInput{BatchProjectID: 4, BookID: 9, Type: AssetImage, Filename: "output.png", ContentType: "image/png", Body: bytes.NewReader(png)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(asset.ObjectKey, raw+"shuihuo/project-4/book-9/") || strings.Count(asset.ObjectKey, "staging/") != strings.Count(raw, "staging/") || asset.ObjectKey != objects.putKey || asset.ObjectKey != store.asset.ObjectKey {
+				t.Fatalf("asset=%+v upload=%q saved=%q", asset, objects.putKey, store.asset.ObjectKey)
+			}
+			// A changed runtime namespace must not change an existing saved reference.
+			next, err := objectkey.ParsePrefix("next-run/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			service.SetKeyPrefix(next)
+			_, body, err := service.OpenAsset(context.Background(), 4, 9, asset.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer body.Close()
+			data, err := io.ReadAll(body)
+			if err != nil || !bytes.Equal(data, png) || objects.getKey != asset.ObjectKey {
+				t.Fatalf("read=%q saved=%q err=%v", objects.getKey, asset.ObjectKey, err)
+			}
+		})
+	}
+}
+
+func TestUploadAssetPrefixDoesNotRewriteImportedReference(t *testing.T) {
+	store := &testStore{}
+	service := NewService(store)
+	prefix, err := objectkey.ParsePrefix("staging/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.SetKeyPrefix(prefix)
+	asset, err := service.CreateAsset(context.Background(), CreateAssetInput{BatchProjectID: 4, BookID: 9, Type: AssetAudio, Bucket: "legacy", ObjectKey: "existing/audio.mp3"})
+	if err != nil || asset.ObjectKey != "existing/audio.mp3" {
+		t.Fatalf("asset=%+v err=%v", asset, err)
+	}
+}
+
+type generatedRoundTripper func(*http.Request) (*http.Response, error)
+
+func (f generatedRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestUploadAssetGeneratedMediaKeyPrefix(t *testing.T) {
+	for _, raw := range []string{"", "staging/"} {
+		for _, tc := range []struct {
+			kind        MediaKind
+			contentType string
+			body        []byte
+		}{
+			{MediaImage, "image/png", []byte{'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n', 0, 0, 0, 0}},
+			{MediaAudio, "audio/wav", []byte("RIFF\x00\x00\x00\x00WAVEfmt ")},
+		} {
+			t.Run(raw+string(tc.kind), func(t *testing.T) {
+				store, objects := &testStore{}, &memoryObjects{}
+				service := NewService(store, objects)
+				service.SetBucket("private")
+				prefix, err := objectkey.ParsePrefix(raw)
+				if err != nil {
+					t.Fatal(err)
+				}
+				service.SetKeyPrefix(prefix)
+				requests := 0
+				worker := &Worker{service: service, client: &http.Client{Transport: generatedRoundTripper(func(*http.Request) (*http.Response, error) {
+					requests++
+					return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(tc.body))}, nil
+				})}}
+				asset, err := worker.persist(context.Background(), MediaTask{BatchProjectID: 4, BookID: 9, SegmentID: 2, Kind: tc.kind}, GeneratedMedia{URL: "https://provider.example/output", ContentType: tc.contentType})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if requests != 1 || !strings.HasPrefix(asset.ObjectKey, raw+"shuihuo/project-4/book-9/") || asset.ObjectKey != objects.putKey || store.asset.ObjectKey != asset.ObjectKey || store.asset.SegmentID != 2 || !bytes.Equal(objects.contents, tc.body) {
+					t.Fatalf("asset=%+v upload=%q saved=%+v requests=%d", asset, objects.putKey, store.asset, requests)
+				}
+			})
+		}
+	}
 }
 
 func TestUploadAssetGeneratesScopedTOSKeyAndDoesNotTrustBrowserKey(t *testing.T) {
@@ -81,7 +178,10 @@ func (*testStore) RetryMediaTask(context.Context, int64, int64, int64) (MediaTas
 func (*testStore) MarkExecutorUnavailable(context.Context, int64, string, string) (MediaTask, error) {
 	return MediaTask{Status: MediaFailed, ErrorCode: "executor_unavailable"}, nil
 }
-func (*testStore) GetAsset(context.Context, int64, int64, int64) (Asset, error) {
+func (t *testStore) GetAsset(context.Context, int64, int64, int64) (Asset, error) {
+	if t.asset.ObjectKey != "" {
+		return Asset{ID: 7, ObjectKey: t.asset.ObjectKey, Bucket: t.asset.Bucket, Status: t.asset.Status}, nil
+	}
 	return Asset{}, ErrNotFound
 }
 func TestVideoTaskIsRecordedAsPendingExecutorWithoutProviderCall(t *testing.T) {

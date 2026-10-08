@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/objectkey"
 	"github.com/volcengine/ve-tos-golang-sdk/v2/tos"
 )
 
@@ -19,6 +20,7 @@ type ObjectUploader interface {
 }
 
 type ArtifactStoreConfig struct {
+	KeyPrefix             objectkey.Prefix
 	Bucket                string
 	PublicBaseURL         string
 	HTTPClient            *http.Client
@@ -27,6 +29,7 @@ type ArtifactStoreConfig struct {
 }
 
 type HTTPArtifactStore struct {
+	keyPrefix             objectkey.Prefix
 	bucket                string
 	publicBaseURL         string
 	client                *http.Client
@@ -43,7 +46,7 @@ func NewArtifactStore(config ArtifactStoreConfig) (*HTTPArtifactStore, error) {
 	if config.HTTPClient == nil {
 		config.HTTPClient = &http.Client{Timeout: 10 * time.Minute}
 	}
-	return &HTTPArtifactStore{bucket: config.Bucket, publicBaseURL: config.PublicBaseURL, client: config.HTTPClient, uploader: config.Uploader, allowInsecureLoopback: config.AllowInsecureLoopback}, nil
+	return &HTTPArtifactStore{keyPrefix: config.KeyPrefix, bucket: config.Bucket, publicBaseURL: config.PublicBaseURL, client: config.HTTPClient, uploader: config.Uploader, allowInsecureLoopback: config.AllowInsecureLoopback}, nil
 }
 
 func (s *HTTPArtifactStore) Persist(ctx context.Context, sourceURL, objectHint string) (Artifact, error) {
@@ -56,7 +59,7 @@ func (s *HTTPArtifactStore) Persist(ctx context.Context, sourceURL, objectHint s
 	if !secure && !loopback {
 		return Artifact{}, fmt.Errorf("video: provider artifact URL must use https")
 	}
-	key, err := validateArtifactObjectKey(objectHint)
+	key, err := s.effectiveObjectKey(objectHint)
 	if err != nil {
 		return Artifact{}, err
 	}
@@ -98,7 +101,7 @@ func (s *HTTPArtifactStore) Persist(ctx context.Context, sourceURL, objectHint s
 // by the merge executor so ffmpeg output does not need to be exposed through a
 // temporary public URL before becoming durable.
 func (s *HTTPArtifactStore) PersistFile(ctx context.Context, sourcePath, objectHint string) (Artifact, error) {
-	key, err := validateArtifactObjectKey(objectHint)
+	key, err := s.effectiveObjectKey(objectHint)
 	if err != nil {
 		return Artifact{}, err
 	}
@@ -121,6 +124,13 @@ func (s *HTTPArtifactStore) persistFile(ctx context.Context, sourcePath, key str
 		return Artifact{}, fmt.Errorf("video: upload artifact to TOS: %w", err)
 	}
 	return Artifact{Bucket: s.bucket, ObjectKey: key, URL: s.publicBaseURL + "/" + key}, nil
+}
+
+func (s *HTTPArtifactStore) effectiveObjectKey(relativeKey string) (string, error) {
+	if s.keyPrefix != (objectkey.Prefix{}) {
+		return s.keyPrefix.Apply(relativeKey)
+	}
+	return validateArtifactObjectKey(relativeKey)
 }
 
 func validateArtifactObjectKey(objectHint string) (string, error) {

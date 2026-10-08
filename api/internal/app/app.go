@@ -18,6 +18,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/objectkey"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
@@ -88,20 +89,28 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	var artifactStore video.ArtifactStore
 	var fileArtifactStore video.FileArtifactStore
 	var tosUploader *video.TOSUploader
+	var tosObjects shuihuo.ObjectStore
+	var tosPrefix objectkey.Prefix
 	tosBucket := ""
-	if endpoint, region, bucket, accessKey, secretKey, publicBase := os.Getenv("TOS_ENDPOINT"), os.Getenv("TOS_REGION"), os.Getenv("TOS_BUCKET"), os.Getenv("TOS_ACCESS_KEY"), os.Getenv("TOS_SECRET_KEY"), os.Getenv("TOS_PUBLIC_BASE_URL"); endpoint != "" && region != "" && bucket != "" && accessKey != "" && secretKey != "" {
-		if uploader, err := video.NewTOSUploader(endpoint, region, accessKey, secretKey); err == nil {
-			tosUploader, tosBucket = uploader, bucket
-			if publicBase != "" {
-				if durableArtifacts, err := video.NewArtifactStore(video.ArtifactStoreConfig{Bucket: bucket, PublicBaseURL: publicBase, Uploader: uploader}); err == nil {
-					artifactStore = durableArtifacts
-					fileArtifactStore = durableArtifacts
+	if err := configureTOSKeyPrefix(os.Getenv("TOS_KEY_PREFIX"), func(prefix objectkey.Prefix) {
+		tosPrefix = prefix
+		if endpoint, region, bucket, accessKey, secretKey, publicBase := os.Getenv("TOS_ENDPOINT"), os.Getenv("TOS_REGION"), os.Getenv("TOS_BUCKET"), os.Getenv("TOS_ACCESS_KEY"), os.Getenv("TOS_SECRET_KEY"), os.Getenv("TOS_PUBLIC_BASE_URL"); endpoint != "" && region != "" && bucket != "" && accessKey != "" && secretKey != "" {
+			if uploader, err := video.NewTOSUploader(endpoint, region, accessKey, secretKey); err == nil {
+				tosUploader, tosObjects, tosBucket = uploader, uploader, bucket
+				if publicBase != "" {
+					if durableArtifacts, err := video.NewArtifactStore(video.ArtifactStoreConfig{Bucket: bucket, PublicBaseURL: publicBase, Uploader: uploader, KeyPrefix: prefix}); err == nil {
+						artifactStore = durableArtifacts
+						fileArtifactStore = durableArtifacts
+					}
 				}
 			}
 		}
+	}); err != nil {
+		logger.Error("TOS storage disabled", "subsystem", "tos", "safe_error", err.Error())
 	}
-	shuihuoMediaService := shuihuo.NewService(shuihuoStore, tosUploader)
+	shuihuoMediaService := shuihuo.NewService(shuihuoStore, tosObjects)
 	shuihuoMediaService.SetBucket(tosBucket)
+	shuihuoMediaService.SetKeyPrefix(tosPrefix)
 	videoService := video.NewService(videoStore, video.NewGenerationFinalPromptSource(generationStore), providerFactory, artifactStore, masterKey)
 	observedVideo := &observedVideoService{next: videoService, logger: logger}
 	mergeExecutor := video.NewFFmpegExecutor(video.FFmpegExecutorConfig{
@@ -160,7 +169,10 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	}
 	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
 	agentService := agentstudio.NewService(agentstudio.NewMySQLStore(db), agentstudio.UnavailableExecutor{})
-	agentService.SetObjects(tosUploader, tosBucket)
+	if tosUploader != nil {
+		agentService.SetObjects(tosUploader, tosBucket)
+	}
+	agentService.SetKeyPrefix(tosPrefix)
 
 	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,

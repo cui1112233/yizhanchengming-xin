@@ -12,19 +12,28 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/objectkey"
 )
 
 type Service struct {
-	store    Store
-	executor Executor
-	now      func() time.Time
-	objects  ObjectStore
-	bucket   string
+	keyPrefix objectkey.Prefix
+	store     Store
+	executor  Executor
+	now       func() time.Time
+	objects   ObjectStore
+	bucket    string
 }
 
 func (s *Service) SetObjects(objects ObjectStore, bucket string) {
 	s.objects = objects
 	s.bucket = strings.TrimSpace(bucket)
+}
+
+func (s *Service) SetKeyPrefix(prefix objectkey.Prefix) {
+	if s != nil {
+		s.keyPrefix = prefix
+	}
 }
 func (s *Service) UploadAttachment(ctx context.Context, a Actor, projectID int64, filename, contentType string, body io.Reader) (Attachment, error) {
 	if s == nil || s.store == nil || a.UserID <= 0 || projectID <= 0 || body == nil || strings.TrimSpace(filename) == "" {
@@ -60,6 +69,10 @@ func (s *Service) UploadAttachment(ctx context.Context, a Actor, projectID int64
 		return Attachment{}, e
 	}
 	key := fmt.Sprintf("agent/project-%d/%s", projectID, hex.EncodeToString(raw))
+	key, e = s.keyPrefix.Apply(key)
+	if e != nil {
+		return Attachment{}, e
+	}
 	if e = s.objects.PutObjectFromFile(ctx, s.bucket, key, path); e != nil {
 		return Attachment{}, e
 	}

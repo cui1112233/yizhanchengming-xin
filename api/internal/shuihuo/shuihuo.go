@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/objectkey"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
 
@@ -158,11 +159,12 @@ type Store interface {
 	GetAsset(context.Context, int64, int64, int64) (Asset, error)
 }
 type Service struct {
-	store    Store
-	objects  ObjectStore
-	bucket   string
-	provider MediaProvider
-	queue    taskruntime.Queue
+	keyPrefix objectkey.Prefix
+	store     Store
+	objects   ObjectStore
+	bucket    string
+	provider  MediaProvider
+	queue     taskruntime.Queue
 }
 
 func NewService(s Store, objects ...ObjectStore) *Service {
@@ -175,6 +177,12 @@ func NewService(s Store, objects ...ObjectStore) *Service {
 func (s *Service) SetBucket(bucket string) {
 	if s != nil {
 		s.bucket = strings.TrimSpace(bucket)
+	}
+}
+
+func (s *Service) SetKeyPrefix(prefix objectkey.Prefix) {
+	if s != nil {
+		s.keyPrefix = prefix
 	}
 }
 
@@ -253,6 +261,10 @@ func (s *Service) UploadAsset(c context.Context, in UploadAssetInput) (Asset, er
 		return Asset{}, err
 	}
 	key := fmt.Sprintf("shuihuo/project-%d/book-%d/%s.%s", in.BatchProjectID, in.BookID, hex.EncodeToString(random), extension)
+	key, err = s.keyPrefix.Apply(key)
+	if err != nil {
+		return Asset{}, err
+	}
 	if err := s.objects.PutObjectFromFile(c, s.bucket, key, path); err != nil {
 		return Asset{}, fmt.Errorf("shuihuo: upload TOS object: %w", err)
 	}
