@@ -28,6 +28,8 @@ function api() {
 describe('NovelPanelWorkbench', () => {
   it('exposes requested panel scope without provider secrets', () => {
     render(<NovelPanelWorkbench projectId={9} initialWorkspace={workspace()} />)
+    expect(document.querySelector('.novel-panel-workbench .novel-panel-legacy-canvas')).not.toBeNull()
+    expect(document.querySelector('iframe')).toBeNull()
     expect(screen.getByText('小说面板')).toBeTruthy()
     expect(screen.getByRole('radio', { name: '普通模式' }).checked).toBe(true)
     expect(screen.getByRole('radio', { name: '精品带图模式' })).toBeTruthy()
@@ -66,4 +68,22 @@ describe('NovelPanelWorkbench', () => {
     expect(await screen.findByText(/保存冲突/)).toBeTruthy()
     expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toBe('未保存但不能丢失的编辑。')
   }, 15000)
+
+  it('reports a Go 403 on save without claiming a persisted workspace', async () => {
+    const client = api(); client.saveWorkspace.mockRejectedValueOnce({ status: 403, message: '无权保存此项目' })
+    render(<NovelPanelWorkbench projectId={9} initialWorkspace={workspace()} api={client} />)
+    fireEvent.click(screen.getByRole('button', { name: '保存小说面板' }))
+    expect(await screen.findByText('无权保存此项目')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toContain('第一段原文')
+  })
+
+  it('reports failed history restoration without replacing the active workspace', async () => {
+    const client = api(); client.restoreHistory.mockRejectedValueOnce({ status: 502, message: '历史快照不可读取' })
+    render(<NovelPanelWorkbench projectId={9} initialWorkspace={workspace()} api={client} />)
+    fireEvent.click(screen.getByRole('button', { name: '保存记录与恢复' }))
+    await screen.findByText(/修订 1 · 初版/)
+    fireEvent.click(screen.getByRole('button', { name: /^恢\s*复$/ }))
+    expect(await screen.findByText('历史快照不可读取')).toBeTruthy()
+    expect(screen.getByRole('textbox', { name: '整段小说原文' }).value).toContain('第一段原文')
+  })
 })

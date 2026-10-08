@@ -96,6 +96,7 @@ export default function NovelPanelWorkbench({ projectId, initialWorkspace, api =
   const shared = [['配音', sharedServices.openAudio], ['人物资产', sharedServices.openAsset, 'characters'], ['场景资产', sharedServices.openAsset, 'scenes'], ['道具资产', sharedServices.openAsset, 'props'], ['图片能力', sharedServices.openImages]]
 
   return <div className="novel-panel-workbench">
+    <div className="novel-panel-legacy-canvas">
     <div className="novel-panel-toolbar"><div><Title level={3}>小说面板</Title><Text type="secondary">项目 #{ws.projectId || '-'} · 修订 {ws.revision || 0}</Text></div><Space><Button onClick={openHistory}>保存记录与恢复</Button><Button type="primary" loading={busy === 'save'} onClick={save}>保存小说面板</Button></Space></div>
     {notice && <Alert className="novel-panel-notice" showIcon type={notice.type} message={notice.message} />}
     <Row gutter={[16, 16]}>
@@ -130,5 +131,6 @@ export default function NovelPanelWorkbench({ projectId, initialWorkspace, api =
       </Col>
     </Row>
     <Drawer title="保存记录与恢复" open={historyOpen} onClose={() => setHistoryOpen(false)}><List dataSource={history} locale={{ emptyText: '暂无保存记录' }} renderItem={(item) => <List.Item actions={[<Button key="restore" onClick={() => restore(item)} loading={busy === 'restore'}>恢复</Button>]}><List.Item.Meta title={`修订 ${item.revision ?? '-'}${item.note ? ` · ${item.note}` : ''}`} description={item.summary?.sourcePreview || item.createdAt || ''} /></List.Item>} /></Drawer>
+    </div>
   </div>
 }

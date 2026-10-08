@@ -95,7 +95,11 @@ export default function ScriptWorkspace() {
   const recompile = async () => { if (!projectId || !bookId) return; setWorking(true); try { await recompileScriptStoryboard(projectId, bookId, `script-canvas-${projectId}-${bookId}-${Date.now()}`); await Promise.all([refreshWorkspace(projectId), refreshStoryboard()]) } catch (reason) { setError(errorText(reason, '重新编译失败')) } finally { setWorking(false) } }
 
   if (loading && !workspace && !projects.length) return <PageState state="loading" title="正在恢复剧本工作区…" />
-  return <main className="script-workspace-page">
+  return <main className="script-workbench-form">
+    <section className="script-workspace-page script-workbench utility-workbench">
+      <div className="script-left">
+        <div className="script-left-scroll">
+          <div className="script-chat-shell">
     <section className="script-workspace-hero"><div><Typography.Text className="eyebrow">一战晟铭 · SCRIPT WORKSPACE</Typography.Text><Typography.Title level={2}>剧本生成</Typography.Title><Typography.Paragraph>复用已入库项目、Go generation 与 MySQL StageRun；刷新和重新登录后从服务端恢复。</Typography.Paragraph></div><Space><Button onClick={() => { setLoading(true); void refreshProjects().then(rows => refreshWorkspace(projectId || rows[0]?.id)).catch(reason => setError(errorText(reason, '刷新失败'))).finally(() => setLoading(false))}}>刷新</Button><Button type="primary" onClick={() => setCreateOpen(true)}>从已获取小说创建项目</Button></Space></section>
     {error && <Alert type="error" showIcon closable className="script-workspace-alert" message={error} onClose={() => setError('')} />}
     <Row gutter={[16, 16]}><Col xs={24} xl={5}><Card title="脚本项目" className="script-project-list" loading={loading}>{projects.length ? <List dataSource={projects} renderItem={item => <List.Item className={item.id === projectId ? 'is-selected' : ''} onClick={() => setProjectId(item.id)}><Space direction="vertical" size={1}><Typography.Text strong>{item.name}</Typography.Text><Typography.Text type="secondary">#{item.id} · {item.bookCount || 0} 本</Typography.Text></Space><StatusTag status={item.runStatus || 'pending'} /></List.Item>} /> : <Empty description="暂无项目。请先在小说获取中保存原文，再创建项目。" />}</Card></Col>
@@ -104,5 +108,9 @@ export default function ScriptWorkspace() {
     <Drawer title="阶段历史" open={historyOpen} onClose={() => setHistoryOpen(false)} width={560}><Steps direction="vertical" current={-1} items={STAGES.map(stage => ({ title: labels[stage], description: `${summary.stages?.[stage]?.status || 'pending'} · ${summary.stages?.[stage]?.updatedAt || '尚未执行'}` }))} /></Drawer>
     <Modal title={result ? `${labels[result.stage] || result.stage} · 结果` : '结果'} open={Boolean(result)} onCancel={() => setResult(null)} footer={null} width={820}><Typography.Paragraph type="secondary">服务端提示词：{result?.promptKey || '-'} v{result?.promptVersion || '-'}</Typography.Paragraph><Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{result?.outputText || result?.errorMessage || '暂无输出'}</Typography.Paragraph></Modal>
     <Modal title="从已获取小说创建脚本项目" open={createOpen} onCancel={() => setCreateOpen(false)} onOk={() => void createProject()} okText="创建"><Alert type="info" showIcon message="仅复用已有 Intake" description="不会创建第二套项目、任务或队列；请填写已有小说获取批次 ID。" /><Form form={createForm} layout="vertical" style={{ marginTop: 16 }}><Form.Item name="intakeId" label="小说获取批次 ID" rules={[{ required: true, message: '请输入 Intake ID' }]}><Input inputMode="numeric" /></Form.Item><Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入项目名称' }]}><Input /></Form.Item></Form></Modal>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 }

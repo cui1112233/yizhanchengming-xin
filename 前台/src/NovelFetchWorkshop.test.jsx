@@ -21,7 +21,9 @@ describe('Novel Fetch Workshop', () => {
   })
   it('restores intake facts, server prompts and persisted settings without browser storage', async () => {
     render(<NovelFetchWorkshop />)
+    expect(window.sessionStorage.getItem('workshopUploadItems')).toBeNull()
     expect(await screen.findByTitle('#7 · 恢复任务 · partial_failed')).toBeTruthy()
+    expect(document.querySelector('.novel-fetch-workshop-shell .legacy-panel-card')).not.toBeNull()
     expect(screen.getByText('script.default v2')).toBeTruthy()
     expect(screen.getByLabelText('处理规则').value).toBe('规则')
   })
@@ -39,5 +41,27 @@ describe('Novel Fetch Workshop', () => {
     fireEvent.change(screen.getByLabelText('处理规则'), { target:{ value:'新规则' } })
     fireEvent.click(screen.getByRole('button', { name:'保存配置' }))
     await waitFor(() => expect(global.fetch.mock.calls.some(([url,options]) => url === '/api/v1/intakes/7/workshop' && options.method === 'PUT')).toBe(true))
+  })
+
+  it('shows the real 403 state without inventing a workshop', async () => {
+    global.fetch = vi.fn(async () => response({ code: 'AUTH_FORBIDDEN', message: '禁止访问' }, 403))
+    render(<NovelFetchWorkshop />)
+    expect(await screen.findByText('无权限访问')).toBeTruthy()
+    expect(screen.getByText('当前账号无权限访问小说处理工作台。')).toBeTruthy()
+  })
+
+  it('keeps a failed original restore as a failed operation instead of replacing the server text', async () => {
+    global.fetch = vi.fn(async (url, options = {}) => {
+      if (url === '/api/v1/intakes') return response({ intakes:[{ id:7, name:'恢复任务', status:'partial_failed' }] })
+      if (url === '/api/v1/intakes/7/workshop' && (!options.method || options.method === 'GET')) return response({ intake:{ id:7, name:'恢复任务', status:'partial_failed' }, books:[{ id:11, bookId:'1001', title:'已恢复', status:'fetched', originalText:'服务端原文' }], settings:{}, prompts:[] })
+      if (url === '/api/v1/intakes/7/books/11/restore') return response({ message:'上游恢复失败' }, 502)
+      return response({})
+    })
+    render(<NovelFetchWorkshop />)
+    await screen.findByTitle('#7 · 恢复任务 · partial_failed')
+    fireEvent.click(screen.getByRole('button', { name:'恢复原文' }))
+    expect(await screen.findByText('上游恢复失败')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name:'查看原文' }))
+    expect(await screen.findByText('服务端原文')).toBeTruthy()
   })
 })

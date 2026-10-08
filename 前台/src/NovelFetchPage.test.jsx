@@ -35,6 +35,15 @@ afterEach(() => {
 })
 
 describe('Novel Fetch 主页面', () => {
+  it('shows the standalone public loading state before Go restores intake history', async () => {
+    let resolve
+    global.fetch = vi.fn(() => new Promise((done) => { resolve = done }))
+    render(<NovelFetchPage />)
+    expect(await screen.findByText('正在加载小说获取…')).toBeTruthy()
+    resolve({ ok:true, status:200, headers:{ get: () => '' }, json:async () => ({ intakes:[] }) })
+    expect(await screen.findByText('小说获取')).toBeTruthy()
+  })
+
   it('从 Go API 恢复 MySQL 中的任务、进度、书籍结果和失败原因', async () => {
     window.history.replaceState({}, '', '/novel-fetch')
     global.fetch = vi.fn((url) => {
@@ -57,6 +66,7 @@ describe('Novel Fetch 主页面', () => {
     render(<NovelFetchPage />)
 
     expect(await screen.findByText('恢复批次')).toBeTruthy()
+    expect(document.querySelector('.novel-fetch-page .novel-fetch-grid')).not.toBeNull()
     expect(screen.getByText(/成功 1\/2/)).toBeTruthy()
     expect(screen.getAllByText('upstream timeout').length).toBeGreaterThanOrEqual(1)
 

@@ -21,6 +21,7 @@ import {
 import { createBatchProject, createIntake, executeIntake, listBooks, listIntakes } from './api.js'
 import StatusTag from './ui/StatusTag.jsx'
 import PageState from './ui/PageState.jsx'
+import './novel-fetch.css'
 
 const { TextArea } = Input
 
@@ -159,6 +160,10 @@ export default function NovelFetchPage() {
   useEffect(() => {
     void loadHistory()
   }, [])
+
+  if (historyLoading && !history.length && !accessDenied) {
+    return <main className="novel-fetch-page novel-fetch-workbench novel-fetch-loading-state"><PageState state="loading" title="正在加载小说获取…" /><div className="novel-fetch-loading-copy"><strong>正在加载小说获取…</strong><span>正在准备工作台，请稍候。</span></div></main>
+  }
 
   const addGroup = () => {
     const ids = parseNovelFetchBookIds(bookIdText)
@@ -404,7 +409,7 @@ export default function NovelFetchPage() {
   ]
 
   return (
-    <main className="page-shell">
+    <main className="page-shell novel-fetch-page novel-fetch-workbench">
       <div className="page-heading">
         <div>
           <Typography.Text type="secondary">一战晟铭 · Novel Fetch</Typography.Text>
@@ -426,6 +431,7 @@ export default function NovelFetchPage() {
         <Alert className="feedback" type="warning" showIcon message="无权限查看小说获取任务。" description="当前登录仍保留；请联系管理员授予 batch.view 权限。" />
       ) : null}
 
+      <div className="novel-fetch-grid">
       <Row gutter={[20, 20]}>
         <Col xs={24} xl={10}>
           <Card title="1. 小说输入与来源" className="panel-card">
@@ -516,6 +522,7 @@ export default function NovelFetchPage() {
           </Card>
         </Col>
       </Row>
+      </div>
 
       <Card title="获取任务记录" className="result-card">
         <Table

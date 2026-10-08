@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Descriptions, Drawer, Form, Input, Row, Selec
 import { executeIntake, getNovelFetchWorkshop, listIntakes, restoreIntakeBook, saveNovelFetchWorkshop } from './api.js'
 import PageState from './ui/PageState.jsx'
 import StatusTag from './ui/StatusTag.jsx'
+import './novel-fetch.css'
 
 const { TextArea } = Input
 
@@ -85,9 +86,9 @@ export default function NovelFetchWorkshop() {
     { title: '原文', render: (_, row) => <Space><Button size="small" disabled={!row.originalText} onClick={() => setOriginal(row)}>查看原文</Button><Button size="small" loading={retrying} onClick={() => void restoreBook(row.id)}>恢复原文</Button></Space> },
   ]
 
-  return <main className="novel-fetch-page">
+  return <main className="novel-fetch-page novel-fetch-workshop-shell">
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
-      <Card title="小说处理工作台" extra={<Button href="/novel-fetch">返回小说获取</Button>}>
+      <Card className="legacy-panel-card" title="小说处理工作台" extra={<Button href="/novel-fetch">返回小说获取</Button>}>
         {error ? <Alert type="error" showIcon message={error} closable onClose={() => setError('')} style={{ marginBottom: 16 }} /> : null}
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}><Form.Item label="Intake 任务"><Select value={intakeId} onChange={changeIntake} options={intakes.map((item) => ({ value:item.id, label:`#${item.id} · ${item.name} · ${item.status}` }))} /></Form.Item></Col>
@@ -95,8 +96,8 @@ export default function NovelFetchWorkshop() {
         </Row>
       </Card>
       <Row gutter={[16, 16]}>
-        <Col xs={24} xl={14}><Card title="处理与任务"><Table rowKey="id" columns={columns} dataSource={books} pagination={{ pageSize: 10 }} locale={{ emptyText:'该任务暂无书籍' }} /><Space style={{ marginTop: 14 }}><Button type="primary" loading={retrying} disabled={!failedCount} onClick={() => void retry()}>重试失败书籍</Button><Typography.Text type="secondary">重试复用既有 Intake execute 服务与 provider121，不创建新队列。</Typography.Text></Space></Card></Col>
-        <Col xs={24} xl={10}><Card title="服务端持久化处理设置"><Form layout="vertical"><Form.Item label="处理规则"><TextArea aria-label="处理规则" value={settings.processingRules} onChange={(event) => setSettings({ ...settings, processingRules:event.target.value })} rows={4} placeholder="保存为当前 Intake 的处理规则" /></Form.Item><Form.Item label="知识库说明"><TextArea aria-label="知识库说明" value={settings.knowledgeBase} onChange={(event) => setSettings({ ...settings, knowledgeBase:event.target.value })} rows={3} placeholder="由服务端持久化，不保存到浏览器" /></Form.Item><Form.Item label="任务备注"><Input aria-label="任务备注" value={settings.taskNotes} onChange={(event) => setSettings({ ...settings, taskNotes:event.target.value })} /></Form.Item><Button type="primary" loading={saving} onClick={() => void save()}>保存配置</Button></Form></Card><Card title="后端提示词 / 知识库入口" style={{ marginTop:16 }}><Typography.Paragraph type="secondary">提示词由 Go `generation_prompts` 服务端事实源提供，前端不写入系统提示词。</Typography.Paragraph>{promptRows.map((item) => <Tag key={`${item.key}-${item.version}`}>{item.key} v{item.version}{item.enabled ? '' : '（停用）'}</Tag>)}</Card></Col>
+        <Col xs={24} xl={14}><Card className="legacy-panel-card" title="处理与任务"><Table rowKey="id" columns={columns} dataSource={books} pagination={{ pageSize: 10 }} locale={{ emptyText:'该任务暂无书籍' }} /><Space style={{ marginTop: 14 }}><Button type="primary" loading={retrying} disabled={!failedCount} onClick={() => void retry()}>重试失败书籍</Button><Typography.Text type="secondary">重试复用既有 Intake execute 服务与 provider121，不创建新队列。</Typography.Text></Space></Card></Col>
+        <Col xs={24} xl={10}><Card className="legacy-panel-card" title="服务端持久化处理设置"><Form layout="vertical"><Form.Item label="处理规则"><TextArea aria-label="处理规则" value={settings.processingRules} onChange={(event) => setSettings({ ...settings, processingRules:event.target.value })} rows={4} placeholder="保存为当前 Intake 的处理规则" /></Form.Item><Form.Item label="知识库说明"><TextArea aria-label="知识库说明" value={settings.knowledgeBase} onChange={(event) => setSettings({ ...settings, knowledgeBase:event.target.value })} rows={3} placeholder="由服务端持久化，不保存到浏览器" /></Form.Item><Form.Item label="任务备注"><Input aria-label="任务备注" value={settings.taskNotes} onChange={(event) => setSettings({ ...settings, taskNotes:event.target.value })} /></Form.Item><Button type="primary" loading={saving} onClick={() => void save()}>保存配置</Button></Form></Card><Card className="legacy-panel-card" title="后端提示词 / 知识库入口" style={{ marginTop:16 }}><Typography.Paragraph type="secondary">提示词由 Go `generation_prompts` 服务端事实源提供，前端不写入系统提示词。</Typography.Paragraph>{promptRows.map((item) => <Tag key={`${item.key}-${item.version}`}>{item.key} v{item.version}{item.enabled ? '' : '（停用）'}</Tag>)}</Card></Col>
       </Row>
     </Space>
     <Drawer title={original ? `${original.title || '小说'} · 原文` : '原文'} open={!!original} width={720} onClose={() => setOriginal(null)}>{original ? <Typography.Paragraph style={{ whiteSpace:'pre-wrap' }}>{original.originalText}</Typography.Paragraph> : null}</Drawer>
