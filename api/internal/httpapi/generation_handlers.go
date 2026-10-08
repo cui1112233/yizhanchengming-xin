@@ -23,78 +23,219 @@ type GenerationService interface {
 
 func generationHTTPStatus(err error) int {
 	switch {
-	case errors.Is(err, generation.ErrInvalid): return http.StatusBadRequest
-	case errors.Is(err, generation.ErrNotFound): return http.StatusNotFound
-	case errors.Is(err, generation.ErrConflict): return http.StatusConflict
-	case errors.Is(err, generation.ErrAudioMeasurementRequired): return http.StatusUnprocessableEntity
-	case errors.Is(err, generation.ErrAudioProbeUnavailable): return http.StatusServiceUnavailable
-	case errors.Is(err, generation.ErrUnavailable): return http.StatusServiceUnavailable
-	default: return http.StatusInternalServerError
+	case errors.Is(err, generation.ErrInvalid):
+		return http.StatusBadRequest
+	case errors.Is(err, generation.ErrNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, generation.ErrConflict):
+		return http.StatusConflict
+	case errors.Is(err, generation.ErrAudioMeasurementRequired):
+		return http.StatusUnprocessableEntity
+	case errors.Is(err, generation.ErrAudioProbeUnavailable):
+		return http.StatusServiceUnavailable
+	case errors.Is(err, generation.ErrUnavailable):
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusInternalServerError
 	}
 }
 
 func (h handler) projectGeneration(w http.ResponseWriter, r *http.Request) {
-	if h.deps.Generation == nil { writeError(w,http.StatusServiceUnavailable,"generation service unavailable"); return }
-	projectID,err:=parsePositiveID(r.PathValue("projectId")); if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	if r.Method==http.MethodGet { out,e:=h.deps.Generation.ProjectSummary(r.Context(),projectID); if e!=nil{writeError(w,generationHTTPStatus(e),"读取生成状态失败");return}; writeJSON(w,http.StatusOK,out); return }
-	var req generation.RunBatchRequest; if err:=decodeJSON(w,r,&req);err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}; req.BatchProjectID=projectID
-	out,e:=h.deps.Generation.RunBatch(r.Context(),req); if e!=nil{writeJSON(w,http.StatusMultiStatus,out);return}; writeJSON(w,http.StatusOK,out)
+	if h.deps.Generation == nil {
+		writeError(w, http.StatusServiceUnavailable, "generation service unavailable")
+		return
+	}
+	projectID, err := parsePositiveID(r.PathValue("projectId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if r.Method == http.MethodGet {
+		out, e := h.deps.Generation.ProjectSummary(r.Context(), projectID)
+		if e != nil {
+			writeError(w, generationHTTPStatus(e), "读取生成状态失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	var req generation.RunBatchRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	req.BatchProjectID = projectID
+	out, e := h.deps.Generation.RunBatch(r.Context(), req)
+	if e != nil {
+		writeJSON(w, http.StatusMultiStatus, out)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h handler) bookGeneration(w http.ResponseWriter, r *http.Request) {
-	if h.deps.Generation == nil { writeError(w,http.StatusServiceUnavailable,"generation service unavailable"); return }
-	projectID,err:=parsePositiveID(r.PathValue("projectId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	bookID,err:=parsePositiveID(r.PathValue("bookId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	if r.Method==http.MethodGet {out,e:=h.deps.Generation.BookSummary(r.Context(),projectID,bookID);if e!=nil{writeError(w,generationHTTPStatus(e),"读取小说生成状态失败");return};writeJSON(w,http.StatusOK,out);return}
-	var req generation.RunBookRequest;if err:=decodeJSON(w,r,&req);err!=nil{writeError(w,http.StatusBadRequest,err.Error());return};req.BatchProjectID,req.BookID=projectID,bookID
-	out,e:=h.deps.Generation.RunBook(r.Context(),req);if e!=nil{writeJSON(w,generationHTTPStatus(e),out);return};writeJSON(w,http.StatusOK,out)
+	if h.deps.Generation == nil {
+		writeError(w, http.StatusServiceUnavailable, "generation service unavailable")
+		return
+	}
+	projectID, err := parsePositiveID(r.PathValue("projectId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	bookID, err := parsePositiveID(r.PathValue("bookId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if r.Method == http.MethodGet {
+		out, e := h.deps.Generation.BookSummary(r.Context(), projectID, bookID)
+		if e != nil {
+			writeError(w, generationHTTPStatus(e), "读取小说生成状态失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	var req generation.RunBookRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	req.BatchProjectID, req.BookID = projectID, bookID
+	out, e := h.deps.Generation.RunBook(r.Context(), req)
+	if e != nil {
+		writeJSON(w, generationHTTPStatus(e), out)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h handler) audioMeasurement(w http.ResponseWriter, r *http.Request) {
-	if h.deps.Generation == nil { writeError(w,http.StatusServiceUnavailable,"generation service unavailable"); return }
-	projectID,err:=parsePositiveID(r.PathValue("projectId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	bookID,err:=parsePositiveID(r.PathValue("bookId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	if r.Method==http.MethodGet {
-		out,e:=h.deps.Generation.AudioMeasurement(r.Context(),projectID,bookID)
-		if e!=nil { writeJSON(w,generationHTTPStatus(e),map[string]string{"error":stableGenerationError(e)}); return }
-		writeJSON(w,http.StatusOK,out); return
+	if h.deps.Generation == nil {
+		writeError(w, http.StatusServiceUnavailable, "generation service unavailable")
+		return
 	}
-	var body struct{
-		AudioAsset string `json:"audioAsset"`
+	projectID, err := parsePositiveID(r.PathValue("projectId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	bookID, err := parsePositiveID(r.PathValue("bookId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if r.Method == http.MethodGet {
+		out, e := h.deps.Generation.AudioMeasurement(r.Context(), projectID, bookID)
+		if e != nil {
+			writeJSON(w, generationHTTPStatus(e), map[string]string{"error": stableGenerationError(e)})
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	var body struct {
+		AudioAsset       string   `json:"audioAsset"`
 		AudioDurationSec *float64 `json:"audioDurationSec,omitempty"`
 	}
-	if err:=decodeJSON(w,r,&body);err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	// AudioDurationSec is compatibility/display input only. It is deliberately
 	// ignored here; ffprobe remains the sole duration fact source.
-	out,e:=h.deps.Generation.MeasureAudio(r.Context(),generation.AudioMeasurementRequest{BatchProjectID:projectID,BookID:bookID,AudioAsset:body.AudioAsset})
-	if e!=nil { writeJSON(w,generationHTTPStatus(e),map[string]string{"error":stableGenerationError(e)}); return }
-	writeJSON(w,http.StatusOK,out)
+	out, e := h.deps.Generation.MeasureAudio(r.Context(), generation.AudioMeasurementRequest{BatchProjectID: projectID, BookID: bookID, AudioAsset: body.AudioAsset})
+	if e != nil {
+		writeJSON(w, generationHTTPStatus(e), map[string]string{"error": stableGenerationError(e)})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func stableGenerationError(err error) string {
 	switch {
-	case errors.Is(err,generation.ErrAudioProbeUnavailable): return "audio_probe_unavailable"
-	case errors.Is(err,generation.ErrAudioMeasurementRequired): return "audio_measurement_required"
-	case errors.Is(err,generation.ErrNotFound): return "not_found"
-	case errors.Is(err,generation.ErrInvalid): return "invalid_request"
-	default: return "generation_unavailable"
+	case errors.Is(err, generation.ErrAudioProbeUnavailable):
+		return "audio_probe_unavailable"
+	case errors.Is(err, generation.ErrAudioMeasurementRequired):
+		return "audio_measurement_required"
+	case errors.Is(err, generation.ErrNotFound):
+		return "not_found"
+	case errors.Is(err, generation.ErrInvalid):
+		return "invalid_request"
+	default:
+		return "generation_unavailable"
 	}
 }
 
-func (h handler) retryGenerationStage(w http.ResponseWriter,r *http.Request){
-	if h.deps.Generation==nil{writeError(w,http.StatusServiceUnavailable,"generation service unavailable");return}
-	projectID,err:=parsePositiveID(r.PathValue("projectId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return};bookID,err:=parsePositiveID(r.PathValue("bookId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	stage:=generation.Stage(strings.ToUpper(strings.TrimSpace(r.PathValue("stage"))))
-	var body struct{RequestID string `json:"requestId"`};if err:=decodeJSON(w,r,&body);err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	out,e:=h.deps.Generation.RetryStage(r.Context(),generation.RetryStageRequest{BatchProjectID:projectID,BookID:bookID,Stage:stage,RequestID:body.RequestID});if e!=nil{writeJSON(w,generationHTTPStatus(e),out);return};writeJSON(w,http.StatusOK,out)
+func (h handler) retryGenerationStage(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Generation == nil {
+		writeError(w, http.StatusServiceUnavailable, "generation service unavailable")
+		return
+	}
+	projectID, err := parsePositiveID(r.PathValue("projectId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	bookID, err := parsePositiveID(r.PathValue("bookId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	stage := generation.Stage(strings.ToUpper(strings.TrimSpace(r.PathValue("stage"))))
+	var body struct {
+		RequestID string `json:"requestId"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	out, e := h.deps.Generation.RetryStage(r.Context(), generation.RetryStageRequest{BatchProjectID: projectID, BookID: bookID, Stage: stage, RequestID: body.RequestID})
+	if e != nil {
+		writeJSON(w, generationHTTPStatus(e), out)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
-func (h handler) generationStage(w http.ResponseWriter,r *http.Request){
-	if h.deps.Generation==nil{writeError(w,http.StatusServiceUnavailable,"generation service unavailable");return}
-	projectID,err:=parsePositiveID(r.PathValue("projectId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return};bookID,err:=parsePositiveID(r.PathValue("bookId"));if err!=nil{writeError(w,http.StatusBadRequest,err.Error());return}
-	stage:=generation.Stage(strings.ToUpper(strings.TrimSpace(r.PathValue("stage"))));out,e:=h.deps.Generation.StageResult(r.Context(),projectID,bookID,stage);if e!=nil{writeError(w,generationHTTPStatus(e),"读取 Stage 结果失败");return};writeJSON(w,http.StatusOK,out)
+func (h handler) generationStage(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Generation == nil {
+		writeError(w, http.StatusServiceUnavailable, "generation service unavailable")
+		return
+	}
+	projectID, err := parsePositiveID(r.PathValue("projectId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	bookID, err := parsePositiveID(r.PathValue("bookId"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	stage := generation.Stage(strings.ToUpper(strings.TrimSpace(r.PathValue("stage"))))
+	out, e := h.deps.Generation.StageResult(r.Context(), projectID, bookID, stage)
+	if e != nil {
+		writeError(w, generationHTTPStatus(e), "读取 Stage 结果失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
-func (h handler) generationPrompts(w http.ResponseWriter,r *http.Request){
-	if h.deps.Generation==nil{writeError(w,http.StatusServiceUnavailable,"generation service unavailable");return};out,e:=h.deps.Generation.ListPrompts(r.Context());if e!=nil{writeError(w,generationHTTPStatus(e),"读取 Prompt 列表失败");return};writeJSON(w,http.StatusOK,map[string]any{"prompts":out})
+func (h handler) generationPrompts(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Generation == nil {
+		writeError(w, http.StatusServiceUnavailable, "generation service unavailable")
+		return
+	}
+	out, e := h.deps.Generation.ListPrompts(r.Context())
+	if e != nil {
+		writeError(w, generationHTTPStatus(e), "读取 Prompt 列表失败")
+		return
+	}
+	safe := append([]generation.Prompt(nil), out...)
+	for i := range safe {
+		safe[i].Content = ""
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"prompts": safe})
 }

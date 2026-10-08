@@ -78,6 +78,9 @@ func (s *Service) Snapshot(ctx context.Context, intakeID int64) (Snapshot, error
 	if err != nil {
 		return Snapshot{}, err
 	}
+	for i := range prompts {
+		prompts[i].Content = ""
+	}
 	return Snapshot{Intake: item, Books: books, Settings: settings, Prompts: prompts}, nil
 }
 

@@ -53,3 +53,14 @@ func TestSnapshotAndSaveUseExistingIntakeFacts(t *testing.T) {
 		t.Fatal("array settings must be rejected")
 	}
 }
+
+func TestSnapshotPromptProjectionNeedsOnlySafeMetadata(t *testing.T) {
+	service := NewService(&memoryStore{value: json.RawMessage(`{}`)}, memoryIntakes{}, memoryPrompts{})
+	snapshot, err := service.Snapshot(context.Background(), 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Prompts) != 1 || snapshot.Prompts[0].Key != generation.PromptScript || snapshot.Prompts[0].Version != 2 || !snapshot.Prompts[0].Enabled || snapshot.Prompts[0].Content != "" {
+		t.Fatalf("unsafe prompt projection: %#v", snapshot.Prompts)
+	}
+}
