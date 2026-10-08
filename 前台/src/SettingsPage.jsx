@@ -4,6 +4,8 @@ import { getWorkspaceSettings } from './api.js'
 import PageState from './ui/PageState.jsx'
 import './settings-page.css'
 
+const validTheme = value => value === 'dark' || value === 'light'
+
 function safeError(copy, error) {
   const requestId = typeof error?.requestId === 'string' && /^[a-zA-Z0-9._:-]{1,128}$/.test(error.requestId) ? error.requestId : ''
   return requestId ? `${copy} 请求 ID：${requestId}` : copy
@@ -20,7 +22,7 @@ function readiness(status) {
   return { label: known ? labels[status.status] : '执行器群组就绪状态未知', reason: reasons[reason], ready: known && status.status === 'available' }
 }
 
-export default function SettingsPage({ onTheme }) {
+export default function SettingsPage({ onTheme, theme }) {
   const [settings, setSettings] = useState(null)
   const [devices, setDevices] = useState([])
   const [executorStatus, setExecutorStatus] = useState(null)
@@ -30,6 +32,13 @@ export default function SettingsPage({ onTheme }) {
   const [changingTheme, setChangingTheme] = useState(false)
   const themeIntent = useRef(0)
   const loadIntent = useRef(0)
+  const globalTheme = useRef(theme)
+  globalTheme.current = theme
+
+  const reconcileTheme = useCallback(value => validTheme(globalTheme.current) ? globalTheme.current : value, [])
+  useEffect(() => {
+    if (validTheme(theme)) setSettings(current => current ? { ...current, theme } : current)
+  }, [theme])
 
   const load = useCallback(async () => {
     const intent = ++loadIntent.current
@@ -38,7 +47,7 @@ export default function SettingsPage({ onTheme }) {
     try {
       const result = await getWorkspaceSettings()
       if (intent !== loadIntent.current) return
-      setSettings(result.settings)
+      setSettings({ ...result.settings, theme: reconcileTheme(result.settings.theme) })
       setDevices(result.executors || [])
       setExecutorStatus(result.executorStatus || null)
     } catch (readError) {
@@ -46,7 +55,7 @@ export default function SettingsPage({ onTheme }) {
     } finally {
       if (intent === loadIntent.current) setLoading(false)
     }
-  }, [])
+  }, [reconcileTheme])
 
   useEffect(() => {
     void load()
@@ -58,11 +67,11 @@ export default function SettingsPage({ onTheme }) {
     setError('')
     try {
       const result = await onTheme(undefined, { saveSettings: settings })
-      setSettings(result.settings)
+      setSettings({ ...result.settings, theme: reconcileTheme(result.settings.theme) })
       setDevices(result.executors || [])
       setExecutorStatus(result.executorStatus || null)
     } catch (saveError) {
-      if (['dark', 'light'].includes(saveError?.rollbackTheme)) setSettings(current => ({ ...current, theme: saveError.rollbackTheme }))
+      if (validTheme(saveError?.rollbackTheme)) setSettings(current => ({ ...current, theme: reconcileTheme(saveError.rollbackTheme) }))
       setError(safeError('保存设置失败，请重试。', saveError))
     } finally {
       setSaving(false)
@@ -78,14 +87,14 @@ export default function SettingsPage({ onTheme }) {
     try {
       const result = await onTheme(nextTheme)
       if (intent === themeIntent.current) {
-        setSettings(current => ({ ...current, theme: result.settings.theme }))
+        setSettings(current => ({ ...current, theme: reconcileTheme(result.settings.theme) }))
         setDevices(result.executors || [])
         setExecutorStatus(result.executorStatus || null)
       }
     } catch (failure) {
       if (intent === themeIntent.current) {
         const rollback = ['dark', 'light'].includes(failure?.rollbackTheme) ? failure.rollbackTheme : previousTheme
-        setSettings(current => ({ ...current, theme: rollback }))
+        setSettings(current => ({ ...current, theme: reconcileTheme(rollback) }))
         setError(safeError('保存主题失败，请重试。', failure))
       }
     } finally {
@@ -109,7 +118,7 @@ export default function SettingsPage({ onTheme }) {
     {error && <Alert type="error" showIcon message={error} />}
     <Card className="settings-card" title="工作台与提醒">
       <Space direction="vertical">
-        <Radio.Group name="workspace-theme" value={settings.theme} disabled={saving} onChange={event => void changeTheme(event.target.value)}>
+        <Radio.Group name="workspace-theme" value={reconcileTheme(settings.theme)} disabled={saving} onChange={event => void changeTheme(event.target.value)}>
           <Radio.Button value="dark">深色</Radio.Button><Radio.Button value="light">浅色</Radio.Button>
         </Radio.Group>
         <Switch checked={settings.notificationsEnabled} onChange={value => setSettings({ ...settings, notificationsEnabled: value })} checkedChildren="提醒开启" unCheckedChildren="提醒关闭" />

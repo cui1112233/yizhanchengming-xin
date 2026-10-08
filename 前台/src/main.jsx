@@ -110,7 +110,7 @@ export function UserApp() {
     const startedEpoch = authEpoch.current
     const draft = options.saveSettings ? { ...options.saveSettings } : null
     const requestedTheme = draft?.theme || (validTheme(nextTheme) ? nextTheme : currentTheme.current === 'dark' ? 'light' : 'dark')
-    if (!options.confirmedSettings) renderTheme(requestedTheme)
+    if (!options.confirmedSettings && !draft) renderTheme(requestedTheme)
     setThemeError(null)
     pending.current += 1
     const transition = saveQueue.current.then(async () => {
@@ -121,9 +121,13 @@ export function UserApp() {
       } else {
         if (!confirmedSettings.current) await readConfirmedSettings()
         if (startedEpoch !== authEpoch.current) throw new Error('Session changed')
-        const settings = draft ? { ...confirmedSettings.current, ...draft } : { ...confirmedSettings.current, theme: requestedTheme }
+        // The form owns non-theme drafts; queued theme transitions own theme.
+        // A page draft captured before those transitions must not restore it.
+        const settings = draft ? { ...confirmedSettings.current, ...draft, theme: confirmedSettings.current.theme } : { ...confirmedSettings.current, theme: requestedTheme }
         if (!completeSettings(settings)) throw new Error('Incomplete settings request')
-        result = await saveWorkspaceSettings(settings)
+        // A 401 replay could send this account's full body under a newly logged
+        // in account. Epoch guards can reject responses, but cannot undo writes.
+        result = await saveWorkspaceSettings(settings, { skipAuthRecovery: true })
       }
       if (startedEpoch !== authEpoch.current) throw new Error('Session changed')
       if (!completeSettings(result?.settings)) throw new Error('Incomplete settings response')

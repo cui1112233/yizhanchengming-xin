@@ -28,6 +28,14 @@ afterEach(() => {
 })
 
 describe('Task 1 首页与用户路由基础', () => {
+  it('/settings follows the global theme rather than an older settings GET theme', async () => {
+    window.history.replaceState({}, '', '/settings')
+    const settings = { theme: 'dark', notificationsEnabled: false, storagePreference: 'tos', petId: 'fox', soundVolume: 23, petVisible: false, companionActive: true }
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ settings, executors: [] }) })
+    render(<RouterApp theme="light" onToggleTheme={vi.fn()} />)
+    expect((await screen.findByLabelText('浅色')).checked).toBe(true)
+  })
+
   it('根路由展示公网首页主视觉、六个创作入口和最近创作入口，不再展示小说获取工作台', () => {
     render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
 

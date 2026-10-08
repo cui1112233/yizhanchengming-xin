@@ -85,6 +85,28 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('switch', { name: /提醒开启/ }).getAttribute('aria-checked')).toBe('true')
   })
 
+  it('reconciles global theme changes while preserving unrelated unsaved fields', async () => {
+    const onTheme = vi.fn().mockResolvedValue(payload({ settings: { ...settings, theme: 'light', notificationsEnabled: true } }))
+    const { rerender } = render(<SettingsPage theme="dark" onTheme={onTheme} />)
+    await screen.findByText('Mac')
+    fireEvent.click(screen.getByRole('switch', { name: /提醒关闭/ }))
+    rerender(<SettingsPage theme="light" onTheme={onTheme} />)
+    expect(screen.getByLabelText('浅色').checked).toBe(true)
+    expect(screen.getByRole('switch', { name: /提醒开启/ }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }))
+    await vi.waitFor(() => expect(onTheme).toHaveBeenCalledWith(undefined, { saveSettings: { ...settings, theme: 'light', notificationsEnabled: true } }))
+  })
+
+  it('uses current global theme when an older page GET resolves after a theme change', async () => {
+    const read = deferred()
+    getWorkspaceSettings.mockReturnValueOnce(read.promise)
+    const { rerender } = render(<SettingsPage theme="dark" onTheme={vi.fn()} />)
+    rerender(<SettingsPage theme="light" onTheme={vi.fn()} />)
+    await act(async () => read.resolve(payload()))
+    expect(screen.getByLabelText('浅色').checked).toBe(true)
+    expect(getWorkspaceSettings).toHaveBeenCalledTimes(1)
+  })
+
   it.each([
     [{ status: 'available', reasonCode: 'available' }, '执行器群组已就绪', '已检测到在线执行器'],
     [{ status: 'degraded', reasonCode: 'offline' }, '执行器群组就绪状态降级', '已注册执行器均离线'],

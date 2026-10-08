@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { __resetAuthRecoveryForTests, requestJSON } from './api'
+import { __resetAuthRecoveryForTests, requestJSON, saveWorkspaceSettings } from './api'
 
 function jsonResponse(status, payload) {
   return new Response(JSON.stringify(payload), {
@@ -58,5 +58,20 @@ describe('auth-aware API client', () => {
       message: '你没有执行此操作的权限',
     })
     expect(refreshCalls).toBe(0)
+  })
+
+  it('does not refresh or replay a settings PUT when auth recovery is disabled', async () => {
+    const settings = { theme: 'light', notificationsEnabled: false, storagePreference: 'tos', petId: 'fox', soundVolume: 23, petVisible: false, companionActive: true }
+    global.fetch = vi.fn(async url => url === '/api/auth/refresh'
+      ? jsonResponse(200, { user: { id: 8 } })
+      : jsonResponse(401, { code: 'AUTH_UNAUTHENTICATED', message: 'private-error', requestId: 'req-no-replay' }))
+    await expect(saveWorkspaceSettings(settings, { skipAuthRecovery: true })).rejects.toMatchObject({ status: 401, requestId: 'req-no-replay' })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const [url, options] = global.fetch.mock.calls[0]
+    expect(url).toBe('/api/v1/workspace/settings')
+    expect(options.method).toBe('PUT')
+    expect(JSON.parse(options.body)).toEqual(settings)
+    expect(options.credentials).toBe('include')
+    expect(options).not.toHaveProperty('skipAuthRecovery')
   })
 })

@@ -78,7 +78,7 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   } else if (pathname === '/history') {
     page = <HistoryPage />
   } else if (pathname === '/settings') {
-    page = <SettingsPage onTheme={onToggleTheme} />
+    page = <SettingsPage theme={theme} onTheme={onToggleTheme} />
   } else if (pathname === '/profile') {
     page = <AccountCenterPage user={currentUser} onLogout={onLogout} />
   } else if (pathname === '/member') {
