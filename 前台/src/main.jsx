@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { App as AntApp, ConfigProvider, theme as antdTheme } from 'antd'
+import { App as AntApp, ConfigProvider } from 'antd'
 import 'antd/dist/reset.css'
 import RouterApp from './RouterApp.jsx'
 import AuthBoundary from './AuthBoundary.jsx'
 import { getWorkspaceSettings } from './api.js'
+import { applyThemeVariables, themeConfig } from './theme.js'
 
 const THEME_STORAGE_KEY = 'yizhan-theme'
 
@@ -31,6 +32,7 @@ export function UserApp() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
+    applyThemeVariables(document.documentElement, theme)
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme)
     } catch {
@@ -40,11 +42,7 @@ export function UserApp() {
 
   return (
     <ConfigProvider
-      theme={{
-        algorithm: theme === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        token: { colorPrimary: '#5b62d9', borderRadius: 10, controlHeight: 40, fontSize: 14 },
-        components: { Card: { headerHeight: 52 }, Table: { cellPaddingBlock: 14 }, Drawer: { footerPaddingBlock: 16, footerPaddingInline: 24 } },
-      }}
+      theme={themeConfig(theme)}
     >
       <AntApp>
         <AuthBoundary onAuthenticated={restoreServerTheme}>
@@ -56,6 +54,8 @@ export function UserApp() {
 }
 
 export function mountUserApp(container) {
+  container.classList.add('user-theme-root')
+  applyThemeVariables(container.ownerDocument.documentElement, readInitialTheme())
   const root = createRoot(container)
   root.render(
     <React.StrictMode>

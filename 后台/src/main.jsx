@@ -24,6 +24,7 @@ import {
 import 'antd/dist/reset.css'
 import './admin.css'
 import { requestJSON } from './api.js'
+import { applyThemeVariables, themeConfig } from './theme.js'
 
 const { Header, Sider, Content } = Layout
 const { TextArea } = Input
@@ -250,7 +251,7 @@ export function AdminShell() {
   }, [capabilities])
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#1677ff', borderRadius: 10 } }}>
+    <ConfigProvider theme={themeConfig('light')}>
       <App>
         <CapabilityBoundary status={status}>
           {menuItems.length === 0 ? <Result status="403" title="没有可访问的后台模块" subTitle="请联系管理员授予具体 admin.* capability。" /> : <Layout className="admin-layout">
@@ -271,5 +272,7 @@ export function AdminShell() {
 
 const root = document.getElementById('root')
 if (root) {
+  root.classList.add('admin-theme-root')
+  applyThemeVariables(root.ownerDocument.documentElement, 'light')
   createRoot(root).render(<React.StrictMode><AdminShell /></React.StrictMode>)
 }

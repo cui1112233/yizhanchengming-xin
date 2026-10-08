@@ -5,18 +5,26 @@ body,
   margin: 0;
 }
 
+#root.user-theme-root {
+  min-height: 100vh;
+  font-family: var(--app-font-family);
+  color: var(--shell-text);
+  background: var(--shell-bg);
+}
+
 body {
-  background: #f6f7fb;
-  color: #1f2430;
+  /* Canvas overscroll exception: inherit the installed contract. */
+  background: var(--shell-bg);
+  min-width: 320px;
 }
 
-.page-shell {
-  max-width: 1500px;
+#root.user-theme-root .page-shell {
+  max-width: var(--app-content-max);
   margin: 0 auto;
-  padding: 32px 24px 56px;
+  padding: 32px var(--app-gutter) 56px;
 }
 
-.page-heading {
+#root.user-theme-root .page-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -24,35 +32,36 @@ body {
   margin-bottom: 20px;
 }
 
-.page-heading .ant-typography {
+#root.user-theme-root .page-heading .ant-typography {
   margin-bottom: 8px;
 }
 
-.heading-stats {
+#root.user-theme-root .heading-stats {
   flex: 0 0 auto;
 }
 
-.feedback {
+#root.user-theme-root .feedback {
   margin-bottom: 20px;
 }
 
-.panel-card {
+#root.user-theme-root .panel-card {
   height: 100%;
 }
 
-.panel-card,
-.result-card {
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgba(33, 43, 79, 0.06);
+#root.user-theme-root .panel-card,
+#root.user-theme-root .result-card {
+  border-radius: var(--app-radius-card);
+  background: var(--shell-card);
+  box-shadow: var(--shell-shadow);
 }
 
-.page-state {
+#root.user-theme-root .page-state {
   min-height: 160px;
   display: grid;
   place-items: center;
 }
 
-.login-page {
+#root.user-theme-root .login-page {
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -63,72 +72,72 @@ body {
     #171927;
 }
 
-.account-center-page { max-width: 1080px; margin: 0 auto; padding: 32px 24px 56px; }
-.account-center-heading { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
-.account-center-heading h2 { margin: 4px 0 8px !important; }
-@media (max-width: 640px) { .account-center-page { padding: 20px 16px 36px; } .account-center-heading { display: block; } .account-center-heading > button { margin-top: 8px; } }
+#root.user-theme-root .account-center-page { max-width: 1080px; margin: 0 auto; padding: 32px 24px 56px; }
+#root.user-theme-root .account-center-heading { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
+#root.user-theme-root .account-center-heading h2 { margin: 4px 0 8px !important; }
+@media (max-width: 640px) { #root.user-theme-root .account-center-page { padding: 20px 16px 36px; } #root.user-theme-root .account-center-heading { display: block; } #root.user-theme-root .account-center-heading > button { margin-top: 8px; } }
 
-.login-card {
+#root.user-theme-root .login-card {
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 24px !important;
   background: linear-gradient(145deg, rgba(35, 37, 65, 0.96), rgba(19, 22, 43, 0.98)) !important;
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.28), 0 0 58px rgba(100, 92, 244, 0.15);
 }
 
-.login-card .ant-card-body { padding: 40px; }
-.login-brand { margin-bottom: 26px; min-height: 30px; }
-.login-brand img { display: block; width: 126px; height: 30px; object-fit: contain; }
-.login-card .ant-typography { color: #fbfbff; }
-.login-card .ant-typography-secondary,
-.login-card .ant-form-item-label > label { color: rgba(230, 232, 248, 0.8) !important; }
-.login-subtitle { margin: 10px 0 28px !important; }
-.login-card .ant-input,
-.login-card .ant-input-affix-wrapper { min-height: 48px; border-radius: 12px; background: #727786 !important; color: #fff !important; }
-.login-card .ant-btn-primary { height: 48px; border: 0; border-radius: 12px; background: linear-gradient(100deg, #ed5966, #ee649d 46%, #6488f4); font-weight: 700; }
+#root.user-theme-root .login-card .ant-card-body { padding: 40px; }
+#root.user-theme-root .login-brand { margin-bottom: 26px; min-height: 30px; }
+#root.user-theme-root .login-brand img { display: block; width: 126px; height: 30px; object-fit: contain; }
+#root.user-theme-root .login-card .ant-typography { color: #fbfbff; }
+#root.user-theme-root .login-card .ant-typography-secondary,
+#root.user-theme-root .login-card .ant-form-item-label > label { color: rgba(230, 232, 248, 0.8) !important; }
+#root.user-theme-root .login-subtitle { margin: 10px 0 28px !important; }
+#root.user-theme-root .login-card .ant-input,
+#root.user-theme-root .login-card .ant-input-affix-wrapper { min-height: 48px; border-radius: 12px; background: #727786 !important; color: #fff !important; }
+#root.user-theme-root .login-card .ant-btn-primary { height: 48px; border: 0; border-radius: 12px; background: linear-gradient(100deg, #ed5966, #ee649d 46%, #6488f4); font-weight: 700; }
 
-.inline-note {
+#root.user-theme-root .inline-note {
   margin: -4px 0 18px;
 }
 
-.source-tag {
+#root.user-theme-root .source-tag {
   padding: 7px 10px;
   font-size: 14px;
 }
 
-.compact-form-item {
+#root.user-theme-root .compact-form-item {
   margin-bottom: 0;
 }
 
-.action-row {
+#root.user-theme-root .action-row {
   width: 100%;
   justify-content: flex-end;
 }
 
-.result-card {
+#root.user-theme-root .result-card {
   margin-top: 20px;
 }
 
 @media (max-width: 767px) {
-  .page-shell {
+  #root.user-theme-root .page-shell {
     padding: 20px 12px 36px;
   }
 
-  .page-heading {
+  #root.user-theme-root .page-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .heading-stats {
+  #root.user-theme-root .heading-stats {
     width: 100%;
     justify-content: space-between;
   }
 
-  .action-row {
+  #root.user-theme-root .action-row {
     justify-content: flex-start;
     margin-top: 12px;
   }
 
-  .compact-form-item {
+  #root.user-theme-root .compact-form-item {
     margin-bottom: 12px;
   }
 }
