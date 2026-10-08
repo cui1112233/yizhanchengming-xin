@@ -8,7 +8,7 @@ import (
 )
 
 func TestAgentStudioMigrationKeepsAttachmentBytesOutOfMySQL(t *testing.T) {
-	path := filepath.Join("..", "..", "db", "migrations", "00013_task16_agent_studio.sql")
+	path := filepath.Join("..", "..", "db", "migrations", "00014_task16_agent_studio.sql")
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)

@@ -524,10 +524,11 @@
 ### 2026-10-08 · 本机隔离 staging 验收（非 ECS / 非公网）
 
 - [x] React 生产构建复制到 `api/internal/webui/dist` 并以 Go `embed` 打入单个 `cmd/server` 二进制；`/api/build-info` 返回构建时注入的 Git SHA，静态响应带 `X-Ycm-Static-Source: go-embed`。
-- [x] 仅在本机 `ycm_staging` 执行 Goose `00001`–`00013`；服务仅监听 `127.0.0.1:18080`，Redis 队列命名空间为 `ycm:staging:`，日志写入独立 `.staging-logs/`。
+- [x] 仅在本机 `ycm_staging` 执行 Goose `00001`–`00014`；服务仅监听 `127.0.0.1:18080`，Redis 队列命名空间为 `ycm:staging:`，日志写入独立 `.staging-logs/`。
 - [x] 浏览器登录、Cookie Session 重启后恢复、同源 CSRF 403、未登录 401、设置刷新恢复与工作区路由进入均在本机单二进制完成；前台全量 25 文件 / 82 测试、`npm run build`、`go test ./...` 均通过。
 - [x] 无 Provider 时媒体任务真实持久化为 `executor_unavailable`；未配置 TOS 时上传真实返回安全的 `503 storage_unavailable`，未发起任何 Provider/TOS 调用。
 - [x] `/issues` UNION 投影在本机 MySQL 默认 collation 下已修复，浏览器返回脱敏空态而非 500；不改写历史业务表或新增错误事实表。
+- [x] Agent Studio migration 与已存在的工作区偏好 migration 的 `00013` 版本冲突已修正为 `00014`；本机 Goose 可读取并应用完整序列，避免 `duplicate version` panic。
 - [ ] 本机验收不替代 Task 16：未连接 ECS、未修改公网、未运行 GitHub Actions、未验证真实 Provider/TOS 或公网视觉对标。
 
 ---

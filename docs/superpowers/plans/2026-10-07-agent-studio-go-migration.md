@@ -23,7 +23,7 @@
 ### Task 1: Durable Agent Studio contract and migration
 
 **Files:**
-- Create: `api/db/migrations/00013_task16_agent_studio.sql`
+- Create: `api/db/migrations/00014_task16_agent_studio.sql`
 - Create: `api/internal/agentstudio/model.go`
 - Create: `api/internal/agentstudio/store.go`
 - Create: `api/internal/agentstudio/mysql_store.go`
