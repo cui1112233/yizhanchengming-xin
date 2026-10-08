@@ -28,7 +28,7 @@ func (h handler) requireBatchProjectAccess(pathKey string, next http.Handler) ht
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		projectID, err := strconv.ParseInt(r.PathValue(pathKey), 10, 64)
 		if err != nil || projectID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "VIDEO_INVALID_REQUEST", "message": "batch project ID 无效"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "BATCH_PROJECT_INVALID_REQUEST", "message": "批量项目 ID 无效"})
 			return
 		}
 		if !h.authorizeBatchProject(w, r, projectID) {

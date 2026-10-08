@@ -56,7 +56,7 @@ func (s *MySQLStore) CanAccessBatchProject(ctx context.Context, projectID, userI
 		err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM batch_projects WHERE id = ?)`, projectID).Scan(&allowed)
 		return allowed, err
 	}
-	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (team_id IS NOT NULL AND team_id = ?)))`, projectID, userID, teamID).Scan(&allowed)
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (? > 0 AND team_id IS NOT NULL AND team_id = ?)))`, projectID, userID, teamID, teamID).Scan(&allowed)
 	return allowed, err
 }
 

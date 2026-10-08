@@ -663,6 +663,7 @@
 - [x] TTS 音频测量与 Shuihuo 音频使用来源命名空间 ID（如 `tts:measurement:44` / `tts:media:44`），不会因不同事实表主键相同产生 React key 冲突。
 - [x] recent 的 Shuihuo↔VIDEO 状态、时间和去重都同时核验 `video_production_jobs.batch_project_id/book_id`；Shuihuo 写入带 `productionTaskId` 的媒体任务也用同一项目/书 scope 的 `INSERT … SELECT` 校验，错 scope 返回未找到。
 - [x] recent 深链使用的 `GET /api/v1/batch-projects/{id}` 已在业务 handler 前强制执行共享 BatchProjectAccess：跨用户 403，缺少策略 503 fail-closed，错误带 request id 且不会读取/泄漏 `originalText`。其余 Batch mutation 的统一归属收口仍属于后续 P0。
+- [x] 共享 BatchProjectAccess 的非 elevated SQL 也显式要求调用者 `teamId>0` 后才允许 team ownership；`teamId=0` 不会匹配数据库的 `0/NULL`，owner 和真实非零 team 访问保持可用。通用项目 ID 错误使用 `BATCH_PROJECT_INVALID_REQUEST`，VIDEO resource 中间件继续使用专属 VIDEO 错误码。
 - [x] Novel Panel 路由读取采用请求序列和卸载保护，仅在 `loadedProject===projectId` 时渲染，并按项目 key 重建编辑器；延迟 A 响应、popstate 切换 B 和未保存 A 状态不会覆盖/保存为 B。
 - [x] 首页继续使用同源 `/assets/home-hero.mp4`，并按 2026-10-09 公网实测收口 86px 桌面 Hero 标题、42px 按钮、三列 116px 快捷卡/24px gap、auto-fill 138px 最近卡/20px gap、900px 以下单列；图标改为仓库内共享受测 SVG，未复制公网 hash CSS、Pixiu/WebGL 或旧 Node/localStorage 链路。
 - [x] 仓库验证：`go test ./...` 退出码 0；前台 `npm install --no-package-lock --prefer-offline --no-audit` 退出码 0；本轮前台全量 27 files / 185 tests 退出码 0；`npm run build` 退出码 0。

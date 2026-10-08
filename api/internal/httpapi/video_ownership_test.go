@@ -61,3 +61,29 @@ func TestTask14ProjectRoutesEnforceTask15OwnershipPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestBatchProjectAndVideoResourceInvalidIDsKeepDomainSpecificSafeCodes(t *testing.T) {
+	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchView, CapabilityBatchExecute}}}
+	h := NewHandler(Dependencies{
+		Auth:                  auth,
+		BatchProjectAccess:    task14ProjectAccessStub{allowed: true},
+		VideoResourceProjects: task14VideoResourceProjectStub{},
+	})
+
+	projectReq := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/batch-projects/0", nil)
+	projectReq.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access-token"})
+	projectRec := httptest.NewRecorder()
+	h.ServeHTTP(projectRec, projectReq)
+	if projectRec.Code != http.StatusBadRequest || !strings.Contains(projectRec.Body.String(), "BATCH_PROJECT_INVALID_REQUEST") || !strings.Contains(projectRec.Body.String(), "批量项目 ID 无效") {
+		t.Fatalf("project status=%d body=%s", projectRec.Code, projectRec.Body.String())
+	}
+
+	videoReq := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/video-tasks/0/poll", strings.NewReader(`{}`))
+	videoReq.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "access-token"})
+	videoReq.Header.Set("Origin", "http://example.com")
+	videoRec := httptest.NewRecorder()
+	h.ServeHTTP(videoRec, videoReq)
+	if videoRec.Code != http.StatusBadRequest || !strings.Contains(videoRec.Body.String(), "VIDEO_INVALID_REQUEST") {
+		t.Fatalf("video status=%d body=%s", videoRec.Code, videoRec.Body.String())
+	}
+}

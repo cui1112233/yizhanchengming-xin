@@ -38,16 +38,41 @@ func TestMySQLBatchProjectOwnershipIsPinnedAndCheckedByOwnerOrTeam(t *testing.T)
 	mock.ExpectExec(regexp.QuoteMeta(claim)).WithArgs(int64(21), int64(7), int64(3)).WillReturnResult(sqlmock.NewResult(0, 1))
 	if err := store.ClaimBatchProject(context.Background(), 21, 7, 3); err != nil { t.Fatal(err) }
 
-	access := `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (team_id IS NOT NULL AND team_id = ?)))`
-	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(7), int64(3)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(true))
+	access := `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (? > 0 AND team_id IS NOT NULL AND team_id = ?)))`
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(7), int64(3), int64(3)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(true))
 	allowed, err := store.CanAccessBatchProject(context.Background(), 21, 7, 3, false)
 	if err != nil { t.Fatal(err) }
 	if !allowed { t.Fatal("owner/team project access unexpectedly denied") }
 
-	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(88), int64(9)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(false))
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(88), int64(9), int64(9)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(false))
 	allowed, err = store.CanAccessBatchProject(context.Background(), 21, 88, 9, false)
 	if err != nil { t.Fatal(err) }
 	if allowed { t.Fatal("foreign user/team unexpectedly gained project access") }
+
+	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
+}
+
+func TestMySQLBatchProjectOwnershipRejectsZeroTeamWithoutBreakingOwnerOrRealTeam(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil { t.Fatal(err) }
+	defer db.Close()
+	store := NewMySQLStore(db)
+	access := `SELECT EXISTS(SELECT 1 FROM auth_batch_project_ownership WHERE batch_project_id = ? AND (owner_user_id = ? OR (? > 0 AND team_id IS NOT NULL AND team_id = ?)))`
+
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(88), int64(0), int64(0)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(false))
+	allowed, err := store.CanAccessBatchProject(context.Background(), 21, 88, 0, false)
+	if err != nil { t.Fatal(err) }
+	if allowed { t.Fatal("teamID=0 must not match ownership team_id=0 or NULL") }
+
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(7), int64(0), int64(0)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(true))
+	allowed, err = store.CanAccessBatchProject(context.Background(), 21, 7, 0, false)
+	if err != nil { t.Fatal(err) }
+	if !allowed { t.Fatal("owner access must not depend on a positive team ID") }
+
+	mock.ExpectQuery(regexp.QuoteMeta(access)).WithArgs(int64(21), int64(88), int64(3), int64(3)).WillReturnRows(sqlmock.NewRows([]string{"allowed"}).AddRow(true))
+	allowed, err = store.CanAccessBatchProject(context.Background(), 21, 88, 3, false)
+	if err != nil { t.Fatal(err) }
+	if !allowed { t.Fatal("matching positive team unexpectedly denied") }
 
 	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
 }
