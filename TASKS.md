@@ -532,6 +532,22 @@
 - [x] 本机真实失败媒体任务暴露了 Shuihuo DTO 大写 JSON 字段与 TTS 外部书号误作数据库主键的问题；已用 HTTP 契约测试锁定 camelCase 响应，前台统一使用 `books.id` 调用受项目范围保护的媒体接口，未改动 MySQL 事实或伪造 Provider 成功。
 - [ ] 本机验收不替代 Task 16：未连接 ECS、未修改公网、未运行 GitHub Actions、未验证真实 Provider/TOS 或公网视觉对标。
 
+### 2026-10-09 · Foundation Task 1–6（仓库阶段）
+
+> 验收基线：`a6181c2a0d83fbaf0b4bb4d0ef1859706af10e09`。本节只记录仓库源码、测试和嵌入构建事实，不替代登录后的本机运行验收、ECS/公网验收或真实外部依赖验收。
+
+- [x] 当前产品范围已收敛：用户导航与路由不再暴露 `/issues`；`/agent` 和 `/agent/canvas` 只呈现“待重新设计”占位页，不创建项目、不调用 Agent API 或 Provider。
+- [x] 用户端与管理端均通过统一 API 模块发起 Cookie Session 请求，复用同源 CSRF 与 capability；安全错误合同统一为 `{code,message,request_id}`，不向前端透传内部错误、凭据或原始 Provider 响应。
+- [x] 前后台共用经公网证据核对的主题、字体、颜色、间距和控件尺寸合同；用户主题以 MySQL 设置为权威，LocalStorage 仅保留非敏感的 `yizhan-theme` 首屏回退。
+- [x] 用户设置写入串行化，服务端归一化响应为最终事实；跨账号认证切换不会重放上一账号的延迟设置请求。页面区分“已选择配置”与“运行时就绪状态”，不伪造执行器在线。
+- [x] `TOS_KEY_PREFIX` 提供一次解析、一次写入前缀的对象键隔离；视频、合并、Shuihuo 媒体和 Agent 附件写入均保存完整 key，读取/删除不重复加前缀。无效非空配置关闭存储接线并返回安全固定错误。
+- [x] 单二进制发布门已锁定：用户/管理 SPA 深链刷新使用各自 Go embed，API 不回退为 SPA，静态响应携带 `X-YCM-Static-Source: go-embed`，`/api/build-info` 由 ldflags 注入构建 SHA；构建脚本仅替换 `dist/user` 和 `dist/admin`。
+- [x] Foundation 全量验证：`go test ./...` 共24 个包通过；用户前台 29 个测试文件 / 171 条测试通过；管理后台 3 个测试文件 / 25 条测试通过；两端 `npm run build` 与 `./scripts/build-embedded-ui.sh` 均退出 0，生成的单一可执行文件包含精确基线 SHA。
+- [ ] Agent 业务功能仍未重新设计或验收；历史 Agent 源码、数据模型、migration 和定向测试仍保留，不得因占位路由而标记为功能完成。
+- [ ] `/issues` 已从当前用户路由和导航删除，但历史 Issues 前端组件、Go 投影和测试仍有残留；是否删除底层历史实现需单独清理，本轮不冒充已完成。
+- [ ] 当前基线尚未启动 `127.0.0.1:18080` 完成真实 MySQL migration、登录、Cookie Session、CSRF、401/403、逐路由刷新恢复和浏览器视觉验收。
+- [ ] 未连接 ECS/公网，未运行 GitHub Actions，未验证真实 Provider/TOS，未进行公网登录或截图对标；Task 16 的公网清单保持未完成。
+
 ---
 
 # 2026-10-07 · 本轮恢复任务 2：Novel Fetch 主页面
