@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
 
@@ -240,5 +240,76 @@ describe('BatchProjectListPage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '查看结果' })[0])
     expect(await screen.findByText('归档历史脚本')).toBeTruthy()
     expect(api.getGenerationStage).toHaveBeenCalledWith(3, 11, 'SCRIPT')
+  }, 15000)
+
+  it.each([
+    ['batch', 'runProjectGeneration', '批量执行', 'failed'],
+    ['single', 'runBookGeneration', '单本执行', 'failed'],
+    ['stage retry', 'retryGenerationStage', '重试 Director', 'failed'],
+    ['video retry', 'retryVideoTask', '重试 VIDEO', 'failed'],
+    ['video cancel', 'cancelVideoTask', '取消 VIDEO', 'running'],
+    ['result read', 'getGenerationStage', '查看结果', 'failed'],
+  ])('keeps safe %s errors and correlation visible inside the drawer across status refresh', async (_, method, button, status) => {
+    api.getProjectVideoStatus.mockResolvedValue({ batchProjectId: 3, books: [{ bookId: 11, provider: 'test-provider', model: 'test-model', attempts: [{ id: 91, status, errorMessage: status === 'failed' ? 'video-secret' : '' }] }] })
+    api[method].mockRejectedValueOnce(Object.assign(new Error('mutation-secret'), { status: 500, requestId: `req-${method}` }))
+    render(<BatchProjectListPage initialProjectId={3} />)
+    fireEvent.click(await screen.findByRole('button', { name: '生成状态' }))
+    const drawer = await screen.findByRole('dialog')
+    await screen.findByText('test-provider')
+    fireEvent.click(within(drawer).getAllByRole('button', { name: button })[0])
+    expect(await within(drawer).findByText(`请求编号：req-${method}`)).toBeTruthy()
+    expect(document.body.textContent).not.toContain('mutation-secret')
+    expect(document.body.textContent).not.toContain('video-secret')
+    fireEvent.click(screen.getByRole('button', { name: '生成状态' }))
+    await waitFor(() => expect(api.getProjectGeneration).toHaveBeenCalledTimes(method === 'runProjectGeneration' || method === 'runBookGeneration' ? 3 : 2))
+    expect(within(drawer).getByText(`请求编号：req-${method}`)).toBeTruthy()
+  }, 15000)
+
+  it('re-reads archived detail after a write conflict without losing its correlation', async () => {
+    api.runProjectGeneration.mockRejectedValueOnce(Object.assign(new Error('archive-secret'), { status: 409, code: 'BATCH_PROJECT_ARCHIVED', requestId: 'req-archive-write' }))
+    render(<BatchProjectListPage initialProjectId={3} />)
+    fireEvent.click(await screen.findByRole('button', { name: '生成状态' }))
+    await screen.findByRole('button', { name: '单本执行' })
+    api.getBatchProject.mockResolvedValue({ project: { id: 3, name: '归档项目', archivedAt: '2026-10-09T04:05:06Z' }, books: [] })
+    fireEvent.click(screen.getByRole('button', { name: '批量执行' }))
+    expect(await screen.findByText('项目已归档，当前为只读查看。恢复后才能修改或执行。')).toBeTruthy()
+    expect(screen.getAllByText(/req-archive-write/).length).toBeGreaterThan(0)
+    expect(document.body.textContent).not.toContain('archive-secret')
+    fireEvent.click(screen.getByRole('button', { name: '查看生成状态' }))
+    expect(await within(screen.getByRole('dialog')).findByText(/req-archive-write/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '批量执行' })).toBeNull()
+  }, 15000)
+
+  it.each(['refresh denied', 'close', 'project switch'])('discards a delayed stage result after %s', async (boundary) => {
+    let resolveStage
+    api.getGenerationStage.mockReturnValueOnce(new Promise((resolve) => { resolveStage = resolve }))
+    const view = render(<BatchProjectListPage initialProjectId={3} />)
+    fireEvent.click(await screen.findByRole('button', { name: '生成状态' }))
+    fireEvent.click((await screen.findAllByRole('button', { name: '查看结果' }))[0])
+    if (boundary === 'refresh denied') {
+      api.getBatchProject.mockRejectedValueOnce(Object.assign(new Error('denied-secret'), { status: 403 }))
+      fireEvent.click(screen.getByRole('button', { name: '刷新项目' }))
+      await screen.findByText('项目不可访问')
+    } else if (boundary === 'close') {
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
+    } else {
+      api.getBatchProject.mockResolvedValueOnce({ project: { id: 4, name: '新项目' }, books: [] })
+      view.rerender(<BatchProjectListPage initialProjectId={4} />)
+      await screen.findByText('新项目')
+    }
+    await act(async () => resolveStage({ stage: 'SCRIPT', outputText: '迟到结果-canary' }))
+    expect(document.body.textContent).not.toContain('迟到结果-canary')
+    expect(screen.queryByText('SCRIPT · 执行结果')).toBeNull()
+  }, 15000)
+
+  it.each(['failed', 'running'])('hides archived video writes with actual %s attempts', async (status) => {
+    api.getBatchProject.mockResolvedValue({ project: { id: 3, name: '归档项目', archivedAt: '2026-10-09T04:05:06Z' }, books: [] })
+    api.getProjectVideoStatus.mockResolvedValue({ batchProjectId: 3, books: [{ bookId: 11, provider: 'archived-provider', model: 'archived-model', attempts: [{ id: 91, status, errorMessage: status === 'failed' ? 'video-secret' : '' }] }] })
+    render(<BatchProjectListPage initialProjectId={3} />)
+    fireEvent.click(await screen.findByRole('button', { name: '查看生成状态' }))
+    expect(await screen.findByText('archived-provider')).toBeTruthy()
+    expect(screen.getByText('尝试 1 次')).toBeTruthy()
+    for (const name of ['批量执行', '单本执行', '重试 Director', '重试 VIDEO', '取消 VIDEO']) expect(screen.queryByRole('button', { name })).toBeNull()
+    expect(document.body.textContent).not.toContain('video-secret')
   }, 15000)
 })

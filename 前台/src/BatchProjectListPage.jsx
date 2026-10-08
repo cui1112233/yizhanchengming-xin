@@ -24,7 +24,12 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   const [refreshKey, setRefreshKey] = useState(0)
   const [contentBook, setContentBook] = useState(null)
   const request = useRef(0)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
+  const [mutationError, setMutationError] = useState(null)
+  const stageRequest = useRef(0)
+  const currentProjectId = useRef(initialProjectId)
+  currentProjectId.current = initialProjectId
+  const drawerProjectId = useRef(null)
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
   const [videoStatus, setVideoStatus] = useState(null)
@@ -33,10 +38,19 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   const [audioMeasurements, setAudioMeasurements] = useState({})
   const [matchAudioByBook, setMatchAudioByBook] = useState({})
   const readonly = Boolean(project?.archivedAt)
-  const refreshDetail = () => setRefreshKey((value) => value + 1)
+  const invalidateStage = () => { stageRequest.current++; setResultModal(null) }
+  const refreshDetail = () => { invalidateStage(); drawerProjectId.current = null; setRefreshKey((value) => value + 1) }
+  const pipelineFailure = (reason, projectId) => {
+    if (Number(projectId) !== Number(currentProjectId.current)) return
+    setMutationError(batchError(reason))
+    if (reason?.code === 'BATCH_PROJECT_ARCHIVED') refreshDetail()
+  }
+
+  useEffect(() => { setMutationError(null); setError(null) }, [initialProjectId])
 
   useEffect(() => {
     const id = ++request.current
+    invalidateStage(); drawerProjectId.current = null
     setLoading(true); setDetailError(null); setProject(null); setBooks([])
     setSelected(null); setSummary(null); setVideoStatus(null); setContentBook(null); setResultModal(null)
     if (!Number.isSafeInteger(Number(initialProjectId)) || Number(initialProjectId) <= 0) {
@@ -51,7 +65,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
     }).catch((reason) => {
       if (id === request.current) setDetailError(batchError(reason, '项目详情读取失败，请稍后重试。'))
     }).finally(() => { if (id === request.current) setLoading(false) })
-    return () => { request.current++ }
+    return () => { request.current++; stageRequest.current++; drawerProjectId.current = null }
   }, [initialProjectId, refreshKey])
 
   const restoreProject = async () => {
@@ -84,6 +98,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
 
   const refreshGeneration = async (project = selected) => {
     if (!project) return
+    invalidateStage()
     setGenerationLoading(true)
     try {
       const [generationPayload, videoPayload] = await Promise.all([
@@ -93,15 +108,16 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       setSummary(generationPayload)
       setVideoStatus(videoPayload)
       await refreshMeasurements(project, generationPayload?.books || [])
-      setError('')
+      setError(null)
     } catch (reason) {
-      setError(batchError(reason).message || '读取生成状态失败')
+      setError(batchError(reason, '读取生成状态失败，请稍后重试。'))
     } finally {
       setGenerationLoading(false)
     }
   }
 
   const openGeneration = async (project) => {
+    drawerProjectId.current = project.id
     setSelected(project)
     setSummary(null)
     setVideoStatus(null)
@@ -123,8 +139,8 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       })
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(batchError(reason).message || '批量执行失败')
-      await refreshGeneration(selected)
+      pipelineFailure(reason, selected.id)
+      if (reason?.code !== 'BATCH_PROJECT_ARCHIVED') await refreshGeneration(selected)
     } finally {
       setGenerationLoading(false)
     }
@@ -147,8 +163,8 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       })
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(batchError(reason).message || '单本执行失败')
-      await refreshGeneration(selected)
+      pipelineFailure(reason, selected.id)
+      if (reason?.code !== 'BATCH_PROJECT_ARCHIVED') await refreshGeneration(selected)
     } finally {
       setGenerationLoading(false)
     }
@@ -161,7 +177,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       await retryGenerationStage(selected.id, bookId, stage, `retry-${bookId}-${stage}-${Date.now()}`)
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(batchError(reason).message || '重试失败')
+      pipelineFailure(reason, selected.id)
     } finally {
       setGenerationLoading(false)
     }
@@ -174,7 +190,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       await retryVideoTask(taskId, `video-retry-${bookId}-${Date.now()}`)
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(batchError(reason).message || 'VIDEO 重试失败')
+      pipelineFailure(reason, selected.id)
     } finally {
       setGenerationLoading(false)
     }
@@ -187,7 +203,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       await cancelVideoTask(taskId)
       await refreshGeneration(selected)
     } catch (reason) {
-      setError(batchError(reason).message || 'VIDEO 取消失败')
+      pipelineFailure(reason, selected.id)
     } finally {
       setGenerationLoading(false)
     }
@@ -195,11 +211,14 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
 
   const showStage = async (bookId, stage) => {
     if (!selected) return
+    const projectId = selected.id
+    const id = ++stageRequest.current
+    const isCurrent = () => id === stageRequest.current && Number(projectId) === Number(currentProjectId.current) && projectId === drawerProjectId.current
     try {
-      const result = await getGenerationStage(selected.id, bookId, stage)
-      setResultModal(result)
+      const result = await getGenerationStage(projectId, bookId, stage)
+      if (isCurrent()) setResultModal(result)
     } catch (reason) {
-      setError(batchError(reason).message || '读取 Stage 结果失败')
+      if (isCurrent()) pipelineFailure(reason, projectId)
     }
   }
 
@@ -311,12 +330,12 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
     {detailError && <PageState state="failed" title={detailError.message} requestId={detailError.requestId} onRetry={refreshDetail} />}
     {loading && <div role="status">正在读取项目详情</div>}
     {restoreError && <Alert type="error" showIcon message={restoreError.message} description={restoreError.requestId ? `请求编号：${restoreError.requestId}` : undefined} className="feedback" />}
+    {!selected && mutationError && <Alert type="error" showIcon message={mutationError.message} description={mutationError.requestId ? `请求编号：${mutationError.requestId}` : undefined} className="feedback" />}
     {project && <>
       {readonly && <Alert type="warning" showIcon message="项目已归档，当前为只读查看。恢复后才能修改或执行。" action={<Button loading={restoring} onClick={() => void restoreProject()}>恢复项目</Button>} className="feedback" />}
       <Space wrap className="batch-project-detail-summary"><Typography.Text>小说数量：{books.length}</Typography.Text>{renderTags(project.sources || [...new Set(books.map((book) => book.source))])}{renderTags(project.genders || [...new Set(books.map((book) => book.gender))])}{renderTags(project.styles || [...new Set(books.map((book) => book.style))])}{project.runStatus && <StatusTag status={project.runStatus} />}<Typography.Text type="secondary">最近更新：{batchUpdatedAt(project.updatedAt || project.createdAt)}</Typography.Text></Space>
       {readonly && <Button className="batch-project-detail-actions" onClick={() => void openGeneration(project)}>查看生成状态</Button>}
       {!readonly && <Space wrap className="batch-project-detail-actions"><UnifiedSettingsPanel project={project} /><Button type="primary" onClick={() => void openGeneration(project)}>进入生产工作台</Button><Button onClick={() => void openGeneration(project)}>生成状态</Button></Space>}
-      {error && <Alert type="error" showIcon message={error} className="feedback" />}
       <Card title="小说列表" className="result-card"><Table rowKey="id" columns={bookColumns} dataSource={books} pagination={false} locale={{ emptyText: '该项目暂无小说' }} scroll={{ x: 1055 }} /></Card>
     </>}
     <Modal title={contentBook?.title || '小说正文'} open={Boolean(contentBook)} onCancel={() => setContentBook(null)} footer={null}><Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{contentBook?.originalText || '暂无正文'}</Typography.Paragraph></Modal>
@@ -324,9 +343,11 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
         title={selected ? `${selected.name} · 剧本与 VIDEO 流水线` : '剧本与 VIDEO 流水线'}
         width="92vw"
         open={Boolean(selected)}
-        onClose={() => { setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
+        onClose={() => { invalidateStage(); drawerProjectId.current = null; setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
         extra={readonly ? null : <Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
       >
+        {mutationError && <Alert type="error" showIcon message={mutationError.message} description={mutationError.requestId ? `请求编号：${mutationError.requestId}` : undefined} className="feedback" />}
+        {error && <Alert type="error" showIcon message={error.message} description={error.requestId ? `请求编号：${error.requestId}` : undefined} className="feedback" />}
         {summary && (
           <>
             <Descriptions bordered size="small" column={4} style={{ marginBottom: 16 }}>
@@ -343,7 +364,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
       <Modal
         title={resultModal ? `${resultModal.stage} · 执行结果` : '执行结果'}
         open={Boolean(resultModal)}
-        onCancel={() => setResultModal(null)}
+        onCancel={invalidateStage}
         footer={null}
         width={820}
       >

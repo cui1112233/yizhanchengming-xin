@@ -716,4 +716,5 @@
 - [x] 确认后归档、归档目录只读打开/恢复均通过共享 `api.js`，失败保留固定安全文案与 requestId，成功重读目录；详情直接读取归属保护接口，提供加载/空态/失败重试/刷新。小说表保留序号、小说、内容、风格、男女频、状态、操作七列及移动端横向滚动，不显示 errorMessage 原文。
 - [x] 归档详情保留只读横幅和历史结果/正文查询，隐藏设置与流水线写入口，禁用音频匹配；恢复后重读服务端 detail 再开放写入口。Batch CSS 独立局部作用域，移除 Shuihuo 中的 Batch 假渐变封面规则。
 - [x] Task 1 仓库验证：目标页面、Router、VIDEO 与 API 回归通过；前台 `CI=1 npm test -- --run` 在同一 PTY 自然退出码 0（28 files / 197 tests）；`go test ./internal/intake ./internal/httpapi -run 'BatchProject'` 两包退出码 0；`npm run build` 退出码 0，构建后自审与 `git diff --check` 通过。既有 AntD 提示与 Vite 大包警告仍保留。
+- [x] Task 1 第一轮审查修复：流水线操作与结果读取失败保留安全文案和 requestId，在抽屉内展示且状态刷新不清除；归档冲突重读详情。阶段结果请求在刷新、关闭、项目切换时失效，迟到成功/失败不回写。含 failed/running VIDEO attempts 的归档写入口回归；先 RED 后 GREEN，定向 3 files / 45 tests、完整前台 28 files / 209 tests 与 build 均自然退出码 0，构建后自审与差异检查通过。此处记录仓库验证，不替代后续独立审查批准或真实运行时验收。
 - [ ] `00020` 尚未对本机 `ycm_staging` 执行；真实登录换账号/跨团队、刷新恢复、浏览器截图、公网登录与视觉、Provider/TOS/readback 和部署验收仍属后续任务。本次没有连接公网/ECS、部署、运行/修改 GitHub Actions 或 push。
