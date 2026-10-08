@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,9 +14,145 @@ import (
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/novelpanel"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 	_ "github.com/go-sql-driver/mysql"
 )
+
+const errorCanaries = "password=pass-canary Cookie: session=cookie-canary Bearer bearer-canary provider_api_key=provider-canary user:dsn-canary@tcp(localhost:3306)/db"
+
+func assertErrorEnvelope(t *testing.T, rec *httptest.ResponseRecorder, status int, code string) {
+	t.Helper()
+	if rec.Code != status {
+		t.Fatalf("status=%d want=%d body=%s", rec.Code, status, rec.Body.String())
+	}
+	id, ok := observability.ValidRequestID(rec.Header().Values(observability.RequestIDHeader))
+	if !ok {
+		t.Fatalf("invalid request ID: %v", rec.Header())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %s", rec.Body.String())
+	}
+	if body["request_id"] != id || body["code"] != code || body["message"] == nil || body["message"] == "" {
+		t.Fatalf("invalid envelope: %v; header=%q", body, id)
+	}
+}
+
+func TestErrorRequestIDContract(t *testing.T) {
+	api := NewHandler(Dependencies{Auth: opsAuthService{user: authn.User{ID: 7, Role: "member"}}})
+	for _, tc := range []struct {
+		name, path, code string
+		status           int
+		cookie           bool
+	}{
+		{"unknown", "/api/v1/not-found", "NOT_FOUND", 404, false},
+		{"anonymous", "/api/auth/current-user", "AUTH_UNAUTHENTICATED", 401, false},
+		{"forbidden", "/api/v1/issues", "AUTH_FORBIDDEN", 403, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.path, nil)
+			if tc.cookie {
+				req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+			}
+			rec := httptest.NewRecorder()
+			api.ServeHTTP(rec, req)
+			assertErrorEnvelope(t, rec, tc.status, tc.code)
+		})
+	}
+	t.Run("runtime", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		NewHandlerWithRuntime(Dependencies{Auth: opsAuthService{}}, &fakeRuntimeService{}).ServeHTTP(rec, runtimeRetryRequest())
+		assertErrorEnvelope(t, rec, 401, "AUTH_UNAUTHENTICATED")
+	})
+}
+
+type failingSettings struct{ UnifiedSettingsService }
+
+func (failingSettings) GetCurrent(context.Context, int64) (unifiedsettings.Current, error) {
+	return unifiedsettings.Current{}, errors.New(errorCanaries)
+}
+
+func TestSafeErrorServiceAndPanicCanaries(t *testing.T) {
+	for _, mode := range []string{"service", "panic", "settings"} {
+		t.Run(mode, func(t *testing.T) {
+			var logs bytes.Buffer
+			h := handler{deps: Dependencies{Logger: observability.NewJSONLogger(&logs)}}
+			wrapped := h.withObservability(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if mode == "panic" {
+					panic(errors.New(errorCanaries))
+				}
+				h.writeServiceError(w, r, 500, "INTERNAL_ERROR", "服务暂时不可用", "test", "read", errors.New(errorCanaries))
+			}))
+			path, code := "/api/test", "INTERNAL_ERROR"
+			if mode == "settings" {
+				wrapped = NewHandler(Dependencies{Logger: h.deps.Logger, UnifiedSettings: failingSettings{}})
+				path, code = "/api/v1/batch-projects/9/settings", "SETTINGS_READ_FAILED"
+			}
+			rec := httptest.NewRecorder()
+			wrapped.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+			for _, canary := range []string{"pass-canary", "cookie-canary", "bearer-canary", "provider-canary", "dsn-canary"} {
+				if strings.Contains(rec.Body.String()+logs.String(), canary) {
+					t.Errorf("leaked %s", canary)
+				}
+			}
+			assertErrorEnvelope(t, rec, 500, code)
+			if mode == "settings" {
+				var body map[string]any
+				_ = json.Unmarshal(rec.Body.Bytes(), &body)
+				if body["error"] != body["message"] {
+					t.Fatal("legacy error field must retain safe public message")
+				}
+			}
+			for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+				var entry map[string]any
+				if json.Unmarshal([]byte(line), &entry) != nil {
+					t.Fatalf("invalid structured log: %s", line)
+				}
+				if entry["request_id"] != rec.Header().Get(observability.RequestIDHeader) {
+					t.Fatalf("uncorrelated log: %s", line)
+				}
+			}
+		})
+	}
+}
+
+type failingRequestBody struct{}
+
+func (failingRequestBody) Read([]byte) (int, error) { return 0, errors.New(errorCanaries) }
+func (failingRequestBody) Close() error             { return nil }
+
+func TestSafeErrorInputAndServiceWrappers(t *testing.T) {
+	for _, mode := range []string{"body-read", "unknown-field", "novel-invalid", "media-service"} {
+		t.Run(mode, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/api/test", strings.NewReader(`{"provider-canary":true}`))
+			if mode == "body-read" {
+				req.Body = failingRequestBody{}
+			}
+			h := handler{}
+			rec := httptest.NewRecorder()
+			h.withObservability(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch mode {
+				case "novel-invalid":
+					h.novelPanelError(w, r, fmt.Errorf("%w: %s", novelpanel.ErrInvalid, errorCanaries))
+				case "media-service":
+					h.swerr(w, r, errors.New(errorCanaries))
+				default:
+					var body struct{ Name string }
+					if err := decodeJSON(w, r, &body); err != nil {
+						writeError(w, 400, err.Error())
+					}
+				}
+			})).ServeHTTP(rec, req)
+			for _, canary := range []string{"pass-canary", "cookie-canary", "bearer-canary", "provider-canary", "dsn-canary"} {
+				if strings.Contains(rec.Body.String(), canary) {
+					t.Errorf("response leaked %s: %s", canary, rec.Body.String())
+				}
+			}
+		})
+	}
+}
 
 func TestReadyzFailsWhenDatabasePingFails(t *testing.T) {
 	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:1)/missing?timeout=10ms")

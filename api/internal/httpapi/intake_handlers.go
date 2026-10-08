@@ -247,7 +247,7 @@ func (h handler) createBatchProject(w http.ResponseWriter, r *http.Request) {
 	)
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"project": projectResponse{ID: result.Project.ID, IntakeID: result.Project.IntakeID, Name: result.Project.Name},
-		"run": runResponse{ID: result.Run.ID, BatchProjectID: result.Run.BatchProjectID, RunAt: result.Run.RunAt, Status: result.Run.Status},
+		"run":     runResponse{ID: result.Run.ID, BatchProjectID: result.Run.BatchProjectID, RunAt: result.Run.RunAt, Status: result.Run.Status},
 	})
 }
 
@@ -256,13 +256,13 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("请求 JSON 无效: %w", err)
+		return fmt.Errorf("请求 JSON 无效")
 	}
 	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		if err == nil {
 			return fmt.Errorf("请求体只能包含一个 JSON 对象")
 		}
-		return fmt.Errorf("请求 JSON 无效: %w", err)
+		return fmt.Errorf("请求 JSON 无效")
 	}
 	return nil
 }

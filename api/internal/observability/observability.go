@@ -24,7 +24,7 @@ type contextKey string
 const requestIDKey contextKey = "request_id"
 
 var safeRequestID = regexp.MustCompile(`^[A-Za-z0-9._:-]+$`)
-var sensitiveAssignment = regexp.MustCompile(`(?i)\b(authorization|cookie|set-cookie|password|passwd|token|access[_-]?token|refresh[_-]?token|api[_-]?key|apikey|secret|credential|client[_-]?secret|ciphertext|nonce|dsn)\s*[:=]\s*([^&\s,;]+)`)
+var sensitiveAssignment = regexp.MustCompile(`(?i)\b([a-z0-9_-]*(?:authorization|cookie|set-cookie|password|passwd|token|access[_-]?token|refresh[_-]?token|api[_-]?key|apikey|secret|credential|client[_-]?secret|ciphertext|nonce|dsn))\s*[:=]\s*([^&\s,;]+)`)
 var bearerValue = regexp.MustCompile(`(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+`)
 var urlUserInfo = regexp.MustCompile(`://[^/@\s]+@`)
 var mysqlLikeCredential = regexp.MustCompile(`\b[^:\s]+:[^@\s]+@tcp\(`)

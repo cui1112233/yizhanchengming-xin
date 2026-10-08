@@ -41,7 +41,7 @@ func (h handler) createOwnedBatchProject(w http.ResponseWriter, r *http.Request)
 	}
 	result, err := h.deps.Pipeline.Create(r.Context(), create)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "BATCH_PROJECT_CREATE_FAILED", "创建批量项目失败", "batch_project", "create", err)
 		return
 	}
 

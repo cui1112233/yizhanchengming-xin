@@ -28,7 +28,7 @@ func sid(r *http.Request, k string) (int64, error) {
 	}
 	return v, nil
 }
-func swerr(w http.ResponseWriter, e error) {
+func (h handler) swerr(w http.ResponseWriter, r *http.Request, e error) {
 	if errors.Is(e, shuihuo.ErrStorageUnavailable) {
 		writeJSON(w, 503, map[string]string{"error": "storage_unavailable", "message": "TOS storage is not configured"})
 		return
@@ -49,7 +49,7 @@ func swerr(w http.ResponseWriter, e error) {
 		writeJSON(w, 409, map[string]string{"error": "invalid_reorder"})
 		return
 	}
-	writeError(w, 422, e.Error())
+	h.writeServiceError(w, r, 422, "SHUIHUO_MEDIA_FAILED", "水火媒体操作失败", "shuihuo_media", "operation", e)
 }
 func (h handler) sm(w http.ResponseWriter) (ShuihuoMediaService, bool) {
 	if h.deps.ShuihuoMedia == nil {
@@ -71,7 +71,7 @@ func (h handler) shuihuoSegments(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		x, e := s.ListSegments(r.Context(), p, b)
 		if e != nil {
-			swerr(w, e)
+			h.swerr(w, r, e)
 			return
 		}
 		writeJSON(w, 200, x)
@@ -88,7 +88,7 @@ func (h handler) shuihuoSegments(w http.ResponseWriter, r *http.Request) {
 	}
 	x, e := s.CreateSegment(r.Context(), shuihuo.CreateSegmentInput{BatchProjectID: p, BookID: b, Position: v.Position, Text: v.Text, EditRevision: v.EditRevision})
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 201, x)
@@ -115,7 +115,7 @@ func (h handler) updateShuihuoSegment(w http.ResponseWriter, r *http.Request) {
 	}
 	out, e := s.UpdateSegment(r.Context(), p, b, id, shuihuo.UpdateSegmentInput{Text: v.Text, EditRevision: v.EditRevision, Version: v.Version})
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 200, out)
@@ -139,7 +139,7 @@ func (h handler) reorderShuihuoSegments(w http.ResponseWriter, r *http.Request) 
 	}
 	out, e := s.ReorderSegments(r.Context(), p, b, v.SegmentIDs)
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 200, out)
@@ -157,7 +157,7 @@ func (h handler) shuihuoAssets(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		x, e := s.ListAssets(r.Context(), p, b, 0)
 		if e != nil {
-			swerr(w, e)
+			h.swerr(w, r, e)
 			return
 		}
 		writeJSON(w, 200, x)
@@ -203,7 +203,7 @@ func (h handler) uploadShuihuoAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	asset, err := s.UploadAsset(r.Context(), shuihuo.UploadAssetInput{BatchProjectID: p, BookID: b, SegmentID: segmentID, Type: typeValue, Filename: header.Filename, ContentType: contentType, Body: file})
 	if err != nil {
-		swerr(w, err)
+		h.swerr(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, asset)
@@ -221,7 +221,7 @@ func (h handler) readShuihuoAsset(w http.ResponseWriter, r *http.Request) {
 	}
 	asset, body, err := s.OpenAsset(r.Context(), p, b, id)
 	if err != nil {
-		swerr(w, err)
+		h.swerr(w, r, err)
 		return
 	}
 	defer body.Close()
@@ -250,7 +250,7 @@ func (h handler) shuihuoMediaTasks(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		x, e := s.ListMediaTasks(r.Context(), p, b)
 		if e != nil {
-			swerr(w, e)
+			h.swerr(w, r, e)
 			return
 		}
 		writeJSON(w, 200, x)
@@ -271,7 +271,7 @@ func (h handler) shuihuoMediaTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	x, e := s.CreateMediaTask(r.Context(), shuihuo.CreateMediaTaskInput{BatchProjectID: p, BookID: b, SegmentID: v.SegmentID, SourceAssetID: v.SourceAssetID, ProductionTaskID: v.ProductionTaskID, Kind: v.Kind, Provider: v.Provider, Model: v.Model, RequestID: v.RequestID})
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 202, x)
@@ -289,7 +289,7 @@ func (h handler) listShuihuoCandidates(w http.ResponseWriter, r *http.Request) {
 	}
 	out, e := s.ListCandidates(r.Context(), p, b, task)
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 200, out)
@@ -308,7 +308,7 @@ func (h handler) selectShuihuoCandidate(w http.ResponseWriter, r *http.Request) 
 	}
 	out, e := s.SelectCandidate(r.Context(), p, b, task, candidate)
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 200, out)
@@ -326,7 +326,7 @@ func (h handler) retryShuihuoMediaTask(w http.ResponseWriter, r *http.Request) {
 	}
 	out, e := s.RetryMediaTask(r.Context(), p, b, task)
 	if e != nil {
-		swerr(w, e)
+		h.swerr(w, r, e)
 		return
 	}
 	writeJSON(w, 202, out)

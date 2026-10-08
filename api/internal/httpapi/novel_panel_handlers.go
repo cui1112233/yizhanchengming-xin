@@ -18,7 +18,7 @@ func (h handler) getNovelPanel(w http.ResponseWriter, r *http.Request) {
 	}
 	v, e := h.deps.NovelPanel.GetWorkspace(r.Context(), id)
 	if e != nil {
-		novelPanelError(w, e)
+		h.novelPanelError(w, r, e)
 		return
 	}
 	writeJSON(w, 200, map[string]any{"workspace": v})
@@ -41,7 +41,7 @@ func (h handler) saveNovelPanel(w http.ResponseWriter, r *http.Request) {
 	body.Workspace.ProjectID = id
 	v, e := h.deps.NovelPanel.Save(r.Context(), body)
 	if e != nil {
-		novelPanelError(w, e)
+		h.novelPanelError(w, r, e)
 		return
 	}
 	writeJSON(w, 200, v)
@@ -58,7 +58,7 @@ func (h handler) listNovelPanelHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	v, e := h.deps.NovelPanel.ListHistory(r.Context(), id, 50)
 	if e != nil {
-		novelPanelError(w, e)
+		h.novelPanelError(w, r, e)
 		return
 	}
 	writeJSON(w, 200, map[string]any{"items": v})
@@ -82,19 +82,19 @@ func (h handler) restoreNovelPanelHistory(w http.ResponseWriter, r *http.Request
 	}
 	v, e := h.deps.NovelPanel.Restore(r.Context(), novelpanel.RestoreRequest{ProjectID: id, HistoryID: r.PathValue("historyId"), ExpectedRevision: body.ExpectedRevision})
 	if e != nil {
-		novelPanelError(w, e)
+		h.novelPanelError(w, r, e)
 		return
 	}
 	writeJSON(w, 200, v)
 }
-func novelPanelError(w http.ResponseWriter, e error) {
+func (h handler) novelPanelError(w http.ResponseWriter, r *http.Request, e error) {
 	switch {
 	case errors.Is(e, novelpanel.ErrNotFound):
 		writeError(w, 404, "小说面板记录不存在")
 	case errors.Is(e, novelpanel.ErrConflict):
 		writeJSON(w, 409, map[string]any{"code": "NOVEL_PANEL_CONFLICT", "message": "小说面板已被其他会话更新，请重新载入"})
 	case errors.Is(e, novelpanel.ErrInvalid):
-		writeJSON(w, 422, map[string]any{"code": "NOVEL_PANEL_INVALID", "message": e.Error()})
+		h.writeServiceError(w, r, 422, "NOVEL_PANEL_INVALID", "小说面板参数无效，请检查输入", "novel_panel", "validate", e)
 	default:
 		writeError(w, 422, "小说面板操作失败")
 	}

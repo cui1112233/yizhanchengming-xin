@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/agentstudio"
@@ -320,10 +321,22 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/video/local-executors/heartbeat", api.heartbeatVideoLocalExecutor)
 	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/complete", api.completeVideoLocalExecutorTask)
 	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/fail", api.failVideoLocalExecutorTask)
-	return api.withObservability(mux)
+	return api.withObservability(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, pattern := mux.Handler(r)
+		if pattern == "" && (r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/")) {
+			// Keep ServeMux's 404/405 decision and Allow header; replace only
+			// its default plain-text body with the shared API error envelope.
+			mux.ServeHTTP(&apiRouteErrorWriter{ResponseWriter: w}, r)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	}))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	if status >= http.StatusBadRequest {
+		value = errorEnvelope(w, status, value)
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)

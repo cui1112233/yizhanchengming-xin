@@ -31,7 +31,7 @@ func NewHandlerWithRuntime(deps Dependencies, runtime RuntimeService) http.Handl
 	boundary := handler{deps: deps}
 	mux := http.NewServeMux()
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/book-runs/{bookRunId}/retry",
-		boundary.requireSameOrigin(boundary.requireCapability(CapabilityBatchExecute, http.HandlerFunc(rh.retryBookRun))))
+		boundary.withObservability(boundary.requireSameOrigin(boundary.requireCapability(CapabilityBatchExecute, http.HandlerFunc(rh.retryBookRun)))))
 	mux.Handle("/", base)
 	return mux
 }
