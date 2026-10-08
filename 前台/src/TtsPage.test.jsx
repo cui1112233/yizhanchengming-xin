@@ -51,4 +51,13 @@ describe('TtsPage', () => {
     expect(await screen.findByRole('link', { name: /下\s*载\s*音\s*频/ })).toBeTruthy()
     expect(api.shuihuoAssetContentURL).toHaveBeenCalledWith(3, 7, 90)
   })
+
+  it('executor_unavailable never presents an audio player or download as a completed result', async () => {
+    api.listShuihuoMediaTasks.mockResolvedValue([{ id: 21, kind: 'audio', status: 'executor_unavailable', errorCode: 'executor_unavailable', errorMessage: 'TTS Provider 未配置' }])
+    render(<TtsPage />)
+    expect(await screen.findByText('TTS Provider 未配置')).toBeTruthy()
+    expect(screen.getByText('TTS 执行器不可用，尚未生成音频。')).toBeTruthy()
+    expect(screen.queryByRole('audio')).toBeNull()
+    expect(screen.queryByRole('link', { name: /下载音频/ })).toBeNull()
+  })
 })

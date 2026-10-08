@@ -126,17 +126,17 @@ export default function AgentCanvasPage() {
   if (!id) return <Alert type="warning" message="项目链接无效" />
 
   return <Layout className="agent-canvas">
-    <Layout.Sider width={260}><Typography.Title level={5}>画布历史</Typography.Title>
+    <Layout.Sider role="complementary" aria-label="画布版本与项目附件" width={260}><Typography.Text className="agent-pane-kicker">PROJECT CANVAS</Typography.Text><Typography.Title level={5}>画布历史</Typography.Title>
       <List size="small" locale={{ emptyText: '暂无版本' }} dataSource={versions} renderItem={(version) => <List.Item actions={[<Button key="restore" size="small" onClick={() => void restoreCanvas(version.revision)}>恢复版本 {version.revision}</Button>]}><span>版本 {version.revision}</span></List.Item>} />
     </Layout.Sider>
-    <Layout.Content>
+    <Layout.Content role="main" aria-label="Agent 创作画布">
       <Card title={`创作画布${canvas.loading ? '（加载中）' : ` · 画布版本 ${canvas.revision}`}`} extra={<Button loading={canvas.saving} onClick={() => void saveCanvas()}>保存画布</Button>}>
         {error && <Alert type="error" message={error} showIcon />}
         <Typography.Paragraph>画布保存在服务端；保存使用 revision 乐观锁，恢复历史会生成一个新的版本。</Typography.Paragraph>
         {canvas.loading ? <Spin aria-label="画布加载中" /> : <Input.TextArea aria-label="画布 JSON" value={canvas.document} onChange={(event) => setCanvas((value) => ({ ...value, document: event.target.value }))} autoSize={{ minRows: 16 }} />}
       </Card>
     </Layout.Content>
-    <Layout.Sider width={360}>
+    <Layout.Sider role="complementary" aria-label="项目对话与执行记录" width={360}>
       <Card title="项目对话">
         <List size="small" locale={{emptyText:'暂无消息'}} dataSource={messages} renderItem={m=><List.Item><Typography.Text strong>{m.role||m.Role}：</Typography.Text>{m.content||m.Content}</List.Item>}/>
         <List size="small" locale={{emptyText:null}} dataSource={executions.slice(0,3)} renderItem={e=><List.Item><Typography.Text type={e.status==='executor_unavailable'?'danger':undefined}>执行 {e.status||e.Status}{(e.errorMessage||e.ErrorMessage)?`：${e.errorMessage||e.ErrorMessage}`:''}</Typography.Text></List.Item>}/>

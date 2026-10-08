@@ -99,10 +99,13 @@ export default function TtsPage() {
 function TtsTaskCard({ task, retrying, onRetry }) {
   const playable = task.status === 'succeeded' && task.assetId && task.hasAsset
   const source = playable ? shuihuoAssetContentURL(task.project.id, task.book.id, task.assetId) : ''
+  const unavailable = task.status === 'executor_unavailable' || task.errorCode === 'executor_unavailable'
+  const storageUnavailable = task.status === 'storage_unavailable' || task.errorCode === 'storage_unavailable'
+  const audioHint = unavailable ? 'TTS 执行器不可用，尚未生成音频。' : storageUnavailable ? '存储不可用，无法读取候选音频。' : task.status === 'pending_executor' ? '正在等待 TTS Provider 执行器，尚未生成音频。' : '音频生成完成后可在此试听和下载。'
   return <Card className="tts-task-card" title={<Space><span>{task.book.title || `小说 #${task.book.id}`}</span><StatusTag status={task.status} /></Space>} extra={<Typography.Text type="secondary">#{task.id}</Typography.Text>}>
     <Typography.Paragraph type="secondary" className="tts-task-meta">{task.project.name || `项目 #${task.project.id}`} · Provider：{task.provider || '等待服务端分配'} · 模型：{task.model || '-'}</Typography.Paragraph>
     {task.errorMessage && <Alert type="error" showIcon message={task.errorMessage} />}
-    {playable ? <audio controls preload="metadata" src={source} className="tts-audio-player" /> : <Typography.Paragraph type="secondary" className="tts-audio-unavailable">{task.status === 'succeeded' ? '音频候选资产不可用，请刷新后重试。' : '音频生成完成后可在此试听和下载。'}</Typography.Paragraph>}
+    {playable ? <audio controls preload="metadata" src={source} className="tts-audio-player" /> : <Typography.Paragraph type="secondary" className="tts-audio-unavailable">{task.status === 'succeeded' ? '音频候选资产不可用，请刷新后重试。' : audioHint}</Typography.Paragraph>}
     <Space wrap>{playable && <Button type="primary" href={source} download={`tts-task-${task.id}.audio`}>下载音频</Button>}{['failed', 'retryable_failed'].includes(task.status) && <Button danger loading={retrying} onClick={onRetry}>重试</Button>}{task.status === 'pending_executor' && <Tag color="gold">等待 TTS Provider 执行器</Tag>}</Space>
   </Card>
 }

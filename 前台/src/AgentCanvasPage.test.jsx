@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AgentCanvasPage from './AgentCanvasPage.jsx'
 vi.mock('./api.js', () => ({ agentAttachmentContentURL: vi.fn(() => '/download'), continueAgentProject: vi.fn(), deleteAgentAttachment: vi.fn(), getAgentCanvas: vi.fn(), listAgentAttachments: vi.fn(), listAgentCanvasVersions: vi.fn(), listAgentExecutions: vi.fn(() => Promise.resolve({executions:[]})), listAgentMessages: vi.fn(() => Promise.resolve({messages:[]})), listAgentSkills: vi.fn(() => Promise.resolve({skills:[]})), restoreAgentCanvas: vi.fn(), saveAgentCanvas: vi.fn(), uploadAgentAttachment: vi.fn() }))
-import { deleteAgentAttachment, getAgentCanvas, listAgentAttachments, listAgentCanvasVersions, restoreAgentCanvas, saveAgentCanvas, uploadAgentAttachment } from './api.js'
+import { deleteAgentAttachment, getAgentCanvas, listAgentAttachments, listAgentCanvasVersions, listAgentExecutions, listAgentMessages, restoreAgentCanvas, saveAgentCanvas, uploadAgentAttachment } from './api.js'
 afterEach(() => vi.clearAllMocks())
 
 it('loads, uploads and deletes project-scoped attachments', async () => {
@@ -48,4 +48,18 @@ it('loads, saves and restores a durable canvas revision', async () => {
   await waitFor(() => expect(saveAgentCanvas).toHaveBeenCalledWith(7, { revision: 1, document: { nodes: ['second'], edges: [] } }))
   fireEvent.click(await screen.findByRole('button', { name: '恢复版本 1' }))
   await waitFor(() => expect(restoreAgentCanvas).toHaveBeenCalledWith(7, 1))
+})
+
+it('renders the three workspace panes and makes an unavailable execution explicit', async () => {
+  window.history.pushState({}, '', '/agent/canvas?projectId=7')
+  listAgentAttachments.mockResolvedValue({ attachments: [] })
+  getAgentCanvas.mockResolvedValue({ canvas: { projectId: 7, revision: 1, document: { nodes: [], edges: [] } } })
+  listAgentCanvasVersions.mockResolvedValue({ versions: [] })
+  listAgentMessages.mockResolvedValue({ messages: [] })
+  listAgentExecutions.mockResolvedValue({ executions: [{ id: 4, status: 'executor_unavailable', errorMessage: '未配置 Agent Provider' }] })
+  render(<AgentCanvasPage />)
+  expect(await screen.findByRole('complementary', { name: '画布版本与项目附件' })).toBeTruthy()
+  expect(screen.getByRole('main', { name: 'Agent 创作画布' })).toBeTruthy()
+  expect(screen.getByRole('complementary', { name: '项目对话与执行记录' })).toBeTruthy()
+  expect(screen.getByText('执行 executor_unavailable：未配置 Agent Provider')).toBeTruthy()
 })

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import HistoryPage from './HistoryPage.jsx'
 
@@ -20,5 +20,13 @@ describe('HistoryPage', () => {
     fireEvent.keyDown(screen.getByLabelText('搜索历史'), { key: 'Enter', code: 'Enter' })
     expect(await screen.findByRole('link', { name: '打开项目' })).toBeTruthy()
     expect(api.listWorkspaceHistory).toHaveBeenLastCalledWith(expect.objectContaining({ q: '历史小说' }))
+  })
+
+  it('sends status filtering to the MySQL projection instead of filtering browser history', async () => {
+    render(<HistoryPage />)
+    await screen.findByText('历史小说')
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '筛选历史状态' }))
+    fireEvent.click(await screen.findByText('failed'))
+    await waitFor(() => expect(api.listWorkspaceHistory).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'failed', page: 1 })))
   })
 })
