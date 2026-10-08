@@ -25,6 +25,7 @@ function ShellLink({ href, active, onNavigate, className = '', children }) {
 export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, currentUser, onLogout, children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [decorationVisible, setDecorationVisible] = useState(true)
   const isHome = pathname === '/'
   const logo = theme === 'dark' || isHome ? '/assets/brand-logo-white.png' : '/assets/brand-logo-black.png'
   const navigate = (href) => { setMobileOpen(false); onNavigate(href) }
@@ -62,6 +63,7 @@ export default function UserShell({ pathname, theme, onToggleTheme, onNavigate, 
         <Drawer title="工作区导航" placement="left" open={mobileOpen} onClose={() => setMobileOpen(false)} className="shell-mobile-drawer">{renderNavigation('user-shell-nav', '移动端工作区导航')}</Drawer>
         <div className="user-shell-content">{children}</div>
       </div>
+      {decorationVisible ? <aside className="shell-decoration" aria-label="桌面装饰"><span aria-hidden="true" className="shell-decoration-orbit" /><span aria-hidden="true" className="shell-decoration-star">✦</span><button type="button" className="shell-decoration-close" onClick={() => setDecorationVisible(false)} aria-label="关闭桌面装饰">×</button></aside> : null}
     </div>
   )
 }

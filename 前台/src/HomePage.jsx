@@ -35,6 +35,7 @@ export default function HomePage({ onNavigate }) {
   return (
     <main className="home-page">
       <section className="home-video-hero" aria-labelledby="home-title">
+        <video className="home-hero-video" aria-label="首页视觉背景" autoPlay muted loop playsInline poster="/assets/brand-logo-white.png" src="/assets/home-hero.mp4" />
         <div className="home-video-overlay" />
         <div className="home-hero-glow home-hero-glow-left" />
         <div className="home-hero-glow home-hero-glow-right" />
@@ -78,7 +79,7 @@ export default function HomePage({ onNavigate }) {
             <span className="home-section-eyebrow">RECENT PROJECTS</span>
             <Typography.Title level={2} id="recent-title">最近创作项目</Typography.Title>
           </div>
-          <Button onClick={() => onNavigate('/history')}>查看全部历史记录</Button>
+          <div className="home-recent-actions"><Button onClick={() => void loadRecent()} loading={recent.loading} aria-label="刷新最近项目">刷新</Button><Button onClick={() => onNavigate('/history')}>查看全部历史记录</Button></div>
         </div>
         {recent.loading ? <div className="recent-project-entry"><Spin size="small" /> <span>正在读取你的最近项目…</span></div> : null}
         {recent.error ? <Alert type="error" showIcon message={recent.error} action={<Button size="small" onClick={() => void loadRecent()}>重试</Button>} /> : null}

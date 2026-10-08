@@ -45,4 +45,13 @@ describe('UserShell', () => {
     fireEvent.click(screen.getByRole('button', { name: '收起侧边导航' }))
     expect(screen.getByRole('button', { name: '展开侧边导航' })).toBeTruthy()
   })
+
+  it('opens mobile navigation and closes its presentation-only decoration', async () => {
+    render(<UserShell pathname="/" theme="dark" onToggleTheme={() => {}} onNavigate={() => {}} currentUser={{ name: '测试创作者' }}><main>内容</main></UserShell>)
+    fireEvent.click(screen.getByRole('button', { name: '打开导航' }))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(screen.getByLabelText('桌面装饰')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '关闭桌面装饰' }))
+    expect(screen.queryByLabelText('桌面装饰')).toBeNull()
+  })
 })
