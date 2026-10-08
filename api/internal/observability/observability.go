@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -25,6 +26,8 @@ const requestIDKey contextKey = "request_id"
 
 var safeRequestID = regexp.MustCompile(`^[A-Za-z0-9._:-]+$`)
 var sensitiveAssignment = regexp.MustCompile(`(?i)\b([a-z0-9_-]*(?:authorization|cookie|set-cookie|password|passwd|token|access[_-]?token|refresh[_-]?token|api[_-]?key|apikey|secret|credential|client[_-]?secret|ciphertext|nonce|dsn))\s*[:=]\s*([^&\s,;]+)`)
+var quotedJSONKey = regexp.MustCompile(`("(?:\\.|[^"\\])*")\s*:`)
+var cookieAssignment = regexp.MustCompile(`(?i)\b(set-cookie|cookie)\s*[:=][^\r\n]*`)
 var bearerValue = regexp.MustCompile(`(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+`)
 var urlUserInfo = regexp.MustCompile(`://[^/@\s]+@`)
 var mysqlLikeCredential = regexp.MustCompile(`\b[^:\s]+:[^@\s]+@tcp\(`)
@@ -78,6 +81,44 @@ func IsSensitiveKey(key string) bool {
 }
 
 func SanitizeString(value string) string {
+	// Decode the value boundary rather than splitting on commas or whitespace:
+	// JSON credentials may contain escaped quotes or nested objects/arrays.
+	var cleaned strings.Builder
+	cursor := 0
+	for _, match := range quotedJSONKey.FindAllStringSubmatchIndex(value, -1) {
+		if match[0] < cursor {
+			continue
+		}
+		var key string
+		if json.Unmarshal([]byte(value[match[2]:match[3]]), &key) != nil || !IsSensitiveKey(key) {
+			continue
+		}
+		start := match[1]
+		decoder := json.NewDecoder(strings.NewReader(value[start:]))
+		var raw json.RawMessage
+		end := len(value)
+		if decoder.Decode(&raw) == nil {
+			end = start + int(decoder.InputOffset())
+		} else if newline := strings.IndexAny(value[start:], "\r\n"); newline >= 0 {
+			// For malformed input, the remainder of this line cannot safely
+			// be distinguished from credential content.
+			end = start + newline
+		}
+		cleaned.WriteString(value[cursor:start])
+		cleaned.WriteString(`"[REDACTED]"`)
+		cursor = end
+	}
+	cleaned.WriteString(value[cursor:])
+	value = cleaned.String()
+	// A Cookie header owns the complete line, including all semicolon pairs
+	// and commas in Set-Cookie Expires. Do this before flattening controls.
+	value = cookieAssignment.ReplaceAllStringFunc(value, func(header string) string {
+		separator := strings.IndexAny(header, ":=")
+		// Omit the assignment delimiter so a second sanitization does not
+		// consume diagnostics from the next (now flattened) line. Never
+		// trust a caller-supplied redaction marker as proof of safety.
+		return header[:separator] + " [REDACTED]"
+	})
 	value = strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\r' || unicode.IsControl(r) {
 			return ' '

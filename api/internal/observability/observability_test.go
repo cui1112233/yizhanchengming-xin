@@ -2,12 +2,48 @@ package observability
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestJSONLoggerQuotedSecretsAndCompleteCookieValues(t *testing.T) {
+	for _, input := range []string{
+		`upstream failed {"provider_api_key":"provider-canary","password":"pass-canary","reason":"diagnostic-visible"}`,
+		`upstream failed {"password":"pass-canary with spaces, semicolons; and \"quotes\"","reason":"diagnostic-visible"}`,
+		`upstream failed {"provider_api_key":{"key":"provider-canary","extra":"pass-canary"},"reason":"diagnostic-visible"}`,
+		"upstream failed\nCookie: locale=zh; session=cookie-canary; refresh=refresh-canary\ndiagnostic-visible",
+		"upstream failed\nCookie: [REDACTED]; session=cookie-canary\ndiagnostic-visible",
+		"upstream failed\nSet-Cookie: locale=zh; session=cookie-canary; Expires=Wed, 21 Oct 2026 07:28:00 GMT; refresh=refresh-canary\ndiagnostic-visible",
+		`upstream failed {"Set-Cookie":"locale=zh; session=cookie-canary; refresh=refresh-canary","reason":"diagnostic-visible"}`,
+	} {
+		t.Run(input, func(t *testing.T) {
+			var buf bytes.Buffer
+			NewJSONLogger(&buf).Error("request failed", "cause", errors.New(input), "detail", input, "safe", "unchanged")
+			for _, secret := range []string{"provider-canary", "pass-canary", "cookie-canary", "refresh-canary"} {
+				if strings.Contains(buf.String(), secret) {
+					t.Errorf("logger leaked %s", secret)
+				}
+			}
+			var entry map[string]any
+			if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{"cause", "detail"} {
+				value, _ := entry[key].(string)
+				if !strings.Contains(value, "upstream failed") || !strings.Contains(value, "diagnostic-visible") {
+					t.Errorf("diagnostic text lost: %s", value)
+				}
+			}
+			if entry["safe"] != "unchanged" {
+				t.Fatal("safe attribute changed")
+			}
+		})
+	}
+}
 
 func TestRedactHeadersMapsAndNestedSecrets(t *testing.T) {
 	headers := http.Header{

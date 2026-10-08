@@ -118,6 +118,39 @@ func TestSafeErrorServiceAndPanicCanaries(t *testing.T) {
 	}
 }
 
+func TestSafeErrorQuotedJSONAndCookieCanaries(t *testing.T) {
+	for _, input := range []string{
+		`upstream failed {"provider_api_key":"provider-canary","password":"pass-canary","reason":"diagnostic-visible"}`,
+		"upstream failed\nCookie: locale=zh; session=cookie-canary; refresh=refresh-canary\ndiagnostic-visible",
+		"upstream failed\nCookie: [REDACTED]; session=cookie-canary\ndiagnostic-visible",
+		"upstream failed\nSet-Cookie: locale=zh; session=cookie-canary; Expires=Wed, 21 Oct 2026 07:28:00 GMT; refresh=refresh-canary\ndiagnostic-visible",
+		`upstream failed {"Cookie":"locale=zh; session=cookie-canary; refresh=refresh-canary","reason":"diagnostic-visible"}`,
+	} {
+		t.Run(input, func(t *testing.T) {
+			var logs bytes.Buffer
+			h := handler{deps: Dependencies{Logger: observability.NewJSONLogger(&logs)}}
+			rec := httptest.NewRecorder()
+			h.withObservability(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				h.writeServiceError(w, r, 500, "INTERNAL_ERROR", "服务暂时不可用", "provider", "request", errors.New(input))
+			})).ServeHTTP(rec, httptest.NewRequest("GET", "/api/test", nil))
+			assertErrorEnvelope(t, rec, 500, "INTERNAL_ERROR")
+			for _, secret := range []string{"provider-canary", "pass-canary", "cookie-canary", "refresh-canary"} {
+				if strings.Contains(logs.String()+rec.Body.String(), secret) {
+					t.Errorf("leaked %s", secret)
+				}
+			}
+			var entry map[string]any
+			if err := json.Unmarshal(bytes.Split(logs.Bytes(), []byte("\n"))[0], &entry); err != nil {
+				t.Fatal(err)
+			}
+			safe, _ := entry["safe_error"].(string)
+			if !strings.Contains(safe, "upstream failed") || !strings.Contains(safe, "diagnostic-visible") {
+				t.Fatalf("diagnostic text lost: %s", safe)
+			}
+		})
+	}
+}
+
 type failingRequestBody struct{}
 
 func (failingRequestBody) Read([]byte) (int, error) { return 0, errors.New(errorCanaries) }
