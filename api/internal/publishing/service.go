@@ -17,6 +17,7 @@ type Store interface {
 	GetAccount(context.Context, int64) (Account, error)
 	ClaimBatchProject(context.Context, int64, int64, int64) error
 	CanAccessBatchProject(context.Context, int64, int64, int64, bool) (bool, error)
+	IsBatchProjectArchived(context.Context, int64) (bool, error)
 	BookBelongsToBatchProject(context.Context, int64, int64) (bool, error)
 	CreateIntentWithAudit(context.Context, Intent, Audit) (Intent, error)
 	GetIntent(context.Context, int64) (Intent, error)
@@ -69,6 +70,9 @@ func (s *Service) CreateIntent(ctx context.Context, actor authn.User, input Crea
 	projectAllowed, err := s.store.CanAccessBatchProject(ctx, input.BatchProjectID, actor.ID, actor.TeamID, elevated(actor))
 	if err != nil { return Intent{}, err }
 	if !projectAllowed { return Intent{}, ErrForbidden }
+	archived, err := s.store.IsBatchProjectArchived(ctx, input.BatchProjectID)
+	if err != nil { return Intent{}, err }
+	if archived { return Intent{}, ErrProjectArchived }
 	if input.BookID > 0 {
 		bookAllowed, err := s.store.BookBelongsToBatchProject(ctx, input.BatchProjectID, input.BookID)
 		if err != nil { return Intent{}, err }

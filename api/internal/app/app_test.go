@@ -62,10 +62,15 @@ func TestNewHandlerWiresPipelineToSameMySQLStore(t *testing.T) {
 	}
 	defer db.Close()
 	now := time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS(SELECT 1 FROM batch_projects WHERE intake_id = ? AND archived_at IS NOT NULL)")).WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"archived"}).AddRow(false))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, status, created_at, updated_at FROM intakes WHERE id = ?")).WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"id", "name", "status", "created_at", "updated_at"}).AddRow(11, "已完成批次", intake.StatusCompleted, now, now))
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = VALUES(name)")).WithArgs(int64(11), "已完成批次").WillReturnResult(sqlmock.NewResult(51, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = IF(archived_at IS NULL, VALUES(name), name)")).WithArgs(int64(11), "已完成批次").WillReturnResult(sqlmock.NewResult(51, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ?")).WithArgs(int64(51)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE")).WithArgs(int64(51)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO runs (batch_project_id,idempotency_key,run_at,status) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)")).WithArgs(int64(51), "pipeline:intake:11:immediate", now, intake.RunStatusPending).WillReturnResult(sqlmock.NewResult(71, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id,batch_project_id,run_at,status FROM runs WHERE id=?")).WithArgs(int64(71)).WillReturnRows(sqlmock.NewRows([]string{"id", "batch_project_id", "run_at", "status"}).AddRow(71, 51, now, intake.RunStatusPending))
+	mock.ExpectCommit()
 	handler := newHandler(db, fakeFetcher{}, nil, func() time.Time { return now }, false)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/intakes/11/batch-projects", bytes.NewBufferString(`{}`))
 	rec := httptest.NewRecorder()
@@ -85,8 +90,8 @@ func TestNewHandlerWiresBatchProjectReaderToMySQLStore(t *testing.T) {
 	}
 	defer db.Close()
 	now := time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC)
-	query := "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.updated_at DESC, bp.id DESC LIMIT 100"
-	mock.ExpectQuery(regexp.QuoteMeta(query)).WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "created_at", "updated_at"}).AddRow(51, 11, "知乎批次", "知乎", 2, "男频", "悬疑", intake.RunStatusPending, now, now))
+	mock.ExpectQuery("^SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery("^SELECT bp.id").WithArgs(20, 0).WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "failure_count", "created_at", "updated_at", "archived_at"}).AddRow(51, 11, "知乎批次", "知乎", 2, "男频", "悬疑", intake.RunStatusPending, 0, now, now, nil))
 	handler := newHandler(db, fakeFetcher{}, nil, func() time.Time { return now }, false)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects", nil)
 	rec := httptest.NewRecorder()

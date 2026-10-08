@@ -65,7 +65,14 @@ func (h runtimeHTTP) retryBookRun(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"code": "RUNTIME_NOT_FOUND", "message": "BookRun 不存在"})
 		return
 	}
+	if !boundary.ensureBatchProjectActive(w, r, projectID) {
+		return
+	}
 	item, created, err := h.runtime.RetryBookRun(r.Context(), bookRunID)
+	if errors.Is(err, task9runtime.ErrProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再重试"})
+		return
+	}
 	if errors.Is(err, task9runtime.ErrBookRunNotRetryable) {
 		writeJSON(w, http.StatusConflict, map[string]any{"code": "RUNTIME_NOT_RETRYABLE", "message": "该 BookRun 当前不可重试"})
 		return

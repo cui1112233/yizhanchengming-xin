@@ -198,21 +198,61 @@ func (s *MySQLStore) ListPrompts(ctx context.Context) ([]Prompt, error) {
 }
 
 func (s *MySQLStore) CreateBookRun(ctx context.Context, v BookRun) (BookRun, error) {
-	r, err := s.db.ExecContext(ctx, `INSERT INTO book_runs(batch_project_id,book_id,status,request_id,error_message,started_at,finished_at) VALUES(?,?,?,?,?,?,?)`, v.BatchProjectID, v.BookID, v.Status, v.RequestID, v.ErrorMessage, v.StartedAt, v.FinishedAt)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return BookRun{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`, v.BatchProjectID).Scan(&archivedAt); err != nil {
+		return BookRun{}, err
+	}
+	if archivedAt.Valid {
+		return BookRun{}, ErrProjectArchived
+	}
+	r, err := tx.ExecContext(ctx, `INSERT INTO book_runs(batch_project_id,book_id,status,request_id,error_message,started_at,finished_at) VALUES(?,?,?,?,?,?,?)`, v.BatchProjectID, v.BookID, v.Status, v.RequestID, v.ErrorMessage, v.StartedAt, v.FinishedAt)
 	if err != nil {
 		return BookRun{}, fmt.Errorf("create book run: %w", err)
 	}
 	v.ID, _ = r.LastInsertId()
+	if err := tx.Commit(); err != nil {
+		return BookRun{}, err
+	}
 	return s.bookRunByID(ctx, v.ID)
 }
 
 func (s *MySQLStore) UpdateBookRun(ctx context.Context, v BookRun) (BookRun, error) {
-	r, err := s.db.ExecContext(ctx, `UPDATE book_runs SET status=?,request_id=?,error_message=?,started_at=?,finished_at=? WHERE id=?`, v.Status, v.RequestID, v.ErrorMessage, v.StartedAt, v.FinishedAt, v.ID)
+	if v.Status != StatusRunning {
+		r, err := s.db.ExecContext(ctx, `UPDATE book_runs SET status=?,request_id=?,error_message=?,started_at=?,finished_at=? WHERE id=?`, v.Status, v.RequestID, v.ErrorMessage, v.StartedAt, v.FinishedAt, v.ID)
+		if err != nil {
+			return BookRun{}, err
+		}
+		if n, _ := r.RowsAffected(); n == 0 {
+			return BookRun{}, ErrNotFound
+		}
+		return s.bookRunByID(ctx, v.ID)
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return BookRun{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`, v.BatchProjectID).Scan(&archivedAt); err != nil {
+		return BookRun{}, err
+	}
+	if archivedAt.Valid {
+		return BookRun{}, ErrProjectArchived
+	}
+	r, err := tx.ExecContext(ctx, `UPDATE book_runs SET status=?,request_id=?,error_message=?,started_at=?,finished_at=? WHERE id=?`, v.Status, v.RequestID, v.ErrorMessage, v.StartedAt, v.FinishedAt, v.ID)
 	if err != nil {
 		return BookRun{}, err
 	}
 	if n, _ := r.RowsAffected(); n == 0 {
 		return BookRun{}, ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return BookRun{}, err
 	}
 	return s.bookRunByID(ctx, v.ID)
 }

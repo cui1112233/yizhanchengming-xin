@@ -196,6 +196,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		ShuihuoMedia:                shuihuoMediaService,
 		IntakeAccess:                store,
 		BatchProjectAccess:          batchProjectAccess,
+		BatchProjectLifecycle:       store,
 		VideoResourceProjects:       videoStore,
 		VideoExecutorBootstrapToken: strings.TrimSpace(os.Getenv("VIDEO_LOCAL_EXECUTOR_BOOTSTRAP_TOKEN")),
 		Database:                    db,

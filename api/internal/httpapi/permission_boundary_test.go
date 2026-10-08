@@ -15,9 +15,9 @@ type permissionBatchReader struct {
 	calls int
 }
 
-func (f *permissionBatchReader) ListBatchProjects(context.Context) ([]intake.BatchProject, error) {
+func (f *permissionBatchReader) ListBatchProjects(_ context.Context, query intake.BatchProjectListQuery) (intake.BatchProjectPage, error) {
 	f.calls++
-	return []intake.BatchProject{{ID: 51, IntakeID: 11, Name: "项目"}}, nil
+	return intake.BatchProjectPage{Projects: []intake.BatchProject{{ID: 51, IntakeID: 11, Name: "项目"}}, Page: query.Page, Limit: query.Limit, Total: 1}, nil
 }
 
 func TestBatchListReturns403ForAuthenticatedUserWithoutCapability(t *testing.T) {

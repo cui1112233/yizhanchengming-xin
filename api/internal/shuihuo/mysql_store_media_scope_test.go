@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
@@ -41,9 +43,12 @@ func TestMySQLStoreCreateMediaTaskRejectsEveryCrossScopeReference(t *testing.T) 
 				i.SourceAssetID, i.SourceAssetID, i.BatchProjectID, i.BookID,
 				i.ProductionTaskID, i.ProductionTaskID, i.BatchProjectID, i.BookID,
 			}
+			mock.ExpectBegin()
+			mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE")).WithArgs(i.BatchProjectID).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
 			mock.ExpectExec(`(?s)INSERT INTO shuihuo_media_tasks.*SELECT.*batch_projects.*books.*shuihuo_storyboard_segments.*shuihuo_media_assets.*video_production_tasks.*video_production_jobs`).
 				WithArgs(args...).
 				WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectRollback()
 
 			_, err = NewMySQLStore(db).CreateMediaTask(context.Background(), i)
 			if !errors.Is(err, ErrNotFound) {
@@ -53,6 +58,41 @@ func TestMySQLStoreCreateMediaTaskRejectsEveryCrossScopeReference(t *testing.T) 
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestMySQLStoreCreateMediaTaskRejectsArchivedProjectUnderLock(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	archivedAt := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE")).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(archivedAt))
+	mock.ExpectRollback()
+	_, err = NewMySQLStore(db).CreateMediaTask(context.Background(), CreateMediaTaskInput{BatchProjectID: 7, BookID: 8, Kind: MediaImage})
+	if !errors.Is(err, ErrProjectArchived) {
+		t.Fatalf("err=%v, want ErrProjectArchived", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLStoreRetryMediaTaskRejectsArchivedProjectUnderLock(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	archivedAt := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE")).WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(archivedAt))
+	mock.ExpectRollback()
+	_, err = NewMySQLStore(db).RetryMediaTask(context.Background(), 7, 8, 9)
+	if !errors.Is(err, ErrProjectArchived) {
+		t.Fatalf("err=%v, want ErrProjectArchived", err)
 	}
 }
 

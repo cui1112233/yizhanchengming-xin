@@ -96,6 +96,7 @@ func (s *MySQLStore) RetryBookRun(ctx context.Context, failedBookRunID int64)(Wo
 	var runID sql.NullInt64;var projectID,bookID int64;var attempt,maxAttempts int;var retryable bool;var status string
 	if err:=tx.QueryRowContext(ctx,`SELECT run_id,batch_project_id,book_id,attempt,max_attempts,retryable,status FROM book_runs WHERE id=? FOR UPDATE`,failedBookRunID).Scan(&runID,&projectID,&bookID,&attempt,&maxAttempts,&retryable,&status);err!=nil{return WorkItem{},false,err}
 	if !runID.Valid||status!="failed"||!retryable||attempt>=maxAttempts{return WorkItem{},false,ErrBookRunNotRetryable}
+	var archivedAt sql.NullTime;if err:=tx.QueryRowContext(ctx,`SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`,projectID).Scan(&archivedAt);err!=nil{return WorkItem{},false,err};if archivedAt.Valid{return WorkItem{},false,ErrProjectArchived}
 	next:=attempt+1
 	res,err:=tx.ExecContext(ctx,`INSERT INTO book_runs (run_id,batch_project_id,book_id,attempt,max_attempts,retryable,status) VALUES (?,?,?,?,?,1,'queued') ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)`,runID.Int64,projectID,bookID,next,maxAttempts);if err!=nil{return WorkItem{},false,err}
 	id,err:=res.LastInsertId();if err!=nil{return WorkItem{},false,err};affected,_:=res.RowsAffected();created:=affected==1

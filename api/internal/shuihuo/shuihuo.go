@@ -61,6 +61,7 @@ var (
 	ErrInvalidReorder     = errors.New("shuihuo: reorder must contain every segment exactly once")
 	ErrStorageUnavailable = errors.New("shuihuo: object storage is unavailable")
 	ErrInvalidUpload      = errors.New("shuihuo: invalid upload")
+	ErrProjectArchived    = errors.New("batch project is archived")
 )
 
 const uploadedObjectCleanupTimeout = 5 * time.Second
@@ -553,13 +554,28 @@ func (s *MySQLStore) SelectCandidate(c context.Context, p, b, taskID, candidateI
 	return out, e
 }
 func (s *MySQLStore) RetryMediaTask(c context.Context, p, b, taskID int64) (out MediaTask, e error) {
-	r, e := s.db.ExecContext(c, `UPDATE shuihuo_media_tasks SET status='pending_executor',error_code='',error_message='' WHERE id=? AND batch_project_id=? AND book_id=? AND production_task_id IS NULL AND status IN ('pending_executor','retryable_failed')`, taskID, p, b)
+	tx, e := s.db.BeginTx(c, nil)
+	if e != nil {
+		return out, e
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if e = tx.QueryRowContext(c, `SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`, p).Scan(&archivedAt); e != nil {
+		return out, e
+	}
+	if archivedAt.Valid {
+		return out, ErrProjectArchived
+	}
+	r, e := tx.ExecContext(c, `UPDATE shuihuo_media_tasks SET status='pending_executor',error_code='',error_message='' WHERE id=? AND batch_project_id=? AND book_id=? AND production_task_id IS NULL AND status IN ('pending_executor','retryable_failed')`, taskID, p, b)
 	if e != nil {
 		return out, e
 	}
 	n, _ := r.RowsAffected()
 	if n == 0 {
 		return out, ErrNotFound
+	}
+	if e = tx.Commit(); e != nil {
+		return out, e
 	}
 	return s.task(c, taskID)
 }
@@ -688,10 +704,22 @@ func (s *MySQLStore) ListAssets(c context.Context, p, b, seg int64) (out []Asset
 	return
 }
 func (s *MySQLStore) CreateMediaTask(c context.Context, i CreateMediaTaskInput) (MediaTask, error) {
-	r, e := s.db.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)
+	tx, e := s.db.BeginTx(c, nil)
+	if e != nil {
+		return MediaTask{}, e
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if e = tx.QueryRowContext(c, `SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`, i.BatchProjectID).Scan(&archivedAt); e != nil {
+		return MediaTask{}, e
+	}
+	if archivedAt.Valid {
+		return MediaTask{}, ErrProjectArchived
+	}
+	r, e := tx.ExecContext(c, `INSERT INTO shuihuo_media_tasks(batch_project_id,book_id,segment_id,source_asset_id,production_task_id,media_kind,provider,model,request_id)
 SELECT ?,?,?,?,?,?,?,?,?
 FROM batch_projects p JOIN books b ON b.intake_id=p.intake_id
-WHERE p.id=? AND b.id=?
+WHERE p.id=? AND p.archived_at IS NULL AND b.id=?
 AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_storyboard_segments s WHERE s.id=? AND s.batch_project_id=? AND s.book_id=?))
 AND (?=0 OR EXISTS(SELECT 1 FROM shuihuo_media_assets a WHERE a.id=? AND a.batch_project_id=? AND a.book_id=?))
 AND (?=0 OR EXISTS(SELECT 1 FROM video_production_tasks linked_vpt JOIN video_production_jobs linked_vpj ON linked_vpj.id=linked_vpt.production_job_id WHERE linked_vpt.id=? AND linked_vpj.batch_project_id=? AND linked_vpj.book_id=?))`,
@@ -711,6 +739,9 @@ AND (?=0 OR EXISTS(SELECT 1 FROM video_production_tasks linked_vpt JOIN video_pr
 		return MediaTask{}, ErrNotFound
 	}
 	id, _ := r.LastInsertId()
+	if e = tx.Commit(); e != nil {
+		return MediaTask{}, e
+	}
 	return s.task(c, id)
 }
 func (s *MySQLStore) MarkExecutorUnavailable(c context.Context, id int64, code, message string) (MediaTask, error) {

@@ -67,7 +67,15 @@ WHERE t.id IN (`+strings.Join(placeholders, ",")+`)`, args...)
 }
 
 func (s *MySQLStore) CreateMergeJob(ctx context.Context, job MergeJob) (MergeJob, error) {
-	result, err := s.db.ExecContext(ctx, `INSERT INTO video_merge_jobs
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return MergeJob{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := lockActiveBatchProject(ctx, tx, job.BatchProjectID); err != nil {
+		return MergeJob{}, err
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO video_merge_jobs
 (batch_project_id, book_id, status, current_attempt, error_message, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)`, job.BatchProjectID, job.BookID, job.Status, job.CurrentAttempt, job.ErrorMessage, job.CreatedAt, job.UpdatedAt)
 	if err != nil {
@@ -75,6 +83,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?)`, job.BatchProjectID, job.BookID, job.Status, job.C
 	}
 	job.ID, err = result.LastInsertId()
 	if err != nil {
+		return MergeJob{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return MergeJob{}, err
 	}
 	return s.GetMergeJob(ctx, job.ID)
@@ -116,6 +127,13 @@ func (s *MySQLStore) CreateMergeAttempt(ctx context.Context, attempt MergeAttemp
 		return MergeAttempt{}, err
 	}
 	defer tx.Rollback()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT p.archived_at FROM video_merge_jobs j JOIN batch_projects p ON p.id=j.batch_project_id WHERE j.id=? FOR UPDATE`, attempt.MergeJobID).Scan(&archivedAt); err != nil {
+		return MergeAttempt{}, err
+	}
+	if archivedAt.Valid {
+		return MergeAttempt{}, ErrProjectArchived
+	}
 	result, err := tx.ExecContext(ctx, `INSERT INTO video_merge_attempts
 (merge_job_id, attempt, status, aspect_ratio, speed, output_bucket, output_object_key, output_url, error_message, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, attempt.MergeJobID, attempt.Attempt, attempt.Status, attempt.AspectRatio, attempt.Speed, attempt.OutputBucket, attempt.OutputObjectKey, attempt.OutputURL, attempt.ErrorMessage, attempt.CreatedAt, attempt.UpdatedAt)

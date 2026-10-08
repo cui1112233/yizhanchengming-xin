@@ -31,11 +31,12 @@ func TestMySQLStoreGetsBatchProjectByID(t *testing.T) {
 
 	store := NewMySQLStore(db)
 	now := time.Date(2026, 10, 5, 8, 30, 0, 0, time.UTC)
-	query := "SELECT id, intake_id, name, created_at, updated_at FROM batch_projects WHERE id = ?"
+	archivedAt := now.Add(time.Hour)
+	query := "SELECT id, intake_id, name, created_at, updated_at, archived_at FROM batch_projects WHERE id = ?"
 	mock.ExpectQuery(regexp.QuoteMeta(query)).
 		WithArgs(int64(51)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "created_at", "updated_at"}).
-			AddRow(51, 11, "真实批次", now, now))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "created_at", "updated_at", "archived_at"}).
+			AddRow(51, 11, "真实批次", now, now, archivedAt))
 
 	project, err := store.GetBatchProject(context.Background(), 51)
 	if err != nil {
@@ -43,6 +44,9 @@ func TestMySQLStoreGetsBatchProjectByID(t *testing.T) {
 	}
 	if project.ID != 51 || project.IntakeID != 11 || project.Name != "真实批次" {
 		t.Fatalf("project = %+v", project)
+	}
+	if project.ArchivedAt == nil || !project.ArchivedAt.Equal(archivedAt) {
+		t.Fatalf("archivedAt = %v, want %v", project.ArchivedAt, archivedAt)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

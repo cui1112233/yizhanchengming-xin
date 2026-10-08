@@ -10,6 +10,7 @@ var (
 	ErrConflict                 = errors.New("generation: conflict")
 	ErrInvalid                  = errors.New("generation: invalid")
 	ErrUnavailable              = errors.New("generation: unavailable")
+	ErrProjectArchived          = errors.New("batch project is archived")
 	ErrAudioProbeUnavailable    = errors.New("audio_probe_unavailable")
 	ErrAudioMeasurementRequired = errors.New("audio_measurement_required")
 )

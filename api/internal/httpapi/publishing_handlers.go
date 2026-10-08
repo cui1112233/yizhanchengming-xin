@@ -50,6 +50,7 @@ func (h handler) listPublishAudits(w http.ResponseWriter, r *http.Request) {
 func writePublishingError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err,publishing.ErrInvalid): writeJSON(w,http.StatusBadRequest,map[string]any{"code":"PUBLISH_INVALID_REQUEST","message":"发布参数无效"})
+	case errors.Is(err,publishing.ErrProjectArchived): writeJSON(w,http.StatusConflict,map[string]any{"code":"BATCH_PROJECT_ARCHIVED","message":"项目已归档，请先恢复后再发布"})
 	case errors.Is(err,publishing.ErrForbidden): writeJSON(w,http.StatusForbidden,map[string]any{"code":"AUTH_FORBIDDEN","message":"你没有执行此发布操作的权限"})
 	case errors.Is(err,publishing.ErrNotFound): writeJSON(w,http.StatusNotFound,map[string]any{"code":"PUBLISH_NOT_FOUND","message":"发布资源不存在"})
 	case errors.Is(err,publishing.ErrUnavailable): writeJSON(w,http.StatusServiceUnavailable,map[string]any{"code":"PUBLISH_UNAVAILABLE","message":"发布服务暂不可用"})

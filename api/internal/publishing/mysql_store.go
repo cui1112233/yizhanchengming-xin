@@ -60,6 +60,14 @@ func (s *MySQLStore) CanAccessBatchProject(ctx context.Context, projectID, userI
 	return allowed, err
 }
 
+func (s *MySQLStore) IsBatchProjectArchived(ctx context.Context, projectID int64) (bool, error) {
+	if s == nil || s.db == nil { return false, ErrUnavailable }
+	var archived bool
+	err := s.db.QueryRowContext(ctx, `SELECT archived_at IS NOT NULL FROM batch_projects WHERE id = ?`, projectID).Scan(&archived)
+	if errors.Is(err, sql.ErrNoRows) { return false, ErrNotFound }
+	return archived, err
+}
+
 func (s *MySQLStore) BookBelongsToBatchProject(ctx context.Context, projectID, bookID int64) (bool, error) {
 	if s == nil || s.db == nil { return false, ErrUnavailable }
 	var allowed bool
@@ -69,6 +77,7 @@ func (s *MySQLStore) BookBelongsToBatchProject(ctx context.Context, projectID, b
 
 func (s *MySQLStore) CreateIntentWithAudit(ctx context.Context, intent Intent, audit Audit) (Intent, error) {
 	tx, err := s.db.BeginTx(ctx, nil); if err != nil { return Intent{}, err }; defer tx.Rollback()
+	var archivedAt sql.NullTime; err = tx.QueryRowContext(ctx, `SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE`, intent.BatchProjectID).Scan(&archivedAt); if errors.Is(err, sql.ErrNoRows) { return Intent{}, ErrNotFound }; if err != nil { return Intent{}, err }; if archivedAt.Valid { return Intent{}, ErrProjectArchived }
 	var book any; if intent.BookID > 0 { book = intent.BookID }
 	result, err := tx.ExecContext(ctx, `INSERT INTO publish_intents (batch_project_id, book_id, publishing_account_id, requested_by_user_id, platform, status, requested_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, intent.BatchProjectID, book, intent.PublishingAccountID, intent.RequestedByUserID, intent.Platform, intent.Status, intent.RequestedAt, intent.UpdatedAt)
 	if err != nil { return Intent{}, err }

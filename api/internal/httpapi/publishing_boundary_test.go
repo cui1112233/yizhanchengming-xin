@@ -16,6 +16,7 @@ type fakePublishingService struct {
 	createIntentCalls  int
 	listAuditCalls     int
 	audits             []publishing.Audit
+	createIntentErr    error
 }
 func (f *fakePublishingService) CreateAccount(_ context.Context, actor authn.User, input publishing.CreateAccountInput) (publishing.Account, error) {
 	f.createAccountCalls++
@@ -24,7 +25,7 @@ func (f *fakePublishingService) CreateAccount(_ context.Context, actor authn.Use
 func (f *fakePublishingService) ListAccounts(context.Context, authn.User) ([]publishing.Account, error) { return nil, nil }
 func (f *fakePublishingService) CreateIntent(_ context.Context, actor authn.User, input publishing.CreateIntentInput) (publishing.Intent, error) {
 	f.createIntentCalls++
-	return publishing.Intent{ID: 73, BatchProjectID: input.BatchProjectID, PublishingAccountID: input.PublishingAccountID, RequestedByUserID: actor.ID, Platform: "douyin", Status: publishing.IntentStatusPending}, nil
+	return publishing.Intent{ID: 73, BatchProjectID: input.BatchProjectID, PublishingAccountID: input.PublishingAccountID, RequestedByUserID: actor.ID, Platform: "douyin", Status: publishing.IntentStatusPending}, f.createIntentErr
 }
 func (f *fakePublishingService) GetIntent(context.Context, authn.User, int64) (publishing.Intent, error) { return publishing.Intent{}, nil }
 func (f *fakePublishingService) ListAudits(context.Context, authn.User, int64) ([]publishing.Audit, error) { f.listAuditCalls++; return f.audits, nil }
@@ -77,6 +78,12 @@ func TestPublishIntentRejectsBrowserSuppliedOutputURL(t *testing.T) {
 	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodPost, "/api/v1/publishing/intents", `{"batchProjectId":21,"publishingAccountId":11,"outputRef":"https://evil.example/video.mp4"}`))
 	if rec.Code != http.StatusBadRequest { t.Fatalf("status=%d body=%s, want 400", rec.Code, rec.Body.String()) }
 	if service.createIntentCalls != 0 { t.Fatalf("service calls=%d; browser media URL must never reach publish service", service.createIntentCalls) }
+}
+
+func TestPublishIntentMapsArchivedProjectToSharedConflictCode(t *testing.T) {
+	service := &fakePublishingService{createIntentErr: publishing.ErrProjectArchived}; auth := &fakeAuthService{user: authn.User{ID: 7, Capabilities: []string{CapabilityPublishExecute}}}; handler := NewHandler(Dependencies{Auth: auth, Publishing: service})
+	rec := httptest.NewRecorder(); handler.ServeHTTP(rec, publishingRequest(http.MethodPost, "/api/v1/publishing/intents", `{"batchProjectId":21,"publishingAccountId":11}`))
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"code":"BATCH_PROJECT_ARCHIVED"`) || service.createIntentCalls != 1 { t.Fatalf("status=%d calls=%d body=%s", rec.Code, service.createIntentCalls, rec.Body.String()) }
 }
 
 func TestPublishAuditRequiresAuditCapability(t *testing.T) {

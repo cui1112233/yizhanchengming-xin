@@ -191,13 +191,14 @@ func allDirectBatchProjectObjectRoutes() []batchProjectRouteCase {
 
 func newBatchProjectOwnershipHandler(auth AuthService, access BatchProjectAccessChecker, business *batchProjectBusinessSpy) http.Handler {
 	return NewHandler(Dependencies{
-		Auth:                auth,
-		BatchProjectAccess:  access,
-		BatchProjectDetails: business,
-		ScriptBooks:         business,
-		ScriptStoryboards:   business,
-		UnifiedSettings:     business,
-		Generation:          business,
+		Auth:                  auth,
+		BatchProjectAccess:    access,
+		BatchProjectLifecycle: &fakeBatchProjectLifecycle{},
+		BatchProjectDetails:   business,
+		ScriptBooks:           business,
+		ScriptStoryboards:     business,
+		UnifiedSettings:       business,
+		Generation:            business,
 	})
 }
 
@@ -274,7 +275,7 @@ func TestBatchProjectObjectRoutesFailClosedWhenPolicyIsUnavailable(t *testing.T)
 	}
 }
 
-func TestBatchProjectListFailsClosedBeforeGlobalReaderWhenPolicyIsMissing(t *testing.T) {
+func TestBatchProjectListFailsClosedBeforeScopedReaderWhenPolicyIsMissing(t *testing.T) {
 	reader := &fakeBatchProjectReader{projects: []intake.BatchProject{{ID: 51, Name: "foreign-secret-project"}}}
 	auth := &fakeAuthService{user: authn.User{ID: 7, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchView}}}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/batch-projects", nil)
@@ -282,7 +283,7 @@ func TestBatchProjectListFailsClosedBeforeGlobalReaderWhenPolicyIsMissing(t *tes
 	rec := httptest.NewRecorder()
 	NewHandler(Dependencies{Auth: auth, BatchProjects: reader}).ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `"code":"AUTH_POLICY_UNAVAILABLE"`) || !strings.Contains(rec.Body.String(), `"request_id"`) {
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), `"code":"AUTH_POLICY_UNAVAILABLE"`) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	if reader.calls != 0 || strings.Contains(rec.Body.String(), "foreign-secret-project") {

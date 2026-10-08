@@ -48,7 +48,15 @@ FROM video_provider_configs WHERE provider_key=? AND model=? LIMIT 1`, provider,
 }
 
 func (s *MySQLStore) CreateOrGetProductionJob(ctx context.Context, job ProductionJob) (ProductionJob, bool, error) {
-	result, err := s.db.ExecContext(ctx, `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return ProductionJob{}, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := lockActiveBatchProject(ctx, tx, job.BatchProjectID); err != nil {
+		return ProductionJob{}, false, err
+	}
+	result, err := tx.ExecContext(ctx, `
 INSERT INTO video_production_jobs
 (batch_project_id, book_id, status, input_revision, final_prompt_stage_run_id, final_prompt_version, final_prompt_text, provider, model, idempotency_key, error_code, error_message)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -60,6 +68,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		if err != nil {
 			return ProductionJob{}, false, err
 		}
+		if err := tx.Commit(); err != nil {
+			return ProductionJob{}, false, err
+		}
 		loaded, err := s.GetProductionJob(ctx, job.ID)
 		return loaded, true, err
 	}
@@ -67,8 +78,26 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	if !errors.As(err, &mysqlErr) || mysqlErr.Number != 1062 {
 		return ProductionJob{}, false, err
 	}
+	if err := tx.Commit(); err != nil {
+		return ProductionJob{}, false, err
+	}
 	existing, err := s.getProductionJobByIdempotency(ctx, job.IdempotencyKey)
 	return existing, false, err
+}
+
+func lockActiveBatchProject(ctx context.Context, tx *sql.Tx, projectID int64) error {
+	var archivedAt sql.NullTime
+	err := tx.QueryRowContext(ctx, `SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`, projectID).Scan(&archivedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if archivedAt.Valid {
+		return ErrProjectArchived
+	}
+	return nil
 }
 
 func (s *MySQLStore) getProductionJobByIdempotency(ctx context.Context, key string) (ProductionJob, error) {
@@ -90,7 +119,19 @@ func (s *MySQLStore) GetProductionJob(ctx context.Context, id int64) (Production
 }
 
 func (s *MySQLStore) CreateProductionTask(ctx context.Context, task ProductionTask) (ProductionTask, error) {
-	result, err := s.db.ExecContext(ctx, `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return ProductionTask{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT p.archived_at FROM video_production_jobs j JOIN batch_projects p ON p.id=j.batch_project_id WHERE j.id=? FOR UPDATE`, task.ProductionJobID).Scan(&archivedAt); err != nil {
+		return ProductionTask{}, err
+	}
+	if archivedAt.Valid {
+		return ProductionTask{}, ErrProjectArchived
+	}
+	result, err := tx.ExecContext(ctx, `
 INSERT INTO video_production_tasks
 (production_job_id, attempt, provider, model, request_id, provider_job_id, status, error_code, error_message, artifact_source_url, output_bucket, output_object_key, output_url)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -102,6 +143,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	}
 	task.ID, err = result.LastInsertId()
 	if err != nil {
+		return ProductionTask{}, err
+	}
+	if err := tx.Commit(); err != nil {
 		return ProductionTask{}, err
 	}
 	return s.GetProductionTask(ctx, task.ID)

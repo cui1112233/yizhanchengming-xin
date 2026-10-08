@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/workshop"
 )
 
@@ -95,6 +96,10 @@ func (h handler) restoreWorkshopBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	book, err := h.deps.Intakes.RestoreBook(r.Context(), intakeID, bookID, body.MaxText)
+	if errors.Is(err, intake.ErrBatchProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再恢复原文"})
+		return
+	}
 	if err != nil {
 		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "BOOK_RESTORE_FAILED", "原文恢复失败", "intake", "restore_book", err)
 		return

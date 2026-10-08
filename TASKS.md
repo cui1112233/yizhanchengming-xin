@@ -702,7 +702,7 @@
 
 ## 2026-10-09 · BatchProject 全路由对象级归属安全边界
 
-> 状态：⚠️ 本安全切片随本提交进入 `main`；仓库 Go 测试完成，真实登录态浏览器与公网验收仍未执行。本切片不包含列表分页或软归档。
+> 状态：⚠️ BatchProject 后端归属、SQL 列表投影与软归档合同已在仓库实现；真实 MySQL migration、前端 UI、登录态浏览器与公网验收仍未执行。
 
 - [x] 所有直接携带 BatchProject `{id}` / `{projectId}` 的详情、原文、分镜读写/排序/重编译、统一设置/版本配置、生成/音频/阶段、Novel Panel、水火、项目视频与合成路由，均在业务 service/store 调用前复用同一 `requireBatchProjectAccess` 边界。
 - [x] 读取与写入继续先要求各自 capability；写操作继续要求同源 CSRF。只有 `admin/owner` 作为 elevated 角色，`dev/manager/member` 不按角色绕过，普通 owner 或非零同团队归属由 MySQL `auth_batch_project_ownership` 判定，`teamId=0` 不参与团队匹配。
@@ -710,5 +710,6 @@
 - [x] BookRun 重试、VIDEO task / merge resource 路由继续先把资源 ID 解析为所属项目再授权；发布意图、详情与审计继续保留 publishing service 的项目归属与账号归属双重校验，没有重复建立第二套授权规则。
 - [x] 项目列表在认证启用但归属策略缺失时于读取全局项目列表前 fail-closed；原有服务层归属校验继续作为 defense-in-depth。
 - [x] 仓库验证：`go test ./internal/httpapi -count=1` 与 `go test ./... -count=1` 均退出码 0。
-- [ ] BatchProject 列表服务端分页、搜索/筛选契约仍未实现；不得把当前全量读取后过滤视为分页完成。
-- [ ] BatchProject 软归档、恢复、归档数据可见性与删除语义仍未设计/实现；本切片没有新增 schema 或伪造归档状态。
+- [x] `GET /api/v1/batch-projects` 已在 MySQL SQL 层完成 owner/非零 team 范围、`q/source/status/archived`、`page/limit`、`updated_desc/name_asc` 筛选与 COUNT，返回真实 latest run status、failure count 及稳定二级 ID 排序；未再全局 LIMIT 后用 Go N+1 过滤。
+- [x] additive migration `00020_batch_project_archive.sql` 与 archive/restore API 已实现软归档；保留 books/runs/stages/media/publishing/TOS 事实，活跃任务冲突返回 `BATCH_PROJECT_ACTIVE`。Pipeline run、BookRun 生成/重试、水火媒体、视频/合成与发布意图在写事务内锁定同一项目行；归档后新建/修改/重试/发布返回 `BATCH_PROJECT_ARCHIVED`，读取、恢复与已有任务 cancel 仍允许。
+- [ ] `00020` 尚未对本机 `ycm_staging` 执行；归档列表/UI、真实登录换账号、刷新恢复与公网视觉验收仍属后续任务。

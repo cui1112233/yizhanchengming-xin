@@ -46,6 +46,8 @@ func (h handler) retryVideoMerge(w http.ResponseWriter, r *http.Request) {
 
 func writeMergeError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, video.ErrProjectArchived):
+		writeJSON(w, http.StatusConflict, map[string]any{"code":"BATCH_PROJECT_ARCHIVED","message":"项目已归档，请先恢复后再合成视频"})
 	case errors.Is(err, video.ErrMergeInputNotReady):
 		writeJSON(w, http.StatusConflict, map[string]any{"error":"merge_input_not_ready","message":"all merge inputs must be succeeded VIDEO tasks from this project/book"})
 	case errors.Is(err, video.ErrMergeRetryNotAllowed):

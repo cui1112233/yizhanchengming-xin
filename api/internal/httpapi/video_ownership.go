@@ -11,6 +11,8 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 )
 
+type resolvedBatchProjectContextKey struct{}
+
 type BatchProjectAccessChecker interface {
 	CanAccessBatchProject(context.Context, int64, int64, int64, bool) (bool, error)
 }
@@ -34,7 +36,23 @@ func (h handler) requireBatchProjectAccess(pathKey string, next http.Handler) ht
 		if !h.authorizeBatchProject(w, r, projectID) {
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resolvedBatchProjectContextKey{}, projectID)))
+	})
+}
+
+func (h handler) requireActiveResolvedBatchProject(next http.Handler) http.Handler {
+	if h.deps.Auth == nil && h.deps.BatchProjectLifecycle == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		projectID, ok := r.Context().Value(resolvedBatchProjectContextKey{}).(int64)
+		if !ok || projectID <= 0 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "BATCH_PROJECT_POLICY_UNAVAILABLE", "message": "项目状态校验暂不可用"})
+			return
+		}
+		if h.ensureBatchProjectActive(w, r, projectID) {
+			next.ServeHTTP(w, r)
+		}
 	})
 }
 
@@ -80,7 +98,26 @@ const (
 
 func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProjectResolverFunc, next http.Handler) http.Handler {
 	if h.deps.Auth == nil {
-		return next
+		if h.deps.BatchProjectLifecycle == nil {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			resourceID, err := strconv.ParseInt(r.PathValue(pathKey), 10, 64)
+			if err != nil || resourceID <= 0 {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"code": "VIDEO_INVALID_REQUEST", "message": "VIDEO resource ID 无效"})
+				return
+			}
+			projectID, err := resolve(r.Context(), resourceID)
+			if errors.Is(err, video.ErrNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]any{"code": "VIDEO_NOT_FOUND", "message": "VIDEO resource 不存在"})
+				return
+			}
+			if err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "BATCH_PROJECT_POLICY_UNAVAILABLE", "message": "项目状态校验暂不可用"})
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resolvedBatchProjectContextKey{}, projectID)))
+		})
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resourceID, err := strconv.ParseInt(r.PathValue(pathKey), 10, 64)
@@ -116,7 +153,7 @@ func (h handler) requireVideoResourceAccess(pathKey string, resolve videoProject
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "AUTH_POLICY_UNAVAILABLE", "message": "项目权限校验暂不可用"})
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), resolvedBatchProjectContextKey{}, projectID)))
 	})
 }
 

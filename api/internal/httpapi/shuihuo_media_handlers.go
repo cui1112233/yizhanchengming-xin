@@ -29,6 +29,10 @@ func sid(r *http.Request, k string) (int64, error) {
 	return v, nil
 }
 func (h handler) swerr(w http.ResponseWriter, r *http.Request, e error) {
+	if errors.Is(e, shuihuo.ErrProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]string{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再创建媒体任务"})
+		return
+	}
 	if errors.Is(e, shuihuo.ErrStorageUnavailable) {
 		writeJSON(w, 503, map[string]string{"error": "storage_unavailable", "message": "TOS storage is not configured"})
 		return

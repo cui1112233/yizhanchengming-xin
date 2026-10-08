@@ -99,7 +99,7 @@ func TestVideoResourceAccessSafelyRejectsResolverFailureBeforeBusiness(t *testin
 	resolver := &videoResourceResolverSpy{err: errors.New("mysql dsn=secret")}
 	business := &videoBusinessSpy{}
 	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchExecute}}}
-	h := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: true}, VideoResourceProjects: resolver, Video: business})
+	h := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: true}, BatchProjectLifecycle: &fakeBatchProjectLifecycle{}, VideoResourceProjects: resolver, Video: business})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, videoResourceRequest())
 
@@ -177,7 +177,7 @@ func TestVideoResourceAccessAuthorizedRequestReachesBusiness(t *testing.T) {
 	resolver := &videoResourceResolverSpy{projectID: 77}
 	business := &videoBusinessSpy{}
 	auth := task14AuthStub{user: authn.User{ID: 12, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchExecute}}}
-	h := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: true}, VideoResourceProjects: resolver, Video: business})
+	h := NewHandler(Dependencies{Auth: auth, BatchProjectAccess: task14ProjectAccessStub{allowed: true}, BatchProjectLifecycle: &fakeBatchProjectLifecycle{}, VideoResourceProjects: resolver, Video: business})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, videoResourceRequest())
 

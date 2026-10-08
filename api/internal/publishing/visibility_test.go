@@ -91,6 +91,15 @@ func TestMySQLElevatedProjectAccessStillRequiresExistingProject(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
 }
 
+func TestMySQLPublishingArchiveGuardReadsCanonicalBatchProjectFact(t *testing.T) {
+	db, mock, err := sqlmock.New(); if err != nil { t.Fatal(err) }; defer db.Close()
+	query := `SELECT archived_at IS NOT NULL FROM batch_projects WHERE id = ?`
+	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(int64(21)).WillReturnRows(sqlmock.NewRows([]string{"archived"}).AddRow(true))
+	archived, err := NewMySQLStore(db).IsBatchProjectArchived(context.Background(), 21)
+	if err != nil || !archived { t.Fatalf("archived=%v err=%v", archived, err) }
+	if err := mock.ExpectationsWereMet(); err != nil { t.Fatal(err) }
+}
+
 func TestMySQLAuditVisibilityCannotCrossOwnerOrTeamBoundary(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil { t.Fatal(err) }

@@ -2,6 +2,7 @@ package publishing
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
@@ -36,6 +37,7 @@ func TestMySQLIntentAndAuditAreAtomic(t *testing.T) {
 	audit:=Audit{BatchProjectID:21,AccountID:11,ActorUserID:7,Platform:"douyin",Action:"intent.created",Result:AuditResultAccepted,CreatedAt:now}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE")).WithArgs(int64(21)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO publish_intents (batch_project_id, book_id, publishing_account_id, requested_by_user_id, platform, status, requested_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" )).
 		WithArgs(int64(21),int64(22),int64(11),int64(7),"douyin",IntentStatusPending,now,now).
 		WillReturnResult(sqlmock.NewResult(73,1))
@@ -56,9 +58,21 @@ func TestMySQLIntentRollsBackWhenAuditInsertFails(t *testing.T) {
 	audit:=Audit{BatchProjectID:21,AccountID:11,ActorUserID:7,Platform:"douyin",Action:"intent.created",Result:AuditResultAccepted,CreatedAt:now}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE")).WithArgs(int64(21)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
 	mock.ExpectExec("INSERT INTO publish_intents").WillReturnResult(sqlmock.NewResult(73,1))
 	mock.ExpectExec("INSERT INTO publish_audits").WillReturnError(context.DeadlineExceeded)
 	mock.ExpectRollback()
 	if _,err:=store.CreateIntentWithAudit(context.Background(),intent,audit);err==nil{t.Fatal("expected audit failure to roll back intent transaction")}
+	if err:=mock.ExpectationsWereMet();err!=nil{t.Fatal(err)}
+}
+
+func TestMySQLIntentTransactionRejectsArchivedProject(t *testing.T) {
+	db,mock,err:=sqlmock.New(); if err!=nil{t.Fatal(err)}; defer db.Close()
+	store:=NewMySQLStore(db); now:=time.Date(2026,10,9,12,0,0,0,time.UTC)
+	intent:=Intent{BatchProjectID:21,PublishingAccountID:11,RequestedByUserID:7,Platform:"douyin",Status:IntentStatusPending,RequestedAt:now,UpdatedAt:now}
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE")).WithArgs(int64(21)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(now))
+	mock.ExpectRollback()
+	if _,err:=store.CreateIntentWithAudit(context.Background(),intent,Audit{});!errors.Is(err,ErrProjectArchived){t.Fatalf("err=%v, want ErrProjectArchived",err)}
 	if err:=mock.ExpectationsWereMet();err!=nil{t.Fatal(err)}
 }

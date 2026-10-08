@@ -46,7 +46,7 @@ type NovelPanelService interface {
 }
 
 type BatchProjectReader interface {
-	ListBatchProjects(context.Context) ([]intake.BatchProject, error)
+	ListBatchProjects(context.Context, intake.BatchProjectListQuery) (intake.BatchProjectPage, error)
 }
 
 type WorkspaceRecentReader interface {
@@ -57,6 +57,13 @@ type WorkspaceRecentReader interface {
 type BatchProjectDetailReader interface {
 	GetBatchProject(ctx context.Context, id int64) (intake.BatchProject, error)
 	ListBooks(ctx context.Context, intakeID int64) ([]intake.Book, error)
+}
+
+type BatchProjectLifecycle interface {
+	ArchiveBatchProject(context.Context, int64, int64) error
+	RestoreBatchProject(context.Context, int64) error
+	IsBatchProjectArchived(context.Context, int64) (bool, error)
+	IsIntakeBatchProjectArchived(context.Context, int64) (bool, error)
 }
 
 type ScriptBookEditor interface {
@@ -155,6 +162,7 @@ type Dependencies struct {
 	ShuihuoMedia                ShuihuoMediaService
 	IntakeAccess                IntakeAccessChecker
 	BatchProjectAccess          BatchProjectAccessChecker
+	BatchProjectLifecycle       BatchProjectLifecycle
 	VideoResourceProjects       VideoResourceProjectResolver
 	VideoExecutorBootstrapToken string
 	Database                    *sql.DB
@@ -173,6 +181,12 @@ func NewHandler(values ...Dependencies) http.Handler {
 	}
 	api := handler{deps: deps}
 	mux := http.NewServeMux()
+	batchMutation := func(capability, pathKey string, next http.Handler) http.Handler {
+		return api.requireSameOrigin(api.requireCapability(capability, api.requireBatchProjectAccess(pathKey, api.requireActiveBatchProject(pathKey, next))))
+	}
+	intakeMutation := func(capability string, next http.Handler) http.Handler {
+		return api.requireSameOrigin(api.requireCapability(capability, api.requireIntakeAccess("id", api.requireActiveIntakeBatchProject("id", next))))
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -194,59 +208,61 @@ func NewHandler(values ...Dependencies) http.Handler {
 	// Stage 1: Shuihuo/Batch Factory intake and project access.
 	mux.Handle("POST /api/v1/intakes", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createIntake))))
 	mux.Handle("GET /api/v1/intakes", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIntakes)))
-	mux.Handle("POST /api/v1/intakes/{id}/execute", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireIntakeAccess("id", http.HandlerFunc(api.executeIntake)))))
+	mux.Handle("POST /api/v1/intakes/{id}/execute", intakeMutation(CapabilityBatchExecute, http.HandlerFunc(api.executeIntake)))
 	mux.Handle("GET /api/v1/intakes/{id}/books", api.requireCapability(CapabilityBatchView, api.requireIntakeAccess("id", http.HandlerFunc(api.listBooks))))
 	mux.Handle("GET /api/v1/intakes/{id}/workshop", api.requireCapability(CapabilityBatchView, api.requireIntakeAccess("id", http.HandlerFunc(api.getWorkshop))))
-	mux.Handle("PUT /api/v1/intakes/{id}/workshop", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireIntakeAccess("id", http.HandlerFunc(api.saveWorkshop)))))
-	mux.Handle("POST /api/v1/intakes/{id}/books/{bookId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireIntakeAccess("id", http.HandlerFunc(api.restoreWorkshopBook)))))
-	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireIntakeAccess("id", http.HandlerFunc(api.createOwnedBatchProject)))))
+	mux.Handle("PUT /api/v1/intakes/{id}/workshop", intakeMutation(CapabilityBatchConfigure, http.HandlerFunc(api.saveWorkshop)))
+	mux.Handle("POST /api/v1/intakes/{id}/books/{bookId}/restore", intakeMutation(CapabilityBatchExecute, http.HandlerFunc(api.restoreWorkshopBook)))
+	mux.Handle("POST /api/v1/intakes/{id}/batch-projects", intakeMutation(CapabilityBatchExecute, http.HandlerFunc(api.createOwnedBatchProject)))
 	mux.Handle("GET /api/v1/batch-projects", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listBatchProjects)))
 	// SECURITY: every object route carrying {id}/{projectId} below must put
 	// requireBatchProjectAccess inside its capability check, so callers cannot
 	// use ownership responses as an oracle and business services never see a
 	// foreign project. Resource-ID routes resolve their project separately.
 	mux.Handle("GET /api/v1/batch-projects/{id}", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.getBatchProject))))
-	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/original-text", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.saveScriptOriginalText)))))
+	mux.Handle("POST /api/v1/batch-projects/{id}/archive", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.archiveBatchProject)))))
+	mux.Handle("POST /api/v1/batch-projects/{id}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.restoreBatchProject)))))
+	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/original-text", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.saveScriptOriginalText)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.scriptStoryboard))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.scriptStoryboard)))))
-	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards/{cardId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.scriptStoryboard)))))
-	mux.Handle("DELETE /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards/{cardId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.scriptStoryboard)))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/reorder", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.scriptStoryboard)))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/recompile", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.scriptStoryboard)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.scriptStoryboard)))
+	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards/{cardId}", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.scriptStoryboard)))
+	mux.Handle("DELETE /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/cards/{cardId}", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.scriptStoryboard)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/reorder", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.scriptStoryboard)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/storyboard/recompile", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.scriptStoryboard)))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.getNovelPanel))))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/novel-panel", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.saveNovelPanel)))))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/novel-panel", batchMutation(CapabilityBatchConfigure, "id", http.HandlerFunc(api.saveNovelPanel)))
 	mux.Handle("GET /api/v1/batch-projects/{id}/novel-panel/history", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.listNovelPanelHistory))))
-	mux.Handle("POST /api/v1/batch-projects/{id}/novel-panel/history/{historyId}/restore", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.restoreNovelPanelHistory)))))
+	mux.Handle("POST /api/v1/batch-projects/{id}/novel-panel/history/{historyId}/restore", batchMutation(CapabilityBatchConfigure, "id", http.HandlerFunc(api.restoreNovelPanelHistory)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.shuihuoSegments))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.shuihuoSegments)))))
-	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/{segmentId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.updateShuihuoSegment)))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/reorder", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.reorderShuihuoSegments)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.shuihuoSegments)))
+	mux.Handle("PUT /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/{segmentId}", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.updateShuihuoSegment)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/segments/reorder", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.reorderShuihuoSegments)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.shuihuoAssets))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets/upload", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.uploadShuihuoAsset)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets/upload", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.uploadShuihuoAsset)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/assets/{assetId}/content", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.readShuihuoAsset))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.shuihuoMediaTasks)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.shuihuoMediaTasks)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/candidates", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.listShuihuoCandidates))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/candidates/{candidateId}/select", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.selectShuihuoCandidate)))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.retryShuihuoMediaTask)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/candidates/{candidateId}/select", batchMutation(CapabilityBatchConfigure, "projectId", http.HandlerFunc(api.selectShuihuoCandidate)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/shuihuo/media-tasks/{taskId}/retry", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.retryShuihuoMediaTask)))
 
 	// Stage 2: unified settings/version profile.
 	mux.Handle("GET /api/v1/batch-projects/{id}/settings", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.getUnifiedSettings))))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/production", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.saveProductionSettings)))))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/publishing", api.requireSameOrigin(api.requireCapability(CapabilityPublishConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.savePublishingSettings)))))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/production", batchMutation(CapabilityBatchConfigure, "id", http.HandlerFunc(api.saveProductionSettings)))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/settings/publishing", batchMutation(CapabilityPublishConfigure, "id", http.HandlerFunc(api.savePublishingSettings)))
 	mux.Handle("GET /api/v1/batch-projects/{id}/version-profile", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("id", http.HandlerFunc(api.getVersionProfile))))
-	mux.Handle("PUT /api/v1/batch-projects/{id}/version-profile", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.saveVersionProfile)))))
-	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-121", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.sync121Settings)))))
-	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-style-types", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, api.requireBatchProjectAccess("id", http.HandlerFunc(api.syncStyleTypes)))))
+	mux.Handle("PUT /api/v1/batch-projects/{id}/version-profile", batchMutation(CapabilityBatchConfigure, "id", http.HandlerFunc(api.saveVersionProfile)))
+	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-121", batchMutation(CapabilityBatchConfigure, "id", http.HandlerFunc(api.sync121Settings)))
+	mux.Handle("POST /api/v1/batch-projects/{id}/version-profile/sync-style-types", batchMutation(CapabilityBatchConfigure, "id", http.HandlerFunc(api.syncStyleTypes)))
 
 	// Stage 3: generation reads and mutations.
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/generation", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.projectGeneration))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/generation", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.projectGeneration)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/generation", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.projectGeneration)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.bookGeneration))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.bookGeneration)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.bookGeneration)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/audio-measurement", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.audioMeasurement))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/audio-measurement", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.audioMeasurement)))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.retryGenerationStage)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/audio-measurement", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.audioMeasurement)))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}/retry", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.retryGenerationStage)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation/stages/{stage}", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.generationStage))))
 
 	// Only immutable system presets are public. Private/project prompts must be registered behind auth.
@@ -276,13 +292,13 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("PUT /api/v1/video-providers/{provider}/models/{model}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.putVideoProviderConfig))))
 	mux.Handle("GET /api/v1/video-providers/{provider}/models/{model}/status", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.getVideoProviderStatus)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/video", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.projectVideoStatus))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.startVideo)))))
-	mux.Handle("POST /api/v1/video-tasks/{taskId}/poll", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(http.HandlerFunc(api.pollVideoTask)))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/video", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.startVideo)))
+	mux.Handle("POST /api/v1/video-tasks/{taskId}/poll", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(api.requireActiveResolvedBatchProject(http.HandlerFunc(api.pollVideoTask))))))
 	mux.Handle("POST /api/v1/video-tasks/{taskId}/cancel", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(http.HandlerFunc(api.cancelVideoTask)))))
-	mux.Handle("POST /api/v1/video-tasks/{taskId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(http.HandlerFunc(api.retryVideoTask)))))
-	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/merge", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.startVideoMerge)))))
+	mux.Handle("POST /api/v1/video-tasks/{taskId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoTaskAccess(api.requireActiveResolvedBatchProject(http.HandlerFunc(api.retryVideoTask))))))
+	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/merge", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.startVideoMerge)))
 	mux.Handle("GET /api/v1/video-merge-jobs/{jobId}", api.requireCapability(CapabilityBatchView, api.requireVideoMergeJobAccess(http.HandlerFunc(api.getVideoMerge))))
-	mux.Handle("POST /api/v1/video-merge-attempts/{attemptId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoMergeAttemptAccess(http.HandlerFunc(api.retryVideoMerge)))))
+	mux.Handle("POST /api/v1/video-merge-attempts/{attemptId}/retry", api.requireSameOrigin(api.requireCapability(CapabilityBatchExecute, api.requireVideoMergeAttemptAccess(api.requireActiveResolvedBatchProject(http.HandlerFunc(api.retryVideoMerge))))))
 
 	// Local executor traffic has a distinct service identity. Registration uses a
 	// server-side bootstrap token; heartbeat/identity/complete/fail continue to

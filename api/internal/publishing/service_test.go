@@ -22,6 +22,8 @@ type fakeStore struct {
 	denyProjectAccess bool
 	bookBelongs       bool
 	bookChecks        int
+	projectArchived   bool
+	archiveChecks     int
 }
 
 func (s *fakeStore) CreateAccountWithCredential(_ context.Context, account Account, credential EncryptedCredential) (Account, error) {
@@ -60,6 +62,10 @@ func (s *fakeStore) CanAccessBatchProject(context.Context, int64, int64, int64, 
 func (s *fakeStore) BookBelongsToBatchProject(context.Context, int64, int64) (bool, error) {
 	s.bookChecks++
 	return s.bookBelongs, nil
+}
+func (s *fakeStore) IsBatchProjectArchived(context.Context, int64) (bool, error) {
+	s.archiveChecks++
+	return s.projectArchived, nil
 }
 func (s *fakeStore) CreateIntentWithAudit(_ context.Context, intent Intent, audit Audit) (Intent, error) {
 	intent.ID = 73
@@ -152,6 +158,24 @@ func TestCreatePublishIntentAllowsSameTeamAndDerivesPlatformFromAccount(t *testi
 	}
 	if store.bookChecks != 1 {
 		t.Fatalf("book checks=%d want 1", store.bookChecks)
+	}
+}
+
+func TestCreatePublishIntentRejectsArchivedProjectWithoutWrites(t *testing.T) {
+	store := &fakeStore{
+		accounts:        map[int64]Account{11: {ID: 11, OwnerUserID: 7, TeamID: 3, Platform: "douyin", CredentialRefID: "cred-11", Active: true}},
+		bookBelongs:     true,
+		projectArchived: true,
+	}
+	service := publishingTestService(store, time.Now)
+	actor := authn.User{ID: 7, TeamID: 3}
+
+	_, err := service.CreateIntent(context.Background(), actor, CreateIntentInput{BatchProjectID: 21, BookID: 22, PublishingAccountID: 11})
+	if !errors.Is(err, ErrProjectArchived) {
+		t.Fatalf("err=%v, want ErrProjectArchived", err)
+	}
+	if store.archiveChecks != 1 || store.bookChecks != 0 || store.createdIntent.ID != 0 || store.createdAudit.ID != 0 {
+		t.Fatalf("archiveChecks=%d bookChecks=%d intent=%#v audit=%#v", store.archiveChecks, store.bookChecks, store.createdIntent, store.createdAudit)
 	}
 }
 

@@ -11,6 +11,7 @@ var (
 	ErrForbidden   = errors.New("publishing access forbidden")
 	ErrNotFound    = errors.New("publishing resource not found")
 	ErrUnavailable = errors.New("publishing service unavailable")
+	ErrProjectArchived = errors.New("batch project is archived")
 )
 
 const (

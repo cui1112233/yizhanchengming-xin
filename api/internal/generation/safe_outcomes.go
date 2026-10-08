@@ -16,6 +16,7 @@ var outcomeCatalogue = [...]struct {
 	{ErrInvalid, Outcome{"GENERATION_INVALID", "生成参数无效，请检查后重试"}},
 	{ErrNotFound, Outcome{"GENERATION_NOT_FOUND", "生成记录不存在，请刷新后重试"}},
 	{ErrConflict, Outcome{"GENERATION_CONFLICT", "当前生成状态不允许此操作，请刷新后重试"}},
+	{ErrProjectArchived, Outcome{"BATCH_PROJECT_ARCHIVED", "项目已归档，请先恢复后再生成"}},
 	{ErrAudioMeasurementRequired, Outcome{"AUDIO_MEASUREMENT_REQUIRED", "请先生成或检测音频"}},
 	{ErrAudioProbeUnavailable, Outcome{"AUDIO_PROBE_UNAVAILABLE", "音频检测服务暂不可用，请稍后重试"}},
 	{ErrTimelineValidation, Outcome{"GENERATION_TIMELINE_INVALID", "导演分镜时长校验失败，请重试导演阶段"}},

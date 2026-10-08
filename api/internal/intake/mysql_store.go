@@ -3,8 +3,14 @@ package intake
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
+)
+
+var (
+	ErrBatchProjectActive   = errors.New("batch project has active work")
+	ErrBatchProjectArchived = errors.New("batch project is archived")
 )
 
 type MySQLStore struct {
@@ -123,14 +129,37 @@ func (s *MySQLStore) CanAccessIntake(ctx context.Context, intakeID, userID, team
 }
 
 func (s *MySQLStore) UpdateIntakeStatus(ctx context.Context, id int64, status Status) error {
-	result, err := s.db.ExecContext(ctx, "UPDATE intakes SET status = ? WHERE id = ?", status, id)
+	if status != StatusRunning {
+		result, err := s.db.ExecContext(ctx, "UPDATE intakes SET status = ? WHERE id = ?", status, id)
+		if err != nil {
+			return fmt.Errorf("update intake status: %w", err)
+		}
+		if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+			return sql.ErrNoRows
+		}
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin update intake status: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	err = tx.QueryRowContext(ctx, "SELECT bp.archived_at FROM batch_projects bp WHERE bp.intake_id = ? FOR UPDATE", id).Scan(&archivedAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("lock intake batch project: %w", err)
+	}
+	if archivedAt.Valid {
+		return ErrBatchProjectArchived
+	}
+	result, err := tx.ExecContext(ctx, "UPDATE intakes SET status = ? WHERE id = ?", status, id)
 	if err != nil {
 		return fmt.Errorf("update intake status: %w", err)
 	}
 	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
 		return sql.ErrNoRows
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (s *MySQLStore) UpsertBook(ctx context.Context, book Book) (Book, error) {
@@ -224,7 +253,7 @@ func (s *MySQLStore) UpdateBookOriginalText(ctx context.Context, intakeID, bookI
 }
 
 func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProject) (BatchProject, error) {
-	const query = "INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = VALUES(name)"
+	const query = "INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = IF(archived_at IS NULL, VALUES(name), name)"
 	result, err := s.db.ExecContext(ctx, query, project.IntakeID, project.Name)
 	if err != nil {
 		return BatchProject{}, fmt.Errorf("create batch project: %w", err)
@@ -234,30 +263,48 @@ func (s *MySQLStore) CreateBatchProject(ctx context.Context, project BatchProjec
 		return BatchProject{}, fmt.Errorf("read batch project id: %w", err)
 	}
 	project.ID = id
+	var archivedAt sql.NullTime
+	if err := s.db.QueryRowContext(ctx, "SELECT archived_at FROM batch_projects WHERE id = ?", id).Scan(&archivedAt); err != nil {
+		return BatchProject{}, fmt.Errorf("read batch project archive state: %w", err)
+	}
+	if archivedAt.Valid {
+		return BatchProject{}, ErrBatchProjectArchived
+	}
 	return project, nil
 }
 
 func (s *MySQLStore) GetBatchProject(ctx context.Context, id int64) (BatchProject, error) {
 	var project BatchProject
 	err := s.db.QueryRowContext(ctx,
-		"SELECT id, intake_id, name, created_at, updated_at FROM batch_projects WHERE id = ?",
+		"SELECT id, intake_id, name, created_at, updated_at, archived_at FROM batch_projects WHERE id = ?",
 		id,
-	).Scan(&project.ID, &project.IntakeID, &project.Name, &project.CreatedAt, &project.UpdatedAt)
+	).Scan(&project.ID, &project.IntakeID, &project.Name, &project.CreatedAt, &project.UpdatedAt, &project.ArchivedAt)
 	if err != nil {
 		return BatchProject{}, fmt.Errorf("get batch project: %w", err)
 	}
 	return project, nil
 }
 
-func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, error) {
-	const query = "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.updated_at DESC, bp.id DESC LIMIT 100"
-	rows, err := s.db.QueryContext(ctx, query)
+func (s *MySQLStore) ListBatchProjects(ctx context.Context, filter BatchProjectListQuery) (BatchProjectPage, error) {
+	page := BatchProjectPage{Page: filter.Page, Limit: filter.Limit, Projects: []BatchProject{}}
+	where, args := batchProjectListWhere(filter)
+	countQuery := "SELECT COUNT(*) FROM batch_projects bp" + where
+	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&page.Total); err != nil {
+		return BatchProjectPage{}, fmt.Errorf("count batch projects: %w", err)
+	}
+	order := " ORDER BY bp.updated_at DESC, bp.id DESC"
+	if filter.Sort == BatchProjectSortNameAsc {
+		order = " ORDER BY bp.name ASC, bp.id ASC"
+	}
+	const selectColumns = "SELECT bp.id, bp.intake_id, bp.name, COALESCE((SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|') FROM books b WHERE b.intake_id = bp.intake_id), ''), (SELECT COUNT(*) FROM books bc WHERE bc.intake_id = bp.intake_id), COALESCE((SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(bg.gender), '') ORDER BY bg.gender SEPARATOR '|') FROM books bg WHERE bg.intake_id = bp.intake_id), ''), COALESCE((SELECT GROUP_CONCAT(DISTINCT NULLIF(TRIM(bs.style), '') ORDER BY bs.style SEPARATOR '|') FROM books bs WHERE bs.intake_id = bp.intake_id), ''), COALESCE((SELECT lr.status FROM runs lr WHERE lr.batch_project_id = bp.id ORDER BY lr.run_at DESC, lr.id DESC LIMIT 1), ''), COALESCE((SELECT COUNT(*) FROM book_runs br WHERE br.run_id = (SELECT fr.id FROM runs fr WHERE fr.batch_project_id = bp.id ORDER BY fr.run_at DESC, fr.id DESC LIMIT 1) AND br.attempt = (SELECT MAX(br_latest.attempt) FROM book_runs br_latest WHERE br_latest.run_id = br.run_id AND br_latest.book_id = br.book_id) AND br.status IN ('failed','retryable_failed')), 0), bp.created_at, bp.updated_at, bp.archived_at FROM batch_projects bp"
+	query := selectColumns + where + order + " LIMIT ? OFFSET ?"
+	queryArgs := append(append([]any(nil), args...), filter.Limit, (filter.Page-1)*filter.Limit)
+	rows, err := s.db.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("list batch projects: %w", err)
+		return BatchProjectPage{}, fmt.Errorf("list batch projects: %w", err)
 	}
 	defer rows.Close()
 
-	projects := make([]BatchProject, 0)
 	for rows.Next() {
 		var project BatchProject
 		var sources, genders, styles, runStatus string
@@ -270,21 +317,150 @@ func (s *MySQLStore) ListBatchProjects(ctx context.Context) ([]BatchProject, err
 			&genders,
 			&styles,
 			&runStatus,
+			&project.FailureCount,
 			&project.CreatedAt,
 			&project.UpdatedAt,
+			&project.ArchivedAt,
 		); err != nil {
-			return nil, fmt.Errorf("scan batch project: %w", err)
+			return BatchProjectPage{}, fmt.Errorf("scan batch project: %w", err)
 		}
 		project.Sources = splitBatchProjectSummary(sources)
 		project.Genders = splitBatchProjectSummary(genders)
 		project.Styles = splitBatchProjectSummary(styles)
 		project.RunStatus = RunStatus(strings.TrimSpace(runStatus))
-		projects = append(projects, project)
+		page.Projects = append(page.Projects, project)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate batch projects: %w", err)
+		return BatchProjectPage{}, fmt.Errorf("iterate batch projects: %w", err)
 	}
-	return projects, nil
+	return page, nil
+}
+
+func batchProjectListWhere(filter BatchProjectListQuery) (string, []any) {
+	conditions := make([]string, 0, 5)
+	args := make([]any, 0, 10)
+	switch filter.Archived {
+	case BatchProjectArchivedActive:
+		conditions = append(conditions, "bp.archived_at IS NULL")
+	case BatchProjectArchivedArchived:
+		conditions = append(conditions, "bp.archived_at IS NOT NULL")
+	}
+	if !filter.Elevated {
+		conditions = append(conditions, "EXISTS (SELECT 1 FROM auth_batch_project_ownership o WHERE o.batch_project_id = bp.id AND (o.owner_user_id = ? OR (? > 0 AND o.team_id IS NOT NULL AND o.team_id = ?)))")
+		args = append(args, filter.UserID, filter.TeamID, filter.TeamID)
+	}
+	if query := strings.ToLower(strings.TrimSpace(filter.Query)); query != "" {
+		conditions = append(conditions, "(LOWER(bp.name) LIKE ? OR EXISTS (SELECT 1 FROM books qb WHERE qb.intake_id = bp.intake_id AND (LOWER(qb.title) LIKE ? OR LOWER(qb.external_book_id) LIKE ?)))")
+		like := "%" + query + "%"
+		args = append(args, like, like, like)
+	}
+	if source := strings.TrimSpace(filter.Source); source != "" {
+		conditions = append(conditions, "EXISTS (SELECT 1 FROM books sb WHERE sb.intake_id = bp.intake_id AND sb.source = ?)")
+		args = append(args, source)
+	}
+	if status := strings.TrimSpace(string(filter.Status)); status != "" {
+		conditions = append(conditions, "COALESCE((SELECT sr.status FROM runs sr WHERE sr.batch_project_id = bp.id ORDER BY sr.run_at DESC, sr.id DESC LIMIT 1), '') = ?")
+		args = append(args, status)
+	}
+	if len(conditions) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(conditions, " AND "), args
+}
+
+const activeBatchProjectQuery = "SELECT EXISTS(SELECT 1 FROM runs WHERE batch_project_id = ? AND status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM book_runs WHERE batch_project_id = ? AND status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM stage_runs sr JOIN book_runs br ON br.id = sr.book_run_id WHERE br.batch_project_id = ? AND sr.status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM shuihuo_media_tasks WHERE batch_project_id = ? AND status IN ('pending_executor','pending','queued','scheduled','running') UNION ALL SELECT 1 FROM video_production_jobs WHERE batch_project_id = ? AND status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM video_production_tasks vt JOIN video_production_jobs vj ON vj.id = vt.production_job_id WHERE vj.batch_project_id = ? AND vt.status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM video_merge_jobs WHERE batch_project_id = ? AND status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM video_merge_attempts va JOIN video_merge_jobs vj ON vj.id = va.merge_job_id WHERE vj.batch_project_id = ? AND va.status IN ('pending','queued','scheduled','running') UNION ALL SELECT 1 FROM intakes i JOIN batch_projects bp ON bp.intake_id = i.id WHERE bp.id = ? AND i.status = 'running')"
+
+func (s *MySQLStore) ArchiveBatchProject(ctx context.Context, projectID, actorUserID int64) error {
+	if s == nil || s.db == nil || projectID <= 0 || actorUserID <= 0 {
+		return fmt.Errorf("archive batch project: invalid request")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin archive batch project: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, "SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE", projectID).Scan(&archivedAt); err != nil {
+		return fmt.Errorf("lock batch project: %w", err)
+	}
+	if archivedAt.Valid {
+		return tx.Commit()
+	}
+	var active bool
+	if err := tx.QueryRowContext(ctx, activeBatchProjectQuery, projectID, projectID, projectID, projectID, projectID, projectID, projectID, projectID, projectID).Scan(&active); err != nil {
+		return fmt.Errorf("check active batch project work: %w", err)
+	}
+	if active {
+		return ErrBatchProjectActive
+	}
+	result, err := tx.ExecContext(ctx, "UPDATE batch_projects SET archived_at = UTC_TIMESTAMP(6), archived_by_user_id = ? WHERE id = ? AND archived_at IS NULL", actorUserID, projectID)
+	if err != nil {
+		return fmt.Errorf("archive batch project: %w", err)
+	}
+	if affected, affectedErr := result.RowsAffected(); affectedErr != nil || affected != 1 {
+		if affectedErr != nil {
+			return fmt.Errorf("archive batch project rows: %w", affectedErr)
+		}
+		return fmt.Errorf("archive batch project: %w", sql.ErrNoRows)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit archive batch project: %w", err)
+	}
+	return nil
+}
+
+func (s *MySQLStore) RestoreBatchProject(ctx context.Context, projectID int64) error {
+	if s == nil || s.db == nil || projectID <= 0 {
+		return fmt.Errorf("restore batch project: invalid request")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin restore batch project: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, "SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE", projectID).Scan(&archivedAt); err != nil {
+		return fmt.Errorf("lock batch project: %w", err)
+	}
+	if !archivedAt.Valid {
+		return tx.Commit()
+	}
+	result, err := tx.ExecContext(ctx, "UPDATE batch_projects SET archived_at = NULL, archived_by_user_id = NULL WHERE id = ? AND archived_at IS NOT NULL", projectID)
+	if err != nil {
+		return fmt.Errorf("restore batch project: %w", err)
+	}
+	if affected, affectedErr := result.RowsAffected(); affectedErr != nil || affected != 1 {
+		if affectedErr != nil {
+			return fmt.Errorf("restore batch project rows: %w", affectedErr)
+		}
+		return fmt.Errorf("restore batch project: %w", sql.ErrNoRows)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit restore batch project: %w", err)
+	}
+	return nil
+}
+
+func (s *MySQLStore) IsBatchProjectArchived(ctx context.Context, projectID int64) (bool, error) {
+	if s == nil || s.db == nil || projectID <= 0 {
+		return false, fmt.Errorf("batch project archive reader unavailable")
+	}
+	var archived bool
+	if err := s.db.QueryRowContext(ctx, "SELECT archived_at IS NOT NULL FROM batch_projects WHERE id = ?", projectID).Scan(&archived); err != nil {
+		return false, fmt.Errorf("read batch project archive state: %w", err)
+	}
+	return archived, nil
+}
+
+func (s *MySQLStore) IsIntakeBatchProjectArchived(ctx context.Context, intakeID int64) (bool, error) {
+	if s == nil || s.db == nil || intakeID <= 0 {
+		return false, fmt.Errorf("batch project archive reader unavailable")
+	}
+	var archived bool
+	if err := s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM batch_projects WHERE intake_id = ? AND archived_at IS NOT NULL)", intakeID).Scan(&archived); err != nil {
+		return false, fmt.Errorf("read intake batch project archive state: %w", err)
+	}
+	return archived, nil
 }
 
 func splitBatchProjectSummary(value string) []string {
@@ -301,7 +477,19 @@ func splitBatchProjectSummary(value string) []string {
 }
 
 func (s *MySQLStore) CreateRun(ctx context.Context, run Run) (Run, error) {
-	result, err := s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Run{}, fmt.Errorf("begin create run: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, "SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE", run.BatchProjectID).Scan(&archivedAt); err != nil {
+		return Run{}, fmt.Errorf("lock batch project for run: %w", err)
+	}
+	if archivedAt.Valid {
+		return Run{}, ErrBatchProjectArchived
+	}
+	result, err := tx.ExecContext(ctx,
 		"INSERT INTO runs (batch_project_id, run_at, status) VALUES (?, ?, ?)",
 		run.BatchProjectID,
 		run.RunAt,
@@ -315,5 +503,8 @@ func (s *MySQLStore) CreateRun(ctx context.Context, run Run) (Run, error) {
 		return Run{}, fmt.Errorf("read run id: %w", err)
 	}
 	run.ID = id
+	if err := tx.Commit(); err != nil {
+		return Run{}, fmt.Errorf("commit create run: %w", err)
+	}
 	return run, nil
 }

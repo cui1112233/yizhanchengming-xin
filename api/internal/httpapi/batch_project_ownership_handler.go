@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 )
 
@@ -40,6 +42,10 @@ func (h handler) createOwnedBatchProject(w http.ResponseWriter, r *http.Request)
 		create.RunAt = parsed
 	}
 	result, err := h.deps.Pipeline.Create(r.Context(), create)
+	if errors.Is(err, intake.ErrBatchProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再修改"})
+		return
+	}
 	if err != nil {
 		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "BATCH_PROJECT_CREATE_FAILED", "创建批量项目失败", "batch_project", "create", err)
 		return
@@ -56,6 +62,6 @@ func (h handler) createOwnedBatchProject(w http.ResponseWriter, r *http.Request)
 
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"project": projectResponse{ID: result.Project.ID, IntakeID: result.Project.IntakeID, Name: result.Project.Name},
-		"run": runResponse{ID: result.Run.ID, BatchProjectID: result.Run.BatchProjectID, RunAt: result.Run.RunAt, Status: result.Run.Status},
+		"run":     runResponse{ID: result.Run.ID, BatchProjectID: result.Run.BatchProjectID, RunAt: result.Run.RunAt, Status: result.Run.Status},
 	})
 }

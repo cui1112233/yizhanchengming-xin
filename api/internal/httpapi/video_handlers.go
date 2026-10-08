@@ -174,6 +174,10 @@ func parseVideoTaskID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 }
 
 func writeVideoServiceError(w http.ResponseWriter, err error) {
+	if errors.Is(err, video.ErrProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再生成视频"})
+		return
+	}
 	if errors.Is(err, video.ErrFinalPromptNotReady) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": "final_prompt_not_ready", "message": "completed FINAL_PROMPT is required"})
 		return

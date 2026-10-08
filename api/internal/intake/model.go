@@ -23,10 +23,14 @@ const (
 type RunStatus string
 
 const (
-	RunStatusPending   RunStatus = "pending"
-	RunStatusRunning   RunStatus = "running"
-	RunStatusCompleted RunStatus = "completed"
-	RunStatusFailed    RunStatus = "failed"
+	RunStatusPending       RunStatus = "pending"
+	RunStatusQueued        RunStatus = "queued"
+	RunStatusScheduled     RunStatus = "scheduled"
+	RunStatusRunning       RunStatus = "running"
+	RunStatusCompleted     RunStatus = "completed"
+	RunStatusSucceeded     RunStatus = "succeeded"
+	RunStatusPartialFailed RunStatus = "partial_failed"
+	RunStatusFailed        RunStatus = "failed"
 )
 
 type Intake struct {
@@ -65,16 +69,53 @@ type Book struct {
 }
 
 type BatchProject struct {
-	ID        int64
-	IntakeID  int64
-	Name      string
-	Sources   []string
-	BookCount int
-	Genders   []string
-	Styles    []string
-	RunStatus RunStatus
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           int64
+	IntakeID     int64
+	Name         string
+	Sources      []string
+	BookCount    int
+	Genders      []string
+	Styles       []string
+	RunStatus    RunStatus
+	FailureCount int
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	ArchivedAt   *time.Time
+}
+
+type BatchProjectArchivedFilter string
+
+const (
+	BatchProjectArchivedActive   BatchProjectArchivedFilter = "active"
+	BatchProjectArchivedArchived BatchProjectArchivedFilter = "archived"
+	BatchProjectArchivedAll      BatchProjectArchivedFilter = "all"
+)
+
+type BatchProjectSort string
+
+const (
+	BatchProjectSortUpdatedDesc BatchProjectSort = "updated_desc"
+	BatchProjectSortNameAsc     BatchProjectSort = "name_asc"
+)
+
+type BatchProjectListQuery struct {
+	UserID   int64
+	TeamID   int64
+	Elevated bool
+	Query    string
+	Source   string
+	Status   RunStatus
+	Archived BatchProjectArchivedFilter
+	Page     int
+	Limit    int
+	Sort     BatchProjectSort
+}
+
+type BatchProjectPage struct {
+	Projects []BatchProject
+	Page     int
+	Limit    int
+	Total    int
 }
 
 type Run struct {

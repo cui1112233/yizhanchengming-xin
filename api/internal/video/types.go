@@ -83,7 +83,10 @@ func providerError(code ErrorCode, message string, err error) error {
 	return &ProviderError{Code: code, Message: message, Err: err}
 }
 
-var ErrNotFound = errors.New("video: not found")
+var (
+	ErrNotFound        = errors.New("video: not found")
+	ErrProjectArchived = errors.New("batch project is archived")
+)
 
 type ProviderConfig struct {
 	ID              int64     `json:"id"`
@@ -192,8 +195,8 @@ type ArtifactStore interface {
 }
 
 type ProductionJob struct {
-	ID                   int64
-	BatchProjectID       int64
+	ID                    int64
+	BatchProjectID        int64
 	BookID                int64
 	Status                JobStatus
 	InputRevision         string

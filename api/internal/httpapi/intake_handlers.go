@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,14 +77,18 @@ type bookResponse struct {
 }
 
 type projectResponse struct {
-	ID        int64            `json:"id"`
-	IntakeID  int64            `json:"intakeId"`
-	Name      string           `json:"name"`
-	Sources   []string         `json:"sources,omitempty"`
-	BookCount int              `json:"bookCount,omitempty"`
-	Genders   []string         `json:"genders,omitempty"`
-	Styles    []string         `json:"styles,omitempty"`
-	RunStatus intake.RunStatus `json:"runStatus,omitempty"`
+	ID           int64            `json:"id"`
+	IntakeID     int64            `json:"intakeId"`
+	Name         string           `json:"name"`
+	Sources      []string         `json:"sources,omitempty"`
+	BookCount    int              `json:"bookCount,omitempty"`
+	Genders      []string         `json:"genders,omitempty"`
+	Styles       []string         `json:"styles,omitempty"`
+	RunStatus    intake.RunStatus `json:"runStatus,omitempty"`
+	FailureCount int              `json:"failureCount"`
+	CreatedAt    *time.Time       `json:"createdAt,omitempty"`
+	UpdatedAt    *time.Time       `json:"updatedAt,omitempty"`
+	ArchivedAt   *time.Time       `json:"archivedAt"`
 }
 
 type runResponse struct {
@@ -188,6 +193,10 @@ func (h handler) executeIntake(w http.ResponseWriter, r *http.Request) {
 	requestID := requestIDFromRequest(r)
 	h.logger().Info("intake execute started", "request_id", requestID, "subsystem", "intake", "intake_id", id)
 	result, err := h.deps.Intakes.ExecuteIntake(r.Context(), id, request.MaxText)
+	if errors.Is(err, intake.ErrBatchProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再执行"})
+		return
+	}
 	if err != nil {
 		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "INTAKE_EXECUTE_FAILED", "小说获取执行失败", "intake", "execute", err)
 		return
@@ -261,6 +270,10 @@ func (h handler) createBatchProject(w http.ResponseWriter, r *http.Request) {
 		create.RunAt = parsed
 	}
 	result, err := h.deps.Pipeline.Create(r.Context(), create)
+	if errors.Is(err, intake.ErrBatchProjectArchived) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "BATCH_PROJECT_ARCHIVED", "message": "项目已归档，请先恢复后再修改"})
+		return
+	}
 	if err != nil {
 		h.writeServiceError(w, r, http.StatusUnprocessableEntity, "BATCH_PROJECT_CREATE_FAILED", "创建批量项目失败", "batch_project", "create", err)
 		return

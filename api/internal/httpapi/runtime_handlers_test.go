@@ -39,7 +39,7 @@ func TestRuntimeRetryRejectsForeignURLProjectBeforeResolvingBookRun(t *testing.T
 	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
 	access := &fakeRuntimeAccess{allowed: false}
 	runtime := &fakeRuntimeService{projectID: 7}
-	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access, BatchProjectLifecycle: &fakeBatchProjectLifecycle{}}, runtime)
 	req := runtimeRetryRequest()
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
 	rec := httptest.NewRecorder()
@@ -74,7 +74,7 @@ func TestRuntimeRetryRejectsBookRunWhoseResolvedProjectDoesNotMatchURL(t *testin
 	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
 	access := &fakeRuntimeAccess{allowed: true}
 	runtime := &fakeRuntimeService{projectID: 99}
-	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access, BatchProjectLifecycle: &fakeBatchProjectLifecycle{}}, runtime)
 	req := runtimeRetryRequest()
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
 	rec := httptest.NewRecorder()
@@ -211,7 +211,7 @@ func TestRuntimeRetryUsesExistingTask15BoundariesAndReturnsAttempt(t *testing.T)
 	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "member", TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}}
 	access := &fakeRuntimeAccess{allowed: true}
 	runtime := &fakeRuntimeService{projectID: 7, item: task9runtime.WorkItem{BookRunID: 42, BookID: 9, Attempt: 2}, created: true}
-	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access, BatchProjectLifecycle: &fakeBatchProjectLifecycle{}}, runtime)
 	req := runtimeRetryRequest()
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
 	rec := httptest.NewRecorder()
@@ -247,7 +247,7 @@ func TestRuntimeRetryMapsNonRetryableWithoutLeakingInternalError(t *testing.T) {
 	auth := &fakeAuthService{user: authn.User{ID: 5, Role: "admin", Capabilities: authn.EffectiveCapabilities("admin", []string{CapabilityBatchExecute})}}
 	access := &fakeRuntimeAccess{allowed: true}
 	runtime := &fakeRuntimeService{projectID: 7, retryErr: task9runtime.ErrBookRunNotRetryable}
-	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access}, runtime)
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access, BatchProjectLifecycle: &fakeBatchProjectLifecycle{}}, runtime)
 	req := runtimeRetryRequest()
 	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
 	rec := httptest.NewRecorder()
@@ -257,5 +257,25 @@ func TestRuntimeRetryMapsNonRetryableWithoutLeakingInternalError(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(rec.Body.String()), "secret") {
 		t.Fatal(errors.New("sensitive error leaked"))
+	}
+}
+
+func TestRuntimeRetryRejectsArchivedProjectBeforeCreatingAttempt(t *testing.T) {
+	auth := &fakeAuthService{user: authn.User{ID: 7, TeamID: 3, Role: "member", Capabilities: []string{CapabilityBatchExecute}}}
+	access := &fakeRuntimeAccess{allowed: true}
+	lifecycle := &fakeBatchProjectLifecycle{archived: true}
+	runtime := &fakeRuntimeService{projectID: 7}
+	h := NewHandlerWithRuntime(Dependencies{Auth: auth, BatchProjectAccess: access, BatchProjectLifecycle: lifecycle}, runtime)
+	req := runtimeRetryRequest()
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), `"code":"BATCH_PROJECT_ARCHIVED"`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if runtime.retryCalls != 0 || lifecycle.stateCalls != 1 {
+		t.Fatalf("retry=%d lifecycle=%+v", runtime.retryCalls, lifecycle)
 	}
 }

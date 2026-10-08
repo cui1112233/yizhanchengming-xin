@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -175,6 +176,14 @@ func writeBatchGenerationOutcome(w http.ResponseWriter, value generation.BatchGe
 		return
 	}
 	outcome := generation.OutcomeForError(cause)
+	if errors.Is(cause, generation.ErrProjectArchived) {
+		writeJSON(w, http.StatusConflict, struct {
+			generation.BatchGenerationResult
+			generation.Outcome
+			Error string `json:"error"`
+		}{value, outcome, outcome.Message})
+		return
+	}
 	writeJSON(w, http.StatusMultiStatus, struct {
 		generation.BatchGenerationResult
 		generation.Outcome

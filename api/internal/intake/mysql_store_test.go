@@ -137,10 +137,11 @@ func TestMySQLStoreCreateBatchProjectAndScheduledRun(t *testing.T) {
 
 	store := NewMySQLStore(db)
 	project := BatchProject{IntakeID: 11, Name: "批量项目-知乎黑岩"}
-	projectQuery := "INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = VALUES(name)"
+	projectQuery := "INSERT INTO batch_projects (intake_id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), name = IF(archived_at IS NULL, VALUES(name), name)"
 	mock.ExpectExec(regexp.QuoteMeta(projectQuery)).
 		WithArgs(project.IntakeID, project.Name).
 		WillReturnResult(sqlmock.NewResult(51, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ?")).WithArgs(int64(51)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
 
 	createdProject, err := store.CreateBatchProject(context.Background(), project)
 	if err != nil {
@@ -152,9 +153,12 @@ func TestMySQLStoreCreateBatchProjectAndScheduledRun(t *testing.T) {
 
 	runAt := time.Date(2026, 10, 6, 8, 30, 0, 0, time.UTC)
 	run := Run{BatchProjectID: 51, RunAt: runAt, Status: RunStatusPending}
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT archived_at FROM batch_projects WHERE id = ? FOR UPDATE")).WithArgs(int64(51)).WillReturnRows(sqlmock.NewRows([]string{"archived_at"}).AddRow(nil))
 	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO runs (batch_project_id, run_at, status) VALUES (?, ?, ?)")).
 		WithArgs(run.BatchProjectID, run.RunAt, run.Status).
 		WillReturnResult(sqlmock.NewResult(71, 1))
+	mock.ExpectCommit()
 
 	createdRun, err := store.CreateRun(context.Background(), run)
 	if err != nil {
@@ -169,7 +173,7 @@ func TestMySQLStoreCreateBatchProjectAndScheduledRun(t *testing.T) {
 }
 
 type batchProjectLister interface {
-	ListBatchProjects(context.Context) ([]BatchProject, error)
+	ListBatchProjects(context.Context, BatchProjectListQuery) (BatchProjectPage, error)
 }
 
 func TestMySQLStoreListsBatchProjectsFromDatabase(t *testing.T) {
@@ -186,21 +190,21 @@ func TestMySQLStoreListsBatchProjectsFromDatabase(t *testing.T) {
 	}
 
 	now := time.Date(2026, 10, 5, 5, 0, 0, 0, time.UTC)
-	query := "SELECT bp.id, bp.intake_id, bp.name, COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.source), '') ORDER BY b.source SEPARATOR '|'), ''), COUNT(b.id), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.gender), '') ORDER BY b.gender SEPARATOR '|'), ''), COALESCE(GROUP_CONCAT(DISTINCT NULLIF(TRIM(b.style), '') ORDER BY b.style SEPARATOR '|'), ''), COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id = bp.id ORDER BY r.run_at DESC, r.id DESC LIMIT 1), ''), bp.created_at, bp.updated_at FROM batch_projects bp LEFT JOIN books b ON b.intake_id = bp.intake_id GROUP BY bp.id, bp.intake_id, bp.name, bp.created_at, bp.updated_at ORDER BY bp.updated_at DESC, bp.id DESC LIMIT 100"
-	mock.ExpectQuery(regexp.QuoteMeta(query)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "created_at", "updated_at"}).
-			AddRow(52, 12, "点众批次", "点众", 2, "女频", "情感", RunStatusPending, now, now).
-			AddRow(51, 11, "知乎批次", "知乎", 1, "男频", "悬疑", RunStatusRunning, now, now))
+	mock.ExpectQuery("^SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+	mock.ExpectQuery("^SELECT bp.id").WithArgs(20, 0).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "intake_id", "name", "sources", "book_count", "genders", "styles", "run_status", "failure_count", "created_at", "updated_at", "archived_at"}).
+			AddRow(52, 12, "点众批次", "点众", 2, "女频", "情感", RunStatusPending, 0, now, now, nil).
+			AddRow(51, 11, "知乎批次", "知乎", 1, "男频", "悬疑", RunStatusRunning, 0, now, now, nil))
 
-	projects, err := lister.ListBatchProjects(context.Background())
+	page, err := lister.ListBatchProjects(context.Background(), BatchProjectListQuery{Elevated: true, Archived: BatchProjectArchivedAll, Page: 1, Limit: 20})
 	if err != nil {
 		t.Fatalf("ListBatchProjects: %v", err)
 	}
-	if len(projects) != 2 || projects[0].ID != 52 || projects[0].Name != "点众批次" || projects[1].ID != 51 {
-		t.Fatalf("projects = %+v", projects)
+	if len(page.Projects) != 2 || page.Projects[0].ID != 52 || page.Projects[0].Name != "点众批次" || page.Projects[1].ID != 51 {
+		t.Fatalf("projects = %+v", page.Projects)
 	}
-	if projects[0].BookCount != 2 || projects[0].RunStatus != RunStatusPending || len(projects[0].Sources) != 1 || projects[0].Sources[0] != "点众" {
-		t.Fatalf("project summary = %+v", projects[0])
+	if page.Projects[0].BookCount != 2 || page.Projects[0].RunStatus != RunStatusPending || len(page.Projects[0].Sources) != 1 || page.Projects[0].Sources[0] != "点众" {
+		t.Fatalf("project summary = %+v", page.Projects[0])
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

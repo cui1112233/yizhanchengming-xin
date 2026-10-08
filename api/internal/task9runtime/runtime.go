@@ -29,6 +29,7 @@ const (
 )
 
 var ErrStaleExecution = errors.New("task9 stale execution")
+var ErrProjectArchived = errors.New("batch project is archived")
 
 type WorkItem struct { BookRunID int64; BookID int64; Attempt int }
 type Execution struct { BookRunID int64; Attempt int; FencingToken uint64; Owner string }

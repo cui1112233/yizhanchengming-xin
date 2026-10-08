@@ -38,6 +38,8 @@ func generationHTTPStatus(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, generation.ErrConflict):
 		return http.StatusConflict
+	case errors.Is(err, generation.ErrProjectArchived):
+		return http.StatusConflict
 	case errors.Is(err, generation.ErrAudioMeasurementRequired):
 		return http.StatusUnprocessableEntity
 	case errors.Is(err, generation.ErrAudioProbeUnavailable):
