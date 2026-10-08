@@ -164,7 +164,7 @@ curl -i -b "$YCM_STAGING_LOG_DIR/member-cookies.txt" \
   http://127.0.0.1:18080/api/v1/admin/prompts
 ```
 
-最后一个请求必须返回 `403` 和 `AUTH_FORBIDDEN`。密码只存在于当前本机 shell，不作为命令参数、日志或文档内容输出。
+最后一个请求必须返回 `403` 和管理端专用错误码 `ADMIN_CAPABILITY_REQUIRED`。密码只存在于当前本机 shell，不作为命令参数、日志或文档内容输出。
 
 ## 7. 清理
 
