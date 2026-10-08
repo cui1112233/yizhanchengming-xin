@@ -19,7 +19,7 @@
 | 提示词 MySQL | `generation_prompts`，定义于 `api/db/migrations/00002_task12_generation.sql` | `id`、`prompt_key`、`version`、`content`、`enabled`、时间戳；`uq_generation_prompts_key_version` | 原表扩展为可区分草稿/已发布/归档，并保留所有版本 |
 | 现存演进 | `api/db/migrations/00006_task13_match_audio.sql` | 同一 `prompt_key` 已存在多个 `enabled=1` 历史版本，解析依赖最高版本 | 新迁移先把每个 key 的最高已启用版本规范为唯一已发布版本，其余保留为已归档 |
 | 后台前端 | `后台/src/main.jsx`、`后台/index.html`、`后台/package.json` | AntD 占位页；尚未接入认证、路由、菜单或 API | 保持独立 React + AntD 构建，接入 Go 同源 API，产物挂到 `/admin` |
-| 用户前端 | `前台/src/api.js`、`前台/src/UserShell.jsx` | 已有带 cookie 的请求、刷新恢复和用户工作区 | 复用请求协议；仅在有任一 `admin.*` 时提供后台入口 |
+| 用户前端 | `前台/src/api.js`、`前台/src/UserShell.jsx` | 已有带 cookie 的请求、刷新恢复和用户工作区 | Task 2 在 UserShell 迁移时消费 capability 契约；Task 7 不修改用户端入口 |
 
 ## 角色兼容与有效能力
 
@@ -33,9 +33,9 @@ effectiveCapabilities = roleDefaultCapabilities(role) ∪ auth_user_capabilities
 
 | 数据库 role | 前台展示 | 默认后台 capability | 兼容策略 |
 |---|---|---|---|
-| `owner` | 所有者 | 十个 `admin.*` | 标准所有者 |
-| `dev` | 开发者 | 十个 `admin.*` | 标准开发者 |
-| `admin` | 所有者 | 十个 `admin.*` | legacy `admin` 是 `owner` 的能力别名；本阶段不写回数据库 |
+| `owner` | 所有者 | 十一个 `admin.*` | 标准所有者 |
+| `dev` | 开发者 | 十一个 `admin.*` | 标准开发者 |
+| `admin` | 所有者 | 十一个 `admin.*` | legacy `admin` 是 `owner` 的能力别名；本阶段不写回数据库 |
 | `manager` | 管理员 | 无 | 只能通过 `auth_user_capabilities` 获得明确单项权限 |
 | `member` | 普通成员 | 无 | 即使访问 `/admin` 或 API 也无后台权限 |
 | 其他值 | 未知角色 | 无 | 仍可登录，但后台入口隐藏且 Admin API 返回 403 |
@@ -62,7 +62,7 @@ effectiveCapabilities = roleDefaultCapabilities(role) ∪ auth_user_capabilities
 
 ## MySQL 迁移设计
 
-新增 Goose migration：`api/db/migrations/00015_task7_admin_governance.sql`。它只定义结构与状态转换，不内置系统提示词正文。
+实施开始时，先以最新 `main` 的 `api/db/migrations` 目录确认下一个未占用编号；实施前必须重新执行 `git fetch`、`git rebase` 并再次确认编号。该 Goose migration 命名为“已确认的下一个编号 + `_task7_admin_governance.sql`”，只定义结构与状态转换，不内置系统提示词正文。
 
 ```sql
 -- +goose Up
@@ -141,17 +141,17 @@ Publishing and restoring run in one transaction with a `SELECT ... FOR UPDATE` o
 
 ## Admin API contract
 
-All paths are Go routes under `/api/v1/admin`. They require the existing HttpOnly cookie session. Read routes require the listed capability. Write routes require existing same-origin protection and the listed capability. A missing session returns `401 AUTH_UNAUTHENTICATED`; an authenticated caller without the exact capability returns `403 ADMIN_CAPABILITY_REQUIRED`; malformed input returns `400 ADMIN_INVALID_REQUEST`; absent resources return `404 ADMIN_NOT_FOUND`; an invalid state transition returns `409 ADMIN_PROMPT_STATE_CONFLICT`; transaction failure returns `500 ADMIN_OPERATION_FAILED` without sensitive details.
+All paths are Go routes under `/api/v1/admin`. They require the existing HttpOnly cookie session. Read routes require the listed capability. Write routes require existing same-origin protection and the listed capability. A missing session returns `401 AUTH_UNAUTHENTICATED`; an authenticated caller without the exact capability returns `403 ADMIN_CAPABILITY_REQUIRED`; malformed input returns `400 ADMIN_INVALID_REQUEST`; absent resources return `404 ADMIN_NOT_FOUND`; an invalid state transition returns `409 ADMIN_PROMPT_STATE_CONFLICT`; transaction failure returns `500 ADMIN_OPERATION_FAILED` without sensitive details. `admin_audit_logs.request_id` is generated from the Go request context or a trusted server-side injector; no Admin request body may supply it.
 
 | Method and path | Capability | Request | Success response |
 |---|---|---|---|
 | `GET /api/v1/admin/capabilities` | any `admin.*` | none | `{ "capabilities": ["admin.prompt.view"] }` from current effective set |
 | `GET /api/v1/admin/prompts` | `admin.prompt.view` | optional `key` | `{ "prompts": [{ "id": 21, "key": "director.default", "version": 3, "lifecycle": "published", "seedSource": "admin", "contentSha256": "…", "publishedAt": "…" }] }` |
 | `GET /api/v1/admin/prompts/{key}/versions/{version}` | `admin.prompt.view` | none | one prompt version including `content`; no secrets, provider response or session data |
-| `POST /api/v1/admin/prompts/{key}/drafts` | `admin.prompt.edit` | `{ "content": "…", "requestId": "…" }` | `201 { "prompt": { "id": 22, "key": "…", "version": 4, "lifecycle": "draft" } }` |
-| `PUT /api/v1/admin/prompts/{key}/drafts/{version}` | `admin.prompt.edit` | `{ "content": "…", "requestId": "…" }` | updated draft metadata and content hash |
-| `POST /api/v1/admin/prompts/{key}/versions/{version}/publish` | `admin.prompt.publish` | `{ "requestId": "…" }` | `{ "prompt": { "id": 22, "lifecycle": "published" } }` |
-| `POST /api/v1/admin/prompts/{key}/versions/{version}/restore` | `admin.prompt.publish` | `{ "requestId": "…" }` | `201` with a newly created published version; response identifies both source and new versions |
+| `POST /api/v1/admin/prompts/{key}/drafts` | `admin.prompt.edit` | `{ "content": "…" }` | `201 { "prompt": { "id": 22, "key": "…", "version": 4, "lifecycle": "draft" } }` |
+| `PUT /api/v1/admin/prompts/{key}/drafts/{version}` | `admin.prompt.edit` | `{ "content": "…" }` | updated draft metadata and content hash |
+| `POST /api/v1/admin/prompts/{key}/versions/{version}/publish` | `admin.prompt.publish` | empty body | `{ "prompt": { "id": 22, "lifecycle": "published" } }` |
+| `POST /api/v1/admin/prompts/{key}/versions/{version}/restore` | `admin.prompt.publish` | empty body | `201` with a newly created published version; response identifies both source and new versions |
 
 Only the detail endpoint with `admin.prompt.view` returns a prompt body. The list endpoint returns metadata and content hash only. The existing public `GET /api/v1/generation/prompts` must be narrowed to safe metadata or replaced by a non-body selection endpoint before Admin implementation exposes controlled bodies; it must never become an unauthenticated source of system prompt text.
 
@@ -175,22 +175,22 @@ The shell calls `GET /api/auth/current-user`, then `GET /api/v1/admin/capabiliti
 | API returns 403 after a permission change | inline “权限已变更” state, refresh current-user/capabilities, retain no stale data |
 | load, empty or failure | AntD loading, empty and retry states; failures show stable safe messages only |
 
-First-batch menu mapping is: 首页 (`admin.dashboard.view`) and 提示词库 (`admin.prompt.view`). 提示词库 shows versions; 草稿按钮 requires `admin.prompt.edit`; 发布与恢复按钮 require `admin.prompt.publish`. Future disabled-by-absence menu mappings are 模型配置 (`admin.model.view`), 技能 (`admin.skill.view`), 审计/错误日志 (`admin.audit.view`) and 成员与权限 (`admin.member.view`). The user UI exposes an “管理后台” link only when the effective capability set contains an `admin.` value.
+First-batch menu mapping is: 首页 (`admin.dashboard.view`) and 提示词库 (`admin.prompt.view`). 提示词库 shows versions; 草稿按钮 requires `admin.prompt.edit`; 发布与恢复按钮 require `admin.prompt.publish`. Future disabled-by-absence menu mappings are 模型配置 (`admin.model.view`), 技能 (`admin.skill.view`), 审计/错误日志 (`admin.audit.view`) and 成员与权限 (`admin.member.view`). Task 7 owns only the `/admin` application shell and its menus; Task 2 later decides whether and how `UserShell` exposes an entry by consuming this capability contract.
 
 ## Test design and acceptance evidence
 
 Tests are written before product code and verified red before each implementation unit.
 
-1. `authn` unit tests: `owner`, `dev` and legacy `admin` receive the complete ten-capability set; `manager` has none until an explicit capability is merged; `member` has none; duplicate grants are removed; unknown roles grant none.
+1. `authn` unit tests: `owner`, `dev` and legacy `admin` receive the complete eleven-capability set; `manager` has none until an explicit capability is merged; `member` has none; duplicate grants are removed; unknown roles grant none.
 2. HTTP middleware tests: an authenticated `member` calling every first-batch Admin route receives `403 ADMIN_CAPABILITY_REQUIRED`; a `manager` with only `admin.prompt.view` can list/read but receives 403 on draft/publish; `owner` succeeds because its effective capability set contains the requirement, not because middleware reads its role.
 3. MySQL migration contract tests: existing multiple enabled prompt versions normalize to one published version per key; all rows survive; the unique generated key rejects a second published row; audit foreign keys and indexes exist.
 4. Store transaction tests: draft is not returned by runtime resolution; publish changes exactly one active version and creates one redacted audit record; restore creates a higher new version while leaving the source immutable; failed audit insertion rolls back the prompt state change.
 5. Seed tests: missing registered keys are inserted from `generation.DefaultPrompts()` with `go_default`; an existing administrator-created or restored record is never overwritten.
-6. Handler contract tests: request/response schemas, capability checks, same-origin write protection, stable error codes and no prompt content in list responses.
+6. Handler contract tests: request/response schemas, capability checks, same-origin write protection, stable error codes, no client-provided request ID field, server-context request ID audit attribution, and no prompt content in list responses.
 7. Audit redaction tests: adversarial prompt body and request values containing `Authorization`, cookie-like strings, tokens, passwords, DSNs and provider response text do not appear in `summary_json`, API responses or error messages; only the SHA-256 is stored.
 8. React tests: no capability renders the no-permission page; a view-only manager sees the prompt menu without edit/publish controls; refresh reloads effective capabilities and prompt data; a 403 invalidates the visible admin state; no system prompt literal exists in `后台/src`.
 9. Build gates: `go test ./...` from `api`, `npm test && npm run build` from `前台`, and `npm run build` from `后台`; source scan verifies no Admin API implementation imports a Node Admin route.
 
 ## Second-batch boundary
 
-Second batch implements model configuration, skills, audit/error-log read views and member capability management using the already-established Admin shell, effective capability mechanism and append-only audit store. Model responses expose only configured/non-configured state, provider name and masked identifier; they never expose credentials. Error views consume only redacted persisted events. Member management grants or revokes individual `admin.*` capabilities and records both actor and target in `admin_audit_logs`.
+Second batch implements model configuration, skills, audit/error-log read views and member capability management using the already-established Admin shell, effective capability mechanism and append-only audit store. Model responses expose only configured/non-configured state, provider name and masked identifier; they never expose credentials. Error views consume only redacted persisted events. Member management grants or revokes individual `admin.*` capabilities, records both actor and target in `admin_audit_logs`, then immediately recomputes the target user's effective capability set for every active session or revokes the target's active sessions. A browser refresh alone is not permission propagation or revocation evidence.
