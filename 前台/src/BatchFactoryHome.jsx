@@ -19,10 +19,10 @@ function parseBookIDs(value) {
     .filter(Boolean))]
 }
 
-export default function BatchFactoryHome({ onOpenProject }) {
+export default function BatchFactoryHome({ onOpenProject, initialError = '' }) {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError)
   const [denied, setDenied] = useState(false)
   const [query, setQuery] = useState('')
   const [source, setSource] = useState('')
@@ -34,7 +34,7 @@ export default function BatchFactoryHome({ onOpenProject }) {
   const [form] = Form.useForm()
 
   const load = async () => {
-    setLoading(true); setError('')
+    setLoading(true); setError(initialError)
     try {
       const payload = await listBatchProjects()
       setProjects(Array.isArray(payload?.projects) ? payload.projects : [])
@@ -44,7 +44,7 @@ export default function BatchFactoryHome({ onOpenProject }) {
       else setError(safeError(reason))
     } finally { setLoading(false) }
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => { void load() }, [initialError])
 
   const visible = useMemo(() => projects.filter((project) => {
     const text = `${project.name || ''} ${(project.sources || []).join(' ')}`.toLowerCase()

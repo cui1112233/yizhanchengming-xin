@@ -35,24 +35,28 @@ function RouteFoundation({ title, description, onNavigate }) {
 }
 
 export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout }) {
-  const [pathname, setPathname] = useState(() => (
-    typeof window === 'undefined' ? '/' : window.location.pathname
-  ))
+  const [location, setLocation] = useState(() => ({
+    pathname: typeof window === 'undefined' ? '/' : window.location.pathname,
+    search: typeof window === 'undefined' ? '' : window.location.search,
+  }))
+  const { pathname, search } = location
 
   useEffect(() => {
-    const handlePopState = () => setPathname(window.location.pathname)
+    const handlePopState = () => setLocation({ pathname: window.location.pathname, search: window.location.search })
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
   const navigate = (path) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path)
-    }
-    setPathname(path)
+    let target
+    try { target = new URL(path, window.location.href) } catch { return }
+    if (target.origin !== window.location.origin) return
+    const next = `${target.pathname}${target.search}${target.hash}`
+    if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== next) window.history.pushState({}, '', next)
+    setLocation({ pathname: target.pathname, search: target.search })
   }
   const [novelPanel, setNovelPanel] = useState({ loading: false, loadedProject: 0, workspace: null, error: null })
-  const panelProjectId = Number(new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('projectId'))
+  const panelProjectId = Number(new URLSearchParams(search).get('projectId'))
   useEffect(() => {
     if (pathname !== '/novel-panel' || !Number.isSafeInteger(panelProjectId) || panelProjectId <= 0 || novelPanel.loadedProject === panelProjectId || novelPanel.loading) return
     setNovelPanel((value) => ({ ...value, loading: true, error: null }))
@@ -65,8 +69,10 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   } else if (pathname === '/novel-fetch') {
     page = <NovelFetchPage />
   } else if (pathname === '/batch-factory') {
-    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'))
-    page = projectId > 0 ? <BatchProjectListPage initialProjectId={projectId} /> : <BatchFactoryHome onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
+    const parsed = parseBatchProjectSearch(search)
+    page = parsed.projectId
+      ? <BatchProjectListPage initialProjectId={parsed.projectId} onClearProject={() => navigate('/batch-factory')} />
+      : <BatchFactoryHome initialError={parsed.error} onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
   } else if (pathname === '/shuihuo-production') {
     page = <ShuihuoProductionPage />
   } else if (pathname === '/novel-fetch-workshop') {
@@ -113,4 +119,12 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   )
 }
 
-export { routeFoundations }
+function parseBatchProjectSearch(search) {
+  if (!search) return { projectId: null, error: '' }
+  const matched = search.match(/^\?projectId=([1-9]\d*)$/)
+  if (!matched) return { projectId: null, error: '项目入口无效' }
+  const projectId = Number(matched[1])
+  return Number.isSafeInteger(projectId) ? { projectId, error: '' } : { projectId: null, error: '项目入口无效' }
+}
+
+export { parseBatchProjectSearch, routeFoundations }

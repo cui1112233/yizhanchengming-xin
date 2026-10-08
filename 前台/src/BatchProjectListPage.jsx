@@ -107,11 +107,12 @@ function BatchProjectDetail({ projectId, onBack, onOpenProduction }) {
   )
 }
 
-export default function BatchProjectListPage({ initialProjectId = null }) {
+export default function BatchProjectListPage({ initialProjectId = null, onClearProject }) {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(initialProjectId)
+  const [selectedDetailProjectId, setSelectedDetailProjectId] = useState(null)
+  const [entryError, setEntryError] = useState('')
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
   const [videoStatus, setVideoStatus] = useState(null)
@@ -122,12 +123,23 @@ export default function BatchProjectListPage({ initialProjectId = null }) {
 
   useEffect(() => {
     let active = true
+    setLoading(true)
+    setSelectedDetailProjectId(null)
+    setEntryError('')
     listBatchProjects()
-      .then((payload) => active && setProjects(payload?.projects || []))
+      .then((payload) => {
+        if (!active) return
+        const visibleProjects = Array.isArray(payload?.projects) ? payload.projects : []
+        setProjects(visibleProjects)
+        if (initialProjectId != null) {
+          if (visibleProjects.some((project) => Number(project.id) === Number(initialProjectId))) setSelectedDetailProjectId(initialProjectId)
+          else setEntryError('项目不可访问')
+        }
+      })
       .catch((reason) => active && setError(reason instanceof Error ? reason.message : '读取批量项目失败'))
       .finally(() => active && setLoading(false))
     return () => { active = false }
-  }, [])
+  }, [initialProjectId])
 
   const refreshMeasurements = async (project, books = []) => {
     if (!project) return
@@ -400,7 +412,7 @@ export default function BatchProjectListPage({ initialProjectId = null }) {
   if (selectedDetailProjectId != null) {
     return <BatchProjectDetail
       projectId={selectedDetailProjectId}
-      onBack={() => setSelectedDetailProjectId(null)}
+      onBack={() => { setSelectedDetailProjectId(null); onClearProject?.() }}
       onOpenProduction={(project) => {
         if (!project) return
         setSelectedDetailProjectId(null)
@@ -421,6 +433,7 @@ export default function BatchProjectListPage({ initialProjectId = null }) {
         </div>
       </div>
 
+      {entryError && <Alert type="warning" showIcon message={entryError} description="该项目不在当前账号可见范围内；已保留可访问项目列表。" className="feedback" />}
       {error && <Alert type="error" showIcon message={error} className="feedback" closable onClose={() => setError('')} />}
 
       <Card title="批量项目" className="result-card">

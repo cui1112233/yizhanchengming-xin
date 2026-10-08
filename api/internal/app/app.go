@@ -26,6 +26,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/unifiedsettings"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/workshop"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/workspace"
 )
 
 func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock) http.Handler {
@@ -36,6 +37,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	startedAt := time.Now().UTC()
 	logger := slog.Default()
 	store := intake.NewMySQLStore(db)
+	recentStore := workspace.NewMySQLStore(db)
 	intakeService := intake.NewService(store, fetcher, classifier)
 	pipelineService := pipeline.NewService(store, now)
 	generationStore := generation.NewMySQLStore(db)
@@ -173,6 +175,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		Reader:                      store,
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,
+		WorkspaceRecent:             recentStore,
 		BatchProjectDetails:         store,
 		ScriptBooks:                 store,
 		ScriptStoryboards:           generationService,

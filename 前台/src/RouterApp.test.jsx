@@ -112,6 +112,43 @@ describe('Task 1 首页与用户路由基础', () => {
     expect(await screen.findByRole('heading', { name: '水货生产' })).toBeTruthy()
   })
 
+  it('preserves query state when a recent item navigates into an owned batch project', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const path = String(url)
+      const payload = path === '/api/v1/workspace/recent?limit=6'
+        ? { items: [{ kind: 'batch', id: 'batch:3', title: '最近项目', status: 'completed', updatedAt: '2026-10-09T04:05:06Z', href: '/batch-factory?projectId=3' }] }
+        : path === '/api/v1/batch-projects'
+          ? { projects: [{ id: 3, name: '最近项目' }] }
+          : path === '/api/v1/batch-projects/3'
+            ? { project: { id: 3, name: '最近项目' }, books: [] }
+            : {}
+      return { ok: true, status: 200, headers: { get: () => '' }, json: async () => payload }
+    })
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    fireEvent.click(await screen.findByRole('link', { name: /最近项目/ }))
+    expect(window.location.pathname).toBe('/batch-factory')
+    expect(window.location.search).toBe('?projectId=3')
+    expect(await screen.findByText('Batch Factory V11 工作台')).toBeTruthy()
+  })
+
+  it('restores pathname and search together on popstate', async () => {
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    window.history.pushState({}, '', '/agent/canvas?projectId=17')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(await screen.findByText('Agent 工作区待重新设计')).toBeTruthy()
+    expect(window.location.pathname).toBe('/agent/canvas')
+    expect(window.location.search).toBe('?projectId=17')
+  })
+
+  it('rejects malformed batch project queries without guessing a project', async () => {
+    window.history.replaceState({}, '', '/batch-factory?projectId=3&next=/admin')
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ projects: [] }) })
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByText('项目入口无效')).toBeTruthy()
+    expect(fetch).toHaveBeenCalledWith('/api/v1/batch-projects', expect.any(Object))
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/batch-projects/3'))).toBe(false)
+  })
+
   it('首页开始生成进入 /script', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,

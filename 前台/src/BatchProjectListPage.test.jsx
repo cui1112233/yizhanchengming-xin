@@ -91,6 +91,19 @@ describe('BatchProjectListPage', () => {
     expect(screen.getByText('执行中')).toBeTruthy()
   })
 
+  it('opens an initial project only after it appears in the server-visible list', async () => {
+    render(<BatchProjectListPage initialProjectId={3} />)
+    expect(await screen.findByText('Batch Factory V11 工作台')).toBeTruthy()
+    await waitFor(() => expect(api.getBatchProject).toHaveBeenCalledWith(3))
+  })
+
+  it('keeps the visible list and does not read an unowned initial project', async () => {
+    render(<BatchProjectListPage initialProjectId={999} />)
+    expect(await screen.findByText('项目不可访问')).toBeTruthy()
+    expect(screen.getByText('测试项目')).toBeTruthy()
+    expect(api.getBatchProject).not.toHaveBeenCalled()
+  })
+
   it('点击真实项目进入 V11 工作台并展示全部小说状态与错误', async () => {
     render(<BatchProjectListPage />)
     fireEvent.click(await screen.findByRole('button', { name: '测试项目' }))

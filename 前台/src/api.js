@@ -212,6 +212,9 @@ export function createBatchProject(intakeId, input) {
 export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
+export function listWorkspaceRecent(limit = 6) {
+  return requestJSON(`${API_PREFIX}/workspace/recent?limit=${encodeURIComponent(limit)}`)
+}
 export function listWorkspaceHistory(input = {}) { const query = new URLSearchParams(); for (const [key,value] of Object.entries(input)) if (value !== undefined && value !== null && value !== '') query.set(key,String(value)); return requestJSON(`${API_PREFIX}/history${query.size ? `?${query}` : ''}`) }
 export function getWorkspaceSettings(){return requestJSON(`${API_PREFIX}/workspace/settings`)}
 export function saveWorkspaceSettings(settings, { skipAuthRecovery = false } = {}) {

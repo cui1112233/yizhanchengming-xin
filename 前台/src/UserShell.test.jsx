@@ -38,6 +38,14 @@ describe('UserShell', () => {
     expect(screen.queryByRole('button', { name: '用户入口' })).toBeNull()
   })
 
+  it('leaves modified navigation clicks to the browser', () => {
+    const onNavigate = vi.fn()
+    render(<UserShell pathname="/" theme="dark" onToggleTheme={() => {}} onNavigate={onNavigate}><main>内容</main></UserShell>)
+    window.addEventListener('click', (event) => event.preventDefault(), { once: true })
+    fireEvent.click(within(screen.getByRole('navigation', { name: '用户导航' })).getByRole('link', { name: '剧本生成' }), { metaKey: true })
+    expect(onNavigate).not.toHaveBeenCalled()
+  })
+
   it('provides a collapsible desktop workspace sidebar outside the home route', () => {
     render(
       <UserShell
