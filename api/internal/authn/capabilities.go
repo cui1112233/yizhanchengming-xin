@@ -24,7 +24,7 @@ var adminCapabilities = []string{CapabilityAdminDashboardView, CapabilityAdminPr
 func EffectiveCapabilities(role string, granted []string) []string {
 	set := map[string]struct{}{}
 	for _, item := range granted {
-		if item = strings.TrimSpace(item); item != "" {
+		if item = strings.TrimSpace(item); item != "" && !strings.HasPrefix(item, "agent.") {
 			set[item] = struct{}{}
 		}
 	}

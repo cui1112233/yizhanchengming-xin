@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cui1112233/yizhanchengming-xin/api/internal/agentstudio"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/httpapi"
@@ -168,15 +167,9 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		}()
 	}
 	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
-	agentService := agentstudio.NewService(agentstudio.NewMySQLStore(db), agentstudio.UnavailableExecutor{})
-	if tosUploader != nil {
-		agentService.SetObjects(tosUploader, tosBucket)
-	}
-	agentService.SetKeyPrefix(tosPrefix)
 
 	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,
-		AgentStudio:                 agentService,
 		Reader:                      store,
 		Pipeline:                    pipelineService,
 		BatchProjects:               store,

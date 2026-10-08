@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cui1112233/yizhanchengming-xin/api/internal/agentstudio"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
@@ -124,7 +123,6 @@ type ShuihuoMediaService interface {
 }
 
 type Dependencies struct {
-	AgentStudio                 AgentStudioService
 	Intakes                     IntakeService
 	Reader                      IntakeReader
 	BatchProjects               BatchProjectReader
@@ -157,25 +155,6 @@ type Dependencies struct {
 	AppInitialized              bool
 }
 
-type AgentStudioService interface {
-	ListProjects(context.Context, agentstudio.Actor) ([]agentstudio.Project, error)
-	DeleteProject(context.Context, agentstudio.Actor, int64) error
-	ListMessages(context.Context, agentstudio.Actor, int64) ([]agentstudio.Message, error)
-	ListExecutions(context.Context, agentstudio.Actor, int64) ([]agentstudio.Execution, error)
-	CreateSkill(context.Context, agentstudio.Actor, agentstudio.CreateSkillInput) (agentstudio.Skill, error)
-	ListSkills(context.Context, agentstudio.Actor) ([]agentstudio.Skill, error)
-	CreateProject(context.Context, agentstudio.Actor, agentstudio.CreateProjectInput) (agentstudio.Project, error)
-	Continue(context.Context, agentstudio.Actor, int64, agentstudio.ContinueInput) (agentstudio.ContinueResult, error)
-	GetCanvas(context.Context, agentstudio.Actor, int64) (agentstudio.Canvas, error)
-	SaveCanvas(context.Context, agentstudio.Actor, agentstudio.Canvas) (agentstudio.Canvas, error)
-	ListCanvasVersions(context.Context, agentstudio.Actor, int64) ([]agentstudio.CanvasVersion, error)
-	RestoreCanvas(context.Context, agentstudio.Actor, int64, int) (agentstudio.Canvas, error)
-	UploadAttachment(context.Context, agentstudio.Actor, int64, string, string, io.Reader) (agentstudio.Attachment, error)
-	OpenAttachment(context.Context, agentstudio.Actor, int64, int64) (agentstudio.Attachment, io.ReadCloser, error)
-	DeleteAttachment(context.Context, agentstudio.Actor, int64, int64) error
-	ListAttachments(context.Context, agentstudio.Actor, int64) ([]agentstudio.Attachment, error)
-}
-
 func NewHandler(values ...Dependencies) http.Handler {
 	var deps Dependencies
 	if len(values) > 0 {
@@ -191,29 +170,12 @@ func NewHandler(values ...Dependencies) http.Handler {
 	})
 	mux.HandleFunc("GET /readyz", api.readyz)
 	mux.Handle("GET /api/v1/diagnostics", api.requireOperationsAdmin(http.HandlerFunc(api.diagnostics)))
-	mux.Handle("GET /api/v1/issues", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listIssues)))
 	mux.Handle("GET /api/v1/history", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listWorkspaceHistory)))
 	mux.Handle("GET /api/v1/workspace/settings", api.requireAuth(http.HandlerFunc(api.workspaceSettings)))
 	mux.Handle("PUT /api/v1/workspace/settings", api.requireSameOrigin(api.requireAuth(http.HandlerFunc(api.workspaceSettings))))
 	mux.Handle("GET /api/v1/account/profile", api.requireAuth(http.HandlerFunc(api.accountProfile)))
 	mux.Handle("PUT /api/v1/account/profile", api.requireSameOrigin(api.requireAuth(http.HandlerFunc(api.accountProfile))))
 	mux.Handle("GET /api/v1/member-center", api.requireAuth(http.HandlerFunc(api.memberCenter)))
-	mux.Handle("POST /api/v1/agent/projects", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.createAgentProject))))
-	mux.Handle("GET /api/v1/agent/projects", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.listAgentProjects)))
-	mux.Handle("DELETE /api/v1/agent/projects/{projectId}", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.deleteAgentProject))))
-	mux.Handle("GET /api/v1/agent/projects/{projectId}/messages", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.listAgentMessages)))
-	mux.Handle("GET /api/v1/agent/projects/{projectId}/executions", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.listAgentExecutions)))
-	mux.Handle("GET /api/v1/agent/skills", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.listAgentSkills)))
-	mux.Handle("POST /api/v1/agent/skills", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.createAgentSkill))))
-	mux.Handle("POST /api/v1/agent/projects/{projectId}/messages", api.requireSameOrigin(api.requireCapability(CapabilityAgentExecute, http.HandlerFunc(api.continueAgentProject))))
-	mux.Handle("GET /api/v1/agent/projects/{projectId}/canvas", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.getAgentCanvas)))
-	mux.Handle("PUT /api/v1/agent/projects/{projectId}/canvas", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.saveAgentCanvas))))
-	mux.Handle("GET /api/v1/agent/projects/{projectId}/canvas/versions", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.listAgentCanvasVersions)))
-	mux.Handle("POST /api/v1/agent/projects/{projectId}/canvas/versions/{revision}/restore", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.restoreAgentCanvas))))
-	mux.Handle("GET /api/v1/agent/projects/{projectId}/attachments", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.agentAttachments)))
-	mux.Handle("POST /api/v1/agent/projects/{projectId}/attachments", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.uploadAgentAttachment))))
-	mux.Handle("GET /api/v1/agent/projects/{projectId}/attachments/{attachmentId}/content", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.readAgentAttachment)))
-	mux.Handle("DELETE /api/v1/agent/projects/{projectId}/attachments/{attachmentId}", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.deleteAgentAttachment))))
 
 	mux.Handle("POST /api/auth/login", api.requireSameOrigin(http.HandlerFunc(api.login)))
 	mux.Handle("POST /api/auth/refresh", api.requireSameOrigin(http.HandlerFunc(api.refreshAuth)))

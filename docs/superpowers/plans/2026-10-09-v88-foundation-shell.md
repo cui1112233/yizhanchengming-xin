@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 遵守总计划全部约束；本阶段不新增业务表、不删除 Agent Go 模型或 MySQL 数据。
+- 遵守总计划全部约束；本阶段不新增业务表、不删除 Agent Go 领域模型、migration、MySQL 数据或 TOS 对象。旧 Agent React/HTTP adapter 与 Issues 页面/API 可按 2026-10-09 范围收口决定退役。
 - 只迁移公网经核验的字体栈、色值、间距和合法静态资产；CSS 必须限制在 `.user-shell`、`.admin-shell` 或页面根节点。
 - 本阶段不实现 Agent 功能，不实现用户/管理错误日志页面，不修改 TASKS 中尚未验收的完成状态。
 - 写代码前先同步 `main`；共享工作树不干净时使用新的临时克隆，禁止覆盖他人未提交文件。
@@ -49,7 +49,8 @@ export default function AgentReservedPage({ onNavigate }) {
 
 - [ ] 从 `RouterApp.jsx` 移除 `IssuesPage`、`AgentStudioPage`、`AgentCanvasPage` 的运行时导入；两条 Agent 路由映射到预留组件，`/issues` 不再是合法用户路由。
 - [ ] 从 `UserShell.jsx` 删除 `/issues` 导航项；保留 Agent 导航项并确保活动态同时覆盖 `/agent/canvas`。
-- [ ] 保留 `AgentStudioPage.jsx`、`AgentCanvasPage.jsx`、`api/internal/agentstudio/` 和对应 migration，不做破坏性删除。
+- [ ] 范围收口修订：删除未被占位路由消费的 `AgentStudioPage.jsx`、`AgentCanvasPage.jsx`、Agent 浏览器 API exports 与 Go HTTP adapter/生产 wiring；保留 `api/internal/agentstudio/`、对应 migration 和全部既有数据引用，不做 DROP/DML 或对象删除。
+- [ ] 添加 Go 失败测试后退役 `GET /api/v1/issues` 与全部旧 `/api/v1/agent/*`：不论认证状态均返回 `{code,message,request_id}` 的 404，且不回退 SPA；`EffectiveCapabilities` 忽略数据库中残留的 `agent.*` 授权但不删除授权行。
 - [ ] 重跑定向测试，期望全部通过。
 - [ ] 提交：`feat(scope): reserve agent and remove user issues entry [skip ci]`。
 

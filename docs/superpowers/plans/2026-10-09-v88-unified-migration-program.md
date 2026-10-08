@@ -17,7 +17,7 @@
 - MySQL 保存业务事实；Redis 只保存队列/租约/锁/短期协调；TOS 只保存有 MySQL 归属记录的媒体对象。
 - 浏览器不得保存业务事实；`localStorage` 仅限主题、侧栏折叠等非敏感 UI 偏好，且服务端设置优先。
 - 所有写 API 使用 Cookie Session、同源 CSRF、capability 和项目归属校验；用户错误只返回安全摘要与 `request_id`。
-- `/issues` 从用户导航和路由移除；不新增管理错误日志 UI。`/agent` 与 `/agent/canvas` 只展示批准的预留说明，不删除现有隔离代码或数据。
+- `/issues` 从用户导航、前端实现和 Go HTTP API 移除；不新增管理错误日志 UI。`/agent` 与 `/agent/canvas` 只展示批准的预留说明，退役旧 React/HTTP adapter，但保留 Agent Go 领域包、migration、MySQL/TOS 数据引用，不执行 DROP/DML 或对象删除。
 - 每个页面必须覆盖 loading、空态、错误、重试、401/403、刷新恢复和无 Provider/执行器的真实失败。
 - 任何 migration 都只做 additive 变更；必须提供用户/团队归属、恢复与删除语义以及 migration contract test。
 
@@ -35,7 +35,7 @@
 ### Gate 1 — Shared Contract Stable
 
 - [ ] 完成基础计划的所有任务，确认用户/后台请求均经过唯一客户端，`request_id` 在页面可见错误中可追踪。
-- [ ] `/issues` 不可从用户 UI 到达；Agent 两条路由不触发业务 API。
+- [ ] `/issues` 不可从用户 UI 到达且旧 API 安全返回 JSON 404；Agent 两条路由不触发业务 API，旧 `/api/v1/agent/*` 同样安全返回 JSON 404。
 - [ ] 前后台使用同一套经过公网核验的颜色、字体、圆角、控件高度 token。
 - [ ] `go test ./...`、前后台完整 Vitest、前后台 build 和 embed handler tests 全部通过。
 

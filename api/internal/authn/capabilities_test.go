@@ -18,3 +18,26 @@ func TestEffectiveCapabilitiesMapsAdminRolesWithoutHTTPRoleBypass(t *testing.T) 
 		}
 	}
 }
+
+func TestEffectiveCapabilitiesFiltersRetiredAgentGrants(t *testing.T) {
+	got := EffectiveCapabilities("owner", []string{
+		"batch.view",
+		"agent.view",
+		"agent.create",
+		"agent.execute",
+		"agent.future-capability",
+		"agent",
+	})
+
+	for _, retired := range []string{"agent.view", "agent.create", "agent.execute", "agent.future-capability"} {
+		if HasCapability(got, retired) {
+			t.Fatalf("retired capability %q remained effective: %v", retired, got)
+		}
+	}
+	if !HasCapability(got, "batch.view") || !HasCapability(got, "agent") {
+		t.Fatalf("unrelated explicit grants were removed: %v", got)
+	}
+	if !HasCapability(got, CapabilityAdminDashboardView) {
+		t.Fatalf("role-derived admin capability was removed: %v", got)
+	}
+}

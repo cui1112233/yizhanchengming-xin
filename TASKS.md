@@ -507,6 +507,8 @@
 
 ### 2026-10-07 · 用户工作区迁移：问题日志（仓库阶段）
 
+> 2026-10-09 当前范围已废止该用户页面和 HTTP 投影；以下勾选仅记录 2026-10-07 曾经完成的历史实现，不代表当前产品范围或可用接口。
+
 - [x] `/issues` 直接投影 MySQL 中的 BookRun、StageRun、视频与媒体任务失败事实；不建立第二套错误日志。
 - [x] 读取在 SQL 层按项目 owner/team 归属过滤；admin/owner 才能读取全局项目。错误摘要经统一脱敏后返回。
 - [x] 前台支持来源筛选、关键词搜索、分页、加载/错误/空态与刷新。
@@ -547,8 +549,9 @@
 - [x] `TOS_KEY_PREFIX` 提供一次解析、一次写入前缀的对象键隔离；视频、合并、Shuihuo 媒体和 Agent 附件写入均保存完整 key，读取/删除不重复加前缀。无效非空配置关闭存储接线并返回安全固定错误。
 - [x] 单二进制发布门已锁定：用户/管理 SPA 深链刷新使用各自 Go embed，API 不回退为 SPA，静态响应携带 `X-YCM-Static-Source: go-embed`，`/api/build-info` 由 ldflags 注入构建 SHA；构建脚本仅替换 `dist/user` 和 `dist/admin`。
 - [x] Foundation 全量验证：`go test ./...` 共24 个包通过；用户前台 29 个测试文件 / 171 条测试通过；管理后台 3 个测试文件 / 25 条测试通过；两端 `npm run build` 与 `./scripts/build-embedded-ui.sh` 均退出 0，生成的单一可执行文件包含精确基线 SHA。
-- [ ] Agent 业务功能仍未重新设计或验收；历史 Agent 源码、数据模型、migration 和定向测试仍保留，不得因占位路由而标记为功能完成。
-- [ ] `/issues` 已从当前用户路由和导航删除，但历史 Issues 前端组件、Go 投影和测试仍有残留；是否删除底层历史实现需单独清理，本轮不冒充已完成。
+- [x] 旧 Agent React 页面、浏览器 API exports、Go HTTP adapter 和生产 wiring 已退役，旧 `/api/v1/agent/*` 返回安全 JSON 404。`api/internal/agentstudio/`、`00014` migration 和已有 MySQL/TOS 数据引用保留，未执行 DROP/DML 或对象删除。
+- [ ] Agent 业务功能仍未重新设计或验收；不得因占位路由或保留的领域代码而标记为功能完成。
+- [x] `/issues` 用户页面、前端 API export 与 Go HTTP 投影已退役；`GET /api/v1/issues` 返回带 `request_id` 的安全 JSON 404，不会回退到 SPA。各项目/任务中已持久化的失败事实和结构化服务日志不受影响。
 - [ ] 当前基线尚未启动 `127.0.0.1:18080` 完成真实 MySQL migration、登录、Cookie Session、CSRF、401/403、逐路由刷新恢复和浏览器视觉验收。
 - [ ] 未连接 ECS/公网，未运行 GitHub Actions，未验证真实 Provider/TOS，未进行公网登录或截图对标；Task 16 的公网清单保持未完成。
 
@@ -617,6 +620,8 @@
 ## 2026-10-07 · 并行迁移任务 1：公网首页与用户路由基础
 
 > 状态：⚠️ 本任务代码随本提交进入 main；当前执行环境无法从 npm registry 安装前台依赖，因此 Vitest / Vite 实际测试与构建未完成。没有使用 GitHub Actions 代替本地验收。
+>
+> 2026-10-09 范围收口 superseded 下文“导航保留问题日志”与 Agent 业务页建议：当前导航不再含 `/issues`，Agent 只保留占位页。下文仅作当时交付证据。
 
 ### 本次真实完成范围
 
@@ -653,7 +658,7 @@
 
 # 2026-10-07 · Task 16：Agent Studio
 
-> 状态：⚠️ 本地实现与测试完成；未部署，真实 Provider 与公网登录验收未完成。
+> 状态：历史证据，已被 2026-10-09 范围决策 superseded。当前只保留 Agent 占位路由、Go 领域包、migration 和既有数据引用；旧前端与 HTTP API 已退役。以下勾选不代表当前产品可用。
 
 - [x] Agent 独立项目、最近项目搜索/创建/进入/删除，以及服务端会话、消息、画布、附件和执行记录恢复。
 - [x] 画布使用 MySQL revision 乐观锁、版本历史与安全恢复；附件内容使用 TOS、元数据使用 MySQL。

@@ -49,7 +49,7 @@ func TestErrorRequestIDContract(t *testing.T) {
 	}{
 		{"unknown", "/api/v1/not-found", "NOT_FOUND", 404, false},
 		{"anonymous", "/api/auth/current-user", "AUTH_UNAUTHENTICATED", 401, false},
-		{"forbidden", "/api/v1/issues", "AUTH_FORBIDDEN", 403, true},
+		{"forbidden", "/api/v1/history", "AUTH_FORBIDDEN", 403, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", tc.path, nil)

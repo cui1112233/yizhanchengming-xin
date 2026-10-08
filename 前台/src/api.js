@@ -162,34 +162,6 @@ export async function logout() {
   return payload
 }
 
-export function createAgentProject(input) { return requestJSON(`${API_PREFIX}/agent/projects`, { method: 'POST', body: JSON.stringify(input) }) }
-export function listAgentProjects() { return requestJSON(`${API_PREFIX}/agent/projects`) }
-export function deleteAgentProject(projectId) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}`, { method: 'DELETE' }) }
-export function listAgentMessages(projectId) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/messages`) }
-export function listAgentExecutions(projectId) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/executions`) }
-export function listAgentSkills() { return requestJSON(`${API_PREFIX}/agent/skills`) }
-export function createAgentSkill(input) { return requestJSON(`${API_PREFIX}/agent/skills`, { method: 'POST', body: JSON.stringify(input) }) }
-export function continueAgentProject(projectId, input) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/messages`, { method: 'POST', body: JSON.stringify(input) }) }
-export function getAgentCanvas(projectId) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/canvas`) }
-export function saveAgentCanvas(projectId, input) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/canvas`, { method: 'PUT', body: JSON.stringify(input) }) }
-export function listAgentCanvasVersions(projectId) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/canvas/versions`) }
-export function restoreAgentCanvas(projectId, revision) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/canvas/versions/${revision}/restore`, { method: 'POST' }) }
-export function listAgentAttachments(projectId) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/attachments`) }
-export async function uploadAgentAttachment(projectId, file, retried = false) {
-  const form = new FormData()
-  form.append('file', file)
-  const response = await fetch(`${API_PREFIX}/agent/projects/${projectId}/attachments`, { method: 'POST', credentials: 'include', body: form })
-  const payload = await parsePayload(response)
-  if (response.ok) return payload
-  if (response.status === 401 && !retried) {
-    await refreshSession()
-    return uploadAgentAttachment(projectId, file, true)
-  }
-  throw errorFrom(response, payload)
-}
-export function deleteAgentAttachment(projectId,id) { return requestJSON(`${API_PREFIX}/agent/projects/${projectId}/attachments/${id}`,{method:'DELETE'}) }
-export function agentAttachmentContentURL(projectId,id) { return `${API_PREFIX}/agent/projects/${projectId}/attachments/${id}/content` }
-
 export function listIntakes() {
   return requestJSON(`${API_PREFIX}/intakes`)
 }
@@ -240,7 +212,6 @@ export function createBatchProject(intakeId, input) {
 export function listBatchProjects() {
   return requestJSON(`${API_PREFIX}/batch-projects`)
 }
-export function listIssues(input = {}) { const query = new URLSearchParams(); for (const [key,value] of Object.entries(input)) if (value !== undefined && value !== null && value !== '') query.set(key,String(value)); return requestJSON(`${API_PREFIX}/issues${query.size ? `?${query}` : ''}`) }
 export function listWorkspaceHistory(input = {}) { const query = new URLSearchParams(); for (const [key,value] of Object.entries(input)) if (value !== undefined && value !== null && value !== '') query.set(key,String(value)); return requestJSON(`${API_PREFIX}/history${query.size ? `?${query}` : ''}`) }
 export function getWorkspaceSettings(){return requestJSON(`${API_PREFIX}/workspace/settings`)}
 export function saveWorkspaceSettings(settings, { skipAuthRecovery = false } = {}) {

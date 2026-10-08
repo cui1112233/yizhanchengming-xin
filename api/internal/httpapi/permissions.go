@@ -14,9 +14,6 @@ const (
 	CapabilityPublishAccountConfigure = "publish.account.configure"
 	CapabilityPublishExecute          = "publish.execute"
 	CapabilityPublishAuditView        = "publish.audit.view"
-	CapabilityAgentView               = "agent.view"
-	CapabilityAgentCreate             = "agent.create"
-	CapabilityAgentExecute            = "agent.execute"
 )
 
 func userHasCapability(user authn.User, capability string) bool {

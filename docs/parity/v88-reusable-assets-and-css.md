@@ -1,5 +1,7 @@
 # V88 可复用 CSS 与资产迁移清单
 
+> 2026-10-09 范围决策 superseded 本文中 Agent 和问题日志的复用建议：旧 Agent 前端/HTTP 实现与 Issues 页面/API 已退役，不得作为当前代码入口。Agent Go 领域包、migration 与已有数据仅作未来重新设计的可恢复基础；下文资产记录仍保留为历史审计证据。
+
 ## 使用边界
 
 此清单是迁移候选与审查规则，不是“复制旧 `dist`”的指令。公网是旧 Express 运行时，当前新站是 React + Ant Design + Go embed；应提取项目拥有、可授权、可隔离的源文件/设计 token，再由 React 组件引用。不得引用公网 hash 文件作为长期依赖。
