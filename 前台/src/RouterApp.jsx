@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Result } from 'antd'
-import IntakeWorkbench from './App.jsx'
+import NovelFetchPage from './NovelFetchPage.jsx'
+import BatchFactoryHome from './BatchFactoryHome.jsx'
+import BatchProjectListPage from './BatchProjectListPage.jsx'
+import ShuihuoProductionPage from './ShuihuoProductionPage.jsx'
 import HomePage from './HomePage.jsx'
 import UserShell from './UserShell.jsx'
 import NovelFetchWorkshop from './NovelFetchWorkshop.jsx'
@@ -62,8 +65,13 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
   let page
   if (pathname === '/') {
     page = <HomePage onNavigate={navigate} />
-  } else if (pathname === '/novel-fetch' || pathname === '/batch-factory' || pathname === '/shuihuo-production') {
-    page = <IntakeWorkbench />
+  } else if (pathname === '/novel-fetch') {
+    page = <NovelFetchPage />
+  } else if (pathname === '/batch-factory') {
+    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'))
+    page = projectId > 0 ? <BatchProjectListPage initialProjectId={projectId} /> : <BatchFactoryHome onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
+  } else if (pathname === '/shuihuo-production') {
+    page = <ShuihuoProductionPage />
   } else if (pathname === '/novel-fetch-workshop') {
     page = <NovelFetchWorkshop />
   } else if (pathname === '/script') {

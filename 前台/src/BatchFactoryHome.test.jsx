@@ -21,6 +21,15 @@ describe('BatchFactoryHome', () => {
     fireEvent.click(screen.getByRole('button', { name: '进入项目' }))
     expect(open).toHaveBeenCalledWith(6)
   })
+  it('offers real project cards in grid or list order without inventing cover URLs', async () => {
+    render(<BatchFactoryHome onOpenProject={() => {}} />)
+    await screen.findByText('来源测试')
+    expect(screen.getByRole('button', { name: '列表视图' })).toBeTruthy()
+    expect(screen.getAllByLabelText('排序方式').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('来源测试 封面').getAttribute('data-cover-fallback')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '列表视图' }))
+    expect(screen.getByRole('button', { name: '网格视图' })).toBeTruthy()
+  })
   it('creates a grouped multi-book intake, executes it, then creates project only after completed', async () => {
     api.createIntake.mockResolvedValue({ intake: { id: 22 } })
     api.executeIntake.mockResolvedValue({ status: 'completed' })

@@ -27,6 +27,8 @@ export default function BatchFactoryHome({ onOpenProject }) {
   const [query, setQuery] = useState('')
   const [source, setSource] = useState('')
   const [runStatus, setRunStatus] = useState('')
+  const [sortOrder, setSortOrder] = useState('recent')
+  const [view, setView] = useState('grid')
   const [creating, setCreating] = useState(false)
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm()
@@ -49,7 +51,11 @@ export default function BatchFactoryHome({ onOpenProject }) {
     return (!query || text.includes(query.toLowerCase()))
       && (!source || (project.sources || []).includes(source))
       && (!runStatus || project.runStatus === runStatus)
-  }), [projects, query, source, runStatus])
+  }).sort((left, right) => {
+    const a = new Date(left.updatedAt || left.createdAt || 0).getTime()
+    const b = new Date(right.updatedAt || right.createdAt || 0).getTime()
+    return sortOrder === 'recent' ? b - a : String(left.name || '').localeCompare(String(right.name || ''), 'zh-CN')
+  }), [projects, query, source, runStatus, sortOrder])
 
   const submit = async (values) => {
     const groups = (values.groups || []).map((group) => {
@@ -87,8 +93,8 @@ export default function BatchFactoryHome({ onOpenProject }) {
     <div className="page-heading"><div><Typography.Text type="secondary">一战晟铭 · Batch Factory</Typography.Text><Typography.Title level={2}>批量工厂</Typography.Title><Typography.Paragraph type="secondary">项目列表和状态来自 Go API / MySQL；刷新或重新登录后会重新读取。</Typography.Paragraph></div><Space><Button onClick={() => void load()}>刷新</Button><Button type="primary" onClick={() => setOpen(true)}>新建批量</Button></Space></div>
     {error && <Alert type="error" showIcon message={error} closable onClose={() => setError('')} className="feedback" />}
     <Card className="result-card" title="批量项目">
-      <Space wrap style={{ marginBottom: 16 }}><Input aria-label="搜索批量项目" placeholder="搜索项目或来源" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: 220 }} /><Select aria-label="来源筛选" allowClear placeholder="来源筛选" value={source || undefined} onChange={(value) => setSource(value || '')} options={sourceOptions.map(({ value, label }) => ({ value, label }))} style={{ width: 150 }} /><Select aria-label="运行状态筛选" allowClear placeholder="运行状态" value={runStatus || undefined} onChange={(value) => setRunStatus(value || '')} options={[{ value: 'pending', label: '待执行' }, { value: 'running', label: '执行中' }, { value: 'completed', label: '已完成' }, { value: 'failed', label: '失败' }]} style={{ width: 150 }} /></Space>
-      {visible.length === 0 ? <Empty description="暂无匹配的批量项目" /> : <div className="batch-project-card-grid">{visible.map((project) => <Card key={project.id} size="small" title={project.name || '未命名项目'} extra={<StatusTag status={project.runStatus || 'pending'} />}><Space direction="vertical" size={8} style={{ width: '100%' }}><Typography.Text>书籍数量：{project.bookCount ?? 0}</Typography.Text><div>{(project.sources || []).map((item) => <Tag key={item}>{item}</Tag>)}</div><div>{(project.genders || []).map((item) => <Tag key={item}>{item}</Tag>)}</div><Button type="primary" onClick={() => onOpenProject(project.id)}>进入项目</Button></Space></Card>)}</div>}
+      <Space wrap style={{ marginBottom: 16 }}><Input aria-label="搜索批量项目" placeholder="搜索项目或来源" value={query} onChange={(event) => setQuery(event.target.value)} style={{ width: 220 }} /><Select aria-label="来源筛选" allowClear placeholder="来源筛选" value={source || undefined} onChange={(value) => setSource(value || '')} options={sourceOptions.map(({ value, label }) => ({ value, label }))} style={{ width: 150 }} /><Select aria-label="运行状态筛选" allowClear placeholder="运行状态" value={runStatus || undefined} onChange={(value) => setRunStatus(value || '')} options={[{ value: 'pending', label: '待执行' }, { value: 'running', label: '执行中' }, { value: 'completed', label: '已完成' }, { value: 'failed', label: '失败' }]} style={{ width: 150 }} /><Select aria-label="排序方式" value={sortOrder} onChange={setSortOrder} options={[{ value: 'recent', label: '最近更新' }, { value: 'name', label: '名称排序' }]} style={{ width: 130 }} /><Button onClick={() => setView(view === 'grid' ? 'list' : 'grid')}>{view === 'grid' ? '列表视图' : '网格视图'}</Button></Space>
+      {visible.length === 0 ? <Empty description="暂无匹配的批量项目" /> : <div className={`batch-project-card-grid ${view === 'list' ? 'is-list' : ''}`}>{visible.map((project) => <Card key={project.id} size="small" title={project.name || '未命名项目'} extra={<StatusTag status={project.runStatus || 'pending'} />}><div className="batch-project-cover" aria-label={`${project.name || '未命名项目'} 封面`} data-cover-fallback={project.coverUrl ? undefined : 'true'} style={project.coverUrl ? { backgroundImage: `url(${project.coverUrl})` } : undefined} /><Space direction="vertical" size={8} style={{ width: '100%' }}><Typography.Text>书籍数量：{project.bookCount ?? 0}</Typography.Text><div>{(project.sources || []).map((item) => <Tag key={item}>{item}</Tag>)}</div><div>{(project.genders || []).map((item) => <Tag key={item}>{item}</Tag>)}</div><Button type="primary" onClick={() => onOpenProject(project.id)}>进入项目</Button></Space></Card>)}</div>}
     </Card>
     <Modal title="新建批量" open={open} confirmLoading={creating} onCancel={() => !creating && setOpen(false)} onOk={() => form.submit()} okText="获取并创建项目">
       <Alert type="info" showIcon message="将依次创建 Intake、执行正文获取；只有全部完成后才创建 BatchProject。" style={{ marginBottom: 16 }} />

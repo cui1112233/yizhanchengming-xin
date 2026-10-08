@@ -70,6 +70,21 @@ describe('Task 1 首页与用户路由基础', () => {
     expect(window.location.pathname).toBe('/novel-fetch')
   })
 
+  it('three production URLs mount distinct roots instead of IntakeWorkbench', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200, headers: { get: () => '' }, json: async () => ({ intakes: [], projects: [] }) })
+    window.history.replaceState({}, '', '/novel-fetch')
+    const first = render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByRole('heading', { name: '小说获取' })).toBeTruthy()
+    first.unmount()
+    window.history.replaceState({}, '', '/batch-factory')
+    const second = render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByRole('heading', { name: '批量工厂' })).toBeTruthy()
+    second.unmount()
+    window.history.replaceState({}, '', '/shuihuo-production')
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+    expect(await screen.findByRole('heading', { name: '水货生产' })).toBeTruthy()
+  })
+
   it('首页开始生成进入 /script', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,

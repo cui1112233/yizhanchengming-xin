@@ -39,6 +39,13 @@ describe('ShuihuoProductionPage', () => {
     await waitFor(() => expect(api.getProjectGeneration).toHaveBeenCalledWith(3))
     expect(api.getProjectVideoStatus).toHaveBeenCalledWith(3)
   })
+  it('uses the requested project ID and ends project loading with a retryable error', async () => {
+    window.history.replaceState({}, '', '/shuihuo-production?projectId=3')
+    api.listBatchProjects.mockRejectedValueOnce(new Error('MySQL unavailable'))
+    render(<ShuihuoProductionPage />)
+    expect(await screen.findByText('MySQL unavailable')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '刷新项目' })).toBeTruthy()
+  })
 
   it('单本继续执行与阶段重试复用现有 Go API', async () => {
     api.runBookGeneration.mockResolvedValue({})
