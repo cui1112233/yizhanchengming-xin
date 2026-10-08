@@ -72,7 +72,7 @@ func main() {
 
 	logger.Info("api listening", "subsystem", "http", "operation", "listen", "address", observability.SanitizeString(addr))
 	api := app.NewHandler(db, fetcher, nil, nil)
-	ui := webui.NewHandler(api, webui.EmbeddedFiles(), webui.BuildInfo{GitSHA: BuildGitSHA})
+	ui := webui.NewHandlerWithAdmin(api, webui.EmbeddedFiles(), webui.EmbeddedAdminFiles(), webui.BuildInfo{GitSHA: BuildGitSHA})
 	if err := http.ListenAndServe(addr, ui); err != nil {
 		fatal(logger, "http server stopped", "http", "listen", err)
 	}

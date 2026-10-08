@@ -128,6 +128,7 @@ type Dependencies struct {
 	ScriptStoryboards           ScriptStoryboardService
 	Pipeline                    PipelineService
 	Generation                  GenerationService
+	AdminPrompts                AdminPromptService
 	Workshop                    WorkshopService
 	NovelPanel                  NovelPanelService
 	UnifiedSettings             UnifiedSettingsService
@@ -267,6 +268,16 @@ func NewHandler(values ...Dependencies) http.Handler {
 
 	// Only immutable system presets are public. Private/project prompts must be registered behind auth.
 	mux.HandleFunc("GET /api/v1/generation/prompts", api.generationPrompts)
+
+	// Admin prompt governance is independently protected by effective admin
+	// capabilities. Mutation routes additionally require same-origin CSRF.
+	mux.Handle("GET /api/v1/admin/capabilities", api.requireAnyAdminCapability(http.HandlerFunc(api.adminCapabilities)))
+	mux.Handle("GET /api/v1/admin/prompts", api.requireAdminCapability(authn.CapabilityAdminPromptView, http.HandlerFunc(api.adminPromptList)))
+	mux.Handle("GET /api/v1/admin/prompts/{key}/versions/{version}", api.requireAdminCapability(authn.CapabilityAdminPromptView, http.HandlerFunc(api.adminPromptDetail)))
+	mux.Handle("POST /api/v1/admin/prompts/{key}/drafts", api.requireAdminCapability(authn.CapabilityAdminPromptEdit, api.requireSameOrigin(http.HandlerFunc(api.adminPromptCreateDraft))))
+	mux.Handle("PUT /api/v1/admin/prompts/{key}/drafts/{version}", api.requireAdminCapability(authn.CapabilityAdminPromptEdit, api.requireSameOrigin(http.HandlerFunc(api.adminPromptUpdateDraft))))
+	mux.Handle("POST /api/v1/admin/prompts/{key}/versions/{version}/publish", api.requireAdminCapability(authn.CapabilityAdminPromptPublish, api.requireSameOrigin(http.HandlerFunc(api.adminPromptPublish))))
+	mux.Handle("POST /api/v1/admin/prompts/{key}/versions/{version}/restore", api.requireAdminCapability(authn.CapabilityAdminPromptPublish, api.requireSameOrigin(http.HandlerFunc(api.adminPromptRestore))))
 
 	// Stage 4: publishing authorization. Browser requests create server-side intent only.
 	mux.Handle("POST /api/v1/publishing/accounts", api.requireSameOrigin(api.requireCapability(CapabilityPublishAccountConfigure, http.HandlerFunc(api.createPublishingAccount))))

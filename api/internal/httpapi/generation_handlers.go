@@ -21,6 +21,15 @@ type GenerationService interface {
 	MeasureAudio(context.Context, generation.AudioMeasurementRequest) (generation.AudioMeasurement, error)
 }
 
+type AdminPromptService interface {
+	ListAdminPrompts(context.Context, string) ([]generation.AdminPrompt, error)
+	GetAdminPrompt(context.Context, string, int) (generation.AdminPrompt, error)
+	CreateAdminPromptDraft(context.Context, int64, string, string) error
+	UpdateAdminPromptDraft(context.Context, int64, string, int, string) error
+	PublishAdminPrompt(context.Context, int64, string, int) error
+	RestoreAdminPrompt(context.Context, int64, string, int) error
+}
+
 func generationHTTPStatus(err error) int {
 	switch {
 	case errors.Is(err, generation.ErrInvalid):

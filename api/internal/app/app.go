@@ -172,6 +172,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		ScriptBooks:                 store,
 		ScriptStoryboards:           generationService,
 		Generation:                  observedGeneration,
+		AdminPrompts:                generationStore,
 		Workshop:                    workshopService,
 		NovelPanel:                  novelPanelService,
 		UnifiedSettings:             settingsService,
