@@ -39,6 +39,7 @@ type LocalExecutorHeartbeatInput struct {
 
 type LocalExecutorRecord struct {
 	ID           string
+	OwnerUserID  int64
 	Name         string
 	ProviderKey  string
 	Model        string
@@ -47,6 +48,22 @@ type LocalExecutorRecord struct {
 	LastSeenAt   time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type LocalExecutorPairingIntent struct {
+	TokenHash   [32]byte
+	OwnerUserID int64
+	ExpiresAt   time.Time
+	UsedAt      *time.Time
+	RevokedAt   *time.Time
+	CreatedAt   time.Time
+}
+
+type LocalExecutorPairingResult struct {
+	// Payload is opaque and intended solely for a QR/deep-link renderer.
+	// It must not be persisted or displayed as copyable browser text.
+	Payload   string    `json:"payload"`
+	ExpiresAt time.Time `json:"expiresAt"`
 }
 
 type LocalExecutorIdentity struct {
@@ -90,12 +107,18 @@ type LocalExecutorStore interface {
 	GetLocalExecutorByTokenHash(context.Context, [32]byte) (LocalExecutorRecord, error)
 	UpdateLocalExecutorHeartbeat(context.Context, string, []string, time.Time) error
 	ListLocalExecutors(context.Context) ([]LocalExecutorRecord, error)
+	ListLocalExecutorsForOwner(context.Context, int64) ([]LocalExecutorRecord, error)
+	DeleteLocalExecutorForOwner(context.Context, string, int64, time.Time) (bool, error)
+	CreateLocalExecutorPairing(context.Context, LocalExecutorPairingIntent) error
+	ConsumeLocalExecutorPairing(context.Context, [32]byte, time.Time) (int64, error)
 	CreateLocalExecutorTask(context.Context, LocalExecutorTask) error
 	GetLocalExecutorTask(context.Context, string) (LocalExecutorTask, error)
 	CompleteLocalExecutorTask(context.Context, string, string, string, time.Time) error
 	FailLocalExecutorTask(context.Context, string, string, ErrorCode, string, time.Time) error
 	CancelLocalExecutorTask(context.Context, string, time.Time) (bool, error)
 }
+
+const LocalExecutorPairingTTL = 5 * time.Minute
 
 // LocalExecutorLeaseCoordinator is deliberately only a Task 14 consumption
 // boundary. Task 14 does not provide a Redis/Scheduler implementation. The
@@ -109,11 +132,11 @@ type LocalExecutorLeaseCoordinator interface {
 }
 
 type LocalExecutorLease struct {
-	TaskID       string    `json:"taskId"`
-	ExecutorID   string    `json:"executorId"`
-	Token        string    `json:"leaseToken"`
-	Generation   int64     `json:"generation"`
-	ExpiresAt    time.Time `json:"expiresAt"`
+	TaskID     string    `json:"taskId"`
+	ExecutorID string    `json:"executorId"`
+	Token      string    `json:"leaseToken"`
+	Generation int64     `json:"generation"`
+	ExpiresAt  time.Time `json:"expiresAt"`
 }
 
 type LocalExecutorService struct {
@@ -129,19 +152,26 @@ func NewLocalExecutorService(store LocalExecutorStore, now func() time.Time) *Lo
 }
 
 func (s *LocalExecutorService) Register(ctx context.Context, input LocalExecutorRegistrationInput) (LocalExecutorRegistrationResult, error) {
+	return s.register(ctx, 0, input)
+}
+
+func (s *LocalExecutorService) RegisterForOwner(ctx context.Context, ownerUserID int64, input LocalExecutorRegistrationInput) (LocalExecutorRegistrationResult, error) {
+	if ownerUserID <= 0 {
+		return LocalExecutorRegistrationResult{}, ErrLocalExecutorInvalid
+	}
+	return s.register(ctx, ownerUserID, input)
+}
+
+func (s *LocalExecutorService) register(ctx context.Context, ownerUserID int64, input LocalExecutorRegistrationInput) (LocalExecutorRegistrationResult, error) {
 	if s == nil || s.store == nil {
 		return LocalExecutorRegistrationResult{}, providerError(ErrorProviderUnavailable, "local executor store unavailable", nil)
+	}
+	if err := validateLocalExecutorRegistration(input); err != nil {
+		return LocalExecutorRegistrationResult{}, err
 	}
 	input.Name = strings.TrimSpace(input.Name)
 	input.ProviderKey = strings.TrimSpace(input.ProviderKey)
 	input.Model = strings.TrimSpace(input.Model)
-	if input.Name == "" || input.ProviderKey == "" || input.Model == "" {
-		return LocalExecutorRegistrationResult{}, ErrLocalExecutorInvalid
-	}
-	mapped, ok := ProviderForModel(input.Model)
-	if !ok || mapped != ProviderDoubaoLocalExecutor || input.ProviderKey != ProviderDoubaoLocalExecutor {
-		return LocalExecutorRegistrationResult{}, ErrLocalExecutorInvalid
-	}
 	capabilities, err := normalizeCapabilities(input.Capabilities)
 	if err != nil {
 		return LocalExecutorRegistrationResult{}, err
@@ -156,7 +186,7 @@ func (s *LocalExecutorService) Register(ctx context.Context, input LocalExecutor
 	}
 	now := s.now().UTC()
 	record := LocalExecutorRecord{
-		ID: id, Name: input.Name, ProviderKey: input.ProviderKey, Model: input.Model,
+		ID: id, OwnerUserID: ownerUserID, Name: input.Name, ProviderKey: input.ProviderKey, Model: input.Model,
 		Capabilities: capabilities, TokenHash: sha256.Sum256([]byte(token)),
 		LastSeenAt: now, CreatedAt: now, UpdatedAt: now,
 	}
@@ -164,6 +194,78 @@ func (s *LocalExecutorService) Register(ctx context.Context, input LocalExecutor
 		return LocalExecutorRegistrationResult{}, err
 	}
 	return LocalExecutorRegistrationResult{Executor: localExecutorView(record, now), Token: token}, nil
+}
+
+func validateLocalExecutorRegistration(input LocalExecutorRegistrationInput) error {
+	name, providerKey, model := strings.TrimSpace(input.Name), strings.TrimSpace(input.ProviderKey), strings.TrimSpace(input.Model)
+	if name == "" || providerKey == "" || model == "" {
+		return ErrLocalExecutorInvalid
+	}
+	mapped, ok := ProviderForModel(model)
+	if !ok || mapped != ProviderDoubaoLocalExecutor || providerKey != ProviderDoubaoLocalExecutor {
+		return ErrLocalExecutorInvalid
+	}
+	_, err := normalizeCapabilities(input.Capabilities)
+	return err
+}
+
+func (s *LocalExecutorService) ListForOwner(ctx context.Context, ownerUserID int64) ([]LocalExecutorIdentity, error) {
+	if ownerUserID <= 0 {
+		return nil, ErrLocalExecutorUnauthorized
+	}
+	records, err := s.store.ListLocalExecutorsForOwner(ctx, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]LocalExecutorIdentity, 0, len(records))
+	for _, record := range records {
+		out = append(out, localExecutorView(record, s.now().UTC()))
+	}
+	return out, nil
+}
+
+func (s *LocalExecutorService) CreatePairingIntent(ctx context.Context, ownerUserID int64) (LocalExecutorPairingResult, error) {
+	if s == nil || s.store == nil || ownerUserID <= 0 {
+		return LocalExecutorPairingResult{}, ErrLocalExecutorUnauthorized
+	}
+	payload, err := randomLocalExecutorValue("pair_", 32)
+	if err != nil {
+		return LocalExecutorPairingResult{}, err
+	}
+	now := s.now().UTC()
+	intent := LocalExecutorPairingIntent{TokenHash: sha256.Sum256([]byte(payload)), OwnerUserID: ownerUserID, CreatedAt: now, ExpiresAt: now.Add(LocalExecutorPairingTTL)}
+	if err := s.store.CreateLocalExecutorPairing(ctx, intent); err != nil {
+		return LocalExecutorPairingResult{}, err
+	}
+	return LocalExecutorPairingResult{Payload: payload, ExpiresAt: intent.ExpiresAt}, nil
+}
+
+func (s *LocalExecutorService) RedeemPairingIntent(ctx context.Context, payload string, input LocalExecutorRegistrationInput) (LocalExecutorRegistrationResult, error) {
+	if s == nil || s.store == nil || strings.TrimSpace(payload) == "" {
+		return LocalExecutorRegistrationResult{}, ErrLocalExecutorUnauthorized
+	}
+	if err := validateLocalExecutorRegistration(input); err != nil {
+		return LocalExecutorRegistrationResult{}, err
+	}
+	ownerUserID, err := s.store.ConsumeLocalExecutorPairing(ctx, sha256.Sum256([]byte(strings.TrimSpace(payload))), s.now().UTC())
+	if err != nil {
+		return LocalExecutorRegistrationResult{}, err
+	}
+	return s.RegisterForOwner(ctx, ownerUserID, input)
+}
+
+func (s *LocalExecutorService) UnbindForOwner(ctx context.Context, ownerUserID int64, executorID string) error {
+	if s == nil || s.store == nil || ownerUserID <= 0 || strings.TrimSpace(executorID) == "" {
+		return ErrLocalExecutorUnauthorized
+	}
+	deleted, err := s.store.DeleteLocalExecutorForOwner(ctx, strings.TrimSpace(executorID), ownerUserID, s.now().UTC())
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrLocalExecutorUnauthorized
+	}
+	return nil
 }
 
 func (s *LocalExecutorService) Identity(ctx context.Context, token string) (LocalExecutorIdentity, error) {
@@ -259,8 +361,8 @@ func localExecutorView(record LocalExecutorRecord, now time.Time) LocalExecutorI
 	return LocalExecutorIdentity{
 		ID: record.ID, Name: record.Name, ProviderKey: record.ProviderKey, Model: record.Model,
 		Capabilities: append([]string(nil), record.Capabilities...),
-		Online: record.LastSeenAt.Add(LocalExecutorOnlineThreshold).After(now),
-		LastSeenAt: record.LastSeenAt, TokenConfigured: record.TokenHash != [32]byte{},
+		Online:       record.LastSeenAt.Add(LocalExecutorOnlineThreshold).After(now),
+		LastSeenAt:   record.LastSeenAt, TokenConfigured: record.TokenHash != [32]byte{},
 	}
 }
 

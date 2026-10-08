@@ -11,6 +11,7 @@ type memoryLocalExecutorStore struct {
 	mu        sync.Mutex
 	executors map[string]LocalExecutorRecord
 	byToken   map[[32]byte]string
+	pairings  map[[32]byte]LocalExecutorPairingIntent
 	tasks     map[string]LocalExecutorTask
 }
 
@@ -18,6 +19,7 @@ func newMemoryLocalExecutorStore() *memoryLocalExecutorStore {
 	return &memoryLocalExecutorStore{
 		executors: map[string]LocalExecutorRecord{},
 		byToken:   map[[32]byte]string{},
+		pairings:  map[[32]byte]LocalExecutorPairingIntent{},
 		tasks:     map[string]LocalExecutorTask{},
 	}
 }
@@ -62,6 +64,53 @@ func (s *memoryLocalExecutorStore) ListLocalExecutors(context.Context) ([]LocalE
 		out = append(out, record)
 	}
 	return out, nil
+}
+
+func (s *memoryLocalExecutorStore) ListLocalExecutorsForOwner(_ context.Context, ownerUserID int64) ([]LocalExecutorRecord, error) {
+	if ownerUserID <= 0 {
+		return nil, ErrLocalExecutorUnauthorized
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]LocalExecutorRecord, 0)
+	for _, record := range s.executors {
+		if record.OwnerUserID == ownerUserID {
+			out = append(out, record)
+		}
+	}
+	return out, nil
+}
+
+func (s *memoryLocalExecutorStore) DeleteLocalExecutorForOwner(_ context.Context, id string, ownerUserID int64, _ time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.executors[id]
+	if !ok || record.OwnerUserID != ownerUserID {
+		return false, nil
+	}
+	delete(s.executors, id)
+	delete(s.byToken, record.TokenHash)
+	return true, nil
+}
+
+func (s *memoryLocalExecutorStore) CreateLocalExecutorPairing(_ context.Context, intent LocalExecutorPairingIntent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pairings[intent.TokenHash] = intent
+	return nil
+}
+
+func (s *memoryLocalExecutorStore) ConsumeLocalExecutorPairing(_ context.Context, hash [32]byte, now time.Time) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	intent, ok := s.pairings[hash]
+	if !ok || intent.UsedAt != nil || intent.RevokedAt != nil || !intent.ExpiresAt.After(now) {
+		return 0, ErrLocalExecutorUnauthorized
+	}
+	usedAt := now
+	intent.UsedAt = &usedAt
+	s.pairings[hash] = intent
+	return intent.OwnerUserID, nil
 }
 
 func (s *memoryLocalExecutorStore) CreateLocalExecutorTask(_ context.Context, task LocalExecutorTask) error {

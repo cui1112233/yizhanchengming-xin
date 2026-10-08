@@ -66,12 +66,73 @@ func TestLocalExecutorRegistrationHeartbeatIdentityAndCapabilities(t *testing.T)
 func TestLocalExecutorRegistrationRejectsWrongProviderModel(t *testing.T) {
 	service := NewLocalExecutorService(newMemoryLocalExecutorStore(), time.Now)
 	_, err := service.Register(context.Background(), LocalExecutorRegistrationInput{
-		Name: "wrong",
+		Name:        "wrong",
 		ProviderKey: ProviderPersonalAPI,
-		Model: "doubao-seedance",
+		Model:       "doubao-seedance",
 	})
 	if err == nil {
 		t.Fatal("expected provider/model rejection")
+	}
+}
+
+func TestLocalExecutorListForOwnerDoesNotExposeAnotherUsersDevice(t *testing.T) {
+	store := newMemoryLocalExecutorStore()
+	service := NewLocalExecutorService(store, time.Now)
+	_, err := service.RegisterForOwner(context.Background(), 11, LocalExecutorRegistrationInput{Name: "alice-mac", ProviderKey: ProviderDoubaoLocalExecutor, Model: "doubao-seedance"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.RegisterForOwner(context.Background(), 22, LocalExecutorRegistrationInput{Name: "bob-mac", ProviderKey: ProviderDoubaoLocalExecutor, Model: "doubao-seedance"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, err := service.ListForOwner(context.Background(), 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "alice-mac" {
+		t.Fatalf("owner list leaked devices: %#v", items)
+	}
+}
+
+func TestLocalExecutorPairingIsSingleUseExpiresAndBindsServerOwner(t *testing.T) {
+	now := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
+	store := newMemoryLocalExecutorStore()
+	service := NewLocalExecutorService(store, func() time.Time { return now })
+	pairing, err := service.CreatePairingIntent(context.Background(), 11)
+	if err != nil || pairing.Payload == "" || pairing.ExpiresAt.Sub(now) != LocalExecutorPairingTTL {
+		t.Fatalf("create pairing = %#v, %v", pairing, err)
+	}
+	registered, err := service.RedeemPairingIntent(context.Background(), pairing.Payload, LocalExecutorRegistrationInput{Name: "alice mac", ProviderKey: ProviderDoubaoLocalExecutor, Model: ModelDoubaoSeedance})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if registered.Token == "" {
+		t.Fatal("executor token must be delivered only to executor redemption response")
+	}
+	items, err := service.ListForOwner(context.Background(), 11)
+	if err != nil || len(items) != 1 || items[0].ID != registered.Executor.ID {
+		t.Fatalf("owner list = %#v, %v", items, err)
+	}
+	if items, err := service.ListForOwner(context.Background(), 22); err != nil || len(items) != 0 {
+		t.Fatalf("other owner list = %#v, %v", items, err)
+	}
+	if _, err := service.RedeemPairingIntent(context.Background(), pairing.Payload, LocalExecutorRegistrationInput{Name: "replay", ProviderKey: ProviderDoubaoLocalExecutor, Model: ModelDoubaoSeedance}); err != ErrLocalExecutorUnauthorized {
+		t.Fatalf("replay err=%v, want unauthorized", err)
+	}
+	expired, err := service.CreatePairingIntent(context.Background(), 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(LocalExecutorPairingTTL)
+	if _, err := service.RedeemPairingIntent(context.Background(), expired.Payload, LocalExecutorRegistrationInput{Name: "expired", ProviderKey: ProviderDoubaoLocalExecutor, Model: ModelDoubaoSeedance}); err != ErrLocalExecutorUnauthorized {
+		t.Fatalf("expired err=%v, want unauthorized", err)
+	}
+	if err := service.UnbindForOwner(context.Background(), 22, registered.Executor.ID); err != ErrLocalExecutorUnauthorized {
+		t.Fatalf("cross-owner unbind err=%v, want unauthorized", err)
+	}
+	if err := service.UnbindForOwner(context.Background(), 11, registered.Executor.ID); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -102,9 +163,9 @@ func TestDoubaoLocalProviderCreatesDurableTaskAndPollsCompleteOrFail(t *testing.
 
 	executorService := NewLocalExecutorService(store, time.Now)
 	reg, err := executorService.Register(ctx, LocalExecutorRegistrationInput{
-		Name: "doubao-win",
-		ProviderKey: ProviderDoubaoLocalExecutor,
-		Model: "doubao-seedance",
+		Name:         "doubao-win",
+		ProviderKey:  ProviderDoubaoLocalExecutor,
+		Model:        "doubao-seedance",
 		Capabilities: []string{"text_to_video"},
 	})
 	if err != nil {
@@ -149,5 +210,9 @@ func (*recordingLeaseCoordinator) Claim(context.Context, LocalExecutorIdentity) 
 func (*recordingLeaseCoordinator) Renew(context.Context, LocalExecutorLease) (LocalExecutorLease, error) {
 	return LocalExecutorLease{}, errors.New("test")
 }
-func (*recordingLeaseCoordinator) Release(context.Context, LocalExecutorLease) error { return errors.New("test") }
-func (*recordingLeaseCoordinator) RequeueExpired(context.Context, time.Time, int) (int, error) { return 0, errors.New("test") }
+func (*recordingLeaseCoordinator) Release(context.Context, LocalExecutorLease) error {
+	return errors.New("test")
+}
+func (*recordingLeaseCoordinator) RequeueExpired(context.Context, time.Time, int) (int, error) {
+	return 0, errors.New("test")
+}

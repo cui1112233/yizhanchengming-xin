@@ -237,6 +237,31 @@ func (s observedLocalExecutorService) Register(ctx context.Context, input video.
 	requestLogger(s.logger, ctx).Info("local executor registered", "subsystem", "local_executor", "executor_id", out.Executor.ID, "provider", out.Executor.ProviderKey, "model", out.Executor.Model, "online", out.Executor.Online)
 	return out, nil
 }
+func (s observedLocalExecutorService) CreatePairingIntent(ctx context.Context, ownerUserID int64) (video.LocalExecutorPairingResult, error) {
+	out, err := s.next.CreatePairingIntent(ctx, ownerUserID)
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "local_executor", "create_pairing", "executor_pairing_create_failed", err, "owner_user_id", ownerUserID)
+	}
+	return out, err
+}
+func (s observedLocalExecutorService) RedeemPairingIntent(ctx context.Context, payload string, input video.LocalExecutorRegistrationInput) (video.LocalExecutorRegistrationResult, error) {
+	out, err := s.next.RedeemPairingIntent(ctx, payload, input)
+	if err != nil {
+		// Never log the opaque pairing payload or the issued device credential.
+		logSafeFailure(s.logger, ctx, "local_executor", "redeem_pairing", "executor_pairing_redeem_failed", err, "provider", input.ProviderKey, "model", input.Model)
+	}
+	return out, err
+}
+func (s observedLocalExecutorService) ListForOwner(ctx context.Context, ownerUserID int64) ([]video.LocalExecutorIdentity, error) {
+	return s.next.ListForOwner(ctx, ownerUserID)
+}
+func (s observedLocalExecutorService) UnbindForOwner(ctx context.Context, ownerUserID int64, executorID string) error {
+	err := s.next.UnbindForOwner(ctx, ownerUserID, executorID)
+	if err != nil {
+		logSafeFailure(s.logger, ctx, "local_executor", "unbind", "executor_unbind_failed", err, "owner_user_id", ownerUserID)
+	}
+	return err
+}
 func (s observedLocalExecutorService) Identity(ctx context.Context, token string) (video.LocalExecutorIdentity, error) {
 	return s.next.Identity(ctx, token)
 }

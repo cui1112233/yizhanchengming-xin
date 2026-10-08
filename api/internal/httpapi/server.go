@@ -86,6 +86,10 @@ type PublishingService interface {
 
 type VideoLocalExecutorService interface {
 	Register(context.Context, video.LocalExecutorRegistrationInput) (video.LocalExecutorRegistrationResult, error)
+	CreatePairingIntent(context.Context, int64) (video.LocalExecutorPairingResult, error)
+	RedeemPairingIntent(context.Context, string, video.LocalExecutorRegistrationInput) (video.LocalExecutorRegistrationResult, error)
+	ListForOwner(context.Context, int64) ([]video.LocalExecutorIdentity, error)
+	UnbindForOwner(context.Context, int64, string) error
 	Identity(context.Context, string) (video.LocalExecutorIdentity, error)
 	Heartbeat(context.Context, string, video.LocalExecutorHeartbeatInput) error
 	List(context.Context) ([]video.LocalExecutorIdentity, error)
@@ -190,6 +194,9 @@ func NewHandler(values ...Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/history", api.requireCapability(CapabilityBatchView, http.HandlerFunc(api.listWorkspaceHistory)))
 	mux.Handle("GET /api/v1/workspace/settings", api.requireAuth(http.HandlerFunc(api.workspaceSettings)))
 	mux.Handle("PUT /api/v1/workspace/settings", api.requireSameOrigin(api.requireAuth(http.HandlerFunc(api.workspaceSettings))))
+	mux.Handle("GET /api/v1/account/profile", api.requireAuth(http.HandlerFunc(api.accountProfile)))
+	mux.Handle("PUT /api/v1/account/profile", api.requireSameOrigin(api.requireAuth(http.HandlerFunc(api.accountProfile))))
+	mux.Handle("GET /api/v1/member-center", api.requireAuth(http.HandlerFunc(api.memberCenter)))
 	mux.Handle("POST /api/v1/agent/projects", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.createAgentProject))))
 	mux.Handle("GET /api/v1/agent/projects", api.requireCapability(CapabilityAgentView, http.HandlerFunc(api.listAgentProjects)))
 	mux.Handle("DELETE /api/v1/agent/projects/{projectId}", api.requireSameOrigin(api.requireCapability(CapabilityAgentCreate, http.HandlerFunc(api.deleteAgentProject))))
@@ -305,7 +312,10 @@ func NewHandler(values ...Dependencies) http.Handler {
 	// server-side bootstrap token; heartbeat/identity/complete/fail continue to
 	// authenticate with the executor's one-time-issued Bearer credential.
 	mux.Handle("POST /api/v1/video/local-executors/register", api.requireVideoExecutorBootstrap(http.HandlerFunc(api.registerVideoLocalExecutor)))
+	mux.Handle("POST /api/v1/video/local-executors/pairings", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.createVideoLocalExecutorPairing))))
+	mux.HandleFunc("POST /api/v1/video/local-executors/redeem", api.redeemVideoLocalExecutorPairing)
 	mux.Handle("GET /api/v1/video/local-executors", api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.listVideoLocalExecutors)))
+	mux.Handle("DELETE /api/v1/video/local-executors/{executorId}", api.requireSameOrigin(api.requireCapability(CapabilityBatchConfigure, http.HandlerFunc(api.unbindVideoLocalExecutor))))
 	mux.HandleFunc("GET /api/v1/video/local-executors/me", api.getVideoLocalExecutorIdentity)
 	mux.HandleFunc("POST /api/v1/video/local-executors/heartbeat", api.heartbeatVideoLocalExecutor)
 	mux.HandleFunc("POST /api/v1/video/local-executor-tasks/{taskId}/complete", api.completeVideoLocalExecutorTask)

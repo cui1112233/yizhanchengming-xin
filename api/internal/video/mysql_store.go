@@ -165,18 +165,18 @@ func (s *MySQLStore) CreateLocalExecutor(ctx context.Context, record LocalExecut
 		return err
 	}
 	_, err = s.db.ExecContext(ctx, `INSERT INTO video_local_executors
-(id, name, provider_key, model, capabilities_json, token_hash, last_seen_at, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, record.ID, record.Name, record.ProviderKey, record.Model, capabilities, record.TokenHash[:], record.LastSeenAt, record.CreatedAt, record.UpdatedAt)
+(id, owner_user_id, name, provider_key, model, capabilities_json, token_hash, last_seen_at, created_at, updated_at)
+VALUES (?, NULLIF(?, 0), ?, ?, ?, ?, ?, ?, ?, ?)`, record.ID, record.OwnerUserID, record.Name, record.ProviderKey, record.Model, capabilities, record.TokenHash[:], record.LastSeenAt, record.CreatedAt, record.UpdatedAt)
 	return err
 }
 
-const localExecutorSelect = `SELECT id, name, provider_key, model, capabilities_json, token_hash, last_seen_at, created_at, updated_at FROM video_local_executors`
+const localExecutorSelect = `SELECT id, COALESCE(owner_user_id,0), name, provider_key, model, capabilities_json, token_hash, last_seen_at, created_at, updated_at FROM video_local_executors`
 
 func scanLocalExecutor(scan func(...any) error) (LocalExecutorRecord, error) {
 	var record LocalExecutorRecord
 	var capabilities []byte
 	var tokenHash []byte
-	if err := scan(&record.ID, &record.Name, &record.ProviderKey, &record.Model, &capabilities, &tokenHash, &record.LastSeenAt, &record.CreatedAt, &record.UpdatedAt); err != nil {
+	if err := scan(&record.ID, &record.OwnerUserID, &record.Name, &record.ProviderKey, &record.Model, &capabilities, &tokenHash, &record.LastSeenAt, &record.CreatedAt, &record.UpdatedAt); err != nil {
 		return LocalExecutorRecord{}, err
 	}
 	if len(tokenHash) != len(record.TokenHash) {
@@ -231,6 +231,71 @@ func (s *MySQLStore) ListLocalExecutors(ctx context.Context) ([]LocalExecutorRec
 		out = append(out, record)
 	}
 	return out, rows.Err()
+}
+
+func (s *MySQLStore) ListLocalExecutorsForOwner(ctx context.Context, ownerUserID int64) ([]LocalExecutorRecord, error) {
+	if ownerUserID <= 0 {
+		return nil, ErrLocalExecutorUnauthorized
+	}
+	rows, err := s.db.QueryContext(ctx, localExecutorSelect+` WHERE owner_user_id=? ORDER BY created_at ASC, id ASC`, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]LocalExecutorRecord, 0)
+	for rows.Next() {
+		record, err := scanLocalExecutor(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, record)
+	}
+	return out, rows.Err()
+}
+
+func (s *MySQLStore) DeleteLocalExecutorForOwner(ctx context.Context, id string, ownerUserID int64, _ time.Time) (bool, error) {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM video_local_executors WHERE id=? AND owner_user_id=?`, id, ownerUserID)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	return affected > 0, err
+}
+
+func (s *MySQLStore) CreateLocalExecutorPairing(ctx context.Context, intent LocalExecutorPairingIntent) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO video_local_executor_pairing_intents(token_hash, owner_user_id, expires_at, created_at) VALUES(?,?,?,?)`, intent.TokenHash[:], intent.OwnerUserID, intent.ExpiresAt, intent.CreatedAt)
+	return err
+}
+
+func (s *MySQLStore) ConsumeLocalExecutorPairing(ctx context.Context, hash [32]byte, now time.Time) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	var ownerUserID int64
+	err = tx.QueryRowContext(ctx, `SELECT owner_user_id FROM video_local_executor_pairing_intents WHERE token_hash=? AND used_at IS NULL AND revoked_at IS NULL AND expires_at>? FOR UPDATE`, hash[:], now).Scan(&ownerUserID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrLocalExecutorUnauthorized
+	}
+	if err != nil {
+		return 0, err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE video_local_executor_pairing_intents SET used_at=? WHERE token_hash=? AND used_at IS NULL`, now, hash[:])
+	if err != nil {
+		return 0, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if affected != 1 {
+		return 0, ErrLocalExecutorUnauthorized
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return ownerUserID, nil
 }
 
 func (s *MySQLStore) CreateLocalExecutorTask(ctx context.Context, task LocalExecutorTask) error {
