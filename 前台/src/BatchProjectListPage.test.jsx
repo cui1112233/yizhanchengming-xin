@@ -115,7 +115,7 @@ describe('BatchProjectListPage', () => {
     expect(await screen.findByRole('dialog')).toBeTruthy()
     expect(screen.getAllByText('Script').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Final Prompt').length).toBeGreaterThan(0)
-    expect(screen.getByText('导演输出格式错误')).toBeTruthy()
+    expect(screen.getByText('生成阶段执行失败，请稍后重试')).toBeTruthy()
   }, 15000)
 
   it('shows four real stage statuses and retry for failed stage', async () => {
@@ -127,7 +127,7 @@ describe('BatchProjectListPage', () => {
     expect(screen.getAllByText('Hook').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Director').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Final Prompt').length).toBeGreaterThan(0)
-    expect(screen.getByText('导演输出格式错误')).toBeTruthy()
+    expect(screen.getByText('生成阶段执行失败，请稍后重试')).toBeTruthy()
     expect(screen.getByRole('button', { name: '重试 Director' })).toBeTruthy()
   }, 15000)
 
@@ -139,6 +139,27 @@ describe('BatchProjectListPage', () => {
     await screen.findByText('批量执行')
     fireEvent.click(screen.getByRole('button', { name: '批量执行' }))
     await waitFor(() => expect(api.runProjectGeneration).toHaveBeenCalledTimes(1))
+  }, 15000)
+
+  it.each([
+    ['{"valid":false,"repaired":true,"durationMs":28250,"error":"validation-canary","nested":{"error":"nested-canary"}}', true],
+    ['{"error":"validation-canary"', false],
+    ['{"valid":"validation-canary","repaired":[],"durationMs":"validation-canary"}', false],
+  ])('renders only safe stage copy and recognized validation facts (%s)', async (validationResult, hasFacts) => {
+    api.getProjectGeneration.mockResolvedValue({ batchProjectId: 3, books: [{ bookId: 11, stages: { DIRECTOR: { stage: 'DIRECTOR', status: 'failed', errorMessage: 'provider-canary-short', errorCode: 'unknown-code', outputText: '已存输出' } } }] })
+    api.getGenerationStage.mockResolvedValue({ stage: 'DIRECTOR', status: 'failed', errorMessage: 'provider-canary-short', errorCode: 'GENERATION_TIMELINE_INVALID', validationResult, inputSnapshot: 'snapshot-canary', outputText: '保留正文 provider-canary-short' })
+    api.retryGenerationStage.mockResolvedValue({})
+    render(<BatchProjectListPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '生成状态' }))
+    expect(await screen.findByText('生成阶段执行失败，请稍后重试')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('provider-canary-short')
+    fireEvent.click(screen.getByRole('button', { name: '查看结果' }))
+    expect(await screen.findByText('导演分镜时长校验失败，请重试导演阶段')).toBeTruthy()
+    expect(screen.getByText('保留正文 provider-canary-short')).toBeTruthy()
+    for (const canary of ['validation-canary', 'nested-canary', 'snapshot-canary']) expect(document.body.textContent).not.toContain(canary)
+    if (hasFacts) expect(screen.getByText(/校验未通过.*已修复.*28.25 秒/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '重试 Director' }))
+    await waitFor(() => expect(api.retryGenerationStage).toHaveBeenCalledWith(3, 11, 'DIRECTOR', expect.any(String)))
   }, 15000)
 
   it('disables match audio when no authoritative measurement exists', async () => {

@@ -34,19 +34,7 @@ func NewService(store Store, provider Provider, now Clock) *Service {
 }
 
 func safeError(err error) string {
-	if err == nil {
-		return ""
-	}
-	text := strings.ToLower(err.Error())
-	for _, marker := range []string{"authorization", "bearer", "token", "api key", "apikey", "password", "secret", "dsn"} {
-		if strings.Contains(text, marker) {
-			return "上游生成服务请求失败，请稍后重试"
-		}
-	}
-	if len(err.Error()) > 300 {
-		return "生成阶段执行失败，请查看服务日志"
-	}
-	return err.Error()
+	return OutcomeForError(err).Message
 }
 
 func (s *Service) validate() error {
@@ -198,6 +186,7 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 
 	finished := s.now().UTC()
 	run.Status, run.ErrorMessage, run.FinishedAt = StatusCompleted, "", &finished
+	run.ErrorCode = ""
 	run, err = s.store.UpdateBookRun(ctx, run)
 	if err != nil {
 		return BookGenerationResult{}, err
@@ -239,7 +228,7 @@ func validateProviderOutput(req TextRequest, output string) error {
 		return nil
 	}
 	var document struct {
-		SchemaVersion  string          `json:"schema_version"`
+		SchemaVersion string          `json:"schema_version"`
 		DirectorCards json.RawMessage `json:"director_cards"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &document); err != nil {
@@ -310,6 +299,7 @@ func (s *Service) executeProviderStage(ctx context.Context, run BookRun, book in
 		return stageRun, callErr
 	}
 	stageRun.Status, stageRun.OutputText, stageRun.ErrorMessage = StatusCompleted, strings.TrimSpace(output), ""
+	stageRun.ErrorCode = ""
 	stageRun, err = s.store.UpdateStageRun(ctx, stageRun)
 	return stageRun, err
 }
@@ -346,7 +336,9 @@ func (s *Service) RunBatch(ctx context.Context, req RunBatchRequest) (BatchGener
 		if runErr != nil {
 			item.Error = safeError(runErr)
 			result.Failed++
-			failures = append(failures, fmt.Sprintf("book %d: %s", book.ID, item.Error))
+			// Preserve original causes for the existing sanitized logger. Only the
+			// outer ErrUnavailable is wrapped, retaining batch classification.
+			failures = append(failures, fmt.Sprintf("book %d: %s", book.ID, runErr))
 		} else {
 			result.Completed++
 		}
@@ -378,6 +370,7 @@ func (s *Service) RetryStage(ctx context.Context, req RetryStageRequest) (BookGe
 		return BookGenerationResult{}, err
 	}
 	run.Status, run.ErrorMessage, run.FinishedAt = StatusRunning, "", nil
+	run.ErrorCode = ""
 	run.RequestID = strings.TrimSpace(req.RequestID)
 	if run, err = s.store.UpdateBookRun(ctx, run); err != nil {
 		return BookGenerationResult{}, err

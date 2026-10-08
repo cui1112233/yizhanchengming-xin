@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"net/http"
 	"strings"
 )
@@ -54,10 +55,12 @@ func (h handler) scriptStoryboard(w http.ResponseWriter, r *http.Request) {
 			}
 			out, e := h.deps.ScriptStoryboards.RecompileStoryboard(r.Context(), p, b, in.RequestID)
 			if e != nil {
-				writeJSON(w, generationHTTPStatus(e), out)
-				return
+				h.logger().Error("recompile_storyboard failed", "request_id", requestIDFromRequest(r),
+					"subsystem", "generation", "operation", "recompile_storyboard",
+					"error_code", generation.OutcomeForError(e).Code, "batch_project_id", p, "book_id", b,
+					"safe_error", observability.SafeError(e))
 			}
-			writeJSON(w, http.StatusOK, out)
+			writeBookGenerationOutcome(w, out, e)
 			return
 		}
 		var in struct {

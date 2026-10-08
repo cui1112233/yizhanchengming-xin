@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { generationOutcomeMessage, generationValidationSummary } from './ui/generationOutcome.js'
 import { Alert, Button, Card, Descriptions, Drawer, Modal, Space, Switch, Table, Tag, Typography } from 'antd'
 import {
   cancelVideoTask,
@@ -320,7 +321,7 @@ export default function BatchProjectListPage({ initialProjectId = null }) {
         return (
           <Space direction="vertical" size={4}>
             <StatusTag status={status} />
-            {stage?.errorMessage && <Typography.Text type="danger">{stage.errorMessage}</Typography.Text>}
+            {stage?.errorMessage && <Typography.Text type="danger">{generationOutcomeMessage(stage)}</Typography.Text>}
             {stage?.outputText && <Button size="small" onClick={() => void showStage(row.bookId, key)}>查看结果</Button>}
             {status === 'failed' && <Button size="small" danger onClick={() => void retryStage(row.bookId, key)}>重试 {label}</Button>}
           </Space>
@@ -464,8 +465,8 @@ export default function BatchProjectListPage({ initialProjectId = null }) {
         {resultModal && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Typography.Text type="secondary">Prompt: {resultModal.promptKey || '-'} v{resultModal.promptVersion || '-'}</Typography.Text>
-            {resultModal.validationResult && <Typography.Text type="secondary">Validation: {resultModal.validationResult}</Typography.Text>}
-            {resultModal.errorMessage && <Alert type="error" showIcon message={resultModal.errorMessage} />}
+            {generationValidationSummary(resultModal.validationResult) && <Typography.Text type="secondary">{generationValidationSummary(resultModal.validationResult)}</Typography.Text>}
+            {resultModal.errorMessage && <Alert type="error" showIcon message={generationOutcomeMessage(resultModal)} />}
             <Typography.Paragraph copyable style={{ whiteSpace: 'pre-wrap' }}>{resultModal.outputText || '暂无输出'}</Typography.Paragraph>
           </Space>
         )}

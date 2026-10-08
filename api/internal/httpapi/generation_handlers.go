@@ -62,10 +62,11 @@ func (h handler) projectGeneration(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		out, e := h.deps.Generation.ProjectSummary(r.Context(), projectID)
 		if e != nil {
-			writeError(w, generationHTTPStatus(e), "读取生成状态失败")
+			outcome := generation.OutcomeForError(e)
+			h.writeServiceError(w, r, generationHTTPStatus(e), outcome.Code, outcome.Message, "generation", "project_summary", e)
 			return
 		}
-		writeJSON(w, http.StatusOK, out)
+		writeJSON(w, http.StatusOK, projectGenerationSummary(out))
 		return
 	}
 	var req generation.RunBatchRequest
@@ -75,11 +76,7 @@ func (h handler) projectGeneration(w http.ResponseWriter, r *http.Request) {
 	}
 	req.BatchProjectID = projectID
 	out, e := h.deps.Generation.RunBatch(r.Context(), req)
-	if e != nil {
-		writeJSON(w, http.StatusMultiStatus, out)
-		return
-	}
-	writeJSON(w, http.StatusOK, out)
+	writeBatchGenerationOutcome(w, out, e)
 }
 
 func (h handler) bookGeneration(w http.ResponseWriter, r *http.Request) {
@@ -100,10 +97,11 @@ func (h handler) bookGeneration(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		out, e := h.deps.Generation.BookSummary(r.Context(), projectID, bookID)
 		if e != nil {
-			writeError(w, generationHTTPStatus(e), "读取小说生成状态失败")
+			outcome := generation.OutcomeForError(e)
+			h.writeServiceError(w, r, generationHTTPStatus(e), outcome.Code, outcome.Message, "generation", "book_summary", e)
 			return
 		}
-		writeJSON(w, http.StatusOK, out)
+		writeJSON(w, http.StatusOK, projectBookGeneration(out))
 		return
 	}
 	var req generation.RunBookRequest
@@ -113,11 +111,7 @@ func (h handler) bookGeneration(w http.ResponseWriter, r *http.Request) {
 	}
 	req.BatchProjectID, req.BookID = projectID, bookID
 	out, e := h.deps.Generation.RunBook(r.Context(), req)
-	if e != nil {
-		writeJSON(w, generationHTTPStatus(e), out)
-		return
-	}
-	writeJSON(w, http.StatusOK, out)
+	writeBookGenerationOutcome(w, out, e)
 }
 
 func (h handler) audioMeasurement(w http.ResponseWriter, r *http.Request) {
@@ -201,11 +195,7 @@ func (h handler) retryGenerationStage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, e := h.deps.Generation.RetryStage(r.Context(), generation.RetryStageRequest{BatchProjectID: projectID, BookID: bookID, Stage: stage, RequestID: body.RequestID})
-	if e != nil {
-		writeJSON(w, generationHTTPStatus(e), out)
-		return
-	}
-	writeJSON(w, http.StatusOK, out)
+	writeBookGenerationOutcome(w, out, e)
 }
 
 func (h handler) generationStage(w http.ResponseWriter, r *http.Request) {
@@ -226,10 +216,11 @@ func (h handler) generationStage(w http.ResponseWriter, r *http.Request) {
 	stage := generation.Stage(strings.ToUpper(strings.TrimSpace(r.PathValue("stage"))))
 	out, e := h.deps.Generation.StageResult(r.Context(), projectID, bookID, stage)
 	if e != nil {
-		writeError(w, generationHTTPStatus(e), "读取 Stage 结果失败")
+		outcome := generation.OutcomeForError(e)
+		h.writeServiceError(w, r, generationHTTPStatus(e), outcome.Code, outcome.Message, "generation", "stage_result", e)
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, projectStageRun(out))
 }
 
 func (h handler) generationPrompts(w http.ResponseWriter, r *http.Request) {

@@ -67,6 +67,7 @@ type BookRun struct {
 	Status         Status     `json:"status"`
 	RequestID      string     `json:"requestId,omitempty"`
 	ErrorMessage   string     `json:"errorMessage,omitempty"`
+	ErrorCode      string     `json:"errorCode,omitempty"` // Derived public metadata; not a stored column.
 	StartedAt      *time.Time `json:"startedAt,omitempty"`
 	FinishedAt     *time.Time `json:"finishedAt,omitempty"`
 	CreatedAt      time.Time  `json:"createdAt"`
@@ -86,6 +87,7 @@ type StageRun struct {
 	InputSnapshot    string     `json:"inputSnapshot,omitempty"`
 	OutputText       string     `json:"outputText,omitempty"`
 	ErrorMessage     string     `json:"errorMessage,omitempty"`
+	ErrorCode        string     `json:"errorCode,omitempty"` // Derived public metadata; not a stored column.
 	ValidationResult string     `json:"validationResult,omitempty"`
 	StartedAt        *time.Time `json:"startedAt,omitempty"`
 	FinishedAt       *time.Time `json:"finishedAt,omitempty"`
@@ -157,16 +159,18 @@ type RunBatchRequest struct {
 }
 
 type BookGenerationResult struct {
-	Run    BookRun            `json:"run"`
-	Stages []StageRun         `json:"stages"`
-	Latest map[Stage]StageRun `json:"latest,omitempty"`
-	Error  string             `json:"error,omitempty"`
+	Run       BookRun            `json:"run"`
+	Stages    []StageRun         `json:"stages"`
+	Latest    map[Stage]StageRun `json:"latest,omitempty"`
+	Error     string             `json:"error,omitempty"`
+	ErrorCode string             `json:"errorCode,omitempty"` // Derived public metadata.
 }
 
 type BatchBookResult struct {
-	BookID int64    `json:"bookId"`
-	Run    *BookRun `json:"run,omitempty"`
-	Error  string   `json:"error,omitempty"`
+	BookID    int64    `json:"bookId"`
+	Run       *BookRun `json:"run,omitempty"`
+	Error     string   `json:"error,omitempty"`
+	ErrorCode string   `json:"errorCode,omitempty"` // Derived public metadata.
 }
 
 type BatchGenerationResult struct {
