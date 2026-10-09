@@ -117,8 +117,8 @@
   font-size: 13px;
 }
 .membership-status-row span { display: inline-flex; align-items: center; gap: 6px; }
-.membership-status-row .is-on { color: #7ac9a3; }
-.membership-status-row .is-off { color: #f09898; }
+.membership-status-row .is-on { color: var(--text-success); }
+.membership-status-row .is-off { color: var(--text-danger); }
 
 .member-role-badge {
   display: inline-flex;
@@ -187,7 +187,7 @@
   cursor: pointer;
   font-weight: 600;
 }
-.member-tabs button.active { background: rgba(255,255,255,.08); color: var(--text-primary, #f8fafc); }
+.member-tabs button.active { background: rgba(255,255,255,.08); color: var(--text-primary); }
 
 .member-overview-grid {
   display: grid;
@@ -226,9 +226,9 @@
 
 .member-api-state { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: 15px; background: rgba(255,255,255,.035); }
 .member-api-state .member-state-dot { width: 9px; height: 9px; margin-top: 6px; border-radius: 50%; box-shadow: 0 0 12px currentColor; }
-.member-api-state.on { color: #7ac9a3; }
-.member-api-state.off { color: #f09898; }
-.member-api-state strong { color: var(--text-primary, #f8fafc); }
+.member-api-state.on { color: var(--text-success); }
+.member-api-state.off { color: var(--text-danger); }
+.member-api-state strong { color: var(--text-primary); }
 .member-api-state p { margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px; }
 .member-managed-note { margin-top: 14px; padding: 12px 14px; border: 1px dashed var(--border-color, #263244); border-radius: 12px; color: var(--text-secondary, #94a3b8); font-size: 12px; line-height: 1.6; }
 .member-api-panel .ant-btn { margin-top: 14px; }
@@ -238,7 +238,7 @@
 .member-feature-row > div:first-child { display: flex; flex-direction: column; }
 .member-feature-row span { color: var(--text-secondary, #94a3b8); font-size: 10px; }
 .member-feature-row b { color: var(--text-secondary, #94a3b8); text-align: right; font-size: 11px; }
-.member-empty-usage { padding: 24px 0; color: var(--text-secondary, #94a3b8); text-align: center; }
+.member-empty-usage { padding: 24px 0; color: var(--text-tertiary); text-align: center; }
 
 .member-recent-list { display: grid; }
 .member-recent-list > div { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 10px 0; }

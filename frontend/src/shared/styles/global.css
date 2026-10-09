@@ -3761,10 +3761,10 @@ select {
 @keyframes novelPanelFlow { to { stroke-dashoffset: 0; } }
 
 .legacy-global-status { position: absolute; left: 25%; right: 25%; top: 50%; transform: translateY(-50%); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 600; pointer-events: none; }
-.legacy-global-status--working { color: #4da3ff; }
-.legacy-global-status--success { color: #48c774; }
-.legacy-global-status--error { color: #ef6a6a; }
-.legacy-global-status--idle { color: transparent; }
+.legacy-global-status--working { color: var(--text-link); }
+.legacy-global-status--success { color: var(--text-success); }
+.legacy-global-status--error { color: var(--text-danger); }
+.legacy-global-status--idle { color: var(--text-tertiary); }
 
 [data-theme='dark'] .ant-modal-confirm-error .ant-modal-confirm-title,
 [data-theme='dark'] .ant-modal-confirm-error .ant-modal-confirm-content,

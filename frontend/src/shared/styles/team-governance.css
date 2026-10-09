@@ -28,7 +28,7 @@
   gap: 10px;
   align-items: center;
   margin-bottom: 7px;
-  color: rgba(226, 232, 240, .78);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -40,11 +40,11 @@
 }
 
 .ac-team-table-row.is-disabled {
-  opacity: .62;
+  color: var(--text-disabled);
 }
 
 .ac-team-table-row.is-disabled:hover {
-  opacity: .82;
+  color: var(--text-disabled);
 }
 
 /* Advanced governance is a selector plus a workspace, not an unbounded stack
@@ -99,23 +99,13 @@
   border-radius: 12px;
   border: 1px solid rgba(59, 130, 246, .22);
   background: rgba(37, 99, 235, .08);
-  color: rgba(226, 232, 240, .86);
+  color: var(--text-primary);
 }
 
-.ac-quota-alert.is-warning {
-  border-color: rgba(234, 179, 8, .3);
-  background: rgba(234, 179, 8, .08);
-}
+.ac-quota-alert.is-warning,
+.ac-quota-alert.is-critical { color: var(--text-warning); border-color: rgba(234, 179, 8, .3); background: rgba(234, 179, 8, .08); }
 
-.ac-quota-alert.is-critical {
-  border-color: rgba(249, 115, 22, .34);
-  background: rgba(249, 115, 22, .09);
-}
-
-.ac-quota-alert.is-exhausted {
-  border-color: rgba(239, 68, 68, .38);
-  background: rgba(239, 68, 68, .1);
-}
+.ac-quota-alert.is-exhausted { color: var(--text-danger); border-color: rgba(239, 68, 68, .38); background: rgba(239, 68, 68, .1); }
 
 .ac-usage-cost-cell {
   display: flex;
@@ -125,14 +115,14 @@
 }
 
 .ac-usage-cost-cell small {
-  color: rgba(226, 232, 240, .58);
+  color: var(--text-tertiary);
   white-space: nowrap;
 }
 
 .ac-team-used small {
   display: block;
   margin-top: 4px;
-  color: rgba(226, 232, 240, .48);
+  color: var(--text-tertiary);
   font-size: 11px;
 }
 

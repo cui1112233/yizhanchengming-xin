@@ -7,7 +7,7 @@
     radial-gradient(circle at 18% 12%, rgba(91,112,255,.18), transparent 32%),
     radial-gradient(circle at 84% 82%, rgba(246,183,80,.12), transparent 28%),
     #070a12;
-  color: #f5f7ff;
+  color: var(--text-primary);
 }
 
 .invite-card {
@@ -20,7 +20,7 @@
   backdrop-filter: blur(20px);
 }
 
-.invite-brand { display: flex; align-items: center; gap: 10px; color: #9ca5bb; font-size: 13px; }
+.invite-brand { display: flex; align-items: center; gap: 10px; color: var(--text-tertiary); font-size: 13px; }
 .invite-brand svg { width: 28px; height: 28px; }
 .invite-hero { display: flex; gap: 16px; margin: 30px 0 22px; }
 .invite-team-icon {
@@ -33,9 +33,9 @@
   color: #c6ceff;
   background: linear-gradient(145deg,rgba(108,126,255,.28),rgba(108,126,255,.08));
 }
-.invite-hero small { color: #7f8aa3; letter-spacing: .14em; }
+.invite-hero small { color: var(--text-tertiary); letter-spacing: .14em; }
 .invite-hero h1 { margin: 4px 0 7px; font-size: 30px; }
-.invite-hero p { margin: 0; color: #9ba5bb; }
+.invite-hero p { margin: 0; color: var(--text-secondary); }
 .invite-policy {
   display: grid;
   gap: 10px;
@@ -45,9 +45,9 @@
   border-radius: 16px;
   background: rgba(255,255,255,.025);
 }
-.invite-policy > div { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; color: #9fa8bc; }
-.invite-policy strong { color: #ecf0fb; font-size: 13px; }
-.invite-footnote { margin: 16px 0 0; color: #747f95; font-size: 12px; text-align: center; }
+.invite-policy > div { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; color: var(--text-secondary); }
+.invite-policy strong { color: var(--text-primary); font-size: 13px; }
+.invite-footnote { margin: 16px 0 0; color: var(--text-tertiary); font-size: 12px; text-align: center; }
 
 .ac-collab-grid { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(280px,.6fr); gap: 16px; }
 .ac-team-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -87,7 +87,7 @@
 }
 .ac-recovery-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .ac-recovery-code { padding: 10px; border-radius: 10px; background: rgba(255,255,255,.04); font-family: ui-monospace,SFMono-Regular,Menlo,monospace; text-align: center; }
-.ac-archive-tag { color: #d0a766; }
+.ac-archive-tag { color: var(--text-warning); }
 .ac-member-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .ac-team-name-edit { display: flex; gap: 8px; }
 .ac-team-name-edit .ant-input { min-width: 220px; }
