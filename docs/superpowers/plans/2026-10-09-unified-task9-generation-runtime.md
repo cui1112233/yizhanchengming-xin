@@ -176,10 +176,23 @@ Commit: `feat(runtime): admit generation runs atomically [skip ci]`
 - Create: `api/internal/generation/runtime_executor_test.go`
 - Modify: `api/internal/generation/service.go`
 - Modify: `api/internal/generation/store.go`
+- Modify: `api/internal/generation/model.go`
+- Modify: `api/internal/generation/prompts.go`
+- Modify: `api/internal/generation/safe_outcomes.go`
+- Modify: `api/internal/generation/safe_outcomes_test.go`
 - Modify: `api/internal/generation/mysql_store.go`
+- Modify: `api/internal/generation/mysql_store_test.go`
+- Modify: `api/internal/generation/service_test.go`
+- Modify: `api/internal/generation/compiler.go`
+- Modify: `api/internal/generation/compiler_test.go`
 - Modify: `api/internal/task9runtime/runtime.go`
+- Modify: `api/internal/task9runtime/runtime_contract_test.go`
 - Modify: `api/internal/task9runtime/mysql_store.go`
+- Modify: `api/internal/task9runtime/mysql_integration_test.go`
+- Modify: `api/internal/task9runtime/multibook_integration_test.go`
 - Modify: `api/internal/task9runtime/error_persistence_integration_test.go`
+- Modify: `api/internal/video/final_prompt_source.go`
+- Modify: `api/internal/video/final_prompt_source_test.go`
 
 **Interfaces:**
 - Consumes: `task9runtime.Execution` for an already-created queued BookRun.
@@ -187,9 +200,20 @@ Commit: `feat(runtime): admit generation runs atomically [skip ci]`
 
 ```go
 type RuntimeBookRunStore interface {
-    RuntimeBookRun(context.Context, int64, int, uint64, string) (BookRun, RunBookRequest, error)
+    RuntimeBookRun(context.Context, task9runtime.Execution) (BookRun, RuntimeExecutionInput, error)
+    GetBookForProject(context.Context, int64, int64) (intake.Book, error)
+    LatestAudioMeasurement(context.Context, int64, int64) (AudioMeasurement, error)
+    ResolvePrompt(context.Context, string) (Prompt, error)
+    ListStageRuns(context.Context, int64) ([]StageRun, error)
     CreateStageRunFenced(context.Context, task9runtime.Execution, StageRun) (StageRun, error)
     UpdateStageRunFenced(context.Context, task9runtime.Execution, StageRun) (StageRun, error)
+}
+
+type RuntimeExecutionInput struct {
+    Request RunBookRequest
+    Action string // full | stage_retry
+    RetryStage Stage
+    SourceBookRunID int64
 }
 
 type RuntimeExecutor struct {
@@ -206,26 +230,40 @@ func (e *RuntimeExecutor) Execute(context.Context, task9runtime.Execution) error
 
 Cover SCRIPT → optional HOOK → DIRECTOR → local FINAL_PROMPT, disabled hook as skipped, H3 validation, authoritative audio measurement, safe Provider failure, Prompt version persistence, context cancellation, and stale token rejection before every StageRun create/update and before BookRun finalization.
 
+Also cover `action=stage_retry`: it references one owned prior BookRun and an explicit failed stage, copies only the required completed upstream outputs into the new attempt, reruns that stage plus required downstream stages, and never silently becomes a full-book rerun. Unsupported snapshot schema/action/hash/book membership fails before any Provider call.
+
+Extend `task9runtime.GenerationSnapshot` without a migration: keep schema version 1 readable as the legacy `full` action, introduce schema version 2 with allowlisted `action`, `retry_stage`, and `source_book_run_id`, and write version 2 for all new admissions. Canonical hashing includes these fields. `full` rejects retry-only fields; `stage_retry` requires one frozen target Book ID, a supported explicit stage, and a positive source BookRun ID. Decoding remains strict and rejects unknown fields or unsupported versions before queue delivery can reach a Provider.
+
 Use a fake Provider counting calls. Admission tests must assert Provider calls remain zero; executor tests assert calls happen only inside `Execute`.
 
 - [ ] **Step 2: Extract execution from synchronous admission**
 
-Keep pure stage-building/compiler helpers in `generation.Service`, but make runtime execution accept an existing fenced BookRun. New production HTTP paths must not call `RunBook`, `RunBatch`, or `RetryStage` synchronously. Legacy methods may remain temporarily for focused unit compatibility, but app wiring must inject the async admission service instead of exposing them to HTTP.
+Keep pure stage-building/compiler helpers in `generation.Service`, but make runtime execution accept an existing fenced BookRun. Narrow `PromptResolver` to a `PromptReader` so the executor does not require the entire legacy Store. New production HTTP paths must not call `RunBook`, `RunBatch`, `RecompileStoryboard`, or `RetryStage` synchronously. Legacy methods may remain temporarily for focused unit compatibility only when they reject `run_id IS NOT NULL`; app wiring must inject the async admission service instead of exposing them to HTTP.
+
+`RuntimeBookRun` loads the exact BookRun by `Execution`, JOINs its Run and BatchProject, and validates exact `run_kind='generation'`, supported snapshot schema/hash/action, frozen Book ID membership, active project, `status='running'`, attempt, token and owner. It never calls `LatestBookRun`, creates a new BookRun, trusts Redis for request options, or expands the current project book list.
 
 - [ ] **Step 3: Fence every durable write**
 
-Every StageRun INSERT/UPDATE verifies the parent BookRun tuple:
+Every StageRun INSERT/UPDATE uses one MySQL transaction and verifies the parent BookRun tuple:
 
 ```sql
 id = ? AND attempt = ? AND status = 'running'
 AND execution_token = ? AND execution_owner = ?
 ```
 
-A worker that lost its lease may finish a Provider call, but all later StageRun and BookRun writes return `task9runtime.ErrStaleExecution`.
+A worker that lost its lease may finish a Provider call, but all later StageRun and BookRun writes return `task9runtime.ErrStaleExecution`. The transaction locks Project → Run → BookRun → StageRun, derives BookID from the locked parent rather than trusting the argument, allocates stage attempt without swallowing read errors, writes and reads back before commit.
+
+Runtime stage snapshots contain only IDs, upstream StageRun IDs, prompt key/version, audio measurement ID/duration and whitelisted options. They never serialize `SystemPrompt`, `Prompt.Content`, source text, credentials or a whole `TextRequest`/`FinalPromptInput`.
+
+The FINAL_PROMPT `OutputText` remains the user-requested compiled business artifact and may contain the backend-resolved preset; it is not copied into Run request snapshots or history-list DTOs. The public prompt catalog still exposes only key/version. This preserves the existing product output while keeping system content out of client-authored configuration and execution snapshots.
 
 - [ ] **Step 4: Aggregate parent Run after finalization**
 
-After successful or failed fenced BookRun finalize, call `AggregateRunStatus`. Preserve `partial_failed`; no HTTP request performs this aggregation.
+Move parent aggregation inside the same MySQL transaction as successful or failed fenced BookRun finalize, using Project → Run → latest BookRun lock order. Preserve `partial_failed`; terminal/cancelled Runs cannot regress. `Worker.Process` and `RunOnce` must honor the durable bool and treat stale/lease-loss/context cancellation as non-business termination: no fallback Fail, no aggregate, no later paid stage.
+
+Add a runtime-neutral safe error interface in `task9runtime` (`SafeCode()`, `SafeMessage()`, `Retryable()`, `Unwrap()`). Generation implements it from the existing allowlisted Outcome; raw Provider bodies never reach StageRun, BookRun, HTTP or logs. The runtime must not import `generation`.
+
+Map persisted runtime BookRun `succeeded` to the existing public Generation `completed` status on reads. Update `ProjectSummary` and `video.FinalPromptSource` tests so completed runtime output remains visible and usable without changing the durable runtime state string.
 
 - [ ] **Step 5: Run Generation + runtime tests and commit**
 
