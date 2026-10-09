@@ -5,14 +5,14 @@ import { captureAccountCenterOrigin, normalizeAccountCenterReturnPath } from './
 
 const ORIGIN = 'http://localhost:3001';
 
-test('captures a business URL once and retains its query and hash', () => {
+test('captures the page that opened the account center, including its query and hash', () => {
   assert.equal(
     captureAccountCenterOrigin('/shuihuo-production?book=42#stage', null, ORIGIN),
     '/shuihuo-production?book=42#stage'
   );
   assert.equal(
     captureAccountCenterOrigin('/script?draft=next', '/shuihuo-production?book=42#stage', ORIGIN),
-    '/shuihuo-production?book=42#stage'
+    '/script?draft=next'
   );
 });
 

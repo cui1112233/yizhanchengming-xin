@@ -25,7 +25,5 @@ export function normalizeAccountCenterReturnPath(value, origin) {
 }
 
 export function captureAccountCenterOrigin(currentUrl, existingOrigin, origin) {
-  const remembered = normalizeAccountCenterReturnPath(existingOrigin, origin);
-  if (remembered !== '/') return remembered;
   return normalizeAccountCenterReturnPath(currentUrl, origin);
 }
