@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, Bug, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, FolderClock, Home, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, Bug, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, FolderClock, Home, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
@@ -511,7 +511,10 @@ export function UserLayout({ children }) {
               <Avatar size={28} src={account?.avatarUrl} style={{ backgroundColor: displayAvatar.background }}>{displayAvatar.emoji}</Avatar>
             </button>
             <span className="legacy-sidebar-username" title={account?.displayName || username}>{account?.displayName || username}</span>
-            <Button size="small" onClick={handleLogout}>退出</Button>
+            <Button className="legacy-sidebar-logout" size="small" type="text" aria-label="退出登录" onClick={handleLogout}>
+              <LogOut size={16} strokeWidth={1.9} aria-hidden="true" />
+              <span className="legacy-sidebar-logout-label">退出</span>
+            </Button>
           </div>
         ) : null}
       </aside>
