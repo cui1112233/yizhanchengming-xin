@@ -276,13 +276,23 @@ Commit: `feat(generation): execute book runs through task9 runtime [skip ci]`
 **Files:**
 - Modify: `api/internal/httpapi/generation_handlers.go`
 - Modify: `api/internal/httpapi/generation_handlers_test.go`
+- Modify: `api/internal/httpapi/script_storyboard_handlers.go`
+- Create: `api/internal/httpapi/script_storyboard_handlers_test.go`
 - Modify: `api/internal/httpapi/server.go`
+- Modify: `api/internal/task9runtime/generation_admission.go`
+- Modify: `api/internal/task9runtime/generation_admission_test.go`
+- Modify: `api/internal/task9runtime/mysql_store.go`
+- Modify: `api/internal/task9runtime/mysql_store_test.go`
 - Modify: `api/internal/app/app.go`
+- Modify: `api/internal/app/observed_services.go`
 - Modify: `前台/src/api.js`
+- Create: `前台/src/api.generation.test.js`
 - Modify: `前台/src/BatchProjectListPage.jsx`
 - Modify: `前台/src/BatchProjectListPage.test.jsx`
 - Modify: `前台/src/ScriptWorkspace.jsx`
 - Modify: `前台/src/ScriptWorkspace.test.jsx`
+- Modify: `前台/src/ShuihuoProductionPage.jsx`
+- Modify: `前台/src/ShuihuoProductionPage.test.jsx`
 
 **Interfaces:**
 - Consumes: `GenerationAdmission.AdmitBook`, `AdmitBatch`, `RetryStage` plus existing read-only Generation summaries.
@@ -294,26 +304,42 @@ Commit: `feat(generation): execute book runs through task9 runtime [skip ci]`
   "status": "queued",
   "runId": 123,
   "taskIds": [456],
-  "pollUrl": "/api/v1/batch-projects/12/generation",
+  "pollUrl": "/api/v1/batch-projects/12/generation/runs/123",
   "dispatch": "queued"
 }
 ```
 
+Exact polling is account/project scoped and MySQL-only:
+
+```http
+GET /api/v1/batch-projects/{projectId}/generation/runs/{runId}
+```
+
+It returns only Run/BookRun lifecycle facts (`runId`, project ID, public status, terminal, counts and task ID/book ID/attempt/public status). It never returns request snapshots, source text, Prompt content or output bodies.
+
 - [ ] **Step 1: Add failing handler tests**
 
-Assert POST returns 202 before any Provider call; repeated same idempotency key and body returns the same Run; same key/different body returns safe 409; queue/runtime/provider unavailable returns safe 503 and zero Provider calls; ownership/capability/CSRF/archive behavior remains enforced.
+Assert POST returns 202 before any Provider call; repeated same idempotency key and body returns the same Run and the complete stable task ID list even after tasks become running/terminal; same key/different body returns safe 409; queue/runtime/provider unavailable returns safe 503 and zero Provider calls; ownership/capability/CSRF/archive behavior remains enforced.
+
+`Idempotency-Key` header wins over the compatibility `requestId` field, and both are sent with the same value by new clients. The HTTP correlation `X-Request-ID` is never a business idempotency key. A stage retry supplies and freezes the exact `sourceBookRunId`; it never resolves a moving “latest failed run” after admission.
 
 - [ ] **Step 2: Replace synchronous handlers with admission**
 
-`Idempotency-Key` is preferred; existing body `requestId` is accepted as the compatibility key. MySQL commit followed by transient Redis enqueue failure returns 202 with `dispatch=pending`; Recovery will dispatch it. A runtime that was never configured returns 503 and persists a safe terminal failure fact rather than accepted success.
+`Idempotency-Key` is preferred; existing body `requestId` is accepted as the compatibility key. Separate the complete HTTP `taskIds` projection from `AdmissionResult.Items`, which remains the list of queue deliveries still requiring dispatch. MySQL commit followed by transient Redis enqueue failure returns 202 with `dispatch=pending`; Recovery will dispatch it. A runtime that was never configured or has no usable Provider returns safe 503 with zero queue/Provider calls; do not accept a run that cannot execute and do not fabricate success.
+
+Keep actor identity server-derived from Cookie Session. POST remains Same-Origin CSRF + `batch.execute` + ownership + active-project guarded. GET remains `batch.view` + ownership; a foreign Run and a missing Run both return the same 404. Archived history remains readable but cannot accept a mutation.
 
 - [ ] **Step 3: Make poll GET read MySQL only**
 
-Keep existing summary GETs and add an exact Run GET if the UI cannot identify one run safely. GET must perform no Provider/TOS/Redis work.
+Keep existing summary GETs and add the exact Run GET above. Project summary may expose the parent Run ID needed for refresh recovery, but must not expose execution snapshots. GET must perform no Provider/TOS/Redis work. Durable runtime `succeeded` maps to public `completed`; terminal statuses are `completed`, `partial_failed`, `failed`, and `cancelled`.
+
+The legacy `/storyboard/recompile` handler must not call the unfenced synchronous Generation service for runtime BookRuns. Until a separately admitted `storyboard_recompile` action exists, return a safe 409 and make the frontend button explicitly unavailable; never report a fake successful recompile.
 
 - [ ] **Step 4: Update frontend state machine**
 
-Treat 202 as queued/running, poll server state with bounded backoff, stop on terminal status/unmount/project switch, preserve requestId on failure, and never write task facts to LocalStorage. Reuse the existing stale-response guards and safe error presentation.
+Treat 202 as queued/running, poll the exact Run URL with non-overlapping bounded backoff (1s, 1.5s, 2.5s, 4s, capped at 5s), stop on terminal status/unmount/project switch, abort stale reads, preserve the same idempotency key after an uncertain network failure, and never write task facts to LocalStorage or SessionStorage. A page refresh discovers queued/running work from MySQL summary and resumes polling. `dispatch=pending` means “saved, waiting for dispatch”, not success; 401/403/404 stop polling, while bounded transient 5xx retries retain the safe request ID.
+
+Apply the same contract to Script workspace, Batch project workbench and Shuihuo Generation entry points. POST loading covers admission only; queued/running states show continuing work and stage progress. The frontend constructs the same-origin poll path from validated project/run IDs rather than trusting an arbitrary server URL. This task only cancels browser polling; it does not invent a business task-cancellation API.
 
 - [ ] **Step 5: Run Go tests, foreground full frontend tests, build and commit**
 
