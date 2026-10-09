@@ -98,19 +98,66 @@ test('creative-workspace style files use global readable text tokens', () => {
   }
 });
 
+function cssBlock(css, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 's'));
+  assert.ok(match, `missing CSS block for ${selector}`);
+  return match[1];
+}
+
 test('agent task drawer surface follows the active theme', () => {
   const css = fs.readFileSync(path.join(root, 'shared/styles/agent-workspace.css'), 'utf8');
-  assert.match(css, /\.agent-page \.agent-task-drawer\s*\{[^}]*background:\s*var\(--surface-panel\)/s);
+  assert.match(cssBlock(css, '.agent-page .agent-task-drawer'), /background:\s*var\(--surface-panel\)/);
 });
 
-test('giant material surfaces, borders, and status backgrounds follow theme semantics', () => {
-  for (const file of [
-    'user/pages/giant-material-test.css',
-    'user/pages/GiantMaterialStatusCard.css'
+function assertThemedSurface(block, selector) {
+  assert.match(block, /background:\s*var\(--surface-(?:base|panel|input)\)/, `${selector} must use a theme surface`);
+  assert.doesNotMatch(block, /background:\s*#(?:0[0-9a-f]|1[0-9a-f]|2[0-9a-f]|3[0-9a-f]|4[0-9a-f]|5[0-9a-f]|6[0-9a-f])/i, `${selector} must not restore a fixed dark surface`);
+}
+
+function assertThemedBorder(block, selector) {
+  assert.match(block, /border(?:-color)?:\s*(?:1px solid )?var\(--border-(?:default|strong)\)/, `${selector} must use a theme border`);
+}
+
+test('giant material test key containers use themed surfaces and borders', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/giant-material-test.css'), 'utf8');
+  for (const selector of [
+    '.giant-material-test-form, .giant-material-test-alert, .giant-material-test-stage',
+    '.giant-material-test-input-row input',
+    '.giant-material-test-body',
+    '.giant-material-test-actions button'
   ]) {
-    const css = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.match(css, /background:\s*var\(--surface-(?:base|panel|input)\)/);
-    assert.match(css, /border(?:-color)?:\s*(?:1px solid )?var\(--border-(?:default|strong)\)/);
-    assert.doesNotMatch(css, /background:\s*#(?:0[0-9a-f]|1[0-9a-f]|2[0-9a-f]|3[0-9a-f]|4[0-9a-f]|5[0-9a-f]|6[0-9a-f])/i);
+    const block = cssBlock(css, selector);
+    assertThemedSurface(block, selector);
+    assertThemedBorder(block, selector);
+  }
+});
+
+test('giant material test status selectors retain themed borders and surfaces', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/giant-material-test.css'), 'utf8');
+  for (const status of ['success', 'error', 'warning', 'loading']) {
+    const selector = `.giant-material-test-stage.is-${status}`;
+    assertThemedBorder(cssBlock(css, selector), selector);
+  }
+
+  for (const status of ['success', 'error', 'warning']) {
+    const selector = `.giant-material-test-stage.is-${status} .giant-material-test-stage-heading span`;
+    assertThemedSurface(cssBlock(css, selector), selector);
+  }
+  assertThemedSurface(cssBlock(css, '.giant-material-test-stage-heading span'), '.giant-material-test-stage-heading span');
+});
+
+test('giant material status card and its states retain themed surfaces and borders', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/GiantMaterialStatusCard.css'), 'utf8');
+  const cardSelector = '.giant-material-status-card';
+  const cardBlock = cssBlock(css, cardSelector);
+  assertThemedSurface(cardBlock, cardSelector);
+  assertThemedBorder(cardBlock, cardSelector);
+
+  for (const status of ['loading', 'success', 'error', 'warning']) {
+    const selector = `.giant-material-status-card.is-${status}`;
+    assertThemedBorder(cssBlock(css, selector), selector);
+    const badgeSelector = `${selector} .giant-material-status-heading span`;
+    assertThemedSurface(cssBlock(css, badgeSelector), badgeSelector);
   }
 });
