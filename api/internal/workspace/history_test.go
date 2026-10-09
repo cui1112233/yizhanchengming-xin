@@ -37,6 +37,25 @@ func historyMatcher(elevated bool) sqlmock.QueryMatcher {
 func historyRows() *sqlmock.Rows {
 	return sqlmock.NewRows([]string{"kind", "origin", "source_id", "intake_id", "project_id", "book_id", "book_run_id", "attempt", "revision", "title", "project_name", "status", "source_status", "updated_at", "archived_at"})
 }
+
+func TestHistoryProjectionNormalizesUnionStatusCollation(t *testing.T) {
+	for _, fragment := range []string{
+		"vi.status COLLATE utf8mb4_unicode_ci AS raw_status",
+		") COLLATE utf8mb4_unicode_ci AS raw_status",
+		"br.status COLLATE utf8mb4_unicode_ci",
+		"sr.status COLLATE utf8mb4_unicode_ci",
+		"'saved' COLLATE utf8mb4_unicode_ci",
+		"'measured' COLLATE utf8mb4_unicode_ci",
+		"vm.status COLLATE utf8mb4_unicode_ci",
+		"vv.status COLLATE utf8mb4_unicode_ci",
+		"vma.status COLLATE utf8mb4_unicode_ci",
+	} {
+		if !strings.Contains(historyProjection, fragment) {
+			t.Fatalf("history UNION status is not normalized with %q", fragment)
+		}
+	}
+}
+
 func TestHistoryOwnedFactsQueryBoundary(t *testing.T) {
 	for _, tc := range []struct {
 		name                string

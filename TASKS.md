@@ -750,5 +750,6 @@
 - [x] `cmd/server` 已改由 `NewApplication` 装配唯一 Task9 Redis Queue、Lease、Worker、Scheduler 与 Recovery；启动先从 MySQL 恢复再开放 readiness，运行期动态报告 available/degraded/unavailable，SIGINT/SIGTERM 会依次停止 HTTP、取消并 join goroutine、关闭 Queue/Lease。兼容 `NewHandler` 仍 fail-closed，正式 Application 不会回退创建第二套 Task9 队列。
 - [x] 本机隔离 `ycm_staging` 已由 Goose 从 18 迁移到 21；独立 `127.0.0.1:16379` Redis 上的真实集成测试覆盖 FLUSHDB 后从 MySQL 重建、过期 execution fencing/retry 与进程对象重建，`go test ./internal/taskruntime ./internal/task9runtime -count=1` 及相关 race 测试退出码 0。
 - [x] 生命周期仓库门禁：`go test ./... -count=1`（25 packages）、`go test -race ./internal/taskruntime ./internal/task9runtime ./internal/generation ./internal/app -count=1`、`go vet ./...` 与 `./scripts/build-embedded-ui.sh` 均退出码 0；前台与后台静态资源已重新嵌入同一个 Go 二进制。
+- [x] 首轮 Docker 浏览器验收发现 MySQL 8 的旧表 `utf8mb4_unicode_ci` 与 Shuihuo 新表 `utf8mb4_0900_ai_ci` 在首页/历史 `UNION` 中冲突；最近创作与历史投影已对跨表状态列显式统一 collation，并新增真实 `WORKSPACE_MYSQL_DSN` 只读集成回归，避免只靠 sqlmock 漏掉运行时错误。
 - [ ] 本机 Docker staging 的登录、CSRF、账号/项目权限、无 Provider 真实失败、假 Provider 中断/重启恢复、浏览器刷新恢复与逐页视觉验收尚未完成；完成前不宣称 Runtime 端到端可用。
 - [ ] 未连接 ECS/公网、未运行 GitHub Actions、未调用付费 Provider/TOS；浏览器与公网对标验收尚未进行。

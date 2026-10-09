@@ -81,22 +81,22 @@ ranked_media AS (
  WHERE smt.media_kind IN ('image','audio','video')
 ),
 recent_items AS (
- SELECT 'batch' AS kind,'project' AS origin,vp.project_id AS source_id,COALESCE(NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)) AS title,COALESCE(rr.status,vp.intake_status,'pending') AS status,GREATEST(vp.project_updated_at,vp.intake_updated_at,COALESCE(rr.updated_at,vp.project_updated_at)) AS updated_at,vp.project_id,0 AS book_id,10 AS kind_rank
+ SELECT 'batch' AS kind,'project' AS origin,vp.project_id AS source_id,COALESCE(NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)) AS title,COALESCE(rr.status,vp.intake_status,'pending') COLLATE utf8mb4_unicode_ci AS status,GREATEST(vp.project_updated_at,vp.intake_updated_at,COALESCE(rr.updated_at,vp.project_updated_at)) AS updated_at,vp.project_id,0 AS book_id,10 AS kind_rank
  FROM visible_projects vp LEFT JOIN ranked_runs rr ON rr.batch_project_id=vp.project_id AND rr.recent_rank=1
  UNION ALL
- SELECT 'script','stage',rs.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),rs.status,rs.updated_at,vp.project_id,b.id,30
+ SELECT 'script','stage',rs.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),rs.status COLLATE utf8mb4_unicode_ci,rs.updated_at,vp.project_id,b.id,30
  FROM ranked_stages rs JOIN visible_projects vp ON vp.project_id=rs.batch_project_id JOIN books b ON b.id=rs.book_id AND b.intake_id=vp.intake_id WHERE rs.recent_rank=1
  UNION ALL
- SELECT 'novel_panel','workspace',npw.batch_project_id,COALESCE(NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),'saved',npw.updated_at,vp.project_id,0,40
+ SELECT 'novel_panel','workspace',npw.batch_project_id,COALESCE(NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),'saved' COLLATE utf8mb4_unicode_ci,npw.updated_at,vp.project_id,0,40
  FROM novel_panel_workspaces npw JOIN visible_projects vp ON vp.project_id=npw.batch_project_id
  UNION ALL
- SELECT 'tts','measurement',ra.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),'measured',ra.updated_at,vp.project_id,b.id,50
+ SELECT 'tts','measurement',ra.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),'measured' COLLATE utf8mb4_unicode_ci,ra.updated_at,vp.project_id,b.id,50
  FROM ranked_audio ra JOIN visible_projects vp ON vp.project_id=ra.batch_project_id JOIN books b ON b.id=ra.book_id AND b.intake_id=vp.intake_id WHERE ra.recent_rank=1
  UNION ALL
- SELECT CASE WHEN rm.media_kind='audio' THEN 'tts' WHEN rm.media_kind='image' THEN 'shuihuo_image' ELSE 'shuihuo_video' END,'media',rm.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),rm.status,rm.updated_at,vp.project_id,b.id,CASE WHEN rm.media_kind='audio' THEN 51 WHEN rm.media_kind='image' THEN 60 ELSE 70 END
+ SELECT CASE WHEN rm.media_kind='audio' THEN 'tts' WHEN rm.media_kind='image' THEN 'shuihuo_image' ELSE 'shuihuo_video' END,'media',rm.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),rm.status COLLATE utf8mb4_unicode_ci,rm.updated_at,vp.project_id,b.id,CASE WHEN rm.media_kind='audio' THEN 51 WHEN rm.media_kind='image' THEN 60 ELSE 70 END
  FROM ranked_media rm JOIN visible_projects vp ON vp.project_id=rm.batch_project_id JOIN books b ON b.id=rm.book_id AND b.intake_id=vp.intake_id WHERE rm.recent_rank=1
  UNION ALL
- SELECT 'video','production_task',rv.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),rv.status,rv.updated_at,vp.project_id,b.id,71
+ SELECT 'video','production_task',rv.id,COALESCE(NULLIF(TRIM(b.title),''),NULLIF(TRIM(vp.project_name),''),CONCAT('项目 #',vp.project_id)),rv.status COLLATE utf8mb4_unicode_ci,rv.updated_at,vp.project_id,b.id,71
  FROM ranked_video rv JOIN visible_projects vp ON vp.project_id=rv.batch_project_id JOIN books b ON b.id=rv.book_id AND b.intake_id=vp.intake_id
  WHERE rv.recent_rank=1 AND NOT EXISTS (
   SELECT 1 FROM shuihuo_media_tasks smt

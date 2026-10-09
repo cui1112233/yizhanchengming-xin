@@ -117,40 +117,40 @@ visible_books AS (
  WHERE smt.media_kind IN ('image','audio','video')
 ), history_facts AS (
  SELECT 'intake' AS kind,'intake' AS origin,CAST(vi.id AS CHAR) AS source_id,vi.id AS intake_id,
- 0 AS project_id,0 AS book_id,0 AS book_run_id,0 AS attempt,0 AS revision,vi.name AS title,'' AS project_name,vi.status AS raw_status,vi.updated_at,vp.archived_at
+ 0 AS project_id,0 AS book_id,0 AS book_run_id,0 AS attempt,0 AS revision,vi.name AS title,'' AS project_name,vi.status COLLATE utf8mb4_unicode_ci AS raw_status,vi.updated_at,vp.archived_at
  FROM visible_intakes vi LEFT JOIN visible_projects vp ON vp.intake_id=vi.id
  UNION ALL
  SELECT 'batch','project',CAST(vp.id AS CHAR),vp.intake_id,vp.id,0,0,0,0,vp.name,vp.name,
- COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id=vp.id ORDER BY r.updated_at DESC,r.id DESC LIMIT 1),vi.status),
+ COALESCE((SELECT r.status FROM runs r WHERE r.batch_project_id=vp.id ORDER BY r.updated_at DESC,r.id DESC LIMIT 1),vi.status) COLLATE utf8mb4_unicode_ci AS raw_status,
  GREATEST(vp.updated_at,vi.updated_at,COALESCE((SELECT r.updated_at FROM runs r WHERE r.batch_project_id=vp.id ORDER BY r.updated_at DESC,r.id DESC LIMIT 1),vp.updated_at)),vp.archived_at
  FROM visible_projects vp JOIN visible_intakes vi ON vi.id=vp.intake_id
  UNION ALL
- SELECT 'book_run','book_run',CAST(br.id AS CHAR),vp.intake_id,vp.id,br.book_id,br.id,br.attempt,0,b.title,vp.name,br.status,br.updated_at,vp.archived_at
+ SELECT 'book_run','book_run',CAST(br.id AS CHAR),vp.intake_id,vp.id,br.book_id,br.id,br.attempt,0,b.title,vp.name,br.status COLLATE utf8mb4_unicode_ci,br.updated_at,vp.archived_at
  FROM visible_book_runs br JOIN visible_projects vp ON vp.id=br.batch_project_id JOIN visible_books b ON b.id=br.book_id AND b.project_id=vp.id
  UNION ALL
- SELECT 'script','stage',CAST(sr.id AS CHAR),vp.intake_id,vp.id,sr.book_id,br.id,sr.attempt,0,b.title,vp.name,sr.status,sr.updated_at,vp.archived_at
+ SELECT 'script','stage',CAST(sr.id AS CHAR),vp.intake_id,vp.id,sr.book_id,br.id,sr.attempt,0,b.title,vp.name,sr.status COLLATE utf8mb4_unicode_ci,sr.updated_at,vp.archived_at
  FROM stage_runs sr JOIN visible_book_runs br ON br.id=sr.book_run_id AND sr.book_id=br.book_id
  JOIN visible_projects vp ON vp.id=br.batch_project_id JOIN visible_books b ON b.id=sr.book_id AND b.project_id=vp.id WHERE sr.stage='SCRIPT'
  UNION ALL
- SELECT 'novel_panel','revision',nh.id,vp.intake_id,vp.id,0,0,0,nh.revision,vp.name,vp.name,'saved',nh.created_at,vp.archived_at
+ SELECT 'novel_panel','revision',nh.id,vp.intake_id,vp.id,0,0,0,nh.revision,vp.name,vp.name,'saved' COLLATE utf8mb4_unicode_ci,nh.created_at,vp.archived_at
  FROM novel_panel_history nh JOIN visible_projects vp ON vp.id=nh.batch_project_id
  UNION ALL
- SELECT 'novel_panel','workspace',CAST(npw.batch_project_id AS CHAR),vp.intake_id,vp.id,0,0,0,npw.revision,vp.name,vp.name,'saved',npw.updated_at,vp.archived_at
+ SELECT 'novel_panel','workspace',CAST(npw.batch_project_id AS CHAR),vp.intake_id,vp.id,0,0,0,npw.revision,vp.name,vp.name,'saved' COLLATE utf8mb4_unicode_ci,npw.updated_at,vp.archived_at
  FROM novel_panel_workspaces npw JOIN visible_projects vp ON vp.id=npw.batch_project_id
  WHERE NOT EXISTS (SELECT 1 FROM novel_panel_history nh WHERE nh.batch_project_id=npw.batch_project_id AND nh.revision=npw.revision)
  UNION ALL
- SELECT 'tts','measurement',CAST(am.id AS CHAR),vp.intake_id,vp.id,am.book_id,0,0,0,b.title,vp.name,'measured',am.measured_at,vp.archived_at
+ SELECT 'tts','measurement',CAST(am.id AS CHAR),vp.intake_id,vp.id,am.book_id,0,0,0,b.title,vp.name,'measured' COLLATE utf8mb4_unicode_ci,am.measured_at,vp.archived_at
  FROM audio_measurements am JOIN visible_projects vp ON vp.id=am.batch_project_id JOIN visible_books b ON b.id=am.book_id AND b.project_id=vp.id
  UNION ALL
  SELECT CASE WHEN vm.media_kind='audio' THEN 'tts' WHEN vm.media_kind='image' THEN 'shuihuo_image' ELSE 'shuihuo_video' END,
- 'media',CAST(vm.id AS CHAR),vp.intake_id,vp.id,vm.book_id,0,vm.attempt,0,b.title,vp.name,vm.status,vm.updated_at,vp.archived_at
+ 'media',CAST(vm.id AS CHAR),vp.intake_id,vp.id,vm.book_id,0,vm.attempt,0,b.title,vp.name,vm.status COLLATE utf8mb4_unicode_ci,vm.updated_at,vp.archived_at
  FROM visible_media vm JOIN visible_projects vp ON vp.id=vm.batch_project_id JOIN visible_books b ON b.id=vm.book_id AND b.project_id=vp.id
  UNION ALL
- SELECT 'video','production_task',CAST(vv.id AS CHAR),vp.intake_id,vp.id,vv.book_id,0,vv.attempt,0,b.title,vp.name,vv.status,vv.updated_at,vp.archived_at
+ SELECT 'video','production_task',CAST(vv.id AS CHAR),vp.intake_id,vp.id,vv.book_id,0,vv.attempt,0,b.title,vp.name,vv.status COLLATE utf8mb4_unicode_ci,vv.updated_at,vp.archived_at
  FROM visible_video vv JOIN visible_projects vp ON vp.id=vv.batch_project_id JOIN visible_books b ON b.id=vv.book_id AND b.project_id=vp.id
  WHERE NOT EXISTS (SELECT 1 FROM shuihuo_media_tasks smt WHERE smt.production_task_id=vv.id AND smt.batch_project_id=vv.batch_project_id AND smt.book_id=vv.book_id AND smt.media_kind='video')
  UNION ALL
- SELECT 'merge','merge_attempt',CAST(vma.id AS CHAR),vp.intake_id,vp.id,vmj.book_id,0,vma.attempt,0,b.title,vp.name,vma.status,vma.updated_at,vp.archived_at
+ SELECT 'merge','merge_attempt',CAST(vma.id AS CHAR),vp.intake_id,vp.id,vmj.book_id,0,vma.attempt,0,b.title,vp.name,vma.status COLLATE utf8mb4_unicode_ci,vma.updated_at,vp.archived_at
  FROM video_merge_attempts vma JOIN video_merge_jobs vmj ON vmj.id=vma.merge_job_id
  JOIN visible_projects vp ON vp.id=vmj.batch_project_id JOIN visible_books b ON b.id=vmj.book_id AND b.project_id=vp.id
 ), safe_history AS (

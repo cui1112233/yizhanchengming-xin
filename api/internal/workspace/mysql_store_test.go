@@ -37,6 +37,21 @@ func TestRecentProjectionSQLKeepsOwnershipJoinsAndStableOrder(t *testing.T) {
 	}
 }
 
+func TestRecentProjectionNormalizesUnionStatusCollation(t *testing.T) {
+	for _, fragment := range []string{
+		"COALESCE(rr.status,vp.intake_status,'pending') COLLATE utf8mb4_unicode_ci AS status",
+		"rs.status COLLATE utf8mb4_unicode_ci",
+		"'saved' COLLATE utf8mb4_unicode_ci",
+		"'measured' COLLATE utf8mb4_unicode_ci",
+		"rm.status COLLATE utf8mb4_unicode_ci",
+		"rv.status COLLATE utf8mb4_unicode_ci",
+	} {
+		if !strings.Contains(recentProjectionQuery, fragment) {
+			t.Fatalf("recent UNION status is not normalized with %q", fragment)
+		}
+	}
+}
+
 func TestMySQLStoreListRecentScopesOwnerAndNonZeroTeamInOneQuery(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
