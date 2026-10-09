@@ -24,6 +24,13 @@ test('keeps current DEV and manager menu gates', () => {
   assert.match(source, /account\?\.role === 'dev'/);
 });
 
+test('keeps profile, member, and security navigation available on every center page', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+
+  assert.doesNotMatch(source, /const profileOpen/);
+  assert.doesNotMatch(source, /profileOpen \?/);
+});
+
 test('integrated CSS does not retain the fixed overlay or second content offset', () => {
   const css = fs.readFileSync(cssPath, 'utf8');
 
