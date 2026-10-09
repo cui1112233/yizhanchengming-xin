@@ -74,6 +74,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+#root.user-theme-root .workspace-sidebar-nav a { gap: 10px; }
+#root.user-theme-root .workspace-nav-icon { width: 18px; height: 18px; flex: 0 0 18px; }
+#root.user-theme-root .workspace-nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #root.user-theme-root .workspace-sidebar-nav a:hover,
 #root.user-theme-root .workspace-sidebar-nav a.is-active,
 #root.user-theme-root .workspace-sidebar-tools a:hover,
@@ -107,6 +110,9 @@
   background: color-mix(in srgb, var(--shell-panel) 88%, transparent);
   backdrop-filter: blur(18px);
 }
+#root.user-theme-root .workspace-sidebar.is-collapsed .workspace-sidebar-nav a { display: grid; place-items: center; }
+#root.user-theme-root .workspace-sidebar.is-collapsed .workspace-nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+#root.user-theme-root .workspace-mobile-header { display: none; }
 
 #root.user-theme-root .user-shell-home .user-shell-header {
   position: absolute;
@@ -540,12 +546,14 @@
   #root.user-theme-root .workspace-sidebar, #root.user-theme-root .workspace-sidebar.is-collapsed { width: var(--app-sidebar-rail); flex-basis: var(--app-sidebar-rail); padding-inline: 6px; }
   #root.user-theme-root .workspace-sidebar-brand { flex-wrap: wrap; justify-content: center; }
   #root.user-theme-root .workspace-sidebar-brand strong, #root.user-theme-root .workspace-sidebar-account strong { display: none; }
-  #root.user-theme-root .workspace-sidebar-nav a, #root.user-theme-root .workspace-sidebar-tools a { display: block; padding: 8px 2px; white-space: normal; text-align: center; font-size: 11px; }
+  #root.user-theme-root .workspace-sidebar-nav a, #root.user-theme-root .workspace-sidebar-tools a { display: grid; place-items: center; padding: 8px 2px; white-space: normal; text-align: center; font-size: 11px; }
+  #root.user-theme-root .workspace-nav-label { display: none; }
   #root.user-theme-root .workspace-sidebar-tools .ant-btn { padding-inline: 0; justify-content: center; }
   #root.user-theme-root .home-quick-actions { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   #root.user-theme-root .workspace-sidebar { display: none; }
+  #root.user-theme-root .workspace-mobile-header { display: grid; }
 
   #root.user-theme-root .user-shell-header {
     padding: 10px 14px;

@@ -15,7 +15,7 @@ describe('UserShell', () => {
     render(<UserShell pathname="/agent/canvas" theme="dark" onToggleTheme={() => {}} onNavigate={() => {}}><main>内容</main></UserShell>)
     fireEvent.click(screen.getByRole('button', { name: '打开导航' }))
     await screen.findByRole('dialog')
-    for (const name of ['用户导航', '工作区侧边导航', '移动端工作区导航']) {
+    for (const name of ['工作区侧边导航', '移动端工作区导航']) {
       const nav = screen.getByRole('navigation', { name })
       expect(within(nav).queryByRole('link', { name: '问题日志' })).toBeNull()
       expect(within(nav).getByRole('link', { name: 'Agent 工作区' }).getAttribute('aria-current')).toBe('page')
@@ -63,6 +63,14 @@ describe('UserShell', () => {
     expect(within(sidebar).getByRole('link', { name: '历史' }).getAttribute('href')).toBe('/history')
     fireEvent.click(screen.getByRole('button', { name: '收起侧边导航' }))
     expect(screen.getByRole('button', { name: '展开侧边导航' })).toBeTruthy()
+  })
+
+  it('uses the V88 desktop shell: icon sidebar only, without a duplicate workspace header', () => {
+    render(<UserShell pathname="/script" theme="dark" onToggleTheme={() => {}} onNavigate={() => {}} currentUser={{ name: '测试创作者' }}><main>内容</main></UserShell>)
+
+    expect(document.querySelector('.user-shell-workspace > .user-shell-stage > .user-shell-header:not(.workspace-mobile-header)')).toBeNull()
+    expect(document.querySelectorAll('.workspace-sidebar-nav svg').length).toBeGreaterThanOrEqual(8)
+    expect(screen.getByRole('navigation', { name: '工作区侧边导航' })).toBeTruthy()
   })
 
   it('opens mobile navigation and closes its presentation-only decoration', async () => {

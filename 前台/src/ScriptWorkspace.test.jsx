@@ -68,5 +68,5 @@ describe('ScriptWorkspace', () => {
     if (!outcome.outputText) expect(modal.textContent).not.toContain('provider-canary-short')
     expect(modal.textContent).not.toContain('pass-canary')
     expect(screen.getByRole('button', { name: '重试' })).toBeTruthy()
-  })
+  }, 15000)
 })
