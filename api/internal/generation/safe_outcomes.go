@@ -24,7 +24,7 @@ func NewRuntimeOutcomeError(cause error) error {
 		return nil
 	}
 	outcome := OutcomeForError(cause)
-	retryable := !errors.Is(cause, ErrInvalid) && !errors.Is(cause, ErrNotFound) && !errors.Is(cause, ErrConflict) && !errors.Is(cause, ErrProjectArchived)
+	retryable := !errors.Is(cause, ErrInvalid) && !errors.Is(cause, ErrNotFound) && !errors.Is(cause, ErrConflict) && !errors.Is(cause, ErrProjectArchived) && !errors.Is(cause, ErrAudioMeasurementRequired)
 	return &RuntimeOutcomeError{cause: cause, outcome: outcome, retryable: retryable}
 }
 

@@ -113,7 +113,7 @@ func TestGenerationConfigSnapshotUsesOnlyAllowlistedServerSettings(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.ProcessingRules != "RULES" || config.KnowledgeBase != "project-kb" || config.ModelConfig != "MODEL" {
+	if config.Constraints != "RULES" || config.ProcessingRulePromptRef != "rules-v3" || config.KnowledgePromptRef != "project-kb" || config.Model != "MODEL" || config.Characters != "CHARACTERS" || config.Scenes != "SCENES" {
 		t.Fatalf("config=%+v", config)
 	}
 	encoded, _ := json.Marshal(config)
@@ -121,9 +121,6 @@ func TestGenerationConfigSnapshotUsesOnlyAllowlistedServerSettings(t *testing.T)
 		if strings.Contains(string(encoded), forbidden) {
 			t.Fatalf("settings snapshot leaked %q: %s", forbidden, encoded)
 		}
-	}
-	if !strings.Contains(config.ProjectConfig, "CHARACTERS") || !strings.Contains(config.ProjectConfig, "SCENES") || !strings.Contains(config.UserConfig, `"profile_id":42`) || !strings.Contains(config.UserConfig, `"processing_rule_prompt_ref":"rules-v3"`) {
-		t.Fatalf("config metadata=%+v", config)
 	}
 }
 

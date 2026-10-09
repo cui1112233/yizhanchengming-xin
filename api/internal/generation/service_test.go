@@ -403,6 +403,27 @@ func TestProjectSummaryAggregatesLatestRuns(t *testing.T) {
 	}
 }
 
+func TestProviderOutputValidationRejectsBlankAndMalformedH3Cards(t *testing.T) {
+	for _, stage := range []Stage{StageScript, StageHook, StageDirector} {
+		if err := validateProviderOutput(TextRequest{Stage: stage, DirectorMode: DirectorNormal}, " \n\t"); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("blank %s err=%v", stage, err)
+		}
+	}
+	for _, body := range []string{
+		`{"schema_version":"h3-director/v1","director_cards":{}}`,
+		`{"schema_version":"h3-director/v1","director_cards":[]}`,
+		`{"schema_version":"h3-director/v1","director_cards":[{}]}`,
+		`{"schema_version":"h3-director/v2","director_cards":[{"shot":"a"}]}`,
+	} {
+		if err := validateProviderOutput(TextRequest{Stage: StageDirector, DirectorMode: DirectorH3}, body); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("malformed H3 accepted: %s err=%v", body, err)
+		}
+	}
+	if err := validateProviderOutput(TextRequest{Stage: StageDirector, DirectorMode: DirectorH3}, `{"schema_version":"h3-director/v1","director_cards":[{"shot":"a"}]}`); err != nil {
+		t.Fatalf("usable H3 rejected: %v", err)
+	}
+}
+
 func TestProjectSummaryMapsDurableRuntimeSucceededToCompleted(t *testing.T) {
 	service, store, _ := serviceFixture()
 	store.bookRuns = append(store.bookRuns, BookRun{ID: 90, RunID: 80, BatchProjectID: 3, BookID: 11, Status: Status("succeeded")})

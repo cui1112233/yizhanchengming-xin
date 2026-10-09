@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -440,7 +441,7 @@ func (s *MySQLStore) RuntimeBookRun(ctx context.Context, execution task9runtime.
 	}
 	if decoded.Action == task9runtime.GenerationActionStageRetry {
 		var count int
-		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM book_runs WHERE id=? AND batch_project_id=? AND book_id=? AND run_id IS NOT NULL AND id<?`, decoded.SourceBookRunID, run.BatchProjectID, run.BookID, run.ID).Scan(&count); err != nil {
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM book_runs source_br JOIN runs source_run ON source_run.id=source_br.run_id WHERE source_br.id=? AND source_br.batch_project_id=? AND source_br.book_id=? AND source_br.status='failed' AND source_run.batch_project_id=source_br.batch_project_id AND source_run.run_kind='generation' AND source_run.requested_by_user_id=? AND source_run.status IN ('failed','partial_failed') AND source_br.id<>?`, decoded.SourceBookRunID, run.BatchProjectID, run.BookID, decoded.RequestedByUserID, run.ID).Scan(&count); err != nil {
 			return BookRun{}, RuntimeExecutionInput{}, err
 		}
 		if count != 1 {
@@ -448,7 +449,8 @@ func (s *MySQLStore) RuntimeBookRun(ctx context.Context, execution task9runtime.
 		}
 	}
 	run.RunID, run.Status = runID, StatusRunning
-	input := RuntimeExecutionInput{Action: decoded.Action, RetryStage: Stage(decoded.RetryStage), SourceBookRunID: decoded.SourceBookRunID, Request: RunBookRequest{BatchProjectID: run.BatchProjectID, BookID: run.BookID, HookEnabled: decoded.HookEnabled, PlotMode: decoded.PlotMode, DirectorMode: DirectorMode(decoded.DirectorMode), MatchAudio: decoded.MatchAudio, ShotDurationLimitSec: decoded.ShotDurationLimitSec, RequestID: run.RequestID, ProcessingRules: decoded.Config.ProcessingRules, KnowledgeBase: decoded.Config.KnowledgeBase, ProjectConfig: decoded.Config.ProjectConfig, UserConfig: decoded.Config.UserConfig, ModelConfig: decoded.Config.ModelConfig}}
+	projectConfig, _ := json.Marshal(map[string]string{"constraints": decoded.Config.Constraints, "characters": decoded.Config.Characters, "scenes": decoded.Config.Scenes})
+	input := RuntimeExecutionInput{Action: decoded.Action, RetryStage: Stage(decoded.RetryStage), SourceBookRunID: decoded.SourceBookRunID, Request: RunBookRequest{BatchProjectID: run.BatchProjectID, BookID: run.BookID, HookEnabled: decoded.HookEnabled, PlotMode: decoded.PlotMode, DirectorMode: DirectorMode(decoded.DirectorMode), MatchAudio: decoded.MatchAudio, ShotDurationLimitSec: decoded.ShotDurationLimitSec, RequestID: run.RequestID, ProcessingRules: decoded.Config.ProcessingRulePromptRef, KnowledgeBase: decoded.Config.KnowledgePromptRef, ProjectConfig: string(projectConfig), ModelConfig: decoded.Config.Model}}
 	return run, input, nil
 }
 

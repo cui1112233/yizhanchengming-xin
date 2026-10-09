@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func TestMySQLStoreLegacyUpdateRejectsRuntimeBookRun(t *testing.T) {
 
 func TestMySQLStoreRuntimeBookRunLoadsExactFencedSnapshotAndConfig(t *testing.T) {
 	db, mock := newSQLMock(t)
-	snapshot := task9runtime.GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 3, BookIDs: []int64{11}, DirectorMode: "normal", ShotDurationLimitSec: 15, RequestedByUserID: 7, Action: task9runtime.GenerationActionFull, Config: task9runtime.GenerationConfigSnapshot{ProcessingRules: "RULES", ModelConfig: "MODEL"}}
+	snapshot := task9runtime.GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 3, BookIDs: []int64{11}, DirectorMode: "normal", ShotDurationLimitSec: 15, RequestedByUserID: 7, Action: task9runtime.GenerationActionFull, Config: task9runtime.GenerationConfigSnapshot{ProcessingRulePromptRef: "rules.prompt", KnowledgePromptRef: "knowledge.prompt", Constraints: "RULES", Characters: "CHARACTERS", Scenes: "SCENES", Model: "MODEL"}}
 	body, err := json.Marshal(snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -92,8 +93,53 @@ func TestMySQLStoreRuntimeBookRunLoadsExactFencedSnapshotAndConfig(t *testing.T)
 	mock.ExpectQuery("SELECT br.id,br.run_id.*FROM book_runs br JOIN runs r").WithArgs(int64(90)).WillReturnRows(sqlmock.NewRows([]string{"id", "run_id", "project_id", "book_id", "book_status", "request_id", "started_at", "created_at", "updated_at", "attempt", "token", "owner", "run_status", "run_kind", "schema", "snapshot", "hash", "actor", "archived_at"}).AddRow(90, 80, 3, 11, "running", "req", now, now, now, 2, 17, "worker-a", "running", "generation", 2, body, hash, 7, nil))
 	execution := task9runtime.Execution{BookRunID: 90, Attempt: 2, FencingToken: 17, Owner: "worker-a"}
 	run, input, err := NewMySQLStore(db).RuntimeBookRun(context.Background(), execution)
-	if err != nil || run.RunID != 80 || input.Action != task9runtime.GenerationActionFull || input.Request.ProcessingRules != "RULES" || input.Request.ModelConfig != "MODEL" {
+	if err != nil || run.RunID != 80 || input.Action != task9runtime.GenerationActionFull || input.Request.ProcessingRules != "rules.prompt" || input.Request.KnowledgeBase != "knowledge.prompt" || input.Request.ModelConfig != "MODEL" || !strings.Contains(input.Request.ProjectConfig, "RULES") || !strings.Contains(input.Request.ProjectConfig, "CHARACTERS") || !strings.Contains(input.Request.ProjectConfig, "SCENES") {
 		t.Fatalf("run=%+v input=%+v err=%v", run, input, err)
+	}
+}
+
+func TestMySQLStoreRuntimeBookRunStageRetryRequiresOwnedTerminalGenerationSource(t *testing.T) {
+	db, mock := newSQLMock(t)
+	snapshot := task9runtime.GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 3, BookIDs: []int64{11}, DirectorMode: "normal", ShotDurationLimitSec: 15, RequestedByUserID: 7, Action: task9runtime.GenerationActionStageRetry, RetryStage: string(StageDirector), SourceBookRunID: 70}
+	body, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	hash := hex.EncodeToString(sum[:])
+	now := time.Now()
+	mock.ExpectQuery("SELECT br.id,br.run_id.*FROM book_runs br JOIN runs r").WithArgs(int64(90)).WillReturnRows(sqlmock.NewRows([]string{"id", "run_id", "project_id", "book_id", "book_status", "request_id", "started_at", "created_at", "updated_at", "attempt", "token", "owner", "run_status", "run_kind", "schema", "snapshot", "hash", "actor", "archived_at"}).AddRow(90, 80, 3, 11, "running", "req", now, now, now, 1, 17, "worker-a", "running", "generation", 2, body, hash, 7, nil))
+	retrySourceQuery := regexp.QuoteMeta(`SELECT COUNT(*) FROM book_runs source_br JOIN runs source_run ON source_run.id=source_br.run_id WHERE source_br.id=? AND source_br.batch_project_id=? AND source_br.book_id=? AND source_br.status='failed' AND source_run.batch_project_id=source_br.batch_project_id AND source_run.run_kind='generation' AND source_run.requested_by_user_id=? AND source_run.status IN ('failed','partial_failed') AND source_br.id<>?`)
+	mock.ExpectQuery(retrySourceQuery).WithArgs(int64(70), int64(3), int64(11), int64(7), int64(90)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	execution := task9runtime.Execution{BookRunID: 90, Attempt: 1, FencingToken: 17, Owner: "worker-a"}
+	run, input, err := NewMySQLStore(db).RuntimeBookRun(context.Background(), execution)
+	if err != nil || run.ID != 90 || input.SourceBookRunID != 70 || input.RetryStage != StageDirector {
+		t.Fatalf("run=%+v input=%+v err=%v", run, input, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLStoreRuntimeBookRunRejectsUnownedOrNonterminalRetrySource(t *testing.T) {
+	db, mock := newSQLMock(t)
+	snapshot := task9runtime.GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 3, BookIDs: []int64{11}, DirectorMode: "normal", ShotDurationLimitSec: 15, RequestedByUserID: 7, Action: task9runtime.GenerationActionStageRetry, RetryStage: string(StageDirector), SourceBookRunID: 70}
+	body, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	hash := hex.EncodeToString(sum[:])
+	now := time.Now()
+	mock.ExpectQuery("SELECT br.id,br.run_id.*FROM book_runs br JOIN runs r").WithArgs(int64(90)).WillReturnRows(sqlmock.NewRows([]string{"id", "run_id", "project_id", "book_id", "book_status", "request_id", "started_at", "created_at", "updated_at", "attempt", "token", "owner", "run_status", "run_kind", "schema", "snapshot", "hash", "actor", "archived_at"}).AddRow(90, 80, 3, 11, "running", "req", now, now, now, 1, 17, "worker-a", "running", "generation", 2, body, hash, 7, nil))
+	retrySourceQuery := regexp.QuoteMeta(`SELECT COUNT(*) FROM book_runs source_br JOIN runs source_run ON source_run.id=source_br.run_id WHERE source_br.id=? AND source_br.batch_project_id=? AND source_br.book_id=? AND source_br.status='failed' AND source_run.batch_project_id=source_br.batch_project_id AND source_run.run_kind='generation' AND source_run.requested_by_user_id=? AND source_run.status IN ('failed','partial_failed') AND source_br.id<>?`)
+	mock.ExpectQuery(retrySourceQuery).WithArgs(int64(70), int64(3), int64(11), int64(7), int64(90)).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	execution := task9runtime.Execution{BookRunID: 90, Attempt: 1, FencingToken: 17, Owner: "worker-a"}
+	if _, _, err := NewMySQLStore(db).RuntimeBookRun(context.Background(), execution); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("err=%v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
 	}
 }
 

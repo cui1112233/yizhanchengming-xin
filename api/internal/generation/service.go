@@ -227,18 +227,26 @@ func (s *Service) nextAttempt(ctx context.Context, bookRunID int64, stage Stage)
 }
 
 func validateProviderOutput(req TextRequest, output string) error {
+	if strings.TrimSpace(output) == "" {
+		return fmt.Errorf("%w: Provider 输出为空", ErrUnavailable)
+	}
 	if req.Stage != StageDirector || req.DirectorMode != DirectorH3 {
 		return nil
 	}
 	var document struct {
-		SchemaVersion string          `json:"schema_version"`
-		DirectorCards json.RawMessage `json:"director_cards"`
+		SchemaVersion string         `json:"schema_version"`
+		DirectorCards []timelineCard `json:"director_cards"`
 	}
 	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), &document); err != nil {
 		return fmt.Errorf("%w: H3 Director 输出不是有效 JSON", ErrUnavailable)
 	}
-	if document.SchemaVersion != "h3-director/v1" || len(document.DirectorCards) == 0 || string(document.DirectorCards) == "null" {
+	if document.SchemaVersion != "h3-director/v1" || len(document.DirectorCards) == 0 {
 		return fmt.Errorf("%w: H3 Director 输出不符合 h3-director/v1", ErrUnavailable)
+	}
+	for _, card := range document.DirectorCards {
+		if len(card) == 0 {
+			return fmt.Errorf("%w: H3 Director 卡片结构无效", ErrUnavailable)
+		}
 	}
 	return nil
 }

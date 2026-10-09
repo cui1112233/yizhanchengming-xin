@@ -10,6 +10,7 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
 
 type RuntimeBookRunStore interface {
@@ -50,7 +51,7 @@ func (e *RuntimeExecutor) Execute(ctx context.Context, execution task9runtime.Ex
 	}
 	run, input, err := e.store.RuntimeBookRun(ctx, execution)
 	if err != nil {
-		return err
+		return runtimeExecutionError(ctx, err)
 	}
 	if run.ID != execution.BookRunID || run.BatchProjectID <= 0 || run.BookID <= 0 || run.Status != StatusRunning {
 		return NewRuntimeOutcomeError(ErrInvalid)
@@ -59,7 +60,7 @@ func (e *RuntimeExecutor) Execute(ctx context.Context, execution task9runtime.Ex
 		return NewRuntimeOutcomeError(ErrInvalid)
 	}
 	if input.Action == "" {
-		input.Action = task9runtime.GenerationActionFull
+		return NewRuntimeOutcomeError(ErrInvalid)
 	}
 	if input.Action != task9runtime.GenerationActionFull && input.Action != task9runtime.GenerationActionStageRetry {
 		return NewRuntimeOutcomeError(ErrInvalid)
@@ -72,14 +73,14 @@ func (e *RuntimeExecutor) Execute(ctx context.Context, execution task9runtime.Ex
 	}
 	book, err := e.store.GetBookForProject(ctx, run.BatchProjectID, run.BookID)
 	if err != nil {
-		return NewRuntimeOutcomeError(err)
+		return runtimeExecutionError(ctx, err)
 	}
 	if book.ID != run.BookID {
 		return NewRuntimeOutcomeError(ErrInvalid)
 	}
 	measurement, err := e.authoritativeAudio(ctx, &input.Request)
 	if err != nil {
-		return NewRuntimeOutcomeError(err)
+		return runtimeExecutionError(ctx, err)
 	}
 
 	completed := map[Stage]StageRun{}
@@ -90,7 +91,7 @@ func (e *RuntimeExecutor) Execute(ctx context.Context, execution task9runtime.Ex
 		}
 		completed, err = e.copyRetryPrerequisites(ctx, execution, run, input)
 		if err != nil {
-			return err
+			return runtimeExecutionError(ctx, err)
 		}
 		start = input.RetryStage
 	}
@@ -152,11 +153,28 @@ func (e *RuntimeExecutor) Execute(ctx context.Context, execution task9runtime.Ex
 			value, err = e.finalPromptStage(ctx, execution, run, book, input.Request, completed)
 		}
 		if err != nil {
-			return err
+			return runtimeExecutionError(ctx, err)
 		}
 		completed[stage] = value
 	}
 	return nil
+}
+
+func runtimeExecutionError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, task9runtime.ErrStaleExecution) || errors.Is(err, taskruntime.ErrLeaseNotOwner) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var safe *RuntimeOutcomeError
+	if errors.As(err, &safe) {
+		return err
+	}
+	return NewRuntimeOutcomeError(err)
 }
 
 func validRuntimeStage(stage Stage) bool {
@@ -191,7 +209,7 @@ func (e *RuntimeExecutor) authoritativeAudio(ctx context.Context, req *RunBookRe
 func (e *RuntimeExecutor) copyRetryPrerequisites(ctx context.Context, execution task9runtime.Execution, run BookRun, input RuntimeExecutionInput) (map[Stage]StageRun, error) {
 	values, err := e.store.ListStageRuns(ctx, input.SourceBookRunID)
 	if err != nil {
-		return nil, NewRuntimeOutcomeError(err)
+		return nil, runtimeExecutionError(ctx, err)
 	}
 	latest := map[Stage]StageRun{}
 	for _, value := range values {
@@ -222,7 +240,7 @@ func (e *RuntimeExecutor) copyRetryPrerequisites(ctx context.Context, execution 
 		snapshot, _ := json.Marshal(map[string]any{"source_stage_run_id": source.ID})
 		copied, err := e.store.CreateStageRunFenced(ctx, execution, StageRun{BookRunID: run.ID, Stage: stage, Status: source.Status, RequestID: run.RequestID, PromptKey: source.PromptKey, PromptVersion: source.PromptVersion, InputSnapshot: string(snapshot), OutputText: source.OutputText, ValidationResult: source.ValidationResult, StartedAt: &now, FinishedAt: &now})
 		if err != nil {
-			return nil, err
+			return nil, runtimeExecutionError(ctx, err)
 		}
 		out[stage] = copied
 	}
@@ -232,7 +250,7 @@ func (e *RuntimeExecutor) copyRetryPrerequisites(ctx context.Context, execution 
 func (e *RuntimeExecutor) providerStage(ctx context.Context, execution task9runtime.Execution, run BookRun, book intake.Book, stage Stage, promptKey string, req TextRequest, snapshotFields map[string]any) (StageRun, error) {
 	prompt, err := e.resolver.Resolve(ctx, promptKey)
 	if err != nil {
-		return StageRun{}, NewRuntimeOutcomeError(err)
+		return StageRun{}, runtimeExecutionError(ctx, err)
 	}
 	started := e.now().UTC()
 	snapshotFields["prompt_key"] = prompt.Key
@@ -240,10 +258,13 @@ func (e *RuntimeExecutor) providerStage(ctx context.Context, execution task9runt
 	snapshot, _ := json.Marshal(snapshotFields)
 	stageRun, err := e.store.CreateStageRunFenced(ctx, execution, StageRun{BookRunID: run.ID, Stage: stage, Status: StatusRunning, RequestID: run.RequestID, PromptKey: prompt.Key, PromptVersion: prompt.Version, InputSnapshot: string(snapshot), StartedAt: &started})
 	if err != nil {
-		return StageRun{}, err
+		return StageRun{}, runtimeExecutionError(ctx, err)
 	}
 	req.SystemPrompt = prompt.Content
 	output, callErr := e.provider.Complete(ctx, req)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return StageRun{}, ctxErr
+	}
 	if callErr == nil {
 		callErr = validateProviderOutput(req, output)
 	}
@@ -273,18 +294,20 @@ func (e *RuntimeExecutor) providerStage(ctx context.Context, execution task9runt
 			stageRun.ValidationResult = validationJSON(false, req, TimelineValidationResult{}, callErr)
 		}
 		if _, err := e.store.UpdateStageRunFenced(ctx, execution, stageRun); err != nil {
-			return StageRun{}, err
+			return StageRun{}, runtimeExecutionError(ctx, err)
 		}
-		return StageRun{}, NewRuntimeOutcomeError(callErr)
+		return StageRun{}, runtimeExecutionError(ctx, callErr)
 	}
 	stageRun.Status, stageRun.OutputText, stageRun.ErrorMessage, stageRun.ErrorCode = StatusCompleted, strings.TrimSpace(output), "", ""
-	return e.store.UpdateStageRunFenced(ctx, execution, stageRun)
+	updated, err := e.store.UpdateStageRunFenced(ctx, execution, stageRun)
+	return updated, runtimeExecutionError(ctx, err)
 }
 
 func (e *RuntimeExecutor) skippedStage(ctx context.Context, execution task9runtime.Execution, run BookRun, book intake.Book, stage Stage, promptKey string) (StageRun, error) {
 	now := e.now().UTC()
 	snapshot, _ := json.Marshal(map[string]any{"book_id": book.ID, "disabled": true})
-	return e.store.CreateStageRunFenced(ctx, execution, StageRun{BookRunID: run.ID, Stage: stage, Status: StatusSkipped, RequestID: run.RequestID, PromptKey: promptKey, InputSnapshot: string(snapshot), StartedAt: &now, FinishedAt: &now})
+	created, err := e.store.CreateStageRunFenced(ctx, execution, StageRun{BookRunID: run.ID, Stage: stage, Status: StatusSkipped, RequestID: run.RequestID, PromptKey: promptKey, InputSnapshot: string(snapshot), StartedAt: &now, FinishedAt: &now})
+	return created, runtimeExecutionError(ctx, err)
 }
 
 func (e *RuntimeExecutor) finalPromptStage(ctx context.Context, execution task9runtime.Execution, run BookRun, book intake.Book, req RunBookRequest, completed map[Stage]StageRun) (StageRun, error) {
@@ -296,14 +319,39 @@ func (e *RuntimeExecutor) finalPromptStage(ctx context.Context, execution task9r
 	}
 	prompt, err := e.resolver.Resolve(ctx, PromptFinal)
 	if err != nil {
-		return StageRun{}, NewRuntimeOutcomeError(err)
+		return StageRun{}, runtimeExecutionError(ctx, err)
+	}
+	processingRules, err := e.resolveOptionalPrompt(ctx, req.ProcessingRules)
+	if err != nil {
+		return StageRun{}, runtimeExecutionError(ctx, err)
+	}
+	knowledge, err := e.resolveOptionalPrompt(ctx, req.KnowledgeBase)
+	if err != nil {
+		return StageRun{}, runtimeExecutionError(ctx, err)
 	}
 	hookText := ""
 	if hook.Status == StatusCompleted {
 		hookText = hook.OutputText
 	}
-	compiled := e.compiler.Compile(FinalPromptInput{SystemPreset: prompt.Content, Script: script.OutputText, Hook: hookText, Director: director.OutputText, ProcessingRules: req.ProcessingRules, KnowledgeBase: req.KnowledgeBase, ProjectConfig: req.ProjectConfig, UserConfig: req.UserConfig, ModelConfig: req.ModelConfig})
+	compiled := e.compiler.Compile(FinalPromptInput{SystemPreset: prompt.Content, Script: script.OutputText, Hook: hookText, Director: director.OutputText, ProcessingRules: processingRules.Content, KnowledgeBase: knowledge.Content, ProjectConfig: req.ProjectConfig, UserConfig: req.UserConfig, ModelConfig: req.ModelConfig})
 	now := e.now().UTC()
-	snapshot, _ := json.Marshal(map[string]any{"script_stage_run_id": script.ID, "hook_stage_run_id": hook.ID, "director_stage_run_id": director.ID, "prompt_key": prompt.Key, "prompt_version": prompt.Version, "book_id": book.ID})
-	return e.store.CreateStageRunFenced(ctx, execution, StageRun{BookRunID: run.ID, Stage: StageFinalPrompt, Status: StatusCompleted, RequestID: run.RequestID, PromptKey: prompt.Key, PromptVersion: prompt.Version, InputSnapshot: string(snapshot), OutputText: compiled, StartedAt: &now, FinishedAt: &now})
+	snapshotFields := map[string]any{"script_stage_run_id": script.ID, "hook_stage_run_id": hook.ID, "director_stage_run_id": director.ID, "prompt_key": prompt.Key, "prompt_version": prompt.Version, "book_id": book.ID}
+	if processingRules.Key != "" {
+		snapshotFields["processing_rules_prompt_key"] = processingRules.Key
+		snapshotFields["processing_rules_prompt_version"] = processingRules.Version
+	}
+	if knowledge.Key != "" {
+		snapshotFields["knowledge_prompt_key"] = knowledge.Key
+		snapshotFields["knowledge_prompt_version"] = knowledge.Version
+	}
+	snapshot, _ := json.Marshal(snapshotFields)
+	created, err := e.store.CreateStageRunFenced(ctx, execution, StageRun{BookRunID: run.ID, Stage: StageFinalPrompt, Status: StatusCompleted, RequestID: run.RequestID, PromptKey: prompt.Key, PromptVersion: prompt.Version, InputSnapshot: string(snapshot), OutputText: compiled, StartedAt: &now, FinishedAt: &now})
+	return created, runtimeExecutionError(ctx, err)
+}
+
+func (e *RuntimeExecutor) resolveOptionalPrompt(ctx context.Context, key string) (Prompt, error) {
+	if strings.TrimSpace(key) == "" {
+		return Prompt{}, nil
+	}
+	return e.resolver.Resolve(ctx, key)
 }

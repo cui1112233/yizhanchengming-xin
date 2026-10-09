@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 )
 
 const outcomeFailureMessage = "生成阶段执行失败，请稍后重试"
@@ -16,6 +18,14 @@ var outcomeCanaries = []string{
 	"provider-canary-short", "password=pass-canary", "Cookie: session=cookie-canary",
 	"Authorization: Bearer bearer-canary", "provider_api_key=key-canary",
 	"user:dsn-canary@tcp(localhost:3306)/db",
+}
+
+func TestRuntimeOutcomeErrorMarksMissingAudioAsNonRetryable(t *testing.T) {
+	err := NewRuntimeOutcomeError(ErrAudioMeasurementRequired)
+	var safe task9runtime.SafeExecutionError
+	if !errors.As(err, &safe) || safe.Retryable() {
+		t.Fatalf("safe=%T %#v", safe, safe)
+	}
 }
 
 func TestGenerationSafeOutcomeCauseCatalogue(t *testing.T) {

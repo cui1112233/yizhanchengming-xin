@@ -66,11 +66,12 @@ type GenerationSnapshot struct {
 }
 
 type GenerationConfigSnapshot struct {
-	ProcessingRules string `json:"processing_rules,omitempty"`
-	KnowledgeBase   string `json:"knowledge_base,omitempty"`
-	ProjectConfig   string `json:"project_config,omitempty"`
-	UserConfig      string `json:"user_config,omitempty"`
-	ModelConfig     string `json:"model_config,omitempty"`
+	ProcessingRulePromptRef string `json:"processing_rule_prompt_ref,omitempty"`
+	KnowledgePromptRef      string `json:"knowledge_prompt_ref,omitempty"`
+	Constraints             string `json:"constraints,omitempty"`
+	Characters              string `json:"characters,omitempty"`
+	Scenes                  string `json:"scenes,omitempty"`
+	Model                   string `json:"model,omitempty"`
 }
 
 const generationConfigFieldLimit = 16 * 1024
@@ -109,31 +110,16 @@ func generationConfigFromSettings(projectRaw, profileRaw []byte, profileID int64
 	}
 	workspace := project.Production.ScriptWorkspace
 	profileWorkspace := profile.Production.ScriptWorkspace
-	projectConfig := struct {
-		Characters string `json:"characters,omitempty"`
-		Scenes     string `json:"scenes,omitempty"`
-	}{Characters: choose(workspace.Characters, profileWorkspace.Characters), Scenes: choose(workspace.Scenes, profileWorkspace.Scenes)}
-	userConfig := struct {
-		ProfileID               int64  `json:"profile_id,omitempty"`
-		ProfileName             string `json:"profile_name,omitempty"`
-		ProfileVersion          string `json:"profile_version,omitempty"`
-		ProcessingRulePromptRef string `json:"processing_rule_prompt_ref,omitempty"`
-		KnowledgePromptRef      string `json:"knowledge_prompt_ref,omitempty"`
-	}{ProfileID: profileID, ProfileName: strings.TrimSpace(profileName), ProfileVersion: strings.TrimSpace(profileVersion), ProcessingRulePromptRef: choose(project.ProcessingRulePromptRef, profile.ProcessingRulePromptRef), KnowledgePromptRef: choose(project.KnowledgePromptRef, profile.KnowledgePromptRef)}
-	projectJSON, _ := json.Marshal(projectConfig)
-	userJSON, _ := json.Marshal(userConfig)
+	_ = profileID
+	_ = profileName
+	_ = profileVersion
 	config := GenerationConfigSnapshot{
-		ProcessingRules: choose(workspace.Constraints, profileWorkspace.Constraints),
-		KnowledgeBase:   choose(project.KnowledgePromptRef, profile.KnowledgePromptRef),
-		ProjectConfig:   string(projectJSON),
-		UserConfig:      string(userJSON),
-		ModelConfig:     choose(workspace.Model, profileWorkspace.Model),
-	}
-	if config.ProjectConfig == "{}" {
-		config.ProjectConfig = ""
-	}
-	if config.UserConfig == "{}" {
-		config.UserConfig = ""
+		ProcessingRulePromptRef: choose(project.ProcessingRulePromptRef, profile.ProcessingRulePromptRef),
+		KnowledgePromptRef:      choose(project.KnowledgePromptRef, profile.KnowledgePromptRef),
+		Constraints:             choose(workspace.Constraints, profileWorkspace.Constraints),
+		Characters:              choose(workspace.Characters, profileWorkspace.Characters),
+		Scenes:                  choose(workspace.Scenes, profileWorkspace.Scenes),
+		Model:                   choose(workspace.Model, profileWorkspace.Model),
 	}
 	if err := validateGenerationConfig(config); err != nil {
 		return GenerationConfigSnapshot{}, err
@@ -143,7 +129,7 @@ func generationConfigFromSettings(projectRaw, profileRaw []byte, profileID int64
 
 func validateGenerationConfig(config GenerationConfigSnapshot) error {
 	total := 0
-	for _, value := range []string{config.ProcessingRules, config.KnowledgeBase, config.ProjectConfig, config.UserConfig, config.ModelConfig} {
+	for _, value := range []string{config.ProcessingRulePromptRef, config.KnowledgePromptRef, config.Constraints, config.Characters, config.Scenes, config.Model} {
 		if !utf8.ValidString(value) || len(value) > generationConfigFieldLimit {
 			return ErrInvalidGenerationRequest
 		}
@@ -151,11 +137,6 @@ func validateGenerationConfig(config GenerationConfigSnapshot) error {
 	}
 	if total > generationConfigTotalLimit {
 		return ErrInvalidGenerationRequest
-	}
-	for _, value := range []string{config.ProjectConfig, config.UserConfig} {
-		if value != "" && !json.Valid([]byte(value)) {
-			return ErrInvalidGenerationRequest
-		}
 	}
 	return nil
 }

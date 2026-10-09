@@ -10,15 +10,17 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
 
 func TestRuntimeExecutorRunsFencedPipelineAndKeepsSnapshotsSafe(t *testing.T) {
 	store := runtimeStoreFixture()
-	store.input.Request.ProcessingRules = "RULES CONFIG"
-	store.input.Request.KnowledgeBase = "KNOWLEDGE CONFIG"
-	store.input.Request.ProjectConfig = `{"characters":"PROJECT CONFIG"}`
-	store.input.Request.UserConfig = `{"profile":"USER CONFIG"}`
+	store.input.Request.ProcessingRules = "rules.prompt"
+	store.input.Request.KnowledgeBase = "knowledge.prompt"
+	store.input.Request.ProjectConfig = `{"constraints":"RULES CONFIG","characters":"PROJECT CONFIG","scenes":"SCENES CONFIG"}`
 	store.input.Request.ModelConfig = "MODEL CONFIG"
+	store.prompts["rules.prompt"] = Prompt{Key: "rules.prompt", Version: 8, Enabled: true, Content: "RESOLVED RULES"}
+	store.prompts["knowledge.prompt"] = Prompt{Key: "knowledge.prompt", Version: 9, Enabled: true, Content: "RESOLVED KNOWLEDGE"}
 	provider := &runtimeProvider{responses: map[Stage]string{StageScript: "SCRIPT", StageHook: "HOOK", StageDirector: "DIRECTOR"}}
 	executor := NewRuntimeExecutor(store, provider, time.Now)
 	if err := executor.Execute(context.Background(), store.execution); err != nil {
@@ -34,13 +36,19 @@ func TestRuntimeExecutorRunsFencedPipelineAndKeepsSnapshotsSafe(t *testing.T) {
 	if !strings.Contains(latest[StageFinalPrompt].OutputText, "FINAL SYSTEM") || !strings.Contains(latest[StageFinalPrompt].OutputText, "DIRECTOR") {
 		t.Fatalf("compiled output=%q", latest[StageFinalPrompt].OutputText)
 	}
-	for _, expected := range []string{"RULES CONFIG", "KNOWLEDGE CONFIG", "PROJECT CONFIG", "USER CONFIG", "MODEL CONFIG"} {
+	for _, expected := range []string{"RESOLVED RULES", "RESOLVED KNOWLEDGE", "RULES CONFIG", "PROJECT CONFIG", "SCENES CONFIG", "MODEL CONFIG"} {
 		if !strings.Contains(latest[StageFinalPrompt].OutputText, expected) {
 			t.Fatalf("compiled output lost frozen config %q: %s", expected, latest[StageFinalPrompt].OutputText)
 		}
 	}
+	if strings.Contains(latest[StageFinalPrompt].OutputText, "rules.prompt") || strings.Contains(latest[StageFinalPrompt].OutputText, "knowledge.prompt") {
+		t.Fatalf("prompt references were compiled as content: %s", latest[StageFinalPrompt].OutputText)
+	}
+	if snapshot := latest[StageFinalPrompt].InputSnapshot; !strings.Contains(snapshot, `"processing_rules_prompt_key":"rules.prompt"`) || !strings.Contains(snapshot, `"processing_rules_prompt_version":8`) || !strings.Contains(snapshot, `"knowledge_prompt_key":"knowledge.prompt"`) || !strings.Contains(snapshot, `"knowledge_prompt_version":9`) {
+		t.Fatalf("resolved prompt identity missing from snapshot: %s", snapshot)
+	}
 	for _, stage := range store.stages {
-		for _, forbidden := range []string{"ORIGINAL SECRET TEXT", "SCRIPT SYSTEM", "HOOK SYSTEM", "DIRECTOR SYSTEM", "FINAL SYSTEM", "RULES CONFIG", "KNOWLEDGE CONFIG", "PROJECT CONFIG", "USER CONFIG", "MODEL CONFIG", "systemPrompt", "userPrompt"} {
+		for _, forbidden := range []string{"ORIGINAL SECRET TEXT", "SCRIPT SYSTEM", "HOOK SYSTEM", "DIRECTOR SYSTEM", "FINAL SYSTEM", "RESOLVED RULES", "RESOLVED KNOWLEDGE", "RULES CONFIG", "PROJECT CONFIG", "SCENES CONFIG", "MODEL CONFIG", "systemPrompt", "userPrompt"} {
 			if strings.Contains(stage.InputSnapshot, forbidden) {
 				t.Fatalf("%s snapshot leaked %q: %s", stage.Stage, forbidden, stage.InputSnapshot)
 			}
@@ -49,6 +57,113 @@ func TestRuntimeExecutorRunsFencedPipelineAndKeepsSnapshotsSafe(t *testing.T) {
 		if stage.InputSnapshot != "" && json.Unmarshal([]byte(stage.InputSnapshot), &value) != nil {
 			t.Fatalf("%s snapshot is not structured JSON: %q", stage.Stage, stage.InputSnapshot)
 		}
+	}
+}
+
+func TestRuntimeExecutorRejectsEmptyActionBeforeProvider(t *testing.T) {
+	store := runtimeStoreFixture()
+	store.input.Action = ""
+	provider := &runtimeProvider{}
+	err := NewRuntimeExecutor(store, provider, time.Now).Execute(context.Background(), store.execution)
+	var safe task9runtime.SafeExecutionError
+	if !errors.As(err, &safe) || safe.SafeCode() != "GENERATION_INVALID" || safe.Retryable() {
+		t.Fatalf("err=%T %v", err, err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("provider calls=%d", len(provider.calls))
+	}
+}
+
+func TestRuntimeExecutorSanitizesStoreErrorsButPassesTermination(t *testing.T) {
+	raw := errors.New("sql: password=secret snapshot={private}")
+	store := runtimeStoreFixture()
+	store.runtimeErr = raw
+	err := NewRuntimeExecutor(store, &runtimeProvider{}, time.Now).Execute(context.Background(), store.execution)
+	var safe task9runtime.SafeExecutionError
+	if !errors.As(err, &safe) || safe.SafeCode() != "GENERATION_FAILED" || strings.Contains(err.Error(), "secret") || !safe.Retryable() {
+		t.Fatalf("unsafe runtime error=%T %v", err, err)
+	}
+	for _, terminal := range []error{task9runtime.ErrStaleExecution, taskruntime.ErrLeaseNotOwner, context.Canceled, context.DeadlineExceeded} {
+		store := runtimeStoreFixture()
+		store.runtimeErr = terminal
+		if got := NewRuntimeExecutor(store, &runtimeProvider{}, time.Now).Execute(context.Background(), store.execution); got != terminal {
+			t.Fatalf("termination %v wrapped as %T %v", terminal, got, got)
+		}
+	}
+}
+
+type foreignSafeError struct{ error }
+
+func (foreignSafeError) SafeCode() string    { return "FOREIGN_SECRET" }
+func (foreignSafeError) SafeMessage() string { return "password=secret" }
+func (foreignSafeError) Retryable() bool     { return false }
+func (e foreignSafeError) Unwrap() error     { return e.error }
+
+func TestRuntimeExecutorDoesNotTrustForeignSafeErrorsFromStore(t *testing.T) {
+	store := runtimeStoreFixture()
+	store.runtimeErr = foreignSafeError{error: errors.New("driver secret")}
+	err := NewRuntimeExecutor(store, &runtimeProvider{}, time.Now).Execute(context.Background(), store.execution)
+	var runtimeErr *RuntimeOutcomeError
+	if !errors.As(err, &runtimeErr) || runtimeErr.SafeCode() != "GENERATION_FAILED" || strings.Contains(runtimeErr.Error(), "secret") {
+		t.Fatalf("err=%T %v", err, err)
+	}
+}
+
+func TestRuntimeExecutorSanitizesEveryDependencyBoundary(t *testing.T) {
+	raw := errors.New("driver leaked dsn password=secret")
+	cases := []struct {
+		name   string
+		mutate func(*runtimeExecutorStore, *runtimeProvider)
+	}{
+		{"book", func(s *runtimeExecutorStore, _ *runtimeProvider) { s.bookErr = raw }},
+		{"prompt", func(s *runtimeExecutorStore, _ *runtimeProvider) { s.promptErr = raw }},
+		{"measurement", func(s *runtimeExecutorStore, _ *runtimeProvider) {
+			s.input.Request.MatchAudio, s.measurementErr = true, raw
+		}},
+		{"create-stage", func(s *runtimeExecutorStore, _ *runtimeProvider) { s.createErr = raw }},
+		{"update-stage", func(s *runtimeExecutorStore, _ *runtimeProvider) { s.updateErr = raw }},
+		{"list-source-stages", func(s *runtimeExecutorStore, _ *runtimeProvider) {
+			s.input.Action, s.input.RetryStage, s.input.SourceBookRunID, s.listErr = task9runtime.GenerationActionStageRetry, StageDirector, 70, raw
+		}},
+		{"provider-validation", func(_ *runtimeExecutorStore, p *runtimeProvider) { p.responses = map[Stage]string{StageScript: "   "} }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := runtimeStoreFixture()
+			provider := &runtimeProvider{responses: map[Stage]string{StageScript: "SCRIPT"}}
+			tc.mutate(store, provider)
+			err := NewRuntimeExecutor(store, provider, time.Now).Execute(context.Background(), store.execution)
+			var safe task9runtime.SafeExecutionError
+			if !errors.As(err, &safe) || strings.Contains(err.Error(), "secret") || strings.TrimSpace(safe.SafeCode()) == "" || strings.TrimSpace(safe.SafeMessage()) == "" {
+				t.Fatalf("unsafe dependency error=%T %v", err, err)
+			}
+		})
+	}
+}
+
+func TestRuntimeExecutorAudioMeasurementRequiredIsNotRetryable(t *testing.T) {
+	store := runtimeStoreFixture()
+	store.input.Request.MatchAudio = true
+	err := NewRuntimeExecutor(store, &runtimeProvider{}, time.Now).Execute(context.Background(), store.execution)
+	var safe task9runtime.SafeExecutionError
+	if !errors.As(err, &safe) || safe.SafeCode() != "AUDIO_MEASUREMENT_REQUIRED" || safe.Retryable() {
+		t.Fatalf("err=%T %v", err, err)
+	}
+}
+
+func TestRuntimeExecutorProviderSuccessAfterCancellationDoesNotCompleteStage(t *testing.T) {
+	store := runtimeStoreFixture()
+	ctx, cancel := context.WithCancel(context.Background())
+	provider := &runtimeProvider{responses: map[Stage]string{StageScript: "SCRIPT"}, callback: cancel}
+	err := NewRuntimeExecutor(store, provider, time.Now).Execute(ctx, store.execution)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+	if stage := store.latest()[StageScript]; stage.Status != StatusRunning || stage.OutputText != "" {
+		t.Fatalf("cancelled provider success persisted: %+v", stage)
+	}
+	if len(provider.calls) != 1 {
+		t.Fatalf("provider calls=%d", len(provider.calls))
 	}
 }
 
@@ -272,17 +387,24 @@ func (p *runtimeProvider) stages() []string {
 }
 
 type runtimeExecutorStore struct {
-	execution     task9runtime.Execution
-	run           BookRun
-	input         RuntimeExecutionInput
-	book          intake.Book
-	measurement   AudioMeasurement
-	prompts       map[string]Prompt
-	stages        []StageRun
-	sourceStages  []StageRun
-	staleOnUpdate Stage
-	staleOnCreate Stage
-	nextID        int64
+	execution      task9runtime.Execution
+	run            BookRun
+	input          RuntimeExecutionInput
+	book           intake.Book
+	measurement    AudioMeasurement
+	prompts        map[string]Prompt
+	stages         []StageRun
+	sourceStages   []StageRun
+	staleOnUpdate  Stage
+	staleOnCreate  Stage
+	nextID         int64
+	runtimeErr     error
+	bookErr        error
+	measurementErr error
+	promptErr      error
+	listErr        error
+	createErr      error
+	updateErr      error
 }
 
 func runtimeStoreFixture() *runtimeExecutorStore {
@@ -302,21 +424,33 @@ func runtimeStoreFixture() *runtimeExecutorStore {
 }
 
 func (s *runtimeExecutorStore) RuntimeBookRun(_ context.Context, e task9runtime.Execution) (BookRun, RuntimeExecutionInput, error) {
+	if s.runtimeErr != nil {
+		return BookRun{}, RuntimeExecutionInput{}, s.runtimeErr
+	}
 	if e != s.execution {
 		return BookRun{}, RuntimeExecutionInput{}, task9runtime.ErrStaleExecution
 	}
 	return s.run, s.input, nil
 }
 func (s *runtimeExecutorStore) GetBookForProject(context.Context, int64, int64) (intake.Book, error) {
+	if s.bookErr != nil {
+		return intake.Book{}, s.bookErr
+	}
 	return s.book, nil
 }
 func (s *runtimeExecutorStore) LatestAudioMeasurement(context.Context, int64, int64) (AudioMeasurement, error) {
+	if s.measurementErr != nil {
+		return AudioMeasurement{}, s.measurementErr
+	}
 	if s.measurement.ID == 0 {
 		return AudioMeasurement{}, ErrNotFound
 	}
 	return s.measurement, nil
 }
 func (s *runtimeExecutorStore) ResolvePrompt(_ context.Context, key string) (Prompt, error) {
+	if s.promptErr != nil {
+		return Prompt{}, s.promptErr
+	}
 	p, ok := s.prompts[key]
 	if !ok {
 		return Prompt{}, ErrNotFound
@@ -324,12 +458,18 @@ func (s *runtimeExecutorStore) ResolvePrompt(_ context.Context, key string) (Pro
 	return p, nil
 }
 func (s *runtimeExecutorStore) ListStageRuns(_ context.Context, bookRunID int64) ([]StageRun, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
 	if bookRunID == s.input.SourceBookRunID {
 		return append([]StageRun{}, s.sourceStages...), nil
 	}
 	return append([]StageRun{}, s.stages...), nil
 }
 func (s *runtimeExecutorStore) CreateStageRunFenced(_ context.Context, e task9runtime.Execution, v StageRun) (StageRun, error) {
+	if s.createErr != nil {
+		return StageRun{}, s.createErr
+	}
 	if e != s.execution || v.Stage == s.staleOnCreate {
 		return StageRun{}, task9runtime.ErrStaleExecution
 	}
@@ -345,6 +485,9 @@ func (s *runtimeExecutorStore) CreateStageRunFenced(_ context.Context, e task9ru
 	return v, nil
 }
 func (s *runtimeExecutorStore) UpdateStageRunFenced(_ context.Context, e task9runtime.Execution, v StageRun) (StageRun, error) {
+	if s.updateErr != nil {
+		return StageRun{}, s.updateErr
+	}
 	if e != s.execution || v.Stage == s.staleOnUpdate {
 		return StageRun{}, task9runtime.ErrStaleExecution
 	}

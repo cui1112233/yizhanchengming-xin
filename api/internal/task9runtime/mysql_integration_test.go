@@ -500,7 +500,7 @@ func TestGenerationAdmissionFreezesAllowlistedServerSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decoded.Config.ProcessingRules != "RULES-V1" || decoded.Config.ModelConfig != "MODEL-V1" || !strings.Contains(decoded.Config.UserConfig, "rules-v3") {
+	if decoded.Config.Constraints != "RULES-V1" || decoded.Config.Model != "MODEL-V1" || decoded.Config.ProcessingRulePromptRef != "rules-v3" || decoded.Config.KnowledgePromptRef != "kb-v7" {
 		t.Fatalf("config=%+v", decoded.Config)
 	}
 	if strings.Contains(string(admission.Run.RequestSnapshot), "must-not-freeze") {
@@ -516,7 +516,7 @@ func TestGenerationAdmissionFreezesAllowlistedServerSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	frozen, err := DecodeGenerationSnapshot(version, body, hash, f.projectID, 1)
-	if err != nil || frozen.Config.ProcessingRules != "RULES-V1" {
+	if err != nil || frozen.Config.Constraints != "RULES-V1" {
 		t.Fatalf("frozen=%+v err=%v", frozen.Config, err)
 	}
 }
