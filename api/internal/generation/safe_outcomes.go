@@ -9,6 +9,31 @@ type Outcome struct {
 	Message string `json:"message"`
 }
 
+// RuntimeOutcomeError implements task9runtime.SafeExecutionError without
+// making the runtime import the generation domain. Cause remains available to
+// trusted diagnostics through errors.Unwrap, while persistence sees only the
+// allowlisted code/message.
+type RuntimeOutcomeError struct {
+	cause     error
+	outcome   Outcome
+	retryable bool
+}
+
+func NewRuntimeOutcomeError(cause error) error {
+	if cause == nil {
+		return nil
+	}
+	outcome := OutcomeForError(cause)
+	retryable := !errors.Is(cause, ErrInvalid) && !errors.Is(cause, ErrNotFound) && !errors.Is(cause, ErrConflict) && !errors.Is(cause, ErrProjectArchived)
+	return &RuntimeOutcomeError{cause: cause, outcome: outcome, retryable: retryable}
+}
+
+func (e *RuntimeOutcomeError) Error() string       { return e.outcome.Message }
+func (e *RuntimeOutcomeError) SafeCode() string    { return e.outcome.Code }
+func (e *RuntimeOutcomeError) SafeMessage() string { return e.outcome.Message }
+func (e *RuntimeOutcomeError) Retryable() bool     { return e.retryable }
+func (e *RuntimeOutcomeError) Unwrap() error       { return e.cause }
+
 var outcomeCatalogue = [...]struct {
 	cause error
 	Outcome

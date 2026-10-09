@@ -34,7 +34,7 @@ func (s *GenerationFinalPromptSource) ResolveFinalPrompt(ctx context.Context, pr
 	if err != nil {
 		return FinalPrompt{}, fmt.Errorf("%w: latest book run: %v", ErrFinalPromptNotReady, err)
 	}
-	if bookRun.ID <= 0 || bookRun.Status != generation.StatusCompleted {
+	if bookRun.ID <= 0 || generation.NormalizeBookRunStatus(bookRun.Status) != generation.StatusCompleted {
 		return FinalPrompt{}, ErrFinalPromptNotReady
 	}
 	stage, err := s.reader.LatestStageRun(ctx, bookRun.ID, generation.StageFinalPrompt)
@@ -46,9 +46,9 @@ func (s *GenerationFinalPromptSource) ResolveFinalPrompt(ctx context.Context, pr
 	}
 	sum := sha256.Sum256([]byte(stage.InputSnapshot))
 	return FinalPrompt{
-		StageRunID: stage.ID,
+		StageRunID:    stage.ID,
 		PromptVersion: stage.PromptVersion,
 		InputRevision: hex.EncodeToString(sum[:]),
-		Text: stage.OutputText,
+		Text:          stage.OutputText,
 	}, nil
 }

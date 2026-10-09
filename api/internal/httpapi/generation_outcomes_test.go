@@ -278,7 +278,7 @@ func TestGenerationOutcomeReadbackMySQLSelectOnly(t *testing.T) {
 	defer db.Close()
 	now := time.Date(2026, 10, 9, 8, 0, 0, 0, time.UTC)
 	f := legacyOutcomeFixture(generationDiagnostic)
-	mock.ExpectQuery("SELECT .* FROM book_runs WHERE batch_project_id=").WithArgs(int64(3), int64(11)).WillReturnRows(sqlmock.NewRows([]string{"id", "batch_project_id", "book_id", "status", "request_id", "error_message", "started_at", "finished_at", "created_at", "updated_at"}).AddRow(17, 3, 11, "failed", "execution-old", generationDiagnostic, now, now, now, now))
+	mock.ExpectQuery("SELECT .* FROM book_runs WHERE batch_project_id=").WithArgs(int64(3), int64(11)).WillReturnRows(sqlmock.NewRows([]string{"id", "run_id", "batch_project_id", "book_id", "status", "request_id", "error_message", "started_at", "finished_at", "created_at", "updated_at"}).AddRow(17, nil, 3, 11, "failed", "execution-old", generationDiagnostic, now, now, now, now))
 	mock.ExpectQuery("SELECT .* FROM stage_runs WHERE book_run_id=").WithArgs(int64(17)).WillReturnRows(sqlmock.NewRows([]string{"id", "book_run_id", "book_id", "stage", "status", "attempt", "request_id", "prompt_key", "prompt_version", "input_snapshot", "output_text", "error_message", "validation_result", "started_at", "finished_at", "created_at", "updated_at"}).AddRow(29, 17, 11, "DIRECTOR", "failed", 4, "execution-old", "director.default", 7, f.stage.InputSnapshot, f.stage.OutputText, generationDiagnostic, f.stage.ValidationResult, now, now, now, now))
 	store := generation.NewMySQLStore(db)
 	run, err := store.LatestBookRun(context.Background(), 3, 11)

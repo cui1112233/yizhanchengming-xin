@@ -10,6 +10,7 @@ import (
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/intake"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 )
 
 type MySQLStore struct{ db *sql.DB }
@@ -222,6 +223,13 @@ func (s *MySQLStore) CreateBookRun(ctx context.Context, v BookRun) (BookRun, err
 }
 
 func (s *MySQLStore) UpdateBookRun(ctx context.Context, v BookRun) (BookRun, error) {
+	var runtimeRunID sql.NullInt64
+	if err := s.db.QueryRowContext(ctx, `SELECT run_id FROM book_runs WHERE id=?`, v.ID).Scan(&runtimeRunID); err != nil {
+		return BookRun{}, noRows(err)
+	}
+	if runtimeRunID.Valid {
+		return BookRun{}, ErrConflict
+	}
 	if v.Status != StatusRunning {
 		r, err := s.db.ExecContext(ctx, `UPDATE book_runs SET status=?,request_id=?,error_message=?,started_at=?,finished_at=? WHERE id=?`, v.Status, v.RequestID, v.ErrorMessage, v.StartedAt, v.FinishedAt, v.ID)
 		if err != nil {
@@ -259,24 +267,34 @@ func (s *MySQLStore) UpdateBookRun(ctx context.Context, v BookRun) (BookRun, err
 
 func (s *MySQLStore) bookRunByID(ctx context.Context, id int64) (BookRun, error) {
 	var v BookRun
-	err := s.db.QueryRowContext(ctx, `SELECT id,batch_project_id,book_id,status,request_id,error_message,started_at,finished_at,created_at,updated_at FROM book_runs WHERE id=?`, id).Scan(&v.ID, &v.BatchProjectID, &v.BookID, &v.Status, &v.RequestID, &v.ErrorMessage, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt)
+	var runID sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT id,run_id,batch_project_id,book_id,status,request_id,error_message,started_at,finished_at,created_at,updated_at FROM book_runs WHERE id=?`, id).Scan(&v.ID, &runID, &v.BatchProjectID, &v.BookID, &v.Status, &v.RequestID, &v.ErrorMessage, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return BookRun{}, noRows(err)
 	}
+	if runID.Valid {
+		v.RunID = runID.Int64
+	}
+	v.Status = NormalizeBookRunStatus(v.Status)
 	return v, nil
 }
 
 func (s *MySQLStore) LatestBookRun(ctx context.Context, projectID, bookID int64) (BookRun, error) {
 	var v BookRun
-	err := s.db.QueryRowContext(ctx, `SELECT id,batch_project_id,book_id,status,request_id,error_message,started_at,finished_at,created_at,updated_at FROM book_runs WHERE batch_project_id=? AND book_id=? ORDER BY id DESC LIMIT 1`, projectID, bookID).Scan(&v.ID, &v.BatchProjectID, &v.BookID, &v.Status, &v.RequestID, &v.ErrorMessage, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt)
+	var runID sql.NullInt64
+	err := s.db.QueryRowContext(ctx, `SELECT id,run_id,batch_project_id,book_id,status,request_id,error_message,started_at,finished_at,created_at,updated_at FROM book_runs WHERE batch_project_id=? AND book_id=? ORDER BY id DESC LIMIT 1`, projectID, bookID).Scan(&v.ID, &runID, &v.BatchProjectID, &v.BookID, &v.Status, &v.RequestID, &v.ErrorMessage, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt)
 	if err != nil {
 		return BookRun{}, noRows(err)
 	}
+	if runID.Valid {
+		v.RunID = runID.Int64
+	}
+	v.Status = NormalizeBookRunStatus(v.Status)
 	return v, nil
 }
 
 func (s *MySQLStore) ListBookRunsByProject(ctx context.Context, projectID int64) ([]BookRun, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,batch_project_id,book_id,status,request_id,error_message,started_at,finished_at,created_at,updated_at FROM book_runs WHERE batch_project_id=? ORDER BY id`, projectID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,run_id,batch_project_id,book_id,status,request_id,error_message,started_at,finished_at,created_at,updated_at FROM book_runs WHERE batch_project_id=? ORDER BY id`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,9 +302,14 @@ func (s *MySQLStore) ListBookRunsByProject(ctx context.Context, projectID int64)
 	out := []BookRun{}
 	for rows.Next() {
 		var v BookRun
-		if err := rows.Scan(&v.ID, &v.BatchProjectID, &v.BookID, &v.Status, &v.RequestID, &v.ErrorMessage, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		var runID sql.NullInt64
+		if err := rows.Scan(&v.ID, &runID, &v.BatchProjectID, &v.BookID, &v.Status, &v.RequestID, &v.ErrorMessage, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, err
 		}
+		if runID.Valid {
+			v.RunID = runID.Int64
+		}
+		v.Status = NormalizeBookRunStatus(v.Status)
 		out = append(out, v)
 	}
 	return out, rows.Err()
@@ -376,4 +399,183 @@ func (s *MySQLStore) CreateAudioMeasurement(ctx context.Context, v AudioMeasurem
 		return AudioMeasurement{}, err
 	}
 	return v, nil
+}
+
+func (s *MySQLStore) RuntimeBookRun(ctx context.Context, execution task9runtime.Execution) (BookRun, RuntimeExecutionInput, error) {
+	var run BookRun
+	var runID int64
+	var attempt int
+	var token uint64
+	var owner, bookStatus, runStatus, runKind string
+	var schemaVersion int
+	var snapshot []byte
+	var requestHash string
+	var actorID int64
+	var archivedAt sql.NullTime
+	err := s.db.QueryRowContext(ctx, `SELECT br.id,br.run_id,br.batch_project_id,br.book_id,br.status,br.request_id,br.started_at,br.created_at,br.updated_at,br.attempt,br.execution_token,br.execution_owner,r.status,r.run_kind,r.request_schema_version,r.request_snapshot,r.request_hash,r.requested_by_user_id,p.archived_at FROM book_runs br JOIN runs r ON r.id=br.run_id JOIN batch_projects p ON p.id=r.batch_project_id WHERE br.id=?`, execution.BookRunID).Scan(
+		&run.ID, &runID, &run.BatchProjectID, &run.BookID, &bookStatus, &run.RequestID, &run.StartedAt, &run.CreatedAt, &run.UpdatedAt, &attempt, &token, &owner, &runStatus, &runKind, &schemaVersion, &snapshot, &requestHash, &actorID, &archivedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return BookRun{}, RuntimeExecutionInput{}, task9runtime.ErrStaleExecution
+		}
+		return BookRun{}, RuntimeExecutionInput{}, err
+	}
+	if archivedAt.Valid || runKind != "generation" || runStatus != string(task9runtime.RunRunning) || bookStatus != string(task9runtime.BookRunning) || attempt != execution.Attempt || token != execution.FencingToken || owner != execution.Owner {
+		return BookRun{}, RuntimeExecutionInput{}, task9runtime.ErrStaleExecution
+	}
+	decoded, err := task9runtime.DecodeGenerationSnapshot(schemaVersion, snapshot, requestHash, run.BatchProjectID, actorID)
+	if err != nil {
+		return BookRun{}, RuntimeExecutionInput{}, ErrInvalid
+	}
+	selected := false
+	for _, id := range decoded.BookIDs {
+		if id == run.BookID {
+			selected = true
+			break
+		}
+	}
+	if !selected {
+		return BookRun{}, RuntimeExecutionInput{}, ErrInvalid
+	}
+	if decoded.Action == task9runtime.GenerationActionStageRetry {
+		var count int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM book_runs WHERE id=? AND batch_project_id=? AND book_id=? AND run_id IS NOT NULL AND id<?`, decoded.SourceBookRunID, run.BatchProjectID, run.BookID, run.ID).Scan(&count); err != nil {
+			return BookRun{}, RuntimeExecutionInput{}, err
+		}
+		if count != 1 {
+			return BookRun{}, RuntimeExecutionInput{}, ErrInvalid
+		}
+	}
+	run.RunID, run.Status = runID, StatusRunning
+	input := RuntimeExecutionInput{Action: decoded.Action, RetryStage: Stage(decoded.RetryStage), SourceBookRunID: decoded.SourceBookRunID, Request: RunBookRequest{BatchProjectID: run.BatchProjectID, BookID: run.BookID, HookEnabled: decoded.HookEnabled, PlotMode: decoded.PlotMode, DirectorMode: DirectorMode(decoded.DirectorMode), MatchAudio: decoded.MatchAudio, ShotDurationLimitSec: decoded.ShotDurationLimitSec, RequestID: run.RequestID, ProcessingRules: decoded.Config.ProcessingRules, KnowledgeBase: decoded.Config.KnowledgeBase, ProjectConfig: decoded.Config.ProjectConfig, UserConfig: decoded.Config.UserConfig, ModelConfig: decoded.Config.ModelConfig}}
+	return run, input, nil
+}
+
+func (s *MySQLStore) runtimeParents(ctx context.Context, bookRunID int64) (int64, int64, error) {
+	var runID sql.NullInt64
+	var projectID int64
+	if err := s.db.QueryRowContext(ctx, `SELECT run_id,batch_project_id FROM book_runs WHERE id=?`, bookRunID).Scan(&runID, &projectID); err != nil {
+		return 0, 0, err
+	}
+	if !runID.Valid {
+		return 0, 0, task9runtime.ErrStaleExecution
+	}
+	return runID.Int64, projectID, nil
+}
+
+func lockRuntimeExecution(ctx context.Context, tx *sql.Tx, runID, projectID int64, execution task9runtime.Execution) (int64, error) {
+	var archivedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT archived_at FROM batch_projects WHERE id=? FOR UPDATE`, projectID).Scan(&archivedAt); err != nil {
+		return 0, err
+	}
+	if archivedAt.Valid {
+		return 0, task9runtime.ErrStaleExecution
+	}
+	var lockedProjectID int64
+	var runStatus, runKind string
+	if err := tx.QueryRowContext(ctx, `SELECT batch_project_id,status,run_kind FROM runs WHERE id=? FOR UPDATE`, runID).Scan(&lockedProjectID, &runStatus, &runKind); err != nil {
+		return 0, err
+	}
+	if lockedProjectID != projectID || runStatus != string(task9runtime.RunRunning) || runKind != "generation" {
+		return 0, task9runtime.ErrStaleExecution
+	}
+	var bookID int64
+	var attempt int
+	var token uint64
+	var owner, status string
+	if err := tx.QueryRowContext(ctx, `SELECT book_id,attempt,execution_token,execution_owner,status FROM book_runs WHERE id=? AND run_id=? AND batch_project_id=? FOR UPDATE`, execution.BookRunID, runID, projectID).Scan(&bookID, &attempt, &token, &owner, &status); err != nil {
+		return 0, err
+	}
+	if attempt != execution.Attempt || token != execution.FencingToken || owner != execution.Owner || status != string(task9runtime.BookRunning) {
+		return 0, task9runtime.ErrStaleExecution
+	}
+	return bookID, nil
+}
+
+func (s *MySQLStore) CreateStageRunFenced(ctx context.Context, execution task9runtime.Execution, v StageRun) (StageRun, error) {
+	if !validRuntimeStage(v.Stage) {
+		return StageRun{}, ErrInvalid
+	}
+	runID, projectID, err := s.runtimeParents(ctx, execution.BookRunID)
+	if err != nil {
+		return StageRun{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return StageRun{}, err
+	}
+	defer tx.Rollback()
+	bookID, err := lockRuntimeExecution(ctx, tx, runID, projectID, execution)
+	if err != nil {
+		return StageRun{}, err
+	}
+	var maxAttempt sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT MAX(attempt) FROM stage_runs WHERE book_run_id=? AND stage=? FOR UPDATE`, execution.BookRunID, v.Stage).Scan(&maxAttempt); err != nil {
+		return StageRun{}, err
+	}
+	v.BookRunID, v.BookID, v.Attempt = execution.BookRunID, bookID, 1
+	if maxAttempt.Valid {
+		v.Attempt = int(maxAttempt.Int64) + 1
+	}
+	result, err := tx.ExecContext(ctx, `INSERT INTO stage_runs(book_run_id,book_id,stage,status,attempt,request_id,prompt_key,prompt_version,input_snapshot,output_text,error_message,validation_result,started_at,finished_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, v.BookRunID, v.BookID, v.Stage, v.Status, v.Attempt, v.RequestID, v.PromptKey, v.PromptVersion, v.InputSnapshot, v.OutputText, v.ErrorMessage, v.ValidationResult, v.StartedAt, v.FinishedAt)
+	if err != nil {
+		return StageRun{}, err
+	}
+	v.ID, err = result.LastInsertId()
+	if err != nil {
+		return StageRun{}, err
+	}
+	if err := scanStageRun(tx.QueryRowContext(ctx, `SELECT id,book_run_id,book_id,stage,status,attempt,request_id,prompt_key,prompt_version,input_snapshot,output_text,error_message,validation_result,started_at,finished_at,created_at,updated_at FROM stage_runs WHERE id=?`, v.ID), &v); err != nil {
+		return StageRun{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return StageRun{}, err
+	}
+	return v, nil
+}
+
+func (s *MySQLStore) UpdateStageRunFenced(ctx context.Context, execution task9runtime.Execution, v StageRun) (StageRun, error) {
+	runID, projectID, err := s.runtimeParents(ctx, execution.BookRunID)
+	if err != nil {
+		return StageRun{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return StageRun{}, err
+	}
+	defer tx.Rollback()
+	bookID, err := lockRuntimeExecution(ctx, tx, runID, projectID, execution)
+	if err != nil {
+		return StageRun{}, err
+	}
+	var lockedBookRunID, lockedBookID int64
+	if err := tx.QueryRowContext(ctx, `SELECT book_run_id,book_id FROM stage_runs WHERE id=? FOR UPDATE`, v.ID).Scan(&lockedBookRunID, &lockedBookID); err != nil {
+		return StageRun{}, err
+	}
+	if lockedBookRunID != execution.BookRunID || lockedBookID != bookID || v.BookRunID != execution.BookRunID || (v.BookID != 0 && v.BookID != bookID) {
+		return StageRun{}, task9runtime.ErrStaleExecution
+	}
+	v.BookID = bookID
+	result, err := tx.ExecContext(ctx, `UPDATE stage_runs SET status=?,request_id=?,prompt_key=?,prompt_version=?,input_snapshot=?,output_text=?,error_message=?,validation_result=?,started_at=?,finished_at=? WHERE id=? AND book_run_id=? AND book_id=?`, v.Status, v.RequestID, v.PromptKey, v.PromptVersion, v.InputSnapshot, v.OutputText, v.ErrorMessage, v.ValidationResult, v.StartedAt, v.FinishedAt, v.ID, execution.BookRunID, bookID)
+	if err != nil {
+		return StageRun{}, err
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		if err != nil {
+			return StageRun{}, err
+		}
+		return StageRun{}, task9runtime.ErrStaleExecution
+	}
+	if err := scanStageRun(tx.QueryRowContext(ctx, `SELECT id,book_run_id,book_id,stage,status,attempt,request_id,prompt_key,prompt_version,input_snapshot,output_text,error_message,validation_result,started_at,finished_at,created_at,updated_at FROM stage_runs WHERE id=?`, v.ID), &v); err != nil {
+		return StageRun{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return StageRun{}, err
+	}
+	return v, nil
+}
+
+func scanStageRun(row interface{ Scan(...any) error }, v *StageRun) error {
+	return row.Scan(&v.ID, &v.BookRunID, &v.BookID, &v.Stage, &v.Status, &v.Attempt, &v.RequestID, &v.PromptKey, &v.PromptVersion, &v.InputSnapshot, &v.OutputText, &v.ErrorMessage, &v.ValidationResult, &v.StartedAt, &v.FinishedAt, &v.CreatedAt, &v.UpdatedAt)
 }

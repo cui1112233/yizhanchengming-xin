@@ -29,7 +29,15 @@ type GenerationRequest struct {
 	ShotDurationLimitSec int64
 	RequestID            string
 	RequestedByUserID    int64
+	Action               string
+	RetryStage           string
+	SourceBookRunID      int64
 }
+
+const (
+	GenerationActionFull       = "full"
+	GenerationActionStageRetry = "stage_retry"
+)
 
 type AdmissionResult struct {
 	Run      RunRecord
@@ -41,16 +49,115 @@ type AdmissionResult struct {
 // GenerationSnapshot is the immutable, versioned execution input. Provider
 // credentials, source text, client durations and Prompt content cannot enter it.
 type GenerationSnapshot struct {
-	SchemaVersion        int     `json:"schema_version"`
-	BatchProjectID       int64   `json:"batch_project_id"`
-	BookIDs              []int64 `json:"book_ids"`
-	SelectionAll         bool    `json:"selection_all"`
-	HookEnabled          bool    `json:"hook_enabled"`
-	PlotMode             bool    `json:"plot_mode"`
-	DirectorMode         string  `json:"director_mode"`
-	MatchAudio           bool    `json:"match_audio"`
-	ShotDurationLimitSec int64   `json:"shot_duration_limit_sec"`
-	RequestedByUserID    int64   `json:"requested_by_user_id"`
+	SchemaVersion        int                      `json:"schema_version"`
+	BatchProjectID       int64                    `json:"batch_project_id"`
+	BookIDs              []int64                  `json:"book_ids"`
+	SelectionAll         bool                     `json:"selection_all"`
+	HookEnabled          bool                     `json:"hook_enabled"`
+	PlotMode             bool                     `json:"plot_mode"`
+	DirectorMode         string                   `json:"director_mode"`
+	MatchAudio           bool                     `json:"match_audio"`
+	ShotDurationLimitSec int64                    `json:"shot_duration_limit_sec"`
+	RequestedByUserID    int64                    `json:"requested_by_user_id"`
+	Action               string                   `json:"action,omitempty"`
+	RetryStage           string                   `json:"retry_stage,omitempty"`
+	SourceBookRunID      int64                    `json:"source_book_run_id,omitempty"`
+	Config               GenerationConfigSnapshot `json:"config"`
+}
+
+type GenerationConfigSnapshot struct {
+	ProcessingRules string `json:"processing_rules,omitempty"`
+	KnowledgeBase   string `json:"knowledge_base,omitempty"`
+	ProjectConfig   string `json:"project_config,omitempty"`
+	UserConfig      string `json:"user_config,omitempty"`
+	ModelConfig     string `json:"model_config,omitempty"`
+}
+
+const generationConfigFieldLimit = 16 * 1024
+const generationConfigTotalLimit = 64 * 1024
+
+type storedGenerationSettings struct {
+	Production struct {
+		ScriptWorkspace struct {
+			Constraints string `json:"constraints"`
+			Characters  string `json:"characters"`
+			Scenes      string `json:"scenes"`
+			Model       string `json:"model"`
+		} `json:"scriptWorkspace"`
+	} `json:"production"`
+	ProcessingRulePromptRef string `json:"processingRulePromptRef"`
+	KnowledgePromptRef      string `json:"knowledgePromptRef"`
+}
+
+func generationConfigFromSettings(projectRaw, profileRaw []byte, profileID int64, profileName, profileVersion string) (GenerationConfigSnapshot, error) {
+	var project, profile storedGenerationSettings
+	if len(projectRaw) > 0 && string(projectRaw) != "null" {
+		if err := json.Unmarshal(projectRaw, &project); err != nil {
+			return GenerationConfigSnapshot{}, ErrInvalidGenerationRequest
+		}
+	}
+	if len(profileRaw) > 0 && string(profileRaw) != "null" {
+		if err := json.Unmarshal(profileRaw, &profile); err != nil {
+			return GenerationConfigSnapshot{}, ErrInvalidGenerationRequest
+		}
+	}
+	choose := func(projectValue, profileValue string) string {
+		if strings.TrimSpace(projectValue) != "" {
+			return strings.TrimSpace(projectValue)
+		}
+		return strings.TrimSpace(profileValue)
+	}
+	workspace := project.Production.ScriptWorkspace
+	profileWorkspace := profile.Production.ScriptWorkspace
+	projectConfig := struct {
+		Characters string `json:"characters,omitempty"`
+		Scenes     string `json:"scenes,omitempty"`
+	}{Characters: choose(workspace.Characters, profileWorkspace.Characters), Scenes: choose(workspace.Scenes, profileWorkspace.Scenes)}
+	userConfig := struct {
+		ProfileID               int64  `json:"profile_id,omitempty"`
+		ProfileName             string `json:"profile_name,omitempty"`
+		ProfileVersion          string `json:"profile_version,omitempty"`
+		ProcessingRulePromptRef string `json:"processing_rule_prompt_ref,omitempty"`
+		KnowledgePromptRef      string `json:"knowledge_prompt_ref,omitempty"`
+	}{ProfileID: profileID, ProfileName: strings.TrimSpace(profileName), ProfileVersion: strings.TrimSpace(profileVersion), ProcessingRulePromptRef: choose(project.ProcessingRulePromptRef, profile.ProcessingRulePromptRef), KnowledgePromptRef: choose(project.KnowledgePromptRef, profile.KnowledgePromptRef)}
+	projectJSON, _ := json.Marshal(projectConfig)
+	userJSON, _ := json.Marshal(userConfig)
+	config := GenerationConfigSnapshot{
+		ProcessingRules: choose(workspace.Constraints, profileWorkspace.Constraints),
+		KnowledgeBase:   choose(project.KnowledgePromptRef, profile.KnowledgePromptRef),
+		ProjectConfig:   string(projectJSON),
+		UserConfig:      string(userJSON),
+		ModelConfig:     choose(workspace.Model, profileWorkspace.Model),
+	}
+	if config.ProjectConfig == "{}" {
+		config.ProjectConfig = ""
+	}
+	if config.UserConfig == "{}" {
+		config.UserConfig = ""
+	}
+	if err := validateGenerationConfig(config); err != nil {
+		return GenerationConfigSnapshot{}, err
+	}
+	return config, nil
+}
+
+func validateGenerationConfig(config GenerationConfigSnapshot) error {
+	total := 0
+	for _, value := range []string{config.ProcessingRules, config.KnowledgeBase, config.ProjectConfig, config.UserConfig, config.ModelConfig} {
+		if !utf8.ValidString(value) || len(value) > generationConfigFieldLimit {
+			return ErrInvalidGenerationRequest
+		}
+		total += len(value)
+	}
+	if total > generationConfigTotalLimit {
+		return ErrInvalidGenerationRequest
+	}
+	for _, value := range []string{config.ProjectConfig, config.UserConfig} {
+		if value != "" && !json.Valid([]byte(value)) {
+			return ErrInvalidGenerationRequest
+		}
+	}
+	return nil
 }
 
 func normalizeGenerationRequest(r GenerationRequest) (GenerationSnapshot, error) {
@@ -82,11 +189,54 @@ func normalizeGenerationRequest(r GenerationRequest) (GenerationSnapshot, error)
 			unique = append(unique, id)
 		}
 	}
-	return GenerationSnapshot{SchemaVersion: 1, BatchProjectID: r.BatchProjectID, BookIDs: unique, SelectionAll: len(r.BookIDs) == 0, HookEnabled: r.HookEnabled, PlotMode: r.PlotMode, DirectorMode: mode, MatchAudio: r.MatchAudio, ShotDurationLimitSec: duration, RequestedByUserID: r.RequestedByUserID}, nil
+	action := strings.TrimSpace(r.Action)
+	if action == "" {
+		action = GenerationActionFull
+	}
+	retryStage := strings.TrimSpace(r.RetryStage)
+	switch action {
+	case GenerationActionFull:
+		if retryStage != "" || r.SourceBookRunID != 0 {
+			return GenerationSnapshot{}, ErrInvalidGenerationRequest
+		}
+	case GenerationActionStageRetry:
+		if len(unique) != 1 || len(r.BookIDs) != 1 || r.SourceBookRunID <= 0 || !isRetryStage(retryStage) {
+			return GenerationSnapshot{}, ErrInvalidGenerationRequest
+		}
+	default:
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	return GenerationSnapshot{SchemaVersion: 2, BatchProjectID: r.BatchProjectID, BookIDs: unique, SelectionAll: len(r.BookIDs) == 0, HookEnabled: r.HookEnabled, PlotMode: r.PlotMode, DirectorMode: mode, MatchAudio: r.MatchAudio, ShotDurationLimitSec: duration, RequestedByUserID: r.RequestedByUserID, Action: action, RetryStage: retryStage, SourceBookRunID: r.SourceBookRunID}, nil
+}
+
+func isRetryStage(stage string) bool {
+	switch stage {
+	case "SCRIPT", "HOOK", "DIRECTOR", "FINAL_PROMPT":
+		return true
+	default:
+		return false
+	}
+}
+
+type generationSnapshotV1 struct {
+	SchemaVersion        int     `json:"schema_version"`
+	BatchProjectID       int64   `json:"batch_project_id"`
+	BookIDs              []int64 `json:"book_ids"`
+	SelectionAll         bool    `json:"selection_all"`
+	HookEnabled          bool    `json:"hook_enabled"`
+	PlotMode             bool    `json:"plot_mode"`
+	DirectorMode         string  `json:"director_mode"`
+	MatchAudio           bool    `json:"match_audio"`
+	ShotDurationLimitSec int64   `json:"shot_duration_limit_sec"`
+	RequestedByUserID    int64   `json:"requested_by_user_id"`
 }
 
 func encodeGenerationSnapshot(s GenerationSnapshot) ([]byte, string, error) {
-	b, err := json.Marshal(s)
+	var value any = s
+	if s.SchemaVersion == 1 {
+		value = generationSnapshotV1{SchemaVersion: 1, BatchProjectID: s.BatchProjectID, BookIDs: s.BookIDs, SelectionAll: s.SelectionAll, HookEnabled: s.HookEnabled, PlotMode: s.PlotMode, DirectorMode: s.DirectorMode, MatchAudio: s.MatchAudio, ShotDurationLimitSec: s.ShotDurationLimitSec, RequestedByUserID: s.RequestedByUserID}
+	}
+	b, err := json.Marshal(value)
 	if err != nil {
 		return nil, "", err
 	}
@@ -95,21 +245,38 @@ func encodeGenerationSnapshot(s GenerationSnapshot) ([]byte, string, error) {
 }
 
 func decodeGenerationSnapshot(version int, b []byte, hash string, projectID, actorID int64) (GenerationSnapshot, error) {
+	if version != 1 && version != 2 {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
 	var s GenerationSnapshot
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.DisallowUnknownFields()
-	if err := d.Decode(&s); err != nil {
+	if version == 1 {
+		var legacy generationSnapshotV1
+		if err := d.Decode(&legacy); err != nil {
+			return s, ErrInvalidGenerationRequest
+		}
+		s = GenerationSnapshot{SchemaVersion: legacy.SchemaVersion, BatchProjectID: legacy.BatchProjectID, BookIDs: legacy.BookIDs, SelectionAll: legacy.SelectionAll, HookEnabled: legacy.HookEnabled, PlotMode: legacy.PlotMode, DirectorMode: legacy.DirectorMode, MatchAudio: legacy.MatchAudio, ShotDurationLimitSec: legacy.ShotDurationLimitSec, RequestedByUserID: legacy.RequestedByUserID, Action: GenerationActionFull}
+	} else if err := d.Decode(&s); err != nil {
 		return s, ErrInvalidGenerationRequest
 	}
 	var extra any
 	if d.Decode(&extra) != io.EOF {
 		return s, ErrInvalidGenerationRequest
 	}
-	if version != 1 || s.SchemaVersion != 1 || s.BatchProjectID != projectID || s.RequestedByUserID != actorID || len(s.BookIDs) == 0 {
+	if s.SchemaVersion != version || s.BatchProjectID != projectID || s.RequestedByUserID != actorID || len(s.BookIDs) == 0 {
 		return s, ErrInvalidGenerationRequest
 	}
-	normalized, err := normalizeGenerationRequest(GenerationRequest{BatchProjectID: s.BatchProjectID, BookIDs: s.BookIDs, HookEnabled: s.HookEnabled, PlotMode: s.PlotMode, DirectorMode: s.DirectorMode, MatchAudio: s.MatchAudio, ShotDurationLimitSec: s.ShotDurationLimitSec, RequestID: "snapshot", RequestedByUserID: s.RequestedByUserID})
+	normalized, err := normalizeGenerationRequest(GenerationRequest{BatchProjectID: s.BatchProjectID, BookIDs: s.BookIDs, HookEnabled: s.HookEnabled, PlotMode: s.PlotMode, DirectorMode: s.DirectorMode, MatchAudio: s.MatchAudio, ShotDurationLimitSec: s.ShotDurationLimitSec, RequestID: "snapshot", RequestedByUserID: s.RequestedByUserID, Action: s.Action, RetryStage: s.RetryStage, SourceBookRunID: s.SourceBookRunID})
 	normalized.SelectionAll = s.SelectionAll
+	if version == 1 {
+		normalized.SchemaVersion = 1
+	} else {
+		if err := validateGenerationConfig(s.Config); err != nil {
+			return s, err
+		}
+		normalized.Config = s.Config
+	}
 	if err != nil || !reflect.DeepEqual(s, normalized) {
 		return s, ErrInvalidGenerationRequest
 	}
@@ -118,6 +285,13 @@ func decodeGenerationSnapshot(version int, b []byte, hash string, projectID, act
 		return s, ErrInvalidGenerationRequest
 	}
 	return s, nil
+}
+
+// DecodeGenerationSnapshot validates and decodes the immutable admission
+// snapshot for domain executors. It does not expose database internals or
+// allow callers to bypass canonical hash validation.
+func DecodeGenerationSnapshot(version int, b []byte, hash string, projectID, actorID int64) (GenerationSnapshot, error) {
+	return decodeGenerationSnapshot(version, b, hash, projectID, actorID)
 }
 
 const generationRunColumns = `id,batch_project_id,idempotency_key,run_at,status,max_attempts,run_kind,target_book_id,request_schema_version,request_snapshot,request_hash,requested_by_user_id`
@@ -193,6 +367,17 @@ func validateFrozenBooks(ctx context.Context, tx *sql.Tx, intakeID int64, ids []
 	return nil
 }
 
+func loadGenerationConfig(ctx context.Context, tx *sql.Tx, projectID int64) (GenerationConfigSnapshot, error) {
+	var projectRaw, profileRaw []byte
+	var profileID sql.NullInt64
+	var profileName, profileVersion sql.NullString
+	err := tx.QueryRowContext(ctx, `SELECT COALESCE(ps.settings_json,JSON_OBJECT()),vp.id,vp.profile_name,vp.version,COALESCE(vp.settings_json,JSON_OBJECT()) FROM batch_projects p LEFT JOIN batch_project_settings ps ON ps.batch_project_id=p.id LEFT JOIN batch_version_config_profiles vp ON vp.batch_project_id=p.id WHERE p.id=?`, projectID).Scan(&projectRaw, &profileID, &profileName, &profileVersion, &profileRaw)
+	if err != nil {
+		return GenerationConfigSnapshot{}, err
+	}
+	return generationConfigFromSettings(projectRaw, profileRaw, profileID.Int64, profileName.String, profileVersion.String)
+}
+
 func materializeGenerationBooks(ctx context.Context, tx *sql.Tx, r RunRecord, snapshot GenerationSnapshot) ([]WorkItem, error) {
 	for _, bookID := range snapshot.BookIDs {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO book_runs (run_id,batch_project_id,book_id,attempt,max_attempts,retryable,status,request_id) VALUES (?,?,?,1,?,1,'queued',?) ON DUPLICATE KEY UPDATE id=id`, r.ID, r.BatchProjectID, bookID, r.MaxAttempts, r.IdempotencyKey); err != nil {
@@ -250,6 +435,10 @@ func (s *MySQLStore) AdmitGeneration(ctx context.Context, req GenerationRequest)
 		if snapshot.SelectionAll {
 			snapshot.BookIDs = append([]int64{}, frozen.BookIDs...)
 		}
+		if frozen.SchemaVersion == 1 {
+			snapshot.SchemaVersion = 1
+		}
+		snapshot.Config = frozen.Config
 		_, hash, err := encodeGenerationSnapshot(snapshot)
 		if err != nil {
 			return AdmissionResult{}, err
@@ -268,11 +457,17 @@ func (s *MySQLStore) AdmitGeneration(ctx context.Context, req GenerationRequest)
 		return AdmissionResult{}, err
 	}
 	if created {
+		snapshot.Config, err = loadGenerationConfig(ctx, tx, req.BatchProjectID)
+		if err != nil {
+			return AdmissionResult{}, err
+		}
+	}
+	if created {
 		body, hash, err := encodeGenerationSnapshot(snapshot)
 		if err != nil {
 			return AdmissionResult{}, err
 		}
-		r = RunRecord{BatchProjectID: req.BatchProjectID, IdempotencyKey: req.RequestID, RunAt: time.Now(), Status: RunRunning, MaxAttempts: 3, RunKind: "generation", RequestSchemaVersion: 1, RequestSnapshot: body, RequestHash: hash, RequestedByUserID: req.RequestedByUserID}
+		r = RunRecord{BatchProjectID: req.BatchProjectID, IdempotencyKey: req.RequestID, RunAt: time.Now(), Status: RunRunning, MaxAttempts: 3, RunKind: "generation", RequestSchemaVersion: snapshot.SchemaVersion, RequestSnapshot: body, RequestHash: hash, RequestedByUserID: req.RequestedByUserID}
 		if !snapshot.SelectionAll && len(snapshot.BookIDs) == 1 {
 			target := snapshot.BookIDs[0]
 			r.TargetBookID = &target

@@ -24,6 +24,13 @@ const (
 	StageFinalPrompt Stage = "FINAL_PROMPT"
 )
 
+func NormalizeBookRunStatus(status Status) Status {
+	if status == Status("succeeded") {
+		return StatusCompleted
+	}
+	return status
+}
+
 type Status string
 
 const (
@@ -63,6 +70,7 @@ type Prompt struct {
 
 type BookRun struct {
 	ID             int64      `json:"id"`
+	RunID          int64      `json:"runId,omitempty"`
 	BatchProjectID int64      `json:"batchProjectId"`
 	BookID         int64      `json:"bookId"`
 	Status         Status     `json:"status"`

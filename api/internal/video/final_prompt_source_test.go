@@ -49,9 +49,20 @@ func TestGenerationFinalPromptSourceTracksStageVersionAndInputRevision(t *testin
 	}
 }
 
+func TestGenerationFinalPromptSourceAcceptsDurableRuntimeSucceeded(t *testing.T) {
+	reader := finalPromptGenerationReader{
+		bookRun:  generation.BookRun{ID: 501, RunID: 401, BatchProjectID: 51, BookID: 31, Status: generation.Status("succeeded")},
+		stageRun: generation.StageRun{ID: 901, BookRunID: 501, BookID: 31, Stage: generation.StageFinalPrompt, Status: generation.StatusCompleted, PromptVersion: 7, InputSnapshot: `{}`, OutputText: "runtime prompt"},
+	}
+	got, err := NewGenerationFinalPromptSource(reader).ResolveFinalPrompt(context.Background(), 51, 31)
+	if err != nil || got.Text != "runtime prompt" {
+		t.Fatalf("prompt=%+v err=%v", got, err)
+	}
+}
+
 func TestGenerationFinalPromptSourceRejectsIncompleteFinalPrompt(t *testing.T) {
 	reader := finalPromptGenerationReader{
-		bookRun: generation.BookRun{ID: 501, BatchProjectID: 51, BookID: 31, Status: generation.StatusRunning},
+		bookRun:  generation.BookRun{ID: 501, BatchProjectID: 51, BookID: 31, Status: generation.StatusRunning},
 		stageRun: generation.StageRun{ID: 901, BookRunID: 501, BookID: 31, Stage: generation.StageFinalPrompt, Status: generation.StatusRunning},
 	}
 	source := NewGenerationFinalPromptSource(reader)

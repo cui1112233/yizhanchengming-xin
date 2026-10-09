@@ -47,6 +47,17 @@ type Failure struct {
 	Message   string
 	Retryable bool
 }
+
+// SafeExecutionError is the cross-domain error contract accepted by the
+// runtime. It lets executors expose an allowlisted outcome without importing
+// their package or persisting the wrapped dependency error.
+type SafeExecutionError interface {
+	error
+	SafeCode() string
+	SafeMessage() string
+	Retryable() bool
+	Unwrap() error
+}
 type BookAttempt struct {
 	BookRunID int64
 	BookID    int64
@@ -122,8 +133,14 @@ func (w *Worker) Process(ctx context.Context, item WorkItem) error {
 		return err
 	}
 	if err := w.executor.Execute(ctx, execution); err != nil {
+		if nonBusinessTermination(ctx, err) {
+			return err
+		}
 		code, message := SafeError(err)
-		_, failErr := w.store.Fail(ctx, execution, Failure{Code: code, Message: message, Retryable: retryableError(err)})
+		durable, failErr := w.store.Fail(ctx, execution, Failure{Code: code, Message: message, Retryable: retryableError(err)})
+		if failErr == nil && !durable {
+			return ErrStaleExecution
+		}
 		return failErr
 	}
 	ok, err = w.store.Complete(ctx, execution)
@@ -131,6 +148,10 @@ func (w *Worker) Process(ctx context.Context, item WorkItem) error {
 		return ErrStaleExecution
 	}
 	return err
+}
+
+func nonBusinessTermination(ctx context.Context, err error) bool {
+	return errors.Is(err, ErrStaleExecution) || errors.Is(err, taskruntime.ErrLeaseNotOwner) || errors.Is(err, context.Canceled) || (ctx != nil && ctx.Err() != nil && errors.Is(err, ctx.Err()))
 }
 
 type retryability interface{ Retryable() bool }
@@ -187,7 +208,19 @@ func (w *Worker) RunOnce(ctx context.Context, q taskruntime.Queue, poll time.Dur
 	}
 	execErr := w.executeWithHeartbeat(ctx, execution, lease, leased)
 	var durable bool
-	if execErr != nil {
+	if execErr != nil && nonBusinessTermination(ctx, execErr) {
+		settleCtx, settleCancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer settleCancel()
+		if leased {
+			_, _ = w.leases.Release(settleCtx, lease)
+		}
+		if errors.Is(execErr, context.Canceled) || (ctx.Err() != nil && errors.Is(execErr, ctx.Err())) {
+			_ = q.Nack(settleCtx, delivery, 0)
+		} else {
+			_ = q.Ack(settleCtx, delivery)
+		}
+		return execErr
+	} else if execErr != nil {
 		code, message := SafeError(execErr)
 		durable, err = w.store.Fail(ctx, execution, Failure{Code: code, Message: message, Retryable: retryableError(execErr)})
 	} else {
@@ -366,6 +399,10 @@ func AggregateRunStatus(states []BookState) RunState {
 func SafeError(err error) (string, string) {
 	if err == nil {
 		return "", ""
+	}
+	var safe SafeExecutionError
+	if errors.As(err, &safe) {
+		return safe.SafeCode(), safe.SafeMessage()
 	}
 	message := err.Error()
 	lower := strings.ToLower(message)

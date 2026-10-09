@@ -176,12 +176,7 @@ func (s *MySQLStore) Renew(ctx context.Context, e Execution, deadline time.Time)
 }
 
 func (s *MySQLStore) Complete(ctx context.Context, e Execution) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE book_runs SET status='succeeded',finished_at=?,lease_deadline=NULL,heartbeat_at=? WHERE id=? AND attempt=? AND execution_token=? AND execution_owner=? AND status='running'`, time.Now(), time.Now(), e.BookRunID, e.Attempt, e.FencingToken, e.Owner)
-	if err != nil {
-		return false, err
-	}
-	n, _ := res.RowsAffected()
-	return n == 1, nil
+	return s.finalizeExecution(ctx, e, nil)
 }
 
 func safeFailure(code, message string) (string, string) {
@@ -202,16 +197,124 @@ func safeFailure(code, message string) (string, string) {
 }
 func (s *MySQLStore) Fail(ctx context.Context, e Execution, f Failure) (bool, error) {
 	code, msg := safeFailure(f.Code, f.Message)
-	retryable := 0
-	if f.Retryable {
-		retryable = 1
+	return s.finalizeExecution(ctx, e, &Failure{Code: code, Message: msg, Retryable: f.Retryable})
+}
+
+func (s *MySQLStore) finalizeExecution(ctx context.Context, e Execution, failure *Failure) (bool, error) {
+	runID, projectID, err := s.bookRunParents(ctx, e.BookRunID)
+	if errors.Is(err, sql.ErrNoRows) || errors.Is(err, ErrBookRunNotRetryable) {
+		return false, nil
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE book_runs SET status='failed',retryable=?,error_code=?,error_message=?,finished_at=?,lease_deadline=NULL,heartbeat_at=? WHERE id=? AND attempt=? AND execution_token=? AND execution_owner=? AND status='running'`, retryable, code, msg, time.Now(), time.Now(), e.BookRunID, e.Attempt, e.FencingToken, e.Owner)
 	if err != nil {
 		return false, err
 	}
-	n, _ := res.RowsAffected()
-	return n == 1, nil
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	if _, err := lockGenerationProject(ctx, tx, projectID, false); err != nil {
+		return false, err
+	}
+	var lockedProjectID int64
+	var runStatus, runKind string
+	var cancelRequested, cancelled sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT batch_project_id,status,run_kind,cancel_requested_at,cancelled_at FROM runs WHERE id=? FOR UPDATE`, runID).Scan(&lockedProjectID, &runStatus, &runKind, &cancelRequested, &cancelled); err != nil {
+		return false, err
+	}
+	if lockedProjectID != projectID || runKind != "generation" || RunState(runStatus) != RunRunning || cancelRequested.Valid || cancelled.Valid {
+		return false, nil
+	}
+	var bookID int64
+	var attempt int
+	var token uint64
+	var owner, status string
+	if err := tx.QueryRowContext(ctx, `SELECT book_id,attempt,execution_token,execution_owner,status FROM book_runs WHERE id=? AND run_id=? AND batch_project_id=? FOR UPDATE`, e.BookRunID, runID, projectID).Scan(&bookID, &attempt, &token, &owner, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if attempt != e.Attempt || token != e.FencingToken || owner != e.Owner || status != string(BookRunning) {
+		return false, nil
+	}
+	now := time.Now()
+	var result sql.Result
+	if failure == nil {
+		result, err = tx.ExecContext(ctx, `UPDATE book_runs SET status='succeeded',retryable=0,error_code='',error_message='',finished_at=?,lease_deadline=NULL,heartbeat_at=? WHERE id=? AND attempt=? AND execution_token=? AND execution_owner=? AND status='running'`, now, now, e.BookRunID, e.Attempt, e.FencingToken, e.Owner)
+	} else {
+		retryable := 0
+		if failure.Retryable {
+			retryable = 1
+		}
+		result, err = tx.ExecContext(ctx, `UPDATE book_runs SET status='failed',retryable=?,error_code=?,error_message=?,finished_at=?,lease_deadline=NULL,heartbeat_at=? WHERE id=? AND attempt=? AND execution_token=? AND execution_owner=? AND status='running'`, retryable, failure.Code, failure.Message, now, now, e.BookRunID, e.Attempt, e.FencingToken, e.Owner)
+	}
+	if err != nil {
+		return false, err
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if _, err := aggregateRunStatusTx(ctx, tx, runID, now); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	_ = bookID
+	return true, nil
+}
+
+func aggregateRunStatusTx(ctx context.Context, tx *sql.Tx, runID int64, now time.Time) (RunState, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT br.status FROM book_runs br JOIN (SELECT book_id,MAX(attempt) max_attempt FROM book_runs WHERE run_id=? GROUP BY book_id) latest ON latest.book_id=br.book_id AND latest.max_attempt=br.attempt WHERE br.run_id=? FOR UPDATE`, runID, runID)
+	if err != nil {
+		return RunRunning, err
+	}
+	total, succeeded, failed := 0, 0, 0
+	active := false
+	for rows.Next() {
+		var status string
+		if err := rows.Scan(&status); err != nil {
+			rows.Close()
+			return RunRunning, err
+		}
+		total++
+		switch status {
+		case string(BookSucceeded):
+			succeeded++
+		case string(BookFailed):
+			failed++
+		default:
+			active = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return RunRunning, err
+	}
+	if err := rows.Close(); err != nil {
+		return RunRunning, err
+	}
+	state := RunRunning
+	if total > 0 && !active {
+		switch {
+		case succeeded == total:
+			state = RunSucceeded
+		case failed == total:
+			state = RunFailed
+		case succeeded > 0 && failed > 0:
+			state = RunPartialFailed
+		}
+	}
+	if state == RunSucceeded || state == RunPartialFailed || state == RunFailed {
+		_, err = tx.ExecContext(ctx, `UPDATE runs SET status=?,finished_at=? WHERE id=? AND status='running' AND cancel_requested_at IS NULL AND cancelled_at IS NULL`, string(state), now, runID)
+	} else {
+		_, err = tx.ExecContext(ctx, `UPDATE runs SET status='running',finished_at=NULL WHERE id=? AND status='running' AND cancel_requested_at IS NULL AND cancelled_at IS NULL`, runID)
+	}
+	return state, err
 }
 
 func (s *MySQLStore) ProjectIDForBookRun(ctx context.Context, bookRunID int64) (int64, error) {
@@ -549,6 +652,9 @@ func (s *MySQLStore) recoverOne(ctx context.Context, id int64, now time.Time) (W
 	if !retryable || attempt >= maxAttempts {
 		_, err := tx.ExecContext(ctx, `UPDATE book_runs SET status='failed',retryable=0,error_code='worker_lease_expired',error_message='worker lease expired',finished_at=?,lease_deadline=NULL WHERE id=? AND status='running'`, now, id)
 		if err != nil {
+			return WorkItem{}, false, err
+		}
+		if _, err := aggregateRunStatusTx(ctx, tx, parentRunID, now); err != nil {
 			return WorkItem{}, false, err
 		}
 		if err := tx.Commit(); err != nil {

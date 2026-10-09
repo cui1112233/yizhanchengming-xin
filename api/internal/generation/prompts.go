@@ -24,14 +24,22 @@ const DirectorPrompt = `你是短视频导演分镜规划器。将剧本与 Hook
 const H3DirectorPrompt = `你是 H3 结构化导演。必须只输出可解析 JSON，schema_version 固定为 "h3-director/v1"，并提供结构化 director_cards。保持剧情连续、空间明确、动作可视化。
 ` + MatchAudioDirectorRules
 
-type PromptResolver struct{ store Store }
+type PromptReader interface {
+	ResolvePrompt(context.Context, string) (Prompt, error)
+}
 
-func NewPromptResolver(store Store) *PromptResolver { return &PromptResolver{store: store} }
+type PromptResolver struct{ store PromptReader }
+
+func NewPromptResolver(store PromptReader) *PromptResolver { return &PromptResolver{store: store} }
 
 func (r *PromptResolver) Resolve(ctx context.Context, key string) (Prompt, error) {
-	if r == nil || r.store == nil || strings.TrimSpace(key) == "" { return Prompt{}, ErrInvalid }
+	if r == nil || r.store == nil || strings.TrimSpace(key) == "" {
+		return Prompt{}, ErrInvalid
+	}
 	prompt, err := r.store.ResolvePrompt(ctx, key)
-	if err != nil { return Prompt{}, err }
+	if err != nil {
+		return Prompt{}, err
+	}
 	if !prompt.Enabled || prompt.Version <= 0 || strings.TrimSpace(prompt.Content) == "" {
 		return Prompt{}, fmt.Errorf("%w: prompt %s unavailable", ErrUnavailable, key)
 	}

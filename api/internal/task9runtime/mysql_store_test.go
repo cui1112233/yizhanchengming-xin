@@ -92,6 +92,7 @@ func TestAdmissionInsertFailureRollsBackRunAndEarlierBooks(t *testing.T) {
 	mock.ExpectQuery("SELECT intake_id,archived_at FROM batch_projects").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"intake_id", "archived_at"}).AddRow(3, nil))
 	mock.ExpectQuery("SELECT .* FROM runs WHERE batch_project_id").WithArgs(int64(7), "atomic").WillReturnError(sql.ErrNoRows)
 	mock.ExpectQuery("SELECT id FROM books WHERE intake_id").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2).AddRow(9))
+	mock.ExpectQuery("SELECT COALESCE\\(ps.settings_json,JSON_OBJECT\\(\\)\\),vp.id,vp.profile_name,vp.version,COALESCE\\(vp.settings_json,JSON_OBJECT\\(\\)\\)").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"project", "profile_id", "profile_name", "profile_version", "profile"}).AddRow(`{}`, nil, nil, nil, `{}`))
 	mock.ExpectExec("INSERT INTO runs").WillReturnResult(sqlmock.NewResult(11, 1))
 	mock.ExpectExec("INSERT INTO book_runs").WithArgs(int64(11), int64(7), int64(2), 3, "atomic").WillReturnResult(sqlmock.NewResult(12, 1))
 	injected := errors.New("materialization unavailable")
@@ -363,6 +364,31 @@ func TestGenerationAggregateLocksProjectRunBeforeLatestAttempt(t *testing.T) {
 	state, err := NewMySQLStore(db).AggregateRunStatus(context.Background(), 11)
 	if err != nil || state != RunRunning {
 		t.Fatalf("state=%s err=%v", state, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerationCompleteFinalizesAndAggregatesInOneTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	execution := Execution{BookRunID: 12, Attempt: 1, FencingToken: 8, Owner: "worker-a"}
+	mock.ExpectQuery("SELECT run_id,batch_project_id FROM book_runs").WithArgs(int64(12)).WillReturnRows(sqlmock.NewRows([]string{"run_id", "batch_project_id"}).AddRow(11, 7))
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT intake_id,archived_at FROM batch_projects.*FOR UPDATE").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"intake_id", "archived_at"}).AddRow(3, nil))
+	mock.ExpectQuery("SELECT batch_project_id,status,run_kind,cancel_requested_at,cancelled_at FROM runs.*FOR UPDATE").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"batch_project_id", "status", "run_kind", "cancel_requested_at", "cancelled_at"}).AddRow(7, "running", "generation", nil, nil))
+	mock.ExpectQuery("SELECT book_id,attempt,execution_token,execution_owner,status FROM book_runs.*FOR UPDATE").WithArgs(int64(12), int64(11), int64(7)).WillReturnRows(sqlmock.NewRows([]string{"book_id", "attempt", "execution_token", "execution_owner", "status"}).AddRow(2, 1, 8, "worker-a", "running"))
+	mock.ExpectExec("UPDATE book_runs SET status='succeeded'").WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), int64(12), 1, uint64(8), "worker-a").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT br.status FROM book_runs.*FOR UPDATE").WithArgs(int64(11), int64(11)).WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("succeeded").AddRow("failed"))
+	mock.ExpectExec("UPDATE runs SET status=\\?,finished_at=\\?").WithArgs(string(RunPartialFailed), sqlmock.AnyArg(), int64(11)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	ok, err := NewMySQLStore(db).Complete(context.Background(), execution)
+	if err != nil || !ok {
+		t.Fatalf("complete ok=%v err=%v", ok, err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

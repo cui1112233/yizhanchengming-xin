@@ -243,6 +243,122 @@ func TestSafeErrorRedactionBeforePersistence(t *testing.T) {
 	}
 }
 
+type contractSafeError struct{ cause error }
+
+func (e contractSafeError) Error() string       { return "raw provider body: secret-canary" }
+func (e contractSafeError) SafeCode() string    { return "GENERATION_UNAVAILABLE" }
+func (e contractSafeError) SafeMessage() string { return "生成服务暂不可用，请稍后重试" }
+func (e contractSafeError) Retryable() bool     { return false }
+func (e contractSafeError) Unwrap() error       { return e.cause }
+
+func TestSafeErrorUsesRuntimeNeutralContract(t *testing.T) {
+	err := contractSafeError{cause: errors.New("provider detail")}
+	code, message := SafeError(err)
+	if code != "GENERATION_UNAVAILABLE" || message != "生成服务暂不可用，请稍后重试" || retryableError(err) {
+		t.Fatalf("safe contract code=%q message=%q retryable=%v", code, message, retryableError(err))
+	}
+}
+
+func TestWorkerDoesNotPersistNonBusinessTermination(t *testing.T) {
+	for _, executionErr := range []error{ErrStaleExecution, taskruntime.ErrLeaseNotOwner, context.Canceled} {
+		t.Run(executionErr.Error(), func(t *testing.T) {
+			store := &recordingWorkerStore{}
+			worker := NewWorker(store, nil, executorFunc(func(context.Context, Execution) error { return executionErr }), "worker-a", time.Minute, time.Now)
+			if err := worker.Process(context.Background(), WorkItem{BookRunID: 3, Attempt: 1}); !errors.Is(err, executionErr) {
+				t.Fatalf("Process error=%v", err)
+			}
+			if store.failCalls != 0 || store.completeCalls != 0 {
+				t.Fatalf("non-business termination persisted fail=%d complete=%d", store.failCalls, store.completeCalls)
+			}
+		})
+	}
+}
+
+func TestWorkerDoesNotPersistExpiredSupervisorContext(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	store := &recordingWorkerStore{}
+	worker := NewWorker(store, nil, executorFunc(func(context.Context, Execution) error { return context.DeadlineExceeded }), "worker-a", time.Minute, time.Now)
+	if err := worker.Process(ctx, WorkItem{BookRunID: 3, Attempt: 1}); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Process error=%v", err)
+	}
+	if store.failCalls != 0 || store.completeCalls != 0 {
+		t.Fatalf("expired supervisor context persisted fail=%d complete=%d", store.failCalls, store.completeCalls)
+	}
+}
+
+func TestWorkerHonorsNonDurableFail(t *testing.T) {
+	store := &recordingWorkerStore{failDurable: false}
+	worker := NewWorker(store, nil, executorFunc(func(context.Context, Execution) error { return errors.New("provider failed") }), "worker-a", time.Minute, time.Now)
+	if err := worker.Process(context.Background(), WorkItem{BookRunID: 3, Attempt: 1}); !errors.Is(err, ErrStaleExecution) {
+		t.Fatalf("Process error=%v", err)
+	}
+}
+
+func TestWorkerHonorsNonDurableComplete(t *testing.T) {
+	store := &recordingWorkerStore{completeDurable: false}
+	worker := NewWorker(store, nil, executorFunc(func(context.Context, Execution) error { return nil }), "worker-a", time.Minute, time.Now)
+	if err := worker.Process(context.Background(), WorkItem{BookRunID: 3, Attempt: 1}); !errors.Is(err, ErrStaleExecution) {
+		t.Fatalf("Process error=%v", err)
+	}
+}
+
+func TestRunOnceCancellationSettlementUsesBoundedContext(t *testing.T) {
+	store := &recordingWorkerStore{}
+	queue := &settlementQueue{}
+	worker := NewWorker(store, nil, executorFunc(func(context.Context, Execution) error { return context.Canceled }), "worker-a", time.Minute, time.Now)
+	if err := worker.RunOnce(context.Background(), queue, time.Millisecond); !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunOnce error=%v", err)
+	}
+	if queue.nacks != 1 || !queue.settlementHadDeadline {
+		t.Fatalf("settlement nacks=%d deadline=%v", queue.nacks, queue.settlementHadDeadline)
+	}
+	if store.failCalls != 0 {
+		t.Fatalf("cancellation persisted as failure: %d", store.failCalls)
+	}
+}
+
+type settlementQueue struct {
+	nacks                 int
+	settlementHadDeadline bool
+}
+
+func (*settlementQueue) Enqueue(context.Context, taskruntime.Message) error { return nil }
+func (*settlementQueue) Claim(context.Context, string, time.Duration) (taskruntime.Delivery, error) {
+	return taskruntime.Delivery{Receipt: "r", Message: taskruntime.Message{TaskKey: "bookrun:3:book:11", Attempt: 1}}, nil
+}
+func (*settlementQueue) Ack(context.Context, taskruntime.Delivery) error { return nil }
+func (q *settlementQueue) Nack(ctx context.Context, _ taskruntime.Delivery, _ time.Duration) error {
+	q.nacks++
+	_, q.settlementHadDeadline = ctx.Deadline()
+	return nil
+}
+
+type executorFunc func(context.Context, Execution) error
+
+func (f executorFunc) Execute(ctx context.Context, e Execution) error { return f(ctx, e) }
+
+type recordingWorkerStore struct {
+	failCalls, completeCalls int
+	failDurable              bool
+	completeDurable          bool
+}
+
+func (s *recordingWorkerStore) Claim(context.Context, WorkItem, string, time.Time) (Execution, bool, error) {
+	return Execution{BookRunID: 3, Attempt: 1, FencingToken: 7, Owner: "worker-a"}, true, nil
+}
+func (*recordingWorkerStore) Renew(context.Context, Execution, time.Time) (bool, error) {
+	return true, nil
+}
+func (s *recordingWorkerStore) Complete(context.Context, Execution) (bool, error) {
+	s.completeCalls++
+	return s.completeDurable, nil
+}
+func (s *recordingWorkerStore) Fail(context.Context, Execution, Failure) (bool, error) {
+	s.failCalls++
+	return s.failDurable, nil
+}
+
 func TestWorkerRequiresMySQLCASBeforeExecution(t *testing.T) {
 	store := &fakeStore{claimResults: []bool{true, false}}
 	exec := &fakeExecutor{}

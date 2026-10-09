@@ -28,6 +28,20 @@ func (p *fakeProvider) Complete(_ context.Context, req TextRequest) (string, err
 	return p.responses[index], nil
 }
 
+func TestLegacyGenerationWritesRejectRuntimeBookRun(t *testing.T) {
+	s, store, provider := serviceFixture()
+	store.bookRuns = append(store.bookRuns, BookRun{ID: 90, RunID: 80, BatchProjectID: 3, BookID: 11, Status: StatusFailed})
+	if _, err := s.RunBook(context.Background(), RunBookRequest{BatchProjectID: 3, BookID: 11, RequestID: "legacy"}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("RunBook err=%v", err)
+	}
+	if _, err := s.RetryStage(context.Background(), RetryStageRequest{BatchProjectID: 3, BookID: 11, Stage: StageScript, RequestID: "retry"}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("RetryStage err=%v", err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("legacy path called provider %d times", len(provider.calls))
+	}
+}
+
 type memoryStore struct {
 	books       map[int64]intake.Book
 	projectBook map[int64][]int64
@@ -45,8 +59,8 @@ func newMemoryStore() *memoryStore {
 			13: {ID: 13, IntakeID: 7, Title: "丙书", OriginalText: "雨夜里她攥紧手机。"},
 		},
 		projectBook: map[int64][]int64{3: {11, 12, 13}},
-		prompts: map[string]Prompt{},
-		now: time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC),
+		prompts:     map[string]Prompt{},
+		now:         time.Date(2026, 10, 5, 8, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -386,5 +400,17 @@ func TestProjectSummaryAggregatesLatestRuns(t *testing.T) {
 	}
 	if summary.Completed != 2 || len(summary.Books) != 3 {
 		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestProjectSummaryMapsDurableRuntimeSucceededToCompleted(t *testing.T) {
+	service, store, _ := serviceFixture()
+	store.bookRuns = append(store.bookRuns, BookRun{ID: 90, RunID: 80, BatchProjectID: 3, BookID: 11, Status: Status("succeeded")})
+	summary, err := service.ProjectSummary(context.Background(), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Completed != 1 || summary.Books[0].Run == nil || summary.Books[0].Run.Status != StatusCompleted {
+		t.Fatalf("summary=%+v", summary)
 	}
 }

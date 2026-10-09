@@ -481,6 +481,46 @@ func TestGenerationAdmissionFrozenAllSelectionAndConflicts(t *testing.T) {
 	}
 }
 
+func TestGenerationAdmissionFreezesAllowlistedServerSettings(t *testing.T) {
+	f := newIntegrationFixture(t, 1)
+	ctx := context.Background()
+	projectSettings := `{"production":{"scriptWorkspace":{"constraints":"RULES-V1","characters":"A","scenes":"ROOM","model":"MODEL-V1","apiKey":"must-not-freeze"},"providerToken":"must-not-freeze"}}`
+	profileSettings := `{"processingRulePromptRef":"rules-v3","knowledgePromptRef":"kb-v7","credentials":{"password":"must-not-freeze"}}`
+	if _, err := f.db.ExecContext(ctx, `INSERT INTO batch_project_settings(batch_project_id,settings_json) VALUES(?,?)`, f.projectID, projectSettings); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.ExecContext(ctx, `INSERT INTO batch_version_config_profiles(batch_project_id,profile_name,version,settings_json) VALUES(?,?,?,?)`, f.projectID, "女频短剧版", "v3", profileSettings); err != nil {
+		t.Fatal(err)
+	}
+	admission, err := f.store.AdmitGeneration(ctx, GenerationRequest{BatchProjectID: f.projectID, BookIDs: f.bookIDs, RequestID: "settings-frozen", RequestedByUserID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeGenerationSnapshot(admission.Run.RequestSchemaVersion, admission.Run.RequestSnapshot, admission.Run.RequestHash, f.projectID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Config.ProcessingRules != "RULES-V1" || decoded.Config.ModelConfig != "MODEL-V1" || !strings.Contains(decoded.Config.UserConfig, "rules-v3") {
+		t.Fatalf("config=%+v", decoded.Config)
+	}
+	if strings.Contains(string(admission.Run.RequestSnapshot), "must-not-freeze") {
+		t.Fatalf("snapshot leaked non-allowlisted settings: %s", admission.Run.RequestSnapshot)
+	}
+	if _, err := f.db.ExecContext(ctx, `UPDATE batch_project_settings SET settings_json=JSON_SET(settings_json,'$.production.scriptWorkspace.constraints','RULES-V2') WHERE batch_project_id=?`, f.projectID); err != nil {
+		t.Fatal(err)
+	}
+	var body []byte
+	var version int
+	var hash string
+	if err := f.db.QueryRowContext(ctx, `SELECT request_schema_version,request_snapshot,request_hash FROM runs WHERE id=?`, admission.Run.ID).Scan(&version, &body, &hash); err != nil {
+		t.Fatal(err)
+	}
+	frozen, err := DecodeGenerationSnapshot(version, body, hash, f.projectID, 1)
+	if err != nil || frozen.Config.ProcessingRules != "RULES-V1" {
+		t.Fatalf("frozen=%+v err=%v", frozen.Config, err)
+	}
+}
+
 func TestGenerationAdmissionForeignAndMissingBooksAreAtomic(t *testing.T) {
 	f := newIntegrationFixture(t, 1)
 	other := newIntegrationFixture(t, 1)

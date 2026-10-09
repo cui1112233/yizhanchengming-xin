@@ -121,6 +121,13 @@ func (s *Service) ReorderStoryboard(ctx context.Context, projectID, bookID int64
 	return store.ReorderStoryboard(ctx, projectID, bookID, ids, expected)
 }
 func (s *Service) RecompileStoryboard(ctx context.Context, projectID, bookID int64, requestID string) (BookGenerationResult, error) {
+	run, err := s.store.LatestBookRun(ctx, projectID, bookID)
+	if err != nil {
+		return BookGenerationResult{}, err
+	}
+	if run.RunID != 0 {
+		return BookGenerationResult{}, ErrConflict
+	}
 	doc, err := s.Storyboard(ctx, projectID, bookID)
 	if err != nil {
 		return BookGenerationResult{}, err
@@ -129,10 +136,6 @@ func (s *Service) RecompileStoryboard(ctx context.Context, projectID, bookID int
 		return BookGenerationResult{}, ErrInvalid
 	}
 	sort.Slice(doc.Cards, func(i, j int) bool { return doc.Cards[i].Position < doc.Cards[j].Position })
-	run, err := s.store.LatestBookRun(ctx, projectID, bookID)
-	if err != nil {
-		return BookGenerationResult{}, err
-	}
 	book, err := s.store.GetBookForProject(ctx, projectID, bookID)
 	if err != nil {
 		return BookGenerationResult{}, err

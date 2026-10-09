@@ -109,6 +109,9 @@ func (s *Service) RunBook(ctx context.Context, req RunBookRequest) (BookGenerati
 	}
 
 	if existing, err := s.store.LatestBookRun(ctx, req.BatchProjectID, req.BookID); err == nil {
+		if existing.RunID != 0 {
+			return BookGenerationResult{}, ErrConflict
+		}
 		if existing.Status == StatusCompleted || existing.Status == StatusRunning {
 			return s.result(ctx, existing)
 		}
@@ -358,6 +361,9 @@ func (s *Service) RetryStage(ctx context.Context, req RetryStageRequest) (BookGe
 	if err != nil {
 		return BookGenerationResult{}, err
 	}
+	if run.RunID != 0 {
+		return BookGenerationResult{}, ErrConflict
+	}
 	latest, err := s.store.LatestStageRun(ctx, run.ID, req.Stage)
 	if err != nil {
 		return BookGenerationResult{}, err
@@ -494,6 +500,7 @@ func (s *Service) ProjectSummary(ctx context.Context, projectID int64) (ProjectS
 			}
 			return ProjectSummary{}, runErr
 		}
+		run.Status = NormalizeBookRunStatus(run.Status)
 		item.Run = &run
 		stages, stageErr := s.store.ListStageRuns(ctx, run.ID)
 		if stageErr != nil {
