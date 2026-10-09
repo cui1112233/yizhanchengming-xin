@@ -16,6 +16,10 @@ import (
 )
 
 var ErrQueueEmpty = errors.New("runtime queue empty")
+var ErrMalformedEnvelope = errors.New("runtime malformed queue envelope")
+
+const processingReceiptTTL = 30 * time.Second
+const queuePollInterval = 50 * time.Millisecond
 
 type queueEnvelope struct {
 	Receipt string  `json:"receipt"`
@@ -28,16 +32,117 @@ type RedisQueue struct {
 }
 
 func NewRedisQueue(addr, prefix string) (*RedisQueue, error) {
-	if strings.TrimSpace(addr)=="" { return nil, ErrQueueUnavailable }
-	c:=redis.NewClient(&redis.Options{Addr:addr})
-	ctx,cancel:=context.WithTimeout(context.Background(),2*time.Second); defer cancel()
-	if err:=c.Ping(ctx).Err(); err!=nil { _=c.Close(); return nil,fmt.Errorf("%w: %v",ErrQueueUnavailable,err) }
-	return &RedisQueue{client:c,prefix:prefix},nil
+	if strings.TrimSpace(addr) == "" {
+		return nil, ErrQueueUnavailable
+	}
+	c := redis.NewClient(&redis.Options{Addr: addr})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := c.Ping(ctx).Err(); err != nil {
+		_ = c.Close()
+		return nil, fmt.Errorf("%w: %v", ErrQueueUnavailable, err)
+	}
+	return &RedisQueue{client: c, prefix: prefix}, nil
 }
-func (q *RedisQueue) Close() error { return q.client.Close() }
-func (q *RedisQueue) readyKey() string { return q.prefix+":queue:ready" }
-func (q *RedisQueue) processingKey() string { return q.prefix+":queue:processing" }
-func (q *RedisQueue) delayedKey() string { return q.prefix+":queue:delayed" }
+func (q *RedisQueue) Close() error          { return q.client.Close() }
+func (q *RedisQueue) readyKey() string      { return q.prefix + ":queue:ready" }
+func (q *RedisQueue) processingKey() string { return q.prefix + ":queue:processing" }
+func (q *RedisQueue) delayedKey() string    { return q.prefix + ":queue:delayed" }
+
+func (q *RedisQueue) processingDeadlineKey() string { return q.prefix + ":queue:processing:deadline" }
+func (q *RedisQueue) processingEnvelopeKey() string { return q.prefix + ":queue:processing:envelope" }
+
+// Moving a receipt and registering its deadline must be one operation: otherwise
+// the upgrade pass could reclaim a delivery while its worker is registering it.
+var claimDeliveryScript = redis.NewScript(`
+local types={'list','list','hash','zset'}
+for i,expected in ipairs(types) do
+ local actual=redis.call('TYPE',KEYS[i]).ok
+ if actual~='none' and actual~=expected then return redis.error_reply('WRONGTYPE queue key') end
+end
+local raw=redis.call('RPOP',KEYS[1])
+if not raw then return {} end
+local ok,env=pcall(cjson.decode,raw)
+if not ok or type(env)~='table' or type(env.message)~='table' then return {raw,''} end
+env.receipt=ARGV[1]
+raw=cjson.encode(env)
+redis.call('LPUSH',KEYS[2],raw)
+redis.call('HSET',KEYS[3],ARGV[1],raw)
+redis.call('ZADD',KEYS[4],ARGV[2],ARGV[1])
+return {raw,ARGV[1]}`)
+
+var settleDeliveryScript = redis.NewScript(`
+local types={'list','hash','zset','list','zset'}
+for i,expected in ipairs(types) do
+ local actual=redis.call('TYPE',KEYS[i]).ok
+ if actual~='none' and actual~=expected then return redis.error_reply('WRONGTYPE queue key') end
+end
+local raw=redis.call('HGET',KEYS[2],ARGV[1]) or ARGV[2]
+local removed=redis.call('LREM',KEYS[1],1,raw)
+redis.call('HDEL',KEYS[2],ARGV[1])
+redis.call('ZREM',KEYS[3],ARGV[1])
+if removed==1 and ARGV[3]=='nack' then
+ if tonumber(ARGV[4])<=0 then redis.call('LPUSH',KEYS[4],raw)
+ else redis.call('ZADD',KEYS[5],ARGV[4],raw) end
+end
+return removed`)
+
+var reclaimProcessingScript = redis.NewScript(`
+local types={'zset','hash','list','list'}
+for i,expected in ipairs(types) do
+ local actual=redis.call('TYPE',KEYS[i]).ok
+ if actual~='none' and actual~=expected then return redis.error_reply('WRONGTYPE queue key') end
+end
+local limit=tonumber(ARGV[2])
+local count=0
+local expired=redis.call('ZRANGEBYSCORE',KEYS[1],'-inf',ARGV[1],'LIMIT',0,limit)
+for _,receipt in ipairs(expired) do
+ local raw=redis.call('HGET',KEYS[2],receipt)
+ redis.call('ZREM',KEYS[1],receipt)
+ redis.call('HDEL',KEYS[2],receipt)
+ if raw and redis.call('LREM',KEYS[3],1,raw)==1 then
+  redis.call('LPUSH',KEYS[4],raw)
+  count=count+1
+ end
+end
+-- Rotate the bounded scan so live entries cannot hide upgrade-era receipts.
+local scans=math.min(limit-#expired,redis.call('LLEN',KEYS[3]))
+for i=1,scans do
+ local raw=redis.call('LPOP',KEYS[3])
+ local ok,env=pcall(cjson.decode,raw)
+ local receipt=ok and type(env)=='table' and env.receipt or nil
+ local tracked=type(receipt)=='string' and redis.call('HGET',KEYS[2],receipt)==raw and redis.call('ZSCORE',KEYS[1],receipt)
+ if tracked then redis.call('RPUSH',KEYS[3],raw)
+ else
+  if type(receipt)=='string' and redis.call('HGET',KEYS[2],receipt)==raw then
+   redis.call('HDEL',KEYS[2],receipt);redis.call('ZREM',KEYS[1],receipt)
+  end
+  redis.call('LPUSH',KEYS[4],raw)
+  count=count+1
+ end
+end
+return count`)
+
+func (q *RedisQueue) ReclaimExpired(ctx context.Context, now time.Time, limit int) (int, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+	count, err := reclaimProcessingScript.Run(ctx, q.client, []string{q.processingDeadlineKey(), q.processingEnvelopeKey(), q.processingKey(), q.readyKey()}, now.UnixMilli(), limit).Int()
+	if err != nil {
+		return 0, queueError(ctx, err)
+	}
+	return count, nil
+}
+
+func queueError(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	return fmt.Errorf("%w: %v", ErrQueueUnavailable, err)
+}
 
 func randomReceipt() (string,error) { b:=make([]byte,16); if _,err:=rand.Read(b);err!=nil{return "",err}; return hex.EncodeToString(b),nil }
 func encodeDelivery(d Delivery)(string,error){ return encodeEnvelope(queueEnvelope{Receipt:d.Receipt,Message:d.Message}) }
@@ -50,7 +155,12 @@ func (q *RedisQueue) Enqueue(ctx context.Context, msg Message) error {
 	return nil
 }
 
-var promoteDueScript=redis.NewScript(`
+var promoteDueScript = redis.NewScript(`
+local types={'zset','list'}
+for i,expected in ipairs(types) do
+ local actual=redis.call('TYPE',KEYS[i]).ok
+ if actual~='none' and actual~=expected then return redis.error_reply('WRONGTYPE queue key') end
+end
 local items=redis.call('ZRANGEBYSCORE',KEYS[1],'-inf',ARGV[1],'LIMIT',0,ARGV[2])
 for _,v in ipairs(items) do
   if redis.call('ZREM',KEYS[1],v)==1 then redis.call('LPUSH',KEYS[2],v) end
@@ -63,30 +173,78 @@ func (q *RedisQueue) promoteDue(ctx context.Context) error {
 	return nil
 }
 
-func (q *RedisQueue) Claim(ctx context.Context, consumer string, wait time.Duration) (Delivery,error) {
+func (q *RedisQueue) Claim(ctx context.Context, consumer string, wait time.Duration) (Delivery, error) {
 	_ = consumer
-	if err:=q.promoteDue(ctx);err!=nil{return Delivery{},err}
-	if wait<0 {wait=0}
-	raw,err:=q.client.BRPopLPush(ctx,q.readyKey(),q.processingKey(),wait).Result()
-	if errors.Is(err,redis.Nil){return Delivery{},ErrQueueEmpty}
-	if err!=nil { if errors.Is(err,context.Canceled)||errors.Is(err,context.DeadlineExceeded){return Delivery{},err}; return Delivery{},fmt.Errorf("%w: %v",ErrQueueUnavailable,err) }
-	var env queueEnvelope
-	if err:=json.Unmarshal([]byte(raw),&env);err!=nil { _=q.client.LRem(ctx,q.processingKey(),1,raw).Err(); return Delivery{},err }
-	return Delivery{Message:env.Message,Receipt:env.Receipt},nil
+	deadline := time.Now().Add(wait)
+	for {
+		if err := ctx.Err(); err != nil {
+			return Delivery{}, err
+		}
+		if err := q.promoteDue(ctx); err != nil {
+			return Delivery{}, queueError(ctx, err)
+		}
+		receipt, err := randomReceipt()
+		if err != nil {
+			return Delivery{}, err
+		}
+		values, err := claimDeliveryScript.Run(ctx, q.client, []string{q.readyKey(), q.processingKey(), q.processingEnvelopeKey(), q.processingDeadlineKey()}, receipt, time.Now().Add(processingReceiptTTL).UnixMilli()).StringSlice()
+		if err != nil {
+			return Delivery{}, queueError(ctx, err)
+		}
+		if len(values) != 0 {
+			if values[1] == "" {
+				return Delivery{}, ErrMalformedEnvelope
+			}
+			var env queueEnvelope
+			if err := json.Unmarshal([]byte(values[0]), &env); err != nil {
+				if ackErr := q.Ack(ctx, Delivery{Receipt: values[1]}); ackErr != nil {
+					return Delivery{}, ackErr
+				}
+				return Delivery{}, ErrMalformedEnvelope
+			}
+			return Delivery{Message: env.Message, Receipt: env.Receipt}, nil
+		}
+		delay := queuePollInterval
+		if wait > 0 {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				return Delivery{}, ErrQueueEmpty
+			}
+			if remaining < delay {
+				delay = remaining
+			}
+		}
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return Delivery{}, ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
-func (q *RedisQueue) Ack(ctx context.Context,d Delivery) error {
-	raw,err:=encodeDelivery(d);if err!=nil{return err}
-	if err:=q.client.LRem(ctx,q.processingKey(),1,raw).Err();err!=nil{return fmt.Errorf("%w: %v",ErrQueueUnavailable,err)}
-	return nil
+func (q *RedisQueue) Ack(ctx context.Context, d Delivery) error {
+	return q.settle(ctx, d, "ack", 0)
 }
 
-func (q *RedisQueue) Nack(ctx context.Context,d Delivery,delay time.Duration) error {
-	raw,err:=encodeDelivery(d);if err!=nil{return err}
-	removed,err:=q.client.LRem(ctx,q.processingKey(),1,raw).Result();if err!=nil{return fmt.Errorf("%w: %v",ErrQueueUnavailable,err)}
-	if removed==0{return nil}
-	if delay<=0 { if err:=q.client.LPush(ctx,q.readyKey(),raw).Err();err!=nil{return fmt.Errorf("%w: %v",ErrQueueUnavailable,err)}; return nil }
-	if err:=q.client.ZAdd(ctx,q.delayedKey(),redis.Z{Score:float64(time.Now().Add(delay).UnixMilli()),Member:raw}).Err();err!=nil{return fmt.Errorf("%w: %v",ErrQueueUnavailable,err)}
+func (q *RedisQueue) Nack(ctx context.Context, d Delivery, delay time.Duration) error {
+	return q.settle(ctx, d, "nack", delay)
+}
+
+func (q *RedisQueue) settle(ctx context.Context, d Delivery, action string, delay time.Duration) error {
+	raw, err := encodeDelivery(d)
+	if err != nil {
+		return err
+	}
+	var due int64
+	if delay > 0 {
+		due = time.Now().Add(delay).UnixMilli()
+	}
+	_, err = settleDeliveryScript.Run(ctx, q.client, []string{q.processingKey(), q.processingEnvelopeKey(), q.processingDeadlineKey(), q.readyKey(), q.delayedKey()}, d.Receipt, raw, action, due).Result()
+	if err != nil {
+		return queueError(ctx, err)
+	}
 	return nil
 }
 

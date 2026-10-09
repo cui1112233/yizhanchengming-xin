@@ -50,8 +50,20 @@ type RuntimeCoordinator interface { Enqueue(context.Context, WorkItem) error }
 type QueueCoordinator struct { queue taskruntime.Queue }
 func NewQueueCoordinator(q taskruntime.Queue)*QueueCoordinator{return &QueueCoordinator{queue:q}}
 func taskKey(item WorkItem) string { return fmt.Sprintf("bookrun:%d:book:%d",item.BookRunID,item.BookID) }
-func decodeWorkItem(msg taskruntime.Message)(WorkItem,error){var br,b int64;if _,err:=fmt.Sscanf(msg.TaskKey,"bookrun:%d:book:%d",&br,&b);err!=nil{return WorkItem{},err};if br<=0{return WorkItem{},errors.New("invalid book run id")};return WorkItem{BookRunID:br,BookID:b,Attempt:msg.Attempt},nil}
-func (c *QueueCoordinator) Enqueue(ctx context.Context,item WorkItem)error{return c.queue.Enqueue(ctx,taskruntime.Message{TaskKey:taskKey(item),Attempt:item.Attempt})}
+func decodeWorkItem(msg taskruntime.Message) (WorkItem, error) {
+	var br, b int64
+	if _, err := fmt.Sscanf(msg.TaskKey, "bookrun:%d:book:%d", &br, &b); err != nil {
+		return WorkItem{}, taskruntime.ErrMalformedEnvelope
+	}
+	item := WorkItem{BookRunID: br, BookID: b, Attempt: msg.Attempt}
+	if br <= 0 || b <= 0 || msg.Attempt <= 0 || taskKey(item) != msg.TaskKey {
+		return WorkItem{}, taskruntime.ErrMalformedEnvelope
+	}
+	return item, nil
+}
+func (c *QueueCoordinator) Enqueue(ctx context.Context, item WorkItem) error {
+	return c.queue.Enqueue(ctx, taskruntime.Message{TaskKey: taskKey(item), Attempt: item.Attempt})
+}
 
 type Worker struct { store Store; leases taskruntime.LeaseStore; executor Executor; owner string; leaseTTL time.Duration; now func() time.Time }
 func NewWorker(store Store, leases taskruntime.LeaseStore, executor Executor, owner string, leaseTTL time.Duration, now func() time.Time) *Worker { if now==nil{now=time.Now};return &Worker{store:store,leases:leases,executor:executor,owner:owner,leaseTTL:leaseTTL,now:now} }
@@ -65,19 +77,70 @@ func (w *Worker) Process(ctx context.Context, item WorkItem) error {
 type retryability interface{ Retryable() bool }
 func retryableError(err error)bool{var r retryability;if errors.As(err,&r){return r.Retryable()};return true}
 
-func (w *Worker) RunOnce(ctx context.Context,q taskruntime.Queue,poll time.Duration)error{
-	delivery,err:=q.Claim(ctx,w.owner,poll);if err!=nil{return err}
-	item,err:=decodeWorkItem(delivery.Message);if err!=nil{_ = q.Ack(ctx,delivery);return err}
-	execution,ok,err:=w.store.Claim(ctx,item,w.owner,w.now().Add(w.leaseTTL));if err!=nil{_ = q.Nack(ctx,delivery,0);return err};if !ok{return q.Ack(ctx,delivery)}
-	var lease taskruntime.Lease;leased:=false
-	if w.leases!=nil { lease,ok,err=w.leases.Claim(ctx,delivery.Message.TaskKey,w.owner,execution.FencingToken,w.leaseTTL);if err!=nil{_ = q.Ack(ctx,delivery);return err};if !ok{_ = q.Ack(ctx,delivery);return nil};leased=true }
-	execErr:=w.executeWithHeartbeat(ctx,execution,lease,leased)
+func (w *Worker) RunOnce(ctx context.Context, q taskruntime.Queue, poll time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if reclaimer, ok := q.(taskruntime.ProcessingReclaimer); ok {
+		if _, err := reclaimer.ReclaimExpired(ctx, w.now(), 100); err != nil {
+			return err
+		}
+	}
+	delivery, err := q.Claim(ctx, w.owner, poll)
+	if err != nil {
+		return err
+	}
+	item, err := decodeWorkItem(delivery.Message)
+	if err != nil {
+		if ackErr := q.Ack(ctx, delivery); ackErr != nil {
+			return ackErr
+		}
+		return taskruntime.ErrMalformedEnvelope
+	}
+	execution, ok, err := w.store.Claim(ctx, item, w.owner, w.now().Add(w.leaseTTL))
+	if err != nil {
+		_ = q.Nack(ctx, delivery, 0)
+		return err
+	}
+	if !ok {
+		return q.Ack(ctx, delivery)
+	}
+	var lease taskruntime.Lease
+	leased := false
+	if w.leases != nil {
+		lease, ok, err = w.leases.Claim(ctx, delivery.Message.TaskKey, w.owner, execution.FencingToken, w.leaseTTL)
+		if err != nil {
+			_ = q.Ack(ctx, delivery)
+			return err
+		}
+		if !ok {
+			_ = q.Ack(ctx, delivery)
+			return nil
+		}
+		leased = true
+	}
+	execErr := w.executeWithHeartbeat(ctx, execution, lease, leased)
 	var durable bool
-	if execErr!=nil {code,message:=SafeError(execErr);durable,err=w.store.Fail(ctx,execution,Failure{Code:code,Message:message,Retryable:retryableError(execErr)})} else {durable,err=w.store.Complete(ctx,execution)}
-	if leased { if _,relErr:=w.leases.Release(ctx,lease);relErr!=nil&&!errors.Is(relErr,taskruntime.ErrLeaseNotOwner)&&err==nil{err=relErr} }
-	if err!=nil{_ = q.Nack(ctx,delivery,0);return err}
-	if !durable{_ = q.Ack(ctx,delivery);return ErrStaleExecution}
-	return q.Ack(ctx,delivery)
+	if execErr != nil {
+		code, message := SafeError(execErr)
+		durable, err = w.store.Fail(ctx, execution, Failure{Code: code, Message: message, Retryable: retryableError(execErr)})
+	} else {
+		durable, err = w.store.Complete(ctx, execution)
+	}
+	if leased {
+		if _, relErr := w.leases.Release(ctx, lease); relErr != nil && !errors.Is(relErr, taskruntime.ErrLeaseNotOwner) && err == nil {
+			err = relErr
+		}
+	}
+	if err != nil {
+		_ = q.Nack(ctx, delivery, 0)
+		return err
+	}
+	if !durable {
+		_ = q.Ack(ctx, delivery)
+		return ErrStaleExecution
+	}
+	return q.Ack(ctx, delivery)
 }
 
 func (w *Worker) executeWithHeartbeat(ctx context.Context,e Execution,lease taskruntime.Lease,leased bool)error{
@@ -93,8 +156,67 @@ func (w *Worker) executeWithHeartbeat(ctx context.Context,e Execution,lease task
 	return err
 }
 
-func (w *Worker) Run(ctx context.Context,q taskruntime.Queue,poll time.Duration)error{
-	for { if err:=ctx.Err();err!=nil{return err};err:=w.RunOnce(ctx,q,poll);if err==nil||errors.Is(err,taskruntime.ErrQueueEmpty)||errors.Is(err,ErrStaleExecution){continue};if errors.Is(err,context.Canceled)||errors.Is(err,context.DeadlineExceeded){return err};return err }
+func (w *Worker) Run(ctx context.Context, q taskruntime.Queue, poll time.Duration) error {
+	return w.RunSupervised(ctx, q, poll, nil)
+}
+
+// RetryEvent exposes only fixed error categories, never queue envelopes or raw
+// dependency errors. The app can attach its logger through the observer.
+type RetryEvent struct {
+	Code    string
+	Backoff time.Duration
+}
+
+// RunSupervised keeps the existing worker alive across dependency failures.
+// Only cancellation of the supervising context shuts it down; an individual
+// Redis/lease operation's timeout is retried. Backoff is capped and cancellable.
+func (w *Worker) RunSupervised(ctx context.Context, q taskruntime.Queue, poll time.Duration, onRetry func(RetryEvent)) error {
+	if poll <= 0 {
+		poll = time.Second
+	}
+	backoff := 25 * time.Millisecond
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := w.RunOnce(ctx, q, poll)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err == nil {
+			backoff = 25 * time.Millisecond
+			continue
+		}
+		if onRetry != nil && !errors.Is(err, taskruntime.ErrQueueEmpty) {
+			code := "runtime_operation_failed"
+			switch {
+			case errors.Is(err, taskruntime.ErrQueueUnavailable):
+				code = "queue_unavailable"
+			case errors.Is(err, taskruntime.ErrLeaseUnavailable):
+				code = "lease_unavailable"
+			case errors.Is(err, taskruntime.ErrMalformedEnvelope):
+				code = "malformed_envelope"
+			case errors.Is(err, ErrStaleExecution), errors.Is(err, taskruntime.ErrLeaseNotOwner):
+				code = "stale_execution"
+			case errors.Is(err, context.DeadlineExceeded):
+				code = "operation_timeout"
+			}
+			onRetry(RetryEvent{Code: code, Backoff: backoff})
+		}
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+		if backoff < time.Second {
+			backoff *= 2
+			if backoff > time.Second {
+				backoff = time.Second
+			}
+		}
+	}
 }
 
 func AggregateRunStatus(states []BookState) RunState { if len(states)==0{return RunPending};succeeded,failed:=0,0;for _,state:=range states{switch state{case BookPending,BookQueued,BookRunning,BookRetryableFailed:return RunRunning;case BookSucceeded:succeeded++;case BookFailed:failed++}};if succeeded==len(states){return RunSucceeded};if failed==len(states){return RunFailed};if succeeded>0&&failed>0{return RunPartialFailed};return RunRunning }

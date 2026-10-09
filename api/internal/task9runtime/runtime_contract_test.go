@@ -3,11 +3,211 @@ package task9runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/taskruntime"
 )
+
+func TestRunOnceSupervisorRetriesTransientQueueErrors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	exec := &cancellingExecutor{cancel: cancel}
+	q := &supervisorQueue{errors: []error{taskruntime.ErrQueueUnavailable, context.DeadlineExceeded}}
+	w := NewWorker(&fakeStore{}, nil, exec, "worker", time.Second, time.Now)
+	if err := w.Run(ctx, q, 10*time.Millisecond); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run stopped before context cancellation: %v", err)
+	}
+	if exec.calls != 1 {
+		t.Fatalf("transient errors prevented execution: %d", exec.calls)
+	}
+}
+
+func TestRunOnceSupervisorRetriesLeaseErrors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	exec := &cancellingExecutor{cancel: cancel}
+	q := &supervisorQueue{}
+	w := NewWorker(&fakeStore{}, &transientLease{noopLease: noopLease{}}, exec, "worker", time.Second, time.Now)
+	if err := w.Run(ctx, q, 10*time.Millisecond); !errors.Is(err, context.Canceled) {
+		t.Fatalf("lease error stopped Run: %v", err)
+	}
+	if exec.calls != 1 {
+		t.Fatalf("lease recovery execution calls=%d", exec.calls)
+	}
+}
+
+func TestRunOnceSupervisorMalformedDeliveryAckedOnce(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	exec := &cancellingExecutor{cancel: cancel}
+	q := &supervisorQueue{malformed: true}
+	w := NewWorker(&fakeStore{}, nil, exec, "worker", time.Second, time.Now)
+	if err := w.Run(ctx, q, 10*time.Millisecond); !errors.Is(err, context.Canceled) {
+		t.Fatalf("malformed delivery stopped Run: %v", err)
+	}
+	if q.malformedAcks != 1 || exec.calls != 1 {
+		t.Fatalf("malformed ACKs=%d execution=%d", q.malformedAcks, exec.calls)
+	}
+}
+
+func TestRunOnceSupervisorReclaimsAndRetriesWithoutBusyLoop(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Millisecond)
+	defer cancel()
+	q := &reclaimingQueue{supervisorQueue: supervisorQueue{alwaysEmpty: true}}
+	w := NewWorker(&fakeStore{}, nil, &fakeExecutor{}, "worker", time.Second, time.Now)
+	started := time.Now()
+	if err := w.Run(ctx, q, 0); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Run cancellation=%v", err)
+	}
+	if q.reclaims == 0 {
+		t.Fatal("processing recovery was not attempted")
+	}
+	if q.claims > 5 || q.reclaims > 6 {
+		t.Fatalf("busy loop claims=%d reclaims=%d", q.claims, q.reclaims)
+	}
+	if time.Since(started) > 500*time.Millisecond {
+		t.Fatal("backoff delayed context cancellation")
+	}
+}
+
+func TestRunOnceRejectsMalformedTaskKeysBeforeExecution(t *testing.T) {
+	for _, msg := range []taskruntime.Message{
+		{TaskKey: "bookrun:91:book:9:extra", Attempt: 1},
+		{TaskKey: "bookrun:91:book:0", Attempt: 1},
+		{TaskKey: "bookrun:91:book:9", Attempt: 0},
+	} {
+		t.Run(msg.TaskKey+"-"+fmt.Sprint(msg.Attempt), func(t *testing.T) {
+			exec := &fakeExecutor{}
+			q := &fixedDeliveryQueue{message: msg}
+			w := NewWorker(&fakeStore{}, nil, exec, "worker", time.Second, time.Now)
+			if err := w.RunOnce(context.Background(), q, time.Millisecond); !errors.Is(err, taskruntime.ErrMalformedEnvelope) {
+				t.Fatalf("malformed error=%v", err)
+			}
+			if exec.calls != 0 || q.acks != 1 {
+				t.Fatalf("malformed executed=%d ACKs=%d", exec.calls, q.acks)
+			}
+		})
+	}
+}
+
+func TestRunOnceSupervisorSafeObserverAndBoundedBackoff(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	q := &supervisorQueue{errors: make([]error, 9)}
+	for i := range q.errors {
+		q.errors[i] = fmt.Errorf("%w: Authorization: Bearer secret-data", taskruntime.ErrQueueUnavailable)
+	}
+	w := NewWorker(&fakeStore{}, nil, &fakeExecutor{}, "worker", time.Second, time.Now)
+	var events []RetryEvent
+	err := w.RunSupervised(ctx, q, time.Millisecond, func(e RetryEvent) {
+		events = append(events, e)
+		if len(events) == 9 {
+			cancel()
+		}
+	})
+	if !errors.Is(err, context.Canceled) || len(events) != 9 {
+		t.Fatalf("observer err=%v events=%d", err, len(events))
+	}
+	for i, e := range events {
+		if e.Code != "queue_unavailable" || e.Backoff <= 0 || e.Backoff > time.Second {
+			t.Fatalf("unsafe/unbounded event=%+v", e)
+		}
+		if i > 0 && e.Backoff < events[i-1].Backoff {
+			t.Fatal("backoff reset across failures")
+		}
+	}
+	if events[8].Backoff != time.Second {
+		t.Fatalf("backoff did not reach its cap: %+v", events[8])
+	}
+}
+
+type fixedDeliveryQueue struct {
+	supervisorQueue
+	message taskruntime.Message
+	acks    int
+}
+
+func (q *fixedDeliveryQueue) Claim(context.Context, string, time.Duration) (taskruntime.Delivery, error) {
+	return taskruntime.Delivery{Receipt: "malformed", Message: q.message}, nil
+}
+func (q *fixedDeliveryQueue) Ack(context.Context, taskruntime.Delivery) error { q.acks++; return nil }
+
+type supervisorQueue struct {
+	errors        []error
+	malformed     bool
+	malformedAcks int
+	alwaysEmpty   bool
+	claims        int
+}
+
+func (*supervisorQueue) Enqueue(context.Context, taskruntime.Message) error { return nil }
+func (q *supervisorQueue) Claim(ctx context.Context, _ string, _ time.Duration) (taskruntime.Delivery, error) {
+	q.claims++
+	if len(q.errors) > 0 {
+		err := q.errors[0]
+		q.errors = q.errors[1:]
+		return taskruntime.Delivery{}, err
+	}
+	if q.alwaysEmpty {
+		return taskruntime.Delivery{}, taskruntime.ErrQueueEmpty
+	}
+	if q.malformed {
+		q.malformed = false
+		return taskruntime.Delivery{Receipt: "poison", Message: taskruntime.Message{TaskKey: "invalid", Attempt: 1}}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return taskruntime.Delivery{}, err
+	}
+	return taskruntime.Delivery{Receipt: "valid", Message: taskruntime.Message{TaskKey: "bookrun:91:book:9", Attempt: 1}}, nil
+}
+func (q *supervisorQueue) Ack(_ context.Context, d taskruntime.Delivery) error {
+	if d.Receipt == "poison" {
+		q.malformedAcks++
+	}
+	return nil
+}
+func (*supervisorQueue) Nack(context.Context, taskruntime.Delivery, time.Duration) error { return nil }
+
+type reclaimingQueue struct {
+	supervisorQueue
+	reclaims int
+}
+
+func (q *reclaimingQueue) ReclaimExpired(context.Context, time.Time, int) (int, error) {
+	q.reclaims++
+	if q.reclaims == 1 {
+		return 0, taskruntime.ErrQueueUnavailable
+	}
+	return 0, nil
+}
+
+type cancellingExecutor struct {
+	cancel context.CancelFunc
+	calls  int
+}
+
+func (e *cancellingExecutor) Execute(context.Context, Execution) error {
+	e.calls++
+	e.cancel()
+	return nil
+}
+
+type transientLease struct {
+	noopLease
+	claims int
+}
+
+func (l *transientLease) Claim(context.Context, string, string, uint64, time.Duration) (taskruntime.Lease, bool, error) {
+	l.claims++
+	if l.claims == 1 {
+		return taskruntime.Lease{}, false, taskruntime.ErrLeaseUnavailable
+	}
+	return taskruntime.Lease{}, true, nil
+}
 
 func TestAggregateRunStatus(t *testing.T) {
 	tests := []struct {

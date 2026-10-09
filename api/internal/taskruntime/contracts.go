@@ -9,7 +9,7 @@ import (
 var (
 	ErrQueueUnavailable = errors.New("runtime queue unavailable")
 	ErrLeaseUnavailable = errors.New("runtime lease store unavailable")
-	ErrLeaseNotOwner = errors.New("runtime lease owner/token mismatch")
+	ErrLeaseNotOwner    = errors.New("runtime lease owner/token mismatch")
 )
 
 type Message struct {
@@ -27,6 +27,12 @@ type Queue interface {
 	Claim(context.Context, string, time.Duration) (Delivery, error)
 	Ack(context.Context, Delivery) error
 	Nack(context.Context, Delivery, time.Duration) error
+}
+
+// ProcessingReclaimer is an optional delivery recovery capability. Business
+// execution ownership remains in the durable store and its fencing checks.
+type ProcessingReclaimer interface {
+	ReclaimExpired(context.Context, time.Time, int) (int, error)
 }
 
 type Lease struct {
