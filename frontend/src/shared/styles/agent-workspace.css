@@ -4,16 +4,16 @@
  */
 
 .agent-page.utility-workbench {
-  --agent-canvas: #0b0c10;
-  --agent-panel: #101218;
-  --agent-surface: #151820;
-  --agent-elevated: #191c24;
-  --agent-hover: #20242e;
-  --agent-border: rgba(255, 255, 255, 0.07);
-  --agent-border-strong: rgba(255, 255, 255, 0.13);
-  --agent-text: #f2f3f5;
-  --agent-secondary: #9ca2ae;
-  --agent-muted: #646b77;
+  --agent-canvas: var(--surface-base);
+  --agent-panel: var(--surface-panel);
+  --agent-surface: var(--surface-input);
+  --agent-elevated: var(--surface-input);
+  --agent-hover: var(--surface-panel);
+  --agent-border: var(--border-default);
+  --agent-border-strong: var(--border-strong);
+  --agent-text: var(--text-primary);
+  --agent-secondary: var(--text-secondary);
+  --agent-muted: var(--text-tertiary);
   --agent-accent: #f07167;
   --agent-accent-hover: #f78378;
   --agent-accent-soft: rgba(240, 113, 103, 0.11);

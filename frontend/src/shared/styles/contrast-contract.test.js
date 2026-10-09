@@ -85,3 +85,15 @@ test('disabled team rows use the disabled text token instead of low opacity', ()
   assert.match(css, /\.ac-team-table-row\.is-disabled\s*\{[^}]*color:\s*var\(--text-disabled\)/s);
   assert.doesNotMatch(css, /\.ac-team-table-row\.is-disabled\s*\{[^}]*opacity:\s*0?\.[0-4]/s);
 });
+
+test('creative-workspace style files use global readable text tokens', () => {
+  for (const file of [
+    'shared/styles/agent-workspace.css',
+    'user/pages/novel-fetch.css',
+    'user/pages/giant-material-test.css',
+    'user/pages/GiantMaterialStatusCard.css'
+  ]) {
+    const css = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(css, /var\(--text-(?:primary|secondary|tertiary|disabled|danger|warning|success)\)/);
+  }
+});
