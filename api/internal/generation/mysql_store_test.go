@@ -98,6 +98,24 @@ func TestMySQLStoreRuntimeBookRunLoadsExactFencedSnapshotAndConfig(t *testing.T)
 	}
 }
 
+func TestMySQLStoreRuntimeBookRunOmitsEmptyProjectConfig(t *testing.T) {
+	db, mock := newSQLMock(t)
+	snapshot := task9runtime.GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 3, BookIDs: []int64{11}, DirectorMode: "normal", ShotDurationLimitSec: 15, RequestedByUserID: 7, Action: task9runtime.GenerationActionFull}
+	body, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	hash := hex.EncodeToString(sum[:])
+	now := time.Now()
+	mock.ExpectQuery("SELECT br.id,br.run_id.*FROM book_runs br JOIN runs r").WithArgs(int64(90)).WillReturnRows(sqlmock.NewRows([]string{"id", "run_id", "project_id", "book_id", "book_status", "request_id", "started_at", "created_at", "updated_at", "attempt", "token", "owner", "run_status", "run_kind", "schema", "snapshot", "hash", "actor", "archived_at"}).AddRow(90, 80, 3, 11, "running", "req", now, now, now, 1, 17, "worker-a", "running", "generation", 2, body, hash, 7, nil))
+	execution := task9runtime.Execution{BookRunID: 90, Attempt: 1, FencingToken: 17, Owner: "worker-a"}
+	_, input, err := NewMySQLStore(db).RuntimeBookRun(context.Background(), execution)
+	if err != nil || input.Request.ProjectConfig != "" {
+		t.Fatalf("project config=%q err=%v", input.Request.ProjectConfig, err)
+	}
+}
+
 func TestMySQLStoreRuntimeBookRunStageRetryRequiresOwnedTerminalGenerationSource(t *testing.T) {
 	db, mock := newSQLMock(t)
 	snapshot := task9runtime.GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 3, BookIDs: []int64{11}, DirectorMode: "normal", ShotDurationLimitSec: 15, RequestedByUserID: 7, Action: task9runtime.GenerationActionStageRetry, RetryStage: string(StageDirector), SourceBookRunID: 70}

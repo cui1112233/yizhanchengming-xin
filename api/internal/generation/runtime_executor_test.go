@@ -83,13 +83,57 @@ func TestRuntimeExecutorSanitizesStoreErrorsButPassesTermination(t *testing.T) {
 	if !errors.As(err, &safe) || safe.SafeCode() != "GENERATION_FAILED" || strings.Contains(err.Error(), "secret") || !safe.Retryable() {
 		t.Fatalf("unsafe runtime error=%T %v", err, err)
 	}
-	for _, terminal := range []error{task9runtime.ErrStaleExecution, taskruntime.ErrLeaseNotOwner, context.Canceled, context.DeadlineExceeded} {
+	for _, terminal := range []error{task9runtime.ErrStaleExecution, taskruntime.ErrLeaseNotOwner} {
 		store := runtimeStoreFixture()
 		store.runtimeErr = terminal
 		if got := NewRuntimeExecutor(store, &runtimeProvider{}, time.Now).Execute(context.Background(), store.execution); got != terminal {
 			t.Fatalf("termination %v wrapped as %T %v", terminal, got, got)
 		}
 	}
+}
+
+func TestRuntimeExecutorSanitizesDependencyInternalContextErrors(t *testing.T) {
+	for _, dependencyErr := range []error{context.Canceled, context.DeadlineExceeded} {
+		store := runtimeStoreFixture()
+		store.runtimeErr = dependencyErr
+		err := NewRuntimeExecutor(store, &runtimeProvider{}, time.Now).Execute(context.Background(), store.execution)
+		var safe *RuntimeOutcomeError
+		if !errors.As(err, &safe) || safe.SafeCode() != "GENERATION_FAILED" || !safe.Retryable() || err == dependencyErr {
+			t.Fatalf("dependency err=%v result=%T %v", dependencyErr, err, err)
+		}
+	}
+}
+
+func TestRuntimeExecutorInternalDeadlinePersistsOnlyGenerationOutcome(t *testing.T) {
+	store := runtimeStoreFixture()
+	store.runtimeErr = context.DeadlineExceeded
+	durable := &capturingRuntimeWorkerStore{execution: store.execution}
+	worker := task9runtime.NewWorker(durable, nil, NewRuntimeExecutor(store, &runtimeProvider{}, time.Now), "worker-a", time.Minute, time.Now)
+	if err := worker.Process(context.Background(), task9runtime.WorkItem{BookRunID: store.execution.BookRunID, BookID: store.run.BookID, Attempt: store.execution.Attempt}); err != nil {
+		t.Fatal(err)
+	}
+	if durable.failure.Code != "GENERATION_FAILED" || durable.failure.Message != outcomeFailureMessage || !durable.failure.Retryable {
+		t.Fatalf("persisted failure=%+v", durable.failure)
+	}
+}
+
+type capturingRuntimeWorkerStore struct {
+	execution task9runtime.Execution
+	failure   task9runtime.Failure
+}
+
+func (s *capturingRuntimeWorkerStore) Claim(context.Context, task9runtime.WorkItem, string, time.Time) (task9runtime.Execution, bool, error) {
+	return s.execution, true, nil
+}
+func (*capturingRuntimeWorkerStore) Renew(context.Context, task9runtime.Execution, time.Time) (bool, error) {
+	return true, nil
+}
+func (*capturingRuntimeWorkerStore) Complete(context.Context, task9runtime.Execution) (bool, error) {
+	return true, nil
+}
+func (s *capturingRuntimeWorkerStore) Fail(_ context.Context, _ task9runtime.Execution, failure task9runtime.Failure) (bool, error) {
+	s.failure = failure
+	return true, nil
 }
 
 type foreignSafeError struct{ error }

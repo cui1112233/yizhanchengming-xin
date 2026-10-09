@@ -164,11 +164,13 @@ func runtimeExecutionError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, task9runtime.ErrStaleExecution) || errors.Is(err, taskruntime.ErrLeaseNotOwner) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, task9runtime.ErrStaleExecution) || errors.Is(err, taskruntime.ErrLeaseNotOwner) {
 		return err
 	}
-	if ctx != nil && ctx.Err() != nil {
-		return ctx.Err()
+	if ctx != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil && errors.Is(err, ctxErr) {
+			return ctxErr
+		}
 	}
 	var safe *RuntimeOutcomeError
 	if errors.As(err, &safe) {

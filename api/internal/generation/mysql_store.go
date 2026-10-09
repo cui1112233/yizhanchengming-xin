@@ -449,8 +449,16 @@ func (s *MySQLStore) RuntimeBookRun(ctx context.Context, execution task9runtime.
 		}
 	}
 	run.RunID, run.Status = runID, StatusRunning
-	projectConfig, _ := json.Marshal(map[string]string{"constraints": decoded.Config.Constraints, "characters": decoded.Config.Characters, "scenes": decoded.Config.Scenes})
-	input := RuntimeExecutionInput{Action: decoded.Action, RetryStage: Stage(decoded.RetryStage), SourceBookRunID: decoded.SourceBookRunID, Request: RunBookRequest{BatchProjectID: run.BatchProjectID, BookID: run.BookID, HookEnabled: decoded.HookEnabled, PlotMode: decoded.PlotMode, DirectorMode: DirectorMode(decoded.DirectorMode), MatchAudio: decoded.MatchAudio, ShotDurationLimitSec: decoded.ShotDurationLimitSec, RequestID: run.RequestID, ProcessingRules: decoded.Config.ProcessingRulePromptRef, KnowledgeBase: decoded.Config.KnowledgePromptRef, ProjectConfig: string(projectConfig), ModelConfig: decoded.Config.Model}}
+	projectConfig, _ := json.Marshal(struct {
+		Constraints string `json:"constraints,omitempty"`
+		Characters  string `json:"characters,omitempty"`
+		Scenes      string `json:"scenes,omitempty"`
+	}{Constraints: decoded.Config.Constraints, Characters: decoded.Config.Characters, Scenes: decoded.Config.Scenes})
+	projectConfigText := string(projectConfig)
+	if projectConfigText == "{}" {
+		projectConfigText = ""
+	}
+	input := RuntimeExecutionInput{Action: decoded.Action, RetryStage: Stage(decoded.RetryStage), SourceBookRunID: decoded.SourceBookRunID, Request: RunBookRequest{BatchProjectID: run.BatchProjectID, BookID: run.BookID, HookEnabled: decoded.HookEnabled, PlotMode: decoded.PlotMode, DirectorMode: DirectorMode(decoded.DirectorMode), MatchAudio: decoded.MatchAudio, ShotDurationLimitSec: decoded.ShotDurationLimitSec, RequestID: run.RequestID, ProcessingRules: decoded.Config.ProcessingRulePromptRef, KnowledgeBase: decoded.Config.KnowledgePromptRef, ProjectConfig: projectConfigText, ModelConfig: decoded.Config.Model}}
 	return run, input, nil
 }
 
