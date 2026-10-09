@@ -147,14 +147,14 @@ func (h handler) readyz(w http.ResponseWriter, r *http.Request) {
 }
 
 type diagnosticsDTO struct {
-	RequestID string                       `json:"request_id"`
-	APIReady  bool                         `json:"api_ready"`
-	Database  databaseDiagnosticsDTO       `json:"database"`
-	Runtime   runtimeDiagnosticsDTO        `json:"runtime"`
-	Process   observability.ProcessStats   `json:"process"`
-	Providers []providerDiagnosticsDTO     `json:"providers"`
-	Executors executorFleetDiagnosticsDTO  `json:"executors"`
-	Jobs      jobDiagnosticsDTO            `json:"jobs"`
+	RequestID string                      `json:"request_id"`
+	APIReady  bool                        `json:"api_ready"`
+	Database  databaseDiagnosticsDTO      `json:"database"`
+	Runtime   runtimeDiagnosticsDTO       `json:"runtime"`
+	Process   observability.ProcessStats  `json:"process"`
+	Providers []providerDiagnosticsDTO    `json:"providers"`
+	Executors executorFleetDiagnosticsDTO `json:"executors"`
+	Jobs      jobDiagnosticsDTO           `json:"jobs"`
 }
 
 type databaseDiagnosticsDTO struct {
@@ -167,9 +167,10 @@ type databaseDiagnosticsDTO struct {
 }
 
 type runtimeDiagnosticsDTO struct {
-	Ready  bool   `json:"ready"`
-	Status string `json:"status"`
-	Redis  string `json:"redis"`
+	Ready      bool   `json:"ready"`
+	Status     string `json:"status"`
+	Redis      string `json:"redis"`
+	ReasonCode string `json:"reason_code"`
 }
 
 type providerDiagnosticsDTO struct {
@@ -236,21 +237,24 @@ func (h handler) diagnostics(w http.ResponseWriter, r *http.Request) {
 	requestID := observability.RequestID(r.Context())
 	result := diagnosticsDTO{
 		RequestID: requestID,
-		APIReady: h.deps.AppInitialized && h.deps.Database != nil,
-		Runtime: runtimeDiagnosticsDTO{Ready: false, Status: "pending_task9_runtime", Redis: "pending_task9"},
-		Process: observability.ReadProcessStats(h.deps.StartedAt, now),
+		APIReady:  h.deps.AppInitialized && h.deps.Database != nil,
+		Runtime:   runtimeDiagnosticsDTO{Ready: false, Status: "unavailable", Redis: "not_configured", ReasonCode: "not_configured"},
+		Process:   observability.ReadProcessStats(h.deps.StartedAt, now),
 		Providers: []providerDiagnosticsDTO{},
 		Executors: executorFleetDiagnosticsDTO{Items: []executorDiagnosticsDTO{}},
+	}
+	if h.deps.RuntimeDiagnostics != nil {
+		result.Runtime = safeRuntimeDiagnostics(h.deps.RuntimeDiagnostics.RuntimeDiagnostics())
 	}
 
 	if h.deps.Database != nil {
 		stats := h.deps.Database.Stats()
 		result.Database = databaseDiagnosticsDTO{
 			OpenConnections: stats.OpenConnections,
-			InUse: stats.InUse,
-			Idle: stats.Idle,
-			WaitCount: stats.WaitCount,
-			WaitDuration: stats.WaitDuration,
+			InUse:           stats.InUse,
+			Idle:            stats.Idle,
+			WaitCount:       stats.WaitCount,
+			WaitDuration:    stats.WaitDuration,
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 		result.Database.Ready = h.deps.Database.PingContext(ctx) == nil
@@ -299,6 +303,27 @@ func (h handler) diagnostics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+func safeRuntimeDiagnostics(value RuntimeDiagnosticsStatus) runtimeDiagnosticsDTO {
+	status := strings.ToLower(strings.TrimSpace(value.Status))
+	if status != "available" && status != "degraded" && status != "unavailable" {
+		status = "unavailable"
+	}
+	redisStatus := strings.ToLower(strings.TrimSpace(value.Redis))
+	if redisStatus != "configured" && redisStatus != "not_configured" && redisStatus != "unavailable" {
+		redisStatus = "unavailable"
+	}
+	reasons := map[string]struct{}{
+		"ready": {}, "not_configured": {}, "provider_not_configured": {}, "redis_unavailable": {},
+		"runtime_setup_failed": {}, "recovery_failed": {}, "worker_retrying": {}, "worker_stopped": {},
+		"scheduler_failed": {}, "stopped": {},
+	}
+	reason := strings.ToLower(strings.TrimSpace(value.ReasonCode))
+	if _, ok := reasons[reason]; !ok {
+		reason = "status_unavailable"
+	}
+	return runtimeDiagnosticsDTO{Ready: value.Ready && status == "available", Status: status, Redis: redisStatus, ReasonCode: reason}
 }
 
 func (h handler) recentProviderFailures(ctx context.Context, provider, model string, since time.Time) int64 {

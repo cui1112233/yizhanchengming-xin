@@ -88,6 +88,17 @@ type GenerationRuntimeService interface {
 	GenerationRun(context.Context, int64, int64) (task9runtime.GenerationRunStatus, error)
 }
 
+type RuntimeDiagnosticsStatus struct {
+	Ready      bool
+	Status     string
+	Redis      string
+	ReasonCode string
+}
+
+type RuntimeDiagnosticsReader interface {
+	RuntimeDiagnostics() RuntimeDiagnosticsStatus
+}
+
 type PipelineService interface {
 	Create(context.Context, pipeline.CreateRequest) (pipeline.CreateResult, error)
 }
@@ -158,6 +169,7 @@ type Dependencies struct {
 	Pipeline                    PipelineService
 	Generation                  GenerationService
 	GenerationRuntime           GenerationRuntimeService
+	RuntimeDiagnostics          RuntimeDiagnosticsReader
 	AdminPrompts                AdminPromptService
 	Workshop                    WorkshopService
 	NovelPanel                  NovelPanelService

@@ -736,7 +736,7 @@
 
 ## 2026-10-09 · Task 9.4 统一异步生成接入（后端合同）
 
-> 状态：🟡 后端 HTTP/MySQL 接入与前台精确 Run 轮询已完成，唯一 Worker/Scheduler 应用生命周期及本机 Docker staging 验收仍在继续；不是完整运行时验收。
+> 状态：🟡 后端 HTTP/MySQL 接入、前台精确 Run 轮询及唯一 Worker/Scheduler 应用生命周期已完成；本机 Docker staging 浏览器验收仍在继续，不是完整运行时验收。
 
 - [x] Batch、单书和阶段重试写接口统一为持久化优先的异步 admission：成功返回 `202`、稳定 Run/Task ID、精确轮询 URL 与 `queued/pending` dispatch；`Idempotency-Key` 优先，兼容旧 `requestId`，同键异参返回安全 409。
 - [x] 新增精确 `GET /api/v1/batch-projects/{projectId}/generation/runs/{runId}`，只从 MySQL 投影 Run/最新 BookRun 生命周期，不读取或返回请求快照、Prompt、正文、输出、Provider 或凭据。
@@ -747,5 +747,8 @@
 - [x] 仓库验证：`go test ./... -count=1` 自然退出码 0（1082 passed / 43 skipped / 25 packages，真实 MySQL/Redis 集成因未配置隔离地址而跳过）；`go vet ./...` 退出码 0。
 - [x] Script、Batch Factory、Shuihuo 前台已统一到 admission/exact-run 轮询合同：稳定幂等键、同 Run 串行轮询、AbortSignal 中止、刷新恢复和项目切换时旧响应隔离均有回归测试；旧同步 storyboard recompile 前台入口不再伪装可用。
 - [x] 前台完整 `CI=1 npm test -- --run` 在同一 PTY 自然退出 0：30 files / 227 tests，352.21 秒；Router 项目深链用例仅增加与同类页面一致的 15 秒局部上限，未删除断言或改全局 timeout。`npm run build` 退出 0（1464 modules）；相关 Go HTTP/runtime/app 包测试退出 0。
-- [ ] 唯一 Worker/Scheduler/Recovery 的应用启动、动态 readiness、优雅关闭及本机 `ycm_staging` + `ycm:staging:` 真实恢复验收仍在 Task 5；当前生产装配故意 fail-closed。
+- [x] `cmd/server` 已改由 `NewApplication` 装配唯一 Task9 Redis Queue、Lease、Worker、Scheduler 与 Recovery；启动先从 MySQL 恢复再开放 readiness，运行期动态报告 available/degraded/unavailable，SIGINT/SIGTERM 会依次停止 HTTP、取消并 join goroutine、关闭 Queue/Lease。兼容 `NewHandler` 仍 fail-closed，正式 Application 不会回退创建第二套 Task9 队列。
+- [x] 本机隔离 `ycm_staging` 已由 Goose 从 18 迁移到 21；独立 `127.0.0.1:16379` Redis 上的真实集成测试覆盖 FLUSHDB 后从 MySQL 重建、过期 execution fencing/retry 与进程对象重建，`go test ./internal/taskruntime ./internal/task9runtime -count=1` 及相关 race 测试退出码 0。
+- [x] 生命周期仓库门禁：`go test ./... -count=1`（25 packages）、`go test -race ./internal/taskruntime ./internal/task9runtime ./internal/generation ./internal/app -count=1`、`go vet ./...` 与 `./scripts/build-embedded-ui.sh` 均退出码 0；前台与后台静态资源已重新嵌入同一个 Go 二进制。
+- [ ] 本机 Docker staging 的登录、CSRF、账号/项目权限、无 Provider 真实失败、假 Provider 中断/重启恢复、浏览器刷新恢复与逐页视觉验收尚未完成；完成前不宣称 Runtime 端到端可用。
 - [ ] 未连接 ECS/公网、未运行 GitHub Actions、未调用付费 Provider/TOS；浏览器与公网对标验收尚未进行。

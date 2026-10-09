@@ -259,6 +259,41 @@ func TestDiagnosticsAdminDTOHasNoSecretLikeFields(t *testing.T) {
 	}
 }
 
+type fixedRuntimeDiagnostics struct{ value RuntimeDiagnosticsStatus }
+
+func (d fixedRuntimeDiagnostics) RuntimeDiagnostics() RuntimeDiagnosticsStatus { return d.value }
+
+func TestDiagnosticsReportsActualGenerationRuntimeState(t *testing.T) {
+	auth := opsAuthService{user: authn.User{ID: 1, Role: "admin"}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/diagnostics", nil)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	NewHandler(Dependencies{
+		Auth: auth,
+		RuntimeDiagnostics: fixedRuntimeDiagnostics{value: RuntimeDiagnosticsStatus{
+			Ready: false, Status: "degraded", Redis: "configured", ReasonCode: "recovery_failed",
+		}},
+	}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Runtime struct {
+			Ready      bool   `json:"ready"`
+			Status     string `json:"status"`
+			Redis      string `json:"redis"`
+			ReasonCode string `json:"reason_code"`
+		} `json:"runtime"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Runtime.Ready || body.Runtime.Status != "degraded" || body.Runtime.Redis != "configured" || body.Runtime.ReasonCode != "recovery_failed" {
+		t.Fatalf("runtime=%+v", body.Runtime)
+	}
+}
+
 func TestAccessLogDoesNotRecordQueryHeadersOrBodies(t *testing.T) {
 	var logs bytes.Buffer
 	logger := observability.NewJSONLogger(&logs)

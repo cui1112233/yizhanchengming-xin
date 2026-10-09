@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/app"
@@ -75,10 +79,48 @@ func main() {
 	}
 
 	logger.Info("api listening", "subsystem", "http", "operation", "listen", "address", observability.SanitizeString(addr))
-	api := app.NewHandler(db, fetcher, nil, nil)
-	ui := webui.NewHandlerWithAdmin(api, webui.EmbeddedFiles(), webui.EmbeddedAdminFiles(), buildInfo())
-	if err := http.ListenAndServe(addr, ui); err != nil {
+	application, err := app.NewApplication(db, fetcher, nil, nil)
+	if err != nil {
+		fatal(logger, "initialize application failed", "app", "initialize", err)
+	}
+	ui := webui.NewHandlerWithAdmin(application.Handler, webui.EmbeddedFiles(), webui.EmbeddedAdminFiles(), buildInfo())
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		fatal(logger, "listen failed", "http", "listen", err)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	server := &http.Server{Addr: addr, Handler: ui, ReadHeaderTimeout: 10 * time.Second}
+	if err := serve(ctx, server, listener, application.Runtime); err != nil {
 		fatal(logger, "http server stopped", "http", "listen", err)
+	}
+}
+
+func serve(ctx context.Context, server *http.Server, listener net.Listener, runtime app.RuntimeLifecycle) error {
+	if err := runtime.Start(ctx); err != nil {
+		_ = listener.Close()
+		return err
+	}
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- server.Serve(listener) }()
+
+	select {
+	case err := <-serveErr:
+		closeErr := runtime.Close()
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		return errors.Join(err, closeErr)
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownErr := server.Shutdown(shutdownCtx)
+		cancel()
+		closeErr := runtime.Close()
+		serverErr := <-serveErr
+		if errors.Is(serverErr, http.ErrServerClosed) {
+			serverErr = nil
+		}
+		return errors.Join(shutdownErr, closeErr, serverErr)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,6 +35,82 @@ func NewHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 }
 
 func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock, authEnabled bool) http.Handler {
+	return newHandlerWithRuntime(db, fetcher, classifier, now, authEnabled, runtimeWiring{})
+}
+
+type runtimeWiring struct {
+	generation  httpapi.GenerationRuntimeService
+	coordinator task9runtime.RuntimeCoordinator
+	diagnostics httpapi.RuntimeDiagnosticsReader
+}
+
+type RuntimeLifecycle interface {
+	Start(context.Context) error
+	Ready() bool
+	Status() RuntimeStatus
+	Wait() error
+	Close() error
+}
+
+type Application struct {
+	Handler http.Handler
+	Runtime RuntimeLifecycle
+}
+
+func NewApplication(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock) (*Application, error) {
+	runtimeStore := task9runtime.NewMySQLStore(db)
+	generationStore := generation.NewMySQLStore(db)
+	textProvider, providerConfigured := textGenerationProvider()
+	redisAddr := runtimeRedisAddress()
+	options := runtimeLifecycleOptions{UnavailableReason: "not_configured", RedisConfigured: redisAddr != ""}
+	var coordinator task9runtime.RuntimeCoordinator
+	if redisAddr != "" {
+		prefix := runtimeRedisPrefix(os.Getenv("QIANTIE_REDIS_PREFIX"), "task9")
+		queue, queueErr := taskruntime.NewRedisQueue(redisAddr, prefix)
+		if queueErr != nil {
+			options.UnavailableReason = "redis_unavailable"
+		} else {
+			options.Closers = append(options.Closers, io.Closer(queue))
+			leases, leaseErr := taskruntime.NewRedisLeaseStore(redisAddr, prefix)
+			if leaseErr != nil {
+				_ = queue.Close()
+				options.Closers = nil
+				options.UnavailableReason = "redis_unavailable"
+			} else {
+				options.Closers = append(options.Closers, io.Closer(leases))
+				if !providerConfigured {
+					options.UnavailableReason = "provider_not_configured"
+				} else {
+					nowFn := time.Now
+					if now != nil {
+						nowFn = now
+					}
+					owner := runtimeOwner()
+					coordinator = task9runtime.NewQueueCoordinator(queue)
+					options.Configured = true
+					options.Queue = queue
+					options.HealthCheck = func(ctx context.Context) error {
+						_, err := queue.ReclaimExpired(ctx, time.Now(), 1)
+						return err
+					}
+					options.Worker = task9runtime.NewWorker(runtimeStore, leases, generation.NewRuntimeExecutor(generationStore, textProvider, nowFn), owner, 30*time.Second, nowFn)
+					options.Scheduler = task9runtime.NewScheduler(runtimeStore, coordinator, nowFn)
+					options.Recovery = task9runtime.NewRecovery(runtimeStore, coordinator)
+				}
+			}
+		}
+	}
+	lifecycle := newGenerationRuntimeLifecycle(options)
+	generationRuntime := task9runtime.NewGenerationAdmissionService(runtimeStore, coordinator, lifecycle)
+	handler := newHandlerWithRuntime(db, fetcher, classifier, now, true, runtimeWiring{
+		generation:  generationRuntime,
+		coordinator: coordinator,
+		diagnostics: lifecycle,
+	})
+	return &Application{Handler: handler, Runtime: lifecycle}, nil
+}
+
+func newHandlerWithRuntime(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier, now pipeline.Clock, authEnabled bool, runtime runtimeWiring) http.Handler {
 	startedAt := time.Now().UTC()
 	logger := slog.Default()
 	store := intake.NewMySQLStore(db)
@@ -43,10 +120,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	generationStore := generation.NewMySQLStore(db)
 	settingsStore := unifiedsettings.NewMySQLStore(db)
 
-	var textProvider generation.Provider = generation.UnavailableProvider{}
-	if baseURL, key, model := os.Getenv("QIANTIE_TEXT_API_BASE_URL"), os.Getenv("QIANTIE_TEXT_API_KEY"), os.Getenv("QIANTIE_TEXT_MODEL"); baseURL != "" && key != "" && model != "" {
-		textProvider = generation.NewHTTPProvider(baseURL, key, model)
-	}
+	textProvider, _ := textGenerationProvider()
 	generationService := generation.NewService(generationStore, textProvider, nil)
 	workshopService := workshop.NewService(workshop.NewMySQLStore(db), store, generationService)
 	novelPanelService := novelpanel.NewService(novelpanel.NewMySQLStore(db))
@@ -127,19 +201,8 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 	// remains bootable but retry returns an explicit queue-unavailable response;
 	// no new BookRun attempt is created without successful coordination.
 	runtimeStore := task9runtime.NewMySQLStore(db)
-	var runtimeCoordinator task9runtime.RuntimeCoordinator
-	redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
-	if redisAddr == "" {
-		redisAddr = strings.TrimSpace(os.Getenv("QIANTIE_REDIS_ADDR"))
-	}
-	if redisAddr == "" {
-		redisAddr = strings.TrimSpace(os.Getenv("TASK9_REDIS_ADDR"))
-	}
-	if redisAddr != "" {
-		if queue, err := taskruntime.NewRedisQueue(redisAddr, runtimeRedisPrefix(os.Getenv("QIANTIE_REDIS_PREFIX"), "task9")); err == nil {
-			runtimeCoordinator = task9runtime.NewQueueCoordinator(queue)
-		}
-	}
+	redisAddr := runtimeRedisAddress()
+	runtimeCoordinator := runtime.coordinator
 	// Image/TTS credentials remain server-only. Each adapter uses the same small
 	// HTTP contract and writes its durable output back through the existing TOS
 	// media service; no browser provider configuration is exposed.
@@ -169,10 +232,14 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		}()
 	}
 	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
-	// Task 5 owns worker lifecycle/readiness. Until that worker is supervised,
-	// browser admissions fail closed even when Redis and Provider credentials
-	// happen to be present; read-only exact Run polling remains available.
-	generationRuntime := task9runtime.NewGenerationAdmissionService(runtimeStore, runtimeCoordinator, task9runtime.StaticRuntimeReadiness(false))
+	// Production injects the single supervised Task9 lifecycle above. The
+	// compatibility constructor deliberately stays fail-closed; it is used by
+	// tests and must never infer that a worker exists merely from environment
+	// variables. Read-only exact Run polling remains available in either mode.
+	var generationRuntime httpapi.GenerationRuntimeService = runtime.generation
+	if generationRuntime == nil {
+		generationRuntime = task9runtime.NewGenerationAdmissionService(runtimeStore, runtimeCoordinator, task9runtime.StaticRuntimeReadiness(false))
+	}
 
 	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,
@@ -186,6 +253,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		ScriptStoryboards:           generationService,
 		Generation:                  observedGeneration,
 		GenerationRuntime:           generationRuntime,
+		RuntimeDiagnostics:          runtime.diagnostics,
 		AdminPrompts:                generationStore,
 		Workshop:                    workshopService,
 		NovelPanel:                  novelPanelService,
@@ -211,6 +279,33 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		AppInitialized:              true,
 	}
 	return httpapi.NewHandlerWithRuntime(deps, runtimeService)
+}
+
+func textGenerationProvider() (generation.Provider, bool) {
+	baseURL := strings.TrimSpace(os.Getenv("QIANTIE_TEXT_API_BASE_URL"))
+	key := strings.TrimSpace(os.Getenv("QIANTIE_TEXT_API_KEY"))
+	model := strings.TrimSpace(os.Getenv("QIANTIE_TEXT_MODEL"))
+	if baseURL == "" || key == "" || model == "" {
+		return generation.UnavailableProvider{}, false
+	}
+	return generation.NewHTTPProvider(baseURL, key, model), true
+}
+
+func runtimeRedisAddress() string {
+	for _, key := range []string{"REDIS_ADDR", "QIANTIE_REDIS_ADDR", "TASK9_REDIS_ADDR"} {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func runtimeOwner() string {
+	hostname := "unknown"
+	if value, err := os.Hostname(); err == nil && strings.TrimSpace(value) != "" {
+		hostname = strings.TrimSpace(value)
+	}
+	return fmt.Sprintf("api-%s-pid%d", hostname, os.Getpid())
 }
 
 func runtimeRedisPrefix(namespace, name string) string {
