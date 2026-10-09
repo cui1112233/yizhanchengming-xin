@@ -42,8 +42,92 @@ const (
 type AdmissionResult struct {
 	Run      RunRecord
 	Items    []WorkItem
+	TaskIDs  []int64
 	Created  bool
 	Dispatch string
+}
+
+var ErrExecutorUnavailable = errors.New("generation executor unavailable")
+
+type GenerationTaskStatus struct {
+	TaskID  int64  `json:"taskId"`
+	BookID  int64  `json:"bookId"`
+	Attempt int    `json:"attempt"`
+	Status  string `json:"status"`
+}
+
+type GenerationRunStatus struct {
+	RunID          int64                  `json:"runId"`
+	BatchProjectID int64                  `json:"batchProjectId"`
+	Status         string                 `json:"status"`
+	Terminal       bool                   `json:"terminal"`
+	Counts         GenerationRunCounts    `json:"counts"`
+	Tasks          []GenerationTaskStatus `json:"tasks"`
+}
+
+type GenerationRunCounts struct {
+	Total     int `json:"total"`
+	Pending   int `json:"pending"`
+	Running   int `json:"running"`
+	Completed int `json:"completed"`
+	Failed    int `json:"failed"`
+}
+
+type GenerationAdmissionStore interface {
+	AdmitGeneration(context.Context, GenerationRequest) (AdmissionResult, error)
+	GenerationRun(context.Context, int64, int64) (GenerationRunStatus, error)
+}
+
+// RuntimeReadiness is implemented by the single supervised generation runtime.
+// Admission checks it on every request so a stopped or degraded worker cannot
+// continue accepting work merely because it was ready when the app started.
+type RuntimeReadiness interface {
+	Ready() bool
+}
+
+type StaticRuntimeReadiness bool
+
+func (r StaticRuntimeReadiness) Ready() bool { return bool(r) }
+
+type GenerationAdmissionService struct {
+	store       GenerationAdmissionStore
+	coordinator RuntimeCoordinator
+	readiness   RuntimeReadiness
+}
+
+func NewGenerationAdmissionService(store GenerationAdmissionStore, coordinator RuntimeCoordinator, readiness RuntimeReadiness) *GenerationAdmissionService {
+	return &GenerationAdmissionService{store: store, coordinator: coordinator, readiness: readiness}
+}
+
+func (s *GenerationAdmissionService) Ready() bool {
+	return s != nil && s.store != nil && s.coordinator != nil && s.readiness != nil && s.readiness.Ready()
+}
+
+func (s *GenerationAdmissionService) AdmitGeneration(ctx context.Context, req GenerationRequest) (AdmissionResult, error) {
+	if !s.Ready() {
+		return AdmissionResult{}, ErrExecutorUnavailable
+	}
+	result, err := s.store.AdmitGeneration(ctx, req)
+	if err != nil {
+		return AdmissionResult{}, err
+	}
+	result.Dispatch = "queued"
+	for _, item := range result.Items {
+		if err := s.coordinator.Enqueue(ctx, item); err != nil {
+			// Admission is already durable. Recovery owns dispatch repair; the HTTP
+			// contract must not turn a committed Run into an ambiguous 5xx.
+			result.Dispatch = "pending"
+			break
+		}
+	}
+	return result, nil
+}
+
+func (s *GenerationAdmissionService) GenerationRun(ctx context.Context, projectID, runID int64) (GenerationRunStatus, error) {
+	if s == nil || s.store == nil {
+		return GenerationRunStatus{}, ErrExecutorUnavailable
+	}
+	return s.store.GenerationRun(ctx, projectID, runID)
 }
 
 // GenerationSnapshot is the immutable, versioned execution input. Provider
@@ -384,6 +468,72 @@ func queuedGenerationItems(ctx context.Context, tx *sql.Tx, runID int64) ([]Work
 	return items, rows.Err()
 }
 
+func loadStageRetrySnapshot(ctx context.Context, tx *sql.Tx, requested GenerationSnapshot) (GenerationSnapshot, error) {
+	if requested.Action != GenerationActionStageRetry || len(requested.BookIDs) != 1 {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	var sourceRunID sql.NullInt64
+	if err := tx.QueryRowContext(ctx, `SELECT run_id FROM book_runs WHERE id=?`, requested.SourceBookRunID).Scan(&sourceRunID); err != nil || !sourceRunID.Valid {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return GenerationSnapshot{}, err
+		}
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	sourceRun, err := scanGenerationRun(tx.QueryRowContext(ctx, `SELECT `+generationRunColumns+` FROM runs WHERE id=? FOR UPDATE`, sourceRunID.Int64))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return GenerationSnapshot{}, ErrInvalidGenerationRequest
+		}
+		return GenerationSnapshot{}, err
+	}
+	if sourceRun.BatchProjectID != requested.BatchProjectID || sourceRun.RunKind != "generation" || sourceRun.RequestedByUserID != requested.RequestedByUserID || (sourceRun.Status != RunFailed && sourceRun.Status != RunPartialFailed) {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	sourceSnapshot, err := decodeGenerationSnapshot(sourceRun.RequestSchemaVersion, sourceRun.RequestSnapshot, sourceRun.RequestHash, sourceRun.BatchProjectID, sourceRun.RequestedByUserID)
+	if err != nil {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	bookID := requested.BookIDs[0]
+	frozenBook := false
+	for _, id := range sourceSnapshot.BookIDs {
+		if id == bookID {
+			frozenBook = true
+			break
+		}
+	}
+	if !frozenBook {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	var sourceBookID int64
+	var sourceBookStatus string
+	if err := tx.QueryRowContext(ctx, `SELECT book_id,status FROM book_runs WHERE id=? AND run_id=? AND batch_project_id=? FOR UPDATE`, requested.SourceBookRunID, sourceRun.ID, requested.BatchProjectID).Scan(&sourceBookID, &sourceBookStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return GenerationSnapshot{}, ErrInvalidGenerationRequest
+		}
+		return GenerationSnapshot{}, err
+	}
+	if sourceBookID != bookID || sourceBookStatus != string(BookFailed) {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	var stageStatus string
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM stage_runs WHERE book_run_id=? AND stage=? ORDER BY attempt DESC,id DESC LIMIT 1 FOR UPDATE`, requested.SourceBookRunID, requested.RetryStage).Scan(&stageStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return GenerationSnapshot{}, ErrInvalidGenerationRequest
+		}
+		return GenerationSnapshot{}, err
+	}
+	if stageStatus != "failed" {
+		return GenerationSnapshot{}, ErrInvalidGenerationRequest
+	}
+	requested.HookEnabled = sourceSnapshot.HookEnabled
+	requested.PlotMode = sourceSnapshot.PlotMode
+	requested.DirectorMode = sourceSnapshot.DirectorMode
+	requested.MatchAudio = sourceSnapshot.MatchAudio
+	requested.ShotDurationLimitSec = sourceSnapshot.ShotDurationLimitSec
+	requested.Config = sourceSnapshot.Config
+	return requested, nil
+}
+
 func (s *MySQLStore) AdmitGeneration(ctx context.Context, req GenerationRequest) (AdmissionResult, error) {
 	snapshot, err := normalizeGenerationRequest(req)
 	if err != nil {
@@ -413,31 +563,48 @@ func (s *MySQLStore) AdmitGeneration(ctx context.Context, req GenerationRequest)
 		if err != nil {
 			return AdmissionResult{}, ErrIdempotencyConflict
 		}
-		if snapshot.SelectionAll {
-			snapshot.BookIDs = append([]int64{}, frozen.BookIDs...)
-		}
-		if frozen.SchemaVersion == 1 {
-			snapshot.SchemaVersion = 1
-		}
-		snapshot.Config = frozen.Config
-		_, hash, err := encodeGenerationSnapshot(snapshot)
-		if err != nil {
-			return AdmissionResult{}, err
-		}
-		if hash != r.RequestHash {
+		if r.RequestedByUserID != req.RequestedByUserID {
 			return AdmissionResult{}, ErrIdempotencyConflict
 		}
+		if snapshot.Action == GenerationActionStageRetry {
+			if frozen.Action != GenerationActionStageRetry || !reflect.DeepEqual(snapshot.BookIDs, frozen.BookIDs) || snapshot.RetryStage != frozen.RetryStage || snapshot.SourceBookRunID != frozen.SourceBookRunID {
+				return AdmissionResult{}, ErrIdempotencyConflict
+			}
+			snapshot = frozen
+		} else if snapshot.SelectionAll {
+			snapshot.BookIDs = append([]int64{}, frozen.BookIDs...)
+		}
+		if snapshot.Action != GenerationActionStageRetry {
+			if frozen.SchemaVersion == 1 {
+				snapshot.SchemaVersion = 1
+			}
+			snapshot.Config = frozen.Config
+			_, hash, err := encodeGenerationSnapshot(snapshot)
+			if err != nil {
+				return AdmissionResult{}, err
+			}
+			if hash != r.RequestHash {
+				return AdmissionResult{}, ErrIdempotencyConflict
+			}
+		}
 	}
-	if created && snapshot.SelectionAll {
-		snapshot.BookIDs, err = projectBookIDs(ctx, tx, intakeID)
-		if err != nil {
-			return AdmissionResult{}, err
+	if created {
+		if snapshot.Action == GenerationActionStageRetry {
+			snapshot, err = loadStageRetrySnapshot(ctx, tx, snapshot)
+			if err != nil {
+				return AdmissionResult{}, err
+			}
+		} else if snapshot.SelectionAll {
+			snapshot.BookIDs, err = projectBookIDs(ctx, tx, intakeID)
+			if err != nil {
+				return AdmissionResult{}, err
+			}
 		}
 	}
 	if err := validateFrozenBooks(ctx, tx, intakeID, snapshot.BookIDs); err != nil {
 		return AdmissionResult{}, err
 	}
-	if created {
+	if created && snapshot.Action != GenerationActionStageRetry {
 		snapshot.Config, err = loadGenerationConfig(ctx, tx, req.BatchProjectID)
 		if err != nil {
 			return AdmissionResult{}, err
@@ -472,10 +639,35 @@ func (s *MySQLStore) AdmitGeneration(ctx context.Context, req GenerationRequest)
 	if err != nil {
 		return AdmissionResult{}, err
 	}
+	taskIDs := make([]int64, 0, len(items))
+	if created {
+		for _, item := range items {
+			taskIDs = append(taskIDs, item.BookRunID)
+		}
+	} else {
+		rows, err := tx.QueryContext(ctx, `SELECT id FROM book_runs WHERE run_id=? AND attempt=1 ORDER BY book_id`, r.ID)
+		if err != nil {
+			return AdmissionResult{}, err
+		}
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return AdmissionResult{}, err
+			}
+			taskIDs = append(taskIDs, id)
+		}
+		if err := rows.Close(); err != nil {
+			return AdmissionResult{}, err
+		}
+		if err := rows.Err(); err != nil {
+			return AdmissionResult{}, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return AdmissionResult{}, err
 	}
-	return AdmissionResult{Run: r, Items: items, Created: created, Dispatch: "pending"}, nil
+	return AdmissionResult{Run: r, Items: items, TaskIDs: taskIDs, Created: created, Dispatch: "pending"}, nil
 }
 
 // Select candidates without row locks, then always lock Project -> Run ->

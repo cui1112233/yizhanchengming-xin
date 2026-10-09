@@ -731,3 +731,20 @@
 - [x] Task 1 仓库验证：目标页面、Router、VIDEO 与 API 回归通过；前台 `CI=1 npm test -- --run` 在同一 PTY 自然退出码 0（28 files / 197 tests）；`go test ./internal/intake ./internal/httpapi -run 'BatchProject'` 两包退出码 0；`npm run build` 退出码 0，构建后自审与 `git diff --check` 通过。既有 AntD 提示与 Vite 大包警告仍保留。
 - [x] Task 1 第一轮审查修复：流水线操作与结果读取失败保留安全文案和 requestId，在抽屉内展示且状态刷新不清除；归档冲突重读详情。阶段结果请求在刷新、关闭、项目切换时失效，迟到成功/失败不回写。含 failed/running VIDEO attempts 的归档写入口回归；先 RED 后 GREEN，定向 3 files / 45 tests、完整前台 28 files / 209 tests 与 build 均自然退出码 0，构建后自审与差异检查通过。此处记录仓库验证，不替代后续独立审查批准或真实运行时验收。
 - [ ] `00020` 尚未对本机 `ycm_staging` 执行；真实登录换账号/跨团队、刷新恢复、浏览器截图、公网登录与视觉、Provider/TOS/readback 和部署验收仍属后续任务。本次没有连接公网/ECS、部署、运行/修改 GitHub Actions 或 push。
+
+---
+
+## 2026-10-09 · Task 9.4 统一异步生成接入（后端合同）
+
+> 状态：🟡 后端 HTTP/MySQL 接入与仓库测试已完成，前台统一轮询及唯一 Worker/Scheduler 生命周期仍在继续；不是完整运行时验收。
+
+- [x] Batch、单书和阶段重试写接口统一为持久化优先的异步 admission：成功返回 `202`、稳定 Run/Task ID、精确轮询 URL 与 `queued/pending` dispatch；`Idempotency-Key` 优先，兼容旧 `requestId`，同键异参返回安全 409。
+- [x] 新增精确 `GET /api/v1/batch-projects/{projectId}/generation/runs/{runId}`，只从 MySQL 投影 Run/最新 BookRun 生命周期，不读取或返回请求快照、Prompt、正文、输出、Provider 或凭据。
+- [x] 三类接口继续复用 Cookie Session、同源 CSRF、capability、BatchProject 归属与归档边界；错误使用稳定安全码并由统一 envelope 附带 request id。
+- [x] 阶段重试要求精确 `sourceBookRunId`，只接受同项目、同请求用户、失败的 generation Run/BookRun/StageRun，并冻结复用来源 Run 的服务端配置；不会读取浏览器配置重新拼装事实。
+- [x] admission 每次动态读取受监督运行时 readiness；Worker 未启动时写接口真实返回 `GENERATION_RUNTIME_UNAVAILABLE`，不会因 Redis/Provider 偶然可用而回退旧同步 generation。旧 storyboard recompile 同步入口明确返回 409，测试断言旧服务零调用。
+- [x] durable commit 后 Redis enqueue 失败返回 `202 dispatch=pending`，交由 MySQL Recovery 修复，避免把已提交 Run 伪装成失败；本轮未新增第二套 Queue/Worker/Scheduler。
+- [x] 仓库验证：`go test ./... -count=1` 自然退出码 0（1082 passed / 43 skipped / 25 packages，真实 MySQL/Redis 集成因未配置隔离地址而跳过）；`go vet ./...` 退出码 0。
+- [ ] Script、Batch Factory、Shuihuo 前台尚未统一到新 admission/exact-run 轮询合同；刷新恢复、请求中止、非重叠轮询和不确定网络失败复用同一幂等键仍在后续提交。
+- [ ] 唯一 Worker/Scheduler/Recovery 的应用启动、动态 readiness、优雅关闭及本机 `ycm_staging` + `ycm:staging:` 真实恢复验收仍在 Task 5；当前生产装配故意 fail-closed。
+- [ ] 未连接 ECS/公网、未运行 GitHub Actions、未调用付费 Provider/TOS；浏览器与公网对标验收尚未进行。

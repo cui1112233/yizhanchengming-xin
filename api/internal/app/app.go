@@ -169,6 +169,10 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		}()
 	}
 	runtimeService := task9runtime.NewRetryService(runtimeStore, runtimeCoordinator)
+	// Task 5 owns worker lifecycle/readiness. Until that worker is supervised,
+	// browser admissions fail closed even when Redis and Provider credentials
+	// happen to be present; read-only exact Run polling remains available.
+	generationRuntime := task9runtime.NewGenerationAdmissionService(runtimeStore, runtimeCoordinator, task9runtime.StaticRuntimeReadiness(false))
 
 	deps := httpapi.Dependencies{
 		Intakes:                     intakeService,
@@ -181,6 +185,7 @@ func newHandler(db *sql.DB, fetcher intake.Fetcher, classifier intake.Classifier
 		ScriptBooks:                 store,
 		ScriptStoryboards:           generationService,
 		Generation:                  observedGeneration,
+		GenerationRuntime:           generationRuntime,
 		AdminPrompts:                generationStore,
 		Workshop:                    workshopService,
 		NovelPanel:                  novelPanelService,

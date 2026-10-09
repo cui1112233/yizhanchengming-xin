@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -121,10 +122,84 @@ func TestAdmissionReplayCreatedFalseWithoutRowsAffected(t *testing.T) {
 	mock.ExpectQuery("SELECT .* FROM runs WHERE batch_project_id").WithArgs(int64(7), "replay").WillReturnRows(generationRunRows().AddRow(11, 7, "replay", time.Now(), "running", 3, "generation", 2, 1, body, hash, 4))
 	mock.ExpectQuery("SELECT id FROM books WHERE intake_id").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
 	mock.ExpectQuery("SELECT id,book_id,attempt FROM book_runs").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"id", "book_id", "attempt"}).AddRow(12, 2, 1))
+	mock.ExpectQuery("SELECT id FROM book_runs WHERE run_id=\\? AND attempt=1 ORDER BY book_id").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(12))
 	mock.ExpectCommit()
 	result, err := NewMySQLStore(db).AdmitGeneration(context.Background(), GenerationRequest{BatchProjectID: 7, BookIDs: []int64{2}, RequestID: "replay", RequestedByUserID: 4})
-	if err != nil || result.Created || result.Run.ID != 11 || len(result.Items) != 1 {
+	if err != nil || result.Created || result.Run.ID != 11 || len(result.Items) != 1 || !reflect.DeepEqual(result.TaskIDs, []int64{12}) {
 		t.Fatalf("replay=%+v err=%v", result, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerationRunProjectsLatestLifecycleFactsOnly(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery("SELECT status FROM runs WHERE id=\\? AND batch_project_id=\\? AND BINARY run_kind='generation'").WithArgs(int64(44), int64(7)).WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("partial_failed"))
+	mock.ExpectQuery("SELECT br.id,br.book_id,br.attempt,br.status FROM book_runs").WithArgs(int64(44), int64(44)).WillReturnRows(sqlmock.NewRows([]string{"id", "book_id", "attempt", "status"}).AddRow(91, 2, 1, "succeeded").AddRow(93, 9, 2, "failed"))
+	got, err := NewMySQLStore(db).GenerationRun(context.Background(), 7, 44)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Terminal || got.Status != "partial_failed" || got.Counts.Total != 2 || got.Counts.Completed != 1 || got.Counts.Failed != 1 || len(got.Tasks) != 2 || got.Tasks[0].Status != "completed" {
+		t.Fatalf("status=%+v", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerationRunForeignProjectIsNotFound(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery("SELECT status FROM runs WHERE id=\\? AND batch_project_id=\\?").WithArgs(int64(44), int64(8)).WillReturnError(sql.ErrNoRows)
+	_, err = NewMySQLStore(db).GenerationRun(context.Background(), 8, 44)
+	if !errors.Is(err, ErrRunNotFound) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestStageRetryAdmissionFreezesSourceOptionsAndConfig(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	source := GenerationSnapshot{SchemaVersion: 2, BatchProjectID: 7, BookIDs: []int64{2}, HookEnabled: true, PlotMode: true, DirectorMode: "h3", MatchAudio: true, ShotDurationLimitSec: 10, RequestedByUserID: 4, Action: GenerationActionFull, Config: GenerationConfigSnapshot{ProcessingRulePromptRef: "rules-v3", Constraints: "keep-me"}}
+	body, hash, err := encodeGenerationSnapshot(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT intake_id,archived_at FROM batch_projects").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"intake_id", "archived_at"}).AddRow(3, nil))
+	mock.ExpectQuery("SELECT .* FROM runs WHERE batch_project_id").WithArgs(int64(7), "retry-key").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT run_id FROM book_runs WHERE id=\\?").WithArgs(int64(12)).WillReturnRows(sqlmock.NewRows([]string{"run_id"}).AddRow(11))
+	mock.ExpectQuery("SELECT .* FROM runs WHERE id=\\? FOR UPDATE").WithArgs(int64(11)).WillReturnRows(generationRunRows().AddRow(11, 7, "source", now, "failed", 3, "generation", 2, 2, body, hash, 4))
+	mock.ExpectQuery("SELECT book_id,status FROM book_runs WHERE id=\\? AND run_id=\\? AND batch_project_id=\\? FOR UPDATE").WithArgs(int64(12), int64(11), int64(7)).WillReturnRows(sqlmock.NewRows([]string{"book_id", "status"}).AddRow(2, "failed"))
+	mock.ExpectQuery("SELECT status FROM stage_runs WHERE book_run_id=\\? AND stage=\\? ORDER BY attempt DESC,id DESC LIMIT 1 FOR UPDATE").WithArgs(int64(12), "DIRECTOR").WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("failed"))
+	mock.ExpectQuery("SELECT id FROM books WHERE intake_id").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
+	mock.ExpectExec("INSERT INTO runs").WillReturnResult(sqlmock.NewResult(21, 1))
+	mock.ExpectExec("INSERT INTO book_runs").WithArgs(int64(21), int64(7), int64(2), 3, "retry-key").WillReturnResult(sqlmock.NewResult(22, 1))
+	mock.ExpectQuery("SELECT id,book_id,attempt FROM book_runs").WithArgs(int64(21)).WillReturnRows(sqlmock.NewRows([]string{"id", "book_id", "attempt"}).AddRow(22, 2, 1))
+	mock.ExpectCommit()
+	result, err := NewMySQLStore(db).AdmitGeneration(context.Background(), GenerationRequest{BatchProjectID: 7, BookIDs: []int64{2}, RequestID: "retry-key", RequestedByUserID: 4, Action: GenerationActionStageRetry, RetryStage: "DIRECTOR", SourceBookRunID: 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decodeGenerationSnapshot(result.Run.RequestSchemaVersion, result.Run.RequestSnapshot, result.Run.RequestHash, 7, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !decoded.HookEnabled || !decoded.PlotMode || decoded.DirectorMode != "h3" || !decoded.MatchAudio || decoded.ShotDurationLimitSec != 10 || !reflect.DeepEqual(decoded.Config, source.Config) || decoded.Action != GenerationActionStageRetry || decoded.SourceBookRunID != 12 || decoded.RetryStage != "DIRECTOR" {
+		t.Fatalf("snapshot=%+v", decoded)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

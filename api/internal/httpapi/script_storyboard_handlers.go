@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
-	"github.com/cui1112233/yizhanchengming-xin/api/internal/observability"
 	"net/http"
 	"strings"
 )
@@ -46,21 +45,10 @@ func (h handler) scriptStoryboard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.HasSuffix(r.URL.Path, "/recompile") {
-			var in struct {
-				RequestID string `json:"requestId"`
-			}
-			if e = decodeJSON(w, r, &in); e != nil {
-				writeError(w, http.StatusBadRequest, e.Error())
-				return
-			}
-			out, e := h.deps.ScriptStoryboards.RecompileStoryboard(r.Context(), p, b, in.RequestID)
-			if e != nil {
-				h.logger().Error("recompile_storyboard failed", "request_id", requestIDFromRequest(r),
-					"subsystem", "generation", "operation", "recompile_storyboard",
-					"error_code", generation.OutcomeForError(e).Code, "batch_project_id", p, "book_id", b,
-					"safe_error", observability.SafeError(e))
-			}
-			writeBookGenerationOutcome(w, out, e)
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"code":    "STORYBOARD_RECOMPILE_ASYNC_REQUIRED",
+				"message": "运行时生成记录必须通过异步任务重新编译",
+			})
 			return
 		}
 		var in struct {

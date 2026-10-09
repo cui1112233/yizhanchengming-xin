@@ -33,6 +33,82 @@ type MySQLStore struct{ db *sql.DB }
 
 func NewMySQLStore(db *sql.DB) *MySQLStore { return &MySQLStore{db: db} }
 
+func publicRunState(state RunState) (string, bool) {
+	switch state {
+	case RunSucceeded:
+		return "completed", true
+	case RunPartialFailed:
+		return "partial_failed", true
+	case RunFailed:
+		return "failed", true
+	case RunState("cancelled"):
+		return "cancelled", true
+	case RunPending:
+		return "queued", false
+	default:
+		return "running", false
+	}
+}
+
+func publicBookState(state BookState) string {
+	switch state {
+	case BookSucceeded:
+		return "completed"
+	case BookPending, BookQueued:
+		return "queued"
+	case BookRunning:
+		return "running"
+	default:
+		return "failed"
+	}
+}
+
+// GenerationRun returns lifecycle facts only. It deliberately does not load
+// request_snapshot or any generation output, and performs no queue/provider work.
+func (s *MySQLStore) GenerationRun(ctx context.Context, projectID, runID int64) (GenerationRunStatus, error) {
+	if s == nil || s.db == nil || projectID <= 0 || runID <= 0 {
+		return GenerationRunStatus{}, ErrRunNotFound
+	}
+	var raw string
+	if err := s.db.QueryRowContext(ctx, `SELECT status FROM runs WHERE id=? AND batch_project_id=? AND BINARY run_kind='generation'`, runID, projectID).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return GenerationRunStatus{}, ErrRunNotFound
+		}
+		return GenerationRunStatus{}, err
+	}
+	status, terminal := publicRunState(RunState(raw))
+	out := GenerationRunStatus{RunID: runID, BatchProjectID: projectID, Status: status, Terminal: terminal, Tasks: []GenerationTaskStatus{}}
+	rows, err := s.db.QueryContext(ctx, `SELECT br.id,br.book_id,br.attempt,br.status FROM book_runs br JOIN (SELECT book_id,MAX(attempt) max_attempt FROM book_runs WHERE run_id=? GROUP BY book_id) latest ON latest.book_id=br.book_id AND latest.max_attempt=br.attempt WHERE br.run_id=? ORDER BY br.book_id`, runID, runID)
+	if err != nil {
+		return GenerationRunStatus{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var task GenerationTaskStatus
+		var state string
+		if err := rows.Scan(&task.TaskID, &task.BookID, &task.Attempt, &state); err != nil {
+			return GenerationRunStatus{}, err
+		}
+		task.Status = publicBookState(BookState(state))
+		out.Tasks = append(out.Tasks, task)
+		out.Counts.Total++
+		switch task.Status {
+		case "queued":
+			out.Counts.Pending++
+		case "running":
+			out.Counts.Running++
+		case "completed":
+			out.Counts.Completed++
+		default:
+			out.Counts.Failed++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return GenerationRunStatus{}, err
+	}
+	return out, nil
+}
+
 func (s *MySQLStore) CreateRun(ctx context.Context, projectID int64, key string, runAt time.Time, maxAttempts int) (RunRecord, bool, error) {
 	if key == "" {
 		return RunRecord{}, false, errors.New("idempotency key required")

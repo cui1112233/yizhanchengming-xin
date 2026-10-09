@@ -7,11 +7,33 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/authn"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/generation"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 )
+
+type fakeGenerationRuntime struct {
+	ready      bool
+	result     task9runtime.AdmissionResult
+	run        task9runtime.GenerationRunStatus
+	err        error
+	req        task9runtime.GenerationRequest
+	admitCalls int
+}
+
+func (f *fakeGenerationRuntime) Ready() bool { return f.ready }
+func (f *fakeGenerationRuntime) AdmitGeneration(_ context.Context, req task9runtime.GenerationRequest) (task9runtime.AdmissionResult, error) {
+	f.admitCalls++
+	f.req = req
+	return f.result, f.err
+}
+func (f *fakeGenerationRuntime) GenerationRun(context.Context, int64, int64) (task9runtime.GenerationRunStatus, error) {
+	return f.run, f.err
+}
 
 type fakeGenerationService struct {
 	project        generation.ProjectSummary
@@ -59,31 +81,35 @@ func (f *fakeGenerationService) MeasureAudio(_ context.Context, r generation.Aud
 }
 
 func TestGenerationBookRouteBindsPathIDs(t *testing.T) {
-	fake := &fakeGenerationService{book: generation.BookGenerationResult{Run: generation.BookRun{ID: 9, Status: generation.StatusCompleted}}}
-	h := NewHandler(Dependencies{Generation: fake})
+	runtime := &fakeGenerationRuntime{ready: true, result: task9runtime.AdmissionResult{Run: task9runtime.RunRecord{ID: 9, BatchProjectID: 3}, TaskIDs: []int64{71}, Created: true, Dispatch: "queued"}}
+	h := generationMutationHarness(runtime)
 	body := bytes.NewBufferString(`{"hookEnabled":true,"directorMode":"normal","requestId":"r1"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/books/11/generation", body)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	sameOrigin(req)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
-	if res.Code != http.StatusOK {
+	if res.Code != http.StatusAccepted {
 		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
 	}
-	if fake.runBookReq.BatchProjectID != 3 || fake.runBookReq.BookID != 11 {
-		t.Fatalf("request=%#v", fake.runBookReq)
+	if runtime.req.BatchProjectID != 3 || len(runtime.req.BookIDs) != 1 || runtime.req.BookIDs[0] != 11 || runtime.req.Action != "" {
+		t.Fatalf("request=%#v", runtime.req)
 	}
 }
 
 func TestGenerationRetryBindsTargetStage(t *testing.T) {
-	fake := &fakeGenerationService{}
-	h := NewHandler(Dependencies{Generation: fake})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/books/11/generation/stages/DIRECTOR/retry", bytes.NewBufferString(`{"requestId":"retry-1"}`))
+	runtime := &fakeGenerationRuntime{ready: true, result: task9runtime.AdmissionResult{Run: task9runtime.RunRecord{ID: 10, BatchProjectID: 3}, TaskIDs: []int64{72}, Created: true, Dispatch: "queued"}}
+	h := generationMutationHarness(runtime)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/books/11/generation/stages/DIRECTOR/retry", bytes.NewBufferString(`{"requestId":"retry-1","sourceBookRunId":70}`))
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	sameOrigin(req)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
-	if res.Code != http.StatusOK {
+	if res.Code != http.StatusAccepted {
 		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
 	}
-	if fake.retryReq.Stage != generation.StageDirector || fake.retryReq.BookID != 11 {
-		t.Fatalf("retry=%#v", fake.retryReq)
+	if runtime.req.RetryStage != string(generation.StageDirector) || len(runtime.req.BookIDs) != 1 || runtime.req.BookIDs[0] != 11 || runtime.req.SourceBookRunID != 70 {
+		t.Fatalf("retry=%#v", runtime.req)
 	}
 }
 
@@ -158,4 +184,131 @@ func TestAudioProbeUnavailableReturnsServiceUnavailableStableCode(t *testing.T) 
 func TestMissingMeasurementReturnsNotFound(t *testing.T) {
 	fake := &fakeGenerationService{measurementErr: errors.New("wrapped: " + generation.ErrNotFound.Error())}
 	_ = fake
+}
+
+func generationMutationHarness(runtime *fakeGenerationRuntime) http.Handler {
+	return NewHandler(Dependencies{
+		Auth:                  &fakeAuthService{user: authn.User{ID: 5, TeamID: 2, Capabilities: []string{CapabilityBatchExecute, CapabilityBatchView}}},
+		BatchProjectAccess:    &fakeRuntimeAccess{allowed: true},
+		BatchProjectLifecycle: &fakeBatchProjectLifecycle{},
+		GenerationRuntime:     runtime,
+	})
+}
+
+func TestGenerationPOSTUsesHeaderIdempotencyAndReturnsAcceptedRuntimeContract(t *testing.T) {
+	runtime := &fakeGenerationRuntime{ready: true, result: task9runtime.AdmissionResult{
+		Run:     task9runtime.RunRecord{ID: 44, BatchProjectID: 3, Status: task9runtime.RunRunning},
+		TaskIDs: []int64{91, 92}, Created: true, Dispatch: "queued",
+	}}
+	h := generationMutationHarness(runtime)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/generation", bytes.NewBufferString(`{"requestId":"body-key","bookIds":[11,12]}`))
+	req.Header.Set("Idempotency-Key", "header-key")
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	sameOrigin(req)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Location") != "/api/v1/batch-projects/3/generation/runs/44" || rec.Header().Get("Retry-After") != "1" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("headers=%v", rec.Header())
+	}
+	if runtime.req.RequestID != "header-key" || runtime.req.RequestedByUserID != 5 {
+		t.Fatalf("request=%+v", runtime.req)
+	}
+	for _, want := range []string{`"runId":44`, `"taskIds":[91,92]`, `"pollUrl":"/api/v1/batch-projects/3/generation/runs/44"`, `"dispatch":"queued"`} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Fatalf("missing %s in %s", want, rec.Body.String())
+		}
+	}
+}
+
+func TestGenerationPOSTNeverFallsBackToLegacySynchronousService(t *testing.T) {
+	runtime := &fakeGenerationRuntime{ready: true, result: task9runtime.AdmissionResult{
+		Run: task9runtime.RunRecord{ID: 44, BatchProjectID: 3}, TaskIDs: []int64{91}, Created: true, Dispatch: "queued",
+	}}
+	legacy := &fakeGenerationService{}
+	h := NewHandler(Dependencies{
+		Auth:                  &fakeAuthService{user: authn.User{ID: 5, TeamID: 2, Capabilities: []string{CapabilityBatchExecute}}},
+		BatchProjectAccess:    &fakeRuntimeAccess{allowed: true},
+		BatchProjectLifecycle: &fakeBatchProjectLifecycle{},
+		Generation:            legacy,
+		GenerationRuntime:     runtime,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/generation", bytes.NewBufferString(`{"requestId":"request-key","bookIds":[11]}`))
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	sameOrigin(req)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted || runtime.admitCalls != 1 {
+		t.Fatalf("status=%d runtime calls=%d body=%s", rec.Code, runtime.admitCalls, rec.Body.String())
+	}
+	if legacy.runBatchReq.BatchProjectID != 0 || legacy.runBookReq.BatchProjectID != 0 || legacy.retryReq.BatchProjectID != 0 {
+		t.Fatalf("legacy synchronous generation was called: batch=%+v book=%+v retry=%+v", legacy.runBatchReq, legacy.runBookReq, legacy.retryReq)
+	}
+}
+
+func TestGenerationPOSTFailsClosedWhenRuntimeNotReady(t *testing.T) {
+	runtime := &fakeGenerationRuntime{ready: false}
+	h := generationMutationHarness(runtime)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/books/11/generation", bytes.NewBufferString(`{"requestId":"key"}`))
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	sameOrigin(req)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable || runtime.admitCalls != 0 || !strings.Contains(rec.Body.String(), "GENERATION_RUNTIME_UNAVAILABLE") {
+		t.Fatalf("status=%d calls=%d body=%s", rec.Code, runtime.admitCalls, rec.Body.String())
+	}
+}
+
+func TestGenerationRetryRequiresFrozenSourceBookRun(t *testing.T) {
+	runtime := &fakeGenerationRuntime{ready: true, result: task9runtime.AdmissionResult{Run: task9runtime.RunRecord{ID: 45, BatchProjectID: 3}, TaskIDs: []int64{93}, Created: true, Dispatch: "queued"}}
+	h := generationMutationHarness(runtime)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/books/11/generation/stages/DIRECTOR/retry", bytes.NewBufferString(`{"requestId":"retry-key","sourceBookRunId":81}`))
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	sameOrigin(req)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted || runtime.req.Action != task9runtime.GenerationActionStageRetry || runtime.req.SourceBookRunID != 81 || runtime.req.RetryStage != "DIRECTOR" {
+		t.Fatalf("status=%d request=%+v body=%s", rec.Code, runtime.req, rec.Body.String())
+	}
+}
+
+func TestGenerationRunGETReturnsOnlyLifecycleProjection(t *testing.T) {
+	runtime := &fakeGenerationRuntime{ready: false, run: task9runtime.GenerationRunStatus{RunID: 44, BatchProjectID: 3, Status: "completed", Terminal: true, Counts: task9runtime.GenerationRunCounts{Total: 1, Completed: 1}, Tasks: []task9runtime.GenerationTaskStatus{{TaskID: 91, BookID: 11, Attempt: 1, Status: "completed"}}}}
+	h := generationMutationHarness(runtime)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batch-projects/3/generation/runs/44", nil)
+	req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"terminal":true`) || !strings.Contains(rec.Body.String(), `"counts":{"total":1`) || strings.Contains(rec.Body.String(), "request_snapshot") || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGenerationAdmissionErrorsUseStableCodesAndNeverLeakCause(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want int
+		code string
+	}{
+		{task9runtime.ErrInvalidGenerationRequest, http.StatusBadRequest, "GENERATION_INVALID"},
+		{task9runtime.ErrIdempotencyConflict, http.StatusConflict, "GENERATION_IDEMPOTENCY_CONFLICT"},
+		{task9runtime.ErrProjectArchived, http.StatusConflict, "BATCH_PROJECT_ARCHIVED"},
+		{task9runtime.ErrExecutorUnavailable, http.StatusServiceUnavailable, "GENERATION_RUNTIME_UNAVAILABLE"},
+		{errors.New(generationDiagnostic), http.StatusInternalServerError, "GENERATION_ADMISSION_FAILED"},
+	} {
+		runtime := &fakeGenerationRuntime{ready: true, err: tc.err}
+		h := generationMutationHarness(runtime)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/batch-projects/3/books/11/generation", bytes.NewBufferString(`{"requestId":"key"}`))
+		req.AddCookie(&http.Cookie{Name: AccessCookieName, Value: "valid"})
+		sameOrigin(req)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != tc.want || !strings.Contains(rec.Body.String(), tc.code) {
+			t.Fatalf("err=%v status=%d body=%s", tc.err, rec.Code, rec.Body.String())
+		}
+		assertSafeOutcomeBody(t, rec.Body.String())
+	}
 }

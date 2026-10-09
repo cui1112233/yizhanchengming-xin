@@ -17,6 +17,7 @@ import (
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/pipeline"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/publishing"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/shuihuo"
+	"github.com/cui1112233/yizhanchengming-xin/api/internal/task9runtime"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/video"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/workshop"
 	"github.com/cui1112233/yizhanchengming-xin/api/internal/workspace"
@@ -79,6 +80,12 @@ type ScriptStoryboardService interface {
 	DeleteStoryboardCard(context.Context, int64, int64, int64, int) (generation.StoryboardDocument, error)
 	ReorderStoryboard(context.Context, int64, int64, []int64, int) (generation.StoryboardDocument, error)
 	RecompileStoryboard(context.Context, int64, int64, string) (generation.BookGenerationResult, error)
+}
+
+type GenerationRuntimeService interface {
+	Ready() bool
+	AdmitGeneration(context.Context, task9runtime.GenerationRequest) (task9runtime.AdmissionResult, error)
+	GenerationRun(context.Context, int64, int64) (task9runtime.GenerationRunStatus, error)
 }
 
 type PipelineService interface {
@@ -150,6 +157,7 @@ type Dependencies struct {
 	ScriptStoryboards           ScriptStoryboardService
 	Pipeline                    PipelineService
 	Generation                  GenerationService
+	GenerationRuntime           GenerationRuntimeService
 	AdminPrompts                AdminPromptService
 	Workshop                    WorkshopService
 	NovelPanel                  NovelPanelService
@@ -263,6 +271,7 @@ func NewHandler(values ...Dependencies) http.Handler {
 	// Stage 3: generation reads and mutations.
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/generation", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.projectGeneration))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/generation", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.projectGeneration)))
+	mux.Handle("GET /api/v1/batch-projects/{projectId}/generation/runs/{runId}", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.generationRun))))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/generation", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.bookGeneration))))
 	mux.Handle("POST /api/v1/batch-projects/{projectId}/books/{bookId}/generation", batchMutation(CapabilityBatchExecute, "projectId", http.HandlerFunc(api.bookGeneration)))
 	mux.Handle("GET /api/v1/batch-projects/{projectId}/books/{bookId}/audio-measurement", api.requireCapability(CapabilityBatchView, api.requireBatchProjectAccess("projectId", http.HandlerFunc(api.audioMeasurement))))

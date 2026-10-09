@@ -9,6 +9,91 @@ import (
 	"testing"
 )
 
+type admissionServiceStore struct {
+	result AdmissionResult
+	err    error
+	run    GenerationRunStatus
+	admits int
+}
+
+func (s *admissionServiceStore) AdmitGeneration(context.Context, GenerationRequest) (AdmissionResult, error) {
+	s.admits++
+	return s.result, s.err
+}
+func (s *admissionServiceStore) GenerationRun(context.Context, int64, int64) (GenerationRunStatus, error) {
+	return s.run, s.err
+}
+
+type admissionCoordinator struct {
+	items []WorkItem
+	fail  int
+}
+
+type mutableRuntimeReadiness struct{ ready bool }
+
+func (r *mutableRuntimeReadiness) Ready() bool { return r.ready }
+
+func (c *admissionCoordinator) Enqueue(_ context.Context, item WorkItem) error {
+	c.items = append(c.items, item)
+	if c.fail > 0 && len(c.items) == c.fail {
+		return errors.New("queue unavailable")
+	}
+	return nil
+}
+
+func TestGenerationAdmissionServiceQueuesOnlyDispatchItemsAndKeepsStableTaskIDs(t *testing.T) {
+	store := &admissionServiceStore{result: AdmissionResult{Run: RunRecord{ID: 9}, Items: []WorkItem{{BookRunID: 31, BookID: 2, Attempt: 1}}, TaskIDs: []int64{31, 32}, Created: false}}
+	coordinator := &admissionCoordinator{}
+	service := NewGenerationAdmissionService(store, coordinator, StaticRuntimeReadiness(true))
+	result, err := service.AdmitGeneration(context.Background(), GenerationRequest{})
+	if err != nil || result.Dispatch != "queued" || !reflect.DeepEqual(result.TaskIDs, []int64{31, 32}) || len(coordinator.items) != 1 {
+		t.Fatalf("result=%+v queued=%+v err=%v", result, coordinator.items, err)
+	}
+}
+
+func TestGenerationAdmissionServiceReturnsPendingAfterDurableQueueFailure(t *testing.T) {
+	store := &admissionServiceStore{result: AdmissionResult{Run: RunRecord{ID: 9}, Items: []WorkItem{{BookRunID: 31, BookID: 2, Attempt: 1}, {BookRunID: 32, BookID: 3, Attempt: 1}}, TaskIDs: []int64{31, 32}, Created: true}}
+	coordinator := &admissionCoordinator{fail: 2}
+	service := NewGenerationAdmissionService(store, coordinator, StaticRuntimeReadiness(true))
+	result, err := service.AdmitGeneration(context.Background(), GenerationRequest{})
+	if err != nil || result.Dispatch != "pending" || len(coordinator.items) != 2 {
+		t.Fatalf("result=%+v queued=%+v err=%v", result, coordinator.items, err)
+	}
+}
+
+func TestGenerationAdmissionServiceFailsClosedBeforeStoreWhenNotReady(t *testing.T) {
+	service := NewGenerationAdmissionService(&admissionServiceStore{}, &admissionCoordinator{}, StaticRuntimeReadiness(false))
+	if _, err := service.AdmitGeneration(context.Background(), GenerationRequest{}); !errors.Is(err, ErrExecutorUnavailable) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestGenerationAdmissionServiceReadsRuntimeReadinessForEveryAdmission(t *testing.T) {
+	store := &admissionServiceStore{result: AdmissionResult{Run: RunRecord{ID: 9}}}
+	readiness := &mutableRuntimeReadiness{}
+	service := NewGenerationAdmissionService(store, &admissionCoordinator{}, readiness)
+
+	if service.Ready() {
+		t.Fatal("service reported ready before the supervised runtime started")
+	}
+	if _, err := service.AdmitGeneration(context.Background(), GenerationRequest{}); !errors.Is(err, ErrExecutorUnavailable) || store.admits != 0 {
+		t.Fatalf("err=%v admits=%d", err, store.admits)
+	}
+
+	readiness.ready = true
+	if !service.Ready() {
+		t.Fatal("service did not observe the supervised runtime becoming ready")
+	}
+	if _, err := service.AdmitGeneration(context.Background(), GenerationRequest{}); err != nil || store.admits != 1 {
+		t.Fatalf("err=%v admits=%d", err, store.admits)
+	}
+
+	readiness.ready = false
+	if service.Ready() {
+		t.Fatal("service did not observe the supervised runtime stopping")
+	}
+}
+
 func TestGenerationSnapshotNormalizesSelectionAndWhitelistsOptions(t *testing.T) {
 	req := GenerationRequest{BatchProjectID: 7, BookIDs: []int64{9, 2, 9}, RequestID: "Case-Sensitive", RequestedByUserID: 4, HookEnabled: true}
 	snap, err := normalizeGenerationRequest(req)

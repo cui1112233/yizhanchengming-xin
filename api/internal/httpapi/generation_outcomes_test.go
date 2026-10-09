@@ -97,7 +97,6 @@ func TestGenerationOutcomeRoutesCanaryMatrix(t *testing.T) {
 			method, suffix string
 			status         int
 		}{
-			{"POST", "/books/11/generation", 500}, {"POST", "/books/11/generation/stages/DIRECTOR/retry", 500}, {"POST", "/generation", 207}, {"POST", "/books/11/storyboard/recompile", 500},
 			{"GET", "/generation", 200}, {"GET", "/books/11/generation", 200}, {"GET", "/books/11/generation/stages/DIRECTOR", 200},
 		} {
 			t.Run(route.method+route.suffix+diagnostic, func(t *testing.T) {
@@ -159,11 +158,12 @@ func TestGenerationOutcomeRoutesBeforeRunAndStatus(t *testing.T) {
 		{generation.ErrAudioProbeUnavailable, 503, "AUDIO_PROBE_UNAVAILABLE", "音频检测服务暂不可用，请稍后重试"}, {generation.ErrUnavailable, 503, "GENERATION_UNAVAILABLE", "生成服务暂不可用，请稍后重试"},
 		{errors.New(generationDiagnostic), 500, "GENERATION_FAILED", generationSafeMessage},
 	} {
-		for _, suffix := range []string{"/books/11/generation", "/books/11/generation/stages/DIRECTOR/retry", "/books/11/storyboard/recompile"} {
+		for _, suffix := range []string{"/generation", "/books/11/generation", "/books/11/generation/stages/DIRECTOR"} {
 			t.Run(tc.code+suffix, func(t *testing.T) {
 				f := &outcomeGenerationFake{err: fmt.Errorf("%w: provider-canary-short", tc.cause)}
+				f.readErr = f.err
 				var logs bytes.Buffer
-				w := requestOutcome(t, f, "POST", suffix, &logs)
+				w := requestOutcome(t, f, "GET", suffix, &logs)
 				var body map[string]any
 				_ = json.Unmarshal(w.Body.Bytes(), &body)
 				if w.Code != tc.status || body["code"] != tc.code || body["message"] != tc.message || body["error"] != tc.message || body["stages"] != nil {
@@ -222,17 +222,13 @@ func TestGenerationLegacyProjectionSnapshotsAndShapes(t *testing.T) {
 }
 
 func TestGenerationOutcomeLogsRecompileAndReads(t *testing.T) {
-	for _, suffix := range []string{"/books/11/storyboard/recompile", "/generation", "/books/11/generation", "/books/11/generation/stages/DIRECTOR"} {
+	for _, suffix := range []string{"/generation", "/books/11/generation", "/books/11/generation/stages/DIRECTOR"} {
 		t.Run(suffix, func(t *testing.T) {
 			f := legacyOutcomeFixture(generationDiagnostic)
 			f.err = errors.New(generationDiagnostic)
 			f.readErr = f.err
 			method := "GET"
 			operation := ""
-			if strings.Contains(suffix, "recompile") {
-				method = "POST"
-				operation = "recompile_storyboard"
-			}
 			var logs bytes.Buffer
 			w := requestOutcome(t, f, method, suffix, &logs)
 			assertSafeOutcomeBody(t, w.Body.String())
@@ -374,11 +370,11 @@ func TestGenerationLegacyProjectionNullAndNonDiagnosticFacts(t *testing.T) {
 }
 
 func TestGenerationOutcomeRoutesSuccessfulLegacyResults(t *testing.T) {
-	for _, suffix := range []string{"/generation", "/books/11/generation", "/books/11/generation/stages/DIRECTOR/retry", "/books/11/storyboard/recompile"} {
+	for _, suffix := range []string{"/generation", "/books/11/generation", "/books/11/generation/stages/DIRECTOR"} {
 		t.Run(suffix, func(t *testing.T) {
 			f := legacyOutcomeFixture(generationDiagnostic)
 			var logs bytes.Buffer
-			w := requestOutcome(t, f, "POST", suffix, &logs)
+			w := requestOutcome(t, f, "GET", suffix, &logs)
 			if w.Code != 200 {
 				t.Fatal(w.Code)
 			}

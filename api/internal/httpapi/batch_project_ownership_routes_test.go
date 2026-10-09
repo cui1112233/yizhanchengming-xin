@@ -153,6 +153,7 @@ func newlyProtectedBatchProjectRoutes() []batchProjectRouteCase {
 		{name: "version profile sync 121", method: http.MethodPost, path: "/api/v1/batch-projects/51/version-profile/sync-121", body: `{}`, capability: CapabilityBatchConfigure},
 		{name: "version profile sync styles", method: http.MethodPost, path: "/api/v1/batch-projects/51/version-profile/sync-style-types", body: `{}`, capability: CapabilityBatchConfigure},
 		{name: "project generation read", method: http.MethodGet, path: "/api/v1/batch-projects/51/generation", capability: CapabilityBatchView},
+		{name: "generation run read", method: http.MethodGet, path: "/api/v1/batch-projects/51/generation/runs/61", capability: CapabilityBatchView},
 		{name: "project generation start", method: http.MethodPost, path: "/api/v1/batch-projects/51/generation", body: `{}`, capability: CapabilityBatchExecute},
 		{name: "book generation read", method: http.MethodGet, path: "/api/v1/batch-projects/51/books/21/generation", capability: CapabilityBatchView},
 		{name: "book generation start", method: http.MethodPost, path: "/api/v1/batch-projects/51/books/21/generation", body: `{}`, capability: CapabilityBatchExecute},
