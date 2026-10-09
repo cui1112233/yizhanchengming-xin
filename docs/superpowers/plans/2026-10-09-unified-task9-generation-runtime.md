@@ -100,8 +100,11 @@ Commit: `feat(runtime): reclaim abandoned queue deliveries [skip ci]`
 **Files:**
 - Create: `api/db/migrations/00021_generation_runtime.sql` (re-read live main first and use the next free number)
 - Modify: `api/internal/task9runtime/mysql_store.go`
-- Modify: `api/internal/task9runtime/mysql_store_test.go`
+- Create: `api/internal/task9runtime/mysql_store_test.go`
 - Modify: `api/internal/task9runtime/mysql_integration_test.go`
+- Modify: `api/internal/task9runtime/runtime.go`
+- Modify: `api/internal/task9runtime/runtime_contract_test.go`
+- Create: `api/internal/task9runtime/generation_runtime_migration_contract_test.go`
 - Create: `api/internal/task9runtime/generation_admission.go`
 - Create: `api/internal/task9runtime/generation_admission_test.go`
 
@@ -136,7 +139,7 @@ func (s *MySQLStore) AdmitGeneration(context.Context, GenerationRequest) (Admiss
 
 The additive migration extends `runs` with `run_kind`, `target_book_id`, `request_schema_version`, `request_snapshot`, `request_hash`, `requested_by_user_id`, `cancel_requested_at`, `cancelled_at`; extends `book_runs` with cancel timestamps; adds `(run_kind,status,run_at,id)` index. `run_kind` defaults to `legacy`, so historical pending rows are never executed as Generation work. Down must explicitly `SIGNAL SQLSTATE '45000'` because rollback would discard execution metadata.
 
-Tests cover: 20 concurrent identical requests create one Run and one BookRun per selected Book; same idempotency key with different hash returns `ErrIdempotencyConflict`; Book IDs must belong to the BatchProject intake; archived project returns `ErrProjectArchived`; no new `run_id=NULL`; snapshot contains no Prompt, secret, Cookie or raw original text.
+Tests cover: 20 concurrent identical requests create one Run and one BookRun per selected Book; same idempotency key with different hash returns `ErrIdempotencyConflict`; Book IDs must belong to the BatchProject intake; archived project returns `ErrProjectArchived`; no new `run_id=NULL`; snapshot contains no Prompt, secret, Cookie or raw original text. Also verify migration defaults old rows to `legacy`, Down signals before any DROP, and no generic runtime fact table is created.
 
 - [ ] **Step 2: Run focused RED tests**
 
@@ -144,9 +147,9 @@ Run: `cd api && go test ./internal/task9runtime -run 'Admission|Generation|Migra
 
 - [ ] **Step 3: Implement one transaction for Run plus first BookRuns**
 
-Lock the BatchProject row, reject `archived_at IS NOT NULL`, validate every selected Book through `books.intake_id=batch_projects.intake_id`, insert/read the idempotent Run, compare `request_hash`, and materialize queued BookRuns in the same transaction. Do not use the old `ClaimDueRun` then `EnsureQueuedBooks` two-transaction window for immediate Generation.
+Lock in the global order BatchProject → Run → BookRun, reject `archived_at IS NOT NULL`, validate every selected Book through `books.intake_id=batch_projects.intake_id`, insert/read the idempotent Run, compare `request_hash`, and materialize queued BookRuns in the same transaction. Do not use the old `ClaimDueRun` then `EnsureQueuedBooks` two-transaction window for immediate Generation.
 
-Persist `request_snapshot` as schema-versioned JSON containing IDs and the boolean/enum/duration settings only. Resolve actual Prompt versions during execution and persist them on StageRun.
+Persist `request_snapshot` as schema-versioned JSON containing IDs and the boolean/enum/duration settings only. Resolve actual Prompt versions during execution and persist them on StageRun. Normalize, sort and deduplicate explicit Book IDs. An empty selection means all current project books and freezes their concrete IDs in the snapshot; a later replay cannot absorb newly added books. Compare the original idempotency key bytes after a case-insensitive unique-index hit, and determine `Created` by an explicit locked lookup rather than `RowsAffected`, which changes under `clientFoundRows`.
 
 - [ ] **Step 4: Repair scheduled claim/materialize crash window**
 
@@ -158,7 +161,7 @@ type SchedulerStore interface {
 }
 ```
 
-The transaction claims a due non-legacy Run, validates active project, inserts BookRuns, and commits once. Recovery marks historical `running` Runs with zero BookRuns back to pending only when `run_kind != 'legacy'` and request snapshot is valid.
+The transaction claims only exact `run_kind='generation'`, validates active project and supported snapshot/hash, inserts BookRuns, and commits once. It must follow the same BatchProject → Run → BookRun lock order as admission. Invalid, archived or legacy candidates must not block later valid due work. Recovery is invoked from `Recovery.Rebuild` and marks `running` Runs with zero BookRuns back to pending only when `run_kind='generation'`, the snapshot/hash is valid, the frozen book list is non-empty and the project is active.
 
 - [ ] **Step 5: Run full Go tests and commit**
 
