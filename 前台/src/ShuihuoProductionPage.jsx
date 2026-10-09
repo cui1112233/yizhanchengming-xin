@@ -19,7 +19,7 @@ function newestTask(video) {
   return attempts.at(-1) || null
 }
 
-export default function ShuihuoProductionPage() {
+export default function ShuihuoProductionPage({ initialProjectId = null }) {
   const [projects, setProjects] = useState([])
   const [selected, setSelected] = useState(null)
   const [summary, setSummary] = useState(null)
@@ -46,7 +46,7 @@ export default function ShuihuoProductionPage() {
     const next = payload?.projects || []
     setProjects(next)
     setSelected((current) => {
-      const value = next.find((item) => item.id === current?.id) || current || next[0] || null
+      const value = next.find((item) => Number(item.id) === Number(current?.id)) || next.find((item) => Number(item.id) === Number(initialProjectId)) || current || next[0] || null
       selectedRef.current = value
       return value
     })
@@ -98,12 +98,14 @@ export default function ShuihuoProductionPage() {
     let alive = true
     setLoading(true)
     refreshProjects().then((next) => {
-      if (!next[0]) return null
-      selectedRef.current = next[0]
-      return refreshProject(next[0])
+      const initial = next.find((item) => Number(item.id) === Number(initialProjectId)) || next[0]
+      if (!initial) return null
+      selectedRef.current = initial
+      setSelected(initial)
+      return refreshProject(initial)
     }).catch((reason) => alive && setError(errorText(reason, '读取生产项目失败'))).finally(() => alive && setLoading(false))
     return () => { alive = false }
-  }, [refreshProjects, refreshProject])
+  }, [initialProjectId, refreshProjects, refreshProject])
 
   useEffect(() => {
     if (!selected?.id) return undefined

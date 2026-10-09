@@ -109,7 +109,24 @@ describe('Task 1 首页与用户路由基础', () => {
     second.unmount()
     window.history.replaceState({}, '', '/shuihuo-production')
     render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
-    expect(await screen.findByRole('heading', { name: '水货生产' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '漫剧解说' })).toBeTruthy()
+  })
+
+  it('renders the V88 Shuihuo project library at the bare production route before a project is selected', async () => {
+    window.history.replaceState({}, '', '/shuihuo-production')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => '' },
+      json: async () => ({ projects: [], total: 0 }),
+    })
+
+    render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
+
+    expect(await screen.findByRole('heading', { name: '漫剧解说' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /创作漫剧/ })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /批量工厂/ }).length).toBeGreaterThan(0)
+    expect(screen.getByText('还没有项目')).toBeTruthy()
   })
 
   it('preserves query state when a recent item navigates into an owned batch project', async () => {

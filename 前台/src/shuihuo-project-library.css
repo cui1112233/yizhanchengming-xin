@@ -1,0 +1,33 @@
+/* V88 ProjectsView visual structure, scoped to the Go/React library route. */
+.shuihuo-library-page { min-height: 100%; background: var(--sh-bg, #0d1522); }
+.shuihuo-library-page .shuihuo-project-library { min-height: calc(100vh - 38px); padding: 28px 24px 64px; color: var(--sh-text, #e4edf9); background: var(--sh-bg, #0d1522); }
+.shuihuo-library-page .shuihuo-project-library-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+.shuihuo-library-page .shuihuo-project-library-title h1 { margin:0; color:var(--sh-text, #e4edf9); font-size:24px; line-height:1.2; }
+.shuihuo-library-page .shuihuo-project-library-title p { margin:7px 0 0; color:var(--sh-muted, #97a8c0); font-size:13px; }
+.shuihuo-library-page .shuihuo-create-actions { display:flex; align-items:center; gap:10px; }
+.shuihuo-library-page .shuihuo-create-project { height:36px; padding:0 17px; color:#09211e!important; border:0; background:var(--sh-accent, #8be0c3)!important; box-shadow:none; font-size:13px; }
+.shuihuo-library-page .shuihuo-create-batch { height:36px; color:var(--sh-accent, #8be0c3); border-color:var(--sh-accent, #8be0c3); background:transparent; }
+.shuihuo-library-page .shuihuo-project-library-section-title { display:flex; align-items:center; gap:9px; margin-top:26px; color:var(--sh-text, #e4edf9); font-size:14px; }
+.shuihuo-library-page .shuihuo-project-library-section-title .anticon { color:#80b9ff; font-size:18px; }
+.shuihuo-library-page .shuihuo-project-library-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:22px; min-height:54px; }
+.shuihuo-library-page .shuihuo-project-search { width:148px; border:0!important; border-bottom:1px solid var(--sh-line, #26354b)!important; border-radius:0; background:transparent!important; box-shadow:none!important; }
+.shuihuo-library-page .shuihuo-project-search .ant-input { color:var(--sh-text, #e4edf9); background:transparent; }
+.shuihuo-library-page .shuihuo-project-search .ant-input-prefix, .shuihuo-library-page .shuihuo-project-filter .anticon { color:var(--sh-muted, #97a8c0); }
+.shuihuo-library-page .shuihuo-project-filter { display:inline-flex; align-items:center; gap:10px; padding:0; color:var(--sh-text, #e4edf9); border:0; background:transparent; cursor:pointer; font-size:12px; }
+.shuihuo-library-page .shuihuo-project-view-toggle { color:var(--sh-muted, #97a8c0); font-size:19px; }
+.shuihuo-library-page .shuihuo-project-library-alert { margin:0 0 16px; }
+.shuihuo-library-page .shuihuo-project-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 266px)); gap:24px 18px; align-items:start; }
+.shuihuo-library-page .shuihuo-project-card { position:relative; display:grid; width:100%; overflow:visible; border:0; border-radius:0; background:transparent; }
+.shuihuo-library-page .shuihuo-project-card-open { display:grid; grid-template-rows:auto auto; gap:9px; width:100%; padding:0; color:inherit; border:0; background:transparent; text-align:left; cursor:pointer; }
+.shuihuo-library-page .shuihuo-project-card-cover { position:relative; display:flex; aspect-ratio:16/9; align-items:flex-start; justify-content:space-between; overflow:hidden; padding:19px 16px; color:#d6e1f0; border:1px solid var(--sh-line, #26354b); border-radius:10px; background:var(--sh-panel-strong, #152236); font-size:12px; transition:border-color .16s ease,transform .16s ease; }
+.shuihuo-library-page .shuihuo-project-card:hover .shuihuo-project-card-cover,.shuihuo-library-page .shuihuo-project-card:focus-within .shuihuo-project-card-cover { border-color:var(--sh-accent, #8be0c3); transform:translateY(-2px); }
+.shuihuo-library-page .shuihuo-project-card-mode { padding:3px 7px; color:#d9edff; border:1px solid #5d7796; border-radius:3px; background:rgba(12,23,39,.42); font-size:11px; line-height:1.2; }
+.shuihuo-library-page .shuihuo-project-card-meta { display:grid; align-content:center; gap:4px; min-height:45px; padding:0 7px; }
+.shuihuo-library-page .shuihuo-project-card-meta strong { overflow:hidden; color:var(--sh-text, #e4edf9); font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
+.shuihuo-library-page .shuihuo-project-card-meta span { color:var(--sh-muted, #97a8c0); font-size:12px; }
+.shuihuo-library-page .shuihuo-project-card-actions { position:absolute; right:4px; bottom:20px; display:flex; gap:1px; opacity:0; transition:opacity .16s ease; background:color-mix(in srgb,var(--sh-panel, #101b2b) 78%,transparent); border-radius:6px; }
+.shuihuo-library-page .shuihuo-project-card:hover .shuihuo-project-card-actions,.shuihuo-library-page .shuihuo-project-card:focus-within .shuihuo-project-card-actions { opacity:1; }
+.shuihuo-library-page .shuihuo-project-card-actions .ant-btn { width:25px; height:25px; padding:0; color:var(--sh-text, #e4edf9); }
+.shuihuo-library-page .shuihuo-empty { min-height:180px; display:grid; grid-column:1/-1; place-items:center; align-content:center; gap:10px; color:var(--sh-muted, #97a8c0); border:1px dashed var(--sh-line, #26354b); text-align:center; }
+.shuihuo-library-page .shuihuo-empty .ant-empty { margin-block:0; }
+@media (max-width:760px) { .shuihuo-library-page .shuihuo-project-library { padding:22px 16px 48px; }.shuihuo-library-page .shuihuo-project-library-heading { align-items:stretch; flex-direction:column; }.shuihuo-library-page .shuihuo-project-library-toolbar { justify-content:flex-start; gap:14px; overflow-x:auto; }.shuihuo-library-page .shuihuo-project-search { flex:0 0 145px; }.shuihuo-library-page .shuihuo-project-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }.shuihuo-library-page .shuihuo-project-card-open { grid-template-rows:110px 1fr; } }

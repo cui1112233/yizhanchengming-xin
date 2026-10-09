@@ -4,6 +4,7 @@ import NovelFetchPage from './NovelFetchPage.jsx'
 import BatchFactoryHome from './BatchFactoryHome.jsx'
 import BatchProjectListPage from './BatchProjectListPage.jsx'
 import ShuihuoProductionPage from './ShuihuoProductionPage.jsx'
+import ShuihuoProjectLibrary from './ShuihuoProjectLibrary.jsx'
 import HomePage from './HomePage.jsx'
 import UserShell from './UserShell.jsx'
 import NovelFetchWorkshop from './NovelFetchWorkshop.jsx'
@@ -87,7 +88,10 @@ export default function RouterApp({ theme, onToggleTheme, currentUser, onLogout 
       ? <BatchProjectListPage key={parsed.projectId} initialProjectId={parsed.projectId} onClearProject={() => navigate('/batch-factory')} />
       : <BatchFactoryHome initialError={parsed.error} initialArchived={parsed.archived || 'active'} onArchivedChange={(archived) => navigate(archived === 'archived' ? '/batch-factory?archived=archived' : '/batch-factory')} onOpenProject={(id) => navigate(`/batch-factory?projectId=${id}`)} />
   } else if (pathname === '/shuihuo-production') {
-    page = <ShuihuoProductionPage />
+    const parsed = parseShuihuoProjectSearch(search)
+    page = parsed.projectId
+      ? <ShuihuoProductionPage initialProjectId={parsed.projectId} />
+      : <ShuihuoProjectLibrary onOpen={(project) => navigate(`/shuihuo-production?projectId=${project.id}`)} onCreate={() => navigate('/batch-factory')} onBatch={() => navigate('/batch-factory')} />
   } else if (pathname === '/novel-fetch-workshop') {
     page = <NovelFetchWorkshop />
   } else if (pathname === '/script') {
@@ -141,4 +145,11 @@ function parseBatchProjectSearch(search) {
   return Number.isSafeInteger(projectId) ? { projectId, error: '' } : { projectId: null, error: '项目入口无效' }
 }
 
-export { parseBatchProjectSearch, routeFoundations }
+function parseShuihuoProjectSearch(search) {
+  const matched = String(search || '').match(/^\?projectId=([1-9]\d*)$/)
+  if (!matched) return { projectId: null }
+  const projectId = Number(matched[1])
+  return Number.isSafeInteger(projectId) ? { projectId } : { projectId: null }
+}
+
+export { parseBatchProjectSearch, parseShuihuoProjectSearch, routeFoundations }
