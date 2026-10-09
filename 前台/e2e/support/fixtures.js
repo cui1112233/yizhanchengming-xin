@@ -118,12 +118,16 @@ export async function routeBatchProjectFixtures(page, { generationSummary, audio
   })
 
   if (generationSummary) {
+    await page.route('**/api/v1/batch-projects/123/generation/runs/*', async (route) => {
+      const runId = Number(new URL(route.request().url()).pathname.split('/').at(-1))
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ runId, batchProjectId: 123, status: 'completed', terminal: true, counts: { total: 1, pending: 0, running: 0, completed: 1, failed: 0 }, tasks: [] }) })
+    })
     await page.route('**/api/v1/batch-projects/123/generation', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(generationSummary()) })
         return
       }
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'accepted' }) })
+      await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ runId: 900, taskIds: [501], status: 'queued', dispatch: 'queued', pollUrl: '/api/v1/batch-projects/123/generation/runs/900' }) })
     })
     await page.route('**/api/v1/batch-projects/123/books/*/audio-measurement', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ durationMs: audioDurationMs, source: 'fixture.wav' }) })
@@ -141,11 +145,12 @@ export function makeGenerationSummary(overrides = {}) {
       {
         bookId: '1001',
         title: '林子深处有声音',
+        run: { id: 501, runId: 900, status: 'completed' },
         stages: {
-          SCRIPT: { status: 'completed', outputText: 'script' },
-          HOOK: { status: 'completed', outputText: 'hook' },
-          DIRECTOR: { status: 'completed', outputText: 'director' },
-          FINAL_PROMPT: { status: 'completed', outputText: 'final' },
+          SCRIPT: { status: 'completed', bookRunId: 501, outputText: 'script' },
+          HOOK: { status: 'completed', bookRunId: 501, outputText: 'hook' },
+          DIRECTOR: { status: 'completed', bookRunId: 501, outputText: 'director' },
+          FINAL_PROMPT: { status: 'completed', bookRunId: 501, outputText: 'final' },
         },
       },
     ],

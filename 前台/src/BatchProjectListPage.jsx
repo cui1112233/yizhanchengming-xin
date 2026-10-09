@@ -6,6 +6,7 @@ import UnifiedSettingsPanel from './UnifiedSettingsPanel.jsx'
 import StatusTag from './ui/StatusTag.jsx'
 import PageState from './ui/PageState.jsx'
 import { batchError, batchUpdatedAt } from './batchFactoryPresentation.js'
+import { activeGenerationRunId, useGenerationRunPolling } from './generationRuntime.js'
 import './batch-factory.css'
 
 const STAGES = [['SCRIPT', 'Script'], ['HOOK', 'Hook'], ['DIRECTOR', 'Director'], ['FINAL_PROMPT', 'Final Prompt']]
@@ -27,6 +28,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   const [error, setError] = useState(null)
   const [mutationError, setMutationError] = useState(null)
   const stageRequest = useRef(0)
+  const generationRequest = useRef(0)
   const currentProjectId = useRef(initialProjectId)
   currentProjectId.current = initialProjectId
   const drawerProjectId = useRef(null)
@@ -76,7 +78,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
     finally { setRestoring(false) }
   }
 
-  const refreshMeasurements = async (project, books = []) => {
+  const refreshMeasurements = async (project, books = [], isCurrent = () => true) => {
     if (!project) return
     const values = await Promise.all((books || []).map(async (book) => {
       try {
@@ -86,6 +88,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
         return [book.bookId, null]
       }
     }))
+    if (!isCurrent()) return
     setAudioMeasurements(Object.fromEntries(values))
     setMatchAudioByBook((current) => {
       const next = { ...current }
@@ -98,6 +101,8 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
 
   const refreshGeneration = async (project = selected) => {
     if (!project) return
+    const id = ++generationRequest.current
+    const isCurrent = () => id === generationRequest.current && Number(drawerProjectId.current) === Number(project.id)
     invalidateStage()
     setGenerationLoading(true)
     try {
@@ -105,16 +110,32 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
         getProjectGeneration(project.id),
         getProjectVideoStatus(project.id),
       ])
+      if (!isCurrent()) return
+      if (Number(generationPayload?.batchProjectId) !== Number(project.id) || Number(videoPayload?.batchProjectId) !== Number(project.id)) {
+        throw new Error('项目状态范围不匹配')
+      }
       setSummary(generationPayload)
       setVideoStatus(videoPayload)
-      await refreshMeasurements(project, generationPayload?.books || [])
+      await refreshMeasurements(project, generationPayload?.books || [], isCurrent)
+      if (!isCurrent()) return
       setError(null)
     } catch (reason) {
-      setError(batchError(reason, '读取生成状态失败，请稍后重试。'))
+      if (isCurrent()) setError(batchError(reason, '读取生成状态失败，请稍后重试。'))
     } finally {
-      setGenerationLoading(false)
+      if (isCurrent()) setGenerationLoading(false)
     }
   }
+
+  const generationRun = useGenerationRunPolling({
+    projectId: selected?.id,
+    onTerminal: () => { if (selected) void refreshGeneration(selected) },
+    onError: (reason) => setError(batchError(reason, '生成状态轮询失败，正在继续重试。')),
+  })
+  const generationBusy = generationLoading || generationRun.submitting || generationRun.active
+  useEffect(() => {
+    const runId = activeGenerationRunId(summary)
+    if (runId) generationRun.resume(runId, summary?.batchProjectId)
+  }, [summary, selected?.id])
 
   const openGeneration = async (project) => {
     drawerProjectId.current = project.id
@@ -127,59 +148,50 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
   }
 
   const runBatch = async () => {
-    if (!selected || selected.archivedAt) return
-    setGenerationLoading(true)
+    if (!selected || selected.archivedAt || generationBusy) return
     try {
-      await runProjectGeneration(selected.id, {
+      await generationRun.admit(`batch:${selected.id}`, (idempotencyKey) => runProjectGeneration(selected.id, {
         hookEnabled: true,
         plotMode: false,
         directorMode: 'normal',
         matchAudio: false,
-        requestId: `batch-${Date.now()}`,
-      })
-      await refreshGeneration(selected)
+      }, { idempotencyKey }))
     } catch (reason) {
       pipelineFailure(reason, selected.id)
       if (reason?.code !== 'BATCH_PROJECT_ARCHIVED') await refreshGeneration(selected)
-    } finally {
-      setGenerationLoading(false)
     }
   }
 
   const runOne = async (bookId) => {
-    if (!selected || selected.archivedAt) return
+    if (!selected || selected.archivedAt || generationBusy) return
     const measurement = audioMeasurements[bookId]
     const matchAudio = Boolean(matchAudioByBook[bookId] && measurement?.durationMs > 0)
-    setGenerationLoading(true)
     try {
-      await runBookGeneration(selected.id, bookId, {
+      await generationRun.admit(`book:${selected.id}:${bookId}`, (idempotencyKey) => runBookGeneration(selected.id, bookId, {
         hookEnabled: true,
         plotMode: false,
         directorMode: 'normal',
         matchAudio,
         audioDurationSec: matchAudio ? measurement.durationMs / 1000 : undefined,
         shotDurationLimitSec: matchAudio ? 15 : undefined,
-        requestId: `book-${bookId}-${Date.now()}`,
-      })
-      await refreshGeneration(selected)
+      }, { idempotencyKey }))
     } catch (reason) {
       pipelineFailure(reason, selected.id)
       if (reason?.code !== 'BATCH_PROJECT_ARCHIVED') await refreshGeneration(selected)
-    } finally {
-      setGenerationLoading(false)
     }
   }
 
   const retryStage = async (bookId, stage) => {
-    if (!selected || selected.archivedAt) return
-    setGenerationLoading(true)
+    if (!selected || selected.archivedAt || generationBusy) return
+    const sourceBookRunId = summary?.books?.find((book) => Number(book.bookId) === Number(bookId))?.stages?.[stage]?.bookRunId
+    if (!Number.isSafeInteger(Number(sourceBookRunId)) || Number(sourceBookRunId) <= 0) {
+      setMutationError({ message: '缺少可验证的失败运行记录，请先刷新生成状态。' })
+      return
+    }
     try {
-      await retryGenerationStage(selected.id, bookId, stage, `retry-${bookId}-${stage}-${Date.now()}`)
-      await refreshGeneration(selected)
+      await generationRun.admit(`stage:${selected.id}:${bookId}:${stage}:${sourceBookRunId}`, (idempotencyKey) => retryGenerationStage(selected.id, bookId, stage, { sourceBookRunId }, { idempotencyKey }))
     } catch (reason) {
       pipelineFailure(reason, selected.id)
-    } finally {
-      setGenerationLoading(false)
     }
   }
 
@@ -240,7 +252,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
             <StatusTag status={status} />
             {stage?.errorMessage && <Typography.Text type="danger">{generationOutcomeMessage(stage)}</Typography.Text>}
             {stage?.outputText && <Button size="small" onClick={() => void showStage(row.bookId, key)}>查看结果</Button>}
-            {!readonly && status === 'failed' && <Button size="small" danger onClick={() => void retryStage(row.bookId, key)}>重试 {label}</Button>}
+            {!readonly && status === 'failed' && <Button size="small" danger disabled={generationBusy} onClick={() => void retryStage(row.bookId, key)}>重试 {label}</Button>}
           </Space>
         )
       },
@@ -309,10 +321,10 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
         title: '单本操作',
         key: 'bookAction',
         width: 120,
-        render: (_, row) => readonly ? null : <Button type="primary" onClick={() => void runOne(row.bookId)}>单本执行</Button>,
+        render: (_, row) => readonly ? null : <Button type="primary" disabled={generationBusy} onClick={() => void runOne(row.bookId)}>单本执行</Button>,
       },
     ]
-  }, [selected, readonly, audioMeasurements, matchAudioByBook, videoByBook])
+  }, [selected, readonly, audioMeasurements, matchAudioByBook, videoByBook, generationBusy])
 
 
   const bookColumns = [
@@ -344,7 +356,7 @@ export default function BatchProjectListPage({ initialProjectId = null, onClearP
         width="92vw"
         open={Boolean(selected)}
         onClose={() => { invalidateStage(); drawerProjectId.current = null; setSelected(null); setSummary(null); setVideoStatus(null); setAudioMeasurements({}); setMatchAudioByBook({}) }}
-        extra={readonly ? null : <Button type="primary" loading={generationLoading} onClick={() => void runBatch()}>批量执行</Button>}
+        extra={readonly ? null : <Button type="primary" loading={generationBusy} onClick={() => void runBatch()}>批量执行</Button>}
       >
         {mutationError && <Alert type="error" showIcon message={mutationError.message} description={mutationError.requestId ? `请求编号：${mutationError.requestId}` : undefined} className="feedback" />}
         {error && <Alert type="error" showIcon message={error.message} description={error.requestId ? `请求编号：${error.requestId}` : undefined} className="feedback" />}

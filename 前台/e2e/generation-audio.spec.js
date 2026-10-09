@@ -4,7 +4,7 @@ import { validateTimeline } from './support/timeline.js'
 
 function stageSummary(stageOverrides = {}) {
   const summary = makeGenerationSummary()
-  summary.books[0].stages = { ...summary.books[0].stages, ...stageOverrides }
+  summary.books[0].stages = Object.fromEntries(Object.entries(summary.books[0].stages).map(([stage, value]) => [stage, { ...value, ...(stageOverrides[stage] || {}) }]))
   return summary
 }
 
@@ -47,10 +47,14 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
         : stageSummary({ SCRIPT: { status: 'failed', errorMessage: 'fixture script failure' } }),
     })
     let retryPath = ''
+    let retryHeaders = null
+    let retryBody = null
     await page.route('**/api/v1/batch-projects/123/books/1001/generation/stages/SCRIPT/retry', async (route) => {
       retryPath = new URL(route.request().url()).pathname
+      retryHeaders = route.request().headers()
+      retryBody = route.request().postDataJSON()
       retried = true
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'accepted' }) })
+      await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ runId: 901, taskIds: [502], status: 'queued', dispatch: 'queued', pollUrl: '/api/v1/batch-projects/123/generation/runs/901' }) })
     })
 
     await page.goto('/batch-factory')
@@ -60,6 +64,8 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
 
     await expect(page.getByText('fixture script failure')).toHaveCount(0)
     expect(retryPath).toBe('/api/v1/batch-projects/123/books/1001/generation/stages/SCRIPT/retry')
+    expect(retryBody?.sourceBookRunId).toBe(501)
+    expect(retryHeaders?.['idempotency-key']).toBe(retryBody?.requestId)
     await expect(page.locator('.ant-table-tbody').getByText('已完成', { exact: true })).toHaveCount(4)
   })
 
@@ -68,7 +74,7 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
     let payload = null
     await page.route('**/api/v1/batch-projects/123/books/1001/generation', async (route) => {
       payload = route.request().postDataJSON()
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'accepted', directorMode: 'h3' }) })
+      await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ runId: 902, taskIds: [503], status: 'queued', dispatch: 'queued' }) })
     })
 
     await page.goto('/batch-factory')
@@ -82,7 +88,7 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
       return response.status
     })
 
-    expect(status).toBe(200)
+    expect(status).toBe(202)
     expect(payload?.directorMode).toBe('h3')
     expect(payload?.hookEnabled).toBe(true)
   })
@@ -92,7 +98,7 @@ test.describe('@generation @audio generation and matchAudio acceptance', () => {
     let payload = null
     await page.route('**/api/v1/batch-projects/123/books/1001/generation', async (route) => {
       payload = route.request().postDataJSON()
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'accepted' }) })
+      await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ runId: 903, taskIds: [504], status: 'queued', dispatch: 'queued' }) })
     })
 
     await page.goto('/batch-factory')

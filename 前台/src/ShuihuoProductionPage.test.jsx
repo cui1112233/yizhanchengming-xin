@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ShuihuoProductionPage from './ShuihuoProductionPage.jsx'
 
 vi.mock('./api.js', () => ({
-  listBatchProjects: vi.fn(), getProjectGeneration: vi.fn(), getProjectVideoStatus: vi.fn(),
+  listBatchProjects: vi.fn(), getProjectGeneration: vi.fn(), getGenerationRun: vi.fn(), getProjectVideoStatus: vi.fn(),
   runProjectGeneration: vi.fn(), runBookGeneration: vi.fn(), retryGenerationStage: vi.fn(),
   getGenerationStage: vi.fn(), startVideoTask: vi.fn(), retryVideoTask: vi.fn(), cancelVideoTask: vi.fn(),
   listShuihuoSegments: vi.fn(), updateShuihuoSegment: vi.fn(), reorderShuihuoSegments: vi.fn(), listShuihuoAssets: vi.fn(), listShuihuoMediaTasks: vi.fn(), listShuihuoCandidates: vi.fn(), selectShuihuoCandidate: vi.fn(), retryShuihuoMediaTask: vi.fn(),
@@ -15,14 +15,15 @@ import * as api from './api.js'
 
 Object.defineProperty(window, 'matchMedia', { writable: true, value: () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }) })
 
-const generation = { completed: 1, running: 0, failed: 1, pending: 0, books: [{ bookId: 7, title: '测试小说', stages: { SCRIPT: { status: 'completed', outputText: '剧本正文' }, HOOK: { status: 'completed' }, DIRECTOR: { status: 'failed', errorMessage: '导演失败' }, FINAL_PROMPT: { status: 'completed' } } }] }
+const generation = { batchProjectId: 3, completed: 1, running: 0, failed: 1, pending: 0, books: [{ bookId: 7, title: '测试小说', stages: { SCRIPT: { status: 'completed', outputText: '剧本正文' }, HOOK: { status: 'completed' }, DIRECTOR: { status: 'failed', bookRunId: 72, errorMessage: '导演失败' }, FINAL_PROMPT: { status: 'completed' } } }] }
 
 describe('ShuihuoProductionPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     api.listBatchProjects.mockResolvedValue({ projects: [{ id: 3, name: '生产项目', bookCount: 1, runStatus: 'running' }] })
     api.getProjectGeneration.mockResolvedValue(generation)
-    api.getProjectVideoStatus.mockResolvedValue({ books: [] })
+    api.getGenerationRun.mockResolvedValue({ runId: 44, batchProjectId: 3, status: 'completed', terminal: true })
+    api.getProjectVideoStatus.mockResolvedValue({ batchProjectId: 3, books: [] })
     api.listShuihuoSegments.mockResolvedValue([{ id: 51, position: 0, text: '第一段分镜', version: 1, editRevision: 'r1' }, { id: 52, position: 1, text: '第二段分镜', version: 1, editRevision: 'r1' }])
     api.listShuihuoAssets.mockResolvedValue([{ id: 61, type: 'reference_image', status: 'ready', objectKey: 'reference/a.png' }])
     api.listShuihuoMediaTasks.mockResolvedValue([{ id: 71, kind: 'image', status: 'retryable_failed', errorMessage: '执行器离线' }])
@@ -47,15 +48,44 @@ describe('ShuihuoProductionPage', () => {
     expect(screen.getByRole('button', { name: '刷新项目' })).toBeTruthy()
   })
 
+  it('does not let an older project response replace the newly selected project', async () => {
+    let resolveOldGeneration
+    api.listBatchProjects.mockResolvedValue({ projects: [
+      { id: 3, name: '旧项目', bookCount: 1, runStatus: 'running' },
+      { id: 4, name: '新项目', bookCount: 1, runStatus: 'running' },
+    ] })
+    api.getProjectGeneration
+      .mockResolvedValueOnce(generation)
+      .mockImplementationOnce(() => new Promise(resolve => { resolveOldGeneration = resolve }))
+      .mockResolvedValueOnce({ batchProjectId: 4, completed: 0, running: 1, failed: 0, pending: 0, books: [{ bookId: 8, title: '新项目小说', stages: {} }] })
+    api.getProjectVideoStatus.mockImplementation((projectId) => Promise.resolve({ batchProjectId: projectId, books: [] }))
+    api.runProjectGeneration.mockResolvedValue({ runId: 44, status: 'queued' })
+
+    render(<ShuihuoProductionPage />)
+    await screen.findByText('测试小说')
+    fireEvent.click(screen.getByRole('button', { name: '批量继续执行' }))
+    await waitFor(() => expect(api.getProjectGeneration).toHaveBeenCalledTimes(2))
+    fireEvent.click(await screen.findByRole('button', { name: /^新项目/ }))
+    await waitFor(() => expect(api.getProjectGeneration).toHaveBeenCalledWith(4))
+    expect((await screen.findAllByText('新项目小说')).length).toBeGreaterThan(0)
+    await act(async () => {
+      resolveOldGeneration({ batchProjectId: 3, completed: 1, running: 0, failed: 0, pending: 0, books: [{ bookId: 7, title: '旧项目小说', stages: {} }] })
+      await Promise.resolve()
+    })
+    expect(screen.queryAllByText('旧项目小说')).toHaveLength(0)
+    expect(screen.getAllByText('新项目小说').length).toBeGreaterThan(0)
+  }, 15000)
+
   it('单本继续执行与阶段重试复用现有 Go API', async () => {
-    api.runBookGeneration.mockResolvedValue({})
-    api.retryGenerationStage.mockResolvedValue({})
+    api.runBookGeneration.mockResolvedValue({ runId: 44, status: 'queued' })
+    api.retryGenerationStage.mockResolvedValue({ runId: 45, status: 'queued' })
     render(<ShuihuoProductionPage />)
     await screen.findByText('测试小说')
     fireEvent.click(screen.getByRole('button', { name: '继续执行' }))
-    await waitFor(() => expect(api.runBookGeneration).toHaveBeenCalledWith(3, 7, expect.objectContaining({ hookEnabled: true, directorMode: 'normal' })), { timeout: 1500 })
+    await waitFor(() => expect(api.runBookGeneration).toHaveBeenCalledWith(3, 7, expect.objectContaining({ hookEnabled: true, directorMode: 'normal' }), expect.objectContaining({ idempotencyKey: expect.any(String) })), { timeout: 1500 })
+    await waitFor(() => expect(api.getGenerationRun).toHaveBeenCalledWith(3, 44, expect.objectContaining({ signal: expect.any(AbortSignal) })), { timeout: 1500 })
     fireEvent.click(screen.getAllByRole('button', { name: /重\s*试/ })[0])
-    await waitFor(() => expect(api.retryGenerationStage).toHaveBeenCalledWith(3, 7, 'DIRECTOR', expect.any(String)), { timeout: 1500 })
+    await waitFor(() => expect(api.retryGenerationStage).toHaveBeenCalledWith(3, 7, 'DIRECTOR', expect.objectContaining({ sourceBookRunId: 72 }), expect.objectContaining({ idempotencyKey: expect.any(String) })), { timeout: 1500 })
   }, 15000)
 
   it('仅在 FINAL_PROMPT 完成后允许提交视频，并调用原有视频 API', async () => {

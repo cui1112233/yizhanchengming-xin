@@ -736,7 +736,7 @@
 
 ## 2026-10-09 · Task 9.4 统一异步生成接入（后端合同）
 
-> 状态：🟡 后端 HTTP/MySQL 接入与仓库测试已完成，前台统一轮询及唯一 Worker/Scheduler 生命周期仍在继续；不是完整运行时验收。
+> 状态：🟡 后端 HTTP/MySQL 接入与前台精确 Run 轮询已完成，唯一 Worker/Scheduler 应用生命周期及本机 Docker staging 验收仍在继续；不是完整运行时验收。
 
 - [x] Batch、单书和阶段重试写接口统一为持久化优先的异步 admission：成功返回 `202`、稳定 Run/Task ID、精确轮询 URL 与 `queued/pending` dispatch；`Idempotency-Key` 优先，兼容旧 `requestId`，同键异参返回安全 409。
 - [x] 新增精确 `GET /api/v1/batch-projects/{projectId}/generation/runs/{runId}`，只从 MySQL 投影 Run/最新 BookRun 生命周期，不读取或返回请求快照、Prompt、正文、输出、Provider 或凭据。
@@ -745,6 +745,7 @@
 - [x] admission 每次动态读取受监督运行时 readiness；Worker 未启动时写接口真实返回 `GENERATION_RUNTIME_UNAVAILABLE`，不会因 Redis/Provider 偶然可用而回退旧同步 generation。旧 storyboard recompile 同步入口明确返回 409，测试断言旧服务零调用。
 - [x] durable commit 后 Redis enqueue 失败返回 `202 dispatch=pending`，交由 MySQL Recovery 修复，避免把已提交 Run 伪装成失败；本轮未新增第二套 Queue/Worker/Scheduler。
 - [x] 仓库验证：`go test ./... -count=1` 自然退出码 0（1082 passed / 43 skipped / 25 packages，真实 MySQL/Redis 集成因未配置隔离地址而跳过）；`go vet ./...` 退出码 0。
-- [ ] Script、Batch Factory、Shuihuo 前台尚未统一到新 admission/exact-run 轮询合同；刷新恢复、请求中止、非重叠轮询和不确定网络失败复用同一幂等键仍在后续提交。
+- [x] Script、Batch Factory、Shuihuo 前台已统一到 admission/exact-run 轮询合同：稳定幂等键、同 Run 串行轮询、AbortSignal 中止、刷新恢复和项目切换时旧响应隔离均有回归测试；旧同步 storyboard recompile 前台入口不再伪装可用。
+- [x] 前台完整 `CI=1 npm test -- --run` 在同一 PTY 自然退出 0：30 files / 227 tests，352.21 秒；Router 项目深链用例仅增加与同类页面一致的 15 秒局部上限，未删除断言或改全局 timeout。`npm run build` 退出 0（1464 modules）；相关 Go HTTP/runtime/app 包测试退出 0。
 - [ ] 唯一 Worker/Scheduler/Recovery 的应用启动、动态 readiness、优雅关闭及本机 `ycm_staging` + `ycm:staging:` 真实恢复验收仍在 Task 5；当前生产装配故意 fail-closed。
 - [ ] 未连接 ECS/公网、未运行 GitHub Actions、未调用付费 Provider/TOS；浏览器与公网对标验收尚未进行。

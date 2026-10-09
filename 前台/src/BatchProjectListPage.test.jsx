@@ -23,6 +23,7 @@ vi.mock('./api.js', () => ({
   listBatchProjects: vi.fn(),
   getBatchProject: vi.fn(),
   getProjectGeneration: vi.fn(),
+  getGenerationRun: vi.fn(),
   runProjectGeneration: vi.fn(),
   runBookGeneration: vi.fn(),
   retryGenerationStage: vi.fn(),
@@ -68,13 +69,14 @@ describe('BatchProjectListPage', () => {
         stages: {
           SCRIPT: { stage: 'SCRIPT', status: 'completed', outputText: 'script' },
           HOOK: { stage: 'HOOK', status: 'completed', outputText: 'hook' },
-          DIRECTOR: { stage: 'DIRECTOR', status: 'failed', errorMessage: '导演输出格式错误' },
+          DIRECTOR: { stage: 'DIRECTOR', status: 'failed', bookRunId: 72, errorMessage: '导演输出格式错误' },
           FINAL_PROMPT: { stage: 'FINAL_PROMPT', status: 'pending' },
         },
       }],
     })
     api.getAudioMeasurement.mockRejectedValue(new Error('audio_measurement_required'))
     api.getProjectVideoStatus.mockResolvedValue({ batchProjectId: 3, books: [] })
+    api.getGenerationRun.mockResolvedValue({ runId: 44, batchProjectId: 3, status: 'completed', terminal: true, counts: { total: 1, completed: 1 }, tasks: [] })
   })
 
   afterEach(() => cleanup())
@@ -147,13 +149,15 @@ describe('BatchProjectListPage', () => {
   }, 15000)
 
   it('starts batch generation through the Go API', async () => {
-    api.runProjectGeneration.mockResolvedValue({ batchProjectId: 3, completed: 1, failed: 0, books: [] })
+    api.runProjectGeneration.mockResolvedValue({ runId: 44, status: 'queued', dispatch: 'queued', taskIds: [81] })
     render(<BatchProjectListPage initialProjectId={3} />)
     await screen.findByText('测试项目')
     fireEvent.click(screen.getByRole('button', { name: '生成状态' }))
     await screen.findByText('批量执行')
     fireEvent.click(screen.getByRole('button', { name: '批量执行' }))
     await waitFor(() => expect(api.runProjectGeneration).toHaveBeenCalledTimes(1))
+    expect(api.runProjectGeneration.mock.calls[0][2]).toEqual(expect.objectContaining({ idempotencyKey: expect.any(String) }))
+    await waitFor(() => expect(api.getGenerationRun).toHaveBeenCalledWith(3, 44, expect.objectContaining({ signal: expect.any(AbortSignal) })))
   }, 15000)
 
   it.each([
@@ -161,9 +165,9 @@ describe('BatchProjectListPage', () => {
     ['{"error":"validation-canary"', false],
     ['{"valid":"validation-canary","repaired":[],"durationMs":"validation-canary"}', false],
   ])('renders only safe stage copy and recognized validation facts (%s)', async (validationResult, hasFacts) => {
-    api.getProjectGeneration.mockResolvedValue({ batchProjectId: 3, books: [{ bookId: 11, stages: { DIRECTOR: { stage: 'DIRECTOR', status: 'failed', errorMessage: 'provider-canary-short', errorCode: 'unknown-code', outputText: '已存输出' } } }] })
+    api.getProjectGeneration.mockResolvedValue({ batchProjectId: 3, books: [{ bookId: 11, stages: { DIRECTOR: { stage: 'DIRECTOR', status: 'failed', bookRunId: 72, errorMessage: 'provider-canary-short', errorCode: 'unknown-code', outputText: '已存输出' } } }] })
     api.getGenerationStage.mockResolvedValue({ stage: 'DIRECTOR', status: 'failed', errorMessage: 'provider-canary-short', errorCode: 'GENERATION_TIMELINE_INVALID', validationResult, inputSnapshot: 'snapshot-canary', outputText: '保留正文 provider-canary-short' })
-    api.retryGenerationStage.mockResolvedValue({})
+    api.retryGenerationStage.mockResolvedValue({ runId: 44, status: 'queued', dispatch: 'queued', taskIds: [81] })
     render(<BatchProjectListPage initialProjectId={3} />)
     fireEvent.click(await screen.findByRole('button', { name: '生成状态' }))
     expect(await screen.findByText('生成阶段执行失败，请稍后重试')).toBeTruthy()
@@ -174,7 +178,7 @@ describe('BatchProjectListPage', () => {
     for (const canary of ['validation-canary', 'nested-canary', 'snapshot-canary']) expect(document.body.textContent).not.toContain(canary)
     if (hasFacts) expect(screen.getByText(/校验未通过.*已修复.*28.25 秒/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '重试 Director' }))
-    await waitFor(() => expect(api.retryGenerationStage).toHaveBeenCalledWith(3, 11, 'DIRECTOR', expect.any(String)))
+    await waitFor(() => expect(api.retryGenerationStage).toHaveBeenCalledWith(3, 11, 'DIRECTOR', expect.objectContaining({ sourceBookRunId: 72 }), expect.objectContaining({ idempotencyKey: expect.any(String) })))
   }, 15000)
 
   it('disables match audio when no authoritative measurement exists', async () => {
@@ -188,7 +192,7 @@ describe('BatchProjectListPage', () => {
 
   it('shows measured duration and sends matchAudio only after measurement exists', async () => {
     api.getAudioMeasurement.mockResolvedValue({ bookId: 11, durationMs: 28000, measuredAt: '2026-10-05T08:00:00Z' })
-    api.runBookGeneration.mockResolvedValue({ run: { status: 'completed' }, stages: [] })
+    api.runBookGeneration.mockResolvedValue({ runId: 44, status: 'queued', dispatch: 'queued', taskIds: [81] })
     render(<BatchProjectListPage initialProjectId={3} />)
     await screen.findByText('测试项目')
     fireEvent.click(screen.getByRole('button', { name: '生成状态' }))

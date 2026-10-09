@@ -277,11 +277,24 @@ export function getProjectGeneration(projectId) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/generation`)
 }
 
-export function runProjectGeneration(projectId, input) {
-  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/generation`, {
+function generationAdmissionOptions(input, options = {}) {
+  const idempotencyKey = String(options.idempotencyKey || input?.requestId || '').trim()
+  return {
+    ...options,
     method: 'POST',
-    body: JSON.stringify(input),
+    headers: { ...(options.headers || {}), ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
+    body: JSON.stringify({ ...(input || {}), ...(idempotencyKey ? { requestId: idempotencyKey } : {}) }),
+  }
+}
+
+export function runProjectGeneration(projectId, input, options = {}) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/generation`, {
+    ...generationAdmissionOptions(input, options),
   })
+}
+
+export function getGenerationRun(projectId, runId, options = {}) {
+  return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/generation/runs/${runId}`, options)
 }
 
 export function getBookGeneration(projectId, bookId) {
@@ -294,10 +307,9 @@ export function saveScriptOriginalText(projectId, bookId, originalText) {
   })
 }
 
-export function runBookGeneration(projectId, bookId, input) {
+export function runBookGeneration(projectId, bookId, input, options = {}) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/generation`, {
-    method: 'POST',
-    body: JSON.stringify(input),
+    ...generationAdmissionOptions(input, options),
   })
 }
 
@@ -312,10 +324,9 @@ export function measureAudio(projectId, bookId, audioAsset) {
   })
 }
 
-export function retryGenerationStage(projectId, bookId, stage, requestId) {
+export function retryGenerationStage(projectId, bookId, stage, input, options = {}) {
   return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/generation/stages/${stage}/retry`, {
-    method: 'POST',
-    body: JSON.stringify({ requestId }),
+    ...generationAdmissionOptions(input, options),
   })
 }
 
@@ -327,8 +338,6 @@ export function getScriptStoryboard(projectId, bookId) { return requestJSON(`${A
 export function saveScriptStoryboardCard(projectId, bookId, input) { const id = input.card?.id; return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/cards${id ? `/${id}` : ''}`, { method: id ? 'PUT' : 'POST', body: JSON.stringify(input) }) }
 export function deleteScriptStoryboardCard(projectId, bookId, cardId, expectedVersion) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/cards/${cardId}`, { method: 'DELETE', body: JSON.stringify({ expectedVersion }) }) }
 export function reorderScriptStoryboard(projectId, bookId, cardIds, expectedVersion) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/reorder`, { method: 'POST', body: JSON.stringify({ cardIds, expectedVersion }) }) }
-export function recompileScriptStoryboard(projectId, bookId, requestId) { return requestJSON(`${API_PREFIX}/batch-projects/${projectId}/books/${bookId}/storyboard/recompile`, { method: 'POST', body: JSON.stringify({ requestId }) }) }
-
 export function listGenerationPrompts() {
   return requestJSON(`${API_PREFIX}/generation/prompts`)
 }

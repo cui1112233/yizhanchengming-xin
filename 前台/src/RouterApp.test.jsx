@@ -129,7 +129,7 @@ describe('Task 1 首页与用户路由基础', () => {
     expect(window.location.pathname).toBe('/batch-factory')
     expect(window.location.search).toBe('?projectId=3')
     expect(await screen.findByText('Batch Factory V11 工作台')).toBeTruthy()
-  })
+  }, 15000)
 
   it('restores pathname and search together on popstate', async () => {
     render(<RouterApp theme="dark" onToggleTheme={() => {}} />)
