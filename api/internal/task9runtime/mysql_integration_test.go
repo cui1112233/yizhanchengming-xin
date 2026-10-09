@@ -728,10 +728,93 @@ func (c *aggregateBarrierConn) QueryContext(ctx context.Context, query string, a
 	if err != nil {
 		return nil, err
 	}
+	return c.barrier.waitRows(ctx, query, rows)
+}
+func (c *aggregateBarrierConn) Prepare(query string) (driver.Stmt, error) {
+	stmt, err := c.Conn.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	return &aggregateBarrierStmt{Stmt: stmt, query: query, barrier: c.barrier}, nil
+}
+func (c *aggregateBarrierConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	var stmt driver.Stmt
+	var err error
+	if preparer, ok := c.Conn.(driver.ConnPrepareContext); ok {
+		stmt, err = preparer.PrepareContext(ctx, query)
+	} else {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		stmt, err = c.Conn.Prepare(query)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &aggregateBarrierStmt{Stmt: stmt, query: query, barrier: c.barrier}, nil
+}
+
+type aggregateBarrierStmt struct {
+	driver.Stmt
+	query   string
+	barrier *aggregateBarrierConnector
+}
+
+func (s *aggregateBarrierStmt) Query(args []driver.Value) (driver.Rows, error) {
+	rows, err := s.Stmt.Query(args)
+	if err != nil {
+		return nil, err
+	}
+	return s.barrier.waitRows(context.Background(), s.query, rows)
+}
+func (s *aggregateBarrierStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	var rows driver.Rows
+	var err error
+	if queryer, ok := s.Stmt.(driver.StmtQueryContext); ok {
+		rows, err = queryer.QueryContext(ctx, args)
+	} else {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		values, conversionErr := aggregateStatementValues(args)
+		if conversionErr != nil {
+			return nil, conversionErr
+		}
+		rows, err = s.Stmt.Query(values)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.barrier.waitRows(ctx, s.query, rows)
+}
+func (s *aggregateBarrierStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	if executor, ok := s.Stmt.(driver.StmtExecContext); ok {
+		return executor.ExecContext(ctx, args)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	values, err := aggregateStatementValues(args)
+	if err != nil {
+		return nil, err
+	}
+	return s.Stmt.Exec(values)
+}
+func aggregateStatementValues(args []driver.NamedValue) ([]driver.Value, error) {
+	values := make([]driver.Value, len(args))
+	for i, arg := range args {
+		if arg.Name != "" {
+			return nil, errors.New("prepared statement does not support named parameters")
+		}
+		values[i] = arg.Value
+	}
+	return values, nil
+}
+func (c *aggregateBarrierConnector) waitRows(ctx context.Context, query string, rows driver.Rows) (driver.Rows, error) {
 	if strings.HasPrefix(query, "SELECT br.status FROM book_runs") {
-		close(c.barrier.read)
+		close(c.read)
 		select {
-		case <-c.barrier.release:
+		case <-c.release:
 		case <-ctx.Done():
 			rows.Close()
 			return nil, ctx.Err()
