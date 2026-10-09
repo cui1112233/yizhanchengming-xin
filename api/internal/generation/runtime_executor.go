@@ -168,7 +168,7 @@ func runtimeExecutionError(ctx context.Context, err error) error {
 		return err
 	}
 	if ctx != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil && errors.Is(err, ctxErr) {
+		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
 	}

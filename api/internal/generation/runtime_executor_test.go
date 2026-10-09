@@ -117,9 +117,26 @@ func TestRuntimeExecutorInternalDeadlinePersistsOnlyGenerationOutcome(t *testing
 	}
 }
 
+func TestRuntimeExecutorOuterCancellationWinsDriverErrorWithoutBusinessFailure(t *testing.T) {
+	store := runtimeStoreFixture()
+	store.runtimeErr = errors.New("driver failed while request was cancelled")
+	durable := &capturingRuntimeWorkerStore{execution: store.execution}
+	worker := task9runtime.NewWorker(durable, nil, NewRuntimeExecutor(store, &runtimeProvider{}, time.Now), "worker-a", time.Minute, time.Now)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := worker.Process(ctx, task9runtime.WorkItem{BookRunID: store.execution.BookRunID, BookID: store.run.BookID, Attempt: store.execution.Attempt})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%T %v", err, err)
+	}
+	if durable.failCalls != 0 {
+		t.Fatalf("outer cancellation persisted business failure: %+v", durable.failure)
+	}
+}
+
 type capturingRuntimeWorkerStore struct {
 	execution task9runtime.Execution
 	failure   task9runtime.Failure
+	failCalls int
 }
 
 func (s *capturingRuntimeWorkerStore) Claim(context.Context, task9runtime.WorkItem, string, time.Time) (task9runtime.Execution, bool, error) {
@@ -133,6 +150,7 @@ func (*capturingRuntimeWorkerStore) Complete(context.Context, task9runtime.Execu
 }
 func (s *capturingRuntimeWorkerStore) Fail(_ context.Context, _ task9runtime.Execution, failure task9runtime.Failure) (bool, error) {
 	s.failure = failure
+	s.failCalls++
 	return true, nil
 }
 
