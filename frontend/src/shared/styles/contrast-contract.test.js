@@ -97,3 +97,20 @@ test('creative-workspace style files use global readable text tokens', () => {
     assert.match(css, /var\(--text-(?:primary|secondary|tertiary|disabled|danger|warning|success)\)/);
   }
 });
+
+test('agent task drawer surface follows the active theme', () => {
+  const css = fs.readFileSync(path.join(root, 'shared/styles/agent-workspace.css'), 'utf8');
+  assert.match(css, /\.agent-page \.agent-task-drawer\s*\{[^}]*background:\s*var\(--surface-panel\)/s);
+});
+
+test('giant material surfaces, borders, and status backgrounds follow theme semantics', () => {
+  for (const file of [
+    'user/pages/giant-material-test.css',
+    'user/pages/GiantMaterialStatusCard.css'
+  ]) {
+    const css = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(css, /background:\s*var\(--surface-(?:base|panel|input)\)/);
+    assert.match(css, /border(?:-color)?:\s*(?:1px solid )?var\(--border-(?:default|strong)\)/);
+    assert.doesNotMatch(css, /background:\s*#(?:0[0-9a-f]|1[0-9a-f]|2[0-9a-f]|3[0-9a-f]|4[0-9a-f]|5[0-9a-f]|6[0-9a-f])/i);
+  }
+});

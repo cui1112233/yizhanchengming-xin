@@ -2,46 +2,46 @@
   min-height: 100vh;
   padding: 56px clamp(20px, 6vw, 96px);
   color: var(--text-primary);
-  background: radial-gradient(circle at 10% 0%, #17384a 0, #0b1723 42%, #081019 100%);
+  background: var(--surface-base);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 .giant-material-test-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; max-width: 1080px; margin: 0 auto 28px; }
 .giant-material-test-eyebrow { color: var(--text-success); font-size: 11px; letter-spacing: .16em; }
 .giant-material-test-header h1 { margin: 8px 0; color: var(--text-primary); font-size: clamp(28px, 4vw, 44px); }
 .giant-material-test-header p { margin: 0; color: var(--text-secondary); }
-.giant-material-test-safety { padding: 8px 12px; border: 1px solid #28516a; border-radius: 999px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
-.giant-material-test-form, .giant-material-test-alert, .giant-material-test-stage { max-width: 1080px; margin: 0 auto 16px; border: 1px solid #24465b; border-radius: 16px; background: rgba(13, 31, 45, .9); box-shadow: 0 16px 48px rgba(0, 0, 0, .18); }
+.giant-material-test-safety { padding: 8px 12px; border: 1px solid var(--border-default); border-radius: 999px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.giant-material-test-form, .giant-material-test-alert, .giant-material-test-stage { max-width: 1080px; margin: 0 auto 16px; border: 1px solid var(--border-default); border-radius: 16px; background: var(--surface-panel); box-shadow: 0 16px 48px rgba(0, 0, 0, .18); }
 .giant-material-test-form { padding: 20px; }
 .giant-material-test-form label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-weight: 600; }
 .giant-material-test-input-row { display: flex; gap: 10px; }
-.giant-material-test-input-row input { min-width: 0; flex: 1; padding: 13px 14px; border: 1px solid #3a6880; border-radius: 10px; outline: none; color: var(--text-primary); background: #0a1a27; font-size: 16px; }
-.giant-material-test-input-row input:focus { border-color: #65d6b5; box-shadow: 0 0 0 3px rgba(101, 214, 181, .12); }
+.giant-material-test-input-row input { min-width: 0; flex: 1; padding: 13px 14px; border: 1px solid var(--border-default); border-radius: 10px; outline: none; color: var(--text-primary); background: var(--surface-input); font-size: 16px; }
+.giant-material-test-input-row input:focus { border-color: var(--border-strong); box-shadow: 0 0 0 3px rgba(101, 214, 181, .12); }
 .giant-material-test-input-row button { padding: 0 20px; border: 0; border-radius: 10px; color: #06241d; background: #73e2be; font-weight: 700; cursor: pointer; }
 .giant-material-test-input-row button:disabled { color: var(--text-disabled); cursor: not-allowed; opacity: 1; }
 .giant-material-test-form small { display: block; margin-top: 8px; color: var(--text-tertiary); }
 .giant-material-test-form .giant-material-test-error { color: var(--text-danger); }
-.giant-material-test-alert { display: flex; gap: 12px; padding: 14px 18px; border-color: #764648; color: var(--text-danger); }
+.giant-material-test-alert { display: flex; gap: 12px; padding: 14px 18px; border-color: var(--border-strong); color: var(--text-danger); }
 .giant-material-test-stages { max-width: 1080px; margin: 0 auto; }
 .giant-material-test-stage { padding: 18px 20px; }
 .giant-material-test-stage-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.giant-material-test-stage-heading span { padding: 4px 9px; border-radius: 999px; font-size: 12px; background: #1b3548; color: var(--text-secondary); }
+.giant-material-test-stage-heading span { padding: 4px 9px; border-radius: 999px; font-size: 12px; background: var(--surface-input); color: var(--text-secondary); }
 .giant-material-test-stage p { margin: 10px 0 0; color: var(--text-secondary); }
-.giant-material-test-stage.is-success { border-color: #26725d; }
-.giant-material-test-stage.is-success .giant-material-test-stage-heading span { background: #164f41; color: var(--text-success); }
-.giant-material-test-stage.is-error { border-color: #764648; }
-.giant-material-test-stage.is-error .giant-material-test-stage-heading span { background: #5b2c34; color: var(--text-danger); }
-.giant-material-test-stage.is-warning { border-color: #79633b; }
-.giant-material-test-stage.is-warning .giant-material-test-stage-heading span { background: #59451f; color: var(--text-warning); }
+.giant-material-test-stage.is-success { border-color: var(--border-strong); }
+.giant-material-test-stage.is-success .giant-material-test-stage-heading span { background: var(--surface-input); color: var(--text-success); }
+.giant-material-test-stage.is-error { border-color: var(--border-strong); }
+.giant-material-test-stage.is-error .giant-material-test-stage-heading span { background: var(--surface-input); color: var(--text-danger); }
+.giant-material-test-stage.is-warning { border-color: var(--border-strong); }
+.giant-material-test-stage.is-warning .giant-material-test-stage-heading span { background: var(--surface-input); color: var(--text-warning); }
 .giant-material-test-stage dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0 0; }
-.giant-material-test-stage dl div { padding: 10px 12px; border-radius: 9px; background: #0a1b29; }
+.giant-material-test-stage dl div { padding: 10px 12px; border-radius: 9px; background: var(--surface-input); }
 .giant-material-test-stage dt { color: var(--text-tertiary); font-size: 12px; }
 .giant-material-test-stage dd { margin: 5px 0 0; overflow-wrap: anywhere; color: var(--text-primary); }
 .giant-material-test-muted { color: var(--text-tertiary) !important; }
 .giant-material-test-stage progress { width: 100%; height: 12px; margin-top: 16px; accent-color: #73e2be; }
-.giant-material-test-body { box-sizing: border-box; width: 100%; min-height: 400px; margin-top: 18px; padding: 18px; border: 1px solid #3a6880; border-radius: 10px; color: var(--text-primary); background: #081722; font-size: 15px; line-height: 1.9; resize: vertical; }
+.giant-material-test-body { box-sizing: border-box; width: 100%; min-height: 400px; margin-top: 18px; padding: 18px; border: 1px solid var(--border-default); border-radius: 10px; color: var(--text-primary); background: var(--surface-input); font-size: 15px; line-height: 1.9; resize: vertical; }
 .giant-material-test-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
-.giant-material-test-actions button { padding: 10px 16px; border: 1px solid #3a6880; border-radius: 8px; color: var(--text-success); background: #12352f; cursor: pointer; }
+.giant-material-test-actions button { padding: 10px 16px; border: 1px solid var(--border-default); border-radius: 8px; color: var(--text-success); background: var(--surface-input); cursor: pointer; }
 .giant-material-test-actions span { color: var(--text-secondary); font-size: 13px; }
-.giant-material-test-input-row .giant-material-test-cancel { background: #273947; color: var(--text-secondary); }
-.giant-material-test-stage.is-loading { border-color: #46a78c; }
+.giant-material-test-input-row .giant-material-test-cancel { background: var(--surface-input); color: var(--text-secondary); }
+.giant-material-test-stage.is-loading { border-color: var(--border-strong); }
 @media (max-width: 640px) { .giant-material-test-header { display: block; } .giant-material-test-safety { display: inline-block; margin-top: 16px; } .giant-material-test-input-row { display: block; } .giant-material-test-input-row button { width: 100%; min-height: 44px; margin-top: 10px; } .giant-material-test-stage dl { grid-template-columns: 1fr; } }

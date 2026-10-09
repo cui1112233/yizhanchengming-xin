@@ -1,19 +1,19 @@
-.giant-material-status-card { max-width: 1080px; margin: 0 auto 16px; padding: 18px 20px; border: 1px solid #24465b; border-radius: 16px; color: var(--text-primary); background: rgba(13, 31, 45, .9); box-shadow: 0 16px 48px rgba(0, 0, 0, .18); }
+.giant-material-status-card { max-width: 1080px; margin: 0 auto 16px; padding: 18px 20px; border: 1px solid var(--border-default); border-radius: 16px; color: var(--text-primary); background: var(--surface-panel); box-shadow: 0 16px 48px rgba(0, 0, 0, .18); }
 .giant-material-status-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .giant-material-status-heading strong { color: var(--text-primary); font-size: 16px; }
-.giant-material-status-heading span { padding: 4px 9px; color: var(--text-secondary); border-radius: 999px; background: #1b3548; font-size: 12px; }
+.giant-material-status-heading span { padding: 4px 9px; color: var(--text-secondary); border-radius: 999px; background: var(--surface-input); font-size: 12px; }
 .giant-material-status-card p { margin: 10px 0 0; color: var(--text-secondary); line-height: 1.55; }
 .giant-material-status-card progress { display: block; width: 100%; height: 7px; margin-top: 16px; accent-color: #73e2be; }
 .giant-material-status-card progress:indeterminate { accent-color: #73e2be; }
 .giant-material-status-stats { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; color: var(--text-tertiary); font-size: 12px; }
-.giant-material-status-card.is-loading { border-color: #46a78c; }
-.giant-material-status-card.is-loading .giant-material-status-heading span { color: var(--text-success); background: #16483e; }
-.giant-material-status-card.is-success { border-color: #26725d; }
-.giant-material-status-card.is-success .giant-material-status-heading span { color: var(--text-success); background: #164f41; }
-.giant-material-status-card.is-error { border-color: #764648; }
-.giant-material-status-card.is-error .giant-material-status-heading span { color: var(--text-danger); background: #5b2c34; }
-.giant-material-status-card.is-warning { border-color: #79633b; }
-.giant-material-status-card.is-warning .giant-material-status-heading span { color: var(--text-warning); background: #59451f; }
+.giant-material-status-card.is-loading { border-color: var(--border-strong); }
+.giant-material-status-card.is-loading .giant-material-status-heading span { color: var(--text-success); background: var(--surface-input); }
+.giant-material-status-card.is-success { border-color: var(--border-strong); }
+.giant-material-status-card.is-success .giant-material-status-heading span { color: var(--text-success); background: var(--surface-input); }
+.giant-material-status-card.is-error { border-color: var(--border-strong); }
+.giant-material-status-card.is-error .giant-material-status-heading span { color: var(--text-danger); background: var(--surface-input); }
+.giant-material-status-card.is-warning { border-color: var(--border-strong); }
+.giant-material-status-card.is-warning .giant-material-status-heading span { color: var(--text-warning); background: var(--surface-input); }
 .giant-material-status-card.is-compact { margin: 12px 0; padding: 13px 15px; border-radius: 10px; box-shadow: none; }
 .giant-material-status-card.is-compact .giant-material-status-heading strong { font-size: 13px; }
 .giant-material-status-card.is-compact .giant-material-status-heading span { padding: 3px 8px; font-size: 11px; }

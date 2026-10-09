@@ -78,7 +78,7 @@
   z-index: 6;
   min-width: 0;
   border-bottom: 1px solid var(--agent-border);
-  background: rgba(16, 18, 24, 0.96);
+  background: var(--surface-panel);
   backdrop-filter: blur(18px);
 }
 
