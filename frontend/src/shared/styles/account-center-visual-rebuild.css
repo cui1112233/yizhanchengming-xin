@@ -21,7 +21,6 @@
   --ac-green: #48d5a3;
   --ac-orange: #f7a54d;
   --ac-danger: #ff6f72;
-  --text-secondary: var(--ac-muted);
   --border-subtle: var(--ac-line);
   background:
     radial-gradient(circle at 78% -8%, rgba(72, 105, 168, 0.16), transparent 33%),
@@ -219,13 +218,11 @@
 }
 
 .account-center-workspace .legacy-page-title {
-  color: #b7c1ce;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 650;
   letter-spacing: .02em;
 }
-
-.account-center-workspace .legacy-page-title { color: transparent; user-select: none; }
 
 .account-center-workspace .legacy-userbar { gap: 12px; }
 .account-center-workspace .legacy-profile-link {

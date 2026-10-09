@@ -5,33 +5,33 @@ const common = {
 };
 
 const dark = {
-  colorText: '#e8e8f0',
-  colorTextSecondary: '#b8b8c8',
-  colorTextTertiary: '#8b8ba0',
-  colorTextPlaceholder: '#9ea0b2',
-  colorTextDisabled: 'rgba(232, 232, 240, 0.5)',
-  colorBgBase: '#0a0a14',
-  colorBgContainer: '#171726',
-  colorBgElevated: '#1e1e36',
-  colorBgLayout: '#0a0a14',
-  colorBgContainerDisabled: '#2a2a3d',
-  colorBorder: 'rgba(255, 255, 255, 0.14)',
-  colorBorderSecondary: 'rgba(255, 255, 255, 0.1)'
+  colorText: '#f5f7fb',
+  colorTextSecondary: '#c7d0dd',
+  colorTextTertiary: '#a7b4c5',
+  colorTextPlaceholder: '#a7b4c5',
+  colorTextDisabled: 'rgba(199, 208, 221, 0.62)',
+  colorBgBase: '#070b11',
+  colorBgContainer: '#0e1621',
+  colorBgElevated: '#0e1621',
+  colorBgLayout: '#070b11',
+  colorBgContainerDisabled: '#0b111a',
+  colorBorder: 'rgba(151, 168, 190, 0.22)',
+  colorBorderSecondary: 'rgba(176, 195, 219, 0.36)'
 };
 
 const light = {
-  colorText: '#202330',
-  colorTextSecondary: '#536074',
-  colorTextTertiary: '#667085',
-  colorTextPlaceholder: '#667085',
-  colorTextDisabled: '#7a8494',
+  colorText: '#172033',
+  colorTextSecondary: '#3f4e63',
+  colorTextTertiary: '#596a80',
+  colorTextPlaceholder: '#596a80',
+  colorTextDisabled: '#748196',
   colorBgBase: '#f4f6fa',
   colorBgContainer: '#ffffff',
   colorBgElevated: '#ffffff',
   colorBgLayout: '#f4f6fa',
-  colorBgContainerDisabled: '#edf1f6',
-  colorBorder: '#cfd5e1',
-  colorBorderSecondary: '#e4e7ee'
+  colorBgContainerDisabled: '#ffffff',
+  colorBorder: '#c8d2df',
+  colorBorderSecondary: '#9daabd'
 };
 
 export function createAntTheme(mode) {
