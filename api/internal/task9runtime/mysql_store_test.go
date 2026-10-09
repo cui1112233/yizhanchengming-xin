@@ -181,11 +181,11 @@ func TestGenerationRecoveryQueriesFilterLegacyAndArchivedWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	mock.ExpectQuery("SELECT br.id,br.book_id,br.attempt FROM book_runs br JOIN runs r .*BINARY r.run_kind='generation'.*p.archived_at IS NULL").WithArgs(5).WillReturnRows(sqlmock.NewRows([]string{"id", "book_id", "attempt"}))
+	mock.ExpectQuery("SELECT br.id,br.book_id,br.attempt FROM book_runs br JOIN runs r .*BINARY r.run_kind='generation'.*p.archived_at IS NULL").WithArgs(int64(0)).WillReturnRows(sqlmock.NewRows([]string{"id", "book_id", "attempt"}))
 	if _, err := NewMySQLStore(db).ListQueuedBookRuns(context.Background(), 5); err != nil {
 		t.Fatal(err)
 	}
-	mock.ExpectQuery("SELECT br.id FROM book_runs br JOIN runs r .*BINARY r.run_kind='generation'.*p.archived_at IS NULL").WithArgs(sqlmock.AnyArg(), 5).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery("SELECT br.id,br.lease_deadline FROM book_runs br JOIN runs r .*BINARY r.run_kind='generation'.*p.archived_at IS NULL").WithArgs(sqlmock.AnyArg()).WillReturnRows(sqlmock.NewRows([]string{"id", "lease_deadline"}))
 	if _, err := NewMySQLStore(db).RecoverStaleBookRuns(context.Background(), time.Now(), 5); err != nil {
 		t.Fatal(err)
 	}
@@ -267,6 +267,128 @@ func TestGenerationRetryAndStaleRecoveryLockRunBeforeBookRun(t *testing.T) {
 				if ok || err != nil {
 					t.Fatalf("ok=%v err=%v", ok, err)
 				}
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestGenerationRecoveryLimitOneSkipsInvalidBeforeValid(t *testing.T) {
+	for _, stale := range []bool{false, true} {
+		t.Run(fmt.Sprint(stale), func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			now := time.Now()
+			expired := now.Add(-time.Minute)
+			body := []byte(`{"schema_version":1,"batch_project_id":7,"book_ids":[2],"selection_all":false,"hook_enabled":false,"plot_mode":false,"director_mode":"normal","match_audio":false,"shot_duration_limit_sec":15,"requested_by_user_id":4}`)
+			sum := sha256.Sum256(body)
+			hash := hex.EncodeToString(sum[:])
+			for _, id := range []int64{12, 13} {
+				if stale {
+					query := mock.ExpectQuery("SELECT br.id,br.lease_deadline FROM book_runs.*ORDER BY br.lease_deadline,br.id LIMIT 1")
+					if id == 12 {
+						query.WithArgs(now)
+					} else {
+						query.WithArgs(now, expired, expired, int64(12))
+					}
+					query.WillReturnRows(sqlmock.NewRows([]string{"id", "lease_deadline"}).AddRow(id, expired))
+				} else {
+					cursor := int64(0)
+					if id == 13 {
+						cursor = 12
+					}
+					mock.ExpectQuery("SELECT br.id,br.book_id,br.attempt FROM book_runs.*br.id>\\?.*LIMIT 1").WithArgs(cursor).WillReturnRows(sqlmock.NewRows([]string{"id", "book_id", "attempt"}).AddRow(id, 2, 1))
+				}
+				mock.ExpectQuery("SELECT run_id,batch_project_id FROM book_runs").WithArgs(id).WillReturnRows(sqlmock.NewRows([]string{"run_id", "batch_project_id"}).AddRow(id-2, 7))
+				mock.ExpectBegin()
+				mock.ExpectQuery("SELECT intake_id,archived_at FROM batch_projects.*FOR UPDATE").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"intake_id", "archived_at"}).AddRow(3, nil))
+				version := 1
+				if id == 12 {
+					version = 99
+				}
+				mock.ExpectQuery("SELECT .* FROM runs WHERE id=\\? FOR UPDATE").WithArgs(id - 2).WillReturnRows(generationRunRows().AddRow(id-2, 7, "recovery", now, "running", 3, "generation", 2, version, body, hash, 4))
+				if id == 12 {
+					mock.ExpectRollback()
+					continue
+				}
+				mock.ExpectQuery("SELECT id FROM books WHERE intake_id").WithArgs(int64(3)).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
+				if stale {
+					mock.ExpectQuery("SELECT run_id,batch_project_id,book_id,attempt,max_attempts,retryable,status,lease_deadline FROM book_runs.*FOR UPDATE").WithArgs(id).WillReturnRows(sqlmock.NewRows([]string{"run_id", "batch_project_id", "book_id", "attempt", "max_attempts", "retryable", "status", "lease_deadline"}).AddRow(11, 7, 2, 1, 3, true, "running", expired))
+					mock.ExpectExec("UPDATE book_runs SET status='failed'").WithArgs(now, id).WillReturnResult(sqlmock.NewResult(0, 1))
+					mock.ExpectQuery("SELECT id FROM book_runs WHERE run_id").WithArgs(int64(11), int64(2), 2).WillReturnError(sql.ErrNoRows)
+					mock.ExpectExec("INSERT INTO book_runs").WithArgs(int64(11), int64(7), int64(2), 2, 3, "recovery").WillReturnResult(sqlmock.NewResult(14, 1))
+				} else {
+					mock.ExpectQuery("SELECT run_id,batch_project_id,book_id,attempt,status FROM book_runs.*FOR UPDATE").WithArgs(id).WillReturnRows(sqlmock.NewRows([]string{"run_id", "batch_project_id", "book_id", "attempt", "status"}).AddRow(11, 7, 2, 1, "queued"))
+				}
+				mock.ExpectCommit()
+			}
+			var items []WorkItem
+			if stale {
+				items, err = NewMySQLStore(db).RecoverStaleBookRuns(context.Background(), now, 1)
+			} else {
+				items, err = NewMySQLStore(db).ListQueuedBookRuns(context.Background(), 1)
+			}
+			wantID := int64(13)
+			if stale {
+				wantID = 14
+			}
+			if err != nil || len(items) != 1 || items[0].BookRunID != wantID {
+				t.Fatalf("items=%+v err=%v", items, err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestGenerationAggregateLocksProjectRunBeforeLatestAttempt(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectQuery("SELECT batch_project_id FROM runs WHERE id=\\?").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"batch_project_id"}).AddRow(7))
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT intake_id,archived_at FROM batch_projects.*FOR UPDATE").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"intake_id", "archived_at"}).AddRow(3, nil))
+	mock.ExpectQuery("SELECT batch_project_id,status,run_kind,cancel_requested_at,cancelled_at FROM runs.*FOR UPDATE").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"batch_project_id", "status", "run_kind", "cancel_requested_at", "cancelled_at"}).AddRow(7, "running", "generation", nil, nil))
+	mock.ExpectQuery("SELECT br.status FROM book_runs.*FOR UPDATE").WithArgs(int64(11), int64(11)).WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("queued"))
+	mock.ExpectExec("UPDATE runs SET status='running',finished_at=NULL").WithArgs(int64(11)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	state, err := NewMySQLStore(db).AggregateRunStatus(context.Background(), 11)
+	if err != nil || state != RunRunning {
+		t.Fatalf("state=%s err=%v", state, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerationAggregatePreservesTerminalAndCancellation(t *testing.T) {
+	for _, status := range []string{"succeeded", "failed", "partial_failed", "cancelled", "cancelling", "running"} {
+		t.Run(status, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			var cancel any
+			if status == "running" {
+				cancel = time.Now()
+			}
+			mock.ExpectQuery("SELECT batch_project_id FROM runs").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"batch_project_id"}).AddRow(7))
+			mock.ExpectBegin()
+			mock.ExpectQuery("SELECT intake_id,archived_at FROM batch_projects.*FOR UPDATE").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"intake_id", "archived_at"}).AddRow(3, nil))
+			mock.ExpectQuery("SELECT batch_project_id,status,run_kind,cancel_requested_at,cancelled_at FROM runs.*FOR UPDATE").WithArgs(int64(11)).WillReturnRows(sqlmock.NewRows([]string{"batch_project_id", "status", "run_kind", "cancel_requested_at", "cancelled_at"}).AddRow(7, status, "generation", cancel, nil))
+			mock.ExpectRollback()
+			got, err := NewMySQLStore(db).AggregateRunStatus(context.Background(), 11)
+			if err != nil || string(got) != status {
+				t.Fatalf("got=%s err=%v", got, err)
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Fatal(err)

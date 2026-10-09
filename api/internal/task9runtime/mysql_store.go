@@ -278,12 +278,34 @@ func (s *MySQLStore) RetryBookRun(ctx context.Context, failedBookRunID int64) (W
 }
 
 func (s *MySQLStore) AggregateRunStatus(ctx context.Context, runID int64) (RunState, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	var projectID int64
+	if err := s.db.QueryRowContext(ctx, `SELECT batch_project_id FROM runs WHERE id=?`, runID).Scan(&projectID); err != nil {
+		return RunRunning, err
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return RunRunning, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT br.status FROM book_runs br JOIN (SELECT book_id,MAX(attempt) max_attempt FROM book_runs WHERE run_id=? GROUP BY book_id) latest ON latest.book_id=br.book_id AND latest.max_attempt=br.attempt WHERE br.run_id=?`, runID, runID)
+	if _, err := lockGenerationProject(ctx, tx, projectID, false); err != nil {
+		return RunRunning, err
+	}
+	var lockedProjectID int64
+	var status, kind string
+	var cancelRequested, cancelled sql.NullTime
+	if err := tx.QueryRowContext(ctx, `SELECT batch_project_id,status,run_kind,cancel_requested_at,cancelled_at FROM runs WHERE id=? FOR UPDATE`, runID).Scan(&lockedProjectID, &status, &kind, &cancelRequested, &cancelled); err != nil {
+		return RunRunning, err
+	}
+	if lockedProjectID != projectID {
+		return RunRunning, ErrRunNotFound
+	}
+	// Only a live generation execution may aggregate. A Retry explicitly
+	// reopens a terminal Run under this same lock; cancellation/terminal state
+	// cannot be overwritten by a stale aggregation snapshot.
+	if kind != "generation" || RunState(status) != RunRunning || cancelRequested.Valid || cancelled.Valid {
+		return RunState(status), nil
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT br.status FROM book_runs br JOIN (SELECT book_id,MAX(attempt) max_attempt FROM book_runs WHERE run_id=? GROUP BY book_id) latest ON latest.book_id=br.book_id AND latest.max_attempt=br.attempt WHERE br.run_id=? FOR UPDATE`, runID, runID)
 	if err != nil {
 		return RunRunning, err
 	}
@@ -305,6 +327,10 @@ func (s *MySQLStore) AggregateRunStatus(ctx context.Context, runID int64) (RunSt
 			active = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return RunRunning, err
+	}
 	if err := rows.Close(); err != nil {
 		return RunRunning, err
 	}
@@ -321,9 +347,9 @@ func (s *MySQLStore) AggregateRunStatus(ctx context.Context, runID int64) (RunSt
 		state = RunPartialFailed
 	}
 	if state == RunSucceeded || state == RunPartialFailed || state == RunFailed {
-		_, err = tx.ExecContext(ctx, `UPDATE runs SET status=?,finished_at=? WHERE id=?`, string(state), time.Now(), runID)
+		_, err = tx.ExecContext(ctx, `UPDATE runs SET status=?,finished_at=? WHERE id=? AND status='running' AND cancel_requested_at IS NULL AND cancelled_at IS NULL`, string(state), time.Now(), runID)
 	} else {
-		_, err = tx.ExecContext(ctx, `UPDATE runs SET status='running',finished_at=NULL WHERE id=?`, runID)
+		_, err = tx.ExecContext(ctx, `UPDATE runs SET status='running',finished_at=NULL WHERE id=? AND status='running' AND cancel_requested_at IS NULL AND cancelled_at IS NULL`, runID)
 	}
 	if err != nil {
 		return state, err
@@ -338,44 +364,54 @@ func (s *MySQLStore) ListQueuedBookRuns(ctx context.Context, limit int) ([]WorkI
 	if limit <= 0 {
 		return nil, nil
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT br.id,br.book_id,br.attempt FROM book_runs br JOIN runs r ON r.id=br.run_id JOIN batch_projects p ON p.id=r.batch_project_id WHERE br.status='queued' AND BINARY r.run_kind='generation' AND r.status='running' AND p.archived_at IS NULL ORDER BY br.id LIMIT ?`, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 	var out []WorkItem
-	for rows.Next() {
-		var w WorkItem
-		if err := rows.Scan(&w.BookRunID, &w.BookID, &w.Attempt); err != nil {
-			return nil, err
+	var cursorID int64
+	for len(out) < limit {
+		var candidate WorkItem
+		err := s.db.QueryRowContext(ctx, `SELECT br.id,br.book_id,br.attempt FROM book_runs br JOIN runs r ON r.id=br.run_id JOIN batch_projects p ON p.id=r.batch_project_id WHERE br.status='queued' AND BINARY r.run_kind='generation' AND r.status='running' AND p.archived_at IS NULL AND br.id>? ORDER BY br.id LIMIT 1`, cursorID).Scan(&candidate.BookRunID, &candidate.BookID, &candidate.Attempt)
+		if errors.Is(err, sql.ErrNoRows) {
+			return out, nil
 		}
-		out = append(out, w)
+		if err != nil {
+			return out, err
+		}
+		cursorID = candidate.BookRunID
+		item, valid, err := s.validQueuedGenerationItem(ctx, candidate.BookRunID)
+		if err != nil {
+			return out, err
+		}
+		if valid {
+			out = append(out, item)
+		}
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *MySQLStore) RecoverStaleBookRuns(ctx context.Context, now time.Time, limit int) ([]WorkItem, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT br.id FROM book_runs br JOIN runs r ON r.id=br.run_id JOIN batch_projects p ON p.id=r.batch_project_id WHERE br.status='running' AND br.lease_deadline IS NOT NULL AND br.lease_deadline<=? AND BINARY r.run_kind='generation' AND r.status='running' AND p.archived_at IS NULL ORDER BY br.lease_deadline,br.id LIMIT ?`, now, limit)
-	if err != nil {
-		return nil, err
-	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return nil, err
+	out := make([]WorkItem, 0, limit)
+	var cursorDeadline time.Time
+	var cursorID int64
+	for len(out) < limit {
+		query := `SELECT br.id,br.lease_deadline FROM book_runs br JOIN runs r ON r.id=br.run_id JOIN batch_projects p ON p.id=r.batch_project_id WHERE br.status='running' AND br.lease_deadline IS NOT NULL AND br.lease_deadline<=? AND BINARY r.run_kind='generation' AND r.status='running' AND p.archived_at IS NULL`
+		args := []any{now}
+		if cursorID > 0 {
+			query += ` AND (br.lease_deadline>? OR (br.lease_deadline=? AND br.id>?))`
+			args = append(args, cursorDeadline, cursorDeadline, cursorID)
 		}
-		ids = append(ids, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	out := make([]WorkItem, 0, len(ids))
-	for _, id := range ids {
+		query += ` ORDER BY br.lease_deadline,br.id LIMIT 1`
+		var id int64
+		var deadline time.Time
+		err := s.db.QueryRowContext(ctx, query, args...).Scan(&id, &deadline)
+		if errors.Is(err, sql.ErrNoRows) {
+			return out, nil
+		}
+		if err != nil {
+			return out, err
+		}
+		cursorDeadline, cursorID = deadline, id
 		item, created, err := s.recoverOne(ctx, id, now)
 		if err != nil {
 			return out, err
@@ -385,6 +421,75 @@ func (s *MySQLStore) RecoverStaleBookRuns(ctx context.Context, now time.Time, li
 		}
 	}
 	return out, nil
+}
+
+func (s *MySQLStore) validQueuedGenerationItem(ctx context.Context, id int64) (WorkItem, bool, error) {
+	runID, projectID, err := s.bookRunParents(ctx, id)
+	if errors.Is(err, ErrBookRunNotRetryable) || errors.Is(err, sql.ErrNoRows) {
+		return WorkItem{}, false, nil
+	}
+	if err != nil {
+		return WorkItem{}, false, err
+	}
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return WorkItem{}, false, err
+	}
+	defer tx.Rollback()
+	intakeID, err := lockGenerationProject(ctx, tx, projectID, false)
+	if errors.Is(err, ErrProjectArchived) || errors.Is(err, sql.ErrNoRows) {
+		return WorkItem{}, false, nil
+	}
+	if err != nil {
+		return WorkItem{}, false, err
+	}
+	r, err := scanGenerationRun(tx.QueryRowContext(ctx, `SELECT `+generationRunColumns+` FROM runs WHERE id=? FOR UPDATE`, runID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return WorkItem{}, false, nil
+	}
+	if err != nil {
+		return WorkItem{}, false, err
+	}
+	if r.RunKind != "generation" || r.BatchProjectID != projectID || r.Status != RunRunning {
+		return WorkItem{}, false, nil
+	}
+	snapshot, err := decodeGenerationSnapshot(r.RequestSchemaVersion, r.RequestSnapshot, r.RequestHash, r.BatchProjectID, r.RequestedByUserID)
+	if errors.Is(err, ErrInvalidGenerationRequest) {
+		return WorkItem{}, false, nil
+	}
+	if err != nil {
+		return WorkItem{}, false, err
+	}
+	if err := validateFrozenBooks(ctx, tx, intakeID, snapshot.BookIDs); err != nil {
+		if errors.Is(err, ErrInvalidGenerationRequest) {
+			return WorkItem{}, false, nil
+		}
+		return WorkItem{}, false, err
+	}
+	var actualRunID, actualProjectID int64
+	var item WorkItem
+	var status string
+	item.BookRunID = id
+	if err := tx.QueryRowContext(ctx, `SELECT run_id,batch_project_id,book_id,attempt,status FROM book_runs WHERE id=? FOR UPDATE`, id).Scan(&actualRunID, &actualProjectID, &item.BookID, &item.Attempt, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return WorkItem{}, false, nil
+		}
+		return WorkItem{}, false, err
+	}
+	selected := false
+	for _, bookID := range snapshot.BookIDs {
+		if bookID == item.BookID {
+			selected = true
+			break
+		}
+	}
+	if actualRunID != runID || actualProjectID != projectID || status != "queued" || !selected {
+		return WorkItem{}, false, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return WorkItem{}, false, err
+	}
+	return item, true, nil
 }
 func (s *MySQLStore) recoverOne(ctx context.Context, id int64, now time.Time) (WorkItem, bool, error) {
 	parentRunID, parentProjectID, err := s.bookRunParents(ctx, id)

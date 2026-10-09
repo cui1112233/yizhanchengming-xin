@@ -3,6 +3,7 @@ package task9runtime
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"os"
@@ -640,5 +641,201 @@ func TestGenerationRecoveryRebuildOnlyResetsValidExactZeroBookRun(t *testing.T) 
 		if status != want {
 			t.Fatalf("run=%d status=%s want=%s", id, status, want)
 		}
+	}
+}
+
+func TestGenerationRecoveryLimitOneInvalidCannotBlockValidMySQL(t *testing.T) {
+	if os.Getenv("TASK9_MYSQL_DSN") == "" {
+		t.Skip("TASK9_MYSQL_DSN not configured")
+	}
+	for _, stale := range []bool{false, true} {
+		t.Run(fmt.Sprint(stale), func(t *testing.T) {
+			f := newIntegrationFixture(t, 1)
+			ctx := context.Background()
+			now := time.Now()
+			bad, err := f.store.AdmitGeneration(ctx, GenerationRequest{BatchProjectID: f.projectID, BookIDs: f.bookIDs, RequestID: "bad-first", RequestedByUserID: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			good, err := f.store.AdmitGeneration(ctx, GenerationRequest{BatchProjectID: f.projectID, BookIDs: f.bookIDs, RequestID: "good-second", RequestedByUserID: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.Exec(`UPDATE runs SET request_hash='invalid' WHERE id=?`, bad.Run.ID); err != nil {
+				t.Fatal(err)
+			}
+			if stale {
+				if _, err := f.db.Exec(`UPDATE book_runs SET status='running',lease_deadline=? WHERE run_id IN (?,?)`, now.Add(-time.Minute), bad.Run.ID, good.Run.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var items []WorkItem
+			if stale {
+				items, err = f.store.RecoverStaleBookRuns(ctx, now, 1)
+			} else {
+				items, err = f.store.ListQueuedBookRuns(ctx, 1)
+			}
+			if err != nil || len(items) != 1 || items[0].BookID != f.bookIDs[0] {
+				t.Fatalf("items=%+v err=%v", items, err)
+			}
+			var runID int64
+			if err := f.db.QueryRow(`SELECT run_id FROM book_runs WHERE id=?`, items[0].BookRunID).Scan(&runID); err != nil || runID != good.Run.ID {
+				t.Fatalf("returned run=%d err=%v", runID, err)
+			}
+			// A second rebuild still passes the untouched invalid candidate. Queued
+			// work returns the same valid item; stale work has already been recovered.
+			if stale {
+				items, err = f.store.RecoverStaleBookRuns(ctx, now, 1)
+				if err != nil || len(items) != 0 {
+					t.Fatalf("second stale=%+v err=%v", items, err)
+				}
+			} else {
+				items, err = f.store.ListQueuedBookRuns(ctx, 1)
+				if err != nil || len(items) != 1 || items[0].BookRunID != good.Items[0].BookRunID {
+					t.Fatalf("second queued=%+v err=%v", items, err)
+				}
+			}
+		})
+	}
+}
+
+// This wrapper controls timing only. All SQL and row values come from two
+// real MySQL connections; no execution or persistence behavior is faked.
+type aggregateBarrierConnector struct {
+	inner         driver.Connector
+	read, release chan struct{}
+}
+
+func (c *aggregateBarrierConnector) Driver() driver.Driver { return c.inner.Driver() }
+func (c *aggregateBarrierConnector) Connect(ctx context.Context) (driver.Conn, error) {
+	conn, err := c.inner.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &aggregateBarrierConn{Conn: conn, barrier: c}, nil
+}
+
+type aggregateBarrierConn struct {
+	driver.Conn
+	barrier *aggregateBarrierConnector
+}
+
+func (c *aggregateBarrierConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	return c.Conn.(driver.ConnBeginTx).BeginTx(ctx, opts)
+}
+func (c *aggregateBarrierConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	rows, err := c.Conn.(driver.QueryerContext).QueryContext(ctx, query, args)
+	if err != nil {
+		return nil, err
+	}
+	if strings.HasPrefix(query, "SELECT br.status FROM book_runs") {
+		close(c.barrier.read)
+		select {
+		case <-c.barrier.release:
+		case <-ctx.Done():
+			rows.Close()
+			return nil, ctx.Err()
+		}
+	}
+	return rows, nil
+}
+
+func TestGenerationAggregateConcurrentRetryLeavesRunningAndClaimableMySQL(t *testing.T) {
+	f := newIntegrationFixture(t, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	admission, err := f.store.AdmitGeneration(ctx, GenerationRequest{BatchProjectID: f.projectID, BookIDs: f.bookIDs, RequestID: "aggregate-retry-race", RequestedByUserID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := admission.Items[0]
+	if _, err := f.db.ExecContext(ctx, `UPDATE book_runs SET status='failed',retryable=1 WHERE id=?`, original.BookRunID); err != nil {
+		t.Fatal(err)
+	}
+	f.db.SetMaxOpenConns(1)
+	cfg, err := mysql.ParseDSN(os.Getenv("TASK9_MYSQL_DSN"))
+	if err != nil {
+		t.Fatal("invalid test DSN")
+	}
+	inner, err := mysql.NewConnector(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	barrier := &aggregateBarrierConnector{inner: inner, read: make(chan struct{}), release: make(chan struct{})}
+	aggregateDB := sql.OpenDB(barrier)
+	aggregateDB.SetMaxOpenConns(1)
+	defer aggregateDB.Close()
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(barrier.release) }) }
+	defer release()
+	type aggregateResult struct {
+		state RunState
+		err   error
+	}
+	aggDone := make(chan aggregateResult, 1)
+	go func() {
+		state, err := NewMySQLStore(aggregateDB).AggregateRunStatus(ctx, admission.Run.ID)
+		aggDone <- aggregateResult{state, err}
+	}()
+	select {
+	case <-barrier.read:
+	case result := <-aggDone:
+		t.Fatalf("aggregation ended before read barrier: %+v", result)
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	type retryResult struct {
+		item    WorkItem
+		created bool
+		err     error
+	}
+	retryDone := make(chan retryResult, 1)
+	retryStarted := make(chan struct{})
+	go func() {
+		close(retryStarted)
+		item, created, err := f.store.RetryBookRun(ctx, original.BookRunID)
+		retryDone <- retryResult{item, created, err}
+	}()
+	<-retryStarted
+	var retry retryResult
+	retryReturned := false
+	select {
+	case retry = <-retryDone:
+		retryReturned = true
+	case <-time.After(200 * time.Millisecond):
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	// With the old aggregate, retry commits here while aggregate retains its
+	// failed snapshot. The aggregate then overwrites the Run back to failed.
+	release()
+	var aggregated aggregateResult
+	select {
+	case aggregated = <-aggDone:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	if aggregated.err != nil {
+		t.Fatal(aggregated.err)
+	}
+	if !retryReturned {
+		select {
+		case retry = <-retryDone:
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+	}
+	if retry.err != nil || !retry.created {
+		t.Fatalf("retry=%+v", retry)
+	}
+	var status string
+	if err := f.db.QueryRowContext(ctx, `SELECT status FROM runs WHERE id=?`, admission.Run.ID).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if retryReturned || status != "running" {
+		t.Fatalf("retry bypassed aggregate lock=%v final status=%s", retryReturned, status)
+	}
+	if _, ok, err := f.store.Claim(ctx, retry.item, "after-retry", time.Now().Add(time.Minute)); err != nil || !ok {
+		t.Fatalf("retry claim ok=%v err=%v", ok, err)
 	}
 }
