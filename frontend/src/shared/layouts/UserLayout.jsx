@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, Bug, ChartNoAxesCombined, ChevronDown, Clapperboard, Crown, FilePenLine, Fingerprint, FolderClock, Home, KeyRound, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, ShieldCheck, Sun, UserRound, UsersRound, X } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, Bug, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, FolderClock, Home, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
@@ -12,6 +12,8 @@ import { dispatchPetContext } from '../pet/stacky';
 import { GLOBAL_STATUS_EVENT, GLOBAL_TASK_NOTIFICATION_EVENT, normalizeGlobalTaskNotification } from '../notifications/globalTaskCenter.js';
 import { createAntTheme } from '../styles/theme';
 import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAccess.js';
+import { AccountCenterLayout } from './AccountCenterLayout';
+import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
 
 // 动态 Logo 包含 WebGL shader，不能阻塞任何已登录业务页的首屏，按真正使用时再下载。
 const SuperOpcLiquidMetalLogo = lazy(() => import('../components/SuperOpcLiquidMetalLogo'));
@@ -28,35 +30,18 @@ const navItems = [
   { href: '/tts', icon: AudioLines, label: '配音' }
 ];
 
-const ACCOUNT_CENTER_ROUTES = ['/member', '/profile', '/security', '/advanced-team-admin', '/api-config', '/usage', '/team', '/accounts'];
-
 const THEME_STORAGE_KEY = 'yizhan-theme';
+const ACCOUNT_CENTER_RETURN_PATH_KEY = 'qiantie:account-center-return-path';
+const ACCOUNT_CENTER_ENTRY_KEY = 'qiantie:account-center-entry-active';
 
 function initialTheme() {
   return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
 }
 
 function pageTitle(pathname) {
-  if (['/member', '/profile', '/security', '/advanced-team-admin', '/api-config', '/usage', '/team', '/accounts'].includes(pathname)) return '个人中心';
+  if (isAccountCenterPath(pathname)) return '个人中心';
   const item = navItems.find(nav => nav.href === pathname);
   return item ? item.label : '一战晟铭';
-}
-
-function canAccessAdmin(account) {
-  // The admin console is a developer workspace. Team members receive API
-  // scopes and usage visibility in the account center, never the console.
-  return account?.role === 'dev';
-}
-
-function normalizeAccountCenterReturnPath(value) {
-  if (!value) return '/';
-  try {
-    const url = new URL(value, window.location.origin);
-    if (url.origin !== window.location.origin || ACCOUNT_CENTER_ROUTES.includes(url.pathname)) return '/';
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return '/';
-  }
 }
 
 function compactHeaderStatus(value) {
@@ -80,8 +65,6 @@ export function UserLayout({ children }) {
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(false);
   const [passkeyLoading, setPasskeyLoading] = useState(false);
-  const [accountCenterOpen, setAccountCenterOpen] = useState(false);
-  const [accountProfileOpen, setAccountProfileOpen] = useState(true);
   const [loginForm] = Form.useForm();
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -93,7 +76,7 @@ export function UserLayout({ children }) {
   const loginCardRef = useRef(null);
   const accountCenterReturnPathRef = useRef(null);
   const pathname = window.location.pathname;
-  const isAccountCenterRoute = ACCOUNT_CENTER_ROUTES.includes(pathname);
+  const isAccountCenterRoute = isAccountCenterPath(pathname);
   const isLoggedIn = Boolean(username);
   const isHome = pathname === '/';
   const isAgentRoute = pathname === '/agent' || pathname === '/agent/canvas';
@@ -116,25 +99,27 @@ export function UserLayout({ children }) {
   }, [theme]);
 
   useEffect(() => {
-    // 个人中心是一个完整工作区：账号页保持抽屉展开，普通业务页则记住返回位置。
-    if (isAccountCenterRoute) {
-      setAccountCenterOpen(true);
-      return;
-    }
-    // 主导航切到普通功能页时，个人中心抽屉必须随路由一起退出。
-    setAccountCenterOpen(false);
-    const currentPath = `${window.location.pathname}${window.location.search}`;
-    accountCenterReturnPathRef.current = currentPath;
-    sessionStorage.setItem('qiantie:account-center-return-path', currentPath);
-  }, [isAccountCenterRoute]);
+    if (isAccountCenterRoute) return;
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const returnPath = captureAccountCenterOrigin(currentUrl, null, window.location.origin);
+    accountCenterReturnPathRef.current = returnPath;
+    sessionStorage.setItem(ACCOUNT_CENTER_RETURN_PATH_KEY, returnPath);
+    sessionStorage.removeItem(ACCOUNT_CENTER_ENTRY_KEY);
+  }, [isAccountCenterRoute, pathname]);
 
-  function closeAccountCenter() {
-    setAccountCenterOpen(false);
-    if (!isAccountCenterRoute) return;
-    const returnPath = normalizeAccountCenterReturnPath(
-      accountCenterReturnPathRef.current
-        || sessionStorage.getItem('qiantie:account-center-return-path')
-    );
+  function enterAccountCenter() {
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const returnPath = captureAccountCenterOrigin(currentUrl, null, window.location.origin);
+    accountCenterReturnPathRef.current = returnPath;
+    sessionStorage.setItem(ACCOUNT_CENTER_RETURN_PATH_KEY, returnPath);
+    sessionStorage.setItem(ACCOUNT_CENTER_ENTRY_KEY, '1');
+  }
+
+  function returnToWorkbench() {
+    const hasEntryOrigin = sessionStorage.getItem(ACCOUNT_CENTER_ENTRY_KEY) === '1';
+    const returnPath = hasEntryOrigin
+      ? normalizeAccountCenterReturnPath(accountCenterReturnPathRef.current || sessionStorage.getItem(ACCOUNT_CENTER_RETURN_PATH_KEY), window.location.origin)
+      : '/';
     window.location.assign(returnPath);
   }
 
@@ -450,9 +435,18 @@ export function UserLayout({ children }) {
     );
   }
 
+  if (isAccountCenterRoute) {
+    return (
+      <ConfigProvider theme={createAntTheme(theme)}>
+        <AccountCenterLayout account={account} username={username} avatar={displayAvatar} pathname={pathname} onReturn={returnToWorkbench} onLogout={handleLogout}>{pageContent}</AccountCenterLayout>
+        {loginOverlay}
+      </ConfigProvider>
+    );
+  }
+
   return (
     <ConfigProvider theme={createAntTheme(theme)}>
-      <div className={`legacy-shell${isAccountCenterRoute ? ' account-center-shell' : ''}${accountCenterOpen ? ' account-center-drawer-open' : ''}`}>
+      <div className="legacy-shell">
       <aside className={`legacy-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="legacy-brand">
           <button
@@ -507,12 +501,8 @@ export function UserLayout({ children }) {
               title="打开个人中心"
               aria-label="进入个人中心"
               onClick={() => {
-                // 头像是个人中心的直达入口。使用应用内路由，避免先展开
-                // 抽屉再触发整页跳转，导致业务页被遮住而看起来卡住。
                 if (!isAccountCenterRoute) {
-                  const currentPath = `${window.location.pathname}${window.location.search}`;
-                  accountCenterReturnPathRef.current = currentPath;
-                  sessionStorage.setItem('qiantie:account-center-return-path', currentPath);
+                  enterAccountCenter();
                 }
                 window.history.pushState({}, '', '/profile');
                 window.dispatchEvent(new PopStateEvent('popstate'));
@@ -525,16 +515,6 @@ export function UserLayout({ children }) {
           </div>
         ) : null}
       </aside>
-      {isLoggedIn && accountCenterOpen ? <aside className="account-center-popover" role="dialog" aria-label="个人中心">
-        <div className="account-center-popover-head"><strong>个人中心</strong><button type="button" aria-label="关闭个人中心" onClick={closeAccountCenter}><X size={19} /></button></div>
-        <div className="account-center-popover-profile"><Avatar size={54} src={account?.avatarUrl}>{displayAvatar.emoji}</Avatar><div><strong>{account?.displayName || username}</strong><small>@{username}</small><em>{account?.role === 'dev' ? 'DEV' : account?.role === 'manager' ? 'MANAGER' : 'MEMBER'}</em></div></div>
-        <div className="account-center-popover-group"><div className="account-center-popover-parent"><Link href="/profile" className={pathname === '/profile' ? 'active' : ''}><UserRound size={18} />个人资料</Link><button type="button" aria-label={accountProfileOpen ? '收起个人资料菜单' : '展开个人资料菜单'} onClick={() => setAccountProfileOpen(value => !value)}><ChevronDown size={17} className={accountProfileOpen ? 'expanded' : ''} /></button></div>
-          {accountProfileOpen ? <div className="account-center-popover-submenu"><Link href="/member" className={pathname === '/member' ? 'active' : ''}><Crown size={17} />会员中心</Link><Link href="/security" className={pathname === '/security' ? 'active' : ''}><ShieldCheck size={17} />账号安全</Link>{['dev', 'manager'].includes(account?.role) ? <Link href="/advanced-team-admin" className={pathname === '/advanced-team-admin' ? 'active' : ''}><UsersRound size={17} />联合治理</Link> : null}</div> : null}
-        </div>
-        <div className="account-center-popover-links"><Link href="/api-config" className={pathname === '/api-config' ? 'active' : ''}><KeyRound size={17} />API 配置</Link><Link href="/usage" className={pathname === '/usage' ? 'active' : ''}><ChartNoAxesCombined size={17} />用量与制作</Link>{['dev', 'manager'].includes(account?.role) ? <Link href="/team" className={pathname === '/team' ? 'active' : ''}><UsersRound size={17} />组员管理</Link> : null}</div>
-        {canAccessAdmin(account) ? <div className="account-center-popover-links account-center-popover-developer-links"><span className="account-center-popover-section-label">开发者工具</span><Link href="/accounts"><UsersRound size={17} />账号与角色</Link><Link href="/admin/presets" reload><ShieldCheck size={17} />管理后台</Link></div> : null}
-        <button type="button" className="account-center-popover-logout" onClick={handleLogout}><LogOut size={17} />退出登录</button>
-      </aside> : null}
       <Fragment key={accountSessionKey}>
         <main className="legacy-main">
           {!isAgentCanvasRoute ? <header className="legacy-topbar">

@@ -23,3 +23,9 @@ test('avatar enters profile through the client route without opening the menu fi
   assert.doesNotMatch(avatarButton, /setAccountCenterOpen\(true\)/);
   assert.doesNotMatch(avatarButton, /window\.location\.assign\('\/profile'\)/);
 });
+
+test('routes account-center pages through the dedicated layout while the avatar records a business origin', () => {
+  assert.match(source, /captureAccountCenterOrigin/);
+  assert.match(source, /<AccountCenterLayout/);
+  assert.doesNotMatch(source, /accountCenterOpen/);
+});

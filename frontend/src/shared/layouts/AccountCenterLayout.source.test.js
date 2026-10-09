@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const sourcePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'AccountCenterLayout.jsx');
+const cssPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'styles', 'account-center-visual-rebuild.css');
 
 test('renders an integrated personal-center shell with a return action', () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
@@ -21,4 +22,12 @@ test('keeps current DEV and manager menu gates', () => {
 
   assert.match(source, /\['dev', 'manager'\]\.includes\(account\?\.role\)/);
   assert.match(source, /account\?\.role === 'dev'/);
+});
+
+test('integrated CSS does not retain the fixed overlay or second content offset', () => {
+  const css = fs.readFileSync(cssPath, 'utf8');
+
+  assert.doesNotMatch(css, /\.account-center-popover\s*\{\s*position:\s*fixed/);
+  assert.doesNotMatch(css, /account-center-drawer-open .legacy-main[\s\S]*margin-left:\s*284px/);
+  assert.match(css, /\.account-center-workspace\s*\{/);
 });

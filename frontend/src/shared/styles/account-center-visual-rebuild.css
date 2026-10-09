@@ -1,7 +1,7 @@
 /* 05 · Account Center Visual Rebuild
    Visual-only layer. Functional routes/components remain unchanged. */
 
-.account-center-shell {
+.account-center-workspace {
   --ac-bg: #070b11;
   --ac-bg-elevated: #0b111a;
   --ac-sidebar: #080d14;
@@ -32,7 +32,51 @@
   color: var(--ac-text);
 }
 
-.account-center-popover {
+.account-center-workspace {
+  display: grid;
+  grid-template-columns: 284px minmax(0, 1fr);
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.account-center-sidebar {
+  display: flex;
+  min-width: 0;
+  padding: 18px 16px;
+  flex-direction: column;
+  border-right: 1px solid var(--ac-line);
+  background: linear-gradient(180deg, var(--ac-panel), var(--ac-sidebar));
+  box-shadow: 18px 0 52px rgba(0, 0, 0, .2);
+}
+
+.account-center-sidebar-head { display: grid; gap: 18px; padding: 4px 5px 0; }
+.account-center-sidebar-head > strong { font-size: 20px; }
+.account-center-return { display: flex; gap: 7px; align-items: center; width: max-content; padding: 6px 8px; border: 0; border-radius: 8px; color: var(--ac-muted); background: transparent; cursor: pointer; font: inherit; font-size: 12px; }
+.account-center-return:hover { color: var(--ac-text); background: rgba(255,255,255,.06); }
+.account-center-sidebar-profile { display: flex; gap: 12px; align-items: center; margin: 28px 5px 24px; }
+.account-center-sidebar-profile .ant-avatar { box-shadow: 0 0 0 2px rgba(239,189,100,.52); }
+.account-center-sidebar-profile > div { display: grid; min-width: 0; gap: 3px; }
+.account-center-sidebar-profile strong { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.account-center-sidebar-profile small { color: #8491a4; }
+.account-center-sidebar-profile em { width: max-content; padding: 3px 8px; border-radius: 8px; color: #efbd64; background: rgba(239,189,100,.12); font-size: 10px; font-style: normal; }
+.account-center-sidebar-nav { display: grid; gap: 5px; }
+.account-center-sidebar-group { display: grid; gap: 5px; padding: 14px 0; border-top: 1px solid var(--ac-line); }
+.account-center-sidebar-group > span { padding: 0 13px 4px; color: #78879b; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.account-center-sidebar a, .account-center-sidebar-logout { display: flex; gap: 11px; align-items: center; width: 100%; padding: 12px 13px; border: 0; border-radius: 9px; color: #cbd5e2; background: transparent; cursor: pointer; font: inherit; font-size: 15px; text-align: left; text-decoration: none; }
+.account-center-sidebar a:hover { color: #fff; background: rgba(125,112,255,.16); }
+.account-center-sidebar a.active { color: #f1eeff; background: linear-gradient(90deg, rgba(117,92,255,.34), rgba(117,92,255,.12)); box-shadow: inset 2px 0 #8b77ff; }
+.account-center-sidebar-submenu { display: grid; gap: 3px; padding: 5px 0 2px 12px; }
+.account-center-sidebar-submenu a { color: #aeb8c8; }
+.account-center-sidebar-developer a { color: #efbd64; }
+.account-center-sidebar-logout { margin-top: auto; border-top: 1px solid var(--ac-line); border-radius: 0; color: #ff8175; }
+.account-center-main { min-width: 0; overflow: auto; container-type: inline-size; scrollbar-gutter: stable; }
+.account-center-workspace * { scrollbar-color: rgba(135,150,181,.45) rgba(255,255,255,.025); }
+.account-center-workspace ::-webkit-scrollbar { width: 8px; height: 8px; }
+.account-center-workspace ::-webkit-scrollbar-track { background: rgba(255,255,255,.025); }
+.account-center-workspace ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(125,139,169,.42); background-clip: padding-box; }
+
+.account-center-sidebar-legacy {
   position: fixed;
   z-index: 70;
   top: 0;
@@ -49,16 +93,16 @@
   box-shadow: 18px 0 52px rgba(0,0,0,.2);
   color: var(--ac-text);
 }
-.account-center-popover-head { display:flex; justify-content:space-between; align-items:center; padding: 0 5px; font-size:20px; }.account-center-popover-head button { display:grid; width:30px; height:30px; place-items:center; border:0; border-radius:8px; color:#9ba9bd; background:transparent; cursor:pointer; }.account-center-popover-head button:hover { color:#fff; background:rgba(255,255,255,.06); }
-.account-center-popover-profile { display:flex; gap:12px; align-items:center; margin:28px 5px 24px; }.account-center-popover-profile .ant-avatar { box-shadow: 0 0 0 2px rgba(239,189,100,.52); }.account-center-popover-profile div { display:grid; gap:3px; min-width:0; }.account-center-popover-profile strong { overflow:hidden; font-size:15px; text-overflow:ellipsis; white-space:nowrap; }.account-center-popover-profile small { color:#8491a4; }.account-center-popover-profile em { width:max-content; padding:3px 8px; border-radius:8px; color:#efbd64; background:rgba(239,189,100,.12); font-size:10px; font-style:normal; }
-.account-center-popover-group,.account-center-popover-links { display:grid; gap:5px; padding:14px 0; border-top:1px solid var(--ac-line); }.account-center-popover-parent,.account-center-popover a,.account-center-popover-logout { display:flex; align-items:center; gap:11px; width:100%; padding:12px 13px; border:0; border-radius:9px; color:#cbd5e2; background:transparent; text-align:left; text-decoration:none; cursor:pointer; }.account-center-popover-parent { justify-content:space-between; font-size:15px; }.account-center-popover-parent > span { display:flex; align-items:center; gap:11px; }.account-center-popover-parent svg { transition:transform .18s ease; }.account-center-popover-parent svg.expanded { transform:rotate(180deg); }.account-center-popover-parent:hover,.account-center-popover a:hover { color:#fff; background:rgba(125,112,255,.16); }.account-center-popover a.active { color:#f1eeff; background:linear-gradient(90deg, rgba(117,92,255,.34), rgba(117,92,255,.12)); box-shadow:inset 2px 0 #8b77ff; }.account-center-popover-submenu { display:grid; gap:3px; padding:5px 0 2px 12px; }.account-center-popover-submenu a { color:#aeb8c8; }.account-center-popover-logout { margin-top:auto; color:#ff8175; border-top:1px solid var(--ac-line); border-radius:0; }
-.account-center-popover-section-label { padding:0 13px 4px; color:#78879b; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
-.account-center-popover-developer-links a { color:#efbd64; }
-.account-center-popover-parent { padding:0; }.account-center-popover-parent > a { flex:1; padding:12px 13px; }.account-center-popover-parent > button { display:grid; width:38px; height:38px; place-items:center; margin-right:4px; border:0; border-radius:8px; color:#9ba9bd; background:transparent; cursor:pointer; }.account-center-popover-parent > button:hover { color:#fff; background:rgba(255,255,255,.06); }
+.account-center-legacy-popover-head { display:flex; justify-content:space-between; align-items:center; padding: 0 5px; font-size:20px; }.account-center-legacy-popover-head button { display:grid; width:30px; height:30px; place-items:center; border:0; border-radius:8px; color:#9ba9bd; background:transparent; cursor:pointer; }.account-center-legacy-popover-head button:hover { color:#fff; background:rgba(255,255,255,.06); }
+.account-center-legacy-popover-profile { display:flex; gap:12px; align-items:center; margin:28px 5px 24px; }.account-center-legacy-popover-profile .ant-avatar { box-shadow: 0 0 0 2px rgba(239,189,100,.52); }.account-center-legacy-popover-profile div { display:grid; gap:3px; min-width:0; }.account-center-legacy-popover-profile strong { overflow:hidden; font-size:15px; text-overflow:ellipsis; white-space:nowrap; }.account-center-legacy-popover-profile small { color:#8491a4; }.account-center-legacy-popover-profile em { width:max-content; padding:3px 8px; border-radius:8px; color:#efbd64; background:rgba(239,189,100,.12); font-size:10px; font-style:normal; }
+.account-center-legacy-popover-group,.account-center-legacy-popover-links { display:grid; gap:5px; padding:14px 0; border-top:1px solid var(--ac-line); }.account-center-legacy-popover-parent,.account-center-legacy-popover a,.account-center-legacy-popover-logout { display:flex; align-items:center; gap:11px; width:100%; padding:12px 13px; border:0; border-radius:9px; color:#cbd5e2; background:transparent; text-align:left; text-decoration:none; cursor:pointer; }.account-center-legacy-popover-parent { justify-content:space-between; font-size:15px; }.account-center-legacy-popover-parent > span { display:flex; align-items:center; gap:11px; }.account-center-legacy-popover-parent svg { transition:transform .18s ease; }.account-center-legacy-popover-parent svg.expanded { transform:rotate(180deg); }.account-center-legacy-popover-parent:hover,.account-center-legacy-popover a:hover { color:#fff; background:rgba(125,112,255,.16); }.account-center-legacy-popover a.active { color:#f1eeff; background:linear-gradient(90deg, rgba(117,92,255,.34), rgba(117,92,255,.12)); box-shadow:inset 2px 0 #8b77ff; }.account-center-legacy-popover-submenu { display:grid; gap:3px; padding:5px 0 2px 12px; }.account-center-legacy-popover-submenu a { color:#aeb8c8; }.account-center-legacy-popover-logout { margin-top:auto; color:#ff8175; border-top:1px solid var(--ac-line); border-radius:0; }
+.account-center-legacy-popover-section-label { padding:0 13px 4px; color:#78879b; font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+.account-center-legacy-popover-developer-links a { color:#efbd64; }
+.account-center-legacy-popover-parent { padding:0; }.account-center-legacy-popover-parent > a { flex:1; padding:12px 13px; }.account-center-legacy-popover-parent > button { display:grid; width:38px; height:38px; place-items:center; margin-right:4px; border:0; border-radius:8px; color:#9ba9bd; background:transparent; cursor:pointer; }.account-center-legacy-popover-parent > button:hover { color:#fff; background:rgba(255,255,255,.06); }
 .legacy-sidebar-avatar { border:0; background:transparent; cursor:pointer; }
-.legacy-sidebar.collapsed + .account-center-popover { left: var(--app-sidebar-collapsed-width); }
+.legacy-sidebar.collapsed + .account-center-legacy-popover { left: var(--app-sidebar-collapsed-width); }
 
-.account-center-shell .legacy-sidebar {
+.account-center-workspace .legacy-sidebar {
   width: var(--app-sidebar-width);
   flex-basis: var(--app-sidebar-width);
   border-right: 1px solid rgba(174, 193, 218, 0.1);
@@ -69,12 +113,12 @@
   backdrop-filter: none;
 }
 
-.account-center-shell .legacy-sidebar.collapsed {
+.account-center-workspace .legacy-sidebar.collapsed {
   width: var(--app-sidebar-collapsed-width);
   flex-basis: var(--app-sidebar-collapsed-width);
 }
 
-.account-center-shell .legacy-brand {
+.account-center-workspace .legacy-brand {
   height: var(--app-topbar-height);
   min-height: var(--app-topbar-height);
   padding: 0 18px;
@@ -83,30 +127,30 @@
   color: #f1f4f9;
 }
 
-.account-center-shell .legacy-brand-title {
+.account-center-workspace .legacy-brand-title {
   font-size: 15px;
   font-weight: 760;
   letter-spacing: .02em;
 }
 
-.account-center-shell .legacy-sidebar-toggle {
+.account-center-workspace .legacy-sidebar-toggle {
   width: 30px;
   height: 30px;
   border-radius: 9px;
   color: #6f7e91;
 }
 
-.account-center-shell .legacy-sidebar-toggle:hover {
+.account-center-workspace .legacy-sidebar-toggle:hover {
   color: #fff;
   background: rgba(255,255,255,.045);
 }
 
-.account-center-shell .legacy-nav {
+.account-center-workspace .legacy-nav {
   gap: 5px;
   padding: 18px 12px;
 }
 
-.account-center-shell .legacy-nav a {
+.account-center-workspace .legacy-nav a {
   position: relative;
   min-height: 44px;
   padding: 0 12px;
@@ -118,31 +162,31 @@
   font-weight: 560;
 }
 
-.account-center-shell .legacy-nav a:hover {
+.account-center-workspace .legacy-nav a:hover {
   color: #e9eef6;
   border-color: rgba(255,255,255,.025);
   background: rgba(255,255,255,.028);
   transform: none;
 }
 
-.account-center-shell .legacy-nav a.active,
-.account-center-shell .legacy-sidebar:not(.collapsed) .legacy-nav a.active {
+.account-center-workspace .legacy-nav a.active,
+.account-center-workspace .legacy-sidebar:not(.collapsed) .legacy-nav a.active {
   color: #ff8d82;
   border-color: rgba(255, 113, 100, .12);
   background: linear-gradient(90deg, rgba(255, 113, 100, .13), rgba(255, 113, 100, .045));
   box-shadow: inset 2px 0 #ff7164;
 }
 
-.account-center-shell .legacy-nav a.active::before { display: none; }
-.account-center-shell .legacy-nav-icon { width: 28px; min-width: 28px; height: 28px; }
-.account-center-shell .legacy-sidebar:not(.collapsed) .legacy-nav a.active .legacy-nav-icon { color: #ff8175; background: transparent; }
+.account-center-workspace .legacy-nav a.active::before { display: none; }
+.account-center-workspace .legacy-nav-icon { width: 28px; min-width: 28px; height: 28px; }
+.account-center-workspace .legacy-sidebar:not(.collapsed) .legacy-nav a.active .legacy-nav-icon { color: #ff8175; background: transparent; }
 
-.account-center-shell .legacy-sidebar-tools {
+.account-center-workspace .legacy-sidebar-tools {
   padding: 12px;
   border-top: 1px solid var(--ac-line);
 }
 
-.account-center-shell .legacy-sidebar-tool {
+.account-center-workspace .legacy-sidebar-tool {
   min-height: 40px;
   padding: 0 12px;
   border-radius: 9px;
@@ -150,25 +194,22 @@
   font-size: 12px;
 }
 
-.account-center-shell .legacy-sidebar-tool:hover {
+.account-center-workspace .legacy-sidebar-tool:hover {
   color: #e8eef5;
   background: rgba(255,255,255,.035);
 }
 
-.account-center-shell .legacy-main {
+.account-center-workspace .legacy-main {
   min-width: 0;
   background: transparent;
   transition: margin-left .2s ease;
 }
 
-.account-center-shell.account-center-drawer-open .legacy-main {
-  /* .legacy-main already follows the fixed sidebar in the flex row; only
-     reserve the drawer width here, otherwise the content gets a second
-     sidebar-sized blank gutter. */
-  margin-left: 284px;
+.account-center-legacy-shell.account-center-drawer-open .legacy-main {
+  margin-left: 0;
 }
 
-.account-center-shell .legacy-topbar {
+.account-center-workspace .legacy-topbar {
   height: var(--app-topbar-height);
   flex-basis: var(--app-topbar-height);
   padding: 0 var(--app-page-gutter);
@@ -177,17 +218,17 @@
   backdrop-filter: blur(18px);
 }
 
-.account-center-shell .legacy-page-title {
+.account-center-workspace .legacy-page-title {
   color: #b7c1ce;
   font-size: 13px;
   font-weight: 650;
   letter-spacing: .02em;
 }
 
-.account-center-shell .legacy-page-title { color: transparent; user-select: none; }
+.account-center-workspace .legacy-page-title { color: transparent; user-select: none; }
 
-.account-center-shell .legacy-userbar { gap: 12px; }
-.account-center-shell .legacy-profile-link {
+.account-center-workspace .legacy-userbar { gap: 12px; }
+.account-center-workspace .legacy-profile-link {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -197,24 +238,24 @@
   color: var(--ac-text-soft);
   text-decoration: none;
 }
-.account-center-shell .legacy-profile-link:hover {
+.account-center-workspace .legacy-profile-link:hover {
   border-color: var(--ac-line);
   background: rgba(255,255,255,.025);
 }
-.account-center-shell .legacy-profile-name { font-size: 12px; font-weight: 650; }
+.account-center-workspace .legacy-profile-name { font-size: 12px; font-weight: 650; }
 
-.account-center-shell .legacy-content {
+.account-center-workspace .legacy-content {
   container-type: inline-size;
   overflow: auto;
   background: transparent;
   scrollbar-gutter: stable;
 }
 
-.account-center-shell * { scrollbar-color: rgba(135, 150, 181, .45) rgba(255,255,255,.025); }
-.account-center-shell ::-webkit-scrollbar { width: 8px; height: 8px; }
-.account-center-shell ::-webkit-scrollbar-track { background: rgba(255,255,255,.025); }
-.account-center-shell ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(125, 139, 169, .42); background-clip: padding-box; }
-.account-center-shell ::-webkit-scrollbar-thumb:hover { background: rgba(153, 166, 198, .62); background-clip: padding-box; }
+.account-center-workspace * { scrollbar-color: rgba(135, 150, 181, .45) rgba(255,255,255,.025); }
+.account-center-workspace ::-webkit-scrollbar { width: 8px; height: 8px; }
+.account-center-workspace ::-webkit-scrollbar-track { background: rgba(255,255,255,.025); }
+.account-center-workspace ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: rgba(125, 139, 169, .42); background-clip: padding-box; }
+.account-center-workspace ::-webkit-scrollbar-thumb:hover { background: rgba(153, 166, 198, .62); background-clip: padding-box; }
 
 .account-center-page {
   width: min(1420px, 100%);
@@ -465,11 +506,11 @@
 }
 
 /* Forms and Ant Design components share one visual language. */
-.account-center-shell .ant-input,
-.account-center-shell .ant-input-affix-wrapper,
-.account-center-shell .ant-select-selector,
-.account-center-shell .ant-input-number,
-.account-center-shell textarea.ant-input {
+.account-center-workspace .ant-input,
+.account-center-workspace .ant-input-affix-wrapper,
+.account-center-workspace .ant-select-selector,
+.account-center-workspace .ant-input-number,
+.account-center-workspace textarea.ant-input {
   min-height: 38px;
   border-color: var(--ac-line-strong) !important;
   border-radius: 9px !important;
@@ -477,34 +518,34 @@
   background: rgba(5, 10, 16, .62) !important;
   box-shadow: none !important;
 }
-.account-center-shell .ant-input-number-input { color: var(--ac-text) !important; background: transparent !important; }
-.account-center-shell .ant-input:hover,
-.account-center-shell .ant-input-affix-wrapper:hover,
-.account-center-shell .ant-select-selector:hover,
-.account-center-shell .ant-input-number:hover { border-color: rgba(110,140,255,.45) !important; }
-.account-center-shell .ant-input:focus,
-.account-center-shell .ant-input-affix-wrapper-focused,
-.account-center-shell .ant-select-focused .ant-select-selector,
-.account-center-shell .ant-input-number-focused {
+.account-center-workspace .ant-input-number-input { color: var(--ac-text) !important; background: transparent !important; }
+.account-center-workspace .ant-input:hover,
+.account-center-workspace .ant-input-affix-wrapper:hover,
+.account-center-workspace .ant-select-selector:hover,
+.account-center-workspace .ant-input-number:hover { border-color: rgba(110,140,255,.45) !important; }
+.account-center-workspace .ant-input:focus,
+.account-center-workspace .ant-input-affix-wrapper-focused,
+.account-center-workspace .ant-select-focused .ant-select-selector,
+.account-center-workspace .ant-input-number-focused {
   border-color: #647df2 !important;
   box-shadow: 0 0 0 3px rgba(100,125,242,.08) !important;
 }
-.account-center-shell .ant-form-item { margin-bottom: 16px; }
-.account-center-shell .ant-form-item-label > label { color: #aeb9c7 !important; font-size: 11px; }
-.account-center-shell .ant-form-item-extra { color: #647185; font-size: 10px; }
-.account-center-shell .ant-btn { border-radius: 9px; box-shadow: none; }
-.account-center-shell .ant-btn-primary {
+.account-center-workspace .ant-form-item { margin-bottom: 16px; }
+.account-center-workspace .ant-form-item-label > label { color: #aeb9c7 !important; font-size: 11px; }
+.account-center-workspace .ant-form-item-extra { color: #647185; font-size: 10px; }
+.account-center-workspace .ant-btn { border-radius: 9px; box-shadow: none; }
+.account-center-workspace .ant-btn-primary {
   background: linear-gradient(115deg, #5c65ef, #7371f7);
   box-shadow: 0 8px 20px rgba(86,94,235,.16);
 }
-.account-center-shell .ant-btn-default {
+.account-center-workspace .ant-btn-default {
   color: #c9d2de;
   border-color: var(--ac-line-strong);
   background: rgba(255,255,255,.018);
 }
-.account-center-shell .ant-tag { border-radius: 999px; }
-.account-center-shell .ant-progress-inner { background: rgba(255,255,255,.055) !important; }
-.account-center-shell .ant-progress-bg { background: linear-gradient(90deg, #6673f2, #8472f8) !important; }
+.account-center-workspace .ant-tag { border-radius: 999px; }
+.account-center-workspace .ant-progress-inner { background: rgba(255,255,255,.055) !important; }
+.account-center-workspace .ant-progress-bg { background: linear-gradient(90deg, #6673f2, #8472f8) !important; }
 
 /* API 配置是一个高密度工作区：主表单和状态侧栏必须保持同一视线层级。 */
 .api-config-page .ac-api-layout {
@@ -906,7 +947,7 @@
 }
 
 /* Light theme keeps structure identical instead of introducing a second layout system. */
-[data-theme='light'] .account-center-shell {
+[data-theme='light'] .account-center-workspace {
   --ac-bg: #f3f6fa;
   --ac-bg-elevated: #f8fafc;
   --ac-sidebar: #ffffff;
@@ -921,15 +962,25 @@
   --ac-faint: #93a0b0;
   background: #f3f6fa;
 }
-[data-theme='light'] .account-center-shell .legacy-topbar { background: rgba(255,255,255,.88); }
-[data-theme='light'] .account-center-shell .legacy-sidebar { box-shadow: 12px 0 30px rgba(37,51,70,.035); }
-[data-theme='light'] .account-center-shell .legacy-brand { color: #182333; }
-[data-theme='light'] .account-center-shell .legacy-brand-title { color: #182333; }
-[data-theme='light'] .account-center-shell .legacy-nav a { color: #526174; }
-[data-theme='light'] .account-center-shell .legacy-nav a:hover { color: #1f2d40; background: rgba(37, 99, 235, .06); }
-[data-theme='light'] .account-center-shell .legacy-sidebar-tool { color: #5d6d80; }
-[data-theme='light'] .account-center-shell .legacy-sidebar-tool:hover { color: #1f2d40; background: rgba(37, 99, 235, .06); }
-[data-theme='light'] .account-center-shell .legacy-profile-name { color: #344256; }
+[data-theme='light'] .account-center-sidebar { box-shadow: 12px 0 30px rgba(37,51,70,.035); }
+[data-theme='light'] .account-center-return { color: var(--ac-muted); }
+[data-theme='light'] .account-center-sidebar a,
+[data-theme='light'] .account-center-sidebar-logout { color: var(--ac-text-soft); }
+[data-theme='light'] .account-center-sidebar a:hover { color: var(--ac-text); background: rgba(37,99,235,.08); }
+[data-theme='light'] .account-center-sidebar a.active { color: #1d4ed8; background: rgba(37,99,235,.1); box-shadow: inset 2px 0 #2563eb; }
+[data-theme='light'] .account-center-sidebar-profile small,
+[data-theme='light'] .account-center-sidebar-submenu a { color: var(--ac-muted); }
+[data-theme='light'] .account-center-sidebar-profile em { color: #9a6700; background: rgba(234,179,8,.14); }
+[data-theme='light'] .account-center-sidebar-logout { color: #c2413b; }
+[data-theme='light'] .account-center-workspace .legacy-topbar { background: rgba(255,255,255,.88); }
+[data-theme='light'] .account-center-workspace .legacy-sidebar { box-shadow: 12px 0 30px rgba(37,51,70,.035); }
+[data-theme='light'] .account-center-workspace .legacy-brand { color: #182333; }
+[data-theme='light'] .account-center-workspace .legacy-brand-title { color: #182333; }
+[data-theme='light'] .account-center-workspace .legacy-nav a { color: #526174; }
+[data-theme='light'] .account-center-workspace .legacy-nav a:hover { color: #1f2d40; background: rgba(37, 99, 235, .06); }
+[data-theme='light'] .account-center-workspace .legacy-sidebar-tool { color: #5d6d80; }
+[data-theme='light'] .account-center-workspace .legacy-sidebar-tool:hover { color: #1f2d40; background: rgba(37, 99, 235, .06); }
+[data-theme='light'] .account-center-workspace .legacy-profile-name { color: #344256; }
 [data-theme='light'] .ac-panel,
 [data-theme='light'] .ac-metric-card,
 [data-theme='light'] .ac-managed-api-card { box-shadow: 0 10px 28px rgba(37,51,70,.045); }
@@ -937,25 +988,25 @@
 [data-theme='light'] .ac-panel-header h2,
 [data-theme='light'] .ac-metric-value strong,
 [data-theme='light'] .ac-member-identity strong { color: #182333; }
-[data-theme='light'] .account-center-shell .ant-input,
-[data-theme='light'] .account-center-shell .ant-input-affix-wrapper,
-[data-theme='light'] .account-center-shell .ant-select-selector,
-[data-theme='light'] .account-center-shell .ant-input-number,
-[data-theme='light'] .account-center-shell textarea.ant-input { color: #192536 !important; background: #fff !important; }
-[data-theme='light'] .account-center-popover { border-color: var(--ac-line); box-shadow: 18px 0 52px rgba(37,51,70,.08); }
-[data-theme='light'] .account-center-popover-head button,
-[data-theme='light'] .account-center-popover-parent > button { color: var(--ac-muted); }
-[data-theme='light'] .account-center-popover a,
-[data-theme='light'] .account-center-popover-parent,
-[data-theme='light'] .account-center-popover-logout { color: var(--ac-text-soft); }
-[data-theme='light'] .account-center-popover a:hover,
-[data-theme='light'] .account-center-popover-parent:hover { color: var(--ac-text); background: rgba(37, 99, 235, .08); }
-[data-theme='light'] .account-center-popover a.active { color: #1d4ed8; background: rgba(37, 99, 235, .1); box-shadow: inset 2px 0 #2563eb; }
-[data-theme='light'] .account-center-popover-profile small,
-[data-theme='light'] .account-center-popover-submenu a { color: var(--ac-muted); }
-[data-theme='light'] .account-center-popover-section-label { color: var(--ac-muted); }
-[data-theme='light'] .account-center-popover-profile em { color: #9a6700; background: rgba(234, 179, 8, .14); }
-[data-theme='light'] .account-center-popover-logout { color: #c2413b; }
+[data-theme='light'] .account-center-workspace .ant-input,
+[data-theme='light'] .account-center-workspace .ant-input-affix-wrapper,
+[data-theme='light'] .account-center-workspace .ant-select-selector,
+[data-theme='light'] .account-center-workspace .ant-input-number,
+[data-theme='light'] .account-center-workspace textarea.ant-input { color: #192536 !important; background: #fff !important; }
+[data-theme='light'] .account-center-legacy-popover { border-color: var(--ac-line); box-shadow: 18px 0 52px rgba(37,51,70,.08); }
+[data-theme='light'] .account-center-legacy-popover-head button,
+[data-theme='light'] .account-center-legacy-popover-parent > button { color: var(--ac-muted); }
+[data-theme='light'] .account-center-legacy-popover a,
+[data-theme='light'] .account-center-legacy-popover-parent,
+[data-theme='light'] .account-center-legacy-popover-logout { color: var(--ac-text-soft); }
+[data-theme='light'] .account-center-legacy-popover a:hover,
+[data-theme='light'] .account-center-legacy-popover-parent:hover { color: var(--ac-text); background: rgba(37, 99, 235, .08); }
+[data-theme='light'] .account-center-legacy-popover a.active { color: #1d4ed8; background: rgba(37, 99, 235, .1); box-shadow: inset 2px 0 #2563eb; }
+[data-theme='light'] .account-center-legacy-popover-profile small,
+[data-theme='light'] .account-center-legacy-popover-submenu a { color: var(--ac-muted); }
+[data-theme='light'] .account-center-legacy-popover-section-label { color: var(--ac-muted); }
+[data-theme='light'] .account-center-legacy-popover-profile em { color: #9a6700; background: rgba(234, 179, 8, .14); }
+[data-theme='light'] .account-center-legacy-popover-logout { color: #c2413b; }
 [data-theme='light'] .account-center-page .ac-page-header h1,
 [data-theme='light'] .account-center-page .ac-panel-header h2,
 [data-theme='light'] .account-center-page strong,
@@ -993,8 +1044,20 @@
 [data-theme='light'] .api-config-page .ant-tag-purple { color: #5b48a8; border-color: #c8bdf5; background: #f1efff; }
 
 @media (max-width: 980px) {
-  .account-center-shell.account-center-drawer-open .legacy-main { margin-left: 0; }
-  .account-center-popover { left: var(--app-sidebar-collapsed-width); width: min(284px, calc(100vw - 100px)); }
+  .account-center-workspace { grid-template-columns: 60px minmax(0, 1fr); }
+  .account-center-sidebar { padding: 14px 6px; align-items: center; }
+  .account-center-sidebar-head { justify-items: center; gap: 12px; padding: 0; }
+  .account-center-sidebar-head > strong,
+  .account-center-return span,
+  .account-center-sidebar-profile > div,
+  .account-center-sidebar-group > span { display: none; }
+  .account-center-sidebar-profile { margin: 16px 0; }
+  .account-center-sidebar-nav { width: 100%; }
+  .account-center-sidebar-group { padding: 8px 0; }
+  .account-center-sidebar a,
+  .account-center-sidebar-logout { justify-content: center; padding: 11px 0; font-size: 0; }
+  .account-center-sidebar-submenu { padding: 0; }
+  .account-center-workspace.account-center-drawer-open .legacy-main { margin-left: 0; }
 }
 
 @media (max-width: 680px) {
