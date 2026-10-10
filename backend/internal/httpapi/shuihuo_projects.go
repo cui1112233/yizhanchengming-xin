@@ -79,6 +79,175 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"presets": []any{}})
 	})))
+	root.Handle("/api/shuihuo-production/asset-types", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		types := shuihuoCollection(config, "assetTypes", []map[string]any{
+			{"id": "system-character", "name": "角色", "category": "character", "system": true},
+			{"id": "system-scene", "name": "场景", "category": "scene", "system": true},
+			{"id": "system-prop", "name": "道具", "category": "prop", "system": true},
+		})
+		if r.Method == http.MethodGet {
+			writeJSON(w, http.StatusOK, map[string]any{"assetTypes": types})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		var input map[string]any
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		name, _ := input["name"].(string)
+		category, _ := input["category"].(string)
+		if strings.TrimSpace(name) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "type name is required"})
+			return
+		}
+		id, idErr := localexecutor.NewArtifactID()
+		if idErr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "type id generation failed"})
+			return
+		}
+		types = append(types, map[string]any{"id": id, "name": strings.TrimSpace(name), "category": strings.TrimSpace(category), "system": false})
+		config["assetTypes"] = types
+		if err := saveShuihuoOwnerConfig(r.Context(), store, owner, config); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"assetType": types[len(types)-1]})
+	})))
+	root.Handle("/api/shuihuo-production/asset-types/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/asset-types/"), "/")
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		types := shuihuoCollection(config, "assetTypes", nil)
+		for index, item := range types {
+			if item["id"] != id {
+				continue
+			}
+			if item["system"] == true {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "system asset type cannot be deleted"})
+				return
+			}
+			if r.Method == http.MethodDelete {
+				types = append(types[:index], types[index+1:]...)
+				config["assetTypes"] = types
+				if err := saveShuihuoOwnerConfig(r.Context(), store, owner, config); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+				return
+			}
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset type not found"})
+	})))
+	root.Handle("/api/shuihuo-production/asset-templates", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		templates := shuihuoCollection(config, "assetTemplates", nil)
+		if r.Method == http.MethodGet {
+			if filter := strings.TrimSpace(r.URL.Query().Get("assetTypeId")); filter != "" {
+				filtered := []map[string]any{}
+				for _, item := range templates {
+					if item["assetTypeId"] == filter {
+						filtered = append(filtered, item)
+					}
+				}
+				templates = filtered
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"assetTemplates": templates})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		var input map[string]any
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		name, _ := input["name"].(string)
+		typeID, _ := input["assetTypeId"].(string)
+		prompt, _ := input["prompt"].(string)
+		if strings.TrimSpace(name) == "" || strings.TrimSpace(typeID) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "template name and assetTypeId are required"})
+			return
+		}
+		id, idErr := localexecutor.NewArtifactID()
+		if idErr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "template id generation failed"})
+			return
+		}
+		item := map[string]any{"id": id, "assetTypeId": strings.TrimSpace(typeID), "name": strings.TrimSpace(name), "prompt": strings.TrimSpace(prompt), "source": "manual"}
+		templates = append(templates, item)
+		config["assetTemplates"] = templates
+		if err := saveShuihuoOwnerConfig(r.Context(), store, owner, config); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"assetTemplate": item})
+	})))
+	root.Handle("/api/shuihuo-production/asset-templates/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/asset-templates/"), "/")
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		templates := shuihuoCollection(config, "assetTemplates", nil)
+		for index, item := range templates {
+			if item["id"] != id {
+				continue
+			}
+			if r.Method != http.MethodDelete {
+				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+				return
+			}
+			templates = append(templates[:index], templates[index+1:]...)
+			config["assetTemplates"] = templates
+			if err := saveShuihuoOwnerConfig(r.Context(), store, owner, config); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset template not found"})
+	})))
 	root.Handle("/api/shuihuo-production/config", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -1138,6 +1307,44 @@ func shuihuoMedia(batch batchfactoryv11.Batch) []map[string]any {
 		return []map[string]any{}
 	}
 	return storedShuihuoMedia(batch.Books[0])
+}
+
+func loadShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, owner string) (map[string]any, error) {
+	if durable, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
+		return durable.GetShuihuoConfig(ctx, owner)
+	}
+	if value, ok := shuihuoProductionConfigs.Load(owner); ok {
+		if config, ok := value.(map[string]any); ok {
+			return config, nil
+		}
+	}
+	config := shuihuoDefaultConfig()
+	shuihuoProductionConfigs.Store(owner, config)
+	return config, nil
+}
+
+func saveShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, owner string, config map[string]any) error {
+	if durable, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
+		return durable.SaveShuihuoConfig(ctx, owner, config)
+	}
+	shuihuoProductionConfigs.Store(owner, config)
+	return nil
+}
+
+func shuihuoCollection(config map[string]any, key string, fallback []map[string]any) []map[string]any {
+	if raw, ok := config[key].([]any); ok {
+		items := make([]map[string]any, 0, len(raw))
+		for _, value := range raw {
+			if item, ok := value.(map[string]any); ok {
+				items = append(items, item)
+			}
+		}
+		return items
+	}
+	if raw, ok := config[key].([]map[string]any); ok {
+		return raw
+	}
+	return append([]map[string]any(nil), fallback...)
 }
 
 func storedShuihuoMedia(book batchfactoryv11.Book) []map[string]any {
