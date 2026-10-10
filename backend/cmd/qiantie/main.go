@@ -309,7 +309,7 @@ func shouldBridgeLegacyAPI(path string) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
-		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") {
+		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") || isGoV12AliasPath(path) {
 			return false
 		}
 		return true
@@ -342,6 +342,26 @@ func shouldBridgeLegacyAPI(path string) bool {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true
 		}
+	}
+	return false
+}
+
+func isGoV12AliasPath(path string) bool {
+	if !strings.HasPrefix(path, "/api/batch-factory/v12/") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(path, "/api/batch-factory/v12/"), "/")
+	if len(parts) >= 2 && parts[0] == "intakes" && len(parts) == 3 && parts[2] == "batches" {
+		return true
+	}
+	if len(parts) == 2 && parts[0] == "batches" {
+		return true
+	}
+	if len(parts) == 3 && parts[0] == "batches" && (parts[2] == "runtime-index" || parts[2] == "status" || parts[2] == "merge-status" || parts[2] == "settings") {
+		return true
+	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "stages" || parts[4] == "override") {
+		return true
 	}
 	return false
 }

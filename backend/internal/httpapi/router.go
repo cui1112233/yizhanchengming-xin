@@ -102,6 +102,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Store != nil && options.Slice >= 3 {
 		registerV12H3Routes(v12, &batchfactoryv11.H3KernelService{Store: options.Store, AudioProbe: options.H3AudioProbe}, options.Director)
 	}
+	registerV12V11Aliases(v12, v11)
 
 	root := http.NewServeMux()
 	root.HandleFunc("GET /api/runtime-build-info", func(w http.ResponseWriter, req *http.Request) {
