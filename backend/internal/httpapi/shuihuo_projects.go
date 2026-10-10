@@ -123,7 +123,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 		}
 		model := map[string]any{}
-		for _, key := range []string{"modelId", "name", "kind", "adapterKind", "enabled", "parameterSchema", "credentialRef", "endpoint", "requestTemplate", "responseMapping", "credential", "apiKey"} {
+		for _, key := range []string{"modelId", "name", "kind", "adapterKind", "enabled", "parameterSchema", "credentialRef", "endpoint", "tasksEndpoint", "resultEndpoint", "workflowId", "requestTemplate", "responseMapping", "credential", "apiKey"} {
 			if value, exists := input[key]; exists {
 				model[key] = value
 			}
@@ -134,6 +134,12 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
 			writeStoreError(w, err)
 			return
+		}
+		if production != nil && production.ProviderRegistry != nil && strings.EqualFold(strings.TrimSpace(kind), "video") {
+			if syncErr := syncShuihuoVideoModel(r.Context(), production.ProviderRegistry, identity.Username, model); syncErr != nil {
+				writeStoreError(w, syncErr)
+				return
+			}
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"model": safeShuihuoModels([]map[string]any{model}, false)[0]})
 	})))
@@ -1436,6 +1442,21 @@ func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[strin
 		result = append(result, copy)
 	}
 	return result
+}
+
+func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoProviderRegistry, owner string, model map[string]any) error {
+	modelID, _ := model["modelId"].(string)
+	provider, _ := model["provider"].(string)
+	provider = batchfactoryv11.VideoProviderForModel(modelID, provider)
+	apiKey, _ := model["apiKey"].(string)
+	if strings.TrimSpace(apiKey) == "" {
+		apiKey, _ = model["credential"].(string)
+	}
+	endpoint, _ := model["endpoint"].(string)
+	tasksEndpoint, _ := model["tasksEndpoint"].(string)
+	resultEndpoint, _ := model["resultEndpoint"].(string)
+	workflowID, _ := model["workflowId"].(string)
+	return registry.Put(ctx, owner, batchfactoryv11.VideoProviderConfig{Provider: provider, APIKey: apiKey, Model: modelID, CreateURL: endpoint, TasksURL: tasksEndpoint, ResultURL: resultEndpoint, WorkflowID: workflowID})
 }
 
 func writeShuihuoProjectExport(w http.ResponseWriter, r *http.Request, files *localartifact.Store, batch batchfactoryv11.Batch) error {
