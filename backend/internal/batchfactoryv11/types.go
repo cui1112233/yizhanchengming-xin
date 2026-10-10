@@ -337,6 +337,7 @@ type Store interface {
 	ListBookAssets(context.Context, string, string, string) ([]BookAsset, error)
 	CreateBookAsset(context.Context, string, string, string, CreateBookAssetInput) (BookAsset, error)
 	UpdateBookAsset(context.Context, string, string, string, string, UpdateBookAssetInput) (BookAsset, error)
+	DeleteBookAsset(context.Context, string, string, string, string) error
 	ListBookAssetImages(context.Context, string, string, string, string) ([]BookAssetImage, error)
 	CreateBookAssetImage(context.Context, string, string, string, string, CreateBookAssetImageInput) (BookAssetImage, error)
 	SetPrimaryBookAssetImage(context.Context, string, string, string, string, string) (BookAssetImage, error)

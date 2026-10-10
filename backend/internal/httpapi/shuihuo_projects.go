@@ -1559,17 +1559,11 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			if len(parts) == 1 && r.Method == http.MethodDelete {
-				if deleter, ok := store.(interface {
-					DeleteBookAsset(context.Context, string, string, string, string) error
-				}); ok {
-					if deleteErr := deleter.DeleteBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID); deleteErr != nil {
-						writeStoreError(w, deleteErr)
-						return
-					}
-					writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+				if deleteErr := store.DeleteBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID); deleteErr != nil {
+					writeStoreError(w, deleteErr)
 					return
 				}
-				writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "asset deletion is not enabled in this Go store"})
+				writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 				return
 			}
 		}
