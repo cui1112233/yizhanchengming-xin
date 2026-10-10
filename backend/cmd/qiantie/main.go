@@ -147,7 +147,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/account-recovery/email/verify" || req.URL.Path == "/api/account-recovery/password/reset") {
+		if req.Method == http.MethodPost && (req.URL.Path == "/api/account-recovery/email/request" || req.URL.Path == "/api/account-recovery/email/verify" || req.URL.Path == "/api/account-recovery/password/request" || req.URL.Path == "/api/account-recovery/password/reset") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
