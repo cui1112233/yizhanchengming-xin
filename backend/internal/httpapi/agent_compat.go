@@ -181,11 +181,102 @@ func RegisterAgentReadCompat(root *http.ServeMux, middleware BridgeAuth, usersRo
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})))
+	root.Handle("GET /api/agent/tasks/{id}/canvas", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		if task := findAgentTask(document, req.PathValue("id")); task != nil {
+			canvas, _ := task["canvas"].(map[string]any)
+			if canvas == nil {
+				canvas = map[string]any{"version": 1, "revision": 0, "nodes": []any{}, "edges": []any{}}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"canvas": canvas})
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+	})))
+	root.Handle("PATCH /api/agent/tasks/{id}/canvas", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			Canvas map[string]any `json:"canvas"`
+		}
+		if json.NewDecoder(req.Body).Decode(&body) != nil || body.Canvas == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "画布数据无效"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		task := findAgentTask(document, req.PathValue("id"))
+		if task == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+			return
+		}
+		body.Canvas["revision"] = numberOr(body.Canvas["revision"], 0)
+		task["canvas"] = body.Canvas
+		task["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
+		if err := saveAgentDocument(usersRoot, identity.Username, document); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存 Agent 画布失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"canvas": body.Canvas})
+	})))
+	root.Handle("GET /api/agent/tasks/{id}/executions", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		if task := findAgentTask(document, req.PathValue("id")); task != nil {
+			executions, _ := task["executions"].([]any)
+			writeJSON(w, http.StatusOK, map[string]any{"executions": executions})
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+	})))
 }
 
 func documentTasks(document map[string]any) []any {
 	tasks, _ := document["tasks"].([]any)
 	return tasks
+}
+
+func findAgentTask(document map[string]any, id string) map[string]any {
+	for _, raw := range documentTasks(document) {
+		if task, ok := raw.(map[string]any); ok && task["id"] == id {
+			return task
+		}
+	}
+	return nil
+}
+
+func numberOr(value any, fallback int) int {
+	switch number := value.(type) {
+	case float64:
+		return int(number)
+	case int:
+		return number
+	default:
+		return fallback
+	}
 }
 
 func loadAgentDocument(root, username string) (map[string]any, error) {
