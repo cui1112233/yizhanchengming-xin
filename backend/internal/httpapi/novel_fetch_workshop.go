@@ -604,6 +604,165 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "suggestions": strings.TrimSpace(content)})
 	})
 
+	mux.HandleFunc("GET /api/novel-fetch-workshop/knowledge/summary", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取知识库失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "summary": novelfetchworkshop.KnowledgeSummary(settings)})
+	})
+
+	mux.HandleFunc("GET /api/novel-fetch-workshop/knowledge/{kind}", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取知识库失败"})
+			return
+		}
+		library, err := novelfetchworkshop.ListKnowledge(settings, req.PathValue("kind"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": req.PathValue("kind"), "data": library, "items": library["items"]})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/knowledge/{kind}", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		var input map[string]any
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+			return
+		}
+		item, _ := input["item"].(map[string]any)
+		if item == nil {
+			item = input
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取知识库失败"})
+			return
+		}
+		normalized, err := novelfetchworkshop.SaveKnowledge(settings, req.PathValue("kind"), item)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "保存知识库失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "item": normalized})
+	})
+
+	mux.HandleFunc("DELETE /api/novel-fetch-workshop/knowledge/{kind}/{id}", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取知识库失败"})
+			return
+		}
+		removed, err := novelfetchworkshop.DeleteKnowledge(settings, req.PathValue("kind"), req.PathValue("id"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "保存知识库失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": removed})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/opening/analyze", func(w http.ResponseWriter, req *http.Request) {
+		var input struct {
+			Text string `json:"text"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+			return
+		}
+		items, err := novelfetchworkshop.AnalyzeOpening(req.Context(), rewriteProvider, input.Text)
+		if err != nil {
+			status := http.StatusBadRequest
+			if rewriteProvider == nil {
+				status = http.StatusServiceUnavailable
+			}
+			writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": items})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/opening/save", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		var input map[string]any
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+			return
+		}
+		item, _ := input["item"].(map[string]any)
+		if item == nil {
+			item = input
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取开头词库失败"})
+			return
+		}
+		normalized, err := novelfetchworkshop.SaveKnowledge(settings, "opening_phrases", item)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "保存开头词库失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "item": normalized})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/opening/normalize", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取开头词库失败"})
+			return
+		}
+		library, _ := novelfetchworkshop.ListKnowledge(settings, "opening_phrases")
+		items := make([]map[string]any, 0)
+		seen := map[string]bool{}
+		removed := 0
+		for _, raw := range novelfetchworkshop.NormalizeKnowledgeItemsForHTTP(library["items"]) {
+			text := strings.TrimSpace(fmt.Sprint(raw["text"]))
+			if text == "" || seen[text] {
+				removed++
+				continue
+			}
+			seen[text] = true
+			items = append(items, raw)
+		}
+		library["items"] = items
+		libraries, _ := settings["knowledgeLibraries"].(map[string]any)
+		if libraries == nil {
+			libraries = map[string]any{}
+		}
+		libraries["opening_phrases"] = library
+		settings["knowledgeLibraries"] = libraries
+		_ = store.PutConfig(req.Context(), identity.Username, settings)
+		grouped := map[string][]map[string]any{}
+		for _, item := range items {
+			style := strings.TrimSpace(fmt.Sprint(item["style"]))
+			if style == "" {
+				style = "未分类"
+			}
+			grouped[style] = append(grouped[style], item)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": removed, "grouped": grouped})
+	})
+
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/tasks/{bookId}", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		bookID := strings.TrimSpace(req.PathValue("bookId"))
