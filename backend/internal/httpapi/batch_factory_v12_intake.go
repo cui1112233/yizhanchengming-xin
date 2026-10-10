@@ -26,6 +26,10 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		}
 		summaries := make([]map[string]any, 0, len(batches))
 		for _, batch := range batches {
+			detail, detailErr := store.GetBatch(r.Context(), owner, batch.ID)
+			if detailErr == nil && isShuihuoProjectBatch(detail) {
+				continue
+			}
 			books := make([]map[string]any, 0, len(batch.Books))
 			for _, book := range batch.Books {
 				books = append(books, map[string]any{"id": book.ID, "bookId": book.BookID, "title": book.Title, "platform": book.Platform})
@@ -53,7 +57,14 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 			writeStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"batches": batches})
+		filtered := make([]batchfactoryv11.Batch, 0, len(batches))
+		for _, batch := range batches {
+			detail, detailErr := store.GetBatch(r.Context(), owner, batch.ID)
+			if detailErr != nil || !isShuihuoProjectBatch(detail) {
+				filtered = append(filtered, batch)
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batches": filtered})
 	})
 	mux.HandleFunc("POST /api/batch-factory/v12/intakes/novel-fetch", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
