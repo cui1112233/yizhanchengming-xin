@@ -102,6 +102,11 @@ func registerV12H3Routes(mux *http.ServeMux, service *batchfactoryv11.H3KernelSe
 		}
 		writeJSON(w, http.StatusCreated, result)
 	})
+}
+
+// registerV12H3TraceRoute is kept separate because trace is a read-only
+// query. It is safe to expose in slice 1 while H3 writes remain gated.
+func registerV12H3TraceRoute(mux *http.ServeMux, service *batchfactoryv11.H3KernelService) {
 	mux.HandleFunc("GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/h3/trace", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

@@ -65,7 +65,7 @@ func TestV12H3TraceRouteShowsLegacyCompatibilityWithoutSynthesizingH3(t *testing
 	if _, err := director.RunDirector(context.Background(), "alice", batch.ID, batch.Books[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 3, Store: store, Director: director})
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
 	path := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + batch.Books[0].ID + "/h3/trace"
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, path, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"legacy":true`) || !strings.Contains(rec.Body.String(), "旧版导演数据") {

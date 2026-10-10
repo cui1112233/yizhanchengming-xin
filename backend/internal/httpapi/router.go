@@ -128,6 +128,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.RegisterV11 != nil {
 		options.RegisterV11(v11)
 	}
+	if options.Store != nil {
+		registerV12H3TraceRoute(v12, &batchfactoryv11.H3KernelService{Store: options.Store, AudioProbe: options.H3AudioProbe})
+	}
 	if options.Store != nil && options.Slice >= 3 {
 		registerV12H3Routes(v12, &batchfactoryv11.H3KernelService{Store: options.Store, AudioProbe: options.H3AudioProbe}, options.Director)
 	}
