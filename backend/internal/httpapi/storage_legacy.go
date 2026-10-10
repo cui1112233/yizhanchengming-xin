@@ -205,13 +205,13 @@ func RegisterStorageRoutes(root *http.ServeMux, middleware BridgeAuth, configs *
 			return
 		}
 		rootDir := configuredStorageRoot(configs, identity.Username)
-		if rootDir == "" {
-			writeJSON(w, http.StatusOK, map[string]any{"saved": false, "reason": "未配置本地存储文件夹"})
+		categoryDir := map[string]string{"image": "图片", "video": "视频", "audio": "配音"}[input.Category]
+		if categoryDir == "" || strings.TrimSpace(input.ProjectName) == "" || strings.TrimSpace(input.Filename) == "" || strings.TrimSpace(input.DataURL) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "projectName/category/filename/dataUrl 均必填"})
 			return
 		}
-		categoryDir := map[string]string{"image": "图片", "video": "视频", "audio": "配音"}[input.Category]
-		if categoryDir == "" || strings.TrimSpace(input.ProjectName) == "" || strings.TrimSpace(input.Filename) == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "projectName/category/filename/dataUrl 均必填"})
+		if rootDir == "" {
+			writeJSON(w, http.StatusOK, map[string]any{"saved": false, "reason": "未配置本地存储文件夹"})
 			return
 		}
 		prefix, encoded, ok := strings.Cut(input.DataURL, ",")
