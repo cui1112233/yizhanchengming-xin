@@ -689,10 +689,11 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 			if len(batch.Books) > 0 {
 				for _, media := range storedShuihuoMedia(batch.Books[0]) {
-					if modelString(media, "kind") != "audio" {
+					mediaKind := modelString(media, "kind")
+					if mediaKind != "audio" && mediaKind != "image" {
 						continue
 					}
-					tasks = append(tasks, map[string]any{"id": modelString(media, "id"), "status": "completed", "kind": "audio", "segmentId": modelString(media, "segmentId"), "mediaUrl": "/api/shuihuo-production/media/" + modelString(media, "id") + "/download", "createdAt": media["createdAt"], "updatedAt": media["createdAt"]})
+					tasks = append(tasks, map[string]any{"id": modelString(media, "id"), "status": "completed", "kind": mediaKind, "segmentId": modelString(media, "segmentId"), "mediaUrl": "/api/shuihuo-production/media/" + modelString(media, "id") + "/download", "createdAt": media["createdAt"], "updatedAt": media["createdAt"]})
 				}
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
