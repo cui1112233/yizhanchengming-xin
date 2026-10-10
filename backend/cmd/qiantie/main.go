@@ -63,6 +63,10 @@ func main() {
 			authProxy.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/login/invite/") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
 			apiHandler.ServeHTTP(w, req)
 			return

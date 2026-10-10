@@ -130,6 +130,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterMemberTeamReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterMemberTeamWriteCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterTeamAdminCompat(root, auth, options.AuthStore, options.MemberProfileStore)
+	if options.MemberProfileStore != nil {
+		RegisterPublicTeamInviteCompat(root, options.MemberProfileStore.SystemDir, options.AuthStore, options.MemberProfileStore)
+	}
 	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	if options.MemberProfileStore != nil {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)
