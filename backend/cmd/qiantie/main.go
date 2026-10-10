@@ -103,7 +103,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodGet && req.URL.Path == "/api/novel-fetch-upload/upload-session" {
+		if (req.Method == http.MethodGet && req.URL.Path == "/api/novel-fetch-upload/upload-session") || (req.Method == http.MethodPost && req.URL.Path == "/api/novel-fetch-upload/upload-login") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
