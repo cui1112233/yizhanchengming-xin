@@ -113,3 +113,30 @@ func TestShuihuoSegmentVoiceSettingsPersist(t *testing.T) {
 		t.Fatalf("unexpected settings: %#v", got)
 	}
 }
+
+func TestShuihuoStoryboardEditingRoutes(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 4, Store: batchfactoryv11.NewMemoryStore()})
+	created := signedJSONRequest(t, api, now, "edit-user", http.MethodPost, "/api/shuihuo-production/projects", map[string]any{"name": "editing", "sourceText": "第一句\n第二句"})
+	project := decodeBody[map[string]any](t, created)
+	projectID := project["id"].(string)
+	confirmed := signedJSONRequest(t, api, now, "edit-user", http.MethodPost, "/api/shuihuo-production/projects/"+projectID+"/segmentation/confirm", map[string]any{"candidates": []map[string]any{{"text": "第一句"}, {"text": "第二句"}}})
+	if confirmed.Code != http.StatusOK {
+		t.Fatalf("confirm=%d body=%s", confirmed.Code, confirmed.Body.String())
+	}
+	body := decodeBody[map[string]any](t, confirmed)
+	segments := body["segments"].([]any)
+	firstID := segments[0].(map[string]any)["id"].(string)
+	inserted := signedJSONRequest(t, api, now, "edit-user", http.MethodPost, "/api/shuihuo-production/segments/"+firstID+"/insert-after", map[string]any{"sourceText": "插入句"})
+	if inserted.Code != http.StatusOK {
+		t.Fatalf("insert=%d body=%s", inserted.Code, inserted.Body.String())
+	}
+	bound := signedJSONRequest(t, api, now, "edit-user", http.MethodPut, "/api/shuihuo-production/segments/"+firstID+"/assets", map[string]any{"assetIds": []string{"asset-1"}})
+	if bound.Code != http.StatusOK {
+		t.Fatalf("bind=%d body=%s", bound.Code, bound.Body.String())
+	}
+	read := signedJSONRequest(t, api, now, "edit-user", http.MethodGet, "/api/shuihuo-production/projects?id="+projectID, nil)
+	if read.Code != http.StatusOK || !bytes.Contains(read.Body.Bytes(), []byte(`"segmentAssetIDs":{"`+firstID+`":["asset-1"]}`)) {
+		t.Fatalf("read=%d body=%s", read.Code, read.Body.String())
+	}
+}
