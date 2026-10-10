@@ -44,6 +44,7 @@ type RouterOptions struct {
 	ScriptHistoryStore        *ScriptHistoryStore
 	MemberProfileStore        *MemberProfileStore
 	MemberAvatarDir           string
+	UserConfigStore           *UserConfigStore
 	TextProvider              batchfactoryv11.DirectorProvider
 	LocalExecutors            *localexecutor.Service
 	GiantMaterialExecutor     *giantmaterialexecutor.Service
@@ -113,6 +114,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	RegisterScriptHistoryRoutes(root, auth, options.ScriptHistoryStore)
 	RegisterMemberProfileRoutes(root, auth, options.MemberProfileStore, options.AuthStore, options.MemberAvatarDir)
+	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore)
 	if options.TextProvider != nil {
 		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)
 		registerChatRoute(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
