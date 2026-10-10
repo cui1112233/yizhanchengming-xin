@@ -172,6 +172,17 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	}
 }
 
+func TestShouldBridgeLegacyAPIRequestKeepsH3TraceReadOnGo(t *testing.T) {
+	read := httptest.NewRequest(http.MethodGet, "/api/batch-factory/v12/batches/demo/books/book-1/h3/trace", nil)
+	if shouldBridgeLegacyAPIRequest(read, 1) {
+		t.Fatal("H3 trace read should use Go while H3 writes remain bridged")
+	}
+	write := httptest.NewRequest(http.MethodPost, "/api/batch-factory/v12/batches/demo/books/book-1/h3/trace", nil)
+	if !shouldBridgeLegacyAPIRequest(write, 1) {
+		t.Fatal("non-GET H3 trace path should keep the legacy bridge")
+	}
+}
+
 func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
 	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "")
 	if goAuthEnabled() {

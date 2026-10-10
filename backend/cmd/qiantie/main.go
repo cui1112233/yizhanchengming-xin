@@ -214,7 +214,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if shouldBridgeLegacyAPIForSlice(req.URL.Path, cfg.Slice) {
+		if shouldBridgeLegacyAPIRequest(req, cfg.Slice) {
 			authProxy.ServeHTTP(w, req)
 			return
 		}
@@ -313,6 +313,20 @@ func envOrDefault(key, fallback string) string {
 
 func shouldBridgeLegacyAPI(path string) bool {
 	return shouldBridgeLegacyAPIForSlice(path, -1)
+}
+
+// Read-only H3 traces are safe to serve from the Go store while the
+// provider-backed H3 writes continue using the legacy bridge.
+func shouldBridgeLegacyAPIRequest(req *http.Request, slice int) bool {
+	if req != nil && req.URL != nil && req.Method == http.MethodGet &&
+		strings.HasPrefix(req.URL.Path, "/api/batch-factory/v12/") &&
+		strings.HasSuffix(req.URL.Path, "/h3/trace") {
+		return false
+	}
+	if req == nil || req.URL == nil {
+		return false
+	}
+	return shouldBridgeLegacyAPIForSlice(req.URL.Path, slice)
 }
 
 // shouldBridgeLegacyAPIForSlice keeps staged V12 routes honest. A route is
