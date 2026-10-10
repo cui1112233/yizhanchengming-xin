@@ -31,6 +31,35 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	handler := middleware.Middleware(http.HandlerFunc(read))
 	root.Handle("GET /api/batch-rewrite/config", handler)
 	root.Handle("GET /api/batch-rewrite/bootstrap", handler)
+	root.Handle("GET /api/batch-rewrite/tasks", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		documents, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务失败"})
+			return
+		}
+		tasks := make([]map[string]any, 0, len(documents))
+		for _, document := range documents {
+			task := map[string]any{}
+			for key, value := range document.Meta {
+				task[key] = value
+			}
+			task["id"] = document.BookID
+			task["book_id"] = document.BookID
+			if _, ok := task["updated_at"]; !ok {
+				task["updated_at"] = document.UpdatedAt
+			}
+			if _, ok := task["original_chars"]; !ok {
+				task["original_chars"] = document.ProcessedChars
+			}
+			tasks = append(tasks, task)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
+	})))
 	root.Handle("POST /api/batch-rewrite/work-form", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
