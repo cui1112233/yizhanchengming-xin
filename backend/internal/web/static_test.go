@@ -14,6 +14,7 @@ func TestStaticHandlerServesIndexAndAssets(t *testing.T) {
 		"index.html":       &fstest.MapFile{Data: []byte("<html>home</html>")},
 		"assets/app.js":    &fstest.MapFile{Data: []byte("console.log('ok')")},
 		"assets/style.css": &fstest.MapFile{Data: []byte("body{}")},
+		"pets/stacky/spritesheet.webp": &fstest.MapFile{Data: []byte("pet")},
 	}
 	handler := StaticHandler(assets)
 
@@ -24,6 +25,7 @@ func TestStaticHandlerServesIndexAndAssets(t *testing.T) {
 		{"/", http.StatusOK},
 		{"/shuihuo-production", http.StatusOK},
 		{"/assets/app.js", http.StatusOK},
+		{"/pets/stacky/spritesheet.webp", http.StatusOK},
 		{"/missing.js", http.StatusNotFound},
 	} {
 		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
