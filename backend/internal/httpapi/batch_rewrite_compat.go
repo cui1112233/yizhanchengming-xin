@@ -2,8 +2,14 @@ package httpapi
 
 import (
 	"encoding/json"
+	"fmt"
+	"html"
+	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 )
@@ -226,6 +232,205 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
 	})))
+	root.Handle("POST /api/batch-rewrite/web-submit/sync-styles", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			Persist *bool `json:"persist"`
+		}
+		_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&body)
+		session := readUploadTargetSession(usersDir, identity.Username)
+		cookie := strings.TrimSpace(toString(session["cookie"]))
+		if cookie == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先保存账号密码并登录目标站"})
+			return
+		}
+		response, err := targetGET(req, "http://two.121w.com/tttadmin/zidingyi.php", cookie)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
+			return
+		}
+		styles := parseTargetStyles(response)
+		if len(styles) == 0 {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用风格目录"})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			return
+		}
+		app := mapOrEmpty(settings["appConfig"])
+		web := mapOrEmpty(app["web_submit"])
+		old := stringArray(settings["styles"])
+		web["style_catalog"] = styles
+		app["web_submit"] = web
+		settings["appConfig"] = app
+		if body.Persist == nil || *body.Persist {
+			settings["styles"] = styleNames(styles)
+			if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存风格目录失败"})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "styles": styleNames(styles), "style_sync": map[string]any{"old_count": len(old), "new_count": len(styles), "added": styleNames(styles), "removed": []any{}}, "output": []string{"已从视频管理系统同步风格目录"}})
+	})))
+	root.Handle("POST /api/batch-rewrite/web-submit/sync-configs", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			Persist *bool `json:"persist"`
+		}
+		_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&body)
+		session := readUploadTargetSession(usersDir, identity.Username)
+		cookie := strings.TrimSpace(toString(session["cookie"]))
+		if cookie == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先保存账号密码并登录目标站"})
+			return
+		}
+		response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档读取失败"})
+			return
+		}
+		var payload map[string]any
+		if json.Unmarshal(response, &payload) != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档返回格式无效"})
+			return
+		}
+		items, _ := payload["data"].([]any)
+		if len(items) == 0 {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用配置档"})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			return
+		}
+		app := mapOrEmpty(settings["appConfig"])
+		web := mapOrEmpty(app["web_submit"])
+		existing := mapOrEmpty(web)
+		local := []any{}
+		for _, item := range arrayOrEmpty(existing["upload_profiles"]) {
+			if strings.ToLower(toString(mapOrEmpty(item)["source"])) != "121" {
+				local = append(local, item)
+			}
+		}
+		groups := make([]any, 0, len(items))
+		for i, item := range items {
+			source := mapOrEmpty(item)
+			data := parseObject(source["config_data"])
+			id := toString(source["id"])
+			if id == "" {
+				id = fmt.Sprintf("%d", i+1)
+			}
+			gender := toString(data["gender"])
+			if gender == "1" {
+				gender = "男"
+			} else if gender == "2" {
+				gender = "女"
+			}
+			profile := map[string]any{"id": "121-" + id, "name": firstText(source["config_name"], "121 配置档 "+id), "enabled": true, "source": "121", "config_id": id, "is_default": targetNumber(source["is_default"]) == 1, "platform_id": firstText(data["platform_id"], source["platform_id"]), "gender": strings.ReplaceAll(gender, "频", ""), "style": firstText(data["style_name"], source["style_name"], data["style"]), "advanced": data}
+			groups = append(groups, profile)
+		}
+		web["upload_profiles"] = append(local, groups...)
+		app["web_submit"] = web
+		settings["appConfig"] = app
+		if body.Persist == nil || *body.Persist {
+			if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存配置档失败"})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "groups": groups, "output": []string{fmt.Sprintf("已从视频管理系统同步 %d 个配置档", len(groups))}})
+	})))
+}
+
+func targetGET(req *http.Request, url, cookie string) ([]byte, error) {
+	check, err := http.NewRequestWithContext(req.Context(), http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	check.Header.Set("Cookie", cookie)
+	response, err := (&http.Client{Timeout: 30 * time.Second}).Do(check)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	if err != nil || response.StatusCode < 200 || response.StatusCode >= 300 || strings.Contains(string(body), "管理员登录") {
+		return nil, fmt.Errorf("target request failed")
+	}
+	return body, nil
+}
+func parseTargetStyles(body []byte) []map[string]any {
+	re := regexp.MustCompile(`(?is)<select[^>]*\bid=["']style["'][^>]*>(.*?)</select>`)
+	match := re.FindSubmatch(body)
+	if len(match) < 2 {
+		return nil
+	}
+	option := regexp.MustCompile(`(?is)<option[^>]*value=["']([^"']+)["'][^>]*>(.*?)</option>`)
+	seen := map[string]bool{}
+	out := []map[string]any{}
+	for _, item := range option.FindAllSubmatch(match[1], -1) {
+		id, name := strings.TrimSpace(string(item[1])), strings.TrimSpace(regexp.MustCompile(`<[^>]+>`).ReplaceAllString(string(item[2]), ""))
+		name = html.UnescapeString(name)
+		if id != "" && name != "" && !strings.Contains(name, "请选择") && !seen[id] {
+			seen[id] = true
+			out = append(out, map[string]any{"id": id, "name": name})
+		}
+	}
+	return out
+}
+func styleNames(styles []map[string]any) []string {
+	out := make([]string, 0, len(styles))
+	for _, item := range styles {
+		out = append(out, toString(item["name"]))
+	}
+	return out
+}
+func stringArray(value any) []string {
+	out := []string{}
+	for _, item := range arrayOrEmpty(value) {
+		out = append(out, toString(item))
+	}
+	return out
+}
+func parseObject(value any) map[string]any {
+	if object, ok := value.(map[string]any); ok {
+		return object
+	}
+	var parsed map[string]any
+	if json.Unmarshal([]byte(toString(value)), &parsed) == nil && parsed != nil {
+		return parsed
+	}
+	return map[string]any{}
+}
+func firstText(values ...any) string {
+	for _, value := range values {
+		if text := strings.TrimSpace(toString(value)); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+func targetNumber(value any) float64 {
+	switch v := value.(type) {
+	case float64:
+		return v
+	case json.Number:
+		n, _ := v.Float64()
+		return n
+	}
+	n, _ := strconv.ParseFloat(strings.TrimSpace(toString(value)), 64)
+	return n
 }
 
 func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[string]any {
