@@ -71,7 +71,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodGet && (req.URL.Path == "/api/team-admin/teams" || strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/members")) {
+		if (req.Method == http.MethodGet && (req.URL.Path == "/api/team-admin/teams" || strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/members"))) || (req.Method == http.MethodPatch && strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/governance")) || (req.Method == http.MethodPut && strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/co-managers")) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}

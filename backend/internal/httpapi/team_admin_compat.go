@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -8,6 +9,69 @@ import (
 
 	"qiantie/backend/internal/auth"
 )
+
+func managedTeamState(profiles *MemberProfileStore) (string, map[string]any, []any) {
+	path := adminSystemFile(profiles.SystemDir, "team-collaboration.json")
+	state := map[string]any{"teams": []any{}, "invites": []any{}, "notifications": []any{}, "archives": []any{}}
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(raw, &state)
+	}
+	teams, _ := state["teams"].([]any)
+	return path, state, teams
+}
+
+func saveManagedTeamState(path string, state map[string]any) error {
+	raw, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, raw, 0o600)
+}
+
+func managedTeamByID(profiles *MemberProfileStore, id string) (string, map[string]any, map[string]any) {
+	path, state, teams := managedTeamState(profiles)
+	for _, raw := range teams {
+		if team, ok := raw.(map[string]any); ok && toString(team["id"]) == id {
+			return path, state, team
+		}
+	}
+	if strings.HasPrefix(id, "go-team-") {
+		manager := strings.TrimPrefix(id, "go-team-")
+		team := map[string]any{"id": id, "managerUsername": manager, "name": manager + "的团队", "coManagers": []any{}}
+		teams = append(teams, team)
+		state["teams"] = teams
+		return path, state, team
+	}
+	return path, state, nil
+}
+
+func teamAdminIdentity(req *http.Request, profiles *MemberProfileStore, accounts auth.Store) (map[string]any, bool) {
+	return teamActor(profiles, accounts, req)
+}
+
+func teamAdminCanAccess(actor, team map[string]any, ownerOnly bool) bool {
+	if actor == nil || team == nil || !teamCanManage(actor) {
+		return false
+	}
+	if toString(actor["role"]) == "dev" {
+		return true
+	}
+	if toString(team["managerUsername"]) == toString(actor["username"]) {
+		return true
+	}
+	return !ownerOnly && containsString(team["coManagers"], toString(actor["username"]))
+}
+
+func findAuthAccount(ctx context.Context, accounts auth.Store, username string) (auth.Account, error) {
+	return accounts.FindAccount(ctx, username)
+}
+
+func managedBool(value any) bool {
+	if parsed, ok := value.(bool); ok {
+		return parsed
+	}
+	return strings.EqualFold(toString(value), "true")
+}
 
 func readManagedTeams(profiles *MemberProfileStore) []map[string]any {
 	path := adminSystemFile(profiles.SystemDir, "team-collaboration.json")
@@ -110,6 +174,72 @@ func RegisterTeamAdminCompat(root *http.ServeMux, middleware BridgeAuth, account
 			team = goTeam(actor)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"team": team, "members": teamAdminMembers(accounts, profiles, manager, req)})
+	})))
+	root.Handle("PATCH /api/team-admin/teams/{teamId}/governance", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamAdminIdentity(req, profiles, accounts)
+		if !ok || actor == nil {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		var input struct {
+			MonthlyTokenLimit *int64 `json:"monthlyTokenLimit"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil || input.MonthlyTokenLimit != nil && (*input.MonthlyTokenLimit < 0 || *input.MonthlyTokenLimit > 10000000000) {
+			managedAccountError(w, http.StatusBadRequest, "月度额度不正确")
+			return
+		}
+		path, state, team := managedTeamByID(profiles, req.PathValue("teamId"))
+		if !teamAdminCanAccess(actor, team, false) {
+			managedAccountError(w, http.StatusForbidden, "无权修改该团队")
+			return
+		}
+		manager := toString(team["managerUsername"])
+		if err := updateManagedProfileFields(profiles, manager, func(row map[string]any) { row["monthlyTokenLimit"] = input.MonthlyTokenLimit }); err != nil || saveManagedTeamState(path, state) != nil {
+			managedAccountError(w, http.StatusInternalServerError, "团队额度保存失败")
+			return
+		}
+		managerProfile := profiles.member(manager, accounts)
+		writeJSON(w, http.StatusOK, map[string]any{"team": team, "manager": managerProfile, "governance": map[string]any{"monthlyTokenLimit": input.MonthlyTokenLimit}, "quota": map[string]any{"used": 0, "limit": input.MonthlyTokenLimit}})
+	})))
+	root.Handle("PUT /api/team-admin/teams/{teamId}/co-managers", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamAdminIdentity(req, profiles, accounts)
+		if !ok || actor == nil {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		var input struct {
+			Usernames []string `json:"usernames"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		path, state, team := managedTeamByID(profiles, req.PathValue("teamId"))
+		if !teamAdminCanAccess(actor, team, true) {
+			managedAccountError(w, http.StatusForbidden, "仅团队主负责人可设置联合管理员")
+			return
+		}
+		seen := map[string]bool{}
+		coManagers := make([]any, 0, len(input.Usernames))
+		for _, username := range input.Usernames {
+			username = strings.TrimSpace(username)
+			if username == "" || seen[username] || username == toString(team["managerUsername"]) {
+				continue
+			}
+			member := profiles.member(username, accounts)
+			if member == nil || toString(member["role"]) != "manager" || !managedBool(member["active"]) {
+				managedAccountError(w, http.StatusBadRequest, "联合管理员账号不可用")
+				return
+			}
+			seen[username] = true
+			coManagers = append(coManagers, username)
+		}
+		team["coManagers"] = coManagers
+		if err := saveManagedTeamState(path, state); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "联合管理员保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"team": team, "coManagers": coManagers})
 	})))
 }
 
