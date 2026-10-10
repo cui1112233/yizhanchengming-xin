@@ -674,19 +674,25 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if len(parts) == 2 && parts[1] == "tasks" && r.Method == http.MethodGet {
-			if production == nil {
-				writeJSON(w, http.StatusOK, map[string]any{"tasks": []any{}})
-				return
-			}
-			status, statusErr := production.GetBatchStatus(r.Context(), owner, batch.ID)
-			if statusErr != nil {
-				writeStoreError(w, statusErr)
-				return
-			}
 			tasks := make([]map[string]any, 0)
-			for _, job := range status.Jobs {
-				for _, task := range job.Tasks {
-					tasks = append(tasks, map[string]any{"id": task.ID, "status": task.Status, "kind": "video", "mediaUrl": task.MediaURL, "errorMessage": task.ErrorMessage, "requestId": job.RequestID, "createdAt": task.CreatedAt, "updatedAt": task.UpdatedAt})
+			if production != nil {
+				status, statusErr := production.GetBatchStatus(r.Context(), owner, batch.ID)
+				if statusErr != nil {
+					writeStoreError(w, statusErr)
+					return
+				}
+				for _, job := range status.Jobs {
+					for _, task := range job.Tasks {
+						tasks = append(tasks, map[string]any{"id": task.ID, "status": task.Status, "kind": "video", "mediaUrl": task.MediaURL, "errorMessage": task.ErrorMessage, "requestId": job.RequestID, "createdAt": task.CreatedAt, "updatedAt": task.UpdatedAt})
+					}
+				}
+			}
+			if len(batch.Books) > 0 {
+				for _, media := range storedShuihuoMedia(batch.Books[0]) {
+					if modelString(media, "kind") != "audio" {
+						continue
+					}
+					tasks = append(tasks, map[string]any{"id": modelString(media, "id"), "status": "completed", "kind": "audio", "segmentId": modelString(media, "segmentId"), "mediaUrl": "/api/shuihuo-production/media/" + modelString(media, "id") + "/download", "createdAt": media["createdAt"], "updatedAt": media["createdAt"]})
 				}
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
