@@ -319,7 +319,37 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if len(parts) == 2 && parts[1] == "asset-generation-config" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
-			writeJSON(w, http.StatusOK, map[string]any{})
+			if len(batch.Books) == 0 {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
+				return
+			}
+			config := storedShuihuoAssetGenerationConfig(batch)
+			if r.Method == http.MethodPut {
+				var input map[string]any
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				config = input
+				metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+				encoded, _ := json.Marshal(config)
+				var normalized map[string]any
+				if json.Unmarshal(encoded, &normalized) == nil {
+					metadata["shuihuoAssetGenerationConfig"] = normalized
+				}
+				if _, saveErr := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision}); saveErr != nil {
+					writeStoreError(w, saveErr)
+					return
+				}
+			}
+			writeJSON(w, http.StatusOK, config)
+			return
+		}
+		if len(parts) == 2 && parts[1] == "files" && r.Method == http.MethodGet {
+			if len(batch.Books) == 0 {
+				writeJSON(w, http.StatusOK, map[string]any{"hasSourceFile": false, "media": []any{}})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"hasSourceFile": strings.TrimSpace(batch.Books[0].TxtFileName) != "" || strings.TrimSpace(batch.Books[0].SourceText) != "", "media": storedShuihuoMedia(batch.Books[0])})
 			return
 		}
 		if len(parts) == 2 && parts[1] == "media" && r.Method == http.MethodPost {
@@ -1138,6 +1168,29 @@ func reorderShuihuoSegments(segments []map[string]any, ids []string) []map[strin
 		}
 	}
 	return ordered
+}
+
+func storedShuihuoAssetGenerationConfig(batch batchfactoryv11.Batch) map[string]any {
+	defaults := map[string]any{"textModelId": nil, "imageModelId": nil, "audioModelId": nil, "assetPresetId": "shuihuo-extract-assets", "characterSheetPresetId": nil, "aspectRatio": "16:9"}
+	if len(batch.Books) == 0 || batch.Books[0].SourceMetadata == nil {
+		return defaults
+	}
+	raw, ok := batch.Books[0].SourceMetadata["shuihuoAssetGenerationConfig"]
+	if !ok {
+		return defaults
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return defaults
+	}
+	var stored map[string]any
+	if json.Unmarshal(encoded, &stored) != nil {
+		return defaults
+	}
+	for key, value := range stored {
+		defaults[key] = value
+	}
+	return defaults
 }
 
 func storedShuihuoSegments(book batchfactoryv11.Book) []map[string]any {
