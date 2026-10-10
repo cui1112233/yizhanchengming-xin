@@ -300,6 +300,27 @@ func (s *MemberProfileStore) markAllNotificationsRead(username string) (int, err
 	return changed, s.writeCollaborationState(state)
 }
 
+func (s *MemberProfileStore) markNotificationRead(username, id string) (map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.readCollaborationState()
+	rows, _ := state["notifications"].([]any)
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok || row["username"] != username || fmt.Sprint(row["id"]) != id {
+			continue
+		}
+		if notificationUnread(row["readAt"]) {
+			row["readAt"] = time.Now().UTC().Format(time.RFC3339)
+			if err := s.writeCollaborationState(state); err != nil {
+				return nil, err
+			}
+		}
+		return row, nil
+	}
+	return nil, auth.ErrNotFound
+}
+
 func notificationLimit(raw string) int {
 	limit, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil || limit <= 0 {
@@ -536,5 +557,22 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"changed": changed})
+	})))
+	root.Handle("POST /api/member/notifications/{id}/read", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		entry, err := profiles.markNotificationRead(identity.Username, req.PathValue("id"))
+		if err != nil {
+			status := http.StatusBadRequest
+			if err == auth.ErrNotFound {
+				status = http.StatusNotFound
+			}
+			writeJSON(w, status, map[string]string{"error": "通知不存在"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"notification": entry})
 	})))
 }
