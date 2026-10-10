@@ -11,6 +11,19 @@ import (
 // the handoff, while the production workbench continues reading the intake
 // through its V11-compatible contract.
 func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
+	mux.HandleFunc("GET /api/batch-factory/v12/batches", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batches": batches})
+	})
 	mux.HandleFunc("POST /api/batch-factory/v12/intakes/novel-fetch", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

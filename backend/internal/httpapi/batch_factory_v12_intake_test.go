@@ -38,6 +38,15 @@ func TestV12NovelFetchIntakeUsesGoBatchStore(t *testing.T) {
 	}
 }
 
+func TestV12BatchListUsesGoBatchStore(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: batchfactoryv11.NewMemoryStore()})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestV12NovelFetchIntakeRejectsEmptyBookList(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: batchfactoryv11.NewMemoryStore()})
