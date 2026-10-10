@@ -117,6 +117,7 @@ func RegisterPublicTeamInviteCompat(root *http.ServeMux, systemDir string, accou
 		}
 		account, _ := accounts.FindAccount(req.Context(), input.Username)
 		member := managedAccountRow(account, managedProfile(profiles, input.Username))
+		appendPublicInviteNotifications(profiles, manager, member, team)
 		writeJSON(w, http.StatusCreated, map[string]any{"member": member, "team": team})
 	}))
 }
@@ -194,4 +195,18 @@ func inviteErrorStatus(err error) int {
 		return http.StatusConflict
 	}
 	return http.StatusBadRequest
+}
+
+func appendPublicInviteNotifications(profiles *MemberProfileStore, manager, member, team map[string]any) {
+	profiles.mu.Lock()
+	defer profiles.mu.Unlock()
+	state := profiles.readCollaborationState()
+	now := time.Now().UTC().Format(time.RFC3339)
+	rows := arrayOrEmpty(state["notifications"])
+	rows = append(rows,
+		map[string]any{"id": fmt.Sprintf("invite-%d-manager", time.Now().UnixNano()), "username": manager["username"], "type": "member.joined", "title": "新成员已加入团队", "message": fmt.Sprintf("%s（@%s）通过邀请加入了团队。", member["displayName"], member["username"]), "metadata": map[string]any{"username": member["username"], "teamId": team["id"]}, "createdAt": now, "readAt": nil},
+		map[string]any{"id": fmt.Sprintf("invite-%d-member", time.Now().UnixNano()), "username": member["username"], "type": "team.joined", "title": fmt.Sprintf("欢迎加入 %s", team["name"]), "message": fmt.Sprintf("你已加入 %s，API 权限与月度额度已按邀请策略配置。", team["name"]), "metadata": map[string]any{"teamId": team["id"], "managerUsername": manager["username"]}, "createdAt": now, "readAt": nil},
+	)
+	state["notifications"] = rows
+	_ = profiles.writeCollaborationState(state)
 }
