@@ -6,11 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-type MySQLStore struct{ DB *sql.DB }
+type MySQLStore struct {
+	DB              *sql.DB
+	LegacyConfigDir string
+}
 
 func NewMySQLStore(db *sql.DB) *MySQLStore { return &MySQLStore{DB: db} }
 
@@ -119,7 +124,26 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 	var raw []byte
 	err := s.DB.QueryRowContext(ctx, `SELECT settings_json FROM novel_fetch_workshop_configs WHERE owner_username=?`, owner).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
-		return map[string]any{}, nil
+		// The old Node frontend stores the model catalog in each user's
+		// api-config.json. Read it as a local compatibility fallback until the
+		// user saves the settings through the Go frontend. Secrets stay local and
+		// are never committed to the repository.
+		settings := map[string]any{}
+		if strings.TrimSpace(s.LegacyConfigDir) != "" {
+			raw, readErr := os.ReadFile(filepath.Join(s.LegacyConfigDir, owner, "api-config.json"))
+			if readErr == nil {
+				var legacy map[string]any
+				if json.Unmarshal(raw, &legacy) == nil {
+					if catalog, ok := legacy["modelCatalog"]; ok {
+						settings["modelCatalog"] = catalog
+					}
+					if version, ok := legacy["modelCatalogVersion"]; ok {
+						settings["modelCatalogVersion"] = version
+					}
+				}
+			}
+		}
+		return settings, nil
 	}
 	if err != nil {
 		return nil, err
@@ -131,7 +155,29 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 	if settings == nil {
 		settings = map[string]any{}
 	}
+	legacyCatalog := s.readLegacyModelCatalog(owner)
+	if catalog, ok := settings["modelCatalog"].([]any); !ok || len(catalog) == 0 {
+		if len(legacyCatalog) > 0 {
+			settings["modelCatalog"] = legacyCatalog
+		}
+	}
 	return settings, nil
+}
+
+func (s *MySQLStore) readLegacyModelCatalog(owner string) []any {
+	if s == nil || strings.TrimSpace(s.LegacyConfigDir) == "" {
+		return nil
+	}
+	raw, err := os.ReadFile(filepath.Join(s.LegacyConfigDir, owner, "api-config.json"))
+	if err != nil {
+		return nil
+	}
+	var legacy map[string]any
+	if json.Unmarshal(raw, &legacy) != nil {
+		return nil
+	}
+	catalog, _ := legacy["modelCatalog"].([]any)
+	return catalog
 }
 
 func (s *MySQLStore) PutConfig(ctx context.Context, owner string, settings map[string]any) error {

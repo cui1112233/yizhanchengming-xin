@@ -24,6 +24,16 @@ var novelFetchBookIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 var novelFetchVersionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 var novelFetchNumericIDPattern = regexp.MustCompile(`\d{10,25}`)
 
+var defaultNovelFetchPlatforms = []any{
+	map[string]any{"id": "1", "name": "黑岩付费"}, map[string]any{"id": "2", "name": "番茄付费"},
+	map[string]any{"id": "3", "name": "七猫付费"}, map[string]any{"id": "4", "name": "点众付费"},
+	map[string]any{"id": "7", "name": "番茄免费"}, map[string]any{"id": "15", "name": "知乎付费"},
+	map[string]any{"id": "20", "name": "掌阅付费"}, map[string]any{"id": "26", "name": "卓越付费"},
+	map[string]any{"id": "29", "name": "九州书城"}, map[string]any{"id": "31", "name": "掌文付费"},
+}
+
+var defaultNovelFetchStyles = []any{"古风虐文", "古风甜文", "古风通用", "年代虐文", "年代甜文", "年代通用", "现代虐文", "现代甜文", "现代悬疑", "现代通用", "男频都市", "现代女主", "玄幻", "历史", "爆款BGM", "家庭奇葩", "家庭伤感", "职场打脸"}
+
 type NovelFetchBridgeAuth struct {
 	Secret          string
 	Now             func() time.Time
@@ -890,6 +900,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				}
 			}
 		}
+		if len(platforms) == 0 {
+			for _, raw := range defaultNovelFetchPlatforms {
+				platform := raw.(map[string]any)
+				platforms = append(platforms, map[string]any{"id": platform["id"], "name": platform["name"]})
+			}
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"platforms": platforms})
 	})
 
@@ -906,11 +922,11 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		platforms, ok := settings["platforms"].([]any)
 		if !ok {
-			platforms = []any{}
+			platforms = append([]any(nil), defaultNovelFetchPlatforms...)
 		}
 		styles, ok := settings["styles"].([]any)
 		if !ok {
-			styles = []any{}
+			styles = append([]any(nil), defaultNovelFetchStyles...)
 		}
 		aiConfig, _ := settings["aiConfig"].(map[string]any)
 		if aiConfig == nil {

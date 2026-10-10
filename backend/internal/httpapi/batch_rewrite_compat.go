@@ -440,6 +440,12 @@ func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[str
 	}
 	platforms := arrayOrEmpty(settings["platforms"])
 	styles := arrayOrEmpty(settings["styles"])
+	if len(platforms) == 0 {
+		platforms = append([]any(nil), defaultNovelFetchPlatforms...)
+	}
+	if len(styles) == 0 {
+		styles = append([]any(nil), defaultNovelFetchStyles...)
+	}
 	knowledge := arrayOrEmptyMap(appConfig["knowledge"])
 	if lightweight {
 		knowledge = map[string]any{}

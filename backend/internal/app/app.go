@@ -51,6 +51,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		return nil, err
 	}
 	novelFetchStore := novelfetchworkshop.NewMySQLStore(db)
+	novelFetchStore.LegacyConfigDir = cfg.ScriptHistoryDir
 	var director *batchfactoryv11.DirectorService
 	var textProvider *batchfactoryv11.OpenAICompatibleProvider
 	if cfg.DirectorEndpoint != "" || cfg.DirectorAPIKey != "" || cfg.DirectorModel != "" {
