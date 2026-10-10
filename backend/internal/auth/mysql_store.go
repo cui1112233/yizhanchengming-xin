@@ -168,3 +168,32 @@ func (s *MySQLStore) RevokeOtherSessions(ctx context.Context, username, currentT
 	}
 	return result.RowsAffected()
 }
+
+// ListSessionsForUser returns the persisted login sessions. Token contains the
+// stored hash rather than the raw bearer token and is only used for display
+// and current-session comparison.
+func (s *MySQLStore) ListSessionsForUser(ctx context.Context, username string) ([]Session, error) {
+	if err := s.available(); err != nil {
+		return nil, err
+	}
+	if err := validateUsername(username); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT token_hash, expires_at, issued_at, browser, os, ip_hint FROM auth_sessions WHERE username = ? AND expires_at > ? ORDER BY issued_at DESC`, username, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]Session, 0)
+	for rows.Next() {
+		var session Session
+		var browser, osName, ipHint sql.NullString
+		if err := rows.Scan(&session.Token, &session.ExpiresAt, &session.IssuedAt, &browser, &osName, &ipHint); err != nil {
+			return nil, err
+		}
+		session.Username = username
+		session.Browser, session.OS, session.IPHint = browser.String, osName.String, ipHint.String
+		result = append(result, session)
+	}
+	return result, rows.Err()
+}

@@ -2,7 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -316,6 +318,18 @@ func notificationUnread(value any) bool {
 	return strings.TrimSpace(fmt.Sprint(value)) == ""
 }
 
+func persistedSessionHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func changeMemberPassword(ctx context.Context, username, currentPassword, newPassword, currentToken string, accounts auth.Store) (int64, error) {
 	account, err := accounts.FindAccount(ctx, username)
 	if err != nil {
@@ -447,6 +461,68 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"entries": entries, "unread": unread})
+	})))
+	root.Handle("GET /api/member/security", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		member := profiles.member(identity.Username, accounts)
+		if member == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "账号不存在"})
+			return
+		}
+		sessions := []map[string]any{}
+		if listing, ok := accounts.(interface {
+			ListSessionsForUser(context.Context, string) ([]auth.Session, error)
+		}); ok {
+			if persisted, err := listing.ListSessionsForUser(req.Context(), identity.Username); err == nil {
+				currentHash := persistedSessionHash(bearerToken(req))
+				for _, session := range persisted {
+					sessions = append(sessions, map[string]any{
+						"id":       session.Token[:minInt(10, len(session.Token))],
+						"current":  bearerToken(req) != "" && session.Token == currentHash,
+						"issuedAt": session.IssuedAt,
+						"browser":  session.Browser,
+						"os":       session.OS,
+						"ipHint":   session.IPHint,
+					})
+				}
+			}
+		}
+		other := 0
+		for _, session := range sessions {
+			if current, _ := session["current"].(bool); !current {
+				other++
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"account":            member,
+			"mfa":                map[string]any{"enabled": false, "enabledAt": nil, "recoveryCodesRemaining": 0, "setupPending": false},
+			"sessions":           sessions,
+			"persistentSessions": []any{},
+			"otherSessionCount":  other,
+		})
+	})))
+	root.Handle("POST /api/member/security/sessions/revoke-others", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		revoked := int64(0)
+		if revoker, ok := accounts.(interface {
+			RevokeOtherSessions(context.Context, string, string) (int64, error)
+		}); ok {
+			count, err := revoker.RevokeOtherSessions(req.Context(), identity.Username, bearerToken(req))
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "退出其他设备失败"})
+				return
+			}
+			revoked = count
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"revoked": revoked})
 	})))
 	root.Handle("POST /api/member/notifications/read-all", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
