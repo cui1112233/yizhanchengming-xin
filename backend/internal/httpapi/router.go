@@ -157,6 +157,11 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.UserConfigStore != nil {
 		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)
 		RegisterAgentChatCompat(root, auth, options.UserConfigStore.BaseDir, options.TextProvider)
+		systemDir := ""
+		if options.MemberProfileStore != nil {
+			systemDir = options.MemberProfileStore.SystemDir
+		}
+		RegisterAgentSkillsCompat(root, auth, systemDir, options.UserConfigStore.BaseDir)
 	}
 	if options.TextProvider != nil {
 		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)
