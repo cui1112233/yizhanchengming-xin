@@ -23,6 +23,23 @@ function Check-Url([string]$Path, [int]$ExpectedStatus) {
 
 Check-Url '/health' 200
 Check-Url '/' 200
+Check-Url '/novel-fetch' 200
+Check-Url '/novel-panel' 200
+Check-Url '/shuihuo-production' 200
+Check-Url '/settings' 200
+
+try {
+  $build = Invoke-RestMethod -Uri ($BaseUrl + '/api/runtime-build-info') -TimeoutSec 5
+  if (-not $build.git_sha -or $build.service -ne 'go-api') {
+    Write-Output 'FAIL /api/runtime-build-info returned an invalid Go build identity'
+    $failed = $true
+  } else {
+    Write-Output "PASS /api/runtime-build-info ($($build.git_sha))"
+  }
+} catch {
+  Write-Output "FAIL /api/runtime-build-info: $($_.Exception.Message)"
+  $failed = $true
+}
 
 if ($failed) { exit 1 }
 Write-Output "Local Go runtime checks passed: $BaseUrl"
