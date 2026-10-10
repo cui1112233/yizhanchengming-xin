@@ -60,6 +60,53 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 	})))
+	root.Handle("GET /api/batch-rewrite/tasks/{id}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		bookID := req.PathValue("id")
+		document, err := store.GetDocument(req.Context(), identity.Username, bookID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+			return
+		}
+		meta := map[string]any{}
+		for key, value := range document.Meta {
+			meta[key] = value
+		}
+		meta["id"] = document.BookID
+		meta["book_id"] = document.BookID
+		meta["updated_at"] = document.UpdatedAt
+		if document.MaxTxt > 0 {
+			meta["max_txt"] = document.MaxTxt
+		}
+		aiTexts := make([]map[string]any, 0, len(document.Versions))
+		for version, raw := range document.Versions {
+			item := map[string]any{"name": version, "version": version}
+			if value, ok := raw.(map[string]any); ok {
+				for key, field := range value {
+					item[key] = field
+				}
+			} else if text, ok := raw.(string); ok {
+				item["text"] = text
+			}
+			aiTexts = append(aiTexts, item)
+		}
+		original := document.Original
+		if original == "" {
+			original = document.ProcessedText
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"meta":             meta,
+			"original":         original,
+			"original_raw":     document.OriginalRaw,
+			"ai_texts":         aiTexts,
+			"has_original_raw": document.OriginalRaw != "",
+			"logs":             document.Logs,
+		})
+	})))
 	root.Handle("POST /api/batch-rewrite/work-form", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
