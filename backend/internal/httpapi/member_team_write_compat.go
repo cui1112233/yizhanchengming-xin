@@ -11,6 +11,22 @@ import (
 	"qiantie/backend/internal/auth"
 )
 
+var managedAPIScopes = map[string]bool{"text": true, "image": true, "video": true, "tts": true}
+
+func updateManagedProfileFields(profiles *MemberProfileStore, username string, update func(map[string]any)) error {
+	profiles.mu.Lock()
+	defer profiles.mu.Unlock()
+	rows := profiles.readArray("member-profiles.json")
+	profile := managedProfileUnlocked(rows, username)
+	if profile == nil {
+		profile = map[string]any{"username": username}
+		rows = append(rows, profile)
+	}
+	update(profile)
+	profile["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
+	return profiles.writeArray("member-profiles.json", rows)
+}
+
 func updateMemberArchive(profiles *MemberProfileStore, username, actor, reason string, restored bool) (map[string]any, error) {
 	profiles.mu.Lock()
 	defer profiles.mu.Unlock()
@@ -288,6 +304,102 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 		}
 		account, _ := accounts.FindAccount(req.Context(), username)
 		writeJSON(w, http.StatusOK, map[string]any{"member": managedAccountRow(account, managedProfile(profiles, username)), "archive": archive, "revoked": 0})
+	})))
+	root.Handle("POST /api/member/team/members/{username}/api", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		username := req.PathValue("username")
+		member := profiles.member(username, accounts)
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权修改成员 API 权限")
+			return
+		}
+		if member == nil || toString(member["role"]) != "member" {
+			managedAccountError(w, http.StatusNotFound, "成员不存在")
+			return
+		}
+		if toString(actor["role"]) == "manager" && toString(member["boundTo"]) != toString(actor["username"]) {
+			managedAccountError(w, http.StatusForbidden, "不能修改其他团队成员")
+			return
+		}
+		var input struct {
+			Enabled bool   `json:"enabled"`
+			Scope   string `json:"scope"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		scope := strings.TrimSpace(input.Scope)
+		if scope == "" {
+			scope = "*"
+		}
+		if scope != "*" && !managedAPIScopes[scope] {
+			managedAccountError(w, http.StatusBadRequest, "API scope 不合法")
+			return
+		}
+		if err := updateManagedProfileFields(profiles, username, func(row map[string]any) {
+			row["apiEnabled"] = input.Enabled
+			if input.Enabled && scope != "*" {
+				row["apiScopes"] = []string{scope}
+			} else if !input.Enabled {
+				row["apiScopes"] = []string{}
+			}
+		}); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "成员权限保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"member": profiles.member(username, accounts)})
+	})))
+	root.Handle("PUT /api/member/team/members/{username}/api-scopes", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		username := req.PathValue("username")
+		member := profiles.member(username, accounts)
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权修改成员 API 权限")
+			return
+		}
+		if member == nil || toString(member["role"]) != "member" {
+			managedAccountError(w, http.StatusNotFound, "成员不存在")
+			return
+		}
+		if toString(actor["role"]) == "manager" && toString(member["boundTo"]) != toString(actor["username"]) {
+			managedAccountError(w, http.StatusForbidden, "不能修改其他团队成员")
+			return
+		}
+		var input struct {
+			Scopes []string `json:"scopes"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		seen := map[string]bool{}
+		scopes := make([]string, 0, len(input.Scopes))
+		for _, scope := range input.Scopes {
+			scope = strings.TrimSpace(scope)
+			if scope == "" || seen[scope] {
+				continue
+			}
+			if !managedAPIScopes[scope] {
+				managedAccountError(w, http.StatusBadRequest, "API scopes 不合法")
+				return
+			}
+			seen[scope] = true
+			scopes = append(scopes, scope)
+		}
+		if err := updateManagedProfileFields(profiles, username, func(row map[string]any) { row["apiScopes"] = scopes; row["apiEnabled"] = len(scopes) > 0 }); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "成员权限保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"member": profiles.member(username, accounts)})
 	})))
 	root.Handle("POST /api/member/team/members/{username}/restore", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		actor, ok := teamActor(profiles, accounts, req)

@@ -161,7 +161,7 @@ func (s *MemberProfileStore) member(ctxUsername string, accounts auth.Store) map
 		role = value
 	}
 	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": account.IsOwner}
-	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit"} {
+	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit", "apiEnabled", "apiScopes"} {
 		if value, ok := profile[key]; ok {
 			member[key] = value
 		}
