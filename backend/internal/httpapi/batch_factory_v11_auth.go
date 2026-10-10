@@ -135,6 +135,9 @@ func (a BridgeAuth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, err := a.authenticate(req)
 		if err != nil {
+			if bearerToken(req) != "" {
+				w.Header().Set("X-Qiantie-Auth-Failure", "session")
+			}
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))

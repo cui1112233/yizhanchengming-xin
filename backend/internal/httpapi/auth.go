@@ -80,11 +80,13 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 					return
 				}
 			}
+			w.Header().Set("X-Qiantie-Auth-Failure", "session")
 			writeAuthError(w, http.StatusUnauthorized, "登录已失效，请重新登录")
 			return
 		}
 		account, err := options.Store.FindAccount(r.Context(), session.Username)
 		if err != nil || !account.Active {
+			w.Header().Set("X-Qiantie-Auth-Failure", "session")
 			writeAuthError(w, http.StatusUnauthorized, "登录已失效，请重新登录")
 			return
 		}

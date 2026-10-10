@@ -123,6 +123,9 @@ func (a NovelFetchBridgeAuth) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, err := a.authenticate(req)
 		if err != nil {
+			if bearerToken(req) != "" {
+				w.Header().Set("X-Qiantie-Auth-Failure", "session")
+			}
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 			return
 		}
