@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"qiantie/backend/internal/auth"
@@ -164,5 +165,34 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"invites": invites})
+	})))
+	root.Handle("GET /api/member/team/audit", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		self := profiles.member(identity.Username, accounts)
+		if self == nil || !teamCanManage(self) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权查看团队操作日志"})
+			return
+		}
+		limit := 100
+		if raw := req.URL.Query().Get("limit"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+				limit = parsed
+			}
+		}
+		if limit > 500 {
+			limit = 500
+		}
+		entries := []map[string]any{}
+		if raw, err := os.ReadFile(adminSystemFile(profiles.SystemDir, "team-audit.json")); err == nil {
+			_ = json.Unmarshal(raw, &entries)
+		}
+		if len(entries) > limit {
+			entries = entries[len(entries)-limit:]
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
 	})))
 }
