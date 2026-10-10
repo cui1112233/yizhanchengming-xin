@@ -1,13 +1,17 @@
 package httpapi
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -251,4 +255,56 @@ func RegisterNovelPanelAssetCompat(root *http.ServeMux, middleware BridgeAuth, u
 	root.Handle("GET /api/reference-assets/file/{assetType}/{assetId}/{variant}", handler)
 	root.Handle("POST /api/reference-assets/upload", handler)
 	root.Handle("POST /api/reference-assets/use-source-as-main", handler)
+	root.Handle("GET /api/novel-panel/reference-assets/public/{username}/{assetType}/{assetId}/{variant}", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		username := strings.TrimSpace(req.PathValue("username"))
+		assetType := strings.ToLower(strings.TrimSpace(req.PathValue("assetType")))
+		assetID := strings.TrimSpace(req.PathValue("assetId"))
+		variant := strings.ToLower(strings.TrimSpace(req.PathValue("variant")))
+		expiresAt, err := strconv.ParseInt(req.URL.Query().Get("expires"), 10, 64)
+		secret := strings.TrimSpace(os.Getenv("QIANTIE_REFERENCE_ASSET_SIGNING_SECRET"))
+		if secret == "" || err != nil || expiresAt <= time.Now().Unix() || !validPanelUsername(username) || !validPanelAssetType(assetType) || !validPanelAssetID(assetID) || !validPanelAssetVariant(variant) || !validReferenceAssetSignature(secret, username, assetType, assetID, variant, expiresAt, req.URL.Query().Get("sig")) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "参考图链接已失效"})
+			return
+		}
+		path := panelAssetPath(usersDir, username, assetType, assetID, variant)
+		if path == "" {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "参考图片不存在。"})
+			return
+		}
+		mime := "image/png"
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".jpg", ".jpeg":
+			mime = "image/jpeg"
+		case ".webp":
+			mime = "image/webp"
+		}
+		w.Header().Set("Cache-Control", "private, max-age=300")
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		http.ServeFile(w, req, path)
+	}))
+}
+
+func validPanelUsername(value string) bool {
+	if value == "" || len(value) > 120 || strings.ContainsAny(value, `/\\`) {
+		return false
+	}
+	for _, r := range value {
+		if !(r == '_' || r == '-' || r == '.' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func validReferenceAssetSignature(secret, username, assetType, assetID, variant string, expiresAt int64, provided string) bool {
+	payload := strings.Join([]string{username, assetType, assetID, variant, strconv.FormatInt(expiresAt, 10)}, "\n")
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(payload))
+	expected := mac.Sum(nil)
+	actual, err := hex.DecodeString(strings.TrimSpace(provided))
+	if err != nil || len(actual) != len(expected) {
+		return false
+	}
+	return hmac.Equal(actual, expected)
 }
