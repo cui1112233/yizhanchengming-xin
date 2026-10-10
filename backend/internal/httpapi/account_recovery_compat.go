@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/auth"
 )
 
 // RegisterAccountRecoveryStatusCompat serves the harmless read-only portion of
@@ -115,6 +118,76 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"verified": true, "email": email, "verifiedAt": now.Format(time.RFC3339)})
 	}))
+	root.Handle("POST /api/account-recovery/password/reset", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		var input struct {
+			Token    string `json:"token"`
+			Password string `json:"password"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		if len(input.Password) < 8 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "新密码至少需要 8 位"})
+			return
+		}
+		path := filepath.Join(systemDir, "account-recovery.json")
+		state := map[string]any{}
+		if raw, err := os.ReadFile(path); err == nil {
+			if json.Unmarshal(raw, &state) != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "账号找回状态损坏"})
+				return
+			}
+		}
+		digest := sha256.Sum256([]byte(strings.TrimSpace(input.Token)))
+		digestText := hex.EncodeToString(digest[:])
+		now := time.Now().UTC()
+		var matched map[string]any
+		for _, value := range recoveryPasswordTokens(state) {
+			row, ok := value.(map[string]any)
+			if !ok || fmt.Sprint(row["tokenDigest"]) != digestText {
+				continue
+			}
+			if recoveryTokenUsed(row["usedAt"]) {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "重置链接已使用"})
+				return
+			}
+			expires, err := time.Parse(time.RFC3339, fmt.Sprint(row["expiresAt"]))
+			if err != nil || !expires.After(now) {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "重置链接已过期"})
+				return
+			}
+			matched = row
+			break
+		}
+		if matched == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "重置链接无效"})
+			return
+		}
+		username := fmt.Sprint(matched["username"])
+		account, err := middleware.AuthStore.FindAccount(req.Context(), username)
+		if err != nil || !account.Active {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "账号当前不可用"})
+			return
+		}
+		hash, algorithm, err := auth.HashPassword(input.Password)
+		if err != nil || middleware.AuthStore.UpdatePassword(req.Context(), username, hash, algorithm) != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "密码保存失败"})
+			return
+		}
+		matched["usedAt"] = now.Format(time.RFC3339)
+		if err := writeRecoveryState(path, state); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "重置状态保存失败"})
+			return
+		}
+		var revoked int64
+		if revoker, ok := middleware.AuthStore.(interface {
+			RevokeOtherSessions(context.Context, string, string) (int64, error)
+		}); ok {
+			revoked, _ = revoker.RevokeOtherSessions(req.Context(), username, "")
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"reset": true, "revoked": revoked})
+	}))
 }
 
 func recoveryVerifiedEmails(state map[string]any) []any {
@@ -124,6 +197,11 @@ func recoveryVerifiedEmails(state map[string]any) []any {
 
 func recoveryEmailTokens(state map[string]any) []any {
 	values, _ := state["emailTokens"].([]any)
+	return values
+}
+
+func recoveryPasswordTokens(state map[string]any) []any {
+	values, _ := state["passwordResetTokens"].([]any)
 	return values
 }
 
