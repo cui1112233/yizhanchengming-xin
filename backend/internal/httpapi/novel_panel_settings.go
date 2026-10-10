@@ -332,4 +332,27 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"message": "连接成功。", "username": identity.Username})
 	})))
+	for _, item := range []struct{ method, pattern, target string }{
+		{http.MethodGet, "/api/novel-panel/settings", "/api/settings"},
+		{http.MethodPost, "/api/novel-panel/settings", "/api/settings"},
+		{http.MethodGet, "/api/novel-panel/runtime-config", "/api/runtime-config"},
+		{http.MethodPost, "/api/novel-panel/runtime-config", "/api/runtime-config"},
+		{http.MethodGet, "/api/novel-panel/image-settings", "/api/image-settings"},
+		{http.MethodPost, "/api/novel-panel/image-settings", "/api/image-settings"},
+		{http.MethodPost, "/api/novel-panel/image-settings/test", "/api/image-settings/test"},
+		{http.MethodPost, "/api/novel-panel/settings/test", "/api/settings/test"},
+	} {
+		root.Handle(item.method+" "+item.pattern, panelSettingsAliasHandler(handler))
+	}
+}
+
+func panelSettingsAliasHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		clone := req.Clone(req.Context())
+		urlCopy := *req.URL
+		urlCopy.Path = strings.Replace(urlCopy.Path, "/api/novel-panel/", "/api/", 1)
+		urlCopy.RawPath = ""
+		clone.URL = &urlCopy
+		handler.ServeHTTP(w, clone)
+	})
 }
