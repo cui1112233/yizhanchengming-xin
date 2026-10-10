@@ -581,7 +581,22 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if len(parts) == 2 && parts[1] == "voice-settings" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
-			writeJSON(w, http.StatusOK, map[string]any{"settings": map[string]any{}})
+			settings := map[string]any{}
+			if len(batch.Books) > 0 {
+				for _, segment := range storedShuihuoSegments(batch.Books[0]) {
+					segmentID := modelString(segment, "id")
+					if segmentID == "" {
+						continue
+					}
+					settings[segmentID] = map[string]any{
+						"voiceAssetId": segment["voiceAssetId"],
+						"speechRate":   segment["speechRate"],
+						"pitch":        segment["pitch"],
+					}
+				}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+			return
 			return
 		}
 		if len(parts) == 2 && parts[1] == "asset-generation-config" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
@@ -1182,7 +1197,12 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		segmentID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/segments/"), "/")
+		segmentPath := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/segments/"), "/")
+		voiceSettingsRoute := strings.HasSuffix(segmentPath, "/voice-settings")
+		if voiceSettingsRoute {
+			segmentPath = strings.TrimSuffix(segmentPath, "/voice-settings")
+		}
+		segmentID := strings.Trim(segmentPath, "/")
 		if segmentID == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "segment id is required"})
 			return
@@ -1220,13 +1240,25 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				if !decodeJSON(w, r, &input) {
 					return
 				}
-				for _, key := range []string{"sourceText", "subtitleText", "speaker", "imagePrompt", "videoPrompt"} {
+				keys := []string{"sourceText", "subtitleText", "speaker", "imagePrompt", "videoPrompt"}
+				if voiceSettingsRoute {
+					keys = []string{"voiceAssetId", "speechRate", "pitch"}
+				}
+				for _, key := range keys {
 					if value, exists := input[key]; exists {
 						segments[index][key] = value
 					}
 				}
 				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
 					writeStoreError(w, err)
+					return
+				}
+				if voiceSettingsRoute {
+					writeJSON(w, http.StatusOK, map[string]any{
+						"voiceAssetId": segments[index]["voiceAssetId"],
+						"speechRate":   segments[index]["speechRate"],
+						"pitch":        segments[index]["pitch"],
+					})
 					return
 				}
 			case http.MethodDelete:
