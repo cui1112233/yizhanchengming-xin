@@ -83,7 +83,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodGet && (req.URL.Path == "/api/novel-panel/diagnostics" || req.URL.Path == "/api/novel-panel/diagnostics/traces" || req.URL.Path == "/api/novel-panel/diagnostics/self-check" || req.URL.Path == "/api/novel-panel/projects" || strings.HasPrefix(req.URL.Path, "/api/novel-panel/projects/") || strings.HasPrefix(req.URL.Path, "/api/novel-panel/diagnostics/trace/")) {
+		if (req.Method == http.MethodGet && (req.URL.Path == "/api/novel-panel/diagnostics" || req.URL.Path == "/api/novel-panel/diagnostics/traces" || req.URL.Path == "/api/novel-panel/diagnostics/self-check" || req.URL.Path == "/api/novel-panel/projects" || req.URL.Path == "/api/novel-panel/draft" || strings.HasPrefix(req.URL.Path, "/api/novel-panel/projects/") || strings.HasPrefix(req.URL.Path, "/api/novel-panel/diagnostics/trace/"))) || (req.Method == http.MethodPut && req.URL.Path == "/api/novel-panel/draft") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}

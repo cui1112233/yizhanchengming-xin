@@ -236,6 +236,49 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})))
+	root.Handle("GET /api/novel-panel/draft", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		path := filepath.Join(usersDir, identity.Username, "novel-panel", "draft.json")
+		var draft any
+		if raw, err := os.ReadFile(path); err == nil {
+			if json.Unmarshal(raw, &draft) != nil {
+				managedAccountError(w, http.StatusInternalServerError, "草稿数据无效")
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"draft": draft})
+	})))
+	root.Handle("PUT /api/novel-panel/draft", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		var payload map[string]any
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 32<<20)).Decode(&payload) != nil {
+			managedAccountError(w, http.StatusBadRequest, "草稿内容无效")
+			return
+		}
+		draft := payload
+		if candidate, ok := payload["draft"].(map[string]any); ok {
+			draft = candidate
+		}
+		directory := filepath.Join(usersDir, identity.Username, "novel-panel")
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "草稿目录不可写")
+			return
+		}
+		raw, err := json.MarshalIndent(draft, "", "  ")
+		if err != nil || os.WriteFile(filepath.Join(directory, "draft.json"), raw, 0o600) != nil {
+			managedAccountError(w, http.StatusInternalServerError, "草稿保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"draft": draft})
+	})))
 }
 
 func readNovelPanelDiagnostics(usersDir, username string, limit int) []map[string]any {
