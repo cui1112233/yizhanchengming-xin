@@ -67,6 +67,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodGet && req.URL.Path == "/api/member/me" {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if shouldBridgeLegacyAPI(req.URL.Path) {
 			authProxy.ServeHTTP(w, req)
 			return
