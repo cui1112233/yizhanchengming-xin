@@ -23,3 +23,15 @@ func TestReferenceAssetSignatureRejectsTamperingAndAcceptsValidPayload(t *testin
 		t.Fatal("tampered variant must be rejected")
 	}
 }
+
+func TestLegacyTOSAssetURLRejectsNonTOSTargets(t *testing.T) {
+	if _, err := legacyTOSAssetURL("https://example.com/reference-assets/a.png"); err == nil {
+		t.Fatal("non-TOS host must be rejected")
+	}
+	if _, err := legacyTOSAssetURL("http://tos-cn-beijing.volces.com/reference-assets/a.png"); err == nil {
+		t.Fatal("non-HTTPS target must be rejected")
+	}
+	if target, err := legacyTOSAssetURL("https://tos-cn-beijing.volces.com/reference-assets/a.png?X-Tos-Signature=ok"); err != nil || target == "" {
+		t.Fatalf("valid TOS target rejected: %v", err)
+	}
+}

@@ -8,7 +8,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -283,6 +285,48 @@ func RegisterNovelPanelAssetCompat(root *http.ServeMux, middleware BridgeAuth, u
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		http.ServeFile(w, req, path)
 	}))
+	root.Handle("GET /api/novel-panel/reference-assets/legacy", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		target, err := legacyTOSAssetURL(req.URL.Query().Get("url"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "旧图片地址无效，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_INVALID"})
+			return
+		}
+		ctx := req.Context()
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "旧图片无法读取，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_NOT_FOUND"})
+			return
+		}
+		response, err := (&http.Client{Timeout: 15 * time.Second}).Do(request)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "旧图片无法读取，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_NOT_FOUND"})
+			return
+		}
+		defer response.Body.Close()
+		contentType := strings.ToLower(strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0]))
+		if response.StatusCode < 200 || response.StatusCode >= 300 || (contentType != "image/png" && contentType != "image/jpeg" && contentType != "image/webp") {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "旧图片无法读取，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_NOT_FOUND"})
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+		if err != nil || len(body) == 0 {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "旧图片无法读取，请重新上传。", "code": "REFERENCE_ASSET_LEGACY_NOT_FOUND"})
+			return
+		}
+		w.Header().Set("Cache-Control", "private, max-age=300")
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+	})))
+}
+
+func legacyTOSAssetURL(raw string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || !strings.HasSuffix(strings.ToLower(parsed.Hostname()), ".volces.com") || !strings.Contains(parsed.Path, "/reference-assets/") {
+		return "", fmt.Errorf("unsupported legacy asset url")
+	}
+	return parsed.String(), nil
 }
 
 func validPanelUsername(value string) bool {
