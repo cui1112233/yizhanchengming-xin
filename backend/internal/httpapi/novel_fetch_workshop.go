@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -20,10 +21,11 @@ var novelFetchBookIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 var novelFetchVersionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 
 type NovelFetchBridgeAuth struct {
-	Secret  string
-	Now     func() time.Time
-	MaxSkew time.Duration
-	Users   BridgeUserResolver
+	Secret    string
+	Now       func() time.Time
+	MaxSkew   time.Duration
+	Users     BridgeUserResolver
+	AuthStore auth.Store
 }
 
 func novelFetchCanonicalPayload(username, issuedAt, owner, method, pathname string) string {
@@ -37,6 +39,21 @@ func novelFetchSignature(secret, payload string) string {
 }
 
 func (a NovelFetchBridgeAuth) authenticate(req *http.Request) (BridgeIdentity, error) {
+	if token := bearerToken(req); token != "" && a.AuthStore != nil {
+		now := time.Now
+		if a.Now != nil {
+			now = a.Now
+		}
+		session, err := a.AuthStore.FindSession(req.Context(), token, now().UTC())
+		if err != nil {
+			return BridgeIdentity{}, errors.New("invalid login session")
+		}
+		account, err := a.AuthStore.FindAccount(req.Context(), session.Username)
+		if err != nil || !account.Active {
+			return BridgeIdentity{}, errors.New("inactive login account")
+		}
+		return BridgeIdentity{Username: account.Username, IsOwner: account.IsOwner}, nil
+	}
 	if strings.TrimSpace(a.Secret) == "" {
 		return BridgeIdentity{}, errors.New("bridge secret is not configured")
 	}

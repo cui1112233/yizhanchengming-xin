@@ -98,7 +98,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		novelFetch := http.NewServeMux()
 		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
-		root.Handle("/api/novel-fetch-workshop/", NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users}.Middleware(novelFetch))
+		root.Handle("/api/novel-fetch-workshop/", NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore}.Middleware(novelFetch))
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
 		if options.Health != nil && options.Health(req.Context()) != nil {

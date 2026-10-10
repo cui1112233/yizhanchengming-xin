@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -168,6 +169,28 @@ func TestNovelFetchWorkshopRejectsUnsignedRequest(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestNovelFetchWorkshopAcceptsBrowserSessionToken(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := novelfetchworkshop.NewMemoryStore()
+	authStore := &authTestStore{
+		account: auth.Account{Username: "alice", Active: true, IsOwner: true},
+		session: auth.Session{Token: "browser-token", Username: "alice", ExpiresAt: now.Add(time.Hour)},
+	}
+	handler := NewRouter(RouterOptions{
+		BridgeSecret:    "unused-bridge-secret",
+		Now:             func() time.Time { return now },
+		AuthStore:       authStore,
+		NovelFetchStore: store,
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/novel-fetch-workshop/tasks", nil)
+	req.Header.Set("Authorization", "Bearer browser-token")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("browser session status=%d body=%s", res.Code, res.Body.String())
 	}
 }
 
