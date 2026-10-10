@@ -360,6 +360,27 @@ func TestNovelFetchWorkshopFetchOriginalPersistsRawAndProcessedText(t *testing.T
 	}
 }
 
+func TestNovelFetchWorkshopRestoreOriginalReprocessesStoredRawText(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "完整原文内容", ProcessedText: "旧版本", Original: "旧版本", MaxTxt: 4}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	restore := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/12345678901/restore-original", nil, now, secret)
+	if restore.Code != http.StatusOK {
+		t.Fatalf("restore status=%d body=%s", restore.Code, restore.Body.String())
+	}
+	document, err := store.GetDocument(context.Background(), "tester", "12345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.OriginalRaw != "完整原文内容" || document.ProcessedText != "完整原文" || document.Meta["originalStatus"] != "restored" {
+		t.Fatalf("restore mismatch: %#v", document)
+	}
+}
+
 func TestNovelFetchMemoryStoreIsOwnerScoped(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutDocument(context.Background(), "alice", novelfetchworkshop.Document{BookID: "same", Original: "alice"}); err != nil {
