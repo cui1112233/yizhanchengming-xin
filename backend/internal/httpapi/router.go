@@ -126,7 +126,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterAccountPasskeyCompat(root, auth, options.MemberProfileStore)
 	}
 	RegisterNovelPanelDiagnosticsCompat(root, auth, options.UserDataDir)
-	RegisterNovelPanelSettingsCompat(root, auth, options.UserConfigStore)
+	RegisterNovelPanelSettingsCompat(root, auth, options.UserConfigStore, options.TextProvider)
 	RegisterNovelPanelAssetCompat(root, auth, options.UserDataDir)
 	RegisterNovelPanelCharacterCompat(root, auth)
 	RegisterNovelPanelLeaseCompat(root, auth)

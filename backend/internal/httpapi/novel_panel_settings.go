@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 const (
@@ -165,7 +167,7 @@ func writePanelImageSettings(store *UserConfigStore, username string, settings m
 	return os.Rename(tmp, imageSettingsPath(store, username))
 }
 
-func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore) {
+func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, provider batchfactoryv11.DirectorProvider) {
 	if root == nil || middleware.AuthStore == nil || store == nil {
 		return
 	}
@@ -307,4 +309,26 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 	root.Handle("GET /api/image-settings", handler)
 	root.Handle("POST /api/image-settings", handler)
 	root.Handle("POST /api/image-settings/test", handler)
+	root.Handle("POST /api/settings/test", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if provider == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "文本 AI 服务暂不可用", "code": "TEXT_AI_UNAVAILABLE"})
+			return
+		}
+		if req.Body != nil {
+			_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&map[string]any{})
+		}
+		ctx, cancel := context.WithTimeout(req.Context(), 20*time.Second)
+		defer cancel()
+		_, err := provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{SystemPrompt: "你是连接测试服务，只需返回 pong。", UserPrompt: "ping", MaxTokens: 8, Temperature: 0, DisableJSONResponse: true})
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error(), "code": "TEXT_AI_TEST_FAILED"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"message": "连接成功。", "username": identity.Username})
+	})))
 }
