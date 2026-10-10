@@ -138,7 +138,6 @@ func shouldBridgeLegacyAPI(path string) bool {
 		"/api/test",
 		"/api/models",
 		"/api/chat",
-		"/api/script-constraint-prompts",
 		"/api/script/",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {

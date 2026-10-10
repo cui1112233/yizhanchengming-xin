@@ -130,7 +130,7 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 }
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
-	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects", "/api/script-video", "/api/chat", "/api/script-constraint-prompts"} {
+	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects", "/api/script-video", "/api/chat"} {
 		if !shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s should use the temporary Node bridge", path)
 		}
@@ -140,6 +140,9 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	}
 	if shouldBridgeLegacyAPI("/api/presets") {
 		t.Fatal("/api/presets is implemented by Go and must not use the Node bridge")
+	}
+	if shouldBridgeLegacyAPI("/api/script-constraint-prompts") {
+		t.Fatal("/api/script-constraint-prompts is implemented by Go and must not use the Node bridge")
 	}
 	for _, path := range []string{"/api/models", "/api/models?kind=text", "/api/config/models", "/api/config/models/text-demo"} {
 		if shouldBridgeLegacyAPI(path) {

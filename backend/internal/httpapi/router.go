@@ -40,6 +40,7 @@ type RouterOptions struct {
 	NovelFetchRewrite         novelfetchworkshop.RewriteProvider
 	NovelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
 	PresetCatalog             *prompt.Catalog
+	PersonalPromptStore       *prompt.PersonalStore
 	LocalExecutors            *localexecutor.Service
 	GiantMaterialExecutor     *giantmaterialexecutor.Service
 	GiantMaterialResolver     GiantMaterialResolver
@@ -102,6 +103,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver})
 	if options.PresetCatalog != nil {
 		registerPresetRoutes(root, auth, options.PresetCatalog)
+	}
+	if options.PersonalPromptStore != nil {
+		registerPersonalPromptRoutes(root, auth, options.PersonalPromptStore)
 	}
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))

@@ -52,6 +52,7 @@ type Config struct {
 	QingyuMaterialSelectURL       string
 	LegacyAccountsPath            string
 	PresetPath                    string
+	PersonalPromptPath            string
 	NodeAuthBaseURL               string
 }
 
@@ -65,6 +66,7 @@ func FromEnv() (Config, error) {
 	cfg.MergeEnabled = strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED")) == "1" || cfg.LocalMergeEnabled
 	cfg.LegacyAccountsPath = strings.TrimSpace(os.Getenv("QIANTIE_LEGACY_ACCOUNTS_PATH"))
 	cfg.PresetPath = envOr("QIANTIE_PRESET_PATH", "data/system/presets.json")
+	cfg.PersonalPromptPath = envOr("QIANTIE_PERSONAL_PROMPT_PATH", "data/system/script-constraint-prompts.json")
 	cfg.RedisURL = strings.TrimSpace(os.Getenv("QIANTIE_REDIS_URL"))
 	if cfg.MySQLDSN == "" {
 		return Config{}, fmt.Errorf("QIANTIE_MYSQL_DSN is required")
