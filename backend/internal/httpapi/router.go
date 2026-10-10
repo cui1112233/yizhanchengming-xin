@@ -45,6 +45,7 @@ type RouterOptions struct {
 	ScriptHistoryStore        *ScriptHistoryStore
 	MemberProfileStore        *MemberProfileStore
 	MemberAvatarDir           string
+	UserDataDir               string
 	UserConfigStore           *UserConfigStore
 	TextProvider              batchfactoryv11.DirectorProvider
 	LocalExecutors            *localexecutor.Service
@@ -124,6 +125,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)
 		RegisterAccountPasskeyCompat(root, auth, options.MemberProfileStore)
 	}
+	RegisterNovelPanelDiagnosticsCompat(root, auth, options.UserDataDir)
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
