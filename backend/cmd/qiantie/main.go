@@ -56,14 +56,14 @@ func main() {
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !goAuthEnabled() && (req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/")) {
-			if req.Method == http.MethodPost && req.URL.Path == "/api/login/passkey/options" {
+			if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
 				apiHandler.ServeHTTP(w, req)
 				return
 			}
 			authProxy.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/login/passkey/options" {
+		if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}

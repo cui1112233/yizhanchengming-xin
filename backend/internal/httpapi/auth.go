@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -103,6 +104,42 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
+	})
+	root.HandleFunc("POST /api/login/passkey/verify", func(w http.ResponseWriter, r *http.Request) {
+		if options.Store == nil || strings.TrimSpace(options.PasskeyFile) == "" {
+			writeAuthError(w, http.StatusServiceUnavailable, "Passkey 服务暂不可用")
+			return
+		}
+		var input map[string]any
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10)).Decode(&input) != nil {
+			writeAuthError(w, http.StatusBadRequest, "Passkey 登录数据不完整")
+			return
+		}
+		username := strings.TrimSpace(fmt.Sprint(input["username"]))
+		account, err := options.Store.FindAccount(r.Context(), username)
+		if err != nil || !account.Active {
+			writeAuthError(w, http.StatusUnauthorized, "Passkey 登录失败")
+			return
+		}
+		if err := finishPasskeyAuthentication(options.PasskeyFile, account.Username, input, r); err != nil {
+			writeAuthError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		token, err := newSessionToken()
+		if err != nil {
+			writeAuthError(w, http.StatusInternalServerError, "登录服务暂不可用")
+			return
+		}
+		issued := now().UTC()
+		expires := issued.Add(24 * time.Hour)
+		if remember, _ := input["remember"].(bool); remember {
+			expires = issued.Add(30 * 24 * time.Hour)
+		}
+		if err := options.Store.CreateSession(r.Context(), auth.Session{Token: token, Username: account.Username, IssuedAt: issued, ExpiresAt: expires, IPHint: r.RemoteAddr}); err != nil {
+			writeAuthError(w, http.StatusUnauthorized, "Passkey 登录失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"token": token, "username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "effectivePermissions": []string{}})
 	})
 
 	root.HandleFunc("GET /api/login/session", func(w http.ResponseWriter, r *http.Request) {

@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -290,6 +292,158 @@ func passkeyAuthenticationOptions(path, username string, req *http.Request) (map
 		return nil, err
 	}
 	return map[string]any{"challenge": challenge, "rpId": rpID, "timeout": 300000, "userVerification": "required", "allowCredentials": allow}, nil
+}
+
+// finishPasskeyAuthentication verifies the WebAuthn assertion produced by the
+// browser.  Keeping this check next to the challenge store makes the Go login
+// path independent from the legacy Node authentication bridge.
+func finishPasskeyAuthentication(path, username string, input map[string]any, req *http.Request) error {
+	credentialValue, _ := input["credential"].(map[string]any)
+	credentialID := strings.TrimSpace(toString(credentialValue["credentialId"]))
+	if credentialID == "" {
+		credentialID = strings.TrimSpace(toString(credentialValue["id"]))
+	}
+	challengeValue := strings.TrimSpace(toString(input["challenge"]))
+	clientData, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(toString(credentialValue["clientDataJSON"])))
+	if err != nil || len(clientData) == 0 {
+		return fmt.Errorf("Passkey 登录数据不完整")
+	}
+	authenticatorData, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(toString(credentialValue["authenticatorData"])))
+	if err != nil || len(authenticatorData) < 37 {
+		return fmt.Errorf("Passkey 登录数据不完整")
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(toString(credentialValue["signature"])))
+	if err != nil || len(signature) == 0 || credentialID == "" || challengeValue == "" {
+		return fmt.Errorf("Passkey 登录数据不完整")
+	}
+	var client struct {
+		Type      string `json:"type"`
+		Challenge string `json:"challenge"`
+		Origin    string `json:"origin"`
+	}
+	if json.Unmarshal(clientData, &client) != nil || client.Type != "webauthn.get" || client.Challenge != challengeValue {
+		return fmt.Errorf("Passkey challenge 无效")
+	}
+	_, expectedOrigin := passkeyRequestContext(req)
+	if client.Origin != expectedOrigin {
+		return fmt.Errorf("Passkey Origin 不匹配")
+	}
+	rpID, _ := passkeyRequestContext(req)
+	expectedRPHash := sha256.Sum256([]byte(rpID))
+	if !equalBytes(authenticatorData[:32], expectedRPHash[:]) {
+		return fmt.Errorf("Passkey RP 校验失败")
+	}
+	flags := authenticatorData[32]
+	if flags&0x01 == 0 || flags&0x04 == 0 {
+		return fmt.Errorf("Passkey 未完成用户验证")
+	}
+	signCount := binaryBigEndian(authenticatorData[33:37])
+	state := map[string]any{"credentials": []any{}, "challenges": []any{}}
+	if raw, readErr := os.ReadFile(path); readErr == nil {
+		_ = json.Unmarshal(raw, &state)
+	}
+	credentials, _ := state["credentials"].([]any)
+	var credential map[string]any
+	for _, raw := range credentials {
+		row, ok := raw.(map[string]any)
+		if ok && toString(row["username"]) == username && toString(row["credentialId"]) == credentialID {
+			credential = row
+			break
+		}
+	}
+	if credential == nil {
+		return fmt.Errorf("Passkey 不存在")
+	}
+	challenges, _ := state["challenges"].([]any)
+	now := time.Now().UTC()
+	matched := false
+	for _, raw := range challenges {
+		row, ok := raw.(map[string]any)
+		if !ok || toString(row["username"]) != username || toString(row["kind"]) != "authenticate" || toString(row["challenge"]) != challengeValue || strings.TrimSpace(toString(row["usedAt"])) != "" {
+			continue
+		}
+		expires, parseErr := time.Parse(time.RFC3339, toString(row["expiresAt"]))
+		if parseErr != nil || !expires.After(now) || toString(row["origin"]) != expectedOrigin || toString(row["rpId"]) != rpID {
+			return fmt.Errorf("Passkey challenge 已失效")
+		}
+		row["usedAt"] = now.Format(time.RFC3339)
+		matched = true
+		break
+	}
+	if !matched {
+		return fmt.Errorf("Passkey challenge 不存在")
+	}
+	publicKeyDER, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(toString(credential["publicKey"])))
+	if err != nil {
+		return fmt.Errorf("Passkey 公钥损坏")
+	}
+	publicKey, err := x509.ParsePKIXPublicKey(publicKeyDER)
+	if err != nil {
+		return fmt.Errorf("Passkey 公钥损坏")
+	}
+	clientHash := sha256.Sum256(clientData)
+	signed := append(append([]byte{}, authenticatorData...), clientHash[:]...)
+	digest := sha256.Sum256(signed)
+	algorithm := int(toNumber(credential["algorithm"]))
+	switch key := publicKey.(type) {
+	case *ecdsa.PublicKey:
+		if algorithm != -7 || !ecdsa.VerifyASN1(key, digest[:], signature) {
+			return fmt.Errorf("Passkey 签名验证失败")
+		}
+	case *rsa.PublicKey:
+		if algorithm != -257 || rsa.VerifyPKCS1v15(key, crypto.SHA256, digest[:], signature) != nil {
+			return fmt.Errorf("Passkey 签名验证失败")
+		}
+	default:
+		return fmt.Errorf("Passkey 公钥算法不受支持")
+	}
+	previous := uint64(toNumber(credential["signCount"]))
+	if previous > 0 && signCount > 0 && uint64(signCount) <= previous {
+		return fmt.Errorf("Passkey 计数器异常")
+	}
+	if uint64(signCount) > previous {
+		credential["signCount"] = signCount
+	}
+	credential["lastUsedAt"] = now.Format(time.RFC3339)
+	raw, err := json.MarshalIndent(state, "", "  ")
+	if err != nil || os.WriteFile(path, raw, 0o600) != nil {
+		return fmt.Errorf("Passkey 登录状态保存失败")
+	}
+	return nil
+}
+
+func toNumber(value any) int64 {
+	switch v := value.(type) {
+	case float64:
+		return int64(v)
+	case int:
+		return int64(v)
+	case int64:
+		return v
+	case json.Number:
+		n, _ := v.Int64()
+		return n
+	default:
+		return 0
+	}
+}
+
+func binaryBigEndian(value []byte) uint32 {
+	if len(value) < 4 {
+		return 0
+	}
+	return uint32(value[0])<<24 | uint32(value[1])<<16 | uint32(value[2])<<8 | uint32(value[3])
+}
+
+func equalBytes(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	var diff byte
+	for i := range a {
+		diff |= a[i] ^ b[i]
+	}
+	return diff == 0
 }
 
 func readPasskeyCredentials(profiles *MemberProfileStore, username string) []map[string]any {
