@@ -388,6 +388,9 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "metadata" || parts[4] == "source" || parts[4] == "override" || parts[4] == "fetch-original") {
 		return true
 	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "stages" {
+		return true
+	}
 	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "videos" && parts[6] == "override" {
 		return true
 	}

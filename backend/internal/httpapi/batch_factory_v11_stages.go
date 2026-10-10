@@ -19,19 +19,7 @@ type bookStageRunInput struct {
 }
 
 func registerBookStageRoutes(mux *http.ServeMux, service *batchfactoryv11.BookStageService) {
-	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/books/{bookId}/stages", func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		summary, err := service.Summary(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
-		if err != nil {
-			writeStoreError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, summary)
-	})
+	registerBookStageSummaryRoute(mux, service, "v11")
 	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/stages/{stage}", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -95,5 +83,23 @@ func registerBookStageRoutes(mux *http.ServeMux, service *batchfactoryv11.BookSt
 			return
 		}
 		writeJSON(w, http.StatusCreated, summary)
+	})
+}
+
+// registerBookStageSummaryRoute keeps the read-only stage history available
+// even when the executable stages are still gated behind Slice 2.
+func registerBookStageSummaryRoute(mux *http.ServeMux, service *batchfactoryv11.BookStageService, version string) {
+	mux.HandleFunc("GET /api/batch-factory/"+version+"/batches/{batchId}/books/{bookId}/stages", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		summary, err := service.Summary(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, summary)
 	})
 }
