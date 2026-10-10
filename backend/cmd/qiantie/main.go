@@ -103,6 +103,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/novel-panel/") && strings.HasSuffix(req.URL.Path, "/export") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if (req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/reference-assets/file/")) || (req.Method == http.MethodPost && (req.URL.Path == "/api/reference-assets/upload" || req.URL.Path == "/api/reference-assets/use-source-as-main")) {
 			apiHandler.ServeHTTP(w, req)
 			return

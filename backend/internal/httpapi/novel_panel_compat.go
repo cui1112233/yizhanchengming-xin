@@ -249,6 +249,77 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})))
+	root.Handle("POST /api/novel-panel/{projectId}/export", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		id := req.PathValue("projectId")
+		if id == "" || filepath.Base(id) != id || strings.ContainsAny(id, `/\\`) {
+			managedAccountError(w, http.StatusBadRequest, "项目 ID 无效")
+			return
+		}
+		projectPath := filepath.Join(usersDir, identity.Username, "novel-panel", "projects", id+".json")
+		raw, err := os.ReadFile(projectPath)
+		if err != nil {
+			managedAccountError(w, http.StatusNotFound, "项目不存在")
+			return
+		}
+		var project map[string]any
+		if json.Unmarshal(raw, &project) != nil {
+			managedAccountError(w, http.StatusInternalServerError, "项目数据无效")
+			return
+		}
+		configPath := filepath.Join(usersDir, identity.Username, "api-config.json")
+		configRaw, _ := os.ReadFile(configPath)
+		var config map[string]any
+		_ = json.Unmarshal(configRaw, &config)
+		storageRoot := strings.TrimSpace(toString(config["storageRoot"]))
+		if storageRoot == "" {
+			writeJSON(w, http.StatusOK, map[string]any{"saved": false, "reason": "未配置本地存储文件夹"})
+			return
+		}
+		name := strings.TrimSpace(toString(project["name"]))
+		if name == "" {
+			name = "未命名项目"
+		}
+		name = strings.Map(func(r rune) rune {
+			if strings.ContainsRune(`\\/:*?"<>|`, r) {
+				return '_'
+			}
+			return r
+		}, name)
+		if name == "" {
+			name = "未命名项目"
+		}
+		dir := filepath.Join(storageRoot, "制作工程", name)
+		if err := os.MkdirAll(filepath.Join(dir, "图片"), 0o755); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "导出目录无法创建")
+			return
+		}
+		for _, child := range []string{"视频", "剪映", "配音"} {
+			_ = os.MkdirAll(filepath.Join(dir, child), 0o755)
+		}
+		data, _ := project["data"].(map[string]any)
+		segments, _ := data["final_segments"].([]any)
+		body := []string{}
+		for index, rawSegment := range segments {
+			segment, _ := rawSegment.(map[string]any)
+			text := toString(segment["finalText"])
+			if strings.TrimSpace(text) == "" {
+				text = toString(segment["sourceText"])
+			}
+			body = append(body, fmt.Sprintf("## 第 %d 段\n\n%s", index+1, text))
+		}
+		content := "# " + name + "　输出结果\n\n" + strings.Join(body, "\n\n")
+		file := filepath.Join(dir, "输出结果.md")
+		if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "导出文件写入失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"saved": true, "path": file})
+	})))
 	root.Handle("GET /api/novel-panel/draft", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
