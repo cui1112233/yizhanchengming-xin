@@ -140,6 +140,60 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 			return
 		}
+		if len(parts) == 2 && parts[1] == "segments" && r.Method == http.MethodPost {
+			var input map[string]any
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if len(batch.Books) == 0 {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
+				return
+			}
+			text, _ := input["sourceText"].(string)
+			if strings.TrimSpace(text) == "" {
+				text, _ = input["text"].(string)
+			}
+			if strings.TrimSpace(text) == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "sourceText is required"})
+				return
+			}
+			segments := storedShuihuoSegments(batch.Books[0])
+			segment := normalizeShuihuoSegments([]map[string]any{input}, batch.Books[0].ID)
+			segment[0]["id"] = fmt.Sprintf("segment_%s_%d", batch.Books[0].ID, len(segments)+1)
+			segments = append(segments, segment[0])
+			if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			updated, err := store.GetBatch(r.Context(), owner, batch.ID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, shuihuoProjectDetail(updated))
+			return
+		}
+		if len(parts) == 3 && parts[1] == "segments" && parts[2] == "order" && r.Method == http.MethodPut {
+			var input struct {
+				SegmentIDs []string `json:"segmentIds"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			segments := storedShuihuoSegments(batch.Books[0])
+			ordered := reorderShuihuoSegments(segments, input.SegmentIDs)
+			if err := saveShuihuoSegments(r, store, owner, batch, ordered); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			updated, err := store.GetBatch(r.Context(), owner, batch.ID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+			return
+		}
 		if len(parts) == 2 && parts[1] == "voice-settings" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
 			writeJSON(w, http.StatusOK, map[string]any{"settings": map[string]any{}})
 			return
@@ -254,6 +308,80 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "project route not found"})
 	})))
+
+	root.Handle("/api/shuihuo-production/segments/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		segmentID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/segments/"), "/")
+		if segmentID == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "segment id is required"})
+			return
+		}
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, batch := range batches {
+			// ListBatches may return compact book records without source metadata.
+			// Always hydrate the batch because editable segments live in that metadata.
+			full, getErr := store.GetBatch(r.Context(), owner, batch.ID)
+			if getErr != nil {
+				continue
+			}
+			batch = full
+			if len(batch.Books) == 0 {
+				continue
+			}
+			segments := storedShuihuoSegments(batch.Books[0])
+			index := -1
+			for i, segment := range segments {
+				if id, _ := segment["id"].(string); id == segmentID {
+					index = i
+					break
+				}
+			}
+			if index < 0 {
+				continue
+			}
+			switch r.Method {
+			case http.MethodPut:
+				var input map[string]any
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				for _, key := range []string{"sourceText", "subtitleText", "speaker", "imagePrompt", "videoPrompt"} {
+					if value, exists := input[key]; exists {
+						segments[index][key] = value
+					}
+				}
+				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+			case http.MethodDelete:
+				segments = append(segments[:index], segments[index+1:]...)
+				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+			default:
+				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+				return
+			}
+			updated, err := store.GetBatch(r.Context(), owner, batch.ID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "segment not found"})
+	})))
 }
 
 func isShuihuoProjectBatch(batch batchfactoryv11.Batch) bool {
@@ -321,6 +449,45 @@ func cloneMetadata(input map[string]any) map[string]any {
 		output[key] = value
 	}
 	return output
+}
+
+func saveShuihuoSegments(r *http.Request, store batchfactoryv11.Store, owner string, batch batchfactoryv11.Batch, segments []map[string]any) error {
+	if len(batch.Books) == 0 {
+		return fmt.Errorf("project has no editable source book")
+	}
+	for index, segment := range segments {
+		segment["orderIndex"] = index + 1
+	}
+	metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+	metadata["shuihuoSegments"] = segments
+	metadata["shuihuoSegmentationStatus"] = "confirmed"
+	_, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision})
+	return err
+}
+
+func reorderShuihuoSegments(segments []map[string]any, ids []string) []map[string]any {
+	byID := make(map[string]map[string]any, len(segments))
+	for _, segment := range segments {
+		if id, _ := segment["id"].(string); id != "" {
+			byID[id] = segment
+		}
+	}
+	ordered := make([]map[string]any, 0, len(segments))
+	for _, id := range ids {
+		if segment, ok := byID[id]; ok {
+			ordered = append(ordered, segment)
+			delete(byID, id)
+		}
+	}
+	for _, segment := range segments {
+		if id, _ := segment["id"].(string); id != "" {
+			if _, ok := byID[id]; ok {
+				ordered = append(ordered, segment)
+				delete(byID, id)
+			}
+		}
+	}
+	return ordered
 }
 
 func storedShuihuoSegments(book batchfactoryv11.Book) []map[string]any {
