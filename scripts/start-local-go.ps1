@@ -19,6 +19,23 @@ if (-not $needsBuild) {
   $latestGoSource = Get-ChildItem $goSourceRoot -Recurse -Filter '*.go' -File | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
   $needsBuild = $latestGoSource -and $latestGoSource.LastWriteTimeUtc -gt $binaryTime
 }
+# Go embeds the prepared frontend and workbench assets. A Go-only timestamp
+# check is not enough: changing frontend/dist or public/* otherwise leaves the
+# local 4001 process serving an older page until someone manually rebuilds it.
+if (-not $needsBuild) {
+  $assetRoots = @(
+    (Join-Path $repo 'frontend/dist'),
+    (Join-Path $repo 'public/novel-panel'),
+    (Join-Path $repo 'public/batch-rewrite'),
+    (Join-Path $repo 'public/assets'),
+    (Join-Path $repo 'pets')
+  ) | Where-Object { Test-Path $_ }
+  $latestAsset = $assetRoots |
+    ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -File -ErrorAction SilentlyContinue } |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+  $needsBuild = $latestAsset -and $latestAsset.LastWriteTimeUtc -gt $binaryTime
+}
 if ($needsBuild) {
   & (Join-Path $PSScriptRoot 'build-go-local.ps1')
 }
