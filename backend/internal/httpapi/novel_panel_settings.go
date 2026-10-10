@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -315,7 +316,7 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		if provider == nil {
+		if provider == nil || (reflect.ValueOf(provider).Kind() == reflect.Ptr && reflect.ValueOf(provider).IsNil()) {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "文本 AI 服务暂不可用", "code": "TEXT_AI_UNAVAILABLE"})
 			return
 		}
