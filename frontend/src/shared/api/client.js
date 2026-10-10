@@ -17,7 +17,12 @@ export function getToken() {
   const cookie = document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('qiantie_auth_token='));
   if (!cookie) return '';
   try {
-    return decodeURIComponent(cookie.slice('qiantie_auth_token='.length));
+    const cookieToken = decodeURIComponent(cookie.slice('qiantie_auth_token='.length));
+    // The legacy novel-fetch iframe still reads localStorage directly. Copy
+    // the shared cookie back into this origin's storage so 3001 and 4001 keep
+    // the same active session during the Go migration.
+    if (cookieToken) localStorage.setItem('auth_token', cookieToken);
+    return cookieToken;
   } catch (_) {
     return '';
   }

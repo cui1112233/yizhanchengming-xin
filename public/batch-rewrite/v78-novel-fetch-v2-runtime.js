@@ -9,11 +9,40 @@
   const POLL_MS = 5000;
   let pollTimer = null;
   let pollCallback = null;
-  let authToken = localStorage.getItem('auth_token') || '';
+  function authTokenFromSharedSession() {
+    let localToken = localStorage.getItem('auth_token') || '';
+    if (!localToken && window.parent && window.parent !== window) {
+      try { localToken = window.parent.localStorage.getItem('auth_token') || ''; } catch (_) {}
+    }
+    if (localToken) return localToken;
+    let cookieText = document.cookie;
+    if (!cookieText && window.parent && window.parent !== window) {
+      try { cookieText = window.parent.document.cookie; } catch (_) {}
+    }
+    const cookie = cookieText.split(';').map(item => item.trim()).find(item => item.startsWith('qiantie_auth_token='));
+    if (!cookie) return '';
+    try {
+      const value = decodeURIComponent(cookie.slice('qiantie_auth_token='.length));
+      if (value) localStorage.setItem('auth_token', value);
+      return value;
+    } catch (_) { return ''; }
+  }
+
+  let authToken = authTokenFromSharedSession();
   let authScope = 0;
 
+  window.addEventListener('message', event => {
+    if (event.origin !== window.location.origin || event.data?.type !== 'qiantie-auth-token') return;
+    const next = String(event.data?.token || '').trim();
+    if (!next || next === authToken) return;
+    authToken = next;
+    try { localStorage.setItem('auth_token', next); } catch (_) {}
+    authScope += 1;
+    cache.clear();
+  });
+
   function syncAuthScope() {
-    const current = localStorage.getItem('auth_token') || '';
+    const current = authTokenFromSharedSession();
     if (current !== authToken) {
       authToken = current;
       authScope += 1;
@@ -22,7 +51,7 @@
   }
 
   function tokenHeaders(extra = {}) {
-    const token = localStorage.getItem('auth_token') || '';
+    const token = authTokenFromSharedSession();
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
   }
 
@@ -130,4 +159,5 @@
     tasks: (query = '') => request(`/tasks${query}`),
     currentBatch: () => request('/batches/current')
   };
+  window.qiantieNovelFetchAuthToken = authTokenFromSharedSession;
 })();

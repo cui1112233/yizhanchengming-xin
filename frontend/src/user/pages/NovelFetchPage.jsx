@@ -12,6 +12,7 @@ import {
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
   saveWorkshopKnowledge, saveWorkshopOpening, suggestWorkshopRules, testWorkshopAi
 } from '../../shared/api/novelFetchWorkshop';
+import { getToken } from '../../shared/api/client';
 import './novel-fetch.css';
 import { batchFactoryNovelFetchHandoffPath } from './shuihuo/batchFactoryNovelFetchHandoff';
 
@@ -60,8 +61,12 @@ export function NovelFetchPage({ theme }) {
   const frameRef = useRef(null);
   const [frameReady, setFrameReady] = useState(false);
   const [frameError, setFrameError] = useState(false);
-  const syncTheme = () => frameRef.current?.contentWindow?.postMessage({ type: 'qiantie-theme-sync', theme: theme === 'light' ? 'light' : 'dark' }, '*');
-  useEffect(() => { syncTheme(); }, [theme]);
+  const syncTheme = () => frameRef.current?.contentWindow?.postMessage({ type: 'qiantie-theme-sync', theme: theme === 'light' ? 'light' : 'dark' }, window.location.origin);
+  const syncAuth = () => {
+    const token = getToken();
+    if (token) frameRef.current?.contentWindow?.postMessage({ type: 'qiantie-auth-token', token }, window.location.origin);
+  };
+  useEffect(() => { syncTheme(); syncAuth(); }, [theme]);
   useEffect(() => {
     const handleWorkbenchReady = event => {
       if (event.origin !== window.location.origin || event.data?.type !== 'qiantie:novel-fetch-ready') return;
@@ -82,7 +87,7 @@ export function NovelFetchPage({ theme }) {
     window.addEventListener('message', receiveHandoff);
     return () => window.removeEventListener('message', receiveHandoff);
   }, []);
-  const handleFrameLoad = () => { setFrameError(false); syncTheme(); };
+  const handleFrameLoad = () => { setFrameError(false); syncTheme(); syncAuth(); };
   const handleFrameError = () => { setFrameError(true); setFrameReady(false); };
   return <div className={`novel-fetch-frame-shell${frameReady ? ' is-ready' : ''}${frameError ? ' has-error' : ''}`}>
     {!frameReady && <div className="novel-fetch-loading-overlay" role="status" aria-live="polite">

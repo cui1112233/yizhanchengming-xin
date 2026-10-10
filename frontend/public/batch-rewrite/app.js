@@ -39,6 +39,25 @@ let textModelPersistPromise = null;
 
 const $ = (id) => document.getElementById(id);
 
+// During the local Go migration the React shell can recover the shared login
+// from the host-only cookie when the 4001 origin has no own localStorage yet.
+// The legacy V78 iframe must use the same fallback, otherwise its requests
+// reach the Node compatibility API without a token and every panel shows 401.
+function getAuthToken() {
+  let localToken = localStorage.getItem("auth_token") || "";
+  if (!localToken && window.parent && window.parent !== window) {
+    try { localToken = window.parent.localStorage.getItem("auth_token") || ""; } catch (_) {}
+  }
+  if (localToken) return localToken;
+  let cookieText = document.cookie;
+  if (!cookieText && window.parent && window.parent !== window) {
+    try { cookieText = window.parent.document.cookie; } catch (_) {}
+  }
+  const cookie = cookieText.split(";").map(item => item.trim()).find(item => item.startsWith("qiantie_auth_token="));
+  if (!cookie) return "";
+  try { return decodeURIComponent(cookie.slice("qiantie_auth_token=".length)); } catch (_) { return ""; }
+}
+
 document.documentElement.dataset.theme = new URLSearchParams(window.location.search).get('theme') === 'light' ? 'light' : 'dark';
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.data?.type !== 'qiantie-theme-sync') return;
@@ -88,7 +107,7 @@ async function api(path, options = {}) {
   }
   const legacyPath = String(path || "").replace(/^\/api/, "");
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const token = localStorage.getItem("auth_token") || "";
+  const token = getAuthToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
   try {
@@ -132,7 +151,7 @@ function normalizeBatchErrorMessage(value, status) {
 // External 121 checks must always settle so the UI cannot remain in a loading state.
 async function novelFetchPlatformApi(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const token = localStorage.getItem("auth_token") || "";
+  const token = getAuthToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), PLATFORM_API_TIMEOUT_MS);
@@ -163,7 +182,7 @@ function reportBatchIssue(kind, path, message, status, method) {
   const section = String(path || "").includes("web-submit") ? "submit"
     : String(path || "").includes("rules") ? "rules"
       : String(path || "").includes("process") ? "processing" : "api";
-  const token = localStorage.getItem("auth_token") || "";
+  const token = getAuthToken();
   const payload = JSON.stringify({
     kind: `batch-rewrite.${section}.${kind}`,
     message: String(message || "小说获取操作失败").slice(0, 4000),
@@ -3282,7 +3301,7 @@ function setBatchStatus(text) {
 }
 
 async function platformApi(path, options = {}) {
-  const token = localStorage.getItem("auth_token") || "";
+  const token = getAuthToken();
   const response = await fetch(path, {
     ...options,
     headers: {

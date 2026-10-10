@@ -41,6 +41,7 @@ test('shares the local login token across the 3001 and 4001 frontends', () => {
     assert.match(cookie, /qiantie_auth_token=node-session-token/);
     values.delete('auth_token');
     assert.equal(getToken(), 'node-session-token');
+    assert.equal(values.get('auth_token'), 'node-session-token');
     setToken('');
     assert.match(cookie, /Max-Age=0/);
   } finally {
