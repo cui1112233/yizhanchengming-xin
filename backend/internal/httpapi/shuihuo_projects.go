@@ -726,6 +726,19 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeJSON(w, http.StatusCreated, map[string]any{"tasks": []any{task}, "job": map[string]any{"requestId": input.RequestID, "tasks": []any{task}}})
 				return
 			}
+			if strings.EqualFold(strings.TrimSpace(input.Kind), "image") {
+				if files == nil {
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media storage is unavailable"})
+					return
+				}
+				task, imageErr := generateShuihuoSegmentImage(r.Context(), store, files, owner, batch, strings.TrimSpace(input.SegmentID), strings.TrimSpace(input.ModelID))
+				if imageErr != nil {
+					writeStoreError(w, imageErr)
+					return
+				}
+				writeJSON(w, http.StatusCreated, map[string]any{"tasks": []any{task}, "job": map[string]any{"requestId": input.RequestID, "tasks": []any{task}}})
+				return
+			}
 			if kind := strings.ToLower(strings.TrimSpace(input.Kind)); kind != "" && kind != "video" {
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入图片或配音任务，请先使用视频任务"})
 				return
@@ -2249,6 +2262,103 @@ func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Stor
 		return nil, err
 	}
 	return map[string]any{"id": artifactID, "status": "completed", "kind": "audio", "segmentId": segmentID, "mediaUrl": "/api/shuihuo-production/media/" + artifactID + "/download", "createdAt": entry["createdAt"]}, nil
+}
+
+func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID, modelID string) (map[string]any, error) {
+	if len(batch.Books) == 0 {
+		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
+	}
+	var prompt string
+	for _, segment := range storedShuihuoSegments(batch.Books[0]) {
+		if modelString(segment, "id") != segmentID {
+			continue
+		}
+		prompt = modelString(segment, "imagePrompt")
+		if prompt == "" {
+			prompt = modelString(segment, "sourceText")
+		}
+		break
+	}
+	if prompt == "" {
+		return nil, fmt.Errorf("%w: segment not found or has no image prompt", batchfactoryv11.ErrNotFound)
+	}
+	config, err := loadShuihuoOwnerConfig(ctx, store, owner)
+	if err != nil {
+		return nil, err
+	}
+	var model map[string]any
+	for _, candidate := range shuihuoCollection(config, "modelCatalog", nil) {
+		if !strings.EqualFold(modelString(candidate, "kind"), "image") || (modelID != "" && modelString(candidate, "modelId") != modelID) {
+			continue
+		}
+		enabled, hasEnabled := candidate["enabled"].(bool)
+		if hasEnabled && !enabled {
+			continue
+		}
+		model = candidate
+		break
+	}
+	if model == nil {
+		return nil, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
+	}
+	endpoint, err := shuihuoImageGenerationEndpoint(modelString(model, "endpoint"))
+	if err != nil {
+		return nil, fmt.Errorf("%w: image model endpoint is invalid", batchfactoryv11.ErrInvalid)
+	}
+	apiKey := modelString(model, "apiKey")
+	if apiKey == "" {
+		apiKey = modelString(model, "credential")
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
+	}
+	body, _ := json.Marshal(map[string]any{"model": modelString(model, "modelId"), "prompt": prompt, "n": 1, "size": shuihuoImageSize("16:9"), "response_format": "b64_json"})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	response, err := (&http.Client{Timeout: 120 * time.Second}).Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	defer response.Body.Close()
+	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("%w: image provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+	}
+	var result struct {
+		Data []struct {
+			B64JSON string `json:"b64_json"`
+			URL     string `json:"url"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
+		return nil, fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
+	}
+	mediaType, imageBytes, decodeErr := decodeShuihuoGeneratedImage(ctx, &http.Client{Timeout: 120 * time.Second}, result.Data[0].B64JSON, result.Data[0].URL)
+	if decodeErr != nil {
+		return nil, fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, decodeErr)
+	}
+	artifactID, err := localexecutor.NewArtifactID()
+	if err != nil {
+		return nil, err
+	}
+	saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
+	if err != nil {
+		return nil, err
+	}
+	media := storedShuihuoMedia(batch.Books[0])
+	createdAt := time.Now().UTC().Format(time.RFC3339)
+	media = append(media, map[string]any{"id": artifactID, "kind": "image", "filename": artifactID + ".png", "mediaType": mediaType, "storageRef": saved.StorageRef, "segmentId": segmentID, "isPrimary": false, "createdAt": createdAt})
+	metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+	metadata["shuihuoMedia"] = media
+	if _, err := store.UpdateBookMetadata(ctx, owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision}); err != nil {
+		_ = files.Remove(saved.StorageRef)
+		return nil, err
+	}
+	return map[string]any{"id": artifactID, "status": "completed", "kind": "image", "segmentId": segmentID, "mediaUrl": "/api/shuihuo-production/media/" + artifactID + "/download", "createdAt": createdAt}, nil
 }
 
 func shuihuoImageGenerationEndpoint(raw string) (string, error) {
