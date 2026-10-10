@@ -40,7 +40,10 @@ func saveManagedProfile(profiles *MemberProfileStore, username, displayName, rol
 		rows = append(rows, profile)
 	}
 	profile["displayName"], profile["role"] = displayName, role
-	profile["boundTo"], profile["monthlyTokenLimit"] = nil, monthly
+	if _, exists := profile["boundTo"]; !exists {
+		profile["boundTo"] = nil
+	}
+	profile["monthlyTokenLimit"] = monthly
 	profile["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
 	return profiles.writeArray("member-profiles.json", rows)
 }
