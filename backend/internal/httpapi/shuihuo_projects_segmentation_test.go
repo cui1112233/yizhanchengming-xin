@@ -29,3 +29,10 @@ func TestFixedShuihuoCandidatesGroupsLines(t *testing.T) {
 		t.Fatalf("unexpected fixed candidates: %#v", got)
 	}
 }
+
+func TestParseShuihuoPromptCandidates(t *testing.T) {
+	got, err := parseShuihuoPromptCandidates("```json\n{\"candidates\":[{\"segmentId\":\"s1\",\"prompt\":\"夜景\"}]}\n```")
+	if err != nil || len(got) != 1 || got[0]["segmentId"] != "s1" {
+		t.Fatalf("unexpected prompt candidates: %#v, err=%v", got, err)
+	}
+}

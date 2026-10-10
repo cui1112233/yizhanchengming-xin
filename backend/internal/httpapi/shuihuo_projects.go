@@ -828,11 +828,76 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if len(parts) == 3 && parts[1] == "prompt-candidates" && r.Method == http.MethodPost {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置文本模型，暂不能生成提示词候选"})
+			var input struct {
+				ModelID        string `json:"modelId,omitempty"`
+				PromptPresetID string `json:"promptPresetId,omitempty"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			kind := strings.TrimSpace(parts[2])
+			candidates, strategy, generationErr := generateShuihuoPromptCandidates(r.Context(), director, batch, kind)
+			response := map[string]any{"candidates": candidates, "kind": kind, "strategy": strategy}
+			if strings.TrimSpace(input.ModelID) != "" {
+				response["modelId"] = strings.TrimSpace(input.ModelID)
+			}
+			if strings.TrimSpace(input.PromptPresetID) != "" {
+				response["promptPresetId"] = strings.TrimSpace(input.PromptPresetID)
+			}
+			if generationErr != nil {
+				response["fallbackReason"] = generationErr.Error()
+			}
+			writeJSON(w, http.StatusOK, response)
 			return
 		}
 		if len(parts) == 4 && parts[1] == "prompt-candidates" && r.Method == http.MethodPut {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置文本模型，暂不能应用提示词候选"})
+			var input struct {
+				Candidates []map[string]any `json:"candidates"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if len(batch.Books) == 0 {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
+				return
+			}
+			kind := strings.TrimSpace(parts[2])
+			segments := storedShuihuoSegments(batch.Books[0])
+			byID := make(map[string]map[string]any, len(segments))
+			for _, segment := range segments {
+				if id := modelString(segment, "id"); id != "" {
+					byID[id] = segment
+				}
+			}
+			applied, skipped := make([]string, 0), make([]string, 0)
+			for _, candidate := range input.Candidates {
+				segmentID := modelString(candidate, "segmentId")
+				prompt := modelString(candidate, "prompt")
+				segment, exists := byID[segmentID]
+				if !exists || prompt == "" {
+					continue
+				}
+				lockKey := kind + "PromptLocked"
+				if locked, ok := segment[lockKey].(bool); ok && locked {
+					skipped = append(skipped, segmentID)
+					continue
+				}
+				if kind == "video" {
+					segment["videoPrompt"] = prompt
+				} else if kind == "image" {
+					segment["imagePrompt"] = prompt
+				} else {
+					segment["negativePrompt"] = prompt
+				}
+				applied = append(applied, segmentID)
+			}
+			if len(applied) > 0 {
+				if saveErr := saveShuihuoSegments(r, store, owner, batch, segments); saveErr != nil {
+					writeStoreError(w, saveErr)
+					return
+				}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"appliedSegmentIds": applied, "skippedLockedSegmentIds": skipped})
 			return
 		}
 		if len(parts) == 2 && parts[1] == "export" && r.Method == http.MethodGet {
@@ -1843,6 +1908,84 @@ func smartShuihuoCandidates(ctx context.Context, director *batchfactoryv11.Direc
 		return fallback(err)
 	}
 	return candidates, "text_model", nil
+}
+
+func generateShuihuoPromptCandidates(ctx context.Context, director *batchfactoryv11.DirectorService, batch batchfactoryv11.Batch, kind string) ([]map[string]any, string, error) {
+	segments := storedShuihuoSegmentsFromBatch(batch)
+	fallback := func(err error) ([]map[string]any, string, error) {
+		items := make([]map[string]any, 0, len(segments))
+		for _, segment := range segments {
+			id := modelString(segment, "id")
+			text := modelString(segment, "sourceText")
+			if id == "" || text == "" {
+				continue
+			}
+			prefix := map[string]string{"image": "电影感画面，", "video": "镜头运动自然，", "negative": "避免"}[kind]
+			if prefix == "" {
+				prefix = "清晰呈现，"
+			}
+			items = append(items, map[string]any{"segmentId": id, "prompt": prefix + text})
+		}
+		return items, "deterministic_fallback", err
+	}
+	if director == nil || director.Provider == nil {
+		return fallback(fmt.Errorf("text model is not configured"))
+	}
+	encoded, _ := json.Marshal(segments)
+	completion, err := director.Provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+		SystemPrompt: "你是短剧视觉提示词编辑。根据每条分镜原文生成可直接用于AI制作的中文提示词。只返回 JSON：{\"candidates\":[{\"segmentId\":\"原ID\",\"prompt\":\"提示词\"}]}。必须覆盖输入中的每个 segmentId，不要编造剧情。",
+		UserPrompt:   fmt.Sprintf("提示词类型：%s\n分镜：%s", kind, string(encoded)),
+		Temperature:  0.3,
+		MaxTokens:    4096,
+	})
+	if err != nil {
+		return fallback(err)
+	}
+	items, err := parseShuihuoPromptCandidates(completion)
+	if err != nil || len(items) == 0 {
+		if err == nil {
+			err = fmt.Errorf("text model returned no prompt candidates")
+		}
+		return fallback(err)
+	}
+	return items, "text_model", nil
+}
+
+func storedShuihuoSegmentsFromBatch(batch batchfactoryv11.Batch) []map[string]any {
+	if len(batch.Books) == 0 {
+		return []map[string]any{}
+	}
+	return storedShuihuoSegments(batch.Books[0])
+}
+
+func parseShuihuoPromptCandidates(raw string) ([]map[string]any, error) {
+	clean := strings.TrimSpace(raw)
+	if strings.HasPrefix(clean, "```") {
+		clean = strings.TrimSpace(strings.TrimPrefix(clean, "```json"))
+		clean = strings.TrimSpace(strings.TrimPrefix(clean, "```"))
+		clean = strings.TrimSpace(strings.TrimSuffix(clean, "```"))
+	}
+	start, end := strings.Index(clean, "{"), strings.LastIndex(clean, "}")
+	if start < 0 || end <= start {
+		return nil, fmt.Errorf("text model returned invalid prompt JSON")
+	}
+	var envelope struct {
+		Candidates []map[string]any `json:"candidates"`
+	}
+	if err := json.Unmarshal([]byte(clean[start:end+1]), &envelope); err != nil {
+		return nil, fmt.Errorf("prompt JSON parse failed: %w", err)
+	}
+	result := make([]map[string]any, 0, len(envelope.Candidates))
+	for _, candidate := range envelope.Candidates {
+		if modelString(candidate, "segmentId") == "" || modelString(candidate, "prompt") == "" {
+			continue
+		}
+		result = append(result, map[string]any{"segmentId": modelString(candidate, "segmentId"), "prompt": modelString(candidate, "prompt")})
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("text model returned no usable prompts")
+	}
+	return result, nil
 }
 
 func paragraphCandidatesForText(bookID, text string) []map[string]any {
