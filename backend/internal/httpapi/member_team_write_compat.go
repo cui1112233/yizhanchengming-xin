@@ -1,7 +1,11 @@
 package httpapi
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,6 +14,16 @@ import (
 
 	"qiantie/backend/internal/auth"
 )
+
+func collaborationToken() (string, string, error) {
+	raw := make([]byte, 24)
+	if _, err := rand.Read(raw); err != nil {
+		return "", "", err
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	digest := sha256.Sum256([]byte(token))
+	return token, fmt.Sprintf("%x", digest[:]), nil
+}
 
 var managedAPIScopes = map[string]bool{"text": true, "image": true, "video": true, "tts": true}
 
@@ -81,6 +95,85 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 	if root == nil || accounts == nil || profiles == nil {
 		return
 	}
+	root.Handle("POST /api/member/team/invites", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权创建团队邀请")
+			return
+		}
+		manager := toString(actor["username"])
+		if toString(actor["role"]) == "dev" {
+			var input struct {
+				ManagerUsername   string   `json:"managerUsername"`
+				ExpiresInHours    any      `json:"expiresInHours"`
+				MonthlyTokenLimit any      `json:"monthlyTokenLimit"`
+				APIScopes         []string `json:"apiScopes"`
+			}
+			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+				managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+				return
+			}
+			if strings.TrimSpace(input.ManagerUsername) != "" {
+				manager = strings.TrimSpace(input.ManagerUsername)
+			}
+			if input.MonthlyTokenLimit != nil {
+				_ = input.MonthlyTokenLimit
+			}
+			_ = input.ExpiresInHours
+			_ = input.APIScopes
+		} else {
+			var input struct {
+				ExpiresInHours    any      `json:"expiresInHours"`
+				MonthlyTokenLimit any      `json:"monthlyTokenLimit"`
+				APIScopes         []string `json:"apiScopes"`
+			}
+			_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input)
+		}
+		managerProfile := profiles.member(manager, accounts)
+		if managerProfile == nil || (toString(managerProfile["role"]) != "dev" && toString(managerProfile["role"]) != "manager") {
+			managedAccountError(w, http.StatusBadRequest, "目标账号不是团队负责人")
+			return
+		}
+		path := adminSystemFile(profiles.SystemDir, "team-collaboration.json")
+		state := map[string]any{"teams": []any{}, "invites": []any{}, "notifications": []any{}, "archives": []any{}}
+		if raw, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(raw, &state)
+		}
+		teams, _ := state["teams"].([]any)
+		var team map[string]any
+		for _, raw := range teams {
+			if row, ok := raw.(map[string]any); ok && toString(row["managerUsername"]) == manager {
+				team = row
+				break
+			}
+		}
+		if team == nil {
+			team = map[string]any{"id": "go-team-" + manager, "name": toString(managerProfile["displayName"]) + "的团队", "managerUsername": manager, "coManagers": []any{}, "createdAt": time.Now().UTC().Format(time.RFC3339)}
+			teams = append(teams, team)
+			state["teams"] = teams
+		}
+		token, digest, err := collaborationToken()
+		if err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "邀请生成失败")
+			return
+		}
+		expires := time.Now().UTC().Add(72 * time.Hour)
+		invite := map[string]any{"id": token[:12], "tokenDigest": digest, "teamId": team["id"], "managerUsername": manager, "createdBy": toString(actor["username"]), "createdAt": time.Now().UTC().Format(time.RFC3339), "expiresAt": expires.Format(time.RFC3339), "monthlyTokenLimit": nil, "apiScopes": []string{}, "usedAt": nil, "usedBy": nil}
+		invites, _ := state["invites"].([]any)
+		invites = append(invites, invite)
+		state["invites"] = invites
+		raw, _ := json.MarshalIndent(state, "", "  ")
+		if err := os.WriteFile(path, raw, 0o600); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "邀请保存失败")
+			return
+		}
+		public := map[string]any{"id": invite["id"], "teamId": team["id"], "teamName": team["name"], "managerUsername": manager, "createdAt": invite["createdAt"], "expiresAt": invite["expiresAt"], "monthlyTokenLimit": nil, "apiScopes": []string{}, "usedAt": nil, "usedBy": nil}
+		writeJSON(w, http.StatusCreated, map[string]any{"token": token, "invite": public, "inviteUrl": "/invite/" + token})
+	})))
 	root.Handle("POST /api/member/team/members", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		actor, ok := teamActor(profiles, accounts, req)
 		if !ok {
