@@ -67,7 +67,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if (req.Method == http.MethodGet && req.URL.Path == "/api/member/me") || (req.Method == http.MethodPatch && req.URL.Path == "/api/member/profile") {
+		if (req.Method == http.MethodGet && req.URL.Path == "/api/member/me") || (req.Method == http.MethodPatch && req.URL.Path == "/api/member/profile") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/avatar") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -168,7 +169,65 @@ func (s *MemberProfileStore) member(ctxUsername string, accounts auth.Store) map
 	return member
 }
 
-func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth, profiles *MemberProfileStore, accounts auth.Store) {
+func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, accounts auth.Store) (map[string]any, error) {
+	const maxBytes = 2 * 1024 * 1024
+	value := strings.TrimSpace(dataURL)
+	prefix, encoded, ok := strings.Cut(value, ",")
+	if !ok || !strings.HasPrefix(prefix, "data:image/") || !strings.HasSuffix(prefix, ";base64") {
+		return nil, fmt.Errorf("头像仅支持 PNG、JPG 或 WebP")
+	}
+	ext := "png"
+	if strings.Contains(prefix, "image/jpeg") {
+		ext = "jpg"
+	} else if strings.Contains(prefix, "image/webp") {
+		ext = "webp"
+	} else if !strings.Contains(prefix, "image/png") {
+		return nil, fmt.Errorf("头像仅支持 PNG、JPG 或 WebP")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(decoded) == 0 || len(decoded) > maxBytes {
+		return nil, fmt.Errorf("头像大小不能超过 2MB")
+	}
+	if strings.TrimSpace(avatarDir) == "" {
+		return nil, fmt.Errorf("头像存储未配置")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.member(username, accounts) == nil {
+		return nil, auth.ErrNotFound
+	}
+	if err := os.MkdirAll(avatarDir, 0o700); err != nil {
+		return nil, err
+	}
+	for _, other := range []string{"png", "jpg", "webp"} {
+		if other != ext {
+			_ = os.Remove(filepath.Join(avatarDir, username+"."+other))
+		}
+	}
+	if err := os.WriteFile(filepath.Join(avatarDir, username+"."+ext), decoded, 0o600); err != nil {
+		return nil, err
+	}
+	profiles := s.readArray("member-profiles.json")
+	var profile map[string]any
+	for _, row := range profiles {
+		if row["username"] == username {
+			profile = row
+			break
+		}
+	}
+	if profile == nil {
+		profile = map[string]any{"username": username}
+		profiles = append(profiles, profile)
+	}
+	profile["avatarUrl"] = "/user-content/avatars/" + username + "." + ext
+	profile["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
+	if err := s.writeArray("member-profiles.json", profiles); err != nil {
+		return nil, err
+	}
+	return s.member(username, accounts), nil
+}
+
+func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth, profiles *MemberProfileStore, accounts auth.Store, avatarDir string) {
 	if root == nil || profiles == nil || accounts == nil {
 		return
 	}
@@ -197,6 +256,30 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			return
 		}
 		member, err := profiles.update(identity.Username, input, accounts)
+		if err != nil {
+			status := http.StatusBadRequest
+			if err == auth.ErrNotFound {
+				status = http.StatusNotFound
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"member": member})
+	})))
+	root.Handle("POST /api/member/avatar", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			AvatarDataURL string `json:"avatarDataUrl"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 3<<20)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		member, err := profiles.updateAvatar(identity.Username, input.AvatarDataURL, avatarDir, accounts)
 		if err != nil {
 			status := http.StatusBadRequest
 			if err == auth.ErrNotFound {

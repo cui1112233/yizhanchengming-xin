@@ -55,6 +55,7 @@ type Config struct {
 	PersonalPromptPath            string
 	ScriptHistoryDir              string
 	MemberSystemDir               string
+	MemberAvatarDir               string
 	NodeAuthBaseURL               string
 }
 
@@ -71,6 +72,7 @@ func FromEnv() (Config, error) {
 	cfg.PersonalPromptPath = envOr("QIANTIE_PERSONAL_PROMPT_PATH", "data/system/script-constraint-prompts.json")
 	cfg.ScriptHistoryDir = envOr("QIANTIE_SCRIPT_HISTORY_DIR", "data/users")
 	cfg.MemberSystemDir = envOr("QIANTIE_MEMBER_SYSTEM_DIR", "data/system")
+	cfg.MemberAvatarDir = envOr("QIANTIE_MEMBER_AVATAR_DIR", "data/avatars")
 	cfg.RedisURL = strings.TrimSpace(os.Getenv("QIANTIE_REDIS_URL"))
 	if cfg.MySQLDSN == "" {
 		return Config{}, fmt.Errorf("QIANTIE_MYSQL_DSN is required")
