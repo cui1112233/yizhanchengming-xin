@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -45,7 +47,15 @@ func main() {
 		log.Fatal(err)
 	}
 	staticHandler := webassets.Handler()
+	authProxy, err := newAuthProxy(envOrDefault("QIANTIE_NODE_AUTH_BASE_URL", "http://127.0.0.1:3001"))
+	if err != nil {
+		log.Fatal(err)
+	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/") {
+			authProxy.ServeHTTP(w, req)
+			return
+		}
 		if req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") {
 			apiHandler.ServeHTTP(w, req)
 			return
@@ -55,6 +65,25 @@ func main() {
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
+}
+
+func newAuthProxy(rawTarget string) (http.Handler, error) {
+	target, err := url.Parse(strings.TrimSpace(rawTarget))
+	if err != nil || target.Scheme != "http" || target.Host == "" {
+		return nil, fmt.Errorf("invalid local auth bridge target")
+	}
+	host := strings.ToLower(target.Hostname())
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" && host != "backend" {
+		return nil, fmt.Errorf("auth bridge target must be local")
+	}
+	return httputil.NewSingleHostReverseProxy(target), nil
+}
+
+func envOrDefault(key, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func databaseDSN(raw string) (string, error) {

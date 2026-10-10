@@ -106,3 +106,25 @@ func TestDatabaseDSNEnablesInterpolationWithoutDroppingExistingOptions(t *testin
 		t.Fatal("databaseDSN() dropped parseTime")
 	}
 }
+
+func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/login" || r.Method != http.MethodPost {
+			t.Fatalf("upstream request = %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"用户名或密码错误"}`))
+	}))
+	defer upstream.Close()
+
+	proxy, err := newAuthProxy(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/login", nil)
+	res := httptest.NewRecorder()
+	proxy.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("proxy status = %d, want %d", res.Code, http.StatusUnauthorized)
+	}
+}
