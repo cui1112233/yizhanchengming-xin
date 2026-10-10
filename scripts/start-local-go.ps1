@@ -18,6 +18,9 @@ if (-not (Test-Path (Join-Path $repo 'backend/qiantie-local.exe'))) {
 Push-Location (Join-Path $repo 'backend')
 try {
   $env:QIANTIE_GO_LISTEN_ADDR = $ListenAddr
+  if (-not $env:QIANTIE_RELEASE_SHA) {
+    $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
+  }
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
     $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '1'
   }
