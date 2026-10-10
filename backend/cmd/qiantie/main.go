@@ -99,7 +99,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health" || req.URL.Path == "/api/admin/agent-skills" || strings.HasPrefix(req.URL.Path, "/api/admin/agent-skills/")) {
+		if (req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health")) || isAdminAgentSkillRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
@@ -203,6 +203,22 @@ func isGoAgentReadRequest(req *http.Request) bool {
 		return false
 	}
 	return req.URL.Path == "/api/agent/chat" || req.URL.Path == "/api/agent/tasks" || strings.HasPrefix(req.URL.Path, "/api/agent/tasks/") || req.URL.Path == "/api/agent/skills" || strings.HasPrefix(req.URL.Path, "/api/agent/skills/")
+}
+
+func isAdminAgentSkillRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+	if req.Method == http.MethodGet {
+		return req.URL.Path == "/api/admin/agent-skills" || strings.HasPrefix(req.URL.Path, "/api/admin/agent-skills/")
+	}
+	if req.Method != http.MethodPost {
+		return false
+	}
+	if req.URL.Path == "/api/admin/agent-skills/draft" {
+		return true
+	}
+	return strings.HasPrefix(req.URL.Path, "/api/admin/agent-skills/") && (strings.HasSuffix(req.URL.Path, "/publish") || strings.HasSuffix(req.URL.Path, "/archive"))
 }
 
 func isGoNovelFetchCompatRequest(req *http.Request) bool {

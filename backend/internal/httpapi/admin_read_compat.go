@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"qiantie/backend/internal/auth"
 )
@@ -111,4 +113,105 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
 	})))
+	root.Handle("POST /api/admin/agent-skills/draft", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := adminSkillOwner(w, req, accounts, profiles)
+		if !ok {
+			return
+		}
+		var input map[string]any
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 80<<10)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "技能内容不合法"})
+			return
+		}
+		id := strings.TrimSpace(toString(input["id"]))
+		if !agentSkillIDPattern.MatchString(id) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "技能内容不合法"})
+			return
+		}
+		path := adminSystemFile(profiles.SystemDir, "agent-skills.json")
+		skills := readAgentSkills(path)
+		version := 1
+		for _, skill := range skills {
+			if toString(skill["id"]) == id && intValue(skill["version"]) >= version {
+				version = intValue(skill["version"]) + 1
+			}
+		}
+		skill, err := normalizeAgentSkill(input, identity.Username, id)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		skill["source"] = "system"
+		skill["owner"] = nil
+		skill["status"] = "draft"
+		skill["version"] = version
+		skill["createdBy"] = identity.Username
+		skills = append(skills, skill)
+		if err := writeAgentSkills(path, skills); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存技能失败"})
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"skill": publicAgentSkill(skill)})
+	})))
+	for _, status := range []string{"published", "archived"} {
+		status := status
+		root.Handle("POST /api/admin/agent-skills/{id}/"+status, middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			identity, ok := adminSkillOwner(w, req, accounts, profiles)
+			if !ok {
+				return
+			}
+			var input map[string]any
+			_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input)
+			version := intValue(input["version"])
+			path := adminSystemFile(profiles.SystemDir, "agent-skills.json")
+			skills := readAgentSkills(path)
+			found := false
+			for index, skill := range skills {
+				if toString(skill["id"]) == req.PathValue("id") && intValue(skill["version"]) == version {
+					found = true
+					if status == "published" {
+						for otherIndex, other := range skills {
+							if otherIndex != index && toString(other["id"]) == req.PathValue("id") && toString(other["status"]) == "published" {
+								other["status"] = "archived"
+								skills[otherIndex] = other
+							}
+						}
+					}
+					skill["status"] = status
+					skill["publishedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
+					skill["publishedBy"] = identity.Username
+					skills[index] = skill
+					break
+				}
+			}
+			if !found {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
+				return
+			}
+			if err := writeAgentSkills(path, skills); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存技能失败"})
+				return
+			}
+			for _, skill := range skills {
+				if toString(skill["id"]) == req.PathValue("id") && intValue(skill["version"]) == version {
+					writeJSON(w, http.StatusOK, map[string]any{"skill": publicAgentSkill(skill)})
+					return
+				}
+			}
+		})))
+	}
+}
+
+func adminSkillOwner(w http.ResponseWriter, req *http.Request, accounts auth.Store, profiles *MemberProfileStore) (BridgeIdentity, bool) {
+	identity, ok := BridgeIdentityFromContext(req.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return BridgeIdentity{}, false
+	}
+	self := profiles.member(identity.Username, accounts)
+	if self == nil || toString(self["role"]) != "dev" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+		return BridgeIdentity{}, false
+	}
+	return identity, true
 }
