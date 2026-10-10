@@ -919,8 +919,28 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusOK, response)
 			return
 		}
-		if len(parts) == 3 && parts[1] == "segmentation" && (parts[2] == "paragraphs" || parts[2] == "fixed") && r.Method == http.MethodPost {
-			candidates := paragraphCandidates(batch)
+		if len(parts) == 3 && parts[1] == "segmentation" && (parts[2] == "paragraphs" || parts[2] == "fixed" || parts[2] == "import") && r.Method == http.MethodPost {
+			var input struct {
+				Text            string `json:"text,omitempty"`
+				LinesPerSegment int    `json:"linesPerSegment,omitempty"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if len(batch.Books) == 0 {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
+				return
+			}
+			text := strings.TrimSpace(input.Text)
+			if text == "" && len(batch.Books) > 0 {
+				text = strings.TrimSpace(batch.Books[0].SourceText)
+			}
+			var candidates []map[string]any
+			if parts[2] == "fixed" {
+				candidates = fixedShuihuoCandidates(batch.Books[0].ID, text, input.LinesPerSegment)
+			} else {
+				candidates = paragraphCandidatesForText(batch.Books[0].ID, text)
+			}
 			writeJSON(w, http.StatusOK, map[string]any{"candidates": candidates, "mode": parts[2], "strategy": parts[2]})
 			return
 		}
@@ -1796,6 +1816,29 @@ func paragraphCandidatesForText(bookID, text string) []map[string]any {
 			continue
 		}
 		candidates = append(candidates, map[string]any{"id": fmt.Sprintf("candidate_%s_%d", bookID, index+1), "text": line, "sourceText": line, "subtitleText": line, "speaker": "旁白"})
+	}
+	return candidates
+}
+
+func fixedShuihuoCandidates(bookID, text string, linesPerSegment int) []map[string]any {
+	if linesPerSegment < 1 {
+		linesPerSegment = 1
+	}
+	lines := strings.FieldsFunc(strings.TrimSpace(text), func(r rune) bool { return r == '\n' || r == '\r' })
+	if len(lines) == 0 && strings.TrimSpace(text) != "" {
+		lines = []string{strings.TrimSpace(text)}
+	}
+	candidates := make([]map[string]any, 0, (len(lines)+linesPerSegment-1)/linesPerSegment)
+	for start, index := 0, 1; start < len(lines); start, index = start+linesPerSegment, index+1 {
+		end := start + linesPerSegment
+		if end > len(lines) {
+			end = len(lines)
+		}
+		line := strings.TrimSpace(strings.Join(lines[start:end], "\n"))
+		if line == "" {
+			continue
+		}
+		candidates = append(candidates, map[string]any{"id": fmt.Sprintf("candidate_%s_%d", bookID, index), "text": line, "sourceText": line, "subtitleText": line, "speaker": "旁白"})
 	}
 	return candidates
 }

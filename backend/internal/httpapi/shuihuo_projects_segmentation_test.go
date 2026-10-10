@@ -22,3 +22,10 @@ func TestParseSmartShuihuoCandidatesRejectsInvalidOutput(t *testing.T) {
 		t.Fatal("expected invalid model output to fail")
 	}
 }
+
+func TestFixedShuihuoCandidatesGroupsLines(t *testing.T) {
+	got := fixedShuihuoCandidates("book-1", "一\n二\n三", 2)
+	if len(got) != 2 || got[0]["text"] != "一\n二" || got[1]["text"] != "三" {
+		t.Fatalf("unexpected fixed candidates: %#v", got)
+	}
+}
