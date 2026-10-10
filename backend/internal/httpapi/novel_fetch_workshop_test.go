@@ -49,6 +49,60 @@ func doNovelFetchRequest(t *testing.T, handler http.Handler, method, path string
 	return rr
 }
 
+func TestNovelFetchWorkshopSparsePutPreservesExistingGenderSource(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "book-existing-gender", Gender: "女频", GenderSource: novelfetchworkshop.GenderAI, GenderReason: "AI 判断",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	put := doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/tasks/book-existing-gender", map[string]any{"bookInfo": map[string]string{"category": "女频"}}, now, secret)
+	if put.Code != http.StatusOK {
+		t.Fatalf("sparse put status=%d body=%s", put.Code, put.Body.String())
+	}
+	get := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/tasks/book-existing-gender", nil, now, secret)
+	if get.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", get.Code, get.Body.String())
+	}
+	var document novelfetchworkshop.Document
+	if err := json.Unmarshal(get.Body.Bytes(), &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Gender != "女频" || document.GenderSource != novelfetchworkshop.GenderAI {
+		t.Fatalf("sparse put changed existing gender source: %#v", document)
+	}
+}
+
+func TestNovelFetchWorkshopPutPreservesExistingPersistentFields(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	put := doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/tasks/book-preserve", map[string]any{
+		"originalRaw": "完整原文", "processedText": "处理正文", "bookInfo": map[string]string{"category": "男频", "genre": "都市"},
+	}, now, secret)
+	if put.Code != http.StatusOK {
+		t.Fatalf("initial put status=%d body=%s", put.Code, put.Body.String())
+	}
+	put = doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/tasks/book-preserve", map[string]any{"gender": "女频"}, now, secret)
+	if put.Code != http.StatusOK {
+		t.Fatalf("sparse put status=%d body=%s", put.Code, put.Body.String())
+	}
+	get := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/tasks/book-preserve", nil, now, secret)
+	if get.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", get.Code, get.Body.String())
+	}
+	var document novelfetchworkshop.Document
+	if err := json.Unmarshal(get.Body.Bytes(), &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.OriginalRaw != "完整原文" || document.ProcessedText != "处理正文" || document.BookInfo.Category != "男频" || document.Gender != "女频" {
+		t.Fatalf("sparse put lost existing fields: %#v", document)
+	}
+}
+
 func TestNovelFetchWorkshopBridgeRoundTrip(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
@@ -191,6 +245,38 @@ func TestNovelFetchWorkshopAcceptsBrowserSessionToken(t *testing.T) {
 	handler.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
 		t.Fatalf("browser session status=%d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestNovelFetchWorkshopConfigMatchesFrontendContract(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	put := doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/config", map[string]any{
+		"appConfig": map[string]any{"workflow": map[string]any{"auto_fetch_original": true}},
+		"platforms": []any{map[string]any{"id": "2", "name": "起点"}},
+	}, now, secret)
+	if put.Code != http.StatusOK {
+		t.Fatalf("config put status=%d body=%s", put.Code, put.Body.String())
+	}
+	get := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/config", nil, now, secret)
+	if get.Code != http.StatusOK {
+		t.Fatalf("config get status=%d body=%s", get.Code, get.Body.String())
+	}
+	var response struct {
+		AppConfig map[string]any   `json:"appConfig"`
+		Platforms []map[string]any `json:"platforms"`
+	}
+	if err := json.Unmarshal(get.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	workflow, ok := response.AppConfig["workflow"].(map[string]any)
+	if !ok || workflow["auto_fetch_original"] != true || len(response.Platforms) != 1 || response.Platforms[0]["name"] != "起点" {
+		t.Fatalf("frontend config contract mismatch: %#v", response)
+	}
+	platforms := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/platforms", nil, now, secret)
+	if platforms.Code != http.StatusOK || !bytes.Contains(platforms.Body.Bytes(), []byte(`"name":"起点"`)) {
+		t.Fatalf("platforms status=%d body=%s", platforms.Code, platforms.Body.String())
 	}
 }
 

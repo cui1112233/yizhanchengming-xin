@@ -129,7 +129,7 @@ func novelFetchBodyPathValues(w http.ResponseWriter, req *http.Request) (string,
 	return bookID, versionID, true
 }
 
-func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store) {
+func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge) {
 	mux.HandleFunc("GET /api/novel-fetch-workshop/runs", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		bookID := strings.TrimSpace(req.URL.Query().Get("bookId"))
@@ -276,7 +276,20 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
 			return
 		}
+		explicitManualGender := strings.TrimSpace(document.Gender) != ""
 		document.BookID = bookID
+		existing, err := store.GetDocument(req.Context(), identity.Username, bookID)
+		if err != nil && !errors.Is(err, novelfetchworkshop.ErrNotFound) {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
+			return
+		}
+		document = mergeNovelFetchDocument(existing, document)
+		if explicitManualGender {
+			decision := novelfetchworkshop.ResolveGender(req.Context(), document.Gender, document.BookInfo, aiJudge)
+			document.Gender = decision.Gender
+			document.GenderSource = decision.Source
+			document.GenderReason = decision.Reason
+		}
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -310,6 +323,30 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, result)
 	})
 
+	mux.HandleFunc("GET /api/novel-fetch-workshop/platforms", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取平台表失败"})
+			return
+		}
+		platforms := make([]map[string]any, 0)
+		if configured, ok := settings["platforms"].([]any); ok {
+			for _, raw := range configured {
+				platform, ok := raw.(map[string]any)
+				if !ok || platform["visible"] == false {
+					continue
+				}
+				id, idOK := platform["id"].(string)
+				name, nameOK := platform["name"].(string)
+				if idOK && strings.TrimSpace(id) != "" && nameOK && strings.TrimSpace(name) != "" {
+					platforms = append(platforms, map[string]any{"id": id, "name": name})
+				}
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"platforms": platforms})
+	})
+
 	mux.HandleFunc("GET /api/novel-fetch-workshop/config", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		settings, err := store.GetConfig(req.Context(), identity.Username)
@@ -317,27 +354,118 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取设置失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
+		appConfig := settings
+		if configured, ok := settings["appConfig"].(map[string]any); ok {
+			appConfig = configured
+		}
+		platforms, _ := settings["platforms"].([]any)
+		styles, _ := settings["styles"].([]any)
+		aiConfig, _ := settings["aiConfig"].(map[string]any)
+		if aiConfig == nil {
+			if ai, ok := appConfig["ai"].(map[string]any); ok {
+				aiConfig = map[string]any{"ai": ai}
+			} else {
+				aiConfig = map[string]any{}
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"appConfig": appConfig,
+			"platforms": platforms,
+			"styles":    styles,
+			"aiConfig":  aiConfig,
+			"settings":  settings,
+		})
 	})
 
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/config", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
-		var body struct {
-			Settings map[string]any `json:"settings"`
-		}
-		if err := decodeNovelFetchJSON(w, req, &body); err != nil {
+		var patch map[string]any
+		if err := decodeNovelFetchJSON(w, req, &patch); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
 			return
 		}
-		if body.Settings == nil {
-			body.Settings = map[string]any{}
+		settings, _ := patch["settings"].(map[string]any)
+		if settings == nil {
+			settings = patch
 		}
-		if err := store.PutConfig(req.Context(), identity.Username, body.Settings); err != nil {
+		current, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取设置失败"})
+			return
+		}
+		merged := mergeWorkshopConfig(current, settings)
+		if err := store.PutConfig(req.Context(), identity.Username, merged); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存设置失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": body.Settings})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": merged})
 	})
+}
+
+func mergeWorkshopConfig(current, patch map[string]any) map[string]any {
+	merged := map[string]any{}
+	for key, value := range current {
+		merged[key] = value
+	}
+	for key, value := range patch {
+		currentMap, currentOK := merged[key].(map[string]any)
+		patchMap, patchOK := value.(map[string]any)
+		if currentOK && patchOK {
+			merged[key] = mergeWorkshopConfig(currentMap, patchMap)
+			continue
+		}
+		merged[key] = value
+	}
+	return merged
+}
+
+func mergeNovelFetchDocument(existing, incoming novelfetchworkshop.Document) novelfetchworkshop.Document {
+	if strings.TrimSpace(incoming.Gender) == "" {
+		incoming.Gender = existing.Gender
+	}
+	if incoming.GenderSource == "" {
+		incoming.GenderSource = existing.GenderSource
+	}
+	if strings.TrimSpace(incoming.GenderReason) == "" {
+		incoming.GenderReason = existing.GenderReason
+	}
+	if strings.TrimSpace(incoming.BookInfo.Category) == "" {
+		incoming.BookInfo.Category = existing.BookInfo.Category
+	}
+	if strings.TrimSpace(incoming.BookInfo.Genre) == "" {
+		incoming.BookInfo.Genre = existing.BookInfo.Genre
+	}
+	if incoming.Meta == nil {
+		incoming.Meta = existing.Meta
+	}
+	if incoming.BodyRefs == nil {
+		incoming.BodyRefs = existing.BodyRefs
+	}
+	if strings.TrimSpace(incoming.Original) == "" {
+		incoming.Original = existing.Original
+	}
+	if strings.TrimSpace(incoming.OriginalRaw) == "" {
+		incoming.OriginalRaw = existing.OriginalRaw
+	}
+	if strings.TrimSpace(incoming.ProcessedText) == "" {
+		incoming.ProcessedText = existing.ProcessedText
+	}
+	if incoming.OriginalRawChars == 0 {
+		incoming.OriginalRawChars = existing.OriginalRawChars
+	}
+	if incoming.ProcessedChars == 0 {
+		incoming.ProcessedChars = existing.ProcessedChars
+	}
+	if incoming.MaxTxt == 0 {
+		incoming.MaxTxt = existing.MaxTxt
+	}
+	if incoming.Versions == nil {
+		incoming.Versions = existing.Versions
+	}
+	if incoming.Logs == nil {
+		incoming.Logs = existing.Logs
+	}
+	return incoming
 }
 
 func decodeNovelFetchJSON(w http.ResponseWriter, req *http.Request, target any) error {
