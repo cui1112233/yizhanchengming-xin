@@ -128,3 +128,14 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 		t.Fatalf("proxy status = %d, want %d", res.Code, http.StatusUnauthorized)
 	}
 }
+
+func TestShouldBridgeLegacyAPI(t *testing.T) {
+	for _, path := range []string{"/api/presets", "/api/models", "/api/chat", "/api/script-constraint-prompts"} {
+		if !shouldBridgeLegacyAPI(path) {
+			t.Fatalf("%s should use the temporary Node bridge", path)
+		}
+	}
+	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") {
+		t.Fatal("migrated Go API paths must not use the Node bridge")
+	}
+}

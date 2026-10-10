@@ -56,6 +56,10 @@ func main() {
 			authProxy.ServeHTTP(w, req)
 			return
 		}
+		if shouldBridgeLegacyAPI(req.URL.Path) {
+			authProxy.ServeHTTP(w, req)
+			return
+		}
 		if req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") {
 			apiHandler.ServeHTTP(w, req)
 			return
@@ -84,6 +88,21 @@ func envOrDefault(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func shouldBridgeLegacyAPI(path string) bool {
+	for _, prefix := range []string{
+		"/api/presets",
+		"/api/models",
+		"/api/chat",
+		"/api/script-constraint-prompts",
+		"/api/script/",
+	} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func databaseDSN(raw string) (string, error) {
