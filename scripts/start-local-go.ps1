@@ -11,7 +11,15 @@ if ($CheckOnly) {
   exit $LASTEXITCODE
 }
 
-if (-not (Test-Path (Join-Path $repo 'backend/qiantie-local.exe'))) {
+$binaryPath = Join-Path $repo 'backend/qiantie-local.exe'
+$goSourceRoot = Join-Path $repo 'backend'
+$needsBuild = -not (Test-Path $binaryPath)
+if (-not $needsBuild) {
+  $binaryTime = (Get-Item $binaryPath).LastWriteTimeUtc
+  $latestGoSource = Get-ChildItem $goSourceRoot -Recurse -Filter '*.go' -File | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+  $needsBuild = $latestGoSource -and $latestGoSource.LastWriteTimeUtc -gt $binaryTime
+}
+if ($needsBuild) {
   & (Join-Path $PSScriptRoot 'build-go-local.ps1')
 }
 
