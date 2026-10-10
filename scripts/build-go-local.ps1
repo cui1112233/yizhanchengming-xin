@@ -13,6 +13,8 @@ $novelPanelDist = Join-Path $goDist 'novel-panel'
 $novelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
 $novelFetchPatchSource = Join-Path $repo 'public/batch-rewrite'
 $novelFetchDist = Join-Path $goDist 'batch-rewrite'
+$brandAssetsSource = Join-Path $repo 'public/assets'
+$brandAssetsDist = Join-Path $goDist 'assets'
 
 if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
   throw "Frontend build output is missing: $frontendDist"
@@ -21,6 +23,16 @@ if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
 New-Item -ItemType Directory -Force $goDist | Out-Null
 Get-ChildItem -LiteralPath $goDist -Force | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Recurse -Force
 Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -Force
+
+# The liquid-metal brand component reads these stable, non-hashed images from
+# /assets. Keep them beside the hashed Vite assets in the embedded Go bundle.
+foreach ($brandAsset in @('brand-logo-black.png', 'brand-logo-white.png')) {
+  $source = Join-Path $brandAssetsSource $brandAsset
+  if (-not (Test-Path $source)) {
+    throw "Brand asset is missing: $source"
+  }
+  Copy-Item -LiteralPath $source -Destination (Join-Path $brandAssetsDist $brandAsset) -Force
+}
 
 # Node 3001 composes the novel-fetch page from the tracked public workbench and
 # injects the current retry/status/date compatibility scripts. Go 4001 must
