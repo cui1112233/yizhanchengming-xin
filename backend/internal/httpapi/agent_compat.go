@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // RegisterAgentReadCompat serves the existing file-backed Agent task list and
@@ -86,4 +87,168 @@ func RegisterAgentReadCompat(root *http.ServeMux, middleware BridgeAuth, usersRo
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
 	})))
+	root.Handle("POST /api/agent/tasks", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		task := map[string]any{"id": "agent-go-" + strings.ReplaceAll(now, ":", ""), "title": "新聊天", "titleMode": "automatic", "createdAt": now, "updatedAt": now, "messages": []any{}, "canvas": map[string]any{"version": 1, "revision": 0, "nodes": []any{}, "edges": []any{}}, "executions": []any{}}
+		tasks, _ := document["tasks"].([]any)
+		document["tasks"] = append([]any{task}, tasks...)
+		if err := saveAgentDocument(usersRoot, identity.Username, document); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存 Agent 任务失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"task": task})
+	})))
+	root.Handle("PATCH /api/agent/tasks/{id}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			Title string `json:"title"`
+		}
+		if json.NewDecoder(req.Body).Decode(&body) != nil || strings.TrimSpace(body.Title) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "标题不能为空"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		updated := false
+		for _, raw := range documentTasks(document) {
+			if task, ok := raw.(map[string]any); ok && task["id"] == req.PathValue("id") {
+				task["title"] = strings.TrimSpace(body.Title)
+				task["titleMode"] = "manual"
+				task["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
+				updated = true
+				writeJSON(w, http.StatusOK, map[string]any{"task": task})
+				break
+			}
+		}
+		if !updated {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+			return
+		}
+		if err := saveAgentDocument(usersRoot, identity.Username, document); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存 Agent 任务失败"})
+		}
+	})))
+	root.Handle("DELETE /api/agent/tasks/{id}/messages", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		updateAgentTask(usersRoot, w, req, func(task map[string]any) { task["messages"] = []any{} })
+	})))
+	root.Handle("DELETE /api/agent/tasks/{id}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		id := req.PathValue("id")
+		filtered := make([]any, 0)
+		deleted := false
+		for _, raw := range documentTasks(document) {
+			task, ok := raw.(map[string]any)
+			if ok && task["id"] == id {
+				deleted = true
+				continue
+			}
+			filtered = append(filtered, raw)
+		}
+		if !deleted {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+			return
+		}
+		document["tasks"] = filtered
+		if err := saveAgentDocument(usersRoot, identity.Username, document); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存 Agent 任务失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	})))
+}
+
+func documentTasks(document map[string]any) []any {
+	tasks, _ := document["tasks"].([]any)
+	return tasks
+}
+
+func loadAgentDocument(root, username string) (map[string]any, error) {
+	username = strings.TrimSpace(username)
+	if username == "" || strings.ContainsAny(username, `/\\`) || username == "." || username == ".." {
+		return nil, os.ErrInvalid
+	}
+	path := filepath.Join(root, username, "agent-tasks.json")
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return map[string]any{"version": 1, "tasks": []any{}}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var document map[string]any
+	if err := json.Unmarshal(raw, &document); err != nil || document == nil {
+		return nil, os.ErrInvalid
+	}
+	if _, ok := document["tasks"].([]any); !ok {
+		document["tasks"] = []any{}
+	}
+	return document, nil
+}
+
+func saveAgentDocument(root, username string, document map[string]any) error {
+	path := filepath.Join(root, strings.TrimSpace(username), "agent-tasks.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func updateAgentTask(root string, w http.ResponseWriter, req *http.Request, update func(map[string]any)) {
+	identity, ok := BridgeIdentityFromContext(req.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	document, err := loadAgentDocument(root, identity.Username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+		return
+	}
+	for _, raw := range documentTasks(document) {
+		if task, ok := raw.(map[string]any); ok && task["id"] == req.PathValue("id") {
+			update(task)
+			task["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
+			if err := saveAgentDocument(root, identity.Username, document); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存 Agent 任务失败"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"task": task})
+			return
+		}
+	}
+	writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
 }
