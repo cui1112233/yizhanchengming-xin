@@ -171,6 +171,54 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "state": body.State})
 	})))
+	root.Handle("GET /api/batch-rewrite/web-submit/config", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			return
+		}
+		appConfig := mapOrEmpty(settings["appConfig"])
+		writeJSON(w, http.StatusOK, map[string]any{"settings": mapOrEmpty(appConfig["web_submit"])})
+	})))
+	root.Handle("POST /api/batch-rewrite/web-submit/config", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			Settings map[string]any `json:"settings"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 128<<10)).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			return
+		}
+		appConfig := mapOrEmpty(settings["appConfig"])
+		appConfig["web_submit"] = body.Settings
+		settings["appConfig"] = appConfig
+		if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存提交配置失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": body.Settings, "tasks": []any{}})
+	})))
+	root.Handle("GET /api/batch-rewrite/web-submit/environment", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if _, ok := BridgeIdentityFromContext(req.Context()); !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": false, "detail": "未登录"}, map[string]any{"name": "上传接口", "ok": false, "detail": "需在 Go 服务中配置提交服务"}}})
+	})))
 }
 
 func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[string]any {
