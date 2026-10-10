@@ -139,3 +139,14 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 		t.Fatal("migrated Go API paths must not use the Node bridge")
 	}
 }
+
+func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
+	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "")
+	if goAuthEnabled() {
+		t.Fatal("Go auth must remain opt-in before legacy account import")
+	}
+	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "1")
+	if !goAuthEnabled() {
+		t.Fatal("Go auth should enable with explicit opt-in")
+	}
+}

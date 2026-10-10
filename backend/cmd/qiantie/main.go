@@ -52,6 +52,10 @@ func main() {
 		log.Fatal(err)
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !goAuthEnabled() && (req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/")) {
+			authProxy.ServeHTTP(w, req)
+			return
+		}
 		if strings.HasPrefix(req.URL.Path, "/api/login/") && req.URL.Path != "/api/login/logout" && req.URL.Path != "/api/login/session" {
 			authProxy.ServeHTTP(w, req)
 			return
@@ -69,6 +73,10 @@ func main() {
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
+}
+
+func goAuthEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("QIANTIE_GO_AUTH_ENABLED")), "1") || strings.EqualFold(strings.TrimSpace(os.Getenv("QIANTIE_GO_AUTH_ENABLED")), "true")
 }
 
 func newAuthProxy(rawTarget string) (http.Handler, error) {
