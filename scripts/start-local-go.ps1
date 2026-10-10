@@ -24,6 +24,12 @@ try {
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
     $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '1'
   }
+  if (-not $env:QIANTIE_LEGACY_ACCOUNTS_PATH) {
+    $env:QIANTIE_LEGACY_ACCOUNTS_PATH = Join-Path $repo 'data/system/accounts.json'
+  }
+  if (-not $env:QIANTIE_GO_AUTH_ENABLED) {
+    $env:QIANTIE_GO_AUTH_ENABLED = '1'
+  }
   & .\qiantie-local.exe
   exit $LASTEXITCODE
 } finally {
