@@ -17,7 +17,7 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-var uploadBookIDPattern = regexp.MustCompile(`^(?:\d{1,20}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`)
+var uploadBookIDPattern = regexp.MustCompile(`(?i)^(?:\d{1,20}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`)
 
 var uploadPlatformIDs = map[int]bool{1: true, 2: true, 3: true, 4: true, 6: true, 7: true, 15: true, 20: true, 26: true, 29: true, 31: true}
 var uploadGenderIDs = map[string]int{"男": 1, "女": 2}
