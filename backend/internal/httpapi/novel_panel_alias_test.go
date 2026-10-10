@@ -31,7 +31,7 @@ func TestNovelPanelSettingsAliasUsesGoConfigStore(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer go-session")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"ai_timeout_seconds"`) {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"ai_timeout_seconds":400`) {
 		t.Fatalf("settings alias response=%d %s", res.Code, res.Body.String())
 	}
 }

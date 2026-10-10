@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	panelDefaultTimeout = 120
-	panelMinTimeout     = 10
-	panelMaxTimeout     = 900
+	panelDefaultTimeout = 400
+	panelMinTimeout     = 30
+	panelMaxTimeout     = 600
 )
 
 var panelImageDefaults = map[string]any{
