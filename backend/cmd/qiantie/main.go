@@ -214,7 +214,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if shouldBridgeLegacyAPI(req.URL.Path) {
+		if shouldBridgeLegacyAPIForSlice(req.URL.Path, cfg.Slice) {
 			authProxy.ServeHTTP(w, req)
 			return
 		}
@@ -312,6 +312,14 @@ func envOrDefault(key, fallback string) string {
 }
 
 func shouldBridgeLegacyAPI(path string) bool {
+	return shouldBridgeLegacyAPIForSlice(path, -1)
+}
+
+// shouldBridgeLegacyAPIForSlice keeps staged V12 routes honest. A route is
+// only kept on Go when the corresponding slice is actually enabled; otherwise
+// the existing Node implementation remains the functional fallback instead
+// of returning a misleading Go 404.
+func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	// These catalog endpoints are now implemented by the Go service. Keep the
 	// broader /api/config bridge for the remaining legacy settings endpoints.
 	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
@@ -328,8 +336,11 @@ func shouldBridgeLegacyAPI(path string) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
-		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") || isGoV12AliasPath(path) {
+		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || (strings.Contains(path, "/h3/") && (slice < 0 || slice >= 3)) || isGoV12AliasPath(path) {
 			return false
+		}
+		if strings.Contains(path, "/h3/") {
+			return true
 		}
 		return true
 	}

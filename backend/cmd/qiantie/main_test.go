@@ -161,6 +161,12 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/effective-settings") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/final-prompt") {
 		t.Fatal("read-only V12 compiler previews must use Go")
 	}
+	if !shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 1) {
+		t.Fatal("H3 execution must stay on the Node bridge before slice 3 is enabled")
+	}
+	if shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 3) {
+		t.Fatal("H3 execution should use Go once slice 3 is enabled")
+	}
 }
 
 func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
