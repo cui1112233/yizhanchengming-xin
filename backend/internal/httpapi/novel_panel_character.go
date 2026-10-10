@@ -78,6 +78,47 @@ func parseCharacterRoster(value string) []map[string]any {
 	return result
 }
 
+func migrateCharacterProject(input map[string]any) map[string]any {
+	project, _ := input["project"].(map[string]any)
+	if project == nil {
+		project = input
+	}
+	projectData, _ := project["data"].(map[string]any)
+	if projectData == nil {
+		projectData = project
+	}
+	if existing, ok := projectData["character_core_v2"].(map[string]any); ok {
+		existing["character_core_version"] = 2
+		return map[string]any{"migrated": false, "character_core": existing}
+	}
+	if existing, ok := projectData["character_core"].(map[string]any); ok {
+		existing["character_core_version"] = 2
+		return map[string]any{"migrated": false, "character_core": existing}
+	}
+	slots := []map[string]any{}
+	if characters, ok := projectData["characters"].([]any); ok {
+		for index, raw := range characters {
+			character, valid := raw.(map[string]any)
+			if !valid {
+				continue
+			}
+			name := characterText(character["name"])
+			if name == "" {
+				name = characterText(character["display_name"])
+			}
+			if name == "" {
+				continue
+			}
+			token := characterSlotToken(name, index+1)
+			slots = append(slots, map[string]any{"slot_id": token, "slot_token": token, "person_id": "person_" + token, "source_entry": name, "display_name": name, "base_name": name, "canonical_name_hint": name, "aliases": []any{}, "bracket_hints": []any{}, "identity_hints": []any{}, "gender": characterText(character["gender"]), "species": "", "age": map[string]any{"chronological_age": characterText(character["age"]), "visual_age_stage": "", "life_stage": "", "timeline_stage": "", "stage_source": "unset"}, "manual_values": map[string]any{}, "inferred_values": map[string]any{}, "appearance": characterText(character["appearance"]), "appearance_revision_note": "", "disabled": false})
+		}
+	}
+	if len(slots) == 0 {
+		slots = parseCharacterRoster(characterText(input["guide_text"]))
+	}
+	return map[string]any{"migrated": true, "character_core": map[string]any{"character_core_version": 2, "source_hash": "", "character_revision": 0, "people": []any{}, "slots": slots, "relationships": []any{}, "aliases": []any{}, "mention_entities": []any{}, "scene_casting": map[string]any{}, "relationship_pending": []any{}, "keyword_index": map[string]any{}, "analysis_state": map[string]any{"protocol": "character_core_2_all_genres_v77", "style_ready": false, "slots_ready": len(slots) > 0, "forced_roster_ready": len(slots) > 0, "facts_ready": false, "relationships_ready": false, "relationship_graph_ready": false, "appearances_ready": false, "character_cards_ready": false, "keyword_index_ready": false, "casting_ready": false, "scene_cast_ready": false, "ready": false}}}
+}
+
 func RegisterNovelPanelCharacterCompat(root *http.ServeMux, middleware BridgeAuth) {
 	if root == nil || middleware.AuthStore == nil {
 		return
@@ -93,6 +134,9 @@ func RegisterNovelPanelCharacterCompat(root *http.ServeMux, middleware BridgeAut
 			return
 		}
 		switch req.URL.Path {
+		case "/api/novel-panel/character-core/migrate-project":
+			writeJSON(w, http.StatusOK, migrateCharacterProject(input))
+			return
 		case "/api/novel-panel/character-core/parse-slots":
 			guide := characterText(input["guide_text"])
 			slots := parseCharacterRoster(guide)
@@ -185,7 +229,7 @@ func RegisterNovelPanelCharacterCompat(root *http.ServeMux, middleware BridgeAut
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "人物核心接口不存在"})
 		}
 	}))
-	for _, path := range []string{"/api/novel-panel/character-core/parse-slots", "/api/novel-panel/character-core/resolve-scene-cast", "/api/novel-panel/character-core/build-scene-context"} {
+	for _, path := range []string{"/api/novel-panel/character-core/parse-slots", "/api/novel-panel/character-core/resolve-scene-cast", "/api/novel-panel/character-core/build-scene-context", "/api/novel-panel/character-core/migrate-project"} {
 		root.Handle("POST "+path, handler)
 	}
 }
