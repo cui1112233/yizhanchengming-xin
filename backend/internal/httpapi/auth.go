@@ -17,6 +17,7 @@ type AuthOptions struct {
 	Now             func() time.Time
 	SessionResolver func(context.Context, string) (BridgeIdentity, error)
 	MFAFile         string
+	PasskeyFile     string
 }
 
 func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
@@ -78,6 +79,30 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			_ = options.Store.RevokeSession(r.Context(), token)
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+	root.HandleFunc("POST /api/login/passkey/options", func(w http.ResponseWriter, r *http.Request) {
+		if options.Store == nil || strings.TrimSpace(options.PasskeyFile) == "" {
+			writeAuthError(w, http.StatusServiceUnavailable, "Passkey 服务暂不可用")
+			return
+		}
+		var input struct {
+			Username string `json:"username"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&input) != nil || strings.TrimSpace(input.Username) == "" {
+			writeAuthError(w, http.StatusBadRequest, "请输入账号")
+			return
+		}
+		account, err := options.Store.FindAccount(r.Context(), strings.TrimSpace(input.Username))
+		if err != nil || !account.Active {
+			writeAuthError(w, http.StatusNotFound, "当前账号没有可用 Passkey")
+			return
+		}
+		result, err := passkeyAuthenticationOptions(options.PasskeyFile, account.Username, r)
+		if err != nil {
+			writeAuthError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	})
 
 	root.HandleFunc("GET /api/login/session", func(w http.ResponseWriter, r *http.Request) {

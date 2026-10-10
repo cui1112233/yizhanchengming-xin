@@ -112,7 +112,11 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.MemberProfileStore != nil {
 		mfaFile = filepath.Join(options.MemberProfileStore.SystemDir, "mfa.json")
 	}
-	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver, MFAFile: mfaFile})
+	passkeyFile := ""
+	if options.MemberProfileStore != nil {
+		passkeyFile = filepath.Join(options.MemberProfileStore.SystemDir, "passkeys.json")
+	}
+	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver, MFAFile: mfaFile, PasskeyFile: passkeyFile})
 	if options.PresetCatalog != nil {
 		registerPresetRoutes(root, auth, options.PresetCatalog)
 	}

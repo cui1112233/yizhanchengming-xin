@@ -145,6 +145,46 @@ func passkeyRequestContext(req *http.Request) (string, string) {
 	return rpID, origin
 }
 
+func passkeyAuthenticationOptions(path, username string, req *http.Request) (map[string]any, error) {
+	state := map[string]any{"credentials": []any{}, "challenges": []any{}}
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(raw, &state)
+	}
+	credentials, _ := state["credentials"].([]any)
+	allow := make([]map[string]any, 0)
+	for _, raw := range credentials {
+		row, ok := raw.(map[string]any)
+		if !ok || toString(row["username"]) != username {
+			continue
+		}
+		allow = append(allow, map[string]any{"type": "public-key", "id": row["credentialId"], "transports": row["transports"]})
+	}
+	if len(allow) == 0 {
+		return nil, fmt.Errorf("当前账号没有可用 Passkey")
+	}
+	challengeBytes := make([]byte, 32)
+	if _, err := rand.Read(challengeBytes); err != nil {
+		return nil, err
+	}
+	challenge := base64.RawURLEncoding.EncodeToString(challengeBytes)
+	rpID, origin := passkeyRequestContext(req)
+	now := time.Now().UTC()
+	challenges, _ := state["challenges"].([]any)
+	challenges = append(challenges, map[string]any{"id": fmt.Sprintf("go-%d", now.UnixNano()), "username": username, "kind": "authenticate", "challenge": challenge, "rpId": rpID, "origin": origin, "createdAt": now.Format(time.RFC3339), "expiresAt": now.Add(5 * time.Minute).Format(time.RFC3339), "usedAt": nil})
+	state["challenges"] = challenges
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	raw, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		return nil, err
+	}
+	return map[string]any{"challenge": challenge, "rpId": rpID, "timeout": 300000, "userVerification": "required", "allowCredentials": allow}, nil
+}
+
 func readPasskeyCredentials(profiles *MemberProfileStore, username string) []map[string]any {
 	path := adminSystemFile(profiles.SystemDir, "passkeys.json")
 	data, err := os.ReadFile(path)
