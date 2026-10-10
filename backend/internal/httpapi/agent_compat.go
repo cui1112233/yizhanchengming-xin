@@ -290,10 +290,10 @@ func RegisterAgentChatCompat(root *http.ServeMux, middleware BridgeAuth, usersRo
 		userMessage := map[string]any{"role": "user", "content": strings.TrimSpace(body.Prompt), "createdAt": now}
 		contextText, _ := json.Marshal(body.Context)
 		completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{
-			SystemPrompt: "你是前贴平台的中文创作助手。请用中文直接回答，不能声称已经替用户执行外部操作。",
-			UserPrompt:   strings.TrimSpace(body.Prompt) + "\n\n页面上下文：\n" + string(contextText),
-			MaxTokens:    2048,
-			Temperature:  0.7,
+			SystemPrompt:        "你是前贴平台的中文创作助手。请用中文直接回答，不能声称已经替用户执行外部操作。",
+			UserPrompt:          strings.TrimSpace(body.Prompt) + "\n\n页面上下文：\n" + string(contextText),
+			MaxTokens:           2048,
+			Temperature:         0.7,
 			DisableJSONResponse: true,
 		})
 		if err != nil {
