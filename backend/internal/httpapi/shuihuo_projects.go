@@ -79,6 +79,62 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"presets": []any{}})
 	})))
+	root.Handle("/api/shuihuo-production/admin/models", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := BridgeIdentityFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if !identity.IsOwner {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权管理模型"})
+			return
+		}
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, identity.Username)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		models := shuihuoCollection(config, "modelCatalog", nil)
+		if r.Method == http.MethodGet {
+			writeJSON(w, http.StatusOK, map[string]any{"models": safeShuihuoModels(models, false)})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		var input map[string]any
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		modelID, _ := input["modelId"].(string)
+		name, _ := input["name"].(string)
+		kind, _ := input["kind"].(string)
+		if strings.TrimSpace(modelID) == "" || strings.TrimSpace(name) == "" || strings.TrimSpace(kind) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "modelId, name and kind are required"})
+			return
+		}
+		for _, model := range models {
+			if model["id"] == modelID || model["modelId"] == modelID {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "模型 ID 已存在"})
+				return
+			}
+		}
+		model := map[string]any{}
+		for _, key := range []string{"modelId", "name", "kind", "adapterKind", "enabled", "parameterSchema", "credentialRef", "endpoint", "requestTemplate", "responseMapping", "credential", "apiKey"} {
+			if value, exists := input[key]; exists {
+				model[key] = value
+			}
+		}
+		model["id"] = modelID
+		models = append(models, model)
+		config["modelCatalog"] = models
+		if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"model": safeShuihuoModels([]map[string]any{model}, false)[0]})
+	})))
 	root.Handle("/api/shuihuo-production/asset-types", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -1345,6 +1401,28 @@ func shuihuoCollection(config map[string]any, key string, fallback []map[string]
 		return raw
 	}
 	return append([]map[string]any(nil), fallback...)
+}
+
+func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[string]any {
+	result := make([]map[string]any, 0, len(models))
+	for _, model := range models {
+		copy := map[string]any{}
+		for _, key := range []string{"id", "modelId", "name", "displayName", "kind", "provider", "adapterKind", "enabled", "configured", "parameterSchema", "credentialRef", "endpoint", "requestTemplate", "responseMapping"} {
+			if value, exists := model[key]; exists {
+				copy[key] = value
+			}
+		}
+		if includeSecrets {
+			if value, exists := model["credential"]; exists {
+				copy["credential"] = value
+			}
+			if value, exists := model["apiKey"]; exists {
+				copy["apiKey"] = value
+			}
+		}
+		result = append(result, copy)
+	}
+	return result
 }
 
 func storedShuihuoMedia(book batchfactoryv11.Book) []map[string]any {
