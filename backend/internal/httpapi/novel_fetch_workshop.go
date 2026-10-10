@@ -214,7 +214,7 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}, nil
 }
 
-func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, fetcher *novelfetchworkshop.UpstreamFetcher) {
+func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider) {
 	registry := newWorkshopProcessRegistry()
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -524,6 +524,57 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"task": document})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/{bookId}/generate-ai", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		bookID := strings.TrimSpace(req.PathValue("bookId"))
+		if !novelFetchBookIDPattern.MatchString(bookID) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "非法的书籍ID"})
+			return
+		}
+		var input struct {
+			Count int `json:"count"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+			return
+		}
+		if input.Count == 0 {
+			input.Count = 1
+		}
+		document, err := novelfetchworkshop.GenerateAIRewrites(req.Context(), store, identity.Username, bookID, input.Count, rewriteProvider)
+		if err != nil {
+			status := http.StatusBadRequest
+			if rewriteProvider == nil || strings.Contains(err.Error(), "模型未配置") {
+				status = http.StatusServiceUnavailable
+			}
+			writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "task": document})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/ai/test", func(w http.ResponseWriter, req *http.Request) {
+		if rewriteProvider == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "AI 改文模型未配置"})
+			return
+		}
+		content, err := rewriteProvider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
+			SystemPrompt: "你是接口连通性测试助手。",
+			UserPrompt:   "请只回复：ok",
+			Temperature:  0,
+			MaxTokens:    8,
+		})
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		content = strings.TrimSpace(content)
+		if len(content) > 200 {
+			content = content[:200]
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "content": content})
 	})
 
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/tasks/{bookId}", func(w http.ResponseWriter, req *http.Request) {

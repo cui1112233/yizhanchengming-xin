@@ -35,6 +35,7 @@ type RouterOptions struct {
 	NovelFetchStore         novelfetchworkshop.LifecycleStore
 	NovelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
 	NovelFetchFetcher       *novelfetchworkshop.UpstreamFetcher
+	NovelFetchRewrite       novelfetchworkshop.RewriteProvider
 	LocalExecutors          *localexecutor.Service
 	GiantMaterialExecutor   *giantmaterialexecutor.Service
 	GiantMaterialResolver   GiantMaterialResolver
@@ -97,7 +98,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
-		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchFetcher)
+		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchFetcher, options.NovelFetchRewrite)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
 		root.Handle("/api/novel-fetch-workshop/", NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore}.Middleware(novelFetch))
 	}

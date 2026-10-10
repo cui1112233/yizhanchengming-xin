@@ -21,6 +21,20 @@ import (
 	"qiantie/backend/internal/storage"
 )
 
+type novelFetchRewriteAdapter struct {
+	provider *batchfactoryv11.OpenAICompatibleProvider
+}
+
+func (a novelFetchRewriteAdapter) Complete(ctx context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
+	return a.provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+		SystemPrompt:        request.SystemPrompt,
+		UserPrompt:          request.UserPrompt,
+		Temperature:         request.Temperature,
+		MaxTokens:           request.MaxTokens,
+		DisableJSONResponse: true,
+	})
+}
+
 func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*http.ServeMux)) (http.Handler, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
@@ -48,6 +62,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		director = &batchfactoryv11.DirectorService{Store: store, Provider: textProvider}
 	}
 	var novelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
+	var novelFetchRewrite novelfetchworkshop.RewriteProvider
 	if textProvider != nil {
 		novelFetchAIGenderJudge = func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
 			return textProvider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
@@ -58,6 +73,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 				DisableJSONResponse: true,
 			})
 		}
+		novelFetchRewrite = novelFetchRewriteAdapter{provider: textProvider}
 	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
 	videoRegistry := batchfactoryv11.NewMemoryVideoProviderRegistry()
@@ -153,5 +169,5 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
 }
