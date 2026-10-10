@@ -116,6 +116,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterScriptHistoryRoutes(root, auth, options.ScriptHistoryStore)
 	RegisterMemberProfileRoutes(root, auth, options.MemberProfileStore, options.AuthStore, options.MemberAvatarDir)
 	RegisterAccountAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
+	RegisterMemberTeamReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	if options.MemberProfileStore != nil {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)
 	}
