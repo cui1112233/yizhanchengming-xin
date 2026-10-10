@@ -3,16 +3,19 @@ import { UserLayout } from '../shared/layouts/UserLayout';
 import { HomeRoute } from './pages/HomeRoute';
 import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
 
+const loadNovelPanelPage = () => import('./pages/NovelPanelPage');
+const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
+const loadBatchFactoryWorkbenchPage = () => import('./pages/BatchFactoryWorkbenchPage');
+
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
-const HistoryPage = lazy(() => import('./pages/HistoryPage'));
-const NovelPanelPage = lazy(() => import('./pages/NovelPanelPage'));
+const NovelPanelPage = lazy(loadNovelPanelPage);
 const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ default: module.AgentPageV2 })));
 const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
-const NovelFetchPage = lazy(() => import('./pages/NovelFetchPage'));
+const NovelFetchPage = lazy(loadNovelFetchPage);
 const NovelFetchWorkshopPage = lazy(() => import('./pages/NovelFetchWorkshopPage'));
 const BatchFactoryPage = lazy(() => import('./pages/BatchFactoryPage'));
-const BatchFactoryWorkbenchPage = lazy(() => import('./pages/BatchFactoryWorkbenchPage'));
+const BatchFactoryWorkbenchPage = lazy(loadBatchFactoryWorkbenchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -24,13 +27,34 @@ const ApiConfigPage = lazy(() => import('./pages/ApiConfigPage'));
 const UsageStatsPage = lazy(() => import('./pages/UsageStatsPage'));
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
 const RecoveryPage = lazy(() => import('./pages/RecoveryPage'));
-const IssueLogPage = lazy(() => import('./pages/IssueLogPage').then(module => ({ default: module.IssueLogPage })));
+
+export async function preloadWorkbenchPages(loaders = {
+  novelFetch: loadNovelFetchPage,
+  novelPanel: loadNovelPanelPage,
+  batchFactory: loadBatchFactoryWorkbenchPage
+}) {
+  await Promise.allSettled(Object.values(loaders).map(load => load()));
+}
+
+function scheduleWorkbenchPreload() {
+  const preload = () => { void preloadWorkbenchPages(); };
+  if (typeof window.requestIdleCallback === 'function') {
+    const idleId = window.requestIdleCallback(preload, { timeout: 1500 });
+    return () => window.cancelIdleCallback?.(idleId);
+  }
+  const timerId = window.setTimeout(preload, 200);
+  return () => window.clearTimeout(timerId);
+}
 
 function usePathname() {
-  const [pathname, setPathname] = useState(window.location.pathname);
+  const canonicalPathname = () => {
+    const pathname = window.location.pathname;
+    return pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  };
+  const [pathname, setPathname] = useState(canonicalPathname);
 
   useEffect(() => {
-    const handlePopState = () => setPathname(window.location.pathname);
+    const handlePopState = () => setPathname(canonicalPathname());
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
@@ -45,7 +69,6 @@ function getPage(pathname) {
     '/novel-fetch-workshop': NovelFetchWorkshopPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
     '/batch-factory-preview': BatchFactoryPage,
-    '/history': HistoryPage,
     '/novel-panel': NovelPanelPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
@@ -61,7 +84,6 @@ function getPage(pathname) {
     '/security': SecurityPage,
     '/advanced-team-admin': AdvancedTeamAdminPage,
     '/accounts': AccountRolePage,
-    '/issues': IssueLogPage
   };
   const Page = routes[pathname];
   if (Page) {
@@ -71,6 +93,8 @@ function getPage(pathname) {
 }
 
 export function UserApp() {
+  useEffect(() => scheduleWorkbenchPreload(), []);
+
   useEffect(() => {
     const recoverChunk = event => {
       const message = String(event?.reason?.message || event?.error?.message || event?.message || '');
