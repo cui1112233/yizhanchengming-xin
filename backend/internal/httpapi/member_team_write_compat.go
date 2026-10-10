@@ -105,33 +105,40 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 			managedAccountError(w, http.StatusForbidden, "无权创建团队邀请")
 			return
 		}
+		var input struct {
+			ManagerUsername   string   `json:"managerUsername"`
+			ExpiresInHours    float64  `json:"expiresInHours"`
+			MonthlyTokenLimit *int64   `json:"monthlyTokenLimit"`
+			APIScopes         []string `json:"apiScopes"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input); err != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
 		manager := toString(actor["username"])
-		if toString(actor["role"]) == "dev" {
-			var input struct {
-				ManagerUsername   string   `json:"managerUsername"`
-				ExpiresInHours    any      `json:"expiresInHours"`
-				MonthlyTokenLimit any      `json:"monthlyTokenLimit"`
-				APIScopes         []string `json:"apiScopes"`
+		if toString(actor["role"]) == "dev" && strings.TrimSpace(input.ManagerUsername) != "" {
+			manager = strings.TrimSpace(input.ManagerUsername)
+		}
+		expiresInHours := input.ExpiresInHours
+		if expiresInHours == 0 {
+			expiresInHours = 72
+		}
+		if expiresInHours < 1 || expiresInHours > 720 {
+			managedAccountError(w, http.StatusBadRequest, "邀请有效期需在1到720小时之间")
+			return
+		}
+		if input.MonthlyTokenLimit != nil && (*input.MonthlyTokenLimit < 0 || *input.MonthlyTokenLimit > 10000000000) {
+			managedAccountError(w, http.StatusBadRequest, "月度额度不正确")
+			return
+		}
+		scopes := make([]string, 0, len(input.APIScopes))
+		seenScopes := map[string]bool{}
+		for _, scope := range input.APIScopes {
+			scope = strings.TrimSpace(scope)
+			if scope != "" && managedAPIScopes[scope] && !seenScopes[scope] {
+				scopes = append(scopes, scope)
+				seenScopes[scope] = true
 			}
-			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
-				managedAccountError(w, http.StatusBadRequest, "请求内容无效")
-				return
-			}
-			if strings.TrimSpace(input.ManagerUsername) != "" {
-				manager = strings.TrimSpace(input.ManagerUsername)
-			}
-			if input.MonthlyTokenLimit != nil {
-				_ = input.MonthlyTokenLimit
-			}
-			_ = input.ExpiresInHours
-			_ = input.APIScopes
-		} else {
-			var input struct {
-				ExpiresInHours    any      `json:"expiresInHours"`
-				MonthlyTokenLimit any      `json:"monthlyTokenLimit"`
-				APIScopes         []string `json:"apiScopes"`
-			}
-			_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input)
 		}
 		managerProfile := profiles.member(manager, accounts)
 		if managerProfile == nil || (toString(managerProfile["role"]) != "dev" && toString(managerProfile["role"]) != "manager") {
@@ -161,8 +168,8 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 			managedAccountError(w, http.StatusInternalServerError, "邀请生成失败")
 			return
 		}
-		expires := time.Now().UTC().Add(72 * time.Hour)
-		invite := map[string]any{"id": token[:12], "tokenDigest": digest, "teamId": team["id"], "managerUsername": manager, "createdBy": toString(actor["username"]), "createdAt": time.Now().UTC().Format(time.RFC3339), "expiresAt": expires.Format(time.RFC3339), "monthlyTokenLimit": nil, "apiScopes": []string{}, "usedAt": nil, "usedBy": nil}
+		expires := time.Now().UTC().Add(time.Duration(expiresInHours * float64(time.Hour)))
+		invite := map[string]any{"id": token[:12], "tokenDigest": digest, "teamId": team["id"], "managerUsername": manager, "createdBy": toString(actor["username"]), "createdAt": time.Now().UTC().Format(time.RFC3339), "expiresAt": expires.Format(time.RFC3339), "monthlyTokenLimit": input.MonthlyTokenLimit, "apiScopes": scopes, "usedAt": nil, "usedBy": nil}
 		invites, _ := state["invites"].([]any)
 		invites = append(invites, invite)
 		state["invites"] = invites
@@ -171,7 +178,7 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 			managedAccountError(w, http.StatusInternalServerError, "邀请保存失败")
 			return
 		}
-		public := map[string]any{"id": invite["id"], "teamId": team["id"], "teamName": team["name"], "managerUsername": manager, "createdAt": invite["createdAt"], "expiresAt": invite["expiresAt"], "monthlyTokenLimit": nil, "apiScopes": []string{}, "usedAt": nil, "usedBy": nil}
+		public := map[string]any{"id": invite["id"], "teamId": team["id"], "teamName": team["name"], "managerUsername": manager, "createdAt": invite["createdAt"], "expiresAt": invite["expiresAt"], "monthlyTokenLimit": input.MonthlyTokenLimit, "apiScopes": scopes, "usedAt": nil, "usedBy": nil}
 		writeJSON(w, http.StatusCreated, map[string]any{"token": token, "invite": public, "inviteUrl": "/invite/" + token})
 	})))
 	root.Handle("POST /api/member/team/members", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
