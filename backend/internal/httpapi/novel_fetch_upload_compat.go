@@ -68,7 +68,7 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			Password string `json:"password"`
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil || strings.TrimSpace(input.Username) == "" || input.Password == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"ok": "false", "error": "请输入账号和密码"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入账号和密码"})
 			return
 		}
 		client := &http.Client{Timeout: 30 * time.Second}
