@@ -702,8 +702,22 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				Provider  string `json:"provider,omitempty"`
 				ModelID   string `json:"modelId,omitempty"`
 				Kind      string `json:"kind,omitempty"`
+				SegmentID string `json:"segmentId,omitempty"`
 			}
 			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if strings.EqualFold(strings.TrimSpace(input.Kind), "audio") {
+				if files == nil {
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media storage is unavailable"})
+					return
+				}
+				task, audioErr := generateShuihuoSegmentAudio(r.Context(), store, files, owner, batch, strings.TrimSpace(input.SegmentID))
+				if audioErr != nil {
+					writeStoreError(w, audioErr)
+					return
+				}
+				writeJSON(w, http.StatusCreated, map[string]any{"tasks": []any{task}, "job": map[string]any{"requestId": input.RequestID, "tasks": []any{task}}})
 				return
 			}
 			if kind := strings.ToLower(strings.TrimSpace(input.Kind)); kind != "" && kind != "video" {
@@ -2169,6 +2183,66 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 		return nil, fmt.Errorf("%w: selected asset not found", batchfactoryv11.ErrNotFound)
 	}
 	return generated, nil
+}
+
+func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID string) (map[string]any, error) {
+	if len(batch.Books) == 0 {
+		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
+	}
+	var text string
+	for _, segment := range storedShuihuoSegments(batch.Books[0]) {
+		if modelString(segment, "id") != segmentID {
+			continue
+		}
+		text = modelString(segment, "subtitleText")
+		if text == "" {
+			text = modelString(segment, "sourceText")
+		}
+		break
+	}
+	if text == "" {
+		return nil, fmt.Errorf("%w: segment not found or empty", batchfactoryv11.ErrNotFound)
+	}
+	body, _ := json.Marshal(map[string]any{"input": text, "voice": "zh-CN-XiaoxiaoNeural", "speed": 1.8, "pitch": "10", "style": "general"})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://tts3.121w.com/v1/audio/speech", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("%w: TTS request failed", batchfactoryv11.ErrUpstream)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Host", "tts3.121w.com")
+	req.Header.Set("Referer", "http://tts3.121w.com/")
+	req.Header.Set("Origin", "http://tts3.121w.com")
+	response, err := (&http.Client{Timeout: 120 * time.Second}).Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: TTS request failed: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	defer response.Body.Close()
+	payload, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 || len(payload) == 0 {
+		return nil, fmt.Errorf("%w: TTS provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+	}
+	mediaType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if mediaType == "" || !strings.HasPrefix(mediaType, "audio/") {
+		mediaType = "audio/mpeg"
+	}
+	artifactID, err := localexecutor.NewArtifactID()
+	if err != nil {
+		return nil, err
+	}
+	saved, err := files.SaveMedia(artifactID, mediaType, "mp3", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	media := storedShuihuoMedia(batch.Books[0])
+	entry := map[string]any{"id": artifactID, "kind": "audio", "filename": artifactID + ".mp3", "mediaType": mediaType, "storageRef": saved.StorageRef, "segmentId": segmentID, "isPrimary": true, "createdAt": time.Now().UTC().Format(time.RFC3339)}
+	media = append(media, entry)
+	metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+	metadata["shuihuoMedia"] = media
+	if _, err := store.UpdateBookMetadata(ctx, owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision}); err != nil {
+		_ = files.Remove(saved.StorageRef)
+		return nil, err
+	}
+	return map[string]any{"id": artifactID, "status": "completed", "kind": "audio", "segmentId": segmentID, "mediaUrl": "/api/shuihuo-production/media/" + artifactID + "/download", "createdAt": entry["createdAt"]}, nil
 }
 
 func shuihuoImageGenerationEndpoint(raw string) (string, error) {
