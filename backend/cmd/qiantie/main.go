@@ -162,7 +162,6 @@ func shouldBridgeLegacyAPI(path string) bool {
 		"/api/admin",
 		"/api/batch-rewrite",
 		"/api/client-errors",
-		"/api/history",
 		"/api/member",
 		"/api/modelCatalog",
 		"/api/novel-fetch",
