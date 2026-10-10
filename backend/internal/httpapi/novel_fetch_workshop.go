@@ -7,10 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"qiantie/backend/internal/auth"
@@ -130,7 +133,89 @@ func novelFetchBodyPathValues(w http.ResponseWriter, req *http.Request) (string,
 	return bookID, versionID, true
 }
 
+type workshopProcessRegistry struct {
+	mu   sync.RWMutex
+	jobs map[string]map[string]map[string]any
+}
+
+func newWorkshopProcessRegistry() *workshopProcessRegistry {
+	return &workshopProcessRegistry{jobs: make(map[string]map[string]map[string]any)}
+}
+
+func (r *workshopProcessRegistry) put(owner, id string, job map[string]any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.jobs[owner] == nil {
+		r.jobs[owner] = make(map[string]map[string]any)
+	}
+	r.jobs[owner][id] = job
+}
+
+func (r *workshopProcessRegistry) get(owner, id string) (map[string]any, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	job, ok := r.jobs[owner][id]
+	if !ok {
+		return nil, false
+	}
+	copyJob := map[string]any{}
+	for key, value := range job {
+		copyJob[key] = value
+	}
+	return copyJob, true
+}
+
+func (r *workshopProcessRegistry) latest(owner string, limit int) []map[string]any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	items := make([]map[string]any, 0, len(r.jobs[owner]))
+	for _, job := range r.jobs[owner] {
+		copyJob := map[string]any{}
+		for key, value := range job {
+			copyJob[key] = value
+		}
+		items = append(items, copyJob)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return fmt.Sprint(items[i]["updated_at"]) > fmt.Sprint(items[j]["updated_at"])
+	})
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 20 {
+		limit = 20
+	}
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items
+}
+
+func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, owner, inputText string, maxTxt int) (map[string]any, error) {
+	if strings.TrimSpace(inputText) == "" {
+		return nil, errors.New("请输入要处理的书籍清单")
+	}
+	if maxTxt <= 0 {
+		maxTxt = 4000
+	}
+	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
+	for _, document := range documents {
+		if err := store.PutDocument(ctx, owner, document); err != nil {
+			return nil, err
+		}
+	}
+	tasks, err := store.ListDocuments(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"parsed": parsed, "emptyIdCount": emptyIDs, "uniqueTasks": len(documents), "duplicateCount": duplicates,
+		"classifyErrors": []any{}, "fetched": 0, "fetchFailed": 0, "generatedAiFiles": 0, "tasks": tasks,
+	}, nil
+}
+
 func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge) {
+	registry := newWorkshopProcessRegistry()
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
@@ -144,22 +229,61 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = 4000
 		}
-		documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(input.InputText, input.MaxTxt)
-		for _, document := range documents {
-			if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
-				return
-			}
-		}
-		tasks, err := store.ListDocuments(req.Context(), identity.Username)
+		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.MaxTxt)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "获取任务列表失败"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{
-			"parsed": parsed, "emptyIdCount": emptyIDs, "uniqueTasks": len(documents), "duplicateCount": duplicates,
-			"classifyErrors": []any{}, "fetched": 0, "fetchFailed": 0, "generatedAiFiles": 0, "tasks": tasks,
-		})
+		writeJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/process/start", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		var input struct {
+			InputText string `json:"inputText"`
+			MaxTxt    int    `json:"maxTxt"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+			return
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
+		job := map[string]any{"id": id, "status": "running", "queue_state": "running", "started_at": now, "updated_at": now, "attempts": 1, "steps": []any{}, "progress": []any{}}
+		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.MaxTxt)
+		if err != nil {
+			job["status"] = "failed"
+			job["queue_state"] = "failed"
+			job["error"] = err.Error()
+		} else {
+			job["status"] = "done"
+			job["queue_state"] = "done"
+			job["result"] = result
+		}
+		job["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
+		registry.put(identity.Username, id, job)
+		writeJSON(w, http.StatusOK, job)
+	})
+
+	mux.HandleFunc("GET /api/novel-fetch-workshop/process/jobs/latest", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
+		jobs := registry.latest(identity.Username, limit)
+		latest := map[string]any{}
+		if len(jobs) > 0 {
+			latest = jobs[0]
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"latest": latest, "jobs": jobs})
+	})
+
+	mux.HandleFunc("GET /api/novel-fetch-workshop/process/jobs/{jobId}", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		job, ok := registry.get(identity.Username, req.PathValue("jobId"))
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "处理任务不存在"})
+			return
+		}
+		writeJSON(w, http.StatusOK, job)
 	})
 
 	mux.HandleFunc("GET /api/novel-fetch-workshop/runs", func(w http.ResponseWriter, req *http.Request) {

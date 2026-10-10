@@ -304,6 +304,34 @@ func TestNovelFetchWorkshopProcessCreatesTasksFromPastedList(t *testing.T) {
 	}
 }
 
+func TestNovelFetchWorkshopProcessStartCanBePolled(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	start := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t可轮询任务"}, now, secret)
+	if start.Code != http.StatusOK {
+		t.Fatalf("start status=%d body=%s", start.Code, start.Body.String())
+	}
+	var job struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(start.Body.Bytes(), &job); err != nil {
+		t.Fatal(err)
+	}
+	if job.ID == "" || job.Status != "done" {
+		t.Fatalf("unexpected job=%+v", job)
+	}
+	polled := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/process/jobs/"+job.ID, nil, now, secret)
+	if polled.Code != http.StatusOK || !bytes.Contains(polled.Body.Bytes(), []byte(`"status":"done"`)) {
+		t.Fatalf("poll status=%d body=%s", polled.Code, polled.Body.String())
+	}
+	latest := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/process/jobs/latest?limit=5", nil, now, secret)
+	if latest.Code != http.StatusOK || !bytes.Contains(latest.Body.Bytes(), []byte(job.ID)) {
+		t.Fatalf("latest status=%d body=%s", latest.Code, latest.Body.String())
+	}
+}
+
 func TestNovelFetchMemoryStoreIsOwnerScoped(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutDocument(context.Background(), "alice", novelfetchworkshop.Document{BookID: "same", Original: "alice"}); err != nil {
