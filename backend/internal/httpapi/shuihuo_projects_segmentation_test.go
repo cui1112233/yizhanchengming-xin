@@ -1,6 +1,10 @@
 package httpapi
 
-import "testing"
+import (
+	"archive/zip"
+	"bytes"
+	"testing"
+)
 
 func TestParseSmartShuihuoCandidatesAcceptsCandidatesAndSegments(t *testing.T) {
 	for _, raw := range []string{
@@ -44,5 +48,22 @@ func TestShuihuoImageGenerationEndpointAndSize(t *testing.T) {
 	}
 	if shuihuoImageSize("9:16") != "1024x1792" || shuihuoImageSize("1:1") != "1024x1024" {
 		t.Fatalf("unexpected image sizes")
+	}
+}
+
+func TestExtractShuihuoDocxText(t *testing.T) {
+	var buffer bytes.Buffer
+	archive := zip.NewWriter(&buffer)
+	entry, err := archive.Create("word/document.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = entry.Write([]byte(`<w:document xmlns:w="x"><w:body><w:p><w:r><w:t>第一段</w:t></w:r></w:p><w:p><w:r><w:t>第二段</w:t></w:r></w:p></w:body></w:document>`))
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := extractShuihuoDocxText(buffer.Bytes())
+	if err != nil || got != "第一段\n第二段" {
+		t.Fatalf("text=%q err=%v", got, err)
 	}
 }

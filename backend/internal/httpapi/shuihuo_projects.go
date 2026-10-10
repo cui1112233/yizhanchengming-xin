@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"mime"
@@ -398,11 +399,15 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		ext := strings.ToLower(filepath.Ext(strings.TrimSpace(input.Filename)))
 		if ext == ".docx" {
-			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "Go 本地迁移阶段暂未接入 DOCX 正文解析，请先保存为 TXT 或 SRT"})
-			return
+			text, extractErr := extractShuihuoDocxText(raw)
+			if extractErr != nil || strings.TrimSpace(text) == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "DOCX 正文读取失败或内容为空"})
+				return
+			}
+			raw = []byte(text)
 		}
-		if ext != "" && ext != ".txt" && ext != ".srt" && ext != ".vtt" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "仅支持 TXT、SRT 或 VTT 文件"})
+		if ext != "" && ext != ".txt" && ext != ".srt" && ext != ".vtt" && ext != ".docx" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "仅支持 TXT、SRT、VTT 或 DOCX 文件"})
 			return
 		}
 		batch, err := store.CreateBatch(r.Context(), owner, batchfactoryv11.CreateBatchInput{Title: name, InitialBatchSettings: batchfactoryv11.SettingsPatch{"shuihuoProject": json.RawMessage("true")}, Books: []batchfactoryv11.CreateBookInput{{Title: name}}})
@@ -2427,6 +2432,65 @@ func detectedShuihuoImageMediaType(payload []byte) string {
 		return "image/webp"
 	}
 	return "image/png"
+}
+
+func extractShuihuoDocxText(payload []byte) (string, error) {
+	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return "", err
+	}
+	var document *zip.File
+	for _, file := range archive.File {
+		if file.Name == "word/document.xml" {
+			document = file
+			break
+		}
+	}
+	if document == nil {
+		return "", fmt.Errorf("word/document.xml is missing")
+	}
+	reader, err := document.Open()
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+	decoder := xml.NewDecoder(reader)
+	var paragraph strings.Builder
+	var output strings.Builder
+	for {
+		token, tokenErr := decoder.Token()
+		if tokenErr == io.EOF {
+			break
+		}
+		if tokenErr != nil {
+			return "", tokenErr
+		}
+		switch value := token.(type) {
+		case xml.StartElement:
+			switch value.Name.Local {
+			case "t":
+				var text string
+				if decodeErr := decoder.DecodeElement(&text, &value); decodeErr != nil {
+					return "", decodeErr
+				}
+				paragraph.WriteString(text)
+			case "tab":
+				paragraph.WriteByte('\t')
+			case "br", "cr":
+				paragraph.WriteByte('\n')
+			}
+		case xml.EndElement:
+			if value.Name.Local == "p" && strings.TrimSpace(paragraph.String()) != "" {
+				output.WriteString(strings.TrimSpace(paragraph.String()))
+				output.WriteByte('\n')
+				paragraph.Reset()
+			}
+		}
+	}
+	if strings.TrimSpace(paragraph.String()) != "" {
+		output.WriteString(strings.TrimSpace(paragraph.String()))
+	}
+	return strings.TrimSpace(output.String()), nil
 }
 
 func storedShuihuoSegmentsFromBatch(batch batchfactoryv11.Batch) []map[string]any {
