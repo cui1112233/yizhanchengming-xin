@@ -67,6 +67,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if isGoNovelFetchCompatRequest(req) {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if (req.Method == http.MethodGet && req.URL.Path == "/api/member/me") || (req.Method == http.MethodPatch && req.URL.Path == "/api/member/profile") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/avatar") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/security/password") || (req.Method == http.MethodGet && req.URL.Path == "/api/member/security") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/security/sessions/revoke-others") || (req.Method == http.MethodGet && req.URL.Path == "/api/member/notifications") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/notifications/read-all") || (req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/member/notifications/") && strings.HasSuffix(req.URL.Path, "/read")) || ((req.Method == http.MethodGet || req.Method == http.MethodPost) && req.URL.Path == "/api/config") || ((req.Method == http.MethodGet && (req.URL.Path == "/api/batch-rewrite/config" || req.URL.Path == "/api/batch-rewrite/bootstrap" || req.URL.Path == "/api/batch-rewrite/tasks" || strings.HasPrefix(req.URL.Path, "/api/batch-rewrite/tasks/"))) || (req.Method == http.MethodPost && (req.URL.Path == "/api/batch-rewrite/work-form" || req.URL.Path == "/api/batch-rewrite/tasks/batch-delete" || strings.HasSuffix(req.URL.Path, "/fetch") || strings.HasSuffix(req.URL.Path, "/restore-original") || strings.HasSuffix(req.URL.Path, "/generate-ai")))) || ((req.Method == http.MethodGet && req.URL.Path == "/api/storage/list") || (req.Method == http.MethodPost && (req.URL.Path == "/api/storage/restore" || req.URL.Path == "/api/storage/save-media"))) || (req.Method == http.MethodGet && req.URL.Path == "/api/novel-fetch/saved") || (req.Method == http.MethodPost && (req.URL.Path == "/api/novel-fetch" || req.URL.Path == "/api/novel-fetch/save")) || (req.Method == http.MethodGet && req.URL.Path == "/api/platform-projects") {
 			apiHandler.ServeHTTP(w, req)
 			return
@@ -84,6 +88,17 @@ func main() {
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
+}
+
+func isGoNovelFetchCompatRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+	path := req.URL.Path
+	if strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") {
+		return req.Method == http.MethodGet || req.Method == http.MethodPost
+	}
+	return false
 }
 
 func isLocalScriptVideoRequest(req *http.Request) bool {
