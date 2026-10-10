@@ -15,9 +15,6 @@ func registerV12V11Aliases(v12, v11 *http.ServeMux) {
 	for _, pattern := range []string{
 		"GET /api/batch-factory/v12/batches/{batchId}",
 		"GET /api/batch-factory/v12/batches/{batchId}/runtime-index",
-		"GET /api/batch-factory/v12/batches/{batchId}/status",
-		"GET /api/batch-factory/v12/batches/{batchId}/merge-status",
-		"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/stages",
 		"POST /api/batch-factory/v12/intakes/{intakeId}/batches",
 		"PUT /api/batch-factory/v12/batches/{batchId}/settings",
 		"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/metadata",

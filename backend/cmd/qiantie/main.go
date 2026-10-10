@@ -369,7 +369,7 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 2 && parts[0] == "batches" {
 		return true
 	}
-	if len(parts) == 3 && parts[0] == "batches" && (parts[2] == "runtime-index" || parts[2] == "status" || parts[2] == "merge-status" || parts[2] == "settings") {
+	if len(parts) == 3 && parts[0] == "batches" && (parts[2] == "runtime-index" || parts[2] == "settings") {
 		return true
 	}
 	if len(parts) == 1 && (parts[0] == "config-versions" || parts[0] == "prompts" || parts[0] == "drafts") {
@@ -378,7 +378,7 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "change-impact" {
 		return true
 	}
-	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "stages" || parts[4] == "metadata" || parts[4] == "source" || parts[4] == "override" || parts[4] == "fetch-original") {
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "metadata" || parts[4] == "source" || parts[4] == "override" || parts[4] == "fetch-original") {
 		return true
 	}
 	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "videos" && parts[6] == "override" {

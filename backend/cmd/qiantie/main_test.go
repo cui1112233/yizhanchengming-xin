@@ -152,6 +152,9 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/chat") || shouldBridgeLegacyAPI("/api/script/smart-unified-style") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/summary") || shouldBridgeLegacyAPI("/api/batch-factory/v12/fetch-originals") || shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/h3/director") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/source") || shouldBridgeLegacyAPI("/api/batch-factory/v12/config-versions") || shouldBridgeLegacyAPI("/api/batch-factory/v12/drafts") {
 		t.Fatal("migrated Go API paths must not use the Node bridge")
 	}
+	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/status") || !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/merge-status") || !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/stages") {
+		t.Fatal("slice-gated V12 routes must remain on the compatibility bridge when not enabled locally")
+	}
 	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/runtime-summary") {
 		t.Fatal("remaining V12 compatibility adapters must use the local Node bridge")
 	}
