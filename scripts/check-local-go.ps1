@@ -1,5 +1,6 @@
 param(
-  [string]$BaseUrl = $(if ($env:QIANTIE_GO_BASE_URL) { $env:QIANTIE_GO_BASE_URL } else { 'http://127.0.0.1:4001' })
+  [string]$BaseUrl = $(if ($env:QIANTIE_GO_BASE_URL) { $env:QIANTIE_GO_BASE_URL } else { 'http://127.0.0.1:4001' }),
+  [string]$ExpectedSHA = $(if ($env:QIANTIE_EXPECTED_GO_SHA) { $env:QIANTIE_EXPECTED_GO_SHA } else { (git rev-parse --short HEAD).Trim() })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,6 +33,9 @@ try {
   $build = Invoke-RestMethod -Uri ($BaseUrl + '/api/runtime-build-info') -TimeoutSec 5
   if (-not $build.git_sha -or $build.service -ne 'go-api') {
     Write-Output 'FAIL /api/runtime-build-info returned an invalid Go build identity'
+    $failed = $true
+  } elseif ($ExpectedSHA -and $build.git_sha -ne $ExpectedSHA) {
+    Write-Output "FAIL /api/runtime-build-info is $($build.git_sha), expected $ExpectedSHA"
     $failed = $true
   } else {
     Write-Output "PASS /api/runtime-build-info ($($build.git_sha))"
