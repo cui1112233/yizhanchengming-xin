@@ -127,6 +127,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterMemberProfileRoutes(root, auth, options.MemberProfileStore, options.AuthStore, options.MemberAvatarDir)
 	RegisterMFARoutes(root, auth, options.MemberProfileStore, options.AuthStore)
 	RegisterAccountAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
+	RegisterAccountTransferCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterMemberTeamReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterMemberTeamWriteCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterTeamAdminCompat(root, auth, options.AuthStore, options.MemberProfileStore)

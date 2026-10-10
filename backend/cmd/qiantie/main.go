@@ -103,6 +103,14 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/account-admin/accounts/") && strings.HasSuffix(req.URL.Path, "/transfer-preview") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
+		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/account-admin/accounts/") && strings.HasSuffix(req.URL.Path, "/transfer") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if (req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health")) || isAdminAgentSkillRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
