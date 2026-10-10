@@ -176,4 +176,42 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 		account, _ := accounts.FindAccount(req.Context(), username)
 		writeJSON(w, http.StatusOK, map[string]any{"member": managedAccountRow(account, managedProfile(profiles, username))})
 	})))
+	root.Handle("POST /api/member/team/members/{username}/reset-password", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权重置成员密码")
+			return
+		}
+		username := req.PathValue("username")
+		member := profiles.member(username, accounts)
+		if member == nil || toString(member["role"]) != "member" {
+			managedAccountError(w, http.StatusNotFound, "成员不存在")
+			return
+		}
+		if toString(actor["role"]) == "manager" && toString(member["boundTo"]) != toString(actor["username"]) {
+			managedAccountError(w, http.StatusForbidden, "不能修改其他团队成员")
+			return
+		}
+		var input struct {
+			Password string `json:"password"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil || len(input.Password) < 8 {
+			managedAccountError(w, http.StatusBadRequest, "密码至少需要 8 位")
+			return
+		}
+		hash, algorithm, err := auth.HashPassword(input.Password)
+		if err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "密码处理失败")
+			return
+		}
+		if err := accounts.UpdatePassword(req.Context(), username, hash, algorithm); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "成员密码保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"reset": true, "username": username})
+	})))
 }
