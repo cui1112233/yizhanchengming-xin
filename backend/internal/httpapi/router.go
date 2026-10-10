@@ -129,7 +129,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	if options.MemberProfileStore != nil {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)
-		RegisterAccountPasskeyCompat(root, auth, options.MemberProfileStore)
+		RegisterAccountPasskeyCompat(root, auth, options.MemberProfileStore, options.AuthStore)
 	}
 	RegisterNovelPanelDiagnosticsCompat(root, auth, options.UserDataDir)
 	RegisterNovelPanelSettingsCompat(root, auth, options.UserConfigStore, options.TextProvider)
