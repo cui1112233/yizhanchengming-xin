@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"qiantie/backend/internal/auth"
@@ -132,5 +134,35 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"day": map[string]any{}, "month": map[string]any{"totalTokens": 0}, "quota": map[string]any{"used": 0, "limit": target["monthlyTokenLimit"]}, "recent": []any{}})
+	})))
+	root.Handle("GET /api/member/team/invites", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		self := profiles.member(identity.Username, accounts)
+		if self == nil || !teamCanManage(self) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权查看团队邀请"})
+			return
+		}
+		manager := toString(self["username"])
+		if toString(self["role"]) == "dev" && req.URL.Query().Get("manager") != "" {
+			manager = req.URL.Query().Get("manager")
+		}
+		invites := []map[string]any{}
+		if raw, err := os.ReadFile(adminSystemFile(profiles.SystemDir, "team-collaboration.json")); err == nil {
+			var state map[string]any
+			if json.Unmarshal(raw, &state) == nil {
+				if rows, ok := state["invites"].([]any); ok {
+					for _, rawRow := range rows {
+						if row, ok := rawRow.(map[string]any); ok && toString(row["managerUsername"]) == manager {
+							invites = append(invites, row)
+						}
+					}
+				}
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"invites": invites})
 	})))
 }
