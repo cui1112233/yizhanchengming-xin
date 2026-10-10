@@ -18,8 +18,40 @@ func StaticHandler(files fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(files))
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		name := strings.TrimPrefix(path.Clean(req.URL.Path), "/")
+		// The legacy novel-fetch workbench is opened at /batch-rewrite/v2,
+		// while its files live in the bundled /batch-rewrite directory. Keep
+		// that public URL stable so relative CSS and scripts still resolve.
+		if name == "batch-rewrite/v2" {
+			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
+			return
+		}
 		if name != "" {
-			if _, err := fs.Stat(files, name); err != nil && path.Ext(name) == "" {
+			if info, err := fs.Stat(files, name); err == nil && info.IsDir() {
+				indexName := path.Join(name, "index.html")
+				if _, indexErr := fs.Stat(files, indexName); indexErr == nil {
+					serveEmbeddedIndex(w, files, indexName)
+					return
+				}
+				// A directory used only to hold a nested page (for example
+				// /novel-panel/workbench) must not turn the SPA route itself
+				// into a directory listing.
+				name = ""
+			} else if err != nil && path.Ext(name) == "" {
+				indexName := path.Join(name, "index.html")
+				if _, indexErr := fs.Stat(files, indexName); indexErr == nil {
+					serveEmbeddedIndex(w, files, indexName)
+					return
+				}
+				index, readErr := fs.ReadFile(files, "index.html")
+				if readErr != nil {
+					http.Error(w, "frontend index is unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_, _ = w.Write(index)
+				return
+			}
+			if name == "" {
 				index, readErr := fs.ReadFile(files, "index.html")
 				if readErr != nil {
 					http.Error(w, "frontend index is unavailable", http.StatusServiceUnavailable)
@@ -32,4 +64,14 @@ func StaticHandler(files fs.FS) http.Handler {
 		}
 		fileServer.ServeHTTP(w, req)
 	})
+}
+
+func serveEmbeddedIndex(w http.ResponseWriter, files fs.FS, name string) {
+	index, err := fs.ReadFile(files, name)
+	if err != nil {
+		http.Error(w, "frontend page is unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(index)
 }

@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"testing/fstest"
@@ -11,9 +12,9 @@ import (
 
 func TestStaticHandlerServesIndexAndAssets(t *testing.T) {
 	assets := fstest.MapFS{
-		"index.html":       &fstest.MapFile{Data: []byte("<html>home</html>")},
-		"assets/app.js":    &fstest.MapFile{Data: []byte("console.log('ok')")},
-		"assets/style.css": &fstest.MapFile{Data: []byte("body{}")},
+		"index.html":                   &fstest.MapFile{Data: []byte("<html>home</html>")},
+		"assets/app.js":                &fstest.MapFile{Data: []byte("console.log('ok')")},
+		"assets/style.css":             &fstest.MapFile{Data: []byte("body{}")},
 		"pets/stacky/spritesheet.webp": &fstest.MapFile{Data: []byte("pet")},
 	}
 	handler := StaticHandler(assets)
@@ -44,5 +45,28 @@ func TestStaticHandlerRejectsNilFilesystem(t *testing.T) {
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/", nil))
 	if res.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", res.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestStaticHandlerServesNestedWorkbenchAndLegacyV2Alias(t *testing.T) {
+	assets := fstest.MapFS{
+		"index.html":                       &fstest.MapFile{Data: []byte("<html>shell</html>")},
+		"novel-panel/workbench/index.html": &fstest.MapFile{Data: []byte("<html>panel</html>")},
+		"batch-rewrite/index.html":         &fstest.MapFile{Data: []byte("<html>fetch</html>")},
+	}
+	handler := StaticHandler(assets)
+	for _, tc := range []struct {
+		path string
+		want string
+	}{
+		{"/novel-panel/workbench", "panel"},
+		{"/batch-rewrite/v2", "fetch"},
+		{"/novel-panel", "shell"},
+	} {
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), tc.want) {
+			t.Fatalf("%s returned status %d body %q, want %q", tc.path, res.Code, res.Body.String(), tc.want)
+		}
 	}
 }

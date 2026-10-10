@@ -99,6 +99,11 @@ func envOrDefault(key, fallback string) string {
 }
 
 func shouldBridgeLegacyAPI(path string) bool {
+	// These catalog endpoints are now implemented by the Go service. Keep the
+	// broader /api/config bridge for the remaining legacy settings endpoints.
+	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
+		return false
+	}
 	for _, prefix := range []string{
 		"/api/config",
 		"/api/agent",
