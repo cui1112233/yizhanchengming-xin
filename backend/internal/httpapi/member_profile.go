@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -227,6 +228,94 @@ func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, a
 	return s.member(username, accounts), nil
 }
 
+func (s *MemberProfileStore) readCollaborationState() map[string]any {
+	state := map[string]any{"notifications": []any{}}
+	if s == nil || s.SystemDir == "" {
+		return state
+	}
+	raw, err := os.ReadFile(filepath.Join(s.SystemDir, "team-collaboration.json"))
+	if err != nil || json.Unmarshal(raw, &state) != nil {
+		return map[string]any{"notifications": []any{}}
+	}
+	if _, ok := state["notifications"].([]any); !ok {
+		state["notifications"] = []any{}
+	}
+	return state
+}
+
+func (s *MemberProfileStore) writeCollaborationState(state map[string]any) error {
+	if err := os.MkdirAll(s.SystemDir, 0o755); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := filepath.Join(s.SystemDir, "team-collaboration.json.tmp")
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(s.SystemDir, "team-collaboration.json"))
+}
+
+func (s *MemberProfileStore) listNotifications(username string, limit int) []map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.readCollaborationState()
+	rows, _ := state["notifications"].([]any)
+	result := make([]map[string]any, 0)
+	for index := len(rows) - 1; index >= 0; index-- {
+		row, ok := rows[index].(map[string]any)
+		if !ok || row["username"] != username {
+			continue
+		}
+		result = append(result, row)
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+	return result
+}
+
+func (s *MemberProfileStore) markAllNotificationsRead(username string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.readCollaborationState()
+	rows, _ := state["notifications"].([]any)
+	changed := 0
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok || row["username"] != username || !notificationUnread(row["readAt"]) {
+			continue
+		}
+		row["readAt"] = now
+		changed++
+	}
+	if changed == 0 {
+		return 0, nil
+	}
+	return changed, s.writeCollaborationState(state)
+}
+
+func notificationLimit(raw string) int {
+	limit, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || limit <= 0 {
+		return 50
+	}
+	if limit > 5000 {
+		return 5000
+	}
+	return limit
+}
+
+func notificationUnread(value any) bool {
+	if value == nil {
+		return true
+	}
+	return strings.TrimSpace(fmt.Sprint(value)) == ""
+}
+
 func changeMemberPassword(ctx context.Context, username, currentPassword, newPassword, currentToken string, accounts auth.Store) (int64, error) {
 	account, err := accounts.FindAccount(ctx, username)
 	if err != nil {
@@ -343,5 +432,33 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"changed": true, "revoked": revoked})
+	})))
+	root.Handle("GET /api/member/notifications", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		entries := profiles.listNotifications(identity.Username, notificationLimit(req.URL.Query().Get("limit")))
+		unread := 0
+		for _, entry := range entries {
+			if notificationUnread(entry["readAt"]) {
+				unread++
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"entries": entries, "unread": unread})
+	})))
+	root.Handle("POST /api/member/notifications/read-all", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		changed, err := profiles.markAllNotificationsRead(identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "通知状态保存失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"changed": changed})
 	})))
 }
