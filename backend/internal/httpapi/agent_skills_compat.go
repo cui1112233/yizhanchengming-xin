@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -212,7 +213,7 @@ func normalizeAgentSkill(input map[string]any, owner, id string) (map[string]any
 	template := strings.TrimSpace(toString(input["inputTemplate"]))
 	body := strings.TrimSpace(toString(input["body"]))
 	if name == "" || len([]rune(name)) > 120 || len([]rune(description)) > 600 || len([]rune(category)) > 80 || len([]rune(template)) > 3000 || body == "" || len([]rune(body)) > 65536 {
-		return nil, os.ErrInvalid
+		return nil, errors.New("技能内容不合法")
 	}
 	if id == "" {
 		id = strings.TrimSpace(toString(input["id"]))
@@ -223,7 +224,7 @@ func normalizeAgentSkill(input map[string]any, owner, id string) (map[string]any
 		}
 	}
 	if !agentSkillIDPattern.MatchString(id) {
-		return nil, os.ErrInvalid
+		return nil, errors.New("技能内容不合法")
 	}
 	createdAt := toString(input["createdAt"])
 	if createdAt == "" {
