@@ -6,6 +6,12 @@ hydrateMissingEnvFromFile(
   process.env.QIANTIE_BASE_ENV_FILE || '/run/qiantie/base.env',
   ['QIANTIE_BRIDGE_SECRET']
 );
+// Local development runs the Go service on 4001 and the compatibility Node
+// service on 3001. Keep the local bridge aligned even when the user starts
+// Node directly without copying a long environment-variable command.
+if (!String(process.env.QIANTIE_GO_BASE_URL || '').trim() && String(process.env.QIANTIE_NODE_PORT || '') === '3001') {
+  process.env.QIANTIE_GO_BASE_URL = 'http://127.0.0.1:4001';
+}
 if (process.env.NODE_ENV === 'production' && !String(process.env.QIANTIE_BRIDGE_SECRET || '').trim()) {
   throw new Error('QIANTIE_BRIDGE_SECRET is required in production');
 }
