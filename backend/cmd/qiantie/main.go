@@ -55,16 +55,16 @@ func main() {
 		log.Fatal(err)
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if (req.Method == http.MethodGet || req.Method == http.MethodPost) && strings.HasPrefix(req.URL.Path, "/api/login/invite/") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if !goAuthEnabled() && (req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/")) {
 			if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
 				apiHandler.ServeHTTP(w, req)
 				return
 			}
 			authProxy.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/login/invite/") {
-			apiHandler.ServeHTTP(w, req)
 			return
 		}
 		if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
