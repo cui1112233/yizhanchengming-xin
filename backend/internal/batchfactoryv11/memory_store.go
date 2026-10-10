@@ -1070,6 +1070,25 @@ func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID,
 	return asset, nil
 }
 
+func (s *MemoryStore) DeleteBookAsset(_ context.Context, owner, batchID, bookID, assetID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasBookLocked(owner, batchID, bookID) {
+		return ErrNotFound
+	}
+	owned, ok := s.bookAssets[assetID]
+	if !ok || owned.Owner != owner || owned.Value.BatchID != batchID || owned.Value.BookID != bookID {
+		return ErrNotFound
+	}
+	delete(s.bookAssets, assetID)
+	for imageID, image := range s.bookAssetImages {
+		if image.Owner == owner && image.Value.AssetID == assetID {
+			delete(s.bookAssetImages, imageID)
+		}
+	}
+	return nil
+}
+
 func validBookAssetImageInput(input CreateBookAssetImageInput) (CreateBookAssetImageInput, error) {
 	input.URL, input.StorageRef, input.MediaType, input.Source = strings.TrimSpace(input.URL), strings.TrimSpace(input.StorageRef), strings.TrimSpace(input.MediaType), strings.TrimSpace(input.Source)
 	if input.Source == "" {

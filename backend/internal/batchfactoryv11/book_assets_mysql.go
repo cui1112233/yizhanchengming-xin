@@ -155,6 +155,31 @@ func (s *MySQLStore) UpdateBookAsset(ctx context.Context, owner, batchID, bookID
 	return asset, nil
 }
 
+// DeleteBookAsset removes one manually managed asset and its image versions.
+// The legacy Shuihuo route uses this narrow optional method so the shared
+// Store interface does not have to change for existing callers.
+func (s *MySQLStore) DeleteBookAsset(ctx context.Context, owner, batchID, bookID, assetID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := ensureBookAssetOwnership(ctx, tx, owner, batchID, bookID, assetID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_asset_images WHERE asset_id=? AND owner_username=?`, assetID, owner); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID)
+	if err != nil {
+		return err
+	}
+	if affected, _ := result.RowsAffected(); affected != 1 {
+		return ErrNotFound
+	}
+	return tx.Commit()
+}
+
 func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, book Book, snapshot DirectorSnapshot, output DirectorResult, now time.Time) error {
 	desired := directorBookAssets(book, snapshot, output)
 	// No structured assets in this run (e.g. SD plain-text mode, where assets

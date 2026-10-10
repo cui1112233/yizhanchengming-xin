@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,12 +10,14 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/localexecutor"
 )
 
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
 // /api/platform-projects. The source of truth is the Go batch store.
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store) {
 	if store == nil {
 		return
 	}
@@ -235,6 +239,61 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusCreated, shuihuoProjectDetail(updated))
 			return
 		}
+		if len(parts) == 3 && parts[1] == "assets" && parts[2] == "image" && r.Method == http.MethodPost {
+			if files == nil || len(batch.Books) == 0 {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "asset image storage is unavailable"})
+				return
+			}
+			var input struct {
+				Category string `json:"category"`
+				Kind     string `json:"kind"`
+				Name     string `json:"name"`
+				Prompt   string `json:"prompt"`
+				DataURL  string `json:"dataUrl"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			mediaType, payload, err := decodeImageDataURL(input.DataURL)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid image upload"})
+				return
+			}
+			kind := strings.TrimSpace(input.Kind)
+			if kind == "" {
+				kind = strings.TrimSpace(input.Category)
+			}
+			if kind == "" {
+				kind = "character"
+			}
+			asset, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), Prompt: strings.TrimSpace(input.Prompt)})
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			artifactID, err := localexecutor.NewArtifactID()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "image id generation failed"})
+				return
+			}
+			saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(payload))
+			if err != nil {
+				writeBookAssetImageStorageError(w, err)
+				return
+			}
+			if _, err := store.CreateBookAssetImage(r.Context(), owner, batch.ID, batch.Books[0].ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: saved.StorageRef, MediaType: saved.MediaType, Source: "upload"}); err != nil {
+				_ = files.Remove(saved.StorageRef)
+				writeStoreError(w, err)
+				return
+			}
+			updated, err := store.GetBatch(r.Context(), owner, batch.ID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, shuihuoProjectDetail(updated))
+			return
+		}
 		if len(parts) == 2 && parts[1] == "segmentation" && r.Method == http.MethodPost {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "segmentation action is required"})
 			return
@@ -381,6 +440,133 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "segment not found"})
+	})))
+
+	root.Handle("/api/shuihuo-production/assets/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/assets/"), "/")
+		parts := strings.Split(path, "/")
+		if len(parts) == 0 || parts[0] == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "asset id is required"})
+			return
+		}
+		assetID := parts[0]
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, compact := range batches {
+			batch, getErr := store.GetBatch(r.Context(), owner, compact.ID)
+			if getErr != nil {
+				continue
+			}
+			if len(batch.Books) == 0 {
+				continue
+			}
+			var asset *batchfactoryv11.BookAsset
+			for index := range batch.Books[0].AssetRecords {
+				if batch.Books[0].AssetRecords[index].ID == assetID {
+					asset = &batch.Books[0].AssetRecords[index]
+					break
+				}
+			}
+			if asset == nil {
+				continue
+			}
+			if len(parts) == 2 && parts[1] == "images" && r.Method == http.MethodGet {
+				images, listErr := store.ListBookAssetImages(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID)
+				if listErr != nil {
+					writeStoreError(w, listErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"images": bookAssetImageResponses(images, batch.ID, batch.Books[0].ID, assetID)})
+				return
+			}
+			if len(parts) == 1 && r.Method == http.MethodPut {
+				var input struct {
+					Name             string `json:"name"`
+					Prompt           string `json:"prompt"`
+					ExpectedRevision int64  `json:"expectedRevision"`
+				}
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				if input.ExpectedRevision == 0 {
+					input.ExpectedRevision = asset.Revision
+				}
+				updated, updateErr := store.UpdateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, batchfactoryv11.UpdateBookAssetInput{Name: input.Name, Prompt: input.Prompt, ExpectedRevision: input.ExpectedRevision})
+				if updateErr != nil {
+					writeStoreError(w, updateErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"asset": updated})
+				return
+			}
+			if len(parts) == 1 && r.Method == http.MethodDelete {
+				if deleter, ok := store.(interface {
+					DeleteBookAsset(context.Context, string, string, string, string) error
+				}); ok {
+					if deleteErr := deleter.DeleteBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID); deleteErr != nil {
+						writeStoreError(w, deleteErr)
+						return
+					}
+					writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+					return
+				}
+				writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "asset deletion is not enabled in this Go store"})
+				return
+			}
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset not found"})
+	})))
+
+	root.Handle("/api/shuihuo-production/asset-images/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		imageID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/asset-images/"), "/")
+		if !strings.HasSuffix(imageID, "/primary") || r.Method != http.MethodPut {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image route not found"})
+			return
+		}
+		imageID = strings.TrimSuffix(imageID, "/primary")
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, compact := range batches {
+			batch, getErr := store.GetBatch(r.Context(), owner, compact.ID)
+			if getErr != nil || len(batch.Books) == 0 {
+				continue
+			}
+			for _, asset := range batch.Books[0].AssetRecords {
+				images, listErr := store.ListBookAssetImages(r.Context(), owner, batch.ID, batch.Books[0].ID, asset.ID)
+				if listErr != nil {
+					continue
+				}
+				for _, image := range images {
+					if image.ID != imageID {
+						continue
+					}
+					primary, primaryErr := store.SetPrimaryBookAssetImage(r.Context(), owner, batch.ID, batch.Books[0].ID, asset.ID, imageID)
+					if primaryErr != nil {
+						writeStoreError(w, primaryErr)
+						return
+					}
+					writeJSON(w, http.StatusOK, map[string]any{"image": bookAssetImageResponse(primary, batch.ID, batch.Books[0].ID, asset.ID)})
+					return
+				}
+			}
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image not found"})
 	})))
 }
 
