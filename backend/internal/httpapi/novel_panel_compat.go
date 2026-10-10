@@ -37,4 +37,39 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"diagnostics": entries})
 	})))
+	root.Handle("GET /api/novel-panel/diagnostics/traces", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		entries := readNovelPanelDiagnostics(usersDir, identity.Username, 200)
+		writeJSON(w, http.StatusOK, map[string]any{"traces": entries})
+	})))
+	root.Handle("GET /api/novel-panel/diagnostics/trace/{traceId}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		for _, entry := range readNovelPanelDiagnostics(usersDir, identity.Username, 200) {
+			if toString(entry["id"]) == req.PathValue("traceId") {
+				writeJSON(w, http.StatusOK, map[string]any{"trace": entry})
+				return
+			}
+		}
+		managedAccountError(w, http.StatusNotFound, "诊断追踪不存在")
+	})))
+}
+
+func readNovelPanelDiagnostics(usersDir, username string, limit int) []map[string]any {
+	entries := []map[string]any{}
+	path := filepath.Join(usersDir, username, "novel-panel", "ai-diagnostics.json")
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(raw, &entries)
+	}
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+	return entries
 }
