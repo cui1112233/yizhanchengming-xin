@@ -39,11 +39,31 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		})
 	})))
 	root.Handle("/api/shuihuo-production/models", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := bridgeOwner(r); !ok {
+		owner, ok := bridgeOwner(r)
+		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"models": []any{}})
+		models := []any{}
+		if durable, durableOK := store.(batchfactoryv11.ShuihuoConfigStore); durableOK {
+			if config, err := durable.GetShuihuoConfig(r.Context(), owner); err == nil {
+				if catalog, catalogOK := config["modelCatalog"].([]any); catalogOK {
+					for _, raw := range catalog {
+						if model, modelOK := raw.(map[string]any); modelOK {
+							// Never return credentials from the account-level catalog.
+							copy := map[string]any{}
+							for _, key := range []string{"id", "name", "displayName", "kind", "provider", "adapterKind", "modelId", "enabled", "configured"} {
+								if value, exists := model[key]; exists {
+									copy[key] = value
+								}
+							}
+							models = append(models, copy)
+						}
+					}
+				}
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"models": models})
 	})))
 	root.Handle("/api/shuihuo-production/preset-slots", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := bridgeOwner(r); !ok {
