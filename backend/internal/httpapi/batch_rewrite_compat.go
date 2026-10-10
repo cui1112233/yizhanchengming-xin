@@ -12,7 +12,7 @@ import (
 // expected by the legacy novel-fetch workbench. The actual settings are still
 // stored in the Go workshop store, so the page no longer needs Node just to
 // bootstrap its form.
-func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth, store novelfetchworkshop.Store) {
+func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth, store novelfetchworkshop.Store, usersDir string) {
 	if root == nil || store == nil {
 		return
 	}
@@ -213,11 +213,18 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": body.Settings, "tasks": []any{}})
 	})))
 	root.Handle("GET /api/batch-rewrite/web-submit/environment", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if _, ok := BridgeIdentityFromContext(req.Context()); !ok {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": false, "detail": "未登录"}, map[string]any{"name": "上传接口", "ok": false, "detail": "需在 Go 服务中配置提交服务"}}})
+		session := readUploadTargetSession(usersDir, identity.Username)
+		loggedIn := strings.TrimSpace(toString(session["cookie"])) != ""
+		detail := "未登录"
+		if loggedIn {
+			detail = "已保存登录会话"
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
 	})))
 }
 
