@@ -1,10 +1,15 @@
 package httpapi
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 )
@@ -66,6 +71,69 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 			return
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"model": publicManagedModel(model)})
+	})
+	mux.HandleFunc("POST /api/config/models/test", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		if !identity.IsOwner {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "无权管理模型"})
+			return
+		}
+		var input map[string]any
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+			return
+		}
+		kind, _ := input["kind"].(string)
+		baseURL, _ := input["baseUrl"].(string)
+		modelID, _ := input["modelId"].(string)
+		credential, _ := input["credential"].(string)
+		baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+		modelID = strings.TrimSpace(modelID)
+		credential = strings.TrimSpace(credential)
+		if kind != "text" || baseURL == "" || modelID == "" || credential == "" {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "测试文本模型前请填写 Base URL、模型 ID 和 API Key"})
+			return
+		}
+		parsed, err := url.Parse(baseURL)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "Base URL 格式不正确"})
+			return
+		}
+		endpoint := baseURL
+		if !strings.HasSuffix(parsed.Path, "/chat/completions") {
+			endpoint += "/chat/completions"
+		}
+		payload, _ := json.Marshal(map[string]any{"model": modelID, "messages": []map[string]string{{"role": "user", "content": "Hi"}}, "max_tokens": 5})
+		ctx, cancel := context.WithTimeout(req.Context(), 20*time.Second)
+		defer cancel()
+		probe, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "文本模型地址无效"})
+			return
+		}
+		probe.Header.Set("Content-Type", "application/json")
+		probe.Header.Set("Authorization", "Bearer "+credential)
+		response, err := http.DefaultClient.Do(probe)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": "文本模型连接失败：" + err.Error()})
+			return
+		}
+		defer response.Body.Close()
+		var decoded struct {
+			Choices []struct {
+				Message map[string]any `json:"message"`
+			} `json:"choices"`
+		}
+		decodeErr := json.NewDecoder(response.Body).Decode(&decoded)
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": fmt.Sprintf("文本模型连接失败（状态 %d），请检查接口、模型名或密钥", response.StatusCode)})
+			return
+		}
+		if decodeErr != nil || len(decoded.Choices) == 0 || len(decoded.Choices[0].Message) == 0 {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": "文本模型未返回有效答复，请检查模型兼容性"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "文本模型连接成功，现在可以保存并启用。"})
 	})
 	mux.HandleFunc("PATCH /api/config/models/{modelId}", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
