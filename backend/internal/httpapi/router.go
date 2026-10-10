@@ -57,6 +57,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerV12IntakeRoutes(v12, options.Store)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
 	}
+	if options.NovelFetchFetcher != nil {
+		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher)
+	}
 	if options.Store != nil && options.Director != nil && options.Slice >= 2 {
 		registerDirectorRoutes(v11, options.Director, options.Store)
 		registerBookStageRoutes(v11, &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production})
