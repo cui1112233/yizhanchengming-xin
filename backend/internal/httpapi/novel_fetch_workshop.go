@@ -19,6 +19,7 @@ import (
 
 var novelFetchBookIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 var novelFetchVersionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
+var novelFetchNumericIDPattern = regexp.MustCompile(`\d{10,25}`)
 
 type NovelFetchBridgeAuth struct {
 	Secret    string
@@ -130,6 +131,37 @@ func novelFetchBodyPathValues(w http.ResponseWriter, req *http.Request) (string,
 }
 
 func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge) {
+	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		var input struct {
+			InputText string `json:"inputText"`
+			MaxTxt    int    `json:"maxTxt"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil || strings.TrimSpace(input.InputText) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请输入要处理的书籍清单"})
+			return
+		}
+		if input.MaxTxt <= 0 {
+			input.MaxTxt = 4000
+		}
+		documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(input.InputText, input.MaxTxt)
+		for _, document := range documents {
+			if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
+				return
+			}
+		}
+		tasks, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "获取任务列表失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"parsed": parsed, "emptyIdCount": emptyIDs, "uniqueTasks": len(documents), "duplicateCount": duplicates,
+			"classifyErrors": []any{}, "fetched": 0, "fetchFailed": 0, "generatedAiFiles": 0, "tasks": tasks,
+		})
+	})
+
 	mux.HandleFunc("GET /api/novel-fetch-workshop/runs", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		bookID := strings.TrimSpace(req.URL.Query().Get("bookId"))
@@ -406,6 +438,66 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": merged})
 	})
+}
+
+func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Document, int, int, int) {
+	lines := strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n")
+	documents := make([]novelfetchworkshop.Document, 0)
+	seen := make(map[string]struct{})
+	parsed, emptyIDs, duplicates := 0, 0, 0
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.Contains(line, "书籍ID") || strings.Contains(strings.ToLower(line), "book_id") {
+			continue
+		}
+		parsed++
+		cells := strings.FieldsFunc(line, func(r rune) bool { return r == '\t' || r == '|' || r == ',' })
+		for index := range cells {
+			cells[index] = strings.TrimSpace(cells[index])
+		}
+		bookID := ""
+		for _, cell := range cells {
+			if match := novelFetchNumericIDPattern.FindString(cell); match != "" {
+				bookID = match
+				break
+			}
+		}
+		if bookID == "" {
+			emptyIDs++
+			continue
+		}
+		if _, exists := seen[bookID]; exists {
+			duplicates++
+			continue
+		}
+		seen[bookID] = struct{}{}
+		bookName, gender := "", ""
+		for _, cell := range cells {
+			if cell == bookID || strings.Contains(cell, "男频") || strings.Contains(cell, "女频") {
+				if strings.Contains(cell, "男频") {
+					gender = "男频"
+				} else if strings.Contains(cell, "女频") {
+					gender = "女频"
+				}
+				continue
+			}
+			if bookName == "" {
+				bookName = cell
+			}
+		}
+		meta := map[string]any{"bookId": bookID, "bookName": bookName, "maxTxt": maxTxt}
+		if gender != "" {
+			meta["gender"] = gender
+			meta["genderSource"] = "input"
+		}
+		document := novelfetchworkshop.Document{BookID: bookID, Gender: gender, MaxTxt: maxTxt, Meta: meta}
+		if gender != "" {
+			document.GenderSource = novelfetchworkshop.GenderManual
+			document.GenderReason = "采用输入清单中的男女频"
+		}
+		documents = append(documents, document)
+	}
+	return documents, parsed, emptyIDs, duplicates
 }
 
 func mergeWorkshopConfig(current, patch map[string]any) map[string]any {

@@ -280,6 +280,30 @@ func TestNovelFetchWorkshopConfigMatchesFrontendContract(t *testing.T) {
 	}
 }
 
+func TestNovelFetchWorkshopProcessCreatesTasksFromPastedList(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	process := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process", map[string]any{
+		"inputText": "书籍ID\t书名\t男女频\n12345678901\t第一本\t男频\n12345678901\t第一本\t男频\n22345678901\t第二本\t女频",
+	}, now, secret)
+	if process.Code != http.StatusOK {
+		t.Fatalf("process status=%d body=%s", process.Code, process.Body.String())
+	}
+	var response struct {
+		UniqueTasks    int                           `json:"uniqueTasks"`
+		DuplicateCount int                           `json:"duplicateCount"`
+		Tasks          []novelfetchworkshop.Document `json:"tasks"`
+	}
+	if err := json.Unmarshal(process.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.UniqueTasks != 2 || response.DuplicateCount != 1 || len(response.Tasks) != 2 {
+		t.Fatalf("unexpected process response: %#v", response)
+	}
+}
+
 func TestNovelFetchMemoryStoreIsOwnerScoped(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutDocument(context.Background(), "alice", novelfetchworkshop.Document{BookID: "same", Original: "alice"}); err != nil {
