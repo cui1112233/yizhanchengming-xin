@@ -32,10 +32,17 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
+		enabledKinds := []string{}
+		if director != nil && director.Provider != nil {
+			enabledKinds = append(enabledKinds, "text")
+		}
+		if production != nil && production.Enabled {
+			enabledKinds = append(enabledKinds, "video")
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "database": map[string]any{"ready": true},
 			"redis":   map[string]any{"ready": false, "reason": "本地 Go 迁移阶段暂未启用 Redis"},
-			"storage": map[string]any{"ready": true}, "enabledModelKinds": []string{},
+			"storage": map[string]any{"ready": true}, "enabledModelKinds": enabledKinds,
 		})
 	})))
 	root.Handle("/api/shuihuo-production/models", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
