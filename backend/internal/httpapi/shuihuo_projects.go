@@ -3,9 +3,11 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -77,6 +79,66 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+	})))
+	root.Handle("/api/shuihuo-production/projects/import", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		var input struct {
+			Name     string `json:"name"`
+			Filename string `json:"filename"`
+			DataURL  string `json:"dataUrl"`
+		}
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		name := strings.TrimSpace(input.Name)
+		if name == "" || strings.TrimSpace(input.DataURL) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name and dataUrl are required"})
+			return
+		}
+		parts := strings.SplitN(strings.TrimSpace(input.DataURL), ",", 2)
+		if len(parts) != 2 || !strings.HasSuffix(parts[0], ";base64") {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid source file"})
+			return
+		}
+		raw, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil || len(raw) == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid source file"})
+			return
+		}
+		ext := strings.ToLower(filepath.Ext(strings.TrimSpace(input.Filename)))
+		if ext == ".docx" {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "Go 本地迁移阶段暂未接入 DOCX 正文解析，请先保存为 TXT 或 SRT"})
+			return
+		}
+		if ext != "" && ext != ".txt" && ext != ".srt" && ext != ".vtt" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "仅支持 TXT、SRT 或 VTT 文件"})
+			return
+		}
+		batch, err := store.CreateBatch(r.Context(), owner, batchfactoryv11.CreateBatchInput{Title: name, InitialBatchSettings: batchfactoryv11.SettingsPatch{"shuihuoProject": json.RawMessage("true")}, Books: []batchfactoryv11.CreateBookInput{{Title: name}}})
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		if len(batch.Books) == 0 {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
+			return
+		}
+		book, err := store.CaptureBookSource(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CaptureBookSourceInput{SourceText: string(raw), ReplaceSource: true, SourceTitle: input.Filename, ExpectedRevision: batch.Books[0].Revision})
+		if err != nil {
+			_ = store.DeleteBatch(r.Context(), owner, batch.ID)
+			writeStoreError(w, err)
+			return
+		}
+		batch.Books[0] = book
+		writeJSON(w, http.StatusCreated, shuihuoProjectDetail(batch))
 	})))
 	root.Handle("/api/shuihuo-production/projects", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
