@@ -130,6 +130,24 @@ func (s *PersonalStore) List(username, category string) ([]PersonalPrompt, error
 	return result, nil
 }
 
+func (s *PersonalStore) GetOwned(username, id string) (PersonalPrompt, bool, error) {
+	if !validPromptUsername(username) || strings.TrimSpace(id) == "" {
+		return PersonalPrompt{}, false, errors.New("invalid personal prompt")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.loadLocked()
+	if err != nil {
+		return PersonalPrompt{}, false, err
+	}
+	for _, item := range state.Prompts {
+		if item.Username == username && item.ID == id {
+			return item, true, nil
+		}
+	}
+	return PersonalPrompt{}, false, nil
+}
+
 func (s *PersonalStore) CreateOrSaveDraft(username, category string, name *string, body string) (PersonalPrompt, error) {
 	if err := validatePersonalInput(username, category, name, body); err != nil {
 		return PersonalPrompt{}, err
