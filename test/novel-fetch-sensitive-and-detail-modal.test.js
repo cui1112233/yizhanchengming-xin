@@ -33,7 +33,7 @@ test('小说获取全部弹框支持遮罩退出，并在提交中锁定关闭',
   assert.match(app, /loginButtons\.forEach\(button => \{ button\.disabled = true; \}\)/);
   assert.match(app, /loginButtons\.forEach\(button => \{ button\.disabled = false; \}\)/);
   assert.match(app, /event\.target === \$\("versionConfigCard"\) && !isModalBusy\("versionConfigCard"\)/);
-  assert.match(app, /\$\("versionConfigCard"\)\.addEventListener\("pointerdown", event => \{/);
+  assert.match(app, /listenOptionalControl\("versionConfigCard", "pointerdown", event => \{/);
   assert.match(app, /setModalBusy\("versionConfigCard", true\)/);
   assert.match(app, /setModalBusy\("versionConfigCard", false\)/);
   assert.match(app, /if \(isModalBusy\("versionConfigCard"\)\) return;/);
