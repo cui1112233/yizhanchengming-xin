@@ -399,6 +399,15 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 1 && (parts[0] == "config-versions" || parts[0] == "prompts" || parts[0] == "drafts") {
 		return true
 	}
+	if len(parts) == 1 && parts[0] == "automation-presets" {
+		return true
+	}
+	if len(parts) == 2 && parts[0] == "automation-presets" {
+		return true
+	}
+	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "automation-presets" {
+		return true
+	}
 	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "change-impact" {
 		return true
 	}
