@@ -900,18 +900,28 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "segmentation action is required"})
 			return
 		}
-		if len(parts) == 3 && parts[1] == "segmentation" && (parts[2] == "paragraphs" || parts[2] == "fixed" || parts[2] == "smart") && r.Method == http.MethodPost {
-			// The current Go migration does not yet have a separate AI screenplay
-			// segmentation service. Keep the route usable and deterministic by
-			// returning the same sentence/paragraph candidates used by the old
-			// editor. The response says which strategy was used so the UI does not
-			// mistake this fallback for a completed model run.
-			candidates := paragraphCandidates(batch)
-			strategy := parts[2]
-			if strategy == "smart" {
-				strategy = "paragraph_fallback"
+		if len(parts) == 3 && parts[1] == "segmentation" && parts[2] == "smart" && r.Method == http.MethodPost {
+			var input struct {
+				Text    string `json:"text,omitempty"`
+				ModelID string `json:"modelId,omitempty"`
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"candidates": candidates, "mode": parts[2], "strategy": strategy})
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			candidates, strategy, modelErr := smartShuihuoCandidates(r.Context(), director, batch, strings.TrimSpace(input.Text))
+			response := map[string]any{"candidates": candidates, "mode": "smart", "strategy": strategy}
+			if strings.TrimSpace(input.ModelID) != "" {
+				response["modelId"] = strings.TrimSpace(input.ModelID)
+			}
+			if modelErr != nil {
+				response["fallbackReason"] = modelErr.Error()
+			}
+			writeJSON(w, http.StatusOK, response)
+			return
+		}
+		if len(parts) == 3 && parts[1] == "segmentation" && (parts[2] == "paragraphs" || parts[2] == "fixed") && r.Method == http.MethodPost {
+			candidates := paragraphCandidates(batch)
+			writeJSON(w, http.StatusOK, map[string]any{"candidates": candidates, "mode": parts[2], "strategy": parts[2]})
 			return
 		}
 		if len(parts) == 3 && parts[1] == "segmentation" && parts[2] == "confirm" && r.Method == http.MethodPost {
@@ -1730,6 +1740,92 @@ func paragraphCandidates(batch batchfactoryv11.Batch) []map[string]any {
 		candidates = append(candidates, map[string]any{"id": fmt.Sprintf("candidate_%s_%d", batch.Books[0].ID, index+1), "text": line, "sourceText": line, "subtitleText": line, "speaker": "旁白"})
 	}
 	return candidates
+}
+
+// smartShuihuoCandidates asks the configured text provider for editable
+// storyboard candidates. A deterministic paragraph split remains available
+// when the provider is not configured or returns malformed output, so the
+// user can still correct and confirm the result instead of seeing a blank
+// workbench.
+func smartShuihuoCandidates(ctx context.Context, director *batchfactoryv11.DirectorService, batch batchfactoryv11.Batch, override string) ([]map[string]any, string, error) {
+	if len(batch.Books) == 0 {
+		return []map[string]any{}, "paragraph_fallback", fmt.Errorf("project has no source book")
+	}
+	source := strings.TrimSpace(override)
+	if source == "" {
+		source = strings.TrimSpace(batch.Books[0].SourceText)
+	}
+	fallback := func(err error) ([]map[string]any, string, error) {
+		return paragraphCandidatesForText(batch.Books[0].ID, source), "paragraph_fallback", err
+	}
+	if director == nil || director.Provider == nil {
+		return fallback(fmt.Errorf("text model is not configured"))
+	}
+	completion, err := director.Provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+		SystemPrompt: "你是短剧分镜编辑。把用户提供的中文原文拆成适合短视频制作的连续分镜候选。只返回 JSON，不要 Markdown。格式为 {\"candidates\":[{\"text\":\"字幕\",\"sourceText\":\"对应原文\",\"subtitleText\":\"适合口播的字幕\",\"speaker\":\"旁白\"}]}。不得编造原文之外的剧情；每条 text 要完整、可编辑。",
+		UserPrompt:   source,
+		Temperature:  0.2,
+		MaxTokens:    4096,
+	})
+	if err != nil {
+		return fallback(err)
+	}
+	candidates, err := parseSmartShuihuoCandidates(completion, batch.Books[0].ID)
+	if err != nil || len(candidates) == 0 {
+		if err == nil {
+			err = fmt.Errorf("text model returned no candidates")
+		}
+		return fallback(err)
+	}
+	return candidates, "text_model", nil
+}
+
+func paragraphCandidatesForText(bookID, text string) []map[string]any {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return []map[string]any{}
+	}
+	lines := strings.FieldsFunc(text, func(r rune) bool { return r == '\n' || r == '\r' })
+	if len(lines) == 1 {
+		lines = splitShuihuoSentences(lines[0])
+	}
+	candidates := make([]map[string]any, 0, len(lines))
+	for index, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		candidates = append(candidates, map[string]any{"id": fmt.Sprintf("candidate_%s_%d", bookID, index+1), "text": line, "sourceText": line, "subtitleText": line, "speaker": "旁白"})
+	}
+	return candidates
+}
+
+func parseSmartShuihuoCandidates(raw, bookID string) ([]map[string]any, error) {
+	clean := strings.TrimSpace(raw)
+	if strings.HasPrefix(clean, "```") {
+		clean = strings.TrimSpace(strings.TrimPrefix(clean, "```json"))
+		clean = strings.TrimSpace(strings.TrimPrefix(clean, "```"))
+		clean = strings.TrimSpace(strings.TrimSuffix(clean, "```"))
+	}
+	start, end := strings.Index(clean, "{"), strings.LastIndex(clean, "}")
+	if start < 0 || end <= start {
+		return nil, fmt.Errorf("text model returned invalid JSON")
+	}
+	var envelope struct {
+		Candidates []map[string]any `json:"candidates"`
+		Segments   []map[string]any `json:"segments"`
+	}
+	if err := json.Unmarshal([]byte(clean[start:end+1]), &envelope); err != nil {
+		return nil, fmt.Errorf("text model JSON parse failed: %w", err)
+	}
+	items := envelope.Candidates
+	if len(items) == 0 {
+		items = envelope.Segments
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("text model returned no candidates")
+	}
+	return normalizeShuihuoSegments(items, bookID), nil
 }
 
 func splitShuihuoSentences(text string) []string {
