@@ -104,6 +104,13 @@ func shouldBridgeLegacyAPI(path string) bool {
 	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
 		return false
 	}
+	// The public novel-fetch workbench still creates an intake through the
+	// legacy Node batch-factory store. Keep this one handoff endpoint on the
+	// bridge until its storage has been moved to the Go batch store; all V11
+	// batch APIs remain handled by Go.
+	if path == "/api/batch-factory/v12/intakes/novel-fetch" {
+		return true
+	}
 	for _, prefix := range []string{
 		"/api/config",
 		"/api/agent",
