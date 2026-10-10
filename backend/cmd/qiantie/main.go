@@ -99,6 +99,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && (req.URL.Path == "/api/novel-panel/outline-scenes" || req.URL.Path == "/api/novel-panel/regenerate-scene-outline" || req.URL.Path == "/api/novel-panel/generate-scene-prompts") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/character-core/trace" {
 			apiHandler.ServeHTTP(w, req)
 			return
