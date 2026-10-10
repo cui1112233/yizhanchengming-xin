@@ -466,6 +466,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			var input struct {
 				RequestID string `json:"requestId"`
 				Provider  string `json:"provider,omitempty"`
+				ModelID   string `json:"modelId,omitempty"`
 			}
 			if !decodeJSON(w, r, &input) {
 				return
@@ -473,7 +474,11 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if strings.TrimSpace(input.RequestID) == "" {
 				input.RequestID = "shuihuo-" + time.Now().UTC().Format("20060102T150405.000000000")
 			}
-			job, submitErr := production.SubmitBookProductionWithProvider(r.Context(), owner, batch.ID, batch.Books[0].ID, input.RequestID, input.Provider)
+			provider := input.Provider
+			if strings.TrimSpace(input.ModelID) != "" {
+				provider = batchfactoryv11.VideoProviderForModel(input.ModelID, provider)
+			}
+			job, submitErr := production.SubmitBookProductionWithProvider(r.Context(), owner, batch.ID, batch.Books[0].ID, input.RequestID, provider)
 			if submitErr != nil {
 				writeStoreError(w, submitErr)
 				return
@@ -489,6 +494,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			var input struct {
 				RequestID string `json:"requestId"`
 				Provider  string `json:"provider,omitempty"`
+				ModelID   string `json:"modelId,omitempty"`
 			}
 			if !decodeJSON(w, r, &input) {
 				return
@@ -496,7 +502,11 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if strings.TrimSpace(input.RequestID) == "" {
 				input.RequestID = "shuihuo-batch-" + time.Now().UTC().Format("20060102T150405.000000000")
 			}
-			status, submitErr := production.SubmitBatchProductionWithProvider(r.Context(), owner, batch.ID, input.RequestID, input.Provider)
+			provider := input.Provider
+			if strings.TrimSpace(input.ModelID) != "" {
+				provider = batchfactoryv11.VideoProviderForModel(input.ModelID, provider)
+			}
+			status, submitErr := production.SubmitBatchProductionWithProvider(r.Context(), owner, batch.ID, input.RequestID, provider)
 			if submitErr != nil {
 				writeStoreError(w, submitErr)
 				return
