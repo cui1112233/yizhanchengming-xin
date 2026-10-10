@@ -669,6 +669,16 @@ func V11LocalArtifactPurgeStatements() []string {
 	}
 }
 
+func V11ShuihuoConfigStatements() []string {
+	return []string{`CREATE TABLE IF NOT EXISTS batch_factory_v11_shuihuo_configs (
+  owner_username VARCHAR(191) NOT NULL PRIMARY KEY,
+  config_json JSON NOT NULL,
+  revision BIGINT NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL
+) ENGINE=InnoDB`}
+}
+
 func V11Migrations() []Migration {
 	return []Migration{
 		{Version: 1100001, SQL: V11FoundationStatements(), CallbackChecksum: "batch-factory-v11-foundation-v1"},
@@ -701,6 +711,7 @@ func V11Migrations() []Migration {
 		{Version: 1100020, SQL: V11MergeProgressStatements(), CallbackChecksum: "batch-factory-v11-merge-progress-v1", Adopt: adoptV11MergeProgressLedger},
 		{Version: 1100021, SQL: V11OpeningVariantStatements(), CallbackChecksum: "batch-factory-v11-opening-variant-v1", Adopt: adoptV11OpeningVariantLedger},
 		{Version: 1100022, SQL: V11LocalArtifactPurgeStatements(), CallbackChecksum: "batch-factory-v11-local-artifact-purge-v1"},
+		{Version: 1100023, SQL: V11ShuihuoConfigStatements(), CallbackChecksum: "batch-factory-v11-shuihuo-config-v1"},
 	}
 }
 

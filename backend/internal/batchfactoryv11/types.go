@@ -347,6 +347,13 @@ type Store interface {
 	PersistDirectorRevision(context.Context, string, Book, DirectorSnapshot, string, string, DirectorResult) (DirectorRevision, error)
 }
 
+// ShuihuoConfigStore is optional so the legacy Store contract remains stable
+// while the Shuihuo compatibility layer gains durable per-user settings.
+type ShuihuoConfigStore interface {
+	GetShuihuoConfig(context.Context, string) (map[string]any, error)
+	SaveShuihuoConfig(context.Context, string, map[string]any) error
+}
+
 // RetentionDeletingStore is optional so existing in-memory stores retain the
 // simple deletion contract while the MySQL implementation can durably queue
 // physical local-merge cleanup.

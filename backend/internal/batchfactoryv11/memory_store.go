@@ -29,6 +29,7 @@ type MemoryStore struct {
 	drafts                map[string]Draft
 	bookAssets            map[string]memoryOwned[BookAsset]
 	bookAssetImages       map[string]memoryOwned[BookAssetImage]
+	shuihuoConfigs        map[string]map[string]any
 	hooks                 map[string][]HookRevision
 	directors             map[string][]DirectorRevision
 	productionJobs        map[string]memoryOwned[ProductionJob]
@@ -53,6 +54,7 @@ func NewMemoryStore() *MemoryStore {
 		drafts:                map[string]Draft{},
 		bookAssets:            map[string]memoryOwned[BookAsset]{},
 		bookAssetImages:       map[string]memoryOwned[BookAssetImage]{},
+		shuihuoConfigs:        map[string]map[string]any{},
 		hooks:                 map[string][]HookRevision{},
 		directors:             map[string][]DirectorRevision{},
 		productionJobs:        map[string]memoryOwned[ProductionJob]{},

@@ -58,6 +58,19 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if r.Method == http.MethodGet {
+			if durable, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
+				config, err := durable.GetShuihuoConfig(r.Context(), owner)
+				if err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				merged := shuihuoDefaultConfig()
+				for key, value := range config {
+					merged[key] = value
+				}
+				writeJSON(w, http.StatusOK, merged)
+				return
+			}
 			if value, exists := shuihuoProductionConfigs.Load(owner); exists {
 				writeJSON(w, http.StatusOK, value)
 				return
@@ -73,6 +86,14 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			config := shuihuoDefaultConfig()
 			for key, value := range input {
 				config[key] = value
+			}
+			if durable, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
+				if err := durable.SaveShuihuoConfig(r.Context(), owner, config); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				writeJSON(w, http.StatusOK, config)
+				return
 			}
 			shuihuoProductionConfigs.Store(owner, config)
 			writeJSON(w, http.StatusOK, config)
