@@ -11,6 +11,7 @@ $petsDist = Join-Path $goDist 'pets'
 $novelPanelSource = Join-Path $repo 'public/novel-panel'
 $novelPanelDist = Join-Path $goDist 'novel-panel'
 $novelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
+$novelFetchPatchSource = Join-Path $repo 'public/batch-rewrite'
 $novelFetchDist = Join-Path $goDist 'batch-rewrite'
 
 if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
@@ -29,6 +30,10 @@ if (-not (Test-Path (Join-Path $novelFetchSource 'index.html'))) {
 }
 New-Item -ItemType Directory -Force $novelFetchDist | Out-Null
 Copy-Item -Path (Join-Path $novelFetchSource '*') -Destination $novelFetchDist -Recurse -Force
+if (-not (Test-Path (Join-Path $novelFetchPatchSource 'v78-novel-fetch-v2-runtime.js'))) {
+  throw "Novel fetch V78 compatibility scripts are missing: $novelFetchPatchSource"
+}
+Copy-Item -Path (Join-Path $novelFetchPatchSource '*') -Destination $novelFetchDist -Recurse -Force
 node (Join-Path $repo 'scripts/compose-novel-fetch-v2.js') (Join-Path $novelFetchSource 'index.html') (Join-Path $novelFetchDist 'index.html')
 
 if (-not (Test-Path (Join-Path $petsSource 'stacky/spritesheet.webp'))) {
