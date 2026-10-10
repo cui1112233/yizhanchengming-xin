@@ -95,6 +95,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/novel-panel/") && (strings.HasSuffix(req.URL.Path, "/optimize-character") || strings.HasSuffix(req.URL.Path, "/optimize-character-copy") || strings.HasSuffix(req.URL.Path, "/optimize-all-characters") || strings.HasSuffix(req.URL.Path, "/optimize-style-copy") || strings.HasSuffix(req.URL.Path, "/instruction-assist")) {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/character-core/trace" {
 			apiHandler.ServeHTTP(w, req)
 			return
