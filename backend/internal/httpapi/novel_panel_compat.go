@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
@@ -146,6 +148,93 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"project": project})
+	})))
+	root.Handle("POST /api/novel-panel/projects", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		var input struct {
+			ProjectID string         `json:"project_id"`
+			ID        string         `json:"id"`
+			Name      string         `json:"name"`
+			Data      map[string]any `json:"data"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<20)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "项目内容无效")
+			return
+		}
+		id := strings.TrimSpace(input.ProjectID)
+		if id == "" {
+			id = strings.TrimSpace(input.ID)
+		}
+		if id == "" {
+			id = fmt.Sprintf("go-%d", time.Now().UnixNano())
+		}
+		if filepath.Base(id) != id || strings.ContainsAny(id, `/\\`) || len(id) > 128 {
+			managedAccountError(w, http.StatusBadRequest, "项目 ID 无效")
+			return
+		}
+		directory := filepath.Join(usersDir, identity.Username, "novel-panel", "projects")
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "项目目录不可写")
+			return
+		}
+		path := filepath.Join(directory, id+".json")
+		existing := map[string]any{}
+		if raw, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(raw, &existing)
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		created := toString(existing["created_at"])
+		if created == "" {
+			created = now
+		}
+		name := strings.TrimSpace(input.Name)
+		if name == "" {
+			name = toString(existing["name"])
+		}
+		if name == "" {
+			name = "未命名项目"
+		}
+		data := input.Data
+		if data == nil {
+			if prior, ok := existing["data"].(map[string]any); ok {
+				data = prior
+			} else {
+				data = map[string]any{}
+			}
+		}
+		project := map[string]any{"id": id, "name": name, "data": data, "created_at": created, "updated_at": now}
+		raw, err := json.MarshalIndent(project, "", "  ")
+		if err != nil || os.WriteFile(path, raw, 0o600) != nil {
+			managedAccountError(w, http.StatusInternalServerError, "项目保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"project": project})
+	})))
+	root.Handle("DELETE /api/novel-panel/projects/{projectId}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		id := req.PathValue("projectId")
+		if id == "" || filepath.Base(id) != id || strings.ContainsAny(id, `/\\`) {
+			managedAccountError(w, http.StatusBadRequest, "项目 ID 无效")
+			return
+		}
+		path := filepath.Join(usersDir, identity.Username, "novel-panel", "projects", id+".json")
+		if err := os.Remove(path); err != nil {
+			if os.IsNotExist(err) {
+				managedAccountError(w, http.StatusNotFound, "项目不存在")
+				return
+			}
+			managedAccountError(w, http.StatusInternalServerError, "项目删除失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})))
 }
 
