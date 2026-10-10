@@ -1,6 +1,6 @@
 param(
   [switch]$CheckOnly,
-  [string]$ListenAddr = $(if ($env:QIANTIE_GO_LISTEN_ADDR) { $env:QIANTIE_GO_LISTEN_ADDR } else { ':4000' })
+  [string]$ListenAddr = $(if ($env:QIANTIE_GO_LISTEN_ADDR) { $env:QIANTIE_GO_LISTEN_ADDR } else { ':4001' })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +18,9 @@ if (-not (Test-Path (Join-Path $repo 'backend/qiantie-local.exe'))) {
 Push-Location (Join-Path $repo 'backend')
 try {
   $env:QIANTIE_GO_LISTEN_ADDR = $ListenAddr
+  if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
+    $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '1'
+  }
   & .\qiantie-local.exe
   exit $LASTEXITCODE
 } finally {
