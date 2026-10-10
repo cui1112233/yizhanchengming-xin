@@ -23,6 +23,41 @@ type MemberProfileStore struct {
 	mu        sync.Mutex
 }
 
+func (s *MemberProfileStore) mfaStatus(username string) map[string]any {
+	status := map[string]any{"enabled": false, "enabledAt": nil, "recoveryCodesRemaining": 0, "setupPending": false}
+	if s == nil || strings.TrimSpace(s.SystemDir) == "" {
+		return status
+	}
+	raw, err := os.ReadFile(filepath.Join(s.SystemDir, "mfa.json"))
+	if err != nil {
+		return status
+	}
+	var rows []struct {
+		Username       string   `json:"username"`
+		Enabled        bool     `json:"enabled"`
+		Secret         string   `json:"secret"`
+		EnabledAt      string   `json:"enabledAt"`
+		RecoveryHashes []string `json:"recoveryHashes"`
+		PendingSecret  string   `json:"pendingSecret"`
+	}
+	if json.Unmarshal(raw, &rows) != nil {
+		return status
+	}
+	for _, row := range rows {
+		if row.Username != username {
+			continue
+		}
+		status["enabled"] = row.Enabled && strings.TrimSpace(row.Secret) != ""
+		if row.EnabledAt != "" {
+			status["enabledAt"] = row.EnabledAt
+		}
+		status["recoveryCodesRemaining"] = len(row.RecoveryHashes)
+		status["setupPending"] = strings.TrimSpace(row.PendingSecret) != ""
+		break
+	}
+	return status
+}
+
 func NewMemberProfileStore(systemDir string) *MemberProfileStore {
 	return &MemberProfileStore{SystemDir: strings.TrimSpace(systemDir)}
 }
@@ -520,7 +555,7 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"account":            member,
-			"mfa":                map[string]any{"enabled": false, "enabledAt": nil, "recoveryCodesRemaining": 0, "setupPending": false},
+			"mfa":                profiles.mfaStatus(identity.Username),
 			"sessions":           sessions,
 			"persistentSessions": []any{},
 			"otherSessionCount":  other,
