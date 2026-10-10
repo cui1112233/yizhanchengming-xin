@@ -2,12 +2,35 @@ import { reportClientError } from '../error-reporting.js';
 import { normalizeLocalExecutorsResponse } from './localExecutors.js';
 
 export function getToken() {
-  return localStorage.getItem('auth_token') || '';
+  const localToken = localStorage.getItem('auth_token') || '';
+  if (localToken) {
+    // 3001 and 4001 are different origins because their ports differ, so
+    // localStorage is not shared during the Go migration. A host-only cookie
+    // lets both local frontends reuse the same active login without exposing
+    // credentials to any external host.
+    if (typeof document !== 'undefined' && !document.cookie.split(';').some(item => item.trim().startsWith('qiantie_auth_token='))) {
+      document.cookie = `qiantie_auth_token=${encodeURIComponent(localToken)}; Path=/; SameSite=Lax`;
+    }
+    return localToken;
+  }
+  if (typeof document === 'undefined') return '';
+  const cookie = document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('qiantie_auth_token='));
+  if (!cookie) return '';
+  try {
+    return decodeURIComponent(cookie.slice('qiantie_auth_token='.length));
+  } catch (_) {
+    return '';
+  }
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem('auth_token', token);
-  else localStorage.removeItem('auth_token');
+  if (token) {
+    localStorage.setItem('auth_token', token);
+    if (typeof document !== 'undefined') document.cookie = `qiantie_auth_token=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
+  } else {
+    localStorage.removeItem('auth_token');
+    if (typeof document !== 'undefined') document.cookie = 'qiantie_auth_token=; Max-Age=0; Path=/; SameSite=Lax';
+  }
 }
 
 export function isSessionAuthFailure(response) {
