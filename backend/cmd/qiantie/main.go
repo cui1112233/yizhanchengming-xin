@@ -143,6 +143,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && req.URL.Path == "/api/batch-rewrite/web-submit/test-visible" {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && req.URL.Path == "/api/config/models/test" {
 			apiHandler.ServeHTTP(w, req)
 			return

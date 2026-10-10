@@ -153,6 +153,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
 	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir)
 	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore)
+	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir)
 	if options.UserConfigStore != nil {
 		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)
 		RegisterAgentChatCompat(root, auth, options.UserConfigStore.BaseDir, options.TextProvider)
