@@ -79,6 +79,12 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Compiler != nil && options.Slice >= 3 {
 		registerCompilerRoutes(v11, options.Compiler)
 	}
+	// The V12 workbench uses these endpoints for read-only preview data. Keep
+	// them available independently of the staged write/production slices so a
+	// local V12 batch does not fall back to the Node compatibility bridge.
+	if options.Compiler != nil {
+		registerV12CompilerRoutes(v12, options.Compiler)
+	}
 	if options.Production != nil && options.Slice >= 4 {
 		registerProductionRoutes(v11, options.Production)
 		if output, ok := options.MergeOutput.(interface {

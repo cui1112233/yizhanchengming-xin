@@ -158,6 +158,9 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/runtime-summary") {
 		t.Fatal("remaining V12 compatibility adapters must use the local Node bridge")
 	}
+	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/effective-settings") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/final-prompt") {
+		t.Fatal("read-only V12 compiler previews must use Go")
+	}
 }
 
 func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
