@@ -241,6 +241,103 @@ func RegisterTeamAdminCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"team": team, "coManagers": coManagers})
 	})))
+	root.Handle("PUT /api/team-admin/teams/{teamId}/members/{username}/api-scopes", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamAdminIdentity(req, profiles, accounts)
+		if !ok || actor == nil {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		_, _, team := managedTeamByID(profiles, req.PathValue("teamId"))
+		if !teamAdminCanAccess(actor, team, false) {
+			managedAccountError(w, http.StatusForbidden, "无权管理该团队")
+			return
+		}
+		target := profiles.member(req.PathValue("username"), accounts)
+		manager := toString(team["managerUsername"])
+		if target == nil || toString(target["role"]) != "member" || toString(target["boundTo"]) != manager {
+			managedAccountError(w, http.StatusForbidden, "目标成员不属于该团队")
+			return
+		}
+		var input struct {
+			Scopes []string `json:"scopes"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		seen := map[string]bool{}
+		scopes := make([]string, 0, len(input.Scopes))
+		for _, scope := range input.Scopes {
+			scope = strings.TrimSpace(scope)
+			if scope == "" || !managedAPIScopes[scope] || seen[scope] {
+				continue
+			}
+			seen[scope] = true
+			scopes = append(scopes, scope)
+		}
+		if err := updateManagedProfileFields(profiles, toString(target["username"]), func(row map[string]any) { row["apiScopes"], row["apiEnabled"] = scopes, len(scopes) > 0 }); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "权限保存失败")
+			return
+		}
+		updated := profiles.member(req.PathValue("username"), accounts)
+		writeJSON(w, http.StatusOK, map[string]any{"member": updated, "changedBy": actor["username"]})
+	})))
+	root.Handle("POST /api/team-admin/teams/{teamId}/members/{username}/status", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamAdminIdentity(req, profiles, accounts)
+		if !ok || actor == nil {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		_, _, team := managedTeamByID(profiles, req.PathValue("teamId"))
+		if !teamAdminCanAccess(actor, team, false) {
+			managedAccountError(w, http.StatusForbidden, "无权管理该团队")
+			return
+		}
+		target := profiles.member(req.PathValue("username"), accounts)
+		if target == nil || toString(target["role"]) != "member" || toString(target["boundTo"]) != toString(team["managerUsername"]) {
+			managedAccountError(w, http.StatusForbidden, "目标成员不属于该团队")
+			return
+		}
+		var input struct {
+			Active *bool `json:"active"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil || input.Active == nil {
+			managedAccountError(w, http.StatusBadRequest, "账号状态不正确")
+			return
+		}
+		if err := accounts.SetActive(req.Context(), req.PathValue("username"), *input.Active); err != nil {
+			managedAccountError(w, http.StatusBadRequest, "账号状态保存失败")
+			return
+		}
+		updated := profiles.member(req.PathValue("username"), accounts)
+		writeJSON(w, http.StatusOK, map[string]any{"member": updated, "changedBy": actor["username"]})
+	})))
+	root.Handle("POST /api/team-admin/teams/{teamId}/members/{username}/reset-password", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamAdminIdentity(req, profiles, accounts)
+		if !ok || actor == nil {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		_, _, team := managedTeamByID(profiles, req.PathValue("teamId"))
+		target := profiles.member(req.PathValue("username"), accounts)
+		if !teamAdminCanAccess(actor, team, false) || target == nil || toString(target["role"]) != "member" || toString(target["boundTo"]) != toString(team["managerUsername"]) {
+			managedAccountError(w, http.StatusForbidden, "目标成员不属于该团队")
+			return
+		}
+		var input struct {
+			Password string `json:"password"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil || len(input.Password) < 8 {
+			managedAccountError(w, http.StatusBadRequest, "新密码至少需要8位")
+			return
+		}
+		hash, algorithm, err := auth.HashPassword(input.Password)
+		if err != nil || accounts.UpdatePassword(req.Context(), req.PathValue("username"), hash, algorithm) != nil {
+			managedAccountError(w, http.StatusBadRequest, "密码保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"changed": true, "changedBy": actor["username"]})
+	})))
 }
 
 func containsString(value any, wanted string) bool {

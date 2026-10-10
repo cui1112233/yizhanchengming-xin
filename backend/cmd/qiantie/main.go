@@ -71,7 +71,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if (req.Method == http.MethodGet && (req.URL.Path == "/api/team-admin/teams" || strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/members"))) || (req.Method == http.MethodPatch && strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/governance")) || (req.Method == http.MethodPut && strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/co-managers")) {
+		if (req.Method == http.MethodGet && (req.URL.Path == "/api/team-admin/teams" || strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/members"))) || (req.Method == http.MethodPatch && strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/governance")) || (req.Method == http.MethodPut && (strings.HasSuffix(req.URL.Path, "/co-managers") || strings.HasSuffix(req.URL.Path, "/api-scopes"))) || (req.Method == http.MethodPost && (strings.HasSuffix(req.URL.Path, "/status") || strings.HasSuffix(req.URL.Path, "/reset-password"))) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
