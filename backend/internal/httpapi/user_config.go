@@ -147,6 +147,16 @@ func publicUserConfig(config map[string]any) map[string]any {
 	return result
 }
 
+func preferenceOnlyPatch(input map[string]any) map[string]any {
+	allowed := map[string]any{}
+	for _, key := range []string{"storageRoot", "productionRetentionDays", "pet", "tts", "notifications", "avatar", "scriptDefaults"} {
+		if value, ok := input[key]; ok {
+			allowed[key] = value
+		}
+	}
+	return allowed
+}
+
 func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, accounts auth.Store) {
 	if root == nil || middleware.AuthStore == nil || store == nil || accounts == nil {
 		return
@@ -172,6 +182,9 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 256<<10)).Decode(&patch) != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
+		}
+		if !identity.IsOwner {
+			patch = preferenceOnlyPatch(patch)
 		}
 		store.mu.Lock()
 		config := mergeConfigMap(store.read(identity.Username), patch)
