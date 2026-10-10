@@ -14,6 +14,7 @@ import (
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 )
 
 type RouterOptions struct {
@@ -38,6 +39,7 @@ type RouterOptions struct {
 	NovelFetchFetcher         *novelfetchworkshop.UpstreamFetcher
 	NovelFetchRewrite         novelfetchworkshop.RewriteProvider
 	NovelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
+	PresetCatalog             *prompt.Catalog
 	LocalExecutors            *localexecutor.Service
 	GiantMaterialExecutor     *giantmaterialexecutor.Service
 	GiantMaterialResolver     GiantMaterialResolver
@@ -98,6 +100,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver})
+	if options.PresetCatalog != nil {
+		registerPresetRoutes(root, auth, options.PresetCatalog)
+	}
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
 	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.Production)

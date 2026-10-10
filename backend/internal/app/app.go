@@ -18,6 +18,7 @@ import (
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/storage"
 )
 
@@ -204,5 +205,5 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), RegisterV11: register}), nil
 }

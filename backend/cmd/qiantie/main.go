@@ -136,7 +136,6 @@ func shouldBridgeLegacyAPI(path string) bool {
 		"/api/team-admin",
 		"/api/teamAdmin",
 		"/api/test",
-		"/api/presets",
 		"/api/models",
 		"/api/chat",
 		"/api/script-constraint-prompts",
