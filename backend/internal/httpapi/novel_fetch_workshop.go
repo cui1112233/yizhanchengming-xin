@@ -577,6 +577,33 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "content": content})
 	})
 
+	mux.HandleFunc("POST /api/novel-fetch-workshop/rules/suggest", func(w http.ResponseWriter, req *http.Request) {
+		if rewriteProvider == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "AI 改文模型未配置"})
+			return
+		}
+		var input struct {
+			Text     string `json:"text"`
+			RuleType string `json:"ruleType"`
+			Goal     string `json:"goal"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil || strings.TrimSpace(input.Text) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入待分析文本"})
+			return
+		}
+		content, err := rewriteProvider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
+			SystemPrompt: "你是小说排版规则设计师。根据文本提出可执行的规则建议。只返回 JSON：{\"summary\":\"...\",\"rules\":[{\"name\":\"...\",\"pattern\":\"...\",\"replacement\":\"...\"}]}，不要解释。",
+			UserPrompt:   fmt.Sprintf("规则类型：%s\n目标：%s\n待分析文本：\n%s", input.RuleType, input.Goal, input.Text),
+			Temperature:  0.2,
+			MaxTokens:    2000,
+		})
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "suggestions": strings.TrimSpace(content)})
+	})
+
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/tasks/{bookId}", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		bookID := strings.TrimSpace(req.PathValue("bookId"))
