@@ -22,6 +22,14 @@ const segmentationPromptOptions = [{ value: 'default', label: '选择提示词' 
 const assetCategoryLabels = { character: '角色', scene: '场景', prop: '道具' };
 
 function countMedia(items, kind) { return (items || []).map(safeMedia).filter(item => item?.kind === kind).length; }
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('读取音频文件失败'));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
 
 function BindingAssetPreview({ asset, onPreview }) {
   const [url, setUrl] = useState('');
@@ -78,6 +86,7 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
   const [narratingSegmentIds, setNarratingSegmentIds] = useState(() => new Set());
   const [submittingTaskSegmentIds, setSubmittingTaskSegmentIds] = useState(() => new Set());
   const segmentationFileRef = useRef(null);
+  const narrationImportRef = useRef(null);
   const project = data.project;
   const media = data.media || [];
   const bindings = data.segmentAssetIDs || {};
@@ -192,6 +201,40 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
     if (completed) await refreshProject();
     if (completed) message.success(`已生成并保存 ${completed} 条配音`);
     if (failures.length) message.error(`${failures.length} 条配音未生成：${failures[0]}`);
+  }
+  async function importNarrationFiles(event) {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+    if (!files.length || !data.segments?.length) return;
+    setBusy(true);
+    let imported = 0;
+    const failures = [];
+    try {
+      for (const file of files) {
+        const numberMatch = file.name.match(/(?:^|[^0-9])(\d{1,4})(?:[^0-9]|$)/);
+        const numberIndex = numberMatch ? Number(numberMatch[1]) - 1 : -1;
+        const target = numberIndex >= 0 && numberIndex < data.segments.length
+          ? data.segments[numberIndex]
+          : data.segments.find(segment => file.name.includes(segment.id));
+        if (!target) {
+          failures.push(`${file.name}（无法匹配分镜）`);
+          continue;
+        }
+        try {
+          await uploadMedia(project.id, { kind: 'audio', filename: file.name, dataUrl: await fileToDataURL(file), segmentId: target.id });
+          imported += 1;
+        } catch (error) {
+          failures.push(`${file.name}（${error.message || '上传失败'}）`);
+        }
+      }
+      if (imported) {
+        await refreshProject();
+        message.success(`已导入 ${imported} 条配音并绑定分镜`);
+      }
+      if (failures.length) message.warning(`有 ${failures.length} 个文件未导入：${failures[0]}`);
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveVoiceSettings() {
     if (!voiceConfiguring) return;
@@ -487,7 +530,8 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
         <InputNumber min={1} max={20} value={lines} onChange={value => setLines(value || 1)} addonBefore="行" />
         <Button icon={<OrderedListOutlined />} loading={busy && segmentMode === 'fixed'} onClick={() => previewSegmentation('fixed')}>按行拆分</Button>
         <Tooltip title={directNarrationReady ? '按各分镜的音色、语速和音调直接生成并保存配音' : directNarrationReason}><Button icon={<SoundOutlined />} disabled={!directNarrationReady} onClick={openAudioBatchFromSegmentation}>智能配音</Button></Tooltip>
-        <Tooltip title="批量导入配音需要音频与分镜自动匹配接口，当前未接入。"><Button icon={<FileTextOutlined />} disabled>导入配音</Button></Tooltip>
+        <input ref={narrationImportRef} type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4" multiple hidden onChange={importNarrationFiles} />
+        <Tooltip title="按文件名中的序号（如 01、02）自动匹配分镜，也支持直接使用分镜 ID"><Button icon={<FileTextOutlined />} disabled={!confirmed || busy} onClick={() => narrationImportRef.current?.click()}>导入配音</Button></Tooltip>
         <Button icon={<DownloadOutlined />} disabled={!candidates.length} onClick={exportSegmentationCandidates}>导出分镜</Button>
       </div>
       <div className="shuihuo-segmentation-table" role="table" aria-label="分镜调整候选表">
