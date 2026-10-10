@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 )
@@ -107,7 +109,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 					failed++
 					continue
 				}
-				uploadReq, reqErr := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/zbooklist_upload.php", strings.NewReader(string(multipartBody)))
+				uploadReq, reqErr := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/zbooklist_upload.php", bytes.NewReader(multipartBody))
 				if reqErr != nil {
 					row["error"] = "上传请求创建失败"
 					results = append(results, row)
@@ -116,7 +118,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 				}
 				uploadReq.Header.Set("Cookie", cookie)
 				uploadReq.Header.Set("Content-Type", contentType)
-				response, requestErr := (&http.Client{}).Do(uploadReq)
+				response, requestErr := (&http.Client{Timeout: 120 * time.Second}).Do(uploadReq)
 				if requestErr != nil {
 					row["error"] = "上传失败"
 					results = append(results, row)
