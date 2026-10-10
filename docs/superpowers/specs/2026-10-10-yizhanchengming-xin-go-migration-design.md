@@ -90,3 +90,8 @@ React 用户前台 / React 管理后台
 - 本地浏览器流程真实可走通。
 - 旧 Node 接口不再是该模块的事实来源。
 
+## 2026-10-10 本地骨架验证记录
+
+- `backend` 下的 `go test ./...` 和 Go 主程序构建已通过。
+- Go 已具备 `/health`、React 静态资源服务、Redis 运行状态边界。
+- 本机尚未用真实 MySQL DSN 和桥接密钥启动 Go 服务，因此浏览器登录、真实 Provider、TOS 和 ECS 验收仍未完成。

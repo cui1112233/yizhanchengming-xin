@@ -14,6 +14,7 @@ import (
 
 	"qiantie/backend/internal/app"
 	"qiantie/backend/internal/config"
+	webassets "qiantie/backend/web"
 )
 
 func main() {
@@ -39,10 +40,18 @@ func main() {
 	configureDatabasePool(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	handler, err := app.Build(ctx, cfg, db, nil)
+	apiHandler, err := app.Build(ctx, cfg, db, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+	staticHandler := webassets.Handler()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
+		staticHandler.ServeHTTP(w, req)
+	})
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
