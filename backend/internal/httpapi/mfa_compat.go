@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base32"
@@ -10,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -22,6 +24,7 @@ type mfaFileRow struct {
 	Enabled        bool     `json:"enabled"`
 	Secret         string   `json:"secret"`
 	RecoveryHashes []string `json:"recoveryHashes"`
+	PendingSecret  string   `json:"pendingSecret"`
 }
 
 func readMFAFile(path string) ([]mfaFileRow, error) {
@@ -117,4 +120,51 @@ func verifyMFAForLogin(path, username, code string, now time.Time) (required, va
 		return true, false, false, nil
 	}
 	return false, true, false, nil
+}
+
+func writeMFAFile(path string, rows []mfaFileRow) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(rows, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func base32MFASecret() (string, error) {
+	seed := make([]byte, 20)
+	if _, err := rand.Read(seed); err != nil {
+		return "", err
+	}
+	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(seed), nil
+}
+
+func generateMFARecoveryCodes() ([]string, error) {
+	result := make([]string, 8)
+	for index := range result {
+		seed := make([]byte, 5)
+		if _, err := rand.Read(seed); err != nil {
+			return nil, err
+		}
+		hexValue := strings.ToUpper(hex.EncodeToString(seed))
+		result[index] = hexValue[:5] + "-" + hexValue[5:]
+	}
+	return result, nil
+}
+
+func mfaStatusRow(row *mfaFileRow) map[string]any {
+	status := map[string]any{"enabled": false, "enabledAt": nil, "recoveryCodesRemaining": 0, "setupPending": false}
+	if row == nil {
+		return status
+	}
+	status["enabled"] = row.Enabled && strings.TrimSpace(row.Secret) != ""
+	status["recoveryCodesRemaining"] = len(row.RecoveryHashes)
+	status["setupPending"] = strings.TrimSpace(row.PendingSecret) != ""
+	return status
 }

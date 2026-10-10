@@ -127,6 +127,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/member/security/mfa/") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/character-core/trace" {
 			apiHandler.ServeHTTP(w, req)
 			return
