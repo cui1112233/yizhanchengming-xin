@@ -1276,8 +1276,21 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				previous := segments[index-1]
 				previous["sourceText"] = strings.TrimSpace(modelString(previous, "sourceText") + "\n" + modelString(segments[index], "sourceText"))
 				previous["subtitleText"] = strings.TrimSpace(modelString(previous, "subtitleText") + "\n" + modelString(segments[index], "subtitleText"))
+				unitIDs := storedShuihuoSegmentSourceUnitIDs(batch)
+				unitIDs[modelString(previous, "id")] = append(unitIDs[modelString(previous, "id")], unitIDs[segmentID]...)
+				delete(unitIDs, segmentID)
 				segments = append(segments[:index], segments[index+1:]...)
 				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				if fresh, freshErr := store.GetBatch(r.Context(), owner, batch.ID); freshErr == nil {
+					batch = fresh
+				} else {
+					writeStoreError(w, freshErr)
+					return
+				}
+				if err := saveShuihuoSegmentSourceUnitIDs(r, store, owner, batch, unitIDs); err != nil {
 					writeStoreError(w, err)
 					return
 				}
@@ -1296,8 +1309,23 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 					return
 				}
 				replacement := normalizeShuihuoSegments(stringsToShuihuoCandidates(lines), batch.Books[0].ID)
+				unitIDs := storedShuihuoSegmentSourceUnitIDs(batch)
+				delete(unitIDs, segmentID)
+				for _, item := range replacement {
+					unitIDs[modelString(item, "id")] = []string{modelString(item, "id")}
+				}
 				segments = append(append(append([]map[string]any{}, segments[:index]...), replacement...), segments[index+1:]...)
 				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				if fresh, freshErr := store.GetBatch(r.Context(), owner, batch.ID); freshErr == nil {
+					batch = fresh
+				} else {
+					writeStoreError(w, freshErr)
+					return
+				}
+				if err := saveShuihuoSegmentSourceUnitIDs(r, store, owner, batch, unitIDs); err != nil {
 					writeStoreError(w, err)
 					return
 				}
@@ -1323,7 +1351,19 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				segments = append(segments, nil)
 				copy(segments[index+2:], segments[index+1:])
 				segments[index+1] = created[0]
+				unitIDs := storedShuihuoSegmentSourceUnitIDs(batch)
+				unitIDs[modelString(created[0], "id")] = []string{modelString(created[0], "id")}
 				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				if fresh, freshErr := store.GetBatch(r.Context(), owner, batch.ID); freshErr == nil {
+					batch = fresh
+				} else {
+					writeStoreError(w, freshErr)
+					return
+				}
+				if err := saveShuihuoSegmentSourceUnitIDs(r, store, owner, batch, unitIDs); err != nil {
 					writeStoreError(w, err)
 					return
 				}
@@ -1807,6 +1847,7 @@ func shuihuoProject(batch batchfactoryv11.Batch) map[string]any {
 	var sourceText string
 	segments := []map[string]any{}
 	segmentAssetIDs := map[string][]string{}
+	segmentSourceUnitIDs := map[string][]string{}
 	if len(batch.Books) > 0 {
 		sourceText = batch.Books[0].SourceText
 		segments = storedShuihuoSegments(batch.Books[0])
@@ -1814,13 +1855,14 @@ func shuihuoProject(batch batchfactoryv11.Batch) map[string]any {
 			encoded, _ := json.Marshal(raw)
 			_ = json.Unmarshal(encoded, &segmentAssetIDs)
 		}
+		segmentSourceUnitIDs = storedShuihuoSegmentSourceUnitIDs(batch)
 		if len(segments) > 0 {
 			status = "confirmed"
 		}
 	}
 	return map[string]any{
 		"id": batch.ID, "name": batch.Title, "createdAt": createdAt, "updatedAt": updatedAt,
-		"sourceText": sourceText, "segmentationStatus": status, "segments": segments, "assets": shuihuoAssets(batch), "segmentAssetIDs": segmentAssetIDs,
+		"sourceText": sourceText, "segmentationStatus": status, "segments": segments, "assets": shuihuoAssets(batch), "segmentAssetIDs": segmentAssetIDs, "segmentSourceUnitIDs": segmentSourceUnitIDs,
 		"media": shuihuoMedia(batch),
 		"books": batch.Books,
 	}
@@ -1855,13 +1897,18 @@ func shuihuoProjectDetailFromProject(project map[string]any) map[string]any {
 	if segmentAssetIDs == nil {
 		segmentAssetIDs = map[string][]string{}
 	}
+	segmentSourceUnitIDs, _ := project["segmentSourceUnitIDs"].(map[string][]string)
+	if segmentSourceUnitIDs == nil {
+		segmentSourceUnitIDs = map[string][]string{}
+	}
 	return map[string]any{
-		"project":         project,
-		"segments":        segments,
-		"assets":          assets,
-		"media":           media,
-		"segmentAssetIDs": segmentAssetIDs,
-		"settings":        map[string]any{},
+		"project":              project,
+		"segments":             segments,
+		"assets":               assets,
+		"media":                media,
+		"segmentAssetIDs":      segmentAssetIDs,
+		"segmentSourceUnitIDs": segmentSourceUnitIDs,
+		"settings":             map[string]any{},
 	}
 }
 
@@ -2078,6 +2125,34 @@ func saveShuihuoSegments(r *http.Request, store batchfactoryv11.Store, owner str
 	metadata := cloneMetadata(batch.Books[0].SourceMetadata)
 	metadata["shuihuoSegments"] = segments
 	metadata["shuihuoSegmentationStatus"] = "confirmed"
+	_, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision})
+	return err
+}
+
+func storedShuihuoSegmentSourceUnitIDs(batch batchfactoryv11.Batch) map[string][]string {
+	result := map[string][]string{}
+	if len(batch.Books) == 0 {
+		return result
+	}
+	if raw, ok := batch.Books[0].SourceMetadata["shuihuoSegmentSourceUnitIDs"]; ok {
+		encoded, _ := json.Marshal(raw)
+		_ = json.Unmarshal(encoded, &result)
+	}
+	for _, segment := range storedShuihuoSegments(batch.Books[0]) {
+		id := modelString(segment, "id")
+		if id != "" && len(result[id]) == 0 {
+			result[id] = []string{id}
+		}
+	}
+	return result
+}
+
+func saveShuihuoSegmentSourceUnitIDs(r *http.Request, store batchfactoryv11.Store, owner string, batch batchfactoryv11.Batch, unitIDs map[string][]string) error {
+	if len(batch.Books) == 0 {
+		return fmt.Errorf("project has no editable source book")
+	}
+	metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+	metadata["shuihuoSegmentSourceUnitIDs"] = unitIDs
 	_, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision})
 	return err
 }
