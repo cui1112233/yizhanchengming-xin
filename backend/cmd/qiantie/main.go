@@ -108,7 +108,7 @@ func shouldBridgeLegacyAPI(path string) bool {
 	// legacy Node batch-factory store. Keep this one handoff endpoint on the
 	// bridge until its storage has been moved to the Go batch store; all V11
 	// batch APIs remain handled by Go.
-	if path == "/api/batch-factory/v12/intakes/novel-fetch" {
+	if path == "/api/batch-factory/v12/intakes/novel-fetch" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") {
 		return true
 	}
 	for _, prefix := range []string{
