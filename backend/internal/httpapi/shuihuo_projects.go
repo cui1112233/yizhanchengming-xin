@@ -692,8 +692,13 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				RequestID string `json:"requestId"`
 				Provider  string `json:"provider,omitempty"`
 				ModelID   string `json:"modelId,omitempty"`
+				Kind      string `json:"kind,omitempty"`
 			}
 			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if kind := strings.ToLower(strings.TrimSpace(input.Kind)); kind != "" && kind != "video" {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入图片或配音任务，请先使用视频任务"})
 				return
 			}
 			if strings.TrimSpace(input.RequestID) == "" {
