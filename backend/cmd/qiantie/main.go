@@ -143,7 +143,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/batch-rewrite/web-submit/test-visible" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-configs" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-styles" || req.URL.Path == "/api/batch-rewrite/web-submit/preview") {
+		if req.Method == http.MethodPost && (req.URL.Path == "/api/batch-rewrite/web-submit/test-visible" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-configs" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-styles" || req.URL.Path == "/api/batch-rewrite/web-submit/preview" || req.URL.Path == "/api/batch-rewrite/web-submit/submit") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
