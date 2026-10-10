@@ -405,6 +405,9 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 2 && parts[0] == "automation-presets" {
 		return true
 	}
+	if len(parts) == 2 && parts[0] == "video-provider" && parts[1] == "status" {
+		return true
+	}
 	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "automation-presets" {
 		return true
 	}

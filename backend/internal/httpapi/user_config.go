@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -91,6 +92,13 @@ func (s *UserConfigStore) read(username string) map[string]any {
 		return config
 	}
 	return mergeConfigMap(config, saved)
+}
+
+// GetConfig exposes the same owner-scoped effective configuration used by the
+// Go settings routes. Callers must still redact secrets before returning data
+// to a browser.
+func (s *UserConfigStore) GetConfig(_ context.Context, username string) (map[string]any, error) {
+	return s.read(username), nil
 }
 
 func (s *UserConfigStore) write(username string, config map[string]any) error {
