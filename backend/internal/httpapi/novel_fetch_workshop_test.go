@@ -332,6 +332,34 @@ func TestNovelFetchWorkshopProcessStartCanBePolled(t *testing.T) {
 	}
 }
 
+func TestNovelFetchWorkshopFetchOriginalPersistsRawAndProcessedText(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Query().Get("bookid") != "12345678901" || req.URL.Query().Get("platform") != "15" {
+			t.Fatalf("unexpected upstream query: %s", req.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"code":200,"msg":"ok","data":"第一行\n第二行\n第三行","bookinfo":{"category":"男频","genre":"都市"}}`))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{BookID: "12345678901", MaxTxt: 4, Meta: map[string]any{"platformId": "15"}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}})
+	fetch := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/12345678901/fetch", map[string]any{"maxTxt": 4}, now, secret)
+	if fetch.Code != http.StatusOK {
+		t.Fatalf("fetch status=%d body=%s", fetch.Code, fetch.Body.String())
+	}
+	document, err := store.GetDocument(context.Background(), "tester", "12345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.OriginalRaw != "第一行\n第二行\n第三行" || document.ProcessedText != "第一行\n" || document.OriginalRawChars <= document.ProcessedChars || document.Gender != "男频" {
+		t.Fatalf("fetch persistence mismatch: %#v", document)
+	}
+}
+
 func TestNovelFetchMemoryStoreIsOwnerScoped(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	if err := store.PutDocument(context.Background(), "alice", novelfetchworkshop.Document{BookID: "same", Original: "alice"}); err != nil {

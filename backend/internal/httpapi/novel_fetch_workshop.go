@@ -214,7 +214,7 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}, nil
 }
 
-func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge) {
+func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, fetcher *novelfetchworkshop.UpstreamFetcher) {
 	registry := newWorkshopProcessRegistry()
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -418,6 +418,75 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		writeJSON(w, http.StatusOK, document)
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/{bookId}/fetch", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		if fetcher == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "原文抓取服务未配置"})
+			return
+		}
+		bookID := strings.TrimSpace(req.PathValue("bookId"))
+		if !novelFetchBookIDPattern.MatchString(bookID) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "非法的书籍ID"})
+			return
+		}
+		document, err := store.GetDocument(req.Context(), identity.Username, bookID)
+		if errors.Is(err, novelfetchworkshop.ErrNotFound) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "任务不存在"})
+			return
+		}
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
+			return
+		}
+		var input struct {
+			MaxTxt int `json:"maxTxt"`
+		}
+		if req.ContentLength != 0 {
+			if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+				return
+			}
+		}
+		maxTxt := input.MaxTxt
+		if maxTxt <= 0 {
+			maxTxt = document.MaxTxt
+		}
+		if maxTxt <= 0 {
+			maxTxt = 4000
+		}
+		platformID := "2"
+		if value, ok := document.Meta["platformId"].(string); ok && strings.TrimSpace(value) != "" {
+			platformID = strings.TrimSpace(value)
+		}
+		result, err := fetcher.FetchAndProcess(req.Context(), bookID, platformID, maxTxt)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		document.OriginalRaw = result.OriginalRaw
+		document.ProcessedText = result.ProcessedText
+		document.Original = result.ProcessedText
+		document.OriginalRawChars = result.OriginalRawChars
+		document.ProcessedChars = result.ProcessedChars
+		document.MaxTxt = result.MaxTxt
+		document.BookInfo = result.BookInfo
+		if document.Meta == nil {
+			document.Meta = map[string]any{}
+		}
+		document.Meta["originalStatus"] = "done"
+		document.Meta["originalRawChars"] = result.OriginalRawChars
+		document.Meta["processedChars"] = result.ProcessedChars
+		if document.Gender == "" {
+			decision := novelfetchworkshop.ResolveGender(req.Context(), "", result.BookInfo, aiJudge)
+			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
+		}
+		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"task": document})
 	})
 
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/tasks/{bookId}", func(w http.ResponseWriter, req *http.Request) {
