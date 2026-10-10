@@ -16,6 +16,12 @@ const (
 	panelMaxTimeout     = 900
 )
 
+var panelImageDefaults = map[string]any{
+	"base_url": "", "model": "", "generate_path": "/images/generations", "edit_path": "/images/edits",
+	"size": "1536x1024", "aspect_ratio": "16:9", "supports_reference": true, "timeout_seconds": 400,
+	"extra_json": map[string]any{},
+}
+
 func panelTimeout(value any) int {
 	var parsed int
 	switch current := value.(type) {
@@ -100,6 +106,62 @@ func panelPublicSettings(store *UserConfigStore, username string) map[string]any
 	return map[string]any{"ai_mode": saved["ai_mode"], "base_url": baseURL, "model": model, "api_key_configured": strings.TrimSpace(apiKey) != "", "text_model_id": saved["text_model_id"], "ai_timeout_seconds": saved["ai_timeout_seconds"]}
 }
 
+func imageSettingsPath(store *UserConfigStore, username string) string {
+	return filepath.Join(store.BaseDir, username, "novel-panel", "image-settings.json")
+}
+
+func readPanelImageSettings(store *UserConfigStore, username string) map[string]any {
+	result := cloneConfigMap(panelImageDefaults)
+	if store == nil || strings.TrimSpace(store.BaseDir) == "" {
+		return result
+	}
+	raw, err := os.ReadFile(imageSettingsPath(store, username))
+	if err != nil {
+		return result
+	}
+	var saved map[string]any
+	if json.Unmarshal(raw, &saved) == nil {
+		result = mergeConfigMap(result, saved)
+	}
+	parsed := panelTimeout(result["timeout_seconds"])
+	if parsed < 30 {
+		parsed = 30
+	}
+	if parsed > 400 {
+		parsed = 400
+	}
+	result["timeout_seconds"] = parsed
+	return result
+}
+
+func publicPanelImageSettings(store *UserConfigStore, username string, input map[string]any) map[string]any {
+	result := cloneConfigMap(input)
+	key, _ := result["api_key"].(string)
+	delete(result, "api_key")
+	result["api_key_configured"] = strings.TrimSpace(key) != ""
+	if !result["api_key_configured"].(bool) {
+		existing, _ := readPanelImageSettings(store, username)["api_key"].(string)
+		result["api_key_configured"] = strings.TrimSpace(existing) != ""
+	}
+	return result
+}
+
+func writePanelImageSettings(store *UserConfigStore, username string, settings map[string]any) error {
+	dir := filepath.Dir(imageSettingsPath(store, username))
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := imageSettingsPath(store, username) + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, imageSettingsPath(store, username))
+}
+
 func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore) {
 	if root == nil || middleware.AuthStore == nil || store == nil {
 		return
@@ -121,6 +183,10 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusOK, map[string]any{"ai_timeout_seconds": saved["ai_timeout_seconds"]})
 			return
 		}
+		if req.Method == http.MethodGet && req.URL.Path == "/api/image-settings" {
+			writeJSON(w, http.StatusOK, map[string]any{"settings": publicPanelImageSettings(store, identity.Username, readPanelImageSettings(store, identity.Username))})
+			return
+		}
 		var patch map[string]any
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&patch) != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
@@ -136,6 +202,41 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"message": "AI等待上限已保存。", "runtime_config": map[string]any{"ai_timeout_seconds": saved["ai_timeout_seconds"]}})
+			return
+		}
+		if req.URL.Path == "/api/image-settings" {
+			current := readPanelImageSettings(store, identity.Username)
+			for _, key := range []string{"base_url", "model", "generate_path", "edit_path", "size", "aspect_ratio"} {
+				if value, ok := patch[key]; ok {
+					current[key] = strings.TrimSpace(fmt.Sprint(value))
+				}
+			}
+			if value, ok := patch["supports_reference"]; ok {
+				current["supports_reference"] = value == true || fmt.Sprint(value) == "true"
+			}
+			if value, ok := patch["timeout_seconds"]; ok {
+				parsed := panelTimeout(value)
+				if parsed < 30 {
+					parsed = 30
+				}
+				if parsed > 400 {
+					parsed = 400
+				}
+				current["timeout_seconds"] = parsed
+			}
+			if value, ok := patch["extra_json"].(map[string]any); ok {
+				current["extra_json"] = value
+			}
+			if clear, ok := patch["clear_api_key"].(bool); ok && clear {
+				delete(current, "api_key")
+			} else if value, ok := patch["api_key"].(string); ok && strings.TrimSpace(value) != "" {
+				current["api_key"] = strings.TrimSpace(value)
+			}
+			if err := writePanelImageSettings(store, identity.Username, current); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "图片设置保存失败"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "图片AI设置已保存。", "settings": publicPanelImageSettings(store, identity.Username, current)})
 			return
 		}
 		if value, ok := patch["ai_mode"].(string); ok && value == "local" {
@@ -159,4 +260,6 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 	root.Handle("POST /api/settings", handler)
 	root.Handle("GET /api/runtime-config", handler)
 	root.Handle("POST /api/runtime-config", handler)
+	root.Handle("GET /api/image-settings", handler)
+	root.Handle("POST /api/image-settings", handler)
 }
