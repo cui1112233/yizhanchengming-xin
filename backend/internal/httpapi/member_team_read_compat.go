@@ -115,4 +115,22 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"teams": []any{map[string]any{"manager": self, "team": goTeam(self), "monthlyTokenLimit": self["monthlyTokenLimit"], "used": 0}}})
 	})))
+	root.Handle("GET /api/member/team/members/{username}/usage", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		self := profiles.member(identity.Username, accounts)
+		target := profiles.member(req.PathValue("username"), accounts)
+		if self == nil || target == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "成员不存在"})
+			return
+		}
+		if toString(self["role"]) == "manager" && toString(target["boundTo"]) != toString(self["username"]) && toString(target["username"]) != toString(self["username"]) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权查看该成员用量"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"day": map[string]any{}, "month": map[string]any{"totalTokens": 0}, "quota": map[string]any{"used": 0, "limit": target["monthlyTokenLimit"]}, "recent": []any{}})
+	})))
 }
