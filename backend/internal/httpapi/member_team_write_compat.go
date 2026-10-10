@@ -3,11 +3,50 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"qiantie/backend/internal/auth"
 )
+
+func updateMemberArchive(profiles *MemberProfileStore, username, actor, reason string, restored bool) (map[string]any, error) {
+	profiles.mu.Lock()
+	defer profiles.mu.Unlock()
+	path := filepath.Join(profiles.SystemDir, "member-archives.json")
+	rows := []map[string]any{}
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(raw, &rows)
+	}
+	var archive map[string]any
+	for _, row := range rows {
+		if row["username"] == username {
+			archive = row
+			break
+		}
+	}
+	if archive == nil {
+		archive = map[string]any{"username": username}
+		rows = append(rows, archive)
+	}
+	if restored {
+		archive["restoredAt"], archive["restoredBy"] = time.Now().UTC().Format(time.RFC3339), actor
+	} else {
+		archive["archivedAt"], archive["archivedBy"], archive["reason"] = time.Now().UTC().Format(time.RFC3339), actor, strings.TrimSpace(reason)
+	}
+	if err := os.MkdirAll(profiles.SystemDir, 0o755); err != nil {
+		return nil, err
+	}
+	raw, err := json.MarshalIndent(rows, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		return nil, err
+	}
+	return archive, nil
+}
 
 func teamActor(profiles *MemberProfileStore, accounts auth.Store, req *http.Request) (map[string]any, bool) {
 	identity, ok := BridgeIdentityFromContext(req.Context())
@@ -213,5 +252,73 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"reset": true, "username": username})
+	})))
+	root.Handle("POST /api/member/team/members/{username}/archive", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		username := req.PathValue("username")
+		member := profiles.member(username, accounts)
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权归档成员")
+			return
+		}
+		if member == nil || toString(member["role"]) != "member" {
+			managedAccountError(w, http.StatusNotFound, "成员不存在")
+			return
+		}
+		if toString(actor["role"]) == "manager" && toString(member["boundTo"]) != toString(actor["username"]) {
+			managedAccountError(w, http.StatusForbidden, "不能归档其他团队成员")
+			return
+		}
+		var input struct {
+			Reason string `json:"reason"`
+		}
+		_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input)
+		if err := accounts.SetActive(req.Context(), username, false); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "成员归档失败")
+			return
+		}
+		archive, err := updateMemberArchive(profiles, username, toString(actor["username"]), input.Reason, false)
+		if err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "归档记录保存失败")
+			return
+		}
+		account, _ := accounts.FindAccount(req.Context(), username)
+		writeJSON(w, http.StatusOK, map[string]any{"member": managedAccountRow(account, managedProfile(profiles, username)), "archive": archive, "revoked": 0})
+	})))
+	root.Handle("POST /api/member/team/members/{username}/restore", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		username := req.PathValue("username")
+		member := profiles.member(username, accounts)
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权恢复成员")
+			return
+		}
+		if member == nil || toString(member["role"]) != "member" {
+			managedAccountError(w, http.StatusNotFound, "成员不存在")
+			return
+		}
+		if toString(actor["role"]) == "manager" && toString(member["boundTo"]) != toString(actor["username"]) {
+			managedAccountError(w, http.StatusForbidden, "不能恢复其他团队成员")
+			return
+		}
+		if err := accounts.SetActive(req.Context(), username, true); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "成员恢复失败")
+			return
+		}
+		archive, err := updateMemberArchive(profiles, username, toString(actor["username"]), "", true)
+		if err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "归档记录保存失败")
+			return
+		}
+		account, _ := accounts.FindAccount(req.Context(), username)
+		writeJSON(w, http.StatusOK, map[string]any{"member": managedAccountRow(account, managedProfile(profiles, username)), "archive": archive})
 	})))
 }
