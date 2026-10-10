@@ -130,7 +130,10 @@ export function NovelPanelPage({ theme }) {
   const [error, setError] = useState(false);
   const searchParams = new URLSearchParams(window.location.search);
   const projectId = searchParams.get('project');
-  const workbenchSrc = `/novel-panel/workbench?nonce=${encodeURIComponent(sessionNonceRef.current)}&instance=${encodeURIComponent(instanceIdRef.current)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`;
+  // Use the concrete document instead of the directory alias. The Go static
+  // server supports both, but an older SPA fallback can mistake the directory
+  // URL for the main application and embed the home page inside the panel.
+  const workbenchSrc = `/novel-panel/workbench/index.html?nonce=${encodeURIComponent(sessionNonceRef.current)}&instance=${encodeURIComponent(instanceIdRef.current)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ''}`;
 
   function abortPendingRequests() {
     for (const controller of controllersRef.current.values()) controller.abort();
