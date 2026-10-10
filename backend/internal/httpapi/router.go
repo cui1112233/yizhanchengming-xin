@@ -138,6 +138,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))
 		RegisterLegacyNovelFetchRoutes(root, auth, options.NovelFetchStore, options.NovelFetchFetcher, options.UserConfigStore)
+		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore)
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
