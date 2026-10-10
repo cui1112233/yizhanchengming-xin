@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
@@ -95,6 +96,32 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": failures == 0, "checks": checks, "summary": map[string]any{"pass": len(checks) - failures, "warn": 0, "fail": failures}, "active_instances": 1, "trace_records": len(readNovelPanelDiagnostics(usersDir, identity.Username, 200))})
+	})))
+	root.Handle("GET /api/novel-panel/projects", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		projects := make([]map[string]any, 0)
+		directory := filepath.Join(usersDir, identity.Username, "novel-panel", "projects")
+		if entries, err := os.ReadDir(directory); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+					continue
+				}
+				path := filepath.Join(directory, entry.Name())
+				var project map[string]any
+				if raw, err := os.ReadFile(path); err == nil && json.Unmarshal(raw, &project) == nil {
+					id := strings.TrimSuffix(entry.Name(), ".json")
+					if value := strings.TrimSpace(toString(project["id"])); value != "" {
+						id = value
+					}
+					projects = append(projects, map[string]any{"id": id, "name": project["name"], "created_at": project["created_at"], "updated_at": project["updated_at"]})
+				}
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"projects": projects})
 	})))
 }
 
