@@ -1199,8 +1199,15 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		segmentPath := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/segments/"), "/")
 		voiceSettingsRoute := strings.HasSuffix(segmentPath, "/voice-settings")
+		assetsRoute := strings.HasSuffix(segmentPath, "/assets")
+		mergeUpRoute := strings.HasSuffix(segmentPath, "/merge-up")
+		splitRoute := strings.HasSuffix(segmentPath, "/split")
+		insertAfterRoute := strings.HasSuffix(segmentPath, "/insert-after")
 		if voiceSettingsRoute {
 			segmentPath = strings.TrimSuffix(segmentPath, "/voice-settings")
+		}
+		for _, suffix := range []string{"/assets", "/merge-up", "/split", "/insert-after"} {
+			segmentPath = strings.TrimSuffix(segmentPath, suffix)
 		}
 		segmentID := strings.Trim(segmentPath, "/")
 		if segmentID == "" {
@@ -1233,6 +1240,100 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 			if index < 0 {
 				continue
+			}
+			if assetsRoute && r.Method == http.MethodPut {
+				var input struct {
+					AssetIDs []string `json:"assetIds"`
+				}
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+				bindings := map[string][]string{}
+				if raw, ok := metadata["shuihuoSegmentAssetIDs"]; ok {
+					encoded, _ := json.Marshal(raw)
+					_ = json.Unmarshal(encoded, &bindings)
+				}
+				bindings[segmentID] = append([]string(nil), input.AssetIDs...)
+				metadata["shuihuoSegmentAssetIDs"] = bindings
+				if _, saveErr := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision}); saveErr != nil {
+					writeStoreError(w, saveErr)
+					return
+				}
+				updated, getErr := store.GetBatch(r.Context(), owner, batch.ID)
+				if getErr != nil {
+					writeStoreError(w, getErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+				return
+			}
+			if mergeUpRoute && r.Method == http.MethodPost {
+				if index == 0 {
+					writeJSON(w, http.StatusConflict, map[string]string{"error": "已经是第一条分镜"})
+					return
+				}
+				previous := segments[index-1]
+				previous["sourceText"] = strings.TrimSpace(modelString(previous, "sourceText") + "\n" + modelString(segments[index], "sourceText"))
+				previous["subtitleText"] = strings.TrimSpace(modelString(previous, "subtitleText") + "\n" + modelString(segments[index], "subtitleText"))
+				segments = append(segments[:index], segments[index+1:]...)
+				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				updated, getErr := store.GetBatch(r.Context(), owner, batch.ID)
+				if getErr != nil {
+					writeStoreError(w, getErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+				return
+			}
+			if splitRoute && r.Method == http.MethodPost {
+				lines := splitShuihuoSentences(modelString(segments[index], "sourceText"))
+				if len(lines) < 2 {
+					writeJSON(w, http.StatusConflict, map[string]string{"error": "当前分镜没有可拆分的原文"})
+					return
+				}
+				replacement := normalizeShuihuoSegments(stringsToShuihuoCandidates(lines), batch.Books[0].ID)
+				segments = append(append(append([]map[string]any{}, segments[:index]...), replacement...), segments[index+1:]...)
+				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				updated, getErr := store.GetBatch(r.Context(), owner, batch.ID)
+				if getErr != nil {
+					writeStoreError(w, getErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+				return
+			}
+			if insertAfterRoute && r.Method == http.MethodPost {
+				var input map[string]any
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				text := strings.TrimSpace(modelString(input, "sourceText"))
+				if text == "" {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "sourceText is required"})
+					return
+				}
+				created := normalizeShuihuoSegments([]map[string]any{{"text": text, "subtitleText": modelString(input, "subtitleText")}}, batch.Books[0].ID)
+				segments = append(segments, nil)
+				copy(segments[index+2:], segments[index+1:])
+				segments[index+1] = created[0]
+				if err := saveShuihuoSegments(r, store, owner, batch, segments); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				updated, getErr := store.GetBatch(r.Context(), owner, batch.ID)
+				if getErr != nil {
+					writeStoreError(w, getErr)
+					return
+				}
+				writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+				return
 			}
 			switch r.Method {
 			case http.MethodPut:
@@ -1705,16 +1806,21 @@ func shuihuoProject(batch batchfactoryv11.Batch) map[string]any {
 	status := "pending"
 	var sourceText string
 	segments := []map[string]any{}
+	segmentAssetIDs := map[string][]string{}
 	if len(batch.Books) > 0 {
 		sourceText = batch.Books[0].SourceText
 		segments = storedShuihuoSegments(batch.Books[0])
+		if raw, ok := batch.Books[0].SourceMetadata["shuihuoSegmentAssetIDs"]; ok {
+			encoded, _ := json.Marshal(raw)
+			_ = json.Unmarshal(encoded, &segmentAssetIDs)
+		}
 		if len(segments) > 0 {
 			status = "confirmed"
 		}
 	}
 	return map[string]any{
 		"id": batch.ID, "name": batch.Title, "createdAt": createdAt, "updatedAt": updatedAt,
-		"sourceText": sourceText, "segmentationStatus": status, "segments": segments, "assets": shuihuoAssets(batch),
+		"sourceText": sourceText, "segmentationStatus": status, "segments": segments, "assets": shuihuoAssets(batch), "segmentAssetIDs": segmentAssetIDs,
 		"media": shuihuoMedia(batch),
 		"books": batch.Books,
 	}
@@ -1745,12 +1851,16 @@ func shuihuoProjectDetailFromProject(project map[string]any) map[string]any {
 	segments, _ := project["segments"].([]map[string]any)
 	assets, _ := project["assets"].([]map[string]any)
 	media, _ := project["media"].([]map[string]any)
+	segmentAssetIDs, _ := project["segmentAssetIDs"].(map[string][]string)
+	if segmentAssetIDs == nil {
+		segmentAssetIDs = map[string][]string{}
+	}
 	return map[string]any{
 		"project":         project,
 		"segments":        segments,
 		"assets":          assets,
 		"media":           media,
-		"segmentAssetIDs": map[string][]string{},
+		"segmentAssetIDs": segmentAssetIDs,
 		"settings":        map[string]any{},
 	}
 }
@@ -2690,6 +2800,16 @@ func normalizeShuihuoSegments(candidates []map[string]any, bookID string) []map[
 		segments = append(segments, segment)
 	}
 	return segments
+}
+
+func stringsToShuihuoCandidates(lines []string) []map[string]any {
+	items := make([]map[string]any, 0, len(lines))
+	for _, line := range lines {
+		if text := strings.TrimSpace(line); text != "" {
+			items = append(items, map[string]any{"text": text})
+		}
+	}
+	return items
 }
 
 func writeShuihuoProject(w http.ResponseWriter, r *http.Request, store batchfactoryv11.Store, owner, id string) {
