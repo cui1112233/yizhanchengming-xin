@@ -16,6 +16,7 @@ type AuthOptions struct {
 	Store           auth.Store
 	Now             func() time.Time
 	SessionResolver func(context.Context, string) (BridgeIdentity, error)
+	MFAFile         string
 }
 
 func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
@@ -32,6 +33,7 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			Username string `json:"username"`
 			Password string `json:"password"`
 			Remember bool   `json:"remember"`
+			MFACode  string `json:"mfaCode"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&input); err != nil || strings.TrimSpace(input.Username) == "" || input.Password == "" {
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
@@ -41,6 +43,18 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 		if err != nil || !account.Active || !auth.VerifyPassword(input.Password, account.PasswordHash, account.PasswordAlgorithm) {
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
+		}
+		if strings.TrimSpace(options.MFAFile) != "" {
+			required, valid, recoveryUsed, verifyErr := verifyMFAForLogin(options.MFAFile, account.Username, input.MFACode, now())
+			if verifyErr != nil {
+				writeAuthError(w, http.StatusServiceUnavailable, "MFA 服务暂不可用")
+				return
+			}
+			if required && !valid {
+				writeJSON(w, http.StatusPreconditionRequired, map[string]string{"error": "请输入 MFA 动态验证码或恢复码", "code": "MFA_REQUIRED"})
+				return
+			}
+			_ = recoveryUsed
 		}
 		token, err := newSessionToken()
 		if err != nil {

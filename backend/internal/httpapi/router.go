@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -107,7 +108,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"service": "go-api", "git_sha": options.ReleaseSHA})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
-	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver})
+	mfaFile := ""
+	if options.MemberProfileStore != nil {
+		mfaFile = filepath.Join(options.MemberProfileStore.SystemDir, "mfa.json")
+	}
+	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver, MFAFile: mfaFile})
 	if options.PresetCatalog != nil {
 		registerPresetRoutes(root, auth, options.PresetCatalog)
 	}
