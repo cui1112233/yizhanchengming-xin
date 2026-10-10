@@ -764,7 +764,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusCreated, map[string]any{"tasks": status.Jobs, "status": status})
 			return
 		}
-		if len(parts) == 3 && parts[1] == "analysis" && r.Method == http.MethodPost {
+		if (len(parts) == 3 && parts[1] == "analysis" && parts[2] == "assets" || len(parts) == 4 && parts[1] == "analysis" && parts[2] == "assets" && parts[3] == "and-bindings") && r.Method == http.MethodPost {
 			if director == nil || len(batch.Books) == 0 {
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置文本模型，暂不能进行智能分析"})
 				return
@@ -780,6 +780,51 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"assets": assets, "project": shuihuoProjectDetail(updated)})
+			return
+		}
+		if len(parts) == 4 && parts[1] == "assets" && parts[2] == "candidates" && parts[3] == "apply" && r.Method == http.MethodPost {
+			if len(batch.Books) == 0 {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "project has no editable source book"})
+				return
+			}
+			var input struct {
+				Candidates []map[string]any `json:"candidates"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			created := 0
+			for _, candidate := range input.Candidates {
+				name := strings.TrimSpace(modelString(candidate, "name"))
+				if name == "" {
+					name = strings.TrimSpace(modelString(candidate, "title"))
+				}
+				if name == "" {
+					continue
+				}
+				kind := strings.TrimSpace(modelString(candidate, "category"))
+				if kind == "" {
+					kind = strings.TrimSpace(modelString(candidate, "kind"))
+				}
+				if kind == "" {
+					kind = "character"
+				}
+				prompt := strings.TrimSpace(modelString(candidate, "prompt"))
+				if prompt == "" {
+					prompt = strings.TrimSpace(modelString(candidate, "description"))
+				}
+				if _, createErr := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: name, Prompt: prompt}); createErr != nil {
+					writeStoreError(w, createErr)
+					return
+				}
+				created++
+			}
+			updated, getErr := store.GetBatch(r.Context(), owner, batch.ID)
+			if getErr != nil {
+				writeStoreError(w, getErr)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"created": created, "project": shuihuoProjectDetail(updated)})
 			return
 		}
 		if len(parts) == 3 && parts[1] == "prompt-candidates" && r.Method == http.MethodPost {
