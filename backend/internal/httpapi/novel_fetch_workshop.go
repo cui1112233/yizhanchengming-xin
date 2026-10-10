@@ -358,8 +358,14 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if configured, ok := settings["appConfig"].(map[string]any); ok {
 			appConfig = configured
 		}
-		platforms, _ := settings["platforms"].([]any)
-		styles, _ := settings["styles"].([]any)
+		platforms, ok := settings["platforms"].([]any)
+		if !ok {
+			platforms = []any{}
+		}
+		styles, ok := settings["styles"].([]any)
+		if !ok {
+			styles = []any{}
+		}
 		aiConfig, _ := settings["aiConfig"].(map[string]any)
 		if aiConfig == nil {
 			if ai, ok := appConfig["ai"].(map[string]any); ok {
