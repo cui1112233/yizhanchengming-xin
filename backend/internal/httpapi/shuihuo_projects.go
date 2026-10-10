@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -912,6 +913,27 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		if len(parts) == 2 && parts[1] == "media" && r.Method == http.MethodPost {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入媒体素材存储"})
+			return
+		}
+		if len(parts) == 3 && parts[1] == "assets" && parts[2] == "generate" && r.Method == http.MethodPost {
+			if files == nil || len(batch.Books) == 0 {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "asset image storage is unavailable"})
+				return
+			}
+			var input struct {
+				AssetIDs    []string `json:"assetIds"`
+				ModelID     string   `json:"modelId"`
+				AspectRatio string   `json:"aspectRatio,omitempty"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			images, generationErr := generateShuihuoAssetImages(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio)
+			if generationErr != nil {
+				writeStoreError(w, generationErr)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"images": images})
 			return
 		}
 		if len(parts) == 2 && parts[1] == "assets" && r.Method == http.MethodPost {
@@ -2043,6 +2065,177 @@ func generateShuihuoPromptCandidates(ctx context.Context, director *batchfactory
 		return fallback(err)
 	}
 	return items, "text_model", nil
+}
+
+func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio string) ([]batchfactoryv11.BookAssetImage, error) {
+	if len(batch.Books) == 0 {
+		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
+	}
+	wanted := make(map[string]bool, len(assetIDs))
+	for _, id := range assetIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			wanted[id] = true
+		}
+	}
+	if len(wanted) == 0 {
+		return nil, fmt.Errorf("%w: asset selection is required", batchfactoryv11.ErrInvalid)
+	}
+	config, err := loadShuihuoOwnerConfig(ctx, store, owner)
+	if err != nil {
+		return nil, err
+	}
+	var model map[string]any
+	for _, candidate := range shuihuoCollection(config, "modelCatalog", nil) {
+		if !strings.EqualFold(modelString(candidate, "kind"), "image") || (modelID != "" && modelString(candidate, "modelId") != strings.TrimSpace(modelID)) {
+			continue
+		}
+		enabled, hasEnabled := candidate["enabled"].(bool)
+		if hasEnabled && !enabled {
+			continue
+		}
+		model = candidate
+		break
+	}
+	if model == nil {
+		return nil, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
+	}
+	endpoint, err := shuihuoImageGenerationEndpoint(modelString(model, "endpoint"))
+	if err != nil {
+		return nil, fmt.Errorf("%w: image model endpoint is invalid", batchfactoryv11.ErrInvalid)
+	}
+	apiKey := modelString(model, "apiKey")
+	if apiKey == "" {
+		apiKey = modelString(model, "credential")
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
+	}
+	client := &http.Client{Timeout: 120 * time.Second}
+	generated := make([]batchfactoryv11.BookAssetImage, 0, len(wanted))
+	for _, asset := range batch.Books[0].AssetRecords {
+		if !wanted[asset.ID] {
+			continue
+		}
+		prompt := strings.TrimSpace(asset.Prompt)
+		if prompt == "" {
+			return nil, fmt.Errorf("%w: asset %s has no prompt", batchfactoryv11.ErrInvalid, asset.ID)
+		}
+		payload := map[string]any{"model": modelString(model, "modelId"), "prompt": prompt, "n": 1, "size": shuihuoImageSize(aspectRatio), "response_format": "b64_json"}
+		body, _ := json.Marshal(payload)
+		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if requestErr != nil {
+			return nil, fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		response, requestErr := client.Do(req)
+		if requestErr != nil {
+			return nil, fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, requestErr)
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+		response.Body.Close()
+		if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+			return nil, fmt.Errorf("%w: image provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+		}
+		var result struct {
+			Data []struct {
+				B64JSON string `json:"b64_json"`
+				URL     string `json:"url"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
+			return nil, fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
+		}
+		mediaType, imageBytes, decodeErr := decodeShuihuoGeneratedImage(ctx, client, result.Data[0].B64JSON, result.Data[0].URL)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, decodeErr)
+		}
+		artifactID, idErr := localexecutor.NewArtifactID()
+		if idErr != nil {
+			return nil, idErr
+		}
+		saved, saveErr := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
+		if saveErr != nil {
+			return nil, saveErr
+		}
+		image, createErr := store.CreateBookAssetImage(ctx, owner, batch.ID, batch.Books[0].ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: saved.StorageRef, MediaType: mediaType, Source: "provider"})
+		if createErr != nil {
+			_ = files.Remove(saved.StorageRef)
+			return nil, createErr
+		}
+		generated = append(generated, image)
+	}
+	if len(generated) != len(wanted) {
+		return nil, fmt.Errorf("%w: selected asset not found", batchfactoryv11.ErrNotFound)
+	}
+	return generated, nil
+}
+
+func shuihuoImageGenerationEndpoint(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("invalid image endpoint")
+	}
+	path := strings.TrimRight(u.Path, "/")
+	if !strings.HasSuffix(strings.ToLower(path), "/images/generations") {
+		if strings.HasSuffix(path, "/v1") || path == "" {
+			path += "/images/generations"
+		} else {
+			path += "/v1/images/generations"
+		}
+	}
+	u.Path = path
+	return u.String(), nil
+}
+
+func shuihuoImageSize(aspectRatio string) string {
+	switch strings.TrimSpace(aspectRatio) {
+	case "9:16":
+		return "1024x1792"
+	case "1:1":
+		return "1024x1024"
+	default:
+		return "1792x1024"
+	}
+}
+
+func decodeShuihuoGeneratedImage(ctx context.Context, client *http.Client, b64, imageURL string) (string, []byte, error) {
+	if strings.TrimSpace(b64) != "" {
+		payload, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64))
+		if err != nil || len(payload) == 0 {
+			return "", nil, fmt.Errorf("image provider returned invalid base64")
+		}
+		return detectedShuihuoImageMediaType(payload), payload, nil
+	}
+	if strings.TrimSpace(imageURL) == "" {
+		return "", nil, fmt.Errorf("image provider returned no image")
+	}
+	response, err := client.Get(imageURL)
+	if err != nil {
+		return "", nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return "", nil, fmt.Errorf("image download returned HTTP %d", response.StatusCode)
+	}
+	payload, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	if err != nil || len(payload) == 0 {
+		return "", nil, fmt.Errorf("image download returned empty content")
+	}
+	return detectedShuihuoImageMediaType(payload), payload, nil
+}
+
+func detectedShuihuoImageMediaType(payload []byte) string {
+	if len(payload) >= 8 && bytes.Equal(payload[:8], []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}) {
+		return "image/png"
+	}
+	if len(payload) >= 3 && payload[0] == 0xff && payload[1] == 0xd8 && payload[2] == 0xff {
+		return "image/jpeg"
+	}
+	if len(payload) >= 12 && string(payload[:4]) == "RIFF" && string(payload[8:12]) == "WEBP" {
+		return "image/webp"
+	}
+	return "image/png"
 }
 
 func storedShuihuoSegmentsFromBatch(batch batchfactoryv11.Batch) []map[string]any {

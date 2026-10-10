@@ -36,3 +36,13 @@ func TestParseShuihuoPromptCandidates(t *testing.T) {
 		t.Fatalf("unexpected prompt candidates: %#v, err=%v", got, err)
 	}
 }
+
+func TestShuihuoImageGenerationEndpointAndSize(t *testing.T) {
+	got, err := shuihuoImageGenerationEndpoint("https://images.example/v1")
+	if err != nil || got != "https://images.example/v1/images/generations" {
+		t.Fatalf("endpoint=%q err=%v", got, err)
+	}
+	if shuihuoImageSize("9:16") != "1024x1792" || shuihuoImageSize("1:1") != "1024x1024" {
+		t.Fatalf("unexpected image sizes")
+	}
+}
