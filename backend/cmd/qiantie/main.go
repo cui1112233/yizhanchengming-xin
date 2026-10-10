@@ -79,6 +79,13 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		// Go has not implemented the rule-preview transformer yet. Keep the
+		// existing Node implementation reachable instead of exposing a 404 on
+		// the React novel-fetch workbench.
+		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-fetch-workshop/rules/preview" {
+			authProxy.ServeHTTP(w, req)
+			return
+		}
 		if isGoNovelFetchCompatRequest(req) || isGoAgentReadRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
