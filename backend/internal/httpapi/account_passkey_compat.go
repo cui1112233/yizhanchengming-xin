@@ -1,7 +1,10 @@
 package httpapi
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -84,6 +87,107 @@ func RegisterAccountPasskeyCompat(root *http.ServeMux, middleware BridgeAuth, pr
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"challenge": challenge, "rp": map[string]string{"id": rpID, "name": "一战晟铭"}, "user": map[string]string{"id": base64.RawURLEncoding.EncodeToString([]byte(identity.Username)), "name": identity.Username, "displayName": identity.Username}, "pubKeyCredParams": []map[string]any{{"type": "public-key", "alg": -7}, {"type": "public-key", "alg": -257}}, "timeout": 300000, "attestation": "none", "authenticatorSelection": map[string]string{"residentKey": "preferred", "userVerification": "required"}, "excludeCredentials": exclude})
 	})))
+	root.Handle("POST /api/account-recovery/passkeys", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		var input struct {
+			Challenge  string `json:"challenge"`
+			Name       string `json:"name"`
+			Credential struct {
+				ID             string   `json:"id"`
+				CredentialID   string   `json:"credentialId"`
+				ClientDataJSON string   `json:"clientDataJSON"`
+				PublicKey      string   `json:"publicKey"`
+				Algorithm      int      `json:"algorithm"`
+				Transports     []string `json:"transports"`
+			} `json:"credential"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 128<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		credentialID := strings.TrimSpace(input.Credential.CredentialID)
+		if credentialID == "" {
+			credentialID = strings.TrimSpace(input.Credential.ID)
+		}
+		publicKeyDER, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(input.Credential.PublicKey))
+		clientDataRaw, clientErr := base64.RawURLEncoding.DecodeString(strings.TrimSpace(input.Credential.ClientDataJSON))
+		if credentialID == "" || len(publicKeyDER) == 0 || len(publicKeyDER) > 4096 || clientErr != nil {
+			managedAccountError(w, http.StatusBadRequest, "Passkey 注册数据不完整")
+			return
+		}
+		var clientData struct {
+			Type      string `json:"type"`
+			Challenge string `json:"challenge"`
+			Origin    string `json:"origin"`
+		}
+		if json.Unmarshal(clientDataRaw, &clientData) != nil || clientData.Type != "webauthn.create" || clientData.Challenge != input.Challenge {
+			managedAccountError(w, http.StatusBadRequest, "Passkey challenge 无效")
+			return
+		}
+		_, expectedOrigin := passkeyRequestContext(req)
+		if clientData.Origin != expectedOrigin {
+			managedAccountError(w, http.StatusForbidden, "Passkey Origin 不匹配")
+			return
+		}
+		publicKey, err := x509.ParsePKIXPublicKey(publicKeyDER)
+		if err != nil || (input.Credential.Algorithm == -7 && !isECDSAPublicKey(publicKey)) || (input.Credential.Algorithm == -257 && !isRSAPublicKey(publicKey)) || (input.Credential.Algorithm != -7 && input.Credential.Algorithm != -257) {
+			managedAccountError(w, http.StatusBadRequest, "Passkey 公钥或算法不受支持")
+			return
+		}
+		path := filepath.Join(profiles.SystemDir, "passkeys.json")
+		state := map[string]any{"credentials": []any{}, "challenges": []any{}}
+		if raw, readErr := os.ReadFile(path); readErr == nil {
+			_ = json.Unmarshal(raw, &state)
+		}
+		challenges, _ := state["challenges"].([]any)
+		matched := false
+		now := time.Now()
+		for _, raw := range challenges {
+			row, ok := raw.(map[string]any)
+			if !ok || toString(row["username"]) != identity.Username || toString(row["kind"]) != "register" || toString(row["challenge"]) != input.Challenge || strings.TrimSpace(toString(row["usedAt"])) != "" {
+				continue
+			}
+			expires, parseErr := time.Parse(time.RFC3339, toString(row["expiresAt"]))
+			if parseErr != nil || !expires.After(now) || toString(row["origin"]) != expectedOrigin {
+				managedAccountError(w, http.StatusConflict, "Passkey challenge 已失效")
+				return
+			}
+			row["usedAt"] = now.UTC().Format(time.RFC3339)
+			matched = true
+			break
+		}
+		if !matched {
+			managedAccountError(w, http.StatusConflict, "Passkey challenge 不存在")
+			return
+		}
+		credentials, _ := state["credentials"].([]any)
+		for _, raw := range credentials {
+			row, ok := raw.(map[string]any)
+			if ok && toString(row["credentialId"]) == credentialID {
+				managedAccountError(w, http.StatusConflict, "该 Passkey 已绑定")
+				return
+			}
+		}
+		name := strings.TrimSpace(input.Name)
+		if name == "" {
+			name = "Passkey"
+		}
+		if len(name) > 60 {
+			name = name[:60]
+		}
+		credential := map[string]any{"id": fmt.Sprintf("go-%d", now.UnixNano()), "username": identity.Username, "credentialId": credentialID, "publicKey": input.Credential.PublicKey, "algorithm": input.Credential.Algorithm, "transports": input.Credential.Transports, "name": name, "signCount": 0, "createdAt": now.UTC().Format(time.RFC3339), "lastUsedAt": nil}
+		state["credentials"] = append(credentials, credential)
+		raw, _ := json.MarshalIndent(state, "", "  ")
+		if err := os.WriteFile(path, raw, 0o600); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "Passkey 保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"credential": credential})
+	})))
 	root.Handle("DELETE /api/account-recovery/passkeys/{id}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -120,6 +224,9 @@ func RegisterAccountPasskeyCompat(root *http.ServeMux, middleware BridgeAuth, pr
 		writeJSON(w, http.StatusOK, map[string]any{"removed": removed})
 	})))
 }
+
+func isECDSAPublicKey(value any) bool { _, ok := value.(*ecdsa.PublicKey); return ok }
+func isRSAPublicKey(value any) bool   { _, ok := value.(*rsa.PublicKey); return ok }
 
 func passkeyRequestContext(req *http.Request) (string, string) {
 	host := strings.TrimSpace(req.Host)

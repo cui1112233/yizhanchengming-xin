@@ -91,6 +91,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && req.URL.Path == "/api/account-recovery/passkeys" {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodGet && req.URL.Path == "/api/member/team/audit" {
 			apiHandler.ServeHTTP(w, req)
 			return
