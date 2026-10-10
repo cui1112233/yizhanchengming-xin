@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 func TestFileAutomationStatusReaderMatchesNodePublicShape(t *testing.T) {
@@ -39,6 +42,24 @@ func TestV12AutomationStatusRouteUsesPersistedState(t *testing.T) {
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, AutomationStatusReader: NewFileAutomationStatusReader(path)})
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/batch-1/automation", nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"job-1"`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestV12RuntimeSummaryUsesGoReadModels(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "运行总览", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "正文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "automation.json")
+	if err := os.WriteFile(path, []byte(`{"jobs":{"job-key":{"owner":"alice","batchId":"`+batch.ID+`","id":"job-1","state":"running","books":{}}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store, AutomationStatusReader: NewFileAutomationStatusReader(path)})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/runtime-summary", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"automation"`) || !strings.Contains(rec.Body.String(), `"stageSummaries"`) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }

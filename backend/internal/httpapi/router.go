@@ -145,6 +145,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.AutomationStatusReader != nil {
 		registerAutomationStatusRoute(v12, auth, options.AutomationStatusReader, "v12")
 	}
+	if options.Store != nil {
+		registerRuntimeSummaryRoute(v12, auth, options.Store, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
+	}
 	mfaFile := ""
 	if options.MemberProfileStore != nil {
 		mfaFile = filepath.Join(options.MemberProfileStore.SystemDir, "mfa.json")

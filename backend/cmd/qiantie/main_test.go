@@ -155,8 +155,8 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/merge-status") {
 		t.Fatal("read-only V12 merge status should use the Go store")
 	}
-	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/runtime-summary") {
-		t.Fatal("remaining V12 compatibility adapters must use the local Node bridge")
+	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/runtime-summary") {
+		t.Fatal("read-only V12 runtime summary should use Go")
 	}
 	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/effective-settings") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/final-prompt") {
 		t.Fatal("read-only V12 compiler previews must use Go")
