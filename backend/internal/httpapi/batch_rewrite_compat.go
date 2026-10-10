@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -30,6 +31,39 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	handler := middleware.Middleware(http.HandlerFunc(read))
 	root.Handle("GET /api/batch-rewrite/config", handler)
 	root.Handle("GET /api/batch-rewrite/bootstrap", handler)
+	root.Handle("POST /api/batch-rewrite/work-form", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			State map[string]any `json:"state"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 128<<10)).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取设置失败"})
+			return
+		}
+		if body.State == nil {
+			body.State = map[string]any{}
+		}
+		appConfig, ok := settings["appConfig"].(map[string]any)
+		if !ok {
+			appConfig = map[string]any{}
+		}
+		appConfig["work_form"] = body.State
+		settings["appConfig"] = appConfig
+		if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存设置失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "state": body.State})
+	})))
 }
 
 func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[string]any {
