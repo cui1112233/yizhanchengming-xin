@@ -152,8 +152,8 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/chat") || shouldBridgeLegacyAPI("/api/script/smart-unified-style") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/summary") || shouldBridgeLegacyAPI("/api/batch-factory/v12/fetch-originals") || shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/h3/director") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/source") || shouldBridgeLegacyAPI("/api/batch-factory/v12/config-versions") || shouldBridgeLegacyAPI("/api/batch-factory/v12/drafts") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/status") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/stages") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/assets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/assets/asset-1/images/image-1/content") {
 		t.Fatal("migrated Go API paths must not use the Node bridge")
 	}
-	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/merge-status") {
-		t.Fatal("slice-gated V12 routes must remain on the compatibility bridge when not enabled locally")
+	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/merge-status") {
+		t.Fatal("read-only V12 merge status should use the Go store")
 	}
 	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/runtime-summary") {
 		t.Fatal("remaining V12 compatibility adapters must use the local Node bridge")

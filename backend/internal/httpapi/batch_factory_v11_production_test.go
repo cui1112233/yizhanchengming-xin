@@ -78,6 +78,28 @@ func TestSliceThreeDoesNotExposeProductionMutation(t *testing.T) {
 	}
 }
 
+func TestEarlySliceExposesReadOnlyV12MergeStatus(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "正文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateMergeJob(context.Background(), batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, RequestID: "merge-read-1", Status: batchfactoryv11.MergeRunning, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-status"
+	owner := signedJSONRequest(t, api, now, "alice", http.MethodGet, path, nil)
+	if owner.Code != http.StatusOK || !strings.Contains(owner.Body.String(), "merge-read-1") {
+		t.Fatalf("owner status=%d body=%s", owner.Code, owner.Body.String())
+	}
+	other := signedJSONRequest(t, api, now, "bob", http.MethodGet, path, nil)
+	if other.Code != http.StatusNotFound {
+		t.Fatalf("cross-owner status=%d body=%s", other.Code, other.Body.String())
+	}
+}
+
 func TestSliceFiveMergeRouteIsIdempotentAndOwnerScoped(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()

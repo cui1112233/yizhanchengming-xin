@@ -95,6 +95,16 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Production != nil {
 		registerProductionStatusRoute(v12, options.Production, "v12")
 	}
+	// Merge status is a persisted read and does not require the external merge
+	// adapter. Keep it available in the early slices without advertising merge
+	// submission as enabled.
+	mergeStatus := options.Merge
+	if mergeStatus == nil && options.Store != nil {
+		mergeStatus = &batchfactoryv11.MergeService{Store: options.Store}
+	}
+	if mergeStatus != nil {
+		registerMergeStatusRoute(v12, mergeStatus, "v12")
+	}
 	if options.Production != nil && options.Slice >= 4 {
 		registerProductionRoutes(v11, options.Production)
 		if output, ok := options.MergeOutput.(interface {

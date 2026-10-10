@@ -458,7 +458,10 @@ func (s *MergeService) submitMerge(ctx context.Context, owner, batchID, onlyBook
 // checks the parent batch first so a missing or cross-owner batch never leaks
 // merge history.
 func (s *MergeService) GetBatchStatus(ctx context.Context, owner, batchID string) ([]MergeJob, error) {
-	if s == nil || !s.Enabled {
+	// Reading persisted merge jobs does not require a merge provider. This is
+	// intentionally available to the staged read-only V12 status endpoint;
+	// submit/poll operations still enforce Enabled in their write paths.
+	if s == nil {
 		return nil, fmt.Errorf("%w: merge is not enabled", ErrUnavailable)
 	}
 	repository, err := s.repository()

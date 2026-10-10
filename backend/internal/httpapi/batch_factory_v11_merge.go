@@ -122,20 +122,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"jobs": jobs, "job": jobs[0]})
 	})
-	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/merge-status", func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		jobs, err := service.GetBatchStatus(r.Context(), owner, r.PathValue("batchId"))
-		if err != nil {
-			log.Printf("batch factory merge status failed: batch=%q owner=%q error=%v", r.PathValue("batchId"), owner, err)
-			writeStoreError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"batchId": r.PathValue("batchId"), "jobs": jobs})
-	})
+	registerMergeStatusRoute(mux, service, "v11")
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/merge-media/{artifactId}", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -243,6 +230,23 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		http.ServeContent(w, r, artifactID+".jpg", time.Time{}, cover)
+	})
+}
+
+func registerMergeStatusRoute(mux *http.ServeMux, service *batchfactoryv11.MergeService, version string) {
+	mux.HandleFunc("GET /api/batch-factory/"+version+"/batches/{batchId}/merge-status", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		jobs, err := service.GetBatchStatus(r.Context(), owner, r.PathValue("batchId"))
+		if err != nil {
+			log.Printf("batch factory merge status failed: batch=%q owner=%q error=%v", r.PathValue("batchId"), owner, err)
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batchId": r.PathValue("batchId"), "jobs": jobs})
 	})
 }
 
