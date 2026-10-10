@@ -709,6 +709,12 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入图片或配音任务，请先使用视频任务"})
 				return
 			}
+			if production.ProviderRegistry != nil {
+				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner); syncErr != nil {
+					writeStoreError(w, syncErr)
+					return
+				}
+			}
 			if strings.TrimSpace(input.RequestID) == "" {
 				input.RequestID = "shuihuo-" + time.Now().UTC().Format("20060102T150405.000000000")
 			}
@@ -736,6 +742,12 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 			if !decodeJSON(w, r, &input) {
 				return
+			}
+			if production.ProviderRegistry != nil {
+				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner); syncErr != nil {
+					writeStoreError(w, syncErr)
+					return
+				}
 			}
 			if strings.TrimSpace(input.RequestID) == "" {
 				input.RequestID = "shuihuo-batch-" + time.Now().UTC().Format("20060102T150405.000000000")
@@ -1457,6 +1469,37 @@ func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoPr
 	resultEndpoint, _ := model["resultEndpoint"].(string)
 	workflowID, _ := model["workflowId"].(string)
 	return registry.Put(ctx, owner, batchfactoryv11.VideoProviderConfig{Provider: provider, APIKey: apiKey, Model: modelID, CreateURL: endpoint, TasksURL: tasksEndpoint, ResultURL: resultEndpoint, WorkflowID: workflowID})
+}
+
+func syncShuihuoConfiguredVideoModels(ctx context.Context, store batchfactoryv11.Store, registry batchfactoryv11.VideoProviderRegistry, owner string) error {
+	config, err := loadShuihuoOwnerConfig(ctx, store, owner)
+	if err != nil {
+		return err
+	}
+	for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
+		kind, _ := model["kind"].(string)
+		enabled, enabledSet := model["enabled"].(bool)
+		if !strings.EqualFold(strings.TrimSpace(kind), "video") || (enabledSet && !enabled) {
+			continue
+		}
+		apiKey, _ := model["apiKey"].(string)
+		if strings.TrimSpace(apiKey) == "" {
+			apiKey, _ = model["credential"].(string)
+		}
+		provider, _ := model["provider"].(string)
+		if strings.TrimSpace(apiKey) == "" && batchfactoryv11.VideoProviderForModel(modelString(model, "modelId"), provider) != batchfactoryv11.VideoProviderDoubaoLocal {
+			continue
+		}
+		if err := syncShuihuoVideoModel(ctx, registry, owner, model); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func modelString(model map[string]any, key string) string {
+	value, _ := model[key].(string)
+	return strings.TrimSpace(value)
 }
 
 func writeShuihuoProjectExport(w http.ResponseWriter, r *http.Request, files *localartifact.Store, batch batchfactoryv11.Batch) error {
