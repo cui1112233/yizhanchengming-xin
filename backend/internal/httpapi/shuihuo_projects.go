@@ -1225,6 +1225,76 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if asset == nil {
 				continue
 			}
+			if len(parts) == 2 && parts[1] == "image" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
+				if r.Method == http.MethodPut {
+					if files == nil {
+						writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "asset image storage is unavailable"})
+						return
+					}
+					var input struct {
+						DataURL string `json:"dataUrl"`
+					}
+					if !decodeJSON(w, r, &input) {
+						return
+					}
+					mediaType, payload, decodeErr := decodeShuihuoMediaDataURL(input.DataURL)
+					if decodeErr != nil || !strings.HasPrefix(mediaType, "image/") {
+						writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid image upload"})
+						return
+					}
+					artifactID, idErr := localexecutor.NewArtifactID()
+					if idErr != nil {
+						writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "image id generation failed"})
+						return
+					}
+					saved, saveErr := files.SaveImage(artifactID, mediaType, bytes.NewReader(payload))
+					if saveErr != nil {
+						writeBookAssetImageStorageError(w, saveErr)
+						return
+					}
+					created, createErr := store.CreateBookAssetImage(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: saved.StorageRef, MediaType: saved.MediaType, Source: "upload"})
+					if createErr != nil {
+						_ = files.Remove(saved.StorageRef)
+						writeStoreError(w, createErr)
+						return
+					}
+					primary, primaryErr := store.SetPrimaryBookAssetImage(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, created.ID)
+					if primaryErr != nil {
+						writeStoreError(w, primaryErr)
+						return
+					}
+					writeJSON(w, http.StatusOK, map[string]any{"image": bookAssetImageResponse(primary, batch.ID, batch.Books[0].ID, assetID)})
+					return
+				}
+				if files == nil {
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "asset image storage is unavailable"})
+					return
+				}
+				images, listErr := store.ListBookAssetImages(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID)
+				if listErr != nil {
+					writeStoreError(w, listErr)
+					return
+				}
+				var selected *batchfactoryv11.BookAssetImage
+				for index := range images {
+					if images[index].IsPrimary || selected == nil {
+						selected = &images[index]
+					}
+				}
+				if selected == nil || strings.TrimSpace(selected.StorageRef) == "" {
+					writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
+					return
+				}
+				file, openErr := files.Open(selected.StorageRef)
+				if openErr != nil {
+					writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
+					return
+				}
+				defer file.Close()
+				w.Header().Set("Content-Type", selected.MediaType)
+				http.ServeContent(w, r, selected.ID, selected.CreatedAt, file)
+				return
+			}
 			if len(parts) == 2 && parts[1] == "images" && r.Method == http.MethodGet {
 				images, listErr := store.ListBookAssetImages(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID)
 				if listErr != nil {
