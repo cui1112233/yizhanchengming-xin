@@ -92,6 +92,8 @@ func envOrDefault(key, fallback string) string {
 
 func shouldBridgeLegacyAPI(path string) bool {
 	for _, prefix := range []string{
+		"/api/config",
+		"/api/agent",
 		"/api/presets",
 		"/api/models",
 		"/api/chat",
