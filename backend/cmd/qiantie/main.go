@@ -250,7 +250,7 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
-	if path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || strings.HasPrefix(path, "/api/batch-rewrite/rules/") {
+	if path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" {
 		return req.Method == http.MethodGet || req.Method == http.MethodPost
 	}
 	return false
