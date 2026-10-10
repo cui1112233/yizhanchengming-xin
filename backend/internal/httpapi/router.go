@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"qiantie/backend/internal/auth"
@@ -139,6 +140,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))
 		RegisterLegacyNovelFetchRoutes(root, auth, options.NovelFetchStore, options.NovelFetchFetcher, options.UserConfigStore)
 		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore)
+		root.Handle("/api/batch-rewrite/tasks/", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/tasks/", "/api/novel-fetch-workshop/tasks/", 1)
+			novelFetch.ServeHTTP(w, clone)
+		})))
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
