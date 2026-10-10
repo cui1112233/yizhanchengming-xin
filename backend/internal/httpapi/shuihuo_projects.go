@@ -23,7 +23,7 @@ var shuihuoProductionConfigs sync.Map
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
 // /api/platform-projects. The source of truth is the Go batch store.
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, production *batchfactoryv11.ProductionService) {
 	if store == nil {
 		return
 	}
@@ -383,15 +383,68 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if len(parts) == 2 && parts[1] == "tasks" && r.Method == http.MethodGet {
-			writeJSON(w, http.StatusOK, map[string]any{"tasks": []any{}})
+			if production == nil {
+				writeJSON(w, http.StatusOK, map[string]any{"tasks": []any{}})
+				return
+			}
+			status, statusErr := production.GetBatchStatus(r.Context(), owner, batch.ID)
+			if statusErr != nil {
+				writeStoreError(w, statusErr)
+				return
+			}
+			tasks := make([]map[string]any, 0)
+			for _, job := range status.Jobs {
+				for _, task := range job.Tasks {
+					tasks = append(tasks, map[string]any{"id": task.ID, "status": task.Status, "kind": "video", "mediaUrl": task.MediaURL, "errorMessage": task.ErrorMessage, "requestId": job.RequestID, "createdAt": task.CreatedAt, "updatedAt": task.UpdatedAt})
+				}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 			return
 		}
 		if len(parts) == 2 && parts[1] == "tasks" && r.Method == http.MethodPost {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+			if production == nil || len(batch.Books) == 0 {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+				return
+			}
+			var input struct {
+				RequestID string `json:"requestId"`
+				Provider  string `json:"provider,omitempty"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if strings.TrimSpace(input.RequestID) == "" {
+				input.RequestID = "shuihuo-" + time.Now().UTC().Format("20060102T150405.000000000")
+			}
+			job, submitErr := production.SubmitBookProductionWithProvider(r.Context(), owner, batch.ID, batch.Books[0].ID, input.RequestID, input.Provider)
+			if submitErr != nil {
+				writeStoreError(w, submitErr)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"tasks": job.Tasks, "job": job})
 			return
 		}
 		if len(parts) == 3 && parts[1] == "tasks" && parts[2] == "batch" && r.Method == http.MethodPost {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+			if production == nil {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+				return
+			}
+			var input struct {
+				RequestID string `json:"requestId"`
+				Provider  string `json:"provider,omitempty"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if strings.TrimSpace(input.RequestID) == "" {
+				input.RequestID = "shuihuo-batch-" + time.Now().UTC().Format("20060102T150405.000000000")
+			}
+			status, submitErr := production.SubmitBatchProductionWithProvider(r.Context(), owner, batch.ID, input.RequestID, input.Provider)
+			if submitErr != nil {
+				writeStoreError(w, submitErr)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"tasks": status.Jobs, "status": status})
 			return
 		}
 		if len(parts) == 3 && parts[1] == "analysis" && r.Method == http.MethodPost {
@@ -872,6 +925,62 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "media not found"})
+	})))
+
+	// The legacy task drawer addresses tasks by task id, while the Go
+	// production service cancels by the owning batch and request id. Resolve
+	// that mapping here so the drawer no longer falls into a 404 hole.
+	root.Handle("/api/shuihuo-production/tasks/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if production == nil {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+			return
+		}
+		path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/tasks/"), "/")
+		parts := strings.Split(path, "/")
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "task route not found"})
+			return
+		}
+		taskID, action := parts[0], parts[1]
+		if action == "retry" && r.Method == http.MethodPost {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入单任务重试，请从生产阶段重试"})
+			return
+		}
+		if action != "cancel" || r.Method != http.MethodPut {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, compact := range batches {
+			status, statusErr := production.GetBatchStatus(r.Context(), owner, compact.ID)
+			if statusErr != nil {
+				continue
+			}
+			for _, job := range status.Jobs {
+				for _, task := range job.Tasks {
+					if task.ID != taskID {
+						continue
+					}
+					result, cancelErr := production.CancelBatch(r.Context(), owner, compact.ID, job.RequestID)
+					if cancelErr != nil {
+						writeStoreError(w, cancelErr)
+						return
+					}
+					writeJSON(w, http.StatusOK, result)
+					return
+				}
+			}
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "task not found"})
 	})))
 }
 
