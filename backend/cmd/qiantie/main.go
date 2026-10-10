@@ -119,6 +119,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if (req.Method == http.MethodGet || req.Method == http.MethodPost) && (req.URL.Path == "/api/batch-rewrite/web-submit/config" || req.URL.Path == "/api/batch-rewrite/web-submit/environment") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/character-core/trace" {
 			apiHandler.ServeHTTP(w, req)
 			return
