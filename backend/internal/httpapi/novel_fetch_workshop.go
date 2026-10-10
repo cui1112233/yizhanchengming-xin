@@ -25,11 +25,12 @@ var novelFetchVersionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
 var novelFetchNumericIDPattern = regexp.MustCompile(`\d{10,25}`)
 
 type NovelFetchBridgeAuth struct {
-	Secret    string
-	Now       func() time.Time
-	MaxSkew   time.Duration
-	Users     BridgeUserResolver
-	AuthStore auth.Store
+	Secret          string
+	Now             func() time.Time
+	MaxSkew         time.Duration
+	Users           BridgeUserResolver
+	AuthStore       auth.Store
+	SessionResolver func(context.Context, string) (BridgeIdentity, error)
 }
 
 func novelFetchCanonicalPayload(username, issuedAt, owner, method, pathname string) string {
@@ -49,14 +50,24 @@ func (a NovelFetchBridgeAuth) authenticate(req *http.Request) (BridgeIdentity, e
 			now = a.Now
 		}
 		session, err := a.AuthStore.FindSession(req.Context(), token, now().UTC())
-		if err != nil {
-			return BridgeIdentity{}, errors.New("invalid login session")
+		if err == nil {
+			account, accountErr := a.AuthStore.FindAccount(req.Context(), session.Username)
+			if accountErr == nil && account.Active {
+				return BridgeIdentity{Username: account.Username, IsOwner: account.IsOwner}, nil
+			}
 		}
-		account, err := a.AuthStore.FindAccount(req.Context(), session.Username)
-		if err != nil || !account.Active {
-			return BridgeIdentity{}, errors.New("inactive login account")
+		if a.SessionResolver != nil {
+			if identity, resolveErr := a.SessionResolver(req.Context(), token); resolveErr == nil {
+				return identity, nil
+			}
 		}
-		return BridgeIdentity{Username: account.Username, IsOwner: account.IsOwner}, nil
+		return BridgeIdentity{}, errors.New("invalid login session")
+	}
+	if token := bearerToken(req); token != "" && a.SessionResolver != nil {
+		if identity, err := a.SessionResolver(req.Context(), token); err == nil {
+			return identity, nil
+		}
+		return BridgeIdentity{}, errors.New("invalid login session")
 	}
 	if strings.TrimSpace(a.Secret) == "" {
 		return BridgeIdentity{}, errors.New("bridge secret is not configured")
@@ -214,7 +225,20 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}, nil
 }
 
-func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider) {
+func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)) {
+	resolveRewriteProvider := func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
+		if rewriteResolver != nil {
+			identity, _ := BridgeIdentityFromContext(req.Context())
+			resolved, err := rewriteResolver(req.Context(), identity.Username)
+			if err != nil {
+				return nil, err
+			}
+			if resolved != nil {
+				return resolved, nil
+			}
+		}
+		return rewriteProvider, nil
+	}
 	registry := newWorkshopProcessRegistry()
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -543,7 +567,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if input.Count == 0 {
 			input.Count = 1
 		}
-		document, err := novelfetchworkshop.GenerateAIRewrites(req.Context(), store, identity.Username, bookID, input.Count, rewriteProvider)
+		provider, providerErr := resolveRewriteProvider(req)
+		if providerErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
+			return
+		}
+		document, err := novelfetchworkshop.GenerateAIRewrites(req.Context(), store, identity.Username, bookID, input.Count, provider)
 		if err != nil {
 			status := http.StatusBadRequest
 			if rewriteProvider == nil || strings.Contains(err.Error(), "模型未配置") {
@@ -556,11 +585,16 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	})
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/ai/test", func(w http.ResponseWriter, req *http.Request) {
-		if rewriteProvider == nil {
+		provider, providerErr := resolveRewriteProvider(req)
+		if providerErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
+			return
+		}
+		if provider == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "AI 改文模型未配置"})
 			return
 		}
-		content, err := rewriteProvider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
+		content, err := provider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
 			SystemPrompt: "你是接口连通性测试助手。",
 			UserPrompt:   "请只回复：ok",
 			Temperature:  0,
@@ -578,7 +612,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	})
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/rules/suggest", func(w http.ResponseWriter, req *http.Request) {
-		if rewriteProvider == nil {
+		provider, providerErr := resolveRewriteProvider(req)
+		if providerErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
+			return
+		}
+		if provider == nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "AI 改文模型未配置"})
 			return
 		}
@@ -591,7 +630,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入待分析文本"})
 			return
 		}
-		content, err := rewriteProvider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
+		content, err := provider.Complete(req.Context(), novelfetchworkshop.RewriteRequest{
 			SystemPrompt: "你是小说排版规则设计师。根据文本提出可执行的规则建议。只返回 JSON：{\"summary\":\"...\",\"rules\":[{\"name\":\"...\",\"pattern\":\"...\",\"replacement\":\"...\"}]}，不要解释。",
 			UserPrompt:   fmt.Sprintf("规则类型：%s\n目标：%s\n待分析文本：\n%s", input.RuleType, input.Goal, input.Text),
 			Temperature:  0.2,
@@ -684,10 +723,15 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
 			return
 		}
-		items, err := novelfetchworkshop.AnalyzeOpening(req.Context(), rewriteProvider, input.Text)
+		provider, providerErr := resolveRewriteProvider(req)
+		if providerErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
+			return
+		}
+		items, err := novelfetchworkshop.AnalyzeOpening(req.Context(), provider, input.Text)
 		if err != nil {
 			status := http.StatusBadRequest
-			if rewriteProvider == nil {
+			if provider == nil {
 				status = http.StatusServiceUnavailable
 			}
 			writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})

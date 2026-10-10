@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -12,8 +13,9 @@ import (
 )
 
 type AuthOptions struct {
-	Store auth.Store
-	Now   func() time.Time
+	Store           auth.Store
+	Now             func() time.Time
+	SessionResolver func(context.Context, string) (BridgeIdentity, error)
 }
 
 func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
@@ -72,6 +74,12 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 		token := bearerToken(r)
 		session, err := options.Store.FindSession(r.Context(), token, now().UTC())
 		if err != nil {
+			if options.SessionResolver != nil {
+				if identity, resolveErr := options.SessionResolver(r.Context(), token); resolveErr == nil {
+					writeJSON(w, http.StatusOK, map[string]any{"username": identity.Username, "active": true, "isOwner": identity.IsOwner, "effectivePermissions": []string{}})
+					return
+				}
+			}
 			writeAuthError(w, http.StatusUnauthorized, "登录已失效，请重新登录")
 			return
 		}

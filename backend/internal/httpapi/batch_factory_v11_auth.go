@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/auth"
 )
 
 const (
@@ -32,10 +34,12 @@ type BridgeUserResolver interface {
 }
 
 type BridgeAuth struct {
-	Secret  string
-	Now     func() time.Time
-	MaxSkew time.Duration
-	Users   BridgeUserResolver
+	Secret          string
+	Now             func() time.Time
+	MaxSkew         time.Duration
+	Users           BridgeUserResolver
+	AuthStore       auth.Store
+	SessionResolver func(context.Context, string) (BridgeIdentity, error)
 }
 
 func canonicalBridgePayload(username, issuedAt, isOwner, method, pathname string) string {
@@ -58,6 +62,25 @@ func SignBridgeRequest(req *http.Request, username string, isOwner bool, issuedA
 }
 
 func (a BridgeAuth) authenticate(req *http.Request) (BridgeIdentity, error) {
+	if token := bearerToken(req); token != "" {
+		if a.AuthStore != nil {
+			now := time.Now
+			if a.Now != nil {
+				now = a.Now
+			}
+			if session, err := a.AuthStore.FindSession(req.Context(), token, now().UTC()); err == nil {
+				account, accountErr := a.AuthStore.FindAccount(req.Context(), session.Username)
+				if accountErr == nil && account.Active {
+					return BridgeIdentity{Username: account.Username, IsOwner: account.IsOwner}, nil
+				}
+			}
+		}
+		if a.SessionResolver != nil {
+			if identity, err := a.SessionResolver(req.Context(), token); err == nil {
+				return identity, nil
+			}
+		}
+	}
 	if strings.TrimSpace(a.Secret) == "" {
 		return BridgeIdentity{}, errors.New("bridge secret is not configured")
 	}

@@ -17,30 +17,32 @@ import (
 )
 
 type RouterOptions struct {
-	BridgeSecret            string
-	ReleaseSHA              string
-	Health                  func(context.Context) error
-	Now                     func() time.Time
-	Users                   BridgeUserResolver
-	AuthStore               auth.Store
-	Slice                   int
-	RegisterV11             func(*http.ServeMux)
-	Store                   batchfactoryv11.Store
-	Director                *batchfactoryv11.DirectorService
-	H3AudioProbe            batchfactoryv11.H3AudioDurationProbe
-	Compiler                *batchfactoryv11.PromptCompilerService
-	Production              *batchfactoryv11.ProductionService
-	Merge                   *batchfactoryv11.MergeService
-	External                *external.Service
-	NovelFetchStore         novelfetchworkshop.LifecycleStore
-	NovelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
-	NovelFetchFetcher       *novelfetchworkshop.UpstreamFetcher
-	NovelFetchRewrite       novelfetchworkshop.RewriteProvider
-	LocalExecutors          *localexecutor.Service
-	GiantMaterialExecutor   *giantmaterialexecutor.Service
-	GiantMaterialResolver   GiantMaterialResolver
-	LocalArtifacts          *localartifact.Store
-	MergeOutput             mergeworker.ObjectStore
+	BridgeSecret              string
+	ReleaseSHA                string
+	Health                    func(context.Context) error
+	Now                       func() time.Time
+	Users                     BridgeUserResolver
+	AuthStore                 auth.Store
+	SessionResolver           func(context.Context, string) (BridgeIdentity, error)
+	Slice                     int
+	RegisterV11               func(*http.ServeMux)
+	Store                     batchfactoryv11.Store
+	Director                  *batchfactoryv11.DirectorService
+	H3AudioProbe              batchfactoryv11.H3AudioDurationProbe
+	Compiler                  *batchfactoryv11.PromptCompilerService
+	Production                *batchfactoryv11.ProductionService
+	Merge                     *batchfactoryv11.MergeService
+	External                  *external.Service
+	NovelFetchStore           novelfetchworkshop.LifecycleStore
+	NovelFetchAIGenderJudge   novelfetchworkshop.AIGenderJudge
+	NovelFetchFetcher         *novelfetchworkshop.UpstreamFetcher
+	NovelFetchRewrite         novelfetchworkshop.RewriteProvider
+	NovelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
+	LocalExecutors            *localexecutor.Service
+	GiantMaterialExecutor     *giantmaterialexecutor.Service
+	GiantMaterialResolver     GiantMaterialResolver
+	LocalArtifacts            *localartifact.Store
+	MergeOutput               mergeworker.ObjectStore
 }
 
 func NewRouter(options RouterOptions) http.Handler {
@@ -87,8 +89,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	root.HandleFunc("GET /api/runtime-build-info", func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"service": "go-api", "git_sha": options.ReleaseSHA})
 	})
-	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users}
-	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now})
+	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
+	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver})
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
@@ -98,9 +100,11 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
-		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchFetcher, options.NovelFetchRewrite)
+		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
-		root.Handle("/api/novel-fetch-workshop/", NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore}.Middleware(novelFetch))
+		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
+		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))
+		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
 		if options.Health != nil && options.Health(req.Context()) != nil {

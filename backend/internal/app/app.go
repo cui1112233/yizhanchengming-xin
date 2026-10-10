@@ -63,6 +63,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	var novelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
 	var novelFetchRewrite novelfetchworkshop.RewriteProvider
+	var novelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
 	if textProvider != nil {
 		novelFetchAIGenderJudge = func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
 			return textProvider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
@@ -74,6 +75,40 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			})
 		}
 		novelFetchRewrite = novelFetchRewriteAdapter{provider: textProvider}
+	}
+	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
+		settings, err := novelFetchStore.GetConfig(ctx, owner)
+		if err != nil {
+			return nil, err
+		}
+		selected := ""
+		if value, ok := settings["textModelId"].(string); ok {
+			selected = strings.TrimSpace(value)
+		}
+		if aiConfig, ok := settings["aiConfig"].(map[string]any); ok {
+			if value, ok := aiConfig["textModelId"].(string); ok && strings.TrimSpace(value) != "" {
+				selected = strings.TrimSpace(value)
+			}
+		}
+		if selected == "" {
+			return novelFetchRewrite, nil
+		}
+		catalog, _ := settings["modelCatalog"].([]any)
+		for _, raw := range catalog {
+			model, ok := raw.(map[string]any)
+			if !ok || model["id"] != selected || model["kind"] != "text" || model["enabled"] != true {
+				continue
+			}
+			endpoint, _ := model["baseUrl"].(string)
+			apiKey, _ := model["credential"].(string)
+			modelID, _ := model["modelId"].(string)
+			provider := &batchfactoryv11.OpenAICompatibleProvider{Endpoint: strings.TrimSpace(endpoint), APIKey: strings.TrimSpace(apiKey), Model: strings.TrimSpace(modelID)}
+			if err := provider.Validate(); err != nil {
+				return nil, err
+			}
+			return novelFetchRewriteAdapter{provider: provider}, nil
+		}
+		return nil, nil
 	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
 	videoRegistry := batchfactoryv11.NewMemoryVideoProviderRegistry()
@@ -169,5 +204,5 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
 }
