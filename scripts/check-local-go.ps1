@@ -1,5 +1,5 @@
 param(
-  [string]$BaseUrl = $(if ($env:QIANTIE_GO_BASE_URL) { $env:QIANTIE_GO_BASE_URL } else { 'http://127.0.0.1:4000' })
+  [string]$BaseUrl = $(if ($env:QIANTIE_GO_BASE_URL) { $env:QIANTIE_GO_BASE_URL } else { 'http://127.0.0.1:4001' })
 )
 
 $ErrorActionPreference = 'Stop'
