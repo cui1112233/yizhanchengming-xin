@@ -900,9 +900,18 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "segmentation action is required"})
 			return
 		}
-		if len(parts) == 3 && parts[1] == "segmentation" && (parts[2] == "paragraphs" || parts[2] == "fixed") && r.Method == http.MethodPost {
+		if len(parts) == 3 && parts[1] == "segmentation" && (parts[2] == "paragraphs" || parts[2] == "fixed" || parts[2] == "smart") && r.Method == http.MethodPost {
+			// The current Go migration does not yet have a separate AI screenplay
+			// segmentation service. Keep the route usable and deterministic by
+			// returning the same sentence/paragraph candidates used by the old
+			// editor. The response says which strategy was used so the UI does not
+			// mistake this fallback for a completed model run.
 			candidates := paragraphCandidates(batch)
-			writeJSON(w, http.StatusOK, map[string]any{"candidates": candidates})
+			strategy := parts[2]
+			if strategy == "smart" {
+				strategy = "paragraph_fallback"
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"candidates": candidates, "mode": parts[2], "strategy": strategy})
 			return
 		}
 		if len(parts) == 3 && parts[1] == "segmentation" && parts[2] == "confirm" && r.Method == http.MethodPost {
