@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 )
@@ -106,6 +107,36 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			"has_original_raw": document.OriginalRaw != "",
 			"logs":             document.Logs,
 		})
+	})))
+	root.Handle("POST /api/batch-rewrite/tasks/batch-delete", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			IDs []string `json:"ids"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		ids := make([]string, 0, len(body.IDs))
+		seen := map[string]bool{}
+		for _, raw := range body.IDs {
+			id := strings.TrimSpace(raw)
+			if id != "" && !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+		result, err := store.DeleteDocuments(req.Context(), identity.Username, ids)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "删除任务失败"})
+			return
+		}
+		documents, _ := store.ListDocuments(req.Context(), identity.Username)
+		writeJSON(w, http.StatusOK, map[string]any{"requested": result.Requested, "deleted": result.Deleted, "failed": 0, "tasks": documents})
 	})))
 	root.Handle("POST /api/batch-rewrite/work-form", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
