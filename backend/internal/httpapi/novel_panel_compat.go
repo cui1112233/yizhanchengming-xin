@@ -15,6 +15,19 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 	if root == nil || middleware.AuthStore == nil || usersDir == "" {
 		return
 	}
+	root.Handle("GET /api/build-info", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"app_version": "v78.3.0.2", "build_date": "2026-08-18", "build_id": "v78.3.0.2-scene-event-canonical-timeline-20260818-r1",
+			"workspace_schema_version": 40, "release_channel": "stable", "release_version": "v78.3.0.2", "release_status": "production",
+			"character_pipeline": "character_core_2_all_genres_v78_stable", "clean_core_phase": "v78_3_0_2_scene_event_canonical_timeline",
+		})
+	})))
+	root.Handle("GET /api/novel-panel/character-core/health", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "character_core_version": 2, "app_version": "v78.3.0.2", "analysis_protocol": "character_core_2_all_genres_v78_stable", "semantic_layer": "character_core_single_executor_v78_stable", "clean_core_phase": "v78_3_0_2_scene_event_canonical_timeline"})
+	})))
+	root.Handle("GET /api/novel-panel/clean-core/health", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "phase": "v78_stable", "workspace_schema_version": 40, "transport": map[string]any{"backend": "remote_json_optimized", "hidden_retry": false}, "checks": []any{map[string]any{"id": "clean_backend_version", "label": "后端V78 Stable版本", "status": "pass", "detail": "v78.3.0.2"}, map[string]any{"id": "clean_core_routes", "label": "Clean Core依赖API完整", "status": "pass", "detail": "Go兼容接口已注册"}}})
+	})))
 	root.Handle("GET /api/novel-panel/diagnostics", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
