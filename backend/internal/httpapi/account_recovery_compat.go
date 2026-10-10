@@ -48,7 +48,7 @@ func RegisterAccountRecoveryStatusCompat(root *http.ServeMux, middleware BridgeA
 				}
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"email": email, "verified": verified, "verifiedAt": verifiedAt, "deliveryConfigured": false})
+		writeJSON(w, http.StatusOK, map[string]any{"email": email, "verified": verified, "verifiedAt": verifiedAt, "deliveryConfigured": strings.TrimSpace(os.Getenv("QIANTIE_MAIL_ENDPOINT")) != "" && strings.TrimSpace(os.Getenv("QIANTIE_MAIL_FROM")) != ""})
 	})))
 	root.Handle("POST /api/account-recovery/email/request", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
