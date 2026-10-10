@@ -22,6 +22,7 @@ func TestStaticHandlerServesIndexAndAssets(t *testing.T) {
 		want int
 	}{
 		{"/", http.StatusOK},
+		{"/shuihuo-production", http.StatusOK},
 		{"/assets/app.js", http.StatusOK},
 		{"/missing.js", http.StatusNotFound},
 	} {
