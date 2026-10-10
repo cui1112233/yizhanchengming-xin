@@ -95,6 +95,60 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 	if root == nil || accounts == nil || profiles == nil {
 		return
 	}
+	root.Handle("PATCH /api/member/team/meta/{teamId}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "无权修改团队信息")
+			return
+		}
+		var input struct {
+			Name string `json:"name"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		name := strings.TrimSpace(input.Name)
+		if name == "" || len([]rune(name)) > 80 {
+			managedAccountError(w, http.StatusBadRequest, "团队名称不能为空且不能超过80个字")
+			return
+		}
+		path := adminSystemFile(profiles.SystemDir, "team-collaboration.json")
+		state := map[string]any{"teams": []any{}, "invites": []any{}, "notifications": []any{}, "archives": []any{}}
+		if raw, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(raw, &state)
+		}
+		teams, _ := state["teams"].([]any)
+		teamID := req.PathValue("teamId")
+		var updated map[string]any
+		for _, raw := range teams {
+			if row, ok := raw.(map[string]any); ok && toString(row["id"]) == teamID && toString(row["managerUsername"]) == toString(actor["username"]) {
+				row["name"], row["updatedAt"] = name, time.Now().UTC().Format(time.RFC3339)
+				updated = row
+				break
+			}
+		}
+		if updated == nil && (teamID == "go-team-"+toString(actor["username"]) || toString(actor["role"]) == "dev") {
+			updated = map[string]any{"id": teamID, "managerUsername": toString(actor["username"]), "createdAt": time.Now().UTC().Format(time.RFC3339)}
+			updated["name"] = name
+			teams = append(teams, updated)
+			state["teams"] = teams
+		}
+		if updated == nil {
+			managedAccountError(w, http.StatusNotFound, "团队不存在")
+			return
+		}
+		raw, err := json.MarshalIndent(state, "", "  ")
+		if err != nil || os.WriteFile(path, raw, 0o600) != nil {
+			managedAccountError(w, http.StatusInternalServerError, "团队保存失败")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"team": updated})
+	})))
 	root.Handle("POST /api/member/team/invites", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		actor, ok := teamActor(profiles, accounts, req)
 		if !ok {
