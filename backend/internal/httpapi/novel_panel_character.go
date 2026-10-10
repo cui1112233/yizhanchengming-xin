@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 func characterText(value any) string { return strings.TrimSpace(toString(value)) }
@@ -283,5 +285,63 @@ func RegisterNovelPanelCharacterTraceCompat(root *http.ServeMux, middleware Brid
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "logged": true})
+	})))
+}
+
+func RegisterNovelPanelCharacterAICompat(root *http.ServeMux, middleware BridgeAuth, provider batchfactoryv11.DirectorProvider) {
+	if root == nil || middleware.AuthStore == nil || provider == nil {
+		return
+	}
+	root.Handle("POST /api/novel-panel/character-core/analyze", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if _, ok := BridgeIdentityFromContext(req.Context()); !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input map[string]any
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<20)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		novelText := characterText(input["novel_text"])
+		stage := strings.ReplaceAll(characterText(input["request_stage"]), "-", "_")
+		allowed := map[string]string{"style": "只返回合法 JSON。返回内容类型、时代、世界观、核心关系、核心冲突、叙事发动机、情绪基调、观看期待，以及 cinematic_quality、capture_texture、grain_texture、filter_tone、lens_language、optical_texture、contrast_level、saturation_level、lighting_layers、narrative_composition、atmosphere。所有文本使用简体中文。", "facts_relationships": "只返回合法 JSON。返回 characters、relationships、alias_bindings、mention_entities、ambiguous_relations。characters 只对应输入提示中的既有槽位，不能新增或删除槽位。", "appearance": "只返回合法 JSON，顶层必须为 {\"appearance\":\"...\"}。appearance 只是一段可拍摄的静态人物外形中文描述，不得输出剧情、标题或解释。", "revision_check": "只返回合法 JSON，顶层必须包含布尔 passed，以及 implemented、missing、violations 数组和 summary 字符串。"}
+		if novelText == "" || allowed[stage] == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "CharacterCore请求缺少分析提示词或阶段标记"})
+			return
+		}
+		maxTokens := 12000
+		if stage == "appearance" {
+			maxTokens = 4000
+		}
+		completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: "你是 CharacterCore 2.0 的服务端阶段执行器。只能依据用户的当前请求，不能引用历史缓存或编造小说事实。\n" + allowed[stage], UserPrompt: novelText, MaxTokens: maxTokens, Temperature: 0.25})
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "CharacterCore模型请求失败", "type": "upstream_error"})
+			return
+		}
+		var result map[string]any
+		if json.Unmarshal([]byte(stripJSONFence(completion)), &result) != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "CharacterCore模型结果格式无效"})
+			return
+		}
+		if stage == "appearance" && characterText(result["appearance"]) == "" {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "CharacterCore未返回人物外形正文"})
+			return
+		}
+		if stage == "facts_relationships" {
+			if _, ok := result["characters"].([]any); !ok {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "CharacterCore未返回人物槽位记录"})
+				return
+			}
+		}
+		if stage == "revision_check" {
+			if _, ok := result["passed"].(bool); !ok {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "CharacterCore验收结果缺少 passed 布尔字段"})
+				return
+			}
+		}
+		result["_character_core_direct"] = true
+		result["_character_core_stage"] = stage
+		result["_character_core_protocol"] = "character_core_2_all_genres_v77"
+		writeJSON(w, http.StatusOK, result)
 	})))
 }
