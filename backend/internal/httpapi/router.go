@@ -41,6 +41,7 @@ type RouterOptions struct {
 	NovelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
 	PresetCatalog             *prompt.Catalog
 	PersonalPromptStore       *prompt.PersonalStore
+	TextProvider              batchfactoryv11.DirectorProvider
 	LocalExecutors            *localexecutor.Service
 	GiantMaterialExecutor     *giantmaterialexecutor.Service
 	GiantMaterialResolver     GiantMaterialResolver
@@ -106,6 +107,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	if options.PersonalPromptStore != nil {
 		registerPersonalPromptRoutes(root, auth, options.PersonalPromptStore)
+	}
+	if options.TextProvider != nil {
+		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)
 	}
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))

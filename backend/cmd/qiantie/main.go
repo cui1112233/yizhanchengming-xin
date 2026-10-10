@@ -104,6 +104,9 @@ func shouldBridgeLegacyAPI(path string) bool {
 	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
 		return false
 	}
+	if path == "/api/script/smart-unified-style" {
+		return false
+	}
 	// V12 is the public workbench contract. Its summary, direct-fetch and
 	// orchestration adapters still live in Node, while Go owns capabilities,
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
