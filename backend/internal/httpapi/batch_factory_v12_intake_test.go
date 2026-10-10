@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,9 +41,26 @@ func TestV12NovelFetchIntakeUsesGoBatchStore(t *testing.T) {
 
 func TestV12BatchListUsesGoBatchStore(t *testing.T) {
 	now := time.Unix(1700000000, 0)
-	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: batchfactoryv11.NewMemoryStore()})
+	store := batchfactoryv11.NewMemoryStore()
+	if _, err := store.CreateBatch(nil, "alice", batchfactoryv11.CreateBatchInput{Title: "列表测试", Books: []batchfactoryv11.CreateBookInput{{BookID: "book-1", Title: "一本书", SourceText: "不应出现在列表"}}}); err != nil {
+		t.Fatalf("create test batch: %v", err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches", nil)
 	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestV12BatchSummaryOmitsSourceText(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	if _, err := store.CreateBatch(nil, "alice", batchfactoryv11.CreateBatchInput{Title: "摘要测试", Books: []batchfactoryv11.CreateBookInput{{BookID: "book-1", Title: "一本书", SourceText: "不应出现在摘要"}}}); err != nil {
+		t.Fatalf("create test batch: %v", err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/summary", nil)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "不应出现在摘要") {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }

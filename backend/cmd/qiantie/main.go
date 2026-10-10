@@ -109,7 +109,7 @@ func shouldBridgeLegacyAPI(path string) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
-		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") {
+		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") {
 			return false
 		}
 		return true

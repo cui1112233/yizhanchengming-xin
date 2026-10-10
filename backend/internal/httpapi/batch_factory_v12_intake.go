@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
@@ -11,6 +13,35 @@ import (
 // the handoff, while the production workbench continues reading the intake
 // through its V11-compatible contract.
 func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
+	mux.HandleFunc("GET /api/batch-factory/v12/batches/summary", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		summaries := make([]map[string]any, 0, len(batches))
+		for _, batch := range batches {
+			books := make([]map[string]any, 0, len(batch.Books))
+			for _, book := range batch.Books {
+				books = append(books, map[string]any{"id": book.ID, "bookId": book.BookID, "title": book.Title, "platform": book.Platform})
+			}
+			item := map[string]any{
+				"id": batch.ID, "title": batch.Title, "createdAt": batch.CreatedAt,
+				"updatedAt": batch.UpdatedAt, "revision": batch.Revision,
+				"bookCount": len(books), "books": books,
+			}
+			if strings.TrimSpace(batch.ProjectCoverJobID) != "" {
+				item["coverMedia"] = map[string]any{"kind": "image", "url": "/api/batch-factory/v11/batches/" + url.PathEscape(batch.ID) + "/merge-cover/" + url.PathEscape(batch.ProjectCoverJobID)}
+			}
+			summaries = append(summaries, item)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"batches": summaries})
+	})
 	mux.HandleFunc("GET /api/batch-factory/v12/batches", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
