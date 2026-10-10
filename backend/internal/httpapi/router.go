@@ -101,6 +101,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
 	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.Production)
+	registerTTSRoute(root, auth)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorArtifactRoutes(root, auth, options.LocalExecutors, options.LocalArtifacts)
