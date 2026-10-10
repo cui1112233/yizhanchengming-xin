@@ -203,9 +203,24 @@ func NewRouter(options RouterOptions) http.Handler {
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/", "/api/novel-fetch-workshop/", 1)
 			novelFetch.ServeHTTP(w, clone)
 		}
+		legacyKnowledgeSummaryAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = "/api/novel-fetch-workshop/knowledge/summary"
+			novelFetch.ServeHTTP(w, clone)
+		}
+		legacyRulesSuggestAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/rules/ai-suggest", "/api/novel-fetch-workshop/rules/suggest", 1)
+			novelFetch.ServeHTTP(w, clone)
+		}
 		root.Handle("/api/batch-rewrite/knowledge/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("/api/batch-rewrite/knowledge", novelAuth.Middleware(http.HandlerFunc(legacyKnowledgeSummaryAlias)))
 		root.Handle("/api/batch-rewrite/opening/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/ai/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("/api/batch-rewrite/process", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("/api/batch-rewrite/process/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("/api/batch-rewrite/rules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("/api/batch-rewrite/rules/ai-suggest", novelAuth.Middleware(http.HandlerFunc(legacyRulesSuggestAlias)))
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
