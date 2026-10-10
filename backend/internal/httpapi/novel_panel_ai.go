@@ -142,13 +142,67 @@ func RegisterNovelPanelTextOpsCompat(root *http.ServeMux, middleware BridgeAuth,
 }
 
 func RegisterNovelPanelOutlineCompat(root *http.ServeMux, middleware BridgeAuth, provider batchfactoryv11.DirectorProvider, catalog *prompt.Catalog) {
-	if root == nil || middleware.AuthStore == nil || provider == nil { return }
+	if root == nil || middleware.AuthStore == nil || provider == nil {
+		return
+	}
 	handler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if _, ok := BridgeIdentityFromContext(req.Context()); !ok { writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"}); return }
-		var input map[string]any; if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<20)).Decode(&input) != nil { writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"}); return }
-		novelText := strings.TrimSpace(toString(input["novel_text"])); if novelText == "" { writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先粘贴小说原文。"}); return }; if len([]rune(novelText)) > 500000 { novelText = string([]rune(novelText)[:500000]) }
-		mode := "outline"; if strings.HasSuffix(req.URL.Path, "/regenerate-scene-outline") { mode = "regenerate" }; system := novelPanelPreset(catalog, "novel-outline") + "\n每个非空原文行至少生成一条分镜，返回合法 JSON，顶层必须包含 outline_shots 数组。"; if mode == "regenerate" { system += "这是单场景重生成，只返回当前场景对应分镜。" }
-		payload := map[string]any{"novel_text": novelText, "generation_rules": input["generation_rules"], "must_cover_details": input["must_cover_details"], "shot_rhythm_requirements": input["shot_rhythm_requirements"], "scene": input["scene"], "characters": input["characters"], "outline_shots": input["outline_shots"]}; user, _ := json.Marshal(payload); completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: system, UserPrompt: string(user), MaxTokens: 16000, Temperature: 0.35}); if err != nil { writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型服务请求失败", "type": "upstream_error"}); return }; var result map[string]any; if json.Unmarshal([]byte(stripJSONFence(completion)), &result) != nil { writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型没有返回合法分镜 JSON"}); return }; if _, ok := result["outline_shots"].([]any); !ok { writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型没有返回分镜数组"}); return }; result["applied"] = true; if result["report"] == nil { result["report"] = map[string]any{"ok": true} }; writeJSON(w, http.StatusOK, result)
+		if _, ok := BridgeIdentityFromContext(req.Context()); !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input map[string]any
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<20)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		novelText := strings.TrimSpace(toString(input["novel_text"]))
+		if novelText == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先粘贴小说原文。"})
+			return
+		}
+		if len([]rune(novelText)) > 500000 {
+			novelText = string([]rune(novelText)[:500000])
+		}
+		mode := "outline"
+		if strings.HasSuffix(req.URL.Path, "/regenerate-scene-outline") {
+			mode = "regenerate"
+		}
+		system := novelPanelPreset(catalog, "novel-outline") + "\n每个非空原文行至少生成一条分镜，返回合法 JSON，顶层必须包含 outline_shots 数组。"
+		if mode == "regenerate" {
+			system += "这是单场景重生成，只返回当前场景对应分镜。"
+		}
+		payload := map[string]any{"novel_text": novelText, "generation_rules": input["generation_rules"], "must_cover_details": input["must_cover_details"], "shot_rhythm_requirements": input["shot_rhythm_requirements"], "scene": input["scene"], "characters": input["characters"], "outline_shots": input["outline_shots"]}
+		user, _ := json.Marshal(payload)
+		completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: system, UserPrompt: string(user), MaxTokens: 16000, Temperature: 0.35})
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型服务请求失败", "type": "upstream_error"})
+			return
+		}
+		var result map[string]any
+		if json.Unmarshal([]byte(stripJSONFence(completion)), &result) != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型没有返回合法分镜 JSON"})
+			return
+		}
+		if _, ok := result["outline_shots"].([]any); !ok {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型没有返回分镜数组"})
+			return
+		}
+		result["applied"] = true
+		if result["report"] == nil {
+			result["report"] = map[string]any{"ok": true}
+		}
+		writeJSON(w, http.StatusOK, result)
 	}))
-	for _, path := range []string{"/api/novel-panel/outline-scenes", "/api/novel-panel/regenerate-scene-outline", "/api/novel-panel/generate-scene-prompts"} { root.Handle("POST "+path, handler) }
+	for _, path := range []string{"/api/novel-panel/outline-scenes", "/api/novel-panel/regenerate-scene-outline", "/api/novel-panel/generate-scene-prompts"} {
+		root.Handle("POST "+path, handler)
+	}
+}
+
+func RegisterNovelPanelAssetDescribeCompat(root *http.ServeMux, middleware BridgeAuth, provider batchfactoryv11.DirectorProvider) {
+	if root == nil || middleware.AuthStore == nil || provider == nil { return }
+	root.Handle("POST /api/novel-panel/reference-assets/describe", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if _, ok := BridgeIdentityFromContext(req.Context()); !ok { writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"}); return }
+		var input map[string]any; if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<20)).Decode(&input) != nil { writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"}); return }
+		payload, _ := json.Marshal(input); completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{SystemPrompt: "你是画面参考资产助手。只返回合法 JSON，不要 Markdown。返回 {\"result\":\"一段简体中文的视觉描述或补充建议\"}。不要编造人物卡之外的性别、年龄或身份事实。", UserPrompt: string(payload), MaxTokens: 3000, Temperature: 0.25}); if err != nil { writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型服务请求失败", "type": "upstream_error"}); return }; var result map[string]any; if json.Unmarshal([]byte(stripJSONFence(completion)), &result) != nil || strings.TrimSpace(toString(result["result"])) == "" { writeJSON(w, http.StatusBadGateway, map[string]string{"error": "模型未返回描述结果"}); return }; writeJSON(w, http.StatusOK, map[string]any{"ok": true, "result": result["result"]})
+	})))
 }
