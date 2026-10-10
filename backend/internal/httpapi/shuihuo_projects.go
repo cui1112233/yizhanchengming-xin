@@ -1285,7 +1285,37 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		taskID, action := parts[0], parts[1]
 		if action == "retry" && r.Method == http.MethodPost {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入单任务重试，请从生产阶段重试"})
+			if director == nil {
+				writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置导演服务，暂不能重试任务"})
+				return
+			}
+			batches, err := store.ListBatches(r.Context(), owner)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			for _, compact := range batches {
+				status, statusErr := production.GetBatchStatus(r.Context(), owner, compact.ID)
+				if statusErr != nil {
+					continue
+				}
+				for _, job := range status.Jobs {
+					for _, task := range job.Tasks {
+						if task.ID != taskID {
+							continue
+						}
+						stages := &batchfactoryv11.BookStageService{Store: store, Director: director, Production: production}
+						summary, retryErr := stages.RetryLastFailed(r.Context(), owner, compact.ID, job.BookID, "shuihuo-retry-"+time.Now().UTC().Format("20060102T150405.000000000"), task.VideoID)
+						if retryErr != nil {
+							writeStoreError(w, retryErr)
+							return
+						}
+						writeJSON(w, http.StatusOK, summary)
+						return
+					}
+				}
+			}
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "task not found"})
 			return
 		}
 		if action != "cancel" || r.Method != http.MethodPut {
