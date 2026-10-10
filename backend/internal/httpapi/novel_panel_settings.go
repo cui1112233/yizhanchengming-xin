@@ -1,13 +1,16 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -239,6 +242,47 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "图片AI设置已保存。", "settings": publicPanelImageSettings(store, identity.Username, current)})
 			return
 		}
+		if req.URL.Path == "/api/image-settings/test" {
+			candidate := readPanelImageSettings(store, identity.Username)
+			for _, key := range []string{"base_url", "model", "api_key", "generate_path", "edit_path"} {
+				if value, ok := patch[key]; ok {
+					candidate[key] = value
+				}
+			}
+			missing := []string{}
+			for _, key := range []string{"base_url", "model", "api_key"} {
+				if strings.TrimSpace(fmt.Sprint(candidate[key])) == "" {
+					missing = append(missing, key)
+				}
+			}
+			public := publicPanelImageSettings(store, identity.Username, candidate)
+			if len(missing) > 0 {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "图片AI配置缺少：" + strings.Join(missing, "、"), "code": "IMAGE_SETTINGS_INCOMPLETE", "details": map[string]any{"missing": missing}, "settings": public})
+				return
+			}
+			parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(fmt.Sprint(candidate["base_url"])), "/"))
+			if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "图片 API 地址格式不正确。请填写 http:// 或 https:// 开头的有效地址。", "code": "IMAGE_AI_URL_INVALID", "settings": public})
+				return
+			}
+			started := time.Now()
+			ctx, cancel := context.WithTimeout(req.Context(), 12*time.Second)
+			defer cancel()
+			probeReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+			probeReq.Header.Set("Accept", "application/json")
+			response, probeErr := http.DefaultClient.Do(probeReq)
+			diagnostics := map[string]any{"host": parsed.Hostname(), "elapsed_ms": time.Since(started).Milliseconds()}
+			if response != nil {
+				diagnostics["http_status"] = response.StatusCode
+				_ = response.Body.Close()
+			}
+			if probeErr != nil {
+				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "已保存图片AI设置；无法连通图片服务地址，生成前请确认服务可用。", "diagnostics": diagnostics, "settings": public})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "图片AI服务地址可访问。", "diagnostics": diagnostics, "settings": public})
+			return
+		}
 		if value, ok := patch["ai_mode"].(string); ok && value == "local" {
 			saved["ai_mode"] = "local"
 		} else if value, ok := patch["ai_mode"].(string); ok && value == "remote" {
@@ -262,4 +306,5 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 	root.Handle("POST /api/runtime-config", handler)
 	root.Handle("GET /api/image-settings", handler)
 	root.Handle("POST /api/image-settings", handler)
+	root.Handle("POST /api/image-settings/test", handler)
 }
