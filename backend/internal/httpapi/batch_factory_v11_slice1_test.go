@@ -101,6 +101,10 @@ func TestSliceOneCreateListAndGetBatch(t *testing.T) {
 	if stage.Code != http.StatusOK || !strings.Contains(stage.Body.String(), `"bookId"`) {
 		t.Fatalf("v12 stage summary=%d body=%s", stage.Code, stage.Body.String())
 	}
+	status := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+created.ID+"/status", nil)
+	if status.Code != http.StatusOK || !strings.Contains(status.Body.String(), created.ID) {
+		t.Fatalf("v12 production status=%d body=%s", status.Code, status.Body.String())
+	}
 }
 
 func TestSaveVideoOverrideRejectsAnotherOwnersVideo(t *testing.T) {

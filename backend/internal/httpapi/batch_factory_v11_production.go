@@ -25,6 +25,7 @@ type videoProviderConfigInput struct {
 }
 
 func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.ProductionService) {
+	registerProductionStatusRoute(mux, service, "v11")
 	mux.HandleFunc("PUT /api/batch-factory/v11/video-provider/config", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -158,7 +159,11 @@ func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.Produ
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/status", func(w http.ResponseWriter, r *http.Request) {
+	/* status is registered by registerProductionStatusRoute above */
+}
+
+func registerProductionStatusRoute(mux *http.ServeMux, service *batchfactoryv11.ProductionService, version string) {
+	mux.HandleFunc("GET /api/batch-factory/"+version+"/batches/{batchId}/status", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})

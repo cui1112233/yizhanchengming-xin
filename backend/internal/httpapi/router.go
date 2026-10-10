@@ -57,6 +57,11 @@ type RouterOptions struct {
 }
 
 func NewRouter(options RouterOptions) http.Handler {
+	if options.Production == nil && options.Store != nil {
+		// Read-only status is safe before the production slice is enabled. Keep
+		// the service disabled for all write/submit operations.
+		options.Production = &batchfactoryv11.ProductionService{Store: options.Store, Compiler: options.Compiler}
+	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
 	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, options.External != nil && options.External.Enabled[external.Provider121], options.External != nil && options.External.Enabled[external.ProviderYadi]))
@@ -86,6 +91,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	// local V12 batch does not fall back to the Node compatibility bridge.
 	if options.Compiler != nil {
 		registerV12CompilerRoutes(v12, options.Compiler)
+	}
+	if options.Production != nil {
+		registerProductionStatusRoute(v12, options.Production, "v12")
 	}
 	if options.Production != nil && options.Slice >= 4 {
 		registerProductionRoutes(v11, options.Production)

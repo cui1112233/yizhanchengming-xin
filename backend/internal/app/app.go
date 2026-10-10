@@ -130,7 +130,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	if cfg.Slice >= 5 && cfg.LocalMergeEnabled {
 		batchfactoryv11.LocalArtifactPurger{Repository: store, Artifacts: artifactStore}.Start(time.Hour)
 	}
-	var production *batchfactoryv11.ProductionService
+	// Keep a read-only production service available for status queries even
+	// before the staged video provider is enabled. Write/submit routes remain
+	// gated by the configured slice below.
+	production := &batchfactoryv11.ProductionService{Store: store, Compiler: compiler, ProviderRegistry: videoRegistry, Enabled: cfg.ProductionEnabled}
 	if cfg.Slice >= 4 {
 		var fallbackAdapter batchfactoryv11.ProductionAdapter
 		if strings.TrimSpace(cfg.VideoEndpoint) != "" && strings.TrimSpace(cfg.VideoPollEndpoint) != "" && strings.TrimSpace(cfg.VideoAPIKey) != "" && strings.TrimSpace(cfg.VideoModel) != "" {
