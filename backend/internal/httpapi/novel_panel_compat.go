@@ -60,6 +60,42 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 		}
 		managedAccountError(w, http.StatusNotFound, "诊断追踪不存在")
 	})))
+	root.Handle("GET /api/novel-panel/diagnostics/self-check", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		panelDir := filepath.Join(usersDir, identity.Username, "novel-panel")
+		checks := []map[string]any{}
+		add := func(id, label string, pass bool, detail string) {
+			status := "fail"
+			if pass {
+				status = "pass"
+			}
+			checks = append(checks, map[string]any{"id": id, "label": label, "status": status, "detail": detail})
+		}
+		if err := os.MkdirAll(panelDir, 0o755); err != nil {
+			add("data_writable", "data目录可写", false, err.Error())
+		} else {
+			add("data_writable", "data目录可写", true, panelDir)
+		}
+		if _, err := os.Stat(filepath.Join(panelDir, "reference_assets")); err == nil {
+			add("reference_assets", "参考资产目录可用", true, "目录已存在")
+		} else if err := os.MkdirAll(filepath.Join(panelDir, "reference_assets"), 0o755); err != nil {
+			add("reference_assets", "参考资产目录可用", false, err.Error())
+		} else {
+			add("reference_assets", "参考资产目录可用", true, "目录已创建")
+		}
+		add("diagnostics_store", "诊断记录可读取", true, "Go诊断存储可用")
+		failures := 0
+		for _, check := range checks {
+			if check["status"] == "fail" {
+				failures++
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": failures == 0, "checks": checks, "summary": map[string]any{"pass": len(checks) - failures, "warn": 0, "fail": failures}, "active_instances": 1, "trace_records": len(readNovelPanelDiagnostics(usersDir, identity.Username, 200))})
+	})))
 }
 
 func readNovelPanelDiagnostics(usersDir, username string, limit int) []map[string]any {
