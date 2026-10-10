@@ -123,6 +123,30 @@ func RegisterNovelPanelDiagnosticsCompat(root *http.ServeMux, middleware BridgeA
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"projects": projects})
 	})))
+	root.Handle("GET /api/novel-panel/projects/{projectId}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		id := req.PathValue("projectId")
+		if id == "" || filepath.Base(id) != id || strings.ContainsAny(id, `/\\`) {
+			managedAccountError(w, http.StatusBadRequest, "项目编号不合法")
+			return
+		}
+		path := filepath.Join(usersDir, identity.Username, "novel-panel", "projects", id+".json")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			managedAccountError(w, http.StatusNotFound, "项目不存在")
+			return
+		}
+		var project map[string]any
+		if json.Unmarshal(raw, &project) != nil {
+			managedAccountError(w, http.StatusInternalServerError, "项目数据无效")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"project": project})
+	})))
 }
 
 func readNovelPanelDiagnostics(usersDir, username string, limit int) []map[string]any {
