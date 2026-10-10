@@ -154,6 +154,46 @@ func RegisterMemberTeamWriteCompat(root *http.ServeMux, middleware BridgeAuth, a
 		account, _ := accounts.FindAccount(req.Context(), input.Username)
 		writeJSON(w, http.StatusCreated, map[string]any{"member": managedAccountRow(account, profile)})
 	})))
+	root.Handle("PATCH /api/member/team/governance/{username}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		actor, ok := teamActor(profiles, accounts, req)
+		if !ok {
+			managedAccountError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if actor == nil || !teamCanManage(actor) {
+			managedAccountError(w, http.StatusForbidden, "当前身份没有团队额度管理权限")
+			return
+		}
+		username := req.PathValue("username")
+		manager := profiles.member(username, accounts)
+		if manager == nil || (toString(manager["role"]) != "dev" && toString(manager["role"]) != "manager") {
+			managedAccountError(w, http.StatusBadRequest, "目标账号不是团队负责人")
+			return
+		}
+		if toString(actor["role"]) == "manager" && toString(actor["username"]) != username {
+			managedAccountError(w, http.StatusForbidden, "MANAGER 只能设置自己团队的总额度")
+			return
+		}
+		var input struct {
+			MonthlyTokenLimit any `json:"monthlyTokenLimit"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&input) != nil {
+			managedAccountError(w, http.StatusBadRequest, "请求内容无效")
+			return
+		}
+		if input.MonthlyTokenLimit != nil {
+			if value, ok := input.MonthlyTokenLimit.(float64); !ok || value < 0 || value != float64(int64(value)) {
+				managedAccountError(w, http.StatusBadRequest, "额度必须是非负整数")
+				return
+			}
+		}
+		if err := updateManagedProfileFields(profiles, username, func(row map[string]any) { row["monthlyTokenLimit"] = input.MonthlyTokenLimit }); err != nil {
+			managedAccountError(w, http.StatusInternalServerError, "团队额度保存失败")
+			return
+		}
+		updated := profiles.member(username, accounts)
+		writeJSON(w, http.StatusOK, map[string]any{"manager": updated, "team": goTeam(updated), "monthlyTokenLimit": updated["monthlyTokenLimit"], "used": 0})
+	})))
 	root.Handle("PATCH /api/member/team/members/{username}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		actor, ok := teamActor(profiles, accounts, req)
 		if !ok {
