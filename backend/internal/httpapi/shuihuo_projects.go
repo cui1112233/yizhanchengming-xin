@@ -238,6 +238,38 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusOK, map[string]any{})
 			return
 		}
+		if len(parts) == 2 && parts[1] == "tasks" && r.Method == http.MethodGet {
+			writeJSON(w, http.StatusOK, map[string]any{"tasks": []any{}})
+			return
+		}
+		if len(parts) == 2 && parts[1] == "tasks" && r.Method == http.MethodPost {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+			return
+		}
+		if len(parts) == 3 && parts[1] == "tasks" && parts[2] == "batch" && r.Method == http.MethodPost {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置可用的生成模型"})
+			return
+		}
+		if len(parts) == 3 && parts[1] == "analysis" && r.Method == http.MethodPost {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置文本模型，暂不能进行智能分析"})
+			return
+		}
+		if len(parts) == 3 && parts[1] == "prompt-candidates" && r.Method == http.MethodPost {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置文本模型，暂不能生成提示词候选"})
+			return
+		}
+		if len(parts) == 4 && parts[1] == "prompt-candidates" && r.Method == http.MethodPut {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "当前 Go 本地环境尚未配置文本模型，暂不能应用提示词候选"})
+			return
+		}
+		if len(parts) == 2 && parts[1] == "export" && r.Method == http.MethodGet {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入剪映导出"})
+			return
+		}
+		if len(parts) == 2 && parts[1] == "media" && r.Method == http.MethodPost {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入媒体素材存储"})
+			return
+		}
 		if len(parts) == 2 && parts[1] == "assets" && r.Method == http.MethodPost {
 			var input struct {
 				Category string `json:"category"`
