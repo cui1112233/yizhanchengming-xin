@@ -78,4 +78,37 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"accounts": result})
 	})))
+	root.Handle("GET /api/admin/agent-skills", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		self := profiles.member(identity.Username, accounts)
+		if self == nil || toString(self["role"]) != "dev" {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"skills": readAgentSkills(adminSystemFile(profiles.SystemDir, "agent-skills.json"))})
+	})))
+	root.Handle("GET /api/admin/agent-skills/{id}/{version}", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		self := profiles.member(identity.Username, accounts)
+		if self == nil || toString(self["role"]) != "dev" {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+			return
+		}
+		version, _ := strconv.Atoi(req.PathValue("version"))
+		for _, skill := range readAgentSkills(adminSystemFile(profiles.SystemDir, "agent-skills.json")) {
+			if toString(skill["id"]) == req.PathValue("id") && intValue(skill["version"]) == version {
+				writeJSON(w, http.StatusOK, map[string]any{"skill": skill})
+				return
+			}
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
+	})))
 }

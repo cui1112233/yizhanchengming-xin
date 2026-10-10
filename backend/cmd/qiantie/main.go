@@ -99,7 +99,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health") {
+		if req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health" || req.URL.Path == "/api/admin/agent-skills" || strings.HasPrefix(req.URL.Path, "/api/admin/agent-skills/")) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
