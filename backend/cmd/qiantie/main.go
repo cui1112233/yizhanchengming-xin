@@ -67,7 +67,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if isGoNovelFetchCompatRequest(req) {
+		if isGoNovelFetchCompatRequest(req) || isGoAgentReadRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
@@ -88,6 +88,13 @@ func main() {
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
+}
+
+func isGoAgentReadRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil || req.Method != http.MethodGet {
+		return false
+	}
+	return req.URL.Path == "/api/agent/tasks" || strings.HasPrefix(req.URL.Path, "/api/agent/tasks/")
 }
 
 func isGoNovelFetchCompatRequest(req *http.Request) bool {
