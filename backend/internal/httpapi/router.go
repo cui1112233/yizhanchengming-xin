@@ -120,6 +120,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
 	if options.UserConfigStore != nil {
 		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)
+		RegisterAgentChatCompat(root, auth, options.UserConfigStore.BaseDir, options.TextProvider)
 	}
 	if options.TextProvider != nil {
 		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)

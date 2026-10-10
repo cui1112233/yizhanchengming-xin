@@ -94,7 +94,7 @@ func isGoAgentReadRequest(req *http.Request) bool {
 	if req == nil || req.URL == nil || (req.Method != http.MethodGet && req.Method != http.MethodPost && req.Method != http.MethodPatch && req.Method != http.MethodDelete) {
 		return false
 	}
-	return req.URL.Path == "/api/agent/tasks" || strings.HasPrefix(req.URL.Path, "/api/agent/tasks/")
+	return req.URL.Path == "/api/agent/chat" || req.URL.Path == "/api/agent/tasks" || strings.HasPrefix(req.URL.Path, "/api/agent/tasks/")
 }
 
 func isGoNovelFetchCompatRequest(req *http.Request) bool {

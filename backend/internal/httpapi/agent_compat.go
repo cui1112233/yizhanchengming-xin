@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 // RegisterAgentReadCompat serves the existing file-backed Agent task list and
@@ -251,6 +253,60 @@ func RegisterAgentReadCompat(root *http.ServeMux, middleware BridgeAuth, usersRo
 			return
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+	})))
+}
+
+func RegisterAgentChatCompat(root *http.ServeMux, middleware BridgeAuth, usersRoot string, provider batchfactoryv11.DirectorProvider) {
+	if root == nil || provider == nil || strings.TrimSpace(usersRoot) == "" {
+		return
+	}
+	root.Handle("POST /api/agent/chat", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body struct {
+			TaskID  string         `json:"taskId"`
+			Prompt  string         `json:"prompt"`
+			Context map[string]any `json:"context"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 256<<10)).Decode(&body) != nil || strings.TrimSpace(body.Prompt) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入消息"})
+			return
+		}
+		document, err := loadAgentDocument(usersRoot, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取 Agent 任务失败"})
+			return
+		}
+		task := findAgentTask(document, body.TaskID)
+		if task == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+			return
+		}
+		now := time.Now().UTC().Format(time.RFC3339Nano)
+		messages, _ := task["messages"].([]any)
+		userMessage := map[string]any{"role": "user", "content": strings.TrimSpace(body.Prompt), "createdAt": now}
+		contextText, _ := json.Marshal(body.Context)
+		completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{
+			SystemPrompt: "你是前贴平台的中文创作助手。请用中文直接回答，不能声称已经替用户执行外部操作。",
+			UserPrompt:   strings.TrimSpace(body.Prompt) + "\n\n页面上下文：\n" + string(contextText),
+			MaxTokens:    2048,
+			Temperature:  0.7,
+		})
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "文本模型请求失败"})
+			return
+		}
+		assistantMessage := map[string]any{"role": "assistant", "content": strings.TrimSpace(completion), "createdAt": time.Now().UTC().Format(time.RFC3339Nano)}
+		task["messages"] = append(messages, userMessage, assistantMessage)
+		task["updatedAt"] = assistantMessage["createdAt"]
+		if err := saveAgentDocument(usersRoot, identity.Username, document); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存 Agent 回复失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"task": task, "user": userMessage, "assistant": assistantMessage})
 	})))
 }
 
