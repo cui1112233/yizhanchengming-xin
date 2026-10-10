@@ -88,3 +88,24 @@ func TestAuthRoutesLoginSessionAndLogout(t *testing.T) {
 		t.Fatalf("logout response = %d", logoutResponse.Code)
 	}
 }
+
+func TestAuthBridgeLookupDoesNotBounceBackToLegacyResolver(t *testing.T) {
+	store := &authTestStore{account: auth.Account{Username: "alice", Active: true}}
+	resolverCalls := 0
+	mux := http.NewServeMux()
+	RegisterAuthRoutes(mux, AuthOptions{
+		Store: store,
+		SessionResolver: func(context.Context, string) (BridgeIdentity, error) {
+			resolverCalls++
+			return BridgeIdentity{}, auth.ErrNotFound
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/login/session", nil)
+	req.Header.Set("Authorization", "Bearer unknown-go-token")
+	req.Header.Set("X-Qiantie-Auth-Bridge", "1")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized || resolverCalls != 0 {
+		t.Fatalf("bridge lookup response=%d resolverCalls=%d", res.Code, resolverCalls)
+	}
+}

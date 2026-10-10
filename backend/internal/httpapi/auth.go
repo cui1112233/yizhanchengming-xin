@@ -74,7 +74,10 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 		token := bearerToken(r)
 		session, err := options.Store.FindSession(r.Context(), token, now().UTC())
 		if err != nil {
-			if options.SessionResolver != nil {
+			// A legacy Node request may ask Go to validate a Go-issued token.
+			// Do not bounce that failed lookup back to Node, or the two services
+			// would recursively validate the same invalid token.
+			if options.SessionResolver != nil && r.Header.Get("X-Qiantie-Auth-Bridge") != "1" {
 				if identity, resolveErr := options.SessionResolver(r.Context(), token); resolveErr == nil {
 					writeJSON(w, http.StatusOK, map[string]any{"username": identity.Username, "active": true, "isOwner": identity.IsOwner, "effectivePermissions": []string{}})
 					return

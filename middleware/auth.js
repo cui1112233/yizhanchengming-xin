@@ -7,6 +7,29 @@ const {
 } = require('../lib/shared');
 const { getPersistentSession, revokePersistentSession } = require('../lib/session-store');
 
+const GO_AUTH_BASE_URL = String(process.env.QIANTIE_GO_AUTH_BASE_URL || 'http://127.0.0.1:4001').replace(/\/$/, '');
+
+async function resolveGoSession(token) {
+  if (!token || !GO_AUTH_BASE_URL || typeof fetch !== 'function') return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(`${GO_AUTH_BASE_URL}/api/login/session`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}`, 'X-Qiantie-Auth-Bridge': '1' },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    if (!payload?.active || typeof payload.username !== 'string' || !payload.username.trim()) return null;
+    return { username: payload.username.trim(), isOwner: payload.isOwner === true };
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function getRuntime(req) {
   // Mounted sub-applications inherit their runtime from the parent app.
   for (let app = req.app; app; app = app.parent) {
@@ -27,7 +50,7 @@ function checkRateLimit(ip) {
   return true;
 }
 
-function authenticateRequest(req) {
+async function authenticateRequest(req) {
   const authHeader = req.headers['authorization'] || '';
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
   if (!match) return null;
@@ -36,10 +59,13 @@ function authenticateRequest(req) {
   const storedSession = runtime.tokenMap.get(token);
   const persistentSession = !storedSession ? getPersistentSession(runtime.sessionsPath, token) : null;
   const username = storedSession?.username || persistentSession?.username;
-  if (typeof username !== 'string') return null;
+  let bridgeIdentity = null;
+  if (typeof username !== 'string') bridgeIdentity = await resolveGoSession(token);
+  const resolvedUsername = username || bridgeIdentity?.username;
+  if (typeof resolvedUsername !== 'string') return null;
 
   try {
-    const account = runtime.accountStore.getAccount(username);
+    const account = runtime.accountStore.getAccount(resolvedUsername);
     if (!account || !account.active || account.pending === true) {
       runtime.tokenMap.delete(token);
       revokePersistentSession(runtime.sessionsPath, token);
@@ -56,8 +82,8 @@ function applyAuthentication(req, auth) {
   req.auth = auth;
 }
 
-function apiAuth(req, res, next) {
-  const auth = authenticateRequest(req);
+async function apiAuth(req, res, next) {
+  const auth = await authenticateRequest(req);
   if (!auth) {
     res.set('X-Qiantie-Auth-Failure', 'session');
     return res.status(401).json({ error: 'Unauthorized — invalid or expired token' });
@@ -66,8 +92,8 @@ function apiAuth(req, res, next) {
   next();
 }
 
-function optionalApiAuth(req, res, next) {
-  const auth = authenticateRequest(req);
+async function optionalApiAuth(req, res, next) {
+  const auth = await authenticateRequest(req);
   if (auth) applyAuthentication(req, auth);
   next();
 }
