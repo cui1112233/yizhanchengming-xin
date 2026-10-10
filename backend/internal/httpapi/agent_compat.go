@@ -294,6 +294,7 @@ func RegisterAgentChatCompat(root *http.ServeMux, middleware BridgeAuth, usersRo
 			UserPrompt:   strings.TrimSpace(body.Prompt) + "\n\n页面上下文：\n" + string(contextText),
 			MaxTokens:    2048,
 			Temperature:  0.7,
+			DisableJSONResponse: true,
 		})
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "文本模型请求失败"})
