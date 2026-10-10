@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 )
+
+var shuihuoProductionConfigs sync.Map
 
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
@@ -45,6 +48,35 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"presets": []any{}})
+	})))
+	root.Handle("/api/shuihuo-production/config", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if r.Method == http.MethodGet {
+			if value, exists := shuihuoProductionConfigs.Load(owner); exists {
+				writeJSON(w, http.StatusOK, value)
+				return
+			}
+			writeJSON(w, http.StatusOK, shuihuoDefaultConfig())
+			return
+		}
+		if r.Method == http.MethodPut {
+			var input map[string]any
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			config := shuihuoDefaultConfig()
+			for key, value := range input {
+				config[key] = value
+			}
+			shuihuoProductionConfigs.Store(owner, config)
+			writeJSON(w, http.StatusOK, config)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 	})))
 	root.Handle("/api/shuihuo-production/projects", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -573,6 +605,13 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 func isShuihuoProjectBatch(batch batchfactoryv11.Batch) bool {
 	value, ok := batch.SettingsState.Patch["shuihuoProject"]
 	return ok && strings.TrimSpace(string(value)) == "true"
+}
+
+func shuihuoDefaultConfig() map[string]any {
+	return map[string]any{
+		"characterPrefix": "", "imagePrefix": "", "imageSuffix": "", "videoPrefix": "", "videoSuffix": "",
+		"textModelId": nil, "imageModelId": nil, "videoModelId": nil, "audioModelId": nil, "jianyingDraftDirectory": "",
+	}
 }
 
 func shuihuoProject(batch batchfactoryv11.Batch) map[string]any {
