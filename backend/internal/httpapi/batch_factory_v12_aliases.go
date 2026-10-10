@@ -31,6 +31,14 @@ func registerV12V11Aliases(v12, v11 *http.ServeMux) {
 		"PUT /api/batch-factory/v12/drafts",
 		"DELETE /api/batch-factory/v12/batches/{batchId}",
 		"DELETE /api/batch-factory/v12/batches/{batchId}/books/{bookId}",
+		"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets",
+		"POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets",
+		"PATCH /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}",
+		"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images",
+		"POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images",
+		"POST /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/upload",
+		"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/primary",
+		"GET /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/content",
 	} {
 		v12.Handle(pattern, v12AliasHandler(v11))
 	}

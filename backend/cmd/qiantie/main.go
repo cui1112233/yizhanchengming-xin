@@ -391,6 +391,23 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "videos" && parts[6] == "override" {
 		return true
 	}
+	// Book reference assets are already implemented by the Go V11 store and
+	// have identical owner-scoped semantics under the V12 browser contract.
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "assets" {
+		return true
+	}
+	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "assets" {
+		return true
+	}
+	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "assets" && parts[6] == "images" {
+		return true
+	}
+	if len(parts) == 8 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "assets" && parts[6] == "images" {
+		return true
+	}
+	if len(parts) == 9 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "assets" && parts[6] == "images" && (parts[8] == "primary" || parts[8] == "content") {
+		return true
+	}
 	return false
 }
 
