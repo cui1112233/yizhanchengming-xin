@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -771,7 +773,13 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if len(parts) == 2 && parts[1] == "export" && r.Method == http.MethodGet {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "Go 本地迁移阶段暂未接入剪映导出"})
+			if files == nil || len(batch.Books) == 0 {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "导出素材存储不可用"})
+				return
+			}
+			if err := writeShuihuoProjectExport(w, r, files, batch); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "项目导出失败"})
+			}
 			return
 		}
 		if len(parts) == 2 && parts[1] == "media" && r.Method == http.MethodPost {
@@ -1428,6 +1436,68 @@ func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[strin
 		result = append(result, copy)
 	}
 	return result
+}
+
+func writeShuihuoProjectExport(w http.ResponseWriter, r *http.Request, files *localartifact.Store, batch batchfactoryv11.Batch) error {
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	book := batch.Books[0]
+	writeEntry := func(name string, data []byte) error {
+		entry, err := zw.Create(name)
+		if err != nil {
+			return err
+		}
+		_, err = entry.Write(data)
+		return err
+	}
+	if err := writeEntry("source.txt", []byte(book.SourceText)); err != nil {
+		return err
+	}
+	segments, err := json.MarshalIndent(storedShuihuoSegments(book), "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := writeEntry("segments.json", segments); err != nil {
+		return err
+	}
+	project, err := json.MarshalIndent(shuihuoProjectDetail(batch), "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := writeEntry("project.json", project); err != nil {
+		return err
+	}
+	for _, media := range storedShuihuoMedia(book) {
+		storageRef, _ := media["storageRef"].(string)
+		mediaID, _ := media["id"].(string)
+		if strings.TrimSpace(storageRef) == "" || strings.TrimSpace(mediaID) == "" {
+			continue
+		}
+		file, openErr := files.Open(storageRef)
+		if openErr != nil {
+			continue
+		}
+		name := "media/" + mediaID
+		if filename, ok := media["filename"].(string); ok && strings.TrimSpace(filename) != "" {
+			name = "media/" + filepath.Base(filename)
+		}
+		entry, createErr := zw.Create(name)
+		if createErr == nil {
+			_, createErr = io.Copy(entry, file)
+		}
+		_ = file.Close()
+		if createErr != nil {
+			return createErr
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=shuihuo-project-%s.zip", batch.ID))
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(archive.Bytes())
+	return err
 }
 
 func storedShuihuoMedia(book batchfactoryv11.Book) []map[string]any {
