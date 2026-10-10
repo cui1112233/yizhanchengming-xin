@@ -116,6 +116,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterMemberProfileRoutes(root, auth, options.MemberProfileStore, options.AuthStore, options.MemberAvatarDir)
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
+	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
 	if options.TextProvider != nil {
 		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)
 		registerChatRoute(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
