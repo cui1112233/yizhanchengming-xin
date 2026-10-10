@@ -23,6 +23,7 @@ type mfaFileRow struct {
 	Username       string   `json:"username"`
 	Enabled        bool     `json:"enabled"`
 	Secret         string   `json:"secret"`
+	EnabledAt      string   `json:"enabledAt"`
 	RecoveryHashes []string `json:"recoveryHashes"`
 	PendingSecret  string   `json:"pendingSecret"`
 }

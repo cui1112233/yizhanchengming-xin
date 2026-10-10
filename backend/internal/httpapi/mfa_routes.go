@@ -86,7 +86,7 @@ func RegisterMFARoutes(root *http.ServeMux, middleware BridgeAuth, profiles *Mem
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "恢复码生成失败"})
 			return
 		}
-		row.Secret, row.PendingSecret, row.Enabled = row.PendingSecret, "", true
+		row.Secret, row.PendingSecret, row.Enabled, row.EnabledAt = row.PendingSecret, "", true, time.Now().UTC().Format(time.RFC3339)
 		row.RecoveryHashes = make([]string, 0, len(recoveryCodes))
 		for _, code := range recoveryCodes {
 			row.RecoveryHashes = append(row.RecoveryHashes, mfaRecoveryHash(code))
