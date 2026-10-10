@@ -21,6 +21,10 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		if !decodeJSON(w, r, &input) {
 			return
 		}
+		if len(input.Books) == 0 {
+			writeStoreError(w, batchfactoryv11.ErrInvalid)
+			return
+		}
 		intake, err := store.CreateIntake(r.Context(), owner, input)
 		if err != nil {
 			writeStoreError(w, err)

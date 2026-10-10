@@ -140,8 +140,11 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 			t.Fatalf("%s should be handled by Go model catalog", path)
 		}
 	}
-	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/capabilities") {
+	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/h3/director") {
 		t.Fatal("migrated Go API paths must not use the Node bridge")
+	}
+	if !shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/summary") || !shouldBridgeLegacyAPI("/api/batch-factory/v12/fetch-originals") {
+		t.Fatal("remaining V12 compatibility adapters must use the local Node bridge")
 	}
 }
 

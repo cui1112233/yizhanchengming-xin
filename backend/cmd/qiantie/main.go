@@ -104,6 +104,16 @@ func shouldBridgeLegacyAPI(path string) bool {
 	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
 		return false
 	}
+	// V12 is the public workbench contract. Its summary, direct-fetch and
+	// orchestration adapters still live in Node, while Go owns capabilities,
+	// intake handoff, and native H3 routes. Keep only the remaining adapters on
+	// the local compatibility bridge so 4001 does not expose false 404s.
+	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
+		if path == "/api/batch-factory/v12/capabilities" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") {
+			return false
+		}
+		return true
+	}
 	for _, prefix := range []string{
 		"/api/config",
 		"/api/agent",
