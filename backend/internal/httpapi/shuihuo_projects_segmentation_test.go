@@ -3,7 +3,11 @@ package httpapi
 import (
 	"archive/zip"
 	"bytes"
+	"net/http"
 	"testing"
+	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 func TestParseSmartShuihuoCandidatesAcceptsCandidatesAndSegments(t *testing.T) {
@@ -65,5 +69,47 @@ func TestExtractShuihuoDocxText(t *testing.T) {
 	got, err := extractShuihuoDocxText(buffer.Bytes())
 	if err != nil || got != "第一段\n第二段" {
 		t.Fatalf("text=%q err=%v", got, err)
+	}
+}
+
+func TestShuihuoSegmentVoiceSettingsPersist(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 4, Store: batchfactoryv11.NewMemoryStore()})
+	created := signedJSONRequest(t, api, now, "voice-user", http.MethodPost, "/api/shuihuo-production/projects", map[string]any{"name": "voice settings", "sourceText": "第一句"})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create=%d body=%s", created.Code, created.Body.String())
+	}
+	project := decodeBody[map[string]any](t, created)
+	if project["id"] == nil {
+		t.Fatalf("missing project: %s", created.Body.String())
+	}
+	projectID := project["id"].(string)
+	candidates := signedJSONRequest(t, api, now, "voice-user", http.MethodPost, "/api/shuihuo-production/projects/"+projectID+"/segmentation/fixed", map[string]any{"text": "第一句", "linesPerSegment": 1})
+	if candidates.Code != http.StatusOK {
+		t.Fatalf("segment=%d body=%s", candidates.Code, candidates.Body.String())
+	}
+	segBody := decodeBody[map[string]any](t, candidates)
+	items := segBody["candidates"].([]any)
+	confirmed := signedJSONRequest(t, api, now, "voice-user", http.MethodPost, "/api/shuihuo-production/projects/"+projectID+"/segmentation/confirm", map[string]any{"candidates": items})
+	if confirmed.Code != http.StatusOK {
+		t.Fatalf("confirm=%d body=%s", confirmed.Code, confirmed.Body.String())
+	}
+	confirmedBody := decodeBody[map[string]any](t, confirmed)
+	confirmedProject := confirmedBody["project"].(map[string]any)
+	segments := confirmedProject["segments"].([]any)
+	segmentID := segments[0].(map[string]any)["id"].(string)
+	saved := signedJSONRequest(t, api, now, "voice-user", http.MethodPut, "/api/shuihuo-production/segments/"+segmentID+"/voice-settings", map[string]any{"voiceAssetId": "voice-1", "speechRate": 1.2, "pitch": 3})
+	if saved.Code != http.StatusOK {
+		t.Fatalf("save=%d body=%s", saved.Code, saved.Body.String())
+	}
+	settings := signedJSONRequest(t, api, now, "voice-user", http.MethodGet, "/api/shuihuo-production/projects/"+projectID+"/voice-settings", nil)
+	if settings.Code != http.StatusOK {
+		t.Fatalf("read=%d body=%s", settings.Code, settings.Body.String())
+	}
+	settingsBody := decodeBody[map[string]any](t, settings)
+	bySegment := settingsBody["settings"].(map[string]any)
+	got := bySegment[segmentID].(map[string]any)
+	if got["voiceAssetId"] != "voice-1" || got["speechRate"].(float64) != 1.2 || got["pitch"].(float64) != 3 {
+		t.Fatalf("unexpected settings: %#v", got)
 	}
 }
