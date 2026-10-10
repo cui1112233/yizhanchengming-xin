@@ -115,6 +115,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	RegisterScriptHistoryRoutes(root, auth, options.ScriptHistoryStore)
 	RegisterMemberProfileRoutes(root, auth, options.MemberProfileStore, options.AuthStore, options.MemberAvatarDir)
+	RegisterAccountAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)

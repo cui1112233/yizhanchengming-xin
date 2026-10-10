@@ -10,6 +10,28 @@ import (
 
 type MySQLStore struct{ db *sql.DB }
 
+// ListAccounts is intentionally an optional capability. Existing auth.Store
+// implementations used by tests and small tools do not need to implement it.
+func (s *MySQLStore) ListAccounts(ctx context.Context) ([]Account, error) {
+	if err := s.available(); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT username, password_hash, password_algorithm, is_owner, active, created_at, updated_at FROM accounts ORDER BY username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	accounts := make([]Account, 0)
+	for rows.Next() {
+		var account Account
+		if err := rows.Scan(&account.Username, &account.PasswordHash, &account.PasswordAlgorithm, &account.IsOwner, &account.Active, &account.CreatedAt, &account.UpdatedAt); err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, rows.Err()
+}
+
 func NewMySQLStore(db *sql.DB) *MySQLStore { return &MySQLStore{db: db} }
 
 func (s *MySQLStore) available() error {
