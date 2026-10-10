@@ -227,6 +227,35 @@ func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, a
 	return s.member(username, accounts), nil
 }
 
+func changeMemberPassword(ctx context.Context, username, currentPassword, newPassword, currentToken string, accounts auth.Store) (int64, error) {
+	account, err := accounts.FindAccount(ctx, username)
+	if err != nil {
+		return 0, err
+	}
+	if !auth.VerifyPassword(currentPassword, account.PasswordHash, account.PasswordAlgorithm) {
+		return 0, fmt.Errorf("当前密码不正确")
+	}
+	if len(newPassword) < 8 {
+		return 0, fmt.Errorf("新密码至少需要 8 位")
+	}
+	if currentPassword == newPassword {
+		return 0, fmt.Errorf("新密码不能与当前密码相同")
+	}
+	hash, algorithm, err := auth.HashPassword(newPassword)
+	if err != nil {
+		return 0, err
+	}
+	if err := accounts.UpdatePassword(ctx, username, hash, algorithm); err != nil {
+		return 0, err
+	}
+	if revoker, ok := accounts.(interface {
+		RevokeOtherSessions(context.Context, string, string) (int64, error)
+	}); ok {
+		return revoker.RevokeOtherSessions(ctx, username, currentToken)
+	}
+	return 0, nil
+}
+
 func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth, profiles *MemberProfileStore, accounts auth.Store, avatarDir string) {
 	if root == nil || profiles == nil || accounts == nil {
 		return
@@ -289,5 +318,30 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"member": member})
+	})))
+	root.Handle("POST /api/member/security/password", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			CurrentPassword string `json:"currentPassword"`
+			NewPassword     string `json:"newPassword"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		revoked, err := changeMemberPassword(req.Context(), identity.Username, input.CurrentPassword, input.NewPassword, bearerToken(req), accounts)
+		if err != nil {
+			status := http.StatusBadRequest
+			if err == auth.ErrNotFound {
+				status = http.StatusNotFound
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"changed": true, "revoked": revoked})
 	})))
 }

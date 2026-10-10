@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -142,4 +143,28 @@ func (s *MySQLStore) RevokeSession(ctx context.Context, rawToken string) error {
 	}
 	_, err := s.db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE token_hash = ?`, sessionTokenHash(rawToken))
 	return err
+}
+
+// RevokeOtherSessions removes every login session for username except the
+// current token. It is used after a password change so other devices are
+// forced to sign in again.
+func (s *MySQLStore) RevokeOtherSessions(ctx context.Context, username, currentToken string) (int64, error) {
+	if err := s.available(); err != nil {
+		return 0, err
+	}
+	if err := validateUsername(username); err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(currentToken) == "" {
+		result, err := s.db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE username = ?`, username)
+		if err != nil {
+			return 0, err
+		}
+		return result.RowsAffected()
+	}
+	result, err := s.db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE username = ? AND token_hash <> ?`, username, sessionTokenHash(currentToken))
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
