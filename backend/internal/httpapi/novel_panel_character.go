@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -16,6 +17,7 @@ func characterSlotToken(entry string, index int) string {
 }
 
 func parseCharacterRoster(value string) []map[string]any {
+	bracketPattern := regexp.MustCompile(`[（(]([^()（）]{1,120})[）)]`)
 	entries := []string{}
 	current := strings.Builder{}
 	depth := 0
@@ -54,22 +56,12 @@ func parseCharacterRoster(value string) []map[string]any {
 		seen[entry] = true
 		base := strings.TrimSpace(entry)
 		hints := []string{}
-		for {
-			start := strings.IndexAny(base, "（(")
-			if start < 0 {
-				break
+		for _, match := range bracketPattern.FindAllStringSubmatch(base, -1) {
+			if len(match) > 1 && strings.TrimSpace(match[1]) != "" {
+				hints = append(hints, strings.TrimSpace(match[1]))
 			}
-			end := strings.IndexAny(base[start+1:], "）)")
-			if end < 0 {
-				break
-			}
-			end += start + 1
-			hint := strings.TrimSpace(base[start+1 : end])
-			if hint != "" {
-				hints = append(hints, hint)
-			}
-			base = strings.TrimSpace(base[:start] + base[end+1:])
 		}
+		base = strings.TrimSpace(bracketPattern.ReplaceAllString(base, ""))
 		if base == "" {
 			continue
 		}
