@@ -18,7 +18,10 @@ func (s *MySQLStore) CreateJob(ctx context.Context, record JobRecord) error {
  lease_executor_id, lease_token_hash, lease_generation, lease_expires_at, accepted_at,
  accepted_account_id, submission_id, artifact_id, error_code, error_message, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, FALSE, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)`,
-		record.ID, record.OwnerUsername, record.SourceTaskID, record.Platform, []byte(record.Payload), record.State,
+		// Pass JSON as a string so MySQL treats it as JSON text rather than a
+		// binary value. Passing []byte makes MySQL 8 reject the parameter with
+		// error 3144 ("Cannot create a JSON value ... CHARACTER SET 'binary'").
+		record.ID, record.OwnerUsername, record.SourceTaskID, record.Platform, string(record.Payload), record.State,
 		record.CreatedAt, record.UpdatedAt)
 	if err != nil {
 		return err
