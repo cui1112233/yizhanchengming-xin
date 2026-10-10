@@ -119,6 +119,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorArtifactRoutes(root, auth, options.LocalExecutors, options.LocalArtifacts)
+	RegisterLocalScriptVideoRoutes(root, auth, options.LocalExecutors)
 	RegisterGiantMaterialExecutorRoutes(root, auth, options.GiantMaterialExecutor)
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {

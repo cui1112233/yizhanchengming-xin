@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -60,6 +63,10 @@ func main() {
 			authProxy.ServeHTTP(w, req)
 			return
 		}
+		if isLocalScriptVideoRequest(req) {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if shouldBridgeLegacyAPI(req.URL.Path) {
 			authProxy.ServeHTTP(w, req)
 			return
@@ -73,6 +80,31 @@ func main() {
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
+}
+
+func isLocalScriptVideoRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+	if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/script-video/go-local:") {
+		return true
+	}
+	if req.Method != http.MethodPost || req.URL.Path != "/api/script-video" || req.Body == nil {
+		return false
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		req.Body = io.NopCloser(bytes.NewReader(body))
+		return false
+	}
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	var input struct {
+		ModelKey string `json:"modelKey"`
+	}
+	if json.Unmarshal(body, &input) != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(input.ModelKey), "local-doubao-executor-video")
 }
 
 func goAuthEnabled() bool {
