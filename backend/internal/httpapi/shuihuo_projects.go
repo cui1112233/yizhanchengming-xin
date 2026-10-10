@@ -1349,11 +1349,16 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		imageID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/asset-images/"), "/")
-		if !strings.HasSuffix(imageID, "/primary") || r.Method != http.MethodPut {
+		action := "primary"
+		if strings.HasSuffix(imageID, "/download") {
+			action = "download"
+			imageID = strings.TrimSuffix(imageID, "/download")
+		} else if strings.HasSuffix(imageID, "/primary") {
+			imageID = strings.TrimSuffix(imageID, "/primary")
+		} else {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image route not found"})
 			return
 		}
-		imageID = strings.TrimSuffix(imageID, "/primary")
 		batches, err := store.ListBatches(r.Context(), owner)
 		if err != nil {
 			writeStoreError(w, err)
@@ -1372,6 +1377,25 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				for _, image := range images {
 					if image.ID != imageID {
 						continue
+					}
+					if action == "download" {
+						if r.Method != http.MethodGet || files == nil || strings.TrimSpace(image.StorageRef) == "" {
+							writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
+							return
+						}
+						file, openErr := files.Open(image.StorageRef)
+						if openErr != nil {
+							writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image file not found"})
+							return
+						}
+						defer file.Close()
+						w.Header().Set("Content-Type", image.MediaType)
+						http.ServeContent(w, r, image.ID, image.CreatedAt, file)
+						return
+					}
+					if r.Method != http.MethodPut {
+						writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+						return
 					}
 					primary, primaryErr := store.SetPrimaryBookAssetImage(r.Context(), owner, batch.ID, batch.Books[0].ID, asset.ID, imageID)
 					if primaryErr != nil {
