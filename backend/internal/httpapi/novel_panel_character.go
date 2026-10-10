@@ -5,8 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func characterText(value any) string { return strings.TrimSpace(toString(value)) }
@@ -185,4 +188,56 @@ func RegisterNovelPanelCharacterCompat(root *http.ServeMux, middleware BridgeAut
 	for _, path := range []string{"/api/novel-panel/character-core/parse-slots", "/api/novel-panel/character-core/resolve-scene-cast", "/api/novel-panel/character-core/build-scene-context"} {
 		root.Handle("POST "+path, handler)
 	}
+}
+
+func RegisterNovelPanelCharacterTraceCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
+	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
+		return
+	}
+	root.Handle("POST /api/novel-panel/character-core/trace", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var body map[string]any
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 2<<20)).Decode(&body) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
+			return
+		}
+		path := filepath.Join(usersDir, identity.Username, "novel-panel", "character-core-traces.json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "追踪记录保存失败"})
+			return
+		}
+		var records []map[string]any
+		if raw, err := os.ReadFile(path); err == nil {
+			_ = json.Unmarshal(raw, &records)
+		}
+		if records == nil {
+			records = []map[string]any{}
+		}
+		entry := map[string]any{"id": characterText(body["request_id"]), "at": time.Now().UTC().Format(time.RFC3339Nano), "trace_stage": characterText(body["trace_stage"])}
+		if entry["id"] == "" {
+			entry["id"] = "trace-" + toString(time.Now().UnixNano())
+		}
+		for key, value := range body {
+			entry[key] = value
+		}
+		records = append([]map[string]any{entry}, records...)
+		if len(records) > 50 {
+			records = records[:50]
+		}
+		raw, _ := json.MarshalIndent(records, "", "  ")
+		tmp := path + ".tmp"
+		if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "追踪记录保存失败"})
+			return
+		}
+		if err := os.Rename(tmp, path); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "追踪记录保存失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "logged": true})
+	})))
 }
