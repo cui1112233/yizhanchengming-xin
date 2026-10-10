@@ -129,6 +129,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterNovelPanelSettingsCompat(root, auth, options.UserConfigStore)
 	RegisterNovelPanelAssetCompat(root, auth, options.UserDataDir)
 	RegisterNovelPanelCharacterCompat(root, auth)
+	RegisterNovelPanelLeaseCompat(root, auth)
 	RegisterNovelPanelCharacterTraceCompat(root, auth, options.UserDataDir)
 	RegisterNovelPanelCharacterAICompat(root, auth, options.TextProvider)
 	RegisterNovelPanelAnalysisCompat(root, auth, options.TextProvider, options.PresetCatalog)

@@ -87,7 +87,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/novel-panel/character-core/parse-slots" || req.URL.Path == "/api/novel-panel/character-core/resolve-scene-cast" || req.URL.Path == "/api/novel-panel/character-core/build-scene-context" || req.URL.Path == "/api/novel-panel/character-core/migrate-project" || req.URL.Path == "/api/novel-panel/character-core/analyze") {
+		if req.Method == http.MethodPost && (req.URL.Path == "/api/novel-panel/character-core/parse-slots" || req.URL.Path == "/api/novel-panel/character-core/resolve-scene-cast" || req.URL.Path == "/api/novel-panel/character-core/build-scene-context" || req.URL.Path == "/api/novel-panel/character-core/migrate-project" || req.URL.Path == "/api/novel-panel/character-core/analyze" || req.URL.Path == "/api/novel-panel/character-core/project-lease") {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
