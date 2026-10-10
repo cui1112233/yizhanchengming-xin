@@ -183,6 +183,18 @@ func TestShouldBridgeLegacyAPIRequestKeepsH3TraceReadOnGo(t *testing.T) {
 	}
 }
 
+func TestShouldBridgeLegacyAPIRequestKeepsExternalClassificationAdaptersOnBridge(t *testing.T) {
+	for _, path := range []string{
+		"/api/batch-factory/v12/batches/demo/classify-fetched-metadata",
+		"/api/batch-factory/v12/batches/demo/backfill-121-metadata",
+	} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		if !shouldBridgeLegacyAPIRequest(req, 1) {
+			t.Fatalf("external adapter %s must remain on the legacy bridge", path)
+		}
+	}
+}
+
 func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
 	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "")
 	if goAuthEnabled() {
