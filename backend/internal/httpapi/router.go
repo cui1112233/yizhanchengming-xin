@@ -43,6 +43,7 @@ type RouterOptions struct {
 	NovelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
 	PresetCatalog             *prompt.Catalog
 	AutomationPresetStore     AutomationPresetStore
+	AutomationStatusReader    *FileAutomationStatusReader
 	PersonalPromptStore       *prompt.PersonalStore
 	ScriptHistoryStore        *ScriptHistoryStore
 	MemberProfileStore        *MemberProfileStore
@@ -140,6 +141,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.AutomationPresetStore != nil {
 		registerAutomationPresetRoutes(v12, auth, options.AutomationPresetStore, "v12")
 		registerBatchAutomationPresetRoute(v12, auth, options.Store, options.AutomationPresetStore, "v12")
+	}
+	if options.AutomationStatusReader != nil {
+		registerAutomationStatusRoute(v12, auth, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
 	if options.MemberProfileStore != nil {
