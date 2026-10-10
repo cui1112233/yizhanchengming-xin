@@ -4,6 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"strings"
+	"time"
+
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/config"
@@ -15,8 +19,6 @@ import (
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/storage"
-	"strings"
-	"time"
 )
 
 func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*http.ServeMux)) (http.Handler, error) {
@@ -24,20 +26,34 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		return nil, err
 	}
 	migrations := append(storage.AppMigrations(), storage.NovelFetchWorkshopMigrations()...)
+	migrations = append(migrations, storage.AuthMigrations()...)
 	if err := storage.RunMigrations(ctx, db, migrations); err != nil {
 		return nil, err
 	}
 	store := batchfactoryv11.NewReadbackMySQLStore(db)
+	authStore := auth.NewMySQLStore(db)
 	novelFetchStore := novelfetchworkshop.NewMySQLStore(db)
 	var director *batchfactoryv11.DirectorService
+	var textProvider *batchfactoryv11.OpenAICompatibleProvider
+	if cfg.DirectorEndpoint != "" || cfg.DirectorAPIKey != "" || cfg.DirectorModel != "" {
+		textProvider = &batchfactoryv11.OpenAICompatibleProvider{Endpoint: cfg.DirectorEndpoint, APIKey: cfg.DirectorAPIKey, Model: cfg.DirectorModel}
+		if err := textProvider.Validate(); err != nil {
+			return nil, err
+		}
+	}
 	if cfg.Slice >= 2 {
-		director = &batchfactoryv11.DirectorService{Store: store}
-		if cfg.DirectorEndpoint != "" || cfg.DirectorAPIKey != "" || cfg.DirectorModel != "" {
-			provider := &batchfactoryv11.OpenAICompatibleProvider{Endpoint: cfg.DirectorEndpoint, APIKey: cfg.DirectorAPIKey, Model: cfg.DirectorModel}
-			if err := provider.Validate(); err != nil {
-				return nil, err
-			}
-			director.Provider = provider
+		director = &batchfactoryv11.DirectorService{Store: store, Provider: textProvider}
+	}
+	var novelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
+	if textProvider != nil {
+		novelFetchAIGenderJudge = func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
+			return textProvider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+				SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
+				UserPrompt:          "请根据以下分类信息判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre,
+				Temperature:         0,
+				MaxTokens:           8,
+				DisableJSONResponse: true,
+			})
 		}
 	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
@@ -134,5 +150,5 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Users: storage.BridgeUsers{DB: db}, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, RegisterV11: register}), nil
 }

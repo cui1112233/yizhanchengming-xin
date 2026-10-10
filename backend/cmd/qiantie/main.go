@@ -52,7 +52,7 @@ func main() {
 		log.Fatal(err)
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/") {
+		if strings.HasPrefix(req.URL.Path, "/api/login/") && req.URL.Path != "/api/login/logout" && req.URL.Path != "/api/login/session" {
 			authProxy.ServeHTTP(w, req)
 			return
 		}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
 	"qiantie/backend/internal/giantmaterialexecutor"
@@ -16,25 +17,28 @@ import (
 )
 
 type RouterOptions struct {
-	BridgeSecret          string
-	ReleaseSHA            string
-	Now                   func() time.Time
-	Users                 BridgeUserResolver
-	Slice                 int
-	RegisterV11           func(*http.ServeMux)
-	Store                 batchfactoryv11.Store
-	Director              *batchfactoryv11.DirectorService
-	H3AudioProbe          batchfactoryv11.H3AudioDurationProbe
-	Compiler              *batchfactoryv11.PromptCompilerService
-	Production            *batchfactoryv11.ProductionService
-	Merge                 *batchfactoryv11.MergeService
-	External              *external.Service
-	NovelFetchStore       novelfetchworkshop.LifecycleStore
-	LocalExecutors        *localexecutor.Service
-	GiantMaterialExecutor *giantmaterialexecutor.Service
-	GiantMaterialResolver GiantMaterialResolver
-	LocalArtifacts        *localartifact.Store
-	MergeOutput           mergeworker.ObjectStore
+	BridgeSecret            string
+	ReleaseSHA              string
+	Health                  func(context.Context) error
+	Now                     func() time.Time
+	Users                   BridgeUserResolver
+	AuthStore               auth.Store
+	Slice                   int
+	RegisterV11             func(*http.ServeMux)
+	Store                   batchfactoryv11.Store
+	Director                *batchfactoryv11.DirectorService
+	H3AudioProbe            batchfactoryv11.H3AudioDurationProbe
+	Compiler                *batchfactoryv11.PromptCompilerService
+	Production              *batchfactoryv11.ProductionService
+	Merge                   *batchfactoryv11.MergeService
+	External                *external.Service
+	NovelFetchStore         novelfetchworkshop.LifecycleStore
+	NovelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
+	LocalExecutors          *localexecutor.Service
+	GiantMaterialExecutor   *giantmaterialexecutor.Service
+	GiantMaterialResolver   GiantMaterialResolver
+	LocalArtifacts          *localartifact.Store
+	MergeOutput             mergeworker.ObjectStore
 }
 
 func NewRouter(options RouterOptions) http.Handler {
@@ -82,6 +86,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"service": "go-api", "git_sha": options.ReleaseSHA})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users}
+	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now})
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
@@ -91,11 +96,15 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
-		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore)
+		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
 		root.Handle("/api/novel-fetch-workshop/", NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users}.Middleware(novelFetch))
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
+		if options.Health != nil && options.Health(req.Context()) != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	return root
