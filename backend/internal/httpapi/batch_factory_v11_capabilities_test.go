@@ -45,6 +45,21 @@ func TestV11CapabilitiesRejectExpiredSignature(t *testing.T) {
 	}
 }
 
+func TestV12CapabilitiesUsesGoContract(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1})
+	req := httptest.NewRequest(http.MethodGet, "/api/batch-factory/v12/capabilities", nil)
+	SignBridgeRequest(req, "alpha-user", false, now, "secret")
+	rec := httptest.NewRecorder()
+	api.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"batch.read"`) {
+		t.Fatalf("body=%s", rec.Body.String())
+	}
+}
+
 func TestSliceThreeUnlocksCompilerPreviewOnly(t *testing.T) {
 	caps := CapabilitiesForSlice(3)
 	if !caps["compiler.preview"].Available {

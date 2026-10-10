@@ -49,6 +49,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
 	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, options.External != nil && options.External.Enabled[external.Provider121], options.External != nil && options.External.Enabled[external.ProviderYadi]))
+	// V12 is the public workbench namespace. Keep its capability contract on
+	// Go even while a few legacy V12 adapters still bridge to Node.
+	v12.HandleFunc("GET /api/batch-factory/v12/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, options.External != nil && options.External.Enabled[external.Provider121], options.External != nil && options.External.Enabled[external.ProviderYadi]))
 	if options.Store != nil && options.Slice >= 1 {
 		registerSliceOneRoutes(v11, options.Store)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
