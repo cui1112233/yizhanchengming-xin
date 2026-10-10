@@ -197,6 +197,70 @@ func (s *Store) SaveImage(id, mediaType string, src io.Reader) (artifact Artifac
 	return Artifact{ID: id, MediaType: mediaType, ByteSize: total, SHA256: hex.EncodeToString(hash.Sum(nil)), StorageRef: finalName}, nil
 }
 
+// SaveMedia stores a browser-uploaded audio/video file after the caller has
+// validated its type. Unlike SaveImage/SaveMP4 this method intentionally does
+// not inspect a codec signature; browser uploads can be WAV, MP3, M4A, WebM or
+// other formats that are only meaningful to the media pipeline.
+func (s *Store) SaveMedia(id, mediaType, extension string, src io.Reader) (artifact Artifact, err error) {
+	if s == nil || !safeArtifactID.MatchString(id) || src == nil {
+		return Artifact{}, ErrInvalidID
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	extension = strings.ToLower(strings.TrimSpace(extension))
+	extension = strings.TrimPrefix(extension, ".")
+	if !strings.HasPrefix(mediaType, "audio/") && !strings.HasPrefix(mediaType, "video/") {
+		return Artifact{}, ErrInvalidMP4
+	}
+	if extension == "" || len(extension) > 8 || strings.ContainsAny(extension, `/\\.`) {
+		return Artifact{}, ErrInvalidID
+	}
+	if err := os.MkdirAll(s.root, 0o750); err != nil {
+		return Artifact{}, err
+	}
+	finalName := id + "." + extension
+	finalPath := filepath.Join(s.root, finalName)
+	if _, statErr := os.Stat(finalPath); statErr == nil {
+		return Artifact{}, ErrAlreadyExists
+	} else if !os.IsNotExist(statErr) {
+		return Artifact{}, statErr
+	}
+	tmp, err := os.CreateTemp(s.root, ".media-upload-*.tmp")
+	if err != nil {
+		return Artifact{}, err
+	}
+	tmpName := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tmp.Close()
+			_ = os.Remove(tmpName)
+		}
+	}()
+	hash := sha256.New()
+	writer := io.MultiWriter(tmp, hash)
+	count, err := io.Copy(writer, io.LimitReader(src, s.maxBytes+1))
+	if err != nil {
+		return Artifact{}, err
+	}
+	if count == 0 {
+		return Artifact{}, ErrInvalidMP4
+	}
+	if count > s.maxBytes {
+		return Artifact{}, ErrTooLarge
+	}
+	if err := tmp.Sync(); err != nil {
+		return Artifact{}, err
+	}
+	if err := tmp.Close(); err != nil {
+		return Artifact{}, err
+	}
+	if err := os.Rename(tmpName, finalPath); err != nil {
+		return Artifact{}, fmt.Errorf("commit media artifact: %w", err)
+	}
+	committed = true
+	return Artifact{ID: id, MediaType: mediaType, ByteSize: count, SHA256: hex.EncodeToString(hash.Sum(nil)), StorageRef: finalName}, nil
+}
+
 func imageExtension(mediaType string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(mediaType)) {
 	case "image/png":

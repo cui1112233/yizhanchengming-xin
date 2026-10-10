@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -319,6 +320,66 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		if len(parts) == 2 && parts[1] == "asset-generation-config" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
 			writeJSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+		if len(parts) == 2 && parts[1] == "media" && r.Method == http.MethodPost {
+			if files == nil || len(batch.Books) == 0 {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media storage is unavailable"})
+				return
+			}
+			var input struct {
+				Kind      string `json:"kind"`
+				Filename  string `json:"filename"`
+				DataURL   string `json:"dataUrl"`
+				SegmentID string `json:"segmentId,omitempty"`
+			}
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			mediaType, payload, err := decodeShuihuoMediaDataURL(input.DataURL)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid media upload"})
+				return
+			}
+			kind := strings.ToLower(strings.TrimSpace(input.Kind))
+			if kind != "image" && kind != "video" && kind != "audio" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported media kind"})
+				return
+			}
+			artifactID, err := localexecutor.NewArtifactID()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "media id generation failed"})
+				return
+			}
+			extension := strings.TrimPrefix(strings.ToLower(filepath.Ext(strings.TrimSpace(input.Filename))), ".")
+			if extension == "" {
+				extension = map[string]string{"image": "png", "video": "mp4", "audio": "mp3"}[kind]
+			}
+			var saved localartifact.Artifact
+			if kind == "image" {
+				saved, err = files.SaveImage(artifactID, mediaType, bytes.NewReader(payload))
+			} else {
+				saved, err = files.SaveMedia(artifactID, mediaType, extension, bytes.NewReader(payload))
+			}
+			if err != nil {
+				writeBookAssetImageStorageError(w, err)
+				return
+			}
+			media := storedShuihuoMedia(batch.Books[0])
+			media = append(media, map[string]any{"id": artifactID, "kind": kind, "filename": input.Filename, "mediaType": mediaType, "storageRef": saved.StorageRef, "segmentId": strings.TrimSpace(input.SegmentID), "isPrimary": false, "createdAt": time.Now().UTC().Format(time.RFC3339)})
+			metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+			metadata["shuihuoMedia"] = media
+			if _, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision}); err != nil {
+				_ = files.Remove(saved.StorageRef)
+				writeStoreError(w, err)
+				return
+			}
+			updated, err := store.GetBatch(r.Context(), owner, batch.ID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"media": map[string]any{"id": artifactID, "kind": kind, "filename": input.Filename, "mediaType": mediaType, "segmentId": strings.TrimSpace(input.SegmentID), "isPrimary": false}, "project": shuihuoProjectDetail(updated)})
 			return
 		}
 		if len(parts) == 2 && parts[1] == "tasks" && r.Method == http.MethodGet {
@@ -715,6 +776,103 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "asset image not found"})
 	})))
+
+	root.Handle("/api/shuihuo-production/media/", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/media/"), "/")
+		parts := strings.Split(path, "/")
+		if len(parts) == 0 || parts[0] == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "media id is required"})
+			return
+		}
+		mediaID := parts[0]
+		batches, err := store.ListBatches(r.Context(), owner)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, compact := range batches {
+			batch, getErr := store.GetBatch(r.Context(), owner, compact.ID)
+			if getErr != nil || len(batch.Books) == 0 {
+				continue
+			}
+			media := storedShuihuoMedia(batch.Books[0])
+			index := -1
+			for i, item := range media {
+				if id, _ := item["id"].(string); id == mediaID {
+					index = i
+					break
+				}
+			}
+			if index < 0 {
+				continue
+			}
+			if len(parts) == 2 && parts[1] == "download" && r.Method == http.MethodGet {
+				if files == nil {
+					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media storage is unavailable"})
+					return
+				}
+				storageRef, _ := media[index]["storageRef"].(string)
+				file, openErr := files.Open(storageRef)
+				if openErr != nil {
+					writeJSON(w, http.StatusNotFound, map[string]string{"error": "media file not found"})
+					return
+				}
+				defer file.Close()
+				mediaType, _ := media[index]["mediaType"].(string)
+				if mediaType == "" {
+					mediaType = "application/octet-stream"
+				}
+				w.Header().Set("Content-Type", mediaType)
+				http.ServeContent(w, r, mediaID, time.Now(), file)
+				return
+			}
+			if len(parts) == 2 && parts[1] == "segment" && r.Method == http.MethodPut {
+				var input struct {
+					SegmentID string `json:"segmentId"`
+				}
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				media[index]["segmentId"] = strings.TrimSpace(input.SegmentID)
+			} else if len(parts) == 2 && parts[1] == "primary" && r.Method == http.MethodPut {
+				for i := range media {
+					media[i]["isPrimary"] = i == index
+				}
+			} else if len(parts) == 1 && r.Method == http.MethodDelete {
+				if files != nil {
+					if storageRef, _ := media[index]["storageRef"].(string); storageRef != "" {
+						_ = files.Remove(storageRef)
+					}
+				}
+				media = append(media[:index], media[index+1:]...)
+			} else if len(parts) == 1 {
+				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+				return
+			} else {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "media route not found"})
+				return
+			}
+			metadata := cloneMetadata(batch.Books[0].SourceMetadata)
+			metadata["shuihuoMedia"] = media
+			if _, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: batch.Books[0].Revision}); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			updated, err := store.GetBatch(r.Context(), owner, batch.ID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, shuihuoProjectDetail(updated))
+			return
+		}
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "media not found"})
+	})))
 }
 
 func isShuihuoProjectBatch(batch batchfactoryv11.Batch) bool {
@@ -745,6 +903,7 @@ func shuihuoProject(batch batchfactoryv11.Batch) map[string]any {
 	return map[string]any{
 		"id": batch.ID, "name": batch.Title, "createdAt": createdAt, "updatedAt": updatedAt,
 		"sourceText": sourceText, "segmentationStatus": status, "segments": segments, "assets": shuihuoAssets(batch),
+		"media": shuihuoMedia(batch),
 		"books": batch.Books,
 	}
 }
@@ -773,14 +932,42 @@ func shuihuoProjectDetail(batch batchfactoryv11.Batch) map[string]any {
 func shuihuoProjectDetailFromProject(project map[string]any) map[string]any {
 	segments, _ := project["segments"].([]map[string]any)
 	assets, _ := project["assets"].([]map[string]any)
+	media, _ := project["media"].([]map[string]any)
 	return map[string]any{
 		"project":         project,
 		"segments":        segments,
 		"assets":          assets,
-		"media":           []any{},
+		"media":           media,
 		"segmentAssetIDs": map[string][]string{},
 		"settings":        map[string]any{},
 	}
+}
+
+func shuihuoMedia(batch batchfactoryv11.Batch) []map[string]any {
+	if len(batch.Books) == 0 {
+		return []map[string]any{}
+	}
+	return storedShuihuoMedia(batch.Books[0])
+}
+
+func storedShuihuoMedia(book batchfactoryv11.Book) []map[string]any {
+	value, ok := book.SourceMetadata["shuihuoMedia"]
+	if !ok {
+		return []map[string]any{}
+	}
+	if items, ok := value.([]map[string]any); ok {
+		return items
+	}
+	if items, ok := value.([]any); ok {
+		output := make([]map[string]any, 0, len(items))
+		for _, item := range items {
+			if media, ok := item.(map[string]any); ok {
+				output = append(output, media)
+			}
+		}
+		return output
+	}
+	return []map[string]any{}
 }
 
 func cloneMetadata(input map[string]any) map[string]any {
@@ -884,6 +1071,22 @@ func splitShuihuoSentences(text string) []string {
 		out = append(out, line)
 	}
 	return out
+}
+
+func decodeShuihuoMediaDataURL(value string) (string, []byte, error) {
+	parts := strings.SplitN(strings.TrimSpace(value), ",", 2)
+	if len(parts) != 2 || !strings.HasPrefix(parts[0], "data:") || !strings.HasSuffix(parts[0], ";base64") {
+		return "", nil, fmt.Errorf("invalid data url")
+	}
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSuffix(strings.TrimPrefix(parts[0], "data:"), ";base64"))
+	if err != nil {
+		return "", nil, err
+	}
+	payload, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil || len(payload) == 0 {
+		return "", nil, fmt.Errorf("invalid base64")
+	}
+	return strings.ToLower(mediaType), payload, nil
 }
 
 func normalizeShuihuoSegments(candidates []map[string]any, bookID string) []map[string]any {
