@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 const (
@@ -112,6 +113,45 @@ func panelPublicSettings(store *UserConfigStore, username string) map[string]any
 	return map[string]any{"ai_mode": saved["ai_mode"], "base_url": baseURL, "model": model, "api_key_configured": strings.TrimSpace(apiKey) != "", "text_model_id": saved["text_model_id"], "ai_timeout_seconds": saved["ai_timeout_seconds"]}
 }
 
+func panelPublicSettingsWithCatalog(ctx context.Context, store *UserConfigStore, username string, catalogStore novelfetchworkshop.Store) map[string]any {
+	result := panelPublicSettings(store, username)
+	if catalogStore == nil {
+		return result
+	}
+	settings, err := catalogStore.GetConfig(ctx, username)
+	if err != nil {
+		return result
+	}
+	selected := strings.TrimSpace(fmt.Sprint(result["text_model_id"]))
+	var fallback map[string]any
+	for _, raw := range modelCatalog(settings) {
+		if raw["kind"] != "text" || raw["enabled"] != true {
+			continue
+		}
+		if fallback == nil {
+			fallback = raw
+		}
+		if selected != "" && (raw["id"] == selected || raw["modelId"] == selected) {
+			fallback = raw
+			break
+		}
+	}
+	if fallback != nil {
+		if id := strings.TrimSpace(fmt.Sprint(fallback["id"])); id != "" && id != "<nil>" {
+			result["text_model_id"] = id
+		}
+		if baseURL := strings.TrimSpace(fmt.Sprint(fallback["baseUrl"])); baseURL != "" && baseURL != "<nil>" {
+			result["base_url"] = baseURL
+		}
+		if modelID := strings.TrimSpace(fmt.Sprint(fallback["modelId"])); modelID != "" && modelID != "<nil>" {
+			result["model"] = modelID
+		}
+		credential := strings.TrimSpace(fmt.Sprint(fallback["credential"]))
+		result["api_key_configured"] = (credential != "" && credential != "<nil>") || fallback["hasCredential"] == true
+	}
+	return result
+}
+
 func imageSettingsPath(store *UserConfigStore, username string) string {
 	return filepath.Join(store.BaseDir, username, "novel-panel", "image-settings.json")
 }
@@ -168,7 +208,7 @@ func writePanelImageSettings(store *UserConfigStore, username string, settings m
 	return os.Rename(tmp, imageSettingsPath(store, username))
 }
 
-func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, provider batchfactoryv11.DirectorProvider) {
+func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, provider batchfactoryv11.DirectorProvider, catalogStores ...novelfetchworkshop.Store) {
 	if root == nil || middleware.AuthStore == nil || store == nil {
 		return
 	}
@@ -180,8 +220,12 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		store.mu.Lock()
 		defer store.mu.Unlock()
+		var catalogStore novelfetchworkshop.Store
+		if len(catalogStores) > 0 {
+			catalogStore = catalogStores[0]
+		}
 		if req.Method == http.MethodGet && req.URL.Path == "/api/settings" {
-			writeJSON(w, http.StatusOK, panelPublicSettings(store, identity.Username))
+			writeJSON(w, http.StatusOK, panelPublicSettingsWithCatalog(req.Context(), store, identity.Username, catalogStore))
 			return
 		}
 		if req.Method == http.MethodGet && req.URL.Path == "/api/runtime-config" {
@@ -301,7 +345,7 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "设置保存失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"message": "设置已保存。", "settings": panelPublicSettings(store, identity.Username)})
+		writeJSON(w, http.StatusOK, map[string]any{"message": "设置已保存。", "settings": panelPublicSettingsWithCatalog(req.Context(), store, identity.Username, catalogStore)})
 	}))
 	root.Handle("GET /api/settings", handler)
 	root.Handle("POST /api/settings", handler)

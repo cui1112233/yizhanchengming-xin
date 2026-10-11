@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/auth"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 func TestNovelPanelHistoryAliasUsesGoHistoryStore(t *testing.T) {
@@ -33,5 +35,24 @@ func TestNovelPanelSettingsAliasUsesGoConfigStore(t *testing.T) {
 	mux.ServeHTTP(res, req)
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"ai_timeout_seconds":400`) {
 		t.Fatalf("settings alias response=%d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestNovelPanelSettingsAliasUsesManagedTextModel(t *testing.T) {
+	store := &authTestStore{account: auth.Account{Username: "alice", Active: true}, session: auth.Session{Token: "go-session", Username: "alice", ExpiresAt: time.Now().Add(time.Hour)}}
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "alice", map[string]any{
+		"modelCatalog": []any{map[string]any{"id": "managed-text", "kind": "text", "modelId": "gemini-configured", "baseUrl": "https://text.example/v1", "credential": "secret", "enabled": true}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterNovelPanelSettingsCompat(mux, BridgeAuth{Secret: "secret", Now: time.Now, AuthStore: store}, NewUserConfigStore(t.TempDir()), nil, catalog)
+	req := httptest.NewRequest(http.MethodGet, "/api/novel-panel/settings", nil)
+	req.Header.Set("Authorization", "Bearer go-session")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"text_model_id":"managed-text"`) || !strings.Contains(res.Body.String(), `"model":"gemini-configured"`) || !strings.Contains(res.Body.String(), `"api_key_configured":true`) {
+		t.Fatalf("settings catalog response=%d %s", res.Code, res.Body.String())
 	}
 }
