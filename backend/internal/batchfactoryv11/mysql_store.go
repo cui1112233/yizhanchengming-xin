@@ -972,7 +972,7 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 	if err != nil {
 		return SettingsResult{}, err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), encoded, next)
+	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(encoded), next)
 	if err != nil {
 		return SettingsResult{}, err
 	}
@@ -989,7 +989,7 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 		return SettingsResult{}, err
 	}
 	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,?,?,?)`, snapshotID, owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), effJSON, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,?,?,?)`, snapshotID, owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(effJSON), now); err != nil {
 		return SettingsResult{}, err
 	}
 	if err := tx.Commit(); err != nil {

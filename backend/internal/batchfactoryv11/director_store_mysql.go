@@ -131,7 +131,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		return DirectorRevision{}, err
 	}
 	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,NULL,?,?)`, snapshotID, owner, book.BatchID, book.ID, snapshotJSON, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,NULL,?,?)`, snapshotID, owner, book.BatchID, book.ID, string(snapshotJSON), now); err != nil {
 		return DirectorRevision{}, err
 	}
 	var currentRevision int64
@@ -150,7 +150,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	if hookID != "" {
 		hookValue = hookID
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_director_revisions(id,batch_id,book_id,owner_username,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, revisionID, book.BatchID, book.ID, owner, currentRevision+1, snapshotID, snapshot.Mode, digest, hookValue, outputJSON, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_director_revisions(id,batch_id,book_id,owner_username,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, revisionID, book.BatchID, book.ID, owner, currentRevision+1, snapshotID, snapshot.Mode, digest, hookValue, string(outputJSON), now); err != nil {
 		return DirectorRevision{}, err
 	}
 
@@ -195,7 +195,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 			if err != nil {
 				return DirectorRevision{}, err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_orphaned_overrides(id,director_revision_id,video_id,patch_json,state,created_at) VALUES(?,?,?,?, 'orphaned',?)`, auditID, revisionID, videoID, encoded, now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_orphaned_overrides(id,director_revision_id,video_id,patch_json,state,created_at) VALUES(?,?,?,?, 'orphaned',?)`, auditID, revisionID, videoID, string(encoded), now); err != nil {
 				return DirectorRevision{}, err
 			}
 			orphaned = append(orphaned, OrphanedOverride{VideoID: videoID, Patch: patch, State: "orphaned"})
@@ -260,7 +260,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		if err != nil {
 			return DirectorRevision{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?)`, video.ID, owner, book.BatchID, book.ID, video.ID, encoded, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?)`, video.ID, owner, book.BatchID, book.ID, video.ID, string(encoded), now); err != nil {
 			return DirectorRevision{}, err
 		}
 	}

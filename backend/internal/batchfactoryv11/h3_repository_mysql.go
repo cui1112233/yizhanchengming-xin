@@ -338,7 +338,7 @@ func (s *MySQLStore) ApplyH3CompilationVideos(ctx context.Context, owner, batchI
 		if err != nil {
 			return nil, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=revision+1,updated_at=VALUES(updated_at)`, video.ID, owner, batchID, bookID, video.ID, encodedPatch, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=revision+1,updated_at=VALUES(updated_at)`, video.ID, owner, batchID, bookID, video.ID, string(encodedPatch), now); err != nil {
 			return nil, err
 		}
 	}
