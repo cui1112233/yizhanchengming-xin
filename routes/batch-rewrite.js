@@ -817,15 +817,12 @@ function createBatchRewriteRouter({
     // explicitly so the workbench can show only the books just submitted.
     const currentBatchIds = prepared.map(item => String(item.bookId || '')).filter(Boolean);
     report({ type: 'version_config', status: 'done', message: `版本配置已读取：${selectedVersions.map(version => version.toUpperCase()).join('、')}；有效 ${prepared.length} 个任务。` });
+    // 先把轻量任务落盘，再抓原文。抓原文返回的 bookinfo 里可能已经有
+    // 男女频/分类信息；在正文还没拿到之前就调用 AI，会把本来能直接判断的
+    // 任务误报成“AI 判断失败”。
     let classified = prepared;
     let classifyErrors = [];
-    if (workflow.auto_classify_missing !== false && prepared.length) {
-      const result = await classifier.classifyMissingRows({ configStore: store, tasks: prepared });
-      classified = result.tasks || prepared;
-      classifyErrors = result.errors || [];
-    }
-    await tasks.saveTasks(req.username, classified);
-    report({ type: 'classify', status: classifyErrors.length ? 'warning' : 'done', message: classifyErrors.length ? classifyErrors.join('；') : '风格和男女频补齐完成。' });
+    await tasks.saveTasks(req.username, prepared);
     let fetched = 0;
     let fetchFailed = 0;
     const fetchedIds = [];
@@ -847,6 +844,42 @@ function createBatchRewriteRouter({
           report({ type: 'fetch', status: 'failed', book_id: task?.bookId || '', message: `${task?.bookId || '任务'} 原文抓取失败。` });
         }
       }
+    }
+
+    // 原文抓取完成后再做分类：优先使用抓取接口返回的 bookinfo，只有仍缺
+    // 男女频或风格时，classifier 才会调用文本模型补齐。
+    if (workflow.auto_classify_missing !== false && prepared.length) {
+      const refreshed = [];
+      for (const task of prepared) {
+        const current = await tasks.getTask(req.username, task.bookId);
+        const meta = current?.meta || current || task;
+        const info = meta?.bookinfo && typeof meta.bookinfo === 'object' ? meta.bookinfo : {};
+        const category = String(info.category || info.category_name || '').trim();
+        const gender = !meta.gender && /女频|女生|女向/i.test(category)
+          ? '女'
+          : (!meta.gender && /男频|男生|男向/i.test(category) ? '男' : '');
+        const styleCandidates = [info.style, info.style_name, info.genre, info.genre_name, category]
+          .map(value => String(value || '').replace(/^(男频|女频)[\s:_-]*/i, '').trim())
+          .filter(Boolean);
+        const styles = Array.isArray(store.getStyles?.()) ? store.getStyles() : [];
+        const style = !meta.style
+          ? styles.find(candidate => styleCandidates.some(value => value === candidate || value.includes(candidate) || candidate.includes(value))) || ''
+          : '';
+        refreshed.push({
+          ...task,
+          ...meta,
+          ...(gender ? { gender, genderSource: 'bookinfo' } : {}),
+          ...(style ? { style, styleSource: 'bookinfo' } : {}),
+          bookinfo: info
+        });
+      }
+      const result = await classifier.classifyMissingRows({ configStore: store, tasks: refreshed });
+      classified = result.tasks || refreshed;
+      classifyErrors = result.errors || [];
+      await tasks.saveTasks(req.username, classified);
+      report({ type: 'classify', status: classifyErrors.length ? 'warning' : 'done', message: classifyErrors.length ? classifyErrors.join('；') : '原文已获取，男女频和风格补齐完成。' });
+    } else {
+      report({ type: 'classify', status: 'skipped', message: '未开启自动分类，保留原文后再手动判断。' });
     }
     let generated = 0;
     let rewriteFailed = 0;
