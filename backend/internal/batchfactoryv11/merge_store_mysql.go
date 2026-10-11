@@ -33,7 +33,7 @@ func loadMergeJob(ctx context.Context, q productionQueryer, owner, id string) (M
 	var state string
 	var outputURL, errorMessage, timingMode, progressPhase sql.NullString
 	var providerTaskID sql.NullString
-	err := q.QueryRowContext(ctx, `SELECT id,batch_id,book_id,COALESCE(opening_variant_index,0),request_id,timing_mode,speed,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at FROM batch_factory_v11_merge_jobs WHERE id=? AND owner_username=?`, id, owner).Scan(
+	err := q.QueryRowContext(ctx, `SELECT id,batch_id,COALESCE(book_id,''),COALESCE(opening_variant_index,0),request_id,timing_mode,speed,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at FROM batch_factory_v11_merge_jobs WHERE id=? AND owner_username=?`, id, owner).Scan(
 		&value.ID, &value.BatchID, &value.BookID, &value.OpeningVariantIndex, &value.RequestID, &timingMode, &value.Speed, &providerTaskID, &state, &progressPhase, &value.ProgressCurrent, &value.ProgressTotal, &outputURL, &errorMessage, &value.CreatedAt, &value.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
