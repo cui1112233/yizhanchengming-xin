@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -24,6 +25,22 @@ import (
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
+
+func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
+	updated := make(map[string]any, len(current)+len(patch))
+	for key, value := range current {
+		updated[key] = value
+	}
+	for _, key := range []string{"name", "kind", "adapterKind", "enabled", "parameterSchema", "credentialRef", "endpoint", "tasksEndpoint", "resultEndpoint", "workflowId", "requestTemplate", "responseMapping", "credential", "apiKey"} {
+		if value, exists := patch[key]; exists {
+			updated[key] = value
+		}
+	}
+	if strings.TrimSpace(modelString(updated, "name")) == "" || strings.TrimSpace(modelString(updated, "kind")) == "" {
+		return nil, errors.New("模型名称和能力不能为空")
+	}
+	return updated, nil
+}
 
 var shuihuoProductionConfigs sync.Map
 
@@ -280,14 +297,9 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if !decodeJSON(w, r, &patch) {
 			return
 		}
-		current := models[index]
-		for _, key := range []string{"name", "kind", "adapterKind", "enabled", "parameterSchema", "credentialRef", "endpoint", "tasksEndpoint", "resultEndpoint", "workflowId", "requestTemplate", "responseMapping", "credential", "apiKey"} {
-			if value, exists := patch[key]; exists {
-				current[key] = value
-			}
-		}
-		if strings.TrimSpace(modelString(current, "name")) == "" || strings.TrimSpace(modelString(current, "kind")) == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "模型名称和能力不能为空"})
+		current, patchErr := patchShuihuoModel(models[index], patch)
+		if patchErr != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": patchErr.Error()})
 			return
 		}
 		models[index] = current

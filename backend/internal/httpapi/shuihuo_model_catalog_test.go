@@ -110,3 +110,14 @@ func TestShuihuoImageModelReadyUsesBaseURLAndCredentialRef(t *testing.T) {
 		t.Fatal("disabled image model must not be ready")
 	}
 }
+
+func TestPatchShuihuoModelAllowsStatusOnlyUpdates(t *testing.T) {
+	current := map[string]any{"id": "text-model", "name": "文本模型", "kind": "text", "enabled": true}
+	updated, err := patchShuihuoModel(current, map[string]any{"enabled": false})
+	if err != nil {
+		t.Fatalf("status-only patch should be accepted: %v", err)
+	}
+	if updated["enabled"] != false || updated["name"] != "文本模型" || updated["kind"] != "text" {
+		t.Fatalf("unexpected patched model: %#v", updated)
+	}
+}
