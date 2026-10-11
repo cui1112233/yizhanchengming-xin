@@ -771,6 +771,25 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "suggestions": strings.TrimSpace(content)})
 	})
 
+	mux.HandleFunc("POST /api/novel-fetch-workshop/rules/preview", func(w http.ResponseWriter, req *http.Request) {
+		var input struct {
+			Text         string         `json:"text"`
+			Scope        string         `json:"scope"`
+			LayoutConfig map[string]any `json:"layoutConfig"`
+			Knowledge    map[string]any `json:"knowledge"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+			return
+		}
+		if strings.TrimSpace(input.Text) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入待预览文本"})
+			return
+		}
+		result, trace := novelfetchworkshop.PreviewRules(input.Text, input.Scope, input.LayoutConfig, input.Knowledge)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "text": result, "result": result, "trace": trace, "config": input.LayoutConfig})
+	})
+
 	mux.HandleFunc("GET /api/novel-fetch-workshop/knowledge/summary", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		settings, err := store.GetConfig(req.Context(), identity.Username)
