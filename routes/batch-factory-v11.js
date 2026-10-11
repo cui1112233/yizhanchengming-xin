@@ -1503,6 +1503,41 @@ const DERIVED_OPENING_PRESETS = Object.freeze([
   ['batch-viral-director', 'director.viral', '爆款开头导演']
 ]);
 
+// 给旧版管理端提供一个只读的批量工厂提示词下拉目录。
+// 这里刻意只返回已发布、属于 batch-factory 的基础预设，避免把草稿或
+// 其它模块的提示词混进业务选择器。
+function listBatchFactoryPrompts(presetStore) {
+  const list = typeof presetStore?.listAll === 'function' ? presetStore.listAll('batch-factory') : [];
+  const typeBySlot = {
+    'batch.hook-adaptation': 'hook',
+    'batch.video-meta': 'video',
+    'batch.original-director': 'director',
+    'batch.viral-director': 'director',
+    'batch.character-meta': 'character',
+    'batch.scene-meta': 'scene',
+    'batch.visual-meta': 'visual'
+  };
+  const typeById = {
+    'batch-hook-adaptation': 'hook',
+    'batch-video-meta': 'video',
+    'batch-original-director': 'director',
+    'batch-viral-director': 'director',
+    'batch-character-meta': 'character',
+    'batch-scene-meta': 'scene',
+    'batch-visual-meta': 'visual'
+  };
+  return list
+    .filter(item => item?.status === 'published' && item?.module === 'batch-factory' && (item?.kind || 'base') === 'base')
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      version: item.version,
+      type: typeBySlot[item.protocolLock?.slot] || typeById[item.id] || item.protocolLock?.slot || 'unknown'
+    }))
+    .filter(item => item.type !== 'unknown');
+}
+
 function resolveDerivedOpeningPrompt(presetId, presetStore, resolveBody = resolveSystemPresetBody) {
   const selected = String(presetId || '').trim();
   const definition = DERIVED_OPENING_PRESETS.find(([id]) => id === selected);
@@ -2730,6 +2765,7 @@ module.exports = {
   directorBookPath,
   singleBookDirectorStageTarget,
   generateOpeningVariantsAfterSingleDirector,
+  listBatchFactoryPrompts,
   styleSystemBookPath,
   batchFactory121PublishPath,
   batchFactoryBookClassificationPath,
