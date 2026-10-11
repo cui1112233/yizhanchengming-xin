@@ -216,7 +216,9 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 		"/api/batch-rewrite/rules/ai-suggest",
 	} {
 		method := http.MethodGet
-		if strings.Contains(path, "rules/") { method = http.MethodPost }
+		if strings.Contains(path, "rules/") {
+			method = http.MethodPost
+		}
 		req := httptest.NewRequest(method, path, nil)
 		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {
 			t.Fatalf("%s %s must use the Go native compatibility handler", method, path)
@@ -229,6 +231,7 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 		{http.MethodPost, "/api/batch-rewrite/process"},
 		{http.MethodPost, "/api/batch-rewrite/process/start"},
 		{http.MethodPost, "/api/batch-rewrite/tasks/book-1/fetch"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/book-1/generate-ai"},
 		{http.MethodPost, "/api/batch-rewrite/tasks/batch-retry"},
 		{http.MethodPost, "/api/batch-rewrite/config"},
 		{http.MethodPost, "/api/batch-rewrite/knowledge/optimize"},
