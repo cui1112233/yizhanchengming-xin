@@ -42,7 +42,7 @@ export function ShuihuoModelCatalogPage() {
 
   function openEdit(model) {
     setEditingModel(model);
-    form.setFieldsValue({ ...model, modelId: model.modelId || model.id, credentialRef: '' });
+    form.setFieldsValue({ ...model, modelId: model.modelId || model.id, endpoint: model.endpoint || model.baseUrl || '', credentialRef: '' });
     setOpen(true);
   }
 
@@ -119,6 +119,7 @@ export function ShuihuoModelCatalogPage() {
         <Form.Item label="适配器" name="adapterKind"><Select options={adapters} onChange={nextAdapterKind => form.setFieldValue('kind', adapters.find(item => item.value === nextAdapterKind)?.kind)} /></Form.Item>
         <Form.Item name="kind" hidden><Input /></Form.Item>
         <Form.Item label="启用" name="enabled" valuePropName="checked"><Switch /></Form.Item>
+        {adapterKind !== 'local_executor_video' ? <Form.Item label="服务地址" name="endpoint" rules={[{ required: true, message: '请填写服务地址' }]} extra="文本和图片模型支持 OpenAI 兼容地址；视频/配音按适配器协议填写"><Input placeholder="例如 https://provider.example.com/v1" /></Form.Item> : null}
         <Form.Item label="公开参数 Schema" name="parameterSchema"><Input.TextArea rows={3} /></Form.Item>
         <Form.Item label="密钥引用" name="credentialRef"><Input.Password placeholder="例如 IMAGE_PROVIDER_TOKEN，仅写入不回显" /></Form.Item>
         {isYDVideoAdapter ? <>

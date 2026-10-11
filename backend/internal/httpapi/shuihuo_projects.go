@@ -12,6 +12,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -204,7 +205,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		model["id"] = modelID
 		models = append(models, model)
 		config["modelCatalog"] = models
-		if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
+		if err := saveShuihuoAdminModelCatalog(r.Context(), store, catalogStore, identity.Username, config, models); err != nil {
 			writeStoreError(w, err)
 			return
 		}
@@ -247,7 +248,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if r.Method == http.MethodDelete {
 			models = append(models[:index], models[index+1:]...)
 			config["modelCatalog"] = models
-			if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
+			if err := saveShuihuoAdminModelCatalog(r.Context(), store, catalogStore, identity.Username, config, models); err != nil {
 				writeStoreError(w, err)
 				return
 			}
@@ -274,7 +275,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		models[index] = current
 		config["modelCatalog"] = models
-		if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
+		if err := saveShuihuoAdminModelCatalog(r.Context(), store, catalogStore, identity.Username, config, models); err != nil {
 			writeStoreError(w, err)
 			return
 		}
@@ -322,10 +323,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if endpoint == "" {
 			endpoint = modelString(model, "baseUrl")
 		}
-		credential := modelString(model, "apiKey")
-		if credential == "" {
-			credential = modelString(model, "credential")
-		}
+		credential := shuihuoModelCredential(model)
 		if endpoint == "" || credential == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": kind, "error": "模型地址或凭据未配置"})
 			return
@@ -2206,6 +2204,27 @@ func saveShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, ow
 	return nil
 }
 
+// saveShuihuoAdminModelCatalog keeps the admin catalog and the account model
+// catalog in sync. The latter is what the user-facing API configuration and
+// runtime model selectors read, so saving only the Shuihuo compatibility blob
+// would make an admin edit disappear on the next read.
+func saveShuihuoAdminModelCatalog(ctx context.Context, store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, owner string, config map[string]any, models []map[string]any) error {
+	if catalogStore != nil {
+		managed, err := catalogStore.GetConfig(ctx, owner)
+		if err != nil {
+			return err
+		}
+		managed["modelCatalog"] = models
+		if _, ok := managed["modelCatalogVersion"]; !ok {
+			managed["modelCatalogVersion"] = 1
+		}
+		if err := catalogStore.PutConfig(ctx, owner, managed); err != nil {
+			return err
+		}
+	}
+	return saveShuihuoOwnerConfig(ctx, store, owner, config)
+}
+
 func shuihuoCollection(config map[string]any, key string, fallback []map[string]any) []map[string]any {
 	if raw, ok := config[key].([]any); ok {
 		items := make([]map[string]any, 0, len(raw))
@@ -2226,7 +2245,7 @@ func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[strin
 	result := make([]map[string]any, 0, len(models))
 	for _, model := range models {
 		copy := map[string]any{}
-		for _, key := range []string{"id", "modelId", "name", "displayName", "kind", "provider", "adapterKind", "enabled", "configured", "parameterSchema", "credentialRef", "endpoint", "requestTemplate", "responseMapping"} {
+		for _, key := range []string{"id", "modelId", "name", "displayName", "kind", "provider", "adapterKind", "enabled", "configured", "parameterSchema", "credentialRef", "endpoint", "baseUrl", "requestTemplate", "responseMapping"} {
 			if value, exists := model[key]; exists {
 				copy[key] = value
 			}
@@ -2242,7 +2261,7 @@ func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[strin
 		if !includeSecrets {
 			_, hasCredential := model["credential"]
 			_, hasAPIKey := model["apiKey"]
-			copy["hasCredential"] = (hasCredential && strings.TrimSpace(modelString(model, "credential")) != "") || (hasAPIKey && strings.TrimSpace(modelString(model, "apiKey")) != "") || model["hasCredential"] == true
+			copy["hasCredential"] = (hasCredential && strings.TrimSpace(modelString(model, "credential")) != "") || (hasAPIKey && strings.TrimSpace(modelString(model, "apiKey")) != "") || shuihuoModelCredential(model) != "" || model["hasCredential"] == true
 		}
 		result = append(result, copy)
 	}
@@ -2264,11 +2283,11 @@ func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoPr
 	modelID, _ := model["modelId"].(string)
 	provider, _ := model["provider"].(string)
 	provider = batchfactoryv11.VideoProviderForModel(modelID, provider)
-	apiKey, _ := model["apiKey"].(string)
-	if strings.TrimSpace(apiKey) == "" {
-		apiKey, _ = model["credential"].(string)
-	}
+	apiKey := shuihuoModelCredential(model)
 	endpoint, _ := model["endpoint"].(string)
+	if strings.TrimSpace(endpoint) == "" {
+		endpoint = modelString(model, "baseUrl")
+	}
 	tasksEndpoint, _ := model["tasksEndpoint"].(string)
 	resultEndpoint, _ := model["resultEndpoint"].(string)
 	workflowID, _ := model["workflowId"].(string)
@@ -2286,10 +2305,7 @@ func syncShuihuoConfiguredVideoModels(ctx context.Context, store batchfactoryv11
 		if !strings.EqualFold(strings.TrimSpace(kind), "video") || (enabledSet && !enabled) {
 			continue
 		}
-		apiKey, _ := model["apiKey"].(string)
-		if strings.TrimSpace(apiKey) == "" {
-			apiKey, _ = model["credential"].(string)
-		}
+		apiKey := shuihuoModelCredential(model)
 		provider, _ := model["provider"].(string)
 		if strings.TrimSpace(apiKey) == "" && batchfactoryv11.VideoProviderForModel(modelString(model, "modelId"), provider) != batchfactoryv11.VideoProviderDoubaoLocal {
 			continue
@@ -2304,6 +2320,19 @@ func syncShuihuoConfiguredVideoModels(ctx context.Context, store batchfactoryv11
 func modelString(model map[string]any, key string) string {
 	value, _ := model[key].(string)
 	return strings.TrimSpace(value)
+}
+
+func shuihuoModelCredential(model map[string]any) string {
+	if value := modelString(model, "apiKey"); value != "" {
+		return value
+	}
+	if value := modelString(model, "credential"); value != "" {
+		return value
+	}
+	if ref := modelString(model, "credentialRef"); ref != "" {
+		return strings.TrimSpace(os.Getenv(ref))
+	}
+	return ""
 }
 
 func writeShuihuoProjectExport(w http.ResponseWriter, r *http.Request, files *localartifact.Store, batch batchfactoryv11.Batch) error {
@@ -2636,14 +2665,15 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 	if model == nil {
 		return nil, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
 	}
-	endpoint, err := shuihuoImageGenerationEndpoint(modelString(model, "endpoint"))
+	endpointRaw := modelString(model, "endpoint")
+	if endpointRaw == "" {
+		endpointRaw = modelString(model, "baseUrl")
+	}
+	endpoint, err := shuihuoImageGenerationEndpoint(endpointRaw)
 	if err != nil {
 		return nil, fmt.Errorf("%w: image model endpoint is invalid", batchfactoryv11.ErrInvalid)
 	}
-	apiKey := modelString(model, "apiKey")
-	if apiKey == "" {
-		apiKey = modelString(model, "credential")
-	}
+	apiKey := shuihuoModelCredential(model)
 	if apiKey == "" {
 		return nil, fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
 	}
@@ -2809,10 +2839,7 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 	if err != nil {
 		return nil, fmt.Errorf("%w: image model endpoint is invalid", batchfactoryv11.ErrInvalid)
 	}
-	apiKey := modelString(model, "apiKey")
-	if apiKey == "" {
-		apiKey = modelString(model, "credential")
-	}
+	apiKey := shuihuoModelCredential(model)
 	if apiKey == "" {
 		return nil, fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
 	}
