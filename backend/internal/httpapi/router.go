@@ -88,26 +88,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerDirectorRoutes(v11, options.Director, options.Store)
 		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production}
 		if options.LocalArtifacts != nil {
-			stageService.ImageReady = func(ctx context.Context, owner string) (bool, string) {
-				config, err := loadShuihuoOwnerConfig(ctx, options.Store, owner, options.NovelFetchStore)
-				if err != nil {
-					return false, "图片模型配置读取失败"
-				}
-				for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
-					if !strings.EqualFold(modelString(model, "kind"), "image") {
-						continue
-					}
-					enabled, hasEnabled := model["enabled"].(bool)
-					if hasEnabled && !enabled {
-						continue
-					}
-					if !shuihuoImageModelReady(model) {
-						continue
-					}
-					return true, ""
-				}
-				return false, "图片模型或图片生成服务未配置"
-			}
+			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, options.NovelFetchStore)
 			stageService.ImageGenerator = func(ctx context.Context, owner, batchID, bookID string) error {
 				batch, err := options.Store.GetBatch(ctx, owner, batchID)
 				if err != nil {
@@ -202,7 +183,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, "v12", options.NovelFetchStore)
 	if options.Store != nil {
-		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production}
+		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, options.NovelFetchStore)}
 		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
@@ -348,6 +329,21 @@ func shuihuoImageModelReady(model map[string]any) bool {
 		return false
 	}
 	return shuihuoModelCredential(model) != ""
+}
+
+func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store) func(context.Context, string) (bool, string) {
+	return func(ctx context.Context, owner string) (bool, string) {
+		config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStore)
+		if err != nil {
+			return false, "图片模型配置读取失败"
+		}
+		for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
+			if shuihuoImageModelReady(model) {
+				return true, ""
+			}
+		}
+		return false, "图片模型或图片生成服务未配置"
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

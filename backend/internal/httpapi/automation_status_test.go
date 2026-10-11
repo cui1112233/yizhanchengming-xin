@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 func TestFileAutomationStatusReaderMatchesNodePublicShape(t *testing.T) {
@@ -86,6 +87,26 @@ func TestV12RuntimeSummaryUsesConfiguredTextProvider(t *testing.T) {
 	})
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/runtime-summary", nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"stage":"assets","available":true`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestV12RuntimeSummaryUsesConfiguredImageModel(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "图片模型状态", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "正文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "alice", map[string]any{"modelCatalog": []any{map[string]any{
+		"id": "image-demo", "kind": "image", "enabled": true, "modelId": "image-model", "baseUrl": "https://images.example/v1", "credential": "image-secret",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 2, Store: store, NovelFetchStore: catalog})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/runtime-summary", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"stage":"image","available":true`) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
