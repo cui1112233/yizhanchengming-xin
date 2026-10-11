@@ -57,3 +57,30 @@ func TestBatchRewriteWebSubmitHistoryReadsGoDocumentLogs(t *testing.T) {
 		t.Fatalf("groups=%#v", payload["groups"])
 	}
 }
+
+func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T) {
+	payload := legacyBatchRewriteConfig(map[string]any{
+		"appConfig": map[string]any{
+			"modelCatalog":  []any{map[string]any{"id": "managed-text", "kind": "text", "modelId": "gemini", "credential": "secret", "enabled": true}},
+			"text_model_id": "managed-text",
+		},
+	}, false)
+	app := payload["app_config"].(map[string]any)
+	if app["text_model_id"] != "managed-text" {
+		t.Fatalf("text model not preserved: %#v", app["text_model_id"])
+	}
+	models := app["modelCatalog"].([]any)
+	if len(models) != 1 || models[0].(map[string]any)["credential"] != nil || models[0].(map[string]any)["hasCredential"] != true {
+		t.Fatalf("model catalog was not safely exposed: %#v", models)
+	}
+	if got := len(payload["parse_modes"].([]any)); got != 7 {
+		t.Fatalf("parse modes=%d", got)
+	}
+	if got := len(payload["column_presets"].([]any)); got != 5 {
+		t.Fatalf("column presets=%d", got)
+	}
+	webSubmit := payload["web_submit"].(map[string]any)
+	if webSubmit["submit_mode"] != "version" || webSubmit["target"] != "two.121w.com" {
+		t.Fatalf("web submit defaults=%#v", webSubmit)
+	}
+}

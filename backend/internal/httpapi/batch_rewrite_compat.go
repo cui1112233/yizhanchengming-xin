@@ -496,9 +496,9 @@ func targetNumber(value any) float64 {
 }
 
 func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[string]any {
-	appConfig := settings
+	appConfig := cloneAnyMap(settings)
 	if configured, ok := settings["appConfig"].(map[string]any); ok {
-		appConfig = configured
+		appConfig = cloneAnyMap(configured)
 	}
 	platforms := arrayOrEmpty(settings["platforms"])
 	styles := arrayOrEmpty(settings["styles"])
@@ -507,6 +507,22 @@ func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[str
 	}
 	if len(styles) == 0 {
 		styles = append([]any(nil), defaultNovelFetchStyles...)
+	}
+	// 旧工作台会直接读取这些字段来初始化表单。Go 端不能只返回空壳，
+	// 否则页面虽然能打开，但“文本模型/解析模式/工作流”都会回到空值。
+	applyBatchRewriteDefaults(appConfig)
+	if catalog, exists := settings["modelCatalog"]; exists {
+		if raw, ok := appConfig["modelCatalog"].([]any); !ok || len(raw) == 0 {
+			appConfig["modelCatalog"] = catalog
+		}
+	}
+	if strings.TrimSpace(toString(appConfig["text_model_id"])) == "" {
+		for _, key := range []string{"text_model_id", "textModelId", "selectedTextModelId"} {
+			if value := strings.TrimSpace(toString(settings[key])); value != "" {
+				appConfig["text_model_id"] = value
+				break
+			}
+		}
 	}
 	knowledge := arrayOrEmptyMap(appConfig["knowledge"])
 	if lightweight {
@@ -517,21 +533,124 @@ func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[str
 		workForm = mapOrEmpty(settings["work_form"])
 	}
 	return map[string]any{
-		"app_config":        appConfig,
+		"app_config":        publicBatchAppConfig(appConfig),
 		"platforms":         platforms,
 		"styles":            styles,
 		"sensitive":         mapOrEmpty(settings["sensitive"]),
-		"web_submit":        mapOrEmpty(appConfig["web_submit"]),
+		"web_submit":        publicBatchWebSubmit(appConfig["web_submit"]),
 		"knowledge":         knowledge,
 		"knowledge_loaded":  !lightweight,
-		"knowledge_summary": map[string]any{},
-		"parse_modes": []any{
-			map[string]any{"id": "smart", "name": "智能解析"},
-			map[string]any{"id": "strict", "name": "严格解析"},
-		},
-		"column_presets": []any{},
-		"work_form":      workForm,
+		"knowledge_summary": batchKnowledgeSummary(knowledge, lightweight),
+		"parse_modes":       batchRewriteParseModes,
+		"column_presets":    batchRewriteColumnPresets,
+		"work_form":         workForm,
 	}
+}
+
+var batchRewriteParseModes = []any{
+	map[string]any{"id": "smart", "name": "smart"},
+	map[string]any{"id": "header", "name": "header"},
+	map[string]any{"id": "multi_header", "name": "multi_header"},
+	map[string]any{"id": "fixed_full_11", "name": "fixed_full_11"},
+	map[string]any{"id": "fixed_from_b", "name": "fixed_from_b"},
+	map[string]any{"id": "fixed_paid_basic", "name": "fixed_paid_basic"},
+	map[string]any{"id": "custom", "name": "custom"},
+}
+
+var batchRewriteColumnPresets = []any{
+	map[string]any{"id": "paid_name_reason", "name": "付费ID/书名/推荐理由", "columns": []any{"paid_book_id", "book_name", "reason"}},
+	map[string]any{"id": "paid_name_gender_reason", "name": "付费ID/书名/男女频/推荐理由", "columns": []any{"paid_book_id", "book_name", "gender", "reason"}},
+	map[string]any{"id": "free_paid_name_gender_reason", "name": "免费ID/付费ID/书名/男女频/推荐理由", "columns": []any{"free_book_id", "paid_book_id", "book_name", "gender", "reason"}},
+	map[string]any{"id": "sample_input", "name": "书籍ID/书名/推荐理由/男女频/标签/评级", "columns": []any{"book_id", "book_name", "reason", "gender", "tags", "rating"}},
+	map[string]any{"id": "full_11", "name": "完整11列", "columns": []any{"ignore", "free_book_id", "paid_book_id", "book_name", "rating", "ignore", "ignore", "ignore", "ignore", "gender", "reason"}},
+}
+
+func applyBatchRewriteDefaults(app map[string]any) {
+	defaults := map[string]any{
+		"workflow":   map[string]any{"auto_classify_missing": true, "auto_fetch_original": true, "auto_rewrite_after_fetch": true, "auto_submit_after_rewrite": false, "auto_submit_confirmed": false},
+		"fetch":      map[string]any{"endpoint": "https://txt.121w.com/api.php", "default_max_txt": 4000, "timeout_seconds": 30, "concurrency": 4, "retries": 1, "auto_detect_platform": false},
+		"ai":         map[string]any{"base_url": "", "api_key": "", "model": "", "timeout_seconds": 180, "max_concurrency": 6, "retry_times": 2, "max_tokens": 1200, "temperature": 0.45, "top_p": 0.9, "stream": false, "json_mode": false, "enable_thinking": false, "disable_thinking": false, "extra_body_json": ""},
+		"ai_presets": []any{}, "ai_assignments": map[string]any{"classifier": "__current__", "rewrite": "__current__", "sensitive_fix": "__current__"},
+		"rewrite":    map[string]any{"default_ai_count": 1, "max_ai_count": 5, "process_line_count": 5, "anchor_line_count": 5, "temperature": 0.45, "strategy": "instruction", "method_sequence": []any{"high_imitation", "opening_instruction", "instruction"}, "prompt": "你是短视频小说正文改写师。请只根据原文、风格类型和男女频改写开头部分，保留故事事实、人物关系、时代背景和后续衔接。输出正文，不要解释。"},
+		"storage":    map[string]any{"cleanup_enabled": true, "retention_days": 7},
+		"parser":     map[string]any{"default_parse_mode": "smart", "default_column_preset_id": "sample_input", "custom_column_order": "书籍ID,书名,推荐理由,男女频,标签,评级"},
+		"web_submit": map[string]any{"enabled": false, "username": "", "password_masked": false, "skip_submitted": true, "min_text_chars": 0, "retry_times": 1, "submit_mode": "version", "selected_profile": "", "advanced": map[string]any{}, "upload_profiles": []any{}, "profile_bindings": map[string]any{}, "style_catalog": []any{}, "target": "two.121w.com"},
+	}
+	for key, value := range defaults {
+		if _, exists := app[key]; !exists || app[key] == nil {
+			app[key] = value
+		} else if dm, ok := value.(map[string]any); ok {
+			if current, ok := app[key].(map[string]any); ok {
+				for child, fallback := range dm {
+					if _, exists := current[child]; !exists || current[child] == nil {
+						current[child] = fallback
+					}
+				}
+			} else {
+				app[key] = dm
+			}
+		}
+	}
+	if _, ok := app["modelCatalog"]; !ok {
+		app["modelCatalog"] = []any{}
+	}
+	if _, ok := app["text_model_id"]; !ok {
+		app["text_model_id"] = ""
+	}
+}
+
+func publicBatchAppConfig(app map[string]any) map[string]any {
+	out := cloneAnyMap(app)
+	if raw, ok := app["modelCatalog"].([]any); ok {
+		models := make([]any, 0, len(raw))
+		for _, item := range raw {
+			if model, ok := item.(map[string]any); ok {
+				models = append(models, publicManagedModel(model))
+			}
+		}
+		out["modelCatalog"] = models
+	}
+	if raw, ok := app["modelCatalog"].([]map[string]any); ok {
+		models := make([]any, 0, len(raw))
+		for _, model := range raw {
+			models = append(models, publicManagedModel(model))
+		}
+		out["modelCatalog"] = models
+	}
+	if raw, ok := app["ai"].(map[string]any); ok {
+		ai := cloneAnyMap(raw)
+		delete(ai, "api_key")
+		out["ai"] = ai
+	}
+	return out
+}
+
+func publicBatchWebSubmit(value any) map[string]any {
+	cfg := mapOrEmpty(value)
+	out := map[string]any{"enabled": cfg["enabled"] == true, "username": firstText(cfg["username"]), "password": "", "password_masked": cfg["password_masked"] == true, "skip_submitted": cfg["skip_submitted"] != false, "min_text_chars": targetNumber(cfg["min_text_chars"]), "retry_times": targetNumber(cfg["retry_times"]), "submit_mode": "version", "selected_profile": firstText(cfg["selected_profile"]), "advanced": mapOrEmpty(cfg["advanced"]), "upload_profiles": arrayOrEmpty(cfg["upload_profiles"]), "profile_bindings": mapOrEmpty(cfg["profile_bindings"]), "style_catalog": arrayOrEmpty(cfg["style_catalog"]), "target": "two.121w.com"}
+	if out["min_text_chars"].(float64) < 0 {
+		out["min_text_chars"] = float64(0)
+	}
+	if out["retry_times"].(float64) < 1 {
+		out["retry_times"] = float64(1)
+	}
+	return out
+}
+
+func batchKnowledgeSummary(knowledge map[string]any, lightweight bool) map[string]any {
+	if lightweight {
+		return map[string]any{}
+	}
+	count := func(section, key string) int { return len(arrayOrEmpty(mapOrEmpty(knowledge[section])[key])) }
+	return map[string]any{"opening_phrases": count("opening_phrases", "items"), "opening_styles": count("opening_phrases", "styles"), "rewrite_profiles": count("rewrite_templates", "profiles"), "temporary_instructions": count("rewrite_templates", "temporary_instructions"), "high_imitation_prompts": count("high_imitation", "prompts"), "high_imitation_references": count("high_imitation", "references"), "sensitive_rules": count("layout_rules", "sensitive_rules"), "symbol_rules": count("symbol_rules", "symbol_rules"), "pair_fill_rules": count("symbol_rules", "pair_fill_rules"), "chapter_exact_rules": count("chapter_rules", "chapter_exact_rules"), "chapter_inline_rules": count("chapter_rules", "chapter_inline_rules")}
+}
+
+func cloneAnyMap(input map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
 }
 
 func arrayOrEmpty(value any) []any {
