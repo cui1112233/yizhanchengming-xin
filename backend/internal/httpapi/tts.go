@@ -122,19 +122,31 @@ func configuredTTSModel(ctx context.Context, store novelfetchworkshop.Store, own
 }
 
 func serveConfiguredTTS(w http.ResponseWriter, r *http.Request, input ttsRequest, model map[string]any) {
+	payload, contentType, err := requestConfiguredTTSBytes(r.Context(), input, model)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "音频模型请求失败: " + err.Error()})
+		return
+	}
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(payload)
+}
+
+func requestConfiguredTTSBytes(ctx context.Context, input ttsRequest, model map[string]any) ([]byte, string, error) {
 	endpoint := modelString(model, "endpoint")
 	if endpoint == "" {
 		endpoint = modelString(model, "baseUrl")
 	}
 	method, headers, body, err := configuredTTSRequest(modelString(model, "requestTemplate"), input, shuihuoModelCredential(model))
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "音频模型请求模板无效: " + err.Error()})
-		return
+		return nil, "", fmt.Errorf("请求模板无效: %w", err)
 	}
-	req, err := http.NewRequestWithContext(r.Context(), method, endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "音频模型地址无效"})
-		return
+		return nil, "", fmt.Errorf("音频模型地址无效")
 	}
 	for key, value := range headers {
 		req.Header.Set(key, value)
@@ -147,25 +159,21 @@ func serveConfiguredTTS(w http.ResponseWriter, r *http.Request, input ttsRequest
 	}
 	response, err := (&http.Client{Timeout: 60 * time.Second}).Do(req)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "音频模型请求失败: " + err.Error()})
-		return
+		return nil, "", err
 	}
 	defer response.Body.Close()
 	payload, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
 	if readErr != nil || len(payload) == 0 || response.StatusCode >= 400 {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": fmt.Sprintf("音频模型返回状态 %d", response.StatusCode)})
-		return
+		return nil, "", fmt.Errorf("音频模型返回状态 %d", response.StatusCode)
 	}
 	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "application/json") {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "音频模型返回了 JSON，而不是音频文件"})
-		return
+		return nil, "", fmt.Errorf("音频模型返回了 JSON，而不是音频文件")
 	}
-	if contentType := response.Header.Get("Content-Type"); contentType != "" {
-		w.Header().Set("Content-Type", contentType)
+	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if contentType == "" {
+		contentType = "audio/mpeg"
 	}
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(payload)
+	return payload, contentType, nil
 }
 
 func configuredTTSRequest(template string, input ttsRequest, credential string) (string, map[string]string, []byte, error) {

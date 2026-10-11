@@ -1009,7 +1009,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media storage is unavailable"})
 					return
 				}
-				task, audioErr := generateShuihuoSegmentAudio(r.Context(), store, files, owner, batch, strings.TrimSpace(input.SegmentID))
+				task, audioErr := generateShuihuoSegmentAudio(r.Context(), store, files, owner, batch, strings.TrimSpace(input.SegmentID), catalogStore)
 				if audioErr != nil {
 					writeStoreError(w, audioErr)
 					return
@@ -2757,7 +2757,7 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 	return generated, nil
 }
 
-func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID string) (map[string]any, error) {
+func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID string, catalogStores ...novelfetchworkshop.Store) (map[string]any, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -2775,25 +2775,39 @@ func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Stor
 	if text == "" {
 		return nil, fmt.Errorf("%w: segment not found or empty", batchfactoryv11.ErrNotFound)
 	}
-	body, _ := json.Marshal(map[string]any{"input": text, "voice": "zh-CN-XiaoxiaoNeural", "speed": 1.8, "pitch": "10", "style": "general"})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://tts3.121w.com/v1/audio/speech", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("%w: TTS request failed", batchfactoryv11.ErrUpstream)
+	input := ttsRequest{Input: text, Voice: "zh-CN-XiaoxiaoNeural", Speed: 1.8, Pitch: "10", Style: "general"}
+	var payload []byte
+	var mediaType string
+	var err error
+	if len(catalogStores) > 0 {
+		if model, found := configuredTTSModel(ctx, catalogStores[0], owner); found {
+			payload, mediaType, err = requestConfiguredTTSBytes(ctx, input, model)
+		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Host", "tts3.121w.com")
-	req.Header.Set("Referer", "http://tts3.121w.com/")
-	req.Header.Set("Origin", "http://tts3.121w.com")
-	response, err := (&http.Client{Timeout: 120 * time.Second}).Do(req)
+	if payload == nil {
+		body, _ := json.Marshal(map[string]any{"input": text, "voice": input.Voice, "speed": input.Speed, "pitch": input.Pitch, "style": input.Style})
+		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, "http://tts3.121w.com/v1/audio/speech", bytes.NewReader(body))
+		if requestErr != nil {
+			return nil, fmt.Errorf("%w: TTS request failed", batchfactoryv11.ErrUpstream)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Host", "tts3.121w.com")
+		req.Header.Set("Referer", "http://tts3.121w.com/")
+		req.Header.Set("Origin", "http://tts3.121w.com")
+		response, requestErr := (&http.Client{Timeout: 120 * time.Second}).Do(req)
+		if requestErr != nil {
+			return nil, fmt.Errorf("%w: TTS request failed: %v", batchfactoryv11.ErrUpstream, requestErr)
+		}
+		defer response.Body.Close()
+		payload, err = io.ReadAll(io.LimitReader(response.Body, 32<<20))
+		if err != nil || response.StatusCode < 200 || response.StatusCode >= 300 || len(payload) == 0 {
+			return nil, fmt.Errorf("%w: TTS provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+		}
+		mediaType = strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: TTS request failed: %v", batchfactoryv11.ErrUpstream, err)
 	}
-	defer response.Body.Close()
-	payload, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
-	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 || len(payload) == 0 {
-		return nil, fmt.Errorf("%w: TTS provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
-	}
-	mediaType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
 	if mediaType == "" || !strings.HasPrefix(mediaType, "audio/") {
 		mediaType = "audio/mpeg"
 	}
