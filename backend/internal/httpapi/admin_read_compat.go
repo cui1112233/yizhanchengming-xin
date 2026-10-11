@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/auth"
+	"qiantie/backend/internal/prompt"
 )
 
 func adminSystemFile(systemDir, name string) string {
@@ -22,10 +23,62 @@ func adminSystemFile(systemDir, name string) string {
 	return paths[0]
 }
 
-func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, accounts auth.Store, profiles *MemberProfileStore) {
+func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, accounts auth.Store, profiles *MemberProfileStore, catalogs ...*prompt.Catalog) {
 	if root == nil || accounts == nil || profiles == nil {
 		return
 	}
+	var catalog *prompt.Catalog
+	if len(catalogs) > 0 {
+		catalog = catalogs[0]
+	}
+	adminPresetAuth := func(next http.Handler) http.Handler {
+		return middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			identity, ok := BridgeIdentityFromContext(req.Context())
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			self := profiles.member(identity.Username, accounts)
+			if self == nil || toString(self["role"]) != "dev" {
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": "Forbidden"})
+				return
+			}
+			next.ServeHTTP(w, req)
+		}))
+	}
+	root.Handle("GET /api/admin/presets", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if catalog == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		items, err := catalog.Published(req.URL.Query().Get("module"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"presets": items})
+	})))
+	root.Handle("GET /api/admin/preset-slots", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if catalog == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		items, err := catalog.Published(req.URL.Query().Get("module"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		seen := map[string]bool{}
+		slots := make([]map[string]string, 0)
+		for _, item := range items {
+			if item.Slot == nil || strings.TrimSpace(*item.Slot) == "" || seen[*item.Slot] {
+				continue
+			}
+			seen[*item.Slot] = true
+			slots = append(slots, map[string]string{"id": *item.Slot, "label": *item.Slot, "mode": "primary"})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"slots": slots})
+	})))
 	root.Handle("GET /api/admin/error-logs", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {

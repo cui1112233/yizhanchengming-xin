@@ -118,7 +118,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if (req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health")) || isAdminAgentSkillRequest(req) {
+		if (req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health")) || isAdminAgentSkillRequest(req) || isGoAdminReadRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
@@ -266,6 +266,13 @@ func isAdminAgentSkillRequest(req *http.Request) bool {
 		return true
 	}
 	return strings.HasPrefix(req.URL.Path, "/api/admin/agent-skills/") && (strings.HasSuffix(req.URL.Path, "/publish") || strings.HasSuffix(req.URL.Path, "/archive"))
+}
+
+func isGoAdminReadRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil || req.Method != http.MethodGet {
+		return false
+	}
+	return req.URL.Path == "/api/admin/presets" || req.URL.Path == "/api/admin/preset-slots"
 }
 
 func isGoNovelFetchCompatRequest(req *http.Request) bool {

@@ -241,3 +241,14 @@ func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
 		t.Fatal("Go auth should enable with explicit opt-in")
 	}
 }
+
+func TestAdminPresetReadsUseGoHandler(t *testing.T) {
+	for _, path := range []string{"/api/admin/presets", "/api/admin/preset-slots"} {
+		if !isGoAdminReadRequest(httptest.NewRequest(http.MethodGet, path, nil)) {
+			t.Fatalf("%s must use the Go admin read handler", path)
+		}
+	}
+	if isGoAdminReadRequest(httptest.NewRequest(http.MethodPost, "/api/admin/presets", nil)) {
+		t.Fatal("admin preset writes remain staged until Go has a durable writer")
+	}
+}

@@ -182,7 +182,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.MemberProfileStore != nil {
 		RegisterPublicTeamInviteCompat(root, options.MemberProfileStore.SystemDir, options.AuthStore, options.MemberProfileStore)
 	}
-	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore)
+	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore, options.PresetCatalog)
 	RegisterClientErrorCompat(root, auth, options.MemberProfileStore)
 	if options.MemberProfileStore != nil {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)
