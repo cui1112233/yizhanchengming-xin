@@ -416,6 +416,12 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 1 && parts[0] == "automation-presets" {
 		return true
 	}
+	if len(parts) == 1 && parts[0] == "schedules" {
+		return true
+	}
+	if len(parts) == 2 && parts[0] == "schedules" {
+		return true
+	}
 	if len(parts) == 2 && parts[0] == "automation-presets" {
 		return true
 	}
