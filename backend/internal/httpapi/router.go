@@ -56,6 +56,7 @@ type RouterOptions struct {
 	GiantMaterialExecutor           *giantmaterialexecutor.Service
 	GiantMaterialResolver           GiantMaterialResolver
 	LocalArtifacts                  *localartifact.Store
+	LocalExecutorDownloadsDir       string
 	MergeOutput                     mergeworker.ObjectStore
 }
 
@@ -228,6 +229,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorArtifactRoutes(root, auth, options.LocalExecutors, options.LocalArtifacts)
 	RegisterLocalScriptVideoRoutes(root, auth, options.LocalExecutors)
+	RegisterLocalExecutorDownloadRoutes(root, options.LocalExecutorDownloadsDir)
 	RegisterGiantMaterialExecutorRoutes(root, auth, options.GiantMaterialExecutor)
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {

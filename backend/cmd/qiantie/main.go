@@ -222,6 +222,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if strings.HasPrefix(req.URL.Path, "/downloads/local-executor/") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if shouldBridgeLegacyAPIRequest(req, cfg.Slice) {
 			authProxy.ServeHTTP(w, req)
 			return

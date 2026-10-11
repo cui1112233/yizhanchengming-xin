@@ -80,6 +80,9 @@ try {
   if (-not $env:QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR) {
     $env:QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR = Join-Path $localData 'local-executor-artifacts'
   }
+  if (-not $env:QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR) {
+    $env:QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR = Join-Path $localData 'downloads'
+  }
   if (-not $env:QIANTIE_GO_AUTH_ENABLED) {
     $env:QIANTIE_GO_AUTH_ENABLED = '1'
   }
