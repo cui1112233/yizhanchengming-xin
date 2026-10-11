@@ -74,7 +74,7 @@ func TestMySQLStoreMigrateLegacyDocumentBodiesIsIdempotent(t *testing.T) {
 
 	selectSQL := regexp.QuoteMeta(`SELECT document_json FROM novel_fetch_workshop_documents WHERE owner_username=? AND book_id=? FOR UPDATE`)
 	insertSQL := regexp.QuoteMeta(`INSERT IGNORE INTO novel_fetch_workshop_bodies(owner_username,book_id,version_id,revision,content_encoding,content_blob,content_hash,char_count,state,created_at,updated_at,last_needed_at,expires_at) VALUES(?,?,?,1,'gzip',?,?,?,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),NULL)`)
-	updateSQL := regexp.QuoteMeta(`UPDATE novel_fetch_workshop_documents SET document_json=?, updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=?`)
+	updateSQL := regexp.QuoteMeta(`UPDATE novel_fetch_workshop_documents SET document_json=CAST(? AS CHAR CHARACTER SET utf8mb4), updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=?`)
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(selectSQL).WithArgs("alice", "123").WillReturnRows(sqlmock.NewRows([]string{"document_json"}).AddRow(raw))
@@ -119,7 +119,7 @@ func TestMySQLStoreGetDocumentMigratesLegacyBodiesLazily(t *testing.T) {
 	getSQL := regexp.QuoteMeta(`SELECT document_json, updated_at FROM novel_fetch_workshop_documents WHERE owner_username=? AND book_id=?`)
 	selectSQL := regexp.QuoteMeta(`SELECT document_json FROM novel_fetch_workshop_documents WHERE owner_username=? AND book_id=? FOR UPDATE`)
 	insertSQL := regexp.QuoteMeta(`INSERT IGNORE INTO novel_fetch_workshop_bodies(owner_username,book_id,version_id,revision,content_encoding,content_blob,content_hash,char_count,state,created_at,updated_at,last_needed_at,expires_at) VALUES(?,?,?,1,'gzip',?,?,?,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),NULL)`)
-	updateSQL := regexp.QuoteMeta(`UPDATE novel_fetch_workshop_documents SET document_json=?, updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=?`)
+	updateSQL := regexp.QuoteMeta(`UPDATE novel_fetch_workshop_documents SET document_json=CAST(? AS CHAR CHARACTER SET utf8mb4), updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=?`)
 
 	mock.ExpectQuery(getSQL).WithArgs("alice", "123").WillReturnRows(sqlmock.NewRows([]string{"document_json", "updated_at"}).AddRow(raw, updated))
 	mock.ExpectBegin()

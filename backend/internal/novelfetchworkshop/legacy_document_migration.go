@@ -149,7 +149,7 @@ func (s *MySQLStore) MigrateLegacyDocumentBodies(ctx context.Context, owner, boo
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE novel_fetch_workshop_documents SET document_json=?, updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=?`, lightweightRaw, owner, bookID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE novel_fetch_workshop_documents SET document_json=CAST(? AS CHAR CHARACTER SET utf8mb4), updated_at=CURRENT_TIMESTAMP(6) WHERE owner_username=? AND book_id=?`, string(lightweightRaw), owner, bookID); err != nil {
 		return err
 	}
 	return tx.Commit()
