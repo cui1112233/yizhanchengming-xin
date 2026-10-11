@@ -67,6 +67,31 @@ func TestBookStageServiceRetriesOnlyLatestFailedStageForBook(t *testing.T) {
 	}
 }
 
+func TestBookStageImageUsesConfiguredGenerator(t *testing.T) {
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "batch", Books: []CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	called := false
+	service := &BookStageService{
+		Store:      store,
+		ImageReady: func(context.Context, string) (bool, string) { return true, "" },
+		ImageGenerator: func(_ context.Context, owner, batchID, bookID string) error {
+			called = owner == "alice" && batchID == batch.ID && bookID == book.ID
+			return nil
+		},
+	}
+	summary, err := service.Run(context.Background(), "alice", batch.ID, book.ID, BookStageImage, StageModeMissing, "image-1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called || len(summary.Runs) != 1 || summary.Runs[0].Status != ProductionSucceeded {
+		t.Fatalf("image run did not use configured generator: called=%v runs=%+v", called, summary.Runs)
+	}
+}
+
 func TestLatestFailedBookStageRunIgnoresFailureResolvedByLaterAttempt(t *testing.T) {
 	firstFailure := BookStageRun{ID: "assets-1", Stage: BookStageAssets, Status: ProductionFailed, Attempt: 1, UpdatedAt: time.Unix(10, 0)}
 	resolvedRetry := BookStageRun{ID: "assets-2", Stage: BookStageAssets, Status: ProductionSucceeded, Attempt: 2, UpdatedAt: time.Unix(20, 0)}

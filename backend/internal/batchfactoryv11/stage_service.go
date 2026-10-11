@@ -21,9 +21,13 @@ type BookStageSummary struct {
 }
 
 type BookStageService struct {
-	Store             Store
-	Director          *DirectorService
-	Production        *ProductionService
+	Store      Store
+	Director   *DirectorService
+	Production *ProductionService
+	// ImageReady and ImageGenerator are supplied by the host application so
+	// the stage service stays independent from a particular image provider.
+	ImageReady        func(context.Context, string) (bool, string)
+	ImageGenerator    func(context.Context, string, string, string) error
 	SmartUnifiedStyle string
 	OpeningMeta       PresetSnapshot
 	H3Director        bool
@@ -41,7 +45,7 @@ func (s *BookStageService) repository() (BookStageRunRepository, error) {
 	return repository, nil
 }
 
-func (s *BookStageService) availability(stage BookStage) BookStageAvailability {
+func (s *BookStageService) availability(ctx context.Context, owner string, stage BookStage) BookStageAvailability {
 	switch stage {
 	case BookStageAssets:
 		if s != nil && s.Director != nil && s.Director.Store != nil && s.Director.Provider != nil {
@@ -59,8 +63,15 @@ func (s *BookStageService) availability(stage BookStage) BookStageAvailability {
 		}
 		return BookStageAvailability{Stage: stage, Reason: "文本模型未配置"}
 	case BookStageImage:
-		// V11 currently persists uploaded/provider-returned images but has no image
-		// provider adapter. Never claim a generated image that has not been produced.
+		if s != nil && s.ImageReady != nil {
+			ready, reason := s.ImageReady(ctx, owner)
+			if ready {
+				return BookStageAvailability{Stage: stage, Available: true}
+			}
+			if strings.TrimSpace(reason) != "" {
+				return BookStageAvailability{Stage: stage, Reason: reason}
+			}
+		}
 		return BookStageAvailability{Stage: stage, Reason: "图片模型或图片生成服务未配置"}
 	case BookStageVideo:
 		if s != nil && s.Production != nil && s.Production.Enabled {
@@ -81,7 +92,7 @@ func (s *BookStageService) Summary(ctx context.Context, owner, batchID, bookID s
 	if err != nil {
 		return BookStageSummary{}, err
 	}
-	availability := []BookStageAvailability{s.availability(BookStageAssets), s.availability(BookStageDirector), s.availability(BookStageOpening), s.availability(BookStageVisual), s.availability(BookStageImage), s.availability(BookStageVideo)}
+	availability := []BookStageAvailability{s.availability(ctx, owner, BookStageAssets), s.availability(ctx, owner, BookStageDirector), s.availability(ctx, owner, BookStageOpening), s.availability(ctx, owner, BookStageVisual), s.availability(ctx, owner, BookStageImage), s.availability(ctx, owner, BookStageVideo)}
 	return BookStageSummary{BookID: bookID, Runs: runs, Availability: availability, LastFailed: LatestFailedBookStageRun(runs)}, nil
 }
 
@@ -171,7 +182,7 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	if err != nil {
 		return BookStageSummary{}, err
 	}
-	availability := s.availability(stage)
+	availability := s.availability(ctx, owner, stage)
 	inputRevision := ""
 	if stage == BookStageVideo {
 		inputRevision = strings.TrimSpace(videoID)
@@ -198,6 +209,12 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		}
 	case BookStageVisual:
 		_, err = s.Director.RunVisualPromptExtraction(ctx, owner, batchID, bookID)
+	case BookStageImage:
+		if s.ImageGenerator == nil {
+			err = fmt.Errorf("%w: 图片模型或图片生成服务未配置", ErrUnavailable)
+		} else {
+			err = s.ImageGenerator(ctx, owner, batchID, bookID)
+		}
 	case BookStageDirector:
 		if mode == StageModeMissing && book.DirectorRevision != nil {
 			err = fmt.Errorf("%w: 导演分镜已存在；请使用重新生成导演分镜", ErrConflict)

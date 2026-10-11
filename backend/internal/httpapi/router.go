@@ -84,7 +84,56 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	if options.Store != nil && options.Director != nil && options.Slice >= 2 {
 		registerDirectorRoutes(v11, options.Director, options.Store)
-		registerBookStageRoutes(v11, &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production})
+		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production}
+		if options.LocalArtifacts != nil {
+			stageService.ImageReady = func(ctx context.Context, owner string) (bool, string) {
+				config, err := loadShuihuoOwnerConfig(ctx, options.Store, owner, options.NovelFetchStore)
+				if err != nil {
+					return false, "图片模型配置读取失败"
+				}
+				for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
+					if !strings.EqualFold(modelString(model, "kind"), "image") {
+						continue
+					}
+					enabled, hasEnabled := model["enabled"].(bool)
+					if hasEnabled && !enabled {
+						continue
+					}
+					if _, err := shuihuoImageGenerationEndpoint(modelString(model, "endpoint")); err != nil {
+						continue
+					}
+					if modelString(model, "apiKey") == "" && modelString(model, "credential") == "" {
+						continue
+					}
+					return true, ""
+				}
+				return false, "图片模型或图片生成服务未配置"
+			}
+			stageService.ImageGenerator = func(ctx context.Context, owner, batchID, bookID string) error {
+				batch, err := options.Store.GetBatch(ctx, owner, batchID)
+				if err != nil {
+					return err
+				}
+				var book batchfactoryv11.Book
+				found := false
+				for _, candidate := range batch.Books {
+					if candidate.ID == bookID {
+						book, found = candidate, true
+						break
+					}
+				}
+				if !found {
+					return batchfactoryv11.ErrNotFound
+				}
+				assetIDs := make([]string, 0, len(book.AssetRecords))
+				for _, asset := range book.AssetRecords {
+					assetIDs = append(assetIDs, asset.ID)
+				}
+				_, err = generateShuihuoAssetImages(ctx, options.Store, options.LocalArtifacts, owner, batch, assetIDs, "", "9:16", options.NovelFetchStore)
+				return err
+			}
+		}
+		registerBookStageRoutes(v11, stageService)
 	} else if options.Store != nil {
 		registerBookStageSummaryRoute(v11, &batchfactoryv11.BookStageService{Store: options.Store}, "v11")
 	}
