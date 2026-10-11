@@ -90,6 +90,12 @@ func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.Produ
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}
+		if service != nil && service.ProviderRegistry != nil {
+			if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), service.Store, service.ProviderRegistry, owner); syncErr != nil {
+				writeStoreError(w, syncErr)
+				return
+			}
+		}
 		job, err := service.SubmitBookProductionWithOptions(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.RequestID, input.Provider, batchfactoryv11.ProductionOptions{CompilationID: input.CompilationID})
 		if err != nil {
 			writeStoreError(w, err)
@@ -110,6 +116,12 @@ func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.Produ
 		if strings.TrimSpace(input.RequestID) == "" {
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
+		}
+		if service != nil && service.ProviderRegistry != nil {
+			if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), service.Store, service.ProviderRegistry, owner); syncErr != nil {
+				writeStoreError(w, syncErr)
+				return
+			}
 		}
 		status, err := service.SubmitBatchProductionWithProvider(r.Context(), owner, r.PathValue("batchId"), input.RequestID, input.Provider)
 		if err != nil {
