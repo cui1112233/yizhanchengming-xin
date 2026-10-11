@@ -278,7 +278,7 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 	// bridge while the actual novel-fetch request remains staged.
 	if (req.Method == http.MethodGet && path == "/api/novel-fetch/saved") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
-		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || strings.HasPrefix(path, "/api/batch-rewrite/tasks/"))) {
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || strings.HasPrefix(path, "/api/batch-rewrite/tasks/") || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
 		return true
 	}
 	if path == "/api/batch-rewrite/issues" || path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {

@@ -220,6 +220,8 @@ func TestNovelFetchSavedSurfaceUsesGoHandler(t *testing.T) {
 		{method: http.MethodPost, path: "/api/novel-fetch/save"},
 		{method: http.MethodGet, path: "/api/batch-rewrite/tasks"},
 		{method: http.MethodGet, path: "/api/batch-rewrite/tasks/book-1"},
+		{method: http.MethodGet, path: "/api/batch-rewrite/config"},
+		{method: http.MethodGet, path: "/api/batch-rewrite/bootstrap"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		if !isGoNovelFetchCompatRequest(req) {
