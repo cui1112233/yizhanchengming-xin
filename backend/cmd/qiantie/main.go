@@ -273,6 +273,12 @@ func isGoAdminReadRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
+	if path == "/api/admin/accounts" {
+		return req.Method == http.MethodGet || req.Method == http.MethodPost
+	}
+	if strings.HasPrefix(path, "/api/admin/accounts/") {
+		return req.Method == http.MethodPost && (strings.HasSuffix(path, "/status") || strings.HasSuffix(path, "/reset-password"))
+	}
 	if path == "/api/admin/applications" || path == "/api/admin/grants" {
 		return req.Method == http.MethodGet
 	}

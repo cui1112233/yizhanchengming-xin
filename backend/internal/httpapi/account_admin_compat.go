@@ -72,7 +72,7 @@ func managedAccountRow(account auth.Account, profile map[string]any) map[string]
 	if account.IsOwner {
 		role = "dev"
 	}
-	return map[string]any{"username": account.Username, "displayName": displayName, "role": role, "active": account.Active, "boundTo": boundTo, "teamOwner": nil, "apiScopes": []any{}, "monthlyTokenLimit": monthly, "presence": map[string]any{"online": false}, "usage": map[string]any{"month": map[string]any{}}}
+	return map[string]any{"username": account.Username, "displayName": displayName, "role": role, "active": account.Active, "isOwner": account.IsOwner, "updatedAt": account.UpdatedAt, "boundTo": boundTo, "teamOwner": nil, "apiScopes": []any{}, "monthlyTokenLimit": monthly, "presence": map[string]any{"online": false}, "usage": map[string]any{"month": map[string]any{}}}
 }
 
 // RegisterAccountAdminReadCompat keeps the account directory contract on Go.

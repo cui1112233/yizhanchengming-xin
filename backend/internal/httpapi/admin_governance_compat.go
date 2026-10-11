@@ -39,6 +39,64 @@ func RegisterAdminGovernanceCompat(root *http.ServeMux, middleware BridgeAuth, a
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"applications": readAdminGovernanceArray(profiles, "applications.json")})
 	})))
+	root.Handle("POST /api/admin/accounts", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := requireAdminGovernance(w, req, accounts, profiles, true)
+		if !ok {
+			return
+		}
+		input, ok := decodeAdminJSON(w, req, 32<<10)
+		if !ok {
+			return
+		}
+		account, err := createAdminAccount(req.Context(), profiles, accounts, identity.Username, input)
+		if err != nil {
+			writeAdminGovernanceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"account": account})
+	})))
+	root.Handle("POST /api/admin/accounts/{username}/status", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := requireAdminGovernance(w, req, accounts, profiles, false)
+		if !ok {
+			return
+		}
+		input, ok := decodeAdminJSON(w, req, 8<<10)
+		if !ok {
+			return
+		}
+		active, exists := input["active"].(bool)
+		if !exists {
+			writeAdminGovernanceError(w, auth.ErrInvalid)
+			return
+		}
+		account, err := setAdminAccountStatus(req.Context(), profiles, accounts, identity.Username, req.PathValue("username"), active)
+		if err != nil {
+			writeAdminGovernanceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"account": account})
+	})))
+	root.Handle("POST /api/admin/accounts/{username}/reset-password", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := requireAdminGovernance(w, req, accounts, profiles, false)
+		if !ok {
+			return
+		}
+		input, ok := decodeAdminJSON(w, req, 8<<10)
+		if !ok {
+			return
+		}
+		password := strings.TrimSpace(toString(input["password"]))
+		if len(password) < 8 {
+			writeAdminGovernanceError(w, auth.ErrInvalid)
+			return
+		}
+		account, err := resetAdminAccountPassword(req.Context(), profiles, accounts, identity.Username, req.PathValue("username"), password)
+		if err != nil {
+			writeAdminGovernanceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"account": account})
+	})))
 	for _, action := range []string{"approve", "reject"} {
 		action := action
 		root.Handle("POST /api/admin/applications/{id}/"+action, middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -243,6 +301,66 @@ func createAdminGrant(ctx context.Context, profiles *MemberProfileStore, account
 		return nil, err
 	}
 	return grant, nil
+}
+
+func createAdminAccount(ctx context.Context, profiles *MemberProfileStore, accounts auth.Store, _ string, input map[string]any) (map[string]any, error) {
+	username := strings.TrimSpace(toString(input["username"]))
+	password := strings.TrimSpace(toString(input["password"]))
+	if !managedUsernamePattern.MatchString(username) || len(password) < 8 {
+		return nil, auth.ErrInvalid
+	}
+	if _, err := accounts.FindAccount(ctx, username); err == nil {
+		return nil, auth.ErrInvalid
+	} else if err != auth.ErrNotFound {
+		return nil, err
+	}
+	hash, algorithm, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	if err := accounts.CreateAccount(ctx, auth.Account{Username: username, PasswordHash: hash, PasswordAlgorithm: algorithm, Active: true, CreatedAt: now, UpdatedAt: now}); err != nil {
+		return nil, err
+	}
+	if err := saveManagedProfile(profiles, username, username, "member", nil); err != nil {
+		return nil, err
+	}
+	account, err := accounts.FindAccount(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+	return managedAccountRow(account, managedProfile(profiles, username)), nil
+}
+
+func setAdminAccountStatus(ctx context.Context, profiles *MemberProfileStore, accounts auth.Store, _ string, username string, active bool) (map[string]any, error) {
+	account, err := accounts.FindAccount(ctx, strings.TrimSpace(username))
+	if err != nil {
+		return nil, err
+	}
+	if account.IsOwner && !active {
+		return nil, auth.ErrInvalid
+	}
+	if err := accounts.SetActive(ctx, account.Username, active); err != nil {
+		return nil, err
+	}
+	account.Active = active
+	return managedAccountRow(account, managedProfile(profiles, account.Username)), nil
+}
+
+func resetAdminAccountPassword(ctx context.Context, profiles *MemberProfileStore, accounts auth.Store, _ string, username, password string) (map[string]any, error) {
+	account, err := accounts.FindAccount(ctx, strings.TrimSpace(username))
+	if err != nil {
+		return nil, err
+	}
+	hash, algorithm, err := auth.HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+	if err := accounts.UpdatePassword(ctx, account.Username, hash, algorithm); err != nil {
+		return nil, err
+	}
+	account.UpdatedAt = time.Now().UTC()
+	return managedAccountRow(account, managedProfile(profiles, account.Username)), nil
 }
 
 func revokeAdminGrant(profiles *MemberProfileStore, _ string, id string) (map[string]any, error) {
