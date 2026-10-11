@@ -92,15 +92,19 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 			role := toString(member["role"])
 			bound := strings.TrimSpace(toString(member["boundTo"]))
 			if account.Username == toString(owner["username"]) || (role == "member" && bound == toString(owner["username"])) {
-				member["presence"] = map[string]any{"online": false}
+				// Keep the team response compatible with the public/3001 contract.
+				// The old page reads the full quota and usage objects, not only used/limit.
+				member["presence"] = map[string]any{"online": account.Username == toString(identity.Username)}
 				member["archive"] = nil
-				member["quota"] = map[string]any{"used": 0, "limit": member["monthlyTokenLimit"]}
+				member["quota"] = memberQuota(member["monthlyTokenLimit"], 0)
 				usage := emptyMemberUsage()
 				member["usage"] = map[string]any{"day": usage["day"], "month": usage["month"]}
+				member["memberQuota"] = memberQuota(member["monthlyTokenLimit"], 0)
+				member["teamGovernance"] = memberTeamGovernance(owner)
 				members = append(members, member)
 			}
 		}
-		response := map[string]any{"team": goTeam(owner), "teamGovernance": map[string]any{"monthlyTokenLimit": owner["monthlyTokenLimit"]}, "members": members}
+		response := map[string]any{"team": goTeam(owner), "teamGovernance": memberTeamGovernance(owner), "members": members}
 		if toString(self["role"]) == "dev" {
 			response["teams"] = []any{goTeam(owner)}
 		}
