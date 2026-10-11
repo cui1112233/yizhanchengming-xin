@@ -123,4 +123,11 @@ func TestBatchRewriteIssuesReadsGoDocumentLogs(t *testing.T) {
 	if entry["kind"] != "batch-rewrite.ai" || entry["status"] != float64(401) || entry["path"] != "/novel-fetch" {
 		t.Fatalf("entry=%#v", entry)
 	}
+	legacyAlias := httptest.NewRequest(http.MethodGet, "/api/novel-fetch-workshop/issues", nil)
+	SignBridgeRequest(legacyAlias, "tester", false, now, "secret")
+	aliasResponse := httptest.NewRecorder()
+	mux.ServeHTTP(aliasResponse, legacyAlias)
+	if aliasResponse.Code != http.StatusOK {
+		t.Fatalf("novel-fetch-workshop issues alias status=%d body=%s", aliasResponse.Code, aliasResponse.Body.String())
+	}
 }

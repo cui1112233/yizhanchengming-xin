@@ -40,7 +40,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	handler := middleware.Middleware(http.HandlerFunc(read))
 	root.Handle("GET /api/batch-rewrite/config", handler)
 	root.Handle("GET /api/batch-rewrite/bootstrap", handler)
-	root.Handle("GET /api/batch-rewrite/issues", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	issuesHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -52,7 +52,11 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
-	})))
+	}))
+	root.Handle("GET /api/batch-rewrite/issues", issuesHandler)
+	// Older novel-fetch pages used the workshop namespace for this same log.
+	// Keep the alias on Go so those pages do not fall back to the old Node app.
+	root.Handle("GET /api/novel-fetch-workshop/issues", issuesHandler)
 	root.Handle("GET /api/batch-rewrite/tasks", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
