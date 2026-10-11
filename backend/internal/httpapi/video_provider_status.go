@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 type videoProviderConfigReader interface {
 	GetConfig(context.Context, string) (map[string]any, error)
 }
 
-func registerVideoProviderStatusRoute(mux *http.ServeMux, auth BridgeAuth, reader videoProviderConfigReader, version string) {
+func registerVideoProviderStatusRoute(mux *http.ServeMux, auth BridgeAuth, reader videoProviderConfigReader, version string, catalogStores ...novelfetchworkshop.Store) {
 	if mux == nil || reader == nil {
 		return
 	}
@@ -26,6 +27,9 @@ func registerVideoProviderStatusRoute(mux *http.ServeMux, auth BridgeAuth, reade
 		if err != nil {
 			writeStoreError(w, batchfactoryv11.ErrUnavailable)
 			return
+		}
+		if len(catalogStores) > 0 {
+			mergeManagedModelCatalog(r.Context(), config, catalogStores[0], owner)
 		}
 		writeJSON(w, http.StatusOK, videoProviderStatus(config, r.URL.Query().Get("provider")))
 	})))

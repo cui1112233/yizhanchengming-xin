@@ -1,11 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 func TestVideoProviderStatusDoesNotExposeCredentials(t *testing.T) {
@@ -26,6 +29,23 @@ func TestV12VideoProviderStatusUsesGoUserConfig(t *testing.T) {
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, UserConfigStore: config})
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/video-provider/status?provider=personal_api", nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"provider":"personal_api"`) || !strings.Contains(rec.Body.String(), `"configured":false`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestV12VideoProviderStatusUsesManagedCatalog(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	config := NewUserConfigStore(filepath.Join(t.TempDir(), "users"))
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "alice", map[string]any{
+		"modelCatalog":        []any{map[string]any{"id": "yd2-mini-video", "kind": "video", "modelId": "yd-model", "credential": "configured"}},
+		"modelCatalogVersion": 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, UserConfigStore: config, NovelFetchStore: catalog})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/video-provider/status?provider=personal_api", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"model":"yd-model"`) || !strings.Contains(rec.Body.String(), `"configured":true`) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
