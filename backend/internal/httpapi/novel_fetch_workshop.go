@@ -843,6 +843,34 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "removed": removed})
 	})
 
+	mux.HandleFunc("POST /api/novel-fetch-workshop/knowledge/{kind}/{id}/optimize", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		provider, providerErr := resolveRewriteProvider(req)
+		if providerErr != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
+			return
+		}
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取知识库失败"})
+			return
+		}
+		item, err := novelfetchworkshop.OptimizeKnowledge(req.Context(), settings, req.PathValue("kind"), req.PathValue("id"), provider)
+		if err != nil {
+			status := http.StatusBadRequest
+			if provider == nil || strings.Contains(err.Error(), "模型未配置") {
+				status = http.StatusServiceUnavailable
+			}
+			writeJSON(w, status, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "保存知识库失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "item": item})
+	})
+
 	mux.HandleFunc("POST /api/novel-fetch-workshop/opening/analyze", func(w http.ResponseWriter, req *http.Request) {
 		var input struct {
 			Text string `json:"text"`

@@ -35,3 +35,23 @@ func TestAnalyzeOpeningUsesProvider(t *testing.T) {
 		t.Fatalf("unexpected opening analysis: %#v err=%v", items, err)
 	}
 }
+
+func TestOptimizeKnowledgePreservesIDAndUpdatesReturnedFields(t *testing.T) {
+	settings := map[string]any{}
+	item, err := SaveKnowledge(settings, "opening_phrases", map[string]any{"id": "opening_001", "text": "她回来了", "style": "现代通用", "tags": []any{"反转"}, "source": "旧"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	optimized, err := OptimizeKnowledge(context.Background(), settings, "opening_phrases", item["id"].(string), rewriteProviderFunc(func(_ context.Context, request RewriteRequest) (string, error) {
+		if request.SystemPrompt == "" || request.UserPrompt == "" {
+			t.Fatal("optimization prompt is incomplete")
+		}
+		return "```json\n{\"item\":{\"text\":\"她带着秘密回来了\",\"style\":\"现代悬疑\"}}\n```", nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if optimized["id"] != "opening_001" || optimized["text"] != "她带着秘密回来了" || optimized["style"] != "现代悬疑" {
+		t.Fatalf("unexpected optimized item: %#v", optimized)
+	}
+}

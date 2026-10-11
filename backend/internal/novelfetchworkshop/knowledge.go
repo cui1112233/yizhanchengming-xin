@@ -145,6 +145,77 @@ func DeleteKnowledge(settings map[string]any, kind, id string) (bool, error) {
 	return removed, nil
 }
 
+// OptimizeKnowledge asks the unified text model to refine one saved knowledge
+// item, then writes only non-empty returned fields back to the same item.
+func OptimizeKnowledge(ctx context.Context, settings map[string]any, kind, id string, provider RewriteProvider) (map[string]any, error) {
+	required := map[string][]string{
+		"high_imitation":    {"title", "source", "style", "content"},
+		"opening_phrases":   {"text", "style", "tags", "source"},
+		"rewrite_templates": {"name", "style", "prompt"},
+	}
+	fields, ok := required[kind]
+	if !ok {
+		return nil, fmt.Errorf("资料库类型无效：%s", kind)
+	}
+	if provider == nil {
+		return nil, errors.New("AI 改文模型未配置")
+	}
+	library, err := ListKnowledge(settings, kind)
+	if err != nil {
+		return nil, err
+	}
+	targetID := strings.TrimSpace(id)
+	var current map[string]any
+	for _, item := range normalizeKnowledgeItems(library["items"]) {
+		if strings.TrimSpace(fmt.Sprint(item["id"])) == targetID {
+			current = item
+			break
+		}
+	}
+	if current == nil {
+		return nil, errors.New("知识条目不存在")
+	}
+	libraryNames := map[string]string{"high_imitation": "高仿文章库", "opening_phrases": "爆款开头词库", "rewrite_templates": "批量改文指令库"}
+	payload := map[string]any{
+		"library_name": libraryNames[kind], "library_type": kind, "current_item": current,
+		"user_goal":       "让这个条目更适合批量自动改文，保留原意，输出更清楚。",
+		"required_fields": fields,
+		"rules":           []string{"只整理当前资料库条目，不要发散新功能。", "不要删除原有 id；没有把握的字段保持原值。"},
+		"return_format":   map[string]any{"item": map[string]any{}},
+	}
+	requestBody, _ := json.Marshal(payload)
+	content, err := provider.Complete(ctx, RewriteRequest{
+		SystemPrompt: "你是批量小说改文系统的提示词整理助手。只根据用户给的目标优化当前资料库条目，不要发散新功能。必须返回 JSON 对象，字段 item 内只放可保存字段。",
+		UserPrompt:   string(requestBody), Temperature: 0.35, MaxTokens: 3000,
+	})
+	if err != nil {
+		return nil, err
+	}
+	content = strings.TrimSpace(strings.TrimPrefix(strings.TrimSuffix(content, "```"), "```json"))
+	start, end := strings.Index(content, "{"), strings.LastIndex(content, "}")
+	if start < 0 || end < start {
+		return nil, errors.New("AI返回格式不正确")
+	}
+	var parsed struct {
+		Item map[string]any `json:"item"`
+	}
+	if err := json.Unmarshal([]byte(content[start:end+1]), &parsed); err != nil || len(parsed.Item) == 0 {
+		return nil, errors.New("AI返回格式不正确")
+	}
+	optimized := cloneMap(current)
+	optimized["id"] = targetID
+	for key, value := range parsed.Item {
+		if value == nil {
+			continue
+		}
+		if text, ok := value.(string); ok && strings.TrimSpace(text) == "" {
+			continue
+		}
+		optimized[key] = value
+	}
+	return SaveKnowledge(settings, kind, optimized)
+}
+
 func KnowledgeSummary(settings map[string]any) map[string]int {
 	result := map[string]int{}
 	for kind := range knowledgeKinds {
