@@ -174,6 +174,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"service": "go-api", "git_sha": options.ReleaseSHA})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
+	if options.Store != nil {
+		registerV12MetadataCompat(v12, auth, options.Store, options.NovelFetchFetcher)
+	}
 	if options.AutomationPresetStore != nil {
 		registerAutomationPresetRoutes(v12, auth, options.AutomationPresetStore, "v12")
 		registerBatchAutomationPresetRoute(v12, auth, options.Store, options.AutomationPresetStore, "v12")

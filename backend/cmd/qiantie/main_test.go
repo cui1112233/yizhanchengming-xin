@@ -210,8 +210,8 @@ func TestShouldBridgeLegacyAPIRequestKeepsExternalClassificationAdaptersOnBridge
 		"/api/batch-factory/v12/batches/demo/backfill-121-metadata",
 	} {
 		req := httptest.NewRequest(http.MethodPost, path, nil)
-		if !shouldBridgeLegacyAPIRequest(req, 1) {
-			t.Fatalf("external adapter %s must remain on the legacy bridge", path)
+		if shouldBridgeLegacyAPIRequest(req, 1) {
+			t.Fatalf("external adapter %s must use the Go metadata handler", path)
 		}
 	}
 }
