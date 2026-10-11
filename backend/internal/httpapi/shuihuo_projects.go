@@ -409,6 +409,15 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "message": "文本模型连接成功"})
 			return
 		}
+		if kind == "audio" {
+			_, contentType, probeErr := requestConfiguredTTSBytes(r.Context(), ttsRequest{Input: "连接测试", Voice: "zh-CN-XiaoxiaoNeural", Speed: 1.8, Pitch: "10", Style: "general"}, model)
+			if probeErr != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": "音频模型连接失败: " + probeErr.Error(), "type": "upstream_error"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "contentType": contentType, "message": "音频模型连接成功，已返回音频数据"})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "tested": "configuration", "message": "配置完整，未发送生成任务"})
 	})))
 	root.Handle("/api/shuihuo-production/asset-types", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
