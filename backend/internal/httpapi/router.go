@@ -76,6 +76,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Store != nil && options.Slice >= 1 {
 		registerSliceOneRoutes(v11, options.Store)
 		registerV12IntakeRoutes(v12, options.Store)
+		registerConfiguredImageGenerationRoute(v11, options.Store, options.NovelFetchStore)
+		registerConfiguredImageGenerationRoute(v12, options.Store, options.NovelFetchStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
 	}
 	if options.NovelFetchFetcher != nil {
