@@ -554,6 +554,9 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) >= 2 && parts[0] == "intakes" && len(parts) == 3 && parts[2] == "batches" {
 		return true
 	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "intakes" && parts[4] == "books" {
+		return true
+	}
 	if len(parts) == 2 && parts[0] == "batches" {
 		return true
 	}
@@ -602,6 +605,15 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "director" || parts[4] == "opening-variants") {
 		return true
 	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "hook" || parts[4] == "smart-unified") {
+		return true
+	}
+	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "stages" && parts[5] == "retry" {
+		return true
+	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "stages" {
+		return true
+	}
 	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "working-front" && parts[5] == "viral" {
 		return true
 	}
@@ -648,6 +660,18 @@ func isGoV12AliasPath(path string) bool {
 		return true
 	}
 	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "videos" && (parts[6] == "effective-settings" || parts[6] == "final-prompt") {
+		return true
+	}
+	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "videos" && parts[6] == "upload" {
+		return true
+	}
+	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "merge" && parts[5] == "upload" {
+		return true
+	}
+	if len(parts) == 9 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "videos" && parts[6] == "tasks" {
+		return true
+	}
+	if len(parts) == 2 && parts[0] == "video-provider" && parts[1] == "config" {
 		return true
 	}
 	// Book reference assets are already implemented by the Go V11 store and
