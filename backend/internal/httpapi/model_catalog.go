@@ -93,6 +93,29 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 		baseURL, _ := input["baseUrl"].(string)
 		modelID, _ := input["modelId"].(string)
 		credential, _ := input["credential"].(string)
+		existingModelID, _ := input["existingModelId"].(string)
+		// The settings page intentionally omits an already-saved credential when
+		// editing a model. Reuse that secret only for this server-side probe; it
+		// is never returned to the browser.
+		if strings.TrimSpace(credential) == "" && strings.TrimSpace(existingModelID) != "" {
+			if settings, settingsErr := store.GetConfig(req.Context(), identity.Username); settingsErr == nil {
+				for _, existing := range modelCatalog(settings) {
+					if existing["id"] != strings.TrimSpace(existingModelID) {
+						continue
+					}
+					if savedCredential, ok := existing["credential"].(string); ok {
+						credential = strings.TrimSpace(savedCredential)
+					}
+					if baseURL == "" {
+						baseURL = firstText(existing["baseUrl"])
+					}
+					if modelID == "" {
+						modelID = firstText(existing["modelId"])
+					}
+					break
+				}
+			}
+		}
 		baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 		modelID = strings.TrimSpace(modelID)
 		credential = strings.TrimSpace(credential)
