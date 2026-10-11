@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestFromEnvRequiresMySQLAndBridgeSecret(t *testing.T) {
 	t.Setenv("QIANTIE_MYSQL_DSN", "")
@@ -11,6 +14,19 @@ func TestFromEnvRequiresMySQLAndBridgeSecret(t *testing.T) {
 	t.Setenv("QIANTIE_MYSQL_DSN", "user:pass@tcp(mysql:3306)/qiantie")
 	if _, err := FromEnv(); err == nil {
 		t.Fatal("expected missing bridge secret error")
+	}
+}
+
+func TestFromEnvDoesNotDefaultNodeAuthGateway(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_NODE_AUTH_BASE_URL", "")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NodeAuthBaseURL != "" {
+		t.Fatalf("Go runtime must not default to a Node gateway: %q", cfg.NodeAuthBaseURL)
 	}
 }
 
@@ -115,6 +131,52 @@ func TestFromEnvAcceptsExplicitLocalMergeForSliceFiveWithoutRemoteProvider(t *te
 	}
 	if !cfg.LocalMergeEnabled || !cfg.MergeEnabled || cfg.MergeEndpoint != "" {
 		t.Fatalf("cfg=%+v", cfg)
+	}
+}
+
+func TestFromEnvUsesConfigurableNovelFetchUpstream(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_NOVEL_FETCH_121_ENDPOINT", "")
+	t.Setenv("QIANTIE_NOVEL_FETCH_121_TIMEOUT_SECONDS", "")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NovelFetch121Endpoint != "https://txt.121w.com/api.php" || cfg.NovelFetch121Timeout != 20*time.Second {
+		t.Fatalf("default novel upstream config = %#v", cfg)
+	}
+
+	t.Setenv("QIANTIE_NOVEL_FETCH_121_ENDPOINT", "http://127.0.0.1:8080/api.php")
+	t.Setenv("QIANTIE_NOVEL_FETCH_121_TIMEOUT_SECONDS", "5")
+	cfg, err = FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NovelFetch121Endpoint != "http://127.0.0.1:8080/api.php" || cfg.NovelFetch121Timeout != 5*time.Second {
+		t.Fatalf("configured novel upstream config = %#v", cfg)
+	}
+}
+
+func TestFromEnvReadsOptionalRedisRuntimeAddress(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_REDIS_URL", "redis://localhost:6379")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RedisURL != "redis://localhost:6379" {
+		t.Fatalf("redis url = %q", cfg.RedisURL)
+	}
+}
+
+func TestFromEnvRejectsInvalidNovelFetchUpstreamTimeout(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_NOVEL_FETCH_121_TIMEOUT_SECONDS", "0")
+	if _, err := FromEnv(); err == nil {
+		t.Fatal("expected invalid novel upstream timeout error")
 	}
 }
 
