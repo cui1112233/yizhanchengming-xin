@@ -111,6 +111,9 @@ func (s *AdminStore) UpdateDraft(actor, id string, version int, input map[string
 	if err := validateDraftInput(input, true); err != nil {
 		return nil, err
 	}
+	if stringValue(input["id"]) != id {
+		return nil, &StoreError{Code: "invalid", Message: "提示词 ID 与编辑地址不一致"}
+	}
 	items, err := s.readLocked()
 	if err != nil {
 		return nil, err
