@@ -67,7 +67,8 @@ function getPage(pathname) {
     '/script': ScriptPage,
     // 保持与公网版本一致：小说获取使用完整原文工作台；Go 工作台另有独立入口。
     '/novel-fetch': NovelFetchPage,
-    '/novel-fetch-workshop': NovelFetchWorkshopPage,
+    // 对外统一使用公网 V78 完整工作台，避免误进入未完成的 Go 简化页。
+    '/novel-fetch-workshop': NovelFetchPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
     '/batch-factory-preview': BatchFactoryPage,
     '/novel-panel': NovelPanelPage,
