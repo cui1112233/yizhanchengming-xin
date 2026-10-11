@@ -160,8 +160,51 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 		if len(legacyCatalog) > 0 {
 			settings["modelCatalog"] = legacyCatalog
 		}
+	} else {
+		// A previous migration may have persisted only the redacted catalog in
+		// MySQL. Keep credentials local and hydrate only missing runtime fields
+		// from the user's uncommitted legacy config file; never write them back.
+		mergeLegacyRuntimeModelFields(catalog, legacyCatalog)
 	}
 	return settings, nil
+}
+
+func mergeLegacyRuntimeModelFields(current, legacy []any) {
+	for _, rawCurrent := range current {
+		currentModel, ok := rawCurrent.(map[string]any)
+		if !ok {
+			continue
+		}
+		currentID := strings.TrimSpace(fmt.Sprint(currentModel["id"]))
+		currentModelID := strings.TrimSpace(fmt.Sprint(currentModel["modelId"]))
+		for _, rawLegacy := range legacy {
+			legacyModel, ok := rawLegacy.(map[string]any)
+			if !ok {
+				continue
+			}
+			legacyID := strings.TrimSpace(fmt.Sprint(legacyModel["id"]))
+			legacyModelID := strings.TrimSpace(fmt.Sprint(legacyModel["modelId"]))
+			if (currentID == "" || legacyID == "" || currentID != legacyID) && (currentModelID == "" || legacyModelID == "" || currentModelID != legacyModelID) {
+				continue
+			}
+			for _, key := range []string{"credential", "apiKey", "baseUrl", "endpoint", "tasksEndpoint", "resultEndpoint", "workflowId"} {
+				if runtimeModelFieldEmpty(currentModel[key]) {
+					if value, exists := legacyModel[key]; exists && !runtimeModelFieldEmpty(value) {
+						currentModel[key] = value
+					}
+				}
+			}
+			break
+		}
+	}
+}
+
+func runtimeModelFieldEmpty(value any) bool {
+	if value == nil {
+		return true
+	}
+	raw := strings.TrimSpace(fmt.Sprint(value))
+	return raw == "" || raw == "<nil>"
 }
 
 func (s *MySQLStore) readLegacyModelCatalog(owner string) []any {
