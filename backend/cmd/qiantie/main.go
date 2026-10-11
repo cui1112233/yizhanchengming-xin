@@ -326,13 +326,21 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 	if (req.Method == http.MethodGet && path == "/api/novel-fetch/saved") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
-		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || strings.HasPrefix(path, "/api/batch-rewrite/tasks/") || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
 		return true
 	}
 	if path == "/api/batch-rewrite/issues" || path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {
 		return req.Method == http.MethodGet || req.Method == http.MethodPost
 	}
 	return false
+}
+
+func isBatchRewriteTaskDetailPath(path string) bool {
+	const prefix = "/api/batch-rewrite/tasks/"
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	return strings.Trim(strings.TrimPrefix(path, prefix), "/") != "" && !strings.Contains(strings.TrimPrefix(path, prefix), "/")
 }
 
 func isLocalScriptVideoRequest(req *http.Request) bool {
