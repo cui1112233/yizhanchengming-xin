@@ -49,6 +49,7 @@ $env:QIANTIE_GO_LISTEN_ADDR = $ListenAddr
 $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
 $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER = '1'
 $env:QIANTIE_NODE_AUTH_BASE_URL = 'http://127.0.0.1:3001'
+$env:QIANTIE_REDIS_URL = 'redis://127.0.0.1:6379'
 
 & (Join-Path $PSScriptRoot 'start-local-go.ps1') -ListenAddr $ListenAddr
 exit $LASTEXITCODE
