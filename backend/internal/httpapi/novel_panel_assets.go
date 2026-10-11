@@ -145,7 +145,7 @@ func writePanelAsset(usersDir, username, assetType, assetID, variant string, pay
 }
 
 func RegisterNovelPanelAssetCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
-	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
+	if root == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
 	handler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -191,7 +191,11 @@ func RegisterNovelPanelAssetCompat(root *http.ServeMux, middleware BridgeAuth, u
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "参考图参数无效"})
 			return
 		}
-		if req.URL.Path == "/api/reference-assets/upload" {
+		assetPath := req.URL.Path
+		if strings.HasPrefix(assetPath, "/api/novel-panel/") {
+			assetPath = "/api" + strings.TrimPrefix(assetPath, "/api/novel-panel")
+		}
+		if assetPath == "/api/reference-assets/upload" {
 			variant, _ := input["variant"].(string)
 			if variant != "" && variant != "source" {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "上传图片仅支持 source 类型"})
@@ -222,7 +226,7 @@ func RegisterNovelPanelAssetCompat(root *http.ServeMux, middleware BridgeAuth, u
 			writeJSON(w, http.StatusOK, meta)
 			return
 		}
-		if req.URL.Path == "/api/reference-assets/use-source-as-main" {
+		if assetPath == "/api/reference-assets/use-source-as-main" {
 			source := panelAssetPath(usersDir, identity.Username, assetType, assetID, "source")
 			if source == "" {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "还没有上传参考图", "code": "REFERENCE_ASSET_SOURCE_MISSING"})
@@ -257,6 +261,13 @@ func RegisterNovelPanelAssetCompat(root *http.ServeMux, middleware BridgeAuth, u
 	root.Handle("GET /api/reference-assets/file/{assetType}/{assetId}/{variant}", handler)
 	root.Handle("POST /api/reference-assets/upload", handler)
 	root.Handle("POST /api/reference-assets/use-source-as-main", handler)
+	// The static workbench bridge mounts ordinary /api/* calls under
+	// /api/novel-panel/* before forwarding them to Go. Keep both forms so
+	// uploads and source-image promotion work on the embedded Go page as well
+	// as through the legacy direct page.
+	root.Handle("GET /api/novel-panel/reference-assets/file/{assetType}/{assetId}/{variant}", handler)
+	root.Handle("POST /api/novel-panel/reference-assets/upload", handler)
+	root.Handle("POST /api/novel-panel/reference-assets/use-source-as-main", handler)
 	root.Handle("GET /api/novel-panel/reference-assets/public/{username}/{assetType}/{assetId}/{variant}", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		username := strings.TrimSpace(req.PathValue("username"))
 		assetType := strings.ToLower(strings.TrimSpace(req.PathValue("assetType")))
