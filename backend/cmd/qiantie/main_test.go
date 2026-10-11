@@ -218,6 +218,7 @@ func TestNovelFetchSavedSurfaceUsesGoHandler(t *testing.T) {
 	}{
 		{method: http.MethodGet, path: "/api/novel-fetch/saved"},
 		{method: http.MethodPost, path: "/api/novel-fetch/save"},
+		{method: http.MethodPost, path: "/api/novel-fetch"},
 		{method: http.MethodGet, path: "/api/batch-rewrite/tasks"},
 		{method: http.MethodGet, path: "/api/batch-rewrite/tasks/book-1"},
 		{method: http.MethodGet, path: "/api/batch-rewrite/config"},
@@ -227,9 +228,6 @@ func TestNovelFetchSavedSurfaceUsesGoHandler(t *testing.T) {
 		if !isGoNovelFetchCompatRequest(req) {
 			t.Fatalf("%s %s must use the Go saved-novel handler", tc.method, tc.path)
 		}
-	}
-	if isGoNovelFetchCompatRequest(httptest.NewRequest(http.MethodPost, "/api/novel-fetch", nil)) {
-		t.Fatal("novel fetching should remain on the legacy bridge until upstream parity is verified")
 	}
 }
 

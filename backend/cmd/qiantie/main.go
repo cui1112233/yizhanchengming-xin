@@ -277,6 +277,7 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 	// not call an upstream provider, so they can safely bypass the old Node
 	// bridge while the actual novel-fetch request remains staged.
 	if (req.Method == http.MethodGet && path == "/api/novel-fetch/saved") ||
+		(req.Method == http.MethodPost && path == "/api/novel-fetch") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
 		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || strings.HasPrefix(path, "/api/batch-rewrite/tasks/") || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
 		return true
