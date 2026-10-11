@@ -18,6 +18,10 @@ func TestCatalogListsPublishedPresetsAndConstraintText(t *testing.T) {
 	if err != nil || len(items) != 2 {
 		t.Fatalf("Published() = %+v, %v", items, err)
 	}
+	all, err := catalog.All("script")
+	if err != nil || len(all) != 3 || all[2].Status != "draft" {
+		t.Fatalf("All() = %+v, %v", all, err)
+	}
 	texts, err := catalog.ConstraintText([]string{"script-constraint-prefix-a"})
 	if err != nil || texts["script-constraint-prefix-a"] != "PREFIX" {
 		t.Fatalf("ConstraintText() = %+v, %v", texts, err)

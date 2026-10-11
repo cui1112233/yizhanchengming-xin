@@ -90,6 +90,22 @@ func publicPreset(record presetRecord) PublicPreset {
 }
 
 func (c *Catalog) Published(module string) ([]PublicPreset, error) {
+	result, err := c.All(module)
+	if err != nil {
+		return nil, err
+	}
+	filtered := result[:0]
+	for _, item := range result {
+		if item.Status == "published" {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered, nil
+}
+
+// All returns every version for an admin view, including drafts and archived
+// records. Public callers should continue using Published.
+func (c *Catalog) All(module string) ([]PublicPreset, error) {
 	records, err := c.load()
 	if err != nil {
 		return nil, err
@@ -100,11 +116,16 @@ func (c *Catalog) Published(module string) ([]PublicPreset, error) {
 	}
 	result := make([]PublicPreset, 0)
 	for _, record := range records {
-		if record.Status == "published" && record.Module == module {
+		if record.Module == module {
 			result = append(result, publicPreset(record))
 		}
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].ID == result[j].ID {
+			return result[i].Version < result[j].Version
+		}
+		return result[i].ID < result[j].ID
+	})
 	return result, nil
 }
 

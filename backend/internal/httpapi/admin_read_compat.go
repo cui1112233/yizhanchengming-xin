@@ -51,7 +51,7 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
 			return
 		}
-		items, err := catalog.Published(req.URL.Query().Get("module"))
+		items, err := catalog.All(req.URL.Query().Get("module"))
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
@@ -63,7 +63,7 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
 			return
 		}
-		items, err := catalog.Published(req.URL.Query().Get("module"))
+		items, err := catalog.All(req.URL.Query().Get("module"))
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
