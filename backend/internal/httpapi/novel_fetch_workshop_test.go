@@ -414,7 +414,7 @@ func TestNovelFetchWorkshopFetchOriginalPersistsRawAndProcessedText(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if document.OriginalRaw != "第一行\n第二行\n第三行" || document.ProcessedText != "第一行\n" || document.OriginalRawChars <= document.ProcessedChars || document.Gender != "男频" {
+	if document.OriginalRaw != "第一行\n第二行\n第三行" || document.ProcessedText != "行\n" || document.OriginalRawChars <= document.ProcessedChars || document.Gender != "男频" || document.Meta["sensitiveStatus"] != "done" {
 		t.Fatalf("fetch persistence mismatch: %#v", document)
 	}
 }

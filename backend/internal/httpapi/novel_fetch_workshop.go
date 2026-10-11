@@ -481,11 +481,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 					retryStages["fetch"]++
 					continue
 				}
+				processedText, sensitiveCount, _ := applyNovelFetchSensitiveRules(req.Context(), store, identity.Username, result.ProcessedText)
 				document.OriginalRaw = result.OriginalRaw
-				document.Original = result.ProcessedText
-				document.ProcessedText = result.ProcessedText
+				document.Original = processedText
+				document.ProcessedText = processedText
 				document.OriginalRawChars = result.OriginalRawChars
-				document.ProcessedChars = result.ProcessedChars
+				document.ProcessedChars = len([]rune(processedText))
 				document.MaxTxt = result.MaxTxt
 				document.BookInfo = result.BookInfo
 				if document.Meta == nil {
@@ -493,8 +494,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				}
 				document.Meta["originalStatus"] = "done"
 				document.Meta["originalRawChars"] = result.OriginalRawChars
-				document.Meta["processedChars"] = result.ProcessedChars
-				if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, result.ProcessedText); err != nil {
+				document.Meta["processedChars"] = document.ProcessedChars
+				document.Meta["sensitiveStatus"] = "done"
+				document.Meta["sensitiveReplaced"] = sensitiveCount
+				if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, processedText); err != nil {
 					failed++
 					retryStages["fetch"]++
 					continue
@@ -678,11 +681,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
+		processedText, sensitiveCount, _ := applyNovelFetchSensitiveRules(req.Context(), store, identity.Username, result.ProcessedText)
 		document.OriginalRaw = result.OriginalRaw
-		document.ProcessedText = result.ProcessedText
-		document.Original = result.ProcessedText
+		document.ProcessedText = processedText
+		document.Original = processedText
 		document.OriginalRawChars = result.OriginalRawChars
-		document.ProcessedChars = result.ProcessedChars
+		document.ProcessedChars = len([]rune(processedText))
 		document.MaxTxt = result.MaxTxt
 		document.BookInfo = result.BookInfo
 		if document.Meta == nil {
@@ -690,14 +694,16 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		document.Meta["originalStatus"] = "done"
 		document.Meta["originalRawChars"] = result.OriginalRawChars
-		document.Meta["processedChars"] = result.ProcessedChars
-		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, result.ProcessedText); err != nil {
+		document.Meta["processedChars"] = document.ProcessedChars
+		document.Meta["sensitiveStatus"] = "done"
+		document.Meta["sensitiveReplaced"] = sensitiveCount
+		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, processedText); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文正文失败"})
 			return
 		}
 		if genderNeedsResolution(document.Gender) {
 			genderInfo := result.BookInfo
-			genderInfo.Text = result.ProcessedText
+			genderInfo.Text = processedText
 			decision := novelfetchworkshop.ResolveGender(req.Context(), "", genderInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
@@ -1228,6 +1234,18 @@ func genderNeedsResolution(value string) bool {
 	default:
 		return false
 	}
+}
+
+func applyNovelFetchSensitiveRules(ctx context.Context, store novelfetchworkshop.Store, owner, text string) (string, int, error) {
+	if store == nil {
+		return text, 0, nil
+	}
+	settings, err := store.GetConfig(ctx, owner)
+	if err != nil {
+		return text, 0, err
+	}
+	processed, replaced := novelfetchworkshop.ApplySensitiveRules(text, settings)
+	return processed, replaced, nil
 }
 
 // novelFetchAppConfig restores the flat config contract used by the 3001
