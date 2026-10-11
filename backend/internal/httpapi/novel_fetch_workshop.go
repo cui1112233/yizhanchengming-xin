@@ -1110,7 +1110,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		})
 	})
 
-	mux.HandleFunc("PUT /api/novel-fetch-workshop/config", func(w http.ResponseWriter, req *http.Request) {
+	saveWorkshopConfig := func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var patch map[string]any
 		if err := decodeNovelFetchJSON(w, req, &patch); err != nil {
@@ -1132,7 +1132,11 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": merged})
-	})
+	}
+	// The current React workbench uses POST; keep PUT for the canonical API and
+	// accept both methods during the Node-to-Go compatibility period.
+	mux.HandleFunc("PUT /api/novel-fetch-workshop/config", saveWorkshopConfig)
+	mux.HandleFunc("POST /api/novel-fetch-workshop/config", saveWorkshopConfig)
 }
 
 // publicNovelFetchConfig removes credentials before configuration reaches the browser.

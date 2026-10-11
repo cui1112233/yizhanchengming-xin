@@ -34,7 +34,7 @@ func TestNovelFetchWorkshopConfigHidesCredentialsAndPreservesOnEdit(t *testing.T
 	if ai["api_key"] != nil || ai["api_key_configured"] != true {
 		t.Fatalf("unexpected public ai config: %#v", ai)
 	}
-	put := doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/config", map[string]any{
+	put := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/config", map[string]any{
 		"appConfig": map[string]any{"ai": map[string]any{"model": "new-model", "api_key": ""}},
 	}, now, secret)
 	if put.Code != http.StatusOK {
@@ -47,5 +47,11 @@ func TestNovelFetchWorkshopConfigHidesCredentialsAndPreservesOnEdit(t *testing.T
 	savedAI := saved["appConfig"].(map[string]any)["ai"].(map[string]any)
 	if savedAI["api_key"] != "secret-value" || savedAI["model"] != "new-model" {
 		t.Fatalf("edit should preserve credential: %#v", savedAI)
+	}
+	put = doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/config", map[string]any{
+		"appConfig": map[string]any{"ai": map[string]any{"model": "put-model", "api_key": ""}},
+	}, now, secret)
+	if put.Code != http.StatusOK {
+		t.Fatalf("put status=%d body=%s", put.Code, put.Body.String())
 	}
 }
