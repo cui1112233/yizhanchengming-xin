@@ -26,10 +26,11 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		}
 		summaries := make([]map[string]any, 0, len(batches))
 		for _, batch := range batches {
-			detail, detailErr := store.GetBatch(r.Context(), owner, batch.ID)
-			if detailErr == nil && isShuihuoProjectBatch(detail) {
-				continue
-			}
+			// The public 3001 library shows existing batches here, including
+			// batches that were first created from Shuihuo.  Hiding them made the
+			// 4001 batch-factory page look empty even though V11 could read them.
+			// Keep the summary as a read-only index; detailed ownership checks stay
+			// in GetBatch and the V11 routes.
 			books := make([]map[string]any, 0, len(batch.Books))
 			for _, book := range batch.Books {
 				books = append(books, map[string]any{"id": book.ID, "bookId": book.BookID, "title": book.Title, "platform": book.Platform})
