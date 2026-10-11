@@ -14,12 +14,23 @@ function readRequired(relativePath) {
   return fs.readFileSync(path.join(frontendDir, relativePath), 'utf8');
 }
 
-test('novel fetch route installs the hardened 121 login guard', () => {
-  assert.match(appSource, /const NovelFetchPage = lazy\(\(\) => import\('\.\/pages\/NovelFetchPage'\)\);/);
-  assert.match(appSource, /'\/novel-fetch': NovelFetchPage/);
+test('novel fetch route uses the Go-native workshop instead of the legacy 3001 iframe', () => {
+  assert.match(appSource, /const NovelFetchWorkshopPage = lazy\(\(\) => import\('\.\/pages\/NovelFetchWorkshopPage'\)\);/);
+  assert.match(appSource, /'\/novel-fetch': NovelFetchWorkshopPage/);
 
-  const pageSource = fs.readFileSync(path.join(pagesDir, 'NovelFetchPage.jsx'), 'utf8');
-  assert.match(pageSource, /batch-rewrite\/index\.html/);
+  const pageSource = fs.readFileSync(path.join(pagesDir, 'NovelFetchWorkshopPage.jsx'), 'utf8');
+  assert.match(pageSource, /novelFetchWorkshop/);
+  assert.doesNotMatch(appSource, /'\/novel-fetch': NovelFetchPage/);
+});
+
+test('novel fetch iframe accepts the parent light-theme sync and applies readable surfaces', () => {
+  const appSource = fs.readFileSync(path.join(frontendDir, 'public/batch-rewrite/app.js'), 'utf8');
+  const layoutSource = fs.readFileSync(path.join(repoDir, 'public/batch-rewrite/v78-novel-fetch-v2-layout.js'), 'utf8');
+  assert.match(appSource, /qiantie-theme-sync/);
+  assert.match(appSource, /qiantie-theme-sync/);
+  assert.match(appSource, /dataset\.theme/);
+  assert.match(layoutSource, /\[data-theme=['\"]light['\"]\]/);
+  assert.match(layoutSource, /#v78ImageStatusPanel #processResult[^}]*background\s*:\s*var\(--panel/);
 });
 
 test('novel fetch keeps a visible loading experience until the iframe is ready', () => {

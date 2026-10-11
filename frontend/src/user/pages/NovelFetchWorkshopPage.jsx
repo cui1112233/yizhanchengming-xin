@@ -5,6 +5,8 @@ import {
   deleteWorkshopTasks, fetchWorkshopOriginal, generateWorkshopAi, getWorkshopConfig, getWorkshopTask,
   listWorkshopTasks, processBatch, saveWorkshopConfig, testWorkshopAi
 } from '../../shared/api/novelFetchWorkshop';
+import { createNovelFetchIntake } from '../../shared/api/batchFactoryV11';
+import { batchFactoryNovelFetchHandoffPath } from './shuihuo/batchFactoryNovelFetchHandoff';
 
 // 输入格式（parse 模块 PARSE_MODES）
 const PARSE_MODE_OPTIONS = [
@@ -78,20 +80,6 @@ function downloadText(filename, content) {
   URL.revokeObjectURL(url);
 }
 
-// 加入上传：把任务写入 sessionStorage 后跳转小说获取页，由其上传列表合并并选择版本
-function handleAddToUpload(row) {
-  const versions = ['edited'];
-  for (let i = 1; i <= (Number(row.aiGeneratedCount) || 0); i++) versions.push(`ai${i}`);
-  const existing = JSON.parse(sessionStorage.getItem('workshopUploadItems') || '[]');
-  existing.push({
-    source: 'workshop', bookId: String(row.bookId),
-    gender: row.gender || '', style: row.style || '',
-    version: 'edited', versions
-  });
-  sessionStorage.setItem('workshopUploadItems', JSON.stringify(existing));
-  window.location.href = '/novel-fetch';
-}
-
 export function NovelFetchWorkshopPage() {
   const [processForm] = Form.useForm();
   const [configForm] = Form.useForm();
@@ -121,6 +109,7 @@ export function NovelFetchWorkshopPage() {
   // 配置保存 / AI 测试
   const [savingConfig, setSavingConfig] = useState(false);
   const [testingAi, setTestingAi] = useState(false);
+  const [handoffBook, setHandoffBook] = useState(null);
 
   async function loadConfig() {
     try {
@@ -316,6 +305,44 @@ export function NovelFetchWorkshopPage() {
     }
   }
 
+  async function handleAddToBatchFactory(row) {
+    setHandoffBook(row.bookId);
+    try {
+      const data = await getWorkshopTask(row.bookId);
+      const original = String(data?.original || data?.processedText || '').trim();
+      if (!original) {
+        message.warning('请先成功抓取原文，再交给批量工厂');
+        return;
+      }
+      const meta = data?.meta || {};
+      const intake = await createNovelFetchIntake({
+        books: [{
+          bookId: String(row.bookId),
+          sourceTaskId: String(row.bookId),
+          title: String(meta.bookName || row.bookName || row.bookId),
+          platform: String(meta.platformName || row.platformName || row.platform || ''),
+          sourceText: original,
+          txtText: original,
+          sourceMetadata: {
+            source: 'novel-fetch-workshop',
+            gender: meta.gender || row.gender || '',
+            style: meta.style || row.style || '',
+            bookInfo: data?.bookInfo || {}
+          }
+        }],
+        metadata: { source: 'novel-fetch-workshop', version: 'go-native' }
+      });
+      const intakeId = intake?.intake?.id || intake?.id;
+      if (!intakeId) throw new Error('批量工厂交接未返回编号');
+      message.success('已交给批量工厂');
+      window.location.assign(batchFactoryNovelFetchHandoffPath(intakeId));
+    } catch (error) {
+      message.error(error.message || '交给批量工厂失败');
+    } finally {
+      setHandoffBook(null);
+    }
+  }
+
   // ===== 配置 Tab =====
   async function handleSaveConfig() {
     const values = await configForm.validateFields().catch(() => null);
@@ -446,7 +473,7 @@ export function NovelFetchWorkshopPage() {
         >重新抓原文</Button>
         <Button size="small" icon={<Wand2 size={14} aria-hidden="true" />} onClick={() => setGenModal({ bookId: row.bookId, count: Number(row.aiCount) || 1 })}>生成AI</Button>
         <Button size="small" icon={<Download size={14} aria-hidden="true" />} onClick={() => handleDownloadOriginal(row)}>下载</Button>
-        <Button size="small" icon={<UploadCloud size={14} aria-hidden="true" />} onClick={() => handleAddToUpload(row)}>加入上传</Button>
+        <Button size="small" icon={<UploadCloud size={14} aria-hidden="true" />} loading={handoffBook === row.bookId} onClick={() => handleAddToBatchFactory(row)}>交给批量工厂</Button>
       </Space>
     )
   };
