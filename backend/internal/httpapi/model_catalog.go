@@ -18,6 +18,12 @@ var modelKinds = map[string]bool{"text": true, "video": true, "image": true}
 
 func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, store novelfetchworkshop.Store) {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/test/text", func(w http.ResponseWriter, req *http.Request) {
+		testConfiguredModel(w, req, store, "text")
+	})
+	mux.HandleFunc("POST /api/test/image", func(w http.ResponseWriter, req *http.Request) {
+		testConfiguredModel(w, req, store, "image")
+	})
 	mux.HandleFunc("GET /api/models", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		models, err := readModelCatalog(req, store, identity.Username, req.URL.Query().Get("kind"), identity.IsOwner)
@@ -229,6 +235,139 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 	root.Handle("/api/models/", secured)
 	root.Handle("/api/config/models", secured)
 	root.Handle("/api/config/models/", secured)
+	root.Handle("/api/test/", secured)
+}
+
+func testConfiguredModel(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, kind string) {
+	identity, ok := BridgeIdentityFromContext(req.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "kind": kind, "error": "unauthorized"})
+		return
+	}
+	var input map[string]any
+	if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+		return
+	}
+	if kind == "image" {
+		if nested, ok := input["image"].(map[string]any); ok {
+			input = nested
+		}
+	}
+	settings, err := store.GetConfig(req.Context(), identity.Username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "kind": kind, "error": "无法读取当前模型配置，请稍后重试。"})
+		return
+	}
+	baseURL := firstText(input["baseUrl"], input["base_url"])
+	modelID := firstText(input["model"], input["modelId"], input["model_id"])
+	credential := firstText(input["apiKey"], input["api_key"], input["credential"])
+	if baseURL == "" || modelID == "" || credential == "" {
+		for _, model := range modelCatalog(settings) {
+			if model["kind"] != kind || model["enabled"] != true {
+				continue
+			}
+			if baseURL == "" {
+				baseURL = firstText(model["baseUrl"])
+			}
+			if modelID == "" {
+				modelID = firstText(model["modelId"])
+			}
+			if credential == "" {
+				credential = firstText(model["credential"])
+			}
+			break
+		}
+	}
+	if baseURL == "" || modelID == "" || credential == "" {
+		message := "请填写完整的文本服务地址、模型和 API Key。"
+		if kind == "image" {
+			message = "请填写完整的生图服务地址、模型和 API Key。"
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": kind, "error": message})
+		return
+	}
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	parsed, err := url.Parse(baseURL)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "kind": kind, "error": "Base URL 格式不正确"})
+		return
+	}
+	client := &http.Client{Timeout: 20 * time.Second}
+	if kind == "image" {
+		testModelCatalogEndpoint(w, client, baseURL, modelID, credential)
+		return
+	}
+	endpoint := baseURL
+	if !strings.HasSuffix(parsed.Path, "/chat/completions") {
+		endpoint += "/chat/completions"
+	}
+	payload, _ := json.Marshal(map[string]any{"model": modelID, "messages": []map[string]string{{"role": "user", "content": "Hi"}}, "max_tokens": 5})
+	probe, err := http.NewRequestWithContext(req.Context(), http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": kind, "error": "文本模型地址无效"})
+		return
+	}
+	probe.Header.Set("Content-Type", "application/json")
+	probe.Header.Set("Authorization", "Bearer "+credential)
+	response, err := client.Do(probe)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": "模型服务连接失败，请检查服务地址、网络和代理设置。", "type": "upstream_connection_error"})
+		return
+	}
+	defer response.Body.Close()
+	var decoded map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": "上游文本模型未返回有效 JSON。"})
+		return
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": fmt.Sprintf("上游模型服务请求失败（状态 %d）。", response.StatusCode), "type": "upstream_error"})
+		return
+	}
+	choices, _ := decoded["choices"].([]any)
+	if len(choices) == 0 {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": "上游文本模型未返回有效答复。"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "message": mapOrEmpty(mapOrEmpty(choices[0])["message"])})
+}
+
+func testModelCatalogEndpoint(w http.ResponseWriter, client *http.Client, baseURL, modelID, credential string) {
+	endpoint := baseURL
+	if !strings.HasSuffix(endpoint, "/models") {
+		endpoint += "/models"
+	}
+	probe, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": "image", "error": "生图服务地址无效"})
+		return
+	}
+	probe.Header.Set("Authorization", "Bearer "+credential)
+	response, err := client.Do(probe)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": "image", "error": "模型服务连接失败，请检查服务地址、网络和代理设置。", "type": "upstream_connection_error"})
+		return
+	}
+	defer response.Body.Close()
+	var decoded map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": "image", "error": fmt.Sprintf("上游模型服务请求失败（状态 %d）。", response.StatusCode), "type": "upstream_error"})
+		return
+	}
+	listed := false
+	if items, ok := decoded["data"].([]any); ok {
+		for _, item := range items {
+			if modelOrID := firstText(mapOrEmpty(item)["id"]); modelOrID == modelID {
+				listed = true
+				break
+			}
+		}
+	}
+	message := "生图服务连接成功，但当前模型未出现在模型目录中，请确认模型名称或供应商支持。"
+	if listed {
+		message = "生图模型连接成功，当前模型已在模型目录中找到。"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": "image", "modelListed": listed, "message": message})
 }
 
 func readModelCatalog(req *http.Request, store novelfetchworkshop.Store, owner, kind string, includeDisabled bool) ([]map[string]any, error) {

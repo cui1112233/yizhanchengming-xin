@@ -166,6 +166,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodPost && (req.URL.Path == "/api/test/text" || req.URL.Path == "/api/test/image") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/batch-rewrite/knowledge/") && strings.HasSuffix(req.URL.Path, "/optimize") {
 			apiHandler.ServeHTTP(w, req)
 			return
