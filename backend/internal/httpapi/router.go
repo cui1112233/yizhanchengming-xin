@@ -52,6 +52,7 @@ type RouterOptions struct {
 	UserDataDir                     string
 	UserConfigStore                 *UserConfigStore
 	TextProvider                    batchfactoryv11.DirectorProvider
+	RedisURL                        string
 	LocalExecutors                  *localexecutor.Service
 	GiantMaterialExecutor           *giantmaterialexecutor.Service
 	GiantMaterialResolver           GiantMaterialResolver
@@ -223,7 +224,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}
-	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore)
+	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore, options.RedisURL)
 	registerTTSRoute(root, auth)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)

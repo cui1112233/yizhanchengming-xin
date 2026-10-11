@@ -20,6 +20,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
+	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -68,7 +69,28 @@ func shuihuoTextModelConfigured(config map[string]any) bool {
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
 // /api/platform-projects. The source of truth is the Go batch store.
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store) {
+func shuihuoRedisHealth(ctx context.Context, rawURL string) (bool, string) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return false, "未配置 Redis 地址"
+	}
+	store, err := mergeworker.NewRedisStore(rawURL, "qiantie:health")
+	if err != nil {
+		return false, "Redis 地址无效"
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	value, err := store.Do(ctx, "PING")
+	if err != nil {
+		return false, "Redis 连接失败"
+	}
+	if strings.EqualFold(strings.TrimSpace(fmt.Sprint(value)), "PONG") {
+		return true, ""
+	}
+	return false, "Redis 未返回 PONG"
+}
+
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, redisURL string) {
 	if store == nil {
 		return
 	}
@@ -91,9 +113,10 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if production != nil && production.Enabled {
 			enabledKinds = append(enabledKinds, "video")
 		}
+		redisReady, redisReason := shuihuoRedisHealth(r.Context(), redisURL)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "database": map[string]any{"ready": true},
-			"redis":   map[string]any{"ready": false, "reason": "本地 Go 迁移阶段暂未启用 Redis"},
+			"redis":   map[string]any{"ready": redisReady, "reason": redisReason},
 			"storage": map[string]any{"ready": true}, "enabledModelKinds": enabledKinds,
 		})
 	})))
