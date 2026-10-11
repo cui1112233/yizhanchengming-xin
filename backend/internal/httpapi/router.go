@@ -175,6 +175,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 	if options.Store != nil {
+		registerV12SmartUnifiedRefresh(v12, auth, options.Store, options.TextProvider)
+	}
+	if options.Store != nil {
 		registerV12MetadataCompat(v12, auth, options.Store, options.NovelFetchFetcher)
 	}
 	if options.AutomationPresetStore != nil {

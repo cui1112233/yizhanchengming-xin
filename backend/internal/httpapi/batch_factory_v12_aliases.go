@@ -16,6 +16,7 @@ func registerV12V11Aliases(v12, v11 *http.ServeMux) {
 		"GET /api/batch-factory/v12/batches/{batchId}",
 		"GET /api/batch-factory/v12/batches/{batchId}/runtime-index",
 		"POST /api/batch-factory/v12/intakes/{intakeId}/batches",
+		"POST /api/batch-factory/v12/intakes/manual",
 		"POST /api/batch-factory/v12/batches/{batchId}/intakes/{intakeId}/books",
 		"PUT /api/batch-factory/v12/batches/{batchId}/settings",
 		"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/metadata",

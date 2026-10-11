@@ -554,6 +554,9 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) >= 2 && parts[0] == "intakes" && len(parts) == 3 && parts[2] == "batches" {
 		return true
 	}
+	if len(parts) == 2 && parts[0] == "intakes" && parts[1] == "manual" {
+		return true
+	}
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "intakes" && parts[4] == "books" {
 		return true
 	}
@@ -605,7 +608,10 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "director" || parts[4] == "opening-variants") {
 		return true
 	}
-	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "hook" || parts[4] == "smart-unified") {
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "hook" {
+		return true
+	}
+	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "smart-unified" && parts[5] == "refresh" {
 		return true
 	}
 	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "stages" && parts[5] == "retry" {
