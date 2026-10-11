@@ -54,3 +54,23 @@ func TestSafeShuihuoConfigForResponseHidesModelCredentials(t *testing.T) {
 		t.Fatalf("safe config lost compatibility fields: %#v", got)
 	}
 }
+
+func TestShuihuoTextModelConfiguredUsesManagedCatalog(t *testing.T) {
+	configured := map[string]any{
+		"modelCatalog": []any{map[string]any{
+			"kind": "text", "enabled": true, "modelId": "[anti-2]gemini-3.8-flash",
+			"baseUrl": "https://example.test/v1", "credential": "secret",
+		}},
+	}
+	if !shuihuoTextModelConfigured(configured) {
+		t.Fatal("enabled managed text model should make Shuihuo text readiness true")
+	}
+	if shuihuoTextModelConfigured(map[string]any{
+		"modelCatalog": []any{map[string]any{
+			"kind": "text", "enabled": false, "modelId": "model",
+			"baseUrl": "https://example.test/v1", "credential": "secret",
+		}},
+	}) {
+		t.Fatal("disabled managed text model must not make Shuihuo text readiness true")
+	}
+}

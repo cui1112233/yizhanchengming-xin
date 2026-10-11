@@ -25,20 +25,67 @@ import (
 
 var shuihuoProductionConfigs sync.Map
 
+func textProviderForShuihuo(director *batchfactoryv11.DirectorService, ownerProvider batchfactoryv11.DirectorProvider) batchfactoryv11.DirectorProvider {
+	if ownerProvider != nil {
+		return ownerProvider
+	}
+	if director != nil {
+		return director.Provider
+	}
+	return nil
+}
+
+// shuihuoTextModelConfigured mirrors the API Config meaning of "ready": an
+// enabled text model with the fields needed to make a request. The health
+// endpoint must inspect the same account catalog that the model calls use;
+// checking only the optional Director environment variables made a configured
+// account look unconfigured in the Shuihuo workbench.
+func shuihuoTextModelConfigured(config map[string]any) bool {
+	catalog, ok := config["modelCatalog"].([]any)
+	if !ok {
+		if typed, typedOK := config["modelCatalog"].([]map[string]any); typedOK {
+			catalog = make([]any, 0, len(typed))
+			for _, model := range typed {
+				catalog = append(catalog, model)
+			}
+		}
+	}
+	for _, raw := range catalog {
+		model, ok := raw.(map[string]any)
+		if !ok || model["kind"] != "text" || model["enabled"] != true {
+			continue
+		}
+		modelID := strings.TrimSpace(fmt.Sprint(model["modelId"]))
+		endpoint := strings.TrimSpace(fmt.Sprint(model["baseUrl"]))
+		credential := strings.TrimSpace(fmt.Sprint(model["credential"]))
+		if modelID != "" && endpoint != "" && credential != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
 // /api/platform-projects. The source of truth is the Go batch store.
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store) {
 	if store == nil {
 		return
 	}
 	root.Handle("/api/shuihuo-production/health", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := bridgeOwner(r); !ok {
+		owner, ok := bridgeOwner(r)
+		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
 		enabledKinds := []string{}
-		if director != nil && director.Provider != nil {
+		textReady := director != nil && director.Provider != nil
+		if !textReady && textProvider != nil {
+			if config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore); err == nil {
+				textReady = shuihuoTextModelConfigured(config)
+			}
+		}
+		if textReady {
 			enabledKinds = append(enabledKinds, "text")
 		}
 		if production != nil && production.Enabled {
@@ -896,7 +943,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			kind := strings.TrimSpace(parts[2])
-			candidates, strategy, generationErr := generateShuihuoPromptCandidates(r.Context(), director, batch, kind)
+			candidates, strategy, generationErr := generateShuihuoPromptCandidates(r.Context(), textProviderForShuihuo(director, textProvider), batch, kind)
 			response := map[string]any{"candidates": candidates, "kind": kind, "strategy": strategy}
 			if strings.TrimSpace(input.ModelID) != "" {
 				response["modelId"] = strings.TrimSpace(input.ModelID)
@@ -1099,7 +1146,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if !decodeJSON(w, r, &input) {
 				return
 			}
-			candidates, strategy, modelErr := smartShuihuoCandidates(r.Context(), director, batch, strings.TrimSpace(input.Text))
+			candidates, strategy, modelErr := smartShuihuoCandidates(r.Context(), textProviderForShuihuo(director, textProvider), batch, strings.TrimSpace(input.Text))
 			response := map[string]any{"candidates": candidates, "mode": "smart", "strategy": strategy}
 			if strings.TrimSpace(input.ModelID) != "" {
 				response["modelId"] = strings.TrimSpace(input.ModelID)
@@ -2280,7 +2327,7 @@ func paragraphCandidates(batch batchfactoryv11.Batch) []map[string]any {
 // when the provider is not configured or returns malformed output, so the
 // user can still correct and confirm the result instead of seeing a blank
 // workbench.
-func smartShuihuoCandidates(ctx context.Context, director *batchfactoryv11.DirectorService, batch batchfactoryv11.Batch, override string) ([]map[string]any, string, error) {
+func smartShuihuoCandidates(ctx context.Context, provider batchfactoryv11.DirectorProvider, batch batchfactoryv11.Batch, override string) ([]map[string]any, string, error) {
 	if len(batch.Books) == 0 {
 		return []map[string]any{}, "paragraph_fallback", fmt.Errorf("project has no source book")
 	}
@@ -2291,10 +2338,10 @@ func smartShuihuoCandidates(ctx context.Context, director *batchfactoryv11.Direc
 	fallback := func(err error) ([]map[string]any, string, error) {
 		return paragraphCandidatesForText(batch.Books[0].ID, source), "paragraph_fallback", err
 	}
-	if director == nil || director.Provider == nil {
+	if provider == nil {
 		return fallback(fmt.Errorf("text model is not configured"))
 	}
-	completion, err := director.Provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+	completion, err := provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
 		SystemPrompt: "你是短剧分镜编辑。把用户提供的中文原文拆成适合短视频制作的连续分镜候选。只返回 JSON，不要 Markdown。格式为 {\"candidates\":[{\"text\":\"字幕\",\"sourceText\":\"对应原文\",\"subtitleText\":\"适合口播的字幕\",\"speaker\":\"旁白\"}]}。不得编造原文之外的剧情；每条 text 要完整、可编辑。",
 		UserPrompt:   source,
 		Temperature:  0.2,
@@ -2313,7 +2360,7 @@ func smartShuihuoCandidates(ctx context.Context, director *batchfactoryv11.Direc
 	return candidates, "text_model", nil
 }
 
-func generateShuihuoPromptCandidates(ctx context.Context, director *batchfactoryv11.DirectorService, batch batchfactoryv11.Batch, kind string) ([]map[string]any, string, error) {
+func generateShuihuoPromptCandidates(ctx context.Context, provider batchfactoryv11.DirectorProvider, batch batchfactoryv11.Batch, kind string) ([]map[string]any, string, error) {
 	segments := storedShuihuoSegmentsFromBatch(batch)
 	fallback := func(err error) ([]map[string]any, string, error) {
 		items := make([]map[string]any, 0, len(segments))
@@ -2331,11 +2378,11 @@ func generateShuihuoPromptCandidates(ctx context.Context, director *batchfactory
 		}
 		return items, "deterministic_fallback", err
 	}
-	if director == nil || director.Provider == nil {
+	if provider == nil {
 		return fallback(fmt.Errorf("text model is not configured"))
 	}
 	encoded, _ := json.Marshal(segments)
-	completion, err := director.Provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+	completion, err := provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
 		SystemPrompt: "你是短剧视觉提示词编辑。根据每条分镜原文生成可直接用于AI制作的中文提示词。只返回 JSON：{\"candidates\":[{\"segmentId\":\"原ID\",\"prompt\":\"提示词\"}]}。必须覆盖输入中的每个 segmentId，不要编造剧情。",
 		UserPrompt:   fmt.Sprintf("提示词类型：%s\n分镜：%s", kind, string(encoded)),
 		Temperature:  0.3,
