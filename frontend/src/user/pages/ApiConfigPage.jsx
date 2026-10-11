@@ -248,6 +248,7 @@ export default function ApiConfigPage() {
     const existing = modelById.get(preset.id);
     const key = String(presetKeys[preset.id] || '').trim();
     const workflowId = String(presetWorkflowIds[preset.id] || '').trim();
+    if (preset.id === 'minimax-h3-video' && !enabled && !key && existing?.hasCredential !== true) return message.warning('首次保存 H3 配置必须填写 API Key');
     if (preset.credentialMode === 'apiKey' && enabled && !isPresetConfigured(preset, existing)) return message.warning('请先填写配置并点击“保存配置”，再启用该模型');
     if (preset.credentialMode === 'executorPairing' && enabled) {
       const pairing = await refreshLocalDoubaoPairingStatus();
@@ -284,7 +285,7 @@ export default function ApiConfigPage() {
           return <div className="ac-platform-preset-grid" key={preset.id}>
             <div className="ac-platform-preset-info"><span className="ac-security-card-icon violet"><Video size={20} /></span><div><strong>{preset.displayName}</strong><small>{preset.description}</small></div></div>
             <div className="ac-platform-preset-credential">{preset.credentialMode === 'executorPairing' ? <small>{doubaoPaired ? '执行器已配对' : '尚未完成执行器配对'}</small> : <Space direction="vertical" style={{ width: '100%' }} size={6}><Input.Password value={presetKeys[preset.id] || ''} onChange={event => setPresetKeys(current => ({ ...current, [preset.id]: event.target.value }))} prefix={<KeyRound size={15} />} placeholder={model?.hasCredential ? '留空表示不修改已保存的 Key' : '填写 API Key'} />{preset.id === 'minimax-h3-video' ? <Input value={presetWorkflowIds[preset.id] || DEFAULT_H3_WORKFLOW_ID} onChange={event => setPresetWorkflowIds(current => ({ ...current, [preset.id]: event.target.value }))} addonBefore="AutoDL 工作流 ID" placeholder={DEFAULT_H3_WORKFLOW_ID} /> : null}{preset.id === 'fanke-video-api' ? <Select value={presetModelIds[preset.id] || model?.modelId || FANKE_VIDEO_MODELS[0].value} onChange={value => setPresetModelIds(current => ({ ...current, [preset.id]: value }))} options={FANKE_VIDEO_MODELS} placeholder="选择视频模型" /> : null}</Space>}<ModelQuotaStatus quota={quotaById.get(preset.id)} /></div>
-            <div className="ac-platform-preset-state"><Space direction="vertical" size={4}><Switch checked={model?.enabled === true} disabled={!model?.enabled && !isPresetConfigured(preset, model)} onChange={enabled => savePreset(preset, enabled)} /><small>{model?.enabled ? '已启用' : '未启用'}</small>{preset.credentialMode === 'apiKey' ? <Button size="small" onClick={() => savePreset(preset, false)}>{preset.id === 'minimax-h3-video' ? '保存工作流' : '保存配置'}</Button> : null}</Space></div>
+            <div className="ac-platform-preset-state"><Space direction="vertical" size={4}><Switch checked={model?.enabled === true} disabled={!model?.enabled && !isPresetConfigured(preset, model)} onChange={enabled => savePreset(preset, enabled)} /><small>{model?.enabled ? '已启用' : '未启用'}</small>{preset.credentialMode === 'apiKey' ? <Button size="small" onClick={() => savePreset(preset, false)}>保存配置</Button> : null}</Space></div>
           </div>;
         })}
       </Panel>

@@ -232,9 +232,13 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 				continue
 			}
 			for key, value := range patch {
-				if key != "id" && key != "credential" || key == "credential" {
-					current[key] = value
+				if key == "id" {
+					continue
 				}
+				if key == "credential" && strings.TrimSpace(fmt.Sprint(value)) == "" {
+					continue
+				}
+				current[key] = value
 			}
 			model, err := normalizeManagedModel(current)
 			if err != nil {
@@ -482,7 +486,21 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if id == "" || id == "<nil>" || kind == "" || !modelKinds[kind] {
 		return nil, errors.New("模型 ID 和类型不能为空")
 	}
-	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "credential": strings.TrimSpace(fmt.Sprint(input["credential"])), "enabled": input["enabled"] == true}
+	workflowID := strings.TrimSpace(fmt.Sprint(input["workflowId"]))
+	if workflowID == "<nil>" {
+		workflowID = ""
+	}
+	if id == "minimax-h3-video" && workflowID == "" {
+		return nil, errors.New("H3 工作流 ID 不能为空")
+	}
+	credential := strings.TrimSpace(fmt.Sprint(input["credential"]))
+	if credential == "<nil>" {
+		credential = ""
+	}
+	if id == "minimax-h3-video" && credential == "" {
+		return nil, errors.New("保存 H3 配置前必须填写 API Key")
+	}
+	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "credential": credential, "workflowId": workflowID, "enabled": input["enabled"] == true}
 	if model["displayName"] == "<nil>" || model["displayName"] == "" {
 		model["displayName"] = id
 	}
@@ -497,16 +515,13 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 			model[key] = ""
 		}
 	}
-	if model["credential"] == "<nil>" {
-		model["credential"] = ""
-	}
 	return model, nil
 }
 
 func publicManagedModel(model map[string]any) map[string]any {
 	result := map[string]any{}
 	for key, value := range model {
-		if key != "credential" {
+		if key != "credential" && key != "apiKey" {
 			result[key] = value
 		}
 	}
