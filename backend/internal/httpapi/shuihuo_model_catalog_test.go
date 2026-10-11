@@ -29,3 +29,28 @@ func TestLoadShuihuoOwnerConfigUsesManagedModelCatalog(t *testing.T) {
 		t.Fatalf("unexpected managed catalog: %#v", config["modelCatalog"])
 	}
 }
+
+func TestSafeShuihuoConfigForResponseHidesModelCredentials(t *testing.T) {
+	config := map[string]any{
+		"textModelId": "managed-text",
+		"modelCatalog": []any{map[string]any{
+			"id": "managed-text", "kind": "text", "modelId": "gemini",
+			"credential": "secret-value", "apiKey": "api-key-value", "enabled": true,
+		}},
+	}
+
+	got := safeShuihuoConfigForResponse(config)
+	catalog, ok := got["modelCatalog"].([]map[string]any)
+	if !ok || len(catalog) != 1 {
+		t.Fatalf("catalog = %#v", got["modelCatalog"])
+	}
+	if _, exists := catalog[0]["credential"]; exists {
+		t.Fatalf("credential leaked: %#v", catalog[0])
+	}
+	if _, exists := catalog[0]["apiKey"]; exists {
+		t.Fatalf("api key leaked: %#v", catalog[0])
+	}
+	if catalog[0]["hasCredential"] != true || got["textModelId"] != "managed-text" {
+		t.Fatalf("safe config lost compatibility fields: %#v", got)
+	}
+}

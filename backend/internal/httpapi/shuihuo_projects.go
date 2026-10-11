@@ -332,14 +332,18 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				for key, value := range config {
 					merged[key] = value
 				}
-				writeJSON(w, http.StatusOK, merged)
+				writeJSON(w, http.StatusOK, safeShuihuoConfigForResponse(merged))
 				return
 			}
 			if value, exists := shuihuoProductionConfigs.Load(owner); exists {
-				writeJSON(w, http.StatusOK, value)
+				if config, ok := value.(map[string]any); ok {
+					writeJSON(w, http.StatusOK, safeShuihuoConfigForResponse(config))
+				} else {
+					writeJSON(w, http.StatusOK, value)
+				}
 				return
 			}
-			writeJSON(w, http.StatusOK, shuihuoDefaultConfig())
+			writeJSON(w, http.StatusOK, safeShuihuoConfigForResponse(shuihuoDefaultConfig()))
 			return
 		}
 		if r.Method == http.MethodPut {
@@ -1985,8 +1989,24 @@ func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[strin
 				copy["apiKey"] = value
 			}
 		}
+		if !includeSecrets {
+			_, hasCredential := model["credential"]
+			_, hasAPIKey := model["apiKey"]
+			copy["hasCredential"] = (hasCredential && strings.TrimSpace(modelString(model, "credential")) != "") || (hasAPIKey && strings.TrimSpace(modelString(model, "apiKey")) != "") || model["hasCredential"] == true
+		}
 		result = append(result, copy)
 	}
+	return result
+}
+
+func safeShuihuoConfigForResponse(config map[string]any) map[string]any {
+	result := make(map[string]any, len(config))
+	for key, value := range config {
+		if key != "modelCatalog" {
+			result[key] = value
+		}
+	}
+	result["modelCatalog"] = safeShuihuoModels(shuihuoCollection(config, "modelCatalog", nil), false)
 	return result
 }
 
