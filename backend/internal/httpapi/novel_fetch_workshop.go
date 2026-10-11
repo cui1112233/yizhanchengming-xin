@@ -238,6 +238,33 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}, nil
 }
 
+// workshopPreviewResult parses the same input as the start endpoint without
+// writing documents. The V78 workbench uses this as a first step to show the
+// user how many books were recognised before starting the real run.
+func workshopPreviewResult(inputText string, maxTxt int) (map[string]any, error) {
+	if strings.TrimSpace(inputText) == "" {
+		return nil, errors.New("请输入要处理的书籍清单")
+	}
+	if maxTxt <= 0 {
+		maxTxt = 4000
+	}
+	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
+	tasks := make([]map[string]any, 0, len(documents))
+	for _, document := range documents {
+		meta := map[string]any{}
+		for key, value := range document.Meta {
+			meta[key] = value
+		}
+		meta["id"] = document.BookID
+		meta["book_id"] = document.BookID
+		tasks = append(tasks, meta)
+	}
+	return map[string]any{
+		"parsed": parsed, "unique_tasks": len(tasks), "duplicate_count": duplicates,
+		"empty_id_count": emptyIDs, "tasks": tasks,
+	}, nil
+}
+
 func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, aiJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)) {
 	resolveGenderJudge := func(req *http.Request) novelfetchworkshop.AIGenderJudge {
 		if aiJudgeResolver == nil {
@@ -280,6 +307,30 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.MaxTxt)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/process/preview", func(w http.ResponseWriter, req *http.Request) {
+		var input struct {
+			InputText       string `json:"input_text"`
+			InputTextLegacy string `json:"inputText"`
+			MaxTxt          int    `json:"max_txt"`
+			MaxTxtLegacy    int    `json:"maxTxt"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			return
+		}
+		if strings.TrimSpace(input.InputText) == "" {
+			input.InputText = input.InputTextLegacy
+		}
+		if input.MaxTxt <= 0 {
+			input.MaxTxt = input.MaxTxtLegacy
+		}
+		result, err := workshopPreviewResult(input.InputText, input.MaxTxt)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, result)

@@ -330,6 +330,39 @@ func TestNovelFetchWorkshopProcessCreatesTasksFromPastedList(t *testing.T) {
 	}
 }
 
+func TestNovelFetchWorkshopProcessPreviewDoesNotPersistTasks(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	preview := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/preview", map[string]any{
+		"input_text": "书籍ID\t书名\t男女频\n12345678901\t预览一本\t男频\n12345678901\t预览一本\t男频\n22345678901\t预览二本\t女频",
+		"max_txt":    4000,
+	}, now, secret)
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", preview.Code, preview.Body.String())
+	}
+	var response struct {
+		Parsed         int              `json:"parsed"`
+		UniqueTasks    int              `json:"unique_tasks"`
+		DuplicateCount int              `json:"duplicate_count"`
+		Tasks          []map[string]any `json:"tasks"`
+	}
+	if err := json.Unmarshal(preview.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Parsed != 3 || response.UniqueTasks != 2 || response.DuplicateCount != 1 || len(response.Tasks) != 2 {
+		t.Fatalf("unexpected preview response: %#v", response)
+	}
+	documents, err := store.ListDocuments(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(documents) != 0 {
+		t.Fatalf("preview must not persist tasks: %d", len(documents))
+	}
+}
+
 func TestNovelFetchWorkshopProcessStartCanBePolled(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
