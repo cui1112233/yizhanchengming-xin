@@ -607,6 +607,18 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 4 && parts[0] == "batches" && parts[2] == "production" && parts[3] == "cancel" {
 		return true
 	}
+	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "merge" {
+		return true
+	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "merge" {
+		return true
+	}
+	if len(parts) == 4 && parts[0] == "batches" && parts[2] == "merge-artifacts" && parts[3] == "migrate-to-tos" {
+		return true
+	}
+	if len(parts) == 5 && parts[0] == "batches" && (parts[2] == "merge-media" || parts[2] == "merge-cover") {
+		return true
+	}
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "metadata" || parts[4] == "source" || parts[4] == "override" || parts[4] == "fetch-original") {
 		return true
 	}
