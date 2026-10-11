@@ -307,5 +307,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	effectiveTextProvider := ownerTextProvider{fallback: textProvider, resolve: func(ctx context.Context, owner string) (batchfactoryv11.DirectorProvider, error) {
 		return resolveCatalogTextProvider(ctx, owner)
 	}}
+	// Slice 2+ director routes must use the same account-scoped model catalog
+	// as the rest of the Go workbench. Without this binding, a slice-3 H3
+	// request boots successfully but reports an unavailable text provider.
+	if director != nil {
+		director.Provider = effectiveTextProvider
+	}
 	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, RegisterV11: register}), nil
 }

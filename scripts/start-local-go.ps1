@@ -48,7 +48,14 @@ try {
   # release, which makes the runtime check misleading.
   $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
-    $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '1'
+    # Slice 3 keeps H3 director/audio/compile routes on Go. Higher slices
+    # still require explicit video/merge/provider settings.
+    $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
+  }
+  if (-not $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER) {
+    # Text credentials are selected from the account model catalog at request
+    # time; do not put a key in this launcher.
+    $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER = '1'
   }
   if (-not $env:QIANTIE_LEGACY_ACCOUNTS_PATH) {
     $env:QIANTIE_LEGACY_ACCOUNTS_PATH = Join-Path $repo 'data/system/accounts.json'
