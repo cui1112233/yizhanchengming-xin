@@ -99,10 +99,7 @@ func NewRouter(options RouterOptions) http.Handler {
 					if hasEnabled && !enabled {
 						continue
 					}
-					if _, err := shuihuoImageGenerationEndpoint(modelString(model, "endpoint")); err != nil {
-						continue
-					}
-					if modelString(model, "apiKey") == "" && modelString(model, "credential") == "" {
+					if !shuihuoImageModelReady(model) {
 						continue
 					}
 					return true, ""
@@ -330,6 +327,23 @@ func NewRouter(options RouterOptions) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	return root
+}
+
+func shuihuoImageModelReady(model map[string]any) bool {
+	if model == nil || !strings.EqualFold(modelString(model, "kind"), "image") {
+		return false
+	}
+	if enabled, exists := model["enabled"].(bool); exists && !enabled {
+		return false
+	}
+	endpoint := modelString(model, "endpoint")
+	if endpoint == "" {
+		endpoint = modelString(model, "baseUrl")
+	}
+	if _, err := shuihuoImageGenerationEndpoint(endpoint); err != nil {
+		return false
+	}
+	return shuihuoModelCredential(model) != ""
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

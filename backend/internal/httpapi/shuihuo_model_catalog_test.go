@@ -74,3 +74,21 @@ func TestShuihuoTextModelConfiguredUsesManagedCatalog(t *testing.T) {
 		t.Fatal("disabled managed text model must not make Shuihuo text readiness true")
 	}
 }
+
+func TestShuihuoImageModelReadyUsesBaseURLAndCredentialRef(t *testing.T) {
+	t.Setenv("V88_IMAGE_MODEL_KEY", "image-secret")
+	model := map[string]any{
+		"kind":          "image",
+		"enabled":       true,
+		"modelId":       "image-model",
+		"baseUrl":       "https://images.example/v1",
+		"credentialRef": "V88_IMAGE_MODEL_KEY",
+	}
+	if !shuihuoImageModelReady(model) {
+		t.Fatal("image model with a valid base URL and credential reference should be ready")
+	}
+	model["enabled"] = false
+	if shuihuoImageModelReady(model) {
+		t.Fatal("disabled image model must not be ready")
+	}
+}
