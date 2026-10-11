@@ -141,7 +141,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerMergeStatusRoute(v12, mergeStatus, "v12")
 	}
 	if options.Production != nil && options.Slice >= 4 {
-		registerProductionRoutes(v11, options.Production)
+		registerProductionRoutes(v11, options.Production, options.NovelFetchStore)
 		if output, ok := options.MergeOutput.(interface {
 			PutUploadedMP4(context.Context, string, string) (string, error)
 		}); ok {

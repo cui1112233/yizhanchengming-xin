@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 type productionSubmitInput struct {
@@ -24,7 +25,7 @@ type videoProviderConfigInput struct {
 	WorkflowID string `json:"workflowId,omitempty"`
 }
 
-func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.ProductionService) {
+func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.ProductionService, catalogStores ...novelfetchworkshop.Store) {
 	registerProductionStatusRoute(mux, service, "v11")
 	mux.HandleFunc("PUT /api/batch-factory/v11/video-provider/config", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -91,7 +92,7 @@ func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.Produ
 			return
 		}
 		if service != nil && service.ProviderRegistry != nil {
-			if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), service.Store, service.ProviderRegistry, owner); syncErr != nil {
+			if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), service.Store, service.ProviderRegistry, owner, catalogStores...); syncErr != nil {
 				writeStoreError(w, syncErr)
 				return
 			}
@@ -118,7 +119,7 @@ func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.Produ
 			return
 		}
 		if service != nil && service.ProviderRegistry != nil {
-			if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), service.Store, service.ProviderRegistry, owner); syncErr != nil {
+			if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), service.Store, service.ProviderRegistry, owner, catalogStores...); syncErr != nil {
 				writeStoreError(w, syncErr)
 				return
 			}
