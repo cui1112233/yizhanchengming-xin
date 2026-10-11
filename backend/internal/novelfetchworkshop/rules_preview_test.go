@@ -24,3 +24,16 @@ func TestPreviewRulesHonorsScopeDisable(t *testing.T) {
 		t.Fatalf("disabled scope should return normalized raw only: text=%q trace=%#v", text, trace)
 	}
 }
+
+func TestApplySensitiveRulesUsesConfiguredKnowledgeAndKeepsRawCallerSeparate(t *testing.T) {
+	settings := map[string]any{"knowledge": map[string]any{"layout_rules": map[string]any{
+		"sensitive_rules": []any{
+			map[string]any{"enabled": true, "find": "脏词", "replace": "文明词"},
+			"@{enabled=True; find=坏词; replace=好词}",
+		},
+	}}}
+	got, count := ApplySensitiveRules("脏词和坏词", settings)
+	if got != "文明词和好词" || count != 2 {
+		t.Fatalf("sensitive replacement = %q count=%d", got, count)
+	}
+}

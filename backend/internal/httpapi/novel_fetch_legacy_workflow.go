@@ -87,10 +87,16 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		if kind == "" {
 			kind, _ = in["libraryType"].(string)
 		}
+		if kind == "" {
+			kind, _ = in["library_type"].(string)
+		}
 		item, _ := in["item"].(map[string]any)
 		id, _ := item["id"].(string)
 		if id == "" {
 			id, _ = in["id"].(string)
+		}
+		if id == "" {
+			id, _ = in["item_id"].(string)
 		}
 		if kind == "" || id == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "资料库类型或条目ID不能为空"})
@@ -216,7 +222,9 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	if len(ids) == 0 {
 		ids = in.BookIDs
 	}
+	settings, _ := store.GetConfig(req.Context(), identity.Username)
 	changed := 0
+	replacements := 0
 	for _, id := range ids {
 		d, err := store.GetDocument(req.Context(), identity.Username, id)
 		if err != nil {
@@ -229,10 +237,19 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		if d.ProcessedText == "" {
 			d.ProcessedText = d.Original
 		}
-		d.Logs = append(d.Logs, map[string]any{"type": "sensitive_reprocessed", "at": time.Now().UTC().Format(time.RFC3339Nano)})
+		processed, count := novelfetchworkshop.ApplySensitiveRules(d.ProcessedText, settings)
+		d.ProcessedText = processed
+		d.Original = processed
+		replacements += count
+		if d.Meta == nil {
+			d.Meta = map[string]any{}
+		}
+		d.Meta["sensitiveProcessed"] = true
+		d.Meta["sensitiveReplacementCount"] = count
+		d.Logs = append(d.Logs, map[string]any{"type": "sensitive_reprocessed", "at": time.Now().UTC().Format(time.RFC3339Nano), "replacements": count})
 		d.ProcessedChars = len([]rune(d.ProcessedText))
 		_ = store.PutDocument(req.Context(), identity.Username, d)
 		changed++
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "processed": changed, "applied": changed, "restored": restore})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "processed": changed, "applied": changed, "restored": restore, "replacements": replacements})
 }
