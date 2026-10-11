@@ -83,4 +83,10 @@ export function createAdminModel({ modelId, name, kind, adapterKind, enabled, pa
     body: JSON.stringify({ modelId, name, kind, adapterKind, enabled, parameterSchema, credentialRef, endpoint, requestTemplate, responseMapping })
   });
 }
+export function updateAdminModel(modelId, payload) {
+  return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}`, { method: 'PATCH', body: JSON.stringify(payload) });
+}
+export function deleteAdminModel(modelId) {
+  return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
+}
 export function createBatchFactoryProject(payload) { return apiRequest('/api/batch-factory/projects', { method: 'POST', body: JSON.stringify(payload) }); }

@@ -216,6 +216,76 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"model": safeShuihuoModels([]map[string]any{model}, false)[0]})
 	})))
+	root.Handle("/api/shuihuo-production/admin/models/{modelId}", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := BridgeIdentityFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if !identity.IsOwner {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权管理模型"})
+			return
+		}
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, identity.Username, catalogStore)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		models := shuihuoCollection(config, "modelCatalog", nil)
+		modelID := strings.TrimSpace(r.PathValue("modelId"))
+		index := -1
+		for i, current := range models {
+			if modelString(current, "id") == modelID || modelString(current, "modelId") == modelID {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "模型不存在"})
+			return
+		}
+		if r.Method == http.MethodDelete {
+			models = append(models[:index], models[index+1:]...)
+			config["modelCatalog"] = models
+			if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodPatch {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		var patch map[string]any
+		if !decodeJSON(w, r, &patch) {
+			return
+		}
+		current := models[index]
+		for _, key := range []string{"name", "kind", "adapterKind", "enabled", "parameterSchema", "credentialRef", "endpoint", "tasksEndpoint", "resultEndpoint", "workflowId", "requestTemplate", "responseMapping", "credential", "apiKey"} {
+			if value, exists := patch[key]; exists {
+				current[key] = value
+			}
+		}
+		if strings.TrimSpace(modelString(current, "name")) == "" || strings.TrimSpace(modelString(current, "kind")) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "模型名称和能力不能为空"})
+			return
+		}
+		models[index] = current
+		config["modelCatalog"] = models
+		if err := saveShuihuoOwnerConfig(r.Context(), store, identity.Username, config); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		if production != nil && production.ProviderRegistry != nil && strings.EqualFold(strings.TrimSpace(modelString(current, "kind")), "video") {
+			if syncErr := syncShuihuoVideoModel(r.Context(), production.ProviderRegistry, identity.Username, current); syncErr != nil {
+				writeStoreError(w, syncErr)
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"model": safeShuihuoModels([]map[string]any{current}, false)[0]})
+	})))
 	root.Handle("/api/shuihuo-production/asset-types", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

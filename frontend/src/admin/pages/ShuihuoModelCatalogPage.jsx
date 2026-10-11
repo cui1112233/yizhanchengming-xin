@@ -1,6 +1,6 @@
-import { Button, Drawer, Form, Input, Select, Switch, Table, Tag, Typography, message } from 'antd';
+import { Button, Drawer, Form, Input, Popconfirm, Select, Switch, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
-import { createAdminModel, listAdminModels } from '../../shared/api/shuihuoProduction';
+import { createAdminModel, deleteAdminModel, listAdminModels, updateAdminModel } from '../../shared/api/shuihuoProduction';
 
 const adapters = [
   { value: 'text_completion', label: '文本分析', kind: 'text' },
@@ -14,6 +14,7 @@ const adapters = [
 export function ShuihuoModelCatalogPage() {
   const [models, setModels] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editingModel, setEditingModel] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const adapterKind = Form.useWatch('adapterKind', form);
@@ -32,20 +33,39 @@ export function ShuihuoModelCatalogPage() {
 
   useEffect(() => { refresh(); }, []);
 
+  function openCreate() {
+    setEditingModel(null);
+    form.resetFields();
+    setOpen(true);
+  }
+
+  function openEdit(model) {
+    setEditingModel(model);
+    form.setFieldsValue({ ...model, modelId: model.modelId || model.id, credentialRef: '' });
+    setOpen(true);
+  }
+
   async function submit() {
     try {
       const values = await form.validateFields();
       setSaving(true);
-      await createAdminModel({
+      const payload = {
         ...values,
         parameterSchema: values.parameterSchema || '{}',
         credentialRef: values.credentialRef || '',
         endpoint: values.endpoint || '',
         requestTemplate: values.requestTemplate || '',
         responseMapping: values.responseMapping || ''
-      });
+      };
+      if (editingModel) {
+        if (!payload.credentialRef) delete payload.credentialRef;
+        await updateAdminModel(editingModel.modelId || editingModel.id, payload);
+      } else {
+        await createAdminModel(payload);
+      }
       setOpen(false);
       form.resetFields();
+      setEditingModel(null);
       await refresh();
       message.success('模型已保存');
     } catch (error) {
@@ -55,19 +75,30 @@ export function ShuihuoModelCatalogPage() {
     }
   }
 
+  async function remove(model) {
+    try {
+      await deleteAdminModel(model.modelId || model.id);
+      await refresh();
+      message.success('模型已停用并移除');
+    } catch (error) {
+      message.error(error.message || '移除模型失败');
+    }
+  }
+
   return <>
     <Typography.Title level={3}>水货生产模型</Typography.Title>
     <Typography.Paragraph>管理员在此配置文本分析、即梦生图、图生视频和配音。密钥只保留服务器端的引用；运行地址、请求模板和返回映射不会在模型列表或用户工作台返回。</Typography.Paragraph>
-    <Button type="primary" onClick={() => setOpen(true)}>新增模型</Button>
+    <Button type="primary" onClick={openCreate}>新增模型</Button>
     <Table rowKey="id" style={{ marginTop: 16 }} dataSource={models} pagination={false} columns={[
       { title: '名称', dataIndex: 'name' },
       { title: '能力', dataIndex: 'kind' },
       { title: '适配器', dataIndex: 'adapterKind' },
       { title: '状态', dataIndex: 'enabled', render: value => <Tag color={value ? 'green' : 'default'}>{value ? '已启用' : '已停用'}</Tag> },
       { title: '凭据引用', dataIndex: 'credentialConfigured', render: value => <Tag color={value ? 'green' : 'gold'}>{value ? '已登记' : '未登记'}</Tag> },
-      { title: '运行配置', dataIndex: 'providerConfigured', render: value => <Tag color={value ? 'green' : 'gold'}>{value ? '模型记录完整' : '待完善'}</Tag> }
+      { title: '运行配置', dataIndex: 'providerConfigured', render: value => <Tag color={value ? 'green' : 'gold'}>{value ? '模型记录完整' : '待完善'}</Tag> },
+      { title: '操作', key: 'actions', render: (_, model) => <><Button type="link" onClick={() => openEdit(model)}>编辑</Button><Popconfirm title="确认移除这个模型？" onConfirm={() => remove(model)}><Button type="link" danger>移除</Button></Popconfirm></> }
     ]} />
-    <Drawer title="新增模型" open={open} onClose={() => setOpen(false)} width={560} extra={<Button type="primary" loading={saving} onClick={submit}>保存</Button>}>
+    <Drawer title={editingModel ? '编辑模型' : '新增模型'} open={open} onClose={() => { setOpen(false); setEditingModel(null); }} width={560} extra={<Button type="primary" loading={saving} onClick={submit}>保存</Button>}>
       <Form form={form} layout="vertical" initialValues={{ kind: 'image', adapterKind: 'jimeng_image', enabled: false, parameterSchema: '{}' }}>
         <Form.Item label="模型标识" name="modelId" rules={[{ required: true, message: '请填写模型标识' }, { pattern: /^[a-z0-9]+(?:-[a-z0-9]+)*$/, message: '请使用小写 kebab-case，例如 video-vidu-admin' }]}><Input placeholder="例如 video-vidu-admin" /></Form.Item>
         <Form.Item label="名称" name="name" rules={[{ required: true, message: '请填写模型名称' }]}><Input /></Form.Item>
