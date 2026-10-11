@@ -53,7 +53,7 @@ $env:QIANTIE_GO_LISTEN_ADDR = $ListenAddr
 # are configured and verified.
 $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
 $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER = '1'
-$env:QIANTIE_NODE_AUTH_BASE_URL = 'http://127.0.0.1:3001'
+# No Node/3001 fallback. Migrated routes are served directly by Go.
 $env:QIANTIE_REDIS_URL = 'redis://127.0.0.1:6379'
 
 & (Join-Path $PSScriptRoot 'start-local-go.ps1') -ListenAddr $ListenAddr

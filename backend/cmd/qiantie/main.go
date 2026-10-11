@@ -50,9 +50,20 @@ func main() {
 		log.Fatal(err)
 	}
 	staticHandler := webassets.Handler()
-	authProxy, err := newAuthProxy(envOrDefault("QIANTIE_NODE_AUTH_BASE_URL", "http://127.0.0.1:3001"))
-	if err != nil {
-		log.Fatal(err)
+	// The Go runtime is self-contained by default. A legacy Node bridge is
+	// only created when an explicit target is supplied for a temporary
+	// migration check; no request is sent to port 3001 implicitly.
+	authProxy := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusNotImplemented)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "该功能尚未迁移到 Go 服务"})
+	}))
+	if target := strings.TrimSpace(os.Getenv("QIANTIE_NODE_AUTH_BASE_URL")); target != "" {
+		proxy, proxyErr := newAuthProxy(target)
+		if proxyErr != nil {
+			log.Fatal(proxyErr)
+		}
+		authProxy = proxy
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if (req.Method == http.MethodGet || req.Method == http.MethodPost) && strings.HasPrefix(req.URL.Path, "/api/login/invite/") {
