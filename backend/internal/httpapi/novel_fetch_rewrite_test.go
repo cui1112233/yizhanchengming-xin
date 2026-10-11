@@ -43,6 +43,9 @@ func TestNovelFetchWorkshopAITestRouteUsesGoProvider(t *testing.T) {
 		if request.UserPrompt != "请只回复：ok" {
 			t.Fatalf("unexpected test prompt: %#v", request)
 		}
+		if request.MaxTokens < 32 {
+			t.Fatalf("AI test budget is too small: %d", request.MaxTokens)
+		}
 		return "ok", nil
 	})
 	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore(), NovelFetchRewrite: provider})

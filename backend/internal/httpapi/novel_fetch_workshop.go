@@ -611,7 +611,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			SystemPrompt: "你是接口连通性测试助手。",
 			UserPrompt:   "请只回复：ok",
 			Temperature:  0,
-			MaxTokens:    8,
+			MaxTokens:    64,
 		})
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
