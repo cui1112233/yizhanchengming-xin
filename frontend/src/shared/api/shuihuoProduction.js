@@ -89,4 +89,7 @@ export function updateAdminModel(modelId, payload) {
 export function deleteAdminModel(modelId) {
   return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
 }
+export function testAdminModel(modelId) {
+  return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}/test`, { method: 'POST', suppressGlobalError: true });
+}
 export function createBatchFactoryProject(payload) { return apiRequest('/api/batch-factory/projects', { method: 'POST', body: JSON.stringify(payload) }); }

@@ -286,6 +286,116 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"model": safeShuihuoModels([]map[string]any{current}, false)[0]})
 	})))
+	root.Handle("/api/shuihuo-production/admin/models/{modelId}/test", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := BridgeIdentityFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if !identity.IsOwner {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权测试模型"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, identity.Username, catalogStore)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		modelID := strings.TrimSpace(r.PathValue("modelId"))
+		var model map[string]any
+		for _, candidate := range shuihuoCollection(config, "modelCatalog", nil) {
+			if modelString(candidate, "id") == modelID || modelString(candidate, "modelId") == modelID {
+				model = candidate
+				break
+			}
+		}
+		if model == nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "模型不存在"})
+			return
+		}
+		kind := strings.ToLower(modelString(model, "kind"))
+		endpoint := modelString(model, "endpoint")
+		if endpoint == "" {
+			endpoint = modelString(model, "baseUrl")
+		}
+		credential := modelString(model, "apiKey")
+		if credential == "" {
+			credential = modelString(model, "credential")
+		}
+		if endpoint == "" || credential == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": kind, "error": "模型地址或凭据未配置"})
+			return
+		}
+		client := &http.Client{Timeout: 20 * time.Second}
+		if kind == "image" {
+			imageEndpoint, endpointErr := shuihuoImageGenerationEndpoint(endpoint)
+			if endpointErr != nil {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "kind": kind, "error": "生图服务地址格式不正确"})
+				return
+			}
+			parsed, parseErr := url.Parse(imageEndpoint)
+			if parseErr != nil || parsed.Host == "" {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "kind": kind, "error": "生图服务地址格式不正确"})
+				return
+			}
+			probeURL := *parsed
+			probeURL.Path = strings.TrimSuffix(probeURL.Path, "/images/generations") + "/models"
+			probe, requestErr := http.NewRequestWithContext(r.Context(), http.MethodGet, probeURL.String(), nil)
+			if requestErr != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": kind, "error": "生图服务地址无效"})
+				return
+			}
+			probe.Header.Set("Authorization", "Bearer "+credential)
+			response, requestErr := client.Do(probe)
+			if requestErr != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": "模型服务连接失败，请检查地址和网络", "type": "upstream_connection_error"})
+				return
+			}
+			defer response.Body.Close()
+			if response.StatusCode < 200 || response.StatusCode >= 300 {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": fmt.Sprintf("上游模型服务返回状态 %d", response.StatusCode), "type": "upstream_error"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "message": "生图服务连接成功"})
+			return
+		}
+		if kind == "text" {
+			parsed, parseErr := url.Parse(endpoint)
+			if parseErr != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "kind": kind, "error": "文本服务地址格式不正确"})
+				return
+			}
+			textEndpoint := strings.TrimRight(endpoint, "/")
+			if !strings.HasSuffix(parsed.Path, "/chat/completions") {
+				textEndpoint += "/chat/completions"
+			}
+			payload, _ := json.Marshal(map[string]any{"model": modelString(model, "modelId"), "messages": []map[string]string{{"role": "user", "content": "Hi"}}, "max_tokens": 5})
+			probe, requestErr := http.NewRequestWithContext(r.Context(), http.MethodPost, textEndpoint, bytes.NewReader(payload))
+			if requestErr != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "kind": kind, "error": "文本服务地址无效"})
+				return
+			}
+			probe.Header.Set("Content-Type", "application/json")
+			probe.Header.Set("Authorization", "Bearer "+credential)
+			response, requestErr := client.Do(probe)
+			if requestErr != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": "模型服务连接失败，请检查地址和网络", "type": "upstream_connection_error"})
+				return
+			}
+			defer response.Body.Close()
+			if response.StatusCode < 200 || response.StatusCode >= 300 {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "kind": kind, "error": fmt.Sprintf("上游模型服务返回状态 %d", response.StatusCode), "type": "upstream_error"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "message": "文本模型连接成功"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "kind": kind, "tested": "configuration", "message": "配置完整，未发送生成任务"})
+	})))
 	root.Handle("/api/shuihuo-production/asset-types", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

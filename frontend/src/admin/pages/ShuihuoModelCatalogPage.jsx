@@ -1,6 +1,6 @@
 import { Button, Drawer, Form, Input, Popconfirm, Select, Switch, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
-import { createAdminModel, deleteAdminModel, listAdminModels, updateAdminModel } from '../../shared/api/shuihuoProduction';
+import { createAdminModel, deleteAdminModel, listAdminModels, testAdminModel, updateAdminModel } from '../../shared/api/shuihuoProduction';
 
 const adapters = [
   { value: 'text_completion', label: '文本分析', kind: 'text' },
@@ -16,6 +16,7 @@ export function ShuihuoModelCatalogPage() {
   const [open, setOpen] = useState(false);
   const [editingModel, setEditingModel] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [testingId, setTestingId] = useState('');
   const [form] = Form.useForm();
   const adapterKind = Form.useWatch('adapterKind', form);
   const isGenericAdapter = adapterKind === 'generic_http';
@@ -85,6 +86,19 @@ export function ShuihuoModelCatalogPage() {
     }
   }
 
+  async function test(model) {
+    const id = model.modelId || model.id;
+    setTestingId(id);
+    try {
+      const result = await testAdminModel(id);
+      message.success(result.message || '模型连接成功');
+    } catch (error) {
+      message.error(error.message || '模型连接测试失败');
+    } finally {
+      setTestingId('');
+    }
+  }
+
   return <>
     <Typography.Title level={3}>水货生产模型</Typography.Title>
     <Typography.Paragraph>管理员在此配置文本分析、即梦生图、图生视频和配音。密钥只保留服务器端的引用；运行地址、请求模板和返回映射不会在模型列表或用户工作台返回。</Typography.Paragraph>
@@ -96,7 +110,7 @@ export function ShuihuoModelCatalogPage() {
       { title: '状态', dataIndex: 'enabled', render: value => <Tag color={value ? 'green' : 'default'}>{value ? '已启用' : '已停用'}</Tag> },
       { title: '凭据引用', dataIndex: 'credentialConfigured', render: value => <Tag color={value ? 'green' : 'gold'}>{value ? '已登记' : '未登记'}</Tag> },
       { title: '运行配置', dataIndex: 'providerConfigured', render: value => <Tag color={value ? 'green' : 'gold'}>{value ? '模型记录完整' : '待完善'}</Tag> },
-      { title: '操作', key: 'actions', render: (_, model) => <><Button type="link" onClick={() => openEdit(model)}>编辑</Button><Popconfirm title="确认移除这个模型？" onConfirm={() => remove(model)}><Button type="link" danger>移除</Button></Popconfirm></> }
+      { title: '操作', key: 'actions', render: (_, model) => <><Button type="link" loading={testingId === (model.modelId || model.id)} onClick={() => test(model)}>测试连接</Button><Button type="link" onClick={() => openEdit(model)}>编辑</Button><Popconfirm title="确认移除这个模型？" onConfirm={() => remove(model)}><Button type="link" danger>移除</Button></Popconfirm></> }
     ]} />
     <Drawer title={editingModel ? '编辑模型' : '新增模型'} open={open} onClose={() => { setOpen(false); setEditingModel(null); }} width={560} extra={<Button type="primary" loading={saving} onClick={submit}>保存</Button>}>
       <Form form={form} layout="vertical" initialValues={{ kind: 'image', adapterKind: 'jimeng_image', enabled: false, parameterSchema: '{}' }}>
