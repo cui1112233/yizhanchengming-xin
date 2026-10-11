@@ -695,8 +695,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文正文失败"})
 			return
 		}
-		if document.Gender == "" {
-			decision := novelfetchworkshop.ResolveGender(req.Context(), "", result.BookInfo, resolveGenderJudge(req))
+		if genderNeedsResolution(document.Gender) {
+			genderInfo := result.BookInfo
+			genderInfo.Text = result.ProcessedText
+			decision := novelfetchworkshop.ResolveGender(req.Context(), "", genderInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
@@ -1068,7 +1070,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
 			return
 		}
-		explicitManualGender := strings.TrimSpace(document.Gender) != ""
+		explicitManualGender := !genderNeedsResolution(document.Gender)
 		document.BookID = bookID
 		existing, err := store.GetDocument(req.Context(), identity.Username, bookID)
 		if err != nil && !errors.Is(err, novelfetchworkshop.ErrNotFound) {
@@ -1077,7 +1079,9 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		document = mergeNovelFetchDocument(existing, document)
 		if explicitManualGender {
-			decision := novelfetchworkshop.ResolveGender(req.Context(), document.Gender, document.BookInfo, resolveGenderJudge(req))
+			genderInfo := document.BookInfo
+			genderInfo.Text = document.ProcessedText
+			decision := novelfetchworkshop.ResolveGender(req.Context(), document.Gender, genderInfo, resolveGenderJudge(req))
 			document.Gender = decision.Gender
 			document.GenderSource = decision.Source
 			document.GenderReason = decision.Reason
@@ -1215,6 +1219,15 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	// accept both methods during the Node-to-Go compatibility period.
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/config", saveWorkshopConfig)
 	mux.HandleFunc("POST /api/novel-fetch-workshop/config", saveWorkshopConfig)
+}
+
+func genderNeedsResolution(value string) bool {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "", "待确认", "未知", "unknown":
+		return true
+	default:
+		return false
+	}
 }
 
 // novelFetchAppConfig restores the flat config contract used by the 3001

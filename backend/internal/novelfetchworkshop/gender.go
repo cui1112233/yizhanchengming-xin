@@ -1,0 +1,104 @@
+package novelfetchworkshop
+
+import (
+	"context"
+	"strings"
+)
+
+type AIGenderJudge func(ctx context.Context, info BookInfo) (string, error)
+
+type GenderSource string
+
+const (
+	GenderManual   GenderSource = "manual"
+	GenderBookInfo GenderSource = "bookinfo"
+	GenderAI       GenderSource = "ai"
+	GenderUnknown  GenderSource = "unknown"
+)
+
+type BookInfo struct {
+	Category string `json:"category"`
+	Genre    string `json:"genre"`
+	// Text is supplied only to the AI fallback. It is deliberately omitted
+	// from the persisted book-info JSON because it is already stored as the
+	// document body.
+	Text string `json:"-"`
+}
+
+type GenderDecision struct {
+	Gender string       `json:"gender"`
+	Source GenderSource `json:"genderSource"`
+	Reason string       `json:"genderReason"`
+}
+
+func ResolveGender(ctx context.Context, manual string, info BookInfo, judge AIGenderJudge) GenderDecision {
+	if strings.TrimSpace(manual) != "" {
+		return DecideGender(manual, BookInfo{}, "")
+	}
+	category := normalizeGender(info.Category)
+	genre := normalizeGender(info.Genre)
+	if (category != "" && genre != "" && category != genre) || category == "" && genre == "" {
+		if judge != nil {
+			aiGender, err := judge(ctx, info)
+			if err == nil {
+				return DecideGender("", info, aiGender)
+			}
+		}
+		return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "分类信息无法确定且 AI 未返回有效判断"}
+	}
+	return DecideGender("", info, "")
+}
+
+func DecideGender(manual string, info BookInfo, aiGender string) GenderDecision {
+	if strings.TrimSpace(manual) != "" {
+		if gender := normalizeGender(manual); gender != "" {
+			return GenderDecision{Gender: gender, Source: GenderManual, Reason: "采用手工填写的男女频"}
+		}
+		return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "手工填写的男女频不明确"}
+	}
+
+	category := normalizeGender(info.Category)
+	genre := normalizeGender(info.Genre)
+	if category != "" && genre != "" && category != genre {
+		if gender := normalizeGender(aiGender); gender != "" {
+			return GenderDecision{Gender: gender, Source: GenderAI, Reason: "分类信息冲突，采用 AI 判断结果"}
+		}
+		return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "分类信息冲突且没有有效 AI 判断结果"}
+	}
+	if category == "" && genre == "" && (strings.TrimSpace(info.Category) != "" || strings.TrimSpace(info.Genre) != "") {
+		if gender := normalizeGender(aiGender); gender != "" {
+			return GenderDecision{Gender: gender, Source: GenderAI, Reason: "分类信息不明确，采用 AI 判断结果"}
+		}
+		return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "分类信息不明确且没有有效 AI 判断结果"}
+	}
+	if category != "" || genre != "" {
+		return GenderDecision{Gender: firstGender(category, genre), Source: GenderBookInfo, Reason: "采用书籍分类信息中的明确男女频"}
+	}
+	if gender := normalizeGender(aiGender); gender != "" {
+		return GenderDecision{Gender: gender, Source: GenderAI, Reason: "书籍分类信息不明确，采用 AI 判断结果"}
+	}
+	return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "没有有效的手工、书籍分类或 AI 判断结果"}
+}
+
+func normalizeGender(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return ""
+	}
+	male := strings.Contains(value, "男")
+	female := strings.Contains(value, "女")
+	if male == female {
+		return ""
+	}
+	if male {
+		return "男频"
+	}
+	return "女频"
+}
+
+func firstGender(category, genre string) string {
+	if category != "" {
+		return category
+	}
+	return genre
+}

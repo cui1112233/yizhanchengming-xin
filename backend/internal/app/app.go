@@ -121,12 +121,21 @@ func textGenderJudge(provider *batchfactoryv11.OpenAICompatibleProvider) novelfe
 	return func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
 		return provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
 			SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
-			UserPrompt:          "请根据以下分类信息判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre,
+			UserPrompt:          "请根据以下分类信息和正文片段判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre + "；正文片段=" + genderTextExcerpt(info.Text),
 			Temperature:         0,
-			MaxTokens:           64,
+			MaxTokens:           256,
 			DisableJSONResponse: true,
 		})
 	}
+}
+
+func genderTextExcerpt(text string) string {
+	text = strings.TrimSpace(text)
+	runes := []rune(text)
+	if len(runes) > 1200 {
+		runes = runes[:1200]
+	}
+	return string(runes)
 }
 
 func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*http.ServeMux)) (http.Handler, error) {
@@ -164,9 +173,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		novelFetchAIGenderJudge = func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
 			return textProvider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
 				SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
-				UserPrompt:          "请根据以下分类信息判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre,
+				UserPrompt:          "请根据以下分类信息和正文片段判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre + "；正文片段=" + genderTextExcerpt(info.Text),
 				Temperature:         0,
-				MaxTokens:           64,
+				MaxTokens:           256,
 				DisableJSONResponse: true,
 			})
 		}
