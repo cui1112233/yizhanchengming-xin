@@ -341,8 +341,39 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 		(req.Method == http.MethodDelete && strings.HasPrefix(path, "/api/batch-rewrite/knowledge/")) {
 		return true
 	}
+	// These legacy batch-rewrite routes already have Go compatibility
+	// handlers registered in internal/httpapi. Keep them on Go instead of
+	// letting the broad legacy bridge send them back to Node on port 3001.
+	if isGoBatchRewriteCompatRequest(req) {
+		return true
+	}
 	// The remaining /api/batch-rewrite/* endpoints belong to the complete
 	// legacy workbench and stay on the established bridge.
+	return false
+}
+
+func isGoBatchRewriteCompatRequest(req *http.Request) bool {
+	if req == nil || req.URL == nil {
+		return false
+	}
+	path := req.URL.Path
+	if req.Method == http.MethodGet && path == "/api/batch-rewrite/issues" {
+		return true
+	}
+	if path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap" {
+		return req.Method == http.MethodGet
+	}
+	if path == "/api/batch-rewrite/tasks/batch-delete" || path == "/api/batch-rewrite/work-form" {
+		return req.Method == http.MethodPost
+	}
+	if strings.HasPrefix(path, "/api/batch-rewrite/web-submit/") {
+		switch path {
+		case "/api/batch-rewrite/web-submit/config", "/api/batch-rewrite/web-submit/environment", "/api/batch-rewrite/web-submit/history":
+			return req.Method == http.MethodGet || req.Method == http.MethodPost
+		case "/api/batch-rewrite/web-submit/test-visible", "/api/batch-rewrite/web-submit/sync-configs", "/api/batch-rewrite/web-submit/sync-styles", "/api/batch-rewrite/web-submit/preview", "/api/batch-rewrite/web-submit/submit":
+			return req.Method == http.MethodPost
+		}
+	}
 	return false
 }
 

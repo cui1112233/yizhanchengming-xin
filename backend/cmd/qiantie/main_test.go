@@ -213,11 +213,25 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 	for _, path := range []string{
 		"/api/batch-rewrite/process/jobs/latest",
 		"/api/batch-rewrite/rules/ai-suggest",
-		"/api/batch-rewrite/web-submit/history",
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		if isGoNovelFetchCompatRequest(req) || !isLegacyNovelFetchBridgeRequest(req) {
 			t.Fatalf("%s must remain on the legacy bridge", path)
+		}
+	}
+	for _, tc := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/batch-rewrite/issues"},
+		{http.MethodGet, "/api/batch-rewrite/web-submit/history"},
+		{http.MethodPost, "/api/batch-rewrite/web-submit/submit"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/batch-delete"},
+		{http.MethodPost, "/api/batch-rewrite/work-form"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {
+			t.Fatalf("%s %s must use the Go compatibility handler", tc.method, tc.path)
 		}
 	}
 }
