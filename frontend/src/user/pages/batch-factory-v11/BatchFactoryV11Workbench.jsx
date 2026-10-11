@@ -32,6 +32,7 @@ import { HookReviewPanel } from './HookReviewPanel';
 import { NovelSourceModule } from './NovelSourceModule.jsx';
 import { WorkbenchCard } from './WorkbenchCard';
 import { actionState } from './batchFactoryV11State.js';
+import { unavailableCapabilitySummary } from './capabilityReadiness.js';
 import {
   DEFAULT_WORKSPACE_LAYOUT,
   GRID_COLUMNS,
@@ -178,6 +179,7 @@ export function BatchFactoryV11Workbench({
   const productionAction = actionState(capabilities, 'production.submit');
   const mergeAction = actionState(capabilities, 'merge.run');
   const compilerAction = actionState(capabilities, 'compiler.preview');
+  const unavailableCapabilities = useMemo(() => unavailableCapabilitySummary(capabilities), [capabilities]);
 
   const selectedBook = useMemo(
     () => books.find(book => book.id === selectedBookId) || books[0] || null,
@@ -729,6 +731,14 @@ export function BatchFactoryV11Workbench({
         </>}
       </Space>
     </section>
+
+    {unavailableCapabilities.length ? <Alert
+      className="bf11-capability-alert"
+      type="warning"
+      showIcon
+      message="当前批量工厂还有未开放能力"
+      description={<Space direction="vertical" size={2}>{unavailableCapabilities.map(item => <Typography.Text key={item.key}>· {item.label}：{item.reason}</Typography.Text>)}</Space>}
+    /> : null}
 
     <section className="bf11-status-row">
       <div className="bf11-status-center" data-bf-region="status-center">
