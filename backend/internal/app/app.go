@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -25,6 +26,29 @@ import (
 
 type novelFetchRewriteAdapter struct {
 	provider *batchfactoryv11.OpenAICompatibleProvider
+}
+
+type ownerTextProvider struct {
+	fallback batchfactoryv11.DirectorProvider
+	resolve  func(context.Context, string) (batchfactoryv11.DirectorProvider, error)
+}
+
+func (p ownerTextProvider) Complete(ctx context.Context, request batchfactoryv11.TextCompletionRequest) (string, error) {
+	if p.resolve != nil {
+		if identity, ok := httpapi.BridgeIdentityFromContext(ctx); ok {
+			provider, err := p.resolve(ctx, identity.Username)
+			if err != nil {
+				return "", err
+			}
+			if provider != nil {
+				return provider.Complete(ctx, request)
+			}
+		}
+	}
+	if p.fallback != nil {
+		return p.fallback.Complete(ctx, request)
+	}
+	return "", errors.New("text provider is not configured")
 }
 
 func (a novelFetchRewriteAdapter) Complete(ctx context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
@@ -147,13 +171,19 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		}
 		novelFetchRewrite = novelFetchRewriteAdapter{provider: textProvider}
 	}
-	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
+	resolveCatalogTextProvider := func(ctx context.Context, owner string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
 		settings, err := novelFetchStore.GetConfig(ctx, owner)
 		if err != nil {
 			return nil, err
 		}
-		selected := selectedTextModelID(settings)
-		provider, providerErr := configuredTextProvider(settings, selected)
+		provider, providerErr := configuredTextProvider(settings, selectedTextModelID(settings))
+		if providerErr != nil {
+			return nil, providerErr
+		}
+		return provider, nil
+	}
+	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
+		provider, providerErr := resolveCatalogTextProvider(ctx, owner)
 		if providerErr != nil {
 			return nil, providerErr
 		}
@@ -163,11 +193,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		return novelFetchRewrite, nil
 	}
 	novelFetchAIGenderJudgeResolver = func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
-		settings, err := novelFetchStore.GetConfig(ctx, owner)
-		if err != nil {
-			return nil, err
-		}
-		provider, providerErr := configuredTextProvider(settings, selectedTextModelID(settings))
+		provider, providerErr := resolveCatalogTextProvider(ctx, owner)
 		if providerErr != nil {
 			return nil, providerErr
 		}
@@ -277,5 +303,8 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: textProvider, RegisterV11: register}), nil
+	effectiveTextProvider := ownerTextProvider{fallback: textProvider, resolve: func(ctx context.Context, owner string) (batchfactoryv11.DirectorProvider, error) {
+		return resolveCatalogTextProvider(ctx, owner)
+	}}
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, RegisterV11: register}), nil
 }
