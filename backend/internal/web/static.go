@@ -25,6 +25,13 @@ func StaticHandler(files fs.FS) http.Handler {
 			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
 			return
 		}
+		// The admin app is built as a separate entry so it can keep its own
+		// navigation and permission gate. Any /admin/* URL must therefore use
+		// admin.html instead of falling back to the user-facing index.html.
+		if name == "admin" || strings.HasPrefix(name, "admin/") {
+			serveEmbeddedIndex(w, files, "admin.html")
+			return
+		}
 		if name != "" {
 			if info, err := fs.Stat(files, name); err == nil && info.IsDir() {
 				indexName := path.Join(name, "index.html")
