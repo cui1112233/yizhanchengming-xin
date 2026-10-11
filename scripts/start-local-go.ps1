@@ -43,9 +43,10 @@ if ($needsBuild) {
 Push-Location (Join-Path $repo 'backend')
 try {
   $env:QIANTIE_GO_LISTEN_ADDR = $ListenAddr
-  if (-not $env:QIANTIE_RELEASE_SHA) {
-    $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
-  }
+  # A local restart must always identify the checkout it is starting. Keeping
+  # an inherited SHA here can make 4001 serve new files while reporting an old
+  # release, which makes the runtime check misleading.
+  $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
     $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '1'
   }
