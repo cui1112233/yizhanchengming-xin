@@ -229,6 +229,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterPublicTeamInviteCompat(root, options.MemberProfileStore.SystemDir, options.AuthStore, options.MemberProfileStore)
 	}
 	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore, options.PresetCatalog)
+	RegisterAdminGovernanceCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterClientErrorCompat(root, auth, options.MemberProfileStore)
 	if options.MemberProfileStore != nil {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)

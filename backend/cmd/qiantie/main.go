@@ -273,6 +273,18 @@ func isGoAdminReadRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
+	if path == "/api/admin/applications" || path == "/api/admin/grants" {
+		return req.Method == http.MethodGet
+	}
+	if strings.HasPrefix(path, "/api/admin/applications/") {
+		return req.Method == http.MethodPost && (strings.HasSuffix(path, "/approve") || strings.HasSuffix(path, "/reject"))
+	}
+	if strings.HasPrefix(path, "/api/admin/grants/") {
+		return req.Method == http.MethodDelete
+	}
+	if path == "/api/admin/grants" {
+		return req.Method == http.MethodPost
+	}
 	if req.Method == http.MethodGet {
 		return path == "/api/admin/presets" || path == "/api/admin/preset-slots" || adminPresetVersionPath(path)
 	}
