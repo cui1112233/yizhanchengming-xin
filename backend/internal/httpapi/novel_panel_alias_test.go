@@ -56,3 +56,19 @@ func TestNovelPanelSettingsAliasUsesManagedTextModel(t *testing.T) {
 		t.Fatalf("settings catalog response=%d %s", res.Code, res.Body.String())
 	}
 }
+
+func TestNovelPanelImageSettingsUsesManagedImageModel(t *testing.T) {
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "alice", map[string]any{
+		"modelCatalog": []any{map[string]any{
+			"id": "managed-image", "kind": "image", "modelId": "image-configured", "baseUrl": "https://image.example/v1", "credential": "secret", "enabled": true,
+			"capabilities": map[string]any{"supportsReferenceImages": true},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	settings := readPanelImageSettingsWithCatalog(context.Background(), NewUserConfigStore(t.TempDir()), "alice", catalog)
+	if settings["base_url"] != "https://image.example/v1" || settings["model"] != "image-configured" || settings["api_key"] != "secret" || settings["supports_reference"] != true {
+		t.Fatalf("unexpected image settings: %#v", settings)
+	}
+}

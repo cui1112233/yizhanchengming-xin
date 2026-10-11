@@ -12,9 +12,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-func RegisterNovelPanelImageGenerateCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore) {
+func RegisterNovelPanelImageGenerateCompat(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, catalogStores ...novelfetchworkshop.Store) {
 	if root == nil || middleware.AuthStore == nil || store == nil {
 		return
 	}
@@ -29,7 +31,11 @@ func RegisterNovelPanelImageGenerateCompat(root *http.ServeMux, middleware Bridg
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
 		}
-		settings := readPanelImageSettings(store, identity.Username)
+		var catalogStore novelfetchworkshop.Store
+		if len(catalogStores) > 0 {
+			catalogStore = catalogStores[0]
+		}
+		settings := readPanelImageSettingsWithCatalog(req.Context(), store, identity.Username, catalogStore)
 		missing := []string{}
 		for _, key := range []string{"base_url", "model", "api_key"} {
 			if strings.TrimSpace(toString(settings[key])) == "" {

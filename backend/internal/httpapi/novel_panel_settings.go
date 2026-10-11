@@ -180,6 +180,46 @@ func readPanelImageSettings(store *UserConfigStore, username string) map[string]
 	return result
 }
 
+func readPanelImageSettingsWithCatalog(ctx context.Context, store *UserConfigStore, username string, catalogStore novelfetchworkshop.Store) map[string]any {
+	result := readPanelImageSettings(store, username)
+	if strings.TrimSpace(fmt.Sprint(result["base_url"])) != "" && strings.TrimSpace(fmt.Sprint(result["model"])) != "" && strings.TrimSpace(fmt.Sprint(result["api_key"])) != "" {
+		return result
+	}
+	if catalogStore == nil {
+		return result
+	}
+	settings, err := catalogStore.GetConfig(ctx, username)
+	if err != nil {
+		return result
+	}
+	for _, candidate := range modelCatalog(settings) {
+		if candidate["kind"] != "image" || candidate["enabled"] != true {
+			continue
+		}
+		baseURL := strings.TrimSpace(fmt.Sprint(candidate["baseUrl"]))
+		modelID := strings.TrimSpace(fmt.Sprint(candidate["modelId"]))
+		credential := strings.TrimSpace(fmt.Sprint(candidate["credential"]))
+		if baseURL == "<nil>" {
+			baseURL = ""
+		}
+		if modelID == "<nil>" {
+			modelID = ""
+		}
+		if credential == "<nil>" {
+			credential = ""
+		}
+		if baseURL == "" || modelID == "" || credential == "" {
+			continue
+		}
+		result["base_url"], result["model"], result["api_key"] = baseURL, modelID, credential
+		if capabilities, ok := candidate["capabilities"].(map[string]any); ok {
+			result["supports_reference"] = capabilities["supportsReferenceImages"] == true
+		}
+		break
+	}
+	return result
+}
+
 func publicPanelImageSettings(store *UserConfigStore, username string, input map[string]any) map[string]any {
 	result := cloneConfigMap(input)
 	key, _ := result["api_key"].(string)
@@ -234,7 +274,7 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		if req.Method == http.MethodGet && req.URL.Path == "/api/image-settings" {
-			writeJSON(w, http.StatusOK, map[string]any{"settings": publicPanelImageSettings(store, identity.Username, readPanelImageSettings(store, identity.Username))})
+			writeJSON(w, http.StatusOK, map[string]any{"settings": publicPanelImageSettings(store, identity.Username, readPanelImageSettingsWithCatalog(req.Context(), store, identity.Username, catalogStore))})
 			return
 		}
 		var patch map[string]any
@@ -255,7 +295,7 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		if req.URL.Path == "/api/image-settings" {
-			current := readPanelImageSettings(store, identity.Username)
+			current := readPanelImageSettingsWithCatalog(req.Context(), store, identity.Username, catalogStore)
 			for _, key := range []string{"base_url", "model", "generate_path", "edit_path", "size", "aspect_ratio"} {
 				if value, ok := patch[key]; ok {
 					current[key] = strings.TrimSpace(fmt.Sprint(value))
@@ -290,7 +330,7 @@ func RegisterNovelPanelSettingsCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		if req.URL.Path == "/api/image-settings/test" {
-			candidate := readPanelImageSettings(store, identity.Username)
+			candidate := readPanelImageSettingsWithCatalog(req.Context(), store, identity.Username, catalogStore)
 			for _, key := range []string{"base_url", "model", "api_key", "generate_path", "edit_path"} {
 				if value, ok := patch[key]; ok {
 					candidate[key] = value
