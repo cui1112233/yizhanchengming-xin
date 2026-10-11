@@ -79,3 +79,19 @@ func TestLegacyModelTestRoutesAreServedByGo(t *testing.T) {
 		}
 	}
 }
+
+func TestModelCatalogAcceptsManagedAudioFields(t *testing.T) {
+	model, err := normalizeManagedModel(map[string]any{
+		"id": "tts-demo", "kind": "audio", "displayName": "测试配音", "enabled": false,
+		"endpoint": "https://audio.example.test/speech", "requestTemplate": `{"method":"POST","body":{"text":"{{input}}"}}`,
+		"responseMapping": `{"resultUrl":"data.url"}`, "credential": "secret-value",
+	})
+	if err != nil {
+		t.Fatalf("audio model should be accepted: %v", err)
+	}
+	for key, want := range map[string]string{"endpoint": "https://audio.example.test/speech", "requestTemplate": `{"method":"POST","body":{"text":"{{input}}"}}`, "responseMapping": `{"resultUrl":"data.url"}`} {
+		if model[key] != want {
+			t.Fatalf("%s=%#v, want %q", key, model[key], want)
+		}
+	}
+}

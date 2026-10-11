@@ -14,7 +14,7 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-var modelKinds = map[string]bool{"text": true, "video": true, "image": true}
+var modelKinds = map[string]bool{"text": true, "video": true, "image": true, "audio": true}
 
 func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, store novelfetchworkshop.Store) {
 	mux := http.NewServeMux()
@@ -434,7 +434,7 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if id == "" || id == "<nil>" || kind == "" || !modelKinds[kind] {
 		return nil, errors.New("模型 ID 和类型不能为空")
 	}
-	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "credential": strings.TrimSpace(fmt.Sprint(input["credential"])), "enabled": input["enabled"] == true}
+	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "credential": strings.TrimSpace(fmt.Sprint(input["credential"])), "enabled": input["enabled"] == true}
 	if model["displayName"] == "<nil>" || model["displayName"] == "" {
 		model["displayName"] = id
 	}
@@ -443,6 +443,11 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	}
 	if model["baseUrl"] == "<nil>" {
 		model["baseUrl"] = ""
+	}
+	for _, key := range []string{"endpoint", "requestTemplate", "responseMapping"} {
+		if model[key] == "<nil>" {
+			model[key] = ""
+		}
 	}
 	if model["credential"] == "<nil>" {
 		model["credential"] = ""
