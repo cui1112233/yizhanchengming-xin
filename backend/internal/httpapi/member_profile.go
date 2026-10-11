@@ -618,34 +618,47 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			return
 		}
 		sessions := []map[string]any{}
+		persistentSessions := []map[string]any{}
 		if listing, ok := accounts.(interface {
 			ListSessionsForUser(context.Context, string) ([]auth.Session, error)
 		}); ok {
 			if persisted, err := listing.ListSessionsForUser(req.Context(), identity.Username); err == nil {
 				currentHash := persistedSessionHash(bearerToken(req))
 				for _, session := range persisted {
-					sessions = append(sessions, map[string]any{
+					public := map[string]any{
 						"id":       session.Token[:minInt(10, len(session.Token))],
 						"current":  bearerToken(req) != "" && session.Token == currentHash,
 						"issuedAt": session.IssuedAt,
 						"browser":  session.Browser,
 						"os":       session.OS,
 						"ipHint":   session.IPHint,
-					})
+					}
+					// A remembered login is stored with the 30-day expiry chosen by
+					// the login request; a normal login expires after 24 hours.
+					// Keep the two groups separate so the security page can show the
+					// same distinction as the legacy member center.
+					if session.ExpiresAt.Sub(session.IssuedAt) > 24*time.Hour {
+						public["expiresAt"] = session.ExpiresAt
+						persistentSessions = append(persistentSessions, public)
+					} else {
+						sessions = append(sessions, public)
+					}
 				}
 			}
 		}
 		other := 0
-		for _, session := range sessions {
-			if current, _ := session["current"].(bool); !current {
-				other++
+		for _, group := range [][]map[string]any{sessions, persistentSessions} {
+			for _, session := range group {
+				if current, _ := session["current"].(bool); !current {
+					other++
+				}
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"account":            member,
 			"mfa":                profiles.mfaStatus(identity.Username),
 			"sessions":           sessions,
-			"persistentSessions": []any{},
+			"persistentSessions": persistentSessions,
 			"otherSessionCount":  other,
 		})
 	})))

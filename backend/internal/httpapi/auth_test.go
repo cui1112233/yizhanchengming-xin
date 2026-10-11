@@ -15,6 +15,7 @@ type authTestStore struct {
 	account  auth.Account
 	password string
 	session  auth.Session
+	sessions []auth.Session
 }
 
 func (s *authTestStore) FindAccount(context.Context, string) (auth.Account, error) {
@@ -41,6 +42,15 @@ func (s *authTestStore) RevokeSession(_ context.Context, token string) error {
 		s.session = auth.Session{}
 	}
 	return nil
+}
+func (s *authTestStore) ListSessionsForUser(_ context.Context, username string) ([]auth.Session, error) {
+	if len(s.sessions) > 0 {
+		return append([]auth.Session(nil), s.sessions...), nil
+	}
+	if s.session.Username == username && s.session.Token != "" {
+		return []auth.Session{s.session}, nil
+	}
+	return nil, nil
 }
 
 func TestAuthRoutesRejectUnknownAccountWithoutLeakingDetails(t *testing.T) {

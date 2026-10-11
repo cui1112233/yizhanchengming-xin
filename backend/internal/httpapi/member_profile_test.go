@@ -1,9 +1,13 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,3 +40,41 @@ func TestMemberProfileIncludesDetailsAndOwnerTeamShape(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMemberSecuritySeparatesRememberedSessions(t *testing.T) {
+	now := time.Date(2026, 10, 11, 3, 0, 0, 0, time.UTC)
+	accounts := &authTestStore{
+		account: auth.Account{Username: "alice", IsOwner: true, Active: true, CreatedAt: now},
+		sessions: []auth.Session{
+			{Token: "runtime-token-hash", Username: "alice", IssuedAt: now, ExpiresAt: now.Add(24 * time.Hour), IPHint: "127.0.0.1"},
+			{Token: "remembered-token-hash", Username: "alice", IssuedAt: now, ExpiresAt: now.Add(30 * 24 * time.Hour), IPHint: "127.0.0.1"},
+		},
+	}
+	mux := http.NewServeMux()
+	RegisterMemberProfileRoutes(mux, BridgeAuth{Secret: "test-secret", Now: func() time.Time { return now }, AuthStore: accounts}, NewMemberProfileStore(t.TempDir()), accounts, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/member/security", nil)
+	SignBridgeRequest(req, "alice", true, now, "test-secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("security status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(strings.NewReader(res.Body.String())).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(payload["sessions"].([]any)); got != 1 {
+		t.Fatalf("runtime sessions=%d, want 1: %#v", got, payload["sessions"])
+	}
+	persistent, ok := payload["persistentSessions"].([]any)
+	if !ok || len(persistent) != 1 {
+		t.Fatalf("persistent sessions=%#v, want one remembered session", payload["persistentSessions"])
+	}
+	if _, ok := persistent[0].(map[string]any)["expiresAt"]; !ok {
+		t.Fatalf("remembered session must expose expiry: %#v", persistent[0])
+	}
+}
+
+var _ interface {
+	ListSessionsForUser(context.Context, string) ([]auth.Session, error)
+} = (*authTestStore)(nil)
