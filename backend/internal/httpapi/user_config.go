@@ -222,6 +222,32 @@ func mergeManagedModelCatalog(ctx context.Context, config map[string]any, catalo
 	}
 }
 
+// applyManagedTextModelPublic keeps the old top-level config fields useful for
+// the settings page while making them reflect the enabled managed text model.
+// The catalog remains the source of truth; this is only a compatibility view.
+func applyManagedTextModelPublic(config map[string]any) {
+	catalog, ok := config["modelCatalog"].([]any)
+	if !ok {
+		return
+	}
+	for _, raw := range catalog {
+		model, ok := raw.(map[string]any)
+		if !ok || model["kind"] != "text" || model["enabled"] != true {
+			continue
+		}
+		modelID := strings.TrimSpace(fmt.Sprint(model["modelId"]))
+		baseURL := strings.TrimSpace(fmt.Sprint(model["baseUrl"]))
+		if modelID == "" || modelID == "<nil>" || baseURL == "" || baseURL == "<nil>" {
+			continue
+		}
+		config["provider"] = "managed"
+		config["baseUrl"] = baseURL
+		config["model"] = modelID
+		config["hasApiKey"] = model["hasApiKey"] == true
+		return
+	}
+}
+
 func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, accounts auth.Store, catalogStore novelfetchworkshop.Store, profiles ...*MemberProfileStore) {
 	if root == nil || middleware.AuthStore == nil || store == nil || accounts == nil {
 		return
@@ -246,6 +272,7 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 			return
 		}
 		result := publicUserConfig(config)
+		applyManagedTextModelPublic(result)
 		result["canManageApi"] = true
 		result["managedBy"] = nil
 		writeJSON(w, http.StatusOK, result)
@@ -279,6 +306,7 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 		}
 		mergeManagedModelCatalog(req.Context(), config, catalogStore, identity.Username)
 		result := publicUserConfig(config)
+		applyManagedTextModelPublic(result)
 		result["canManageApi"] = true
 		result["managedBy"] = nil
 		writeJSON(w, http.StatusOK, result)

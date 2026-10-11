@@ -17,7 +17,7 @@ func TestUserConfigReportsModelManagementForOwner(t *testing.T) {
 	store := &authTestStore{account: auth.Account{Username: "tester", Active: true, IsOwner: true}}
 	catalogStore := novelfetchworkshop.NewMemoryStore()
 	if err := catalogStore.PutConfig(context.Background(), "tester", map[string]any{
-		"modelCatalog":        []any{map[string]any{"id": "text-primary", "kind": "text", "enabled": true}},
+		"modelCatalog":        []any{map[string]any{"id": "text-primary", "kind": "text", "enabled": true, "modelId": "managed-text", "baseUrl": "https://text.example/v1", "credential": "secret"}},
 		"modelCatalogVersion": 1,
 	}); err != nil {
 		t.Fatal(err)
@@ -41,6 +41,9 @@ func TestUserConfigReportsModelManagementForOwner(t *testing.T) {
 	}
 	if _, ok := payload["managedBy"]; !ok {
 		t.Fatalf("owner config must expose managedBy for frontend parity: %#v", payload)
+	}
+	if payload["provider"] != "managed" || payload["baseUrl"] != "https://text.example/v1" || payload["model"] != "managed-text" || payload["hasApiKey"] != true {
+		t.Fatalf("owner config must expose the enabled managed text model as the effective summary: %#v", payload)
 	}
 	catalog, ok := payload["modelCatalog"].([]any)
 	if !ok || len(catalog) != 1 || catalog[0].(map[string]any)["id"] != "text-primary" {
