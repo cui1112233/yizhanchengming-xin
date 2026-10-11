@@ -1085,10 +1085,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if nested, ok := settings["settings"].(map[string]any); ok {
 			publicSource = nested
 		}
-		appConfig := publicSource
-		if configured, ok := publicSource["appConfig"].(map[string]any); ok {
-			appConfig = configured
-		}
+		appConfig := novelFetchAppConfig(publicSource)
 		platforms, ok := publicSource["platforms"].([]any)
 		if !ok {
 			platforms = append([]any(nil), defaultNovelFetchPlatforms...)
@@ -1144,6 +1141,27 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	// accept both methods during the Node-to-Go compatibility period.
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/config", saveWorkshopConfig)
 	mux.HandleFunc("POST /api/novel-fetch-workshop/config", saveWorkshopConfig)
+}
+
+// novelFetchAppConfig restores the flat config contract used by the 3001
+// workbench.  MySQL rows created by the migration keep the real fetch/rewrite
+// sections at the root while appConfig contains only the newer UI fields.
+// Merge both maps instead of returning the small compatibility fragment.
+func novelFetchAppConfig(source map[string]any) map[string]any {
+	base := map[string]any{}
+	for _, key := range []string{
+		"workflow", "fetch", "ai", "ai_presets", "ai_assignments", "rewrite",
+		"storage", "parser", "knowledge", "knowledgeLibraries", "modelCatalog",
+		"modelCatalogVersion", "sensitive_ai", "text_model_id", "web_submit", "work_form",
+	} {
+		if value, ok := source[key]; ok {
+			base[key] = value
+		}
+	}
+	if configured, ok := source["appConfig"].(map[string]any); ok {
+		base = mergeWorkshopConfig(base, configured)
+	}
+	return base
 }
 
 // publicNovelFetchConfig removes credentials before configuration reaches the browser.
