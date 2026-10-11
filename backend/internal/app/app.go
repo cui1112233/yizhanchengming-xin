@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -34,6 +35,48 @@ func (a novelFetchRewriteAdapter) Complete(ctx context.Context, request novelfet
 		MaxTokens:           request.MaxTokens,
 		DisableJSONResponse: true,
 	})
+}
+
+// configuredTextProvider reads the owner-scoped model catalog. An explicit
+// selection wins; when it is empty, the first enabled text model is the
+// account's default. This keeps the Go runtime aligned with the API Config
+// page instead of requiring a duplicate environment-variable configuration.
+func configuredTextProvider(settings map[string]any, selected string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
+	selected = strings.TrimSpace(selected)
+	var catalog []any
+	switch raw := settings["modelCatalog"].(type) {
+	case []any:
+		catalog = raw
+	case []map[string]any:
+		catalog = make([]any, 0, len(raw))
+		for _, item := range raw {
+			catalog = append(catalog, item)
+		}
+	}
+	for _, raw := range catalog {
+		model, ok := raw.(map[string]any)
+		if !ok || model["kind"] != "text" || model["enabled"] != true {
+			continue
+		}
+		id := strings.TrimSpace(fmt.Sprint(model["id"]))
+		if selected != "" && id != selected {
+			continue
+		}
+		endpoint := strings.TrimRight(strings.TrimSpace(fmt.Sprint(model["baseUrl"])), "/")
+		if !strings.HasSuffix(endpoint, "/chat/completions") {
+			endpoint += "/chat/completions"
+		}
+		provider := &batchfactoryv11.OpenAICompatibleProvider{
+			Endpoint: endpoint,
+			APIKey:   strings.TrimSpace(fmt.Sprint(model["credential"])),
+			Model:    strings.TrimSpace(fmt.Sprint(model["modelId"])),
+		}
+		if err := provider.Validate(); err != nil {
+			return nil, err
+		}
+		return provider, nil
+	}
+	return nil, nil
 }
 
 func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*http.ServeMux)) (http.Handler, error) {
@@ -92,25 +135,14 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 				selected = strings.TrimSpace(value)
 			}
 		}
-		if selected == "" {
-			return novelFetchRewrite, nil
+		provider, providerErr := configuredTextProvider(settings, selected)
+		if providerErr != nil {
+			return nil, providerErr
 		}
-		catalog, _ := settings["modelCatalog"].([]any)
-		for _, raw := range catalog {
-			model, ok := raw.(map[string]any)
-			if !ok || model["id"] != selected || model["kind"] != "text" || model["enabled"] != true {
-				continue
-			}
-			endpoint, _ := model["baseUrl"].(string)
-			apiKey, _ := model["credential"].(string)
-			modelID, _ := model["modelId"].(string)
-			provider := &batchfactoryv11.OpenAICompatibleProvider{Endpoint: strings.TrimSpace(endpoint), APIKey: strings.TrimSpace(apiKey), Model: strings.TrimSpace(modelID)}
-			if err := provider.Validate(); err != nil {
-				return nil, err
-			}
+		if provider != nil {
 			return novelFetchRewriteAdapter{provider: provider}, nil
 		}
-		return nil, nil
+		return novelFetchRewrite, nil
 	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
 	videoRegistry := batchfactoryv11.NewMemoryVideoProviderRegistry()
