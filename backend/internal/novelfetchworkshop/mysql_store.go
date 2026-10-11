@@ -54,7 +54,7 @@ func (s *MySQLStore) PutDocument(ctx context.Context, owner string, document Doc
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_documents(owner_username,book_id,document_json,created_at,updated_at) VALUES(?,?,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE document_json=VALUES(document_json), updated_at=CURRENT_TIMESTAMP(6)`, owner, document.BookID, string(raw))
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO novel_fetch_workshop_documents(owner_username,book_id,document_json,created_at,updated_at) VALUES(?,?,CAST(? AS CHAR CHARACTER SET utf8mb4),CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE document_json=VALUES(document_json), updated_at=CURRENT_TIMESTAMP(6)`, owner, document.BookID, string(raw))
 	return err
 }
 
