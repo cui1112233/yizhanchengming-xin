@@ -201,6 +201,7 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 			"/api/batch-rewrite/process/jobs/latest",
 			"/api/batch-rewrite/knowledge/summary",
 			"/api/batch-rewrite/rules/ai-suggest",
+			"/api/batch-rewrite/web-submit/history",
 		} {
 			req := httptest.NewRequest(method, path, nil)
 			if !isGoNovelFetchCompatRequest(req) {
