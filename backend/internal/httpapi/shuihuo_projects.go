@@ -36,7 +36,11 @@ func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
 			updated[key] = value
 		}
 	}
-	if strings.TrimSpace(modelString(updated, "name")) == "" || strings.TrimSpace(modelString(updated, "kind")) == "" {
+	name := strings.TrimSpace(modelString(updated, "name"))
+	if name == "" {
+		name = strings.TrimSpace(modelString(updated, "displayName"))
+	}
+	if name == "" || strings.TrimSpace(modelString(updated, "kind")) == "" {
 		return nil, errors.New("模型名称和能力不能为空")
 	}
 	return updated, nil

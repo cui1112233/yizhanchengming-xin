@@ -121,3 +121,11 @@ func TestPatchShuihuoModelAllowsStatusOnlyUpdates(t *testing.T) {
 		t.Fatalf("unexpected patched model: %#v", updated)
 	}
 }
+
+func TestPatchShuihuoModelAcceptsSharedCatalogDisplayName(t *testing.T) {
+	current := map[string]any{"id": "text-model", "displayName": "共享文本模型", "kind": "text", "enabled": true}
+	updated, err := patchShuihuoModel(current, map[string]any{"enabled": false})
+	if err != nil || updated["enabled"] != false {
+		t.Fatalf("shared catalog status-only patch should be accepted: %#v, %v", updated, err)
+	}
+}
