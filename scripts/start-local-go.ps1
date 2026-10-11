@@ -52,6 +52,33 @@ try {
   if (-not $env:QIANTIE_LEGACY_ACCOUNTS_PATH) {
     $env:QIANTIE_LEGACY_ACCOUNTS_PATH = Join-Path $repo 'data/system/accounts.json'
   }
+  # The process runs from backend/, while the shared data files live at the
+  # repository root. Keep local Go pointed at the same data as the Node app.
+  $localData = Join-Path $repo 'data'
+  if (-not $env:QIANTIE_PRESET_PATH) {
+    $env:QIANTIE_PRESET_PATH = Join-Path $localData 'system/presets.json'
+  }
+  if (-not $env:QIANTIE_PERSONAL_PROMPT_PATH) {
+    $env:QIANTIE_PERSONAL_PROMPT_PATH = Join-Path $localData 'system/script-constraint-prompts.json'
+  }
+  if (-not $env:QIANTIE_BATCH_FACTORY_AUTOMATION_PRESETS_PATH) {
+    $env:QIANTIE_BATCH_FACTORY_AUTOMATION_PRESETS_PATH = Join-Path $localData 'batch-factory-v11-automation-presets.json'
+  }
+  if (-not $env:QIANTIE_BATCH_FACTORY_AUTOMATION_STATE_PATH) {
+    $env:QIANTIE_BATCH_FACTORY_AUTOMATION_STATE_PATH = Join-Path $localData 'batch-factory-v11-automation.json'
+  }
+  if (-not $env:QIANTIE_SCRIPT_HISTORY_DIR) {
+    $env:QIANTIE_SCRIPT_HISTORY_DIR = Join-Path $localData 'users'
+  }
+  if (-not $env:QIANTIE_MEMBER_SYSTEM_DIR) {
+    $env:QIANTIE_MEMBER_SYSTEM_DIR = Join-Path $localData 'system'
+  }
+  if (-not $env:QIANTIE_MEMBER_AVATAR_DIR) {
+    $env:QIANTIE_MEMBER_AVATAR_DIR = Join-Path $localData 'avatars'
+  }
+  if (-not $env:QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR) {
+    $env:QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR = Join-Path $localData 'local-executor-artifacts'
+  }
   if (-not $env:QIANTIE_GO_AUTH_ENABLED) {
     $env:QIANTIE_GO_AUTH_ENABLED = '1'
   }
