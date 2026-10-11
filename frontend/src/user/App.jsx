@@ -65,7 +65,9 @@ function usePathname() {
 function getPage(pathname) {
   const routes = {
     '/script': ScriptPage,
-    '/novel-fetch': NovelFetchPage,
+    // 小说获取统一进入 Go 工作台；旧版 V78 iframe 仅保留为兼容组件，
+    // 不再作为用户主入口，避免页面看起来像切回旧版本。
+    '/novel-fetch': NovelFetchWorkshopPage,
     '/novel-fetch-workshop': NovelFetchWorkshopPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
     '/batch-factory-preview': BatchFactoryPage,
