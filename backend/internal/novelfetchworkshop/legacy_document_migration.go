@@ -28,7 +28,14 @@ func legacyBodyRecords(document Document) []BodyRecord {
 
 	original := document.Original
 	if original == "" {
-		original = document.OriginalRaw
+		original = document.ProcessedText
+	}
+	if document.OriginalRaw != "" {
+		records = append(records, BodyRecord{
+			BookID:  document.BookID,
+			BodyRef: BodyRef{VersionID: "original_raw", State: "ready"},
+			Content: document.OriginalRaw,
+		})
 	}
 	if original != "" {
 		records = append(records, BodyRecord{
@@ -130,6 +137,7 @@ func (s *MySQLStore) MigrateLegacyDocumentBodies(ctx context.Context, owner, boo
 		return tx.Commit()
 	}
 
+	bodyRefs := map[string]BodyRef{}
 	for _, body := range bodies {
 		blob, hash, charCount, err := encodeBody(body.Content)
 		if err != nil {
@@ -142,9 +150,11 @@ func (s *MySQLStore) MigrateLegacyDocumentBodies(ctx context.Context, owner, boo
 		if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO novel_fetch_workshop_bodies(owner_username,book_id,version_id,revision,content_encoding,content_blob,content_hash,char_count,state,created_at,updated_at,last_needed_at,expires_at) VALUES(?,?,?,1,'gzip',?,?,?,?,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),NULL)`, owner, bookID, body.VersionID, blob, hash, charCount, state); err != nil {
 			return err
 		}
+		bodyRefs[body.VersionID] = BodyRef{VersionID: body.VersionID, Revision: 1, ContentHash: hash, CharCount: charCount, State: state}
 	}
 
 	lightweight := lightweightLegacyDocument(document, bodies)
+	lightweight.BodyRefs = bodyRefs
 	lightweightRaw, err := json.Marshal(lightweight)
 	if err != nil {
 		return err

@@ -63,6 +63,19 @@ func GenerateAIRewrites(ctx context.Context, store Store, owner, bookID string, 
 			return document, err
 		}
 		document.Versions[fmt.Sprintf("ai%d", index)] = result
+		versionID := fmt.Sprintf("ai%d", index)
+		ref, bodyErr := store.PutBody(ctx, owner, BodyRecord{
+			BookID:  document.BookID,
+			BodyRef: BodyRef{VersionID: versionID, State: "ready"},
+			Content: result,
+		})
+		if bodyErr != nil {
+			document.Meta["aiStatus"] = "failed"
+			document.Meta["aiError"] = bodyErr.Error()
+			_ = store.PutDocument(ctx, owner, document)
+			return document, bodyErr
+		}
+		document.BodyRefs[versionID] = ref
 	}
 	document.Meta["aiStatus"] = "done"
 	document.Meta["aiGeneratedCount"] = count

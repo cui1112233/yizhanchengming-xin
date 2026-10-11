@@ -230,6 +230,10 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		if err != nil {
 			continue
 		}
+		d, err = hydrateNovelFetchDocument(req.Context(), store, identity.Username, d)
+		if err != nil {
+			continue
+		}
 		if restore && d.OriginalRaw != "" {
 			d.Original = d.OriginalRaw
 			d.ProcessedText = d.OriginalRaw
@@ -248,6 +252,9 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		d.Meta["sensitiveReplacementCount"] = count
 		d.Logs = append(d.Logs, map[string]any{"type": "sensitive_reprocessed", "at": time.Now().UTC().Format(time.RFC3339Nano), "replacements": count})
 		d.ProcessedChars = len([]rune(d.ProcessedText))
+		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &d, d.OriginalRaw, d.ProcessedText); err != nil {
+			continue
+		}
 		_ = store.PutDocument(req.Context(), identity.Username, d)
 		changed++
 	}

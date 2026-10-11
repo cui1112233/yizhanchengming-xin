@@ -104,6 +104,11 @@ func RegisterLegacyNovelFetchRoutes(root *http.ServeMux, middleware BridgeAuth, 
 				continue
 			}
 			document := novelfetchworkshop.Document{BookID: bookID, OriginalRaw: fetched.OriginalRaw, Original: fetched.ProcessedText, ProcessedText: fetched.ProcessedText, OriginalRawChars: fetched.OriginalRawChars, ProcessedChars: fetched.ProcessedChars, MaxTxt: fetched.MaxTxt, BookInfo: fetched.BookInfo, Meta: map[string]any{"bookId": bookID, "platformId": platformText, "platformName": legacyNovelFetchPlatforms[platformID], "originalStatus": "done", "originalRawChars": fetched.OriginalRawChars, "processedChars": fetched.ProcessedChars, "maxTxt": fetched.MaxTxt, "updatedAt": time.Now().UTC().Format(time.RFC3339)}}
+			if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, fetched.OriginalRaw, fetched.ProcessedText); err != nil {
+				base["status"], base["data"], base["error"], base["length"] = "error", nil, "保存原文正文失败", 0
+				results = append(results, base)
+				continue
+			}
 			if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 				base["status"], base["data"], base["error"], base["length"] = "error", nil, "保存原文失败", 0
 				results = append(results, base)

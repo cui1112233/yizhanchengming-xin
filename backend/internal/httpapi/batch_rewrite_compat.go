@@ -98,6 +98,11 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
 			return
 		}
+		document, err = hydrateNovelFetchDocument(req.Context(), store, identity.Username, document)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取正文失败"})
+			return
+		}
 		meta := map[string]any{}
 		for key, value := range document.Meta {
 			meta[key] = value

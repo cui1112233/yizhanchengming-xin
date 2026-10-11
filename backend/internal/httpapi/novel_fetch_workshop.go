@@ -443,6 +443,11 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				document.Meta["originalStatus"] = "done"
 				document.Meta["originalRawChars"] = result.OriginalRawChars
 				document.Meta["processedChars"] = result.ProcessedChars
+				if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, result.ProcessedText); err != nil {
+					failed++
+					retryStages["fetch"]++
+					continue
+				}
 				if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 					failed++
 					retryStages["fetch"]++
@@ -569,6 +574,11 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
 			return
 		}
+		document, err = hydrateNovelFetchDocument(req.Context(), store, identity.Username, document)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取正文失败"})
+			return
+		}
 		writeJSON(w, http.StatusOK, document)
 	})
 
@@ -630,6 +640,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		document.Meta["originalStatus"] = "done"
 		document.Meta["originalRawChars"] = result.OriginalRawChars
 		document.Meta["processedChars"] = result.ProcessedChars
+		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, result.ProcessedText); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文正文失败"})
+			return
+		}
 		if document.Gender == "" {
 			decision := novelfetchworkshop.ResolveGender(req.Context(), "", result.BookInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
@@ -657,6 +671,11 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取任务失败"})
 			return
 		}
+		document, err = hydrateNovelFetchDocument(req.Context(), store, identity.Username, document)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取正文失败"})
+			return
+		}
 		if strings.TrimSpace(document.OriginalRaw) == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "没有可恢复的原始正文"})
 			return
@@ -671,6 +690,10 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.Meta = map[string]any{}
 		}
 		document.Meta["originalStatus"] = "restored"
+		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, document.OriginalRaw, document.ProcessedText); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存恢复正文失败"})
+			return
+		}
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存恢复结果失败"})
 			return
