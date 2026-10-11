@@ -619,6 +619,12 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 4 && parts[0] == "batches" && (parts[2] == "merge-media" || parts[2] == "merge-cover") {
 		return true
 	}
+	if len(parts) >= 3 && parts[0] == "publish" && parts[2] == "credential" {
+		return true
+	}
+	if len(parts) >= 3 && parts[0] == "publish" && parts[2] == "intents" {
+		return true
+	}
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "metadata" || parts[4] == "source" || parts[4] == "override" || parts[4] == "fetch-original") {
 		return true
 	}

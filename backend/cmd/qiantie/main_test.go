@@ -183,6 +183,9 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 		"/api/batch-factory/v12/batches/demo/merge",
 		"/api/batch-factory/v12/batches/demo/books/book-1/merge",
 		"/api/batch-factory/v12/batches/demo/merge-media/artifact-1",
+		"/api/batch-factory/v12/publish/121/credential",
+		"/api/batch-factory/v12/publish/121/intents",
+		"/api/batch-factory/v12/publish/121/intents/intent-1/confirm",
 	} {
 		if shouldBridgeLegacyAPIForSlice(path, 3) {
 			t.Fatalf("slice 3 director path must stay on Go: %s", path)
