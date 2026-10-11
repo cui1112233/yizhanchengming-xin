@@ -2327,6 +2327,9 @@ func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoPr
 	modelID, _ := model["modelId"].(string)
 	provider, _ := model["provider"].(string)
 	provider = batchfactoryv11.VideoProviderForModel(modelID, provider)
+	if provider == batchfactoryv11.VideoProviderAutoDLH3 && strings.TrimSpace(modelID) == "" {
+		modelID = batchfactoryv11.AutoDLH3Model
+	}
 	apiKey := shuihuoModelCredential(model)
 	endpoint, _ := model["endpoint"].(string)
 	if strings.TrimSpace(endpoint) == "" {
@@ -2334,6 +2337,14 @@ func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoPr
 	}
 	tasksEndpoint, _ := model["tasksEndpoint"].(string)
 	resultEndpoint, _ := model["resultEndpoint"].(string)
+	if provider == batchfactoryv11.VideoProviderAutoDLH3 {
+		if strings.TrimSpace(endpoint) == "" {
+			endpoint = batchfactoryv11.DefaultAutoDLH3CreateURL
+		}
+		if strings.TrimSpace(tasksEndpoint) == "" {
+			tasksEndpoint = batchfactoryv11.DefaultAutoDLH3TasksURL
+		}
+	}
 	workflowID, _ := model["workflowId"].(string)
 	return registry.Put(ctx, owner, batchfactoryv11.VideoProviderConfig{Provider: provider, APIKey: apiKey, Model: modelID, CreateURL: endpoint, TasksURL: tasksEndpoint, ResultURL: resultEndpoint, WorkflowID: workflowID})
 }
