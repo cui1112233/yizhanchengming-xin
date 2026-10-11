@@ -167,6 +167,8 @@ test('batch management, prompt persistence, production and merge actions use the
   assert.deepEqual(calls[2], ['director', 'b1']);
   assert.deepEqual(calls[3].slice(0, 4), ['video', 'b1', 'k1', 'v1']);
   assert.deepEqual(calls[4], ['merge', 'b1', { requestId: 'r1', timingMode: 'speed', speed: 1.5, ttsSpeed: 1.7 }]);
+  await adapter.runMerge({ batchId: 'b1', requestId: 'r2', timingMode: 'audio', speed: '1', ttsSpeed: 1.7, audioDurationSeconds: 12.5 });
+  assert.deepEqual(calls[5], ['merge', 'b1', { requestId: 'r2', timingMode: 'audio', speed: 1, ttsSpeed: 1.7, audioDurationSeconds: 12.5 }]);
 });
 
 

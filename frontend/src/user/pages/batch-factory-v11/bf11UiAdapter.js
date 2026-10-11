@@ -304,7 +304,9 @@ export function createBf11UiAdapter(api) {
         });
       }
       if (typeof api.submitBatchMerge !== 'function') throw new Error('批量合并接口未接入');
-      return api.submitBatchMerge(batchId, { requestId, timingMode, speed: Number(speed), ttsSpeed: Number(ttsSpeed) });
+      const payload = { requestId, timingMode, speed: Number(speed), ttsSpeed: Number(ttsSpeed) };
+      if (Number(audioDurationSeconds) > 0) payload.audioDurationSeconds = Number(audioDurationSeconds);
+      return api.submitBatchMerge(batchId, payload);
     },
 
     async getPublishCredential(provider) {

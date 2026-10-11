@@ -187,6 +187,9 @@ export function BatchFactoryV11Workbench({
     [books, selectedBookId]
   );
 
+  const measuredAudioDuration = Number(selectedBook?.settingsState?.patch?.audioDurationSeconds
+    ?? batch?.settingsState?.patch?.audioDurationSeconds ?? 0);
+
   const selectedVideo = useMemo(() => {
     const videos = selectedBook?.videos || [];
     return videos.find(video => video.id === selectedVideoId) || videos[0] || null;
@@ -668,12 +671,12 @@ export function BatchFactoryV11Workbench({
             ]}
           /> : <div className="bf11-tts-timing">
             <div><Typography.Text strong>TTS 测时语速</Typography.Text><InputNumber min={0.5} max={3} step={0.1} value={ttsSpeed} onChange={value => setTtsSpeed(Number(value || 1.7))} addonAfter="x" /></div>
-            <Typography.Text type="secondary">TTS 只测时，不合入成片；默认 1.7 是 TTS 参数，不是固定视频倍率。</Typography.Text>
+            <Typography.Text type={measuredAudioDuration > 0 ? 'secondary' : 'warning'}>配音时长：{measuredAudioDuration > 0 ? `${measuredAudioDuration.toFixed(2)} 秒` : '尚未读取'}。{measuredAudioDuration > 0 ? 'TTS 只测时，不合入成片；' : '请先在生产设置中读取配音时长；'}默认 1.7 是 TTS 参数，不是固定视频倍率。</Typography.Text>
           </div>}
           <Button
-            disabled={mergeAction.disabled || !onRunMerge}
-            title={mergeAction.disabled ? mergeAction.reason : ''}
-            onClick={() => onRunMerge?.(batch, { bookId: selectedBook?.id || '', timingMode: mergeTimingMode, speed: mergeSpeed, ttsSpeed })}
+            disabled={mergeAction.disabled || !onRunMerge || (mergeTimingMode === 'audio' && measuredAudioDuration <= 0)}
+            title={mergeAction.disabled ? mergeAction.reason : (mergeTimingMode === 'audio' && measuredAudioDuration <= 0 ? '跟随音频时长前，请先读取有效配音时长' : '')}
+            onClick={() => onRunMerge?.(batch, { bookId: selectedBook?.id || '', timingMode: mergeTimingMode, speed: mergeSpeed, ttsSpeed, audioDurationSeconds: measuredAudioDuration })}
           >合并待合并（当前小说）</Button>
         </section>
 
