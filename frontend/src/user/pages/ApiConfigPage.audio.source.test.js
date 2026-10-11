@@ -9,4 +9,6 @@ test('API configuration exposes a dedicated audio/TTS model form', () => {
   assert.match(source, /requestTemplate/);
   assert.match(source, /responseMapping/);
   assert.match(source, /音频模型/);
+  assert.match(source, /testManagedAudioModel/);
+  assert.match(source, /测试音频连接/);
 });

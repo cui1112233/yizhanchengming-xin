@@ -2,7 +2,7 @@ import { Button, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Switc
 import { KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, Video, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canManageModelCatalog, getConfig } from '../../shared/api/config';
-import { createManagedModel, deleteManagedModel, getManagedModelQuotas, listManagedModels, refreshLocalDoubaoPairingStatus, testManagedTextModel, updateManagedModel } from '../../shared/api/modelCatalog';
+import { createManagedModel, deleteManagedModel, getManagedModelQuotas, listManagedModels, refreshLocalDoubaoPairingStatus, testManagedAudioModel, testManagedTextModel, updateManagedModel } from '../../shared/api/modelCatalog';
 import { createCustomModelId } from '../../shared/modelCatalog/customModelId';
 import { isTextModelVerified, textModelVerificationKey } from '../../shared/modelCatalog/textModelVerification';
 import { getMemberCenter } from '../../shared/api/member';
@@ -72,6 +72,7 @@ export default function ApiConfigPage() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [testingTextModel, setTestingTextModel] = useState(false);
+  const [testingAudioModel, setTestingAudioModel] = useState(false);
   const [verifiedTextModelKey, setVerifiedTextModelKey] = useState('');
   const [customForm] = Form.useForm();
   const [presetKeys, setPresetKeys] = useState({});
@@ -213,6 +214,19 @@ export default function ApiConfigPage() {
     } finally { setTestingTextModel(false); }
   }
 
+  async function testCustomAudioModel() {
+    try {
+      const values = await customForm.validateFields(['kind', 'endpoint', 'requestTemplate', 'responseMapping']);
+      if (values.kind !== 'audio') return message.warning('只有音频模型需要音频连接测试');
+      setTestingAudioModel(true);
+      const candidate = customForm.getFieldsValue(true);
+      await testManagedAudioModel(candidate, editing?.id);
+      message.success('音频模型连接成功，现在可以保存并启用。');
+    } catch (error) {
+      if (!error?.errorFields) message.error(error.message || '音频模型连接测试失败');
+    } finally { setTestingAudioModel(false); }
+  }
+
   async function deleteModel(model) {
     try { await deleteManagedModel(model.id); message.success('模型已删除'); await refreshModels(); }
     catch (error) { message.error(error.message || '模型删除失败'); }
@@ -298,7 +312,7 @@ export default function ApiConfigPage() {
           return Promise.reject(new Error('启用模型前必须填写 API Key'));
         } })]}><Input.Password prefix={<KeyRound size={15} />} placeholder={editing?.hasCredential ? '留空表示不修改已保存的 Key' : '请输入 API Key'} /></Form.Item>
         <Form.Item noStyle shouldUpdate={(previous, current) => previous.kind !== current.kind || previous.baseUrl !== current.baseUrl || previous.modelId !== current.modelId || previous.credential !== current.credential || previous.enabled !== current.enabled}>
-          {() => customForm.getFieldValue('kind') === 'text' ? <div className="ac-api-actions"><Button onClick={testCustomTextModel} loading={testingTextModel}>测试文本连接</Button><span className="ac-muted-copy">启用保存前必须测试成功；修改地址、模型或密钥后需要重新测试。</span></div> : customForm.getFieldValue('kind') === 'audio' ? <div className="ac-api-actions"><span className="ac-muted-copy"><Volume2 size={14} /> 音频模型会由 TTS 接口按请求模板调用；保存前请确认模板能返回音频文件或音频 URL。</span></div> : null}
+          {() => customForm.getFieldValue('kind') === 'text' ? <div className="ac-api-actions"><Button onClick={testCustomTextModel} loading={testingTextModel}>测试文本连接</Button><span className="ac-muted-copy">启用保存前必须测试成功；修改地址、模型或密钥后需要重新测试。</span></div> : customForm.getFieldValue('kind') === 'audio' ? <div className="ac-api-actions"><Button onClick={testCustomAudioModel} loading={testingAudioModel}>测试音频连接</Button><span className="ac-muted-copy"><Volume2 size={14} /> TTS 会按请求模板调用；测试成功后再启用。</span></div> : null}
         </Form.Item>
         <Form.Item label="适用能力" extra="仅保存模型运行时可识别的能力；留空的时长不限制。">
           <Space direction="vertical">

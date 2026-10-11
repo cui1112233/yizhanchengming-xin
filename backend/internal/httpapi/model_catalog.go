@@ -164,6 +164,54 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "文本模型连接成功，现在可以保存并启用。"})
 	})
+	mux.HandleFunc("POST /api/config/models/test-audio", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		if !identity.IsOwner {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "无权管理模型"})
+			return
+		}
+		var input map[string]any
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+			return
+		}
+		model := map[string]any{
+			"kind":            "audio",
+			"endpoint":        strings.TrimSpace(fmt.Sprint(input["endpoint"])),
+			"requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])),
+			"responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])),
+			"credential":      strings.TrimSpace(fmt.Sprint(input["credential"])),
+		}
+		existingModelID := strings.TrimSpace(fmt.Sprint(input["existingModelId"]))
+		if existingModelID != "" {
+			if settings, settingsErr := store.GetConfig(req.Context(), identity.Username); settingsErr == nil {
+				for _, existing := range modelCatalog(settings) {
+					if existing["id"] != existingModelID {
+						continue
+					}
+					for _, key := range []string{"endpoint", "requestTemplate", "responseMapping", "credential"} {
+						if strings.TrimSpace(fmt.Sprint(model[key])) == "" {
+							model[key] = existing[key]
+						}
+					}
+					break
+				}
+			}
+		}
+		if modelString(model, "endpoint") == "" || modelString(model, "requestTemplate") == "" || modelString(model, "responseMapping") == "" || shuihuoModelCredential(model) == "" {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": "测试音频模型前请填写服务地址、请求模板、返回映射和 API Key"})
+			return
+		}
+		payload, contentType, err := requestConfiguredTTSBytes(req.Context(), ttsRequest{Input: "测试配音", Voice: "zh-CN-XiaoxiaoNeural", Speed: 1, Pitch: "0", Style: "general"}, model)
+		if err != nil || len(payload) == 0 || strings.HasPrefix(strings.ToLower(contentType), "application/json") {
+			if err == nil {
+				err = errors.New("服务未返回音频文件")
+			}
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": "音频模型连接失败：" + err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "contentType": contentType, "message": "音频模型连接成功，现在可以保存并启用。"})
+	})
 	mux.HandleFunc("PATCH /api/config/models/{modelId}", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		if !identity.IsOwner {

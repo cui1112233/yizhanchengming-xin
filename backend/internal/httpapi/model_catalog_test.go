@@ -95,3 +95,25 @@ func TestModelCatalogAcceptsManagedAudioFields(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedAudioModelConnectionTestAcceptsAudioResponse(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Header.Get("Authorization") != "Bearer audio-secret" {
+			t.Errorf("authorization = %q", req.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("audio-probe"))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/config/models/test-audio", map[string]any{
+		"kind": "audio", "endpoint": upstream.URL, "credential": "audio-secret",
+		"requestTemplate": `{"method":"POST","body":{"text":"{{input}}"}}`, "responseMapping": `{}`,
+	}, now, secret)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "音频模型连接成功") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}

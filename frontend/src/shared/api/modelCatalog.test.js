@@ -5,7 +5,7 @@ import test from 'node:test';
 // Resolve the browser's extensionless client import for the native Node runner.
 const source = readFileSync(new URL('./modelCatalog.js', import.meta.url), 'utf8')
   .replace(/from '\.\/client(?:\.js)?'/, `from '${new URL('./client.js', import.meta.url).href}'`);
-const { modelSelectOptions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const { isModelKind, modelKindLabel, modelSelectOptions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
 test('uses backend displayName for typed model choices', () => {
   assert.deepEqual(modelSelectOptions([
@@ -24,4 +24,9 @@ test('uses the available label fallback and skips entries without a usable ID', 
     { value: 'model-name', label: '名称' },
     { value: 'model-id', label: '模型标识' }
   ]);
+});
+
+test('treats audio as a supported managed model kind', () => {
+  assert.equal(isModelKind('audio'), true);
+  assert.equal(modelKindLabel('audio'), '音频');
 });

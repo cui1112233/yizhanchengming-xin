@@ -3,7 +3,8 @@ import { apiRequest } from './client.js';
 const MODEL_KIND_LABELS = Object.freeze({
   text: '文本',
   video: '视频',
-  image: '图片'
+  image: '图片',
+  audio: '音频'
 });
 
 export function isModelKind(kind) {
@@ -63,7 +64,7 @@ export async function refreshAvailableModels(kind, request = apiRequest) {
 }
 
 export async function listManagedModels() {
-  const groups = await Promise.all(['text', 'video', 'image'].map(kind => listManagedModelsByKind(kind)));
+  const groups = await Promise.all(['text', 'video', 'image', 'audio'].map(kind => listManagedModelsByKind(kind)));
   return groups.flat();
 }
 
@@ -83,6 +84,14 @@ export function createManagedModel(model) {
 
 export function testManagedTextModel(model, existingModelId = '') {
   return apiRequest('/api/config/models/test', {
+    method: 'POST',
+    body: JSON.stringify({ ...model, ...(existingModelId ? { existingModelId } : {}) }),
+    suppressGlobalError: true
+  });
+}
+
+export function testManagedAudioModel(model, existingModelId = '') {
+  return apiRequest('/api/config/models/test-audio', {
     method: 'POST',
     body: JSON.stringify({ ...model, ...(existingModelId ? { existingModelId } : {}) }),
     suppressGlobalError: true
