@@ -337,7 +337,10 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
 		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap" || strings.HasPrefix(path, "/api/batch-rewrite/process/"))) ||
 		(req.Method == http.MethodPost && (path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/process" || strings.HasPrefix(path, "/api/batch-rewrite/process/") || path == "/api/batch-rewrite/ai/test" || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/rules/preview")) ||
+		(req.Method == http.MethodPost && (path == "/api/batch-rewrite/knowledge/optimize" || path == "/api/batch-rewrite/tasks/apply-rules" || path == "/api/batch-rewrite/tasks/reprocess-sensitive" || path == "/api/batch-rewrite/tasks/batch-ai-count" || path == "/api/batch-rewrite/web-submit/operations" || path == "/api/batch-rewrite/schedules")) ||
 		(req.Method == http.MethodPost && (strings.HasSuffix(path, "/tasks/batch-retry") || strings.HasSuffix(path, "/tasks/generate-ai") || (strings.Contains(path, "/tasks/") && (strings.HasSuffix(path, "/fetch") || strings.HasSuffix(path, "/restore-original"))))) ||
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/logs" || path == "/api/batch-rewrite/schedules" || path == "/api/batch-rewrite/batches/current" || strings.HasPrefix(path, "/api/batch-rewrite/web-submit/operations/"))) ||
+		((req.Method == http.MethodPatch || req.Method == http.MethodDelete) && strings.HasPrefix(path, "/api/batch-rewrite/schedules/")) ||
 		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/"))) ||
 		(req.Method == http.MethodPost && path == "/api/batch-rewrite/knowledge") ||
 		(req.Method == http.MethodDelete && strings.HasPrefix(path, "/api/batch-rewrite/knowledge/")) {

@@ -231,6 +231,18 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 		{http.MethodPost, "/api/batch-rewrite/tasks/book-1/fetch"},
 		{http.MethodPost, "/api/batch-rewrite/tasks/batch-retry"},
 		{http.MethodPost, "/api/batch-rewrite/config"},
+		{http.MethodPost, "/api/batch-rewrite/knowledge/optimize"},
+		{http.MethodGet, "/api/batch-rewrite/logs"},
+		{http.MethodGet, "/api/batch-rewrite/schedules"},
+		{http.MethodPost, "/api/batch-rewrite/schedules"},
+		{http.MethodPatch, "/api/batch-rewrite/schedules/schedule-1"},
+		{http.MethodDelete, "/api/batch-rewrite/schedules/schedule-1"},
+		{http.MethodGet, "/api/batch-rewrite/batches/current"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/apply-rules"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/reprocess-sensitive"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/batch-ai-count"},
+		{http.MethodPost, "/api/batch-rewrite/web-submit/operations"},
+		{http.MethodGet, "/api/batch-rewrite/web-submit/operations/op-1"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {

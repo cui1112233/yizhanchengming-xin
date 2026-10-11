@@ -269,6 +269,13 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
 		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver)
+		registerNovelFetchLegacyWorkflowRoutes(novelFetch, options.NovelFetchStore, func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
+			if options.NovelFetchRewriteResolver == nil {
+				return options.NovelFetchRewrite, nil
+			}
+			identity, _ := BridgeIdentityFromContext(req.Context())
+			return options.NovelFetchRewriteResolver(req.Context(), identity.Username)
+		})
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
 		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))
@@ -310,6 +317,18 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("/api/batch-rewrite/rules/ai-suggest", novelAuth.Middleware(http.HandlerFunc(legacyRulesSuggestAlias)))
 		root.Handle("/api/batch-rewrite/rules/preview", novelAuth.Middleware(http.HandlerFunc(legacyRulesPreviewAlias)))
 		root.Handle("/api/batch-rewrite/config", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("GET /api/batch-rewrite/logs", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("GET /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("GET /api/batch-rewrite/batches/current", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/batch-rewrite/tasks/apply-rules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/batch-rewrite/tasks/reprocess-sensitive", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/batch-rewrite/tasks/batch-ai-count", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/batch-rewrite/knowledge/optimize", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/batch-rewrite/web-submit/operations", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("GET /api/batch-rewrite/web-submit/operations/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("PATCH /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("DELETE /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
