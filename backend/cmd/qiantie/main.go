@@ -427,7 +427,7 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
-		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || (strings.Contains(path, "/h3/") && (slice < 0 || slice >= 3)) || isGoV12AliasPath(path) {
+		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || path == "/api/batch-factory/v12/image-generation" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || (strings.Contains(path, "/h3/") && (slice < 0 || slice >= 3)) || isGoV12AliasPath(path) {
 			return false
 		}
 		if strings.Contains(path, "/h3/") {
