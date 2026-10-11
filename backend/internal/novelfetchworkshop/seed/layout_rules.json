@@ -1,0 +1,36 @@
+{
+  "source": "TextLayoutToolAI",
+  "imported_at": "2026-08-18T13:05:01",
+  "indent_spaces": 0,
+  "blank_lines_before": 0,
+  "delimiters": [
+    "？】",
+    "。】",
+    "。”",
+    "！”",
+    "？”",
+    "。」",
+    "。",
+    "？"
+  ],
+  "drop_empty_lines": true,
+  "line_len_min": "15",
+  "line_len_max": "16",
+  "enable_len_wrap": true,
+  "target_line_len": 15,
+  "apply_sensitive_replace": true,
+  "layout_preview_settings": {
+    "default_visible_rows": 20,
+    "default_paragraph_indent": 2,
+    "default_font_size": 41,
+    "default_display_zoom": "50%",
+    "default_canvas_width": 1080,
+    "default_canvas_margin_x": 168,
+    "default_text_area_width": 744,
+    "default_site_style": "约一行16个字",
+    "auto_font": true,
+    "repair_punctuation": false,
+    "show_line_numbers": false,
+    "show_empty_line_marks": false
+  }
+}

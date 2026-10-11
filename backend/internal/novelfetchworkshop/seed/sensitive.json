@@ -1,0 +1,4329 @@
+{
+  "groups": [
+    {
+      "name": "TextLayoutToolAI敏感词库",
+      "enabled": true,
+      "apply_to_original": true,
+      "apply_to_ai": true,
+      "rules": [
+        {
+          "find": "花魁",
+          "replace": "魁首",
+          "enabled": true
+        },
+        {
+          "find": "卧槽",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爬上床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "避孕套",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "强上",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "一夜情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "禁脔",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "捉奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿帽子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "婊子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "怂蛋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老资",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "劳资",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贱人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "狗东西",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "先奸后杀",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "奸杀",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "骚货",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贱货",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "妓女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "妓妾",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "通房丫头",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "我草",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "畜生",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "骚扰",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私会",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "龌龊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "王八蛋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "搞我闺蜜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "肾虚",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "猥琐",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "涉黄涉毒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拉皮条",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "床上技术",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "激情视频",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "轮奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "鬼混",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玉米地",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "与多人有染",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玩了多少小明星",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "潜规则",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "伟哥",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "一夜七次郎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "操烂了",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "龙阳之好",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私奔",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "荡妇",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "双修",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小三上位",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "知三当三",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "青楼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "出轨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿帽",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小三",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "家暴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "求包养",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "上床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情妇",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿茶婊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "逼格",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "蛋疼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "滚你妈",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "傻X",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "屌丝",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "碧莲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "我靠",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "我操",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "我擦",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "握草",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "装逼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "牛逼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "把妹",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "特么的",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "草泥马",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "仙人板板",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "龟儿子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "狗男女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "高丽棒子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黑鬼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小日本",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "东亚病夫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "装B",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "逼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "勾引",
+          "replace": "吸引",
+          "enabled": true
+        },
+        {
+          "find": "衣冠禽兽",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "杂种",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "低贱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下了药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "冥婚",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "卖身",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "包养",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "守活寡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拐卖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "红灯区",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "军妓",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私生子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "懵逼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "偷人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "万人骑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "千人骑万人乘",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "人贩子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "偷税漏税",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "受贿",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "传销",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "卖淫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌博",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "劈腿",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "乱搞",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "开房",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "外遇",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "婚外情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "娇喘",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "诈骗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "恋尸癖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "交配",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "搞大肚子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "圆房",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "通奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私通",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "孽种",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "猥亵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "纵欲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "偷情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "舔狗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "酒后乱性",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黄谣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "性奴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "强奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "政府",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "中央",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "党中央",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "政权",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "体制",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "意识形态",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "公安",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警察",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "派出所",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "民警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "军队",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "部队",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "政委",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "武警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "纪委",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "法院",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "检察院",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "司法",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "教育局",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "税务局",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "公务员",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下海",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "湿身",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黑丝诱惑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "露沟",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "走光",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "凸点",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "没穿内衣",
+          "replace": "衣着单薄",
+          "enabled": true
+        },
+        {
+          "find": "丁字裤",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿帽奴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "乱伦",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "恋童",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "恋童癖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "迷奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "催情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "丰胸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "缩阴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "延时喷剂",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "壮阳",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "原味内衣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "约炮",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "聊骚",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "裸聊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "援交",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿帽癖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爆菊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "打飞机",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "撸管",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "潮吹",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "擦边",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "软色情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "漏点",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爆乳",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "事业线",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黑丝",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "骨科",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "迷药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "听话水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "招嫖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "外围女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "楼凤",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "炮友",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿奴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "字母圈",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "SM",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "滴蜡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "捆绑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "幼女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "萝莉控",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "破处",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "堕胎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "打胎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "露点",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大尺度",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "全裸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "半裸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情趣内衣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "丝袜诱惑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "制服诱惑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "春药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "包夜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "全套服务",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "车震",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "野战",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "肉番",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "口交",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "群交",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "媚药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "发情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情欲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "欲火",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "淫欲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "淫乱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "淫荡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "色诱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "香艳",
+          "replace": "暧昧",
+          "enabled": true
+        },
+        {
+          "find": "春宵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "呻吟",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "酥胸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玉体",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "胴体",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赤裸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "肉欲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "侍寝",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "承欢",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "炉鼎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "采补",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "采阴补阳",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "血腥",
+          "replace": "残忍",
+          "enabled": true
+        },
+        {
+          "find": "弄死",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "灭门",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "活埋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "凌迟",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "腰斩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毒杀",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "枪杀",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "自残",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "服毒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "轻生",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "同归于尽",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "报复社会",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毒品",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "摇头丸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大麻",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "枪支弹药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "海洛因",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "套现",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "博彩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "六合彩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "走私",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "保护伞",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贪官",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "游行",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "买卖器官",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "器官买卖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贩卖人口",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "勒索",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "敲诈",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "电诈",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "网暴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "地域歧视",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "种族歧视",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "足交",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "调教",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "主奴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "榨干",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "弄死你",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "真丝吊带",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "透明",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "强制爱",
+          "replace": "偏执占有",
+          "enabled": true
+        },
+        {
+          "find": "囚禁",
+          "replace": "关起来",
+          "enabled": true
+        },
+        {
+          "find": "锁链",
+          "replace": "银链",
+          "enabled": true
+        },
+        {
+          "find": "挂空挡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "喘息",
+          "replace": "粗重呼吸",
+          "enabled": true
+        },
+        {
+          "find": "锁骨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "强制猥亵",
+          "replace": "冒犯",
+          "enabled": true
+        },
+        {
+          "find": "窥视",
+          "replace": "暗中观察",
+          "enabled": true
+        },
+        {
+          "find": "偷拍",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "裙底",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "渔网袜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "兔女郎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "跪下",
+          "replace": "屈服",
+          "enabled": true
+        },
+        {
+          "find": "碎尸",
+          "replace": "处理掉",
+          "enabled": true
+        },
+        {
+          "find": "抛尸",
+          "replace": "丢弃",
+          "enabled": true
+        },
+        {
+          "find": "毁容",
+          "replace": "伤了脸",
+          "enabled": true
+        },
+        {
+          "find": "割喉",
+          "replace": "封喉",
+          "enabled": true
+        },
+        {
+          "find": "绑架",
+          "replace": "带走",
+          "enabled": true
+        },
+        {
+          "find": "撕票",
+          "replace": "下死手",
+          "enabled": true
+        },
+        {
+          "find": "挖眼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "剁手指",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "虐待",
+          "replace": "折磨",
+          "enabled": true
+        },
+        {
+          "find": "虐杀",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "暴力倾向",
+          "replace": "脾气暴躁",
+          "enabled": true
+        },
+        {
+          "find": "割腕",
+          "replace": "做傻事",
+          "enabled": true
+        },
+        {
+          "find": "跳楼",
+          "replace": "一跃而下",
+          "enabled": true
+        },
+        {
+          "find": "灭口",
+          "replace": "除掉",
+          "enabled": true
+        },
+        {
+          "find": "校园霸凌",
+          "replace": "校园欺凌",
+          "enabled": true
+        },
+        {
+          "find": "PUA",
+          "replace": "精神控制",
+          "enabled": true
+        },
+        {
+          "find": "杀猪盘",
+          "replace": "情感骗局",
+          "enabled": true
+        },
+        {
+          "find": "嘎腰子",
+          "replace": "割器官",
+          "enabled": true
+        },
+        {
+          "find": "缅北",
+          "replace": "境外",
+          "enabled": true
+        },
+        {
+          "find": "高利贷",
+          "replace": "巨额债务",
+          "enabled": true
+        },
+        {
+          "find": "裸贷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "洗钱",
+          "replace": "资金周转",
+          "enabled": true
+        },
+        {
+          "find": "偷渡",
+          "replace": "非法出境",
+          "enabled": true
+        },
+        {
+          "find": "邪教",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "洗脑",
+          "replace": "控制思想",
+          "enabled": true
+        },
+        {
+          "find": "脑残",
+          "replace": "糊涂",
+          "enabled": true
+        },
+        {
+          "find": "孤儿",
+          "replace": "没爹妈的孩子",
+          "enabled": true
+        },
+        {
+          "find": "孽畜",
+          "replace": "畜生",
+          "enabled": true
+        },
+        {
+          "find": "猪猡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "蛆虫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下三滥",
+          "replace": "没底线",
+          "enabled": true
+        },
+        {
+          "find": "笑气",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "迷魂药",
+          "replace": "迷药",
+          "enabled": true
+        },
+        {
+          "find": "毒针",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "针孔摄像",
+          "replace": "偷拍设备",
+          "enabled": true
+        },
+        {
+          "find": "换妻",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "性侵",
+          "replace": "侵犯",
+          "enabled": true
+        },
+        {
+          "find": "猥亵儿童",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "卖血",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "地下钱庄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "监听",
+          "replace": "窃听",
+          "enabled": true
+        },
+        {
+          "find": "跟踪",
+          "replace": "尾随",
+          "enabled": true
+        },
+        {
+          "find": "威胁",
+          "replace": "要挟",
+          "enabled": true
+        },
+        {
+          "find": "恐吓",
+          "replace": "吓唬",
+          "enabled": true
+        },
+        {
+          "find": "逼良为娼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "逼婚",
+          "replace": "强迫结婚",
+          "enabled": true
+        },
+        {
+          "find": "骗婚",
+          "replace": "婚姻骗局",
+          "enabled": true
+        },
+        {
+          "find": "尸块",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "剥皮",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "抽筋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毒打",
+          "replace": "痛殴",
+          "enabled": true
+        },
+        {
+          "find": "扇耳光",
+          "replace": "打脸",
+          "enabled": true
+        },
+        {
+          "find": "跪地求饶",
+          "replace": "卑微求情",
+          "enabled": true
+        },
+        {
+          "find": "软禁",
+          "replace": "限制自由",
+          "enabled": true
+        },
+        {
+          "find": "阉割",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "催情药",
+          "replace": "助兴药",
+          "enabled": true
+        },
+        {
+          "find": "乖乖水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "迷幻药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "焚尸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "尸检",
+          "replace": "验尸",
+          "enabled": true
+        },
+        {
+          "find": "停尸房",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "乱葬岗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "领口",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "腿根",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "胯下",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "挺进",
+          "replace": "深入",
+          "enabled": true
+        },
+        {
+          "find": "抽插",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "顶弄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "研磨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "吮吸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "舔舐",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "紧致",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "窄小",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "泥泞",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "湿透",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "挺拔",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "挺立",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "傲人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "幽深",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "密林",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "溪水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "蜜汁",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爱液",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "汁水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "阳具",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "阴茎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "阴部",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "阴蒂",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "浪叫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "浪语",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "欢愉",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贪欢",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "痴缠",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "欲仙欲死",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "销魂",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "蚀骨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "缠绵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "娇躯",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "软玉温香",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "亵玩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "调情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "挑逗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "诱惑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "撩人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "惹火",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "喷薄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "释放",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "痉挛",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "酥麻",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "燥热",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "粗重",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "深入",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "蹂躏",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "敏感点",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "挺弄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "摩挲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "娇嫩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "禁忌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玩弄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "娇滴滴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "狂野",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "交欢",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "欢好",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贪婪",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "娇嗔",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "喘息声",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "颤抖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "精液",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "液体",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "勾勒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "曲线",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "曼妙",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "丰盈",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "湿润",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "粘稠",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "翻云覆雨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "巫山云雨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "颠鸾倒凤",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "欲罢不能",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "魂飞魄散",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "政",
+          "replace": "证",
+          "enabled": true
+        },
+        {
+          "find": "抽烟",
+          "replace": "抽焱",
+          "enabled": true
+        },
+        {
+          "find": "贴身",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "佛",
+          "replace": "坲",
+          "enabled": true
+        },
+        {
+          "find": "欲求不满",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "睡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "喜提",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "巨债",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "脑瘤",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "确诊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "欠条",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "局子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "报案",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "坐牢",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "续命",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私生",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "女兄弟",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "雌竞",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "被讹",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "阴阳",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "合同",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "卖肾",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "退学",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警校",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "211",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "985",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "挡雷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "无情道",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "替身",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "为闺蜜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "捐精",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "当兵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "婆婆怀孕",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "报了警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "罚款",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "收费站",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "为青梅",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "丈夫为青梅",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "舍友男友",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "撬了",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "深夜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "碰瓷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警车",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "冒充",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "报案",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "C罗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "逮捕",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "晚上",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "色色",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "裸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贷款",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "越狱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "杀人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "外网",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "性冷淡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "佛主",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "菩萨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "活佛",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "庇佑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拆迁",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "缴获",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毒品",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黄赌毒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌神",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌王",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌石",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "凑钱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "无名单",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "村长",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "观赛",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "相亲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "人亡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "六次",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "流产",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "跪地",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "记录",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警局",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "失联",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "流水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "柜员",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "销户",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "省状元",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "同床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "我的妻子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贫困",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "球赛",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "首富",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "特种兵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "自首",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "遗孤",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "烈士",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "林海夏",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "林海",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "别人的",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "殉情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "纸人陪他",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "15个表妹",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "我扎15个表妹等身纸人陪他",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贿赂",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "受贿",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "圆房",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "偷情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "纵欲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "巨乳",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "童颜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "冥婚",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "军",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "妓",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "偷人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "男女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "乱搞",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "包养",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "民警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "娇喘",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私密",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "阴谋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "隐秘",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "超薄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "派出所",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "公安局",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "法院",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "民政局",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小树林",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玉米地",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "视频",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "激情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "刑警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "揭穿",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贱女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "揭露",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "曝光",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警察",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "顶尖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "公认",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "必选",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "第一",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "最佳",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "首选",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "权倾朝野",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "揭穿真相",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "暗通款曲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "渣男",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "高考状元",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "舔狗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "淫妇",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "奸夫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "潜规则",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爆菊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "孙子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "乃子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "奶子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大奶",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "轮大米",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "轮奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "误睡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "一夜情",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "约炮",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情趣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "安眠药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "偷窃",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "要堕胎",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拐卖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "烂赌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "隐私照",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "女学生的",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贫困生",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "吃回扣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "三奶",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "二奶",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "通缉",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "家暴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "牺牲",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毛贼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "提审",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "徒刑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "无期",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "火警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "洗澡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老玻璃",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "侵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "精神病",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "警报",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小叔",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "祖安",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿茶婊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "祖安文化",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "矮矬穷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "撕逼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "外卖员",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贩子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "人贩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "人贩子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "号召",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "成人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "涉毒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "涉赌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "涉黄",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "万人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大群",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "陪睡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "最火",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "全网",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "顶罪",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "决赛",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "嫂子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "权重",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "癌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "牢底",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "带煞",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "引魂人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "师生恋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "市委",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "常委",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "县委",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大吏",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "封疆",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "书记",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "主任",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "招生办",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "萎缩",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "猥琐",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "民族",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "玉米",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "树林",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "一晚",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "一夜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "淫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "寡妇",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "春色",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "胁迫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "威胁",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "强迫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "强暴",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "鞭打",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "暴力",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "白嫖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "白面",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "郭富城",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "刘德华",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黎明",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大出血",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "睡了",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "代付",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "队伍",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "特战",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "央视",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "夜袭",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "进酒店",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "抓奸",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "千术",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌博",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老千",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "担保",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "当狗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "军车",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "iPhone",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "中奖",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "脱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "审判",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "穷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贫穷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "暴露",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "执法",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "婊",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绿茶",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "死刑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "复印件",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "身份证",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "顶级",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "黑老大",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "渣夫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "吉尼斯",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "QQ",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "药引",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "地下室",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "法官",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "QJ",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "冲喜",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "侵犯",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下头",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "虾头",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "脏乱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私生活",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "违禁",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "补课",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "男老师",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "军区",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "行刑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "暗号",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "绝密",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毒枭",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "行医",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "非法",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "飞刀",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "军校",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贱妻",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "首长",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "通共",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "顶替",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "野鸡",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "科大",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "国防",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "提现",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "审批",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "标兵",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "藏南",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "边境",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "隶属",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "红包",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "勾引",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "野种",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小姨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "民政",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "公安",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "飞行员",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "特招",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "嫂嫂",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "妹夫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "脏病",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "online",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "刑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "狐狸精",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拐仔",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "劳资",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拐女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "霸凌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "骗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "网恋",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "立案",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "犯",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "卫健委",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "证据",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "狗",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "造谣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "撞死",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "酒驾",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "交通局",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "看守所",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "十八个对象",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "预警",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "站长",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "菜鸟",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "打赌",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "不二之选",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "官方",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "王一博",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "两道杠",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "避孕药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "寡嫂",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "找上门",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "私生女",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "下毒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "毒死",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "大我二十二岁的男人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "队长",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "刑侦",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "包庇",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "贷",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "征信",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "户籍",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "预知",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "猫儿子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "逼我",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "戴套",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "戴驴套",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "牛马",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "护身符",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "房中术",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "房事",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老婆和",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "老婆和助理",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "直播",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "热吻",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "借种",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "上龙",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "龙床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "回扣",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "出击",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "赌注",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "服务",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "上门",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "诅咒",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "咒我",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "凌晨",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情色",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "污蔑",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "后宫",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "祸乱",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "助学金",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "刑警队",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拼多多",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "拼夕夕",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小三",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "暧昧",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "羊驼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "吐口水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "配种",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "护士",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "院长",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "造假",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "上过床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情药",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "闲鱼",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "抖音",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "淘宝",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "快手",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "叫水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "叫七次水",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "需求旺盛",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "洞房",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "亲热",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "向来体力极好的老公意外两分钟就泄了气",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爬上大小姐的床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "扒了他的裤子",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "小三",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "情人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "法官",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "奸人",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "勾引",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "爬床",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "滚床单",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "滚在床上",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "侵犯",
+          "replace": "",
+          "enabled": true
+        },
+        {
+          "find": "取卵",
+          "replace": "",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "name": "新词组",
+      "enabled": true,
+      "apply_to_original": true,
+      "apply_to_ai": true,
+      "rules": []
+    }
+  ]
+}

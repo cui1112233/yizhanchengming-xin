@@ -251,7 +251,7 @@ func main() {
 }
 
 func isLegacyNovelFetchBridgeRequest(req *http.Request) bool {
-	return req != nil && req.URL != nil && strings.HasPrefix(req.URL.Path, "/api/batch-rewrite")
+	return req != nil && req.URL != nil && strings.HasPrefix(req.URL.Path, "/api/batch-rewrite") && !isGoNovelFetchCompatRequest(req)
 }
 
 func isGoAgentReadRequest(req *http.Request) bool {
@@ -335,17 +335,14 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 	if (req.Method == http.MethodGet && path == "/api/novel-fetch/saved") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
-		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) ||
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/"))) ||
+		(req.Method == http.MethodPost && path == "/api/batch-rewrite/knowledge") ||
+		(req.Method == http.MethodDelete && strings.HasPrefix(path, "/api/batch-rewrite/knowledge/")) {
 		return true
 	}
-	// The iframe at /novel-fetch is the complete legacy workbench.  Its
-	// /api/batch-rewrite/* calls carry the snake_case payload and the full
-	// fetch/rewrite/upload workflow, so keep them on the established bridge
-	// instead of sending them to the smaller Go workshop compatibility API.
-	// The Go-native workshop remains available under /api/novel-fetch-workshop/*.
-	if path == "/api/batch-rewrite/issues" || path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {
-		return req.Method == http.MethodGet || req.Method == http.MethodPost
-	}
+	// The remaining /api/batch-rewrite/* endpoints belong to the complete
+	// legacy workbench and stay on the established bridge.
 	return false
 }
 

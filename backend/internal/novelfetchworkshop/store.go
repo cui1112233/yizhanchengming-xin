@@ -13,14 +13,22 @@ import (
 var ErrNotFound = errors.New("novel fetch workshop record not found")
 
 type Document struct {
-	BookID      string             `json:"bookId"`
-	Meta        map[string]any     `json:"meta"`
-	BodyRefs    map[string]BodyRef `json:"bodyRefs,omitempty"`
-	Original    string             `json:"original,omitempty"`
-	OriginalRaw string             `json:"originalRaw,omitempty"`
-	Versions    map[string]any     `json:"versions,omitempty"`
-	Logs        []any              `json:"logs"`
-	UpdatedAt   string             `json:"updatedAt,omitempty"`
+	BookID           string             `json:"bookId"`
+	Gender           string             `json:"gender,omitempty"`
+	GenderSource     GenderSource       `json:"genderSource,omitempty"`
+	GenderReason     string             `json:"genderReason,omitempty"`
+	BookInfo         BookInfo           `json:"bookInfo,omitempty"`
+	Meta             map[string]any     `json:"meta"`
+	BodyRefs         map[string]BodyRef `json:"bodyRefs,omitempty"`
+	Original         string             `json:"original,omitempty"`
+	OriginalRaw      string             `json:"originalRaw,omitempty"`
+	ProcessedText    string             `json:"processedText,omitempty"`
+	OriginalRawChars int                `json:"originalRawChars,omitempty"`
+	ProcessedChars   int                `json:"processedChars,omitempty"`
+	MaxTxt           int                `json:"maxTxt,omitempty"`
+	Versions         map[string]any     `json:"versions,omitempty"`
+	Logs             []any              `json:"logs"`
+	UpdatedAt        string             `json:"updatedAt,omitempty"`
 }
 
 type BodyRef struct {
@@ -247,7 +255,7 @@ func (s *MemoryStore) DeleteDocuments(_ context.Context, owner string, ids []str
 func (s *MemoryStore) GetConfig(_ context.Context, owner string) (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return cloneMap(s.configs[owner]), nil
+	return EnsureWorkshopDefaults(cloneMap(s.configs[owner])), nil
 }
 
 func (s *MemoryStore) PutConfig(_ context.Context, owner string, settings map[string]any) error {

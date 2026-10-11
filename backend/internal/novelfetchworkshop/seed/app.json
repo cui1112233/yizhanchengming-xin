@@ -1,0 +1,132 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8121,
+    "access_code": ""
+  },
+  "workflow": {
+    "auto_queue_enabled": true,
+    "global_auto_queue_enabled": true,
+    "auto_queue_history": false,
+    "auto_queue_sources": [
+      "workbench_push"
+    ],
+    "auto_queue_task_timeout_seconds": 180,
+    "auto_submit_batch_size": 12,
+    "auto_submit_flush_seconds": 5,
+    "skip_short_original": true,
+    "min_original_chars": 2000,
+    "auto_classify_missing": true,
+    "auto_fetch_original": true,
+    "auto_rewrite_after_fetch": true,
+    "auto_submit_after_rewrite": true,
+    "auto_sync_site_styles": true,
+    "auto_reclassify_invalid_style": true
+  },
+  "fetch": {
+    "endpoint": "https://txt.121w.com/api.php",
+    "default_max_txt": 4000,
+    "timeout_seconds": 30,
+    "concurrency": 4,
+    "retries": 1
+  },
+  "ai": {
+    "base_url": "https://nvewvip.preview.tencent-zeabur.cn/v1",
+    "api_key": "sk-1ZouTed8iStUO5fPF1xGtxDaAnqSwszhIlshILl5qYETyE3a",
+    "model": "gemini-3.5-flash-maxthinking",
+    "timeout_seconds": 180,
+    "max_concurrency": 6,
+    "retry_times": 2,
+    "stream": false,
+    "json_mode": false,
+    "max_tokens": 1200,
+    "temperature": 0.45,
+    "top_p": 0.9,
+    "presence_penalty": 0,
+    "frequency_penalty": 0,
+    "enable_thinking": false,
+    "disable_thinking": false,
+    "force_serial_batch": false,
+    "extra_body_json": ""
+  },
+  "ai_presets": [
+    {
+      "base_url": "https://nvewvip.preview.tencent-zeabur.cn/v1",
+      "api_key": "sk-1ZouTed8iStUO5fPF1xGtxDaAnqSwszhIlshILl5qYETyE3a",
+      "model": "gemini-3.5-flash-maxthinking",
+      "timeout_seconds": 180,
+      "max_concurrency": 6,
+      "retry_times": 2,
+      "stream": false,
+      "json_mode": false,
+      "max_tokens": 1200,
+      "temperature": 0.45,
+      "top_p": 0.9,
+      "presence_penalty": 0,
+      "frequency_penalty": 0,
+      "enable_thinking": false,
+      "disable_thinking": false,
+      "force_serial_batch": false,
+      "extra_body_json": "",
+      "id": "preset_1787558353360",
+      "name": "gemini-3.5-flash-maxthinking"
+    }
+  ],
+  "ai_assignments": {
+    "classifier": "preset_1787558353360",
+    "rewrite": "preset_1787558353360",
+    "sensitive_fix": "preset_1787558353360"
+  },
+  "rewrite": {
+    "default_ai_count": 1,
+    "max_ai_count": 5,
+    "process_line_count": 20,
+    "anchor_line_count": 5,
+    "temperature": 0.45,
+    "strategy": "instruction",
+    "method_sequence": [
+      "high_imitation",
+      "opening_instruction",
+      "instruction"
+    ],
+    "ai_slot_methods": {
+      "ai1": "instruction",
+      "ai2": "opening_instruction"
+    },
+    "default_template_id": "",
+    "opening_phrase_mode": "auto",
+    "high_imitation_mode": "auto",
+    "prompt": "你是短视频小说正文改写师。请只根据原文、风格类型和男女频改写开头部分，保留故事事实、人物关系、时代背景和后续衔接。输出正文，不要解释。"
+  },
+  "layout": {
+    "apply_to_original": true,
+    "apply_to_ai": true,
+    "apply_sensitive": true,
+    "apply_chapter_cleanup": true,
+    "apply_symbol_rules": true,
+    "apply_pair_fill": true,
+    "drop_empty_lines": true,
+    "trim_lines": true
+  },
+  "sensitive_ai": {
+    "enabled": true,
+    "group_hits": true,
+    "context_chars": 12,
+    "max_hits_per_task": 80,
+    "concurrency": 4,
+    "retries": 1,
+    "temperature": 0.2,
+    "prompt": "你是内容合规改写助手。请只改写下面命中敏感词的小段内容。\n要求：保留原剧情意思、人物关系和情绪；不增加新剧情；去掉违规、擦边、色情、低俗表达。\n只返回改写后的小段，不要解释。\n\n任务ID：{book_id}\n命中词：{keyword}\n\n原片段：\n{snippet}"
+  },
+  "storage": {
+    "ai_folder_prefix": "ai",
+    "auto_cleanup_enabled": true,
+    "cleanup_keep_days": 2,
+    "cleanup_interval_days": 2
+  },
+  "parser": {
+    "default_parse_mode": "custom",
+    "default_column_preset_id": "",
+    "custom_column_order": "书籍ID,书籍名称,标签,推荐理由"
+  }
+}

@@ -196,17 +196,28 @@ func TestShouldBridgeLegacyAPIRequestKeepsExternalClassificationAdaptersOnBridge
 }
 
 func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
-	for _, method := range []string{http.MethodGet, http.MethodPost} {
-		for _, path := range []string{
-			"/api/batch-rewrite/process/jobs/latest",
-			"/api/batch-rewrite/knowledge/summary",
-			"/api/batch-rewrite/rules/ai-suggest",
-			"/api/batch-rewrite/web-submit/history",
-		} {
-			req := httptest.NewRequest(method, path, nil)
-			if !isGoNovelFetchCompatRequest(req) {
-				t.Fatalf("%s %s must use the Go compatibility handler", method, path)
-			}
+	for _, tc := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/batch-rewrite/knowledge"},
+		{http.MethodGet, "/api/batch-rewrite/knowledge/summary"},
+		{http.MethodPost, "/api/batch-rewrite/knowledge"},
+		{http.MethodDelete, "/api/batch-rewrite/knowledge/item-1"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {
+			t.Fatalf("%s %s must use the Go knowledge handler", tc.method, tc.path)
+		}
+	}
+	for _, path := range []string{
+		"/api/batch-rewrite/process/jobs/latest",
+		"/api/batch-rewrite/rules/ai-suggest",
+		"/api/batch-rewrite/web-submit/history",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		if isGoNovelFetchCompatRequest(req) || !isLegacyNovelFetchBridgeRequest(req) {
+			t.Fatalf("%s must remain on the legacy bridge", path)
 		}
 	}
 }

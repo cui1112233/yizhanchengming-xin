@@ -59,11 +59,10 @@ func ListKnowledge(settings map[string]any, kind string) (map[string]any, error)
 	if !knowledgeKinds[kind] && kind != "layout_rules" && kind != "symbol_rules" && kind != "chapter_rules" {
 		return nil, fmt.Errorf("资料库类型无效：%s", kind)
 	}
-	if !knowledgeKinds[kind] {
-		return map[string]any{"source": "go", "updated_at": "", "items": []any{}}, nil
-	}
 	library := knowledgeLibrary(settings, kind)
-	library["items"] = normalizeKnowledgeItems(library["items"])
+	if knowledgeKinds[kind] {
+		library["items"] = normalizeKnowledgeItems(library["items"])
+	}
 	return library, nil
 }
 
@@ -220,9 +219,38 @@ func KnowledgeSummary(settings map[string]any) map[string]int {
 	result := map[string]int{}
 	for kind := range knowledgeKinds {
 		library := knowledgeLibrary(settings, kind)
-		result[kind] = len(normalizeKnowledgeItems(library["items"]))
+		if kind == "high_imitation" || kind == "rewrite_templates" {
+			result[kind] = len(normalizeKnowledgeItems(library["items"]))
+			if result[kind] == 0 {
+				result[kind] = len(arrayMap(library["prompts"])) + len(arrayMap(library["references"])) + len(arrayMap(library["profiles"])) + len(arrayMap(library["temporary_instructions"]))
+			}
+		} else {
+			result[kind] = len(normalizeKnowledgeItems(library["items"]))
+		}
 	}
-	result["layout_rules"], result["symbol_rules"], result["chapter_rules"] = 0, 0, 0
+	layout := knowledgeLibrary(settings, "layout_rules")
+	symbol := knowledgeLibrary(settings, "symbol_rules")
+	chapter := knowledgeLibrary(settings, "chapter_rules")
+	result["sensitive_rules"] = len(arrayMap(layout["sensitive_rules"])) + len(arrayMap(layout["sensitiveKeywords"]))
+	if result["sensitive_rules"] == 0 {
+		app := mapOrEmpty(settings["appConfig"])
+		sensitive := mapOrEmpty(app["sensitive"])
+		for _, rawGroup := range arrayMap(sensitive["groups"]) {
+			result["sensitive_rules"] += len(arrayMap(rawGroup["rules"]))
+		}
+	}
+	result["symbol_rules"] = len(arrayMap(symbol["symbol_rules"]))
+	result["pair_fill_rules"] = len(arrayMap(symbol["pair_fill_rules"]))
+	result["chapter_exact_rules"] = len(arrayMap(chapter["chapter_exact_rules"]))
+	result["chapter_inline_rules"] = len(arrayMap(chapter["chapter_inline_rules"]))
+	return result
+}
+
+func mapOrEmpty(value any) map[string]any {
+	result, _ := value.(map[string]any)
+	if result == nil {
+		return map[string]any{}
+	}
 	return result
 }
 

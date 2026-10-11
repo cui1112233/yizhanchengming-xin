@@ -55,3 +55,33 @@ func TestOptimizeKnowledgePreservesIDAndUpdatesReturnedFields(t *testing.T) {
 		t.Fatalf("unexpected optimized item: %#v", optimized)
 	}
 }
+
+func TestDefaultWorkshopSettingsIncludeImportedKnowledgeAndRules(t *testing.T) {
+	settings := DefaultWorkshopSettings()
+	got := KnowledgeSummary(settings)
+	want := map[string]int{
+		"opening_phrases": 174, "rewrite_templates": 14, "high_imitation": 1,
+		"sensitive_rules": 862, "symbol_rules": 17, "pair_fill_rules": 10,
+		"chapter_exact_rules": 9, "chapter_inline_rules": 9,
+	}
+	for key, expected := range want {
+		if got[key] != expected {
+			t.Fatalf("%s = %d, want %d (summary=%#v)", key, got[key], expected, got)
+		}
+	}
+}
+
+func TestEnsureWorkshopDefaultsDoesNotLetEmptyLegacyPlaceholdersHideCatalog(t *testing.T) {
+	settings := EnsureWorkshopDefaults(map[string]any{
+		"knowledgeLibraries": map[string]any{
+			"opening_phrases": map[string]any{"items": []any{}},
+		},
+	})
+	library, err := ListKnowledge(settings, "opening_phrases")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(normalizeKnowledgeItems(library["items"])); got != 174 {
+		t.Fatalf("opening phrases after empty placeholder merge = %d, want 174", got)
+	}
+}

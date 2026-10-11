@@ -143,7 +143,7 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 				}
 			}
 		}
-		return settings, nil
+		return EnsureWorkshopDefaults(settings), nil
 	}
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 		// from the user's uncommitted legacy config file; never write them back.
 		mergeLegacyRuntimeModelFields(catalog, legacyCatalog)
 	}
-	return settings, nil
+	return EnsureWorkshopDefaults(settings), nil
 }
 
 func mergeLegacyRuntimeModelFields(current, legacy []any) {

@@ -14,31 +14,37 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-var defaultUserConfig = map[string]any{
-	"provider":                "openai",
-	"baseUrl":                 "https://api.openai.com/v1",
-	"model":                   "gpt-4o-mini",
-	"modelCatalog":            []any{},
-	"modelCatalogVersion":     1,
-	"storageRoot":             "",
-	"productionRetentionDays": 3,
-	"image": map[string]any{
-		"mode": "openai_compatible", "provider": "openai_compatible", "displayName": "", "baseUrl": "", "model": "",
-	},
-	"video": map[string]any{
-		"provider": "yd_video", "displayName": "中转亚迪",
-	},
-	"pet": map[string]any{
-		"id": "stacky", "displayName": "CM", "description": "CM，前贴的桌面宠物。", "spriteVersionNumber": 2, "spritesheetPath": "/pets/stacky/spritesheet.webp",
-	},
-	"tts":           map[string]any{"voice": "zh-CN-XiaoxiaoNeural", "style": "general", "speed": 1.8, "pitch": 10},
-	"notifications": map[string]any{"soundEnabled": true, "petVisible": true, "soundVolume": 60},
-	"avatar":        nil,
-	"scriptDefaults": map[string]any{
-		"textModelId": "", "imageModelId": "", "videoModelKey": "",
-		"imageAspectRatio": "9:16", "videoAspectRatio": "9:16", "videoResolution": "720p",
-	},
-}
+var defaultUserConfig = func() map[string]any {
+	config := map[string]any{
+		"provider":                "openai",
+		"baseUrl":                 "https://api.openai.com/v1",
+		"model":                   "gpt-4o-mini",
+		"modelCatalog":            []any{},
+		"modelCatalogVersion":     1,
+		"storageRoot":             "",
+		"productionRetentionDays": 3,
+		"image": map[string]any{
+			"mode": "openai_compatible", "provider": "openai_compatible", "displayName": "", "baseUrl": "", "model": "",
+		},
+		"video": map[string]any{
+			"provider": "yd_video", "displayName": "中转亚迪",
+		},
+		"pet": map[string]any{
+			"id": "stacky", "displayName": "CM", "description": "CM，前贴的桌面宠物。", "spriteVersionNumber": 2, "spritesheetPath": "/pets/stacky/spritesheet.webp",
+		},
+		"tts":           map[string]any{"voice": "zh-CN-XiaoxiaoNeural", "style": "general", "speed": 1.8, "pitch": 10},
+		"notifications": map[string]any{"soundEnabled": true, "petVisible": true, "soundVolume": 60},
+		"avatar":        nil,
+		"scriptDefaults": map[string]any{
+			"textModelId": "", "imageModelId": "", "videoModelKey": "",
+			"imageAspectRatio": "9:16", "videoAspectRatio": "9:16", "videoResolution": "720p",
+		},
+	}
+	for key, value := range novelfetchworkshop.DefaultWorkshopSettings() {
+		config[key] = value
+	}
+	return config
+}()
 
 type UserConfigStore struct {
 	BaseDir string

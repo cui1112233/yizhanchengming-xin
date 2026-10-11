@@ -58,3 +58,29 @@ func TestUserConfigReportsModelManagementForOwner(t *testing.T) {
 		t.Fatalf("owner config must expose script defaults: %#v", payload["scriptDefaults"])
 	}
 }
+
+func TestUserConfigSeedsImportedWorkshopCatalog(t *testing.T) {
+	store := NewUserConfigStore(t.TempDir())
+	settings, err := store.GetConfig(context.Background(), "new-user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, ok := settings["appConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("appConfig missing: %#v", settings)
+	}
+	knowledge, ok := app["knowledge"].(map[string]any)
+	if !ok {
+		t.Fatalf("appConfig.knowledge missing: %#v", app)
+	}
+	opening, _ := knowledge["opening_phrases"].(map[string]any)
+	items, _ := opening["items"].([]any)
+	if len(items) != 174 {
+		t.Fatalf("opening phrase seed count = %d, want 174", len(items))
+	}
+	sensitive, _ := app["sensitive"].(map[string]any)
+	groups, _ := sensitive["groups"].([]any)
+	if len(groups) != 2 {
+		t.Fatalf("sensitive groups = %d, want 2", len(groups))
+	}
+}
