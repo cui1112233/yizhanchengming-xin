@@ -133,6 +133,42 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			"logs":             document.Logs,
 		})
 	})))
+	diagnostic := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		bookID := req.PathValue("id")
+		document, err := store.GetDocument(req.Context(), identity.Username, bookID)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
+			return
+		}
+		meta := map[string]any{}
+		for key, value := range document.Meta {
+			meta[key] = value
+		}
+		switch {
+		case strings.HasSuffix(req.URL.Path, "/sensitive-log"):
+			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "logs": document.Logs})
+		case strings.HasSuffix(req.URL.Path, "/site-submit-log"):
+			logs := []any{}
+			if raw, ok := meta["websiteSubmitHistory"].([]any); ok {
+				logs = raw
+			}
+			var result any = map[string]any{}
+			if len(logs) > 0 {
+				result = logs[len(logs)-1]
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "result": result, "logs": logs})
+		default:
+			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "stages": []any{}})
+		}
+	}))
+	root.Handle("GET /api/batch-rewrite/tasks/{id}/sensitive-log", diagnostic)
+	root.Handle("GET /api/batch-rewrite/tasks/{id}/rules-trace", diagnostic)
+	root.Handle("GET /api/batch-rewrite/tasks/{id}/site-submit-log", diagnostic)
 	root.Handle("POST /api/batch-rewrite/tasks/batch-delete", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {

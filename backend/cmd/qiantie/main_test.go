@@ -231,15 +231,15 @@ func TestNovelFetchSavedSurfaceUsesGoHandler(t *testing.T) {
 	}
 }
 
-func TestNovelFetchNestedTaskEndpointsStayOnLegacyBridge(t *testing.T) {
+func TestNovelFetchNestedTaskDiagnosticsUseGoHandler(t *testing.T) {
 	for _, path := range []string{
 		"/api/batch-rewrite/tasks/book-1/sensitive-log",
 		"/api/batch-rewrite/tasks/book-1/rules-trace",
 		"/api/batch-rewrite/tasks/book-1/site-submit-log",
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
-		if isGoNovelFetchCompatRequest(req) {
-			t.Fatalf("nested task endpoint %s must not be sent to the incomplete Go compatibility handler", path)
+		if !isGoNovelFetchCompatRequest(req) {
+			t.Fatalf("nested task endpoint %s must use the Go compatibility handler", path)
 		}
 	}
 }

@@ -326,7 +326,7 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 	if (req.Method == http.MethodGet && path == "/api/novel-fetch/saved") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
-		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
 		return true
 	}
 	if path == "/api/batch-rewrite/issues" || path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {
@@ -341,6 +341,21 @@ func isBatchRewriteTaskDetailPath(path string) bool {
 		return false
 	}
 	return strings.Trim(strings.TrimPrefix(path, prefix), "/") != "" && !strings.Contains(strings.TrimPrefix(path, prefix), "/")
+}
+
+func isBatchRewriteTaskDiagnosticPath(path string) bool {
+	const prefix = "/api/batch-rewrite/tasks/"
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+	rest := strings.TrimPrefix(path, prefix)
+	for _, suffix := range []string{"/sensitive-log", "/rules-trace", "/site-submit-log"} {
+		if strings.HasSuffix(rest, suffix) {
+			bookID := strings.TrimSuffix(rest, suffix)
+			return bookID != "" && !strings.Contains(bookID, "/")
+		}
+	}
+	return false
 }
 
 func isLocalScriptVideoRequest(req *http.Request) bool {

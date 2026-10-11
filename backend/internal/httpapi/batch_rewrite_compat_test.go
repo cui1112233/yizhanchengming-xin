@@ -85,6 +85,29 @@ func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T
 	}
 }
 
+func TestBatchRewriteTaskDiagnosticsReadGoDocument(t *testing.T) {
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "book-1", Meta: map[string]any{"bookName": "测试书"},
+		Logs: []any{map[string]any{"event": "sensitive", "status": "done"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	for _, path := range []string{"sensitive-log", "rules-trace", "site-submit-log"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/tasks/book-1/"+path, nil)
+		SignBridgeRequest(req, "tester", false, now, "secret")
+		res := httptest.NewRecorder()
+		mux.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("%s status=%d body=%s", path, res.Code, res.Body.String())
+		}
+	}
+}
+
 func TestBatchRewriteIssuesReadsGoDocumentLogs(t *testing.T) {
 	now := time.Date(2026, 10, 11, 11, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()
