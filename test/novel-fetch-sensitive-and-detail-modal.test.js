@@ -86,6 +86,17 @@ test('任务详情规范化保留阶段错误、当前版本和更新时间', ()
   assert.equal(normalized.updated_at, '2026-09-21T00:01:00.000Z');
 });
 
+test('已完成上传的任务不会继续显示为 AI 处理中', () => {
+  const normalized = toV78Task({
+    bookId: 'book-uploaded',
+    status: 'ai_processing',
+    originalStatus: 'done',
+    aiStatus: 'done',
+    siteSubmitStatus: 'submitted'
+  });
+  assert.equal(normalized.status, 'submitted');
+});
+
 test('任务详情展示阶段错误并在打开时持续刷新', () => {
   const app = read('frontend/public/batch-rewrite/app.js');
   assert.match(app, /metaItem\("AI失败原因", meta\.ai_error/);
