@@ -2,6 +2,11 @@ const express = require('express');
 const http = require('http');
 const { apiAuth } = require('../middleware/auth');
 
+const TTS_UPSTREAM = Object.freeze({
+  origin: 'http://tts3.121w.com',
+  hostname: 'tts3.121w.com',
+  path: '/v1/audio/speech'
+});
 const router = express.Router();
 router.use(apiAuth);
 
@@ -21,7 +26,7 @@ router.post('/', async (req, res) => {
       style: style || 'general'
     });
 
-    const ttsReq = http.request('http://tts3.121w.com/v1/audio/speech', {
+    const ttsReq = http.request(`${TTS_UPSTREAM.origin}${TTS_UPSTREAM.path}`, {
       method: 'POST',
       headers: {
         'Host': 'tts3.121w.com',
@@ -86,3 +91,4 @@ router.post('/', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.TTS_UPSTREAM = TTS_UPSTREAM;
