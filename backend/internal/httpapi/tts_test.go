@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -32,6 +33,32 @@ func TestConfiguredTTSModelUsesEnabledManagedAudioModel(t *testing.T) {
 	model, ok := configuredTTSModel(context.Background(), store, "tts-owner")
 	if !ok || model["endpoint"] != "https://enabled.example" {
 		t.Fatalf("model=%#v ok=%v", model, ok)
+	}
+}
+
+func TestRequestConfiguredTTSBytesAcceptsAudioAndRejectsJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/audio" {
+			w.Header().Set("Content-Type", "audio/mpeg")
+			_, _ = w.Write([]byte("fake-audio"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"bad model"}`))
+	}))
+	defer server.Close()
+	model := map[string]any{
+		"endpoint":        server.URL + "/audio",
+		"credential":      "secret",
+		"requestTemplate": `{"method":"POST","body":{"text":"{{input}}"}}`,
+	}
+	payload, contentType, err := requestConfiguredTTSBytes(context.Background(), ttsRequest{Input: "测试"}, model)
+	if err != nil || string(payload) != "fake-audio" || contentType != "audio/mpeg" {
+		t.Fatalf("payload=%q contentType=%q err=%v", payload, contentType, err)
+	}
+	model["endpoint"] = server.URL + "/json"
+	if _, _, err := requestConfiguredTTSBytes(context.Background(), ttsRequest{Input: "测试"}, model); err == nil {
+		t.Fatal("JSON error response must not be accepted as audio")
 	}
 }
 
