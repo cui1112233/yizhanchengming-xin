@@ -1,17 +1,22 @@
 param(
-  [string]$EnvFile = "$(Join-Path (Split-Path -Parent $PSScriptRoot) '.env.v88-review')",
+  [string]$EnvFile = '',
   [string]$ListenAddr = ':4001',
   [switch]$UseYcmMysql
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($EnvFile)) {
+  $EnvFile = Join-Path $repo '.env.v88-review'
+}
 if (-not (Test-Path -LiteralPath $EnvFile)) {
   throw "找不到本地 review 配置文件：$EnvFile"
 }
+Write-Output "Using review config $EnvFile"
 
 function Read-ReviewValue([string]$name) {
-  $line = Get-Content -LiteralPath $EnvFile | Where-Object { $_ -match "^\s*$name\s*=" } | Select-Object -First 1
+  $line = ([IO.File]::ReadAllText($EnvFile, [Text.Encoding]::UTF8) -split "`n") |
+    Where-Object { $_.Trim().StartsWith("$name=") } | Select-Object -First 1
   if (-not $line) { return '' }
   $value = ($line -split '=', 2)[1].Trim()
   if ($value.Length -ge 2 -and $value.StartsWith('"') -and $value.EndsWith('"')) {
