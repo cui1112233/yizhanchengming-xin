@@ -89,6 +89,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production}
 		if options.LocalArtifacts != nil {
 			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, options.NovelFetchStore)
+			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production)
 			stageService.ImageGenerator = func(ctx context.Context, owner, batchID, bookID string) error {
 				batch, err := options.Store.GetBatch(ctx, owner, batchID)
 				if err != nil {
@@ -183,7 +184,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, "v12", options.NovelFetchStore)
 	if options.Store != nil {
-		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, options.NovelFetchStore)}
+		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, options.NovelFetchStore), VideoReady: shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production)}
 		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
@@ -343,6 +344,22 @@ func shuihuoImageReadyChecker(store batchfactoryv11.Store, catalogStore novelfet
 			}
 		}
 		return false, "图片模型或图片生成服务未配置"
+	}
+}
+
+func shuihuoVideoReadyChecker(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, production *batchfactoryv11.ProductionService) func(context.Context, string) (bool, string) {
+	return func(ctx context.Context, owner string) (bool, string) {
+		if production == nil || !production.Enabled {
+			return false, "视频生成服务未启用"
+		}
+		config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStore)
+		if err != nil {
+			return false, "视频模型配置读取失败"
+		}
+		if shuihuoModelKindConfigured(config, "video") {
+			return true, ""
+		}
+		return false, "视频模型或视频生成服务未配置"
 	}
 }
 

@@ -5,6 +5,35 @@ import (
 	"testing"
 )
 
+func TestBookStageVideoAvailabilityUsesConfiguredModelCheck(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "video readiness", Books: []CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &BookStageService{
+		Store:      store,
+		Production: &ProductionService{Enabled: true},
+		VideoReady: func(context.Context, string) (bool, string) {
+			return false, "视频模型或视频生成服务未配置"
+		},
+	}
+	summary, err := service.Summary(ctx, "alice", batch.ID, batch.Books[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range summary.Availability {
+		if item.Stage == BookStageVideo {
+			if item.Available || item.Reason != "视频模型或视频生成服务未配置" {
+				t.Fatalf("video availability = %+v", item)
+			}
+			return
+		}
+	}
+	t.Fatal("video availability missing")
+}
+
 type countingBatchReadStore struct {
 	*MemoryStore
 	getBatchCalls   int

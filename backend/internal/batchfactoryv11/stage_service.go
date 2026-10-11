@@ -26,7 +26,10 @@ type BookStageService struct {
 	Production *ProductionService
 	// ImageReady and ImageGenerator are supplied by the host application so
 	// the stage service stays independent from a particular image provider.
-	ImageReady        func(context.Context, string) (bool, string)
+	ImageReady func(context.Context, string) (bool, string)
+	// VideoReady is supplied by the host application so availability reflects
+	// the account's selected video model, not only the global production flag.
+	VideoReady        func(context.Context, string) (bool, string)
 	ImageGenerator    func(context.Context, string, string, string) error
 	SmartUnifiedStyle string
 	OpeningMeta       PresetSnapshot
@@ -74,6 +77,15 @@ func (s *BookStageService) availability(ctx context.Context, owner string, stage
 		}
 		return BookStageAvailability{Stage: stage, Reason: "图片模型或图片生成服务未配置"}
 	case BookStageVideo:
+		if s != nil && s.VideoReady != nil {
+			ready, reason := s.VideoReady(ctx, owner)
+			if ready {
+				return BookStageAvailability{Stage: stage, Available: true}
+			}
+			if strings.TrimSpace(reason) != "" {
+				return BookStageAvailability{Stage: stage, Reason: reason}
+			}
+		}
 		if s != nil && s.Production != nil && s.Production.Enabled {
 			return BookStageAvailability{Stage: stage, Available: true}
 		}
