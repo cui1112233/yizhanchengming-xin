@@ -377,6 +377,110 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 	})
 
+	// 批量重试由 Go 直接处理，避免小说获取工作台因为一个重试按钮又回到 Node。
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/batch-retry", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		var input struct {
+			IDs []string `json:"ids"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
+			return
+		}
+		ids := make([]string, 0, len(input.IDs))
+		seen := map[string]bool{}
+		for _, raw := range input.IDs {
+			id := strings.TrimSpace(raw)
+			if !novelFetchBookIDPattern.MatchString(id) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "非法的书籍ID"})
+				return
+			}
+			if !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+		retried, failed, skipped := 0, 0, 0
+		retryStages := map[string]int{}
+		for _, bookID := range ids {
+			document, err := store.GetDocument(req.Context(), identity.Username, bookID)
+			if errors.Is(err, novelfetchworkshop.ErrNotFound) {
+				failed++
+				retryStages["failed"]++
+				continue
+			}
+			if err != nil {
+				failed++
+				retryStages["failed"]++
+				continue
+			}
+			actionTaken := false
+			if strings.TrimSpace(fmt.Sprint(document.Meta["originalStatus"])) != "done" && fetcher != nil {
+				platformID := "2"
+				if value, ok := document.Meta["platformId"].(string); ok && strings.TrimSpace(value) != "" {
+					platformID = strings.TrimSpace(value)
+				}
+				maxTxt := document.MaxTxt
+				if maxTxt <= 0 {
+					maxTxt = 4000
+				}
+				result, fetchErr := fetcher.FetchAndProcess(req.Context(), bookID, platformID, maxTxt)
+				if fetchErr != nil {
+					failed++
+					retryStages["fetch"]++
+					continue
+				}
+				document.OriginalRaw = result.OriginalRaw
+				document.Original = result.ProcessedText
+				document.ProcessedText = result.ProcessedText
+				document.OriginalRawChars = result.OriginalRawChars
+				document.ProcessedChars = result.ProcessedChars
+				document.MaxTxt = result.MaxTxt
+				document.BookInfo = result.BookInfo
+				if document.Meta == nil {
+					document.Meta = map[string]any{}
+				}
+				document.Meta["originalStatus"] = "done"
+				document.Meta["originalRawChars"] = result.OriginalRawChars
+				document.Meta["processedChars"] = result.ProcessedChars
+				if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
+					failed++
+					retryStages["fetch"]++
+					continue
+				}
+				actionTaken = true
+				retryStages["fetch"]++
+			}
+			if strings.EqualFold(strings.TrimSpace(fmt.Sprint(document.Meta["aiStatus"])), "failed") {
+				provider, providerErr := resolveRewriteProvider(req)
+				if providerErr != nil || provider == nil {
+					failed++
+					retryStages["rewrite"]++
+					continue
+				}
+				if _, rewriteErr := novelfetchworkshop.GenerateAIRewrites(req.Context(), store, identity.Username, bookID, 1, provider); rewriteErr != nil {
+					failed++
+					retryStages["rewrite"]++
+					continue
+				}
+				actionTaken = true
+				retryStages["rewrite"]++
+			}
+			if actionTaken {
+				retried++
+			} else {
+				skipped++
+				retryStages["skipped"]++
+			}
+		}
+		tasks, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "读取任务列表失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "retried": retried, "failed": failed, "skipped": skipped, "retry_stage_counts": retryStages, "tasks": tasks})
+	})
+
 	mux.HandleFunc("GET /api/novel-fetch-workshop/tasks/{bookId}/bodies", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		bookID, _, ok := novelFetchBodyPathValues(w, req)

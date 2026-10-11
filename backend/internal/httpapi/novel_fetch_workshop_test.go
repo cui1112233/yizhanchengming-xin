@@ -76,6 +76,32 @@ func TestNovelFetchWorkshopSparsePutPreservesExistingGenderSource(t *testing.T) 
 	}
 }
 
+func TestNovelFetchWorkshopBatchRetryUsesGoStore(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID:        "already-done",
+		Original:      "已有正文",
+		ProcessedText: "已有正文",
+		Meta:          map[string]any{"originalStatus": "done", "aiStatus": "done"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-retry", map[string]any{"ids": []string{"already-done"}}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("batch retry status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["ok"] != true || payload["skipped"] != float64(1) || payload["retried"] != float64(0) {
+		t.Fatalf("unexpected batch retry result: %#v", payload)
+	}
+}
+
 func TestNovelFetchWorkshopPutPreservesExistingPersistentFields(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
