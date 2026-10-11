@@ -348,7 +348,24 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 	} else {
 		raw, err := ParseDirectorJSON(completion)
 		if err != nil {
-			return DirectorRevision{}, retryableModelOutputError(err)
+			// Some OpenAI-compatible gateways accept JSON mode but still return
+			// explanatory text on the first attempt. Give the same frozen
+			// contract one repair attempt without response_format before marking
+			// the stage failed; this keeps a transient formatting issue retryable
+			// without weakening the final validator.
+			retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{
+				SystemPrompt:        contract.SystemPrompt + "\n上一轮输出无法解析。现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
+				UserPrompt:          contract.UserPrompt,
+				Temperature:         0.2,
+				MaxTokens:           contract.MaxTokens,
+				DisableJSONResponse: true,
+			})
+			if retryErr == nil {
+				raw, err = ParseDirectorJSON(retryCompletion)
+			}
+			if err != nil {
+				return DirectorRevision{}, retryableModelOutputError(err)
+			}
 		}
 		result, err = NormalizeDirectorOutput(raw, contract.Normalization)
 		if err != nil {
@@ -394,7 +411,19 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	}
 	raw, err := ParseDirectorJSON(completion)
 	if err != nil {
-		return nil, retryableModelOutputError(err)
+		retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{
+			SystemPrompt:        contract.SystemPrompt + "\n上一轮输出无法解析。现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
+			UserPrompt:          contract.UserPrompt,
+			Temperature:         0.2,
+			MaxTokens:           contract.MaxTokens,
+			DisableJSONResponse: true,
+		})
+		if retryErr == nil {
+			raw, err = ParseDirectorJSON(retryCompletion)
+		}
+		if err != nil {
+			return nil, retryableModelOutputError(err)
+		}
 	}
 	assets, err := NormalizeAssetExtractionOutput(raw)
 	if err != nil {

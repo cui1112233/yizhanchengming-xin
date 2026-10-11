@@ -34,6 +34,18 @@ func rawSetting(t *testing.T, value any) json.RawMessage {
 	return raw
 }
 
+func TestDirectorRetriesOnceWhenGatewayReturnsNonJSONText(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	provider := &queuedDirectorProvider{values: []string{"先解释一下", validDirectorJSON()}}
+	service := &DirectorService{Store: store, Provider: provider}
+	if _, err := service.RunDirector(context.Background(), "alice", batch.ID, book.ID); err != nil {
+		t.Fatalf("director should recover from one formatting-only response: %v", err)
+	}
+	if len(provider.calls) != 2 || !provider.calls[1].DisableJSONResponse {
+		t.Fatalf("retry request should disable response_format: calls=%+v", provider.calls)
+	}
+}
+
 func seedDirectorBook(t *testing.T, mode string, fixed bool) (*MemoryStore, Batch, Book) {
 	t.Helper()
 	store := NewMemoryStore()
