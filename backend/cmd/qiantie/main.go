@@ -353,6 +353,11 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	if path == "/api/chat" {
 		return false
 	}
+	// This prefix already ends with a slash; do not add a second slash when
+	// matching script endpoints such as /api/script/director-pipeline.
+	if strings.HasPrefix(path, "/api/script/") {
+		return true
+	}
 	// V12 is the public workbench contract. Its summary, direct-fetch and
 	// orchestration adapters still live in Node, while Go owns capabilities,
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
@@ -389,7 +394,6 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		"/api/test",
 		"/api/models",
 		"/api/chat",
-		"/api/script/",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true

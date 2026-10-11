@@ -130,7 +130,7 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 }
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
-	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects", "/api/script-video"} {
+	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects", "/api/script-video", "/api/script/director-pipeline"} {
 		if !shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s should use the temporary Node bridge", path)
 		}
