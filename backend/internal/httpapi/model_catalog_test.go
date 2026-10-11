@@ -38,3 +38,16 @@ func TestModelCatalogCRUDHidesCredential(t *testing.T) {
 		t.Fatalf("unexpected public catalog: %#v", payload.Models)
 	}
 }
+
+func TestLegacyModelTestRoutesAreServedByGo(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	for _, path := range []string{"/api/test/text", "/api/test/image"} {
+		response := doNovelFetchRequest(t, handler, http.MethodPost, path, map[string]any{"baseUrl": "ftp://invalid", "model": "demo", "apiKey": "secret"}, now, secret)
+		if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "Base URL 格式不正确") {
+			t.Fatalf("%s should be Go-owned validation, status=%d body=%s", path, response.Code, response.Body.String())
+		}
+	}
+}
