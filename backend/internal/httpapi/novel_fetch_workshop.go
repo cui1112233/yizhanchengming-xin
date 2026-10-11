@@ -1078,19 +1078,26 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取设置失败"})
 			return
 		}
-		appConfig := settings
-		if configured, ok := settings["appConfig"].(map[string]any); ok {
+		// The migrated store can contain a compatibility wrapper under
+		// `settings`.  The browser contract is the same flat config returned by
+		// 3001, so unwrap it before selecting appConfig/platforms/aiConfig.
+		publicSource := settings
+		if nested, ok := settings["settings"].(map[string]any); ok {
+			publicSource = nested
+		}
+		appConfig := publicSource
+		if configured, ok := publicSource["appConfig"].(map[string]any); ok {
 			appConfig = configured
 		}
-		platforms, ok := settings["platforms"].([]any)
+		platforms, ok := publicSource["platforms"].([]any)
 		if !ok {
 			platforms = append([]any(nil), defaultNovelFetchPlatforms...)
 		}
-		styles, ok := settings["styles"].([]any)
+		styles, ok := publicSource["styles"].([]any)
 		if !ok {
 			styles = append([]any(nil), defaultNovelFetchStyles...)
 		}
-		aiConfig, _ := settings["aiConfig"].(map[string]any)
+		aiConfig, _ := publicSource["aiConfig"].(map[string]any)
 		if aiConfig == nil {
 			if ai, ok := appConfig["ai"].(map[string]any); ok {
 				aiConfig = map[string]any{"ai": ai}
@@ -1100,7 +1107,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		publicAppConfig := publicNovelFetchConfig(appConfig)
 		publicAIConfig := publicNovelFetchConfig(aiConfig)
-		publicSettings := publicNovelFetchConfig(settings)
+		publicSettings := publicNovelFetchConfig(publicSource)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"appConfig": publicAppConfig,
 			"platforms": platforms,
