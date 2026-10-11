@@ -219,6 +219,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
+	if options.NovelFetchStore != nil {
+		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
+	}
 	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore)
 	registerTTSRoute(root, auth)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
