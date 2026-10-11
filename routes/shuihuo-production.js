@@ -13,10 +13,10 @@ const HOP_BY_HOP_HEADERS = new Set([
 ]);
 
 function signBridgeRequest(secret, { username, isOwner, issuedAt, method, pathname }) {
-  // Shuihuo remains on the established Go gateway, whose platform identity
-  // protocol uses newline-delimited fields. V11 has its own upstream and a
-  // distinct signature representation, so it must not be reused here.
-  const payload = [username, issuedAt, String(isOwner), method, pathname].join('\n');
+  // Keep the Shuihuo bridge signature identical to Go's BridgeAuth canonical
+  // payload.  The old Node adapter used newline separators, which made every
+  // Shuihuo request fail authentication after the Go gateway became canonical.
+  const payload = [username, issuedAt, String(isOwner), method, pathname].join('');
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
 
