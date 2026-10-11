@@ -86,6 +86,9 @@ export function createAdminModel({ modelId, name, kind, adapterKind, enabled, pa
 export function updateAdminModel(modelId, payload) {
   return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}`, { method: 'PATCH', body: JSON.stringify(payload) });
 }
+export function setAdminModelEnabled(modelId, enabled) {
+  return updateAdminModel(modelId, { enabled: Boolean(enabled) });
+}
 export function deleteAdminModel(modelId) {
   return apiRequest(`${base}/admin/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' });
 }
