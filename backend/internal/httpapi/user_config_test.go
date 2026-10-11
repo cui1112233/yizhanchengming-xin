@@ -49,4 +49,12 @@ func TestUserConfigReportsModelManagementForOwner(t *testing.T) {
 	if !ok || len(catalog) != 1 || catalog[0].(map[string]any)["id"] != "text-primary" {
 		t.Fatalf("owner config must expose the managed model catalog: %#v", payload["modelCatalog"])
 	}
+	model := catalog[0].(map[string]any)
+	if model["hasCredential"] != true {
+		t.Fatalf("owner config must expose hasCredential for the current settings page: %#v", model)
+	}
+	defaults, ok := payload["scriptDefaults"].(map[string]any)
+	if !ok || defaults["videoResolution"] != "720p" {
+		t.Fatalf("owner config must expose script defaults: %#v", payload["scriptDefaults"])
+	}
 }

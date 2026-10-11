@@ -34,6 +34,10 @@ var defaultUserConfig = map[string]any{
 	"tts":           map[string]any{"voice": "zh-CN-XiaoxiaoNeural", "style": "general", "speed": 1.8, "pitch": 10},
 	"notifications": map[string]any{"soundEnabled": true, "petVisible": true, "soundVolume": 60},
 	"avatar":        nil,
+	"scriptDefaults": map[string]any{
+		"textModelId": "", "imageModelId": "", "videoModelKey": "",
+		"imageAspectRatio": "9:16", "videoAspectRatio": "9:16", "videoResolution": "720p",
+	},
 }
 
 type UserConfigStore struct {
@@ -151,6 +155,9 @@ func publicUserConfig(config map[string]any) map[string]any {
 			key, _ := model["credential"].(string)
 			delete(model, "credential")
 			model["hasApiKey"] = strings.TrimSpace(key) != ""
+			// The current settings page uses the clearer credential name. Keep
+			// hasApiKey as a compatibility alias for older pages.
+			model["hasCredential"] = strings.TrimSpace(key) != ""
 		}
 	}
 	return result
