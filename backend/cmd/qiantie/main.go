@@ -79,9 +79,14 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		// The novel-fetch workbench and its compatibility aliases are now served
-		// by Go. Keep this dispatch before the broad legacy bridge so the iframe
-		// does not silently fall back to the old Node implementation.
+		// /novel-fetch loads the complete legacy workbench from the embedded
+		// frontend. Its batch-rewrite API is a single workflow (including the
+		// snake_case process payload and upload actions), so keep that namespace
+		// on the established local bridge until the Go-native workshop is complete.
+		if isLegacyNovelFetchBridgeRequest(req) {
+			authProxy.ServeHTTP(w, req)
+			return
+		}
 		if isGoNovelFetchCompatRequest(req) || isGoAgentReadRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
@@ -245,6 +250,10 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
+func isLegacyNovelFetchBridgeRequest(req *http.Request) bool {
+	return req != nil && req.URL != nil && strings.HasPrefix(req.URL.Path, "/api/batch-rewrite")
+}
+
 func isGoAgentReadRequest(req *http.Request) bool {
 	if req == nil || req.URL == nil || (req.Method != http.MethodGet && req.Method != http.MethodPost && req.Method != http.MethodPatch && req.Method != http.MethodDelete) {
 		return false
@@ -329,6 +338,11 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) {
 		return true
 	}
+	// The iframe at /novel-fetch is the complete legacy workbench.  Its
+	// /api/batch-rewrite/* calls carry the snake_case payload and the full
+	// fetch/rewrite/upload workflow, so keep them on the established bridge
+	// instead of sending them to the smaller Go workshop compatibility API.
+	// The Go-native workshop remains available under /api/novel-fetch-workshop/*.
 	if path == "/api/batch-rewrite/issues" || path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {
 		return req.Method == http.MethodGet || req.Method == http.MethodPost
 	}
