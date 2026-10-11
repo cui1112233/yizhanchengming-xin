@@ -6,6 +6,7 @@ import { PresetLibraryPage } from './pages/PresetLibraryPage';
 import { ShuihuoModelCatalogPage } from './pages/ShuihuoModelCatalogPage';
 import { AgentSkillLibraryPage } from './pages/AgentSkillLibraryPage';
 import { ErrorLogPage } from './pages/ErrorLogPage';
+import { AccountGovernancePage } from './pages/AccountGovernancePage';
 import { Link } from '../shared/components/Link';
 
 function usePathname() {
@@ -21,20 +22,13 @@ function usePathname() {
 }
 
 function getPage(pathname) {
-  if (pathname === '/admin/accounts') return <LegacyAccountRedirect />;
+  if (pathname === '/admin/accounts') return <AccountGovernancePage />;
   if (pathname === '/admin/presets') return <PresetLibraryPage />;
   if (pathname === '/admin/agent-skills') return <AgentSkillLibraryPage />;
   if (pathname === '/admin/prompts') return <PromptStrategyPage />;
   if (pathname === '/admin/shuihuo-models') return <ShuihuoModelCatalogPage />;
   if (pathname === '/admin/error-logs') return <ErrorLogPage />;
   return <DashboardPage />;
-}
-
-function LegacyAccountRedirect() {
-  useEffect(() => {
-    window.location.replace('/accounts');
-  }, []);
-  return <section className="admin-legacy-redirect"><h2>账号与授权已移入个人中心</h2><p>账号角色和跨团队调整请在个人中心完成。</p><Link href="/accounts">前往账号与角色</Link></section>;
 }
 
 export function AdminApp() {

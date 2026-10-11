@@ -11,6 +11,7 @@ const navItems = [
   { href: '/admin/prompts', icon: '⌁', label: 'Prompt 策略' },
   { href: '/admin/agent-skills', icon: '◇', label: 'CM 平台技能' },
   { href: '/admin/shuihuo-models', icon: '◇', label: '水货生产模型' },
+  { href: '/admin/accounts', icon: '◎', label: '账号与授权' },
   { href: '/admin/error-logs', icon: '!', label: '错误日志' }
 ];
 
