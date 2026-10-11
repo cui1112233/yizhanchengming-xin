@@ -20,6 +20,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 var shuihuoProductionConfigs sync.Map
@@ -27,7 +28,7 @@ var shuihuoProductionConfigs sync.Map
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
 // /api/platform-projects. The source of truth is the Go batch store.
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, production *batchfactoryv11.ProductionService) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store) {
 	if store == nil {
 		return
 	}
@@ -56,8 +57,8 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		models := []any{}
-		if durable, durableOK := store.(batchfactoryv11.ShuihuoConfigStore); durableOK {
-			if config, err := durable.GetShuihuoConfig(r.Context(), owner); err == nil {
+		if _, durableOK := store.(batchfactoryv11.ShuihuoConfigStore); durableOK {
+			if config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore); err == nil {
 				if catalog, catalogOK := config["modelCatalog"].([]any); catalogOK {
 					for _, raw := range catalog {
 						if model, modelOK := raw.(map[string]any); modelOK {
@@ -93,7 +94,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权管理模型"})
 			return
 		}
-		config, err := loadShuihuoOwnerConfig(r.Context(), store, identity.Username)
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, identity.Username, catalogStore)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -151,7 +152,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -199,7 +200,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/asset-types/"), "/")
-		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -234,7 +235,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -289,7 +290,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/shuihuo-production/asset-templates/"), "/")
-		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner)
+		config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -321,8 +322,8 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		if r.Method == http.MethodGet {
-			if durable, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
-				config, err := durable.GetShuihuoConfig(r.Context(), owner)
+			if _, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
+				config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore)
 				if err != nil {
 					writeStoreError(w, err)
 					return
@@ -752,7 +753,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 					writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media storage is unavailable"})
 					return
 				}
-				task, imageErr := generateShuihuoSegmentImage(r.Context(), store, files, owner, batch, strings.TrimSpace(input.SegmentID), strings.TrimSpace(input.ModelID))
+				task, imageErr := generateShuihuoSegmentImage(r.Context(), store, files, owner, batch, strings.TrimSpace(input.SegmentID), strings.TrimSpace(input.ModelID), catalogStore)
 				if imageErr != nil {
 					writeStoreError(w, imageErr)
 					return
@@ -765,7 +766,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			if production.ProviderRegistry != nil {
-				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner); syncErr != nil {
+				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner, catalogStore); syncErr != nil {
 					writeStoreError(w, syncErr)
 					return
 				}
@@ -799,7 +800,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			if production.ProviderRegistry != nil {
-				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner); syncErr != nil {
+				if syncErr := syncShuihuoConfiguredVideoModels(r.Context(), store, production.ProviderRegistry, owner, catalogStore); syncErr != nil {
 					writeStoreError(w, syncErr)
 					return
 				}
@@ -982,7 +983,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if !decodeJSON(w, r, &input) {
 				return
 			}
-			images, generationErr := generateShuihuoAssetImages(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio)
+			images, generationErr := generateShuihuoAssetImages(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio, catalogStore)
 			if generationErr != nil {
 				writeStoreError(w, generationErr)
 				return
@@ -1913,17 +1914,33 @@ func shuihuoMedia(batch batchfactoryv11.Batch) []map[string]any {
 	return storedShuihuoMedia(batch.Books[0])
 }
 
-func loadShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, owner string) (map[string]any, error) {
+func loadShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, owner string, catalogStores ...novelfetchworkshop.Store) (map[string]any, error) {
+	var config map[string]any
 	if durable, ok := store.(batchfactoryv11.ShuihuoConfigStore); ok {
-		return durable.GetShuihuoConfig(ctx, owner)
-	}
-	if value, ok := shuihuoProductionConfigs.Load(owner); ok {
-		if config, ok := value.(map[string]any); ok {
-			return config, nil
+		loaded, err := durable.GetShuihuoConfig(ctx, owner)
+		if err != nil {
+			return nil, err
+		}
+		config = loaded
+	} else if value, ok := shuihuoProductionConfigs.Load(owner); ok {
+		if loaded, ok := value.(map[string]any); ok {
+			config = loaded
 		}
 	}
-	config := shuihuoDefaultConfig()
-	shuihuoProductionConfigs.Store(owner, config)
+	if config == nil {
+		config = shuihuoDefaultConfig()
+		shuihuoProductionConfigs.Store(owner, config)
+	}
+	if len(catalogStores) > 0 && catalogStores[0] != nil {
+		if managed, err := catalogStores[0].GetConfig(ctx, owner); err == nil {
+			if catalog, ok := managed["modelCatalog"].([]any); ok && len(catalog) > 0 {
+				config["modelCatalog"] = catalog
+			}
+			if version, ok := managed["modelCatalogVersion"]; ok {
+				config["modelCatalogVersion"] = version
+			}
+		}
+	}
 	return config, nil
 }
 
@@ -1988,8 +2005,8 @@ func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoPr
 	return registry.Put(ctx, owner, batchfactoryv11.VideoProviderConfig{Provider: provider, APIKey: apiKey, Model: modelID, CreateURL: endpoint, TasksURL: tasksEndpoint, ResultURL: resultEndpoint, WorkflowID: workflowID})
 }
 
-func syncShuihuoConfiguredVideoModels(ctx context.Context, store batchfactoryv11.Store, registry batchfactoryv11.VideoProviderRegistry, owner string) error {
-	config, err := loadShuihuoOwnerConfig(ctx, store, owner)
+func syncShuihuoConfiguredVideoModels(ctx context.Context, store batchfactoryv11.Store, registry batchfactoryv11.VideoProviderRegistry, owner string, catalogStores ...novelfetchworkshop.Store) error {
+	config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStores...)
 	if err != nil {
 		return err
 	}
@@ -2317,7 +2334,7 @@ func generateShuihuoPromptCandidates(ctx context.Context, director *batchfactory
 	return items, "text_model", nil
 }
 
-func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio string) ([]batchfactoryv11.BookAssetImage, error) {
+func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio string, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -2330,7 +2347,7 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 	if len(wanted) == 0 {
 		return nil, fmt.Errorf("%w: asset selection is required", batchfactoryv11.ErrInvalid)
 	}
-	config, err := loadShuihuoOwnerConfig(ctx, store, owner)
+	config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStores...)
 	if err != nil {
 		return nil, err
 	}
@@ -2481,7 +2498,7 @@ func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Stor
 	return map[string]any{"id": artifactID, "status": "completed", "kind": "audio", "segmentId": segmentID, "mediaUrl": "/api/shuihuo-production/media/" + artifactID + "/download", "createdAt": entry["createdAt"]}, nil
 }
 
-func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID, modelID string) (map[string]any, error) {
+func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID, modelID string, catalogStores ...novelfetchworkshop.Store) (map[string]any, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -2499,7 +2516,7 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 	if prompt == "" {
 		return nil, fmt.Errorf("%w: segment not found or has no image prompt", batchfactoryv11.ErrNotFound)
 	}
-	config, err := loadShuihuoOwnerConfig(ctx, store, owner)
+	config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStores...)
 	if err != nil {
 		return nil, err
 	}
