@@ -95,9 +95,13 @@ func TestModelCatalogPatchPreservesCredentialAndValidatesWorkflow(t *testing.T) 
 		t.Fatalf("patch status=%d body=%s", response.Code, response.Body.String())
 	}
 	settings, err := store.GetConfig(context.Background(), "tester")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	model := modelCatalog(settings)[0]
-	if model["credential"] != "saved-secret" || model["workflowId"] != "new-workflow" { t.Fatalf("patch lost protected fields: %#v", model) }
+	if model["credential"] != "saved-secret" || model["workflowId"] != "new-workflow" {
+		t.Fatalf("patch lost protected fields: %#v", model)
+	}
 }
 
 func TestModelCatalogH3ConfigRequiresKeyAndSavesWorkflowTogether(t *testing.T) {
@@ -120,7 +124,9 @@ func TestModelCatalogH3ConfigRequiresKeyAndSavesWorkflowTogether(t *testing.T) {
 		t.Fatalf("H3 save with key should succeed without leaking it, status=%d body=%s", withKey.Code, withKey.Body.String())
 	}
 	settings, err := store.GetConfig(context.Background(), "tester")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	model := modelCatalog(settings)[0]
 	if model["credential"] != "h3-secret" || model["workflowId"] != "saved-workflow" {
 		t.Fatalf("H3 key and workflow must be saved together: %#v", model)
@@ -129,7 +135,47 @@ func TestModelCatalogH3ConfigRequiresKeyAndSavesWorkflowTogether(t *testing.T) {
 
 func TestModelCatalogRejectsEmptyH3Workflow(t *testing.T) {
 	model, err := normalizeManagedModel(map[string]any{"id": "minimax-h3-video", "kind": "video", "workflowId": ""})
-	if err == nil || model != nil { t.Fatalf("empty H3 workflow must be rejected: %#v, %v", model, err) }
+	if err == nil || model != nil {
+		t.Fatalf("empty H3 workflow must be rejected: %#v, %v", model, err)
+	}
+}
+
+func TestModelCatalogAcceptsLegacyH3ApiKeyAlias(t *testing.T) {
+	model, err := normalizeManagedModel(map[string]any{
+		"id": "minimax-h3-video", "kind": "video", "apiKey": "legacy-secret", "workflowId": "saved-workflow",
+	})
+	if err != nil {
+		t.Fatalf("legacy apiKey should be accepted: %v", err)
+	}
+	if model["credential"] != "legacy-secret" || model["apiKey"] != nil {
+		t.Fatalf("legacy apiKey must normalize to credential: %#v", model)
+	}
+}
+
+func TestModelCatalogPatchAcceptsLegacyH3ApiKeyAlias(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"modelCatalog": []any{map[string]any{
+		"id": "minimax-h3-video", "kind": "video", "displayName": "H3", "workflowId": "saved-workflow", "apiKey": "legacy-secret", "enabled": false,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodPatch, "/api/config/models/minimax-h3-video", map[string]any{
+		"workflowId": "new-workflow",
+	}, now, secret)
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "legacy-secret") {
+		t.Fatalf("legacy H3 patch status=%d body=%s", response.Code, response.Body.String())
+	}
+	settings, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := modelCatalog(settings)[0]
+	if model["credential"] != "legacy-secret" || model["workflowId"] != "new-workflow" {
+		t.Fatalf("legacy key must survive patch normalization: %#v", model)
+	}
 }
 
 func TestModelCatalogAcceptsManagedAudioFields(t *testing.T) {

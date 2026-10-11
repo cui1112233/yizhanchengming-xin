@@ -235,10 +235,26 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 				if key == "id" {
 					continue
 				}
+				// Older settings pages called the secret apiKey. Keep accepting
+				// that spelling, but normalize it into the single credential field
+				// before validation and persistence.
+				if key == "apiKey" {
+					if strings.TrimSpace(fmt.Sprint(value)) != "" {
+						current["credential"] = value
+					}
+					continue
+				}
 				if key == "credential" && strings.TrimSpace(fmt.Sprint(value)) == "" {
 					continue
 				}
 				current[key] = value
+			}
+			// Migrate a legacy stored apiKey before normalizeManagedModel checks
+			// the H3 key requirement. The secret never leaves public responses.
+			if strings.TrimSpace(fmt.Sprint(current["credential"])) == "" {
+				if legacyKey := strings.TrimSpace(fmt.Sprint(current["apiKey"])); legacyKey != "" && legacyKey != "<nil>" {
+					current["credential"] = legacyKey
+				}
 			}
 			model, err := normalizeManagedModel(current)
 			if err != nil {
@@ -488,12 +504,18 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	}
 	workflowID := strings.TrimSpace(fmt.Sprint(input["workflowId"]))
 	if workflowID == "<nil>" {
+		workflowID = strings.TrimSpace(fmt.Sprint(input["workflow_id"]))
+	}
+	if workflowID == "<nil>" {
 		workflowID = ""
 	}
 	if id == "minimax-h3-video" && workflowID == "" {
 		return nil, errors.New("H3 工作流 ID 不能为空")
 	}
 	credential := strings.TrimSpace(fmt.Sprint(input["credential"]))
+	if credential == "<nil>" || credential == "" {
+		credential = strings.TrimSpace(fmt.Sprint(input["apiKey"]))
+	}
 	if credential == "<nil>" {
 		credential = ""
 	}
