@@ -64,6 +64,32 @@ func TestV12RuntimeSummaryUsesGoReadModels(t *testing.T) {
 	}
 }
 
+type runtimeSummaryTextProvider struct{}
+
+func (runtimeSummaryTextProvider) Complete(context.Context, batchfactoryv11.TextCompletionRequest) (string, error) {
+	return "{}", nil
+}
+
+func TestV12RuntimeSummaryUsesConfiguredTextProvider(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "文本模型状态", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", SourceText: "正文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{
+		BridgeSecret: "secret",
+		Now:          func() time.Time { return now },
+		Slice:        2,
+		Store:        store,
+		Director:     &batchfactoryv11.DirectorService{Store: store, Provider: runtimeSummaryTextProvider{}},
+	})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/runtime-summary", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"stage":"assets","available":true`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func mustJSON(value any) []byte {
 	encoded, _ := json.Marshal(value)
 	return encoded

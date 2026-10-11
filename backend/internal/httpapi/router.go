@@ -200,7 +200,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, "v12", options.NovelFetchStore)
 	if options.Store != nil {
-		registerRuntimeSummaryRoute(v12, auth, options.Store, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
+		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production}
+		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
 	}
 	mfaFile := ""
 	if options.MemberProfileStore != nil {

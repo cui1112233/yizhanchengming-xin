@@ -7,7 +7,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
-func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, production *batchfactoryv11.ProductionService, merge *batchfactoryv11.MergeService, automation *FileAutomationStatusReader, version string) {
+func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, stageService *batchfactoryv11.BookStageService, production *batchfactoryv11.ProductionService, merge *batchfactoryv11.MergeService, automation *FileAutomationStatusReader, version string) {
 	if mux == nil || store == nil {
 		return
 	}
@@ -54,7 +54,9 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 			}
 			result["merge"] = map[string]any{"batchId": batch.ID, "jobs": jobs}
 		}
-		stageService := &batchfactoryv11.BookStageService{Store: store}
+		if stageService == nil {
+			stageService = &batchfactoryv11.BookStageService{Store: store}
+		}
 		stageSummaries := result["stageSummaries"].(map[string]any)
 		for _, book := range batch.Books {
 			summary, summaryErr := stageService.Summary(r.Context(), owner, batch.ID, book.ID)
