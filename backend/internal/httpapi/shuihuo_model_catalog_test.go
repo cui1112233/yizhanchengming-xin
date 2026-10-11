@@ -75,6 +75,24 @@ func TestShuihuoTextModelConfiguredUsesManagedCatalog(t *testing.T) {
 	}
 }
 
+func TestShuihuoModelKindConfiguredUsesCredentialReferenceAndAudioFields(t *testing.T) {
+	t.Setenv("V88_TEXT_MODEL_KEY", "text-secret")
+	config := map[string]any{"modelCatalog": []any{
+		map[string]any{"kind": "text", "enabled": true, "modelId": "text-model", "baseUrl": "https://text.example/v1", "credentialRef": "V88_TEXT_MODEL_KEY"},
+		map[string]any{"kind": "audio", "enabled": true, "modelId": "tts-model", "endpoint": "https://audio.example/speech", "credential": "audio-secret", "requestTemplate": `{\"body\":{}}`, "responseMapping": `{\"resultUrl\":\"data.url\"}`},
+	}}
+	if !shuihuoModelKindConfigured(config, "text") {
+		t.Fatal("text model with a credential reference should be ready")
+	}
+	if !shuihuoModelKindConfigured(config, "audio") {
+		t.Fatal("audio model with endpoint, credential, template and mapping should be ready")
+	}
+	config["modelCatalog"] = []any{map[string]any{"kind": "audio", "enabled": true, "modelId": "tts-model", "endpoint": "https://audio.example/speech", "credential": "audio-secret"}}
+	if shuihuoModelKindConfigured(config, "audio") {
+		t.Fatal("audio model without request template and response mapping must not be ready")
+	}
+}
+
 func TestShuihuoImageModelReadyUsesBaseURLAndCredentialRef(t *testing.T) {
 	t.Setenv("V88_IMAGE_MODEL_KEY", "image-secret")
 	model := map[string]any{

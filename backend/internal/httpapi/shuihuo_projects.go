@@ -43,26 +43,35 @@ func textProviderForShuihuo(director *batchfactoryv11.DirectorService, ownerProv
 // checking only the optional Director environment variables made a configured
 // account look unconfigured in the Shuihuo workbench.
 func shuihuoTextModelConfigured(config map[string]any) bool {
-	catalog, ok := config["modelCatalog"].([]any)
-	if !ok {
-		if typed, typedOK := config["modelCatalog"].([]map[string]any); typedOK {
-			catalog = make([]any, 0, len(typed))
-			for _, model := range typed {
-				catalog = append(catalog, model)
-			}
-		}
-	}
-	for _, raw := range catalog {
-		model, ok := raw.(map[string]any)
-		if !ok || model["kind"] != "text" || model["enabled"] != true {
+	return shuihuoModelKindConfigured(config, "text")
+}
+
+// shuihuoModelKindConfigured is the shared readiness rule for the account
+// model catalog. It deliberately checks the same endpoint/credential fields
+// that runtime adapters use, including credentialRef, so health does not
+// disagree with the admin model page.
+func shuihuoModelKindConfigured(config map[string]any, kind string) bool {
+	for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
+		if !strings.EqualFold(modelString(model, "kind"), kind) || model["enabled"] != true {
 			continue
 		}
-		modelID := strings.TrimSpace(fmt.Sprint(model["modelId"]))
-		endpoint := strings.TrimSpace(fmt.Sprint(model["baseUrl"]))
-		credential := strings.TrimSpace(fmt.Sprint(model["credential"]))
-		if modelID != "" && endpoint != "" && credential != "" {
-			return true
+		if modelString(model, "modelId") == "" {
+			continue
 		}
+		endpoint := modelString(model, "endpoint")
+		if endpoint == "" {
+			endpoint = modelString(model, "baseUrl")
+		}
+		if endpoint == "" {
+			continue
+		}
+		if kind == "audio" && (modelString(model, "requestTemplate") == "" || modelString(model, "responseMapping") == "") {
+			continue
+		}
+		if shuihuoModelCredential(model) == "" && !strings.EqualFold(modelString(model, "adapterKind"), "local_executor_video") {
+			continue
+		}
+		return true
 	}
 	return false
 }
@@ -102,17 +111,25 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			return
 		}
 		enabledKinds := []string{}
+		var ownerConfig map[string]any
+		if config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore); err == nil {
+			ownerConfig = config
+		}
 		textReady := director != nil && director.Provider != nil
-		if !textReady && textProvider != nil {
-			if config, err := loadShuihuoOwnerConfig(r.Context(), store, owner, catalogStore); err == nil {
-				textReady = shuihuoTextModelConfigured(config)
-			}
+		if !textReady && textProvider != nil && ownerConfig != nil {
+			textReady = shuihuoTextModelConfigured(ownerConfig)
 		}
 		if textReady {
 			enabledKinds = append(enabledKinds, "text")
 		}
 		if production != nil && production.Enabled {
 			enabledKinds = append(enabledKinds, "video")
+		}
+		if ownerConfig != nil && shuihuoModelKindConfigured(ownerConfig, "image") {
+			enabledKinds = append(enabledKinds, "image")
+		}
+		if ownerConfig != nil && shuihuoModelKindConfigured(ownerConfig, "audio") {
+			enabledKinds = append(enabledKinds, "audio")
 		}
 		redisReady, redisReason := shuihuoRedisHealth(r.Context(), redisURL)
 		writeJSON(w, http.StatusOK, map[string]any{
