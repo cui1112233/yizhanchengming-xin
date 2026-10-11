@@ -5,6 +5,7 @@ import {
   deleteWorkshopTasks, fetchWorkshopOriginal, generateWorkshopAi, getWorkshopConfig, getWorkshopTask,
   listWorkshopTasks, processBatch, saveWorkshopConfig, testWorkshopAi
 } from '../../shared/api/novelFetchWorkshop';
+import { getUploadSession, uploadBatch, uploadLogin } from '../../shared/api/novelFetch';
 import { createNovelFetchIntake } from '../../shared/api/batchFactoryV11';
 import { batchFactoryNovelFetchHandoffPath } from './shuihuo/batchFactoryNovelFetchHandoff';
 
@@ -84,6 +85,8 @@ export function NovelFetchWorkshopPage() {
   const [processForm] = Form.useForm();
   const [configForm] = Form.useForm();
   const [aiConfigForm] = Form.useForm();
+  const [uploadAuthForm] = Form.useForm();
+  const [uploadForm] = Form.useForm();
 
   // 配置数据（GET /config）
   const [configData, setConfigData] = useState({ platforms: [], styles: [], aiConfig: null });
@@ -110,6 +113,11 @@ export function NovelFetchWorkshopPage() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [testingAi, setTestingAi] = useState(false);
   const [handoffBook, setHandoffBook] = useState(null);
+  const [uploadSession, setUploadSession] = useState({ loggedIn: false, status: 'missing' });
+  const [uploadLoginLoading, setUploadLoginLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadSelectedKeys, setUploadSelectedKeys] = useState([]);
+  const [uploadResult, setUploadResult] = useState(null);
 
   async function loadConfig() {
     try {
@@ -176,8 +184,63 @@ export function NovelFetchWorkshopPage() {
   useEffect(() => {
     loadConfig();
     loadTasks();
+    loadUploadSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleUploadLogin() {
+    const values = await uploadAuthForm.validateFields().catch(() => null);
+    if (!values) return;
+    setUploadLoginLoading(true);
+    try {
+      await uploadLogin({ username: values.username, password: values.password });
+      uploadAuthForm.resetFields(['password']);
+      await loadUploadSession();
+      message.success('目标站登录成功');
+    } catch (error) {
+      message.error(error.message || '目标站登录失败');
+    } finally {
+      setUploadLoginLoading(false);
+    }
+  }
+
+  async function handleUploadBatch() {
+    if (!uploadSelectedKeys.length) {
+      message.warning('请先选择要上传的书');
+      return;
+    }
+    if (!uploadSession.loggedIn) {
+      message.warning('请先登录目标站');
+      return;
+    }
+    const values = uploadForm.getFieldsValue();
+    const selected = tasks.filter(task => uploadSelectedKeys.includes(task.bookId));
+    const items = selected.map(task => ({
+      bookId: String(task.bookId),
+      source: 'workshop',
+      version: values.version || 'original',
+      gender: task.gender || '',
+      style: task.style || ''
+    }));
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const result = await uploadBatch({
+        platformId: Number(values.platformId || 15),
+        items,
+        advanced: {}
+      });
+      setUploadResult(result || {});
+      const failed = (result?.results || []).filter(item => item.status !== 'ok').length;
+      if (failed) message.warning(`上传完成，但有 ${failed} 本失败`);
+      else message.success('所选书籍上传成功');
+      await loadUploadSession();
+    } catch (error) {
+      message.error(error.message || '上传失败');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   // ===== 处理 Tab =====
   async function handleProcess() {
@@ -302,6 +365,15 @@ export function NovelFetchWorkshopPage() {
       downloadText(`${row.bookId}.txt`, text);
     } catch (error) {
       message.error(error.message || '下载失败');
+    }
+  }
+
+  async function loadUploadSession() {
+    try {
+      const data = await getUploadSession();
+      setUploadSession(data || { loggedIn: false, status: 'missing' });
+    } catch (error) {
+      setUploadSession({ loggedIn: false, status: 'error', error: error.message || '会话检查失败' });
     }
   }
 
@@ -624,6 +696,64 @@ export function NovelFetchWorkshopPage() {
                   支持勾选批量删除选中任务；批量重试一期未提供，单本操作：查看、重新抓原文、生成AI、下载。
                 </Typography.Paragraph>
                 <TaskTable withSelection selectedRowKeys={selectedRowKeys} onSelectionChange={setSelectedRowKeys} />
+              </Space>
+            )
+          },
+          {
+            key: 'upload',
+            label: '上传',
+            children: (
+              <Space direction="vertical" size={16} style={{ width: '100%', maxWidth: 960 }}>
+                <Alert
+                  type={uploadSession.loggedIn ? 'success' : 'warning'}
+                  showIcon
+                  message={uploadSession.loggedIn ? '目标站会话已连接' : '尚未登录目标站'}
+                  description={uploadSession.error || '上传前必须先登录并验证目标站会话；不会把本地保存的 Cookie 当作登录成功。'}
+                />
+                <div className="legacy-panel-card" style={{ padding: 16 }}>
+                  <Typography.Title level={5} style={{ margin: '0 0 12px' }}>目标站登录</Typography.Title>
+                  <Form form={uploadAuthForm} layout="inline">
+                    <Form.Item name="username" label="账号" rules={[{ required: true, message: '请输入账号' }]}>
+                      <Input placeholder="121 账号" autoComplete="username" />
+                    </Form.Item>
+                    <Form.Item name="password" label="密码" rules={[{ required: true, message: '请输入密码' }]}>
+                      <Input.Password placeholder="目标站密码" autoComplete="current-password" />
+                    </Form.Item>
+                    <Button type="primary" loading={uploadLoginLoading} onClick={handleUploadLogin}>登录并验证</Button>
+                    <Button loading={uploadLoginLoading} onClick={loadUploadSession}>重新检查</Button>
+                  </Form>
+                </div>
+                <div className="legacy-panel-card" style={{ padding: 16 }}>
+                  <Typography.Title level={5} style={{ margin: '0 0 12px' }}>选择上传内容</Typography.Title>
+                  <Form form={uploadForm} layout="inline" initialValues={{ platformId: 15, version: 'original' }}>
+                    <Form.Item name="platformId" label="平台">
+                      <Select style={{ width: 180 }} options={(configData.platforms || []).filter(p => p && p.visible !== false).map(p => ({ value: Number(p.id), label: p.name }))} />
+                    </Form.Item>
+                    <Form.Item name="version" label="正文版本">
+                      <Select style={{ width: 180 }} options={[{ value: 'original', label: '原文' }, { value: 'edited', label: 'AI改写版' }, { value: 'ai1', label: 'AI1版本' }]} />
+                    </Form.Item>
+                  </Form>
+                  <Table
+                    size="small"
+                    rowKey="bookId"
+                    dataSource={tasks}
+                    loading={tasksLoading}
+                    pagination={{ pageSize: 10, showSizeChanger: false }}
+                    rowSelection={{ selectedRowKeys: uploadSelectedKeys, onChange: setUploadSelectedKeys }}
+                    columns={[
+                      { title: 'ID', dataIndex: 'bookId', width: 180, ellipsis: true },
+                      { title: '书名', dataIndex: 'bookName', ellipsis: true },
+                      { title: '男女频', dataIndex: 'gender', width: 80 },
+                      { title: '风格', dataIndex: 'style', width: 120 },
+                      { title: '原文', dataIndex: 'originalStatus', width: 90, render: originalStatusText }
+                    ]}
+                  />
+                  <Space style={{ marginTop: 12 }}>
+                    <Button type="primary" icon={<UploadCloud size={14} aria-hidden="true" />} loading={uploading} disabled={!uploadSelectedKeys.length} onClick={handleUploadBatch}>上传选中</Button>
+                    <Typography.Text type="secondary">已选 {uploadSelectedKeys.length} 本</Typography.Text>
+                  </Space>
+                  {uploadResult ? <Alert style={{ marginTop: 12 }} type="info" showIcon message="上传结果" description={(uploadResult.results || []).map(item => `${item.bookId}：${item.status === 'ok' ? '成功' : item.error || '失败'}`).join('；') || '暂无结果'} /> : null}
+                </div>
               </Space>
             )
           },

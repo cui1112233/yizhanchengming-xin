@@ -14,13 +14,27 @@ function readRequired(relativePath) {
   return fs.readFileSync(path.join(frontendDir, relativePath), 'utf8');
 }
 
-test('novel fetch route uses the Go-native workshop instead of the legacy 3001 iframe', () => {
+test('novel fetch keeps the complete V78 workbench while serving it from Go instead of 3001', () => {
   assert.match(appSource, /const NovelFetchWorkshopPage = lazy\(\(\) => import\('\.\/pages\/NovelFetchWorkshopPage'\)\);/);
-  assert.match(appSource, /'\/novel-fetch': NovelFetchWorkshopPage/);
+  assert.match(appSource, /'\/novel-fetch': NovelFetchPage/);
 
   const pageSource = fs.readFileSync(path.join(pagesDir, 'NovelFetchWorkshopPage.jsx'), 'utf8');
   assert.match(pageSource, /novelFetchWorkshop/);
-  assert.doesNotMatch(appSource, /'\/novel-fetch': NovelFetchPage/);
+  const legacyPageSource = fs.readFileSync(path.join(pagesDir, 'NovelFetchPage.jsx'), 'utf8');
+  assert.match(legacyPageSource, /src=\{`\/batch-rewrite\/v2/);
+  assert.doesNotMatch(legacyPageSource, /3001/);
+});
+
+test('Go-native novel fetch exposes the target upload flow instead of returning to the legacy page', () => {
+  const pageSource = fs.readFileSync(path.join(pagesDir, 'NovelFetchWorkshopPage.jsx'), 'utf8');
+  const apiSource = readRequired('src/shared/api/novelFetch.js');
+  assert.match(pageSource, /uploadLogin/);
+  assert.match(pageSource, /getUploadSession/);
+  assert.match(pageSource, /uploadBatch/);
+  assert.match(pageSource, /label: '上传'/);
+  assert.match(pageSource, /uploadBatch/);
+  assert.match(apiSource, /\/api\/novel-fetch-upload\/upload-batch/);
+  assert.doesNotMatch(pageSource, /window\.location\.assign\(['"]\/novel-fetch['"]\)/);
 });
 
 test('novel fetch iframe accepts the parent light-theme sync and applies readable surfaces', () => {
