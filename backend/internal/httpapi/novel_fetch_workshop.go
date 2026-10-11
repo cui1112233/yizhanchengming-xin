@@ -1098,12 +1098,15 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				aiConfig = map[string]any{}
 			}
 		}
+		publicAppConfig := publicNovelFetchConfig(appConfig)
+		publicAIConfig := publicNovelFetchConfig(aiConfig)
+		publicSettings := publicNovelFetchConfig(settings)
 		writeJSON(w, http.StatusOK, map[string]any{
-			"appConfig": appConfig,
+			"appConfig": publicAppConfig,
 			"platforms": platforms,
 			"styles":    styles,
-			"aiConfig":  aiConfig,
-			"settings":  settings,
+			"aiConfig":  publicAIConfig,
+			"settings":  publicSettings,
 		})
 	})
 
@@ -1123,13 +1126,78 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取设置失败"})
 			return
 		}
-		merged := mergeWorkshopConfig(current, settings)
+		merged := mergeWorkshopConfigPreservingSecrets(current, settings)
 		if err := store.PutConfig(req.Context(), identity.Username, merged); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存设置失败"})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": merged})
 	})
+}
+
+// publicNovelFetchConfig removes credentials before configuration reaches the browser.
+// Empty api_key values are intentionally retained by the save path so a user can
+// edit other settings without accidentally clearing the stored key.
+func publicNovelFetchConfig(input map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range input {
+		switch key {
+		case "credential", "api_key", "password", "secret", "token":
+			if key == "api_key" || key == "password" {
+				out[key+"_configured"] = strings.TrimSpace(fmt.Sprint(value)) != "" && fmt.Sprint(value) != "<nil>"
+			}
+			continue
+		}
+		if nested, ok := value.(map[string]any); ok {
+			out[key] = publicNovelFetchConfig(nested)
+			continue
+		}
+		if list, ok := value.([]any); ok {
+			items := make([]any, 0, len(list))
+			for _, item := range list {
+				if nested, ok := item.(map[string]any); ok {
+					items = append(items, publicNovelFetchConfig(nested))
+				} else {
+					items = append(items, item)
+				}
+			}
+			out[key] = items
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func mergeWorkshopConfigPreservingSecrets(current, patch map[string]any) map[string]any {
+	merged := mergeWorkshopConfig(current, patch)
+	currentAI, _ := current["aiConfig"].(map[string]any)
+	patchAI, _ := patch["aiConfig"].(map[string]any)
+	if currentAI != nil && patchAI != nil {
+		if strings.TrimSpace(fmt.Sprint(patchAI["api_key"])) == "" {
+			if key := strings.TrimSpace(fmt.Sprint(currentAI["api_key"])); key != "" && key != "<nil>" {
+				if ai, ok := merged["aiConfig"].(map[string]any); ok {
+					ai["api_key"] = key
+				}
+			}
+		}
+	}
+	currentApp, _ := current["appConfig"].(map[string]any)
+	patchApp, _ := patch["appConfig"].(map[string]any)
+	if currentApp != nil && patchApp != nil {
+		currentAI, _ := currentApp["ai"].(map[string]any)
+		patchAI, _ := patchApp["ai"].(map[string]any)
+		if currentAI != nil && patchAI != nil && strings.TrimSpace(fmt.Sprint(patchAI["api_key"])) == "" {
+			if key := strings.TrimSpace(fmt.Sprint(currentAI["api_key"])); key != "" && key != "<nil>" {
+				if app, ok := merged["appConfig"].(map[string]any); ok {
+					if ai, ok := app["ai"].(map[string]any); ok {
+						ai["api_key"] = key
+					}
+				}
+			}
+		}
+	}
+	return merged
 }
 
 func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Document, int, int, int) {
