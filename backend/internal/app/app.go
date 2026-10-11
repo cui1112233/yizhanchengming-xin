@@ -83,7 +83,8 @@ func configuredTextProvider(settings map[string]any, selected string) (*batchfac
 			continue
 		}
 		id := strings.TrimSpace(fmt.Sprint(model["id"]))
-		if selected != "" && id != selected {
+		modelID := strings.TrimSpace(fmt.Sprint(model["modelId"]))
+		if selected != "" && id != selected && modelID != selected {
 			continue
 		}
 		endpoint := strings.TrimRight(strings.TrimSpace(fmt.Sprint(model["baseUrl"])), "/")
@@ -93,7 +94,7 @@ func configuredTextProvider(settings map[string]any, selected string) (*batchfac
 		provider := &batchfactoryv11.OpenAICompatibleProvider{
 			Endpoint: endpoint,
 			APIKey:   strings.TrimSpace(fmt.Sprint(model["credential"])),
-			Model:    strings.TrimSpace(fmt.Sprint(model["modelId"])),
+			Model:    modelID,
 		}
 		if err := provider.Validate(); err != nil {
 			return nil, err
