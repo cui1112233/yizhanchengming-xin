@@ -155,6 +155,8 @@ export function BatchFactoryV11Workbench({
   onGenerateAssetImage,
   generatedAssetImages = {},
   onRunMerge,
+  onMeasureAudio,
+  audioBusyBookId = '',
   onRunUpload
 }) {
   const [selectedBookId, setSelectedBookId] = useState(books[0]?.id || '');
@@ -672,6 +674,7 @@ export function BatchFactoryV11Workbench({
           /> : <div className="bf11-tts-timing">
             <div><Typography.Text strong>TTS 测时语速</Typography.Text><InputNumber min={0.5} max={3} step={0.1} value={ttsSpeed} onChange={value => setTtsSpeed(Number(value || 1.7))} addonAfter="x" /></div>
             <Typography.Text type={measuredAudioDuration > 0 ? 'secondary' : 'warning'}>配音时长：{measuredAudioDuration > 0 ? `${measuredAudioDuration.toFixed(2)} 秒` : '尚未读取'}。{measuredAudioDuration > 0 ? 'TTS 只测时，不合入成片；' : '请先在生产设置中读取配音时长；'}默认 1.7 是 TTS 参数，不是固定视频倍率。</Typography.Text>
+            <Button size="small" loading={audioBusyBookId === selectedBook?.id} disabled={!onMeasureAudio || !selectedBook} onClick={() => onMeasureAudio?.(selectedBook)}>读取 TTS 配音时长</Button>
           </div>}
           <Button
             disabled={mergeAction.disabled || !onRunMerge || (mergeTimingMode === 'audio' && measuredAudioDuration <= 0)}

@@ -59,6 +59,15 @@ test('batch tools contain production progress and approved merge timing UI', () 
   assert.match(source, /1\.7/);
 });
 
+test('V11 exposes a real TTS measurement action instead of only showing a duration field', () => {
+  const page = read('BatchFactoryV11UiPage.jsx');
+  const workbench = read('BatchFactoryV11Workbench.jsx');
+  assert.match(page, /textToSpeech/);
+  assert.match(page, /measureH3Audio/);
+  assert.match(page, /onMeasureAudio/);
+  assert.match(workbench, /读取 TTS 配音时长/);
+});
+
 test('showcase data represents a full 100-book batch', async () => {
   const module = await import('./showcaseData.js');
   assert.equal(module.SHOWCASE_BATCH.count, 100);

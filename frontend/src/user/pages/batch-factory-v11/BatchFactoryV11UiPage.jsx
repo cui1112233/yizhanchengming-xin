@@ -1,6 +1,7 @@
 import { Alert, Button, Empty, Input, Modal, Space, Spin, Tag, Typography, message } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as batchFactoryV11 from '../../../shared/api/batchFactoryV11.js';
+import { textToSpeech } from '../../../shared/api/tts.js';
 import { BatchFactoryV11Workbench } from './BatchFactoryV11Workbench';
 import { ProductionSettingsDrawer } from './BatchFactoryV11SettingsDrawers';
 import { PublishSettingsDrawer } from './BatchFactoryV11PublishSettings';
@@ -38,6 +39,24 @@ function batchForView(batch, books) {
   };
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('无法读取 TTS 音频数据'));
+    reader.onload = () => resolve(String(reader.result || '').split(',').at(-1) || '');
+    reader.readAsDataURL(blob);
+  });
+}
+
+function ttsFingerprint(tts) {
+  return `v11-tts-${JSON.stringify({
+    voice: String(tts?.voice || ''),
+    style: String(tts?.style || ''),
+    speed: Number(tts?.speed || 0),
+    pitch: Number(tts?.pitch || 0)
+  })}`;
+}
+
 export function BatchFactoryV11UiPage({ initialBatchId = '' } = {}) {
   const adapter = useMemo(() => createBf11UiAdapter({
     ...batchFactoryV11,
@@ -54,6 +73,7 @@ export function BatchFactoryV11UiPage({ initialBatchId = '' } = {}) {
   const [promptPreview, setPromptPreview] = useState({ open: false, loading: false, data: null, error: '' });
   const [productionBusy, setProductionBusy] = useState(false);
   const [mergeBusy, setMergeBusy] = useState(false);
+  const [audioBusyBookId, setAudioBusyBookId] = useState('');
   const [publishSettingsOpen, setPublishSettingsOpen] = useState(false);
   const [externalPublishOpen, setExternalPublishOpen] = useState(false);
   const [batchManagerOpen, setBatchManagerOpen] = useState(false);
@@ -264,6 +284,51 @@ export function BatchFactoryV11UiPage({ initialBatchId = '' } = {}) {
       patch,
       revision: activeBook.settingsState?.revision || 0
     }, '当前小说设置已保存');
+  }
+
+  async function measureAudio(book) {
+    if (!book?.id || audioBusyBookId) return false;
+    const director = book.directorRevision;
+    const document = director?.output?.h3_director || director?.output?.h3Director;
+    const cards = document?.director_cards || [];
+    if (!director?.id || !document || !cards.length) {
+      message.warning('请先完成当前小说的 Director，再读取 TTS 配音时长。');
+      return false;
+    }
+    setAudioBusyBookId(book.id);
+    try {
+      const tts = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10, ...(batchSettingsState.patch.tts || {}), ...(book.settingsState?.patch?.tts || {}) };
+      const lines = [];
+      for (const card of cards) {
+        const sourceText = String(card.source_text || '').trim();
+        if (!sourceText) throw new Error('Director 中存在空的配音原文');
+        const audio = await textToSpeech({ input: sourceText, ...tts });
+        lines.push({ source_key: card.source_key, source_text: sourceText, audio_base64: await blobToBase64(audio) });
+      }
+      const result = await batchFactoryV11.measureH3Audio(batch.id, book.id, {
+        director_revision_id: director.id,
+        tts_fingerprint: ttsFingerprint(tts),
+        lines
+      });
+      const measurement = result?.audio_measurement?.measurement || result?.audioMeasurement?.measurement || {};
+      const durationSeconds = Number(measurement.duration_ms || 0) / 1000;
+      if (!(durationSeconds > 0)) throw new Error('TTS 已返回，但没有得到有效配音时长');
+      const saveResult = await runtime.save({
+        scope: 'book', batchId: batch.id, bookId: book.id,
+        patch: { audioDurationSeconds: Number(durationSeconds.toFixed(2)), audioDurationFingerprint: ttsFingerprint(tts), audioDurationManual: false },
+        revision: book.settingsState?.revision || 0
+      });
+      if (!saveResult.ok) throw new Error(saveResult.message || '保存配音时长失败');
+      const next = await runtime.load({ ...requestParams, batchId: batch.id });
+      setRuntimeState(next);
+      message.success(`已读取 ${book.title || '当前小说'} 的 TTS 配音时长：${durationSeconds.toFixed(2)} 秒`);
+      return true;
+    } catch (error) {
+      message.error(error?.message || '读取 TTS 配音时长失败');
+      return false;
+    } finally {
+      setAudioBusyBookId('');
+    }
   }
 
   function saveVideoSettings(patch) {
@@ -602,6 +667,8 @@ export function BatchFactoryV11UiPage({ initialBatchId = '' } = {}) {
         onPreviewFinalPrompt={previewFinalPrompt}
         onRunProduction={runProduction}
         onRunMerge={runMerge}
+        onMeasureAudio={measureAudio}
+        audioBusyBookId={audioBusyBookId}
         onRunUpload={() => setExternalPublishOpen(true)}
         onSaveSource={saveBookSource}
         onSaveVideoPrompt={saveVideoPrompt}
