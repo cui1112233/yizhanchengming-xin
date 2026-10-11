@@ -2,6 +2,11 @@ function available(ids, selectedId) {
   return Boolean(selectedId) && ids.has(selectedId);
 }
 
+function firstEnabledModelId(models) {
+  const item = (Array.isArray(models) ? models : []).find(model => model?.enabled !== false && String(model?.id || '').trim());
+  return String(item?.id || '').trim();
+}
+
 const preferencePrefix = 'qiantie:script-model-selection:';
 function preferenceKey(username) { return `${preferencePrefix}${encodeURIComponent(String(username || 'guest'))}`; }
 
@@ -37,5 +42,13 @@ export function reconcileScriptModelSelection(selection = {}, modelsByKind = {})
     textModelId: available(textIds, textModelId) ? textModelId : '',
     imageModelId: available(imageIds, imageModelId) ? imageModelId : '',
     unavailableKinds
+  };
+}
+
+export function defaultEnabledModelSelection(selection = {}, modelsByKind = {}) {
+  const reconciled = reconcileScriptModelSelection(selection, modelsByKind);
+  return {
+    textModelId: reconciled.textModelId || firstEnabledModelId(modelsByKind.text),
+    imageModelId: reconciled.imageModelId || firstEnabledModelId(modelsByKind.image)
   };
 }

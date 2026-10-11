@@ -32,7 +32,7 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
-import { loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
+import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 
 function videoModelKey(model) {
   return String(model?.key || model?.modelKey || model?.id || '').trim();
@@ -299,7 +299,7 @@ export function ScriptPage() {
         setScriptModelSelection(current => {
           const next = reconcileScriptModelSelection(current, nextModels);
           if (next.unavailableKinds.length) message.warning(`已选${next.unavailableKinds.map(kind => kind === 'text' ? '文本模型' : '图片模型').join('、')}已下架，请重新选择`);
-          return { textModelId: next.textModelId, imageModelId: next.imageModelId };
+          return defaultEnabledModelSelection(next, nextModels);
         });
       })
       .catch(error => { if (active) message.warning(error?.message || '读取剧本模型失败'); })
@@ -311,7 +311,7 @@ export function ScriptPage() {
     setScriptModelSelection(current => {
       const next = reconcileScriptModelSelection(current, scriptModels);
       if (next.unavailableKinds.length) message.warning(`已选${next.unavailableKinds.map(kind => kind === 'text' ? '文本模型' : '图片模型').join('、')}已下架，请重新选择`);
-      return { textModelId: next.textModelId, imageModelId: next.imageModelId };
+      return defaultEnabledModelSelection(next, scriptModels);
     });
   }, [scriptModels, scriptModelsLoaded]);
   useEffect(() => { setSelectedShotIndexes(new Set()); }, [selectedFormat]);
@@ -766,7 +766,10 @@ export function ScriptPage() {
         setSoundEnabled(config.notifications?.soundEnabled !== false);
         setSoundVolume(Number.isFinite(config.notifications?.soundVolume) ? config.notifications.soundVolume : 60);
         const defaults = normalizeScriptUnifiedConfig(config.scriptDefaults);
-        setScriptModelSelection({ textModelId: defaults.textModelId, imageModelId: defaults.imageModelId });
+        setScriptModelSelection(current => ({
+          textModelId: defaults.textModelId || current.textModelId,
+          imageModelId: defaults.imageModelId || current.imageModelId
+        }));
         setScriptVideoModelKey(defaults.videoModelKey);
         setScriptImageAspectRatio(defaults.imageAspectRatio);
         setScriptVideoAspectRatio(defaults.videoAspectRatio);
