@@ -95,7 +95,8 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 				member["presence"] = map[string]any{"online": false}
 				member["archive"] = nil
 				member["quota"] = map[string]any{"used": 0, "limit": member["monthlyTokenLimit"]}
-				member["usage"] = map[string]any{"day": map[string]any{}, "month": map[string]any{}}
+				usage := emptyMemberUsage()
+				member["usage"] = map[string]any{"day": usage["day"], "month": usage["month"]}
 				members = append(members, member)
 			}
 		}
@@ -134,7 +135,8 @@ func RegisterMemberTeamReadCompat(root *http.ServeMux, middleware BridgeAuth, ac
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "无权查看该成员用量"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"day": map[string]any{}, "month": map[string]any{"totalTokens": 0}, "quota": map[string]any{"used": 0, "limit": target["monthlyTokenLimit"]}, "recent": []any{}})
+		usage := emptyMemberUsage()
+		writeJSON(w, http.StatusOK, map[string]any{"day": usage["day"], "month": usage["month"], "quota": memberQuota(target["monthlyTokenLimit"], 0), "recent": []any{}})
 	})))
 	root.Handle("GET /api/member/team/invites", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
