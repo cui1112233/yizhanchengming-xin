@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -39,6 +40,19 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	handler := middleware.Middleware(http.HandlerFunc(read))
 	root.Handle("GET /api/batch-rewrite/config", handler)
 	root.Handle("GET /api/batch-rewrite/bootstrap", handler)
+	root.Handle("GET /api/batch-rewrite/issues", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		entries, err := legacyBatchRewriteIssues(req.Context(), store, identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取问题日志失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
+	})))
 	root.Handle("GET /api/batch-rewrite/tasks", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -413,6 +427,112 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "groups": groups, "output": []string{fmt.Sprintf("已从视频管理系统同步 %d 个配置档", len(groups))}})
 	})))
+}
+
+// legacyBatchRewriteIssues keeps the old issue-log response shape while using
+// the Go workshop documents as the source of truth. It deliberately mirrors
+// the legacy Node filtering rules: only failed/error events and partial runs
+// become visible issues.
+func legacyBatchRewriteIssues(ctx context.Context, store novelfetchworkshop.Store, owner string) ([]map[string]any, error) {
+	documents, err := store.ListDocuments(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]map[string]any, 0)
+	for _, document := range documents {
+		taskName := firstText(document.Meta["bookName"], document.Meta["book_name"], document.Meta["title"])
+		if taskError := firstText(document.Meta["ai_error"], document.Meta["aiError"], document.Meta["error"]); taskError != "" {
+			event := "task_failed"
+			if firstText(document.Meta["ai_error"], document.Meta["aiError"]) != "" {
+				event = "ai_generate_failed"
+			}
+			entries = append(entries, batchRewriteIssueEntry(document.BookID, taskName, event, document.UpdatedAt, map[string]any{"error": taskError, "status": "failed"}, 0))
+		}
+		for index, raw := range document.Logs {
+			item, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			if entry, ok := batchRewriteIssueEntryFromLog(document.BookID, taskName, item, index); ok {
+				entries = append(entries, entry)
+			}
+		}
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		return toString(entries[i]["at"]) > toString(entries[j]["at"])
+	})
+	if len(entries) > 200 {
+		entries = entries[:200]
+	}
+	return entries, nil
+}
+
+func batchRewriteIssueEntryFromLog(bookID, bookName string, item map[string]any, index int) (map[string]any, bool) {
+	event := toString(item["event"])
+	if event == "" {
+		event = "task_error"
+	}
+	data := mapOrEmpty(item["data"])
+	status := firstText(data["status"], item["status"])
+	detail := firstText(data["error"], data["upload_error"], item["error"])
+	failedCount := toInt(data["failed_count"])
+	if !regexp.MustCompile(`(?i)(failed|error|失败|错误)`).MatchString(event+" "+status) && failedCount <= 0 && status != "partial" {
+		return nil, false
+	}
+	return batchRewriteIssueEntry(bookID, bookName, event, firstText(item["time"], item["updated_at"]), map[string]any{"error": detail, "status": status, "items": data["items"]}, index), true
+}
+
+func toInt(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case json.Number:
+		n, _ := strconv.Atoi(string(v))
+		return n
+	default:
+		n, _ := strconv.Atoi(strings.TrimSpace(toString(value)))
+		return n
+	}
+}
+
+func batchRewriteIssueEntry(bookID, bookName, event, at string, data map[string]any, index int) map[string]any {
+	detail := firstText(data["error"], data["upload_error"])
+	kind := "batch-rewrite.processing"
+	label := "原文处理"
+	if event == "site_submit" {
+		kind, label = "batch-rewrite.submit", "网站提交"
+	} else if strings.Contains(event, "sensitive") {
+		kind, label = "batch-rewrite.sensitive", "敏感词处理"
+	} else if strings.Contains(event, "ai") {
+		kind, label = "batch-rewrite.ai", "AI 文案处理"
+	}
+	if detail == "" {
+		detail = "书籍 " + bookID + " 的" + label + "失败"
+	}
+	if at == "" {
+		at = time.Unix(0, 0).UTC().Format(time.RFC3339)
+	}
+	entry := map[string]any{
+		"id":   fmt.Sprintf("batch-rewrite:%s:%s:%s", bookID, event, firstText(at, strconv.Itoa(index))),
+		"kind": kind,
+		"message": fmt.Sprintf("书籍 %s%s：%s", bookID, func() string {
+			if bookName != "" {
+				return "《" + bookName + "》"
+			}
+			return ""
+		}(), detail),
+		"at":     at,
+		"path":   "/novel-fetch",
+		"method": event,
+	}
+	if strings.Contains(detail, "未登录") || strings.Contains(detail, "会话") || strings.Contains(detail, "认证") {
+		entry["status"] = 401
+	}
+	return entry
 }
 
 func targetGET(req *http.Request, url, cookie string) ([]byte, error) {

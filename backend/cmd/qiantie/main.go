@@ -158,6 +158,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodGet && req.URL.Path == "/api/batch-rewrite/issues" {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && (req.URL.Path == "/api/batch-rewrite/web-submit/test-visible" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-configs" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-styles" || req.URL.Path == "/api/batch-rewrite/web-submit/preview" || req.URL.Path == "/api/batch-rewrite/web-submit/submit") {
 			apiHandler.ServeHTTP(w, req)
 			return
@@ -261,7 +265,7 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
-	if path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {
+	if path == "/api/batch-rewrite/issues" || path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/") || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || strings.HasPrefix(path, "/api/batch-rewrite/ai/") || strings.HasPrefix(path, "/api/batch-rewrite/process") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/web-submit/history" {
 		return req.Method == http.MethodGet || req.Method == http.MethodPost
 	}
 	return false

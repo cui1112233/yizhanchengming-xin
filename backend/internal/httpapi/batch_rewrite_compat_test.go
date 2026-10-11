@@ -84,3 +84,43 @@ func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T
 		t.Fatalf("web submit defaults=%#v", webSubmit)
 	}
 }
+
+func TestBatchRewriteIssuesReadsGoDocumentLogs(t *testing.T) {
+	now := time.Date(2026, 10, 11, 11, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID:    "book-issue",
+		UpdatedAt: now.Format(time.RFC3339),
+		Meta:      map[string]any{"bookName": "问题书"},
+		Logs: []any{map[string]any{
+			"event": "ai_generate_failed",
+			"time":  now.Format(time.RFC3339),
+			"data":  map[string]any{"status": "failed", "error": "文本模型未登录"},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/issues", nil)
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("issues status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload struct {
+		Entries []map[string]any `json:"entries"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Entries) != 1 {
+		t.Fatalf("entries=%#v", payload.Entries)
+	}
+	entry := payload.Entries[0]
+	if entry["kind"] != "batch-rewrite.ai" || entry["status"] != float64(401) || entry["path"] != "/novel-fetch" {
+		t.Fatalf("entry=%#v", entry)
+	}
+}
