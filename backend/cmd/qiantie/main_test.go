@@ -195,6 +195,21 @@ func TestShouldBridgeLegacyAPIRequestKeepsExternalClassificationAdaptersOnBridge
 	}
 }
 
+func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		for _, path := range []string{
+			"/api/batch-rewrite/process/jobs/latest",
+			"/api/batch-rewrite/knowledge/summary",
+			"/api/batch-rewrite/rules/ai-suggest",
+		} {
+			req := httptest.NewRequest(method, path, nil)
+			if !isGoNovelFetchCompatRequest(req) {
+				t.Fatalf("%s %s must use the Go compatibility handler", method, path)
+			}
+		}
+	}
+}
+
 func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
 	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "")
 	if goAuthEnabled() {

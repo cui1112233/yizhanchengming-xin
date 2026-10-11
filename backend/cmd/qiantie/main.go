@@ -79,9 +79,9 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		// Go has not implemented the rule-preview transformer yet. Keep the
-		// existing Node implementation reachable instead of exposing a 404 on
-		// the React novel-fetch workbench.
+		// The novel-fetch workbench and its compatibility aliases are now served
+		// by Go. Keep this dispatch before the broad legacy bridge so the iframe
+		// does not silently fall back to the old Node implementation.
 		if isGoNovelFetchCompatRequest(req) || isGoAgentReadRequest(req) {
 			apiHandler.ServeHTTP(w, req)
 			return
