@@ -171,6 +171,17 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 3) {
 		t.Fatal("H3 execution should use Go once slice 3 is enabled")
 	}
+	for _, path := range []string{
+		"/api/batch-factory/v12/batches/demo/director",
+		"/api/batch-factory/v12/batches/demo/books/book-1/director",
+		"/api/batch-factory/v12/batches/demo/books/book-1/opening-variants",
+		"/api/batch-factory/v12/batches/demo/books/book-1/working-front/viral",
+		"/api/batch-factory/v12/batches/demo/books/book-1/hooks/hook-1/approve",
+	} {
+		if shouldBridgeLegacyAPIForSlice(path, 3) {
+			t.Fatalf("slice 3 director path must stay on Go: %s", path)
+		}
+	}
 }
 
 func TestShouldBridgeLegacyAPIRequestKeepsH3TraceReadOnGo(t *testing.T) {

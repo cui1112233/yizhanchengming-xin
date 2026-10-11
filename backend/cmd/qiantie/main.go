@@ -586,6 +586,18 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "change-impact" {
 		return true
 	}
+	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "director" {
+		return true
+	}
+	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "director" || parts[4] == "opening-variants") {
+		return true
+	}
+	if len(parts) == 6 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "working-front" && parts[5] == "viral" {
+		return true
+	}
+	if len(parts) == 7 && parts[0] == "batches" && parts[2] == "books" && parts[4] == "hooks" && parts[6] == "approve" {
+		return true
+	}
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "books" && (parts[4] == "metadata" || parts[4] == "source" || parts[4] == "override" || parts[4] == "fetch-original") {
 		return true
 	}
