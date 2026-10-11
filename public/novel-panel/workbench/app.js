@@ -22975,8 +22975,8 @@ if (typeof buildAnalysisNovelPayload === "function") {
   function arrays(v){return Array.isArray(v)?v:[];}
   function txt(v){return String(v??"").trim();}
   function localRegressionChecks(){
-    const checks=[];const runtime=globalThis.__V77_CURRENT_RUNTIME__||{};const build=globalThis.__VIDEO_PROMPT_TOOL_BUILD__||{};
-    checks.push(statusRow(runtime.version===VERSION&&runtime.buildId===BUILD?"pass":"fail","前端单一运行时版本一致",`runtime=${runtime.version||"?"} / ${runtime.buildId||"?"}`,"runtime"));
+    const checks=[];const runtime=globalThis.__V78_CURRENT_RUNTIME__||globalThis.__V77_CURRENT_RUNTIME__||{};const build=globalThis.__VIDEO_PROMPT_TOOL_BUILD__||{};
+    checks.push(statusRow(runtime.version&&runtime.buildId&&build.version===runtime.version&&build.buildId===runtime.buildId?"pass":"fail","前端单一运行时版本一致",`runtime=${runtime.version||"?"} / ${runtime.buildId||runtime.build||"?"}`,"runtime"));
     checks.push(statusRow(txt(build.version)===VERSION?"pass":"warn","页面Build版本一致",`page=${build.version||"未声明"}`,"page_build"));
     const api=globalThis.__characterCoreV2Api,core=typeof api?.state==="function"?api.state():null;
     checks.push(statusRow(api&&core?"pass":"fail","CharacterCore 2.0当前执行层可访问",api?`protocol=${api.protocol||"?"}`:"未找到 __characterCoreV2Api","character_core"));
@@ -23003,9 +23003,11 @@ if (typeof buildAnalysisNovelPayload === "function") {
     const sceneMemory=globalThis.__V77_SCENE_MEMORY__;if(sceneMemory){const scenesNow=arrays(state?.scenes),memoryCount=scenesNow.filter(x=>txt(x.scene_anchor_id)&&x.scene_memory&&typeof x.scene_memory==="object").length;checks.push(statusRow(!scenesNow.length||memoryCount===scenesNow.length?"pass":"warn","Scene Memory 场景记忆覆盖",scenesNow.length?`scenes=${scenesNow.length}；memory=${memoryCount}`:"当前尚无分镜，生成后自动建立","scene_memory"));const badDirector=scenesNow.filter(x=>{const d=x.director_decision||{};return /\b(?:wide|medium|close|dolly|pan|tilt|tracking|zoom|cut|shot)\b/i.test(JSON.stringify(d));});checks.push(statusRow(!badDirector.length?"pass":"fail","中文导演决策字段",badDirector.length?`发现 ${badDirector.length} 个导演决策包含英文镜头术语`:`景别/角度/运镜决策保持中文`,"director_chinese"));}
     const structuredAssets=[...arrays(state?.referenceAssets?.scenes),...arrays(state?.referenceAssets?.props)];const invalidRatio=structuredAssets.filter(x=>(x.type==="scene"&&txt(x.aspect_ratio||"9:16")!=="9:16")||(x.type==="prop"&&!txt(x.aspect_ratio||"3:4")));checks.push(statusRow(!invalidRatio.length?"pass":"warn","场景/道具视频资产契约",invalidRatio.length?`发现 ${invalidRatio.length} 个资产比例契约异常`:`场景默认9:16、道具默认3:4，并携带视频使用契约`,"asset_video_contract"));
     checks.push(statusRow(globalThis.__V77_DIRTY_RENDER__?.version==="dirty_render_v38"?"pass":"fail","Dirty Render 局部刷新基础设施",globalThis.__V77_DIRTY_RENDER__?`executed=${globalThis.__V77_DIRTY_RENDER__.snapshot().executed}；skipped=${globalThis.__V77_DIRTY_RENDER__.snapshot().skipped}`:"未安装","dirty_render"));
-    checks.push(statusRow(globalThis.__V77_AI_TASK_MANAGER__?.version==="ai_task_manager_v38"?"pass":"fail","统一AI Task Manager",globalThis.__V77_AI_TASK_MANAGER__?`active=${globalThis.__V77_AI_TASK_MANAGER__.snapshot().active.length}`:"未安装","ai_task_manager"));
-    checks.push(statusRow(globalThis.__V77_WORKSPACE_SCHEMA__?.schema_version===40?"pass":"fail","Workspace Snapshot Schema",globalThis.__V77_WORKSPACE_SCHEMA__?`schema=${globalThis.__V77_WORKSPACE_SCHEMA__.version}`:"未安装","workspace_schema"));
-    checks.push(statusRow(globalThis.__V77_CLEAN_CORE_BRIDGE__?.version==="clean_core_bridge_v78_phase13"?"pass":"fail","V78 Clean Core第十一阶段兼容桥接",globalThis.__V77_CLEAN_CORE_BRIDGE__?`capabilities=${globalThis.__V77_CLEAN_CORE_BRIDGE__.capabilities.length}`:"未安装","clean_bridge"));
+    const taskManager=globalThis.__V77_AI_TASK_MANAGER__,workspaceSchema=globalThis.__V78_WORKSPACE_STORE__||globalThis.__V77_WORKSPACE_SCHEMA__;
+    checks.push(statusRow(/^ai_task_manager_v\d+$/.test(String(taskManager?.version||""))?"pass":"fail","统一AI Task Manager",taskManager?`version=${taskManager.version}；active=${taskManager.snapshot().active.length}`:"未安装","ai_task_manager"));
+    checks.push(statusRow(/^workspace_(?:schema|store)_v78_/.test(String(workspaceSchema?.version||""))&&[38,40].includes(Number(workspaceSchema?.schema_version))?"pass":"fail","Workspace Snapshot Schema",workspaceSchema?`schema=${workspaceSchema.version}`:"未安装","workspace_schema"));
+    const cleanBridge=globalThis.__V77_CLEAN_CORE_BRIDGE__,bridgeCapabilities=Array.isArray(cleanBridge?.capabilities)?cleanBridge.capabilities:[];
+    checks.push(statusRow(/^clean_core_bridge_v(?:\d+|78_stable)$/.test(String(cleanBridge?.version||""))&&bridgeCapabilities.includes("workspace.snapshot")&&bridgeCapabilities.includes("diagnostics.run")?"pass":"fail","V78 Clean Core兼容桥接",cleanBridge?`version=${cleanBridge.version}；capabilities=${bridgeCapabilities.length}`:"未安装","clean_bridge"));
     return checks;
   }
   function v35Esc(value){return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
@@ -23013,7 +23015,7 @@ if (typeof buildAnalysisNovelPayload === "function") {
   function executorSnapshot(){const r=globalThis.__V77_EXECUTOR_REGISTRY__||{};const e=r.executors||{};return Object.entries(e).map(([key,item])=>({key,id:item?.id||"",owner:item?.owner||r.owner||"",function_name:item?.function_name||item?.fn?.name||""}));}
   async function runDiagnostics(){
     const box=document.querySelector("#v35DiagChecks"),summary=document.querySelector("#v35DiagSummary");if(box)box.innerHTML='<div class="v35-diag-loading">正在执行无AI自检…</div>';
-    let backend=null,error=null;try{backend=await requestJSON("/api/diagnostics/self-check",{method:"GET",timeoutMs:30000,timeoutLabelSeconds:30});}catch(e){error=e;}
+    let backend=null,error=null;try{backend=await requestJSON("/api/novel-panel/diagnostics/self-check",{method:"GET",timeoutMs:30000,timeoutLabelSeconds:30});}catch(e){error=e;}
     const local=localRegressionChecks(),all=[...(backend?.checks||[]),...local];const counts={pass:0,warn:0,fail:0};all.forEach(x=>counts[x.status]=(counts[x.status]||0)+1);
     if(error)all.unshift(statusRow("fail","后端诊断接口可访问",error.message||String(error),"backend_diag"));
     if(box)box.innerHTML=renderCheckRows(all);if(summary){summary.textContent=`PASS ${counts.pass} · WARN ${counts.warn} · FAIL ${counts.fail}${error?" · 后端诊断失败":""}`;summary.className=`v35-diag-summary ${counts.fail||error?"fail":counts.warn?"warn":"pass"}`;}
@@ -23025,7 +23027,7 @@ if (typeof buildAnalysisNovelPayload === "function") {
   async function loadTrace(traceId){
     if(!traceId)return;const status=document.querySelector("#v35TraceStatus");if(status)status.textContent="正在读取 Trace…";
     try{
-      const data=await requestJSON(`/api/diagnostics/trace/${encodeURIComponent(traceId)}`,{method:"GET",timeoutMs:30000,timeoutLabelSeconds:30});const trace=data.trace||{},events=arrays(trace.events);
+      const data=await requestJSON(`/api/novel-panel/diagnostics/trace/${encodeURIComponent(traceId)}`,{method:"GET",timeoutMs:30000,timeoutLabelSeconds:30});const trace=data.trace||{},events=arrays(trace.events);
       const request=traceEventPick(events,s=>s==="remote_ai_request"),raw=traceEventPick(events,s=>s==="remote_ai_response"),parsed=traceEventPick(events,s=>s==="remote_ai_parsed"),final=traceEventPick(events,s=>/writeback|style_writeback|outline_writeback|regenerate_writeback|core_parity_facts_relationships/.test(s));
       const set=(id,val)=>{const el=document.querySelector(id);if(el)el.value=val||"";};
       set("#v35TraceRequest",formatTraceData(request?.data?.request_prompt||request?.data?.request_body||""));
@@ -23035,7 +23037,7 @@ if (typeof buildAnalysisNovelPayload === "function") {
       if(status)status.textContent=`Trace ${traceId} · ${trace.request_phase||"未知阶段"} · ${events.length} 个事件`;
     }catch(error){if(status)status.textContent=`Trace读取失败：${error.message}`;}
   }
-  async function refreshTraces(){const list=document.querySelector("#v35TraceList");if(!list)return;list.innerHTML='<option>正在读取…</option>';try{const data=await requestJSON("/api/diagnostics/traces?limit=40",{method:"GET",timeoutMs:30000,timeoutLabelSeconds:30});const rows=arrays(data.traces);list.innerHTML='<option value="">选择最近一次AI Trace</option>'+rows.map(r=>`<option value="${r.request_id}">${(r.request_phase||"AI")} · ${(r.display_name||"")} · ${r.request_id}</option>`).join("");}catch(error){list.innerHTML='<option value="">Trace列表读取失败</option>';}}
+  async function refreshTraces(){const list=document.querySelector("#v35TraceList");if(!list)return;list.innerHTML='<option>正在读取…</option>';try{const data=await requestJSON("/api/novel-panel/diagnostics/traces?limit=40",{method:"GET",timeoutMs:30000,timeoutLabelSeconds:30});const rows=arrays(data.traces);list.innerHTML='<option value="">选择最近一次AI Trace</option>'+rows.map(r=>`<option value="${r.request_id}">${(r.request_phase||"AI")} · ${(r.display_name||"")} · ${r.request_id}</option>`).join("");}catch(error){list.innerHTML='<option value="">Trace列表读取失败</option>';}}
   function copyReport(){const report=globalThis.__V77_LAST_DIAGNOSTIC_REPORT__||{version:VERSION,build:BUILD,local:localRegressionChecks()};const textValue=JSON.stringify(report,null,2);if(typeof copyText==="function")return copyText(textValue);navigator.clipboard?.writeText?.(textValue).catch(()=>{});}
   function installDialog(){
     if(document.querySelector("#v35DiagnosticsDialog"))return;
