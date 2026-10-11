@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"qiantie/backend/internal/auth"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 var defaultUserConfig = map[string]any{
@@ -205,7 +206,23 @@ func managedPublicUserConfig(config map[string]any, managedBy any) map[string]an
 	return result
 }
 
-func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, accounts auth.Store, profiles ...*MemberProfileStore) {
+func mergeManagedModelCatalog(ctx context.Context, config map[string]any, catalogStore novelfetchworkshop.Store, username string) {
+	if catalogStore == nil || strings.TrimSpace(username) == "" {
+		return
+	}
+	settings, err := catalogStore.GetConfig(ctx, username)
+	if err != nil {
+		return
+	}
+	if catalog, ok := settings["modelCatalog"].([]any); ok {
+		config["modelCatalog"] = catalog
+	}
+	if version, ok := settings["modelCatalogVersion"]; ok {
+		config["modelCatalogVersion"] = version
+	}
+}
+
+func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, accounts auth.Store, catalogStore novelfetchworkshop.Store, profiles ...*MemberProfileStore) {
 	if root == nil || middleware.AuthStore == nil || store == nil || accounts == nil {
 		return
 	}
@@ -222,6 +239,7 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 		store.mu.Lock()
 		config := store.read(identity.Username)
 		store.mu.Unlock()
+		mergeManagedModelCatalog(req.Context(), config, catalogStore, identity.Username)
 		canManageAPI, managedBy := configManagementState(identity, profileStore, accounts)
 		if !canManageAPI {
 			writeJSON(w, http.StatusOK, managedPublicUserConfig(config, managedBy))
@@ -259,6 +277,7 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 			writeJSON(w, http.StatusOK, managedPublicUserConfig(config, managedBy))
 			return
 		}
+		mergeManagedModelCatalog(req.Context(), config, catalogStore, identity.Username)
 		result := publicUserConfig(config)
 		result["canManageApi"] = true
 		result["managedBy"] = nil
