@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -231,6 +232,67 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			detail = "已保存登录会话"
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
+	})))
+	root.Handle("GET /api/batch-rewrite/web-submit/history", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		documents, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交历史失败"})
+			return
+		}
+		records := make([]map[string]any, 0)
+		for _, document := range documents {
+			bookName := firstText(document.Meta["bookName"], document.Meta["book_name"], document.Meta["title"])
+			platformName := firstText(document.Meta["platformName"], document.Meta["platform_name"])
+			for _, raw := range document.Logs {
+				item, ok := raw.(map[string]any)
+				if !ok || toString(item["event"]) != "site_submit" {
+					continue
+				}
+				data := mapOrEmpty(item["data"])
+				receipt := mapOrEmpty(item["remote_receipt"])
+				remote := mapOrEmpty(receipt["remote_record"])
+				status := toString(item["status"])
+				result := firstText(item["error"], receipt["upload_error"])
+				verified, _ := receipt["verified"].(bool)
+				if result == "" && status == "submitted" && verified {
+					result = fmt.Sprintf("视频管理系统已确认接收 %d 个文件", intValue(receipt["upload_success_count"]))
+					if detail := toString(remote["detail"]); detail != "" {
+						result += "；" + detail
+					}
+				} else if result == "" && status == "accepted_pending" {
+					result = firstText(remote["detail"], "视频管理系统已接收，等待后台确认")
+				}
+				records = append(records, map[string]any{
+					"book_id": document.BookID, "book_name": bookName, "platform_name": platformName,
+					"version": item["version"], "status": status, "group_id": item["group_id"],
+					"material_allocation": item["material_allocation"], "result": result,
+					"error": firstText(item["error"], receipt["upload_error"]),
+					"time":  firstText(item["time"], item["updated_at"]), "data": data,
+				})
+			}
+		}
+		sort.SliceStable(records, func(i, j int) bool { return toString(records[i]["time"]) > toString(records[j]["time"]) })
+		if len(records) > 200 {
+			records = records[:200]
+		}
+		groups := []any{}
+		if settings, configErr := store.GetConfig(req.Context(), identity.Username); configErr == nil {
+			groups = append(groups, arrayOrEmpty(settings["site_submit_groups"])...)
+			app := mapOrEmpty(settings["appConfig"])
+			groups = append(groups, arrayOrEmpty(app["site_submit_groups"])...)
+		}
+		sort.SliceStable(groups, func(i, j int) bool {
+			return toString(mapOrEmpty(groups[i])["updated_at"]) > toString(mapOrEmpty(groups[j])["updated_at"])
+		})
+		if len(groups) > 50 {
+			groups = groups[:50]
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"records": records, "groups": groups})
 	})))
 	root.Handle("POST /api/batch-rewrite/web-submit/sync-styles", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
