@@ -79,6 +79,31 @@ func configuredTextProvider(settings map[string]any, selected string) (*batchfac
 	return nil, nil
 }
 
+func selectedTextModelID(settings map[string]any) string {
+	selected, _ := settings["textModelId"].(string)
+	if aiConfig, ok := settings["aiConfig"].(map[string]any); ok {
+		if value, ok := aiConfig["textModelId"].(string); ok && strings.TrimSpace(value) != "" {
+			selected = value
+		}
+	}
+	return strings.TrimSpace(selected)
+}
+
+func textGenderJudge(provider *batchfactoryv11.OpenAICompatibleProvider) novelfetchworkshop.AIGenderJudge {
+	if provider == nil {
+		return nil
+	}
+	return func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
+		return provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
+			SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
+			UserPrompt:          "请根据以下分类信息判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre,
+			Temperature:         0,
+			MaxTokens:           64,
+			DisableJSONResponse: true,
+		})
+	}
+}
+
 func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*http.ServeMux)) (http.Handler, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
@@ -107,6 +132,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		director = &batchfactoryv11.DirectorService{Store: store, Provider: textProvider}
 	}
 	var novelFetchAIGenderJudge novelfetchworkshop.AIGenderJudge
+	var novelFetchAIGenderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error)
 	var novelFetchRewrite novelfetchworkshop.RewriteProvider
 	var novelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
 	if textProvider != nil {
@@ -115,7 +141,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 				SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
 				UserPrompt:          "请根据以下分类信息判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre,
 				Temperature:         0,
-				MaxTokens:           8,
+				MaxTokens:           64,
 				DisableJSONResponse: true,
 			})
 		}
@@ -126,15 +152,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		if err != nil {
 			return nil, err
 		}
-		selected := ""
-		if value, ok := settings["textModelId"].(string); ok {
-			selected = strings.TrimSpace(value)
-		}
-		if aiConfig, ok := settings["aiConfig"].(map[string]any); ok {
-			if value, ok := aiConfig["textModelId"].(string); ok && strings.TrimSpace(value) != "" {
-				selected = strings.TrimSpace(value)
-			}
-		}
+		selected := selectedTextModelID(settings)
 		provider, providerErr := configuredTextProvider(settings, selected)
 		if providerErr != nil {
 			return nil, providerErr
@@ -143,6 +161,20 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			return novelFetchRewriteAdapter{provider: provider}, nil
 		}
 		return novelFetchRewrite, nil
+	}
+	novelFetchAIGenderJudgeResolver = func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
+		settings, err := novelFetchStore.GetConfig(ctx, owner)
+		if err != nil {
+			return nil, err
+		}
+		provider, providerErr := configuredTextProvider(settings, selectedTextModelID(settings))
+		if providerErr != nil {
+			return nil, providerErr
+		}
+		if provider != nil {
+			return textGenderJudge(provider), nil
+		}
+		return novelFetchAIGenderJudge, nil
 	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
 	videoRegistry := batchfactoryv11.NewMemoryVideoProviderRegistry()
@@ -245,5 +277,5 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: textProvider, RegisterV11: register}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: httpapi.NewLegacySessionResolver(cfg.NodeAuthBaseURL), Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: textProvider, RegisterV11: register}), nil
 }

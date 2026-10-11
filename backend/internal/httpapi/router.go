@@ -20,42 +20,43 @@ import (
 )
 
 type RouterOptions struct {
-	BridgeSecret              string
-	ReleaseSHA                string
-	Health                    func(context.Context) error
-	Now                       func() time.Time
-	Users                     BridgeUserResolver
-	AuthStore                 auth.Store
-	SessionResolver           func(context.Context, string) (BridgeIdentity, error)
-	Slice                     int
-	RegisterV11               func(*http.ServeMux)
-	Store                     batchfactoryv11.Store
-	Director                  *batchfactoryv11.DirectorService
-	H3AudioProbe              batchfactoryv11.H3AudioDurationProbe
-	Compiler                  *batchfactoryv11.PromptCompilerService
-	Production                *batchfactoryv11.ProductionService
-	Merge                     *batchfactoryv11.MergeService
-	External                  *external.Service
-	NovelFetchStore           novelfetchworkshop.LifecycleStore
-	NovelFetchAIGenderJudge   novelfetchworkshop.AIGenderJudge
-	NovelFetchFetcher         *novelfetchworkshop.UpstreamFetcher
-	NovelFetchRewrite         novelfetchworkshop.RewriteProvider
-	NovelFetchRewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
-	PresetCatalog             *prompt.Catalog
-	AutomationPresetStore     AutomationPresetStore
-	AutomationStatusReader    *FileAutomationStatusReader
-	PersonalPromptStore       *prompt.PersonalStore
-	ScriptHistoryStore        *ScriptHistoryStore
-	MemberProfileStore        *MemberProfileStore
-	MemberAvatarDir           string
-	UserDataDir               string
-	UserConfigStore           *UserConfigStore
-	TextProvider              batchfactoryv11.DirectorProvider
-	LocalExecutors            *localexecutor.Service
-	GiantMaterialExecutor     *giantmaterialexecutor.Service
-	GiantMaterialResolver     GiantMaterialResolver
-	LocalArtifacts            *localartifact.Store
-	MergeOutput               mergeworker.ObjectStore
+	BridgeSecret                    string
+	ReleaseSHA                      string
+	Health                          func(context.Context) error
+	Now                             func() time.Time
+	Users                           BridgeUserResolver
+	AuthStore                       auth.Store
+	SessionResolver                 func(context.Context, string) (BridgeIdentity, error)
+	Slice                           int
+	RegisterV11                     func(*http.ServeMux)
+	Store                           batchfactoryv11.Store
+	Director                        *batchfactoryv11.DirectorService
+	H3AudioProbe                    batchfactoryv11.H3AudioDurationProbe
+	Compiler                        *batchfactoryv11.PromptCompilerService
+	Production                      *batchfactoryv11.ProductionService
+	Merge                           *batchfactoryv11.MergeService
+	External                        *external.Service
+	NovelFetchStore                 novelfetchworkshop.LifecycleStore
+	NovelFetchAIGenderJudge         novelfetchworkshop.AIGenderJudge
+	NovelFetchAIGenderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error)
+	NovelFetchFetcher               *novelfetchworkshop.UpstreamFetcher
+	NovelFetchRewrite               novelfetchworkshop.RewriteProvider
+	NovelFetchRewriteResolver       func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
+	PresetCatalog                   *prompt.Catalog
+	AutomationPresetStore           AutomationPresetStore
+	AutomationStatusReader          *FileAutomationStatusReader
+	PersonalPromptStore             *prompt.PersonalStore
+	ScriptHistoryStore              *ScriptHistoryStore
+	MemberProfileStore              *MemberProfileStore
+	MemberAvatarDir                 string
+	UserDataDir                     string
+	UserConfigStore                 *UserConfigStore
+	TextProvider                    batchfactoryv11.DirectorProvider
+	LocalExecutors                  *localexecutor.Service
+	GiantMaterialExecutor           *giantmaterialexecutor.Service
+	GiantMaterialResolver           GiantMaterialResolver
+	LocalArtifacts                  *localartifact.Store
+	MergeOutput                     mergeworker.ObjectStore
 }
 
 func NewRouter(options RouterOptions) http.Handler {
@@ -227,7 +228,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
-		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver)
+		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
 		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))

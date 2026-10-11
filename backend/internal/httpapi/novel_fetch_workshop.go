@@ -238,7 +238,18 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}, nil
 }
 
-func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)) {
+func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, aiJudge novelfetchworkshop.AIGenderJudge, aiJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), fetcher *novelfetchworkshop.UpstreamFetcher, rewriteProvider novelfetchworkshop.RewriteProvider, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)) {
+	resolveGenderJudge := func(req *http.Request) novelfetchworkshop.AIGenderJudge {
+		if aiJudgeResolver == nil {
+			return aiJudge
+		}
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		resolved, err := aiJudgeResolver(req.Context(), identity.Username)
+		if err == nil && resolved != nil {
+			return resolved
+		}
+		return aiJudge
+	}
 	resolveRewriteProvider := func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
 		if rewriteResolver != nil {
 			identity, _ := BridgeIdentityFromContext(req.Context())
@@ -516,7 +527,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		document.Meta["originalRawChars"] = result.OriginalRawChars
 		document.Meta["processedChars"] = result.ProcessedChars
 		if document.Gender == "" {
-			decision := novelfetchworkshop.ResolveGender(req.Context(), "", result.BookInfo, aiJudge)
+			decision := novelfetchworkshop.ResolveGender(req.Context(), "", result.BookInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
@@ -841,7 +852,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		}
 		document = mergeNovelFetchDocument(existing, document)
 		if explicitManualGender {
-			decision := novelfetchworkshop.ResolveGender(req.Context(), document.Gender, document.BookInfo, aiJudge)
+			decision := novelfetchworkshop.ResolveGender(req.Context(), document.Gender, document.BookInfo, resolveGenderJudge(req))
 			document.Gender = decision.Gender
 			document.GenderSource = decision.Source
 			document.GenderReason = decision.Reason
