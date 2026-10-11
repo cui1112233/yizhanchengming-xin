@@ -70,3 +70,27 @@ func TestTTSRouteValidatesInputBeforeUpstream(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestTTSRouteUsesConfiguredAudioModelEndToEnd(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer audio-secret" {
+			t.Fatalf("unexpected upstream request: method=%s authorization=%q", r.Method, r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("configured-audio"))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tts-user", map[string]any{"modelCatalog": []any{map[string]any{
+		"id": "tts-configured", "kind": "audio", "enabled": true, "endpoint": upstream.URL,
+		"credential": "audio-secret", "requestTemplate": `{"method":"POST","body":{"text":"{{input}}"}}`,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, NovelFetchStore: store})
+	rec := signedJSONRequest(t, api, now, "tts-user", http.MethodPost, "/api/tts", map[string]any{"input": "你好"})
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "audio/mpeg" || rec.Body.String() != "configured-audio" {
+		t.Fatalf("status=%d content-type=%q body=%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
+	}
+}
