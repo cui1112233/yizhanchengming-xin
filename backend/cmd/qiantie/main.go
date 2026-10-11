@@ -110,6 +110,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if (req.Method == http.MethodPost && req.URL.Path == "/api/client-errors") || (req.Method == http.MethodGet && req.URL.Path == "/api/client-errors/mine") {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/account-admin/accounts/") && strings.HasSuffix(req.URL.Path, "/transfer") {
 			apiHandler.ServeHTTP(w, req)
 			return
