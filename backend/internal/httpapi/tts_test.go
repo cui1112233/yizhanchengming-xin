@@ -43,6 +43,11 @@ func TestRequestConfiguredTTSBytesAcceptsAudioAndRejectsJSON(t *testing.T) {
 			_, _ = w.Write([]byte("fake-audio"))
 			return
 		}
+		if r.URL.Path == "/json-audio" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"url":"` + serverURLForTest(r, "/audio") + `"}}`))
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"error":"bad model"}`))
 	}))
@@ -60,6 +65,16 @@ func TestRequestConfiguredTTSBytesAcceptsAudioAndRejectsJSON(t *testing.T) {
 	if _, _, err := requestConfiguredTTSBytes(context.Background(), ttsRequest{Input: "测试"}, model); err == nil {
 		t.Fatal("JSON error response must not be accepted as audio")
 	}
+	model["endpoint"] = server.URL + "/json-audio"
+	model["responseMapping"] = `{"resultUrl":"data.url"}`
+	payload, contentType, err = requestConfiguredTTSBytes(context.Background(), ttsRequest{Input: "测试"}, model)
+	if err != nil || string(payload) != "fake-audio" || contentType != "audio/mpeg" {
+		t.Fatalf("mapped payload=%q contentType=%q err=%v", payload, contentType, err)
+	}
+}
+
+func serverURLForTest(r *http.Request, path string) string {
+	return "http://" + r.Host + path
 }
 
 func TestTTSRouteValidatesInputBeforeUpstream(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -167,10 +168,87 @@ func requestConfiguredTTSBytes(ctx context.Context, input ttsRequest, model map[
 		return nil, "", fmt.Errorf("音频模型返回状态 %d", response.StatusCode)
 	}
 	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "application/json") {
-		return nil, "", fmt.Errorf("音频模型返回了 JSON，而不是音频文件")
+		audioURL, resolveErr := configuredTTSAudioURL(payload, modelString(model, "responseMapping"))
+		if resolveErr != nil {
+			return nil, "", fmt.Errorf("音频模型返回了 JSON，而不是音频文件: %w", resolveErr)
+		}
+		return fetchConfiguredTTSAudio(ctx, audioURL)
 	}
 	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
 	if contentType == "" {
+		contentType = "audio/mpeg"
+	}
+	return payload, contentType, nil
+}
+
+func configuredTTSAudioURL(payload []byte, responseMapping string) (string, error) {
+	var mapping map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(responseMapping)), &mapping); err != nil {
+		return "", fmt.Errorf("返回映射无效")
+	}
+	if len(mapping) == 0 {
+		return "", fmt.Errorf("未配置音频 URL 返回映射")
+	}
+	var response any
+	if err := json.Unmarshal(payload, &response); err != nil {
+		return "", fmt.Errorf("返回内容不是有效 JSON")
+	}
+	for _, rawPath := range mapping {
+		path, ok := rawPath.(string)
+		if !ok || strings.TrimSpace(path) == "" {
+			continue
+		}
+		value, ok := jsonPathValue(response, path)
+		if !ok {
+			continue
+		}
+		candidate, ok := value.(string)
+		if !ok {
+			continue
+		}
+		parsed, err := url.Parse(strings.TrimSpace(candidate))
+		if err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != "" {
+			return parsed.String(), nil
+		}
+	}
+	return "", fmt.Errorf("未找到有效的音频 URL")
+}
+
+func jsonPathValue(root any, path string) (any, bool) {
+	current := root
+	for _, part := range strings.Split(strings.Trim(path, " ."), ".") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		object, ok := current.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current, ok = object[part]
+		if !ok {
+			return nil, false
+		}
+	}
+	return current, true
+}
+
+func fetchConfiguredTTSAudio(ctx context.Context, audioURL string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("音频 URL 无效")
+	}
+	response, err := (&http.Client{Timeout: 60 * time.Second}).Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("音频 URL 请求失败: %w", err)
+	}
+	defer response.Body.Close()
+	payload, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	if readErr != nil || len(payload) == 0 || response.StatusCode >= 400 {
+		return nil, "", fmt.Errorf("音频 URL 返回状态 %d", response.StatusCode)
+	}
+	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if contentType == "" || contentType == "application/octet-stream" {
 		contentType = "audio/mpeg"
 	}
 	return payload, contentType, nil
