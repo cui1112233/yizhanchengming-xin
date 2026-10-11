@@ -68,7 +68,7 @@ func TestAuthRoutesLoginSessionAndLogout(t *testing.T) {
 	login.Header.Set("Content-Type", "application/json")
 	loginResponse := httptest.NewRecorder()
 	mux.ServeHTTP(loginResponse, login)
-	if loginResponse.Code != http.StatusOK || store.session.Token == "" {
+	if loginResponse.Code != http.StatusOK || store.session.Token == "" || !strings.Contains(loginResponse.Body.String(), `"role":"dev"`) {
 		t.Fatalf("login response = %d %s", loginResponse.Code, loginResponse.Body.String())
 	}
 
@@ -76,7 +76,7 @@ func TestAuthRoutesLoginSessionAndLogout(t *testing.T) {
 	session.Header.Set("Authorization", "Bearer "+store.session.Token)
 	sessionResponse := httptest.NewRecorder()
 	mux.ServeHTTP(sessionResponse, session)
-	if sessionResponse.Code != http.StatusOK || !strings.Contains(sessionResponse.Body.String(), "alice") {
+	if sessionResponse.Code != http.StatusOK || !strings.Contains(sessionResponse.Body.String(), "alice") || !strings.Contains(sessionResponse.Body.String(), `"role":"dev"`) {
 		t.Fatalf("session response = %d %s", sessionResponse.Code, sessionResponse.Body.String())
 	}
 

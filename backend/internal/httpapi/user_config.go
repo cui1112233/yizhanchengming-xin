@@ -165,9 +165,53 @@ func preferenceOnlyPatch(input map[string]any) map[string]any {
 	return allowed
 }
 
-func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, accounts auth.Store) {
+func configManagementState(identity BridgeIdentity, profiles *MemberProfileStore, accounts auth.Store) (bool, any) {
+	if identity.IsOwner {
+		return true, nil
+	}
+	if profiles == nil || accounts == nil {
+		return false, nil
+	}
+	member := profiles.member(identity.Username, accounts)
+	if member == nil {
+		return false, nil
+	}
+	role, _ := member["role"].(string)
+	if role == "dev" || role == "manager" {
+		return true, nil
+	}
+	if role == "member" {
+		if boundTo, ok := member["boundTo"].(string); ok && strings.TrimSpace(boundTo) != "" {
+			return false, boundTo
+		}
+	}
+	return false, nil
+}
+
+func managedPublicUserConfig(config map[string]any, managedBy any) map[string]any {
+	result := publicUserConfig(config)
+	result["provider"] = "managed"
+	result["baseUrl"] = ""
+	result["model"] = ""
+	result["hasApiKey"] = false
+	if image, ok := result["image"].(map[string]any); ok {
+		image["baseUrl"], image["model"], image["displayName"], image["hasApiKey"] = "", "", "", false
+	}
+	if video, ok := result["video"].(map[string]any); ok {
+		video["baseUrl"], video["model"], video["displayName"], video["hasApiKey"] = "", "", "", false
+	}
+	result["canManageApi"] = false
+	result["managedBy"] = managedBy
+	return result
+}
+
+func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store *UserConfigStore, accounts auth.Store, profiles ...*MemberProfileStore) {
 	if root == nil || middleware.AuthStore == nil || store == nil || accounts == nil {
 		return
+	}
+	var profileStore *MemberProfileStore
+	if len(profiles) > 0 {
+		profileStore = profiles[0]
 	}
 	root.Handle("GET /api/config", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
@@ -178,7 +222,15 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 		store.mu.Lock()
 		config := store.read(identity.Username)
 		store.mu.Unlock()
-		writeJSON(w, http.StatusOK, publicUserConfig(config))
+		canManageAPI, managedBy := configManagementState(identity, profileStore, accounts)
+		if !canManageAPI {
+			writeJSON(w, http.StatusOK, managedPublicUserConfig(config, managedBy))
+			return
+		}
+		result := publicUserConfig(config)
+		result["canManageApi"] = true
+		result["managedBy"] = nil
+		writeJSON(w, http.StatusOK, result)
 	})))
 	root.Handle("POST /api/config", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
@@ -191,7 +243,8 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
 		}
-		if !identity.IsOwner {
+		canManageAPI, managedBy := configManagementState(identity, profileStore, accounts)
+		if !canManageAPI {
 			patch = preferenceOnlyPatch(patch)
 		}
 		store.mu.Lock()
@@ -202,6 +255,13 @@ func registerUserConfigRoutes(root *http.ServeMux, middleware BridgeAuth, store 
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "配置保存失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, publicUserConfig(config))
+		if !canManageAPI {
+			writeJSON(w, http.StatusOK, managedPublicUserConfig(config, managedBy))
+			return
+		}
+		result := publicUserConfig(config)
+		result["canManageApi"] = true
+		result["managedBy"] = nil
+		writeJSON(w, http.StatusOK, result)
 	})))
 }

@@ -15,10 +15,38 @@ import (
 
 type AuthOptions struct {
 	Store           auth.Store
+	Profiles        *MemberProfileStore
 	Now             func() time.Time
 	SessionResolver func(context.Context, string) (BridgeIdentity, error)
 	MFAFile         string
 	PasskeyFile     string
+}
+
+func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[string]any {
+	role := "member"
+	displayName := account.Username
+	var avatarURL any
+	if account.IsOwner {
+		role = "dev"
+	} else if profiles != nil {
+		var profile map[string]any
+		for _, row := range profiles.readArray("member-profiles.json") {
+			if row["username"] == account.Username {
+				profile = row
+				break
+			}
+		}
+		if profile != nil {
+			if value, ok := profile["role"].(string); ok && (value == "dev" || value == "manager") {
+				role = value
+			}
+			if value, ok := profile["displayName"].(string); ok && strings.TrimSpace(value) != "" {
+				displayName = value
+			}
+			avatarURL = profile["avatarUrl"]
+		}
+	}
+	return map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "role": role, "displayName": displayName, "avatarUrl": avatarURL, "effectivePermissions": []string{}}
 }
 
 func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
@@ -72,7 +100,9 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"token": token, "username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "effectivePermissions": []string{}})
+		payload := authAccountPayload(account, options.Profiles)
+		payload["token"] = token
+		writeJSON(w, http.StatusOK, payload)
 	})
 
 	root.HandleFunc("POST /api/login/logout", func(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +169,9 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			writeAuthError(w, http.StatusUnauthorized, "Passkey 登录失败")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"token": token, "username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "effectivePermissions": []string{}})
+		payload := authAccountPayload(account, options.Profiles)
+		payload["token"] = token
+		writeJSON(w, http.StatusOK, payload)
 	})
 
 	root.HandleFunc("GET /api/login/session", func(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +187,11 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			// would recursively validate the same invalid token.
 			if options.SessionResolver != nil && r.Header.Get("X-Qiantie-Auth-Bridge") != "1" {
 				if identity, resolveErr := options.SessionResolver(r.Context(), token); resolveErr == nil {
-					writeJSON(w, http.StatusOK, map[string]any{"username": identity.Username, "active": true, "isOwner": identity.IsOwner, "effectivePermissions": []string{}})
+					role := "member"
+					if identity.IsOwner {
+						role = "dev"
+					}
+					writeJSON(w, http.StatusOK, map[string]any{"username": identity.Username, "active": true, "isOwner": identity.IsOwner, "role": role, "displayName": identity.Username, "avatarUrl": nil, "effectivePermissions": []string{}})
 					return
 				}
 			}
@@ -169,7 +205,7 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			writeAuthError(w, http.StatusUnauthorized, "登录已失效，请重新登录")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "effectivePermissions": []string{}})
+		writeJSON(w, http.StatusOK, authAccountPayload(account, options.Profiles))
 	})
 }
 

@@ -160,7 +160,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.MemberProfileStore != nil {
 		passkeyFile = filepath.Join(options.MemberProfileStore.SystemDir, "passkeys.json")
 	}
-	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Now: options.Now, SessionResolver: options.SessionResolver, MFAFile: mfaFile, PasskeyFile: passkeyFile})
+	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Profiles: options.MemberProfileStore, Now: options.Now, SessionResolver: options.SessionResolver, MFAFile: mfaFile, PasskeyFile: passkeyFile})
 	if options.PresetCatalog != nil {
 		registerPresetRoutes(root, auth, options.PresetCatalog)
 	}
@@ -196,7 +196,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterNovelPanelAssetDescribeCompat(root, auth, options.TextProvider)
 	RegisterNovelPanelImageGenerateCompat(root, auth, options.UserConfigStore)
 	RegisterNovelPanelClipboardCompat(root, auth)
-	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore)
+	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore, options.MemberProfileStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
 	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir)
