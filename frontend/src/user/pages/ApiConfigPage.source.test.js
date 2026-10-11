@@ -15,7 +15,7 @@ test('平台预设模型必须先确认配置后才能启用', () => {
 });
 
 test('H3 保存配置必须带当前 key，并和 workflow 一起提交', () => {
-  assert.ok(source.includes("if (preset.id === 'minimax-h3-video' && !enabled && !key)"));
+  assert.ok(source.includes("if (preset.id === 'minimax-h3-video' && !key)"));
   assert.ok(source.includes('工作流 ID 会和 Key 一起保存'));
   assert.ok(source.includes('payload.workflowId = workflowId || DEFAULT_H3_WORKFLOW_ID'));
 });

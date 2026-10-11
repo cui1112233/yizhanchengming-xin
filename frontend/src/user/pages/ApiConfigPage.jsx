@@ -248,7 +248,7 @@ export default function ApiConfigPage() {
     const existing = modelById.get(preset.id);
     const key = String(presetKeys[preset.id] || '').trim();
     const workflowId = String(presetWorkflowIds[preset.id] || '').trim();
-    if (preset.id === 'minimax-h3-video' && !enabled && !key) return message.warning('保存 H3 配置必须填写 API Key；工作流 ID 会和 Key 一起保存');
+    if (preset.id === 'minimax-h3-video' && !key) return message.warning('保存 H3 配置必须填写 API Key；工作流 ID 会和 Key 一起保存');
     if (preset.credentialMode === 'apiKey' && enabled && !isPresetConfigured(preset, existing)) return message.warning('请先填写配置并点击“保存配置”，再启用该模型');
     if (preset.credentialMode === 'executorPairing' && enabled) {
       const pairing = await refreshLocalDoubaoPairingStatus();
