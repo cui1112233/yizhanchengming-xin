@@ -335,7 +335,9 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 	if (req.Method == http.MethodGet && path == "/api/novel-fetch/saved") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch") ||
 		(req.Method == http.MethodPost && path == "/api/novel-fetch/save") ||
-		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap")) ||
+		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/tasks" || isBatchRewriteTaskDetailPath(path) || isBatchRewriteTaskDiagnosticPath(path) || path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/bootstrap" || strings.HasPrefix(path, "/api/batch-rewrite/process/"))) ||
+		(req.Method == http.MethodPost && (path == "/api/batch-rewrite/config" || path == "/api/batch-rewrite/process" || strings.HasPrefix(path, "/api/batch-rewrite/process/") || path == "/api/batch-rewrite/ai/test" || strings.HasPrefix(path, "/api/batch-rewrite/opening/") || path == "/api/batch-rewrite/rules/ai-suggest" || path == "/api/batch-rewrite/rules/preview")) ||
+		(req.Method == http.MethodPost && (strings.HasSuffix(path, "/tasks/batch-retry") || strings.HasSuffix(path, "/tasks/generate-ai") || (strings.Contains(path, "/tasks/") && (strings.HasSuffix(path, "/fetch") || strings.HasSuffix(path, "/restore-original"))))) ||
 		(req.Method == http.MethodGet && (path == "/api/batch-rewrite/knowledge" || strings.HasPrefix(path, "/api/batch-rewrite/knowledge/"))) ||
 		(req.Method == http.MethodPost && path == "/api/batch-rewrite/knowledge") ||
 		(req.Method == http.MethodDelete && strings.HasPrefix(path, "/api/batch-rewrite/knowledge/")) {

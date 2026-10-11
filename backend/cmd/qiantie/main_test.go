@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -214,9 +215,26 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 		"/api/batch-rewrite/process/jobs/latest",
 		"/api/batch-rewrite/rules/ai-suggest",
 	} {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		if isGoNovelFetchCompatRequest(req) || !isLegacyNovelFetchBridgeRequest(req) {
-			t.Fatalf("%s must remain on the legacy bridge", path)
+		method := http.MethodGet
+		if strings.Contains(path, "rules/") { method = http.MethodPost }
+		req := httptest.NewRequest(method, path, nil)
+		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {
+			t.Fatalf("%s %s must use the Go native compatibility handler", method, path)
+		}
+	}
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, "/api/batch-rewrite/opening/analyze"},
+		{http.MethodPost, "/api/batch-rewrite/rules/preview"},
+		{http.MethodPost, "/api/batch-rewrite/ai/test"},
+		{http.MethodPost, "/api/batch-rewrite/process"},
+		{http.MethodPost, "/api/batch-rewrite/process/start"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/book-1/fetch"},
+		{http.MethodPost, "/api/batch-rewrite/tasks/batch-retry"},
+		{http.MethodPost, "/api/batch-rewrite/config"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {
+			t.Fatalf("%s %s must use the Go native compatibility handler", tc.method, tc.path)
 		}
 	}
 	for _, tc := range []struct {

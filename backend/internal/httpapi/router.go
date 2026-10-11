@@ -296,6 +296,11 @@ func NewRouter(options RouterOptions) http.Handler {
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/rules/ai-suggest", "/api/novel-fetch-workshop/rules/suggest", 1)
 			novelFetch.ServeHTTP(w, clone)
 		}
+		legacyRulesPreviewAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/rules/preview", "/api/novel-fetch-workshop/rules/preview", 1)
+			novelFetch.ServeHTTP(w, clone)
+		}
 		root.Handle("/api/batch-rewrite/knowledge/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/knowledge", novelAuth.Middleware(http.HandlerFunc(legacyKnowledgeSummaryAlias)))
 		root.Handle("/api/batch-rewrite/opening/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
@@ -303,6 +308,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("/api/batch-rewrite/process", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/process/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/rules/ai-suggest", novelAuth.Middleware(http.HandlerFunc(legacyRulesSuggestAlias)))
+		root.Handle("/api/batch-rewrite/rules/preview", novelAuth.Middleware(http.HandlerFunc(legacyRulesPreviewAlias)))
+		root.Handle("/api/batch-rewrite/config", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
