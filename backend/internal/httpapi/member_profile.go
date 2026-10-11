@@ -195,16 +195,71 @@ func (s *MemberProfileStore) member(ctxUsername string, accounts auth.Store) map
 	} else if value, ok := profile["role"].(string); ok && (value == "dev" || value == "manager") {
 		role = value
 	}
-	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": account.IsOwner}
+	member := map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "createdAt": account.CreatedAt, "updatedAt": account.UpdatedAt, "displayName": account.Username, "avatarUrl": nil, "role": role, "boundTo": nil, "monthlyTokenLimit": nil, "apiScopes": []any{}, "apiEnabled": false, "bio": nil, "phone": nil, "email": nil, "teamTitle": nil}
 	for _, key := range []string{"displayName", "avatarUrl", "boundTo", "monthlyTokenLimit", "apiEnabled", "apiScopes"} {
 		if value, ok := profile[key]; ok {
 			member[key] = value
 		}
 	}
+	for _, row := range s.readArray("member-profile-details.json") {
+		if row["username"] != ctxUsername {
+			continue
+		}
+		for _, key := range []string{"bio", "phone", "email", "teamTitle"} {
+			if value, ok := row[key]; ok {
+				member[key] = value
+			}
+		}
+		break
+	}
 	if role != "member" {
 		member["boundTo"] = nil
 	}
 	return member
+}
+
+func emptyMemberUsage() map[string]any {
+	empty := func() map[string]any {
+		return map[string]any{"calls": 0, "successfulCalls": 0, "billableCalls": 0, "knownUsageCalls": 0, "pricedCalls": 0, "inputTokens": 0, "outputTokens": 0, "totalTokens": 0, "byFeature": map[string]any{}, "callsByFeature": map[string]any{}, "byModel": map[string]any{}, "costByCurrency": map[string]any{}, "estimatedCost": nil, "costCurrency": nil}
+	}
+	return map[string]any{"day": empty(), "month": empty(), "recent": []any{}}
+}
+
+func memberQuota(limit any, used int) map[string]any {
+	quota := map[string]any{"used": used, "limit": limit, "remaining": nil, "percent": nil, "level": "unlimited", "threshold": nil}
+	if limit == nil {
+		return quota
+	}
+	value, ok := limit.(float64)
+	if !ok {
+		value, _ = strconv.ParseFloat(strings.TrimSpace(fmt.Sprint(limit)), 64)
+	}
+	if value <= 0 {
+		return quota
+	}
+	remaining := value - float64(used)
+	if remaining < 0 {
+		remaining = 0
+	}
+	percent := float64(used) / value * 100
+	level := "normal"
+	if percent >= 100 {
+		level = "exhausted"
+	} else if percent >= 90 {
+		level = "critical"
+	} else if percent >= 70 {
+		level = "warning"
+	}
+	quota["remaining"] = remaining
+	quota["percent"] = percent
+	quota["level"] = level
+	return quota
+}
+
+func memberTeamGovernance(manager map[string]any) map[string]any {
+	usage := emptyMemberUsage()
+	monthlyLimit := manager["monthlyTokenLimit"]
+	return map[string]any{"managerUsername": manager["username"], "monthlyTokenLimit": monthlyLimit, "thresholds": []any{70, 90, 100}, "updatedAt": nil, "updatedBy": nil, "usage": usage["month"], "quota": memberQuota(monthlyLimit, 0)}
 }
 
 func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, accounts auth.Store) (map[string]any, error) {
@@ -430,7 +485,40 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "账号不存在"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"member": member, "presence": map[string]any{"online": true}, "manager": nil, "team": nil, "notificationSummary": map[string]any{"unread": 0, "recent": []any{}}, "memberQuota": map[string]any{"used": 0, "limit": member["monthlyTokenLimit"]}, "teamGovernance": nil, "usage": map[string]any{"day": map[string]any{}, "month": map[string]any{}, "recent": []any{}}})
+		manager := map[string]any(nil)
+		team := map[string]any(nil)
+		if toString(member["role"]) == "dev" || toString(member["role"]) == "manager" {
+			team = goTeam(member)
+		} else if bound := strings.TrimSpace(toString(member["boundTo"])); bound != "" {
+			if found, err := accounts.FindAccount(req.Context(), bound); err == nil {
+				manager = profiles.member(found.Username, accounts)
+				if manager != nil {
+					team = goTeam(manager)
+				}
+			}
+		}
+		notifications := profiles.listNotifications(identity.Username, 8)
+		unread := 0
+		for _, notification := range notifications {
+			if notificationUnread(notification["readAt"]) {
+				unread++
+			}
+		}
+		usage := emptyMemberUsage()
+		governanceManager := member
+		if manager != nil {
+			governanceManager = manager
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"member":              member,
+			"presence":            map[string]any{"online": true},
+			"manager":             manager,
+			"team":                team,
+			"notificationSummary": map[string]any{"unread": unread, "recent": notifications},
+			"memberQuota":         memberQuota(member["monthlyTokenLimit"], 0),
+			"teamGovernance":      memberTeamGovernance(governanceManager),
+			"usage":               usage,
+		})
 	})))
 	root.Handle("PATCH /api/member/profile", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
