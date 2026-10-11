@@ -25,9 +25,9 @@ function signBridgeRequest(secret, { username, isOwner, issuedAt, method, pathna
 // Keeping this resolver shared prevents the project list and the workbench
 // bridge from silently targeting different upstreams.
 function resolveShuihuoBaseUrl(targetBaseUrl) {
-  return targetBaseUrl
-    || process.env.QIANTIE_SHUIHUO_COMPAT_BASE_URL
+  return process.env.QIANTIE_SHUIHUO_COMPAT_BASE_URL
     || process.env.QIANTIE_GO_BASE_URL
+    || targetBaseUrl
     || 'http://127.0.0.1:4000';
 }
 
@@ -78,7 +78,7 @@ function syncAccountAIConfig({ targetBaseUrl, bridgeSecret, username, isOwner, c
     return Promise.resolve();
   }
   const target = new URL(resolveShuihuoBaseUrl(targetBaseUrl));
-  const secret = bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me';
+  const secret = bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || '';
   const transport = target.protocol === 'https:' ? https : http;
   const pathname = '/api/shuihuo-production/account-ai-config';
   const issuedAt = String(Math.floor(Date.now() / 1000));
@@ -243,7 +243,7 @@ function upstreamTimeoutForRequest(method, pathname) {
 
 function createShuihuoProductionRouter({ targetBaseUrl, bridgeSecret, presetStore, configReader = readConfig, authenticate = apiAuth } = {}) {
   const target = new URL(resolveShuihuoBaseUrl(targetBaseUrl));
-  const secret = bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me';
+  const secret = bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || '';
   const transport = target.protocol === 'https:' ? https : http;
   const router = express.Router();
 
@@ -315,6 +315,13 @@ function createShuihuoProductionRouter({ targetBaseUrl, bridgeSecret, presetStor
       headers,
       timeout: upstreamTimeoutForRequest(req.method, requestURL.pathname)
     }, upstreamResponse => {
+      if (upstreamResponse.statusCode === 401 || upstreamResponse.statusCode === 403) {
+        upstreamResponse.resume();
+        upstreamResponse.on('end', () => {
+          if (!res.headersSent) res.status(503).json({ error: '水货生产服务鉴权失败，请联系管理员检查服务连接' });
+        });
+        return;
+      }
       for (const [name, value] of Object.entries(upstreamResponse.headers)) {
         if (value !== undefined && !HOP_BY_HOP_HEADERS.has(name.toLowerCase())) res.setHeader(name, value);
       }
