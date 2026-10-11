@@ -2259,9 +2259,11 @@ func safeShuihuoModels(models []map[string]any, includeSecrets bool) []map[strin
 			}
 		}
 		if !includeSecrets {
-			_, hasCredential := model["credential"]
-			_, hasAPIKey := model["apiKey"]
-			copy["hasCredential"] = (hasCredential && strings.TrimSpace(modelString(model, "credential")) != "") || (hasAPIKey && strings.TrimSpace(modelString(model, "apiKey")) != "") || shuihuoModelCredential(model) != "" || model["hasCredential"] == true
+			credentialConfigured := shuihuoModelCredential(model) != ""
+			copy["hasCredential"] = credentialConfigured
+			copy["credentialConfigured"] = credentialConfigured
+			endpointConfigured := modelString(model, "endpoint") != "" || modelString(model, "baseUrl") != "" || strings.EqualFold(modelString(model, "adapterKind"), "local_executor_video")
+			copy["providerConfigured"] = modelString(model, "modelId") != "" && endpointConfigured
 		}
 		result = append(result, copy)
 	}
