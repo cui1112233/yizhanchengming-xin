@@ -248,7 +248,18 @@ func TestAdminPresetReadsUseGoHandler(t *testing.T) {
 			t.Fatalf("%s must use the Go admin read handler", path)
 		}
 	}
+	for _, item := range []struct{ method, path string }{
+		{http.MethodGet, "/api/admin/presets/demo/1"},
+		{http.MethodPost, "/api/admin/presets/draft"},
+		{http.MethodPut, "/api/admin/presets/demo/1/draft"},
+		{http.MethodPost, "/api/admin/presets/demo/publish"},
+		{http.MethodPost, "/api/admin/presets/demo/rollback"},
+	} {
+		if !isGoAdminReadRequest(httptest.NewRequest(item.method, item.path, nil)) {
+			t.Fatalf("%s %s must use the Go admin preset handler", item.method, item.path)
+		}
+	}
 	if isGoAdminReadRequest(httptest.NewRequest(http.MethodPost, "/api/admin/presets", nil)) {
-		t.Fatal("admin preset writes remain staged until Go has a durable writer")
+		t.Fatal("unrecognized admin preset route must not use the Go handler")
 	}
 }

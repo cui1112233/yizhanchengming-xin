@@ -52,6 +52,13 @@ type PublicPreset struct {
 
 func NewCatalog(path string) *Catalog { return &Catalog{path: strings.TrimSpace(path)} }
 
+func (c *Catalog) Path() string {
+	if c == nil {
+		return ""
+	}
+	return c.path
+}
+
 func (c *Catalog) load() ([]presetRecord, error) {
 	if c == nil || c.path == "" {
 		return nil, errors.New("preset catalog path is not configured")

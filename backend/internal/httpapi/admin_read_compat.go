@@ -31,6 +31,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 	if len(catalogs) > 0 {
 		catalog = catalogs[0]
 	}
+	var adminStore *prompt.AdminStore
+	if catalog != nil {
+		adminStore = prompt.NewAdminStore(catalog.Path())
+	}
 	adminPresetAuth := func(next http.Handler) http.Handler {
 		return middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			identity, ok := BridgeIdentityFromContext(req.Context())
@@ -47,17 +51,96 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}))
 	}
 	root.Handle("GET /api/admin/presets", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if catalog == nil {
+		if adminStore == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
 			return
 		}
-		items, err := catalog.All(req.URL.Query().Get("module"))
+		items, err := adminStore.List(req.URL.Query().Get("module"))
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"presets": items})
 	})))
+	root.Handle("GET /api/admin/presets/{id}/{version}", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if adminStore == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		version, _ := strconv.Atoi(req.PathValue("version"))
+		item, err := adminStore.Get(req.PathValue("id"), version)
+		if err != nil {
+			writeAdminStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"preset": item})
+	})))
+	root.Handle("POST /api/admin/presets/draft", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if adminStore == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		input, ok := decodeAdminJSON(w, req, 256<<10)
+		if !ok {
+			return
+		}
+		item, err := adminStore.CreateDraft(identity.Username, input)
+		if err != nil {
+			writeAdminStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"preset": item})
+	})))
+	root.Handle("PUT /api/admin/presets/{id}/{version}/draft", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if adminStore == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		input, ok := decodeAdminJSON(w, req, 256<<10)
+		if !ok {
+			return
+		}
+		version, _ := strconv.Atoi(req.PathValue("version"))
+		item, err := adminStore.UpdateDraft(identity.Username, req.PathValue("id"), version, input)
+		if err != nil {
+			writeAdminStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"preset": item})
+	})))
+	for _, action := range []string{"publish", "rollback"} {
+		action := action
+		root.Handle("POST /api/admin/presets/{id}/"+action, adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if adminStore == nil {
+				writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+				return
+			}
+			identity, _ := BridgeIdentityFromContext(req.Context())
+			input, ok := decodeAdminJSON(w, req, 16<<10)
+			if !ok {
+				return
+			}
+			version, ok := input["version"].(float64)
+			if !ok {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺少版本号"})
+				return
+			}
+			var item map[string]any
+			var err error
+			if action == "publish" {
+				item, err = adminStore.Publish(identity.Username, req.PathValue("id"), int(version))
+			} else {
+				item, err = adminStore.Rollback(identity.Username, req.PathValue("id"), int(version))
+			}
+			if err != nil {
+				writeAdminStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"preset": item})
+		})))
+	}
 	root.Handle("GET /api/admin/preset-slots", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if catalog == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
@@ -253,6 +336,30 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 			}
 		})))
 	}
+}
+
+func decodeAdminJSON(w http.ResponseWriter, req *http.Request, limit int64) (map[string]any, bool) {
+	var input map[string]any
+	if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, limit)).Decode(&input); err != nil || input == nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容不合法"})
+		return nil, false
+	}
+	return input, true
+}
+
+func writeAdminStoreError(w http.ResponseWriter, err error) {
+	status := http.StatusInternalServerError
+	if typed, ok := err.(*prompt.StoreError); ok {
+		switch typed.Code {
+		case "invalid":
+			status = http.StatusBadRequest
+		case "not_found":
+			status = http.StatusNotFound
+		case "conflict":
+			status = http.StatusConflict
+		}
+	}
+	writeJSON(w, status, map[string]string{"error": err.Error()})
 }
 
 func adminSkillOwner(w http.ResponseWriter, req *http.Request, accounts auth.Store, profiles *MemberProfileStore) (BridgeIdentity, bool) {

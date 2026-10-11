@@ -269,10 +269,32 @@ func isAdminAgentSkillRequest(req *http.Request) bool {
 }
 
 func isGoAdminReadRequest(req *http.Request) bool {
-	if req == nil || req.URL == nil || req.Method != http.MethodGet {
+	if req == nil || req.URL == nil {
 		return false
 	}
-	return req.URL.Path == "/api/admin/presets" || req.URL.Path == "/api/admin/preset-slots"
+	path := req.URL.Path
+	if req.Method == http.MethodGet {
+		return path == "/api/admin/presets" || path == "/api/admin/preset-slots" || adminPresetVersionPath(path)
+	}
+	if req.Method == http.MethodPost {
+		return path == "/api/admin/presets/draft" || adminPresetActionPath(path, "publish") || adminPresetActionPath(path, "rollback")
+	}
+	return req.Method == http.MethodPut && adminPresetDraftPath(path)
+}
+
+func adminPresetVersionPath(path string) bool {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	return len(parts) == 5 && parts[0] == "api" && parts[1] == "admin" && parts[2] == "presets" && parts[3] != "" && parts[4] != ""
+}
+
+func adminPresetDraftPath(path string) bool {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	return len(parts) == 6 && parts[0] == "api" && parts[1] == "admin" && parts[2] == "presets" && parts[5] == "draft"
+}
+
+func adminPresetActionPath(path, action string) bool {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	return len(parts) == 5 && parts[0] == "api" && parts[1] == "admin" && parts[2] == "presets" && parts[4] == action
 }
 
 func isGoNovelFetchCompatRequest(req *http.Request) bool {
