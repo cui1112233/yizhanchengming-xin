@@ -289,6 +289,20 @@ func TestNovelFetchCompatibilitySurfaceUsesGoHandler(t *testing.T) {
 	}
 }
 
+func TestNovelFetchNamespaceNeverFallsBackToNode(t *testing.T) {
+	for _, path := range []string{
+		"/api/batch-rewrite/future-endpoint",
+		"/api/novel-fetch-workshop/future-endpoint",
+		"/api/novel-fetch-upload/future-endpoint",
+		"/api/novel-fetch/future-endpoint",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		if !isGoNovelFetchCompatRequest(req) || isLegacyNovelFetchBridgeRequest(req) {
+			t.Fatalf("%s must stay on Go and never use the Node bridge", path)
+		}
+	}
+}
+
 func TestNovelFetchSavedSurfaceUsesGoHandler(t *testing.T) {
 	for _, tc := range []struct {
 		method string

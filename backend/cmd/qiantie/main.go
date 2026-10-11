@@ -329,6 +329,16 @@ func isGoNovelFetchCompatRequest(req *http.Request) bool {
 		return false
 	}
 	path := req.URL.Path
+	// The complete novel-fetch workbench belongs to the Go runtime now. Keep
+	// the whole namespace here (including future/optional endpoints) so an
+	// unimplemented route returns a Go response instead of silently falling
+	// back to the retired Node service on port 3001.
+	if strings.HasPrefix(path, "/api/batch-rewrite") ||
+		strings.HasPrefix(path, "/api/novel-fetch-workshop") ||
+		strings.HasPrefix(path, "/api/novel-fetch-upload") ||
+		strings.HasPrefix(path, "/api/novel-fetch") {
+		return true
+	}
 	// These two routes only read/write the user's Go workshop store. They do
 	// not call an upstream provider, so they can safely bypass the old Node
 	// bridge while the actual novel-fetch request remains staged.
