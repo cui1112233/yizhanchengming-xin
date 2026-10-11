@@ -214,7 +214,7 @@ function resultURL(body) {
 
 function bridgeJSON(gateway, account, method, pathname, payload) {
   const target = new URL(gateway?.targetBaseUrl || process.env.QIANTIE_GO_BASE_URL || 'http://127.0.0.1:4000');
-  const secret = gateway?.bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me';
+  const secret = gateway?.bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || '';
   const body = payload === undefined ? null : Buffer.from(JSON.stringify(payload));
   const issuedAt = String(Math.floor(Date.now() / 1000));
   const signature = crypto.createHmac('sha256', secret).update([account.username, issuedAt, String(account.isOwner === true), method, pathname].join('\n')).digest('hex');
@@ -226,7 +226,7 @@ function bridgeJSON(gateway, account, method, pathname, payload) {
 }
 
 function bridgeDownload(gateway, account, pathname, res) {
-  const target = new URL(gateway?.targetBaseUrl || process.env.QIANTIE_GO_BASE_URL || 'http://127.0.0.1:4000'); const secret = gateway?.bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me'; const issuedAt=String(Math.floor(Date.now()/1000)); const signature=crypto.createHmac('sha256',secret).update([account.username,issuedAt,String(account.isOwner===true),'GET',pathname].join('\n')).digest('hex'); const transport=target.protocol==='https:'?https:http;
+  const target = new URL(gateway?.targetBaseUrl || process.env.QIANTIE_GO_BASE_URL || 'http://127.0.0.1:4000'); const secret = gateway?.bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || ''; const issuedAt=String(Math.floor(Date.now()/1000)); const signature=crypto.createHmac('sha256',secret).update([account.username,issuedAt,String(account.isOwner===true),'GET',pathname].join('\n')).digest('hex'); const transport=target.protocol==='https:'?https:http;
   const upstream=transport.request({protocol:target.protocol,hostname:target.hostname,port:target.port||undefined,method:'GET',path:pathname,headers:{'X-Qiantie-Username':account.username,'X-Qiantie-Is-Owner':String(account.isOwner===true),'X-Qiantie-Issued-At':issuedAt,'X-Qiantie-Signature':signature}},response=>{res.status(response.statusCode||502); if(response.headers['content-type'])res.setHeader('Content-Type',response.headers['content-type']); response.pipe(res)}); upstream.on('error',()=>res.status(503).json({error:'视频下载服务暂不可用'})); upstream.end();
 }
 
@@ -384,7 +384,13 @@ function createScriptVideoRouter({
     }
     let imageUrls;
     try { imageUrls = validOptionalImageURLs(await providerAccessibleImageUrls(req, req.body?.imageUrls)); } catch (error) { return res.status(400).json({ error: error.message || '可选图片参数不正确' }); }
-    const apiKey = getVideoApiKey(configReader(req.username), 'yd');
+    let apiKey = '';
+    try {
+      apiKey = getVideoApiKey(configReader(req.username), 'yd');
+    } catch (error) {
+      const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 ? error.status : 422;
+      return res.status(status).json({ error: error?.message || '请先在设置中保存视频生成 API Key' });
+    }
     if (!apiKey) return res.status(400).json({ error: '请先在设置中保存视频生成 API Key' });
     try {
       const aspectRatio = ['16:9', '9:16'].includes(String(req.body?.aspectRatio || req.body?.aspect_ratio || ''))
