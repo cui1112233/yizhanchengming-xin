@@ -871,7 +871,7 @@ async function submitBatchFactoryBookTo121(req, route, options = {}) {
     // 凭据文件固定在 <数据目录>/users/{owner}/novel-fetch-workshop/121-credentials.json
     const credentialStore = create121CredentialStore({
       usersDir: path.join(__dirname, '..', 'data', 'users'),
-      secret: process.env.QIANTIE_121_CREDENTIAL_SECRET || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me'
+      secret: process.env.QIANTIE_121_CREDENTIAL_SECRET || process.env.QIANTIE_BRIDGE_SECRET || ''
     });
     const credential = credentialStore.get(owner);
     if (!credential) throw sessionExpiredError();
@@ -1796,7 +1796,7 @@ async function syncH3ProviderConfig(req, options, { allowMissing = false } = {})
       apiKey,
       createUrl: H3_CREATE_URL,
       tasksUrl: H3_TASKS_URL,
-      workflowId: providerConfig.workflowId
+      workflowId: h3WorkflowForRequest(req, options)
     }),
     redirect: 'manual'
   });
