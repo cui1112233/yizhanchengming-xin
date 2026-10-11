@@ -2325,6 +2325,9 @@ func safeShuihuoConfigForResponse(config map[string]any) map[string]any {
 
 func syncShuihuoVideoModel(ctx context.Context, registry batchfactoryv11.VideoProviderRegistry, owner string, model map[string]any) error {
 	modelID, _ := model["modelId"].(string)
+	if strings.TrimSpace(modelID) == "" && strings.EqualFold(modelString(model, "id"), batchfactoryv11.AutoDLH3Model) {
+		modelID = batchfactoryv11.AutoDLH3Model
+	}
 	provider, _ := model["provider"].(string)
 	provider = batchfactoryv11.VideoProviderForModel(modelID, provider)
 	if provider == batchfactoryv11.VideoProviderAutoDLH3 && strings.TrimSpace(modelID) == "" {
