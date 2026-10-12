@@ -70,19 +70,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		tasks := make([]map[string]any, 0, len(documents))
 		for _, document := range documents {
-			task := map[string]any{}
-			for key, value := range document.Meta {
-				task[key] = value
-			}
-			task["id"] = document.BookID
-			task["book_id"] = document.BookID
-			if _, ok := task["updated_at"]; !ok {
-				task["updated_at"] = document.UpdatedAt
-			}
-			if _, ok := task["original_chars"]; !ok {
-				task["original_chars"] = document.ProcessedChars
-			}
-			tasks = append(tasks, task)
+			tasks = append(tasks, legacyBatchRewriteTask(document))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 	})))
@@ -103,16 +91,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取正文失败"})
 			return
 		}
-		meta := map[string]any{}
-		for key, value := range document.Meta {
-			meta[key] = value
-		}
-		meta["id"] = document.BookID
-		meta["book_id"] = document.BookID
-		meta["updated_at"] = document.UpdatedAt
-		if document.MaxTxt > 0 {
-			meta["max_txt"] = document.MaxTxt
-		}
+		meta := legacyBatchRewriteTask(document)
 		aiTexts := make([]map[string]any, 0, len(document.Versions))
 		for version, raw := range document.Versions {
 			item := map[string]any{"name": version, "version": version}
@@ -472,6 +451,59 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "groups": groups, "output": []string{fmt.Sprintf("已从视频管理系统同步 %d 个配置档", len(groups))}})
 	})))
+}
+
+// legacyBatchRewriteTask converts the Go document (camelCase fields and
+// nested book metadata) to the flat snake_case shape used by the V78 table.
+// Without this adapter the API had the data, but every visible column read an
+// empty legacy field name.
+func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any {
+	task := map[string]any{}
+	for key, value := range document.Meta {
+		task[key] = value
+	}
+	platformID := firstText(task["platform_id"], task["platformId"])
+	platformName := firstText(task["platform_name"], task["platformName"])
+	if platformName == "" {
+		if id, err := strconv.Atoi(platformID); err == nil {
+			platformName = legacyNovelFetchPlatforms[id]
+		}
+	}
+	bookName := firstText(task["book_name"], task["bookName"], task["title"])
+	style := firstText(task["style"], task["style_name"], task["styleName"], document.BookInfo.Genre, document.BookInfo.Category)
+	gender := firstText(task["gender"], strings.TrimSpace(document.Gender))
+	sensitiveReplaced := toInt(firstText(task["sensitive_hit_count"], task["sensitiveReplaced"]))
+	if sensitiveReplaced == 0 {
+		sensitiveReplaced = toInt(task["sensitiveReplaced"])
+	}
+	originalStatus := firstText(task["original_status"], task["originalStatus"])
+	aiStatus := firstText(task["ai_status"], task["aiStatus"])
+	classifyStatus := firstText(task["classify_status"], task["classifyStatus"])
+	if classifyStatus == "" && gender != "" {
+		classifyStatus = "done"
+	}
+	task["id"] = document.BookID
+	task["book_id"] = document.BookID
+	task["book_name"] = bookName
+	task["platform_id"] = platformID
+	task["platform_name"] = platformName
+	task["style"] = style
+	task["gender"] = gender
+	task["classify_status"] = classifyStatus
+	task["original_status"] = originalStatus
+	task["ai_status"] = aiStatus
+	task["original_chars"] = document.ProcessedChars
+	task["raw_original_chars"] = document.OriginalRawChars
+	task["sensitive_status"] = firstText(task["sensitive_status"], task["sensitiveStatus"])
+	task["sensitive_hit_count"] = sensitiveReplaced
+	task["sensitive_fixed_count"] = sensitiveReplaced
+	task["sensitive_failed_count"] = toInt(task["sensitive_failed_count"])
+	task["ai_generated_count"] = toInt(firstText(task["ai_generated_count"], task["aiGeneratedCount"]))
+	task["updated_at"] = firstText(task["updated_at"], task["updatedAt"], document.UpdatedAt)
+	if document.MaxTxt > 0 {
+		task["max_txt"] = document.MaxTxt
+	}
+	return task
 }
 
 // legacyBatchRewriteIssues keeps the old issue-log response shape while using
