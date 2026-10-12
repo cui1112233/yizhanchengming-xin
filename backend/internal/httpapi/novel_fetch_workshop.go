@@ -425,7 +425,13 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "获取任务列表失败"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
+		// 小说获取旧工作台仍使用 snake_case 字段。返回新字段的同时补齐
+		// 兼容字段，避免页面把已经保存的元数据误显示为空。
+		legacyTasks := make([]map[string]any, 0, len(tasks))
+		for _, task := range tasks {
+			legacyTasks = append(legacyTasks, legacyNovelFetchTask(task))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"tasks": legacyTasks})
 	})
 
 	// 批量重试由 Go 直接处理，避免小说获取工作台因为一个重试按钮又回到 Node。
@@ -1301,6 +1307,67 @@ func publicNovelFetchConfig(input map[string]any) map[string]any {
 		out[key] = value
 	}
 	return out
+}
+
+func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
+	raw, _ := json.Marshal(document)
+	result := map[string]any{}
+	_ = json.Unmarshal(raw, &result)
+	meta := document.Meta
+	metaString := func(keys ...string) string {
+		for _, key := range keys {
+			if value, ok := meta[key]; ok {
+				if text := strings.TrimSpace(fmt.Sprint(value)); text != "" && text != "<nil>" {
+					return text
+				}
+			}
+		}
+		return ""
+	}
+	bookName := metaString("bookName", "book_name")
+	platformName := metaString("platformName", "platform_name")
+	style := metaString("style", "styleName", "style_name")
+	gender := strings.TrimSpace(document.Gender)
+	if gender == "" {
+		gender = metaString("gender")
+	}
+	result["id"] = document.BookID
+	result["book_id"] = document.BookID
+	result["book_name"] = bookName
+	result["platform_name"] = platformName
+	result["style"] = style
+	result["gender"] = gender
+	result["classify_status"] = "classify_failed"
+	if gender != "" {
+		result["classify_status"] = "classified"
+	}
+	result["original_status"] = metaString("originalStatus", "original_status")
+	if result["original_status"] == "" && document.OriginalRawChars > 0 {
+		result["original_status"] = "done"
+	}
+	result["original_raw_chars"] = document.OriginalRawChars
+	result["processed_chars"] = document.ProcessedChars
+	result["max_txt"] = document.MaxTxt
+	result["ai_status"] = metaString("aiStatus", "ai_status")
+	if result["ai_status"] == "" {
+		result["ai_status"] = "waiting_ai_config"
+	}
+	generated := make([]string, 0, len(document.Versions))
+	for version, value := range document.Versions {
+		if version == "original_raw" {
+			continue
+		}
+		if state, ok := value.(map[string]any); ok && strings.EqualFold(strings.TrimSpace(fmt.Sprint(state["state"])), "ready") {
+			generated = append(generated, version)
+		}
+	}
+	if len(generated) > 0 {
+		result["ai_files"] = generated
+		result["selected_versions"] = generated
+		result["ai_status"] = "ai_done"
+	}
+	result["site_submit_status"] = metaString("siteSubmitStatus", "site_submit_status")
+	return result
 }
 
 func mergeWorkshopConfigPreservingSecrets(current, patch map[string]any) map[string]any {
