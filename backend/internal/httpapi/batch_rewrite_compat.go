@@ -471,6 +471,9 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	}
 	bookName := firstText(task["book_name"], task["bookName"], task["title"])
 	style := firstText(task["style"], task["style_name"], task["styleName"], document.BookInfo.Genre, document.BookInfo.Category)
+	if style == "" {
+		style = "待判定"
+	}
 	gender := firstText(task["gender"], strings.TrimSpace(document.Gender))
 	sensitiveReplaced := toInt(firstText(task["sensitive_hit_count"], task["sensitiveReplaced"]))
 	if sensitiveReplaced == 0 {
@@ -495,6 +498,10 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	task["original_chars"] = document.ProcessedChars
 	task["raw_original_chars"] = document.OriginalRawChars
 	task["sensitive_status"] = firstText(task["sensitive_status"], task["sensitiveStatus"])
+	if task["sensitive_status"] == "" {
+		task["sensitive_status"] = "done"
+	}
+	task["sensitive_mode"] = "系统规则"
 	task["sensitive_hit_count"] = sensitiveReplaced
 	task["sensitive_fixed_count"] = sensitiveReplaced
 	task["sensitive_failed_count"] = toInt(task["sensitive_failed_count"])
