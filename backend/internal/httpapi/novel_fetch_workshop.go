@@ -755,6 +755,18 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			decision := novelfetchworkshop.ResolveGender(req.Context(), "", genderInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
+		if strings.TrimSpace(firstText(document.Meta["style"], document.Meta["styleName"], document.Meta["style_name"])) == "" {
+			if provider, providerErr := resolveRewriteProvider(req); providerErr == nil {
+				styleInfo := result.BookInfo
+				styleInfo.Text = processedText
+				style := novelfetchworkshop.ResolveStyle(req.Context(), styleInfo, provider)
+				if style.Style != "" {
+					document.Meta["style"] = style.Style
+					document.Meta["styleSource"] = style.Source
+					document.Meta["styleReason"] = style.Reason
+				}
+			}
+		}
 		syncNovelFetchClassificationMetadata(&document)
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文失败"})
@@ -1141,6 +1153,18 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.GenderSource = decision.Source
 			document.GenderReason = decision.Reason
 		}
+		if strings.TrimSpace(firstText(document.Meta["style"], document.Meta["styleName"], document.Meta["style_name"])) == "" && strings.TrimSpace(document.ProcessedText) != "" {
+			if provider, providerErr := resolveRewriteProvider(req); providerErr == nil {
+				styleInfo := document.BookInfo
+				styleInfo.Text = document.ProcessedText
+				style := novelfetchworkshop.ResolveStyle(req.Context(), styleInfo, provider)
+				if style.Style != "" {
+					document.Meta["style"] = style.Style
+					document.Meta["styleSource"] = style.Source
+					document.Meta["styleReason"] = style.Reason
+				}
+			}
+		}
 		syncNovelFetchClassificationMetadata(&document)
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
@@ -1275,6 +1299,30 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	// accept both methods during the Node-to-Go compatibility period.
 	mux.HandleFunc("PUT /api/novel-fetch-workshop/config", saveWorkshopConfig)
 	mux.HandleFunc("POST /api/novel-fetch-workshop/config", saveWorkshopConfig)
+}
+
+func saveNovelFetchConfig(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, response func(map[string]any) map[string]any) {
+	identity, _ := BridgeIdentityFromContext(req.Context())
+	var patch map[string]any
+	if err := decodeNovelFetchJSON(w, req, &patch); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
+		return
+	}
+	settings, _ := patch["settings"].(map[string]any)
+	if settings == nil {
+		settings = patch
+	}
+	current, err := store.GetConfig(req.Context(), identity.Username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取设置失败"})
+		return
+	}
+	merged := mergeWorkshopConfigPreservingSecrets(current, settings)
+	if err := store.PutConfig(req.Context(), identity.Username, merged); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存设置失败"})
+		return
+	}
+	writeJSON(w, http.StatusOK, response(merged))
 }
 
 func genderNeedsResolution(value string) bool {
