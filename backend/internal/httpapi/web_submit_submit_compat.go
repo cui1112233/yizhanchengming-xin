@@ -164,9 +164,6 @@ func submissionGenderStyle(doc novelfetchworkshop.Document) (string, string) {
 	meta := doc.Meta
 	gender := strings.ReplaceAll(firstText(meta["gender"], meta["gender_name"], doc.Gender), "频", "")
 	style := firstText(meta["style"], meta["styleName"], meta["style_name"])
-	if _, ok := uploadStyleIDs[style]; !ok {
-		style = "现代通用"
-	}
 	return strings.TrimSpace(gender), style
 }
 

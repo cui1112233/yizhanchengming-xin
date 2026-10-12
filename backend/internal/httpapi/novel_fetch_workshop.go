@@ -755,6 +755,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			decision := novelfetchworkshop.ResolveGender(req.Context(), "", genderInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
+		syncNovelFetchClassificationMetadata(&document)
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文失败"})
 			return
@@ -1140,6 +1141,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.GenderSource = decision.Source
 			document.GenderReason = decision.Reason
 		}
+		syncNovelFetchClassificationMetadata(&document)
 		if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -1281,6 +1283,33 @@ func genderNeedsResolution(value string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// syncNovelFetchClassificationMetadata keeps the legacy flat metadata view in
+// step with the canonical document fields. The old submit/workbench pages
+// read meta.gender, while the workshop API reads document.gender.
+func syncNovelFetchClassificationMetadata(document *novelfetchworkshop.Document) {
+	if document == nil {
+		return
+	}
+	if document.Meta == nil {
+		document.Meta = map[string]any{}
+	}
+	if strings.TrimSpace(document.Gender) != "" && !genderNeedsResolution(document.Gender) {
+		document.Meta["gender"] = document.Gender
+		if document.GenderSource != "" {
+			document.Meta["genderSource"] = string(document.GenderSource)
+		}
+		if strings.TrimSpace(document.GenderReason) != "" {
+			document.Meta["genderReason"] = document.GenderReason
+		}
+	}
+	if strings.TrimSpace(document.BookInfo.Category) != "" {
+		document.Meta["category"] = document.BookInfo.Category
+	}
+	if strings.TrimSpace(document.BookInfo.Genre) != "" {
+		document.Meta["genre"] = document.BookInfo.Genre
 	}
 }
 
