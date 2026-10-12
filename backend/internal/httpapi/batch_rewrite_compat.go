@@ -129,13 +129,27 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "任务不存在"})
 			return
 		}
-		meta := map[string]any{}
-		for key, value := range document.Meta {
-			meta[key] = value
-		}
+		// The legacy workbench reads snake_case fields from diagnostic payloads,
+		// while Go documents keep the original camelCase metadata. Reuse the
+		// same adapter as the task table so the detail view cannot silently show
+		// an all-empty card.
+		meta := legacyBatchRewriteTask(document)
 		switch {
 		case strings.HasSuffix(req.URL.Path, "/sensitive-log"):
-			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "logs": document.Logs})
+			hits := toInt(meta["sensitive_hit_count"])
+			fixed := toInt(meta["sensitive_fixed_count"])
+			writeJSON(w, http.StatusOK, map[string]any{
+				"meta": meta,
+				"sensitive_hits": map[string]any{
+					"mode": meta["sensitive_mode"], "status": meta["sensitive_status"],
+					"hit_count": hits, "updated_at": meta["updated_at"], "hits": []any{},
+				},
+				"sensitive_fixed": map[string]any{
+					"mode": meta["sensitive_mode"], "status": meta["sensitive_status"],
+					"fixed_count": fixed, "updated_at": meta["updated_at"], "items": []any{},
+				},
+				"logs": document.Logs,
+			})
 		case strings.HasSuffix(req.URL.Path, "/site-submit-log"):
 			logs := []any{}
 			if raw, ok := meta["websiteSubmitHistory"].([]any); ok {

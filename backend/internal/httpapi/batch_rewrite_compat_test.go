@@ -108,6 +108,45 @@ func TestBatchRewriteTaskDiagnosticsReadGoDocument(t *testing.T) {
 	}
 }
 
+func TestBatchRewriteSensitiveDiagnosticUsesLegacyFieldsAndCounts(t *testing.T) {
+	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "book-sensitive", Gender: "女频", ProcessedChars: 3919, OriginalRawChars: 4334,
+		Meta: map[string]any{
+			"bookName": "敏感测试书", "platformId": "15", "sensitiveStatus": "done",
+			"sensitiveReplaced": 44, "updatedAt": now.Format(time.RFC3339),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/tasks/book-sensitive/sensitive-log", nil)
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("diagnostic status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	meta := payload["meta"].(map[string]any)
+	if meta["book_id"] != "book-sensitive" || meta["book_name"] != "敏感测试书" {
+		t.Fatalf("legacy meta missing: %#v", meta)
+	}
+	if meta["sensitive_hit_count"] != float64(44) || meta["sensitive_fixed_count"] != float64(44) {
+		t.Fatalf("legacy sensitive counts missing: %#v", meta)
+	}
+	fixed := payload["sensitive_fixed"].(map[string]any)
+	if fixed["fixed_count"] != float64(44) {
+		t.Fatalf("sensitive_fixed=%#v", fixed)
+	}
+}
+
 func TestBatchRewriteTaskListFlattensGoDocumentFields(t *testing.T) {
 	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()
