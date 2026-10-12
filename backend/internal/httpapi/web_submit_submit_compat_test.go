@@ -47,3 +47,12 @@ func TestSyncNovelFetchClassificationMetadataPersistsResolvedGender(t *testing.T
 		t.Fatalf("meta genderSource = %#v, want ai", got)
 	}
 }
+
+func TestStyleNeedsResolutionTreatsPendingDisplayValueAsUnknown(t *testing.T) {
+	if !styleNeedsResolution(map[string]any{"style": "待判定"}) {
+		t.Fatal("待判定 must trigger style resolution")
+	}
+	if styleNeedsResolution(map[string]any{"style": "现代悬疑"}) {
+		t.Fatal("a supported style must not trigger a second AI call")
+	}
+}

@@ -755,7 +755,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			decision := novelfetchworkshop.ResolveGender(req.Context(), "", genderInfo, resolveGenderJudge(req))
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
-		if strings.TrimSpace(firstText(document.Meta["style"], document.Meta["styleName"], document.Meta["style_name"])) == "" {
+		if styleNeedsResolution(document.Meta) {
 			if provider, providerErr := resolveRewriteProvider(req); providerErr == nil {
 				styleInfo := result.BookInfo
 				styleInfo.Text = processedText
@@ -1153,7 +1153,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.GenderSource = decision.Source
 			document.GenderReason = decision.Reason
 		}
-		if strings.TrimSpace(firstText(document.Meta["style"], document.Meta["styleName"], document.Meta["style_name"])) == "" && strings.TrimSpace(document.ProcessedText) != "" {
+		if styleNeedsResolution(document.Meta) && strings.TrimSpace(document.ProcessedText) != "" {
 			if provider, providerErr := resolveRewriteProvider(req); providerErr == nil {
 				styleInfo := document.BookInfo
 				styleInfo.Text = document.ProcessedText
@@ -1273,27 +1273,9 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	})
 
 	saveWorkshopConfig := func(w http.ResponseWriter, req *http.Request) {
-		identity, _ := BridgeIdentityFromContext(req.Context())
-		var patch map[string]any
-		if err := decodeNovelFetchJSON(w, req, &patch); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
-			return
-		}
-		settings, _ := patch["settings"].(map[string]any)
-		if settings == nil {
-			settings = patch
-		}
-		current, err := store.GetConfig(req.Context(), identity.Username)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取设置失败"})
-			return
-		}
-		merged := mergeWorkshopConfigPreservingSecrets(current, settings)
-		if err := store.PutConfig(req.Context(), identity.Username, merged); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存设置失败"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": merged})
+		saveNovelFetchConfig(w, req, store, func(merged map[string]any) map[string]any {
+			return map[string]any{"ok": true, "settings": merged}
+		})
 	}
 	// The current React workbench uses POST; keep PUT for the canonical API and
 	// accept both methods during the Node-to-Go compatibility period.
@@ -1302,7 +1284,11 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 }
 
 func saveNovelFetchConfig(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, response func(map[string]any) map[string]any) {
-	identity, _ := BridgeIdentityFromContext(req.Context())
+	identity, ok := BridgeIdentityFromContext(req.Context())
+	if !ok || identity.Username == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
 	var patch map[string]any
 	if err := decodeNovelFetchJSON(w, req, &patch); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})

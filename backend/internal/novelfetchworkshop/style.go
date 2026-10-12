@@ -37,16 +37,27 @@ func ResolveStyle(ctx context.Context, info BookInfo, provider RewriteProvider) 
 	if err != nil {
 		return StyleDecision{Reason: "AI 风格判断失败"}
 	}
-	var payload struct {
-		Style string `json:"style"`
-	}
-	if json.Unmarshal([]byte(strings.TrimSpace(content)), &payload) != nil {
-		return StyleDecision{Reason: "AI 风格判断返回格式无效"}
-	}
-	if style := matchNovelStyle(payload.Style); style != "" {
+	if style := parseStyleResponse(content); style != "" {
 		return StyleDecision{Style: style, Source: "ai", Reason: "平台风格不明确，采用 AI 判断结果"}
 	}
 	return StyleDecision{Reason: "AI 未返回有效风格"}
+}
+
+func parseStyleResponse(content string) string {
+	raw := strings.TrimSpace(content)
+	if strings.HasPrefix(raw, "```") {
+		raw = strings.TrimSpace(strings.TrimPrefix(raw, "```json"))
+		raw = strings.TrimSpace(strings.TrimSuffix(raw, "```"))
+	}
+	var payload struct {
+		Style string `json:"style"`
+	}
+	if json.Unmarshal([]byte(raw), &payload) == nil {
+		if style := matchNovelStyle(payload.Style); style != "" {
+			return style
+		}
+	}
+	return matchNovelStyle(raw)
 }
 
 func matchNovelStyle(value string) string {

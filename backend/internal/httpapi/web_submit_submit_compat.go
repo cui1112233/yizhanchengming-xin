@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, store novelfetchworkshop.Store) {
+func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, store novelfetchworkshop.Store, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)) {
 	if root == nil || store == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
@@ -76,6 +77,28 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			meta := doc.Meta
 			if meta == nil {
 				meta = map[string]any{}
+			}
+			// A fetched task can still carry the display placeholder “待判定”.
+			// Resolve it here as a last safe fallback instead of silently choosing
+			// a generic upload style or sending an invalid submission.
+			if styleNeedsResolution(meta) {
+				if rewriteResolver != nil {
+					if provider, providerErr := rewriteResolver(req.Context(), identity.Username); providerErr == nil && provider != nil {
+						styleInfo := doc.BookInfo
+						styleInfo.Text = strings.TrimSpace(doc.ProcessedText)
+						if styleInfo.Text == "" {
+							styleInfo.Text = strings.TrimSpace(doc.Original)
+						}
+						decision := novelfetchworkshop.ResolveStyle(req.Context(), styleInfo, provider)
+						if decision.Style != "" {
+							meta["style"] = decision.Style
+							meta["styleSource"] = decision.Source
+							meta["styleReason"] = decision.Reason
+							doc.Meta = meta
+							_ = store.PutDocument(req.Context(), identity.Username, doc)
+						}
+					}
+				}
 			}
 			done := anyStrings(meta["siteSubmitDoneVersions"])
 			if len(done) == 0 {
@@ -169,6 +192,11 @@ func submissionGenderStyle(doc novelfetchworkshop.Document) (string, string) {
 	gender := strings.ReplaceAll(firstText(meta["gender"], meta["gender_name"], doc.Gender), "频", "")
 	style := firstText(meta["style"], meta["styleName"], meta["style_name"])
 	return strings.TrimSpace(gender), style
+}
+
+func styleNeedsResolution(meta map[string]any) bool {
+	style := strings.TrimSpace(firstText(meta["style"], meta["styleName"], meta["style_name"]))
+	return style == "" || style == "待判定" || style == "未判定"
 }
 
 func uniqueStrings(values []string) []string {

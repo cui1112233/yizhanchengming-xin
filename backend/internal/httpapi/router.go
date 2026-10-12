@@ -288,7 +288,12 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterLegacyNovelFetchRoutes(root, auth, options.NovelFetchStore, options.NovelFetchFetcher, options.UserConfigStore)
 		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore, options.UserDataDir)
 		RegisterWebSubmitPreviewCompat(root, auth, options.NovelFetchStore)
-		RegisterWebSubmitSubmitCompat(root, auth, options.UserDataDir, options.NovelFetchStore)
+		RegisterWebSubmitSubmitCompat(root, auth, options.UserDataDir, options.NovelFetchStore, func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
+			if options.NovelFetchRewriteResolver == nil {
+				return options.NovelFetchRewrite, nil
+			}
+			return options.NovelFetchRewriteResolver(ctx, owner)
+		})
 		root.Handle("/api/batch-rewrite/tasks/", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/tasks/", "/api/novel-fetch-workshop/tasks/", 1)
