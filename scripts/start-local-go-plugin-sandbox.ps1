@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
-$runtimeDir = Join-Path $repo 'backend\.build-verify\giant-material-plugin-http\sandbox'
+$runtimeDir = Join-Path $repo ("backend\.build-verify\giant-material-plugin-http\sandbox-{0}" -f $GoPort)
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 
 $pluginExe = Join-Path $runtimeDir 'giant-material-plugin.exe'
