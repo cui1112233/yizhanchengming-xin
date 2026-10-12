@@ -2122,7 +2122,7 @@ function renderWebSubmitHistory(records = []) {
       <code title="${escapeHtml(item.book_id || "")}">${escapeHtml(item.book_id || "")}</code>
       <span class="site-history-name" title="${escapeHtml(item.book_name || "")}">${escapeHtml(item.book_name || "-")}</span>
       <span>${escapeHtml(item.version || "-")}</span>
-      <span class="${statusClass(item.status)}">${escapeHtml(item.status || "-")}</span>
+      <span class="${statusClass(item.status)}">${escapeHtml(taskStatusText(item.status, "-"))}</span>
       <span>${escapeHtml(allocationText || "-")}</span>
       <time title="${escapeHtml(item.time || "")}">${escapeHtml(item.time || "-")}</time>
       <span class="site-history-error" title="${escapeHtml(item.result || item.error || "")}">${escapeHtml(item.result || item.error || "-")}</span>
@@ -2247,7 +2247,7 @@ function siteSubmitText(task) {
   if (accepted.length) parts.push(`待确认：${accepted.map(displayVersionLabel).join(",")}`);
   if (failed.length) parts.push(`失败：${failed.map(displayVersionLabel).join(",")}`);
   if (parts.length) return parts.join("；");
-  if (task.site_submit_status) return task.site_submit_status;
+  if (task.site_submit_status) return taskStatusText(task.site_submit_status, "未提交");
   return "未提交";
 }
 
@@ -2278,7 +2278,7 @@ function groupCardHtml(group) {
     <div class="site-group-card">
       <div class="site-group-head">
         <b>${escapeHtml(group.group_id || "提交组")}</b>
-        <span class="${statusClass(status)}">${escapeHtml(status || "待提交")}</span>
+        <span class="${statusClass(status)}">${escapeHtml(taskStatusText(status, "待提交"))}</span>
       </div>
       <div class="meta-grid compact">
         ${metaItem("平台", `${summary.platform_name || ""} ${summary.platform_id || ""}`)}
@@ -2306,7 +2306,7 @@ function renderWebSubmitGroups(data = {}) {
     <div class="site-skipped-row">
       <code>${escapeHtml(item.id || "")}</code>
       <span>${escapeHtml(item.version || "")}</span>
-      <span>${escapeHtml(item.status || "")}</span>
+      <span>${escapeHtml(taskStatusText(item.status, "") )}</span>
       <span>${escapeHtml(item.error || "")}</span>
     </div>
   `).join("");
@@ -2811,7 +2811,7 @@ function renderSiteSubmitLog(data) {
     const traceRows = asArray(item.execution_trace).map((entry) => `
       <div class="site-skipped-row submit-trace-row">
         <code>${escapeHtml(entry.step || "执行步骤")}</code>
-        <span class="${statusClass(entry.status)}">${escapeHtml(entry.status || "")}</span>
+        <span class="${statusClass(entry.status)}">${escapeHtml(taskStatusText(entry.status, ""))}</span>
         <span>${escapeHtml(entry.detail || "")}</span>
         <time>${escapeHtml(entry.time || "")}</time>
       </div>
@@ -2822,7 +2822,7 @@ function renderSiteSubmitLog(data) {
       <div class="sensitive-log-card">
         <div class="sensitive-log-head">
           <b>${escapeHtml(key)}</b>
-          <span class="${statusClass(item.status)}">${escapeHtml(item.status || "")}</span>
+          <span class="${statusClass(item.status)}">${escapeHtml(taskStatusText(item.status, ""))}</span>
         </div>
         <div class="meta-grid compact">
           ${metaItem("提交组", item.group_id || "")}
