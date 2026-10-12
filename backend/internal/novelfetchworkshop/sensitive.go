@@ -10,26 +10,60 @@ import (
 // processed field to save. Both the current map form and the legacy
 // "@{enabled=True; find=x; replace=y}" form are accepted.
 func ApplySensitiveRules(text string, settings map[string]any) (string, int) {
+	result, changes, _ := ApplySensitiveRulesWithDetails(text, settings)
+	return result, changes
+}
+
+// ApplySensitiveRulesWithDetails applies the same deterministic replacements
+// as ApplySensitiveRules and also returns the before/after line for every hit.
+// The detail records are used by the task detail page and are safe to persist
+// without exposing the untouched raw document.
+func ApplySensitiveRulesWithDetails(text string, settings map[string]any) (string, int, []map[string]any) {
 	if text == "" || settings == nil {
-		return text, 0
+		return text, 0, []map[string]any{}
 	}
 	rules := make([]any, 0)
 	collectSensitiveRules(settings, &rules)
 	result := text
 	changes := 0
+	items := make([]map[string]any, 0)
 	for _, raw := range rules {
 		find, replace, enabled := sensitiveRule(raw)
 		if !enabled || find == "" || find == replace {
 			continue
 		}
-		matches := strings.Count(result, find)
-		if matches == 0 {
-			continue
+		for {
+			index := strings.Index(result, find)
+			if index < 0 {
+				break
+			}
+			before := sensitiveLine(result, index)
+			result = result[:index] + replace + result[index+len(find):]
+			after := sensitiveLine(result, index)
+			changes++
+			items = append(items, map[string]any{
+				"hit_index": len(items) + 1,
+				"keyword":   find,
+				"before":    before,
+				"after":     after,
+				"status":    "done",
+				"source":    "system_rule",
+				"error":     "",
+			})
 		}
-		result = strings.ReplaceAll(result, find, replace)
-		changes += matches
 	}
-	return result, changes
+	return result, changes, items
+}
+
+func sensitiveLine(text string, index int) string {
+	start := strings.LastIndex(text[:index], "\n") + 1
+	end := strings.IndexByte(text[index:], '\n')
+	if end < 0 {
+		end = len(text)
+	} else {
+		end += index
+	}
+	return text[start:end]
 }
 
 func collectSensitiveRules(value any, out *[]any) {

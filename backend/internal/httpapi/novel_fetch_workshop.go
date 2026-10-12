@@ -527,7 +527,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 					retryStages["fetch"]++
 					continue
 				}
-				processedText, sensitiveCount, _ := applyNovelFetchSensitiveRules(req.Context(), store, identity.Username, result.ProcessedText)
+				processedText, sensitiveCount, sensitiveItems, _ := applyNovelFetchSensitiveRulesDetailed(req.Context(), store, identity.Username, result.ProcessedText)
 				document.OriginalRaw = result.OriginalRaw
 				document.Original = processedText
 				document.ProcessedText = processedText
@@ -543,6 +543,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 				document.Meta["processedChars"] = document.ProcessedChars
 				document.Meta["sensitiveStatus"] = "done"
 				document.Meta["sensitiveReplaced"] = sensitiveCount
+				setSensitiveDetails(document.Meta, sensitiveItems, sensitiveCount)
 				if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, processedText); err != nil {
 					failed++
 					retryStages["fetch"]++
@@ -727,7 +728,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
-		processedText, sensitiveCount, _ := applyNovelFetchSensitiveRules(req.Context(), store, identity.Username, result.ProcessedText)
+		processedText, sensitiveCount, sensitiveItems, _ := applyNovelFetchSensitiveRulesDetailed(req.Context(), store, identity.Username, result.ProcessedText)
 		document.OriginalRaw = result.OriginalRaw
 		document.ProcessedText = processedText
 		document.Original = processedText
@@ -743,6 +744,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		document.Meta["processedChars"] = document.ProcessedChars
 		document.Meta["sensitiveStatus"] = "done"
 		document.Meta["sensitiveReplaced"] = sensitiveCount
+		setSensitiveDetails(document.Meta, sensitiveItems, sensitiveCount)
 		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &document, result.OriginalRaw, processedText); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存原文正文失败"})
 			return
@@ -1283,15 +1285,38 @@ func genderNeedsResolution(value string) bool {
 }
 
 func applyNovelFetchSensitiveRules(ctx context.Context, store novelfetchworkshop.Store, owner, text string) (string, int, error) {
+	processed, replaced, _, err := applyNovelFetchSensitiveRulesDetailed(ctx, store, owner, text)
+	return processed, replaced, err
+}
+
+func applyNovelFetchSensitiveRulesDetailed(ctx context.Context, store novelfetchworkshop.Store, owner, text string) (string, int, []map[string]any, error) {
 	if store == nil {
-		return text, 0, nil
+		return text, 0, []map[string]any{}, nil
 	}
 	settings, err := store.GetConfig(ctx, owner)
 	if err != nil {
-		return text, 0, err
+		return text, 0, []map[string]any{}, err
 	}
-	processed, replaced := novelfetchworkshop.ApplySensitiveRules(text, settings)
-	return processed, replaced, nil
+	processed, replaced, items := novelfetchworkshop.ApplySensitiveRulesWithDetails(text, settings)
+	return processed, replaced, items, nil
+}
+
+func setSensitiveDetails(meta map[string]any, items []map[string]any, count int) {
+	if meta == nil {
+		return
+	}
+	updated := time.Now().UTC().Format(time.RFC3339Nano)
+	hits := make([]any, 0, len(items))
+	fixed := make([]any, 0, len(items))
+	for _, item := range items {
+		hits = append(hits, map[string]any{
+			"hit_index": item["hit_index"], "keyword": item["keyword"],
+			"snippet": item["before"], "status": item["status"],
+		})
+		fixed = append(fixed, item)
+	}
+	meta["sensitiveHits"] = map[string]any{"mode": "system_rule", "status": "done", "hit_count": count, "updated_at": updated, "hits": hits}
+	meta["sensitiveFixed"] = map[string]any{"mode": "system_rule", "status": "done", "fixed_count": count, "failed_count": 0, "updated_at": updated, "items": fixed}
 }
 
 // novelFetchAppConfig restores the flat config contract used by the 3001

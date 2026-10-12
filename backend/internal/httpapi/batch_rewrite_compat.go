@@ -138,16 +138,18 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		case strings.HasSuffix(req.URL.Path, "/sensitive-log"):
 			hits := toInt(meta["sensitive_hit_count"])
 			fixed := toInt(meta["sensitive_fixed_count"])
+			hitsData := mapOrEmpty(meta["sensitiveHits"])
+			fixedData := mapOrEmpty(meta["sensitiveFixed"])
+			if len(hitsData) == 0 {
+				hitsData = map[string]any{"mode": meta["sensitive_mode"], "status": meta["sensitive_status"], "hit_count": hits, "updated_at": meta["updated_at"], "hits": []any{}}
+			}
+			if len(fixedData) == 0 {
+				fixedData = map[string]any{"mode": meta["sensitive_mode"], "status": meta["sensitive_status"], "fixed_count": fixed, "updated_at": meta["updated_at"], "items": []any{}}
+			}
 			writeJSON(w, http.StatusOK, map[string]any{
 				"meta": meta,
-				"sensitive_hits": map[string]any{
-					"mode": meta["sensitive_mode"], "status": meta["sensitive_status"],
-					"hit_count": hits, "updated_at": meta["updated_at"], "hits": []any{},
-				},
-				"sensitive_fixed": map[string]any{
-					"mode": meta["sensitive_mode"], "status": meta["sensitive_status"],
-					"fixed_count": fixed, "updated_at": meta["updated_at"], "items": []any{},
-				},
+				"sensitive_hits": hitsData,
+				"sensitive_fixed": fixedData,
 				"logs": document.Logs,
 			})
 		case strings.HasSuffix(req.URL.Path, "/site-submit-log"):

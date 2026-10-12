@@ -252,7 +252,7 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		if d.ProcessedText == "" {
 			d.ProcessedText = d.Original
 		}
-		processed, count := novelfetchworkshop.ApplySensitiveRules(d.ProcessedText, settings)
+		processed, count, sensitiveItems := novelfetchworkshop.ApplySensitiveRulesWithDetails(d.ProcessedText, settings)
 		d.ProcessedText = processed
 		d.Original = processed
 		replacements += count
@@ -261,6 +261,9 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		}
 		d.Meta["sensitiveProcessed"] = true
 		d.Meta["sensitiveReplacementCount"] = count
+		d.Meta["sensitiveStatus"] = "done"
+		d.Meta["sensitiveReplaced"] = count
+		setSensitiveDetails(d.Meta, sensitiveItems, count)
 		d.Logs = append(d.Logs, map[string]any{"type": "sensitive_reprocessed", "at": time.Now().UTC().Format(time.RFC3339Nano), "replacements": count})
 		d.ProcessedChars = len([]rune(d.ProcessedText))
 		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &d, d.OriginalRaw, d.ProcessedText); err != nil {

@@ -37,3 +37,17 @@ func TestApplySensitiveRulesUsesConfiguredKnowledgeAndKeepsRawCallerSeparate(t *
 		t.Fatalf("sensitive replacement = %q count=%d", got, count)
 	}
 }
+
+func TestApplySensitiveRulesWithDetailsKeepsBeforeAndAfterItems(t *testing.T) {
+	text := "这是坏词。\n坏词再次出现。"
+	settings := map[string]any{"knowledge": map[string]any{"layout_rules": map[string]any{
+		"sensitive_rules": []any{map[string]any{"find": "坏词", "replace": "合规词", "enabled": true}},
+	}}}
+	processed, count, items := ApplySensitiveRulesWithDetails(text, settings)
+	if processed != "这是合规词。\n合规词再次出现。" || count != 2 || len(items) != 2 {
+		t.Fatalf("processed=%q count=%d items=%#v", processed, count, items)
+	}
+	if items[0]["keyword"] != "坏词" || items[0]["before"] != "这是坏词。" || items[0]["after"] != "这是合规词。" {
+		t.Fatalf("first item=%#v", items[0])
+	}
+}
