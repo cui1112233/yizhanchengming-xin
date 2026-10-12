@@ -50,6 +50,8 @@ func main() {
 		log.Fatal(err)
 	}
 	staticHandler := webassets.Handler()
+	nodeAuthTarget := strings.TrimSpace(os.Getenv("QIANTIE_NODE_AUTH_BASE_URL"))
+	goAuth := goAuthEnabled()
 	// The Go runtime is self-contained by default. A legacy Node bridge is
 	// only created when an explicit target is supplied for a temporary
 	// migration check; no request is sent to port 3001 implicitly.
@@ -58,8 +60,8 @@ func main() {
 		w.WriteHeader(http.StatusNotImplemented)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "该功能尚未迁移到 Go 服务"})
 	}))
-	if target := strings.TrimSpace(os.Getenv("QIANTIE_NODE_AUTH_BASE_URL")); target != "" {
-		proxy, proxyErr := newAuthProxy(target)
+	if nodeAuthTarget != "" {
+		proxy, proxyErr := newAuthProxy(nodeAuthTarget)
 		if proxyErr != nil {
 			log.Fatal(proxyErr)
 		}
@@ -70,7 +72,7 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
-		if !goAuthEnabled() && (req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/")) {
+		if !goAuth && (req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/")) {
 			if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
 				apiHandler.ServeHTTP(w, req)
 				return

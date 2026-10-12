@@ -336,10 +336,10 @@ func TestNovelFetchNestedTaskDiagnosticsUseGoHandler(t *testing.T) {
 	}
 }
 
-func TestGoAuthEnabledOnlyWithExplicitOptIn(t *testing.T) {
+func TestGoAuthEnabledDefaultsSafelyWithoutNodeAuthTarget(t *testing.T) {
 	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "")
 	if goAuthEnabled() {
-		t.Fatal("Go auth must remain opt-in before legacy account import")
+		t.Fatal("Go auth must remain disabled unless explicitly enabled")
 	}
 	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "1")
 	if !goAuthEnabled() {
