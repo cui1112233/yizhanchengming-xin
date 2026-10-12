@@ -299,6 +299,11 @@ func NewRouter(options RouterOptions) http.Handler {
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/", "/api/novel-fetch-workshop/", 1)
 			novelFetch.ServeHTTP(w, clone)
 		}
+		legacyWebSubmitAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/web-submit/", "/api/novel-fetch-workshop/web-submit/", 1)
+			novelFetch.ServeHTTP(w, clone)
+		}
 		legacyKnowledgeSummaryAlias := func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			clone.URL.Path = "/api/novel-fetch-workshop/knowledge/summary"
@@ -333,6 +338,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("POST /api/batch-rewrite/knowledge/optimize", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("POST /api/batch-rewrite/web-submit/operations", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("GET /api/batch-rewrite/web-submit/operations/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		root.Handle("POST /api/web-submit/operations", novelAuth.Middleware(http.HandlerFunc(legacyWebSubmitAlias)))
+		root.Handle("GET /api/web-submit/operations/", novelAuth.Middleware(http.HandlerFunc(legacyWebSubmitAlias)))
 		root.Handle("PATCH /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("DELETE /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
