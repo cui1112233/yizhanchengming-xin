@@ -420,8 +420,8 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档返回格式无效"})
 			return
 		}
-		items, _ := payload["data"].([]any)
-		if len(items) == 0 {
+		items, hasItems := targetConfigItems(payload)
+		if !hasItems || len(items) == 0 {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用配置档"})
 			return
 		}
@@ -467,6 +467,33 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "groups": groups, "output": []string{fmt.Sprintf("已从视频管理系统同步 %d 个配置档", len(groups))}})
 	})))
+}
+
+// targetConfigItems accepts the response shapes used by different releases of
+// the target backend: data[], data.list[], result[] and items[].
+func targetConfigItems(payload map[string]any) ([]any, bool) {
+	var find func(any) ([]any, bool)
+	find = func(value any) ([]any, bool) {
+		if items, ok := value.([]any); ok {
+			return items, true
+		}
+		object, ok := value.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		for _, key := range []string{"list", "rows", "records", "items", "configs", "data", "result"} {
+			if items, found := find(object[key]); found {
+				return items, true
+			}
+		}
+		return nil, false
+	}
+	for _, key := range []string{"data", "result", "configs", "items"} {
+		if items, ok := find(payload[key]); ok {
+			return items, true
+		}
+	}
+	return nil, false
 }
 
 // legacyBatchRewriteTask converts the Go document (camelCase fields and

@@ -13,6 +13,28 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
+func TestTargetConfigItemsAcceptsNestedListResponse(t *testing.T) {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(`{"success":true,"data":{"list":[{"id":"1"}]}}`), &payload); err != nil {
+		t.Fatal(err)
+	}
+	items, ok := targetConfigItems(payload)
+	if !ok || len(items) != 1 {
+		t.Fatalf("items=%#v ok=%v", items, ok)
+	}
+}
+
+func TestTargetConfigItemsAcceptsResultArrayResponse(t *testing.T) {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(`{"code":0,"result":[{"id":"1"}]}`), &payload); err != nil {
+		t.Fatal(err)
+	}
+	items, ok := targetConfigItems(payload)
+	if !ok || len(items) != 1 {
+		t.Fatalf("items=%#v ok=%v", items, ok)
+	}
+}
+
 func TestBatchRewriteWebSubmitHistoryReadsGoDocumentLogs(t *testing.T) {
 	now := time.Date(2026, 10, 11, 10, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()
