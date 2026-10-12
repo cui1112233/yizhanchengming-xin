@@ -51,7 +51,7 @@ func main() {
 	}
 	staticHandler := webassets.Handler()
 	nodeAuthTarget := strings.TrimSpace(os.Getenv("QIANTIE_NODE_AUTH_BASE_URL"))
-	goAuth := goAuthEnabled()
+	goAuth := goAuthEnabled(strings.TrimSpace(nodeAuthTarget))
 	// The Go runtime is self-contained by default. A legacy Node bridge is
 	// only created when an explicit target is supplied for a temporary
 	// migration check; no request is sent to port 3001 implicitly.
@@ -453,8 +453,15 @@ func isLocalScriptVideoRequest(req *http.Request) bool {
 	return strings.EqualFold(strings.TrimSpace(input.ModelKey), "local-doubao-executor-video")
 }
 
-func goAuthEnabled() bool {
-	return strings.EqualFold(strings.TrimSpace(os.Getenv("QIANTIE_GO_AUTH_ENABLED")), "1") || strings.EqualFold(strings.TrimSpace(os.Getenv("QIANTIE_GO_AUTH_ENABLED")), "true")
+func goAuthEnabled(nodeAuthTarget string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("QIANTIE_GO_AUTH_ENABLED"))) {
+	case "1", "true":
+		return true
+	case "0", "false":
+		return strings.TrimSpace(nodeAuthTarget) == ""
+	default:
+		return strings.TrimSpace(nodeAuthTarget) == ""
+	}
 }
 
 func newAuthProxy(rawTarget string) (http.Handler, error) {

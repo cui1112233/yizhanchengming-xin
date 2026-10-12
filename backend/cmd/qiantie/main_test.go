@@ -337,13 +337,24 @@ func TestNovelFetchNestedTaskDiagnosticsUseGoHandler(t *testing.T) {
 }
 
 func TestGoAuthEnabledDefaultsSafelyWithoutNodeAuthTarget(t *testing.T) {
-	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "")
-	if goAuthEnabled() {
-		t.Fatal("Go auth must remain disabled unless explicitly enabled")
-	}
-	t.Setenv("QIANTIE_GO_AUTH_ENABLED", "1")
-	if !goAuthEnabled() {
-		t.Fatal("Go auth should enable with explicit opt-in")
+	for _, tc := range []struct {
+		name     string
+		nodeURL  string
+		switchOn string
+		want     bool
+	}{
+		{name: "no Node URL and no switch", want: true},
+		{name: "Node URL and no switch", nodeURL: "http://127.0.0.1:3001", want: false},
+		{name: "explicit true", switchOn: "true", want: true},
+		{name: "no Node URL and explicit false", switchOn: "false", want: true},
+		{name: "Node URL and explicit false", nodeURL: "http://127.0.0.1:3001", switchOn: "false", want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("QIANTIE_GO_AUTH_ENABLED", tc.switchOn)
+			if got := goAuthEnabled(tc.nodeURL); got != tc.want {
+				t.Fatalf("goAuthEnabled(%q) = %t, want %t", tc.nodeURL, got, tc.want)
+			}
+		})
 	}
 }
 
