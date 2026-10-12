@@ -51,6 +51,8 @@ type Config struct {
 	LocalExecutorDownloadsDir     string
 	QingyuN8AdminToken            string
 	QingyuMaterialSelectURL       string
+	GiantMaterialPluginURL        string
+	GiantMaterialPluginToken      string
 	LegacyAccountsPath            string
 	PresetPath                    string
 	AutomationPresetPath          string
@@ -72,6 +74,8 @@ func FromEnv() (Config, error) {
 	// The Go runtime no longer assumes a Node service on port 3001. A legacy
 	// session bridge is opt-in only when an explicit target is supplied.
 	cfg.NodeAuthBaseURL = strings.TrimSpace(os.Getenv("QIANTIE_NODE_AUTH_BASE_URL"))
+	cfg.GiantMaterialPluginURL = strings.TrimRight(strings.TrimSpace(os.Getenv("QIANTIE_GIANT_MATERIAL_PLUGIN_URL")), "/")
+	cfg.GiantMaterialPluginToken = strings.TrimSpace(os.Getenv("QIANTIE_GIANT_MATERIAL_PLUGIN_TOKEN"))
 	cfg.LocalExecutorDownloadsDir = envOr("QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR", "data/downloads")
 	cfg.MergeEnabled = strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED")) == "1" || cfg.LocalMergeEnabled
 	cfg.LegacyAccountsPath = strings.TrimSpace(os.Getenv("QIANTIE_LEGACY_ACCOUNTS_PATH"))

@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,5 +35,28 @@ func TestGiantMaterialResolverRouteReturnsNormalizedMaterialWithoutToken(t *test
 	}
 	if containsAny(recorder.Body.String(), "N8-Admin-Token", "server-token") {
 		t.Fatalf("credential leaked: %s", recorder.Body.String())
+	}
+}
+
+func TestGiantMaterialResolverErrorSeparatesPluginFailureKinds(t *testing.T) {
+	for _, tc := range []struct {
+		code string
+		want int
+	}{
+		{code: "GIANT_PLUGIN_UNAVAILABLE", want: http.StatusServiceUnavailable},
+		{code: "GIANT_PLUGIN_TIMEOUT", want: http.StatusGatewayTimeout},
+		{code: "GIANT_PLUGIN_UPSTREAM_FAILED", want: http.StatusBadGateway},
+		{code: "GIANT_PLUGIN_ENDPOINT_INVALID", want: http.StatusInternalServerError},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			writeGiantMaterialResolverError(recorder, &giantmaterialresolver.CodedError{Code: tc.code})
+			if recorder.Code != tc.want {
+				t.Fatalf("status = %d, want %d body=%s", recorder.Code, tc.want, recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), tc.code) {
+				t.Fatalf("body = %s", recorder.Body.String())
+			}
+		})
 	}
 }

@@ -138,6 +138,13 @@ func genderTextExcerpt(text string) string {
 	return string(runes)
 }
 
+func selectGiantMaterialResolver(cfg config.Config) httpapi.GiantMaterialResolver {
+	if strings.TrimSpace(cfg.GiantMaterialPluginURL) != "" {
+		return giantmaterialresolver.NewHTTPPluginClient(nil, cfg.GiantMaterialPluginURL, cfg.GiantMaterialPluginToken)
+	}
+	return giantmaterialresolver.NewClient(nil, cfg.QingyuMaterialSelectURL, cfg.QingyuN8AdminToken)
+}
+
 func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*http.ServeMux)) (http.Handler, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
@@ -222,7 +229,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	if err := giantMaterialExecutorService.EnsureIdentityUniqueIndex(ctx); err != nil {
 		return nil, err
 	}
-	giantMaterialResolver := giantmaterialresolver.NewClient(nil, cfg.QingyuMaterialSelectURL, cfg.QingyuN8AdminToken)
+	giantMaterialResolver := selectGiantMaterialResolver(cfg)
 	artifactStore := localartifact.NewStore(cfg.LocalExecutorArtifactDir, cfg.LocalExecutorArtifactMaxBytes)
 	automationPresetStore, err := httpapi.NewFileAutomationPresetStore(cfg.AutomationPresetPath, time.Now)
 	if err != nil {

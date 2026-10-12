@@ -30,6 +30,20 @@ func TestFromEnvDoesNotDefaultNodeAuthGateway(t *testing.T) {
 	}
 }
 
+func TestFromEnvReadsOptionalGiantMaterialPlugin(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_GIANT_MATERIAL_PLUGIN_URL", "http://127.0.0.1:18180")
+	t.Setenv("QIANTIE_GIANT_MATERIAL_PLUGIN_TOKEN", "plugin-token")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.GiantMaterialPluginURL != "http://127.0.0.1:18180" || cfg.GiantMaterialPluginToken != "plugin-token" {
+		t.Fatalf("giant material plugin config = %#v", cfg)
+	}
+}
+
 func TestFromEnvRejectsUnreleasedSliceNumber(t *testing.T) {
 	t.Setenv("QIANTIE_MYSQL_DSN", "user:pass@tcp(mysql:3306)/qiantie")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "secret")

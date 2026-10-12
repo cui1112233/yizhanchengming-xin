@@ -1,6 +1,11 @@
 package app
 
-import "testing"
+import (
+	"testing"
+
+	"qiantie/backend/internal/config"
+	"qiantie/backend/internal/giantmaterialresolver"
+)
 
 func TestConfiguredTextProviderAcceptsCatalogIDOrProviderModelID(t *testing.T) {
 	settings := map[string]any{"modelCatalog": []any{map[string]any{
@@ -22,5 +27,19 @@ func TestConfiguredTextProviderAcceptsCatalogIDOrProviderModelID(t *testing.T) {
 	}
 	if provider != nil {
 		t.Fatalf("unexpected provider for unknown selection: %#v", provider)
+	}
+}
+
+func TestSelectGiantMaterialResolverUsesHTTPPluginWhenConfigured(t *testing.T) {
+	resolver := selectGiantMaterialResolver(config.Config{
+		GiantMaterialPluginURL:   "http://127.0.0.1:18180",
+		GiantMaterialPluginToken: "plugin-token",
+	})
+	plugin, ok := resolver.(*giantmaterialresolver.HTTPPluginClient)
+	if !ok {
+		t.Fatalf("resolver type = %T, want *HTTPPluginClient", resolver)
+	}
+	if plugin.BaseURL != "http://127.0.0.1:18180" || plugin.Token != "plugin-token" {
+		t.Fatalf("plugin = %#v", plugin)
 	}
 }

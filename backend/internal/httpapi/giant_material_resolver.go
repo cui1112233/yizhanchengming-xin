@@ -50,13 +50,13 @@ func writeGiantMaterialResolverError(w http.ResponseWriter, err error) {
 	switch code {
 	case "INVALID_GIANT_MATERIAL_ID":
 		status = http.StatusBadRequest
-	case "QINGYU_AUTH_NOT_CONFIGURED":
+	case "QINGYU_AUTH_NOT_CONFIGURED", "GIANT_PLUGIN_UNAVAILABLE":
 		status = http.StatusServiceUnavailable
 	case "QINGYU_AUTH_FAILED":
 		status = http.StatusUnauthorized
-	case "QINGYU_TIMEOUT":
+	case "QINGYU_TIMEOUT", "GIANT_PLUGIN_TIMEOUT":
 		status = http.StatusGatewayTimeout
-	case "QINGYU_ENDPOINT_INVALID":
+	case "QINGYU_ENDPOINT_INVALID", "GIANT_PLUGIN_ENDPOINT_INVALID":
 		status = http.StatusInternalServerError
 	}
 	writeGiantExecutorError(w, status, code)
