@@ -752,11 +752,21 @@ func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[str
 	if len(workForm) == 0 {
 		workForm = mapOrEmpty(settings["work_form"])
 	}
+	// The legacy page renders the top-level `sensitive` field, while the
+	// migrated Go config keeps the same groups under `appConfig.sensitive`.
+	// Expose the canonical app config here so the page cannot manufacture an
+	// empty "默认敏感词组" while the worker uses the real rules.
+	sensitive := mapOrEmpty(settings["sensitive"])
+	if configured := mapOrEmpty(appConfig["sensitive"]); len(configured) > 0 {
+		sensitive = configured
+	} else if len(sensitive) > 0 {
+		appConfig["sensitive"] = sensitive
+	}
 	return map[string]any{
 		"app_config":        publicBatchAppConfig(appConfig),
 		"platforms":         platforms,
 		"styles":            styles,
-		"sensitive":         mapOrEmpty(settings["sensitive"]),
+		"sensitive":         sensitive,
 		"web_submit":        publicBatchWebSubmit(appConfig["web_submit"]),
 		"knowledge":         knowledge,
 		"knowledge_loaded":  !lightweight,

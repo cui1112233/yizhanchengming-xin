@@ -85,6 +85,29 @@ func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T
 	}
 }
 
+func TestLegacyBatchRewriteConfigExposesSensitiveGroupsFromAppConfig(t *testing.T) {
+	payload := legacyBatchRewriteConfig(map[string]any{
+		"appConfig": map[string]any{
+			"sensitive": map[string]any{
+				"groups": []any{map[string]any{
+					"name": "实际词库", "enabled": true,
+					"rules": []any{map[string]any{"find": "玩", "replace": "", "enabled": true}},
+				}},
+			},
+		},
+		"sensitive": map[string]any{},
+	}, false)
+	sensitive := payload["sensitive"].(map[string]any)
+	groups := sensitive["groups"].([]any)
+	if len(groups) != 1 {
+		t.Fatalf("sensitive groups=%#v", sensitive)
+	}
+	group := groups[0].(map[string]any)
+	if group["name"] != "实际词库" {
+		t.Fatalf("sensitive group was not exposed from appConfig: %#v", group)
+	}
+}
+
 func TestBatchRewriteTaskDiagnosticsReadGoDocument(t *testing.T) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()
