@@ -2,6 +2,7 @@ package novelfetchworkshop
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 )
 
@@ -23,6 +24,41 @@ type BookInfo struct {
 	// from the persisted book-info JSON because it is already stored as the
 	// document body.
 	Text string `json:"-"`
+}
+
+// UnmarshalJSON accepts the upstream's inconsistent genre representation.
+// Some 121 responses use a numeric category code while others use its text.
+// Keep the public BookInfo contract textual so callers do not need to know
+// which representation the upstream used.
+func (info *BookInfo) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Category string          `json:"category"`
+		Genre    json.RawMessage `json:"genre"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	genre, err := decodeUpstreamTextOrNumber(raw.Genre)
+	if err != nil {
+		return err
+	}
+	*info = BookInfo{Category: raw.Category, Genre: genre}
+	return nil
+}
+
+func decodeUpstreamTextOrNumber(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return text, nil
+	}
+	var number json.Number
+	if err := json.Unmarshal(raw, &number); err != nil {
+		return "", err
+	}
+	return number.String(), nil
 }
 
 type GenderDecision struct {
