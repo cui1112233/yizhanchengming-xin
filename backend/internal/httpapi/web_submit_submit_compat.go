@@ -16,7 +16,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 	if root == nil || store == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
-	root.Handle("POST /api/batch-rewrite/web-submit/submit", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	submitHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -93,8 +93,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 					continue
 				}
 				platform, _ := strconv.Atoi(firstText(meta["platformId"], meta["platform_id"]))
-				gender := strings.ReplaceAll(firstText(meta["gender"]), "频", "")
-				style := firstText(meta["style"])
+				gender, style := submissionGenderStyle(doc)
 				fields, fieldErr := buildUploadFieldsCompat(platform, gender, style, mapOrEmpty(web["advanced"]), map[string]any{})
 				if fieldErr != nil {
 					row["error"] = fieldErr.Error()
@@ -153,7 +152,22 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			_ = store.PutDocument(req.Context(), identity.Username, doc)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": failed == 0, "results": results, "success_groups": success, "failed_groups": failed})
-	})))
+	}))
+	// The legacy workbench calls /api/web-submit/submit, while the canonical
+	// compatibility route lives under /api/batch-rewrite/web-submit/submit.
+	// Keep both paths on the same handler so the Go 4001 page cannot 404.
+	root.Handle("POST /api/batch-rewrite/web-submit/submit", submitHandler)
+	root.Handle("POST /api/web-submit/submit", submitHandler)
+}
+
+func submissionGenderStyle(doc novelfetchworkshop.Document) (string, string) {
+	meta := doc.Meta
+	gender := strings.ReplaceAll(firstText(meta["gender"], meta["gender_name"], doc.Gender), "频", "")
+	style := firstText(meta["style"], meta["styleName"], meta["style_name"])
+	if _, ok := uploadStyleIDs[style]; !ok {
+		style = "现代通用"
+	}
+	return strings.TrimSpace(gender), style
 }
 
 func uniqueStrings(values []string) []string {
