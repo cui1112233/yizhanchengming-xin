@@ -40,6 +40,11 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 	handler := middleware.Middleware(http.HandlerFunc(read))
 	root.Handle("GET /api/batch-rewrite/config", handler)
 	root.Handle("GET /api/batch-rewrite/bootstrap", handler)
+	root.Handle("POST /api/batch-rewrite/config", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		saveNovelFetchConfig(w, req, store, func(merged map[string]any) map[string]any {
+			return map[string]any{"ok": true, "config": legacyBatchRewriteConfig(merged, false)}
+		})
+	})))
 	issuesHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -147,10 +152,10 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				fixedData = map[string]any{"mode": meta["sensitive_mode"], "status": meta["sensitive_status"], "fixed_count": fixed, "updated_at": meta["updated_at"], "items": []any{}}
 			}
 			writeJSON(w, http.StatusOK, map[string]any{
-				"meta": meta,
-				"sensitive_hits": hitsData,
+				"meta":            meta,
+				"sensitive_hits":  hitsData,
 				"sensitive_fixed": fixedData,
-				"logs": document.Logs,
+				"logs":            document.Logs,
 			})
 		case strings.HasSuffix(req.URL.Path, "/site-submit-log"):
 			logs := []any{}
@@ -549,6 +554,23 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	task["sensitive_fixed_count"] = sensitiveReplaced
 	task["sensitive_failed_count"] = toInt(task["sensitive_failed_count"])
 	task["ai_generated_count"] = toInt(firstText(task["ai_generated_count"], task["aiGeneratedCount"]))
+	// The legacy V78 table reads flat snake_case fields. Keep the real submit
+	// receipt visible after the Go submit handler stores it in task metadata.
+	submitStatus := firstText(task["site_submit_status"], task["siteSubmitStatus"])
+	confirmedVersions := anyStrings(task["site_submit_confirmed_versions"])
+	if len(confirmedVersions) == 0 {
+		confirmedVersions = anyStrings(task["siteSubmitDoneVersions"])
+	}
+	failedVersions := anyStrings(task["site_submit_failed_versions"])
+	if len(failedVersions) == 0 {
+		failedVersions = anyStrings(task["siteSubmitFailedVersions"])
+	}
+	task["site_submit_status"] = submitStatus
+	task["siteSubmitStatus"] = submitStatus
+	task["site_submit_confirmed_versions"] = confirmedVersions
+	task["siteSubmitConfirmedVersions"] = confirmedVersions
+	task["site_submit_failed_versions"] = failedVersions
+	task["siteSubmitFailedVersions"] = failedVersions
 	task["updated_at"] = firstText(task["updated_at"], task["updatedAt"], document.UpdatedAt)
 	if document.MaxTxt > 0 {
 		task["max_txt"] = document.MaxTxt

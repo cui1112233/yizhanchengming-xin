@@ -35,6 +35,24 @@ func TestTargetConfigItemsAcceptsResultArrayResponse(t *testing.T) {
 	}
 }
 
+func TestLegacyBatchRewriteTaskIncludesStoredSubmitReceipt(t *testing.T) {
+	task := legacyBatchRewriteTask(novelfetchworkshop.Document{
+		BookID: "book-submit",
+		Meta: map[string]any{
+			"bookName":               "已提交的书",
+			"siteSubmitStatus":       "submitted",
+			"siteSubmitDoneVersions": []any{"original", "ai1"},
+		},
+	})
+	if task["site_submit_status"] != "submitted" {
+		t.Fatalf("site_submit_status=%#v", task["site_submit_status"])
+	}
+	confirmed, ok := task["site_submit_confirmed_versions"].([]string)
+	if !ok || len(confirmed) != 2 {
+		t.Fatalf("confirmed versions=%#v", task["site_submit_confirmed_versions"])
+	}
+}
+
 func TestBatchRewriteWebSubmitHistoryReadsGoDocumentLogs(t *testing.T) {
 	now := time.Date(2026, 10, 11, 10, 0, 0, 0, time.UTC)
 	store := novelfetchworkshop.NewMemoryStore()
@@ -199,22 +217,37 @@ func TestBatchRewriteTaskListFlattensGoDocumentFields(t *testing.T) {
 		BookID: "2010030448764536200", Gender: "女频", BookInfo: novelfetchworkshop.BookInfo{Genre: "现代女主"},
 		ProcessedChars: 3919, OriginalRawChars: 4334, UpdatedAt: now.Format(time.RFC3339),
 		Meta: map[string]any{"bookName": "非要给我打青霉素的实习护士", "platformId": "15", "originalStatus": "done", "sensitiveStatus": "done", "sensitiveReplaced": 44, "aiStatus": "done", "aiGeneratedCount": 1},
-	}); err != nil { t.Fatal(err) }
+	}); err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
 	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
 	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/tasks", nil)
 	SignBridgeRequest(req, "tester", false, now, "secret")
-	res := httptest.NewRecorder(); mux.ServeHTTP(res, req)
-	if res.Code != http.StatusOK { t.Fatalf("list status=%d body=%s", res.Code, res.Body.String()) }
-	var payload struct { Tasks []map[string]any `json:"tasks"` }
-	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil { t.Fatal(err) }
-	if len(payload.Tasks) != 1 { t.Fatalf("tasks=%#v", payload.Tasks) }
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload struct {
+		Tasks []map[string]any `json:"tasks"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Tasks) != 1 {
+		t.Fatalf("tasks=%#v", payload.Tasks)
+	}
 	task := payload.Tasks[0]
 	for key, want := range map[string]any{"book_name": "非要给我打青霉素的实习护士", "platform_id": "15", "platform_name": "知乎付费", "gender": "女频", "style": "现代女主", "original_status": "done", "ai_status": "done"} {
-		if task[key] != want { t.Fatalf("%s=%#v want=%#v task=%#v", key, task[key], want, task) }
+		if task[key] != want {
+			t.Fatalf("%s=%#v want=%#v task=%#v", key, task[key], want, task)
+		}
 	}
-	if task["sensitive_hit_count"] != float64(44) { t.Fatalf("sensitive_hit_count=%#v", task["sensitive_hit_count"]) }
+	if task["sensitive_hit_count"] != float64(44) {
+		t.Fatalf("sensitive_hit_count=%#v", task["sensitive_hit_count"])
+	}
 }
 
 func TestBatchRewriteIssuesReadsGoDocumentLogs(t *testing.T) {
