@@ -275,7 +275,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
 		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver)
-		registerNovelFetchLegacyWorkflowRoutes(novelFetch, options.NovelFetchStore, func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
+		registerNovelFetchLegacyWorkflowRoutes(novelFetch, options.NovelFetchStore, options.UserDataDir, func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
 			if options.NovelFetchRewriteResolver == nil {
 				return options.NovelFetchRewrite, nil
 			}
@@ -327,7 +327,6 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("/api/batch-rewrite/process/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/rules/ai-suggest", novelAuth.Middleware(http.HandlerFunc(legacyRulesSuggestAlias)))
 		root.Handle("/api/batch-rewrite/rules/preview", novelAuth.Middleware(http.HandlerFunc(legacyRulesPreviewAlias)))
-		root.Handle("/api/batch-rewrite/config", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("GET /api/batch-rewrite/logs", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("GET /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("POST /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))

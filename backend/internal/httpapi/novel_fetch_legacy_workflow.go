@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +20,7 @@ var novelFetchOperations = struct {
 // on the Go store. These routes are deliberately small adapters: they return
 // the same shapes the workbench expects while preserving the complete raw
 // text in each stored document.
-func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, rewriteProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error)) {
+func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, usersDir string, rewriteProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error)) {
 	mux.HandleFunc("GET /api/novel-fetch-workshop/logs", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		docs, err := store.ListDocuments(req.Context(), identity.Username)
@@ -126,6 +128,15 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		}
 		id := fmt.Sprintf("op-%d", time.Now().UnixNano())
 		item := map[string]any{"id": id, "status": "done", "kind": input["kind"], "createdAt": time.Now().UTC().Format(time.RFC3339Nano), "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}
+		if fmt.Sprint(input["kind"]) == "configs" {
+			result, err := syncTargetConfigProfiles(req, store, usersDir)
+			if err != nil {
+				item["status"] = "failed"
+				item["error"] = err.Error()
+			} else {
+				item["result"] = result
+			}
+		}
 		novelFetchOperations.Lock()
 		novelFetchOperations.items[id] = item
 		novelFetchOperations.Unlock()
@@ -152,6 +163,69 @@ func legacyOperationResponse(item map[string]any) map[string]any {
 		response[key] = value
 	}
 	return response
+}
+
+// syncTargetConfigProfiles is shared by the old operation-based workbench and
+// the newer direct sync endpoint. The old page used to mark the operation done
+// without ever calling the target configuration API, which made the UI report
+// zero profiles even when the target account had profiles.
+func syncTargetConfigProfiles(req *http.Request, store novelfetchworkshop.Store, usersDir string) (map[string]any, error) {
+	identity, ok := BridgeIdentityFromContext(req.Context())
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	session := readUploadTargetSession(usersDir, identity.Username)
+	cookie := strings.TrimSpace(toString(session["cookie"]))
+	if cookie == "" {
+		return nil, fmt.Errorf("请先保存账号密码并登录目标站")
+	}
+	response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
+	if err != nil {
+		return nil, fmt.Errorf("目标站配置档读取失败")
+	}
+	var payload map[string]any
+	if json.Unmarshal(response, &payload) != nil {
+		return nil, fmt.Errorf("目标站配置档返回格式无效")
+	}
+	items, hasItems := targetConfigItems(payload)
+	if !hasItems || len(items) == 0 {
+		return nil, fmt.Errorf("目标站未返回可用配置档")
+	}
+	settings, err := store.GetConfig(req.Context(), identity.Username)
+	if err != nil {
+		return nil, fmt.Errorf("读取提交配置失败")
+	}
+	app := mapOrEmpty(settings["appConfig"])
+	web := mapOrEmpty(app["web_submit"])
+	local := []any{}
+	for _, item := range arrayOrEmpty(web["upload_profiles"]) {
+		if strings.ToLower(toString(mapOrEmpty(item)["source"])) != "121" {
+			local = append(local, item)
+		}
+	}
+	groups := make([]any, 0, len(items))
+	for i, item := range items {
+		source := mapOrEmpty(item)
+		data := parseObject(source["config_data"])
+		id := toString(source["id"])
+		if id == "" {
+			id = fmt.Sprintf("%d", i+1)
+		}
+		gender := toString(data["gender"])
+		if gender == "1" {
+			gender = "男"
+		} else if gender == "2" {
+			gender = "女"
+		}
+		groups = append(groups, map[string]any{"id": "121-" + id, "name": firstText(source["config_name"], "121 配置档 "+id), "enabled": true, "source": "121", "config_id": id, "is_default": targetNumber(source["is_default"]) == 1, "platform_id": firstText(data["platform_id"], source["platform_id"]), "gender": strings.ReplaceAll(gender, "频", ""), "style": firstText(data["style_name"], source["style_name"], data["style"]), "advanced": data})
+	}
+	web["upload_profiles"] = append(local, groups...)
+	app["web_submit"] = web
+	settings["appConfig"] = app
+	if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
+		return nil, fmt.Errorf("保存配置档失败")
+	}
+	return map[string]any{"ok": true, "settings": web, "groups": groups, "output": []string{fmt.Sprintf("已从视频管理系统同步 %d 个配置档", len(groups))}}, nil
 }
 
 func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, remove bool) {
