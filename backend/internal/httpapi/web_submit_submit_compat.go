@@ -24,6 +24,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		}
 		var body struct {
 			TaskIDs  []string `json:"taskIds"`
+			IDs      []string `json:"ids"`
 			Versions []string `json:"versions"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
@@ -46,6 +47,9 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 		if cookie == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先在网站提交页保存账号密码并登录目标站"})
 			return
+		}
+		if len(body.TaskIDs) == 0 {
+			body.TaskIDs = body.IDs
 		}
 		versions := cleanStrings(body.Versions)
 		if len(versions) == 0 {
