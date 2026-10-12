@@ -71,8 +71,7 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 					continue
 				}
 				platform := firstText(meta["platformId"], meta["platform_id"])
-				gender := firstText(meta["gender"])
-				style := firstText(meta["style"])
+				gender, style := submissionGenderStyle(doc)
 				profileID := "default"
 				profileName := "默认配置"
 				if profiles := arrayOrEmpty(web["upload_profiles"]); len(profiles) > 0 {
