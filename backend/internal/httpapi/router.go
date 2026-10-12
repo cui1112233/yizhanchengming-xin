@@ -347,6 +347,38 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("GET /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("POST /api/batch-rewrite/schedules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("GET /api/batch-rewrite/batches/current", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		// The V78 page polls this endpoint for the small queue summary shown
+		// above the task table. Keep it on Go as well; without the alias the
+		// page reports a misleading 404 even though the task list is available.
+		root.Handle("GET /api/batch-rewrite/realtime/status", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			identity, ok := BridgeIdentityFromContext(req.Context())
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			documents, err := options.NovelFetchStore.ListDocuments(req.Context(), identity.Username)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务队列失败"})
+				return
+			}
+			counts := map[string]int{"running": 0, "queued": 0, "waiting_retry": 0, "failed": 0, "stopped": 0}
+			for _, document := range documents {
+				status := strings.ToLower(firstText(document.Meta["status"], document.Meta["taskStatus"], document.Meta["aiStatus"]))
+				switch {
+				case strings.Contains(status, "running") || strings.Contains(status, "processing"):
+					counts["running"]++
+				case strings.Contains(status, "queued") || strings.Contains(status, "queue"):
+					counts["queued"]++
+				case strings.Contains(status, "retry"):
+					counts["waiting_retry"]++
+				case strings.Contains(status, "failed") || strings.Contains(status, "error"):
+					counts["failed"]++
+				case strings.Contains(status, "stopped") || strings.Contains(status, "cancel"):
+					counts["stopped"]++
+				}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"counts": counts, "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)})
+		})))
 		root.Handle("POST /api/batch-rewrite/tasks/apply-rules", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("POST /api/batch-rewrite/tasks/reprocess-sensitive", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("POST /api/batch-rewrite/tasks/batch-ai-count", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
