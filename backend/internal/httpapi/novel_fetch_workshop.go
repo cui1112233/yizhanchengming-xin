@@ -215,7 +215,7 @@ func (r *workshopProcessRegistry) latest(owner string, limit int) []map[string]a
 	return items
 }
 
-func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, owner, inputText string, maxTxt int) (map[string]any, error) {
+func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, owner, inputText, platformID string, maxTxt int) (map[string]any, error) {
 	if strings.TrimSpace(inputText) == "" {
 		return nil, errors.New("请输入要处理的书籍清单")
 	}
@@ -224,6 +224,10 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}
 	documents, parsed, emptyIDs, duplicates := parseWorkshopDocuments(inputText, maxTxt)
 	for _, document := range documents {
+		if document.Meta == nil {
+			document.Meta = map[string]any{}
+		}
+		document.Meta["platformId"] = platformID
 		if err := store.PutDocument(ctx, owner, document); err != nil {
 			return nil, err
 		}
@@ -233,8 +237,9 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 		return nil, err
 	}
 	return map[string]any{
-		"parsed": parsed, "emptyIdCount": emptyIDs, "uniqueTasks": len(documents), "duplicateCount": duplicates,
-		"classifyErrors": []any{}, "fetched": 0, "fetchFailed": 0, "generatedAiFiles": 0, "tasks": tasks,
+		"parsed": parsed, "uniqueTasks": len(documents), "unique_tasks": len(documents), "duplicateCount": duplicates, "duplicate_count": duplicates,
+		"emptyIdCount": emptyIDs, "empty_id_count": emptyIDs, "classifyErrors": []any{}, "classify_errors": []any{},
+		"fetched": 0, "fetchFailed": 0, "fetch_failed": 0, "raw_fetched": 0, "generatedAiFiles": 0, "generated_ai_files": 0, "tasks": tasks,
 	}, nil
 }
 
@@ -294,17 +299,36 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			InputText string `json:"inputText"`
-			MaxTxt    int    `json:"maxTxt"`
+			InputText       string `json:"inputText"`
+			InputTextLegacy string `json:"input_text"`
+			MaxTxt          int    `json:"maxTxt"`
+			MaxTxtLegacy    int    `json:"max_txt"`
+			PlatformID      string `json:"platform_id"`
+			PlatformIDCamel string `json:"platformId"`
 		}
-		if err := decodeNovelFetchJSON(w, req, &input); err != nil || strings.TrimSpace(input.InputText) == "" {
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			return
+		}
+		if strings.TrimSpace(input.InputText) == "" {
+			input.InputText = input.InputTextLegacy
+		}
+		if input.MaxTxt <= 0 {
+			input.MaxTxt = input.MaxTxtLegacy
+		}
+		if strings.TrimSpace(input.PlatformID) == "" {
+			input.PlatformID = input.PlatformIDCamel
+		}
+		if strings.TrimSpace(input.PlatformID) == "" {
+			input.PlatformID = "2"
+		}
+		if strings.TrimSpace(input.InputText) == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请输入要处理的书籍清单"})
 			return
 		}
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = 4000
 		}
-		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.MaxTxt)
+		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, input.MaxTxt)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -339,17 +363,33 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process/start", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			InputText string `json:"inputText"`
-			MaxTxt    int    `json:"maxTxt"`
+			InputText       string `json:"inputText"`
+			InputTextLegacy string `json:"input_text"`
+			MaxTxt          int    `json:"maxTxt"`
+			MaxTxtLegacy    int    `json:"max_txt"`
+			PlatformID      string `json:"platform_id"`
+			PlatformIDCamel string `json:"platformId"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
 			return
 		}
+		if strings.TrimSpace(input.InputText) == "" {
+			input.InputText = input.InputTextLegacy
+		}
+		if input.MaxTxt <= 0 {
+			input.MaxTxt = input.MaxTxtLegacy
+		}
+		if strings.TrimSpace(input.PlatformID) == "" {
+			input.PlatformID = input.PlatformIDCamel
+		}
+		if strings.TrimSpace(input.PlatformID) == "" {
+			input.PlatformID = "2"
+		}
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
 		job := map[string]any{"id": id, "status": "running", "queue_state": "running", "started_at": now, "updated_at": now, "attempts": 1, "steps": []any{}, "progress": []any{}}
-		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.MaxTxt)
+		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, input.MaxTxt)
 		if err != nil {
 			job["status"] = "failed"
 			job["queue_state"] = "failed"
@@ -1446,7 +1486,10 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 				bookName = cell
 			}
 		}
-		meta := map[string]any{"bookId": bookID, "bookName": bookName, "maxTxt": maxTxt}
+		// The V78 preview hides the textarea after parsing and later rebuilds
+		// input_text from each selected task's sourceLine. Preserve the original
+		// line here; without it the second request starts with an empty list.
+		meta := map[string]any{"bookId": bookID, "bookName": bookName, "maxTxt": maxTxt, "sourceLine": line}
 		if gender != "" {
 			meta["gender"] = gender
 			meta["genderSource"] = "input"

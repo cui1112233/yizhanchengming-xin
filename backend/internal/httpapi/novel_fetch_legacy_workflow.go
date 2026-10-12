@@ -129,7 +129,10 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		novelFetchOperations.Lock()
 		novelFetchOperations.items[id] = item
 		novelFetchOperations.Unlock()
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "operation": item})
+		// The legacy workbench reads id/status/result from the top level, while
+		// newer callers also accept the nested operation object. Return both
+		// shapes so polling never turns a valid operation into /undefined.
+		writeJSON(w, http.StatusOK, legacyOperationResponse(item))
 	})
 	mux.HandleFunc("GET /api/novel-fetch-workshop/web-submit/operations/{id}", func(w http.ResponseWriter, req *http.Request) {
 		novelFetchOperations.RLock()
@@ -139,8 +142,16 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": "操作不存在"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "operation": item})
+		writeJSON(w, http.StatusOK, legacyOperationResponse(item))
 	})
+}
+
+func legacyOperationResponse(item map[string]any) map[string]any {
+	response := map[string]any{"ok": true, "operation": item}
+	for key, value := range item {
+		response[key] = value
+	}
+	return response
 }
 
 func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, remove bool) {
