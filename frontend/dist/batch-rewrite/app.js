@@ -1788,13 +1788,17 @@ async function openWebLoginDialog() {
       try {
         const username = $("webLoginUsername").value.trim();
         const password = $("webLoginPassword").value;
-        const operation = await api("/api/web-submit/operations", {
+        const token = localStorage.getItem("auth_token") || "";
+        const response = await fetch("/api/novel-fetch-upload/upload-login", {
           method: "POST",
-          body: JSON.stringify({ kind: "login", username, password }),
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ username, password }),
         });
-        const completed = await waitWebSubmitOperation(operation.id);
-        if (completed.status === "failed") throw new Error(completed.error || "登录验证失败");
-        const settings = completed.result?.settings || {};
+        const body = await response.text();
+        let resultBody = {};
+        try { resultBody = body ? JSON.parse(body) : {}; } catch (_) { resultBody = { error: body }; }
+        if (!response.ok || resultBody.ok !== true) throw new Error(resultBody.error || `登录验证失败（HTTP ${response.status}）`);
+        const settings = { username: resultBody.username || username, upload_session_status: resultBody.status || "ready" };
         state.webLoginSession = true;
         state.config.web_submit = { ...(state.config.web_submit || {}), ...settings, username, password_masked: true };
         renderWebLoginStatus(state.config.web_submit);
