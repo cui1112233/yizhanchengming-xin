@@ -82,7 +82,10 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	if options.NovelFetchFetcher != nil {
 		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher)
-		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchFetcher)
+		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchFetcher, batchFetchClassification{
+			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
+			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
+		})
 	}
 	if options.Store != nil && options.Director != nil && options.Slice >= 2 {
 		registerDirectorRoutes(v11, options.Director, options.Store)

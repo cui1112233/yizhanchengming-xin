@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,7 +10,45 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store, fetcher *novelfetchworkshop.UpstreamFetcher) {
+type batchFetchClassification struct {
+	AIGenderJudge         novelfetchworkshop.AIGenderJudge
+	AIGenderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error)
+	RewriteProvider       novelfetchworkshop.RewriteProvider
+	RewriteResolver       func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
+}
+
+func classifyFetchedBatchBook(ctx context.Context, owner string, bookInfo novelfetchworkshop.BookInfo, sourceText string, metadata map[string]any, classification batchFetchClassification) map[string]any {
+	meta := copyAnyMap(metadata)
+	info := bookInfo
+	info.Text = sourceText
+	judge := classification.AIGenderJudge
+	if classification.AIGenderJudgeResolver != nil {
+		if resolved, err := classification.AIGenderJudgeResolver(ctx, owner); err == nil && resolved != nil {
+			judge = resolved
+		}
+	}
+	decision := novelfetchworkshop.ResolveGender(ctx, stringValue(meta["gender"]), info, judge)
+	if decision.Gender != "" {
+		meta["gender"] = decision.Gender
+		meta["genderSource"] = string(decision.Source)
+		meta["genderReason"] = decision.Reason
+	}
+	provider := classification.RewriteProvider
+	if classification.RewriteResolver != nil {
+		if resolved, err := classification.RewriteResolver(ctx, owner); err == nil && resolved != nil {
+			provider = resolved
+		}
+	}
+	style := novelfetchworkshop.ResolveStyle(ctx, info, provider)
+	if style.Style != "" {
+		meta["style"] = style.Style
+		meta["styleSource"] = style.Source
+		meta["styleReason"] = style.Reason
+	}
+	return meta
+}
+
+func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store, fetcher *novelfetchworkshop.UpstreamFetcher, classification batchFetchClassification) {
 	if mux == nil || store == nil || fetcher == nil {
 		return
 	}
@@ -78,10 +117,7 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 		if result.BookInfo.Genre != "" {
 			metadata["genre"] = result.BookInfo.Genre
 		}
-		decision := novelfetchworkshop.ResolveGender(r.Context(), "", result.BookInfo, nil)
-		if decision.Gender == "男频" || decision.Gender == "女频" {
-			metadata["gender"], metadata["genderSource"] = decision.Gender, string(decision.Source)
-		}
+		metadata = classifyFetchedBatchBook(r.Context(), owner, result.BookInfo, result.ProcessedText, metadata, classification)
 		updated, err := store.CaptureBookSource(r.Context(), owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: result.ProcessedText, ReplaceSource: true, SourceTitle: book.Title, SourceMetadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
