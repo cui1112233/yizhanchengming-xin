@@ -571,6 +571,14 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	task["siteSubmitConfirmedVersions"] = confirmedVersions
 	task["site_submit_failed_versions"] = failedVersions
 	task["siteSubmitFailedVersions"] = failedVersions
+	createdAt := firstText(task["created_at"], task["createdAt"], task["created_time"], task["createdTime"])
+	if createdAt == "" {
+		// Older records did not persist a separate creation field. UpdatedAt is
+		// still a real task timestamp and is preferable to showing a blank cell.
+		createdAt = document.UpdatedAt
+	}
+	task["created_at"] = createdAt
+	task["createdAt"] = createdAt
 	task["updated_at"] = firstText(task["updated_at"], task["updatedAt"], document.UpdatedAt)
 	if document.MaxTxt > 0 {
 		task["max_txt"] = document.MaxTxt

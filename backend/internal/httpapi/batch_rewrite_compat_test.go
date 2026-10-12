@@ -37,7 +37,8 @@ func TestTargetConfigItemsAcceptsResultArrayResponse(t *testing.T) {
 
 func TestLegacyBatchRewriteTaskIncludesStoredSubmitReceipt(t *testing.T) {
 	task := legacyBatchRewriteTask(novelfetchworkshop.Document{
-		BookID: "book-submit",
+		BookID:    "book-submit",
+		UpdatedAt: "2026-10-12T05:19:27Z",
 		Meta: map[string]any{
 			"bookName":               "已提交的书",
 			"siteSubmitStatus":       "submitted",
@@ -50,6 +51,9 @@ func TestLegacyBatchRewriteTaskIncludesStoredSubmitReceipt(t *testing.T) {
 	confirmed, ok := task["site_submit_confirmed_versions"].([]string)
 	if !ok || len(confirmed) != 2 {
 		t.Fatalf("confirmed versions=%#v", task["site_submit_confirmed_versions"])
+	}
+	if task["created_at"] != "2026-10-12T05:19:27Z" {
+		t.Fatalf("created_at=%#v", task["created_at"])
 	}
 }
 

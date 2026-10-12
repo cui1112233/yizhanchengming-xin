@@ -1495,6 +1495,12 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 		result["ai_status"] = "ai_done"
 	}
 	result["site_submit_status"] = metaString("siteSubmitStatus", "site_submit_status")
+	createdAt := metaString("createdAt", "created_at", "createdTime", "created_time")
+	if createdAt == "" {
+		createdAt = document.UpdatedAt
+	}
+	result["created_at"] = createdAt
+	result["createdAt"] = createdAt
 	return result
 }
 
@@ -1577,7 +1583,7 @@ func parseWorkshopDocuments(input string, maxTxt int) ([]novelfetchworkshop.Docu
 		// The V78 preview hides the textarea after parsing and later rebuilds
 		// input_text from each selected task's sourceLine. Preserve the original
 		// line here; without it the second request starts with an empty list.
-		meta := map[string]any{"bookId": bookID, "bookName": bookName, "maxTxt": maxTxt, "sourceLine": line}
+		meta := map[string]any{"bookId": bookID, "bookName": bookName, "maxTxt": maxTxt, "sourceLine": line, "createdAt": time.Now().UTC().Format(time.RFC3339Nano)}
 		if gender != "" {
 			meta["gender"] = gender
 			meta["genderSource"] = "input"
