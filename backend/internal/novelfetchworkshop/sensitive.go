@@ -25,6 +25,23 @@ var safeSensitiveReplacements = map[string]string{
 	"狗东西": "讨厌家伙",
 	"激情视频": "凌晨快乐视频",
 	"开房": "外面睡觉",
+	"捉奸": "发现关系越界",
+	"爬上床": "深夜留宿",
+	"避孕套": "防护用品",
+	"强上": "强行靠近",
+	"禁脔": "专属对象",
+	"骚货": "轻浮称呼",
+	"私会": "私下见面",
+	"搞我闺蜜": "介入朋友关系",
+	"拉皮条": "私下牵线",
+	"床上技术": "亲密相处方式",
+	"鬼混": "混乱交往",
+	"与多人有染": "同时与多人交往",
+	"潜规则": "隐性约定",
+	"伟哥": "活力药物",
+	"把妹": "主动结识女生",
+	"约炮": "临时约会",
+	"裸聊": "私密聊天",
 	"卧槽":  "惊讶感叹",
 	"我草":  "惊讶感叹",
 	"我操":  "惊讶感叹",
@@ -37,6 +54,9 @@ var safeSensitiveHomophones = map[rune]rune{
 	'狗': '够', '杀': '煞', '赌': '堵', '毒': '独', '嫖': '飘', '妓': '技',
 	'裸': '落', '乳': '如', '胸': '凶', '性': '幸', '欲': '遇', '插': '叉',
 	'操': '超', '妈': '麻', '逼': 'B', '骂': '嘛', '偷': '透', '骗': '片',
+	'怂': '松', '蛋': '弹', '猥': '委', '琐': '锁', '老': '佬', '资': '姿',
+	'丫': '呀', '房': '方', '床': '创', '湿': '诗', '喘': '船',
+	'舔': '添', '吻': '稳', '娇': '焦',
 }
 
 var safeSensitivePassThrough = map[string]struct{}{
@@ -130,7 +150,7 @@ func safeSensitiveReplacement(find string) string {
 		return "健康状况"
 	case containsAny(find, "诈骗", "偷税", "受贿", "贿赂", "传销", "拐卖", "造谣", "网暴", "勒索", "敲诈", "洗钱", "偷渡", "骗婚", "酒驾"):
 		return "违规行为"
-	case containsAny(find, "奸", "淫", "骚", "妓", "嫖", "裸", "乳", "胸", "性", "色", "欲", "精", "射", "插", "上床", "床上", "约炮", "一夜"):
+	case containsAny(find, "奸", "淫", "骚", "妓", "嫖", "裸", "乳", "胸", "性", "色", "欲", "精", "射", "插", "喘", "湿", "阴", "阳", "床", "房", "洞房", "交配", "配种", "情趣", "情欲", "亲热", "热吻", "爱液", "液", "叫", "娇", "裙", "裤", "丝袜", "内衣", "诱惑", "春宵", "发情", "欢", "交欢", "侍寝", "承欢", "调情", "挑逗", "撩", "酥", "痉挛", "颤", "缠", "滴蜡", "炮友", "换妻", "陪睡", "包夜", "全套", "援交", "卖身", "包养", "房事", "上过床", "爬床", "滚床", "床单", "堕胎", "流产", "取卵", "避孕", "捐精", "借种", "上床", "床上", "约炮", "一夜"):
 		if replacement := neutralizeByHomophone(find); replacement != find {
 			return replacement
 		}
@@ -146,7 +166,10 @@ func safeSensitiveReplacement(find string) string {
 		if replacement := neutralizeByHomophone(find); replacement != find {
 			return replacement
 		}
-		return "中性说法"
+		// Do not replace an unknown phrase with an opaque label. Keeping the
+		// original is more readable for ordinary false-positive entries and
+		// leaves the term available for a later, reviewed dictionary entry.
+		return find
 	}
 }
 

@@ -142,7 +142,7 @@ func TestSafeSensitiveReplacementUsesMeaningfulNeutralLanguage(t *testing.T) {
 	}}}}}
 	EnsureSensitiveRuleReplacements(settings)
 	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
-	want := []string{"关系介入者", "多人伤害", "中性说法"}
+	want := []string{"关系介入者", "多人伤害", "未知脏词"}
 	for i, expected := range want {
 		if got := rules[i].(map[string]any)["replace"]; got != expected {
 			t.Fatalf("rule %d replacement=%q, want %q", i, got, expected)
@@ -180,8 +180,8 @@ func TestSafeSensitiveReplacementVariesByWordMeaning(t *testing.T) {
 	if got := rules[1].(map[string]any)["replace"]; got == "不当称呼" || got == "中性说法" {
 		t.Fatalf("贱人 collapsed to generic wording: %q", got)
 	}
-	if got := rules[2].(map[string]any)["replace"]; got != "中性说法" {
-		t.Fatalf("unclassified word=%q, want explicit review fallback", got)
+	if got := rules[2].(map[string]any)["replace"]; got != "未知脏词" {
+		t.Fatalf("unclassified word=%q, want readable pass-through", got)
 	}
 }
 
@@ -196,6 +196,21 @@ func TestSafeSensitiveReplacementUsesSceneReadablePhrases(t *testing.T) {
 	for i, expected := range want {
 		if got := rules[i].(map[string]any)["replace"]; got != expected {
 			t.Fatalf("rule %d replacement=%q, want %q", i, got, expected)
+		}
+	}
+}
+
+func TestSafeSensitiveReplacementPreviewSetIsStable(t *testing.T) {
+	preview := map[string]string{
+		"捉奸": "发现关系越界", "爬上床": "深夜留宿", "避孕套": "防护用品", "强上": "强行靠近",
+		"一夜情": "短暂关系", "禁脔": "专属对象", "婊子": "失礼之人", "骚货": "轻浮称呼",
+		"私会": "私下见面", "搞我闺蜜": "介入朋友关系", "拉皮条": "私下牵线", "床上技术": "亲密相处方式",
+		"鬼混": "混乱交往", "与多人有染": "同时与多人交往", "潜规则": "隐性约定", "伟哥": "活力药物",
+		"把妹": "主动结识女生", "约炮": "临时约会", "裸聊": "私密聊天", "激情视频": "凌晨快乐视频", "开房": "外面睡觉",
+	}
+	for find, want := range preview {
+		if got := safeSensitiveReplacement(find); got != want {
+			t.Fatalf("%s replacement=%q, want %q", find, got, want)
 		}
 	}
 }
