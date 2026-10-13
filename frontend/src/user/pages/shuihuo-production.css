@@ -3558,3 +3558,12 @@ body.shuihuo-reference-shell
   color: #d48806;
   font-size: 12px;
 }
+
+/* The storyboard asset rail is now represented by @asset mentions in the
+   storyboard prompt. Keep the workbench grid aligned to its six visible
+   columns after removing that rail. */
+.batch-factory-workbench-table .shuihuo-workbench-head,
+.batch-factory-book-row {
+  grid-template-columns: 64px minmax(300px, 1.04fr) minmax(170px, .60fr) minmax(330px, 1.16fr) minmax(300px, 1.02fr) minmax(210px, .72fr) !important;
+  min-width: 1374px !important;
+}

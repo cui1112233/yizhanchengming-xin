@@ -349,20 +349,28 @@ test('task logs distinguish scheduled auto-publish from automation that stops fo
   assert.match(source, /自动生产默认停在待上传/);
 });
 
-test('renders every novel row with Shuihuo preset, prompt and clip-library cells', () => {
-  assert.match(source, /shuihuo-preset-cell batch-factory-book-preset-cell/);
+test('renders every novel row with prompt and clip-library cells without a separate storyboard asset column', () => {
+  assert.doesNotMatch(source, /shuihuo-preset-cell batch-factory-book-preset-cell/);
   assert.match(source, /shuihuo-prompt-cell batch-factory-book-prompt-cell/);
   assert.match(source, /shuihuo-library-cell batch-factory-book-library-cell/);
-	assert.match(source, /InlineStoryboardAssets/);
+	assert.doesNotMatch(source, /label: '分镜资产'/);
   assert.match(source, /画面提示词/);
 	assert.match(source, /function InlineMediaLibrary/);
+});
+
+test('puts selected storyboard assets into the storyboard prompt as @ mentions', () => {
+  assert.match(source, /function storyboardAssetMentions\(book, video\)/);
+  assert.match(source, /map\(asset => `@\$\{assetName\(asset\)\}`\)/);
+  assert.match(source, /function withStoryboardAssetMentions\(prompt, book, video\)/);
+  assert.match(source, /withStoryboardAssetMentions\(compiledPrompt \|\| displayPrompt \|\| rawVideoPrompt, book, video\)/);
+  assert.match(source, /资产：\$\{mentions\}/);
 });
 
 test('binds the current storyboard to selectable asset cards whose grey state is saved as a video override', () => {
   assert.match(source, /function InlineStoryboardAssets/);
   assert.match(source, /assetSelection/);
   assert.match(source, /excludedAssetIds/);
-  assert.match(source, /自动推荐资产/);
+  assert.match(source, /当前分镜的图片和视频生成/);
   assert.match(source, /saveVideoOverride\(batchId, book\.id, selectedVideo\.id/);
 	assert.match(source, /batch-factory-storyboard-asset-card/);
 	assert.match(source, /'is-muted'/);

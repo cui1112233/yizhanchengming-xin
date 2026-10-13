@@ -370,6 +370,41 @@ func selectedAssets(kind string, names []string, records map[string]compiledAsse
 	return selected
 }
 
+func storyboardAssetMentions(groups ...[]compiledAsset) string {
+	seen := map[string]bool{}
+	mentions := []string{}
+	for _, group := range groups {
+		for _, asset := range group {
+			name := strings.TrimSpace(asset.Name)
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+			mentions = append(mentions, "@"+name)
+		}
+	}
+	return strings.Join(mentions, " ")
+}
+
+func withStoryboardAssetMentions(prompt, mentions string) string {
+	prompt = strings.TrimSpace(prompt)
+	mentions = strings.TrimSpace(mentions)
+	if prompt == "" || mentions == "" {
+		return prompt
+	}
+	allPresent := true
+	for _, mention := range strings.Fields(mentions) {
+		if !strings.Contains(prompt, mention) {
+			allPresent = false
+			break
+		}
+	}
+	if allPresent {
+		return prompt
+	}
+	return prompt + "\n资产：" + mentions
+}
+
 func baseSetupEnabled(values SettingsPatch) bool {
 	raw, exists := values["aiPromptConfig"]
 	if !exists {
@@ -635,6 +670,7 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 	characters := selectedAssets("character", characterRefs, records, primaryImages, selectedIDs, hasSelection)
 	scenes := selectedAssets("scene", sceneRefs, records, primaryImages, selectedIDs, hasSelection)
 	props := selectedAssets("prop", propRefs, records, primaryImages, selectedIDs, hasSelection)
+	assetMentions := storyboardAssetMentions(characters, scenes, props)
 	limit := referenceImageLimit(values)
 	if frozenReferenceLimit >= 0 {
 		limit = frozenReferenceLimit
@@ -782,6 +818,13 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		addComponent(&components, "video", videoLabel, videoPrompt)
 		addComponent(&components, "restriction", "画面限制", constraintBody("restriction", "restrictionEnabled", "restriction"))
 		addComponent(&components, "negative", "负面提示词", constraintBody("negative", "negativeEnabled", "negative"))
+	}
+	displayPrompt = withStoryboardAssetMentions(displayPrompt, assetMentions)
+	videoPrompt = withStoryboardAssetMentions(videoPrompt, assetMentions)
+	for index := range components {
+		if components[index].Key == "video" {
+			components[index].Content = videoPrompt
+		}
 	}
 	duration := rawInt(values, "duration", int(video.DurationSeconds))
 

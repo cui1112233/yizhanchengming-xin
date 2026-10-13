@@ -164,7 +164,7 @@ func TestFinalPromptH3BaseSetupSwitchOffOmitsSubjectDefinitions(t *testing.T) {
 func TestFinalPromptStripsSharedSectionsFromOverride(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{
-		Patch: SettingsPatch{"videoPrompt": rawSetting(t, "【基础设定】\n人物：张三\n\n镜头画面：\n00:00 | 中景 | 动作\n\n负面提示词：模糊")},
+		Patch:            SettingsPatch{"videoPrompt": rawSetting(t, "【基础设定】\n人物：张三\n\n镜头画面：\n00:00 | 中景 | 动作\n\n负面提示词：模糊")},
 		ExpectedRevision: video.Revision,
 	}); err != nil {
 		t.Fatal(err)
@@ -447,7 +447,7 @@ func TestFinalPromptWithConstraintsDisabledContainsOnlyStoryboardPrompt(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prompt.CompiledPrompt != "视频提示词：镜头画面：\n00:00-00:03 | 中景｜缓慢推轨 | 林晚进入客厅\n00:03-00:09 | 特写｜固定 | 她握紧玻璃杯" {
+	if prompt.CompiledPrompt != "视频提示词：镜头画面：\n00:00-00:03 | 中景｜缓慢推轨 | 林晚进入客厅\n00:03-00:09 | 特写｜固定 | 她握紧玻璃杯\n资产：@林晚 @林家客厅 @玻璃杯" {
 		t.Fatalf("constraints disabled must leave only storyboard prompt, got:\n%s", prompt.CompiledPrompt)
 	}
 }
@@ -514,8 +514,14 @@ func TestFinalPromptExcludesDeselectedStoryboardAssetFromTextAndReferences(t *te
 	if strings.Contains(compiled.CompiledPrompt, "林晚：18岁中国女性") || slices.Contains(compiled.ReferenceImageURLs, "https://images.example/"+character.ID+".png") {
 		t.Fatalf("deselected character leaked into production request: %+v\n%s", compiled.ReferenceImageURLs, compiled.CompiledPrompt)
 	}
+	if strings.Contains(compiled.CompiledPrompt, "@林晚") {
+		t.Fatalf("deselected character asset mention leaked into production request: %s", compiled.CompiledPrompt)
+	}
 	if !slices.Contains(compiled.ReferenceImageURLs, "https://images.example/"+scene.ID+".png") {
 		t.Fatalf("selected scene image missing: %+v", compiled.ReferenceImageURLs)
+	}
+	if !strings.Contains(compiled.CompiledPrompt, "@林家客厅") {
+		t.Fatalf("selected scene asset mention missing from production request: %s", compiled.CompiledPrompt)
 	}
 }
 
