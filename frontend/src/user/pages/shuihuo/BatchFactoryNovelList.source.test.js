@@ -539,11 +539,18 @@ test('persists named AI reasoning presets through the V11 backend and lets users
 });
 
 test('routes every new director run through the unified structured pipeline', () => {
-  assert.match(source, /function usesSelectedH3VideoPreset\(settings = \{\}\)/);
-  assert.match(source, /if \(presetId\) return presetId === 'batch-video-h3-director'/);
+  assert.doesNotMatch(source, /function usesSelectedH3VideoPreset/);
   assert.match(source, /h3: true,/);
   assert.match(source, /if \(stage === 'director'\) await compileBookH3Videos\(book\)/);
   assert.match(source, /if \(stage === 'director' && mode === 'compile' && h3DirectorCards\(book\)\.length\)/);
+  assert.match(source, /选中的视频预设只改变提示词规则，不改变处理链路/);
+});
+
+test('keeps video model selection separate from prompt-preset selection', () => {
+  assert.match(source, /videoProviderForModel\(settings\.videoModelId, settings\.videoProvider\)/);
+  assert.match(source, /const videoPreset = promptConfig\.video \|\| \{\};/);
+  assert.match(source, /prompt_template: videoPromptTemplate/);
+  assert.match(source, /视频模型只负责最终生成/);
 });
 
 test('uses the script-generation constraint layers instead of one generic multi-select', () => {
@@ -1127,9 +1134,9 @@ test('lets a VIDEO card inspect the actual submitted prompt and compile trace', 
   assert.match(source, /compile_trace/);
 });
 
-test('shows persisted H3 director cards before final VIDEO compilation instead of looking empty', () => {
+test('shows persisted director cards before final VIDEO compilation instead of looking empty', () => {
   assert.match(source, /function h3DirectorCards\(book\)/);
-  assert.match(source, /H3 导演卡已提取/);
+  assert.match(source, /导演分镜卡已提取/);
   assert.match(source, /等待真实配音时长编译最终 VIDEO/);
   assert.match(source, /h3Card\.source_text/);
 });

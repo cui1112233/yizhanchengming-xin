@@ -168,6 +168,12 @@ test('unified AI reasoning keeps one asset extraction prompt and preserves video
   assert.match(source, /video: \{ \.\.\.video, \.\.\.presetValue\(catalog\.find\(item => item\.id === normalizedId\)\), enabled: Boolean\(normalizedId\) \}/);
 });
 
+test('explains that the video prompt preset controls rules while the video model controls execution', () => {
+  assert.match(source, /不决定导演分镜或提示词内容/);
+  assert.match(source, /决定导演分镜和最终 VIDEO Prompt 的规则与格式/);
+  assert.match(source, /与上面的具体视频模型相互独立/);
+});
+
 test('keeps the automation gear beside the unified configuration label', () => {
   assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
 });

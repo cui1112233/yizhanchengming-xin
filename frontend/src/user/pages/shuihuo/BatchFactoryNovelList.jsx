@@ -309,12 +309,6 @@ function effectiveBookSettings(batch, book) {
   const bookPatch = book?.settingsState?.patch || {};
   return normalizeAudioSourceSettings({ ...batchPatch, ...bookPatch, publishSettings: { ...(batchPatch.publishSettings || {}), ...(bookPatch.publishSettings || {}) } });
 }
-function usesSelectedH3VideoPreset(settings = {}) {
-  const video = settings?.aiPromptConfig?.video || {};
-  const presetId = String(video.presetId || '').trim();
-  if (presetId) return presetId === 'batch-video-h3-director';
-  return String(video.presetKey || '').trim() === 'h3-video-normal';
-}
 function h3CompilationStatus(settings = {}) {
   if (settings.audioPlanningEnabled === true) return '等待真实配音时长编译最终 VIDEO';
   const seconds = Number(settings.storyboardDurationLimit) === 15 ? 15 : 10;
@@ -602,7 +596,7 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
     const preset = assetPromptCatalog.find(item => item.id === presetId);
     try {
       await onAssetPromptChange?.(preset ? { presetId: preset.id, presetName: preset.name, presetSlot: preset.slot, presetVersion: preset.version, constraintCategory: preset.constraintCategory || '' } : { presetId: '' });
-      message.success(preset?.id === 'batch-assets-h3' ? 'H3 人物场景道具方案已选中，点击“重新生成资产”应用到当前书。' : '资产提示词已保存。');
+      message.success(preset?.id === 'batch-assets-h3' ? '人物场景道具方案已选中，点击“重新生成资产”应用到当前书。' : '资产提示词已保存。');
     } catch (error) { message.error(error?.message || '保存资产提示词失败'); }
   }
   function toggleAssetSelection(assetId, checked) {
@@ -881,7 +875,7 @@ function InlineStoryboardAssets({ book, batchId, selectedVideoId: controlledSele
   const selectedCount = showingPrecompiledAssets ? assets.length : assets.filter(asset => selection.selectedIds.has(String(asset.id))).length;
   return <div className="batch-factory-cell-shell batch-factory-inline-assets">
     <header className="batch-factory-cell-head">
-      <div><b>{showingPrecompiledAssets ? `H3 导演卡 ${(selectedPrecompiledFrame?.index || 0) + 1} · 资产` : storyboardVideoLabel(selectedVideo, currentIndex)}</b><small>{showingPrecompiledAssets ? 'H3 导演卡已提取，等待 VIDEO 编译' : `${selectedCount}/${assets.length || 0} 已启用`}</small></div>
+      <div><b>{showingPrecompiledAssets ? `导演分镜卡 ${(selectedPrecompiledFrame?.index || 0) + 1} · 资产` : storyboardVideoLabel(selectedVideo, currentIndex)}</b><small>{showingPrecompiledAssets ? '导演分镜卡已提取，等待 VIDEO 编译' : `${selectedCount}/${assets.length || 0} 已启用`}</small></div>
       <span className="batch-factory-cell-state">{assets.length ? '资产就绪' : '待提取'}</span>
     </header>
     <div className="batch-factory-cell-content batch-factory-asset-content">
@@ -892,7 +886,7 @@ function InlineStoryboardAssets({ book, batchId, selectedVideoId: controlledSele
           const starred = !showingPrecompiledAssets && selected && asset.kind === 'character' && starredCharacterNames.includes(assetName(asset));
           const onClick = showingPrecompiledAssets ? () => onManage?.() : () => onAssetClick(asset);
           const onDoubleClick = showingPrecompiledAssets ? undefined : () => onAssetDoubleClick(asset);
-          const title = showingPrecompiledAssets ? 'H3 导演卡已提取；最终 VIDEO 编译后可按分镜调整资产。点击管理全部资产。' : starred ? '星标人物聚焦；点击后取消星标并停用，双击可取消星标。' : selected ? '点击停用；双击人物卡设为星标聚焦。' : '点击启用：用于当前分镜的图片和视频生成';
+          const title = showingPrecompiledAssets ? '导演分镜卡已提取；最终 VIDEO 编译后可按分镜调整资产。点击管理全部资产。' : starred ? '星标人物聚焦；点击后取消星标并停用，双击可取消星标。' : selected ? '点击停用；双击人物卡设为星标聚焦。' : '点击启用：用于当前分镜的图片和视频生成';
           return <button type="button" key={asset.id} disabled={savingAssetId === asset.id} onClick={onClick} onDoubleClick={onDoubleClick} className={`batch-factory-storyboard-asset-card ${starred ? 'is-starred' : selected ? 'is-selected' : 'is-muted'}`} title={title}>
             <span>{group.label}</span><b>{assetName(asset)}</b>{starred ? <i aria-label="星标人物">★</i> : null}
           </button>;
@@ -903,7 +897,7 @@ function InlineStoryboardAssets({ book, batchId, selectedVideoId: controlledSele
         <button type="button" onClick={() => onManage?.(selectedVideo?.id || selectedPrecompiledFrame?.key)}>管理全部资产</button>
       </div>
     </div>
-    {showingPrecompiledAssets ? <div className="batch-factory-cell-pager"><button type="button" aria-label="上一张 H3 导演卡资产" disabled={!selectedPrecompiledFrame || selectedPrecompiledFrame.index === 0} onClick={() => switchPrecompiledFrame(-1)}><LeftOutlined /></button><span>{(selectedPrecompiledFrame?.index || 0) + 1} / {precompiledWorkspace.frames.length}</span><button type="button" aria-label="下一张 H3 导演卡资产" disabled={!selectedPrecompiledFrame || selectedPrecompiledFrame.index >= precompiledWorkspace.frames.length - 1} onClick={() => switchPrecompiledFrame(1)}><RightOutlined /></button></div> : <div className="batch-factory-cell-pager">
+    {showingPrecompiledAssets ? <div className="batch-factory-cell-pager"><button type="button" aria-label="上一张导演分镜卡资产" disabled={!selectedPrecompiledFrame || selectedPrecompiledFrame.index === 0} onClick={() => switchPrecompiledFrame(-1)}><LeftOutlined /></button><span>{(selectedPrecompiledFrame?.index || 0) + 1} / {precompiledWorkspace.frames.length}</span><button type="button" aria-label="下一张导演分镜卡资产" disabled={!selectedPrecompiledFrame || selectedPrecompiledFrame.index >= precompiledWorkspace.frames.length - 1} onClick={() => switchPrecompiledFrame(1)}><RightOutlined /></button></div> : <div className="batch-factory-cell-pager">
       <button type="button" aria-label="上一分镜资产" disabled={currentIndex === 0} onClick={() => switchVideo(-1)}><LeftOutlined /></button>
       <span>{currentIndex + 1} / {videos.length}</span>
       <button type="button" aria-label="下一分镜资产" disabled={currentIndex >= videos.length - 1} onClick={() => switchVideo(1)}><RightOutlined /></button>
@@ -1011,16 +1005,16 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const camera = h3Card.camera || {};
 		return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell">
 			<div className="batch-factory-cell-shell batch-factory-prompt-entry-card is-h3-director-card">
-				<header className="batch-factory-cell-head"><div><b>H3 导演卡 {h3CardIndex + 1}</b><small>已提取，尚未编译 VIDEO</small></div></header>
+				<header className="batch-factory-cell-head"><div><b>导演分镜卡 {h3CardIndex + 1}</b><small>已提取，尚未编译 VIDEO</small></div></header>
 				<button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(h3Frame?.key || '')}>
-					<span className="batch-factory-prompt-status">H3 导演卡已提取</span>
+					<span className="batch-factory-prompt-status">导演分镜卡已提取</span>
 					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}{h3AssetPromptText ? `\n\n【资产提示词】\n${h3AssetPromptText}` : ''}{h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}</p>
 					<small title={[h3AssetPromptText, ...h3ConstraintRows].filter(Boolean).join('\n')}>{h3AssetPromptText ? `资产提示词：${promptPreview(h3AssetPromptText)}` : '暂无资产提示词'} · {h3ConstraintLabels ? `约束：${h3ConstraintLabels}` : '未启用约束'} · {h3CompilationMessage}</small>
 				</button>
 				<div className="batch-factory-cell-pager">
-					<button type="button" aria-label="上一张 H3 导演卡" disabled={h3CardIndex === 0} onClick={() => selectH3Frame(h3CardIndex - 1)}><LeftOutlined /></button>
+					<button type="button" aria-label="上一张导演分镜卡" disabled={h3CardIndex === 0} onClick={() => selectH3Frame(h3CardIndex - 1)}><LeftOutlined /></button>
 					<span>{h3CardIndex + 1} / {h3Cards.length}</span>
-					<button type="button" aria-label="下一张 H3 导演卡" disabled={h3CardIndex >= h3Cards.length - 1} onClick={() => selectH3Frame(h3CardIndex + 1)}><RightOutlined /></button>
+					<button type="button" aria-label="下一张导演分镜卡" disabled={h3CardIndex >= h3Cards.length - 1} onClick={() => selectH3Frame(h3CardIndex + 1)}><RightOutlined /></button>
 				</div>
 			</div>
 		</div>;
@@ -1153,20 +1147,20 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   if (!selectedVideo && selectedPrecompiledFrame) {
     const card = selectedPrecompiledFrame.card || {};
     return <div className="batch-factory-prompt-modal-stack">
-      <div className="batch-factory-prompt-modal-head"><Space><Tooltip title="上一张 H3 导演卡"><Button aria-label="上一张 H3 导演卡" icon={<LeftOutlined />} disabled={selectedPrecompiledFrame.index === 0} onClick={() => movePrecompiledFrame(-1)} /></Tooltip><span className="batch-factory-prompt-modal-index">{selectedPrecompiledFrame.index + 1}/{precompiledWorkspace.frames.length}</span><Tooltip title="下一张 H3 导演卡"><Button aria-label="下一张 H3 导演卡" icon={<RightOutlined />} disabled={selectedPrecompiledFrame.index >= precompiledWorkspace.frames.length - 1} onClick={() => movePrecompiledFrame(1)} /></Tooltip></Space><span className="batch-factory-prompt-status">H3 导演卡 · 待编译 VIDEO</span></div>
-      <Alert type="info" showIcon message="当前是 H3 导演结构，不是最终 VIDEO 提示词" description="开启跟随配音后会先读取每行真实时长，再按 10/15 秒确定性切段并填充最终 VIDEO Prompt。" />
+      <div className="batch-factory-prompt-modal-head"><Space><Tooltip title="上一张导演分镜卡"><Button aria-label="上一张导演分镜卡" icon={<LeftOutlined />} disabled={selectedPrecompiledFrame.index === 0} onClick={() => movePrecompiledFrame(-1)} /></Tooltip><span className="batch-factory-prompt-modal-index">{selectedPrecompiledFrame.index + 1}/{precompiledWorkspace.frames.length}</span><Tooltip title="下一张导演分镜卡"><Button aria-label="下一张导演分镜卡" icon={<RightOutlined />} disabled={selectedPrecompiledFrame.index >= precompiledWorkspace.frames.length - 1} onClick={() => movePrecompiledFrame(1)} /></Tooltip></Space><span className="batch-factory-prompt-status">导演分镜卡 · 待编译 VIDEO</span></div>
+      <Alert type="info" showIcon message="当前是导演分镜结构，不是最终 VIDEO 提示词" description="提示词预设决定内容和格式；视频模型只负责最终生成。开启跟随配音后会先读取每行真实时长，再按 10/15 秒确定性切段并填充最终 VIDEO Prompt。" />
 			<label className="shuihuo-form-label batch-factory-prompt-editor-label">分镜视频提示词<Input.TextArea rows={18} readOnly value={`${formatH3DirectorCardPrompt(h3Document, card)}${h3AssetPromptText ? `\n\n【资产提示词】\n${h3AssetPromptText}` : ''}${h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}`} /></label>
       <div className="batch-factory-prompt-modal-actions">
         <Tooltip title="等待最终 VIDEO 编译后才能保存"><Button type="primary" disabled>保存</Button></Tooltip>
-        <Tooltip title="复用当前 H3 导演卡、真实配音时长和当前约束设置，编译最终 VIDEO 提示词；不会重新调用导演模型。"><Button type="primary" loading={regenerating} disabled={regenerating || !onCompile} onClick={onCompile}>编译最终提示词</Button></Tooltip>
+        <Tooltip title="复用当前导演分镜卡、真实配音时长和当前约束设置，编译最终 VIDEO 提示词；不会重新调用导演模型。"><Button type="primary" loading={regenerating} disabled={regenerating || !onCompile} onClick={onCompile}>编译最终提示词</Button></Tooltip>
         <Button loading={regenerating} disabled={regenerating || !onRegenerate} onClick={onRegenerate}>重新生成导演分镜</Button>
         <Tooltip title="等待最终 VIDEO 编译后才能编辑"><Button disabled>编辑</Button></Tooltip>
-        <Tooltip title="等待 H3 最终 VIDEO 编译"><Button disabled>生成视频</Button></Tooltip>
-        <Button onClick={openH3Trace}>查看 H3 Trace</Button>
+        <Tooltip title="等待最终 VIDEO 编译"><Button disabled>生成视频</Button></Tooltip>
+        <Button onClick={openH3Trace}>查看编译 Trace</Button>
         <Button type="text" disabled={regenerating} onClick={() => onRetry?.()}>重试</Button>
       </div>
-      <p className="shuihuo-modal-note">此处与当前行的资产、分镜视频共用同一张 H3 导演卡；最终 VIDEO 生成前，不会伪造可播放视频。</p>
-      <Modal title="H3 分镜编译与提交 Trace" open={h3TraceOpen} onCancel={() => setH3TraceOpen(false)} footer={null} width={980}>{h3TraceBusy ? <Alert type="info" showIcon message="正在读取编译 Trace…" /> : h3TraceError ? <Alert type="error" showIcon message="编译 Trace 读取失败" description={h3TraceError} /> : <Alert type="info" showIcon message="当前导演卡尚未产生最终 VIDEO 编译记录" />}</Modal>
+      <p className="shuihuo-modal-note">此处与当前行的资产、分镜视频共用同一张导演分镜卡；最终 VIDEO 生成前，不会伪造可播放视频。</p>
+      <Modal title="分镜编译与提交 Trace" open={h3TraceOpen} onCancel={() => setH3TraceOpen(false)} footer={null} width={980}>{h3TraceBusy ? <Alert type="info" showIcon message="正在读取编译 Trace…" /> : h3TraceError ? <Alert type="error" showIcon message="编译 Trace 读取失败" description={h3TraceError} /> : <Alert type="info" showIcon message="当前导演卡尚未产生最终 VIDEO 编译记录" />}</Modal>
     </div>;
   }
   return <div className="batch-factory-prompt-modal-stack">
@@ -1207,12 +1201,12 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
         }}>{editing ? '完成编辑' : '编辑'}</Button>
         {promptKind === 'visual' ? <Button onClick={() => onGenerateVisual?.(selectedVideo?.id)}>生成图片</Button> : <Tooltip title={productionAvailable ? '为当前分镜生成视频候选版本。' : productionReason}><Button disabled={!productionAvailable || regenerating} loading={regenerating} onClick={() => onGenerateVideo?.(selectedVideo?.id)}>生成视频</Button></Tooltip>}
         {promptKind === 'video' && selectedIndex === 0 && engineSettings.openingEnabled === true ? <Button onClick={() => setOpeningVariantsOpen(true)}>查看换开头提示词</Button> : null}
-        {promptKind === 'video' ? <Button onClick={openH3Trace}>查看 H3 Trace</Button> : null}
+        {promptKind === 'video' ? <Button onClick={openH3Trace}>查看编译 Trace</Button> : null}
         <Button type="text" disabled={regenerating} onClick={() => onRetry?.(selectedVideo?.id)}>重试</Button>
       </div>
     </>}
     <p className="shuihuo-modal-note">{promptKind === 'visual' ? '画面版本从当前书的人物场景预设中管理和生成。' : editing ? '编辑的是当前分镜的视频描述；保存后会按已启用资产与约束重新编译最终视频提示词。' : compilingPrompt ? '正在读取已启用资产与约束编译的最终视频提示词。' : '视频版本只在当前分镜内生成和切换，不会覆盖其他分镜。'}</p>
-    <Modal title="H3 分镜编译与提交 Trace" open={h3TraceOpen} onCancel={() => setH3TraceOpen(false)} footer={null} width={980}>
+    <Modal title="分镜编译与提交 Trace" open={h3TraceOpen} onCancel={() => setH3TraceOpen(false)} footer={null} width={980}>
       {h3TraceBusy ? <Alert type="info" showIcon message="正在读取编译 Trace…" /> : h3TraceError ? <Alert type="error" showIcon message="编译 Trace 读取失败" description={h3TraceError} /> : h3Trace?.legacy ? <Alert type="warning" showIcon message="旧数据只读" description={h3Trace?.notice || '旧版导演数据，无完整结构化 Trace'} /> : h3Segment ? <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <Descriptions size="small" bordered column={2} items={[
           { key: 'director', label: '导演修订', children: h3Trace?.director_revision_id || '—' },
@@ -1221,7 +1215,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
           { key: 'duration', label: '确定性时长', children: `${h3Segment.canonical_duration_ms || 0}ms → ${h3Segment.request_duration_ms || 0}ms` },
           { key: 'hash', label: 'Prompt Hash', children: h3Segment.compiled_prompt_hash || '—', span: 2 }
         ]} />
-        <label className="shuihuo-form-label">实际提交视频模型的 H3 最终 Prompt<Input.TextArea rows={16} readOnly value={h3Segment.compiled_prompt || ''} /></label>
+        <label className="shuihuo-form-label">实际提交视频模型的最终 VIDEO Prompt<Input.TextArea rows={16} readOnly value={h3Segment.compiled_prompt || ''} /></label>
         <label className="shuihuo-form-label">Compile Trace<Input.TextArea rows={12} readOnly value={JSON.stringify(h3Segment.compile_trace || {}, null, 2)} /></label>
       </Space> : <Alert type="info" showIcon message="当前分镜尚无编译记录" />}
     </Modal>
@@ -1362,10 +1356,10 @@ function InlineMediaLibrary({ book, versionsByVideo, productionStatus, mergeJob,
   useEffect(() => { if (!controlledSelectedVideoId) setLocalSelectedVideoId(book?.videos?.[0]?.id || ''); }, [book?.id]);
   useEffect(() => { if (!videos.some(item => item.id === selectedVideoId) && videos[0]?.id) selectVideo(videos[0].id); }, [videos.map(item => item.id).join('|')]);
   function move(direction) { const next = videos[selectedIndex + direction]; if (next) selectVideo(next.id); }
-  if (!video && precompiledWorkspace.status === 'awaiting_compilation') return <button type="button" className="batch-factory-cell-shell batch-factory-inline-media is-empty" title="打开待编译的 H3 分镜视频" onClick={() => onManage?.(selectedVideoId)}>
-    <header className="batch-factory-cell-head"><div><b>H3 分镜视频</b><small>导演卡已提取，尚未编译 VIDEO</small></div><span className="batch-factory-cell-state">待编译</span></header>
-    <div className="batch-factory-cell-content batch-factory-video-content"><div className="batch-factory-cell-empty"><CloudUploadOutlined /><span>点击查看待编译的 H3 分镜视频；{h3CompilationMessage}。</span></div></div>
-    <div className="batch-factory-cell-pager"><span>{precompiledWorkspace.cards.length} 张 H3 导演卡待编译 · 点击进入</span></div>
+  if (!video && precompiledWorkspace.status === 'awaiting_compilation') return <button type="button" className="batch-factory-cell-shell batch-factory-inline-media is-empty" title="打开待编译的分镜视频" onClick={() => onManage?.(selectedVideoId)}>
+    <header className="batch-factory-cell-head"><div><b>分镜视频</b><small>导演分镜卡已提取，尚未编译 VIDEO</small></div><span className="batch-factory-cell-state">待编译</span></header>
+    <div className="batch-factory-cell-content batch-factory-video-content"><div className="batch-factory-cell-empty"><CloudUploadOutlined /><span>点击查看待编译的分镜视频；{h3CompilationMessage}。</span></div></div>
+    <div className="batch-factory-cell-pager"><span>{precompiledWorkspace.cards.length} 张导演分镜卡待编译 · 点击进入</span></div>
   </button>;
   if (!video) return <div className="batch-factory-cell-shell batch-factory-inline-media is-empty"><div className="batch-factory-cell-empty">AI 推理后显示该书的分镜视频。</div></div>;
   const running = currentProgress?.status === 'running' || currentProgress?.status === 'queued';
@@ -2050,7 +2044,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
       <div className="batch-factory-media-pickstation-workspace">
         <section className="batch-factory-media-pickstation-viewer">
           <header>
-            <div><b>VIDEO {String(currentIndex + 1).padStart(2, '0')}</b><small>H3 导演卡 · 待编译</small></div>
+            <div><b>VIDEO {String(currentIndex + 1).padStart(2, '0')}</b><small>导演分镜卡 · 待编译</small></div>
             <Tag color="default">待生成</Tag>
           </header>
           <div className="batch-factory-media-pickstation-stage">
@@ -2058,7 +2052,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
               <div className="batch-factory-media-primary-empty"><PictureOutlined /><span>当前分镜暂不可播放视频</span></div>
             </div>
           </div>
-          <footer><span>当前为 H3 导演卡 {(currentIndex || 0) + 1}；{h3CompilationStatus(mergeSettings)} Prompt。</span><small>待编译</small></footer>
+          <footer><span>当前为导演分镜卡 {(currentIndex || 0) + 1}；{h3CompilationStatus(mergeSettings)} Prompt。</span><small>待编译</small></footer>
         </section>
         <aside className="batch-factory-media-pickstation-rail">
           <section className="batch-factory-media-pickstation-rail-card">
@@ -2072,7 +2066,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
               <header><div><span className="batch-factory-media-pickstation-index">{String(index + 1).padStart(2, '0')}</span><b>VIDEO {String(index + 1).padStart(2, '0')}</b></div><small>待生成</small></header>
               <button type="button" className="batch-factory-media-pickstation-main is-empty" onClick={() => setSelectedVideoId(frame.key)}>
                 <PassiveMediaPoster className="batch-factory-media-pickstation-thumb is-landscape" label={`分镜 ${index + 1}`} detail="暂无视频" />
-                <span><b>{String(frameCard.source_text || 'H3 导演卡')}</b><small>{frameCard.action ? `动作：${frameCard.action}` : '等待最终 VIDEO 编译'}</small></span>
+                <span><b>{String(frameCard.source_text || '导演分镜卡')}</b><small>{frameCard.action ? `动作：${frameCard.action}` : '等待最终 VIDEO 编译'}</small></span>
               </button>
               <div className="batch-factory-media-pickstation-versions"><Button size="small" type={active ? 'primary' : 'default'} onClick={() => onOpenDirector?.(frame.key)}>打开分镜提示词</Button></div>
             </section>;
@@ -2082,7 +2076,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
       <section className="batch-factory-media-bottom-sheet is-precompiled-collapsed">
         <div className="batch-factory-media-bottom-sheet-bar">
           <div className="batch-factory-media-bottom-sheet-ready"><span><PictureOutlined /></span><div><b>0 / {precompiledWorkspace.frames.length} 分镜已选好</b><small>先完成最终 VIDEO 编译，再生成、选择与合成视频。</small></div></div>
-          <div className="batch-factory-media-bottom-sheet-quick"><Button size="small" onClick={() => onOpenDirector?.(selectedPrecompiledFrame?.key || '')}>查看导演提示词</Button><Tooltip title="等待 H3 最终 VIDEO 编译"><Button type="primary" disabled>合成当前书</Button></Tooltip><Tooltip title="等待可上传视频"><Button size="small" className="batch-factory-upload-network-button" disabled>上传网络</Button></Tooltip></div>
+          <div className="batch-factory-media-bottom-sheet-quick"><Button size="small" onClick={() => onOpenDirector?.(selectedPrecompiledFrame?.key || '')}>查看导演提示词</Button><Tooltip title="等待最终 VIDEO 编译"><Button type="primary" disabled>合成当前书</Button></Tooltip><Tooltip title="等待可上传视频"><Button size="small" className="batch-factory-upload-network-button" disabled>上传网络</Button></Tooltip></div>
         </div>
       </section>
     </div>;
