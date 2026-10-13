@@ -167,7 +167,8 @@ test('keeps the automation gear beside the unified configuration label', () => {
 
 test('uses a website profile organization as the unified organization default', () => {
   assert.match(source, /const selected = \(publish\.websiteProfiles \|\| \[\]\)\.find\(profile => profile\.id === publish\.websiteProfileId\)/);
-  assert.match(source, /const organization = selected\?\.organization \|\| selected\?\.organization_id \|\| ''/);
+    assert.match(source, /const advanced = selected\?\.advanced \|\| selected\?\.config_data \|\| \{\}/);
+    assert.match(source, /advanced\?\.organization_id/);
 });
 
 test('unified AI reasoning exposes all four constraint layers plus the base-setup switch', () => {

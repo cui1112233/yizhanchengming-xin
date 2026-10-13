@@ -116,7 +116,16 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
   const patch = next => onChange({ ...value, ...next });
   useEffect(() => {
     const selected = (publish.websiteProfiles || []).find(profile => profile.id === publish.websiteProfileId);
-    const organization = selected?.organization || selected?.organization_id || '';
+    const advanced = selected?.advanced || selected?.config_data || {};
+    const organization = selected?.organization
+      || selected?.organization_id
+      || selected?.organizationId
+      || selected?.org_id
+      || advanced?.organization_id
+      || advanced?.organizationId
+      || advanced?.organization
+      || advanced?.org_id
+      || '';
     if (organization && organization !== publish.organization) {
       patch({ publishSettings: { ...publish, organization } });
     }
