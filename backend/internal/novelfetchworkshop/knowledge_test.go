@@ -103,3 +103,18 @@ func TestKnowledgeWritesSynchronizeLegacyAppConfigView(t *testing.T) {
 		t.Fatalf("legacy appConfig view has %d opening phrases, want 175", got)
 	}
 }
+
+func TestSyncKnowledgeConfigViewsPreservesRuleReplacements(t *testing.T) {
+	settings := EnsureWorkshopDefaults(map[string]any{})
+	SyncKnowledgeConfigViews(settings, map[string]any{
+		"appConfig": map[string]any{"knowledge": map[string]any{
+			"layout_rules": map[string]any{"sensitive_rules": []any{map[string]any{"find": "脏词", "replace": "文明词", "enabled": true}}},
+		}},
+	})
+	libraries := settings["knowledgeLibraries"].(map[string]any)
+	layout := libraries["layout_rules"].(map[string]any)
+	rules := layout["sensitive_rules"].([]any)
+	if len(rules) != 1 || rules[0].(map[string]any)["replace"] != "文明词" {
+		t.Fatalf("rule replacement was not persisted: %#v", layout)
+	}
+}

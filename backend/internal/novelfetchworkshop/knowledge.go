@@ -17,6 +17,47 @@ var knowledgeKinds = map[string]bool{
 
 var openingStyles = []string{"现代通用", "现代女主", "现代虐文", "现代甜文", "现代悬疑", "古风通用", "古风虐文", "古风甜文", "年代通用", "年代虐文", "年代甜文", "男频都市", "玄幻", "历史", "家庭奇葩", "家庭伤感", "职场打脸"}
 
+// SyncKnowledgeConfigViews makes knowledgeLibraries the canonical persisted
+// view while keeping appConfig.knowledge compatible with the legacy page.
+// Rules are edited through appConfig, whereas library entries are edited
+// through knowledgeLibraries, so the changed view must win for each request.
+func SyncKnowledgeConfigViews(settings, patch map[string]any) {
+	if settings == nil {
+		return
+	}
+	libraries, _ := settings["knowledgeLibraries"].(map[string]any)
+	if libraries == nil {
+		libraries = map[string]any{}
+	}
+	apply := func(source map[string]any) {
+		for kind, value := range source {
+			if kind == "high_imitation" || kind == "opening_phrases" || kind == "rewrite_templates" || kind == "layout_rules" || kind == "symbol_rules" || kind == "chapter_rules" || kind == "opening_analyzer" {
+				if library, ok := value.(map[string]any); ok {
+					libraries[kind] = cloneMap(library)
+				}
+			}
+		}
+	}
+	if root, ok := patch["knowledge"].(map[string]any); ok {
+		apply(root)
+	}
+	if root, ok := patch["knowledgeLibraries"].(map[string]any); ok {
+		apply(root)
+	}
+	if app, ok := patch["appConfig"].(map[string]any); ok {
+		if root, ok := app["knowledge"].(map[string]any); ok {
+			apply(root)
+		}
+	}
+	settings["knowledgeLibraries"] = libraries
+	app, _ := settings["appConfig"].(map[string]any)
+	if app == nil {
+		app = map[string]any{}
+	}
+	app["knowledge"] = cloneMap(libraries)
+	settings["appConfig"] = app
+}
+
 func normalizeKnowledgeItems(raw any) []map[string]any {
 	values, _ := raw.([]any)
 	if typed, ok := raw.([]map[string]any); ok {
