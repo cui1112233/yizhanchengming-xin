@@ -36,6 +36,7 @@ test('public Compose renders V88 and isolated Shuihuo DNS-only request chains', 
     { mode: 'ingress', target: 80, published: '80', protocol: 'tcp' },
     { mode: 'ingress', target: 80, published: '3000', protocol: 'tcp' },
   ]);
+  assert.ok(services.nginx.volumes.some(volume => volume.target === '/etc/letsencrypt' && volume.read_only));
   assert.equal(services['v88-node'].build, undefined);
   assert.equal(services['go-api'].build, undefined);
   assert.equal(config.networks.qiantie_internal.external, true);
@@ -45,6 +46,10 @@ test('public Nginx proxies application requests only through the Node service', 
   const nginx = fs.readFileSync(nginxFile, 'utf8');
 
   assert.match(nginx, /proxy_pass http:\/\/v88-node:3000;/);
+  assert.match(nginx, /server_name yzcm\.site;/);
+  assert.match(nginx, /ssl_session_cache shared:SSL:10m;/);
+  assert.match(nginx, /ssl_session_timeout 1d;/);
+  assert.match(nginx, /keepalive_requests 1000;/);
   assert.doesNotMatch(nginx, /proxy_pass http:\/\/go-api:4000;/);
   assert.doesNotMatch(nginx, /18081|172\.19\.|host\.docker\.internal/);
 });
