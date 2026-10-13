@@ -111,6 +111,11 @@ test('treats the legacy novel-fetch browser session as the same shared 121 login
   assert.match(source, /SESSION_CHECK_NAMES\s*=\s*\[\s*'视频管理系统登录会话',\s*'121 后台登录会话',\s*'目标站登录会话'\s*\]/);
 });
 
+test('opens the shared login form when rechecking finds an expired session', () => {
+  const selfCheck = source.slice(source.indexOf('const selfCheck'), source.indexOf('useEffect', source.indexOf('const selfCheck')));
+  assert.match(selfCheck, /openLoginForm\(\)/);
+});
+
 test('unified engine settings write the opening variants toggle and count at the patch root', () => {
   assert.match(source, /换开头/);
   assert.match(source, /openingEnabled/);
