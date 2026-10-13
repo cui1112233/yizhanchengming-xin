@@ -136,16 +136,16 @@ test('places opening variants under AI reasoning asset settings with a compact h
   assert.doesNotMatch(source.slice(modelStart, modelEnd), /换开头/);
 });
 
-test('unified AI reasoning selects extraction, character and scene prompts without overwriting video prompts', () => {
+test('unified AI reasoning keeps one asset extraction prompt and preserves video prompt selection', () => {
   assert.match(source, /value=\{assets\.extraction\?\.presetId \|\| undefined\}/);
-  assert.match(source, /value=\{assets\.character\?\.presetId \|\| undefined\}/);
-  assert.match(source, /value=\{assets\.scene\?\.presetId \|\| undefined\}/);
   assert.match(source, /bySlot\('script\.asset-extraction'\)/);
-  assert.match(source, /bySlot\('batch\.character-meta'\)/);
-  assert.match(source, /bySlot\('batch\.scene-meta'\)/);
-  assert.match(source, /assets: \{ \.\.\.assets, enabled: true, character: presetFor\(presetId\) \}/);
-  assert.match(source, /assets: \{ \.\.\.assets, enabled: true, scene: presetFor\(presetId\) \}/);
-  assert.match(source, /video: \{ \.\.\.video, \.\.\.presetValue\(catalog\.find\(item => item\.id === presetId\)\), enabled: true \}/);
+  assert.doesNotMatch(source, /<b>人物提示词<\/b>/);
+  assert.doesNotMatch(source, /<b>场景提示词<\/b>/);
+  assert.match(source, /noPromptOption = \{ value: '__none__', label: '无' \}/);
+  assert.match(source, /promptOptions = options => \[noPromptOption, \.\.\.options\]/);
+  assert.match(source, /normalizePromptId = presetId => presetId === '__none__'/);
+  assert.match(source, /placeholder="选择提示词或无"/);
+  assert.match(source, /video: \{ \.\.\.video, \.\.\.presetValue\(catalog\.find\(item => item\.id === normalizedId\)\), enabled: Boolean\(normalizedId\) \}/);
 });
 
 test('unified AI reasoning exposes all four constraint layers plus the base-setup switch', () => {
