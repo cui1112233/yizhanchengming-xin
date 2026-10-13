@@ -52,6 +52,7 @@ func importedKnowledge() (map[string]any, map[string]any) {
 	layout := readImportedSeed("layout_rules.json")
 	symbol := readImportedSeed("symbol_rules.json")
 	chapter := readImportedSeed("chapter_rules.json")
+	openingAnalyzer := readImportedSeed("opening_analyzer.json")
 	sensitive := readImportedSeed("sensitive.json")
 
 	// The old workbench keeps sensitive rules in a separate file, while the
@@ -73,6 +74,7 @@ func importedKnowledge() (map[string]any, map[string]any) {
 	rewrite["items"] = appendObjects(rewrite["profiles"], rewrite["temporary_instructions"])
 	knowledge := map[string]any{
 		"opening_phrases":   opening,
+		"opening_analyzer":  openingAnalyzer,
 		"high_imitation":    high,
 		"rewrite_templates": rewrite,
 		"layout_rules":      layout,

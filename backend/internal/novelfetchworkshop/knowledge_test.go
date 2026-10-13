@@ -58,6 +58,11 @@ func TestOptimizeKnowledgePreservesIDAndUpdatesReturnedFields(t *testing.T) {
 
 func TestDefaultWorkshopSettingsIncludeImportedKnowledgeAndRules(t *testing.T) {
 	settings := DefaultWorkshopSettings()
+	app, _ := settings["appConfig"].(map[string]any)
+	knowledge, _ := app["knowledge"].(map[string]any)
+	if analyzer, ok := knowledge["opening_analyzer"].(map[string]any); !ok || analyzer["name"] != "爆款开头拆解" {
+		t.Fatalf("opening analyzer seed missing: %#v", knowledge["opening_analyzer"])
+	}
 	got := KnowledgeSummary(settings)
 	want := map[string]int{
 		"opening_phrases": 174, "rewrite_templates": 14, "high_imitation": 1,
