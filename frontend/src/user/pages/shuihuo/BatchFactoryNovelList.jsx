@@ -2360,6 +2360,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [automationRunMode, setAutomationRunMode] = useState('full_submit');
   const [automationScheduledAt, setAutomationScheduledAt] = useState('');
   const [automationConcurrency, setAutomationConcurrency] = useState(2);
+  const [contentRangeLines, setContentRangeLines] = useState(5);
+  const [contentCaptureCharacters, setContentCaptureCharacters] = useState(4000);
+  const [contentSettingsSaving, setContentSettingsSaving] = useState(false);
   const [productionStatus, setProductionStatus] = useState(null);
 	const [activeProductionRequestID, setActiveProductionRequestID] = useState('');
   const [mergeStatus, setMergeStatus] = useState(null);
@@ -3066,11 +3069,36 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   }
   async function openAutomationStart() {
     try {
+      const firstBook = books[0];
+      setContentRangeLines(Number(firstBook?.sourceMetadata?.contentRangeLines || 5));
+      setContentCaptureCharacters(Number(firstBook?.sourceMetadata?.contentCaptureCharacters || 4000));
       const values = await loadAutomationPresets();
       setAutomationPresetID(current => current || values[0]?.id || '');
       setAutomationScheduledAt(current => current || formatBeijingDatetimeLocal(new Date(Date.now() + 10 * 60 * 1000).toISOString()));
       setAutomationStartOpen(true);
     } catch (error) { message.error(error?.message || '读取自动化预设失败'); }
+  }
+  async function saveContentSettings() {
+    if (!batch?.id || !books.length || contentSettingsSaving) return false;
+    const rangeLines = Math.min(500, Math.max(1, Number(contentRangeLines) || 5));
+    const captureCharacters = Math.min(100000, Math.max(1000, Number(contentCaptureCharacters) || 4000));
+    setContentSettingsSaving(true);
+    try {
+      for (const book of books) {
+        await updateBookMetadata(batch.id, book.id, {
+          metadata: { ...(book.sourceMetadata || {}), contentRangeLines: rangeLines, contentCaptureCharacters: captureCharacters },
+          expectedRevision: Number(book.revision || 0)
+        });
+      }
+      await refreshBatch();
+      setContentRangeLines(rangeLines);
+      setContentCaptureCharacters(captureCharacters);
+      message.success(`内容设置已保存：范围 ${rangeLines} 行，截取 ${captureCharacters} 字。`);
+      return true;
+    } catch (error) {
+      message.error(error?.message || '内容范围和截取设置保存失败');
+      return false;
+    } finally { setContentSettingsSaving(false); }
   }
   useEffect(() => {
     if (openAutomationOnLoad && !automationAutoOpenedRef.current) {
@@ -3090,6 +3118,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     }
     setAutomationBusy(key);
     try {
+      if (key === 'start' && !(await saveContentSettings())) return;
       let result;
       if (key === 'start') result = await startBatchAutomation(batch.id, { presetId: automationPresetID, runMode: automationRunMode, scheduledAt: scheduledAt || undefined, concurrency: normalizeAutomationConcurrency(automationConcurrency) });
       else if (key === 'pause') result = await pauseBatchAutomation(batch.id);
@@ -3383,8 +3412,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 
     <BatchFactoryUnifiedSettingsModal open={unifiedSettingsOpen} batch={batch} onClose={() => setUnifiedSettingsOpen(false)} onSaved={saveSettings} />
     <Modal title="任务 / 日志" open={logsOpen} onCancel={() => setLogsOpen(false)} footer={<Button onClick={() => loadRuntimeStatus()}>刷新状态</Button>} width={860}><BatchLogs books={books} automationStatus={automationStatus} productionStatus={productionStatus} mergeStatus={mergeStatus} error={logsError} /></Modal>
-    <Modal title="自动生产" open={automationStartOpen} onCancel={() => setAutomationStartOpen(false)} width={620} destroyOnClose footer={<Space><Button onClick={() => setAutomationStartOpen(false)}>取消</Button><Button loading={automationBusy === 'start'} onClick={() => runAutomationAction('start', { immediate: true })}>立即执行</Button><Button type="primary" loading={automationBusy === 'start'} onClick={() => runAutomationAction('start')}>保存定时任务</Button></Space>}>
+    <Modal title="自动生产" open={automationStartOpen} onCancel={() => setAutomationStartOpen(false)} width={620} destroyOnClose footer={<Space><Button onClick={() => setAutomationStartOpen(false)}>取消</Button><Button loading={contentSettingsSaving} onClick={saveContentSettings}>保存内容设置</Button><Button loading={automationBusy === 'start'} onClick={() => runAutomationAction('start', { immediate: true })}>立即执行</Button><Button type="primary" loading={automationBusy === 'start'} onClick={() => runAutomationAction('start')}>保存定时任务</Button></Space>}>
       <Space direction="vertical" size={14} style={{ width: '100%' }}>
+        <Alert type="info" showIcon message="本批次内容设置" description="这些设置会同步到当前批量的全部小说；不会重新获取正文，只影响生产时展示和截取的内容。" />
+        <label className="batch-factory-engine-field"><span><b>内容范围</b></span><InputNumber min={1} max={500} value={contentRangeLines} onChange={value => setContentRangeLines(value || 5)} addonAfter="行" style={{ width: '100%' }} /></label>
+        <label className="batch-factory-engine-field"><span><b>内容截取</b></span><Select value={contentCaptureCharacters} onChange={setContentCaptureCharacters} style={{ width: '100%' }} options={[1000, 2000, 4000, 8000, 12000, 20000, 50000, 100000].map(value => ({ value, label: `${value} 字` }))} /></label>
         <label className="batch-factory-engine-field"><span><b>自动化预设</b></span><Select value={automationPresetID || undefined} onChange={setAutomationPresetID} placeholder="选择已保存预设" options={automationPresets.map(item => ({ value: item.id, label: `${item.name} · v${item.version}` }))} style={{ width: '100%' }} /></label>
         <label className="batch-factory-engine-field"><span><b>执行模式</b></span><Select value={automationRunMode} onChange={setAutomationRunMode} style={{ width: '100%' }} options={[{ value: 'storyboard_only', label: '只生成分镜' }, { value: 'video_no_submit', label: '生成视频不提交' }, { value: 'full_submit', label: '全自动生成并提交（成片完成后上传）' }]} /></label>
         <label className="batch-factory-engine-field"><span><b>自动启动时间（北京时间 UTC+8）</b></span><Input type="datetime-local" value={automationScheduledAt} onChange={event => setAutomationScheduledAt(event.target.value)} /><small>“保存定时任务”会在此时间启动生产；“立即执行”不使用此时间。两者均在成片后才按执行模式决定是否上传。</small></label>

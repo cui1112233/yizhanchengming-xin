@@ -33,6 +33,15 @@ test('novel-fetch handoff always opens a new batch instead of appending to the a
   assert.match(handoff, /\/batch-factory/);
 });
 
+test('novel-fetch batch setup exposes and saves content range and capture settings', () => {
+  const source = fs.readFileSync(path.join(here, 'shuihuo/BatchFactoryNovelList.jsx'), 'utf8');
+  assert.match(source, /内容范围/);
+  assert.match(source, /内容截取/);
+  assert.match(source, /contentRangeLines/);
+  assert.match(source, /contentCaptureCharacters/);
+  assert.match(source, /saveContentSettings/);
+});
+
 test('returns the created batch so giant-material OCR can bind its executor job', () => {
   const page = fs.readFileSync(pagePath, 'utf8');
   assert.match(page, /if\s*\(!input\?\.automationEnabled\)\s*return batch;/);
