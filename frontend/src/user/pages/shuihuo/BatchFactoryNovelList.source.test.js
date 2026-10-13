@@ -1207,6 +1207,13 @@ test('shows enabled constraints on an uncompiled H3 storyboard card', () => {
   assert.match(source, /【当前已启用约束】/);
 });
 
+test('shows asset prompt text on storyboard cards before and after VIDEO compilation', () => {
+  assert.match(source, /function storyboardAssetPromptText\(book = \{\}\)/);
+  assert.match(source, /资产提示词：/);
+  assert.match(source, /资产提示词已注入：/);
+  assert.match(source, /【资产提示词】/);
+});
+
 test('passes only the selected V11 final template and its H3 protocol key to compilation', () => {
   assert.match(source, /function finalVideoPromptTemplate\(body\)/);
   assert.match(source, /const videoPromptTemplate = finalVideoPromptTemplate\(videoPresetBody\);/);

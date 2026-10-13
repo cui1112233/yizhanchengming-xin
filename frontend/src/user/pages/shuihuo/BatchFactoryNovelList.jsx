@@ -332,6 +332,22 @@ function h3ConstraintPreview(settings = {}) {
   if (compiled.switches.negative && compiled.negative_text) rows.push(`负面提示词：${compiled.negative_text}`);
   return rows;
 }
+function storyboardAssetPromptText(book = {}) {
+  return (Array.isArray(book?.assetRecords) ? book.assetRecords : [])
+    .map(asset => {
+      const prompt = assetPrompt(asset);
+      return prompt ? `${assetKindLabel(asset?.kind)}「${assetName(asset)}」：${prompt}` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+function assetKindLabel(kind) {
+  return kind === 'character' ? '人物' : kind === 'scene' ? '场景' : kind === 'prop' ? '道具' : '资产';
+}
+function promptPreview(value, limit = 180) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  return text.length > limit ? `${text.slice(0, limit)}…` : text;
+}
 function effectiveBookAssetRules(batch, book) {
   return {
     ...(batch?.settingsState?.patch?.aiPromptConfig?.assets || {}),
@@ -959,10 +975,11 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const hasVisualPrompt = Boolean(visualPrompt.trim());
   // 分镜卡直接读取 Go 编译后的最终 Prompt，让已开启的智能统一、基础设定、
   // 画质、限制和负面规则在卡片中可见；弹窗与卡片使用同一份编译结果。
-  const { displayPrompt, compiledPrompt, smartUnifiedPending, loading } = useCompiledVideoPrompt(batchId, book, video, settingsRevision, { enabled: true });
+  const { displayPrompt, compiledPrompt, baseSetupPrompt, smartUnifiedPending, loading } = useCompiledVideoPrompt(batchId, book, video, settingsRevision, { enabled: true });
   // 智能统一是增强层。视觉基线尚未取得时，仍须展示已经编译的 VIDEO
   // 提示词，并明确标出基线状态，不能把一条可执行分镜伪装成“什么都没有”。
   const videoPrompt = withStoryboardAssetMentions(compiledPrompt || displayPrompt || rawVideoPrompt, book, video);
+  const assetPromptText = String(baseSetupPrompt || '').trim();
   const activePrompt = promptKind === 'visual' ? visualPrompt : videoPrompt;
 
   useEffect(() => {
@@ -986,6 +1003,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const h3CardIndex = h3Frame?.index || 0;
 		const h3ConstraintRows = h3ConstraintPreview(effectiveBookSettings(batch, book));
 		const h3ConstraintLabels = h3ConstraintRows.map(row => row.split('：', 1)[0]).join(' · ');
+		const h3AssetPromptText = storyboardAssetPromptText(book);
 		const selectH3Frame = index => {
 			const next = precompiledWorkspace.frames?.[index];
 			if (next) selectVideo(next.key);
@@ -996,8 +1014,8 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 				<header className="batch-factory-cell-head"><div><b>H3 导演卡 {h3CardIndex + 1}</b><small>已提取，尚未编译 VIDEO</small></div></header>
 				<button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(h3Frame?.key || '')}>
 					<span className="batch-factory-prompt-status">H3 导演卡已提取</span>
-					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}{h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}</p>
-					<small title={h3ConstraintRows.join('\n')}>{h3ConstraintLabels ? `已启用约束：${h3ConstraintLabels}` : '未启用约束'} · {h3CompilationMessage}</small>
+					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}{h3AssetPromptText ? `\n\n【资产提示词】\n${h3AssetPromptText}` : ''}{h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}</p>
+					<small title={[h3AssetPromptText, ...h3ConstraintRows].filter(Boolean).join('\n')}>{h3AssetPromptText ? `资产提示词：${promptPreview(h3AssetPromptText)}` : '暂无资产提示词'} · {h3ConstraintLabels ? `约束：${h3ConstraintLabels}` : '未启用约束'} · {h3CompilationMessage}</small>
 				</button>
 				<div className="batch-factory-cell-pager">
 					<button type="button" aria-label="上一张 H3 导演卡" disabled={h3CardIndex === 0} onClick={() => selectH3Frame(h3CardIndex - 1)}><LeftOutlined /></button>
@@ -1024,7 +1042,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
       <button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(video.id)}>
         <span className="batch-factory-prompt-status">{stateLabel}</span>
         <p>{activePrompt ? renderStoryboardPromptWithAssetMentions(activePrompt, book, video) : (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
-        <small>点击打开完整提示词</small>
+        <small title={assetPromptText}>{assetPromptText ? `资产提示词已注入：${promptPreview(assetPromptText)}` : '当前分镜暂无资产提示词'} · 点击打开完整提示词</small>
       </button>
       <div className="batch-factory-cell-pager">
         <button type="button" aria-label="上一分镜" disabled={selectedIndex === 0} onClick={() => move(-1)}><LeftOutlined /></button>
@@ -1124,6 +1142,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const h3Segment = h3Segments[selectedIndex] || null;
 	  const engineSettings = effectiveBookSettings(batch, book);
 	  const h3ConstraintRows = h3ConstraintPreview(engineSettings);
+	  const h3AssetPromptText = storyboardAssetPromptText(book);
   const apiDurationSeconds = Number(selectedVideo?.durationSeconds || 0);
   const realDurationSeconds = realVideoDurationSeconds(submittedVideoPrompt);
   const durationLabel = realDurationSeconds !== null
@@ -1136,7 +1155,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     return <div className="batch-factory-prompt-modal-stack">
       <div className="batch-factory-prompt-modal-head"><Space><Tooltip title="上一张 H3 导演卡"><Button aria-label="上一张 H3 导演卡" icon={<LeftOutlined />} disabled={selectedPrecompiledFrame.index === 0} onClick={() => movePrecompiledFrame(-1)} /></Tooltip><span className="batch-factory-prompt-modal-index">{selectedPrecompiledFrame.index + 1}/{precompiledWorkspace.frames.length}</span><Tooltip title="下一张 H3 导演卡"><Button aria-label="下一张 H3 导演卡" icon={<RightOutlined />} disabled={selectedPrecompiledFrame.index >= precompiledWorkspace.frames.length - 1} onClick={() => movePrecompiledFrame(1)} /></Tooltip></Space><span className="batch-factory-prompt-status">H3 导演卡 · 待编译 VIDEO</span></div>
       <Alert type="info" showIcon message="当前是 H3 导演结构，不是最终 VIDEO 提示词" description="开启跟随配音后会先读取每行真实时长，再按 10/15 秒确定性切段并填充最终 VIDEO Prompt。" />
-			<label className="shuihuo-form-label batch-factory-prompt-editor-label">分镜视频提示词<Input.TextArea rows={18} readOnly value={`${formatH3DirectorCardPrompt(h3Document, card)}${h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}`} /></label>
+			<label className="shuihuo-form-label batch-factory-prompt-editor-label">分镜视频提示词<Input.TextArea rows={18} readOnly value={`${formatH3DirectorCardPrompt(h3Document, card)}${h3AssetPromptText ? `\n\n【资产提示词】\n${h3AssetPromptText}` : ''}${h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}`} /></label>
       <div className="batch-factory-prompt-modal-actions">
         <Tooltip title="等待最终 VIDEO 编译后才能保存"><Button type="primary" disabled>保存</Button></Tooltip>
         <Tooltip title="复用当前 H3 导演卡、真实配音时长和当前约束设置，编译最终 VIDEO 提示词；不会重新调用导演模型。"><Button type="primary" loading={regenerating} disabled={regenerating || !onCompile} onClick={onCompile}>编译最终提示词</Button></Tooltip>
