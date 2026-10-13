@@ -344,7 +344,14 @@ function promptPreview(value, limit = 180) {
 }
 function selectedVideoPromptLabel(settings = {}) {
   const video = settings?.aiPromptConfig?.video || {};
-  return String(video.presetName || video.presetId || video.presetKey || '').trim() || '未选择视频提示词';
+  const id = String(video.presetId || video.presetKey || '').trim();
+  if (!id || id === 'batch-video-meta') return 'SD 视频提示词';
+  return String(video.presetName || id).trim() || 'SD 视频提示词';
+}
+function usesH3VideoPrompt(settings = {}) {
+  const video = settings?.aiPromptConfig?.video || {};
+  const id = String(video.presetId || video.presetKey || '').trim();
+  return id === 'batch-video-h3-director' || id === 'h3-video-normal';
 }
 function effectiveBookAssetRules(batch, book) {
   return {
@@ -2935,7 +2942,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     setActionBusy(stageActionKey(stage, book.id));
     try {
       const settings = effectiveBookSettings(batch, book);
-      if (stage === 'director' && mode === 'compile' && h3DirectorCards(book).length) {
+      const h3VideoPrompt = usesH3VideoPrompt(settings);
+      if (stage === 'director' && mode === 'compile' && h3VideoPrompt && h3DirectorCards(book).length) {
         await compileBookH3Videos(book);
         await Promise.all([refreshBatch(), loadRuntimeStatus({ quiet: true })]);
         message.success('已复用统一导演卡编译最终 VIDEO Prompt。');
@@ -2947,10 +2955,10 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
       const stageResult = await runBookStage(batch.id, book.id, stage, {
         mode: requestedMode,
-        // New V12 runs always use the same structured director contract. The
-        // selected video preset changes only the prompt body and final
-        // renderer rules; it must not switch the business pipeline.
-        h3: true,
+        // The selected video prompt preset chooses the director contract:
+        // H3 uses the structured H3 document, while SD uses the SD text
+        // contract. The video model remains an execution-only setting.
+        h3: h3VideoPrompt,
         videoId,
         textModelId: textModelId || settings.textModelId,
         ...(stage === 'video' ? {
@@ -2959,7 +2967,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         } : {}),
         requestId: requestID(`bf11-${stage}-${mode}`)
       });
-      if (stage === 'director') await compileBookH3Videos(book);
+      if (stage === 'director' && h3VideoPrompt) await compileBookH3Videos(book);
       // The modal keeps its own book snapshot while it is open.  Refresh the
       // exact book immediately after a director run so a newly-created
       // director revision (and its rebuilt H3 cards) is visible without
@@ -3017,7 +3025,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       const settings = effectiveBookSettings(batch, book);
       if (summary?.lastFailed?.stage === 'director' && settings.audioPlanningEnabled === true) await ensureBookAudioDuration(book);
       await retryBookStage(batch.id, book.id, {
-        h3: true,
+        h3: usesH3VideoPrompt(settings),
         videoId: effectiveVideoID,
         textModelId: textModelId || settings.textModelId,
         ...(summary?.lastFailed?.stage === 'video' || retryAsVideo || !summary?.lastFailed ? {
@@ -3026,7 +3034,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         } : {}),
         requestId: requestID('bf11-book-retry')
       });
-		if (summary?.lastFailed?.stage === 'director') await compileBookH3Videos(book);
+		if (summary?.lastFailed?.stage === 'director' && usesH3VideoPrompt(settings)) await compileBookH3Videos(book);
       await Promise.all([refreshBatch(), loadRuntimeStatus({ quiet: true })]);
       message.success('已识别并重跑该书最后失败的步骤。');
     } catch (error) {
@@ -3435,7 +3443,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
           <div className="shuihuo-workbench-cell batch-factory-actions">
             <div className="batch-factory-action-group is-utility"><span>资料与流程</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => setViewingBook(book)}>查看资料</Button>{previewText ? <Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新状态</Button> : <Button size="small" type="primary" onClick={() => fetchMissingBookSource(book)} loading={actionBusy === `source-${book.id}`} disabled={Boolean(actionBusy)}>获取正文</Button>}</div></div>
             <div className="batch-factory-action-group is-production"><span>资产获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '提取当前书的人物、场景、道具提示词；手动资产保留。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'assets', 'force')} loading={actionBusy === stageActionKey('assets', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="只刷新智能统一视觉基线，不重做资产、分镜、视频或成片。"><Button size="small" loading={actionBusy === `smart-unified-${book.id}`} disabled={Boolean(actionBusy)} onClick={() => refreshBookSmartUnifiedAction(book)}>刷新智能统一</Button></Tooltip><Tooltip title="打开资产图选择与生成面板；选择资产和图片模型后生成。"><Button size="small" onClick={() => setAssetBook(book)} disabled={Boolean(actionBusy)}>生成图片</Button></Tooltip></div></div>
-            <div className="batch-factory-action-group is-production"><span>视频获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? (h3DirectorCards(book).length ? '复用已有统一导演卡，按当前规则编译最终 VIDEO Prompt。' : '按统一流程生成导演分镜：选中的视频预设只改变提示词规则，不改变处理链路。') : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'director', 'compile')} loading={actionBusy === stageActionKey('director', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title={productionCapability.available ? '按当前书最终编译视频提示词、可用参考图和画幅创建 VIDEO 任务。' : productionCapability.reason}><Button size="small" className="batch-factory-action-video" onClick={() => runBookStageAction(book, 'video')} loading={actionBusy === stageActionKey('video', book.id)} disabled={!productionCapability.available || Boolean(actionBusy)}>生成视频</Button></Tooltip></div></div>
+            <div className="batch-factory-action-group is-production"><span>视频获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? (h3DirectorCards(book).length && usesH3VideoPrompt(effectiveBookSettings(batch, book)) ? '复用已有统一导演卡，按当前规则编译最终 VIDEO Prompt。' : '按统一流程生成导演分镜：选中的视频提示词决定 SD 或 H3 的输出协议。') : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'director', 'compile')} loading={actionBusy === stageActionKey('director', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title={productionCapability.available ? '按当前书最终编译视频提示词、可用参考图和画幅创建 VIDEO 任务。' : productionCapability.reason}><Button size="small" className="batch-factory-action-video" onClick={() => runBookStageAction(book, 'video')} loading={actionBusy === stageActionKey('video', book.id)} disabled={!productionCapability.available || Boolean(actionBusy)}>生成视频</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-production"><span>画面获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '根据已生成的分镜卡（视频提示词）和画面提示词预设，生成每张分镜的画面提示词。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'visual', 'force')} loading={actionBusy === stageActionKey('visual', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="画面首帧图片生成服务尚未配置；可先在分镜提示词中查看或编辑画面提示词。"><Button size="small" disabled>生成图片</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-recovery"><span>异常处理</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新</Button><Button size="small" danger onClick={() => retryLastFailedStage(book)} loading={actionBusy === stageActionKey('retry', book.id)} disabled={Boolean(actionBusy) && actionBusy !== stageActionKey('retry', book.id)}>重试失败步骤</Button></div></div>
           </div>

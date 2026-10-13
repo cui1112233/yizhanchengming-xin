@@ -233,14 +233,13 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		} else {
 			var revision DirectorRevision
 			if s.usesUnifiedDirectorFlow(batch, book) {
-				// Every current video preset follows the same persisted director path.
-				// The selected preset changes the director rules and final template, not
-				// whether duration planning, compilation and Trace exist.
+				// H3 video prompt presets use the structured director document and
+				// its duration/compilation trace. The caller selects this explicitly;
+				// SD presets use the SD text contract below instead.
 				revision, err = s.Director.RunConfiguredH3Director(ctx, owner, batchID, bookID, s.SmartUnifiedStyle)
 			} else {
-				// A V11 record without any saved video-prompt selection remains readable
-				// and runnable through its historical director contract. New UI requests
-				// always set H3Director and therefore never create this legacy shape.
+				// SD is the default video prompt contract. Historical records without
+				// a saved selection remain readable through this same compatible path.
 				revision, err = s.Director.RunDirectorWithSmartUnifiedStyle(ctx, owner, batchID, bookID, s.SmartUnifiedStyle)
 			}
 			if err == nil {

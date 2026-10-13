@@ -538,12 +538,12 @@ test('persists named AI reasoning presets through the V11 backend and lets users
   assert.match(source, /presetVersions=\{configVersions\}/);
 });
 
-test('routes every new director run through the unified structured pipeline', () => {
-  assert.doesNotMatch(source, /function usesSelectedH3VideoPreset/);
-  assert.match(source, /h3: true,/);
-  assert.match(source, /if \(stage === 'director'\) await compileBookH3Videos\(book\)/);
-  assert.match(source, /if \(stage === 'director' && mode === 'compile' && h3DirectorCards\(book\)\.length\)/);
-  assert.match(source, /选中的视频预设只改变提示词规则，不改变处理链路/);
+test('routes director runs through the selected SD or H3 prompt contract', () => {
+  assert.match(source, /function usesH3VideoPrompt\(settings = \{\}\)/);
+  assert.match(source, /h3: usesH3VideoPrompt\(settings\),/);
+  assert.match(source, /if \(stage === 'director' && h3VideoPrompt\) await compileBookH3Videos\(book\)/);
+  assert.match(source, /if \(stage === 'director' && mode === 'compile' && h3VideoPrompt && h3DirectorCards\(book\)\.length\)/);
+  assert.match(source, /选中的视频提示词决定 SD 或 H3 的输出协议/);
 });
 
 test('keeps video model selection separate from prompt-preset selection', () => {
@@ -1143,6 +1143,8 @@ test('shows persisted director cards before final VIDEO compilation instead of l
 
 test('shows the active video prompt preset on storyboard cards', () => {
   assert.match(source, /function selectedVideoPromptLabel\(settings = \{\}\)/);
+  assert.match(source, /id === 'batch-video-meta'/);
+  assert.match(source, /return 'SD 视频提示词'/);
   assert.match(source, /视频提示词：\{h3VideoPromptLabel\}/);
   assert.match(source, /视频提示词：\{videoPromptLabel\}/);
 });
@@ -1231,6 +1233,12 @@ test('passes only the selected V11 final template and its H3 protocol key to com
   assert.match(source, /function finalVideoPromptTemplate\(body\)/);
   assert.match(source, /const videoPromptTemplate = finalVideoPromptTemplate\(videoPresetBody\);/);
   assert.match(source, /key: String\(videoPreset\.presetKey \|\| videoPreset\.presetId \|\| videoPreset\.id \|\| 'h3-video-normal'\)/);
+});
+
+test('routes the director stage by the selected video prompt preset instead of hardcoding H3', () => {
+  assert.match(source, /function usesH3VideoPrompt\(settings = \{\}\)/);
+  assert.match(source, /h3: usesH3VideoPrompt\(settings\)/);
+  assert.doesNotMatch(source, /h3: true/);
 });
 
 

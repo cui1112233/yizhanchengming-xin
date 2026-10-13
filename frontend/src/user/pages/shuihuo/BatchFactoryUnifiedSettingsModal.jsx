@@ -25,6 +25,13 @@ const normalizeLegacyPatch = value => {
   return { ...nested, ...patch };
 };
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
+const DEFAULT_VIDEO_PROMPT = { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: 1, enabled: true };
+function requiredVideoPrompt(value) {
+  const selected = value && typeof value === 'object' ? value : {};
+  const presetId = String(selected.presetId || selected.presetKey || '').trim();
+  if (!presetId || presetId === 'batch-video-meta' || presetId === '__none__') return { ...DEFAULT_VIDEO_PROMPT };
+  return { ...DEFAULT_VIDEO_PROMPT, ...selected, enabled: true };
+}
 const AUDIO_SOURCE_OPTIONS = [{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }];
 const voices = [
   { value: 'zh-CN-XiaoxiaoNeural', label: '晓晓（女声·温柔）' },
@@ -391,10 +398,15 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
   }, [open, batch?.id]);
   const save = async () => {
     setSaving(true);
-    const videoPresetId = draftPatch.aiPromptConfig?.video?.presetId;
-    const nextPatch = videoPresetId === 'batch-video-sd' && !draftPatch.storyTimelineVersion
-      ? { ...draftPatch, storyTimelineVersion: 'sd.original-story.v1' }
-      : draftPatch;
+    const aiPromptConfig = draftPatch.aiPromptConfig && typeof draftPatch.aiPromptConfig === 'object' ? draftPatch.aiPromptConfig : {};
+    const video = requiredVideoPrompt(aiPromptConfig.video);
+    const nextPatch = {
+      ...draftPatch,
+      aiPromptConfig: { ...aiPromptConfig, video },
+      ...(video.presetId === 'batch-video-sd' && !draftPatch.storyTimelineVersion
+        ? { storyTimelineVersion: 'sd.original-story.v1' }
+        : {})
+    };
     try { const result = await onSaved(nextPatch); if (result !== false) onClose(); }
     finally { setSaving(false); }
   };

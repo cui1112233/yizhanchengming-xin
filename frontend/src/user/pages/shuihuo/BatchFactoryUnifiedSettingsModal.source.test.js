@@ -204,3 +204,10 @@ test('unified constraint selector fetches and persists the preset body instead o
   assert.match(source, /const body = String\(result\?\.texts\?\.\[presetId\] \|\| ''\)/);
   assert.match(source, /selections: \[\.\.\.rest, \{ \.\.\.presetValue\(selected\), body \}\]/);
 });
+
+test('persists the default SD video prompt when unified settings are saved without a video selection', () => {
+  assert.match(source, /const DEFAULT_VIDEO_PROMPT =/);
+  assert.match(source, /function requiredVideoPrompt\(/);
+  assert.match(source, /const video = requiredVideoPrompt\(aiPromptConfig\.video\)/);
+  assert.match(source, /aiPromptConfig: \{ \.\.\.aiPromptConfig, video \}/);
+});
