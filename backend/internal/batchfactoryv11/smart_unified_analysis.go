@@ -12,10 +12,13 @@ const smartUnifiedAnalysisSchemaV1 = "h3-style-system/v1"
 // Prompt is the only text eligible for final VIDEO injection; Fields and
 // Preset keep the result inspectable after the editable system preset changes.
 type SmartUnifiedAnalysis struct {
-	SchemaVersion string                     `json:"schema_version"`
-	Prompt        string                     `json:"prompt"`
-	Fields        map[string]string          `json:"fields"`
-	Preset        SmartUnifiedPresetSnapshot `json:"preset"`
+	SchemaVersion string `json:"schema_version"`
+	Prompt        string `json:"prompt"`
+	// SDUnifiedStyle is the compact, provider-facing style paragraph required
+	// by the SD preset. Prompt remains the legacy/H3-compatible field.
+	SDUnifiedStyle string                     `json:"sd_unified_style,omitempty"`
+	Fields         map[string]string          `json:"fields"`
+	Preset         SmartUnifiedPresetSnapshot `json:"preset"`
 }
 
 type SmartUnifiedPresetSnapshot struct {

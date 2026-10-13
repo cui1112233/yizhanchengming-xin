@@ -379,7 +379,7 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 
 【智能统一与资产同次返回】
 除 characters、scenes、props 外，顶层还必须返回 smart_unified_analysis。它是本书后续 VIDEO 的视觉基线，格式严格为：
-"smart_unified_analysis":{"schema_version":"h3-style-system/v1","prompt":"可直接注入 VIDEO 的中文视觉基线","fields":{"final_genre":"题材","trailer_style":"影像风格","story_era":"时代背景"},"preset":{"id":"script-constraint-prefix-smart-unified","name":"智能统一","version":1}}
+"smart_unified_analysis":{"schema_version":"h3-style-system/v1","prompt":"可直接注入 VIDEO 的中文视觉基线","sd_unified_style":"SD 最终分镜使用的完整统一风格段落","fields":{"final_genre":"题材","trailer_style":"影像风格","story_era":"时代背景"},"preset":{"id":"script-constraint-prefix-smart-unified","name":"智能统一","version":1}}
 不得单独解释或要求再次调用；四个字段都必须在这一次 JSON 返回中。`
 		for _, selection := range config.Constraints.Selections {
 			if selection.ID == smartUnifiedPrefixPresetID && constraintCategory(selection) == "prefix" && strings.TrimSpace(selection.Body) != "" {

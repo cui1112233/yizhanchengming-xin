@@ -470,6 +470,9 @@ func smartUnifiedStyleForRevision(book Book, config AIReasoningPromptConfig) str
 		return strings.TrimSpace(book.DirectorRevision.Output.SmartUnifiedStyle)
 	}
 	if analysis, err := parseSmartUnifiedAnalysis(rawString(book.SettingsState.Patch, "h3StyleAnalysis", "")); err == nil && analysis != nil {
+		if selectedSDVideoPreset(config.Video) && strings.TrimSpace(analysis.SDUnifiedStyle) != "" {
+			return strings.TrimSpace(analysis.SDUnifiedStyle)
+		}
 		return analysis.Prompt
 	}
 	return ""

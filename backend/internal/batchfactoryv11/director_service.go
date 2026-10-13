@@ -385,6 +385,9 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 	}
 	if smartUnifiedAnalysis != nil {
 		result.SmartUnifiedStyle = smartUnifiedAnalysis.Prompt
+		if selectedSDVideoPreset(aiReasoningPromptConfig(snapshot.Effective).Video) && strings.TrimSpace(smartUnifiedAnalysis.SDUnifiedStyle) != "" {
+			result.SmartUnifiedStyle = smartUnifiedAnalysis.SDUnifiedStyle
+		}
 		result.SmartUnifiedAnalysis = smartUnifiedAnalysis
 	}
 	return s.Store.PersistDirectorRevision(ctx, owner, book, snapshot, sourceDigest(book.SourceText), hook.ID, result)
