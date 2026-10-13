@@ -17,6 +17,8 @@
 .shuihuo-theme-active { --sh-bg: #070b11; --sh-panel: #0e1621; --sh-panel-strong: #111b28; --sh-line: rgba(151, 168, 190, .16); --sh-text: #f5f7fb; --sh-muted: #8391a4; --sh-accent: #63dfc0; --sh-accent-dark: #23645d; --sh-danger: #f08a8a; }
 [data-theme='light'] .shuihuo-production,
 [data-theme='light'] .shuihuo-theme-active { --sh-bg: #f3f6fa; --sh-panel: #ffffff; --sh-panel-strong: #f8fafc; --sh-line: rgba(55, 73, 96, .14); --sh-text: #182333; --sh-muted: #68788d; --sh-accent: #168e74; --sh-accent-dark: #cce9e0; }
+html[data-theme='light'] body.shuihuo-theme-active,
+body[data-theme='light'].shuihuo-theme-active { --sh-bg: #f3f6fa; --sh-panel: #ffffff; --sh-panel-strong: #f8fafc; --sh-line: rgba(55, 73, 96, .14); --sh-text: #182333; --sh-muted: #68788d; --sh-accent: #168e74; --sh-accent-dark: #cce9e0; }
 
 body.shuihuo-reference-shell { overflow: hidden; background: var(--sh-bg); }
 /* Keep the application navigation; only the project-local editor sidebar was removed. */

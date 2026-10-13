@@ -16,3 +16,8 @@ test('batch factory rows and settings cards use shared Shuihuo text and surface 
   assert.match(css, /\.batch-factory-book-config-region\s*\{[^}]*background:\s*var\(--sh-panel-strong\)/s);
   assert.match(css, /\.batch-factory-book-config-region small\s*\{[^}]*color:\s*var\(--sh-muted\)/s);
 });
+
+test('light theme variables are applied when the theme attribute is on either document root or body', () => {
+  assert.match(css, /html\[data-theme='light'\] body\.shuihuo-theme-active[\s\S]*--sh-panel-strong:\s*#f8fafc/);
+  assert.match(css, /body\[data-theme='light'\]\.shuihuo-theme-active[\s\S]*--sh-panel-strong:\s*#f8fafc/);
+});
