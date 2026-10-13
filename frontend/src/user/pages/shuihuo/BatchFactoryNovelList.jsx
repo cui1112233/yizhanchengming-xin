@@ -985,6 +985,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const h3Card = h3Frame?.card || {};
 		const h3CardIndex = h3Frame?.index || 0;
 		const h3ConstraintRows = h3ConstraintPreview(effectiveBookSettings(batch, book));
+		const h3ConstraintLabels = h3ConstraintRows.map(row => row.split('：', 1)[0]).join(' · ');
 		const selectH3Frame = index => {
 			const next = precompiledWorkspace.frames?.[index];
 			if (next) selectVideo(next.key);
@@ -996,7 +997,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 				<button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(h3Frame?.key || '')}>
 					<span className="batch-factory-prompt-status">H3 导演卡已提取</span>
 					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}{h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}</p>
-					{showSmartUnified ? <small>智能统一：{smartUnifiedAnalysis.prompt}</small> : <small>{h3CompilationMessage}</small>}
+					<small title={h3ConstraintRows.join('\n')}>{h3ConstraintLabels ? `已启用约束：${h3ConstraintLabels}` : '未启用约束'} · {h3CompilationMessage}</small>
 				</button>
 				<div className="batch-factory-cell-pager">
 					<button type="button" aria-label="上一张 H3 导演卡" disabled={h3CardIndex === 0} onClick={() => selectH3Frame(h3CardIndex - 1)}><LeftOutlined /></button>
@@ -1121,7 +1122,8 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const regenerateCurrentPrompt = promptKind === 'visual' ? onRegenerateVisual : onRegenerate;
   const h3Segments = h3Trace?.compilation?.compilation?.segments || [];
   const h3Segment = h3Segments[selectedIndex] || null;
-  const engineSettings = effectiveBookSettings(batch, book);
+	  const engineSettings = effectiveBookSettings(batch, book);
+	  const h3ConstraintRows = h3ConstraintPreview(engineSettings);
   const apiDurationSeconds = Number(selectedVideo?.durationSeconds || 0);
   const realDurationSeconds = realVideoDurationSeconds(submittedVideoPrompt);
   const durationLabel = realDurationSeconds !== null
@@ -1134,7 +1136,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     return <div className="batch-factory-prompt-modal-stack">
       <div className="batch-factory-prompt-modal-head"><Space><Tooltip title="上一张 H3 导演卡"><Button aria-label="上一张 H3 导演卡" icon={<LeftOutlined />} disabled={selectedPrecompiledFrame.index === 0} onClick={() => movePrecompiledFrame(-1)} /></Tooltip><span className="batch-factory-prompt-modal-index">{selectedPrecompiledFrame.index + 1}/{precompiledWorkspace.frames.length}</span><Tooltip title="下一张 H3 导演卡"><Button aria-label="下一张 H3 导演卡" icon={<RightOutlined />} disabled={selectedPrecompiledFrame.index >= precompiledWorkspace.frames.length - 1} onClick={() => movePrecompiledFrame(1)} /></Tooltip></Space><span className="batch-factory-prompt-status">H3 导演卡 · 待编译 VIDEO</span></div>
       <Alert type="info" showIcon message="当前是 H3 导演结构，不是最终 VIDEO 提示词" description="开启跟随配音后会先读取每行真实时长，再按 10/15 秒确定性切段并填充最终 VIDEO Prompt。" />
-      <label className="shuihuo-form-label batch-factory-prompt-editor-label">分镜视频提示词<Input.TextArea rows={18} readOnly value={formatH3DirectorCardPrompt(h3Document, card)} /></label>
+			<label className="shuihuo-form-label batch-factory-prompt-editor-label">分镜视频提示词<Input.TextArea rows={18} readOnly value={`${formatH3DirectorCardPrompt(h3Document, card)}${h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}`} /></label>
       <div className="batch-factory-prompt-modal-actions">
         <Tooltip title="等待最终 VIDEO 编译后才能保存"><Button type="primary" disabled>保存</Button></Tooltip>
         <Tooltip title="复用当前 H3 导演卡、真实配音时长和当前约束设置，编译最终 VIDEO 提示词；不会重新调用导演模型。"><Button type="primary" loading={regenerating} disabled={regenerating || !onCompile} onClick={onCompile}>编译最终提示词</Button></Tooltip>
