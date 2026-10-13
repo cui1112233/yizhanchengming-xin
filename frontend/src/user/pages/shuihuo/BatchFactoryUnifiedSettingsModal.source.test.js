@@ -161,6 +161,10 @@ test('unified AI reasoning keeps one asset extraction prompt and preserves video
   assert.match(source, /video: \{ \.\.\.video, \.\.\.presetValue\(catalog\.find\(item => item\.id === normalizedId\)\), enabled: Boolean\(normalizedId\) \}/);
 });
 
+test('keeps the automation gear beside the unified configuration label', () => {
+  assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
+});
+
 test('unified AI reasoning exposes all four constraint layers plus the base-setup switch', () => {
   assert.match(source, /<b>画面前缀词（智能统一）<\/b>/);
   assert.match(source, /<b>画质约束<\/b>/);
