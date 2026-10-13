@@ -184,3 +184,18 @@ func TestSafeSensitiveReplacementVariesByWordMeaning(t *testing.T) {
 		t.Fatalf("unclassified word=%q, want explicit review fallback", got)
 	}
 }
+
+func TestSafeSensitiveReplacementUsesSceneReadablePhrases(t *testing.T) {
+	settings := map[string]any{"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
+		map[string]any{"find": "激情视频", "replace": ""},
+		map[string]any{"find": "开房", "replace": ""},
+	}}}}}
+	EnsureSensitiveRuleReplacements(settings)
+	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
+	want := []string{"凌晨快乐视频", "外面睡觉"}
+	for i, expected := range want {
+		if got := rules[i].(map[string]any)["replace"]; got != expected {
+			t.Fatalf("rule %d replacement=%q, want %q", i, got, expected)
+		}
+	}
+}
