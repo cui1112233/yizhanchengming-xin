@@ -499,12 +499,22 @@
     panel.id = 'v78CurrentBatchPanel';
     panel.className = 'section full';
     panel.innerHTML = `
-      <div class="v78-inline-head"><div><h3>当前批次</h3><div id="v78CurrentBatchMeta" class="v78-muted">正在读取...</div></div><div class="v78-actions"><button id="v78CurrentBatchRefresh">刷新</button><button id="v78StopBatch" class="danger">停止处理</button><button id="v78ViewAllTasks">查看全部任务</button></div></div>
+      <div class="v78-inline-head"><div><h3>当前批次</h3><div id="v78CurrentBatchMeta" class="v78-muted">正在读取...</div></div><div class="v78-actions"><button id="v78CurrentBatchRefresh">刷新</button><span id="v78CurrentBatchRefreshStatus" class="v78-muted" aria-live="polite"></span><button id="v78StopBatch" class="danger">停止处理</button><button id="v78ViewAllTasks">查看全部任务</button></div></div>
       <div id="v78CurrentBatchSummary" class="v78-batch-summary"></div><div id="v78CurrentBatchBooks" class="v78-batch-list"></div>`;
     workspace.insertAdjacentElement('afterend', panel);
-    byId('v78CurrentBatchRefresh').onclick = () => void loadCurrentBatch();
+    byId('v78CurrentBatchRefresh').onclick = () => void refreshCurrentBatchFromButton();
     byId('v78StopBatch').onclick = () => void stopCurrentBatch();
     byId('v78ViewAllTasks').onclick = () => { activateLegacyTab('tasks'); if (typeof loadTasks === 'function') void loadTasks(); };
+  }
+
+  async function refreshCurrentBatchFromButton() {
+    const button = byId('v78CurrentBatchRefresh');
+    const status = byId('v78CurrentBatchRefreshStatus');
+    if (button) { button.disabled = true; button.textContent = '刷新中…'; }
+    if (status) status.textContent = '正在读取当前批次';
+    const ok = await loadCurrentBatch();
+    if (button) { button.disabled = false; button.textContent = '刷新'; }
+    if (status) status.textContent = ok ? `已刷新 ${new Date().toLocaleTimeString()}` : '刷新失败';
   }
 
   function renderCurrentBatch(batch, taskRows = []) {
@@ -535,8 +545,9 @@
     try {
       const [batchData, taskData] = await Promise.all([v2Api('/batches/current'), v2Api('/tasks')]);
       renderCurrentBatch(batchData.batch || null, taskData.tasks || []);
+      return true;
     }
-    catch (error) { setText('v78CurrentBatchMeta', error.message); }
+    catch (error) { setText('v78CurrentBatchMeta', error.message); return false; }
   }
 
   async function refreshAllData() {
