@@ -605,29 +605,33 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-engine-field .ant-select, .batch-factory-engine-field .ant-input, .batch-factory-engine-field .ant-input-number { max-width:300px; }
 
 .batch-factory-automation-modal.ant-modal { width:min(680px,calc(100vw - 96px))!important; max-width:calc(100vw - 24px); top:12px; padding-bottom:0; }
-.batch-factory-automation-modal .ant-modal-content { overflow:hidden; max-height:calc(100vh - 24px); padding:0; border:1px solid #304b68; border-radius:16px; background:linear-gradient(145deg,#101d2d 0%,#0d1726 100%); box-shadow:0 24px 70px rgba(0,0,0,.42); }
-.batch-factory-automation-modal .ant-modal-header { margin:0; padding:22px 26px 18px; border-bottom:1px solid #263d56; background:transparent; }
+.batch-factory-automation-modal .ant-modal-content { overflow:hidden; max-height:calc(100vh - 24px); padding:0; border:1px solid var(--sh-line); border-radius:16px; color:var(--sh-text); background:var(--sh-panel); box-shadow:0 24px 70px rgba(0,0,0,.42); }
+.batch-factory-automation-modal .ant-modal-header { margin:0; padding:22px 26px 18px; border-bottom:1px solid var(--sh-line); background:var(--sh-panel); }
+.batch-factory-automation-modal .ant-modal-body { background:var(--sh-panel); color:var(--sh-text); }
+.batch-factory-automation-modal .ant-modal-footer { border-top:1px solid var(--sh-line); background:var(--sh-panel) !important; color:var(--sh-text); }
 .batch-factory-automation-modal .ant-modal-body { max-height:calc(100vh - 210px); overflow-y:auto; padding:18px 22px 22px; }
 .batch-factory-automation-title { display:flex; align-items:baseline; gap:10px; color:#f2f7ff; }
 .batch-factory-automation-title strong { font-size:20px; letter-spacing:.02em; }
 .batch-factory-automation-title span { color:#86a2bf; font-size:12px; font-weight:500; }
 .batch-factory-automation-form { display:grid; gap:12px; }
-.batch-factory-automation-section { padding:15px 16px 16px; border:1px solid #29435e; border-radius:12px; background:rgba(22,39,59,.72); }
+.batch-factory-automation-section { padding:15px 16px 16px; border:1px solid var(--sh-line); border-radius:12px; background:var(--sh-panel-strong); }
 .batch-factory-automation-section-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
 .batch-factory-automation-section-head > div { display:grid; gap:2px; }
-.batch-factory-automation-section-head b { color:#eaf3ff; font-size:14px; }
-.batch-factory-automation-section-head small { color:#86a2bf; font-size:11px; }
-.batch-factory-automation-section-mark { display:grid; place-items:center; width:28px; height:28px; border:1px solid #4d9fe2; border-radius:8px; color:#a9dcff; background:#153656; font-size:11px; font-weight:800; }
+.batch-factory-automation-section-head b { color:var(--sh-text); font-size:14px; }
+.batch-factory-automation-section-head small { color:var(--sh-muted); font-size:11px; }
+.batch-factory-automation-section-mark { display:grid; place-items:center; width:28px; height:28px; border:1px solid var(--sh-accent); border-radius:8px; color:var(--sh-accent); background:color-mix(in srgb,var(--sh-accent) 14%,transparent); font-size:11px; font-weight:800; }
 .batch-factory-automation-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 18px; }
 .batch-factory-automation-section .batch-factory-engine-field { grid-template-columns:1fr; gap:6px; }
 .batch-factory-automation-section .batch-factory-engine-field > span { gap:2px; }
-.batch-factory-automation-section .batch-factory-engine-field > span b { color:#dceaff; font-size:12px; }
-.batch-factory-automation-section .batch-factory-engine-field small { color:#7793ad; font-size:11px; }
-.batch-factory-automation-section .ant-input,.batch-factory-automation-section .ant-input-number,.batch-factory-automation-section .ant-select-selector { min-height:36px!important; border-color:#385571!important; border-radius:8px!important; background:#0d1b2b!important; color:#eef6ff!important; }
+.batch-factory-automation-section .batch-factory-engine-field > span b { color:var(--sh-text); font-size:12px; }
+.batch-factory-automation-section .batch-factory-engine-field small { color:var(--sh-muted); font-size:11px; }
+.batch-factory-automation-section .ant-input,.batch-factory-automation-section .ant-input-number,.batch-factory-automation-section .ant-select-selector { min-height:36px!important; border-color:var(--sh-line)!important; border-radius:8px!important; background:var(--sh-bg)!important; color:var(--sh-text)!important; }
 .batch-factory-automation-footer { display:flex; align-items:center; flex-wrap:wrap; gap:8px; width:100%; }
 .batch-factory-automation-footer > span { flex:1; }
-.batch-factory-automation-modal .ant-modal-close { top:18px; color:#8da7c0; }
-.batch-factory-automation-modal .ant-modal-close:hover { color:#fff; background:#1c3855; }
+.batch-factory-automation-modal .ant-modal-close { top:18px; color:var(--sh-muted); }
+.batch-factory-automation-modal .ant-modal-close:hover { color:var(--sh-text); background:var(--sh-panel-strong); }
+.batch-factory-automation-modal .ant-btn-default { color:var(--sh-text); border-color:var(--sh-line); background:transparent; }
+.batch-factory-automation-modal .ant-btn-primary { color:var(--sh-bg); border-color:var(--sh-accent); background:var(--sh-accent); }
 @media (max-width:900px) { .batch-factory-automation-modal.ant-modal { width:calc(100vw - 96px)!important; } .batch-factory-automation-grid { grid-template-columns:1fr; } .batch-factory-automation-footer { justify-content:flex-end; } .batch-factory-automation-footer > span { display:none; } }
 @media (max-width:560px) { .batch-factory-automation-modal.ant-modal { width:calc(100vw - 24px)!important; } .batch-factory-automation-modal .ant-modal-header,.batch-factory-automation-modal .ant-modal-body { padding-left:16px; padding-right:16px; } .batch-factory-automation-footer { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .batch-factory-automation-footer .ant-btn { width:100%; margin:0; } }
 .batch-factory-engine-field .ant-segmented { width:max-content; max-width:100%; }
