@@ -1107,6 +1107,14 @@ test('compiles existing H3 director cards instead of regenerating them from vide
   assert.match(source, /onRegenerateVisual=\{\(\) => runBookStageAction\(promptBook, 'visual', 'force'\)\}/);
 });
 
+test('refreshes the open storyboard modal after director regeneration', () => {
+  const start = source.indexOf('async function runBookStageAction(book, stage');
+  const end = source.indexOf('async function retryLastFailedStage', start);
+  const action = start >= 0 && end > start ? source.slice(start, end) : '';
+  assert.match(action, /if \(stage === 'director'\) \{[\s\S]*?const latestResponse = await getBatch\(batch\.id\);[\s\S]*?setPromptBook\(latestBook\);/);
+  assert.match(source, /<PromptPanel key=\{`\$\{promptBook\.id\}:\$\{promptBook\.revision \|\| 0\}:\$\{promptBook\.directorRevision\?\.id \|\| ''\}`\}/);
+});
+
 test('names the prompt workbench as storyboard cards carrying video prompts', () => {
   assert.match(source, /title=\{promptBook \? `分镜卡（视频提示词） · \$\{promptBook\.title\}` : '分镜卡（视频提示词）'\}/);
 });
