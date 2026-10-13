@@ -117,14 +117,23 @@ test('unified engine settings write the opening variants toggle and count at the
   assert.match(source, /openingCount/);
   assert.match(source, /min=\{1\}/);
   assert.match(source, /max=\{8\}/);
-  assert.match(source, /disabled=\{value\.openingEnabled !== true\}/);
+  assert.match(source, /disabled=\{(?:value|config)\.openingEnabled !== true\}/);
   assert.match(source, /条（含原始）/);
-  assert.match(source, /patch\(\{ openingEnabled: enabled, openingCount: value\.openingCount \?\? 4 \}\)/);
-  assert.match(source, /patch\(\{ openingCount: count \?\? 4 \}\)/);
-  // 换开头是根级生产开关，不得塞进 AI 推理草稿或 aiPromptConfig
+  assert.match(source, /(?:patch|onChange)\(\{\s*(?:\.\.\.config,\s*)?openingEnabled: enabled, openingCount: (?:value|config)\.openingCount \?\? 4 \}\)/);
+  assert.match(source, /(?:patch|onChange)\(\{\s*(?:\.\.\.config,\s*)?openingCount: count \?\? 4 \}\)/);
+  // 换开头仍是根级生产开关，只是展示在 AI 推理的资产设置卡中。
   assert.doesNotMatch(source, /openingConfig/);
   assert.doesNotMatch(source, /onOpeningChange/);
-  assert.doesNotMatch(source, /\{ \.\.\.config, openingEnabled/);
+});
+
+test('places opening variants under AI reasoning asset settings with a compact help tip', () => {
+  const assetStart = source.indexOf('<section className="batch-factory-engine-card"><header><b>资产设置</b>');
+  const assetEnd = source.indexOf('<section className="batch-factory-engine-card"><header><b>约束设置</b>');
+  const modelStart = source.indexOf('<section className="batch-factory-engine-card"><header><b>模型配置</b>');
+  const modelEnd = source.indexOf('{modelsError ?');
+  assert.match(source.slice(assetStart, assetEnd), /换开头/);
+  assert.match(source.slice(assetStart, assetEnd), /batch-factory-help-button/);
+  assert.doesNotMatch(source.slice(modelStart, modelEnd), /换开头/);
 });
 
 test('unified AI reasoning selects extraction, character and scene prompts without overwriting video prompts', () => {
