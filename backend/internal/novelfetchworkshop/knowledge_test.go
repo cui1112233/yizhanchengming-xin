@@ -165,3 +165,22 @@ func TestSafeSensitiveReplacementCoversInstitutionsAndBenignWords(t *testing.T) 
 		}
 	}
 }
+
+func TestSafeSensitiveReplacementVariesByWordMeaning(t *testing.T) {
+	settings := map[string]any{"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
+		map[string]any{"find": "奸夫", "replace": ""},
+		map[string]any{"find": "贱人", "replace": ""},
+		map[string]any{"find": "未知脏词", "replace": ""},
+	}}}}}
+	EnsureSensitiveRuleReplacements(settings)
+	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
+	if got := rules[0].(map[string]any)["replace"]; got == "亲密行为" || got == "中性说法" {
+		t.Fatalf("奸夫 collapsed to generic wording: %q", got)
+	}
+	if got := rules[1].(map[string]any)["replace"]; got == "不当称呼" || got == "中性说法" {
+		t.Fatalf("贱人 collapsed to generic wording: %q", got)
+	}
+	if got := rules[2].(map[string]any)["replace"]; got != "中性说法" {
+		t.Fatalf("unclassified word=%q, want explicit review fallback", got)
+	}
+}

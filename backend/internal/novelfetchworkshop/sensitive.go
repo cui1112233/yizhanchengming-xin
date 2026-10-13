@@ -18,11 +18,23 @@ var safeSensitiveReplacements = map[string]string{
 	"赌博":  "违规下注",
 	"花魁":  "名伶",
 	"轮奸":  "多人伤害",
+	"奸夫":  "关系越界者",
+	"淫妇":  "关系越界者",
+	"贱人":  "失礼之人",
+	"婊子":  "失礼之人",
+	"狗东西": "讨厌家伙",
 	"卧槽":  "惊讶感叹",
 	"我草":  "惊讶感叹",
 	"我操":  "惊讶感叹",
 	"我擦":  "惊讶感叹",
 	"握草":  "惊讶感叹",
+}
+
+var safeSensitiveHomophones = map[rune]rune{
+	'奸': '间', '淫': '隐', '色': '瑟', '骚': '燥', '婊': '表', '贱': '见',
+	'狗': '够', '杀': '煞', '赌': '堵', '毒': '独', '嫖': '飘', '妓': '技',
+	'裸': '落', '乳': '如', '胸': '凶', '性': '幸', '欲': '遇', '插': '叉',
+	'操': '超', '妈': '麻', '逼': 'B', '骂': '嘛', '偷': '透', '骗': '片',
 }
 
 var safeSensitivePassThrough = map[string]struct{}{
@@ -117,14 +129,40 @@ func safeSensitiveReplacement(find string) string {
 	case containsAny(find, "诈骗", "偷税", "受贿", "贿赂", "传销", "拐卖", "造谣", "网暴", "勒索", "敲诈", "洗钱", "偷渡", "骗婚", "酒驾"):
 		return "违规行为"
 	case containsAny(find, "奸", "淫", "骚", "妓", "嫖", "裸", "乳", "胸", "性", "色", "欲", "精", "射", "插", "上床", "床上", "约炮", "一夜"):
+		if replacement := neutralizeByHomophone(find); replacement != find {
+			return replacement
+		}
 		return "亲密行为"
 	case containsAny(find, "杀", "砍", "打", "暴力", "暴打", "行凶", "伤害", "血腥", "凶杀"):
 		return "伤害行为"
 	case containsAny(find, "傻", "蠢", "贱", "狗", "畜", "王八", "废物", "垃圾", "婊", "逼", "妈的", "他妈"):
+		if replacement := neutralizeByHomophone(find); replacement != find {
+			return replacement
+		}
 		return "不当称呼"
 	default:
+		if replacement := neutralizeByHomophone(find); replacement != find {
+			return replacement
+		}
 		return "中性说法"
 	}
+}
+
+func neutralizeByHomophone(find string) string {
+	var builder strings.Builder
+	changed := false
+	for _, char := range find {
+		if replacement, ok := safeSensitiveHomophones[char]; ok {
+			builder.WriteRune(replacement)
+			changed = true
+			continue
+		}
+		builder.WriteRune(char)
+	}
+	if !changed {
+		return find
+	}
+	return builder.String()
 }
 
 func containsAny(value string, parts ...string) bool {
