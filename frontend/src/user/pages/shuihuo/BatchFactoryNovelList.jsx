@@ -105,6 +105,7 @@ import { checkWebSubmitEnvironment, getWebSubmitConfig, testWebSubmitVisible } f
 import { batchFactoryPlatformOptions } from './batchFactoryPlatformOptions';
 import { BOOK_CONFIG_REGIONS, bookAssetSummary, bookConfigRegionStatus } from './batchFactoryBookConfigRegions';
 import { videoProviderForModel } from './videoProviderBinding';
+import { stripBaseSetupSection } from '../scriptFinalSegment';
 import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
 
 
@@ -308,6 +309,9 @@ function effectiveBookSettings(batch, book) {
   const batchPatch = batch?.settingsState?.patch || {};
   const bookPatch = book?.settingsState?.patch || {};
   return normalizeAudioSourceSettings({ ...batchPatch, ...bookPatch, publishSettings: { ...(batchPatch.publishSettings || {}), ...(bookPatch.publishSettings || {}) } });
+}
+function baseSetupEnabled(settings = {}) {
+  return settings?.aiPromptConfig?.constraints?.baseSetup?.enabled !== false;
 }
 function h3CompilationStatus(settings = {}) {
   if (settings.audioPlanningEnabled === true) return '等待真实配音时长编译最终 VIDEO';
@@ -980,11 +984,14 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const hasVisualPrompt = Boolean(visualPrompt.trim());
   // 分镜卡直接读取 Go 编译后的最终 Prompt，让已开启的智能统一、基础设定、
   // 画质、限制和负面规则在卡片中可见；弹窗与卡片使用同一份编译结果。
+  const currentSettings = effectiveBookSettings(batch, book);
+  const baseSetupEnabledForBook = baseSetupEnabled(currentSettings);
   const { displayPrompt, compiledPrompt, baseSetupPrompt, smartUnifiedPending, loading } = useCompiledVideoPrompt(batchId, book, video, settingsRevision, { enabled: true });
   // 智能统一是增强层。视觉基线尚未取得时，仍须展示已经编译的 VIDEO
   // 提示词，并明确标出基线状态，不能把一条可执行分镜伪装成“什么都没有”。
-  const videoPrompt = withStoryboardAssetMentions(compiledPrompt || displayPrompt || rawVideoPrompt, book, video);
-  const assetPromptText = String(baseSetupPrompt || '').trim();
+  const rawCompiledPrompt = compiledPrompt || displayPrompt || rawVideoPrompt;
+  const videoPrompt = withStoryboardAssetMentions(baseSetupEnabledForBook ? rawCompiledPrompt : stripBaseSetupSection(rawCompiledPrompt), book, video);
+  const assetPromptText = baseSetupEnabledForBook ? String(baseSetupPrompt || '').trim() : '';
   const activePrompt = promptKind === 'visual' ? visualPrompt : videoPrompt;
 
   useEffect(() => {
@@ -1008,7 +1015,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const h3CardIndex = h3Frame?.index || 0;
 		const h3ConstraintRows = h3ConstraintPreview(effectiveBookSettings(batch, book));
 		const h3ConstraintLabels = h3ConstraintRows.map(row => row.split('：', 1)[0]).join(' · ');
-		const h3AssetPromptText = storyboardAssetPromptText(book);
+    const h3AssetPromptText = baseSetupEnabled(currentSettings) ? storyboardAssetPromptText(book) : '';
 		const h3VideoPromptLabel = selectedVideoPromptLabel(effectiveBookSettings(batch, book));
 		const selectH3Frame = index => {
 			const next = precompiledWorkspace.frames?.[index];
@@ -1085,6 +1092,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const selectedVideo = videos[selectedIndex] || null;
   const selectedPrecompiledFrame = resolvePrecompiledStoryboardFrame(book, selectedVideoId || initialVideoId);
   const h3Document = h3DirectorDocument(book);
+  const engineSettings = effectiveBookSettings(batch, book);
   const { displayPrompt, compiledPrompt, smartUnifiedPending, loading: compilingPrompt } = useCompiledVideoPrompt(batchId, book, selectedVideo, settingsRevision);
   const hasVisualPrompt = Boolean(String(visualPrompt || '').trim());
   const hasVideoPrompt = Boolean(String(videoPrompt || '').trim());
@@ -1141,15 +1149,15 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     if (frame) setSelectedVideoId(frame.key);
   }
 	  const activeLabel = promptKind === 'visual' ? '画面提示词' : '分镜视频提示词';
-  const submittedVideoPrompt = compiledPrompt || displayPrompt || videoPrompt;
+  const rawSubmittedVideoPrompt = compiledPrompt || displayPrompt || videoPrompt;
+  const submittedVideoPrompt = baseSetupEnabled(engineSettings) ? rawSubmittedVideoPrompt : stripBaseSetupSection(rawSubmittedVideoPrompt);
   const activeValue = promptKind === 'visual' ? visualPrompt : editing ? videoPrompt : submittedVideoPrompt;
   const activeReady = promptKind === 'visual' ? hasVisualPrompt : Boolean(submittedVideoPrompt.trim());
   const regenerateCurrentPrompt = promptKind === 'visual' ? onRegenerateVisual : onRegenerate;
   const h3Segments = h3Trace?.compilation?.compilation?.segments || [];
   const h3Segment = h3Segments[selectedIndex] || null;
-	  const engineSettings = effectiveBookSettings(batch, book);
 	  const h3ConstraintRows = h3ConstraintPreview(engineSettings);
-	  const h3AssetPromptText = storyboardAssetPromptText(book);
+  const h3AssetPromptText = baseSetupEnabled(engineSettings) ? storyboardAssetPromptText(book) : '';
   const apiDurationSeconds = Number(selectedVideo?.durationSeconds || 0);
   const realDurationSeconds = realVideoDurationSeconds(submittedVideoPrompt);
   const durationLabel = realDurationSeconds !== null

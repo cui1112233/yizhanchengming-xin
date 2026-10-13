@@ -1149,6 +1149,12 @@ test('shows the active video prompt preset on storyboard cards', () => {
   assert.match(source, /视频提示词：\{videoPromptLabel\}/);
 });
 
+test('lets the base setup switch hide or show asset prompts without regenerating the storyboard', () => {
+  assert.match(source, /baseSetupEnabled/);
+  assert.match(source, /baseSetupEnabledForBook \? String\(baseSetupPrompt/);
+  assert.match(source, /baseSetupEnabled\(currentSettings\) \? storyboardAssetPromptText\(book\)/);
+});
+
 test('uses the same media-library structure for an H3 director card before VIDEO compilation', () => {
   const start = source.indexOf('function MediaVersionPanel(');
   const end = source.indexOf('export function BatchFactoryNovelList(', start);
