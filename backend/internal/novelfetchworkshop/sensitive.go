@@ -8,6 +8,7 @@ import (
 var safeSensitiveReplacements = map[string]string{
 	"绿帽子": "颜色帽子",
 	"绿帽":  "颜色帽",
+	"第三者": "关系介入者",
 	"小三":  "介入关系的人",
 	"出轨":  "关系越界",
 	"勾引":  "主动接近",
@@ -16,6 +17,12 @@ var safeSensitiveReplacements = map[string]string{
 	"强奸":  "非法伤害",
 	"赌博":  "违规下注",
 	"花魁":  "名伶",
+	"轮奸":  "多人伤害",
+	"卧槽":  "惊讶感叹",
+	"我草":  "惊讶感叹",
+	"我操":  "惊讶感叹",
+	"我擦":  "惊讶感叹",
+	"握草":  "惊讶感叹",
 }
 
 // EnsureSensitiveRuleReplacements fills empty sensitive-word replacements
@@ -68,7 +75,38 @@ func safeSensitiveReplacement(find string) string {
 	if replacement, ok := safeSensitiveReplacements[find]; ok {
 		return replacement
 	}
-	return "相关内容"
+	// Keep the replacement understandable even when a newly imported rule is
+	// not in the hand-curated table above. These broad buckets are intentionally
+	// neutral and preserve the scene's meaning better than deleting the word.
+	switch {
+	case containsAny(find, "卧槽", "我草", "我操", "我擦", "握草", "靠"):
+		return "惊讶感叹"
+	case containsAny(find, "强奸", "轮奸", "奸杀", "先奸", "强上", "绑架", "虐待"):
+		return "伤害行为"
+	case containsAny(find, "第三者", "小三", "出轨", "情妇", "偷情", "私会", "私奔", "绿帽", "绿茶"):
+		return "关系介入者"
+	case containsAny(find, "赌博", "赌", "博彩", "下注"):
+		return "违规下注"
+	case containsAny(find, "毒品", "吸毒", "冰毒", "海洛因", "鸦片", "涉毒"):
+		return "违禁品"
+	case containsAny(find, "奸", "淫", "骚", "妓", "嫖", "裸", "乳", "胸", "性", "色", "欲", "精", "射", "插", "上床", "床上", "约炮", "一夜"):
+		return "亲密行为"
+	case containsAny(find, "杀", "砍", "打", "暴力", "暴打", "行凶", "伤害", "血腥", "凶杀"):
+		return "伤害行为"
+	case containsAny(find, "傻", "蠢", "贱", "狗", "畜", "王八", "废物", "垃圾", "婊", "逼", "妈的", "他妈"):
+		return "不当称呼"
+	default:
+		return "不当表达"
+	}
+}
+
+func containsAny(value string, parts ...string) bool {
+	for _, part := range parts {
+		if strings.Contains(value, part) {
+			return true
+		}
+	}
+	return false
 }
 
 // ApplySensitiveRules applies the saved sensitive-word replacements to the
