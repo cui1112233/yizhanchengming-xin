@@ -92,6 +92,7 @@ import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { BatchFactoryUnifiedSettingsModal } from './BatchFactoryUnifiedSettingsModal';
 import { BatchFactoryBookSettingsModal } from './BatchFactoryBookSettingsModal';
+import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { BatchFactoryGiantMaterialPendingProgress } from './BatchFactoryGiantMaterialPendingProgress';
 import { batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, contentRangeLinesForBook, sourceTextAfterViralAdoption } from './batchFactoryContentRange';
@@ -111,7 +112,7 @@ const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.
 const UNIFIED_CONFIGURATION_KEYS = [
   'textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode',
   'storyboardDurationLimit', 'maxVideoDuration', 'fixedSingleVideo', 'audioPlanningEnabled',
-  'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount'
+  'audioSource', 'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount'
 ];
 function readBatchFactoryAudioDuration(blob) {
   return new Promise((resolve, reject) => {
@@ -298,7 +299,7 @@ function savedDraftKey(type, asset) { return `asset:${type}:${asset?.id || asset
 function effectiveBookSettings(batch, book) {
   const batchPatch = batch?.settingsState?.patch || {};
   const bookPatch = book?.settingsState?.patch || {};
-  return { ...batchPatch, ...bookPatch, publishSettings: { ...(batchPatch.publishSettings || {}), ...(bookPatch.publishSettings || {}) } };
+  return normalizeAudioSourceSettings({ ...batchPatch, ...bookPatch, publishSettings: { ...(batchPatch.publishSettings || {}), ...(bookPatch.publishSettings || {}) } });
 }
 function usesSelectedH3VideoPreset(settings = {}) {
   const video = settings?.aiPromptConfig?.video || {};
@@ -1359,7 +1360,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
   const [playRequested, setPlayRequested] = useState(false);
   const [mediaMetrics, setMediaMetrics] = useState({});
   const [primaryOverrides, setPrimaryOverrides] = useState({});
-  const [followAudio, setFollowAudio] = useState(mergeSettings.audioMergeEnabled === true);
+  const [followAudio, setFollowAudio] = useState(normalizeAudioSource(mergeSettings.audioSource) !== 'original' && mergeSettings.audioMergeEnabled === true);
   const [audioDurationSeconds, setAudioDurationSeconds] = useState(Number(mergeSettings.audioDurationSeconds || 0));
   const [audioBusy, setAudioBusy] = useState(false);
   const [pendingUploadKey, setPendingUploadKey] = useState('');
@@ -1500,9 +1501,9 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
 
   const fixedSingleVideo = mergeSettings.fixedSingleVideo === true;
   useEffect(() => {
-    setFollowAudio(fixedSingleVideo ? false : mergeSettings.audioMergeEnabled === true);
+    setFollowAudio(fixedSingleVideo || normalizeAudioSource(mergeSettings.audioSource) === 'original' ? false : mergeSettings.audioMergeEnabled === true);
     setAudioDurationSeconds(Number(mergeSettings.audioDurationSeconds || 0));
-  }, [book?.id, fixedSingleVideo, mergeSettings.audioMergeEnabled, mergeSettings.audioDurationSeconds]);
+  }, [book?.id, fixedSingleVideo, mergeSettings.audioSource, mergeSettings.audioMergeEnabled, mergeSettings.audioDurationSeconds]);
 
   useEffect(() => {
     if (!selectedVideo) {
@@ -1829,6 +1830,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
 
   async function toggleFollowAudio(checked) {
     if (fixedSingleVideo) { message.warning('固定开头模式只生产 VIDEO01，请先关闭固定开头。'); return; }
+    if (normalizeAudioSource(mergeSettings.audioSource) === 'original') { message.info('当前为原声模式，不会合入 TTS。'); return; }
     setFollowAudio(checked);
     try {
       await persistMediaAudioPatch({ audioMergeEnabled: checked });
@@ -2566,7 +2568,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 			if (!confirmed) throw new Error('已保留手动提示词，当前配置尚未应用到最终分镜');
 		}
 		let audioResult = null;
-		if (settings.audioPlanningEnabled === true) {
+    if (settings.audioPlanningEnabled === true) {
 			const tts = await batchFactoryBookTts(settings);
 			const previousMeasurement = priorTrace?.timeline?.timeline?.audio_measurement;
 			if (!allowAudioSynthesis && !previousMeasurement?.asset_id) return { skipped: 'audio' };
@@ -3051,8 +3053,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     } catch (error) { message.error(error?.message || '提交视频任务失败'); } finally { setActionBusy(''); }
   }
   function mergePayload(prefix, book = null, speed = 1, overrides = {}) {
-    const settings = book ? effectiveBookSettings(batch, book) : (batch?.settingsState?.patch || {});
-    const followAudio = settings.fixedSingleVideo === true ? false : (Object.hasOwn(overrides, 'followAudio') ? overrides.followAudio === true : settings.audioMergeEnabled === true);
+    const settings = normalizeAudioSourceSettings(book ? effectiveBookSettings(batch, book) : (batch?.settingsState?.patch || {}));
+    const followAudio = normalizeAudioSource(settings.audioSource) === 'original' || settings.fixedSingleVideo === true ? false : (Object.hasOwn(overrides, 'followAudio') ? overrides.followAudio === true : settings.audioMergeEnabled === true);
     const audioDurationSeconds = Object.hasOwn(overrides, 'audioDurationSeconds')
       ? Number(overrides.audioDurationSeconds || 0)
       : Number(settings.audioDurationSeconds || 0);
@@ -3233,7 +3235,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   }
   async function saveSettings(patch) {
     const audioPlanningWasEnabled = batch?.settingsState?.patch?.audioPlanningEnabled === true;
-    const normalized = { ...patch, audioDurationSeconds: 0, ...(patch.fixedSingleVideo === true ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {}) };
+    const normalized = normalizeAudioSourceSettings({ ...patch, audioDurationSeconds: 0, ...(patch.fixedSingleVideo === true ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {}) });
     const shouldPrepareAudio = audioPlanningWasEnabled === false && normalized.audioPlanningEnabled === true && normalized.fixedSingleVideo !== true;
     try {
       await saveBatchSettings(batch.id, { patch: normalized, expectedRevision: Number(batch?.settingsState?.revision || 0) }, { suppressGlobalError: true });

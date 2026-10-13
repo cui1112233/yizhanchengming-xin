@@ -12,6 +12,7 @@ import {
   updateAutomationPreset
 } from '../../../shared/api/batchFactoryV11';
 import { videoProviderForModel } from './videoProviderBinding';
+import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { getConstraintPresetTexts } from '../../../shared/api/generation';
 
 const clone = value => JSON.parse(JSON.stringify(value || {}));
@@ -24,6 +25,7 @@ const normalizeLegacyPatch = value => {
   return { ...nested, ...patch };
 };
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
+const AUDIO_SOURCE_OPTIONS = [{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }];
 const voices = [
   { value: 'zh-CN-XiaoxiaoNeural', label: '晓晓（女声·温柔）' },
   { value: 'zh-CN-XiaochenNeural', label: '晓辰（女声·知性）' },
@@ -93,6 +95,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
       <label className="batch-factory-engine-field"><span><b>视频画幅</b><small>视频不会跟随参考图画幅</small></span><Segmented value={value.videoAspectRatio || (value.aspectRatio === '16:9' ? '16:9' : '9:16')} options={['16:9', '9:16']} onChange={videoAspectRatio => patch({ videoAspectRatio })} /></label>
       <label className="batch-factory-engine-field"><span><b>视频分辨率</b></span><Segmented value={value.videoResolution || '720p'} options={['480p', '720p', '1080p']} onChange={videoResolution => patch({ videoResolution })} /></label>
       <label className="batch-factory-engine-field"><span><b>分镜时长</b></span><Segmented value={Number(value.storyboardDurationLimit) === 15 ? 15 : 10} options={[{ value: 10, label: '10 秒' }, { value: 15, label: '15 秒' }]} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} /></label>
+      <label className="batch-factory-engine-field"><span><b>音频来源</b><small>默认使用 TTS，原声保留视频模型自带声音</small></span><Segmented block value={normalizeAudioSource(value.audioSource)} options={AUDIO_SOURCE_OPTIONS} onChange={audioSource => onChange(normalizeAudioSourceSettings({ ...value, audioSource }))} /></label>
       <label className="batch-factory-engine-field"><span><b>配音音色</b></span><Select value={tts.voice} options={voices} onChange={voice => patch({ tts: { ...tts, voice } })} /></label>
       <label className="batch-factory-engine-field"><span><b>配音风格</b></span><Select value={tts.style} options={styles} onChange={style => patch({ tts: { ...tts, style } })} /></label>
       <label className="batch-factory-engine-field"><span><b>语速</b></span><InputNumber min={0.5} max={2} step={0.1} value={tts.speed} onChange={speed => patch({ tts: { ...tts, speed: speed ?? DEFAULT_TTS.speed } })} /></label>

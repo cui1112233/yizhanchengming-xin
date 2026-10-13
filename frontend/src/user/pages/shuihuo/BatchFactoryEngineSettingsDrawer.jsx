@@ -5,6 +5,7 @@ import { getConfig } from '../../../shared/api/config';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
 import { selectedModelState } from './modelSelectionState';
 import { videoProviderForModel } from './videoProviderBinding';
+import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 
 const TARGET_ADMIN_URL = 'http://two.121w.com/tttadmin/index.php';
 // The shared novel-fetch verification service predates the VMS UI label.  It
@@ -17,6 +18,7 @@ const providerOptions = [
   { value: 'autodl_comfyui', label: 'AutoDL ComfyUI' }
 ];
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
+const AUDIO_SOURCE_OPTIONS = [{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }];
 const TTS_VOICE_OPTIONS = [
   { label: '晓晓（女声·温柔）', value: 'zh-CN-XiaoxiaoNeural' },
   { label: '晓辰（女声·知性）', value: 'zh-CN-XiaochenNeural' },
@@ -118,12 +120,12 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
     if (fixedSingleVideo) message.info('固定开头只生产 VIDEO01，两个跟随配音功能已关闭。');
   }
   async function save() {
-    const normalized = {
+    const normalized = normalizeAudioSourceSettings({
       ...form,
       tts: { ...tts },
       audioDurationSeconds: 0,
       ...(form.fixedSingleVideo === true ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {})
-    };
+    });
     setSaving(true);
     try { const saved = await onSave(normalized); if (saved) onClose(); } finally { setSaving(false); }
   }
@@ -233,6 +235,9 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
           </EngineCard>
 
           <EngineCard title="配音与时长" description="统一的是配音参数与跟随策略；每本小说的真实秒数会在需要时独立生成和读取。">
+            <div className="batch-factory-engine-grid batch-factory-tts-grid">
+              <Field label="音频来源"><Segmented block value={normalizeAudioSource(form.audioSource)} options={AUDIO_SOURCE_OPTIONS} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></Field>
+            </div>
             <div className="batch-factory-engine-grid batch-factory-tts-grid">
               <Field label="配音音色"><Select value={tts.voice} options={TTS_VOICE_OPTIONS} onChange={voice => patchTts({ voice })} /></Field>
               <Field label="配音风格"><Select value={tts.style} options={TTS_STYLE_OPTIONS} onChange={style => patchTts({ style })} /></Field>

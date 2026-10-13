@@ -6,10 +6,11 @@ import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { deleteScriptConstraintPrompt, getConstraintPresetTexts, listScriptConstraintPrompts, saveScriptConstraintPrompt, updateScriptConstraintPrompt } from '../../../shared/api/generation';
 import { videoProviderForModel } from './videoProviderBinding';
+import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { audioDurationFingerprint as runtimeAudioDurationFingerprint, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { batchFactoryPreviewText } from './batchFactoryContentRange';
 
-const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'fixedSingleVideo', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
+const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'fixedSingleVideo', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings'];
 const ENGINE_OVERRIDE_FIELDS = [...ENGINE_MODEL_OVERRIDE_FIELDS, ...ENGINE_PUBLISH_OVERRIDE_FIELDS];
 const BOOK_OVERRIDE_FIELDS = [...ENGINE_OVERRIDE_FIELDS, 'starredCharacterNames', 'openingEnabled', 'openingCount', 'aiPromptConfig'];
@@ -99,7 +100,7 @@ function mergePublishSettings(base, override) { return { ...(base || {}), ...(ov
 function effectiveValues(batchPatch, bookPatch) {
   const aiPromptConfig = mergePromptConfig(batchPatch?.aiPromptConfig, bookPatch?.aiPromptConfig);
   const values = { ...(batchPatch || {}), ...(bookPatch || {}), aiPromptConfig: { ...aiPromptConfig, video: requiredVideoPrompt(aiPromptConfig.video) }, publishSettings: mergePublishSettings(batchPatch?.publishSettings, bookPatch?.publishSettings) };
-  return values.fixedSingleVideo === true ? { ...values, audioPlanningEnabled: false, audioMergeEnabled: false } : values;
+  return normalizeAudioSourceSettings(values.fixedSingleVideo === true ? { ...values, audioPlanningEnabled: false, audioMergeEnabled: false } : values);
 }
 function selectedMeta(catalog, id) {
   const preset = catalog.find(item => item.id === id);
@@ -570,9 +571,12 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 
           <ConfigCard title="配音与时长" description="读取当前生产正文；读取时长不会自动打开任何跟随功能。"><section className="batch-factory-book-audio-content">
             <div className="batch-factory-book-audio-head"><div><b>当前正文配音</b><p>只读取小说正文当前选择范围或已保存的生产正文，不读取整本全文。</p></div><Space wrap><Button size="small" loading={audioBusy} onClick={measureBookAudio}>生成配音并读取时长</Button>{audioBlob ? <Button size="small" onClick={() => downloadAudio(audioBlob, `${book?.bookId || book?.id || 'book'}-配音.mp3`)}>下载配音</Button> : null}</Space></div>
+            <div className="batch-factory-engine-grid">
+              <label className="batch-factory-engine-field"><span><b>音频来源</b><small>默认 TTS；原声保留视频模型自带声音</small></span><Segmented block value={normalizeAudioSource(form.audioSource)} options={[{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }]} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></label>
+            </div>
             <div className="batch-factory-audio-options">
               <AudioOptionCard disabled={fixedOpening} title="分镜规划跟随配音" description={fixedOpening ? '固定开头开启时暂不生效，原配置保留。' : '按真实配音时长规划 VIDEO。'} value={form.audioPlanningEnabled} inherited={inherited.audioPlanningEnabled} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
-              <AudioOptionCard disabled={fixedOpening} title="合并跟随配音" description={fixedOpening ? '固定开头开启时暂不生效，原配置保留。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
+              <AudioOptionCard disabled={fixedOpening || normalizeAudioSource(form.audioSource) === 'original'} title="合并跟随配音" description={fixedOpening ? '固定开头开启时暂不生效，原配置保留。' : normalizeAudioSource(form.audioSource) === 'original' ? '原声模式不合入 TTS。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
             </div>
             <div className="batch-factory-engine-grid">
               <label className="batch-factory-engine-field"><span><b>配音音色</b><small>当前书 TTS</small></span><Select value={tts.voice} options={TTS_VOICE_OPTIONS} onChange={voice => patchTts({ voice })} /></label>

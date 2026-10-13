@@ -1054,3 +1054,17 @@ func TestAssetRefreshReplacesOnlyGeneratedAssetsAndKeepsManualAssets(t *testing.
 		t.Fatalf("asset refresh must replace generated assets but preserve manual assets: %#v", assets)
 	}
 }
+
+func TestOriginalAudioSourceKeepsAudioPlanningMeasurement(t *testing.T) {
+	_, batch, book := seedDirectorBook(t, "original", false)
+	batch.SettingsState.Patch["audioSource"] = rawSetting(t, "original")
+	batch.SettingsState.Patch["audioPlanningEnabled"] = rawSetting(t, true)
+	batch.SettingsState.Patch["audioDurationSeconds"] = rawSetting(t, 42)
+	snapshot, err := snapshotForBook(batch, book)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.AudioDurationSeconds != 42 || snapshot.AudioTargetSeconds != 42 {
+		t.Fatalf("original audio must keep TTS duration planning: %#v", snapshot)
+	}
+}
