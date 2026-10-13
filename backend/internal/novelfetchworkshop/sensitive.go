@@ -25,6 +25,12 @@ var safeSensitiveReplacements = map[string]string{
 	"握草":  "惊讶感叹",
 }
 
+var safeSensitivePassThrough = map[string]struct{}{
+	"玉米": {}, "树林": {}, "小树林": {}, "视频": {}, "服务": {}, "晚上": {}, "深夜": {},
+	"直播": {}, "护士": {}, "院长": {}, "男老师": {}, "男女": {}, "睡": {}, "玩": {},
+	"第一": {}, "最佳": {}, "首选": {}, "顶尖": {}, "公认": {}, "必选": {}, "最火": {},
+}
+
 // EnsureSensitiveRuleReplacements fills empty sensitive-word replacements
 // with neutral wording. Existing user replacements always win.
 func EnsureSensitiveRuleReplacements(settings map[string]any) int {
@@ -75,6 +81,9 @@ func safeSensitiveReplacement(find string) string {
 	if replacement, ok := safeSensitiveReplacements[find]; ok {
 		return replacement
 	}
+	if _, ok := safeSensitivePassThrough[find]; ok {
+		return find
+	}
 	// Keep the replacement understandable even when a newly imported rule is
 	// not in the hand-curated table above. These broad buckets are intentionally
 	// neutral and preserve the scene's meaning better than deleting the word.
@@ -89,6 +98,24 @@ func safeSensitiveReplacement(find string) string {
 		return "违规下注"
 	case containsAny(find, "毒品", "吸毒", "冰毒", "海洛因", "鸦片", "涉毒"):
 		return "违禁品"
+	case containsAny(find, "警察", "公安", "民警", "武警", "刑警", "警局", "派出所", "执法"):
+		return "执法人员"
+	case containsAny(find, "法院", "法官", "检察院", "司法", "审判", "审判"):
+		return "司法机构"
+	case containsAny(find, "政府", "中央", "市委", "县委", "常委", "政委", "纪委", "民政", "教育局", "税务局", "交通局", "卫健委", "招生办"):
+		return "公共机构"
+	case containsAny(find, "军队", "部队", "军区", "特战", "军校", "当兵", "军车", "国防"):
+		return "相关队伍"
+	case containsAny(find, "丈夫", "老公", "妻子", "老婆", "情人", "对象", "婆婆", "嫂子", "妹夫", "小叔", "舍友男友"):
+		return "人物关系"
+	case containsAny(find, "贷款", "征信", "合同", "收费", "红包", "中奖", "提现", "回扣", "代付", "担保", "债"):
+		return "相关事务"
+	case containsAny(find, "佛", "菩萨", "活佛", "庇佑", "冥婚", "邪教"):
+		return "宗教相关称谓"
+	case containsAny(find, "癌", "脑瘤", "肾虚", "精神病", "萎缩", "确诊", "疾病", "贫困"):
+		return "健康状况"
+	case containsAny(find, "诈骗", "偷税", "受贿", "贿赂", "传销", "拐卖", "造谣", "网暴", "勒索", "敲诈", "洗钱", "偷渡", "骗婚", "酒驾"):
+		return "违规行为"
 	case containsAny(find, "奸", "淫", "骚", "妓", "嫖", "裸", "乳", "胸", "性", "色", "欲", "精", "射", "插", "上床", "床上", "约炮", "一夜"):
 		return "亲密行为"
 	case containsAny(find, "杀", "砍", "打", "暴力", "暴打", "行凶", "伤害", "血腥", "凶杀"):
@@ -96,7 +123,7 @@ func safeSensitiveReplacement(find string) string {
 	case containsAny(find, "傻", "蠢", "贱", "狗", "畜", "王八", "废物", "垃圾", "婊", "逼", "妈的", "他妈"):
 		return "不当称呼"
 	default:
-		return "不当表达"
+		return "中性说法"
 	}
 }
 

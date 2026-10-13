@@ -142,7 +142,23 @@ func TestSafeSensitiveReplacementUsesMeaningfulNeutralLanguage(t *testing.T) {
 	}}}}}
 	EnsureSensitiveRuleReplacements(settings)
 	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
-	want := []string{"关系介入者", "多人伤害", "不当表达"}
+	want := []string{"关系介入者", "多人伤害", "中性说法"}
+	for i, expected := range want {
+		if got := rules[i].(map[string]any)["replace"]; got != expected {
+			t.Fatalf("rule %d replacement=%q, want %q", i, got, expected)
+		}
+	}
+}
+
+func TestSafeSensitiveReplacementCoversInstitutionsAndBenignWords(t *testing.T) {
+	settings := map[string]any{"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
+		map[string]any{"find": "警察", "replace": ""},
+		map[string]any{"find": "法院", "replace": ""},
+		map[string]any{"find": "玉米", "replace": ""},
+	}}}}}
+	EnsureSensitiveRuleReplacements(settings)
+	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
+	want := []string{"执法人员", "司法机构", "玉米"}
 	for i, expected := range want {
 		if got := rules[i].(map[string]any)["replace"]; got != expected {
 			t.Fatalf("rule %d replacement=%q, want %q", i, got, expected)
