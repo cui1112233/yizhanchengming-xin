@@ -249,7 +249,17 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		appConfig := mapOrEmpty(settings["appConfig"])
-		writeJSON(w, http.StatusOK, map[string]any{"settings": mapOrEmpty(appConfig["web_submit"])})
+		webSubmit := mapOrEmpty(appConfig["web_submit"])
+		// 小说获取和批量工厂使用同一份目标站会话。小说获取先登录时，
+		// 批量工厂也要直接显示这个账号，而不是要求再次录入密码。
+		if strings.TrimSpace(toString(webSubmit["username"])) == "" {
+			session := readUploadTargetSession(usersDir, identity.Username)
+			if targetUsername := strings.TrimSpace(toString(session["targetUsername"])); targetUsername != "" {
+				webSubmit["username"] = targetUsername
+				webSubmit["password_masked"] = true
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"settings": webSubmit})
 	})))
 	root.Handle("POST /api/batch-rewrite/web-submit/config", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
@@ -304,10 +314,19 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		session := readUploadTargetSession(usersDir, identity.Username)
-		loggedIn := strings.TrimSpace(toString(session["cookie"])) != ""
+		cookie := strings.TrimSpace(toString(session["cookie"]))
+		loggedIn := false
 		detail := "未登录"
-		if loggedIn {
-			detail = "已保存登录会话"
+		if cookie != "" {
+			body, probeErr := targetGET(req, "http://two.121w.com/tttadmin/zidingyi.php", cookie)
+			if probeErr != nil {
+				detail = "小说获取共享会话检查失败"
+			} else if targetPageLooksAuthenticated(string(body)) {
+				loggedIn = true
+				detail = "已登录（共享小说获取会话）"
+			} else {
+				detail = "共享登录会话已失效"
+			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
 	})))
