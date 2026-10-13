@@ -1201,6 +1201,12 @@ test('maps the selected smart-unified prefix to baseline injection', () => {
 	assert.match(bookSettingsSource, /智能统一/);
 });
 
+test('shows enabled constraints on an uncompiled H3 storyboard card', () => {
+  assert.match(source, /function h3ConstraintPreview\(settings = \{\}\)/);
+  assert.match(source, /const h3ConstraintRows = h3ConstraintPreview\(effectiveBookSettings\(batch, book\)\)/);
+  assert.match(source, /【当前已启用约束】/);
+});
+
 test('passes only the selected V11 final template and its H3 protocol key to compilation', () => {
   assert.match(source, /function finalVideoPromptTemplate\(body\)/);
   assert.match(source, /const videoPromptTemplate = finalVideoPromptTemplate\(videoPresetBody\);/);

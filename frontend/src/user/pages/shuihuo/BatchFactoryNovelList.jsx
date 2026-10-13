@@ -320,6 +320,18 @@ function h3CompilationStatus(settings = {}) {
   const seconds = Number(settings.storyboardDurationLimit) === 15 ? 15 : 10;
   return `将按 ${seconds} 秒确定性切段并编译最终 VIDEO`;
 }
+function h3ConstraintPreview(settings = {}) {
+  const constraints = settings?.aiPromptConfig?.constraints || {};
+  const compiled = buildBatchFactoryH3Constraints(constraints);
+  const rows = [];
+  if (compiled.switches.smart_unified) rows.push('智能统一：由智能统一结果注入');
+  if (compiled.switches.base_setup) rows.push('基础设定：人物 / 场景资产');
+  if (compiled.switches.prefix && compiled.prefix_text) rows.push(`画面前缀词：${compiled.prefix_text}`);
+  if (compiled.switches.quality && compiled.quality_text) rows.push(`画质约束：${compiled.quality_text}`);
+  if (compiled.switches.visual_restriction && compiled.visual_restriction_text) rows.push(`画面限制：${compiled.visual_restriction_text}`);
+  if (compiled.switches.negative && compiled.negative_text) rows.push(`负面提示词：${compiled.negative_text}`);
+  return rows;
+}
 function effectiveBookAssetRules(batch, book) {
   return {
     ...(batch?.settingsState?.patch?.aiPromptConfig?.assets || {}),
@@ -972,6 +984,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const h3Frame = resolvePrecompiledStoryboardFrame(book, selectedVideoId);
 		const h3Card = h3Frame?.card || {};
 		const h3CardIndex = h3Frame?.index || 0;
+		const h3ConstraintRows = h3ConstraintPreview(effectiveBookSettings(batch, book));
 		const selectH3Frame = index => {
 			const next = precompiledWorkspace.frames?.[index];
 			if (next) selectVideo(next.key);
@@ -982,7 +995,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 				<header className="batch-factory-cell-head"><div><b>H3 导演卡 {h3CardIndex + 1}</b><small>已提取，尚未编译 VIDEO</small></div></header>
 				<button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(h3Frame?.key || '')}>
 					<span className="batch-factory-prompt-status">H3 导演卡已提取</span>
-					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}</p>
+					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}{h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}</p>
 					{showSmartUnified ? <small>智能统一：{smartUnifiedAnalysis.prompt}</small> : <small>{h3CompilationMessage}</small>}
 				</button>
 				<div className="batch-factory-cell-pager">
