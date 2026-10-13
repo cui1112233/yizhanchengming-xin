@@ -1378,11 +1378,9 @@ function plainObject(value) {
 
 const PROMPT_SELECTION_FIELDS = ['presetId', 'presetName', 'presetSlot', 'presetVersion', 'body', 'prompt'];
 const ASSET_REQUIREMENTS = [
-  ['extraction', 'assets.extraction', '人物场景道具提示词'],
-  ['character', 'assets.character', '人物提示词'],
-  ['scene', 'assets.scene', '场景提示词']
+  ['extraction', 'assets.extraction', 'SD 资产预设提示词']
 ];
-const DEFAULT_ASSET_EXTRACTION_PRESET_ID = 'script-extract-assets';
+const DEFAULT_ASSET_EXTRACTION_PRESET_ID = 'batch-assets-sd-character-scene';
 const LEGACY_ASSET_SELECTION_KEYS = ['prop'];
 const PUBLIC_SCRIPT_STORYBOARD_PRESETS = Object.freeze([
   ['segmented', 'script-segmented', 'script.segmented', '分段开头'],
@@ -1445,9 +1443,9 @@ function resolveAssetSelections(assets, presetStore, resolveBody) {
     if (selection) assets[key] = selection;
     else delete assets[key];
   }
-  // Character and scene rendering are first-class V12 output choices. Props
-  // remain part of the combined extraction contract for now.
-  for (const key of LEGACY_ASSET_SELECTION_KEYS) delete assets[key];
+  // Character and scene selectors were retired: the SD asset preset returns
+  // their structured facts, relationships and appearance in the same call.
+  for (const key of ['character', 'scene', ...LEGACY_ASSET_SELECTION_KEYS]) delete assets[key];
 }
 
 function resolveConstraintSelections(constraints, presetStore, resolveBody) {
@@ -1566,8 +1564,8 @@ function enrichBatchFactorySystemPresetConfig(input, presetStore, resolveBody = 
   if (plainObject(config.hook)) resolveModuleSelection(config.hook, 'hook', '爆款开头改编预设词', presetStore, resolveBody);
   if (plainObject(config.originalDirector)) resolveModuleSelection(config.originalDirector, 'director.original', '原文直转导演预设词', presetStore, resolveBody);
   if (plainObject(config.viralDirector)) resolveModuleSelection(config.viralDirector, 'director.viral', '爆款开头导演预设词', presetStore, resolveBody);
-  // 视频提示词是导演分镜的必需输入；“分镜元提示词（自动组合）”只是
-  // batch.video-meta 槽位中的默认选项，管理员可发布其它视频提示词供选择。
+  // 视频提示词是导演分镜的必需输入；默认使用 SD 视频提示词，管理员
+  // 仍可在 batch.video-meta 槽位发布并明确选择其它视频预设。
   if (plainObject(config.video)) resolveModuleSelection(config.video, 'video', '视频提示词预设词', presetStore, resolveBody);
   if (plainObject(config.visual)) resolveModuleSelection(config.visual, 'visual', '画面提示词预设词', presetStore, resolveBody);
   // Retired: historical video-style-prefix choices must not be copied into a

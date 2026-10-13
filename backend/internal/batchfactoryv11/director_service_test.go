@@ -511,6 +511,35 @@ func TestAssetExtractionPersistsCombinedSmartUnifiedAnalysisWithOneModelCall(t *
 	}
 }
 
+func TestAssetExtractionWithSDCombinedPresetUsesOneModelCall(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+			"assets": map[string]any{
+				"enabled": true,
+				"extraction": map[string]any{
+					"presetId": "batch-assets-sd-character-scene",
+					"presetKey": "sd-character-scene",
+					"body": "SD ONE CALL ASSET RULE",
+				},
+			},
+		})}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{values: []string{`{"characters":[{"name":"林溪","prompt":"完整人物外形与视频锚点"}],"scenes":[{"name":"客厅","prompt":"完整场景锚点"}],"props":[{"name":"手机","prompt":"完整道具锚点"}]}`}}
+	assets, err := (&DirectorService{Store: store, Provider: provider}).RunAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 1 || len(assets) != 3 {
+		t.Fatalf("SD combined asset flow calls=%d assets=%+v, want one request with all asset kinds", len(provider.calls), assets)
+	}
+	if !strings.Contains(provider.calls[0].SystemPrompt, "SD ONE CALL ASSET RULE") {
+		t.Fatalf("SD combined preset body was not used: %q", provider.calls[0].SystemPrompt)
+	}
+}
+
 func TestAssetExtractionWithH3FullPresetCompilesAllCharactersOnce(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{

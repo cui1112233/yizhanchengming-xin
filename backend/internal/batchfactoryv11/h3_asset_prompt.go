@@ -12,6 +12,7 @@ const (
 	h3CharacterRendererKey = "h3-character-normal"
 	h3SceneRendererKey     = "h3-scene-normal"
 	h3AssetsRendererKey    = "h3-assets-full"
+	sdAssetsRendererKey    = "sd-character-scene"
 )
 
 func usesH3CharacterRenderer(selection PresetSnapshot) bool {
@@ -24,6 +25,15 @@ func usesH3SceneRenderer(selection PresetSnapshot) bool {
 
 func usesH3AssetRenderer(selection PresetSnapshot) bool {
 	return strings.EqualFold(strings.TrimSpace(selection.Key), h3AssetsRendererKey)
+}
+
+// usesCombinedAssetRenderer marks presets whose single response already
+// contains the complete asset result.  These presets must never fall through
+// to the legacy per-character/per-scene compiler, otherwise one user choice
+// becomes several hidden AI calls.
+func usesCombinedAssetRenderer(selection PresetSnapshot) bool {
+	key := strings.TrimSpace(selection.Key)
+	return strings.EqualFold(key, h3AssetsRendererKey) || strings.EqualFold(key, sdAssetsRendererKey)
 }
 
 func h3AssetSelection(snapshot DirectorSnapshot, book Book, kind string) (PresetSnapshot, bool) {

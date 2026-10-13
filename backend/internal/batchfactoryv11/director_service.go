@@ -436,7 +436,7 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	// together with characters/scenes/props. Other renderer selections retain
 	// their historical post-extraction compilation behavior.
 	config := aiReasoningPromptConfig(snapshot.Effective)
-	if !(config.Assets.appliesTo(book, config.Assets.Extraction) && usesH3AssetRenderer(config.Assets.Extraction)) {
+	if !(config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)) {
 		assets, err = s.compileH3AssetPrompts(ctx, book, snapshot, assets)
 		if err != nil {
 			return nil, err

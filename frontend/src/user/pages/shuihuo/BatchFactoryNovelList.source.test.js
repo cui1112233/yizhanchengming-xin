@@ -309,9 +309,9 @@ test('keeps AI reasoning constraints in the same per-book override model as othe
   assert.match(reasoningSource, /<Range value=\{value\}/);
 });
 
-test('defaults the unified asset rule to the script extraction preset that includes props', () => {
-  assert.match(reasoningSource, /script-extract-assets/);
-  assert.match(reasoningSource, /人物场景道具提取/);
+test('defaults the unified asset rule to the one-call SD asset preset', () => {
+  assert.match(reasoningSource, /batch-assets-sd-character-scene/);
+  assert.match(reasoningSource, /SD 资产预设提示词/);
   assert.match(reasoningSource, /catalog\.script\.filter\(x=>x\.slot==='script\.asset-extraction'\)/);
 });
 

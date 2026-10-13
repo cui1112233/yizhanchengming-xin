@@ -1420,6 +1420,7 @@ function presetStore() {
     ['script-extract', makePreset('script-extract', 'script', 'base', { format: 'extract', slot: 'script.extract' }, '提取人物与场景')],
     ['script-extract-assets', makePreset('script-extract-assets', 'script', 'base', { format: 'extract', slot: 'script.asset-extraction' }, '提取人物、场景与关键道具')],
     ['script-extract-assets-female', makePreset('script-extract-assets-female', 'script', 'base', { format: 'extract', slot: 'script.asset-extraction' }, '女频人物、场景与关键道具')],
+    ['batch-assets-sd-character-scene', makePreset('batch-assets-sd-character-scene', 'script', 'base', { format: 'extract', slot: 'script.asset-extraction' }, 'SD 一次资产调用')],
     ['script-constraint-wrapper', makePreset('script-constraint-wrapper', 'script', 'base', { slot: 'script.constraint.wrapper' }, '约束总规则')],
     ['batch-hook-adaptation', makePreset('batch-hook-adaptation', 'batch-factory', 'base', { slot: 'batch.hook-adaptation' }, '爆款开头规则')],
     ['batch-original-director', makePreset('batch-original-director', 'batch-factory', 'base', { slot: 'batch.original-director' }, '原文导演规则')],
@@ -1445,7 +1446,7 @@ test('enrichment rejects a non-script extraction preset for the unified asset ru
   const input = { patch: { aiPromptConfig: { assets: { extraction: { presetId: 'batch-scene-meta' } } } } };
   assert.throws(
     () => enrichBatchFactorySystemPresetConfig(input, presetStore()),
-    /人物场景道具提示词/
+    /SD 资产预设提示词/
   );
 });
 
@@ -1533,20 +1534,20 @@ test('enrichment snapshots the only combined script extraction preset and strips
 test('enrichment rejects the character-and-scene-only script extractor for Batch Factory assets', () => {
   assert.throws(
     () => enrichBatchFactorySystemPresetConfig({ patch: { aiPromptConfig: { assets: { extraction: { presetId: 'script-extract' } } } } }, presetStore()),
-    /人物场景道具提示词/
+    /SD 资产预设提示词/
   );
 });
 
-test('enrichment defaults old batches to the combined script asset extraction preset', () => {
+test('enrichment defaults old batches to the one-call SD asset preset', () => {
   const enriched = enrichBatchFactorySystemPresetConfig({
     patch: { aiPromptConfig: { assets: { enabled: true } } }
   }, presetStore());
   assert.deepEqual(enriched.patch.aiPromptConfig.assets.extraction, {
-    presetId: 'script-extract-assets',
-    presetName: 'script-extract-assets',
+    presetId: 'batch-assets-sd-character-scene',
+    presetName: 'batch-assets-sd-character-scene',
     presetSlot: 'script.asset-extraction',
     presetVersion: 3,
-    body: '提取人物、场景与关键道具'
+    body: 'SD 一次资产调用'
   });
 });
 
@@ -1627,7 +1628,7 @@ test('enrichment keeps the selected published video prompt as one option in the 
   assert.equal(video.sourcePresets, undefined);
 });
 
-test('enrichment keeps the selected character renderer while dropping retired wrapper and prefix settings', () => {
+test('enrichment drops retired character and scene renderer selections', () => {
   const enriched = enrichBatchFactorySystemPresetConfig({
     patch: {
       aiPromptConfig: {
@@ -1642,7 +1643,8 @@ test('enrichment keeps the selected character renderer while dropping retired wr
   }, presetStore());
   const config = enriched.patch.aiPromptConfig;
   assert.equal(config.assets.extraction.body, '女频人物、场景与关键道具');
-	assert.equal(config.assets.character.body, '只生成人物提示词');
+	assert.equal(config.assets.character, undefined);
+	assert.equal(config.assets.scene, undefined);
   assert.equal(config.constraints.wrapper, undefined);
   assert.equal(config.hook.body, '爆款开头规则');
   assert.equal(config.originalDirector.body, '原文导演规则');

@@ -388,7 +388,7 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 			}
 		}
 	}
-	h3AssetSelected := config.Assets.appliesTo(book, config.Assets.Extraction) && usesH3AssetRenderer(config.Assets.Extraction)
+	h3AssetSelected := config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)
 	h3CharacterSelected := config.Assets.appliesTo(book, config.Assets.Character) && usesH3CharacterRenderer(config.Assets.Character)
 	h3Selected := h3AssetSelected || h3CharacterSelected
 	if h3Selected {
