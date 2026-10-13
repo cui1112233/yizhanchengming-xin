@@ -342,6 +342,10 @@ function promptPreview(value, limit = 180) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
+function selectedVideoPromptLabel(settings = {}) {
+  const video = settings?.aiPromptConfig?.video || {};
+  return String(video.presetName || video.presetId || video.presetKey || '').trim() || '未选择视频提示词';
+}
 function effectiveBookAssetRules(batch, book) {
   return {
     ...(batch?.settingsState?.patch?.aiPromptConfig?.assets || {}),
@@ -998,6 +1002,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const h3ConstraintRows = h3ConstraintPreview(effectiveBookSettings(batch, book));
 		const h3ConstraintLabels = h3ConstraintRows.map(row => row.split('：', 1)[0]).join(' · ');
 		const h3AssetPromptText = storyboardAssetPromptText(book);
+		const h3VideoPromptLabel = selectedVideoPromptLabel(effectiveBookSettings(batch, book));
 		const selectH3Frame = index => {
 			const next = precompiledWorkspace.frames?.[index];
 			if (next) selectVideo(next.key);
@@ -1005,7 +1010,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
 		const camera = h3Card.camera || {};
 		return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell">
 			<div className="batch-factory-cell-shell batch-factory-prompt-entry-card is-h3-director-card">
-				<header className="batch-factory-cell-head"><div><b>导演分镜卡 {h3CardIndex + 1}</b><small>已提取，尚未编译 VIDEO</small></div></header>
+				<header className="batch-factory-cell-head"><div><b>导演分镜卡 {h3CardIndex + 1}</b><small>视频提示词：{h3VideoPromptLabel} · 已提取，尚未编译 VIDEO</small></div></header>
 				<button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(h3Frame?.key || '')}>
 					<span className="batch-factory-prompt-status">导演分镜卡已提取</span>
 					<p>{String(h3Card.source_text || '')}{h3Card.action ? `\n\n动作：${h3Card.action}` : ''}{camera.shot_size ? `\n机位：${camera.shot_size}${camera.shot_angle ? ` · ${camera.shot_angle}` : ''}` : ''}{h3AssetPromptText ? `\n\n【资产提示词】\n${h3AssetPromptText}` : ''}{h3ConstraintRows.length ? `\n\n【当前已启用约束】\n${h3ConstraintRows.join('\n')}` : ''}</p>
@@ -1023,6 +1028,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   if (!video) return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell"><div className="batch-factory-cell-shell"><div className="batch-factory-cell-empty">AI 推理后会在这里显示当前书的分镜提示词。</div></div></div>;
 
   const stateLabel = promptKind === 'visual' ? (hasVisualPrompt ? '画面已生成' : '待生成') : loading ? '编译中' : videoPrompt.trim() ? (smartUnifiedPending ? '基线未获取' : '最终已编译') : '待生成';
+  const videoPromptLabel = selectedVideoPromptLabel(effectiveBookSettings(batch, book));
 
   return <div className="shuihuo-workbench-cell shuihuo-prompt-cell batch-factory-book-prompt-cell">
     <div className="batch-factory-cell-shell batch-factory-prompt-entry-card">
@@ -1036,7 +1042,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
       <button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(video.id)}>
         <span className="batch-factory-prompt-status">{stateLabel}</span>
         <p>{activePrompt ? renderStoryboardPromptWithAssetMentions(activePrompt, book, video) : (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
-        <small title={assetPromptText}>{assetPromptText ? `资产提示词已注入：${promptPreview(assetPromptText)}` : '当前分镜暂无资产提示词'} · 点击打开完整提示词</small>
+        <small title={assetPromptText}>{assetPromptText ? `资产提示词已注入：${promptPreview(assetPromptText)}` : '当前分镜暂无资产提示词'} · 视频提示词：{videoPromptLabel} · 点击打开完整提示词</small>
       </button>
       <div className="batch-factory-cell-pager">
         <button type="button" aria-label="上一分镜" disabled={selectedIndex === 0} onClick={() => move(-1)}><LeftOutlined /></button>

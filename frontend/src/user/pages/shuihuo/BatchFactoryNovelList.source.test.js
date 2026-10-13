@@ -1141,6 +1141,12 @@ test('shows persisted director cards before final VIDEO compilation instead of l
   assert.match(source, /h3Card\.source_text/);
 });
 
+test('shows the active video prompt preset on storyboard cards', () => {
+  assert.match(source, /function selectedVideoPromptLabel\(settings = \{\}\)/);
+  assert.match(source, /视频提示词：\{h3VideoPromptLabel\}/);
+  assert.match(source, /视频提示词：\{videoPromptLabel\}/);
+});
+
 test('uses the same media-library structure for an H3 director card before VIDEO compilation', () => {
   const start = source.indexOf('function MediaVersionPanel(');
   const end = source.indexOf('export function BatchFactoryNovelList(', start);
