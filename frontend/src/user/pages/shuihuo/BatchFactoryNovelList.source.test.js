@@ -538,12 +538,12 @@ test('persists named AI reasoning presets through the V11 backend and lets users
   assert.match(source, /presetVersions=\{configVersions\}/);
 });
 
-test('routes director regeneration to H3 only when the selected video preset is H3', () => {
+test('routes every new director run through the unified structured pipeline', () => {
   assert.match(source, /function usesSelectedH3VideoPreset\(settings = \{\}\)/);
   assert.match(source, /if \(presetId\) return presetId === 'batch-video-h3-director'/);
-  assert.match(source, /\.\.\.\(usesSelectedH3VideoPreset\(settings\) \? \{ h3: true \} : \{\}\)/);
-  assert.match(source, /if \(stage === 'director' && usesSelectedH3VideoPreset\(settings\)\) await compileBookH3Videos\(book\)/);
-  assert.match(source, /if \(stage === 'director' && mode === 'compile' && usesSelectedH3VideoPreset\(settings\) && h3DirectorCards\(book\)\.length\)/);
+  assert.match(source, /h3: true,/);
+  assert.match(source, /if \(stage === 'director'\) await compileBookH3Videos\(book\)/);
+  assert.match(source, /if \(stage === 'director' && mode === 'compile' && h3DirectorCards\(book\)\.length\)/);
 });
 
 test('uses the script-generation constraint layers instead of one generic multi-select', () => {
