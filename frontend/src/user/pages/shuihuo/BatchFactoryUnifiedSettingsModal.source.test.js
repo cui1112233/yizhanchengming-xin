@@ -134,6 +134,8 @@ test('places opening variants under AI reasoning asset settings with a compact h
   assert.match(source.slice(assetStart, assetEnd), /换开头/);
   assert.match(source.slice(assetStart, assetEnd), /batch-factory-help-button/);
   assert.doesNotMatch(source.slice(modelStart, modelEnd), /换开头/);
+  assert.match(source, /batch-factory-option-title/);
+  assert.match(source, /batch-factory-unified-settings-title/);
 });
 
 test('unified AI reasoning keeps one asset extraction prompt and preserves video prompt selection', () => {

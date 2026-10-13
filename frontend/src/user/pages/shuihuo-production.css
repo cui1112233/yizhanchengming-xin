@@ -2946,7 +2946,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 }
 .batch-factory-help-button:hover{color:var(--sh-accent);border-color:color-mix(in srgb,var(--sh-accent) 48%,var(--sh-line))}
 .batch-factory-help-popover{max-width:320px;color:var(--sh-text);font-size:12px;line-height:1.65}
-.batch-factory-option-title{display:flex;align-items:center;gap:6px;min-width:0}
+.batch-factory-option-title{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-width:0}
+.batch-factory-unified-settings-title{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
+.batch-factory-unified-settings-title>span{flex:1;min-width:0}
+.batch-factory-unified-settings-modal .ant-modal-title{display:flex;align-items:center;width:100%}
 .batch-factory-audio-option.is-disabled{opacity:.5}
 .batch-factory-audio-option.is-disabled .batch-factory-help-button{opacity:1}
 .batch-factory-engine-modal-final .ant-input-number,.batch-factory-engine-modal .ant-input-number{width:100%;min-height:35px;color:var(--sh-text);border-color:var(--sh-line);background:var(--sh-panel-strong)}
