@@ -698,6 +698,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-prompt-entry-content:focus-visible, .batch-factory-prompt-entry-nav button:focus-visible, .batch-factory-prompt-entry-tabs button:focus-visible { outline:2px solid var(--sh-accent); outline-offset:2px; }
 .batch-factory-prompt-entry-content p { display:-webkit-box; overflow:hidden; margin:0; color:var(--sh-text); font-size:13px; line-height:1.7; white-space:pre-wrap; -webkit-line-clamp:8; -webkit-box-orient:vertical; }
 .batch-factory-prompt-entry-content span { margin-top:12px; color:var(--sh-muted); font-size:11px; }
+.batch-factory-prompt-entry-content p .batch-factory-asset-mention { display:inline-flex; align-items:center; margin:0 3px 2px 0; padding:1px 7px; border:1px solid rgba(93,215,190,.55); border-radius:999px; color:#dffcf4; background:rgba(46,145,127,.28); font-size:12px; font-weight:700; line-height:1.45; white-space:nowrap; vertical-align:baseline; }
+.batch-factory-prompt-entry-content p .batch-factory-asset-mention.is-character { border-color:rgba(112,183,255,.62); background:rgba(47,105,178,.3); }
+.batch-factory-prompt-entry-content p .batch-factory-asset-mention.is-scene { border-color:rgba(183,145,255,.62); background:rgba(108,70,174,.3); }
+.batch-factory-prompt-entry-content p .batch-factory-asset-mention.is-prop { border-color:rgba(255,190,98,.64); background:rgba(169,104,34,.3); }
 .batch-factory-prompt-modal-stack { display:grid; gap:14px; }
 
 

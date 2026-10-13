@@ -366,6 +366,12 @@ test('puts selected storyboard assets into the storyboard prompt as @ mentions',
   assert.match(source, /资产：\$\{mentions\}/);
 });
 
+test('renders storyboard @asset mentions as compact visual pills', () => {
+  assert.match(source, /function renderStoryboardPromptWithAssetMentions\(prompt, book, video\)/);
+  assert.match(source, /batch-factory-asset-mention/);
+  assert.match(source, /renderStoryboardPromptWithAssetMentions\(activePrompt, book, video\)/);
+});
+
 test('binds the current storyboard to selectable asset cards whose grey state is saved as a video override', () => {
   assert.match(source, /function InlineStoryboardAssets/);
   assert.match(source, /assetSelection/);

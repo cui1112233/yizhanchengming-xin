@@ -729,6 +729,25 @@ function withStoryboardAssetMentions(prompt, book, video) {
   return `${text}\n资产：${mentions}`;
 }
 
+function renderStoryboardPromptWithAssetMentions(prompt, book, video) {
+  const text = String(prompt || '');
+  const selectedIds = readStoryboardAssetSelection(book, video).selectedIds;
+  const assets = (book?.assetRecords || [])
+    .filter(asset => selectedIds.has(String(asset?.id || '')))
+    .map(asset => ({ ...asset, mention: `@${assetName(asset)}` }))
+    .filter(asset => asset.mention.length > 1)
+    .sort((left, right) => right.mention.length - left.mention.length);
+  if (!text || !assets.length) return text;
+  const pattern = new RegExp(`(${assets.map(asset => asset.mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+  const assetByMention = new Map(assets.map(asset => [asset.mention, asset]));
+  return text.split(pattern).map((part, index) => {
+    const asset = assetByMention.get(part);
+    return asset
+      ? <span key={`${asset.id || asset.mention}-${index}`} className={`batch-factory-asset-mention is-${asset.kind || 'asset'}`} title={`${asset.kind || '资产'}：${assetName(asset)}`}>{part}</span>
+      : <span key={`prompt-text-${index}`}>{part}</span>;
+  });
+}
+
 function InlineStoryboardAssets({ book, batchId, selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage, onSaved }) {
   const videos = book?.videos || [];
   const precompiledWorkspace = resolvePrecompiledVideoWorkspace(book);
@@ -981,7 +1000,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
       </header>
       <button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(video.id)}>
         <span className="batch-factory-prompt-status">{stateLabel}</span>
-        <p>{activePrompt || (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
+        <p>{activePrompt ? renderStoryboardPromptWithAssetMentions(activePrompt, book, video) : (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
         <small>点击打开完整提示词</small>
       </button>
       <div className="batch-factory-cell-pager">
