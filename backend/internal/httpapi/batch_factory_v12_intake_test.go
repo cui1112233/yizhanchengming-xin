@@ -61,7 +61,7 @@ func TestV12NovelFetchIntakeUsesGoBatchStore(t *testing.T) {
 	if payload.Intake.ID == "" {
 		t.Fatal("Go V12 intake response did not include an id")
 	}
-	if !strings.Contains(created.Body.String(), `"redirectTo":"/shuihuo-production?intake=`) {
+	if !strings.Contains(created.Body.String(), `"redirectTo":"/batch-factory?intake=`) {
 		t.Fatalf("expected batch factory redirect, got %s", created.Body.String())
 	}
 	read := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/intakes/"+payload.Intake.ID, nil)

@@ -11,6 +11,6 @@ test('routes the Shuihuo entry to the shared work library while retaining the Ba
   assert.match(app, /const loadBatchFactoryWorkbenchPage = \(\) => import\('\.\/pages\/BatchFactoryWorkbenchPage'\)/);
   assert.match(app, /const BatchFactoryWorkbenchPage = lazy\(loadBatchFactoryWorkbenchPage\)/);
   assert.match(app, /'\/batch-factory': BatchFactoryWorkbenchPage/);
-  assert.match(app, /'\/shuihuo-production': BatchFactoryWorkbenchPage/);
+  assert.match(app, /'\/shuihuo-production': ShuihuoProductionPage/);
   assert.doesNotMatch(app, /BatchFactoryFromShuihuoPage/);
 });

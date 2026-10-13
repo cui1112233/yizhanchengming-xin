@@ -10,7 +10,7 @@ const quickActions = [
   { href: '/script', className: 'card-write', icon: FilePenLine, title: '新建剧本项目', desc: '导入小说，生成可编辑剧本与制作素材' },
   { href: '/novel-panel', className: 'card-panel', icon: LayoutPanelTop, title: '小说面板', desc: '分析人物、场景与分镜，保存完整项目' },
   { href: '/batch-factory', className: 'card-batch-factory', icon: Zap, title: '批量工厂', desc: '多篇小说批量导演、审核并生成视频方案' },
-  { href: '/shuihuo-production', className: 'card-shuihuo', icon: Clapperboard, title: '批量工厂', desc: '统一配置、批量生产、素材和视频任务' },
+  { href: '/shuihuo-production', className: 'card-shuihuo', icon: Clapperboard, title: '水货生产', desc: '管理和创建您的漫剧解说作品' },
   { href: '/agent', className: 'card-agent', icon: Bot, title: 'AI 智能 Agent', desc: '专属助手对话，辅助精细化剧本包装' },
   { href: '/tts', className: 'card-tts', icon: AudioLines, title: '声音配音工坊', desc: '多音色情感合成，让你的画面声临其境' }
 ];
@@ -20,7 +20,7 @@ const navItems = [
   { href: '/script', label: '剧本生成' },
   { href: '/novel-fetch', label: '小说获取' },
   { href: '/novel-panel', label: '小说面板' },
-  { href: '/shuihuo-production', label: '批量工厂' },
+  { href: '/shuihuo-production', label: '水货生产' },
   { href: '/agent', label: 'Agent 工作区' },
   { href: '/tts', label: '配音' },
   { href: '/settings', label: '设置' }

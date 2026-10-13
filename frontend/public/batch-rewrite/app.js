@@ -3390,7 +3390,7 @@ async function transferSelectedToBatchFactory() {
       }),
     });
     const intakeId = String(result?.intake?.id || "").trim();
-    const redirectTo = intakeId ? `/shuihuo-production?intake=${encodeURIComponent(intakeId)}` : "";
+    const redirectTo = intakeId ? `/batch-factory?intake=${encodeURIComponent(intakeId)}` : "";
     if (!redirectTo) throw new Error("小说获取交接创建成功但未返回交接编号");
     setBatchStatus(`已转入 ${items.length} 本${skipped ? `, 跳过 ${skipped} 本未完成任务` : ""}`);
     if (window.parent !== window) {

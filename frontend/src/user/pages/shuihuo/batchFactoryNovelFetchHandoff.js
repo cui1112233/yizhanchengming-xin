@@ -2,7 +2,7 @@ export const BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY = 'qiantie:batch-factory:act
 
 export function batchFactoryNovelFetchHandoffPath(intakeId) {
   const normalized = String(intakeId || '').trim();
-  return normalized ? `/shuihuo-production?intake=${encodeURIComponent(normalized)}` : '/shuihuo-production';
+  return normalized ? `/batch-factory?intake=${encodeURIComponent(normalized)}` : '/batch-factory';
 }
 
 export function pendingNovelFetchIntakeId(search = '') {

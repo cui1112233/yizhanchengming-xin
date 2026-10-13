@@ -23,7 +23,7 @@ const navItems = [
   { href: '/script', icon: FilePenLine, label: '剧本生成' },
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取' },
   { href: '/novel-panel', icon: NotebookTabs, label: '小说面板' },
-  { href: '/shuihuo-production', icon: Clapperboard, label: '批量工厂' },
+  { href: '/shuihuo-production', icon: Clapperboard, label: '水货生产' },
   { href: '/agent', icon: Bot, label: 'Agent 工作区' },
   { href: '/tts', icon: AudioLines, label: '配音' }
 ];

@@ -73,10 +73,9 @@ function getPage(pathname) {
     '/novel-panel': NovelPanelPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
-    // Batch Factory is the single production entry. Keep the old URL as a
-    // compatibility alias so bookmarks and existing handoffs do not open a
-    // second, legacy workbench.
-    '/shuihuo-production': BatchFactoryWorkbenchPage,
+    // Shuihuo is the unified production overview; Batch Factory remains its
+    // dedicated batch workspace opened by the overview button.
+    '/shuihuo-production': ShuihuoProductionPage,
     '/shuihuo-production/creative': ShuihuoProductionPage,
     '/tts': TtsPage,
     '/settings': SettingsPage,
