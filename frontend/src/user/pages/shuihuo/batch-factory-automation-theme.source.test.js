@@ -10,3 +10,9 @@ test('automation dialog portal follows the active Shuihuo theme for every surfac
   assert.match(css, /\.batch-factory-automation-modal \.ant-modal-content[^{]*\{[^}]*background:\s*var\(--sh-panel\)/s);
   assert.match(css, /\.batch-factory-automation-section[^{]*\{[^}]*background:\s*var\(--sh-panel-strong\)/s);
 });
+
+test('batch factory rows and settings cards use shared Shuihuo text and surface tokens', () => {
+  assert.match(css, /\.batch-factory-book-content strong\s*\{[^}]*color:\s*var\(--sh-text\)/s);
+  assert.match(css, /\.batch-factory-book-config-region\s*\{[^}]*background:\s*var\(--sh-panel-strong\)/s);
+  assert.match(css, /\.batch-factory-book-config-region small\s*\{[^}]*color:\s*var\(--sh-muted\)/s);
+});
