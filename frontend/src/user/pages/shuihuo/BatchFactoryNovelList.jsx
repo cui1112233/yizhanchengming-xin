@@ -151,9 +151,17 @@ async function generateBatchFactoryBookAudioMeasurement(book, settings = {}) {
   const tts = await batchFactoryBookTts(settings);
   const blob = await textToSpeech({ input, ...tts });
   const duration = await readBatchFactoryAudioDuration(blob);
+  const lines = String(input).replace(/\r\n/g, '\n').split('\n').filter(line => line.trim());
+  const lineDurations = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineBlob = await textToSpeech({ input: lines[index], ...tts });
+    const lineDuration = await readBatchFactoryAudioDuration(lineBlob);
+    lineDurations.push({ sourceIndex: index + 1, sourceText: lines[index], durationMs: Math.max(1, Math.round(lineDuration * 1000)) });
+  }
   return {
     durationSeconds: Number(duration.toFixed(2)),
     fingerprint: batchFactoryAudioFingerprint(input, tts),
+    lineDurations,
     tts,
     blob
   };
@@ -2485,7 +2493,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (!quiet) message.info(`正在为《${book.title || book.bookId || '当前小说'}》读取真实配音时长…`);
     try {
       const measured = await generateBatchFactoryBookAudioMeasurement(book, settings);
-      await saveBookOverrideWithRetry(currentBatch.id, book.id, Number(book.revision || 0), { patch: { audioDurationSeconds: measured.durationSeconds, audioDurationFingerprint: measured.fingerprint, audioDurationManual: false } });
+      await saveBookOverrideWithRetry(currentBatch.id, book.id, Number(book.revision || 0), { patch: { audioDurationSeconds: measured.durationSeconds, audioDurationFingerprint: measured.fingerprint, audioLineDurations: measured.lineDurations, audioDurationManual: false } });
       return measured.durationSeconds;
     } catch (error) {
       if (currentSeconds > 0) {

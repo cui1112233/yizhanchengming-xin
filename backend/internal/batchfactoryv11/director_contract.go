@@ -611,6 +611,12 @@ func buildSDDirectorContract(book Book, hook HookRevision, snapshot DirectorSnap
 			payload["story_script_rows"] = decoded
 		}
 	}
+	if lineDurations := snapshot.Effective["audioLineDurations"]; len(lineDurations) > 0 {
+		var decoded any
+		if json.Unmarshal(lineDurations, &decoded) == nil {
+			payload["audio_line_durations"] = decoded
+		}
+	}
 	if snapshot.AudioTargetSeconds > 0 {
 		payload["audio_planning"] = map[string]any{
 			"enabled":             true,

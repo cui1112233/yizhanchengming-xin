@@ -37,6 +37,12 @@ source_text 必须逐字原样返回；每个 source_index 只能对应一行；
 		"assets":                 payloadAssets(book),
 		"style_system_analysis":  rawString(snapshot.Effective, "h3StyleAnalysis", ""),
 	}
+	if lineDurations := snapshot.Effective["audioLineDurations"]; len(lineDurations) > 0 {
+		var decoded any
+		if json.Unmarshal(lineDurations, &decoded) == nil {
+			payload["audio_line_durations"] = decoded
+		}
+	}
 	encoded, _ := json.MarshalIndent(payload, "", "  ")
 	return PromptContract{SystemPrompt: contract, UserPrompt: string(encoded), Temperature: 0.2, MaxTokens: 6000}
 }
