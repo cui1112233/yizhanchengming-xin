@@ -330,6 +330,36 @@ func TestNovelFetchWorkshopProcessCreatesTasksFromPastedList(t *testing.T) {
 	}
 }
 
+func TestNovelFetchWorkshopCurrentBatchOnlyContainsLatestInput(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	first := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process", map[string]any{"inputText": "12345678901\t旧批次"}, now, secret)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first process status=%d body=%s", first.Code, first.Body.String())
+	}
+	second := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process", map[string]any{"inputText": "22345678901\t当前批次"}, now, secret)
+	if second.Code != http.StatusOK {
+		t.Fatalf("second process status=%d body=%s", second.Code, second.Body.String())
+	}
+	current := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/batches/current", nil, now, secret)
+	if current.Code != http.StatusOK {
+		t.Fatalf("current status=%d body=%s", current.Code, current.Body.String())
+	}
+	var response struct {
+		Batch struct {
+			TaskIDs []string `json:"taskIds"`
+		} `json:"batch"`
+	}
+	if err := json.Unmarshal(current.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Batch.TaskIDs) != 1 || response.Batch.TaskIDs[0] != "22345678901" {
+		t.Fatalf("current batch leaked historical tasks: %#v", response.Batch.TaskIDs)
+	}
+}
+
 func TestNovelFetchWorkshopProcessPreviewDoesNotPersistTasks(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

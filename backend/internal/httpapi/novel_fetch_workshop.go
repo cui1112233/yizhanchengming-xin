@@ -215,7 +215,7 @@ func (r *workshopProcessRegistry) latest(owner string, limit int) []map[string]a
 	return items
 }
 
-func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, owner, inputText, platformID string, maxTxt int) (map[string]any, error) {
+func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, owner, inputText, platformID, batchID string, maxTxt int) (map[string]any, error) {
 	if strings.TrimSpace(inputText) == "" {
 		return nil, errors.New("请输入要处理的书籍清单")
 	}
@@ -228,6 +228,7 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 			document.Meta = map[string]any{}
 		}
 		document.Meta["platformId"] = platformID
+		document.Meta["currentBatchId"] = batchID
 		if err := store.PutDocument(ctx, owner, document); err != nil {
 			return nil, err
 		}
@@ -236,7 +237,15 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	if err != nil {
 		return nil, err
 	}
+	settings, _ := store.GetConfig(ctx, owner)
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	settings["novel_fetch_current_batch_id"] = batchID
+	settings["novel_fetch_current_batch_at"] = time.Now().UTC().Format(time.RFC3339Nano)
+	_ = store.PutConfig(ctx, owner, settings)
 	return map[string]any{
+		"batch_id": batchID, "current_batch_id": batchID,
 		"parsed": parsed, "uniqueTasks": len(documents), "unique_tasks": len(documents), "duplicateCount": duplicates, "duplicate_count": duplicates,
 		"emptyIdCount": emptyIDs, "empty_id_count": emptyIDs, "classifyErrors": []any{}, "classify_errors": []any{},
 		"fetched": 0, "fetchFailed": 0, "fetch_failed": 0, "raw_fetched": 0, "generatedAiFiles": 0, "generated_ai_files": 0, "tasks": tasks,
@@ -328,7 +337,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if input.MaxTxt <= 0 {
 			input.MaxTxt = 4000
 		}
-		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, input.MaxTxt)
+		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
+		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存任务失败"})
 			return
@@ -389,7 +399,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
 		job := map[string]any{"id": id, "status": "running", "queue_state": "running", "started_at": now, "updated_at": now, "attempts": 1, "steps": []any{}, "progress": []any{}}
-		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, input.MaxTxt)
+		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
+		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
 		if err != nil {
 			job["status"] = "failed"
 			job["queue_state"] = "failed"

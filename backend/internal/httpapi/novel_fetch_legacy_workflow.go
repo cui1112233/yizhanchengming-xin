@@ -37,16 +37,39 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 
 	mux.HandleFunc("GET /api/novel-fetch-workshop/batches/current", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
+		settings, _ := store.GetConfig(req.Context(), identity.Username)
+		currentBatchID := strings.TrimSpace(fmt.Sprint(settings["novel_fetch_current_batch_id"]))
 		docs, err := store.ListDocuments(req.Context(), identity.Username)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取批次失败"})
 			return
 		}
 		ids := make([]string, 0, len(docs))
+		states := make([]map[string]any, 0, len(docs))
+		targets := []string{}
+		seenTargets := map[string]bool{}
 		for _, doc := range docs {
+			if currentBatchID == "" || strings.TrimSpace(fmt.Sprint(doc.Meta["currentBatchId"])) != currentBatchID {
+				continue
+			}
 			ids = append(ids, doc.BookID)
+			state := legacyNovelFetchTask(doc)
+			states = append(states, state)
+			if doc.OriginalRawChars > 0 && !seenTargets["original"] {
+				targets = append(targets, "original")
+				seenTargets["original"] = true
+			}
+			generatedVersions, _ := state["ai_files"].([]string)
+			for _, version := range []string{"ai1", "ai2", "ai3", "ai4", "ai5"} {
+				for _, generated := range generatedVersions {
+					if generated == version && !seenTargets[version] {
+						targets = append(targets, version)
+						seenTargets[version] = true
+					}
+				}
+			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"batch": map[string]any{"id": "current", "taskIds": ids, "bookIds": ids, "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}})
+		writeJSON(w, http.StatusOK, map[string]any{"batch": map[string]any{"id": currentBatchID, "taskIds": ids, "bookIds": ids, "taskStates": states, "settingsSnapshot": map[string]any{"target_versions": targets}, "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}})
 	})
 
 	mux.HandleFunc("GET /api/novel-fetch-workshop/schedules", func(w http.ResponseWriter, req *http.Request) {
