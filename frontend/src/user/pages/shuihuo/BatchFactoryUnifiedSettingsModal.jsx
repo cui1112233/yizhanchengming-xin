@@ -114,6 +114,13 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
   const [organizationsError, setOrganizationsError] = useState('');
   const publish = value.publishSettings || {};
   const patch = next => onChange({ ...value, ...next });
+  useEffect(() => {
+    const selected = (publish.websiteProfiles || []).find(profile => profile.id === publish.websiteProfileId);
+    const organization = selected?.organization || selected?.organization_id || '';
+    if (organization && organization !== publish.organization) {
+      patch({ publishSettings: { ...publish, organization } });
+    }
+  }, [publish.websiteProfileId, publish.websiteProfiles]);
   const hasSession = result => Boolean((result?.checks || []).some(check => SESSION_CHECK_NAMES.includes(check.name) && check.ok));
   const checkDetail = (result, name) => String((result?.checks || []).find(check => check.name === name)?.detail || '').trim();
   const sessionDetail = result => String((result?.checks || []).find(check => SESSION_CHECK_NAMES.includes(check.name))?.detail || (result?.checks || [])[0]?.detail || '').trim();

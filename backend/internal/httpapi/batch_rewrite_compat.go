@@ -509,6 +509,10 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				gender = "女"
 			}
 			profile := map[string]any{"id": "121-" + id, "name": firstText(source["config_name"], "121 配置档 "+id), "enabled": true, "source": "121", "config_id": id, "is_default": targetNumber(source["is_default"]) == 1, "platform_id": firstText(data["platform_id"], source["platform_id"]), "gender": strings.ReplaceAll(gender, "频", ""), "style": firstText(data["style_name"], source["style_name"], data["style"]), "advanced": data}
+			organization := firstText(data["organization_id"], data["organization"], source["organization_id"], source["organization"], source["org_id"])
+			if organization != "" {
+				profile["organization"] = organization
+			}
 			groups = append(groups, profile)
 		}
 		web["upload_profiles"] = append(local, groups...)

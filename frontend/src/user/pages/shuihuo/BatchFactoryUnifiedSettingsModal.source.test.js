@@ -165,6 +165,11 @@ test('keeps the automation gear beside the unified configuration label', () => {
   assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
 });
 
+test('uses a website profile organization as the unified organization default', () => {
+  assert.match(source, /const selected = \(publish\.websiteProfiles \|\| \[\]\)\.find\(profile => profile\.id === publish\.websiteProfileId\)/);
+  assert.match(source, /const organization = selected\?\.organization \|\| selected\?\.organization_id \|\| ''/);
+});
+
 test('unified AI reasoning exposes all four constraint layers plus the base-setup switch', () => {
   assert.match(source, /<b>画面前缀词（智能统一）<\/b>/);
   assert.match(source, /<b>画质约束<\/b>/);
