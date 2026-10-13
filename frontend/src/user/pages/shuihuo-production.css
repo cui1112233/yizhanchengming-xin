@@ -2960,6 +2960,15 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 }
 .batch-factory-engine-modal-final .batch-factory-engine-card > header b,
 .batch-factory-book-engine-modal .batch-factory-engine-card > header b { min-width: 0; }
+.batch-factory-engine-modal-final .batch-factory-engine-field > span,
+.batch-factory-book-engine-modal .batch-factory-engine-field > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.batch-factory-engine-modal-final .batch-factory-engine-field > span b,
+.batch-factory-book-engine-modal .batch-factory-engine-field > span b { min-width: 0; }
 .batch-factory-help-popover{max-width:320px;color:var(--sh-text);font-size:12px;line-height:1.65}
 .batch-factory-option-title{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-width:0}
 .batch-factory-unified-settings-title{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
