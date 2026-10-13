@@ -13,6 +13,17 @@ test('global header status expires instead of permanently retaining API polling 
   assert.match(source, /setGlobalStatus\(current => current\.expiresAt === expiresAt \? \{ text: '', tone: 'idle'/);
 });
 
+test('侧边栏不再显示历史和问题日志入口', () => {
+  assert.doesNotMatch(source, /href: '\/history'/);
+  assert.doesNotMatch(source, /href: '\/issues'/);
+  assert.doesNotMatch(source, /label: '历史'/);
+  assert.doesNotMatch(source, /label: '问题日志'/);
+});
+
+test('批量工厂工作区沿用水货生产主入口名称', () => {
+  assert.match(source, /pathname === '\/batch-factory' \|\| pathname\.startsWith\('\/batch-factory\/'\).*return '水货生产'/s);
+});
+
 test('avatar enters profile through the client route without opening the menu first', () => {
   const avatarButton = source.slice(
     source.indexOf('className="legacy-sidebar-avatar"'),

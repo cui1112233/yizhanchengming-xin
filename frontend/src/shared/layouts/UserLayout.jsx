@@ -38,6 +38,7 @@ function initialTheme() {
 
 function pageTitle(pathname) {
   if (isAccountCenterPath(pathname)) return '个人中心';
+  if (pathname === '/batch-factory' || pathname.startsWith('/batch-factory/')) return '水货生产';
   const item = navItems.find(nav => nav.href === pathname);
   return item ? item.label : '一战晟铭';
 }
