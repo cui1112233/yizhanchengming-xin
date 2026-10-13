@@ -142,5 +142,26 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 	if settings == nil {
 		settings = map[string]any{}
 	}
-	return mergeWorkshopMaps(DefaultWorkshopSettings(), settings)
+	// Migrate the old appConfig.knowledge view before defaults are merged. This
+	// prevents a user's saved library from being hidden by a fresh empty
+	// knowledgeLibraries placeholder.
+	if libraries, _ := settings["knowledgeLibraries"].(map[string]any); len(libraries) == 0 {
+		if app, _ := settings["appConfig"].(map[string]any); app != nil {
+			if knowledge, _ := app["knowledge"].(map[string]any); len(knowledge) > 0 {
+				settings["knowledgeLibraries"] = cloneMap(knowledge)
+			}
+		}
+	}
+	merged := mergeWorkshopMaps(DefaultWorkshopSettings(), settings)
+	// Keep the legacy view synchronized for older embedded pages. The Go
+	// knowledgeLibraries map remains the canonical persisted source.
+	if libraries, _ := merged["knowledgeLibraries"].(map[string]any); len(libraries) > 0 {
+		app, _ := merged["appConfig"].(map[string]any)
+		if app == nil {
+			app = map[string]any{}
+		}
+		app["knowledge"] = cloneMap(libraries)
+		merged["appConfig"] = app
+	}
+	return merged
 }

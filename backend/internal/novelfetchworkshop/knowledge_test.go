@@ -90,3 +90,16 @@ func TestEnsureWorkshopDefaultsDoesNotLetEmptyLegacyPlaceholdersHideCatalog(t *t
 		t.Fatalf("opening phrases after empty placeholder merge = %d, want 174", got)
 	}
 }
+
+func TestKnowledgeWritesSynchronizeLegacyAppConfigView(t *testing.T) {
+	settings := EnsureWorkshopDefaults(map[string]any{})
+	if _, err := SaveKnowledge(settings, "opening_phrases", map[string]any{"id": "opening_sync", "text": "她推门就看见了遗书", "style": "现代悬疑"}); err != nil {
+		t.Fatal(err)
+	}
+	app := settings["appConfig"].(map[string]any)
+	knowledge := app["knowledge"].(map[string]any)
+	opening := knowledge["opening_phrases"].(map[string]any)
+	if got := len(normalizeKnowledgeItems(opening["items"])); got != 175 {
+		t.Fatalf("legacy appConfig view has %d opening phrases, want 175", got)
+	}
+}

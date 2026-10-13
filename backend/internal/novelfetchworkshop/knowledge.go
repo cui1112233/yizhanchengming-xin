@@ -36,6 +36,12 @@ func NormalizeKnowledgeItemsForHTTP(raw any) []map[string]any { return normalize
 
 func knowledgeLibrary(settings map[string]any, kind string) map[string]any {
 	libraries, _ := settings["knowledgeLibraries"].(map[string]any)
+	// Older configs kept the same data under appConfig.knowledge. Read that
+	// view as a compatibility fallback while all writes use knowledgeLibraries.
+	if len(libraries) == 0 {
+		app, _ := settings["appConfig"].(map[string]any)
+		libraries, _ = app["knowledge"].(map[string]any)
+	}
 	if libraries == nil {
 		libraries = map[string]any{}
 	}
@@ -53,6 +59,17 @@ func putKnowledgeLibrary(settings map[string]any, kind string, library map[strin
 	}
 	libraries[kind] = library
 	settings["knowledgeLibraries"] = libraries
+	app, _ := settings["appConfig"].(map[string]any)
+	if app == nil {
+		app = map[string]any{}
+	}
+	appKnowledge, _ := app["knowledge"].(map[string]any)
+	if appKnowledge == nil {
+		appKnowledge = map[string]any{}
+	}
+	appKnowledge[kind] = cloneMap(library)
+	app["knowledge"] = appKnowledge
+	settings["appConfig"] = app
 }
 
 func ListKnowledge(settings map[string]any, kind string) (map[string]any, error) {
