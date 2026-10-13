@@ -318,14 +318,26 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		loggedIn := false
 		detail := "未登录"
 		if cookie != "" {
-			body, probeErr := targetGET(req, "http://two.121w.com/tttadmin/zidingyi.php", cookie)
-			if probeErr != nil {
+			check, requestErr := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
+			if requestErr != nil {
 				detail = "小说获取共享会话检查失败"
-			} else if targetPageLooksAuthenticated(string(body)) {
-				loggedIn = true
-				detail = "已登录（共享小说获取会话）"
 			} else {
-				detail = "共享登录会话已失效"
+				check.Header.Set("Cookie", cookie)
+				response, probeErr := (&http.Client{Timeout: 30 * time.Second}).Do(check)
+				if probeErr != nil {
+					detail = "小说获取共享会话连接失败"
+				} else {
+					body, readErr := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+					response.Body.Close()
+					if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+						detail = "小说获取共享会话检查失败"
+					} else if !targetPageLooksAuthenticated(string(body)) {
+						detail = "共享登录会话已失效，请先到小说获取重新登录"
+					} else {
+						loggedIn = true
+						detail = "已登录（共享小说获取会话）"
+					}
+				}
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
