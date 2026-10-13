@@ -143,6 +143,53 @@ func mergeSetCookies(values []string) string {
 	return strings.Join(parts, "; ")
 }
 
+func loginTargetSite(req *http.Request, username, password string) (string, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	landing, err := client.Get("http://two.121w.com/tttadmin/login.php")
+	if err != nil {
+		return "", fmt.Errorf("121 登录页请求失败")
+	}
+	landing.Body.Close()
+	if landing.StatusCode >= 400 {
+		return "", fmt.Errorf("121 登录页请求失败（HTTP %d）", landing.StatusCode)
+	}
+	initialCookie := mergeSetCookies(landing.Header.Values("Set-Cookie"))
+	payload, _ := json.Marshal(map[string]string{"username": strings.TrimSpace(username), "password": password})
+	loginReq, err := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/login.php", bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("121 登录请求失败")
+	}
+	loginReq.Header.Set("Content-Type", "application/json")
+	if initialCookie != "" {
+		loginReq.Header.Set("Cookie", initialCookie)
+	}
+	response, err := client.Do(loginReq)
+	if err != nil {
+		return "", fmt.Errorf("121 登录请求失败")
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if response.StatusCode >= 400 {
+		return "", fmt.Errorf("121 登录请求失败（HTTP %d）", response.StatusCode)
+	}
+	var result map[string]any
+	if json.Unmarshal(body, &result) != nil || result["success"] != true {
+		message := strings.TrimSpace(fmt.Sprint(result["message"]))
+		if message == "" || message == "<nil>" {
+			message = strings.TrimSpace(fmt.Sprint(result["msg"]))
+		}
+		if message == "" || message == "<nil>" {
+			message = "121 登录失败"
+		}
+		return "", fmt.Errorf("%s", message)
+	}
+	cookie := mergeSetCookies(append([]string{initialCookie}, response.Header.Values("Set-Cookie")...))
+	if cookie == "" {
+		return "", fmt.Errorf("121 登录未返回会话")
+	}
+	return cookie, nil
+}
+
 func saveUploadTargetSession(usersDir, username string, value map[string]any) error {
 	directory := filepath.Join(usersDir, username)
 	if err := os.MkdirAll(directory, 0o700); err != nil {

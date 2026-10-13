@@ -264,6 +264,25 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
 		}
+		settingsInput := mapOrEmpty(body.Settings)
+		if password := strings.TrimSpace(toString(settingsInput["password"])); password != "" {
+			username := strings.TrimSpace(toString(settingsInput["username"]))
+			if username == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入账号和密码"})
+				return
+			}
+			cookie, loginErr := loginTargetSite(req, username, password)
+			if loginErr != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": loginErr.Error()})
+				return
+			}
+			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "http_cookie", "cookie": cookie, "sessionKey": cookie, "targetUsername": username, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "上传会话保存失败"})
+				return
+			}
+			body.Settings["password_masked"] = true
+			delete(body.Settings, "password")
+		}
 		settings, err := store.GetConfig(req.Context(), identity.Username)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
