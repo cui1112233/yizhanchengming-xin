@@ -1078,12 +1078,14 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   background: var(--sh-panel-strong);
 }
 .batch-factory-engine-card > header {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding-bottom: 11px;
   border-bottom: 1px solid var(--sh-line);
 }
-.batch-factory-engine-card > header b { color: var(--sh-text); font-size: 14px; }
+.batch-factory-engine-card > header b { min-width: 0; color: var(--sh-text); font-size: 14px; }
 .batch-factory-engine-card > header small { color: var(--sh-muted); font-size: 12px; line-height: 1.5; }
 .batch-factory-engine-card-body { display: grid; gap: 14px; min-width: 0; }
 .batch-factory-engine-card .batch-factory-engine-field { margin: 0; }
@@ -2949,6 +2951,15 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   font-size:10px;font-weight:800;line-height:1;cursor:pointer;vertical-align:middle
 }
 .batch-factory-help-button:hover{color:var(--sh-accent);border-color:color-mix(in srgb,var(--sh-accent) 48%,var(--sh-line))}
+.batch-factory-engine-modal-final .batch-factory-engine-card > header,
+.batch-factory-book-engine-modal .batch-factory-engine-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.batch-factory-engine-modal-final .batch-factory-engine-card > header b,
+.batch-factory-book-engine-modal .batch-factory-engine-card > header b { min-width: 0; }
 .batch-factory-help-popover{max-width:320px;color:var(--sh-text);font-size:12px;line-height:1.65}
 .batch-factory-option-title{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-width:0}
 .batch-factory-unified-settings-title{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
