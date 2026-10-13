@@ -554,7 +554,7 @@ test('keeps video model selection separate from prompt-preset selection', () => 
 });
 
 test('uses the script-generation constraint layers instead of one generic multi-select', () => {
-  assert.doesNotMatch(reasoningSource, /基础设定（人物 \/ 场景）/);
+  assert.match(reasoningSource, /基础设定（人物 \/ 场景）/);
   assert.match(reasoningSource, /画面前缀词/);
   assert.match(reasoningSource, /画面约束提示词/);
   assert.match(reasoningSource, /画面限制/);

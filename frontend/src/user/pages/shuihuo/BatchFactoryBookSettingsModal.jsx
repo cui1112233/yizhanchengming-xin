@@ -35,12 +35,13 @@ const VIDEO_PROVIDER_OPTIONS = [
   { value: 'autodl_comfyui', label: 'AutoDL ComfyUI' }
 ];
 const CONSTRAINT_LAYERS = [
+  ['baseSetup', '基础设定（人物 / 场景）'],
   ['prefix', '画面前缀词'],
   ['quality', '画质约束'],
   ['restriction', '画面限制'],
   ['negative', '负面提示词']
 ];
-const EDITABLE_CONSTRAINT_LAYERS = CONSTRAINT_LAYERS;
+const EDITABLE_CONSTRAINT_LAYERS = CONSTRAINT_LAYERS.filter(([category]) => category !== 'baseSetup');
 const DEFAULT_ENABLED_CONSTRAINT_CATEGORIES = ['prefix', 'quality', 'restriction', 'negative'];
 const DEFAULT_VIDEO_PROMPT = { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
@@ -286,6 +287,7 @@ function ConstraintCategoryEditor({ category, label, value, systemOptions, perso
 function ConstraintLayers({ value, records, personalPrompts, loading, saving, editingPromptId, onChange, onSelectSystem, onSelectPersonal, onSaveDraft, onSaveNamed, onEditPersonal, onDeletePersonal }) {
   const rules = normalizeConstraintRules(value);
   return <div className="batch-factory-constraint-layers">
+    <div className="batch-factory-constraint-layer"><Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}><div><b>基础设定（人物 / 场景）</b><HelpTip title="基础设定（人物 / 场景）">开启后，当前书每个分镜自动带入已提取的人物与场景设定；关闭后不显示资产提示词。</HelpTip></div><Switch checked={rules.baseSetup.enabled} onChange={enabled => onChange({ ...rules, baseSetup: { enabled } })} /></Space></div>
     {EDITABLE_CONSTRAINT_LAYERS.map(([category, label]) => <ConstraintCategoryEditor key={category} category={category} label={label} value={rules[category]} systemOptions={records.filter(item => item.constraintCategory === category)} personalPrompts={personalPrompts[category] || []} loading={loading} saving={saving === category} editingPromptId={editingPromptId === category} onChange={patch => onChange({ ...rules, [category]: { ...rules[category], ...patch } })} onSelectSystem={presetId => onSelectSystem(category, presetId)} onSelectPersonal={promptId => onSelectPersonal(category, promptId)} onSaveDraft={() => onSaveDraft(category)} onSaveNamed={() => onSaveNamed(category)} onEditPersonal={prompt => onEditPersonal(category, prompt)} onDeletePersonal={promptId => onDeletePersonal(category, promptId)} />)}
   </div>;
 }

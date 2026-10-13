@@ -212,7 +212,7 @@ test('persists the default SD video prompt when unified settings are saved witho
   assert.match(source, /aiPromptConfig: \{ \.\.\.aiPromptConfig, video \}/);
 });
 
-test('does not expose base setup as a duplicate constraint switch', () => {
-  assert.doesNotMatch(source, /<span>基础设定<\/span>/);
-  assert.doesNotMatch(source, /constraints\.baseSetup\?\.enabled/);
+test('keeps base setup as the switch controlling asset prompt display', () => {
+  assert.match(source, /<span>基础设定<\/span>/);
+  assert.match(source, /constraints\.baseSetup\?\.enabled/);
 });
