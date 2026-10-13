@@ -34,7 +34,7 @@ test('single-book configuration selects enabled text, image and video models', (
 });
 
 test('single-book configuration has the same layered script constraints and video overrides as the confirmed V11 plan', () => {
-  assert.match(source, /基础设定（人物 \/ 场景）/);
+  assert.doesNotMatch(source, /基础设定（人物 \/ 场景）/);
   assert.match(source, /画面前缀词/);
   assert.match(source, /画质约束/);
   assert.match(source, /画面限制/);
@@ -57,7 +57,7 @@ test('single-book constraints support the same system, personal and editable pro
   assert.match(source, /我的提示词/);
   assert.match(source, /提示词内容/);
   assert.match(source, /保存为我的提示词/);
-  assert.match(source, /开启后，当前书每个分镜自动带入已提取的人物与场景设定/);
+  assert.doesNotMatch(source, /开启后，当前书每个分镜自动带入已提取的人物与场景设定/);
 });
 
 test('single-book media configuration saves the video module instead of dropping the combined region', () => {
