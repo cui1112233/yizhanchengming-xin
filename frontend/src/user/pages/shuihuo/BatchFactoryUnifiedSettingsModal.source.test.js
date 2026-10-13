@@ -104,7 +104,7 @@ test('marks the video-management session stale and refreshes organizations after
   assert.match(source, /const markPublishSessionExpired = error =>/);
   assert.match(source, /session: false, visible: \{ ok: false, error: detail \}/);
   assert.match(source, /const refreshOrganizations = async \(\) =>/);
-  assert.match(source, /const organizations = session && visible\?\.ok \? await refreshOrganizations\(\) : null;/);
+  assert.match(source, /const organizations = await refreshOrganizations\(\);/);
 });
 
 test('treats the legacy novel-fetch browser session as the same shared 121 login', () => {
@@ -124,6 +124,12 @@ test('unified engine settings write the opening variants toggle and count at the
   // 换开头仍是根级生产开关，只是展示在 AI 推理的资产设置卡中。
   assert.doesNotMatch(source, /openingConfig/);
   assert.doesNotMatch(source, /onOpeningChange/);
+});
+
+test('gives visible feedback when publish verification succeeds or fails', () => {
+  assert.match(source, /message\.error\(detail\)/);
+  assert.match(source, /message\.success\('重新验证完成，组织目录已更新'\)/);
+  assert.match(source, /loading=\{checking\}/);
 });
 
 test('places opening variants under AI reasoning asset settings with a compact help tip', () => {

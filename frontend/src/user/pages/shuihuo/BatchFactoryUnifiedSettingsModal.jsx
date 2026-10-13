@@ -150,11 +150,24 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
       const visible = session ? await testWebSubmitVisible() : null;
       const checked = { environment: result, session, visible };
       setEnvironment(checked);
-      const organizations = session && visible?.ok ? await refreshOrganizations() : null;
+      if (!session) {
+        const detail = sessionDetail(result) || '视频管理系统登录会话无效，请重新登录';
+        message.error(detail);
+        return { ...checked, error: new Error(detail) };
+      }
+      if (!visible?.ok) {
+        const detail = visible?.error || '视频管理系统后台验证未通过';
+        message.error(detail);
+        return { ...checked, error: new Error(detail) };
+      }
+      const organizations = await refreshOrganizations();
+      if (!organizations?.ok) message.error(organizations.error?.message || '视频管理系统组织目录读取失败');
+      else message.success('重新验证完成，组织目录已更新');
       return { ...checked, organizations };
     } catch (error) {
       const checked = { error: error?.message || '视频管理系统环境自检失败', session: false, visible: null };
       setEnvironment(checked);
+      message.error(checked.error);
       return checked;
     } finally { setChecking(false); }
   };
