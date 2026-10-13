@@ -111,7 +111,7 @@ import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijin
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
 const UNIFIED_CONFIGURATION_KEYS = [
   'textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode',
-  'storyboardDurationLimit', 'maxVideoDuration', 'fixedSingleVideo', 'audioPlanningEnabled',
+  'storyboardDurationLimit', 'maxVideoDuration', 'audioPlanningEnabled',
   'audioSource', 'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount'
 ];
 function readBatchFactoryAudioDuration(blob) {
@@ -1499,11 +1499,10 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
     setSheetOffset(null);
   }, [book?.id, initialVideoId, initialTab]);
 
-  const fixedSingleVideo = mergeSettings.fixedSingleVideo === true;
   useEffect(() => {
-    setFollowAudio(fixedSingleVideo || normalizeAudioSource(mergeSettings.audioSource) === 'original' ? false : mergeSettings.audioMergeEnabled === true);
+    setFollowAudio(normalizeAudioSource(mergeSettings.audioSource) === 'original' ? false : mergeSettings.audioMergeEnabled === true);
     setAudioDurationSeconds(Number(mergeSettings.audioDurationSeconds || 0));
-  }, [book?.id, fixedSingleVideo, mergeSettings.audioSource, mergeSettings.audioMergeEnabled, mergeSettings.audioDurationSeconds]);
+  }, [book?.id, mergeSettings.audioSource, mergeSettings.audioMergeEnabled, mergeSettings.audioDurationSeconds]);
 
   useEffect(() => {
     if (!selectedVideo) {
@@ -1805,7 +1804,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
   }
 
   async function measureMergeAudioDuration({ force = false } = {}) {
-    if (audioBusy || fixedSingleVideo) return Number(audioDurationSeconds || 0);
+    if (audioBusy) return Number(audioDurationSeconds || 0);
     const input = batchFactoryBookAudioInput(book);
     const tts = await batchFactoryBookTts(mergeSettings);
     const fingerprint = batchFactoryAudioFingerprint(input, tts);
@@ -1829,7 +1828,6 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
   }
 
   async function toggleFollowAudio(checked) {
-    if (fixedSingleVideo) { message.warning('固定开头模式只生产 VIDEO01，请先关闭固定开头。'); return; }
     if (normalizeAudioSource(mergeSettings.audioSource) === 'original') { message.info('当前为原声模式，不会合入 TTS。'); return; }
     setFollowAudio(checked);
     try {
@@ -1986,9 +1984,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
     ? mergeReason
     : !mergeReady
       ? `还有 ${missingVideos.length} 个分镜没有可用主版本`
-      : fixedSingleVideo && followAudio
-        ? '固定开头模式不可使用合并跟随配音'
-        : followAudio && Number(audioDurationSeconds || 0) <= 0
+      : followAudio && Number(audioDurationSeconds || 0) <= 0
           ? '点击合成时会先自动生成配音并读取真实时长'
           : '按各分镜当前主版本合成；不会覆盖历史成片。';
 
@@ -2113,7 +2109,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
         <div className="batch-factory-media-bottom-sheet-quick">
           {!followAudio ? <InputNumber min={0.5} max={4} step={0.1} value={mergeSpeed} onChange={value => onMergeSpeedChange?.(Number(value || 1))} addonAfter="x" /> : <span className="batch-factory-audio-quick-state">{audioBusy ? '读取配音…' : `配音 ${Number(audioDurationSeconds || 0).toFixed(2)}s · 自动 ${autoMergeRate > 0 ? autoMergeRate.toFixed(3) : '—'}x`}</span>}
           <Button size="small" onClick={toggleSheet}>{sheetAnchor === 'collapsed' ? '展开' : sheetAnchor === 'half' ? '全展开' : '收起'}</Button>
-          <Tooltip title={mergeTooltip}><Button type="primary" loading={merging} disabled={!mergeAvailable || merging || !mergeReady || fixedSingleVideo && followAudio} onClick={runCurrentMerge}>合成当前书</Button></Tooltip>
+          <Tooltip title={mergeTooltip}><Button type="primary" loading={merging} disabled={!mergeAvailable || merging || !mergeReady} onClick={runCurrentMerge}>合成当前书</Button></Tooltip>
           <Tooltip title="上传当前小说"><Button size="small" className="batch-factory-upload-network-button" onClick={onUpload} disabled={!mergedReady && !uploadVersion?.mediaUrl}>上传网络</Button></Tooltip>
         </div>
       </div>
@@ -2123,9 +2119,9 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
           <section>
             <h3>合成控制</h3>
             <div className="batch-factory-media-bottom-sheet-row"><span>本次倍率</span>{followAudio ? <b>{autoMergeRate > 0 ? `自动 · ${autoMergeRate.toFixed(3)}x` : '自动计算'}</b> : <InputNumber min={0.5} max={4} step={0.1} value={mergeSpeed} onChange={value => onMergeSpeedChange?.(Number(value || 1))} addonAfter="x" />}</div>
-            <div className="batch-factory-media-bottom-sheet-row"><span>合并跟随配音</span><div className="batch-factory-follow-audio-control"><Switch checked={followAudio} disabled={fixedSingleVideo} loading={audioBusy} onChange={toggleFollowAudio} /><small>{fixedSingleVideo ? '固定开头模式不可用' : '可事后开启并自动读取当前书配音时长'}</small></div></div>
+            <div className="batch-factory-media-bottom-sheet-row"><span>合并跟随配音</span><div className="batch-factory-follow-audio-control"><Switch checked={followAudio} loading={audioBusy} onChange={toggleFollowAudio} /><small>可事后开启并自动读取当前书配音时长</small></div></div>
             {followAudio ? <><div className="batch-factory-media-bottom-sheet-row"><span>配音目标</span><div className="batch-factory-audio-duration-edit"><InputNumber min={0.1} step={0.01} value={audioDurationSeconds || undefined} onChange={value => setAudioDurationSeconds(Number(value || 0))} onBlur={persistManualAudioDuration} addonAfter="s" /><Button size="small" loading={audioBusy} onClick={() => measureMergeAudioDuration({ force: true })}>重新读取</Button></div></div><div className="batch-factory-media-bottom-sheet-row"><span>主视频总时长</span><b>{videoTotalSeconds > 0 ? `${videoTotalIsExact ? '' : '≈ '}${videoTotalSeconds.toFixed(2)}s` : '等待读取'}</b></div><div className="batch-factory-media-bottom-sheet-row"><span>自动倍率</span><b>{autoMergeRate > 0 ? `${autoMergeRate.toFixed(3)}x` : '—'}</b></div><div className="batch-factory-media-bottom-sheet-row"><span>预计成片</span><b>{estimatedFinalSeconds > 0 ? `${estimatedFinalSeconds.toFixed(2)}s` : '—'}</b></div></> : null}
-            <div className="batch-factory-media-bottom-sheet-actions"><Tooltip title={mergeTooltip}><Button type="primary" loading={merging || audioBusy} disabled={!mergeAvailable || merging || !mergeReady || fixedSingleVideo && followAudio} onClick={runCurrentMerge}>{mergeJob?.status === 'succeeded' ? '重新合成' : '合成当前书'}</Button></Tooltip></div>
+            <div className="batch-factory-media-bottom-sheet-actions"><Tooltip title={mergeTooltip}><Button type="primary" loading={merging || audioBusy} disabled={!mergeAvailable || merging || !mergeReady} onClick={runCurrentMerge}>{mergeJob?.status === 'succeeded' ? '重新合成' : '合成当前书'}</Button></Tooltip></div>
           </section>
 
           <section>
@@ -2480,7 +2476,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   async function ensureBookAudioDuration(book, { force = false, quiet = false, batchSnapshot = batch } = {}) {
     const currentBatch = batchSnapshot || batch;
     const settings = effectiveBookSettings(currentBatch, book);
-    if (settings.fixedSingleVideo === true || settings.audioPlanningEnabled !== true) return Number(settings.audioDurationSeconds || 0);
+    if (settings.audioPlanningEnabled !== true) return Number(settings.audioDurationSeconds || 0);
     const input = batchFactoryBookAudioInput(book);
     const tts = await batchFactoryBookTts(settings);
     const fingerprint = batchFactoryAudioFingerprint(input, tts);
@@ -2503,7 +2499,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   async function prepareAudioPlanningForBatch(currentBatch) {
     const candidates = (currentBatch?.books || []).filter(book => {
       const settings = effectiveBookSettings(currentBatch, book);
-      return settings.audioPlanningEnabled === true && settings.fixedSingleVideo !== true;
+      return settings.audioPlanningEnabled === true;
     });
     if (!candidates.length) return;
     message.info(`正在逐本生成配音并读取 ${candidates.length} 本小说的真实时长…`);
@@ -2905,7 +2901,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
       const requestedMode = stage === 'director' && mode === 'compile' ? 'missing' : mode;
       if (stage === 'director' && settings.audioPlanningEnabled === true) {
-        if (settings.fixedSingleVideo === true) throw new Error('固定开头只生产 VIDEO01，请先关闭固定开头后再使用分镜规划跟随配音。');
         await ensureBookAudioDuration(book);
       }
       const stageResult = await runBookStage(batch.id, book.id, stage, {
@@ -3029,7 +3024,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (scope?.id) { await runBookStageAction(scope, 'director', 'missing', '', textModelId); return; }
     setActionBusy('director');
     try {
-      const audioBooks = books.filter(book => { const settings = effectiveBookSettings(batch, book); return settings.audioPlanningEnabled === true && settings.fixedSingleVideo !== true; });
+      const audioBooks = books.filter(book => { const settings = effectiveBookSettings(batch, book); return settings.audioPlanningEnabled === true; });
       if (audioBooks.length) message.info(`正在逐本读取 ${audioBooks.length} 本小说的真实配音时长…`);
       for (const book of audioBooks) await ensureBookAudioDuration(book, { quiet: true });
       await runBatchDirector(batch.id, { textModelId: textModelId || batch?.settingsState?.patch?.textModelId });
@@ -3054,7 +3049,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   }
   function mergePayload(prefix, book = null, speed = 1, overrides = {}) {
     const settings = normalizeAudioSourceSettings(book ? effectiveBookSettings(batch, book) : (batch?.settingsState?.patch || {}));
-    const followAudio = normalizeAudioSource(settings.audioSource) === 'original' || settings.fixedSingleVideo === true ? false : (Object.hasOwn(overrides, 'followAudio') ? overrides.followAudio === true : settings.audioMergeEnabled === true);
+    const followAudio = normalizeAudioSource(settings.audioSource) === 'original' ? false : (Object.hasOwn(overrides, 'followAudio') ? overrides.followAudio === true : settings.audioMergeEnabled === true);
     const audioDurationSeconds = Object.hasOwn(overrides, 'audioDurationSeconds')
       ? Number(overrides.audioDurationSeconds || 0)
       : Number(settings.audioDurationSeconds || 0);
@@ -3235,8 +3230,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   }
   async function saveSettings(patch) {
     const audioPlanningWasEnabled = batch?.settingsState?.patch?.audioPlanningEnabled === true;
-    const normalized = normalizeAudioSourceSettings({ ...patch, audioDurationSeconds: 0, ...(patch.fixedSingleVideo === true ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {}) });
-    const shouldPrepareAudio = audioPlanningWasEnabled === false && normalized.audioPlanningEnabled === true && normalized.fixedSingleVideo !== true;
+    const normalized = normalizeAudioSourceSettings({ ...patch, audioDurationSeconds: 0 });
+    const shouldPrepareAudio = audioPlanningWasEnabled === false && normalized.audioPlanningEnabled === true;
     try {
       await saveBatchSettings(batch.id, { patch: normalized, expectedRevision: Number(batch?.settingsState?.revision || 0) }, { suppressGlobalError: true });
     } catch (error) {

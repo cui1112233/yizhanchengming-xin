@@ -6,7 +6,7 @@ export const BOOK_CONFIG_REGIONS = [
   { key: 'visual', label: '画面设置' }
 ];
 
-const ENGINE_KEYS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'fixedSingleVideo', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'publishSettings', 'publishRewriteEnabled'];
+const ENGINE_KEYS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'publishSettings', 'publishRewriteEnabled'];
 const AI_MODULE_BY_REGION = {
   assets: 'assets',
   constraints: 'constraints',

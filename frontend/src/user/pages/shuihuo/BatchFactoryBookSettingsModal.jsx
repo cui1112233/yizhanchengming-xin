@@ -10,7 +10,7 @@ import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFacto
 import { audioDurationFingerprint as runtimeAudioDurationFingerprint, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { batchFactoryPreviewText } from './batchFactoryContentRange';
 
-const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'fixedSingleVideo', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
+const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings'];
 const ENGINE_OVERRIDE_FIELDS = [...ENGINE_MODEL_OVERRIDE_FIELDS, ...ENGINE_PUBLISH_OVERRIDE_FIELDS];
 const BOOK_OVERRIDE_FIELDS = [...ENGINE_OVERRIDE_FIELDS, 'starredCharacterNames', 'openingEnabled', 'openingCount', 'aiPromptConfig'];
@@ -100,7 +100,7 @@ function mergePublishSettings(base, override) { return { ...(base || {}), ...(ov
 function effectiveValues(batchPatch, bookPatch) {
   const aiPromptConfig = mergePromptConfig(batchPatch?.aiPromptConfig, bookPatch?.aiPromptConfig);
   const values = { ...(batchPatch || {}), ...(bookPatch || {}), aiPromptConfig: { ...aiPromptConfig, video: requiredVideoPrompt(aiPromptConfig.video) }, publishSettings: mergePublishSettings(batchPatch?.publishSettings, bookPatch?.publishSettings) };
-  return normalizeAudioSourceSettings(values.fixedSingleVideo === true ? { ...values, audioPlanningEnabled: false, audioMergeEnabled: false } : values);
+  return normalizeAudioSourceSettings(values);
 }
 function selectedMeta(catalog, id) {
   const preset = catalog.find(item => item.id === id);
@@ -202,7 +202,7 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
       if (!equal(inherited?.[key], edited?.[key])) patch[key] = edited?.[key];
       else if (Object.hasOwn(bookPatch || {}, key)) restoreKeys.push(key);
     }
-    // 换开头是统一配置根级的生产开关，与“固定开头”同属引擎配置；单书只存差异，拨回相同值即恢复继承。
+    // 换开头是统一配置根级的生产开关；单书只存差异，拨回相同值即恢复继承。
     for (const key of ['openingEnabled', 'openingCount']) {
       if (!equal(inherited?.[key], edited?.[key])) patch[key] = edited?.[key];
       else if (Object.hasOwn(bookPatch || {}, key)) restoreKeys.push(key);
@@ -238,32 +238,29 @@ function InheritedNumberField({ label, value, inherited, min, max, onChange }) {
 
 function InheritedStoryboardDurationField({ value, inherited, onChange }) {
   const duration = Number(value ?? inherited) === 15 ? 15 : 10;
-  return <label className="batch-factory-engine-field"><span><b>分镜时长</b><small>视频提示词按此上限切分</small></span><Segmented value={duration} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={onChange} /></label>;
+  return <label className="batch-factory-engine-field"><span><b>分镜时长</b><HelpTip title="分镜时长">视频提示词按此上限切分。</HelpTip></span><Segmented value={duration} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={onChange} /></label>;
 }
 
 function InheritedSwitchField({ label, value, inherited, onChange }) {
   return <label className="batch-factory-engine-field"><span><b>{label}</b></span><Switch checked={value ?? inherited ?? false} onChange={onChange} /></label>;
 }
-function InheritedFixedVideoSwitch({ value, inherited, onChange }) {
-  return <label className="batch-factory-engine-field"><span><b>固定开头</b><small>开启后只生产 VIDEO01；关闭后按全部分镜执行</small></span><Switch checked={value ?? inherited ?? false} onChange={onChange} /></label>;
-}
 function AudioOptionCard({ title, description, help, value, inherited, onChange, disabled = false }) {
-  return <section className={`batch-factory-audio-option${disabled ? ' is-disabled' : ''}`}><div><div className="batch-factory-option-title"><b>{title}</b>{help ? <HelpTip title={title}>{help}</HelpTip> : null}</div><small>{description}</small></div><Switch disabled={disabled} checked={value ?? inherited ?? false} onChange={onChange} /></section>;
+  return <section className={`batch-factory-audio-option${disabled ? ' is-disabled' : ''}`}><div><div className="batch-factory-option-title"><b>{title}</b><HelpTip title={title}>{help || description}</HelpTip></div></div><Switch disabled={disabled} checked={value ?? inherited ?? false} onChange={onChange} /></section>;
 }
 function ConfigCard({ title, description, children }) {
-  return <section className="batch-factory-engine-card"><header><b>{title}</b>{description ? <small>{description}</small> : null}</header><div className="batch-factory-engine-card-body">{children}</div></section>;
+  return <section className="batch-factory-engine-card"><header><b>{title}</b>{description ? <HelpTip title={title}>{description}</HelpTip> : null}</header><div className="batch-factory-engine-card-body">{children}</div></section>;
 }
 
 function PromptSelect({ label, value, options, onChange, disabled, required = false }) {
   const catalog = optionsWithCurrent(options.catalog || [], value, label);
-  return <label className="batch-factory-engine-field"><span><b>{label}</b><small>从个人中心已发布预设词选择</small></span><Select allowClear={!required} disabled={disabled} value={value?.presetId || undefined} options={catalog.map(optionFor)} placeholder={required ? '请选择已发布视频提示词' : '未选择'} onChange={id => onChange(selectedMeta(catalog, id))} /></label>;
+  return <label className="batch-factory-engine-field"><span><b>{label}</b><HelpTip title={label}>从个人中心已发布预设词选择。</HelpTip></span><Select allowClear={!required} disabled={disabled} value={value?.presetId || undefined} options={catalog.map(optionFor)} placeholder={required ? '请选择已发布视频提示词' : '未选择'} onChange={id => onChange(selectedMeta(catalog, id))} /></label>;
 }
 
 function RuleModule({ title, value, onChange, children, required = false }) {
   const module = value || {};
   const enabled = required || module.enabled === true;
   return <section className="batch-factory-ai-module">
-    <div className="batch-factory-ai-module-head"><div><b>{title}</b><p>保存后只覆盖当前小说；所选预设及当前编辑内容会随本书配置保存。</p></div>{required ? null : <Switch checked={enabled} onChange={enabled => onChange({ ...module, enabled })} />}</div>
+    <div className="batch-factory-ai-module-head"><div><b>{title}</b><HelpTip title={title}>保存后只覆盖当前小说；所选预设及当前编辑内容会随本书配置保存。</HelpTip></div>{required ? null : <Switch checked={enabled} onChange={enabled => onChange({ ...module, enabled })} />}</div>
     {enabled ? <div className="batch-factory-ai-module-body">{children}</div> : null}
   </section>;
 }
@@ -289,7 +286,7 @@ function ConstraintCategoryEditor({ category, label, value, systemOptions, perso
 function ConstraintLayers({ value, records, personalPrompts, loading, saving, editingPromptId, onChange, onSelectSystem, onSelectPersonal, onSaveDraft, onSaveNamed, onEditPersonal, onDeletePersonal }) {
   const rules = normalizeConstraintRules(value);
   return <div className="batch-factory-constraint-layers">
-    <div className="batch-factory-constraint-layer"><Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}><div><b>基础设定（人物 / 场景）</b><p>开启后，当前书每个分镜自动带入已提取的人物与场景设定。</p></div><Switch checked={rules.baseSetup.enabled} onChange={enabled => onChange({ ...rules, baseSetup: { enabled } })} /></Space></div>
+    <div className="batch-factory-constraint-layer"><Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}><div><b>基础设定（人物 / 场景）</b><HelpTip title="基础设定（人物 / 场景）">开启后，当前书每个分镜自动带入已提取的人物与场景设定。</HelpTip></div><Switch checked={rules.baseSetup.enabled} onChange={enabled => onChange({ ...rules, baseSetup: { enabled } })} /></Space></div>
     {EDITABLE_CONSTRAINT_LAYERS.map(([category, label]) => <ConstraintCategoryEditor key={category} category={category} label={label} value={rules[category]} systemOptions={records.filter(item => item.constraintCategory === category)} personalPrompts={personalPrompts[category] || []} loading={loading} saving={saving === category} editingPromptId={editingPromptId === category} onChange={patch => onChange({ ...rules, [category]: { ...rules[category], ...patch } })} onSelectSystem={presetId => onSelectSystem(category, presetId)} onSelectPersonal={promptId => onSelectPersonal(category, promptId)} onSaveDraft={() => onSaveDraft(category)} onSaveNamed={() => onSaveNamed(category)} onEditPersonal={prompt => onEditPersonal(category, prompt)} onDeletePersonal={promptId => onDeletePersonal(category, promptId)} />)}
   </div>;
 }
@@ -538,7 +535,6 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   let body = null;
   if (region === 'engine') {
     const audioEnabled = form.audioPlanningEnabled === true || form.audioMergeEnabled === true;
-    const fixedOpening = form.fixedSingleVideo === true;
     const profiles = Array.isArray(publish.websiteProfiles)
       ? publish.websiteProfiles
       : (Array.isArray(inheritedPublish.websiteProfiles) ? inheritedPublish.websiteProfiles : []);
@@ -550,8 +546,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
         key: 'models',
         label: '模型配置',
         children: <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
-          <Alert type="info" showIcon message="当前书独立模型配置" description="这里只保存当前小说与批量默认值不同的参数。" />
-          <ConfigCard title="核心视频引擎" description="视频生成、分镜时长、画幅与固定开头。"><div className="batch-factory-engine-grid">
+          <Alert type="info" showIcon message={<span>当前书独立模型配置 <HelpTip title="当前书独立模型配置">这里只保存当前小说与批量默认值不同的参数。</HelpTip></span>} />
+          <ConfigCard title="核心视频引擎" description="视频生成、分镜时长和画幅。"><div className="batch-factory-engine-grid">
             <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider || 'personal_api'} inherited={inherited.videoProvider || 'personal_api'} options={VIDEO_PROVIDER_OPTIONS} loading={false} onChange={videoProvider => patch({ videoProvider })} />
             <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={modelOptions.video} loading={loading} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: videoProviderForModel(videoModelId, form.videoProvider || inherited.videoProvider) } : {}) })} />
             <InheritedStoryboardDurationField value={form.storyboardDurationLimit} inherited={inherited.storyboardDurationLimit} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} />
@@ -559,9 +555,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             <InheritedField label="视频画幅" field="videoAspectRatio" value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} inherited={inherited.videoAspectRatio || (inherited.aspectRatio === '16:9' ? '16:9' : '9:16')} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} loading={false} onChange={videoAspectRatio => patch({ videoAspectRatio })} />
             <InheritedField label="视频分辨率" field="videoResolution" value={form.videoResolution || '720p'} inherited={inherited.videoResolution || '720p'} options={[{ value: '480p', label: '480p' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} loading={false} onChange={videoResolution => patch({ videoResolution })} />
           </div>
-          <InheritedFixedVideoSwitch value={form.fixedSingleVideo} inherited={inherited.fixedSingleVideo} onChange={fixedSingleVideo => patch({ fixedSingleVideo })} />
           <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-            <span><b>换开头</b><small style={{ display: 'block', color: '#94a3b8' }}>2 个及以上分镜的书为分镜一生成多个开场变体并分别合成上传；不改这里就跟随批量（批量当前：{inherited.openingEnabled === true ? `开启 · ${inherited.openingCount ?? 4} 条（含原始）` : '关闭'}）</small></span>
+            <span><b>换开头</b><HelpTip title="换开头">2 个及以上分镜的书为分镜一生成多个开场变体并分别合成上传；不改这里就跟随批量（批量当前：{inherited.openingEnabled === true ? `开启 · ${inherited.openingCount ?? 4} 条（含原始）` : '关闭'}）。</HelpTip></span>
             <Space>
               <Switch checked={form.openingEnabled === true} onChange={enabled => patch({ openingEnabled: enabled, openingCount: form.openingCount ?? inherited.openingCount ?? 4 })} />
               <InputNumber min={1} max={8} precision={0} disabled={form.openingEnabled !== true} value={form.openingCount ?? inherited.openingCount ?? 4} onChange={count => patch({ openingCount: count ?? 4 })} addonAfter="条（含原始）" />
@@ -570,21 +565,21 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
           </ConfigCard>
 
           <ConfigCard title="配音与时长" description="读取当前生产正文；读取时长不会自动打开任何跟随功能。"><section className="batch-factory-book-audio-content">
-            <div className="batch-factory-book-audio-head"><div><b>当前正文配音</b><p>只读取小说正文当前选择范围或已保存的生产正文，不读取整本全文。</p></div><Space wrap><Button size="small" loading={audioBusy} onClick={measureBookAudio}>生成配音并读取时长</Button>{audioBlob ? <Button size="small" onClick={() => downloadAudio(audioBlob, `${book?.bookId || book?.id || 'book'}-配音.mp3`)}>下载配音</Button> : null}</Space></div>
+            <div className="batch-factory-book-audio-head"><div><b>当前正文配音</b><HelpTip title="当前正文配音">只读取小说正文当前选择范围或已保存的生产正文，不读取整本全文。</HelpTip></div><Space wrap><Button size="small" loading={audioBusy} onClick={measureBookAudio}>生成配音并读取时长</Button>{audioBlob ? <Button size="small" onClick={() => downloadAudio(audioBlob, `${book?.bookId || book?.id || 'book'}-配音.mp3`)}>下载配音</Button> : null}</Space></div>
             <div className="batch-factory-engine-grid">
-              <label className="batch-factory-engine-field"><span><b>音频来源</b><small>默认 TTS；原声保留视频模型自带声音</small></span><Segmented block value={normalizeAudioSource(form.audioSource)} options={[{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }]} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></label>
+              <label className="batch-factory-engine-field"><span><b>音频来源</b><HelpTip title="音频来源">默认 TTS；原声保留视频模型自带声音。</HelpTip></span><Segmented block value={normalizeAudioSource(form.audioSource)} options={[{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }]} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></label>
             </div>
             <div className="batch-factory-audio-options">
-              <AudioOptionCard disabled={fixedOpening} title="分镜规划跟随配音" description={fixedOpening ? '固定开头开启时暂不生效，原配置保留。' : '按真实配音时长规划 VIDEO。'} value={form.audioPlanningEnabled} inherited={inherited.audioPlanningEnabled} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
-              <AudioOptionCard disabled={fixedOpening || normalizeAudioSource(form.audioSource) === 'original'} title="合并跟随配音" description={fixedOpening ? '固定开头开启时暂不生效，原配置保留。' : normalizeAudioSource(form.audioSource) === 'original' ? '原声模式不合入 TTS。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
+              <AudioOptionCard title="分镜规划跟随配音" description="按真实配音时长规划 VIDEO。" value={form.audioPlanningEnabled} inherited={inherited.audioPlanningEnabled} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
+              <AudioOptionCard disabled={normalizeAudioSource(form.audioSource) === 'original'} title="合并跟随配音" description={normalizeAudioSource(form.audioSource) === 'original' ? '原声模式不合入 TTS。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
             </div>
             <div className="batch-factory-engine-grid">
-              <label className="batch-factory-engine-field"><span><b>配音音色</b><small>当前书 TTS</small></span><Select value={tts.voice} options={TTS_VOICE_OPTIONS} onChange={voice => patchTts({ voice })} /></label>
-              <label className="batch-factory-engine-field"><span><b>配音风格</b><small>当前书 TTS</small></span><Select value={tts.style} options={TTS_STYLE_OPTIONS} onChange={style => patchTts({ style })} /></label>
-              <label className="batch-factory-engine-field"><span><b>语速</b><small>改变后需重新读取时长</small></span><InputNumber min={0.5} max={2} step={0.1} value={tts.speed} onChange={speed => patchTts({ speed: speed ?? DEFAULT_TTS.speed })} /></label>
-              <label className="batch-factory-engine-field"><span><b>音调</b><small>改变后需重新读取时长</small></span><InputNumber min={-50} max={50} step={1} value={tts.pitch} onChange={pitch => patchTts({ pitch: pitch ?? DEFAULT_TTS.pitch })} /></label>
+              <label className="batch-factory-engine-field"><span><b>配音音色</b><HelpTip title="配音音色">当前书 TTS。</HelpTip></span><Select value={tts.voice} options={TTS_VOICE_OPTIONS} onChange={voice => patchTts({ voice })} /></label>
+              <label className="batch-factory-engine-field"><span><b>配音风格</b><HelpTip title="配音风格">当前书 TTS。</HelpTip></span><Select value={tts.style} options={TTS_STYLE_OPTIONS} onChange={style => patchTts({ style })} /></label>
+              <label className="batch-factory-engine-field"><span><b>语速</b><HelpTip title="语速">改变后需重新读取时长。</HelpTip></span><InputNumber min={0.5} max={2} step={0.1} value={tts.speed} onChange={speed => patchTts({ speed: speed ?? DEFAULT_TTS.speed })} /></label>
+              <label className="batch-factory-engine-field"><span><b>音调</b><HelpTip title="音调">改变后需重新读取时长。</HelpTip></span><InputNumber min={-50} max={50} step={1} value={tts.pitch} onChange={pitch => patchTts({ pitch: pitch ?? DEFAULT_TTS.pitch })} /></label>
             </div>
-            {audioDurationStale ? <Alert type="warning" showIcon message="配音时长已过期" description="当前正文或 TTS 参数已变化，请重新生成配音并读取时长。" /> : null}
+            {audioDurationStale ? <Alert type="warning" showIcon message={<span>配音时长已过期 <HelpTip title="配音时长已过期">当前正文或 TTS 参数已变化，请重新生成配音并读取时长。</HelpTip></span>} /> : null}
             {audioEnabled ? <div className="batch-factory-book-audio-duration"><InheritedNumberField label="配音目标（秒）" value={form.audioDurationSeconds ?? 0} inherited={inherited.audioDurationSeconds ?? 0} min={0} max={86400} onChange={audioDurationSeconds => patch({ audioDurationSeconds })} /></div> : null}
           </section></ConfigCard>
 
@@ -605,10 +600,10 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             <Alert type="info" showIcon message="男女频、风格和标签属于当前书" description="这里不会覆盖书级 AI 判断结果。" />
           </ConfigCard>
           <ConfigCard title="上传规则" description="只影响当前小说。">
-            <label className="batch-factory-engine-field"><span><b>上传视频类型</b><small>当前书发布策略</small></span><Segmented value={publish.uploadVideoType || 'merged'} options={[{ value: 'merged', label: '合并成品' }, { value: 'individual', label: '独立 VIDEO' }]} onChange={uploadVideoType => patch({ publishSettings: { ...publish, uploadVideoType } })} /></label>
+            <label className="batch-factory-engine-field"><span><b>上传视频类型</b><HelpTip title="上传视频类型">当前书发布策略。</HelpTip></span><Segmented value={publish.uploadVideoType || 'merged'} options={[{ value: 'merged', label: '合并成品' }, { value: 'individual', label: '独立 VIDEO' }]} onChange={uploadVideoType => patch({ publishSettings: { ...publish, uploadVideoType } })} /></label>
             <div className="batch-factory-engine-grid">
-              <label className="batch-factory-engine-field"><span><b>素材使用</b><small>当前书发布策略</small></span><Select value={publish.materialReuse === true ? 'reuse' : 'no_reuse'} options={[{ value: 'no_reuse', label: '不复用' }, { value: 'reuse', label: '复用' }]} onChange={value => patch({ publishSettings: { ...publish, materialReuse: value === 'reuse' } })} /></label>
-              <label className="batch-factory-engine-field"><span><b>水平翻转</b><small>当前书发布策略</small></span><Select value={publish.horizontalFlip === true ? 'flip' : 'no_flip'} options={[{ value: 'no_flip', label: '不翻转' }, { value: 'flip', label: '翻转' }]} onChange={value => patch({ publishSettings: { ...publish, horizontalFlip: value === 'flip' } })} /></label>
+              <label className="batch-factory-engine-field"><span><b>素材使用</b><HelpTip title="素材使用">当前书发布策略。</HelpTip></span><Select value={publish.materialReuse === true ? 'reuse' : 'no_reuse'} options={[{ value: 'no_reuse', label: '不复用' }, { value: 'reuse', label: '复用' }]} onChange={value => patch({ publishSettings: { ...publish, materialReuse: value === 'reuse' } })} /></label>
+              <label className="batch-factory-engine-field"><span><b>水平翻转</b><HelpTip title="水平翻转">当前书发布策略。</HelpTip></span><Select value={publish.horizontalFlip === true ? 'flip' : 'no_flip'} options={[{ value: 'no_flip', label: '不翻转' }, { value: 'flip', label: '翻转' }]} onChange={value => patch({ publishSettings: { ...publish, horizontalFlip: value === 'flip' } })} /></label>
             </div>
             <InheritedSwitchField label="改文后上传" value={form.publishRewriteEnabled} inherited={inherited.publishRewriteEnabled} onChange={publishRewriteEnabled => patch({ publishRewriteEnabled })} />
           </ConfigCard>
@@ -621,7 +616,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
         <PromptSelect label="人物场景道具提取提示词" value={assetRules.extraction} options={Object.assign(scriptExtraction.map(optionFor), { catalog: scriptExtraction })} disabled={loading} onChange={selection => updateAssetSelection('extraction', selection)} />
         <PromptSelect label="人物提示词" value={assetRules.character} options={Object.assign(characterPromptRules.map(optionFor), { catalog: characterPromptRules })} disabled={loading} onChange={selection => updateAssetSelection('character', selection)} />
         <PromptSelect label="场景提示词" value={assetRules.scene} options={Object.assign(scenePromptRules.map(optionFor), { catalog: scenePromptRules })} disabled={loading} onChange={selection => updateAssetSelection('scene', selection)} />
-        <label className="batch-factory-engine-field"><span><b>星标人物聚焦</b><small>与公网剧本生成一致：只作为导演分镜的剧情与镜头聚焦变量，不等同于分镜资产灰显。</small></span><Select mode="multiple" allowClear value={starredCharacterNames} options={characterOptions} placeholder={characterOptions.length ? '选择已提取的人物' : '请先提取人物资产'} onChange={starredCharacterNames => patch({ starredCharacterNames })} /></label>
+        <label className="batch-factory-engine-field"><span><b>星标人物聚焦</b><HelpTip title="星标人物聚焦">与公网剧本生成一致：只作为导演分镜的剧情与镜头聚焦变量，不等同于分镜资产灰显。</HelpTip></span><Select mode="multiple" allowClear value={starredCharacterNames} options={characterOptions} placeholder={characterOptions.length ? '选择已提取的人物' : '请先提取人物资产'} onChange={starredCharacterNames => patch({ starredCharacterNames })} /></label>
         <Button onClick={() => { onClose?.(); onOpenBookAssets?.(book); }}>维护当前书人物场景预设</Button>
       </RuleModule>
     </>;

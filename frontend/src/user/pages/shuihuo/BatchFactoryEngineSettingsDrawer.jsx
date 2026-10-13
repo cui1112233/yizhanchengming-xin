@@ -65,13 +65,11 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
     if (!open) return;
     const current = batch?.settingsState?.patch || {};
     const duration = storyboardDuration(current.storyboardDurationLimit);
-    const fixedSingleVideo = current.fixedSingleVideo === true;
     setForm({
       ...current,
       storyboardDurationLimit: duration,
       maxVideoDuration: duration,
-      audioDurationSeconds: 0,
-      ...(fixedSingleVideo ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {})
+      audioDurationSeconds: 0
     });
   }, [open, batch?.id, batch?.settingsState?.revision]);
   useEffect(() => {
@@ -115,16 +113,11 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   const tts = { ...DEFAULT_TTS, ...accountTts, ...(form.tts || {}) };
   function patch(next) { setForm(current => ({ ...current, ...next })); }
   function patchTts(next) { patch({ tts: { ...tts, ...next } }); }
-  function patchFixedSingleVideo(fixedSingleVideo) {
-    patch({ fixedSingleVideo, ...(fixedSingleVideo ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {}) });
-    if (fixedSingleVideo) message.info('固定开头只生产 VIDEO01，两个跟随配音功能已关闭。');
-  }
   async function save() {
     const normalized = normalizeAudioSourceSettings({
       ...form,
       tts: { ...tts },
       audioDurationSeconds: 0,
-      ...(form.fixedSingleVideo === true ? { audioPlanningEnabled: false, audioMergeEnabled: false } : {})
     });
     setSaving(true);
     try { const saved = await onSave(normalized); if (saved) onClose(); } finally { setSaving(false); }
@@ -231,7 +224,6 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
               <Field label="视频画幅" note="只影响视频输出"><Segmented value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} options={['16:9', '9:16']} onChange={videoAspectRatio => patch({ videoAspectRatio })} /></Field>
               <Field label="视频分辨率" note="随视频任务提交"><Segmented value={form.videoResolution || '720p'} options={['480p', '720p', '1080p']} onChange={videoResolution => patch({ videoResolution })} /></Field>
             </div>
-            <section className="batch-factory-audio-option batch-factory-fixed-option"><div><b>固定开头</b><small>开启后只生产 VIDEO01，同时禁用两个跟随配音功能。</small></div><Switch checked={form.fixedSingleVideo === true} onChange={patchFixedSingleVideo} /></section>
           </EngineCard>
 
           <EngineCard title="配音与时长" description="统一的是配音参数与跟随策略；每本小说的真实秒数会在需要时独立生成和读取。">
@@ -245,13 +237,13 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
               <Field label="音调"><InputNumber min={-50} max={50} step={1} value={tts.pitch} onChange={pitch => patchTts({ pitch: pitch ?? DEFAULT_TTS.pitch })} /></Field>
             </div>
             <div className="batch-factory-audio-options batch-factory-audio-options-v13">
-              <section className={`batch-factory-audio-option${form.fixedSingleVideo === true ? ' is-disabled' : ''}`}>
-                <div><div className="batch-factory-option-title"><b>分镜规划跟随配音</b><HelpTip title="分镜规划跟随配音">先为每本小说按当前正文与配音参数生成临时配音并读取真实时长，再据此规划 VIDEO 数量和每段目标时长。剧情节点、对白/旁白密度优先，不会机械平均切分。</HelpTip></div><small>{form.fixedSingleVideo === true ? '固定开头只生产 VIDEO01，当前不可使用。' : '生成分镜前先按每本书真实配音时长规划 VIDEO。'}</small></div>
-                <Switch disabled={form.fixedSingleVideo === true} checked={form.audioPlanningEnabled === true} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
+              <section className="batch-factory-audio-option">
+                <div><div className="batch-factory-option-title"><b>分镜规划跟随配音</b><HelpTip title="分镜规划跟随配音">先为每本小说按当前正文与配音参数生成临时配音并读取真实时长，再据此规划 VIDEO 数量和每段目标时长。剧情节点、对白/旁白密度优先，不会机械平均切分。</HelpTip></div></div>
+                <Switch checked={form.audioPlanningEnabled === true} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
               </section>
-              <section className={`batch-factory-audio-option${form.fixedSingleVideo === true ? ' is-disabled' : ''}`}>
-                <div><div className="batch-factory-option-title"><b>合并跟随配音</b><HelpTip title="合并跟随配音">可在视频生成前或生成后开启。系统读取当前书配音时长，并根据各分镜主视频的实际总时长自动计算最终合并倍率，用来修正生成视频产生的时长误差。</HelpTip></div><small>{form.fixedSingleVideo === true ? '固定开头只生产 VIDEO01，当前不可使用。' : '成片阶段按实际视频总时长二次校正倍率。'}</small></div>
-                <Switch disabled={form.fixedSingleVideo === true} checked={form.audioMergeEnabled === true} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
+              <section className="batch-factory-audio-option">
+                <div><div className="batch-factory-option-title"><b>合并跟随配音</b><HelpTip title="合并跟随配音">可在视频生成前或生成后开启。系统读取当前书配音时长，并根据各分镜主视频的实际总时长自动计算最终合并倍率，用来修正生成视频产生的时长误差。</HelpTip></div></div>
+                <Switch checked={form.audioMergeEnabled === true} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
               </section>
             </div>
           </EngineCard>

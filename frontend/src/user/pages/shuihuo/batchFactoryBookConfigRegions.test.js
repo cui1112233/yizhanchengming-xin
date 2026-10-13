@@ -6,7 +6,7 @@ test('keeps single-book publishing inside engine configuration instead of a spec
   assert.deepEqual(BOOK_CONFIG_REGIONS.map(item => item.key), ['engine', 'assets', 'constraints', 'video', 'visual']);
 });
 
-test('reports fixed opening as an engine override and video prompts as a video override', () => {
+test('reports current engine and video overrides without the retired fixed opening', () => {
   const book = { settingsState: { patch: { videoModelId: 'video-a', fixedSingleVideo: true, aiPromptConfig: { constraints: { enabled: false }, video: { presetId: 'batch-video-meta' } } } } };
   assert.equal(bookConfigRegionStatus(book, 'engine').tone, 'overridden');
   assert.equal(bookConfigRegionStatus(book, 'video').tone, 'overridden');
@@ -14,9 +14,9 @@ test('reports fixed opening as an engine override and video prompts as a video o
   assert.equal(bookConfigRegionStatus(book, 'assets').tone, 'inherited');
 });
 
-test('does not mark video settings overridden when only fixed opening is overridden', () => {
+test('ignores a legacy fixed-opening field when reporting current engine overrides', () => {
   const book = { settingsState: { patch: { fixedSingleVideo: true } } };
-  assert.equal(bookConfigRegionStatus(book, 'engine').tone, 'overridden');
+  assert.equal(bookConfigRegionStatus(book, 'engine').tone, 'inherited');
   assert.equal(bookConfigRegionStatus(book, 'video').tone, 'inherited');
 });
 

@@ -81,7 +81,7 @@ test('automation preset manager changes the unified draft only after confirmatio
   assert.match(source, /重命名所选预设/);
   assert.match(source, /删除所选预设/);
   assert.match(source, /确认载入此预设/);
-  assert.match(source, /setDraftPatch\(clonePresetConfig/);
+  assert.match(source, /onLoad\(clonePresetConfig\)/);
   assert.doesNotMatch(source, /setDraftPatch\(.*saveBatchSettings/);
 });
 
@@ -147,6 +147,13 @@ test('places opening variants under AI reasoning asset settings with a compact h
   assert.doesNotMatch(source.slice(modelStart, modelEnd), /换开头/);
   assert.match(source, /batch-factory-option-title/);
   assert.match(source, /batch-factory-unified-settings-title/);
+});
+
+test('keeps configuration explanations behind question-mark tips and removes fixed opening', () => {
+  assert.match(source, /batch-factory-help-button/);
+  assert.doesNotMatch(source, /固定开头/);
+  assert.match(source, /<HelpTip title="模型配置">/);
+  assert.match(source, /<HelpTip title="跟随配音">/);
 });
 
 test('unified AI reasoning keeps one asset extraction prompt and preserves video prompt selection', () => {

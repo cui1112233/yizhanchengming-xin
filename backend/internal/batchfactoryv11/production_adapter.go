@@ -31,6 +31,15 @@ type ProductionPoller interface {
 	Poll(context.Context, FrozenVideoModel, ProviderTaskRef) (ProviderTaskRef, error)
 }
 
+// ProductionAdapterPoller is the complete provider contract used by the
+// script-video compatibility routes: submit a task and poll its result.
+// Keeping the combined interface here avoids duplicating that contract in the
+// HTTP layer while retaining the smaller interfaces for production services.
+type ProductionAdapterPoller interface {
+	ProductionAdapter
+	ProductionPoller
+}
+
 func (a *HTTPVideoAdapter) Validate() error {
 	if _, err := a.validatedURL(strings.TrimSpace(a.Endpoint)); err != nil {
 		return fmt.Errorf("video provider endpoint: %w", err)

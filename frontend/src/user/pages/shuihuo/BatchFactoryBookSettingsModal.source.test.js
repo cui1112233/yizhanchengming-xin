@@ -43,7 +43,7 @@ test('single-book configuration has the same layered script constraints and vide
 	assert.match(source, /分镜时长/);
 	assert.match(source, /value: 10, label: '10s'/);
 	assert.match(source, /value: 15, label: '15s'/);
-  assert.match(source, /固定开头/);
+  assert.doesNotMatch(source, /固定开头/);
   assert.match(source, /视频引擎/);
   assert.doesNotMatch(source, /约束设置总规则/);
 });
@@ -101,6 +101,14 @@ test('single-book engine settings can override opening variants and restore batc
   assert.doesNotMatch(source, /换开头（当前书覆盖）/);
 });
 
+test('single-book configuration keeps explanations behind question-mark tips and removes fixed opening', () => {
+  assert.match(source, /batch-factory-help-button/);
+  assert.doesNotMatch(source, /固定开头/);
+  assert.match(source, /function ConfigCard\(\{ title, description, children \}\)/);
+  assert.match(source, /<ConfigCard title="核心视频引擎" description=/);
+  assert.match(source, /<ConfigCard title="配音与时长" description=/);
+});
+
 test('single-book constraints view backfills empty system-constraint bodies on open for display', () => {
   // 打开约束页时，对“系统预设 + 有 presetId + 正文为空”的层静默拉取正文回显
   assert.match(source, /if \(!open \|\| region !== 'constraints' \|\| loading\) return undefined/);
@@ -152,11 +160,9 @@ test('lets a book override only the inherited publish organization', () => {
   assert.match(source, /publishSettings: \{ \.\.\.publish, organization/);
 });
 
-test('uses one fixed-opening switch for the current book engine configuration', () => {
-  assert.match(source, /function InheritedFixedVideoSwitch/);
-  assert.match(source, /开启后只生产 VIDEO01；关闭后按全部分镜执行/);
-  assert.doesNotMatch(source, /单个 VIDEO/);
-  assert.doesNotMatch(source, /多个 VIDEO/);
+test('does not expose the retired fixed-opening switch in the current book engine configuration', () => {
+  assert.doesNotMatch(source, /function InheritedFixedVideoSwitch/);
+  assert.doesNotMatch(source, /固定开头/);
   assert.match(source, /batch-factory-book-audio/);
   assert.match(source, /batch-factory-audio-option/);
 });
