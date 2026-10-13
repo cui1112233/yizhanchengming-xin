@@ -118,7 +118,7 @@ export function BatchFactoryProductionControls({ batch, item, onRefresh }) {
           <Tag>{production.modelName || `模型 #${production.modelId}`}</Tag>
           <Typography.Text>{production.queued}/{production.total} 个 VIDEO 已排队</Typography.Text>
           {production.failed ? <Tag color="red">{production.failed} 个提交失败</Tag> : null}
-          <Button icon={<ExternalLink size={14} />} onClick={() => { window.location.href = '/shuihuo-production'; }}>打开视频生产</Button>
+          <Button icon={<ExternalLink size={14} />} onClick={() => { window.location.href = '/shuihuo-production'; }}>打开批量工厂</Button>
         </Space>
         {production.failed ? <Alert type="warning" showIcon message="部分 VIDEO 没有成功进入队列" description="展开上方的视频生成进度，可以看到每个 VIDEO 的实际状态和失败原因。" /> : null}
       </Space>

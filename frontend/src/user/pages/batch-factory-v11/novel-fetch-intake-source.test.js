@@ -21,7 +21,7 @@ test('Novel Fetch transfer targets the unified V12 intake and preserves source f
   assert.match(source, /platform_id\s*\|\|\s*meta\.platform_name/);
   assert.match(source, /contentCaptureCharacters/);
   assert.doesNotMatch(source, /platformApi\(["']\/api\/batch-factory\/intakes\/novel-fetch/);
-  assert.match(source, /redirectTo.*batch-factory\?intake/);
+  assert.match(source, /redirectTo.*shuihuo-production\?intake/);
 });
 
 test('novel fetch persists every processing choice immediately when changed', () => {

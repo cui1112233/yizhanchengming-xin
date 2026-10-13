@@ -30,7 +30,7 @@ test('novel-fetch handoff always opens a new batch instead of appending to the a
   assert.match(handoff, /createBatchFromIntake\(intakeId/);
   assert.doesNotMatch(handoff, /appendNovelFetchIntake/);
   assert.doesNotMatch(handoff, /currentBatchId/);
-  assert.match(handoff, /\/batch-factory/);
+  assert.match(handoff, /\/shuihuo-production/);
 });
 
 test('novel-fetch batch setup exposes and saves content range and capture settings', () => {

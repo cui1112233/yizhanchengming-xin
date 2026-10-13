@@ -93,7 +93,7 @@ export default function BatchFactoryWorkbenchPage() {
     if (!intakeId || handoffRef.current === intakeId) return undefined;
     handoffRef.current = intakeId;
     let cancelled = false;
-    const clearHandoffQuery = () => window.history.replaceState({}, '', '/batch-factory');
+    const clearHandoffQuery = () => window.history.replaceState({}, '', '/shuihuo-production');
     const finish = async result => {
       const batch = asBatch(result);
       if (cancelled) return;

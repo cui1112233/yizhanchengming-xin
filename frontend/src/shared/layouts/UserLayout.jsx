@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, Bug, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, FolderClock, Home, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
@@ -23,10 +23,8 @@ const navItems = [
   { href: '/script', icon: FilePenLine, label: '剧本生成' },
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取' },
   { href: '/novel-panel', icon: NotebookTabs, label: '小说面板' },
-  { href: '/shuihuo-production', icon: Clapperboard, label: '水货生产' },
+  { href: '/shuihuo-production', icon: Clapperboard, label: '批量工厂' },
   { href: '/agent', icon: Bot, label: 'Agent 工作区' },
-  { href: '/history', icon: FolderClock, label: '历史' },
-  { href: '/issues', icon: Bug, label: '问题日志' },
   { href: '/tts', icon: AudioLines, label: '配音' }
 ];
 
@@ -462,7 +460,7 @@ export function UserLayout({ children }) {
             <Suspense fallback={<BrandLogo className="legacy-brand-logo" />}>
               <SuperOpcLiquidMetalLogo theme={theme} scale={1} className="legacy-brand-logo" />
             </Suspense>
-            <span className="legacy-brand-title">一战晟铭</span>
+            <span className="legacy-brand-title shine">一战晟铭</span>
           </Link>
         </div>
         <nav className="legacy-nav">
