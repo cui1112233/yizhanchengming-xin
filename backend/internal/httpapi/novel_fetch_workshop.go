@@ -469,6 +469,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		// 兼容字段，避免页面把已经保存的元数据误显示为空。
 		legacyTasks := make([]map[string]any, 0, len(tasks))
 		for _, task := range tasks {
+			syncNovelFetchClassificationMetadata(&task)
 			legacyTasks = append(legacyTasks, legacyNovelFetchTask(task))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"tasks": legacyTasks})
@@ -680,6 +681,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取正文失败"})
 			return
 		}
+		syncNovelFetchClassificationMetadata(&document)
 		writeJSON(w, http.StatusOK, document)
 	})
 
@@ -756,15 +758,15 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
 		}
 		if styleNeedsResolution(document.Meta) {
-			if provider, providerErr := resolveRewriteProvider(req); providerErr == nil {
-				styleInfo := result.BookInfo
-				styleInfo.Text = processedText
+			document.Meta["styleStatus"] = "processing"
+			styleInfo := result.BookInfo
+			styleInfo.Text = processedText
+			provider, providerErr := resolveRewriteProvider(req)
+			if providerErr != nil {
+				recordNovelFetchStyleDecision(document.Meta, novelfetchworkshop.StyleDecision{}, providerErr)
+			} else {
 				style := novelfetchworkshop.ResolveStyle(req.Context(), styleInfo, provider)
-				if style.Style != "" {
-					document.Meta["style"] = style.Style
-					document.Meta["styleSource"] = style.Source
-					document.Meta["styleReason"] = style.Reason
-				}
+				recordNovelFetchStyleDecision(document.Meta, style, nil)
 			}
 		}
 		syncNovelFetchClassificationMetadata(&document)
@@ -1154,15 +1156,18 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.GenderReason = decision.Reason
 		}
 		if styleNeedsResolution(document.Meta) && strings.TrimSpace(document.ProcessedText) != "" {
-			if provider, providerErr := resolveRewriteProvider(req); providerErr == nil {
-				styleInfo := document.BookInfo
-				styleInfo.Text = document.ProcessedText
+			if document.Meta == nil {
+				document.Meta = map[string]any{}
+			}
+			document.Meta["styleStatus"] = "processing"
+			styleInfo := document.BookInfo
+			styleInfo.Text = document.ProcessedText
+			provider, providerErr := resolveRewriteProvider(req)
+			if providerErr != nil {
+				recordNovelFetchStyleDecision(document.Meta, novelfetchworkshop.StyleDecision{}, providerErr)
+			} else {
 				style := novelfetchworkshop.ResolveStyle(req.Context(), styleInfo, provider)
-				if style.Style != "" {
-					document.Meta["style"] = style.Style
-					document.Meta["styleSource"] = style.Source
-					document.Meta["styleReason"] = style.Reason
-				}
+				recordNovelFetchStyleDecision(document.Meta, style, nil)
 			}
 		}
 		syncNovelFetchClassificationMetadata(&document)
@@ -1344,6 +1349,12 @@ func syncNovelFetchClassificationMetadata(document *novelfetchworkshop.Document)
 	}
 	if strings.TrimSpace(document.BookInfo.Genre) != "" {
 		document.Meta["genre"] = document.BookInfo.Genre
+	}
+	inferNovelFetchStyleFailure(document.Meta)
+	if style := strings.TrimSpace(firstText(document.Meta["style"], document.Meta["styleName"], document.Meta["style_name"])); style != "" && style != "待判定" && style != "未判定" {
+		if strings.TrimSpace(fmt.Sprint(document.Meta["styleStatus"])) == "" {
+			document.Meta["styleStatus"] = "classified"
+		}
 	}
 }
 

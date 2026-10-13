@@ -2335,6 +2335,8 @@ function taskIsProblem(task) {
     task.original_status,
     task.ai_status,
     task.classify_status,
+    task.style_status || task.styleStatus,
+    task.style_error || task.styleError,
     task.error,
   ].filter(Boolean).join(" ").toLowerCase();
   return text.includes("failed") || text.includes("失败") || text.includes("waiting") || text.includes("等待") || text.includes("partial");
@@ -2394,6 +2396,16 @@ function classifyDetailText(meta = {}) {
   const label = taskStatusText(meta.classify_status, "待判断");
   const reason = String(meta.classify_error || meta.classifyError || "").trim();
   return reason ? `${label}（分类错误：${reason}）` : label;
+}
+
+function styleStatusText(item = {}) {
+  const status = String(item.style_status || item.styleStatus || "").trim();
+  const style = String(item.style || item.styleName || "").trim();
+  const reason = String(item.style_error || item.styleError || item.styleReason || "").trim();
+  if (status === "failed" || reason && !style) return reason ? `识别失败（${reason}）` : "识别失败";
+  if (status === "processing") return "识别中…";
+  if (status === "classified" || style) return "已识别";
+  return "待判定";
 }
 
 function aiStatusDisplay(task = {}, aiText = '') {
@@ -2538,7 +2550,7 @@ function renderTasks(tasks, options = {}) {
       <td class="id-cell"><button class="task-id-link" data-action="detail" data-id="${escapeHtml(id)}" title="查看任务详情">${escapeHtml(id)}</button></td>
       <td>${escapeHtml(task.book_name || "")}</td>
       <td>${escapeHtml(task.platform_name || "")}</td>
-      <td>${escapeHtml(task.style || "")}</td>
+      <td class="${statusClass(task.style_status || task.styleStatus)}" title="${escapeHtml(task.style_error || task.styleError || task.styleReason || "")}">${escapeHtml(task.style || "待判定")}<small class="task-status-reason">${escapeHtml(styleStatusText(task))}</small></td>
       <td>${escapeHtml(task.gender || "")}</td>
       <td class="${statusClass(task.classify_status)}" title="${escapeHtml(task.classify_error || task.classifyError || "")}">${classifyStatusDisplay(task)}</td>
       <td class="${statusClass(task.original_status)}">${escapeHtml(originalText)}${task.original_error ? `<div class="task-error-detail" title="${escapeHtml(task.original_error)}">${escapeHtml(task.original_error)}</div>` : ""}</td>
@@ -2570,6 +2582,8 @@ function renderDetail(data) {
     original_error_code: rawMeta.original_error_code || rawMeta.originalErrorCode || "",
     original_upstream_code: rawMeta.original_upstream_code ?? rawMeta.originalUpstreamCode ?? "",
     classify_error: rawMeta.classify_error || rawMeta.classifyError || "",
+    style_status: rawMeta.style_status || rawMeta.styleStatus || "",
+    style_error: rawMeta.style_error || rawMeta.styleError || rawMeta.styleReason || "",
     ai_status: rawMeta.ai_status || rawMeta.aiStatus || "",
     ai_error: rawMeta.ai_error || rawMeta.aiError || "",
     ai_current_version: rawMeta.ai_current_version || rawMeta.aiCurrentVersion || "",
@@ -2612,6 +2626,8 @@ function renderDetail(data) {
       ${metaItem("书名", meta.book_name)}
       ${metaItem("平台", `${meta.platform_name || ""} ${meta.platform_id || ""}`)}
       ${metaItem("风格", meta.style)}
+      ${metaItem("风格状态", styleStatusText(meta))}
+      ${metaItem("风格失败原因", meta.style_error || "")}
       ${metaItem("男女频", meta.gender)}
       ${metaItem("AI判断", classifyDetailText(meta))}
       ${metaItem("分类模型（历史分类）", meta.classifier_model)}

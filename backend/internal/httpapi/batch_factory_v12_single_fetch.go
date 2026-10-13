@@ -40,11 +40,8 @@ func classifyFetchedBatchBook(ctx context.Context, owner string, bookInfo novelf
 		}
 	}
 	style := novelfetchworkshop.ResolveStyle(ctx, info, provider)
-	if style.Style != "" {
-		meta["style"] = style.Style
-		meta["styleSource"] = style.Source
-		meta["styleReason"] = style.Reason
-	}
+	meta["styleStatus"] = "processing"
+	recordNovelFetchStyleDecision(meta, style, nil)
 	return meta
 }
 
