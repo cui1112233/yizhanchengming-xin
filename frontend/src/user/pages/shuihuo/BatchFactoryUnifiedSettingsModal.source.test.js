@@ -169,7 +169,8 @@ test('uses a website profile organization as the unified organization default', 
   assert.match(source, /const websiteProfileOrganization = profile =>/);
   assert.match(source, /const selectedProfileOrganization = websiteProfileOrganization\(selectedWebsiteProfile\)/);
   assert.match(source, /organization: websiteProfileOrganization\(profile\)/);
-  assert.match(source, /!selectedProfileOrganization \? <label className="batch-factory-engine-field">/);
+  assert.doesNotMatch(source, /请选择视频管理系统组织归属/);
+  assert.doesNotMatch(source, /onChange=\{organization => patch\(\{ publishSettings:/);
 });
 
 test('unified AI reasoning exposes all four constraint layers plus the base-setup switch', () => {
