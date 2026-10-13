@@ -138,7 +138,7 @@ test('keeps derived-opening presets out of single-book video settings', () => {
   assert.match(source, /const moduleKeys = region === 'video' \|\| region === 'media' \? \['video'\]/);
 	assert.match(videoRegion, /<RuleModule required title="视频提示词"/);
   assert.match(videoRegion, /<PromptSelect required label="视频提示词"/);
-	assert.match(source, /const DEFAULT_VIDEO_PROMPT = \{ presetId: 'batch-video-meta'/);
+  assert.match(source, /const DEFAULT_VIDEO_PROMPT = \{ presetId: 'batch-video-sd'/);
 	assert.match(source, /video: requiredVideoPrompt\(aiPromptConfig\.video\)/);
 });
 

@@ -272,7 +272,9 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
   const assets = config.assets || {};
   const constraints = config.constraints || {};
   const derivedOpening = config.derivedOpening || {};
-  const video = config.video || {};
+  const video = config.video?.presetId && config.video.presetId !== 'batch-video-meta'
+    ? config.video
+    : { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
   const visual = config.visual || {};
   useEffect(() => {
     let active = true;
@@ -287,6 +289,7 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
   const bySlot = slot => promptOptions(catalog.filter(item => item.slot === slot).map(selectOption));
   const presetFor = presetId => presetValue(catalog.find(item => item.id === presetId));
   const bySlots = slots => promptOptions(catalog.filter(item => slots.includes(item.slot)).map(selectOption));
+  const selectedConstraint = category => (constraints.selections || []).find(item => item.constraintCategory === category)?.presetId || constraints[category]?.presetId || '';
   const byConstraint = category => promptOptions(catalog.filter(item => item.kind === 'addon' && item.constraintCategory === category).map(selectOption));
   const updateConstraint = (category, presetId) => {
     presetId = normalizePromptId(presetId);
@@ -305,7 +308,6 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
       })
       .catch(() => message.error('系统预设提示词读取失败，请重试'));
   };
-  const selectedConstraint = category => (constraints.selections || []).find(item => item.constraintCategory === category)?.presetId;
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>AI 推理 <HelpTip title="AI 推理">选择规则后，资产提取、智能统一、导演分镜和最终 Prompt 都共用同一份批量草稿。</HelpTip></span>} />
     <section className="batch-factory-engine-card"><header><b>资产设置</b><HelpTip title="资产设置">人物、场景和道具统一使用提取提示词；选择“无”表示不使用提示词。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">

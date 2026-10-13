@@ -43,7 +43,7 @@ const CONSTRAINT_LAYERS = [
 ];
 const EDITABLE_CONSTRAINT_LAYERS = CONSTRAINT_LAYERS.filter(([category]) => category !== 'baseSetup');
 const DEFAULT_ENABLED_CONSTRAINT_CATEGORIES = ['prefix', 'quality', 'restriction', 'negative'];
-const DEFAULT_VIDEO_PROMPT = { presetId: 'batch-video-meta', presetName: '分镜元提示词（自动组合）', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
+const DEFAULT_VIDEO_PROMPT = { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
 const TTS_VOICE_OPTIONS = [
   { label: '晓晓（女声·温柔）', value: 'zh-CN-XiaoxiaoNeural' },
@@ -94,6 +94,7 @@ function mergePromptConfig(base, override) {
 }
 function requiredVideoPrompt(value) {
   const selected = value && typeof value === 'object' ? value : {};
+  if (!selected.presetId || selected.presetId === 'batch-video-meta') return { ...DEFAULT_VIDEO_PROMPT, enabled: true };
   return { ...DEFAULT_VIDEO_PROMPT, ...selected, enabled: true };
 }
 function mergePublishSettings(base, override) { return { ...(base || {}), ...(override || {}) }; }
