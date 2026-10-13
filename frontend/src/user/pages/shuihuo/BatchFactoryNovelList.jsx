@@ -945,11 +945,11 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const rawVideoPrompt = String(video?.videoPrompt || '');
   const visualPrompt = String(video?.visualPrompt || '');
   const hasVisualPrompt = Boolean(visualPrompt.trim());
-  // 首屏按书渲染时只使用随批量返回的提示词。完整最终提示词会在用户
-  // 打开编辑面板后按需读取，避免几十本书同时向 Go/MySQL 发起聚合请求。
-  const { displayPrompt, compiledPrompt, smartUnifiedPending, loading } = useCompiledVideoPrompt(batchId, book, video, settingsRevision, { enabled: false });
-  // 智能统一是增强层。视觉基线尚未取得时，仍须展示并允许使用已经
-  // 编译的 VIDEO 提示词，不能把一条可执行分镜伪装成“什么都没有”。
+  // 分镜卡直接读取 Go 编译后的最终 Prompt，让已开启的智能统一、基础设定、
+  // 画质、限制和负面规则在卡片中可见；弹窗与卡片使用同一份编译结果。
+  const { displayPrompt, compiledPrompt, smartUnifiedPending, loading } = useCompiledVideoPrompt(batchId, book, video, settingsRevision, { enabled: true });
+  // 智能统一是增强层。视觉基线尚未取得时，仍须展示已经编译的 VIDEO
+  // 提示词，并明确标出基线状态，不能把一条可执行分镜伪装成“什么都没有”。
   const videoPrompt = withStoryboardAssetMentions(compiledPrompt || displayPrompt || rawVideoPrompt, book, video);
   const activePrompt = promptKind === 'visual' ? visualPrompt : videoPrompt;
 

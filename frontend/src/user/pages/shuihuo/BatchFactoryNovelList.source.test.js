@@ -427,7 +427,7 @@ test('defers compiled prompt reads until the user opens the prompt editor', () =
   const inlineStart = source.indexOf('function InlineBookPrompts(');
   const inlineEnd = source.indexOf('\nfunction StoryboardVideoNavigator(', inlineStart);
   const inline = inlineStart >= 0 && inlineEnd > inlineStart ? source.slice(inlineStart, inlineEnd) : '';
-  assert.match(inline, /useCompiledVideoPrompt\(batchId, book, video, settingsRevision, \{ enabled: false \}\)/);
+  assert.match(inline, /useCompiledVideoPrompt\(batchId, book, video, settingsRevision, \{ enabled: true \}\)/);
 
   assert.match(source, /useCompiledVideoPrompt\(batchId, book, selectedVideo, settingsRevision\)/);
 });
