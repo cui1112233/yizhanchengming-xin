@@ -5,6 +5,72 @@ import (
 	"strings"
 )
 
+var safeSensitiveReplacements = map[string]string{
+	"绿帽子": "颜色帽子",
+	"绿帽":  "颜色帽",
+	"小三":  "介入关系的人",
+	"出轨":  "关系越界",
+	"勾引":  "主动接近",
+	"一夜情": "短暂关系",
+	"上床":  "私下接触",
+	"强奸":  "非法伤害",
+	"赌博":  "违规下注",
+	"花魁":  "名伶",
+}
+
+// EnsureSensitiveRuleReplacements fills empty sensitive-word replacements
+// with neutral wording. Existing user replacements always win.
+func EnsureSensitiveRuleReplacements(settings map[string]any) int {
+	if settings == nil {
+		return 0
+	}
+	changed := 0
+	fill := func(raw any) {
+		items, ok := raw.([]any)
+		if !ok {
+			return
+		}
+		for _, value := range items {
+			item, ok := value.(map[string]any)
+			if !ok {
+				continue
+			}
+			find := strings.TrimSpace(fmt.Sprint(item["find"]))
+			if find == "" || strings.TrimSpace(fmt.Sprint(item["replace"])) != "" {
+				continue
+			}
+			item["replace"] = safeSensitiveReplacement(find)
+			changed++
+		}
+	}
+	fillGroups := func(raw any) {
+		groups, ok := raw.([]any)
+		if !ok {
+			return
+		}
+		for _, rawGroup := range groups {
+			if group, ok := rawGroup.(map[string]any); ok {
+				fill(group["rules"])
+			}
+		}
+	}
+	for _, root := range []map[string]any{settings, mapOrEmpty(settings["appConfig"]), mapOrEmpty(settings["app_config"])} {
+		fillGroups(mapOrEmpty(root["sensitive"])["groups"])
+		knowledge := mapOrEmpty(root["knowledge"])
+		fill(mapOrEmpty(knowledge["layout_rules"])["sensitive_rules"])
+		libraries := mapOrEmpty(root["knowledgeLibraries"])
+		fill(mapOrEmpty(libraries["layout_rules"])["sensitive_rules"])
+	}
+	return changed
+}
+
+func safeSensitiveReplacement(find string) string {
+	if replacement, ok := safeSensitiveReplacements[find]; ok {
+		return replacement
+	}
+	return "相关内容"
+}
+
 // ApplySensitiveRules applies the saved sensitive-word replacements to the
 // working text. It never touches Document.OriginalRaw; callers decide which
 // processed field to save. Both the current map form and the legacy

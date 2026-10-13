@@ -118,3 +118,18 @@ func TestSyncKnowledgeConfigViewsPreservesRuleReplacements(t *testing.T) {
 		t.Fatalf("rule replacement was not persisted: %#v", layout)
 	}
 }
+
+func TestEnsureSensitiveRuleReplacementsFillsSafeWords(t *testing.T) {
+	settings := map[string]any{"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
+		map[string]any{"find": "绿帽子", "replace": ""},
+		map[string]any{"find": "卧槽", "replace": ""},
+		map[string]any{"find": "已有词", "replace": "自定义"},
+	}}}}}
+	if got := EnsureSensitiveRuleReplacements(settings); got != 2 {
+		t.Fatalf("changed=%d, want 2", got)
+	}
+	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
+	if rules[0].(map[string]any)["replace"] != "颜色帽子" || rules[1].(map[string]any)["replace"] != "相关内容" || rules[2].(map[string]any)["replace"] != "自定义" {
+		t.Fatalf("unexpected safe replacements: %#v", rules)
+	}
+}

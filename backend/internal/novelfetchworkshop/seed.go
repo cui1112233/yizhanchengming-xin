@@ -163,5 +163,6 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 		app["knowledge"] = cloneMap(libraries)
 		merged["appConfig"] = app
 	}
+	EnsureSensitiveRuleReplacements(merged)
 	return merged
 }

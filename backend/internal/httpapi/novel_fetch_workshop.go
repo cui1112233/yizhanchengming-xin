@@ -1324,6 +1324,7 @@ func saveNovelFetchConfig(w http.ResponseWriter, req *http.Request, store novelf
 	// knowledgeLibraries. Persist both views together so replacements survive
 	// a restart and are visible from either workbench.
 	novelfetchworkshop.SyncKnowledgeConfigViews(merged, settings)
+	novelfetchworkshop.EnsureSensitiveRuleReplacements(merged)
 	if err := store.PutConfig(req.Context(), identity.Username, merged); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存设置失败"})
 		return
