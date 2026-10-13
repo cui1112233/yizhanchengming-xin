@@ -2956,6 +2956,25 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-fixed-option{margin-top:2px}
 .batch-factory-media-setting-stack{display:grid;gap:12px}
 
+/* The batch table has several legacy dark-only rules below the shared theme
+   layer. Keep its labels and action rail readable when the shell is light. */
+html[data-theme='light'] body.shuihuo-theme-active .shuihuo-workbench-head,
+body[data-theme='light'].shuihuo-theme-active .shuihuo-workbench-head,
+html[data-theme='light'] body.shuihuo-theme-active .shuihuo-order-cell strong,
+body[data-theme='light'].shuihuo-theme-active .shuihuo-order-cell strong { color: var(--sh-text); }
+html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-group.is-utility,
+html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-group.is-production,
+html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-group.is-recovery,
+body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-utility,
+body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-production,
+body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-recovery { color: var(--sh-text); border-color: var(--sh-line); background: var(--sh-panel-strong); }
+html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-group > span,
+body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group > span { color: var(--sh-muted); }
+html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-button-grid .ant-btn,
+body[data-theme='light'].shuihuo-theme-active .batch-factory-action-button-grid .ant-btn { color: var(--sh-text); border-color: var(--sh-line); background: var(--sh-panel); }
+html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-group.is-production .batch-factory-action-video,
+body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-production .batch-factory-action-video { color: #0f6b54; border-color: #7cc3b2; background: #d9efe9; }
+
 /* Workbench density: one book should not acquire a large empty floor. */
 .batch-factory-workbench-table .shuihuo-workbench-head,
 .batch-factory-book-row{

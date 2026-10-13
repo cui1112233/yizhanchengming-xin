@@ -21,3 +21,9 @@ test('light theme variables are applied when the theme attribute is on either do
   assert.match(css, /html\[data-theme='light'\] body\.shuihuo-theme-active[\s\S]*--sh-panel-strong:\s*#f8fafc/);
   assert.match(css, /body\[data-theme='light'\]\.shuihuo-theme-active[\s\S]*--sh-panel-strong:\s*#f8fafc/);
 });
+
+test('light workbench keeps headers, row numbers, and action controls readable', () => {
+  assert.match(css, /body\.shuihuo-theme-active \.shuihuo-workbench-head[\s\S]*color:\s*var\(--sh-text\)/);
+  assert.match(css, /body\.shuihuo-theme-active \.shuihuo-order-cell strong[\s\S]*color:\s*var\(--sh-text\)/);
+  assert.match(css, /body\.shuihuo-theme-active \.batch-factory-action-button-grid \.ant-btn[\s\S]*background:\s*var\(--sh-panel\)/);
+});
