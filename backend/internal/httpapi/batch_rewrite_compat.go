@@ -543,6 +543,24 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	task["classify_status"] = classifyStatus
 	task["original_status"] = originalStatus
 	task["ai_status"] = aiStatus
+	// A previous worker can leave aiStatus at ai_processing even though the
+	// generated body has already been durably stored. The V78 processing view
+	// consumes this compatibility shape, so derive completion from the stored
+	// versions rather than presenting a stale in-flight state.
+	generatedVersions := make([]string, 0, 5)
+	for index := 1; index <= 5; index++ {
+		versionID := fmt.Sprintf("ai%d", index)
+		value, exists := document.Versions[versionID]
+		if !exists || strings.TrimSpace(fmt.Sprint(value)) == "" || fmt.Sprint(value) == "<nil>" {
+			continue
+		}
+		generatedVersions = append(generatedVersions, versionID)
+	}
+	if len(generatedVersions) > 0 {
+		task["ai_files"] = generatedVersions
+		task["selected_versions"] = generatedVersions
+		task["ai_status"] = "ai_done"
+	}
 	task["original_chars"] = document.ProcessedChars
 	task["raw_original_chars"] = document.OriginalRawChars
 	task["sensitive_status"] = firstText(task["sensitive_status"], task["sensitiveStatus"])
@@ -554,6 +572,9 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	task["sensitive_fixed_count"] = sensitiveReplaced
 	task["sensitive_failed_count"] = toInt(task["sensitive_failed_count"])
 	task["ai_generated_count"] = toInt(firstText(task["ai_generated_count"], task["aiGeneratedCount"]))
+	if len(generatedVersions) > task["ai_generated_count"].(int) {
+		task["ai_generated_count"] = len(generatedVersions)
+	}
 	// The legacy V78 table reads flat snake_case fields. Keep the real submit
 	// receipt visible after the Go submit handler stores it in task metadata.
 	submitStatus := firstText(task["site_submit_status"], task["siteSubmitStatus"])
@@ -773,6 +794,11 @@ func targetNumber(value any) float64 {
 }
 
 func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[string]any {
+	// The legacy workbench reads the catalog from appConfig.  Older saved
+	// settings can contain only empty placeholders (or the newer snake_case
+	// shape), so normalize them here before building the response.  Otherwise
+	// the three knowledge bases render as present but all zero entries.
+	settings = novelfetchworkshop.EnsureWorkshopDefaults(settings)
 	appConfig := cloneAnyMap(settings)
 	if configured, ok := settings["appConfig"].(map[string]any); ok {
 		appConfig = cloneAnyMap(configured)
@@ -804,6 +830,13 @@ func legacyBatchRewriteConfig(settings map[string]any, lightweight bool) map[str
 	knowledge := arrayOrEmptyMap(appConfig["knowledge"])
 	if lightweight {
 		knowledge = map[string]any{}
+	} else if knowledgeCatalogEmpty(knowledge) {
+		// Some migrated accounts have a complete-looking knowledge object whose
+		// every list is empty.  Keep the bundled V78 catalog visible in that
+		// case; an empty placeholder is not a deliberate deletion.
+		defaults := novelfetchworkshop.DefaultWorkshopSettings()
+		defaultApp := mapOrEmpty(defaults["appConfig"])
+		knowledge = mapOrEmpty(defaultApp["knowledge"])
 	}
 	workForm := mapOrEmpty(appConfig["work_form"])
 	if len(workForm) == 0 {
@@ -930,6 +963,21 @@ func batchKnowledgeSummary(knowledge map[string]any, lightweight bool) map[strin
 	}
 	count := func(section, key string) int { return len(arrayOrEmpty(mapOrEmpty(knowledge[section])[key])) }
 	return map[string]any{"opening_phrases": count("opening_phrases", "items"), "opening_styles": count("opening_phrases", "styles"), "rewrite_profiles": count("rewrite_templates", "profiles"), "temporary_instructions": count("rewrite_templates", "temporary_instructions"), "high_imitation_prompts": count("high_imitation", "prompts"), "high_imitation_references": count("high_imitation", "references"), "sensitive_rules": count("layout_rules", "sensitive_rules"), "symbol_rules": count("symbol_rules", "symbol_rules"), "pair_fill_rules": count("symbol_rules", "pair_fill_rules"), "chapter_exact_rules": count("chapter_rules", "chapter_exact_rules"), "chapter_inline_rules": count("chapter_rules", "chapter_inline_rules")}
+}
+
+func knowledgeCatalogEmpty(knowledge map[string]any) bool {
+	if len(knowledge) == 0 {
+		return true
+	}
+	for _, section := range []string{"opening_phrases", "high_imitation", "rewrite_templates"} {
+		value := mapOrEmpty(knowledge[section])
+		for _, key := range []string{"items", "styles", "prompts", "references", "profiles", "temporary_instructions"} {
+			if len(arrayOrEmpty(value[key])) > 0 {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func cloneAnyMap(input map[string]any) map[string]any {

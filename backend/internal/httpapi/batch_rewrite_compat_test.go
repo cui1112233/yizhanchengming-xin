@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -129,6 +130,22 @@ func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T
 	}
 }
 
+func TestLegacyBatchRewriteConfigRestoresKnowledgeCatalog(t *testing.T) {
+	payload := legacyBatchRewriteConfig(map[string]any{
+		"appConfig": map[string]any{
+			"knowledge": map[string]any{
+				"opening_phrases": map[string]any{"items": []any{}},
+				"high_imitation":  map[string]any{"prompts": []any{}, "references": []any{}},
+				"rewrite_templates": map[string]any{"profiles": []any{}, "temporary_instructions": []any{}},
+			},
+		},
+	}, false)
+	summary := payload["knowledge_summary"].(map[string]any)
+	if summary["opening_phrases"] != 174 || summary["high_imitation_prompts"] != 1 || summary["rewrite_profiles"] != 8 {
+		t.Fatalf("knowledge catalog was not restored: %#v", summary)
+	}
+}
+
 func TestLegacyBatchRewriteConfigExposesSensitiveGroupsFromAppConfig(t *testing.T) {
 	payload := legacyBatchRewriteConfig(map[string]any{
 		"appConfig": map[string]any{
@@ -220,7 +237,12 @@ func TestBatchRewriteTaskListFlattensGoDocumentFields(t *testing.T) {
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
 		BookID: "2010030448764536200", Gender: "女频", BookInfo: novelfetchworkshop.BookInfo{Genre: "现代女主"},
 		ProcessedChars: 3919, OriginalRawChars: 4334, UpdatedAt: now.Format(time.RFC3339),
-		Meta: map[string]any{"bookName": "非要给我打青霉素的实习护士", "platformId": "15", "originalStatus": "done", "sensitiveStatus": "done", "sensitiveReplaced": 44, "aiStatus": "done", "aiGeneratedCount": 1},
+		// Old in-flight metadata can remain at ai_processing even after the
+		// finished AI body has been persisted. The compatibility response must
+		// report the stored version as completed so the processing page does not
+		// disagree with the task page.
+		Meta:     map[string]any{"bookName": "非要给我打青霉素的实习护士", "platformId": "15", "originalStatus": "done", "sensitiveStatus": "done", "sensitiveReplaced": 44, "aiStatus": "ai_processing", "aiGeneratedCount": 1},
+		Versions: map[string]any{"ai1": "已生成的改文"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -244,13 +266,16 @@ func TestBatchRewriteTaskListFlattensGoDocumentFields(t *testing.T) {
 		t.Fatalf("tasks=%#v", payload.Tasks)
 	}
 	task := payload.Tasks[0]
-	for key, want := range map[string]any{"book_name": "非要给我打青霉素的实习护士", "platform_id": "15", "platform_name": "知乎付费", "gender": "女频", "style": "现代女主", "original_status": "done", "ai_status": "done"} {
+	for key, want := range map[string]any{"book_name": "非要给我打青霉素的实习护士", "platform_id": "15", "platform_name": "知乎付费", "gender": "女频", "style": "现代女主", "original_status": "done", "ai_status": "ai_done"} {
 		if task[key] != want {
 			t.Fatalf("%s=%#v want=%#v task=%#v", key, task[key], want, task)
 		}
 	}
 	if task["sensitive_hit_count"] != float64(44) {
 		t.Fatalf("sensitive_hit_count=%#v", task["sensitive_hit_count"])
+	}
+	if got, want := task["ai_files"], []any{"ai1"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("ai_files=%#v want=%#v", got, want)
 	}
 }
 
