@@ -331,6 +331,17 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 			return DirectorRevision{}, fmt.Errorf("%w: viral mode requires approved Hook", ErrConflict)
 		}
 	}
+	config := aiReasoningPromptConfig(snapshot.Effective)
+	if shouldRunSDStoryScript(snapshot, config) {
+		rows, err := s.runSDStoryScript(ctx, book, snapshot, config)
+		if err != nil {
+			return DirectorRevision{}, retryableModelOutputError(fmt.Errorf("SD_STORY_SCRIPT: %w", err))
+		}
+		// The rows are an immutable hand-off to the director stage. They are
+		// intentionally not persisted as mutable settings; the final director
+		// revision remains the durable business result.
+		snapshot.Effective["sdStoryScriptRows"] = rows
+	}
 	contract, err := BuildDirectorContract(book, hook, snapshot)
 	if err != nil {
 		return DirectorRevision{}, err

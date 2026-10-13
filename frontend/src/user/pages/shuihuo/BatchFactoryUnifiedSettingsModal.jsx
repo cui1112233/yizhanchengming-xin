@@ -391,7 +391,11 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
   }, [open, batch?.id]);
   const save = async () => {
     setSaving(true);
-    try { const result = await onSaved(draftPatch); if (result !== false) onClose(); }
+    const videoPresetId = draftPatch.aiPromptConfig?.video?.presetId;
+    const nextPatch = videoPresetId === 'batch-video-sd' && !draftPatch.storyTimelineVersion
+      ? { ...draftPatch, storyTimelineVersion: 'sd.original-story.v1' }
+      : draftPatch;
+    try { const result = await onSaved(nextPatch); if (result !== false) onClose(); }
     finally { setSaving(false); }
   };
   return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} onLoad={setDraftPatch} /><span>统一配置</span></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>

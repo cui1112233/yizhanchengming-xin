@@ -590,6 +590,9 @@ func buildSDDirectorContract(book Book, hook HookRevision, snapshot DirectorSnap
 	if snapshot.AudioTargetSeconds > 0 {
 		system += fmt.Sprintf("\n分镜规划跟随配音已开启：当前书真实配音约 %.2f 秒，规划整数目标为 %d 秒；至少输出 %d 个 VIDEO 段，全部段的时长之和必须严格等于 %d 秒。按剧情节点、对白/旁白密度和情绪节奏分配各段时长，不要机械平均；不得用重复动作、空镜或静止画面凑时长。", snapshot.AudioDurationSeconds, snapshot.AudioTargetSeconds, audioMinimumVideoCount(snapshot.AudioTargetSeconds, snapshot.MaxVideoDuration), snapshot.AudioTargetSeconds)
 	}
+	if len(snapshot.Effective["sdStoryScriptRows"]) > 0 {
+		system += "\n本次已完成 SD_STORY_SCRIPT。用户消息中的 story_script_rows 是冻结的逐行故事剧本；导演只能按 source_index 顺序为这些行填写固定镜头画面，不得新增、删除、合并、拆分、改写原文行或改变时间契约。"
+	}
 	payload := map[string]any{
 		"book_id":     book.ID,
 		"title":       book.Title,
@@ -601,6 +604,12 @@ func buildSDDirectorContract(book Book, hook HookRevision, snapshot DirectorSnap
 	}
 	if analysis, err := parseSmartUnifiedAnalysis(rawString(snapshot.Effective, "h3StyleAnalysis", "")); err == nil && analysis != nil {
 		payload["style_system_analysis"] = analysis.Prompt
+	}
+	if rows := snapshot.Effective["sdStoryScriptRows"]; len(rows) > 0 {
+		var decoded any
+		if json.Unmarshal(rows, &decoded) == nil {
+			payload["story_script_rows"] = decoded
+		}
 	}
 	if snapshot.AudioTargetSeconds > 0 {
 		payload["audio_planning"] = map[string]any{
