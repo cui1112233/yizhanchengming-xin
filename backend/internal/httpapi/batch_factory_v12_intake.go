@@ -88,7 +88,7 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"intake":     intake,
-			"redirectTo": "/shuihuo-production?intake=" + intake.ID,
+			"redirectTo": "/batch-factory?intake=" + intake.ID,
 		})
 	})
 	mux.HandleFunc("GET /api/batch-factory/v12/intakes/{intakeId}", func(w http.ResponseWriter, r *http.Request) {

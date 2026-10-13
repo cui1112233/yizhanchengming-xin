@@ -24,6 +24,15 @@ test('creates a batch from an intake when the giant-material flow has already re
   assert.match(page, /input\?\.intakeId\s*\?\s*await createBatchFromIntake\(input\.intakeId,\s*\{\s*title: input\.title,\s*giantAutomation: input\.giantAutomation\s*\}\)/s);
 });
 
+test('novel-fetch handoff always opens a new batch instead of appending to the active batch', () => {
+  const page = fs.readFileSync(pagePath, 'utf8');
+  const handoff = page.slice(page.indexOf('const intakeId = pendingNovelFetchIntakeId'), page.indexOf('async function createBatch('));
+  assert.match(handoff, /createBatchFromIntake\(intakeId/);
+  assert.doesNotMatch(handoff, /appendNovelFetchIntake/);
+  assert.doesNotMatch(handoff, /currentBatchId/);
+  assert.match(handoff, /\/batch-factory/);
+});
+
 test('returns the created batch so giant-material OCR can bind its executor job', () => {
   const page = fs.readFileSync(pagePath, 'utf8');
   assert.match(page, /if\s*\(!input\?\.automationEnabled\)\s*return batch;/);

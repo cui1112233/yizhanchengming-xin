@@ -3327,6 +3327,10 @@ async function transferSelectedToBatchFactory() {
   setBatchStatus(`正在检查 ${ids.length} 个任务的原文…`);
   try {
     const details = await Promise.all(ids.map(id => api(`/api/tasks/${encodeURIComponent(id)}`)));
+    const selectedVersions = selectedProcessVersions().map(version => String(version || '').trim().toLowerCase()).filter(Boolean);
+    if (!selectedVersions.length) {
+      throw new Error("请先选择要转入的版本（原文或 AI1-AI5）");
+    }
     const items = details.flatMap((detail, index) => {
       const meta = detail?.meta || {};
       const sourceTaskId = String(meta.book_id || ids[index]).trim();
@@ -3339,16 +3343,18 @@ async function transferSelectedToBatchFactory() {
       return versions.flatMap(item => {
         const version = String(item?.version || item?.name || "").trim().toLowerCase();
         const sourceText = String(item?.text || "").trim();
-        if (!version || !sourceText || seenVersions.has(version)) return [];
+        if (!selectedVersions.includes(version) || !sourceText || seenVersions.has(version)) return [];
         seenVersions.add(version);
+        const contentCaptureCharacters = Number(meta.max_txt || meta.maxTxt || meta.contentCaptureCharacters || sourceText.length || 4000);
+        const contentRangeLines = Number(meta.contentRangeLines || 5);
         return [{
           sourceTaskId,
           bookId,
           title: version === "original" ? baseTitle : `${version.toUpperCase()}·${baseTitle}`,
-          platform: String(meta.platform_name || "").trim(),
+          platform: String(meta.platform_id || meta.platform_name || "").trim(),
           sourceText,
           txtText: sourceText,
-          sourceMetadata: { ...meta, sourceContentVersion: version },
+          sourceMetadata: { ...meta, platformId: meta.platform_id || meta.platformId || "", platformName: meta.platform_name || meta.platformName || "", sourceMode: "novel_fetch", sourceContentVersion: version, contentRangeLines, contentCaptureCharacters },
         }];
       });
     });
@@ -3376,12 +3382,15 @@ async function transferSelectedToBatchFactory() {
         metadata: {
           name: `小说获取转入 ${items.length} 本`,
           source: "novel-fetch",
+          contentRangeLines: Number(items[0]?.sourceMetadata?.contentRangeLines || 5),
+          contentCaptureCharacters: Number(items[0]?.sourceMetadata?.contentCaptureCharacters || 4000),
+          selectedVersions,
           transferredAt: new Date().toISOString(),
         },
       }),
     });
     const intakeId = String(result?.intake?.id || "").trim();
-    const redirectTo = intakeId ? `/shuihuo-production?intake=${encodeURIComponent(intakeId)}` : "";
+    const redirectTo = intakeId ? `/batch-factory?intake=${encodeURIComponent(intakeId)}` : "";
     if (!redirectTo) throw new Error("小说获取交接创建成功但未返回交接编号");
     setBatchStatus(`已转入 ${items.length} 本${skipped ? `, 跳过 ${skipped} 本未完成任务` : ""}`);
     if (window.parent !== window) {

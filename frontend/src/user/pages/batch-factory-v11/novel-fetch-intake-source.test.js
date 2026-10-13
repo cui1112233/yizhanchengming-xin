@@ -17,8 +17,11 @@ test('Novel Fetch transfer targets the unified V12 intake and preserves source f
   assert.match(source, /txtText/);
   assert.match(source, /sourceContentVersion/);
   assert.match(source, /ai_texts/);
+  assert.match(source, /selectedProcessVersions\(\)/);
+  assert.match(source, /platform_id\s*\|\|\s*meta\.platform_name/);
+  assert.match(source, /contentCaptureCharacters/);
   assert.doesNotMatch(source, /platformApi\(["']\/api\/batch-factory\/intakes\/novel-fetch/);
-  assert.match(source, /redirectTo.*shuihuo-production\?intake/);
+  assert.match(source, /redirectTo.*batch-factory\?intake/);
 });
 
 test('novel fetch persists every processing choice immediately when changed', () => {

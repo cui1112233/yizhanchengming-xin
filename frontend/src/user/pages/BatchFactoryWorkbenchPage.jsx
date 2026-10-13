@@ -2,7 +2,6 @@ import { FileTextOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icon
 import { Button, Modal, Spin, message } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  appendNovelFetchIntake,
   classifyFetchedBatchMetadata,
   createBatchFromIntake,
   createManualIntake,
@@ -45,6 +44,7 @@ export default function BatchFactoryWorkbenchPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [openAutomationOnLoad, setOpenAutomationOnLoad] = useState(false);
   const handoffRef = useRef('');
   const mountedRef = useRef(true);
 
@@ -93,12 +93,13 @@ export default function BatchFactoryWorkbenchPage() {
     if (!intakeId || handoffRef.current === intakeId) return undefined;
     handoffRef.current = intakeId;
     let cancelled = false;
-    const clearHandoffQuery = () => window.history.replaceState({}, '', '/shuihuo-production');
+    const clearHandoffQuery = () => window.history.replaceState({}, '', '/batch-factory');
     const finish = async result => {
       const batch = asBatch(result);
       if (cancelled) return;
       localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
       setActiveBatch(batch);
+      setOpenAutomationOnLoad(true);
       clearHandoffQuery();
       await refreshBatches({ quiet: true });
     };
@@ -107,25 +108,15 @@ export default function BatchFactoryWorkbenchPage() {
         const intakeResult = await getIntake(intakeId);
         const intake = intakeResult?.intake || intakeResult;
         const incoming = novelFetchIntakeBooks(intake);
-        const currentBatchId = localStorage.getItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY) || '';
-        if (!currentBatchId) {
-          const result = await createBatchFromIntake(intakeId, {
-            title: incoming.length === 1 ? `小说获取·${incoming[0]?.title || '新批量'}` : `小说获取·${incoming.length || 0}本`
-          });
-          await finish(result);
-          message.success('小说获取内容已登记到新批量');
-          return;
-        }
-        const current = asBatch(await getBatch(currentBatchId));
-        const sourceKey = book => `${String(book?.platform || '').trim()}\u0000${String(book?.bookId || book?.id || '').trim()}`;
-        const existingSourceKeys = new Set((current.books || []).map(sourceKey).filter(key => !key.endsWith('\u0000')));
-        const duplicates = incoming.filter(book => existingSourceKeys.has(sourceKey(book)));
-        const append = async () => {
-          const result = await appendNovelFetchIntake(current.id, intakeId);
-          await finish(result);
-          message.success(duplicates.length ? `小说获取内容已登记；同书城同 Book ID 的 ${duplicates.length} 本内容已跳过` : '小说获取内容已登记到当前批量');
-        };
-        await append();
+        const result = await createBatchFromIntake(intakeId, {
+          title: incoming.length === 1 ? `小说获取·${incoming[0]?.title || '新批量'}` : `小说获取·${incoming.length || 0}本`,
+          initialBatchSettings: {
+            contentRangeLines: Number(intake?.metadata?.contentRangeLines || 5),
+            contentCaptureCharacters: Number(intake?.metadata?.contentCaptureCharacters || 4000),
+          }
+        });
+        await finish(result);
+        message.success('小说获取内容已登记到新批量；统一配置、内容范围、内容截取和自动生产入口已保留');
       } catch (requestError) {
         if (!cancelled) {
           handoffRef.current = '';
@@ -178,7 +169,7 @@ export default function BatchFactoryWorkbenchPage() {
 
   if (activeBatch) {
     return <div className="shuihuo-production is-workbench batch-factory-canonical-entry">
-      <BatchFactoryNovelList batch={activeBatch} onBack={() => { setActiveBatch(null); refreshBatches({ quiet: true }); }} onBatchChanged={async () => {
+      <BatchFactoryNovelList batch={activeBatch} openAutomationOnLoad={openAutomationOnLoad} onBack={() => { setActiveBatch(null); refreshBatches({ quiet: true }); }} onBatchChanged={async () => {
         setActiveBatch(asBatch(await getBatch(activeBatch.id)));
         await refreshBatches({ quiet: true });
       }} />

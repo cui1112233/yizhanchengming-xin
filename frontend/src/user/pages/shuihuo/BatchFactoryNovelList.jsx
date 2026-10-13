@@ -2318,7 +2318,7 @@ function UploadNetwork({ batch, books, selectedBookIds, productionStatus, mergeS
   </Modal>;
 }
 
-export function BatchFactoryNovelList({ batch, onBack, onBatchChanged }) {
+export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutomationOnLoad = false }) {
   const [novelListOpen, setNovelListOpen] = useState(false);
   const [viewingBook, setViewingBookRaw] = useState(null);
   const [sourceEditorBook, setSourceEditorBook] = useState(null);
@@ -2354,6 +2354,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged }) {
   const [automationStatus, setAutomationStatus] = useState({ state: 'idle', counts: { total: 0, ready: 0, running: 0, pending: 0, failed: 0, blocked: 0 } });
   const [automationBusy, setAutomationBusy] = useState('');
   const [automationStartOpen, setAutomationStartOpen] = useState(false);
+  const automationAutoOpenedRef = useRef(false);
   const [automationPresets, setAutomationPresets] = useState([]);
   const [automationPresetID, setAutomationPresetID] = useState('');
   const [automationRunMode, setAutomationRunMode] = useState('full_submit');
@@ -3071,6 +3072,14 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged }) {
       setAutomationStartOpen(true);
     } catch (error) { message.error(error?.message || '读取自动化预设失败'); }
   }
+  useEffect(() => {
+    if (openAutomationOnLoad && !automationAutoOpenedRef.current) {
+      automationAutoOpenedRef.current = true;
+      void openAutomationStart();
+    }
+    // The parent only sets this flag for a newly created novel-fetch batch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openAutomationOnLoad]);
   async function runAutomationAction(key, { immediate = false } = {}) {
     if (!batch?.id || automationBusy) return;
     if (key === 'start' && !automationPresetID) { message.warning('请先选择自动化预设'); return; }

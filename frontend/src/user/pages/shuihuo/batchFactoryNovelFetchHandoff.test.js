@@ -6,10 +6,10 @@ import {
   pendingNovelFetchIntakeId
 } from './batchFactoryNovelFetchHandoff.js';
 
-test('Novel Fetch always hands off to the unified Shuihuo Batch Factory entry', () => {
+test('Novel Fetch always hands off to the dedicated Batch Factory entry', () => {
   assert.equal(
     batchFactoryNovelFetchHandoffPath('intake/a b'),
-    '/shuihuo-production?intake=intake%2Fa%20b'
+    '/batch-factory?intake=intake%2Fa%20b'
   );
 });
 
