@@ -63,18 +63,21 @@ func validateSDStoryScriptRows(completion string, book Book) (json.RawMessage, e
 	if err := json.Unmarshal(root, &envelope); err != nil {
 		return nil, err
 	}
-	expected := make([]string, 0)
+	type expectedLine struct {
+		index int
+		text  string
+	}
+	expected := make([]expectedLine, 0)
 	for index, line := range strings.Split(strings.ReplaceAll(book.SourceText, "\r\n", "\n"), "\n") {
 		if strings.TrimSpace(line) != "" {
-			expected = append(expected, line)
-			_ = index
+			expected = append(expected, expectedLine{index: index + 1, text: line})
 		}
 	}
 	if len(envelope.Rows) != len(expected) {
 		return nil, fmt.Errorf("SD 故事剧本 rows 数量为 %d，期望 %d", len(envelope.Rows), len(expected))
 	}
 	for index, row := range envelope.Rows {
-		if row.SourceIndex != index+1 || row.SourceText != expected[index] || strings.TrimSpace(row.StoryScriptLine) == "" || len(row.CoveredSourceSpanKeys) == 0 {
+		if row.SourceIndex != expected[index].index || row.SourceText != expected[index].text || strings.TrimSpace(row.StoryScriptLine) == "" || len(row.CoveredSourceSpanKeys) == 0 {
 			return nil, fmt.Errorf("SD 故事剧本第 %d 行未完整覆盖原文契约", index+1)
 		}
 	}

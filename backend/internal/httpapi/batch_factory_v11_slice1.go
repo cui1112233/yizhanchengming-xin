@@ -543,7 +543,17 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		}
 		writeJSON(w, http.StatusConflict, map[string]string{"error": message})
 	case errors.Is(err, batchfactoryv11.ErrInvalid):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid input"})
+		message := strings.TrimSpace(err.Error())
+		if message == "" || message == batchfactoryv11.ErrInvalid.Error() {
+			message = "invalid input"
+		}
+		// Keep validation failures actionable without returning an unbounded
+		// provider/config payload to the browser.
+		if len([]rune(message)) > 240 {
+			runes := []rune(message)
+			message = string(runes[:240]) + "..."
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": message})
 	case errors.Is(err, batchfactoryv11.ErrUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "capability unavailable"})
 	case errors.Is(err, batchfactoryv11.ErrUpstream):

@@ -18,6 +18,14 @@ func TestValidateSDStoryScriptRowsRequiresOneRowPerSourceLine(t *testing.T) {
 	}
 }
 
+func TestValidateSDStoryScriptRowsKeepsOriginalIndexesAcrossBlankLines(t *testing.T) {
+	book := Book{SourceText: "甲走进房间。\n\n乙抬头。"}
+	valid := `{"rows":[{"source_index":1,"source_text":"甲走进房间。","story_script_line":"甲推门进入室内。","covered_source_span_keys":["L0001-P01"]},{"source_index":3,"source_text":"乙抬头。","story_script_line":"乙抬头看向门口。","covered_source_span_keys":["L0003-P01"]}]}`
+	if _, err := validateSDStoryScriptRows(valid, book); err != nil {
+		t.Fatalf("blank source line must not renumber the second row: %v", err)
+	}
+}
+
 func TestBuildSDStoryScriptContractUsesOriginalStoryVersion(t *testing.T) {
 	contract := buildSDStoryScriptContract(Book{SourceText: "甲走进房间。\n乙抬头。"}, DirectorSnapshot{Effective: SettingsPatch{}})
 	if contract.SystemPrompt == "" || contract.UserPrompt == "" {

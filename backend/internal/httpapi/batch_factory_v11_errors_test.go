@@ -33,3 +33,15 @@ func TestWriteStoreErrorKeepsTransientUpstreamReasonAndUsesServiceUnavailable(t 
 		t.Fatalf("body must retain the actionable upstream reason, got %s", rec.Body.String())
 	}
 }
+
+func TestWriteStoreErrorKeepsSpecificInvalidReason(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeStoreError(rec, fmt.Errorf("%w: AutoDL H3 API key is required", batchfactoryv11.ErrInvalid))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "AutoDL H3 API key is required") {
+		t.Fatalf("body must retain the actionable validation reason, got %s", rec.Body.String())
+	}
+}
