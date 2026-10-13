@@ -89,6 +89,13 @@ export default function BatchFactoryWorkbenchPage() {
   useEffect(() => { refreshBatches({ quiet: true }); }, [refreshBatches]);
 
   useEffect(() => {
+    const activeBatchId = localStorage.getItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY) || '';
+    if (!activeBatchId) return undefined;
+    void openBatch(activeBatchId);
+    return undefined;
+  }, [openBatch]);
+
+  useEffect(() => {
     const intakeId = pendingNovelFetchIntakeId(window.location.search);
     if (!intakeId || handoffRef.current === intakeId) return undefined;
     handoffRef.current = intakeId;

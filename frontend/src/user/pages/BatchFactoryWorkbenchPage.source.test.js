@@ -42,6 +42,12 @@ test('novel-fetch batch setup exposes and saves content range and capture settin
   assert.match(source, /saveContentSettings/);
 });
 
+test('restores the last active batch when opening the canonical Shuihuo entry', () => {
+  const page = fs.readFileSync(pagePath, 'utf8');
+  assert.match(page, /localStorage\.getItem\(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY\)/);
+  assert.match(page, /openBatch\(activeBatchId\)/);
+});
+
 test('returns the created batch so giant-material OCR can bind its executor job', () => {
   const page = fs.readFileSync(pagePath, 'utf8');
   assert.match(page, /if\s*\(!input\?\.automationEnabled\)\s*return batch;/);
