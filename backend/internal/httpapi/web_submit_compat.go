@@ -39,7 +39,7 @@ func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAu
 		defer response.Body.Close()
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 		page := string(body)
-		valid := response.StatusCode >= 200 && response.StatusCode < 300 && strings.Contains(page, "自定义文案") && !strings.Contains(page, "管理员登录")
+		valid := response.StatusCode >= 200 && response.StatusCode < 300 && targetPageLooksAuthenticated(page)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": valid, "output": []any{}, "result": map[string]any{"checks": map[string]any{"login_session": valid, "upload_endpoint": "/tttadmin/api/zbooklist_upload.php"}}})
 	})))
 	root.Handle("GET /api/batch-factory/v12/publish-121/organizations", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -71,6 +71,19 @@ func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAu
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "organizations": organizations})
 	})))
+}
+
+func targetPageLooksAuthenticated(page string) bool {
+	text := strings.TrimSpace(page)
+	if text == "" {
+		return false
+	}
+	for _, marker := range []string{"管理员登录", "登录后操作", "login.php", "name=login"} {
+		if strings.Contains(strings.ToLower(text), strings.ToLower(marker)) {
+			return false
+		}
+	}
+	return true
 }
 
 func normalizeOrganizationOptions(payload any) []map[string]any {

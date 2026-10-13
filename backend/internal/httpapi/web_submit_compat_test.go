@@ -13,3 +13,18 @@ func TestNormalizeOrganizationOptions(t *testing.T) {
 		t.Fatalf("unexpected organization options: %#v", got)
 	}
 }
+
+func TestTargetPageLooksAuthenticated(t *testing.T) {
+	for _, sample := range []struct {
+		page string
+		want bool
+	}{
+		{page: `<html><body>自定义配置</body></html>`, want: true},
+		{page: `<form action="login.php">管理员登录</form>`, want: false},
+		{page: ``, want: false},
+	} {
+		if got := targetPageLooksAuthenticated(sample.page); got != sample.want {
+			t.Fatalf("target page auth check = %v, want %v for %q", got, sample.want, sample.page)
+		}
+	}
+}
