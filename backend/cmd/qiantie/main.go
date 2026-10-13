@@ -186,6 +186,10 @@ func main() {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
+		if req.Method == http.MethodGet && req.URL.Path == "/api/batch-factory/v12/publish-121/organizations" {
+			apiHandler.ServeHTTP(w, req)
+			return
+		}
 		if req.Method == http.MethodPost && req.URL.Path == "/api/config/models/test" {
 			apiHandler.ServeHTTP(w, req)
 			return
@@ -569,6 +573,9 @@ func isGoV12AliasPath(path string) bool {
 		return false
 	}
 	parts := strings.Split(strings.TrimPrefix(path, "/api/batch-factory/v12/"), "/")
+	if len(parts) == 2 && parts[0] == "publish-121" && parts[1] == "organizations" {
+		return true
+	}
 	if len(parts) >= 2 && parts[0] == "intakes" && len(parts) == 3 && parts[2] == "batches" {
 		return true
 	}
