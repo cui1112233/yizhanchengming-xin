@@ -350,7 +350,7 @@ function storyboardAssetPromptText(book = {}) {
 function composeStoryboardDisplayPrompt(prompt, assetText) {
   const body = String(prompt || '').trim();
   const assets = String(assetText || '').trim();
-  if (!assets || body.includes('【基础设定】')) return body;
+  if (!assets || body.includes('【基础设定】') || body.includes('基础设定：')) return body;
   return `【基础设定】\n${assets}${body ? `\n\n${body}` : ''}`;
 }
 function assetKindLabel(kind) {
