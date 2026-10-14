@@ -205,6 +205,13 @@ func TestAutomationStartIsNativeGo(t *testing.T) {
 	}
 }
 
+func TestRemovedLegacyAutomationRepairDoesNotBridge(t *testing.T) {
+	path := "/api/batch-factory/v12/batches/demo/automation/repair-legacy-overrides"
+	if shouldBridgeLegacyAPI(path) {
+		t.Fatal("removed legacy automation repair must not be forwarded to Node")
+	}
+}
+
 func TestBatchFactoryV12IntakeReadIsNativeGo(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/intake-1") {
 		t.Fatal("V12 intake reads must use the Go batch store")

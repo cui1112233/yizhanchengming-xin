@@ -525,6 +525,11 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
+		// This legacy repair endpoint was removed from the Node router. Do not
+		// resurrect it through the broad V12 compatibility fallback.
+		if strings.HasSuffix(path, "/automation/repair-legacy-overrides") {
+			return false
+		}
 		// Batch Factory's final 121 upload is implemented by the Go publisher;
 		// keep it on the native router instead of sending it to the retired Node
 		// compatibility response.
