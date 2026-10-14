@@ -102,3 +102,18 @@ func TestCleanupExpiredSessionsOnlyDeletesExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPurgeAccountDeletesSessionsAndNonOwner(t *testing.T) {
+	store, mock := newMockStore(t)
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM auth_sessions WHERE username = ?")).WithArgs("alice").WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM accounts WHERE username = ? AND is_owner = FALSE")).WithArgs("alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	removed, err := store.PurgeAccount(context.Background(), "alice")
+	if err != nil || removed != 1 {
+		t.Fatalf("removed=%d err=%v", removed, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

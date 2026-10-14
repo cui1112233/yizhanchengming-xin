@@ -34,6 +34,13 @@ func (s *applicationTestStore) FindSession(context.Context, string, time.Time) (
 	return auth.Session{}, auth.ErrNotFound
 }
 func (s *applicationTestStore) RevokeSession(context.Context, string) error { return nil }
+func (s *applicationTestStore) PurgeAccount(_ context.Context, username string) (int64, error) {
+	if _, ok := s.accounts[username]; !ok {
+		return 0, auth.ErrNotFound
+	}
+	delete(s.accounts, username)
+	return 1, nil
+}
 
 func TestApplicationsCompatSubmitStatusAndWithdraw(t *testing.T) {
 	accounts := &applicationTestStore{accounts: map[string]auth.Account{}}

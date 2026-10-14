@@ -191,6 +191,41 @@ func (s *MySQLStore) RevokeOtherSessions(ctx context.Context, username, currentT
 	return result.RowsAffected()
 }
 
+// PurgeAccount permanently removes a non-owner account and all of its login
+// sessions. It is deliberately optional so small auth.Store test doubles do
+// not need to implement destructive account administration.
+func (s *MySQLStore) PurgeAccount(ctx context.Context, username string) (int64, error) {
+	if err := s.available(); err != nil {
+		return 0, err
+	}
+	if err := validateUsername(username); err != nil {
+		return 0, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM auth_sessions WHERE username = ?`, username); err != nil {
+		return 0, err
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM accounts WHERE username = ? AND is_owner = FALSE`, username)
+	if err != nil {
+		return 0, err
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if removed == 0 {
+		return 0, ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return removed, nil
+}
+
 // ListSessionsForUser returns the persisted login sessions. Token contains the
 // stored hash rather than the raw bearer token and is only used for display
 // and current-session comparison.

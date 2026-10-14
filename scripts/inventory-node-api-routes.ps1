@@ -34,7 +34,6 @@ foreach ($line in (Get-Content -LiteralPath $app)) {
   $handler = 'none'
   $test = 'add focused Go contract test before removal'
   $match = $goOwned | Where-Object { $path -eq $_ -or $path.StartsWith($_ + '/') } | Select-Object -First 1
-  if ($path -eq '/api/account-recovery/purge/:username') { $match = $null }
   if ($match) {
     $owner = 'go'
     $status = 'shadow'

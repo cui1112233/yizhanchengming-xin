@@ -18,8 +18,8 @@ type nodeRouteInventory struct {
 
 // The inventory is the cutover guardrail: every remaining Express mount must
 // either have a Go shadow implementation or be explicitly named as a blocker.
-// This keeps cleanup honest without pretending a dangerous account purge API
-// has already been replaced.
+// This keeps cleanup honest and prevents a newly added Node mount from being
+// silently treated as part of the Go-owned API.
 func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "migration", "node-api-contract-inventory.json"))
 	if err != nil {
@@ -44,14 +44,11 @@ func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 			}
 		case "blocked":
 			blocked++
-			if route.Path != "/api/account-recovery/purge/:username" {
-				t.Fatalf("unexpected blocked Node route: %+v", route)
-			}
 		default:
 			t.Fatalf("unknown route status %q for %s", route.Status, route.Path)
 		}
 	}
-	if blocked != 1 {
-		t.Fatalf("expected exactly one explicitly blocked legacy contract, got %d", blocked)
+	if blocked != 0 {
+		t.Fatalf("expected no blocked legacy contracts, got %d", blocked)
 	}
 }
