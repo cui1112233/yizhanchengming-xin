@@ -49,4 +49,8 @@ test('package defaults to Go and exposes no Node application start script', () =
   const pkg = loadManifest('package.json');
   assert.match(pkg.scripts.start, /start-local-go-review\.ps1/);
   assert.equal(Object.prototype.hasOwnProperty.call(pkg.scripts, 'start:node-legacy'), false);
+  assert.equal(pkg.dependencies, undefined, 'the Go release must not install Node application dependencies');
+  assert.deepEqual(Object.keys(pkg.devDependencies).sort(), [
+    '@volcengine/tos-sdk', 'express', 'https-proxy-agent',
+  ]);
 });
