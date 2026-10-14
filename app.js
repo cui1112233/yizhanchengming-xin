@@ -30,7 +30,6 @@ const historyRouter = require('./routes/history');
 const { createStorageRouter } = require('./routes/storage');
 const { createPlatformProjectsRouter } = require('./routes/platform-projects');
 const novelPanelRouter = require('./routes/novel-panel-page');
-const { createMySQLBatchFactoryStoreFactory } = require('./lib/batch-factory/mysql-store');
 const { createAgentRouter } = require('./routes/agent');
 const { createAgentSkillsRouter } = require('./routes/agent-skills');
 const { createAgentSkillStore } = require('./lib/agent-skill-store');
@@ -140,7 +139,11 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   const resolvedNovelPanelHistoryStore = novelPanelHistoryStore || createNovelPanelHistoryStore({ usersDir });
   const resolvedNovelPanelPremiumStore = novelPanelPremiumStore || createNovelPanelPremiumStore({ usersDir });
   const resolvedNovelFetchStore = novelFetchStore || createNovelFetchStore({ usersDir });
-  const resolvedBatchFactoryStore = createMySQLBatchFactoryStoreFactory(shuihuoGateway);
+  let resolvedBatchFactoryStore = null;
+  if (nodeLegacyAPIEnabled) {
+    const { createMySQLBatchFactoryStoreFactory } = require('./lib/batch-factory/mysql-store');
+    resolvedBatchFactoryStore = createMySQLBatchFactoryStoreFactory(shuihuoGateway);
+  }
   const teamConfigReader = createTeamConfigReader({
     accountStore: authRuntime.accountStore,
     memberStore: resolvedMemberStore,
