@@ -39,7 +39,8 @@ test('prompt panel renders image-backed mentions and opens the picker in edit mo
   assert.match(source, /renderStoryboardPromptHTML/);
   assert.match(source, /data-fallback/);
   assert.match(source, /compactUnifiedAssetDescriptions\(withStoryboardAssetMentions\(prompt, book, video\), book\)/g);
-  assert.match(source, /function withStoryboardAssetMentions\(prompt, book, video\) \{[\s\S]{0,220}return text;[\s\S]{0,80}\}/);
+  assert.match(source, /function withStoryboardAssetMentions\(prompt, book, video\)/);
+  assert.match(source, /return stripStandaloneAssetMentionLine\(text, book\)/);
   assert.doesNotMatch(source, /return `\$\{text\}\\n资产：\$\{mentions\}`/);
   assert.match(source, /contentEditableTextOffset/);
   assert.match(source, /batch-factory-asset-mention-menu/);
@@ -55,4 +56,10 @@ test('batch card keeps the prompt and asset mentions in one content layer', () =
 test('batch card keeps rich prompt text visible after legacy span hiding rules', () => {
   const css = fs.readFileSync(path.join(here, '..', 'shuihuo-production.css'), 'utf8');
   assert.match(css, /batch-factory-prompt-entry-rich-view>span\{display:inline!important;/);
+});
+
+test('prompt display removes the legacy standalone asset row', () => {
+  assert.match(source, /function stripStandaloneAssetMentionLine\(prompt, book\)/);
+  assert.match(source, /const match = line\.match/);
+  assert.match(source, /remainder\.replace/);
 });

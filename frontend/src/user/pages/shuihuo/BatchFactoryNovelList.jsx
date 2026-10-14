@@ -768,11 +768,30 @@ function storyboardAssetMentions(book, video) {
     .join(' ');
 }
 
+function stripStandaloneAssetMentionLine(prompt, book) {
+  const text = String(prompt || '');
+  const names = (book?.assetRecords || [])
+    .map(asset => assetName(asset))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+  if (!text || !names.length) return text;
+  return text.split('\n').filter(line => {
+    const match = line.match(/^\s*资产\s*[：:]\s*(.*)$/);
+    if (!match) return true;
+    let remainder = match[1];
+    names.forEach(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      remainder = remainder.replace(new RegExp(`@${escaped}`, 'g'), '');
+    });
+    return remainder.replace(/[\s、,，|]+/g, '') !== '';
+  }).join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
 function withStoryboardAssetMentions(prompt, book, video) {
   const text = String(prompt || '').trim();
   // 展示层只负责把正文中已有的资产名称渲染成标签；不能额外追加一行
   // “资产：@...” ，否则卡片和编辑器会与最终 VIDEO Prompt 重复显示。
-  return text;
+  return stripStandaloneAssetMentionLine(text, book);
 }
 
 function compactUnifiedAssetDescriptions(prompt, book) {
