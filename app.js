@@ -30,7 +30,6 @@ const historyRouter = require('./routes/history');
 const { createStorageRouter } = require('./routes/storage');
 const { createPlatformProjectsRouter } = require('./routes/platform-projects');
 const novelPanelRouter = require('./routes/novel-panel-page');
-const novelPanelApiRouter = require('./routes/novel-panel');
 const { createNovelFetchV2PageMiddleware } = require('./lib/novel-fetch-workshop/v2-page');
 const { createMySQLBatchFactoryStoreFactory } = require('./lib/batch-factory/mysql-store');
 const { createAgentRouter } = require('./routes/agent');
@@ -437,8 +436,11 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   app.use('/api/admin', createAdminRouter(authRuntime.accountStore, resolvedPresetStore, resolvedAgentSkillStore, resolvedErrorLogStore, { memberStore: resolvedMemberStore }));
   app.use('/api/presets', createPresetsRouter(resolvedPresetStore));
   app.use('/api/script-constraint-prompts', createScriptConstraintPromptsRouter({ promptStore: resolvedScriptConstraintPromptStore }));
-  app.use('/api/novel-panel/settings', apiAuth, restrictMemberNovelPanelSettings);
-  app.use('/api/novel-panel', trackNovelPanelUsage, novelPanelApiRouter);
+  if (nodeLegacyAPIEnabled) {
+    const novelPanelApiRouter = require('./routes/novel-panel');
+    app.use('/api/novel-panel/settings', apiAuth, restrictMemberNovelPanelSettings);
+    app.use('/api/novel-panel', trackNovelPanelUsage, novelPanelApiRouter);
+  }
   if (nodeLegacyAPIEnabled) {
     const { createNovelFetchRouter } = require('./routes/novel-fetch');
     const { createNovelFetchUploadRouter } = require('./routes/novel-fetch-upload');
