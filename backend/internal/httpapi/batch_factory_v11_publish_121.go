@@ -189,7 +189,55 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if readbackResponse.StatusCode < 200 || readbackResponse.StatusCode >= 300 || readback["success"] != true {
 		return nil, fmt.Errorf("视频管理系统回读失败：%s", firstText(readback["message"], readback["msg"], "后台记录未确认"))
 	}
-	return map[string]any{"status": "accepted_pending", "bookId": book.BookID, "internalBookId": book.ID, "sourceTextFile": book.BookID + ".txt", "aiHeadVideoFile": book.BookID + ".mp4", "uploadedAt": time.Now().UTC().Format(time.RFC3339Nano), "response": remote, "readback": readback}, nil
+	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
+	// The Go publisher is the single upload owner. Persist the confirmed
+	// response back to the book so the workbench can show the same success
+	// state after a refresh and will not treat an already uploaded book as new.
+	metadata = clonePublishMetadata(metadata)
+	metadata["websiteSubmitStatus"] = "uploaded"
+	metadata["publishStatus"] = "uploaded"
+	metadata["websiteSubmitProgress"] = map[string]any{
+		"status":    "uploaded",
+		"phase":     "completed",
+		"message":   "视频管理系统已接收并回读确认",
+		"updatedAt": uploadedAt,
+	}
+	history := publishHistory(metadata["websiteSubmitHistory"])
+	history = append(history, map[string]any{
+		"status":      "uploaded",
+		"phase":       "completed",
+		"detail":      "视频管理系统已接收并回读确认",
+		"submittedAt": uploadedAt,
+		"bookId":      book.BookID,
+	})
+	metadata["websiteSubmitHistory"] = history
+	if _, err := p.Store.UpdateBookMetadata(ctx, owner, batchID, bookID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision}); err != nil {
+		return nil, fmt.Errorf("上传已成功，但保存上传状态失败：%w", err)
+	}
+	return map[string]any{"status": "uploaded", "bookId": book.BookID, "internalBookId": book.ID, "sourceTextFile": book.BookID + ".txt", "aiHeadVideoFile": book.BookID + ".mp4", "uploadedAt": uploadedAt, "response": remote, "readback": readback}, nil
+}
+
+func clonePublishMetadata(source map[string]any) map[string]any {
+	out := make(map[string]any, len(source)+5)
+	for key, value := range source {
+		out[key] = value
+	}
+	return out
+}
+
+func publishHistory(value any) []any {
+	switch history := value.(type) {
+	case []any:
+		return append([]any(nil), history...)
+	case []map[string]any:
+		out := make([]any, 0, len(history))
+		for _, item := range history {
+			out = append(out, item)
+		}
+		return out
+	default:
+		return []any{}
+	}
 }
 
 func publishOrganization(input map[string]any, settings map[string]json.RawMessage) string {
