@@ -1098,6 +1098,8 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const h3Document = h3DirectorDocument(book);
   const engineSettings = effectiveBookSettings(batch, book);
   const { displayPrompt, compiledPrompt, smartUnifiedPending, loading: compilingPrompt } = useCompiledVideoPrompt(batchId, book, selectedVideo, settingsRevision);
+  const smartUnifiedAnalysis = smartUnifiedAnalysisForBook(book);
+  const showSmartUnified = smartUnifiedDisplayEnabled(batch, book) && smartUnifiedAnalysis;
   const hasVisualPrompt = Boolean(String(visualPrompt || '').trim());
   const hasVideoPrompt = Boolean(String(videoPrompt || '').trim());
   useEffect(() => {
@@ -1154,7 +1156,10 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   }
 	  const activeLabel = promptKind === 'visual' ? '画面提示词' : '分镜视频提示词';
   const rawSubmittedVideoPrompt = compiledPrompt || displayPrompt || videoPrompt;
-  const submittedVideoPrompt = baseSetupEnabled(engineSettings) ? rawSubmittedVideoPrompt : stripBaseSetupSection(rawSubmittedVideoPrompt);
+  const rawPromptWithUnifiedStyle = showSmartUnified && String(smartUnifiedAnalysis.prompt || '').trim() && !rawSubmittedVideoPrompt.includes(String(smartUnifiedAnalysis.prompt).trim())
+    ? `【统一风格】\n${String(smartUnifiedAnalysis.prompt).trim()}\n\n${rawSubmittedVideoPrompt}`
+    : rawSubmittedVideoPrompt;
+  const submittedVideoPrompt = baseSetupEnabled(engineSettings) ? rawPromptWithUnifiedStyle : stripBaseSetupSection(rawPromptWithUnifiedStyle);
   const activeValue = promptKind === 'visual' ? visualPrompt : editing ? videoPrompt : submittedVideoPrompt;
   const activeReady = promptKind === 'visual' ? hasVisualPrompt : Boolean(submittedVideoPrompt.trim());
   const regenerateCurrentPrompt = promptKind === 'visual' ? onRegenerateVisual : onRegenerate;
