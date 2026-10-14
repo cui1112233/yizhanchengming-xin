@@ -35,8 +35,9 @@ jobs:
           set -Eeuo pipefail
           npm --prefix frontend ci
           npm --prefix frontend run build
-          rm -rf backend/web/dist
           mkdir -p backend/web/dist
+          # Keep the Go-embedded public workbenches and stable brand assets;
+          # only the Vite-produced application bundle is replaced here.
           cp -a frontend/dist/. backend/web/dist/
 
       - name: Verify Go-only release contracts

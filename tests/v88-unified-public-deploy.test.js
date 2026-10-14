@@ -51,8 +51,8 @@ test('unified V88 release verifies source contracts before publishing', () => {
 });
 
 test('unified V88 release embeds the frontend bundle into Go', () => {
-  assert.match(workflow, /rm -rf backend\/web\/dist/);
   assert.match(workflow, /cp -a frontend\/dist\/\. backend\/web\/dist\//);
+  assert.match(workflow, /Go-embedded public workbenches/);
 });
 
 test('unified V88 release has no Node runtime smoke step', () => {
