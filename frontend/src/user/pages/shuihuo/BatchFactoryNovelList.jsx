@@ -2945,7 +2945,13 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     const fetchFailures = [];
     for (const book of newlyAddedBooks) {
       try {
-        await fetchBookOriginal(batch.id, book.id, { maxTxt: Number(contentCaptureCharacters || 4000), platform: String(platform) });
+        const fetched = await fetchBookOriginal(batch.id, book.id, { maxTxt: Number(contentCaptureCharacters || 4000), platform: String(platform) });
+        const metadata = resultData(fetched, 'sourceMetadata') || resultData(fetched?.book, 'sourceMetadata');
+        const styleFailed = String(metadata?.styleStatus || '').trim().toLowerCase() === 'failed';
+        const genderMissing = !String(metadata?.gender || '').trim();
+        if (styleFailed || genderMissing) {
+          fetchFailures.push(`${book.title || book.bookId}: ${styleFailed ? (metadata?.styleError || '风格识别失败') : '男女频识别失败'}`);
+        }
       } catch (error) {
         fetchFailures.push(`${book.title || book.bookId}: ${error?.message || '获取失败'}`);
       }

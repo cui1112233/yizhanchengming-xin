@@ -367,6 +367,8 @@ test('manual add-books flow fetches original text and classification for each ne
   assert.match(source, /const beforeBookIDs = new Set\(books\.map\(book => String\(book\?\.id \|\| ''\)\)\)/);
   assert.match(source, /const newlyAddedBooks = \(appendedBatch\?\.books \|\| \[\]\)\.filter/);
   assert.match(source, /await fetchBookOriginal\(batch\.id, book\.id, \{ maxTxt: Number\(contentCaptureCharacters \|\| 4000\), platform: String\(platform\) \}\)/);
+  assert.match(source, /styleStatus.*failed/);
+  assert.match(source, /男女频识别失败/);
   assert.match(source, /自动获取正文并识别风格、男女频/);
 });
 
