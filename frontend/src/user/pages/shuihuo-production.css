@@ -981,17 +981,27 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 /* Keep the unified pill treatment usable inside the narrow action column. */
 .batch-factory-workbench .batch-factory-actions { min-width: 0; overflow: hidden; }
 .batch-factory-workbench .batch-factory-action-button-grid { min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
-.batch-factory-workbench .batch-factory-action-button-grid .ant-btn {
-  min-width: 0;
-  width: 100%;
-  min-height: 27px;
-  height: 27px;
-  padding-inline: 5px;
+.batch-factory-workbench .batch-factory-actions .batch-factory-action-button-grid .ant-btn {
+  box-sizing: border-box;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 27px !important;
+  height: 27px !important;
+  margin: 0;
+  padding-inline: 5px !important;
   overflow: hidden;
-  font-size: 10px;
-  line-height: 25px;
+  font-size: 10px !important;
+  line-height: 25px !important;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.batch-factory-workbench .batch-factory-actions .batch-factory-action-group {
+  min-width: 0;
+  overflow: hidden;
+}
+.batch-factory-workbench .batch-factory-actions .batch-factory-action-button-grid {
+  min-width: 0;
+  align-items: center;
 }
 .batch-factory-workbench .batch-factory-action-group.is-production .batch-factory-action-video { grid-column: auto; }
 
