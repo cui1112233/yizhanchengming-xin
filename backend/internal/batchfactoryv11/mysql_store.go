@@ -177,10 +177,14 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 		nextOrdinal++
 		var metadata any
 		if len(bookInput.SourceMetadata) > 0 {
-			metadata, err = json.Marshal(bookInput.SourceMetadata)
+			var encodedMetadata []byte
+			encodedMetadata, err = json.Marshal(bookInput.SourceMetadata)
 			if err != nil {
 				return Batch{}, ErrInvalid
 			}
+			// Bind JSON as text. MySQL rejects driver-bound []byte as binary
+			// when inserting into a JSON column.
+			metadata = string(encodedMetadata)
 		}
 		if _, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_records(book_id,source_book_id,source_task_id,platform,title,source_text,txt_text,txt_file_name,source_metadata_json) VALUES(?,?,?,?,?,?,?,?,?)`, bookID, nullableString(sourceID), nullableString(bookInput.SourceTaskID), nullableString(bookInput.Platform), bookInput.Title, nullableString(bookInput.SourceText), nullableString(bookInput.TxtText), nullableString(bookInput.TxtFileName), metadata); err != nil {
 			return Batch{}, err

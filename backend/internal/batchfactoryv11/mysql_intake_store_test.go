@@ -155,6 +155,47 @@ func TestCreateBatchTxBindsGiantMetadataAndSettingsAsText(t *testing.T) {
 	}
 }
 
+func TestMySQLAppendBooksFromIntakeBindsSourceMetadataAsText(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT payload_json,consumed_at FROM batch_factory_v11_intakes").
+		WithArgs("intake-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"payload_json", "consumed_at"}).AddRow(
+			`{"books":[{"bookId":"book-1","title":"书","platform":"15","sourceMetadata":{"platformId":"15"}}]}`,
+			nil,
+		))
+	mock.ExpectQuery("SELECT revision FROM batch_factory_v11_batches").
+		WithArgs("batch-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(int64(1)))
+	mock.ExpectQuery("SELECT COALESCE\\(source_book_id").
+		WithArgs("batch-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"source_book_id", "platform"}))
+	mock.ExpectQuery("SELECT COALESCE\\(MAX\\(ordinal\\)\\+1,0\\)").
+		WithArgs("batch-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"nextOrdinal"}).AddRow(0))
+	mock.ExpectExec("INSERT INTO batch_factory_v11_books").
+		WithArgs(sqlmock.AnyArg(), "batch-1", "alice", 0, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO batch_factory_v11_book_records").
+		WithArgs(sqlmock.AnyArg(), "book-1", nil, "15", "书", nil, nil, "book-1.txt", jsonTextArg{}).
+		WillReturnError(errors.New("stop after append metadata write"))
+	mock.ExpectRollback()
+
+	store := NewMySQLStore(db)
+	_, err = store.AppendBooksFromIntake(context.Background(), "alice", "batch-1", "intake-1", false)
+	if err == nil || err.Error() != "stop after append metadata write" {
+		t.Fatalf("AppendBooksFromIntake error = %v, want metadata write sentinel", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMySQLUpdateBookMetadataBindsJSONAsText(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
