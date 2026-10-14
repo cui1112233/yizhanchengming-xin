@@ -534,7 +534,7 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		// V12 automation start is owned by the native Go coordinator. Keep the
 		// legacy Node controller out of this request so one click cannot create
 		// two different jobs or silently fall back to the old runtime.
-		if strings.HasSuffix(path, "/automation/start") || strings.HasSuffix(path, "/automation/cancel") {
+		if strings.HasSuffix(path, "/automation/start") || strings.HasSuffix(path, "/automation/cancel") || strings.HasSuffix(path, "/automation/pause") || strings.HasSuffix(path, "/automation/resume") || strings.HasSuffix(path, "/automation/retry") {
 			return false
 		}
 		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || path == "/api/batch-factory/v12/image-generation" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || (strings.Contains(path, "/h3/") && (slice < 0 || slice >= 3)) || isGoV12AliasPath(path) {
@@ -632,6 +632,9 @@ func isGoV12AliasPath(path string) bool {
 		return true
 	}
 	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "automation" {
+		return true
+	}
+	if len(parts) == 4 && parts[0] == "batches" && parts[2] == "automation" && (parts[3] == "start" || parts[3] == "cancel" || parts[3] == "pause" || parts[3] == "resume" || parts[3] == "retry") {
 		return true
 	}
 	if len(parts) == 3 && parts[0] == "batches" && parts[2] == "runtime-summary" {

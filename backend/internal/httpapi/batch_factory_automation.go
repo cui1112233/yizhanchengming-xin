@@ -122,6 +122,21 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	if err != nil {
 		return nil, err
 	}
+	presetID := automationStringValue(input["presetId"], "")
+	if presetID == "" {
+		return nil, fmt.Errorf("%w: 请先选择自动化预设", batchfactoryv11.ErrInvalid)
+	}
+	if c.presets == nil {
+		return nil, fmt.Errorf("%w: 自动化预设服务未配置", batchfactoryv11.ErrUnavailable)
+	}
+	preset, err := c.presets.Get(owner, presetID)
+	if err != nil || preset == nil {
+		return nil, fmt.Errorf("自动化预设不存在或不属于当前账号")
+	}
+	batch, err = c.applyPreset(ctx, owner, batch, preset)
+	if err != nil {
+		return nil, err
+	}
 	// Automatic production enters the same provider-sync boundary as the
 	// explicit production endpoint. Without this, the UI can show a configured
 	// video model while the Go worker's in-memory registry is still empty.
@@ -142,7 +157,7 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	job := map[string]any{
 		"id": jobID, "owner": owner, "batchId": batchID, "state": "running",
 		"runMode": runMode, "autoPublish": autoPublish,
-		"concurrency": automationNumberValue(input["concurrency"], 1), "preset": input["preset"],
+		"concurrency": automationNumberValue(input["concurrency"], 1), "preset": map[string]any{"id": preset.ID, "name": preset.Name, "version": preset.Version},
 		"createdAt": c.now(), "startedAt": c.now(), "updatedAt": c.now(),
 		"counts": automationCounts(len(batch.Books), len(batch.Books), 0, 0), "books": map[string]any{},
 	}
@@ -157,9 +172,60 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	// authenticated owner in its context. Account-scoped text/video providers
 	// must not fall back to an anonymous, unconfigured context in background
 	// stages.
+	c.launchRun(owner, batchID, jobID, job, batch)
+	return publicAutomationJob(job), nil
+}
+
+func (c *BatchAutomationCoordinator) applyPreset(ctx context.Context, owner string, batch batchfactoryv11.Batch, preset *AutomationPreset) (batchfactoryv11.Batch, error) {
+	current := map[string]any{}
+	for key, raw := range batch.SettingsState.Patch {
+		var value any
+		if json.Unmarshal(raw, &value) == nil {
+			current[key] = value
+		}
+	}
+	config := preset.Config
+	if len(config) == 0 {
+		return batchfactoryv11.Batch{}, fmt.Errorf("自动化预设没有可用配置")
+	}
+	merged := map[string]any{}
+	for key, value := range current {
+		merged[key] = value
+	}
+	for key, value := range config {
+		merged[key] = value
+	}
+	for _, key := range []string{"aiPromptConfig", "publishSettings"} {
+		left, _ := current[key].(map[string]any)
+		right, _ := config[key].(map[string]any)
+		if left != nil || right != nil {
+			nested := map[string]any{}
+			for k, v := range left {
+				nested[k] = v
+			}
+			for k, v := range right {
+				nested[k] = v
+			}
+			merged[key] = nested
+		}
+	}
+	patch := batchfactoryv11.SettingsPatch{}
+	for key, value := range merged {
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return batchfactoryv11.Batch{}, err
+		}
+		patch[key] = raw
+	}
+	if _, err := c.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: patch, ExpectedRevision: batch.Revision}); err != nil {
+		return batchfactoryv11.Batch{}, err
+	}
+	return c.store.GetBatch(ctx, owner, batch.ID)
+}
+
+func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
 	automationCtx := context.WithValue(context.Background(), bridgeIdentityKey{}, BridgeIdentity{Username: owner})
 	go c.run(automationCtx, owner, batchID, jobID, job, batch)
-	return publicAutomationJob(job), nil
 }
 
 func automationStringValue(value any, fallback string) string {
@@ -328,6 +394,17 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 			failed++
 			persist()
 		}
+		if entryStatus := automationStringValue(entry["status"], ""); entryStatus == "completed" {
+			continue
+		}
+		control, controlJob, controlErr := c.currentJobControl(owner, batchID, jobID)
+		if controlErr == nil && controlJob != nil {
+			if control == "paused" || control == "stopped" {
+				entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = control, control, "自动化已"+map[string]string{"paused": "暂停", "stopped": "停止"}[control], c.now()
+				persist()
+				return
+			}
+		}
 		if ctx.Err() != nil {
 			entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "stopped", "stopped", "测试任务已停止", c.now()
 			persist()
@@ -448,6 +525,20 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		job["state"] = "failed"
 	}
 	_ = c.setJob(owner, batchID, jobID, job)
+}
+
+func (c *BatchAutomationCoordinator) currentJobControl(owner, batchID, jobID string) (string, map[string]any, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	state, err := c.loadLocked()
+	if err != nil {
+		return "", nil, err
+	}
+	job, ok := state.Jobs[jobID]
+	if !ok || automationStringValue(job["owner"], "") != owner || automationStringValue(job["batchId"], "") != batchID {
+		return "", nil, nil
+	}
+	return automationStringValue(job["state"], ""), job, nil
 }
 
 func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, batchID, bookID, requestID string) (batchfactoryv11.ProductionJob, error) {
@@ -585,6 +676,88 @@ func (c *BatchAutomationCoordinator) Cancel(owner, batchID string) error {
 	return c.saveLocked(state)
 }
 
+func (c *BatchAutomationCoordinator) Pause(owner, batchID string) (map[string]any, error) {
+	return c.control(owner, batchID, "paused", nil)
+}
+
+func (c *BatchAutomationCoordinator) Resume(ctx context.Context, owner, batchID string) (map[string]any, error) {
+	return c.control(owner, batchID, "running", func(job map[string]any) error {
+		batch, err := c.store.GetBatch(ctx, owner, batchID)
+		if err != nil {
+			return err
+		}
+		c.launchRun(owner, batchID, automationStringValue(job["id"], ""), job, batch)
+		return nil
+	})
+}
+
+func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID string, bookIDs []string) (map[string]any, error) {
+	set := map[string]bool{}
+	for _, id := range bookIDs {
+		if strings.TrimSpace(id) != "" {
+			set[id] = true
+		}
+	}
+	return c.control(owner, batchID, "running", func(job map[string]any) error {
+		books, _ := job["books"].(map[string]any)
+		for id, raw := range books {
+			if len(set) > 0 && !set[id] {
+				continue
+			}
+			entry, _ := raw.(map[string]any)
+			status := automationStringValue(entry["status"], "")
+			if status == "failed" || status == "blocked" || status == "paused" {
+				entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", "assets", "重新执行失败阶段", "", c.now()
+			}
+		}
+		batch, err := c.store.GetBatch(ctx, owner, batchID)
+		if err != nil {
+			return err
+		}
+		c.launchRun(owner, batchID, automationStringValue(job["id"], ""), job, batch)
+		return nil
+	})
+}
+
+func (c *BatchAutomationCoordinator) control(owner, batchID, nextState string, after func(map[string]any) error) (map[string]any, error) {
+	c.mu.Lock()
+	state, err := c.loadLocked()
+	if err != nil {
+		c.mu.Unlock()
+		return nil, err
+	}
+	var target map[string]any
+	for _, candidate := range state.Jobs {
+		if automationStringValue(candidate["owner"], "") != owner || automationStringValue(candidate["batchId"], "") != batchID {
+			continue
+		}
+		current := automationStringValue(candidate["state"], "")
+		if current == "running" || current == "paused" || current == "needs_attention" {
+			target = candidate
+			break
+		}
+	}
+	if target == nil {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("%w: 没有可控制的自动化任务", batchfactoryv11.ErrNotFound)
+	}
+	target["state"], target["updatedAt"] = nextState, c.now()
+	if err := c.saveLocked(state); err != nil {
+		c.mu.Unlock()
+		return nil, err
+	}
+	c.mu.Unlock()
+	if after != nil {
+		if err := after(target); err != nil {
+			return nil, err
+		}
+		if err := c.setJob(owner, batchID, automationStringValue(target["id"], ""), target); err != nil {
+			return nil, err
+		}
+	}
+	return publicAutomationJob(target), nil
+}
+
 func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordinator *BatchAutomationCoordinator, version string) {
 	if mux == nil || coordinator == nil {
 		return
@@ -617,5 +790,50 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	})))
+	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/pause", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		result, err := coordinator.Pause(owner, r.PathValue("batchId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"automation": result})
+	})))
+	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/resume", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		result, err := coordinator.Resume(r.Context(), owner, r.PathValue("batchId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"automation": result})
+	})))
+	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/retry", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			BookIDs []string `json:"bookIds"`
+		}
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		result, err := coordinator.Retry(r.Context(), owner, r.PathValue("batchId"), input.BookIDs)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"automation": result})
 	})))
 }

@@ -197,9 +197,11 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 }
 
 func TestAutomationStartIsNativeGo(t *testing.T) {
-	path := "/api/batch-factory/v12/batches/demo/automation/start"
-	if shouldBridgeLegacyAPI(path) {
-		t.Fatalf("automation start must be handled by the Go coordinator")
+	for _, action := range []string{"start", "cancel", "pause", "resume", "retry"} {
+		path := "/api/batch-factory/v12/batches/demo/automation/" + action
+		if shouldBridgeLegacyAPI(path) {
+			t.Fatalf("automation %s must be handled by the Go coordinator", action)
+		}
 	}
 }
 
