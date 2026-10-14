@@ -796,7 +796,19 @@ function compactUnifiedAssetDescriptions(prompt, book) {
 }
 
 function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImages = {}) {
-  const text = compactUnifiedAssetDescriptions(prompt, book);
+  let text = compactUnifiedAssetDescriptions(prompt, book);
+  // Director/SD cards from older runs often contain the asset name followed by
+  // its full appearance description instead of an @ reference. Normalize only
+  // the durable asset name for display; the description remains readable after
+  // the thumbnail chip and no regeneration is needed.
+  (book?.assetRecords || [])
+    .map(asset => assetName(asset))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .forEach(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`(^|[^@])${escaped}`, 'g'), `$1@${name}`);
+    });
   const selectedIds = readStoryboardAssetSelection(book, video).selectedIds;
   const assets = (book?.assetRecords || [])
     .filter(asset => selectedIds.has(String(asset?.id || '')) || text.includes(`@${assetName(asset)}`))
@@ -1166,7 +1178,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
         const response = await listBookAssetImages(batchId, book.id, asset.id);
         const images = resultData(response, 'images');
         const primary = Array.isArray(images) ? (images.find(image => image?.isPrimary) || images[0]) : null;
-        return [String(asset.id), String(primary?.url || primary?.imageUrl || '')];
+        return [String(asset.id), String(primary?.url || primary?.imageUrl || primary?.image_url || primary?.thumbnailUrl || primary?.path || '')];
       } catch (_) { return [String(asset.id), '']; }
     })).then(entries => { if (active) setAssetThumbs(Object.fromEntries(entries)); });
     return () => { active = false; };
@@ -1292,7 +1304,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       <span className="batch-factory-prompt-meta-item"><b>视频模型：</b>{videoModelLabel}</span>
     </div>
     {!activeReady ? <Alert type="info" showIcon message={smartUnifiedPending && promptKind === 'video' ? '智能统一待分析' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看'} description={smartUnifiedPending && promptKind === 'video' ? '智能统一与资产提示词分开获取；未取得基线不会阻断资产、分镜或视频。可在资产区单独刷新。' : '当前分镜尚未有这一类提示词；切换分镜时会保持当前查看类型。'} /> : <>
-      <label className="shuihuo-form-label batch-factory-prompt-editor-label">{activeLabel}<div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} readOnly={!editing} value={activeValue} onChange={updatePromptValue} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} placeholder={promptKind === 'visual' ? '仅用于生成当前分镜的画面图片' : '编辑时输入 @ 选择有图片的资产'} />{editing && promptKind === 'video' && assetMentionMenu?.candidates?.length ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates.map(asset => <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}><img src={assetThumbs[String(asset.id)]} alt="" /><span>{assetName(asset)}</span><small>{asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'}</small></button>)}</div> : null}</div></label>
+      <label className="shuihuo-form-label batch-factory-prompt-editor-label">{activeLabel}{!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div> : <div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} value={activeValue} onChange={updatePromptValue} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} placeholder={promptKind === 'visual' ? '仅用于生成当前分镜的画面图片' : '输入 @ 选择有图片的资产'} />{editing && promptKind === 'video' && assetMentionMenu?.candidates?.length ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates.map(asset => <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}><img src={assetThumbs[String(asset.id)]} alt="" /><span>{assetName(asset)}</span><small>{asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'}</small></button>)}</div> : null}</div>}</label>
       <div className="batch-factory-prompt-modal-actions">
         <Button type="primary" loading={saving} disabled={!editing || !selectedVideo} onClick={savePrompt}>保存</Button>
         <Tooltip title={promptKind === 'visual' ? '按当前小说原文重新生成画面提示词。' : '按当前小说原文重新生成导演分镜，并重编最终 VIDEO 提示词；不会提交视频生成任务。'}><Button icon={promptKind === 'visual' ? <ReloadOutlined /> : null} loading={regenerating} disabled={regenerating || !regenerateCurrentPrompt} onClick={regenerateCurrentPrompt}>{promptKind === 'visual' ? '重新生成画面提示词' : '重新生成导演分镜'}</Button></Tooltip>
