@@ -11,7 +11,9 @@ services:
     image: ${QIANTIE_GO_IMAGE:?set an immutable Go image reference}
     restart: unless-stopped
     environment:
-      QIANTIE_GO_LISTEN_ADDR: :4000
+      # Nginx's existing upstream is kept as a DNS alias only; the process
+      # behind it is now the native Go API.
+      QIANTIE_GO_LISTEN_ADDR: :3000
       QIANTIE_MYSQL_DSN: ${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE}?parseTime=true&charset=utf8mb4&collation=utf8mb4_0900_ai_ci
       QIANTIE_BRIDGE_SECRET: ${QIANTIE_BRIDGE_SECRET}
       # The Go API can be repaired independently during an emergency.  Normal
@@ -41,14 +43,26 @@ services:
       # 内置合成的成片工作目录必须落在持久卷上：否则 go-api 容器一重建，
       # 已合成的 mp4 随容器内部目录一起丢失，上传时会 404。
       QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR: /data/local-executor-artifacts
+      QIANTIE_PRESET_PATH: /app/data/system/presets.json
+      QIANTIE_PERSONAL_PROMPT_PATH: /app/data/system/script-constraint-prompts.json
+      QIANTIE_BATCH_FACTORY_AUTOMATION_PRESETS_PATH: /app/data/batch-factory-v11-automation-presets.json
+      QIANTIE_BATCH_FACTORY_AUTOMATION_STATE_PATH: /app/data/batch-factory-v11-automation.json
+      QIANTIE_SCRIPT_HISTORY_DIR: /app/data/users
+      QIANTIE_MEMBER_SYSTEM_DIR: /app/data/system
+      QIANTIE_MEMBER_AVATAR_DIR: /app/data/avatars
+      QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR: /app/data/downloads
     volumes:
+      - v88_data:/app/data
       - go_api_artifacts:/data/local-executor-artifacts
     expose:
-      - "4000"
+      - "3000"
     networks:
-      - qiantie_internal
+      qiantie_internal:
+        aliases:
+          - v88-node
 
   browser-worker:
+    profiles: ["node-legacy"]
     image: ${QIANTIE_BROWSER_WORKER_IMAGE:?set the existing browser worker image reference}
     restart: unless-stopped
     init: true
@@ -82,6 +96,7 @@ services:
   # The retained legacy implementation runs with its own database and object
   # volume. It must never apply legacy migrations to qiantie_v88.
   shuihuo-compat:
+    profiles: ["node-legacy"]
     image: ${QIANTIE_SHUIHUO_COMPAT_IMAGE:?set the retained legacy Shuihuo image reference}
     pull_policy: never
     restart: unless-stopped
@@ -100,6 +115,7 @@ services:
       - qiantie_internal
 
   v88-node:
+    profiles: ["node-legacy"]
     image: ${QIANTIE_NODE_IMAGE:?set an immutable Node image reference}
     restart: unless-stopped
     environment:
@@ -151,7 +167,7 @@ services:
       # Certificates are supplied by the deployment host and never stored in Git.
       - ./certs:/etc/letsencrypt:ro
     depends_on:
-      - v88-node
+      - go-api
     networks:
       - qiantie_internal
 
