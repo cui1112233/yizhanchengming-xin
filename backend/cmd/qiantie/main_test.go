@@ -142,6 +142,11 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/config") {
 		t.Fatal("owner config is implemented by Go and must not use the Node bridge")
 	}
+	for _, path := range []string{"/api/presets", "/api/presets/constraint-text", "/api/script-constraint-prompts", "/api/script-constraint-prompts/usage"} {
+		if shouldBridgeLegacyAPI(path) {
+			t.Fatalf("%s is implemented by Go and must not use the Node bridge", path)
+		}
+	}
 	if shouldBridgeLegacyAPI("/api/script-video") {
 		t.Fatal("script video must use Go routes")
 	}
