@@ -157,7 +157,7 @@ test('treats a missing saved viral candidate as an empty review state', () => {
 test('keeps existing video prompts usable while smart unified analysis is pending', () => {
   assert.match(source, /smartUnifiedPending/);
   assert.match(source, /智能统一待分析/);
-  assert.match(source, /资产提取时与资产同次获取/);
+  assert.match(source, /智能统一与资产提示词分开获取/);
   assert.match(source, /不影响本分镜的提示词使用/);
 });
 

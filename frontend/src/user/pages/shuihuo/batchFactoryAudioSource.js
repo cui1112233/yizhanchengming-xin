@@ -13,8 +13,9 @@ export function normalizeAudioSourceSettings(settings = {}) {
     return {
       ...settings,
       audioSource: source,
+      audioPlanningEnabled: true,
       audioMergeEnabled: false
     };
   }
-  return { ...settings, audioSource: source, audioMergeEnabled: true };
+  return { ...settings, audioSource: source, audioPlanningEnabled: true, audioMergeEnabled: true };
 }

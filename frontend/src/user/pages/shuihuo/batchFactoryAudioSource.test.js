@@ -19,10 +19,10 @@ test('original audio keeps TTS planning but disables only final TTS merge', () =
   });
 });
 
-test('TTS audio enables final audio merge while preserving planning choice', () => {
+test('TTS audio enables final audio merge and always keeps the shared timing flow', () => {
   assert.deepEqual(normalizeAudioSourceSettings({ audioSource: 'tts', audioPlanningEnabled: false, audioMergeEnabled: false }), {
     audioSource: 'tts',
-    audioPlanningEnabled: false,
+    audioPlanningEnabled: true,
     audioMergeEnabled: true
   });
 });

@@ -373,21 +373,6 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 {"characters":[{"name":"人物名","prompt":"外形、服装、年龄感、气质等可见特征"}],"scenes":[{"name":"场景名","prompt":"空间、时段、陈设、氛围等可见特征"}],"props":[{"name":"道具名","prompt":"材质、外观、状态等可见特征"}]}
 每个数组可以为空；每个元素必须同时有非空 name 与 prompt。`)
 	config := aiReasoningPromptConfig(snapshot.Effective)
-	smartUnifiedSelected := smartUnifiedSelectedForRevision(book, config)
-	if smartUnifiedSelected {
-		system += `
-
-【智能统一与资产同次返回】
-除 characters、scenes、props 外，顶层还必须返回 smart_unified_analysis。它是本书后续 VIDEO 的视觉基线，格式严格为：
-"smart_unified_analysis":{"schema_version":"h3-style-system/v1","prompt":"可直接注入 VIDEO 的中文视觉基线","sd_unified_style":"SD 最终分镜使用的完整统一风格段落","fields":{"final_genre":"题材","trailer_style":"影像风格","story_era":"时代背景"},"preset":{"id":"script-constraint-prefix-smart-unified","name":"智能统一","version":1}}
-不得单独解释或要求再次调用；四个字段都必须在这一次 JSON 返回中。`
-		for _, selection := range config.Constraints.Selections {
-			if selection.ID == smartUnifiedPrefixPresetID && constraintCategory(selection) == "prefix" && strings.TrimSpace(selection.Body) != "" {
-				system += "\n\n当前智能统一规则：\n" + strings.TrimSpace(selection.Body)
-				break
-			}
-		}
-	}
 	h3AssetSelected := config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)
 	h3CharacterSelected := config.Assets.appliesTo(book, config.Assets.Character) && usesH3CharacterRenderer(config.Assets.Character)
 	h3Selected := h3AssetSelected || h3CharacterSelected
@@ -434,6 +419,30 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 在同一个合法 JSON 对象中返回 characters、scenes、props 三个数组。characters 的每项必须同时返回 name 与 prompt；prompt 必须是该人物可直接用于图片和视频一致性的完整详细外形，而不是简短标签。scenes 与 props 的每项也必须同时有非空 name 与 prompt。不得返回第二份外形结果、不得要求后续逐人调用。`
 	}
 	return PromptContract{SystemPrompt: system, UserPrompt: string(payload), Temperature: 0.2, MaxTokens: 4000}, nil
+}
+
+// BuildSmartUnifiedContract is the dedicated one-call visual baseline stage.
+// It is intentionally separate from asset extraction so the two results can
+// be retried, audited and displayed independently.
+func BuildSmartUnifiedContract(book Book, snapshot DirectorSnapshot) (PromptContract, error) {
+	if strings.TrimSpace(book.SourceText) == "" {
+		return PromptContract{}, fmt.Errorf("%w: source text is required", ErrInvalid)
+	}
+	system := `你负责建立全片级视觉基线。完整阅读原文，只返回一个合法 JSON 对象：
+{"smart_unified_analysis":{"schema_version":"h3-style-system/v1","prompt":"可直接注入 VIDEO 的完整中文视觉基线","sd_unified_style":"SD 最终分镜使用的完整统一风格段落","fields":{"final_genre":"题材","trailer_style":"影像风格","story_era":"时代背景"},"preset":{"id":"script-constraint-prefix-smart-unified","name":"智能统一","version":1}}}
+不得输出解释、Markdown、人物分镜或资产列表。`
+	config := aiReasoningPromptConfig(snapshot.Effective)
+	for _, selection := range config.Constraints.Selections {
+		if selection.ID == smartUnifiedPrefixPresetID && constraintCategory(selection) == "prefix" && strings.TrimSpace(selection.Body) != "" {
+			system += "\n\n当前智能统一规则：\n" + strings.TrimSpace(selection.Body)
+			break
+		}
+	}
+	payload, err := json.MarshalIndent(map[string]any{"book_id": book.ID, "title": book.Title, "source_text": book.SourceText}, "", "  ")
+	if err != nil {
+		return PromptContract{}, err
+	}
+	return PromptContract{SystemPrompt: system, UserPrompt: string(payload), Temperature: 0.25, MaxTokens: 2600}, nil
 }
 
 func BuildDirectorContract(book Book, hook HookRevision, snapshot DirectorSnapshot) (PromptContract, error) {
@@ -590,8 +599,8 @@ func buildSDDirectorContract(book Book, hook HookRevision, snapshot DirectorSnap
 	if snapshot.AudioTargetSeconds > 0 {
 		system += fmt.Sprintf("\n分镜规划跟随配音已开启：当前书真实配音约 %.2f 秒，规划整数目标为 %d 秒；至少输出 %d 个 VIDEO 段，全部段的时长之和必须严格等于 %d 秒。按剧情节点、对白/旁白密度和情绪节奏分配各段时长，不要机械平均；不得用重复动作、空镜或静止画面凑时长。", snapshot.AudioDurationSeconds, snapshot.AudioTargetSeconds, audioMinimumVideoCount(snapshot.AudioTargetSeconds, snapshot.MaxVideoDuration), snapshot.AudioTargetSeconds)
 	}
-	if len(snapshot.Effective["sdStoryScriptRows"]) > 0 {
-		system += "\n本次已完成 SD_STORY_SCRIPT。用户消息中的 story_script_rows 是冻结的逐行故事剧本；导演只能按 source_index 顺序为这些行填写固定镜头画面，不得新增、删除、合并、拆分、改写原文行或改变时间契约。"
+	if rawString(snapshot.Effective, "storyTimelineVersion", "") == sdOriginalStoryVersion {
+		system += "\n本次采用 sd.original-story.v1 单次视频提示词流程：你必须在同一次输出中先为每个原文行写出对应的画面故事剧本，再紧接着写该行的场景环境与固定镜头；不得等待第二次调用，也不得只输出摘要。原文行、顺序、已测量时长和镜头时间契约由系统冻结，不得新增、删除、合并、拆分或改写原文。"
 	}
 	payload := map[string]any{
 		"book_id":     book.ID,

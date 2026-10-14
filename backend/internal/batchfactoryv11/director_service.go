@@ -70,7 +70,10 @@ func rawInt(patch SettingsPatch, key string, fallback int) int {
 // storyboard durations are integer seconds. Keep the measured audio value in
 // settings, but plan against the same ceiling rule used by script generation.
 func measuredAudioDurationSeconds(patch SettingsPatch) float64 {
-	if !rawBool(patch, "audioPlanningEnabled", false) {
+	// Full TTS and line timing are part of every new production flow. Keep
+	// explicit false values for historical snapshots, but default missing
+	// configuration to enabled so audio source only controls the final mix.
+	if !rawBool(patch, "audioPlanningEnabled", true) {
 		return 0
 	}
 	raw, ok := patch["audioDurationSeconds"]
@@ -132,7 +135,11 @@ func snapshotForBookWithAudioRequirement(batch Batch, book Book, requireMeasured
 		return DirectorSnapshot{}, fmt.Errorf("%w: storyboardDurationLimit must be 10 or 15", ErrInvalid)
 	}
 	fixed := rawBool(effective, "fixedSingleVideo", false)
-	audioPlanning := rawBool(effective, "audioPlanningEnabled", false)
+	// 新链路始终先做完整配音和逐行时长测量；audioPlanningEnabled 只作为
+	// 历史任务的兼容开关。新 SD 原文时间轴任务缺省即开启，旧任务仍尊重
+	// 明确保存的 false，避免历史快照被静默升级。
+	audioPlanningDefault := rawString(effective, "storyTimelineVersion", "") == sdOriginalStoryVersion
+	audioPlanning := rawBool(effective, "audioPlanningEnabled", audioPlanningDefault)
 	if requireMeasuredAudio && fixed && audioPlanning {
 		return DirectorSnapshot{}, fmt.Errorf("%w: 固定开头只生产 VIDEO01，不能同时启用分镜规划跟随配音", ErrConflict)
 	}
@@ -331,17 +338,10 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 			return DirectorRevision{}, fmt.Errorf("%w: viral mode requires approved Hook", ErrConflict)
 		}
 	}
-	config := aiReasoningPromptConfig(snapshot.Effective)
-	if shouldRunSDStoryScript(snapshot, config) {
-		rows, err := s.runSDStoryScript(ctx, book, snapshot, config)
-		if err != nil {
-			return DirectorRevision{}, retryableModelOutputError(fmt.Errorf("SD_STORY_SCRIPT: %w", err))
-		}
-		// The rows are an immutable hand-off to the director stage. They are
-		// intentionally not persisted as mutable settings; the final director
-		// revision remains the durable business result.
-		snapshot.Effective["sdStoryScriptRows"] = rows
-	}
+	// sd.original-story.v1 uses one SD video-prompt request. The response must
+	// contain both the story-script line and the fixed director shots; keeping
+	// the old SD_STORY_SCRIPT helper below preserves historical compatibility
+	// without making a second model call for new tasks.
 	contract, err := BuildDirectorContract(book, hook, snapshot)
 	if err != nil {
 		return DirectorRevision{}, err
@@ -415,6 +415,46 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	if err != nil {
 		return nil, err
 	}
+	config := aiReasoningPromptConfig(snapshot.Effective)
+	if smartUnifiedSelectedForRevision(book, config) && strings.TrimSpace(rawString(snapshot.Effective, "h3StyleAnalysis", "")) == "" {
+		styleContract, contractErr := BuildSmartUnifiedContract(book, snapshot)
+		if contractErr != nil {
+			return nil, contractErr
+		}
+		styleCompletion, completionErr := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: styleContract.SystemPrompt, UserPrompt: styleContract.UserPrompt, Temperature: styleContract.Temperature, MaxTokens: styleContract.MaxTokens})
+		if completionErr != nil {
+			return nil, completionErr
+		}
+		styleRaw, parseErr := ParseDirectorJSON(styleCompletion)
+		if parseErr != nil {
+			return nil, retryableModelOutputError(parseErr)
+		}
+		analysis, analysisErr := SmartUnifiedAnalysisFromAssetExtractionOutput(styleRaw)
+		if analysisErr != nil || analysis == nil {
+			if analysisErr == nil {
+				analysisErr = fmt.Errorf("智能统一未返回完整视觉基线")
+			}
+			return nil, retryableModelOutputError(analysisErr)
+		}
+		encoded, _ := json.Marshal(analysis)
+		analysisSetting, _ := json.Marshal(string(encoded))
+		latest, latestErr := s.Store.GetBatch(ctx, owner, batchID)
+		if latestErr != nil {
+			return nil, latestErr
+		}
+		for _, candidate := range latest.Books {
+			if candidate.ID != bookID {
+				continue
+			}
+			if _, latestErr = s.Store.SaveSettings(ctx, owner, ScopeRef{Kind: ScopeBook, BatchID: batchID, BookID: bookID}, SettingsUpdate{
+				Patch: SettingsPatch{"h3StyleAnalysis": json.RawMessage(analysisSetting)}, ExpectedRevision: candidate.Revision,
+			}); latestErr != nil {
+				return nil, latestErr
+			}
+			break
+		}
+		snapshot.Effective["h3StyleAnalysis"] = analysisSetting
+	}
 	contract, err := BuildAssetExtractionContract(book, snapshot)
 	if err != nil {
 		return nil, err
@@ -443,13 +483,10 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	if err != nil {
 		return nil, retryableModelOutputError(err)
 	}
-	// The visual baseline is deliberately optional. Asset extraction remains
-	// productive even if a model omitted or malformed the extra analysis field.
-	smartUnifiedAnalysis, _ := SmartUnifiedAnalysisFromAssetExtractionOutput(raw)
 	// The selected full H3 assets preset already returns detailed appearances
 	// together with characters/scenes/props. Other renderer selections retain
 	// their historical post-extraction compilation behavior.
-	config := aiReasoningPromptConfig(snapshot.Effective)
+	config = aiReasoningPromptConfig(snapshot.Effective)
 	if !(config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)) {
 		assets, err = s.compileH3AssetPrompts(ctx, book, snapshot, assets)
 		if err != nil {
@@ -460,30 +497,6 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	if err != nil {
 		return nil, err
 	}
-	if smartUnifiedAnalysis == nil {
-		return persisted, nil
-	}
-	analysisJSON, err := json.Marshal(smartUnifiedAnalysis)
-	if err != nil {
-		return persisted, nil
-	}
-	analysisSetting, err := json.Marshal(string(analysisJSON))
-	if err != nil {
-		return persisted, nil
-	}
-	// Persist after assets so a style write conflict can never roll back a
-	// successful extraction. A later explicit refresh can repair such a race.
-	latest, err := s.Store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return persisted, nil
-	}
-	latestBook, err := bookFromBatch(latest, bookID)
-	if err != nil {
-		return persisted, nil
-	}
-	_, _ = s.Store.SaveSettings(ctx, owner, ScopeRef{Kind: ScopeBook, BatchID: batchID, BookID: bookID}, SettingsUpdate{
-		Patch: SettingsPatch{"h3StyleAnalysis": analysisSetting}, ExpectedRevision: latestBook.Revision,
-	})
 	return persisted, nil
 }
 

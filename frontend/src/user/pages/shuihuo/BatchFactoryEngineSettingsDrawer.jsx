@@ -226,7 +226,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
             </div>
           </EngineCard>
 
-          <EngineCard title="配音与时长" description="统一的是配音参数与跟随策略；每本小说的真实秒数会在需要时独立生成和读取。">
+          <EngineCard title="配音与时长" description="完整配音和逐行时长是生产时间轴的固定流程；音频来源只决定最终合成使用 TTS 还是视频原声。">
             <div className="batch-factory-engine-grid batch-factory-tts-grid">
               <Field label="音频来源"><Segmented block value={normalizeAudioSource(form.audioSource)} options={AUDIO_SOURCE_OPTIONS} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></Field>
             </div>
@@ -237,9 +237,9 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
               <Field label="音调"><InputNumber min={-50} max={50} step={1} value={tts.pitch} onChange={pitch => patchTts({ pitch: pitch ?? DEFAULT_TTS.pitch })} /></Field>
             </div>
             <div className="batch-factory-audio-options batch-factory-audio-options-v13">
-              <section className="batch-factory-audio-option">
-                <div><div className="batch-factory-option-title"><b>分镜规划跟随配音</b><HelpTip title="分镜规划跟随配音">先为每本小说按当前正文与配音参数生成临时配音并读取真实时长，再据此规划 VIDEO 数量和每段目标时长。剧情节点、对白/旁白密度优先，不会机械平均切分。</HelpTip></div></div>
-                <Switch checked={form.audioPlanningEnabled === true} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
+              <section className="batch-factory-audio-option batch-factory-audio-option-fixed">
+                <div><div className="batch-factory-option-title"><b>完整配音与逐行时长</b><HelpTip title="完整配音与逐行时长">系统固定执行，用于建立原文时间计划；不受音频来源影响。</HelpTip></div></div>
+                <Tag color="blue">系统固定</Tag>
               </section>
               <section className="batch-factory-audio-option">
                 <div><div className="batch-factory-option-title"><b>合并跟随配音</b><HelpTip title="合并跟随配音">可在视频生成前或生成后开启。系统读取当前书配音时长，并根据各分镜主视频的实际总时长自动计算最终合并倍率，用来修正生成视频产生的时长误差。</HelpTip></div></div>

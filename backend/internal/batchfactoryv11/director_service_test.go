@@ -473,7 +473,7 @@ func TestAssetExtractionDoesNotRequireAudioPlanningMeasurement(t *testing.T) {
 	}
 }
 
-func TestAssetExtractionPersistsCombinedSmartUnifiedAnalysisWithOneModelCall(t *testing.T) {
+func TestAssetExtractionPersistsSmartUnifiedAnalysisWithSeparateAssetCall(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
 		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
@@ -488,19 +488,19 @@ func TestAssetExtractionPersistsCombinedSmartUnifiedAnalysisWithOneModelCall(t *
 		})}, ExpectedRevision: batch.Revision}); err != nil {
 		t.Fatal(err)
 	}
-	provider := &queuedDirectorProvider{values: []string{`{
-		"characters":[{"name":"林溪","prompt":"短发女主"}],"scenes":[{"name":"客厅","prompt":"现代客厅"}],"props":[],
-		"smart_unified_analysis":{"schema_version":"h3-style-system/v1","prompt":"现代都市短剧；暖黄室内光。","fields":{"final_genre":"都市情感","trailer_style":"电影感","story_era":"现代都市"},"preset":{"id":"script-constraint-prefix-smart-unified","name":"智能统一","version":1}}
-	}`}}
+	provider := &queuedDirectorProvider{values: []string{
+		`{"smart_unified_analysis":{"schema_version":"h3-style-system/v1","prompt":"现代都市短剧；暖黄室内光。","fields":{"final_genre":"都市情感","trailer_style":"电影感","story_era":"现代都市"},"preset":{"id":"script-constraint-prefix-smart-unified","name":"智能统一","version":1}}}`,
+		`{"characters":[{"name":"林溪","prompt":"短发女主"}],"scenes":[{"name":"客厅","prompt":"现代客厅"}],"props":[]}`,
+	}}
 	assets, err := (&DirectorService{Store: store, Provider: provider}).RunAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(provider.calls) != 1 || len(assets) != 2 {
-		t.Fatalf("asset extraction must use one request and persist assets, calls=%d assets=%+v", len(provider.calls), assets)
+	if len(provider.calls) != 2 || len(assets) != 2 {
+		t.Fatalf("smart-unified and asset extraction must use two requests, calls=%d assets=%+v", len(provider.calls), assets)
 	}
-	if !strings.Contains(provider.calls[0].SystemPrompt, "smart_unified_analysis") {
-		t.Fatalf("combined contract must request the visual baseline: %s", provider.calls[0].SystemPrompt)
+	if !strings.Contains(provider.calls[0].SystemPrompt, "smart_unified_analysis") || strings.Contains(provider.calls[1].SystemPrompt, "智能统一与资产同次返回") {
+		t.Fatalf("smart-unified and asset prompts were not separated: %+v", provider.calls)
 	}
 	read, err := store.GetBatch(context.Background(), "alice", batch.ID)
 	if err != nil {
@@ -518,9 +518,9 @@ func TestAssetExtractionWithSDCombinedPresetUsesOneModelCall(t *testing.T) {
 			"assets": map[string]any{
 				"enabled": true,
 				"extraction": map[string]any{
-					"presetId": "batch-assets-sd-character-scene",
+					"presetId":  "batch-assets-sd-character-scene",
 					"presetKey": "sd-character-scene",
-					"body": "SD ONE CALL ASSET RULE",
+					"body":      "SD ONE CALL ASSET RULE",
 				},
 			},
 		})}, ExpectedRevision: batch.Revision,

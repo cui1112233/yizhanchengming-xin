@@ -36,11 +36,12 @@ func TestBuildSDStoryScriptContractUsesOriginalStoryVersion(t *testing.T) {
 	}
 }
 
-func TestRunDirectorWithSDStoryVersionUsesStoryScriptHandoff(t *testing.T) {
+func TestRunDirectorWithSDStoryVersionUsesSingleVideoPromptCall(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
 		Patch: SettingsPatch{
 			"storyTimelineVersion": rawSetting(t, sdOriginalStoryVersion),
+			"audioDurationSeconds": rawSetting(t, 1),
 			"aiPromptConfig": rawSetting(t, map[string]any{"video": map[string]any{
 				"enabled": true, "scope": "all", "presetId": "batch-video-sd", "body": "SD VIDEO RULE",
 			}}),
@@ -49,17 +50,16 @@ func TestRunDirectorWithSDStoryVersionUsesStoryScriptHandoff(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := &queuedDirectorProvider{values: []string{
-		`{"rows":[{"source_index":1,"source_text":"她被当众羞辱后沉默离开。","story_script_line":"她低头离开人群。","covered_source_span_keys":["L0001-P01"]}]}`,
-		"===VIDEO 01===\n时长：1秒\n资产引用：人物=无；场景=无；道具=无\n她沉默离开。",
+		"===VIDEO 01===\n时长：1秒\n资产引用：人物=无；场景=无；道具=无\n[场景 1｜对应原文第 1 行｜总时长 1 秒]\n画面故事剧本：她低头离开人群。\n场景环境：空旷街道。\n[镜头 1｜出镜人物：无｜时长 1 秒] 她沉默离开。",
 	}}
 	if _, err := (&DirectorService{Store: store, Provider: provider}).RunDirector(context.Background(), "alice", batch.ID, book.ID); err != nil {
-		t.Fatalf("SD staged director failed: %v", err)
+		t.Fatalf("SD unified director failed: %v", err)
 	}
-	if len(provider.calls) != 2 {
-		t.Fatalf("SD staged director calls=%d, want story script plus director", len(provider.calls))
+	if len(provider.calls) != 1 {
+		t.Fatalf("SD unified director calls=%d, want one video prompt call", len(provider.calls))
 	}
-	if !strings.Contains(provider.calls[1].UserPrompt, "story_script_rows") || !strings.Contains(provider.calls[1].SystemPrompt, "SD_STORY_SCRIPT") {
-		t.Fatalf("director call did not receive frozen story-script handoff: %+v", provider.calls[1])
+	if !strings.Contains(provider.calls[0].SystemPrompt, "单次视频提示词流程") || !strings.Contains(provider.calls[0].SystemPrompt, "画面故事剧本") {
+		t.Fatalf("director call did not receive single-call story-script contract: %+v", provider.calls[0])
 	}
 }
 

@@ -565,13 +565,13 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
           </Space>
           </ConfigCard>
 
-          <ConfigCard title="配音与时长" description="读取当前生产正文；读取时长不会自动打开任何跟随功能。"><section className="batch-factory-book-audio-content">
+          <ConfigCard title="配音与时长" description="完整配音和逐行时长固定参与时间轴；音频来源只决定最终合成使用 TTS 还是视频原声。"><section className="batch-factory-book-audio-content">
             <div className="batch-factory-book-audio-head"><div><b>当前正文配音</b><HelpTip title="当前正文配音">只读取小说正文当前选择范围或已保存的生产正文，不读取整本全文。</HelpTip></div><Space wrap><Button size="small" loading={audioBusy} onClick={measureBookAudio}>生成配音并读取时长</Button>{audioBlob ? <Button size="small" onClick={() => downloadAudio(audioBlob, `${book?.bookId || book?.id || 'book'}-配音.mp3`)}>下载配音</Button> : null}</Space></div>
             <div className="batch-factory-engine-grid">
               <label className="batch-factory-engine-field"><span><b>音频来源</b><HelpTip title="音频来源">默认 TTS；原声保留视频模型自带声音。</HelpTip></span><Segmented block value={normalizeAudioSource(form.audioSource)} options={[{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }]} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></label>
             </div>
             <div className="batch-factory-audio-options">
-              <AudioOptionCard title="分镜规划跟随配音" description="按真实配音时长规划 VIDEO。" value={form.audioPlanningEnabled} inherited={inherited.audioPlanningEnabled} onChange={audioPlanningEnabled => patch({ audioPlanningEnabled })} />
+              <AudioOptionCard title="完整配音与逐行时长" description="系统固定执行，用于建立原文时间计划。" value={true} inherited={false} onChange={() => {}} />
               <AudioOptionCard disabled={normalizeAudioSource(form.audioSource) === 'original'} title="合并跟随配音" description={normalizeAudioSource(form.audioSource) === 'original' ? '原声模式不合入 TTS。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
             </div>
             <div className="batch-factory-engine-grid">
