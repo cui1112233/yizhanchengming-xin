@@ -8,10 +8,9 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $app = Join-Path $repo 'app.js'
 if (-not (Test-Path -LiteralPath $app)) { throw "app.js not found: $app" }
 
-# This is deliberately read-only. It records Express public mount points so a
-# Node route cannot disappear silently during the Go cutover. A mount is not
-# treated as a complete contract; the Go handler and focused test are recorded
-# separately in the manifest for human review.
+# This is deliberately read-only. It records historical Express public mount
+# points and marks a mount migrated only when the canonical Go router owns the
+# same namespace. The manifest is a cutover guardrail, not a runtime router.
 $goOwned = @(
   '/api/login', '/api/account-recovery', '/api/member', '/api/team-admin',
   '/api/account-admin', '/api/client-errors', '/api/applications', '/api/admin',
@@ -36,7 +35,7 @@ foreach ($line in (Get-Content -LiteralPath $app)) {
   $match = $goOwned | Where-Object { $path -eq $_ -or $path.StartsWith($_ + '/') } | Select-Object -First 1
   if ($match) {
     $owner = 'go'
-    $status = 'shadow'
+    $status = 'migrated'
     $handler = "backend/internal/httpapi (mount $match)"
     $test = 'backend/internal/httpapi/*_test.go'
   }
@@ -54,7 +53,7 @@ foreach ($line in (Get-Content -LiteralPath $app)) {
 
 $manifest = [ordered]@{
   generatedAt = (Get-Date).ToUniversalTime().ToString('o')
-  purpose = 'Node public API mounts retained for Go cutover audit; shadow means Go exists but Node source remains for rollback.'
+  purpose = 'Historical Node public API mounts retained as an audit record; migrated means the default runtime is owned by Go.'
   routes = @($routes)
 }
 $target = Join-Path $repo $Output
