@@ -1221,6 +1221,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const [selectedVideoId, setSelectedVideoId] = useState(initialVideoId || videos[0]?.id || '');
   const [promptKind, setPromptKind] = useState('video');
   const [editing, setEditing] = useState(false);
+  const [editingSnapshot, setEditingSnapshot] = useState(null);
   const [saving, setSaving] = useState(false);
   const [videoPrompt, setVideoPrompt] = useState('');
   const [visualPrompt, setVisualPrompt] = useState('');
@@ -1290,6 +1291,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       }
       await onSaved?.();
       setEditing(false);
+      setEditingSnapshot(null);
       message.success(promptKind === 'visual' ? '当前分镜画面提示词已保存。' : '当前分镜视频提示词已保存。');
     } catch (error) { message.error(error?.message || '保存分镜提示词失败'); } finally { setSaving(false); }
   }
@@ -1335,8 +1337,12 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     const root = event.currentTarget;
     const nextValue = String(root.innerText || '').replace(/\u00a0/g, ' ');
     setVideoPrompt(nextValue);
+    updateAssetMentionMenu(root, nextValue);
+  }
+
+  function updateAssetMentionMenu(root, value = String(root?.innerText || '').replace(/\u00a0/g, ' ')) {
     const cursor = contentEditableTextOffset(root);
-    const match = nextValue.slice(0, cursor).match(/@([^\s@]*)$/);
+    const match = value.slice(0, cursor).match(/@([^\s@]*)$/);
     if (!match) { setAssetMentionMenu(null); return; }
     const query = match[1].toLowerCase();
     const candidates = (book?.assetRecords || []).filter(asset => {
@@ -1344,6 +1350,39 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       return asset?.id && imageUrl && String(assetName(asset) || '').toLowerCase().includes(query);
     });
     setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
+  }
+
+  function handleEditablePromptKeyUp(event) {
+    if (event.key === '@' || event.key.length === 1) updateAssetMentionMenu(event.currentTarget);
+  }
+
+  function cancelEditing() {
+    if (editingSnapshot) {
+      setVideoPrompt(editingSnapshot.videoPrompt);
+      setVisualPrompt(editingSnapshot.visualPrompt);
+    }
+    setEditingSnapshot(null);
+    setAssetMentionMenu(null);
+    setEditing(false);
+  }
+
+  async function toggleEditing() {
+    if (editing) {
+      setEditing(false);
+      setAssetMentionMenu(null);
+      return;
+    }
+    setEditingSnapshot({ videoPrompt, visualPrompt });
+    if (promptKind === 'video' && (book?.directorRevision?.output?.h3_director || book?.directorRevision?.output?.h3Director)) {
+      try {
+        const trace = await getH3Trace(batchId, book.id);
+        const segment = trace?.compilation?.compilation?.segments?.[selectedIndex];
+        if (!segment) throw new Error('分镜编译记录缺失');
+        setPromptEditTrace(trace);
+        setVideoPrompt(segment.compiled_prompt);
+      } catch (error) { setEditingSnapshot(null); message.error(error?.message || '读取分镜失败'); return; }
+    } else if (promptKind === 'video') setVideoPrompt(submittedVideoPrompt);
+    setEditing(true);
   }
 
   function insertAssetMention(asset) {
@@ -1424,27 +1463,15 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       <label className="shuihuo-form-label batch-factory-prompt-editor-label">
         {activeLabel}
         {!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div> : editing && promptKind === 'video' ? <div className="batch-factory-prompt-editor-rich-wrap">
-          <div ref={promptEditableRef} className="batch-factory-prompt-rich-view is-editing" contentEditable suppressContentEditableWarning role="textbox" aria-label="可编辑分镜视频提示词" onInput={updateEditablePromptValue} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} />
+          <div ref={promptEditableRef} className="batch-factory-prompt-rich-view is-editing" contentEditable suppressContentEditableWarning role="textbox" aria-label="可编辑分镜视频提示词" onInput={updateEditablePromptValue} onKeyUp={handleEditablePromptKeyUp} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} />
           {assetMentionMenu ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates?.length ? assetMentionMenu.candidates.map(asset => <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}><img src={assetThumbs[String(asset.id)] || asset.imageUrl || asset.image_url || asset.thumbnailUrl} alt="" /><span>{assetName(asset)}</span><small>{asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'}</small></button>) : <div className="batch-factory-asset-mention-empty">暂无带图片的资产，请先在资产设置上传或生成图片</div>}</div> : null}
         </div> : <div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} value={activeValue} onChange={event => setVisualPrompt(event.target.value)} placeholder="仅用于生成当前分镜的画面图片" /></div>}
       </label>
       <div className="batch-factory-prompt-modal-actions">
         <Button type="primary" loading={saving} disabled={!editing || !selectedVideo} onClick={savePrompt}>保存</Button>
         <Tooltip title={promptKind === 'visual' ? '按当前小说原文重新生成画面提示词。' : '按当前小说原文重新生成导演分镜，并重编最终 VIDEO 提示词；不会提交视频生成任务。'}><Button icon={promptKind === 'visual' ? <ReloadOutlined /> : null} loading={regenerating} disabled={regenerating || !regenerateCurrentPrompt} onClick={regenerateCurrentPrompt}>{promptKind === 'visual' ? '重新生成画面提示词' : '重新生成导演分镜'}</Button></Tooltip>
-        <Button onClick={async () => {
-          if (!editing && promptKind === 'video') {
-            if (book?.directorRevision?.output?.h3_director || book?.directorRevision?.output?.h3Director) {
-              try {
-                const trace = await getH3Trace(batchId, book.id);
-                const segment = trace?.compilation?.compilation?.segments?.[selectedIndex];
-                if (!segment) throw new Error('分镜编译记录缺失');
-                setPromptEditTrace(trace);
-                setVideoPrompt(segment.compiled_prompt);
-              } catch (error) { message.error(error?.message || '读取分镜失败'); return; }
-            } else setVideoPrompt(submittedVideoPrompt);
-          }
-          setEditing(value => !value);
-        }}>{editing ? '完成编辑' : '编辑'}</Button>
+        {editing ? <Button onClick={cancelEditing}>取消编辑</Button> : null}
+        <Button onClick={toggleEditing}>{editing ? '完成编辑' : '编辑'}</Button>
         {promptKind === 'visual' ? <Button onClick={() => onGenerateVisual?.(selectedVideo?.id)}>生成图片</Button> : <Tooltip title={productionAvailable ? '为当前分镜生成视频候选版本。' : productionReason}><Button disabled={!productionAvailable || regenerating} loading={regenerating} onClick={() => onGenerateVideo?.(selectedVideo?.id)}>生成视频</Button></Tooltip>}
         {promptKind === 'video' && selectedIndex === 0 && engineSettings.openingEnabled === true ? <Button onClick={() => setOpeningVariantsOpen(true)}>查看换开头提示词</Button> : null}
         {promptKind === 'video' ? <Button onClick={openH3Trace}>查看编译 Trace</Button> : null}

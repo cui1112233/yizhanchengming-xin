@@ -63,3 +63,14 @@ test('prompt display removes the legacy standalone asset row', () => {
   assert.match(source, /const match = line\.match/);
   assert.match(source, /remainder\.replace/);
 });
+
+test('prompt editor provides cancel editing and preserves an entry snapshot', () => {
+  assert.match(source, /editingSnapshot/);
+  assert.match(source, /取消编辑/);
+  assert.match(source, /setVideoPrompt\(editingSnapshot\.videoPrompt\)/);
+});
+
+test('prompt editor opens asset mentions from an explicit at-key trigger', () => {
+  assert.match(source, /onKeyUp=\{handleEditablePromptKeyUp\}/);
+  assert.match(source, /function handleEditablePromptKeyUp\(event\)/);
+});
