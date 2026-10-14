@@ -113,7 +113,10 @@ func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input S
 	if filename == "" {
 		filename = input.BookID + ".txt"
 	}
-	part, err := writer.CreateFormFile("file", filename)
+	// The target site accepts novel uploads under the same files[] field used
+	// by the existing production contract. Keep this exact field name so the
+	// Go connector and the former client cannot diverge.
+	part, err := writer.CreateFormFile("files[]", filename)
 	if err != nil {
 		return Submission{}, err
 	}
@@ -149,8 +152,12 @@ func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, 
 	if err != nil {
 		return Submission{}, err
 	}
-	query := url.Values{"id": []string{strings.TrimSpace(id)}}.Encode()
-	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/api/zbooklist.php?"+query, session.Cookie, nil)
+	query := url.Values{
+		"bookid":   []string{strings.TrimSpace(id)},
+		"page":     []string{"1"},
+		"pageSize": []string{"10"},
+	}.Encode()
+	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/api/zbooklist_get.php?"+query, session.Cookie, nil)
 	if err != nil {
 		return Submission{}, fmt.Errorf("target site readback: %w", err)
 	}

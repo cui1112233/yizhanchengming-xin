@@ -32,8 +32,16 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 			if r.FormValue("bookid") != "book-1" {
 				t.Errorf("bookid=%q", r.FormValue("bookid"))
 			}
+			if _, _, err := r.FormFile("files[]"); err != nil {
+				t.Errorf("files[] upload missing: %v", err)
+			}
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"success":true,"id":"submission-1"}`))
+		case "/tttadmin/api/zbooklist_get.php":
+			if r.URL.Query().Get("bookid") != "book-1" || r.URL.Query().Get("page") != "1" || r.URL.Query().Get("pageSize") != "10" {
+				t.Errorf("unexpected readback query: %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -50,6 +58,10 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 	result, err := service.Submit(context.Background(), session, SubmissionInput{BookID: "book-1", Filename: "book-1.txt", Content: []byte("正文"), FormFields: map[string]string{"bookid": "book-1"}})
 	if err != nil || result.ID != "submission-1" || result.Status != "submitted" {
 		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	readback, err := service.GetSubmission(context.Background(), session, "book-1")
+	if err != nil || readback.ID != "book-1" || readback.Status != "readback" {
+		t.Fatalf("readback=%#v err=%v", readback, err)
 	}
 }
 
