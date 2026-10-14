@@ -34,6 +34,8 @@ test('SD plain-text storyboards fall back to their final prompt when structured 
 
 test('prompt panel renders image-backed mentions and opens the picker in edit mode', () => {
   assert.match(source, /batch-factory-prompt-rich-view/);
+  assert.match(source, /batch-factory-prompt-editor-rich-wrap/);
+  assert.match(source, /batch-factory-prompt-editor-input-overlay/);
   assert.match(source, /batch-factory-asset-mention-menu/);
   assert.match(source, /输入 @ 选择有图片的资产/);
   assert.match(source, /assetThumbs\[String\(asset\.id\)\]/);
