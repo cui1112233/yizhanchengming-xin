@@ -978,6 +978,23 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-final-merge-empty b { color:var(--sh-text); }
 .batch-factory-final-merge-empty span { max-width:420px; font-size:12px; line-height:1.6; }
 
+/* Keep the unified pill treatment usable inside the narrow action column. */
+.batch-factory-workbench .batch-factory-actions { min-width: 0; overflow: hidden; }
+.batch-factory-workbench .batch-factory-action-button-grid { min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.batch-factory-workbench .batch-factory-action-button-grid .ant-btn {
+  min-width: 0;
+  width: 100%;
+  min-height: 27px;
+  height: 27px;
+  padding-inline: 5px;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 25px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.batch-factory-workbench .batch-factory-action-group.is-production .batch-factory-action-video { grid-column: auto; }
+
 /* Batch Factory uses the screenplay workbench rhythm: one uninterrupted
    production row, aligned column boundaries, and compact tiered controls. */
 .batch-factory-workbench-table {

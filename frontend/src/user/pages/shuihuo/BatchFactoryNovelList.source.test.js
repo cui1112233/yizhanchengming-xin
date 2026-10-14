@@ -49,6 +49,7 @@ test('book content exposes production-content edit and TXT download actions', ()
   assert.match(stylesheet, /\.batch-factory-workbench \.ant-btn:not\(\.ant-btn-link\)/);
   assert.match(stylesheet, /\.batch-factory-workbench \.ant-btn\.ant-btn-primary/);
   assert.match(stylesheet, /\.batch-factory-workbench \.ant-btn\.ant-btn-dangerous/);
+  assert.match(stylesheet, /\.batch-factory-workbench \.batch-factory-action-button-grid \.ant-btn/);
 });
 
 test('TXT download uses the complete captured source instead of the production line preview', () => {
