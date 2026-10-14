@@ -325,7 +325,12 @@ func (s *MemoryStore) ListBookStageRuns(_ context.Context, owner, batchID, bookI
 			out = append(out, owned.Value)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].UpdatedAt.Before(out[j].UpdatedAt) })
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].UpdatedAt.Equal(out[j].UpdatedAt) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].UpdatedAt.Before(out[j].UpdatedAt)
+	})
 	return out, nil
 }
 
