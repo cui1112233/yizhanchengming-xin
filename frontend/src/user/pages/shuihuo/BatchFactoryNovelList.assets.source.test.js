@@ -72,5 +72,8 @@ test('prompt editor provides cancel editing and preserves an entry snapshot', ()
 
 test('prompt editor opens asset mentions from an explicit at-key trigger', () => {
   assert.match(source, /onKeyUp=\{handleEditablePromptKeyUp\}/);
+  assert.match(source, /onKeyDown=\{handleEditablePromptKeyDown\}/);
   assert.match(source, /function handleEditablePromptKeyUp\(event\)/);
+  assert.match(source, /function handleEditablePromptKeyDown\(event\)/);
+  assert.doesNotMatch(source, /asset\?\.id && imageUrl && String\(assetName\(asset\)/);
 });

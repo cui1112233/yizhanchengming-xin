@@ -1326,10 +1326,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     const match = nextValue.slice(0, cursor).match(/@([^\s@]*)$/);
     if (!match) { setAssetMentionMenu(null); return; }
     const query = match[1].toLowerCase();
-    const candidates = (book?.assetRecords || []).filter(asset => {
-      const imageUrl = assetThumbs[String(asset.id)] || asset?.imageUrl || asset?.image_url || asset?.thumbnailUrl || '';
-      return asset?.id && imageUrl && String(assetName(asset) || '').toLowerCase().includes(query);
-    });
+    const candidates = (book?.assetRecords || []).filter(asset => asset?.id && String(assetName(asset) || '').toLowerCase().includes(query));
     setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
   }
 
@@ -1345,15 +1342,16 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     const match = value.slice(0, cursor).match(/@([^\s@]*)$/);
     if (!match) { setAssetMentionMenu(null); return; }
     const query = match[1].toLowerCase();
-    const candidates = (book?.assetRecords || []).filter(asset => {
-      const imageUrl = assetThumbs[String(asset.id)] || asset?.imageUrl || asset?.image_url || asset?.thumbnailUrl || '';
-      return asset?.id && imageUrl && String(assetName(asset) || '').toLowerCase().includes(query);
-    });
+    const candidates = (book?.assetRecords || []).filter(asset => asset?.id && String(assetName(asset) || '').toLowerCase().includes(query));
     setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
   }
 
   function handleEditablePromptKeyUp(event) {
     if (event.key === '@' || event.key.length === 1) updateAssetMentionMenu(event.currentTarget);
+  }
+
+  function handleEditablePromptKeyDown(event) {
+    if (event.key === '@') requestAnimationFrame(() => updateAssetMentionMenu(event.currentTarget));
   }
 
   function cancelEditing() {
@@ -1463,7 +1461,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       <label className="shuihuo-form-label batch-factory-prompt-editor-label">
         {activeLabel}
         {!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div> : editing && promptKind === 'video' ? <div className="batch-factory-prompt-editor-rich-wrap">
-          <div ref={promptEditableRef} className="batch-factory-prompt-rich-view is-editing" contentEditable suppressContentEditableWarning role="textbox" aria-label="可编辑分镜视频提示词" onInput={updateEditablePromptValue} onKeyUp={handleEditablePromptKeyUp} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} />
+          <div ref={promptEditableRef} className="batch-factory-prompt-rich-view is-editing" contentEditable suppressContentEditableWarning role="textbox" aria-label="可编辑分镜视频提示词" onInput={updateEditablePromptValue} onKeyDown={handleEditablePromptKeyDown} onKeyUp={handleEditablePromptKeyUp} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} />
           {assetMentionMenu ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates?.length ? assetMentionMenu.candidates.map(asset => <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}><img src={assetThumbs[String(asset.id)] || asset.imageUrl || asset.image_url || asset.thumbnailUrl} alt="" /><span>{assetName(asset)}</span><small>{asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'}</small></button>) : <div className="batch-factory-asset-mention-empty">暂无带图片的资产，请先在资产设置上传或生成图片</div>}</div> : null}
         </div> : <div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} value={activeValue} onChange={event => setVisualPrompt(event.target.value)} placeholder="仅用于生成当前分镜的画面图片" /></div>}
       </label>
