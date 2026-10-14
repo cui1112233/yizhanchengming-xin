@@ -19,6 +19,7 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/mergeworker"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 const publish121BaseURL = "http://two.121w.com"
@@ -368,7 +369,7 @@ func batchFactoryBuildUploadMultipart(fields map[string]string, filename string,
 	return body.Bytes(), writer.FormDataContentType(), nil
 }
 
-func publish121OrganizationsHandler(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
+func publish121OrganizationsHandler(root *http.ServeMux, middleware BridgeAuth, usersDir string, targets ...videomanagementconnector.Service) {
 	root.Handle("GET /api/batch-factory/v11/publish-121/organizations", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -381,15 +382,24 @@ func publish121OrganizationsHandler(root *http.ServeMux, middleware BridgeAuth, 
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请先保存账号密码并登录目标站"})
 			return
 		}
-		body, err := targetGET(req, publish121BaseURL+"/tttadmin/api/organization.php", cookie)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
-			return
-		}
 		var payload any
-		if json.Unmarshal(body, &payload) != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录返回了无效数据"})
-			return
+		if len(targets) > 0 && targets[0] != nil {
+			catalogs, err := targets[0].RefreshCatalogs(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
+				return
+			}
+			payload = catalogs.Raw
+		} else {
+			body, err := targetGET(req, publish121BaseURL+"/tttadmin/api/organization.php", cookie)
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
+				return
+			}
+			if json.Unmarshal(body, &payload) != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录返回了无效数据"})
+				return
+			}
 		}
 		organizations := normalizeOrganizationOptions(payload)
 		if len(organizations) == 0 {

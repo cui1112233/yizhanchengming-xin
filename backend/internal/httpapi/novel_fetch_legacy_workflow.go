@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 var novelFetchOperations = struct {
@@ -20,7 +22,7 @@ var novelFetchOperations = struct {
 // on the Go store. These routes are deliberately small adapters: they return
 // the same shapes the workbench expects while preserving the complete raw
 // text in each stored document.
-func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, usersDir string, rewriteProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error)) {
+func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, usersDir string, rewriteProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error), targets ...videomanagementconnector.Service) {
 	mux.HandleFunc("GET /api/novel-fetch-workshop/logs", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		docs, err := store.ListDocuments(req.Context(), identity.Username)
@@ -152,7 +154,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		id := fmt.Sprintf("op-%d", time.Now().UnixNano())
 		item := map[string]any{"id": id, "status": "done", "kind": input["kind"], "createdAt": time.Now().UTC().Format(time.RFC3339Nano), "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}
 		if fmt.Sprint(input["kind"]) == "configs" {
-			result, err := syncTargetConfigProfiles(req, store, usersDir)
+			result, err := syncTargetConfigProfiles(req, store, usersDir, targets...)
 			if err != nil {
 				item["status"] = "failed"
 				item["error"] = err.Error()
@@ -192,7 +194,7 @@ func legacyOperationResponse(item map[string]any) map[string]any {
 // the newer direct sync endpoint. The old page used to mark the operation done
 // without ever calling the target configuration API, which made the UI report
 // zero profiles even when the target account had profiles.
-func syncTargetConfigProfiles(req *http.Request, store novelfetchworkshop.Store, usersDir string) (map[string]any, error) {
+func syncTargetConfigProfiles(req *http.Request, store novelfetchworkshop.Store, usersDir string, targets ...videomanagementconnector.Service) (map[string]any, error) {
 	identity, ok := BridgeIdentityFromContext(req.Context())
 	if !ok {
 		return nil, fmt.Errorf("unauthorized")
@@ -202,13 +204,27 @@ func syncTargetConfigProfiles(req *http.Request, store novelfetchworkshop.Store,
 	if cookie == "" {
 		return nil, fmt.Errorf("请先保存账号密码并登录目标站")
 	}
-	response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
-	if err != nil {
-		return nil, fmt.Errorf("目标站配置档读取失败")
-	}
 	var payload map[string]any
-	if json.Unmarshal(response, &payload) != nil {
-		return nil, fmt.Errorf("目标站配置档返回格式无效")
+	if len(targets) > 0 && targets[0] != nil {
+		reader, ok := targets[0].(interface {
+			RefreshProfiles(context.Context, videomanagementconnector.Session) (any, error)
+		})
+		if !ok {
+			return nil, fmt.Errorf("视频管理系统 Go 连接器不支持配置档读取")
+		}
+		value, err := reader.RefreshProfiles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+		if err != nil {
+			return nil, fmt.Errorf("目标站配置档读取失败")
+		}
+		payload = mapOrEmpty(value)
+	} else {
+		response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
+		if err != nil {
+			return nil, fmt.Errorf("目标站配置档读取失败")
+		}
+		if json.Unmarshal(response, &payload) != nil {
+			return nil, fmt.Errorf("目标站配置档返回格式无效")
+		}
 	}
 	items, hasItems := targetConfigItems(payload)
 	if !hasItems || len(items) == 0 {

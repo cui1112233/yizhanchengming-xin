@@ -294,7 +294,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
 	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
 	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
-	publish121OrganizationsHandler(root, auth, options.UserDataDir)
+	publish121OrganizationsHandler(root, auth, options.UserDataDir, options.VideoManagementConnector)
 	if options.UserConfigStore != nil {
 		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)
 		RegisterAgentChatCompat(root, auth, options.UserConfigStore.BaseDir, options.TextProvider)
@@ -344,7 +344,7 @@ func NewRouter(options RouterOptions) http.Handler {
 			}
 			identity, _ := BridgeIdentityFromContext(req.Context())
 			return options.NovelFetchRewriteResolver(req.Context(), identity.Username)
-		})
+		}, options.VideoManagementConnector)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
 		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))

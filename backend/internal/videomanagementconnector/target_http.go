@@ -75,6 +75,31 @@ func (s *TargetHTTPService) RefreshCatalogs(ctx context.Context, session Session
 	return Catalogs{Raw: value}, nil
 }
 
+// RefreshProfiles reads the video-management system's saved configuration
+// profiles. It is intentionally separate from organization catalogs because
+// the two endpoints have different payload contracts, while both remain
+// owned by the same Go connector.
+func (s *TargetHTTPService) RefreshProfiles(ctx context.Context, session Session) (any, error) {
+	base, err := s.base()
+	if err != nil {
+		return nil, err
+	}
+	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/api/zdy_config.php?action=list", session.Cookie, nil)
+	if err != nil {
+		return nil, fmt.Errorf("target site profiles: %w", err)
+	}
+	defer response.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("target site profiles returned HTTP %d", response.StatusCode)
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil, fmt.Errorf("target site profiles returned invalid JSON: %w", err)
+	}
+	return value, nil
+}
+
 func (s *TargetHTTPService) CheckSession(ctx context.Context, session Session) error {
 	base, err := s.base()
 	if err != nil {
