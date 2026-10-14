@@ -69,7 +69,6 @@ import {
   runBatchDirector,
   runBookStage,
   retryBookStage,
-  refreshBookSmartUnified,
   saveBatchSettings,
   saveBookOverride,
   updateBookAsset,
@@ -3515,42 +3514,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       void Promise.all([refreshBatch(), loadRuntimeStatus({ quiet: true })]).catch(() => {});
     } finally { setActionBusy(''); }
   }
-  async function refreshBookSmartUnifiedAction(book, { quiet = false } = {}) {
-    if (!batch?.id || !book?.id || actionBusy) return null;
-    setActionBusy(`smart-unified-${book.id}`);
-    try {
-      const settings = effectiveBookSettings(batch, book);
-      const response = await refreshBookSmartUnified(batch.id, book.id, { textModelId: settings.textModelId });
-      const smartUnified = resultData(response, 'smartUnified') || response?.smartUnified || {};
-      await refreshBatch();
-      if (smartUnified.available) {
-        const latest = resultData(await getBatch(batch.id), 'batch');
-        const refreshedBook = (latest?.books || []).find(item => item?.id === book.id);
-        if (refreshedBook && h3DirectorCards(refreshedBook).length) await compileBookH3Videos(refreshedBook, { interactive: false });
-        await refreshBatch();
-      }
-      if (!quiet) {
-        if (smartUnified.available) message.success('智能统一视觉基线已刷新，最终 VIDEO Prompt 已按当前导演卡重新编译。');
-        else message.info(smartUnified.reason || '智能统一未获取，已保留原流程和既有导演卡。');
-      }
-      return smartUnified;
-    } catch (error) {
-      if (!quiet) message.error(error?.message || '刷新智能统一失败');
-      return null;
-    } finally { setActionBusy(''); }
-  }
-  async function refreshAllSmartUnified() {
-    const targets = books.filter(book => Boolean(book?.id));
-    if (!targets.length || actionBusy) return;
-    let succeeded = 0;
-    let unavailable = 0;
-    for (const book of targets) {
-      const result = await refreshBookSmartUnifiedAction(book, { quiet: true });
-      if (result?.available) succeeded += 1;
-      else unavailable += 1;
-    }
-    message.info(`已逐本刷新智能统一：${succeeded} 本获取成功，${unavailable} 本未获取但未阻断任何生产步骤。`);
-  }
   async function runAi(scope, textModelId = '') {
     if (!batch?.id || actionBusy) return;
     if (scope?.id) { await runBookStageAction(scope, 'director', 'missing', '', textModelId); return; }
@@ -3891,7 +3854,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       <div className="shuihuo-workbench-toolbar" role="toolbar" aria-label="批量工厂工具栏">
         <Button type="text" icon={<BarsOutlined />} onClick={() => setNovelListOpen(true)}>小说列表</Button>
         <Button type="text" icon={<SettingOutlined />} onClick={() => setUnifiedSettingsOpen(true)}>统一配置</Button>
-        <Tooltip title="只重新获取每本书的智能统一视觉基线，并按现有导演卡重新编译最终 VIDEO Prompt；不重做资产、分镜、视频或成片。"><Button type="text" loading={String(actionBusy).startsWith('smart-unified-')} disabled={Boolean(actionBusy)} onClick={refreshAllSmartUnified}>刷新智能统一</Button></Tooltip>
         <Dropdown menu={{ items: automationMenuItems, onClick: ({ key }) => key === 'start' ? openAutomationStart() : runAutomationAction(key) }}><Button type="text" loading={Boolean(automationBusy)} disabled={automationState === 'idle' && automationStartBlocked}>{automationLabel}</Button></Dropdown>
         <Dropdown menu={{ items: batchMenuItems, onClick: ({ key }) => key === 'production' ? runProduction() : runMerge() }}><Button className="shuihuo-batch-button" type="text" icon={<PictureOutlined />} loading={actionBusy === 'production' || actionBusy === 'merge'}>批量操作</Button></Dropdown>
 		<Tooltip title={cancelCapability.available ? '取消可取消的本地执行器任务；其它供应商保持在途状态。' : cancelCapability.reason}><Button className="shuihuo-cancel-button" type="text" loading={actionBusy === 'cancel'} disabled={!cancelCapability.available || Boolean(actionBusy)} onClick={cancelProduction}>取消操作</Button></Tooltip>
@@ -3920,7 +3882,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 		  <div className="shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell"><InlineMediaLibrary book={book} versionsByVideo={mediaVersionsByVideo} productionStatus={productionStatus} mergeJob={latestBookMerge(mergeStatus, book.id)} aspectRatio={effectiveBookSettings(batch, book).aspectRatio} h3CompilationMessage={h3CompilationStatus(effectiveBookSettings(batch, book))} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setMediaVideoId(videoId || ''); setMediaStartTab('clips'); setMediaBook(book); }} onOpenMerge={() => { setMediaVideoId(''); setMediaStartTab('merges'); setMediaBook(book); }} /></div>
           <div className="shuihuo-workbench-cell batch-factory-actions">
             <div className="batch-factory-action-group is-utility"><span>资料与流程</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => setViewingBook(book)}>查看资料</Button>{previewText ? <Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新状态</Button> : <Button size="small" type="primary" onClick={() => fetchMissingBookSource(book)} loading={actionBusy === `source-${book.id}`} disabled={Boolean(actionBusy)}>获取正文</Button>}</div></div>
-            <div className="batch-factory-action-group is-production"><span>资产获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '提取当前书的人物、场景、道具提示词；手动资产保留。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'assets', 'force')} loading={actionBusy === stageActionKey('assets', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="只刷新智能统一视觉基线，不重做资产、分镜、视频或成片。"><Button size="small" loading={actionBusy === `smart-unified-${book.id}`} disabled={Boolean(actionBusy)} onClick={() => refreshBookSmartUnifiedAction(book)}>刷新智能统一</Button></Tooltip><Tooltip title="打开资产图选择与生成面板；选择资产和图片模型后生成。"><Button size="small" onClick={() => setAssetBook(book)} disabled={Boolean(actionBusy)}>生成图片</Button></Tooltip></div></div>
+            <div className="batch-factory-action-group is-production"><span>资产获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '提取当前书的人物、场景、道具提示词；手动资产保留。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'assets', 'force')} loading={actionBusy === stageActionKey('assets', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="打开资产图选择与生成面板；选择资产和图片模型后生成。"><Button size="small" onClick={() => setAssetBook(book)} disabled={Boolean(actionBusy)}>生成图片</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-production"><span>视频获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? (h3DirectorCards(book).length && usesH3VideoPrompt(effectiveBookSettings(batch, book)) ? '复用已有统一导演卡，按当前规则编译最终 VIDEO Prompt。' : '按统一流程生成导演分镜：选中的视频提示词决定 SD 或 H3 的输出协议。') : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'director', 'compile')} loading={actionBusy === stageActionKey('director', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title={productionCapability.available ? '按当前书最终编译视频提示词、可用参考图和画幅创建 VIDEO 任务。' : productionCapability.reason}><Button size="small" className="batch-factory-action-video" onClick={() => runBookStageAction(book, 'video')} loading={actionBusy === stageActionKey('video', book.id)} disabled={!productionCapability.available || Boolean(actionBusy)}>生成视频</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-production"><span>画面获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '根据已生成的分镜卡（视频提示词）和画面提示词预设，生成每张分镜的画面提示词。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'visual', 'force')} loading={actionBusy === stageActionKey('visual', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="画面首帧图片生成服务尚未配置；可先在分镜提示词中查看或编辑画面提示词。"><Button size="small" disabled>生成图片</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-recovery"><span>异常处理</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新</Button><Button size="small" danger onClick={() => retryLastFailedStage(book)} loading={actionBusy === stageActionKey('retry', book.id)} disabled={Boolean(actionBusy) && actionBusy !== stageActionKey('retry', book.id)}>重试失败步骤</Button></div></div>
