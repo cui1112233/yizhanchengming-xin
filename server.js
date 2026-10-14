@@ -1,11 +1,20 @@
-const os = require('os');
-const express = require('express');
-
 const { hydrateMissingEnvFromFile } = require('./lib/runtime-env');
 hydrateMissingEnvFromFile(
   process.env.QIANTIE_BASE_ENV_FILE || '/run/qiantie/base.env',
   ['QIANTIE_BRIDGE_SECRET']
 );
+
+// Go is the only default application runtime. Check this before loading
+// Express or any legacy router/store so an accidental Node start consumes
+// only the small environment-loader footprint and exits immediately.
+const nodeLegacyAPIEnabled = String(process.env.QIANTIE_NODE_LEGACY_API || '') === '1';
+if (!nodeLegacyAPIEnabled) {
+  console.error('Node 兼容服务默认已停用，请使用 Go 服务；仅在明确回滚时设置 QIANTIE_NODE_LEGACY_API=1。');
+  process.exit(78);
+}
+
+const os = require('os');
+const express = require('express');
 // Local development runs the Go service on 4001 and the compatibility Node
 // service on 3001. Keep the local bridge aligned even when the user starts
 // Node directly without copying a long environment-variable command.
@@ -20,17 +29,6 @@ const { HOST, PORT } = require('./lib/shared');
 const { createApp } = require('./app');
 const { apiAuth } = require('./middleware/auth');
 const { migrateLegacyScriptPromptPresets } = require('./lib/script-prompt-preset-migration');
-const nodeLegacyAPIEnabled = String(process.env.QIANTIE_NODE_LEGACY_API || '') === '1';
-
-// Go is the only default application runtime. Refuse direct Node startup too,
-// so bypassing start-local-node.ps1 cannot accidentally create a second
-// resident business service. Legacy Node remains available only as an
-// explicit, temporary rollback profile.
-if (!nodeLegacyAPIEnabled) {
-  console.error('Node 兼容服务默认已停用，请使用 Go 服务；仅在明确回滚时设置 QIANTIE_NODE_LEGACY_API=1。');
-  process.exit(78);
-}
-
 // ============================================================
 // 启动服务器
 // ============================================================
