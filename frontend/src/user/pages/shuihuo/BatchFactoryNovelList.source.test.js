@@ -52,6 +52,10 @@ test('book content exposes production-content edit and TXT download actions', ()
   assert.match(stylesheet, /\.batch-factory-workbench \.batch-factory-action-button-grid \.ant-btn/);
 });
 
+test('keeps the batch factory header and rows on the same six-column grid', () => {
+  assert.match(stylesheet, /BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_BEGIN[\s\S]*grid-template-columns:\s*64px minmax\(300px,\s*1\.04fr\) minmax\(170px,\s*\.60fr\) minmax\(330px,\s*1\.16fr\) minmax\(300px,\s*1\.02fr\) minmax\(210px,\s*\.72fr\)\s*!important/);
+});
+
 test('TXT download uses the complete captured source instead of the production line preview', () => {
   assert.match(source, /const productionText = batchFactoryCleanSourceText\(book\.sourceText\);/);
 });
