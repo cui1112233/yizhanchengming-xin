@@ -8,9 +8,10 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
-func registerV12FetchOriginalsRoute(mux *http.ServeMux, fetcher *novelfetchworkshop.UpstreamFetcher) {
+func registerV12FetchOriginalsRoute(mux *http.ServeMux, fetcher *novelfetchworkshop.UpstreamFetcher, classification batchFetchClassification) {
 	mux.HandleFunc("POST /api/batch-factory/v12/fetch-originals", func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := bridgeOwner(r); !ok {
+		owner, ok := bridgeOwner(r)
+		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
@@ -57,11 +58,7 @@ func registerV12FetchOriginalsRoute(mux *http.ServeMux, fetcher *novelfetchworks
 			if result.BookInfo.Genre != "" {
 				metadata["genre"] = result.BookInfo.Genre
 			}
-			decision := novelfetchworkshop.ResolveGender(r.Context(), "", result.BookInfo, nil)
-			if decision.Gender == "男频" || decision.Gender == "女频" {
-				metadata["gender"] = decision.Gender
-				metadata["genderSource"] = string(decision.Source)
-			}
+			metadata = classifyFetchedBatchBook(r.Context(), owner, result.BookInfo, result.ProcessedText, metadata, classification)
 			results = append(results, map[string]any{
 				"bookId": bookID, "platform": input.Platform, "status": "ok",
 				"data": result.ProcessedText, "rawData": result.OriginalRaw,
