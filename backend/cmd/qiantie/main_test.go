@@ -203,6 +203,12 @@ func TestAutomationStartIsNativeGo(t *testing.T) {
 	}
 }
 
+func TestBatchFactoryV12IntakeReadIsNativeGo(t *testing.T) {
+	if shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/intake-1") {
+		t.Fatal("V12 intake reads must use the Go batch store")
+	}
+}
+
 func TestShuihuoProductionBatchFactoryPathsStayOnGo(t *testing.T) {
 	paths := []string{
 		"/api/batch-factory/v12/batches/demo",

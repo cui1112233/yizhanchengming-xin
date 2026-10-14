@@ -589,6 +589,12 @@ func isGoV12AliasPath(path string) bool {
 	if len(parts) == 2 && parts[0] == "intakes" && parts[1] == "manual" {
 		return true
 	}
+	if len(parts) == 2 && parts[0] == "intakes" && parts[1] != "" {
+		// The V12 intake detail route is registered directly by the Go batch
+		// store. Keeping it on the compatibility bridge caused the novel-fetch
+		// handoff to switch runtimes between creation and detail loading.
+		return true
+	}
 	if len(parts) == 5 && parts[0] == "batches" && parts[2] == "intakes" && parts[4] == "books" {
 		return true
 	}
