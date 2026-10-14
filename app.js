@@ -40,11 +40,6 @@ const { createNovelFetchV2PageMiddleware } = require('./lib/novel-fetch-workshop
 const { createBatchFactoryRouter } = require('./routes/batch-factory');
 const { createBatchFactoryIntakeRouter } = require('./routes/batch-factory-intake');
 const { createBatchFactoryProductionRouter } = require('./routes/batch-factory-production');
-const { createBatchFactoryV11Router } = require('./routes/batch-factory-v11');
-const { createBatchFactoryV12Router } = require('./routes/batch-factory-v12');
-const { createBatchFactoryV11ScheduleRouter } = require('./routes/batch-factory-v11-schedules');
-const { createBatchFactoryV11Scheduler } = require('./lib/batch-factory-v11-scheduler');
-const { createSignedBridgeHeaders } = require('./lib/batch-factory-v11/go-proxy');
 const { createMySQLBatchFactoryStoreFactory } = require('./lib/batch-factory/mysql-store');
 const { createAgentRouter } = require('./routes/agent');
 const { createAgentSkillsRouter } = require('./routes/agent-skills');
@@ -104,6 +99,18 @@ function appBuildInfo({ env = process.env, rootDir } = {}) {
   };
 }
 
+function resolveNovelFetchBridge(env = process.env) {
+  const targetBaseUrl = String(env.QIANTIE_GO_BASE_URL || 'http://127.0.0.1:4000').replace(/\/$/, '');
+  const target = new URL(targetBaseUrl);
+  const localHost = ['127.0.0.1', 'localhost', '::1'].includes(target.hostname);
+  const dockerHost = target.hostname === 'backend' && target.port === '4000';
+  if (!localHost && !dockerHost) throw new Error('QIANTIE_GO_BASE_URL 只允许本机地址或 Docker backend:4000');
+  return {
+    targetBaseUrl,
+    bridgeSecret: String(env.QIANTIE_BRIDGE_SECRET || '')
+  };
+}
+
 function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptConstraintPromptStore, shuihuoGateway, agentStore, agentSkillStore, agentResponder, errorLogStore, novelPanelAiDiagnosticStore, novelPanelHistoryStore, novelPanelPremiumStore, novelFetchStore, memberStore, usageStore, passkeyStore, accountRecoveryStore, mailer, configReader, configWriter, tosCleaner } = {}) {
   const app = express();
   const authRuntime = createAuthRuntime({ accountStore, tokenMap, sessionsPath });
@@ -137,33 +144,6 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     logger: console
   });
   resolvedProductionRetentionScheduler.start();
-  const resolvedBatchFactoryV11Scheduler = createBatchFactoryV11Scheduler({
-    usersDir,
-    submit: async item => {
-      const base = String(process.env.QIANTIE_GO_BASE_URL || 'http://backend:4000').replace(/\/$/, '');
-      const productionPath = item.bookId
-        ? '/api/batch-factory/v11/batches/' + encodeURIComponent(item.batchId) + '/books/' + encodeURIComponent(item.bookId) + '/production'
-        : '/api/batch-factory/v11/batches/' + encodeURIComponent(item.batchId) + '/production';
-      const account = authRuntime.accountStore.getInternalAccount(item.username);
-      const response = await fetch(base + productionPath, {
-        method: 'POST',
-        headers: {
-          ...createSignedBridgeHeaders({
-            username: item.username,
-            isOwner: account?.isOwner === true,
-            method: 'POST',
-            pathname: productionPath,
-            secret: process.env.QIANTIE_BRIDGE_SECRET || '',
-            now: Date.now
-          }),
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ requestId: item.requestId, provider: item.provider })
-      });
-      if (!response.ok) throw new Error('定时生产提交失败（HTTP ' + response.status + '）');
-    }
-  });
-  resolvedBatchFactoryV11Scheduler.start();
   const resolvedNovelPanelAiDiagnosticStore = novelPanelAiDiagnosticStore || createNovelPanelAiDiagnosticStore({ usersDir });
   const resolvedNovelPanelHistoryStore = novelPanelHistoryStore || createNovelPanelHistoryStore({ usersDir });
   const resolvedNovelPanelPremiumStore = novelPanelPremiumStore || createNovelPanelPremiumStore({ usersDir });
@@ -467,38 +447,23 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   app.use('/api/novel-panel', trackNovelPanelUsage, novelPanelApiRouter);
   app.use('/api/novel-fetch', createNovelFetchRouter({ presetStore: resolvedPresetStore, novelFetchStore: resolvedNovelFetchStore }));
   app.use('/api/novel-fetch-upload', createNovelFetchUploadRouter({ store: resolvedNovelFetchStore, workshopGateway: shuihuoGateway }));
+  const novelFetchBridge = resolveNovelFetchBridge();
   const workshopOptions = {
     ...shuihuoGateway,
+    ...novelFetchBridge,
     systemDir: path.dirname(authRuntime.accountStore.files.audit),
     resolveRuntimeModel: app.locals.resolveRuntimeModel
   };
-  app.use('/api/novel-fetch-workshop', createNovelFetchWorkshopRouter(workshopOptions));
-  app.use('/api/batch-rewrite', createBatchRewriteRouter({
+  const batchRewriteRouter = createBatchRewriteRouter({
     ...workshopOptions,
     novelFetchStore: resolvedNovelFetchStore,
     resolveRuntimeModel: app.locals.resolveRuntimeModel
-  }));
-  const batchFactoryV11Router = createBatchFactoryV11Router({
-    memberStore: resolvedMemberStore,
-    accountStore: authRuntime.accountStore,
-    presetStore: resolvedPresetStore,
-    configReader: readConfig,
-    novelFetchStore: resolvedNovelFetchStore
   });
-  app.use('/api/batch-factory/v11', apiAuth, batchFactoryV11Router);
-  app.use('/api/batch-factory/v11', createBatchFactoryV11ScheduleRouter(resolvedBatchFactoryV11Scheduler));
+  app.use('/api/novel-fetch-workshop', createNovelFetchWorkshopRouter({ ...workshopOptions, processRouter: batchRewriteRouter }));
+  app.use('/api/batch-rewrite', batchRewriteRouter);
   const resolvedConfigReader = configReader || readConfig;
-  app.use('/api/batch-factory/v12', apiAuth, createBatchFactoryV12Router({
-    ...shuihuoGateway,
-    presetStore: resolvedPresetStore,
-    memberStore: resolvedMemberStore,
-    accountStore: authRuntime.accountStore,
-    configReader: resolvedConfigReader,
-    novelFetchStore: resolvedNovelFetchStore,
-    goBaseUrl: process.env.QIANTIE_GO_BASE_URL,
-    bridgeSecret: process.env.QIANTIE_BRIDGE_SECRET,
-    legacyRouter: batchFactoryV11Router
-  }));
+  // 批量工厂运行时统一由 Go 提供；Node 仅保留通用页面与历史兼容模块，
+  // 不再加载旧 V11/V12 路由或 Node 定时调度器，避免重复链路和常驻内存。
   app.use('/api/batch-factory', createBatchFactoryIntakeRouter({ store: resolvedBatchFactoryStore }));
   app.use('/api/batch-factory', createBatchFactoryRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway, configReader: teamConfigReader, upstreamRequest: createTeamUpstreamRequest({ usageStore: resolvedUsageStore, feature: 'batch-factory' }) }));
   app.use('/api/batch-factory', createBatchFactoryProductionRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway }));
@@ -587,4 +552,4 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   return app;
 }
 
-module.exports = { createApp, appBuildInfo };
+module.exports = { createApp, appBuildInfo, resolveNovelFetchBridge };
