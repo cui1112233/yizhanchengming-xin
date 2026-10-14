@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/videomanagementconnector"
@@ -59,6 +57,10 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 		cookie := strings.TrimSpace(toString(session["cookie"]))
 		if cookie == "" {
 			writeJSON(w, http.StatusOK, map[string]any{"ok": false, "notLoggedIn": true, "error": "请先登录目标站"})
+			return
+		}
+		if len(targets) == 0 || targets[0] == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器未配置"})
 			return
 		}
 		results := make([]map[string]any, 0, len(input.Items))
@@ -115,58 +117,13 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 				results = append(results, result)
 				continue
 			}
-			if len(targets) > 0 && targets[0] != nil {
-				submission, submitErr := targets[0].Submit(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}, videomanagementconnector.SubmissionInput{BookID: bookID, Filename: bookID + ".txt", Content: content, FormFields: fields})
-				if submitErr != nil {
-					result["error"] = "上传失败"
-				} else {
-					result["status"] = "ok"
-					result["submissionId"] = submission.ID
-					result["error"] = nil
-				}
-				results = append(results, result)
-				continue
-			}
-			body, contentType, err := buildUploadMultipart(fields, bookID+".txt", content)
-			if err != nil {
-				result["error"] = "上传内容组装失败"
-				results = append(results, result)
-				continue
-			}
-			request, err := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/zbooklist_upload.php", bytes.NewReader(body))
-			if err != nil {
-				result["error"] = "上传请求创建失败"
-				results = append(results, result)
-				continue
-			}
-			request.Header.Set("Cookie", cookie)
-			request.Header.Set("Content-Type", contentType)
-			response, requestErr := (&http.Client{Timeout: 120 * time.Second}).Do(request)
-			if requestErr != nil {
+			submission, submitErr := targets[0].Submit(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}, videomanagementconnector.SubmissionInput{BookID: bookID, Filename: bookID + ".txt", Content: content, FormFields: fields})
+			if submitErr != nil {
 				result["error"] = "上传失败"
-				results = append(results, result)
-				continue
-			}
-			responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
-			response.Body.Close()
-			if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || strings.Contains(string(responseBody), "管理员登录") {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "notLoggedIn": true, "error": "目标站登录已失效，请重新登录"})
-				return
-			}
-			var remote map[string]any
-			_ = json.Unmarshal(responseBody, &remote)
-			if response.StatusCode >= 200 && response.StatusCode < 300 && remote["success"] == true {
-				result["status"] = "ok"
-				result["error"] = nil
 			} else {
-				message := strings.TrimSpace(fmt.Sprint(remote["message"]))
-				if message == "" || message == "<nil>" {
-					message = strings.TrimSpace(fmt.Sprint(remote["msg"]))
-				}
-				if message == "" || message == "<nil>" {
-					message = "上传失败"
-				}
-				result["error"] = message
+				result["status"] = "ok"
+				result["submissionId"] = submission.ID
+				result["error"] = nil
 			}
 			results = append(results, result)
 		}

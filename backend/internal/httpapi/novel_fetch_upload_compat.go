@@ -36,33 +36,12 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			return
 		}
 		cookie := strings.TrimSpace(toString(session["cookie"]))
-		if len(targets) > 0 && targets[0] != nil {
-			if err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}); err != nil {
-				writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "loggedIn": false, "notLoggedIn": true, "status": "expired", "lastVerifiedAt": nil, "error": "目标站登录已失效，请重新登录", "code": "SESSION_EXPIRED"})
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "loggedIn": true, "status": "ready", "lastVerifiedAt": time.Now().UTC().Format(time.RFC3339)})
+		if len(targets) == 0 || targets[0] == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "loggedIn": false, "error": "视频管理系统 Go 连接器未配置"})
 			return
 		}
-		check, err := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 会话验证失败"})
-			return
-		}
-		check.Header.Set("Cookie", cookie)
-		client := &http.Client{Timeout: 30 * time.Second}
-		response, err := client.Do(check)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "loggedIn": false, "error": "121 会话验证失败"})
-			return
-		}
-		defer response.Body.Close()
-		if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+		if err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}); err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "loggedIn": false, "notLoggedIn": true, "status": "expired", "lastVerifiedAt": nil, "error": "目标站登录已失效，请重新登录", "code": "SESSION_EXPIRED"})
-			return
-		}
-		if response.StatusCode < 200 || response.StatusCode >= 300 {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "loggedIn": false, "error": "121 会话验证失败"})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "loggedIn": true, "status": "ready", "lastVerifiedAt": time.Now().UTC().Format(time.RFC3339)})
@@ -81,70 +60,16 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入账号和密码"})
 			return
 		}
-		if len(targets) > 0 && targets[0] != nil {
-			connected, err := targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: strings.TrimSpace(input.Username), Password: input.Password})
-			if err != nil || strings.TrimSpace(connected.Cookie) == "" {
-				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录失败"})
-				return
-			}
-			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "上传会话保存失败"})
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "username": strings.TrimSpace(input.Username), "status": "ready"})
+		if len(targets) == 0 || targets[0] == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器未配置"})
 			return
 		}
-		client := &http.Client{Timeout: 30 * time.Second}
-		landing, err := client.Get("http://two.121w.com/tttadmin/login.php")
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录页请求失败"})
+		connected, err := targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: strings.TrimSpace(input.Username), Password: input.Password})
+		if err != nil || strings.TrimSpace(connected.Cookie) == "" {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录失败"})
 			return
 		}
-		landing.Body.Close()
-		if landing.StatusCode >= 400 {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": fmt.Sprintf("121 登录页请求失败（HTTP %d）", landing.StatusCode)})
-			return
-		}
-		initialCookie := mergeSetCookies(landing.Header.Values("Set-Cookie"))
-		payload, _ := json.Marshal(map[string]string{"username": strings.TrimSpace(input.Username), "password": input.Password})
-		loginReq, err := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/login.php", bytes.NewReader(payload))
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录请求失败"})
-			return
-		}
-		loginReq.Header.Set("Content-Type", "application/json")
-		if initialCookie != "" {
-			loginReq.Header.Set("Cookie", initialCookie)
-		}
-		response, err := client.Do(loginReq)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录请求失败"})
-			return
-		}
-		defer response.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-		if response.StatusCode >= 400 {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": fmt.Sprintf("121 登录请求失败（HTTP %d）", response.StatusCode)})
-			return
-		}
-		var result map[string]any
-		if json.Unmarshal(body, &result) != nil || result["success"] != true {
-			message := strings.TrimSpace(fmt.Sprint(result["message"]))
-			if message == "" || message == "<nil>" {
-				message = strings.TrimSpace(fmt.Sprint(result["msg"]))
-			}
-			if message == "" || message == "<nil>" {
-				message = "121 登录失败"
-			}
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": message})
-			return
-		}
-		cookie := mergeSetCookies(append([]string{initialCookie}, response.Header.Values("Set-Cookie")...))
-		if cookie == "" {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录未返回会话"})
-			return
-		}
-		if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "http_cookie", "cookie": cookie, "sessionKey": cookie, "targetUsername": strings.TrimSpace(input.Username), "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+		if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "上传会话保存失败"})
 			return
 		}
