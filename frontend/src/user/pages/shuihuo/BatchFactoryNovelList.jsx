@@ -1338,8 +1338,17 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   }
 
   function updateAssetMentionMenu(root, value = String(root?.innerText || '').replace(/\u00a0/g, ' ')) {
-    const cursor = contentEditableTextOffset(root);
-    const match = value.slice(0, cursor).match(/@([^\s@]*)$/);
+    let cursor = contentEditableTextOffset(root);
+    let match = value.slice(0, cursor).match(/@([^\s@]*)$/);
+    // Some browsers keep the old selection when a contenteditable is
+    // rehydrated with rich mention spans.  If the actual input ends in an @
+    // query, prefer that real text position instead of silently closing the
+    // picker because the stale selection points into the previous span.
+    const trailingMatch = value.match(/@([^\s@]*)$/);
+    if (!match && trailingMatch) {
+      cursor = value.length;
+      match = trailingMatch;
+    }
     if (!match) { setAssetMentionMenu(null); return; }
     const query = match[1].toLowerCase();
     const candidates = (book?.assetRecords || []).filter(asset => asset?.id && String(assetName(asset) || '').toLowerCase().includes(query));

@@ -87,4 +87,5 @@ test('asset picker shows a kind fallback when an asset has no image', () => {
 test('asset picker is positioned below the active caret', () => {
   assert.match(source, /getBoundingClientRect/);
   assert.match(source, /style=\{\{ left: assetMentionMenu\.left, top: assetMentionMenu\.top \}\}/);
+  assert.match(source, /const trailingMatch = value\.match/);
 });
