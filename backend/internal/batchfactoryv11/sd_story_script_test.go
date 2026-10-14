@@ -61,6 +61,11 @@ func TestRunDirectorWithSDStoryVersionUsesSingleVideoPromptCall(t *testing.T) {
 	if !strings.Contains(provider.calls[0].SystemPrompt, "单次视频提示词流程") || !strings.Contains(provider.calls[0].SystemPrompt, "画面故事剧本") {
 		t.Fatalf("director call did not receive single-call story-script contract: %+v", provider.calls[0])
 	}
+	for _, required := range []string{"对应原文第 M 行", "场景环境：", "出镜人物：人物名", "镜头时长必须保留三位小数", "00:00-00:04", "替代上述标题"} {
+		if !strings.Contains(provider.calls[0].SystemPrompt, required) {
+			t.Fatalf("SD contract is missing fixed public output format %q", required)
+		}
+	}
 }
 
 func containsAll(value string, parts []string) bool {
