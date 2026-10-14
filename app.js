@@ -27,19 +27,11 @@ const chatRouter = require('./routes/chat');
 const ttsRouter = require('./routes/tts');
 const promptRouter = require('./routes/prompt');
 const historyRouter = require('./routes/history');
-const { createShuihuoProductionRouter } = require('./routes/shuihuo-production');
 const { createStorageRouter } = require('./routes/storage');
 const { createPlatformProjectsRouter } = require('./routes/platform-projects');
 const novelPanelRouter = require('./routes/novel-panel-page');
 const novelPanelApiRouter = require('./routes/novel-panel');
-const { createNovelFetchRouter } = require('./routes/novel-fetch');
-const { createNovelFetchUploadRouter } = require('./routes/novel-fetch-upload');
-const { createNovelFetchWorkshopRouter } = require('./routes/novel-fetch-workshop');
-const { createBatchRewriteRouter } = require('./routes/batch-rewrite');
 const { createNovelFetchV2PageMiddleware } = require('./lib/novel-fetch-workshop/v2-page');
-const { createBatchFactoryRouter } = require('./routes/batch-factory');
-const { createBatchFactoryIntakeRouter } = require('./routes/batch-factory-intake');
-const { createBatchFactoryProductionRouter } = require('./routes/batch-factory-production');
 const { createMySQLBatchFactoryStoreFactory } = require('./lib/batch-factory/mysql-store');
 const { createAgentRouter } = require('./routes/agent');
 const { createAgentSkillsRouter } = require('./routes/agent-skills');
@@ -51,7 +43,6 @@ const { createNovelPanelAiDiagnosticStore } = require('./lib/novel-panel/ai-diag
 const { createNovelPanelHistoryStore } = require('./lib/novel-panel/history-store');
 const { createNovelPanelPremiumStore } = require('./lib/novel-panel/premium-store');
 const { createNovelFetchStore } = require('./lib/novel-fetch-store');
-const { createScriptVideoRouter } = require('./routes/script-video');
 const { createLocalExecutorDownloadsRouter } = require('./routes/local-executor-downloads');
 const { createLocalExecutorDeviceRouter } = require('./routes/local-executor-device');
 const { createLocalExecutorArtifactRouter } = require('./routes/local-executor-artifact');
@@ -449,6 +440,8 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   app.use('/api/novel-panel/settings', apiAuth, restrictMemberNovelPanelSettings);
   app.use('/api/novel-panel', trackNovelPanelUsage, novelPanelApiRouter);
   if (nodeLegacyAPIEnabled) {
+    const { createNovelFetchRouter } = require('./routes/novel-fetch');
+    const { createNovelFetchUploadRouter } = require('./routes/novel-fetch-upload');
     app.use('/api/novel-fetch', createNovelFetchRouter({ presetStore: resolvedPresetStore, novelFetchStore: resolvedNovelFetchStore }));
     app.use('/api/novel-fetch-upload', createNovelFetchUploadRouter({ store: resolvedNovelFetchStore, workshopGateway: shuihuoGateway }));
   }
@@ -459,12 +452,14 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     systemDir: path.dirname(authRuntime.accountStore.files.audit),
     resolveRuntimeModel: app.locals.resolveRuntimeModel
   };
-  const batchRewriteRouter = createBatchRewriteRouter({
-    ...workshopOptions,
-    novelFetchStore: resolvedNovelFetchStore,
-    resolveRuntimeModel: app.locals.resolveRuntimeModel
-  });
   if (nodeLegacyAPIEnabled) {
+    const { createNovelFetchWorkshopRouter } = require('./routes/novel-fetch-workshop');
+    const { createBatchRewriteRouter } = require('./routes/batch-rewrite');
+    const batchRewriteRouter = createBatchRewriteRouter({
+      ...workshopOptions,
+      novelFetchStore: resolvedNovelFetchStore,
+      resolveRuntimeModel: app.locals.resolveRuntimeModel
+    });
     app.use('/api/novel-fetch-workshop', createNovelFetchWorkshopRouter({ ...workshopOptions, processRouter: batchRewriteRouter }));
     app.use('/api/batch-rewrite', batchRewriteRouter);
   }
@@ -472,6 +467,9 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   // 批量工厂运行时统一由 Go 提供；Node 仅保留通用页面与历史兼容模块，
   // 不再加载旧 V11/V12 路由或 Node 定时调度器，避免重复链路和常驻内存。
   if (nodeLegacyAPIEnabled) {
+    const { createBatchFactoryRouter } = require('./routes/batch-factory');
+    const { createBatchFactoryIntakeRouter } = require('./routes/batch-factory-intake');
+    const { createBatchFactoryProductionRouter } = require('./routes/batch-factory-production');
     app.use('/api/batch-factory', createBatchFactoryIntakeRouter({ store: resolvedBatchFactoryStore }));
     app.use('/api/batch-factory', createBatchFactoryRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway, configReader: teamConfigReader, upstreamRequest: createTeamUpstreamRequest({ usageStore: resolvedUsageStore, feature: 'batch-factory' }) }));
     app.use('/api/batch-factory', createBatchFactoryProductionRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway }));
@@ -511,6 +509,7 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     isModelReferenced
   })); // GET/POST /api/config
   if (nodeLegacyAPIEnabled) {
+    const { createScriptVideoRouter } = require('./routes/script-video');
     app.use('/api/script-video', createScriptVideoRouter({
       shuihuoGateway,
       memberStore: resolvedMemberStore,
@@ -537,6 +536,7 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     bridgeSecret: process.env.QIANTIE_BRIDGE_SECRET
   }));
   if (nodeLegacyAPIEnabled) {
+    const { createShuihuoProductionRouter } = require('./routes/shuihuo-production');
     app.use('/api/shuihuo-production', apiAuth, requireShuihuoAiAccess, createShuihuoProductionRouter({ ...shuihuoGateway, presetStore: resolvedPresetStore }));
   }
   // 本地存储文件夹：createStorageRouter 返回的子应用内部自带 /api/storage 前缀，
