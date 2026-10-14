@@ -108,28 +108,6 @@ func TestDatabaseDSNEnablesInterpolationWithoutDroppingExistingOptions(t *testin
 	}
 }
 
-func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/login" || r.Method != http.MethodPost {
-			t.Fatalf("upstream request = %s %s", r.Method, r.URL.Path)
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":"用户名或密码错误"}`))
-	}))
-	defer upstream.Close()
-
-	proxy, err := newAuthProxy(upstream.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodPost, "/api/login", nil)
-	res := httptest.NewRecorder()
-	proxy.ServeHTTP(res, req)
-	if res.Code != http.StatusUnauthorized {
-		t.Fatalf("proxy status = %d, want %d", res.Code, http.StatusUnauthorized)
-	}
-}
-
 func TestShouldBridgeLegacyAPI(t *testing.T) {
 	for _, path := range []string{"/api/account-recovery/purge/member"} {
 		if shouldBridgeLegacyAPI(path) {
@@ -426,29 +404,6 @@ func TestNovelFetchNestedTaskDiagnosticsUseGoHandler(t *testing.T) {
 		if !isGoNovelFetchCompatRequest(req) {
 			t.Fatalf("nested task endpoint %s must use the Go compatibility handler", path)
 		}
-	}
-}
-
-func TestGoAuthEnabledDefaultsSafelyWithoutNodeAuthTarget(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		nodeURL  string
-		switchOn string
-		want     bool
-	}{
-		{name: "no Node URL and no switch", want: true},
-		{name: "Node URL and no switch", nodeURL: "http://127.0.0.1:3001", want: false},
-		{name: "explicit true", switchOn: "true", want: true},
-		{name: "explicit one", switchOn: "1", want: true},
-		{name: "no Node URL and explicit false", switchOn: "false", want: true},
-		{name: "Node URL and explicit false", nodeURL: "http://127.0.0.1:3001", switchOn: "false", want: false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("QIANTIE_GO_AUTH_ENABLED", tc.switchOn)
-			if got := goAuthEnabled(tc.nodeURL); got != tc.want {
-				t.Fatalf("goAuthEnabled(%q) = %t, want %t", tc.nodeURL, got, tc.want)
-			}
-		})
 	}
 }
 

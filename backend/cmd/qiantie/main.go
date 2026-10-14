@@ -9,8 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -51,35 +49,9 @@ func main() {
 		log.Fatal(err)
 	}
 	staticHandler := webassets.Handler()
-	nodeAuthTarget := strings.TrimSpace(os.Getenv("QIANTIE_NODE_AUTH_BASE_URL"))
-	goAuth := goAuthEnabled(strings.TrimSpace(nodeAuthTarget))
-	// The Go runtime is self-contained by default. A legacy Node bridge is
-	// only created when an explicit target is supplied for a temporary
-	// migration check; no request is sent to port 3001 implicitly.
-	authProxy := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusNotImplemented)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "该功能尚未迁移到 Go 服务"})
-	}))
-	if nodeAuthTarget != "" {
-		proxy, proxyErr := newAuthProxy(nodeAuthTarget)
-		if proxyErr != nil {
-			log.Fatal(proxyErr)
-		}
-		authProxy = proxy
-	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if (req.Method == http.MethodGet || req.Method == http.MethodPost) && strings.HasPrefix(req.URL.Path, "/api/login/invite/") {
 			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if !goAuth && (req.URL.Path == "/api/login" || strings.HasPrefix(req.URL.Path, "/api/login/")) {
-			if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
-				apiHandler.ServeHTTP(w, req)
-				return
-			}
-			runtimeaudit.Default().RecordBridge(req.URL.Path)
-			authProxy.ServeHTTP(w, req)
 			return
 		}
 		if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
@@ -87,8 +59,7 @@ func main() {
 			return
 		}
 		if strings.HasPrefix(req.URL.Path, "/api/login/") && req.URL.Path != "/api/login/logout" && req.URL.Path != "/api/login/session" {
-			runtimeaudit.Default().RecordBridge(req.URL.Path)
-			authProxy.ServeHTTP(w, req)
+			apiHandler.ServeHTTP(w, req)
 			return
 		}
 		// /novel-fetch and its complete batch-rewrite API are served by Go.
@@ -248,7 +219,9 @@ func main() {
 		}
 		if shouldBridgeLegacyAPIRequest(req, cfg.Slice) {
 			runtimeaudit.Default().RecordBridge(req.URL.Path)
-			authProxy.ServeHTTP(w, req)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusNotImplemented)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "该功能尚未迁移到 Go 服务"})
 			return
 		}
 		if req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") {
@@ -449,29 +422,6 @@ func isLocalScriptVideoRequest(req *http.Request) bool {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(input.ModelKey), "local-doubao-executor-video")
-}
-
-func goAuthEnabled(nodeAuthTarget string) bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("QIANTIE_GO_AUTH_ENABLED"))) {
-	case "1", "true":
-		return true
-	case "0", "false":
-		return strings.TrimSpace(nodeAuthTarget) == ""
-	default:
-		return strings.TrimSpace(nodeAuthTarget) == ""
-	}
-}
-
-func newAuthProxy(rawTarget string) (http.Handler, error) {
-	target, err := url.Parse(strings.TrimSpace(rawTarget))
-	if err != nil || target.Scheme != "http" || target.Host == "" {
-		return nil, fmt.Errorf("invalid local auth bridge target")
-	}
-	host := strings.ToLower(target.Hostname())
-	if host != "127.0.0.1" && host != "localhost" && host != "::1" && host != "backend" {
-		return nil, fmt.Errorf("auth bridge target must be local")
-	}
-	return httputil.NewSingleHostReverseProxy(target), nil
 }
 
 func envOrDefault(key, fallback string) string {
