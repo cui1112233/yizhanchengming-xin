@@ -1,7 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
-const { isDeepStrictEqual } = require('node:util');
 const { getVideoApiKey, readConfig } = require('../lib/shared');
 const { proxyV11Request, createSignedBridgeHeaders } = require('../lib/batch-factory-v11/go-proxy');
 const { BATCH_FACTORY_PRESET_REQUIREMENTS, isPublishedPresetAllowed, resolveSystemPresetBody } = require('../lib/system-preset-catalog');
@@ -58,104 +57,6 @@ function sanitizeAutomationPresetConfig(value) {
   const config = JSON.parse(JSON.stringify(object(value)));
   delete config.automationPresetSnapshot;
   return config;
-}
-
-// Only established batch-level production settings may have been inherited.
-// Book metadata, computed audio measurements and unknown keys are never removed.
-const LEGACY_INHERITED_FIELDS = {
-  textModelId: 'string', imageModelId: 'string', videoModelId: 'string', videoProvider: 'string',
-  aspectRatio: 'string', imageAspectRatio: 'string', videoAspectRatio: 'string', videoResolution: 'string', productionMode: 'string',
-  storyboardDurationLimit: 'number', maxVideoDuration: 'number', fixedSingleVideo: 'boolean',
-  audioPlanningEnabled: 'boolean', audioMergeEnabled: 'boolean', tts: 'object', publishRewriteEnabled: 'boolean',
-  openingEnabled: 'boolean', openingCount: 'number', publishSettings: 'object', aiPromptConfig: 'object'
-};
-
-function legacyJSONValue(value, ancestors = new Set()) {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (!value || typeof value !== 'object' || ancestors.has(value)) return false;
-  if (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return false;
-  const next = new Set(ancestors).add(value);
-  return Object.values(value).every(item => legacyJSONValue(item, next));
-}
-
-function legacyConfigField(value, kind) {
-  return typeof value === kind && (kind !== 'object' || plainObject(value));
-}
-
-function legacyRestoreCandidate(book, config) {
-  const patch = book?.settingsState?.patch;
-  if (!plainObject(patch) || !legacyJSONValue(patch) || !Number.isSafeInteger(book?.revision) || book.revision < 1) {
-    return { reason: 'malformed_book' };
-  }
-  const restoreKeys = Object.keys(patch).filter(key => Object.hasOwn(LEGACY_INHERITED_FIELDS, key));
-  if (!restoreKeys.length) return { reason: 'no_copied_fields' };
-  for (const key of restoreKeys) {
-    if (!Object.hasOwn(config, key)) return { reason: 'missing_snapshot_field' };
-    const kind = LEGACY_INHERITED_FIELDS[key];
-    if (!legacyConfigField(patch[key], kind) || !legacyConfigField(config[key], kind)) {
-      return { reason: 'malformed_config' };
-    }
-    // Entire nested values must match; deleting one nested leaf can erase a
-    // later manual selection because restoreKeys operates at the root only.
-    if (!isDeepStrictEqual(patch[key], config[key])) return { reason: 'different_override' };
-  }
-  return { restoreKeys };
-}
-
-async function repairLegacyExecutionOverrides({ owner, isOwner = false, batch, snapshot, bridgeOptions } = {}) {
-  const result = { repairedBookIds: [], skippedBookIds: [], skippedBooks: [] };
-  const books = Array.isArray(batch?.books) ? batch.books : [];
-  const skip = (bookId, reason) => {
-    result.skippedBookIds.push(bookId);
-    result.skippedBooks.push({ bookId, reason });
-  };
-  const config = snapshot?.configSnapshot;
-  const validEvidence = owner && batch?.id && snapshot?.owner === owner && snapshot?.batchId === batch.id &&
-    plainObject(config) && Object.keys(config).length > 0 && legacyJSONValue(config) &&
-    Object.entries(config).every(([key, value]) => !Object.hasOwn(LEGACY_INHERITED_FIELDS, key) || legacyConfigField(value, LEGACY_INHERITED_FIELDS[key])) &&
-    Array.isArray(snapshot?.appliedBookIds) && snapshot.appliedBookIds.every(id => typeof id === 'string' && id) &&
-    new Set(snapshot.appliedBookIds).size === snapshot.appliedBookIds.length;
-  const batchPath = `/api/batch-factory/v11/batches/${encodeURIComponent(batch?.id || '')}`;
-  const request = { ...bridgeOptions, username: owner, isOwner };
-  for (const initialBook of books) {
-    const bookId = typeof initialBook?.id === 'string' ? initialBook.id : '';
-    if (!bookId || books.filter(book => book?.id === bookId).length !== 1) { skip(bookId, 'malformed_book'); continue; }
-    if (!validEvidence) { skip(bookId, 'missing_snapshot'); continue; }
-    if (!snapshot.appliedBookIds.includes(bookId)) { skip(bookId, 'snapshot_not_applied'); continue; }
-    const initialCandidate = legacyRestoreCandidate(initialBook, config);
-    if (initialCandidate.reason) { skip(bookId, initialCandidate.reason); continue; }
-    const restoreKeys = Object.freeze([...initialCandidate.restoreKeys]);
-    const initialPatch = JSON.parse(JSON.stringify(initialBook.settingsState.patch));
-    let book = initialBook;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const candidate = attempt === 0 ? initialCandidate : legacyRestoreCandidate(book, config);
-      if (candidate.reason) { skip(bookId, candidate.reason); break; }
-      // A concurrent matching value can be a new manual edit. The original
-      // proof never authorizes deleting keys added while this repair runs.
-      if (attempt > 0 && !isDeepStrictEqual(book.settingsState.patch, initialPatch)) { skip(bookId, 'changed_patch'); break; }
-      try {
-        await v11JSONRequest({
-          ...request, method: 'PUT', pathname: `${batchPath}/books/${encodeURIComponent(bookId)}/override`,
-          payload: { patch: {}, restoreKeys, expectedRevision: book.revision }
-        });
-        result.repairedBookIds.push(bookId);
-        break;
-      } catch (error) {
-        if (error?.status !== 409) throw error;
-        if (attempt === 1) { skip(bookId, 'revision_conflict'); break; }
-        try {
-          const loaded = await v11JSONRequest({ ...request, method: 'GET', pathname: batchPath });
-          const current = loaded?.batch || loaded;
-          const matches = current?.id === batch.id && Array.isArray(current?.books)
-            ? current.books.filter(item => item?.id === bookId) : [];
-          if (matches.length !== 1) { skip(bookId, 'revision_conflict'); break; }
-          book = matches[0];
-        } catch (_) { skip(bookId, 'revision_conflict'); break; }
-      }
-    }
-  }
-  return result;
 }
 
 async function applyAutomationPresetToBatch({ username, isOwner, batch, preset, bridgeOptions }) {
@@ -2535,20 +2436,6 @@ function createBatchFactoryV11Router(options = {}) {
   router.get('/batches/:batchId/automation', (req, res) => {
     res.json({ automation: safeAutomationStatus(automation, automationContext(req), upstreamOptions.logger || console) });
   });
-  router.post('/batches/:batchId/automation/repair-legacy-overrides', async (req, res) => {
-    try {
-      if (!String(req.username || '').trim()) throw requestError('请先登录', 401, 'AUTH_REQUIRED');
-      const { owner, isOwner, batchId } = automationContext(req);
-      const loaded = await v11JSONRequest({
-        ...upstreamOptions, username: owner, isOwner, method: 'GET',
-        pathname: `/api/batch-factory/v11/batches/${encodeURIComponent(batchId)}`
-      });
-      const snapshot = typeof automation.legacyConfigSnapshot === 'function'
-        ? automation.legacyConfigSnapshot({ owner, batchId }) : null;
-      const result = await repairLegacyExecutionOverrides({ owner, isOwner, batch: loaded?.batch || loaded, snapshot, bridgeOptions: upstreamOptions });
-      return res.json(result);
-    } catch (error) { return sendAutomationError(res, error); }
-  });
   router.post('/batches/:batchId/automation/start', async (req, res) => {
     try {
       const presetId = String(req.body?.presetId || '').trim();
@@ -2732,7 +2619,6 @@ function createBatchFactoryV11Router(options = {}) {
 
 module.exports = {
   batchFactoryRecoveryIndexPath,
-  repairLegacyExecutionOverrides,
   validateBatchFactoryModelPatch,
   sanitizeAutomationPresetConfig,
   applyAutomationPresetToBatch,
