@@ -34,9 +34,9 @@ foreach ($brandAsset in @('brand-logo-black.png', 'brand-logo-white.png')) {
   Copy-Item -LiteralPath $source -Destination (Join-Path $brandAssetsDist $brandAsset) -Force
 }
 
-# Node 3001 composes the novel-fetch page from the tracked public workbench and
-# injects the current retry/status/date compatibility scripts. Go 4001 must
-# embed that same composed page instead of the older copied dist snapshot.
+# The Go composer assembles the novel-fetch page from the tracked public
+# workbench and injects the current retry/status/date compatibility scripts.
+# Go 4001 embeds that composed page instead of the older copied dist snapshot.
 if (-not (Test-Path (Join-Path $novelFetchSource 'index.html'))) {
   throw "Novel fetch workbench assets are missing: $novelFetchSource"
 }
