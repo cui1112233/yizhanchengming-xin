@@ -303,6 +303,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.TextProvider != nil {
 		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)
 		registerChatRoute(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
+		registerScriptDirectorPipelineCompat(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
 	}
 	if legacyV11Public() {
 		root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))

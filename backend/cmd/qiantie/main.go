@@ -515,6 +515,12 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	if path == "/api/chat" {
 		return false
 	}
+	// The quick director contract is now implemented by the Go prompt/chat
+	// pipeline too. Keep this exact legacy URL on Go so older clients cannot
+	// silently jump back to the retired Node process.
+	if path == "/api/script/director-pipeline" {
+		return false
+	}
 	// This prefix already ends with a slash; do not add a second slash when
 	// matching script endpoints such as /api/script/director-pipeline.
 	if strings.HasPrefix(path, "/api/script/") {

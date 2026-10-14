@@ -39,9 +39,12 @@ async function resolveSmartUnifiedGenerationInput(input) {
 }
 
 function requestDirectorPipeline(payload) {
-  return apiRequest('/api/script/director-pipeline', {
+  // Quick director is now handled by Go's shared chat/prompt pipeline. Keep
+  // the payload shape stable for ScriptPage while removing the old Node-only
+  // director-pipeline endpoint from the browser path.
+  return apiRequest('/api/chat', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ ...payload, promptType: 'quick_director' })
   });
 }
 
