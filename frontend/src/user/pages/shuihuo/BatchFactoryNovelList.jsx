@@ -796,7 +796,7 @@ function compactUnifiedAssetDescriptions(prompt, book) {
     const end = endCandidates.length ? Math.min(...endCandidates) : text.length;
     text = `${text.slice(0, start)}${compact(text.slice(start, end), true)}${text.slice(end)}`;
   }
-  return compact(text);
+  return compact(text, true);
 }
 
 function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImages = {}) {
