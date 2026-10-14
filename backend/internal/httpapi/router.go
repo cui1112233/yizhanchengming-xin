@@ -367,14 +367,6 @@ func NewRouter(options RouterOptions) http.Handler {
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/tasks/", "/api/novel-fetch-workshop/tasks/", 1)
 			novelFetch.ServeHTTP(w, clone)
 		})))
-		// The embedded V78 workbench still requests the short legacy task path.
-		// Keep it pointed at the Go task store so refreshing the task list does
-		// not return 404 and clear the user's current selection.
-		root.Handle("/api/tasks", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			clone := req.Clone(req.Context())
-			clone.URL.Path = "/api/novel-fetch-workshop/tasks"
-			novelFetch.ServeHTTP(w, clone)
-		})))
 		legacyWorkshopAlias := func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/", "/api/novel-fetch-workshop/", 1)
