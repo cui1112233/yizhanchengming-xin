@@ -73,7 +73,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.AutomationCoordinator == nil && options.Store != nil && options.Director != nil && options.AutomationStatusReader != nil {
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
-		}, options.AutomationStatusReader, options.Now)
+		}, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now)
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,18 +14,24 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/batchfactoryv11/external"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 // BatchAutomationCoordinator is the Go owner of the V12 start/stop controls.
 // It intentionally persists the same public job shape that the old worker
 // used, so the existing workbench does not need a second status protocol.
 type BatchAutomationCoordinator struct {
-	store   batchfactoryv11.Store
-	presets AutomationPresetStore
-	stages  *batchfactoryv11.BookStageService
-	path    string
-	now     func() time.Time
-	mu      sync.Mutex
+	store      batchfactoryv11.Store
+	presets    AutomationPresetStore
+	stages     *batchfactoryv11.BookStageService
+	merge      *batchfactoryv11.MergeService
+	external   *external.Service
+	ttsStore   novelfetchworkshop.Store
+	audioProbe batchfactoryv11.H3AudioDurationProbe
+	path       string
+	now        func() time.Time
+	mu         sync.Mutex
 }
 
 type automationStateFile struct {
@@ -32,7 +39,7 @@ type automationStateFile struct {
 	Jobs    map[string]map[string]any `json:"jobs"`
 }
 
-func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets AutomationPresetStore, stages *batchfactoryv11.BookStageService, reader *FileAutomationStatusReader, now func() time.Time) *BatchAutomationCoordinator {
+func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets AutomationPresetStore, stages *batchfactoryv11.BookStageService, merge *batchfactoryv11.MergeService, publisher *external.Service, ttsStore novelfetchworkshop.Store, audioProbe batchfactoryv11.H3AudioDurationProbe, reader *FileAutomationStatusReader, now func() time.Time) *BatchAutomationCoordinator {
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
@@ -40,7 +47,7 @@ func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets Automati
 	if reader != nil {
 		path = reader.Path()
 	}
-	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, path: path, now: now}
+	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now}
 }
 
 func (c *BatchAutomationCoordinator) loadLocked() (automationStateFile, error) {
@@ -144,37 +151,217 @@ func automationNumberValue(value any, fallback int) int {
 	return fallback
 }
 
+func productionLines(book batchfactoryv11.Book) []string {
+	limit := 0
+	if raw, ok := book.SourceMetadata["contentRangeLines"]; ok {
+		switch value := raw.(type) {
+		case float64:
+			limit = int(value)
+		case int:
+			limit = value
+		case json.Number:
+			if parsed, err := value.Int64(); err == nil {
+				limit = int(parsed)
+			}
+		}
+	}
+	lines := make([]string, 0, limit)
+	for _, line := range strings.Split(strings.ReplaceAll(book.SourceText, "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lines = append(lines, line)
+		if limit > 0 && len(lines) >= limit {
+			break
+		}
+	}
+	return lines
+}
+
+// ensureAudioPlan is deliberately independent of the final audioSource switch.
+// The switch only chooses which track is used during the final merge; every
+// production run still creates TTS and measures every selected source line so
+// the storyboard timeline is based on real durations.
+func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner, batchID string, book batchfactoryv11.Book) error {
+	if c == nil || c.ttsStore == nil || c.store == nil {
+		return fmt.Errorf("配音与逐行时长服务未配置")
+	}
+	lines := productionLines(book)
+	if len(lines) == 0 {
+		return fmt.Errorf("正文没有可测量的生产行")
+	}
+	model, ok := configuredTTSModel(ctx, c.ttsStore, owner)
+	if !ok {
+		return fmt.Errorf("缺少已启用的配音模型")
+	}
+	probe := c.audioProbe
+	if probe == nil {
+		probe = batchfactoryv11.FFprobeH3AudioDuration{}
+	}
+	durations := make([]float64, 0, len(lines))
+	hash := sha256.New()
+	for _, line := range lines {
+		lineCtx, cancel := context.WithTimeout(ctx, 75*time.Second)
+		audio, _, err := requestConfiguredTTSBytes(lineCtx, ttsRequest{Input: line, Voice: "zh-CN-XiaoxiaoNeural", Speed: 1.8, Pitch: "10", Style: "general"}, model)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("TTS 生成失败：%w", err)
+		}
+		durationMS, err := probe.DurationMS(ctx, audio)
+		if err != nil {
+			return fmt.Errorf("TTS 时长测量失败：%w", err)
+		}
+		durations = append(durations, float64(durationMS)/1000)
+		_, _ = hash.Write(audio)
+	}
+	total := 0.0
+	for _, duration := range durations {
+		total += duration
+	}
+	latest, err := c.store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return err
+	}
+	for _, candidate := range latest.Books {
+		if candidate.ID != book.ID {
+			continue
+		}
+		lineRaw, _ := json.Marshal(durations)
+		totalRaw, _ := json.Marshal(total)
+		enabledRaw, _ := json.Marshal(true)
+		_, err = c.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: batchID, BookID: book.ID}, batchfactoryv11.SettingsUpdate{
+			Patch: batchfactoryv11.SettingsPatch{
+				"audioPlanningEnabled": enabledRaw,
+				"audioDurationSeconds": totalRaw,
+				"audioLineDurations":   lineRaw,
+				"ttsFingerprint":       json.RawMessage(fmt.Sprintf("%q", func() string { digest := hash.Sum(nil); return fmt.Sprintf("tts-%x", digest[:12]) }())),
+			},
+			ExpectedRevision: candidate.Revision,
+		})
+		return err
+	}
+	return batchfactoryv11.ErrNotFound
+}
+
 func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
 	// Each external stage must have a bounded lifetime.  The UI should receive a
 	// failed state instead of leaving a book stuck at "running" when an upstream
 	// model endpoint stops responding.
-	const stageTimeout = 2 * time.Minute
+	const stageTimeout = 10 * time.Minute
 	books := job["books"].(map[string]any)
 	failed := 0
 	for _, book := range batch.Books {
 		entry := books[book.ID].(map[string]any)
+		persist := func() { _ = c.setJob(owner, batchID, jobID, job) }
+		fail := func(stage string, err error, message string) {
+			entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", stage, err.Error(), message, c.now()
+			failed++
+			persist()
+		}
+		if ctx.Err() != nil {
+			entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "stopped", "stopped", "测试任务已停止", c.now()
+			persist()
+			continue
+		}
+		entry["stage"] = "audio_planning"
+		entry["message"] = "正在逐行生成配音并测量时长"
+		entry["updatedAt"] = c.now()
+		persist()
+		stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+		stageErr := c.ensureAudioPlan(stageCtx, owner, batchID, book)
+		cancel()
+		if stageErr != nil {
+			fail("audio_planning", stageErr, "配音与逐行时长失败")
+			continue
+		}
 		entry["stage"] = "assets"
 		entry["message"] = "正在提取资产"
 		entry["updatedAt"] = c.now()
-		stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-		_, stageErr := c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageAssets, batchfactoryv11.StageModeForce, jobID+"-assets-"+book.ID, "")
+		stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
+		_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageAssets, batchfactoryv11.StageModeForce, jobID+"-assets-"+book.ID, "")
 		cancel()
 		if stageErr != nil {
-			entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "assets", stageErr.Error(), "资产提取失败", c.now()
-			failed++
+			fail("assets", stageErr, "资产提取失败")
 			continue
 		}
 		entry["stage"], entry["message"] = "director", "正在生成分镜提示词"
 		entry["updatedAt"] = c.now()
+		persist()
 		stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
 		_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageDirector, batchfactoryv11.StageModeForce, jobID+"-director-"+book.ID, "")
 		cancel()
 		if stageErr != nil {
-			entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "director", stageErr.Error(), "分镜提示词生成失败", c.now()
-			failed++
+			fail("director", stageErr, "分镜提示词生成失败")
 			continue
 		}
-		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "director", "已完成资产与分镜提示词", c.now()
+		if automationStringValue(job["runMode"], "full_submit") == "storyboard_only" {
+			entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "ready_for_video", "已完成资产与分镜提示词", c.now()
+			persist()
+			continue
+		}
+		entry["stage"], entry["message"], entry["updatedAt"] = "video", "正在提交视频生成", c.now()
+		persist()
+		stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
+		_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageVideo, batchfactoryv11.StageModeMissing, jobID+"-video-"+book.ID, "")
+		cancel()
+		if stageErr != nil {
+			fail("video", stageErr, "视频提交失败")
+			continue
+		}
+		stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
+		production, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID)
+		cancel()
+		if waitErr != nil {
+			fail("video", waitErr, "视频生成失败")
+			continue
+		}
+		if automationStringValue(job["runMode"], "full_submit") == "video_no_submit" {
+			entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "ready_for_upload", "视频已完成，等待上传", c.now()
+			entry["productionTasks"] = len(production.Tasks)
+			persist()
+			continue
+		}
+		if c.merge == nil || !c.merge.Enabled {
+			fail("merge", fmt.Errorf("合成服务未启用"), "最终合成失败")
+			continue
+		}
+		entry["stage"], entry["message"], entry["updatedAt"] = "merge", "正在合成最终视频", c.now()
+		persist()
+		mergeCtx, mergeCancel := context.WithTimeout(ctx, stageTimeout)
+		mergeJobs, mergeErr := c.merge.SubmitBookMerge(mergeCtx, owner, batchID, book.ID, jobID+"-merge-"+book.ID, batchfactoryv11.MergeOptions{TimingMode: "audio", AudioDurationSeconds: productionAudioDuration(production)})
+		if mergeErr == nil {
+			_, mergeErr = c.waitMerge(mergeCtx, owner, batchID, book.ID, mergeJobs)
+		}
+		mergeCancel()
+		if mergeErr != nil {
+			fail("merge", mergeErr, "最终合成失败")
+			continue
+		}
+		if automationBoolValue(job["autoPublish"]) {
+			entry["stage"], entry["message"], entry["updatedAt"] = "upload", "正在上传视频管理系统", c.now()
+			persist()
+			if c.external == nil {
+				fail("upload", fmt.Errorf("视频管理系统上传服务未配置"), "上传失败")
+				continue
+			}
+			publishCtx, publishCancel := context.WithTimeout(ctx, stageTimeout)
+			intent, publishErr := c.external.CreateIntent(publishCtx, owner, string(external.Provider121), batchID, book.ID, json.RawMessage(`{}`))
+			if publishErr == nil {
+				_, publishErr = c.external.ConfirmIntent(publishCtx, owner, intent.ID)
+			}
+			if publishErr == nil {
+				_, publishErr = c.external.Submit(publishCtx, owner, string(external.Provider121), intent.ID)
+			}
+			publishCancel()
+			if publishErr != nil {
+				fail("upload", publishErr, "上传失败")
+				continue
+			}
+		}
+		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "completed", "已完成视频生成、合成与上传", c.now()
+		entry["productionTasks"] = len(production.Tasks)
+		persist()
 	}
 	job["state"] = "completed"
 	job["completedAt"], job["updatedAt"] = c.now(), c.now()
@@ -183,6 +370,112 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		job["state"] = "failed"
 	}
 	_ = c.setJob(owner, batchID, jobID, job)
+}
+
+func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.ProductionJob, error) {
+	if c.stages == nil || c.stages.Production == nil {
+		return batchfactoryv11.ProductionJob{}, fmt.Errorf("视频生产服务未配置")
+	}
+	for {
+		status, err := c.stages.Production.GetBatchStatus(ctx, owner, batchID)
+		if err != nil {
+			return batchfactoryv11.ProductionJob{}, err
+		}
+		for _, job := range status.Jobs {
+			if job.BookID != bookID {
+				continue
+			}
+			if productionJobFailed(job) {
+				return job, fmt.Errorf("视频任务失败：%s", productionJobError(job))
+			}
+			if len(job.Tasks) > 0 && productionJobComplete(job) {
+				return job, nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return batchfactoryv11.ProductionJob{}, fmt.Errorf("视频生成超时或已停止")
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func productionJobComplete(job batchfactoryv11.ProductionJob) bool {
+	for _, task := range job.Tasks {
+		if task.Status != batchfactoryv11.ProductionSucceeded || strings.TrimSpace(task.MediaURL) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func productionJobFailed(job batchfactoryv11.ProductionJob) bool {
+	for _, task := range job.Tasks {
+		if task.Status == batchfactoryv11.ProductionFailed || task.Status == batchfactoryv11.ProductionCancelled {
+			return true
+		}
+	}
+	return false
+}
+
+func productionJobError(job batchfactoryv11.ProductionJob) string {
+	for _, task := range job.Tasks {
+		if strings.TrimSpace(task.ErrorMessage) != "" {
+			return task.ErrorMessage
+		}
+	}
+	return "视频模型未返回成片"
+}
+
+func productionAudioDuration(job batchfactoryv11.ProductionJob) float64 {
+	var total float64
+	for _, task := range job.Tasks {
+		if task.ActualDurationSeconds > 0 {
+			total += task.ActualDurationSeconds
+		} else {
+			total += task.TargetDurationSeconds
+		}
+	}
+	return total
+}
+
+func (c *BatchAutomationCoordinator) waitMerge(ctx context.Context, owner, batchID, bookID string, submitted []batchfactoryv11.MergeJob) ([]batchfactoryv11.MergeJob, error) {
+	wanted := map[string]bool{}
+	for _, job := range submitted {
+		wanted[job.ID] = true
+	}
+	for {
+		jobs, err := c.merge.GetBatchStatus(ctx, owner, batchID)
+		if err != nil {
+			return nil, err
+		}
+		found := 0
+		for _, job := range jobs {
+			if job.BookID != bookID || !wanted[job.ID] {
+				continue
+			}
+			found++
+			if job.Status == batchfactoryv11.MergeFailed {
+				return jobs, fmt.Errorf("合成任务失败：%s", job.ErrorMessage)
+			}
+		}
+		if found == len(wanted) && found > 0 {
+			complete := true
+			for _, job := range jobs {
+				if job.BookID == bookID && wanted[job.ID] && job.Status != batchfactoryv11.MergeSucceeded {
+					complete = false
+				}
+			}
+			if complete {
+				return jobs, nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("最终合成超时或已停止")
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 func (c *BatchAutomationCoordinator) Cancel(owner, batchID string) error {
