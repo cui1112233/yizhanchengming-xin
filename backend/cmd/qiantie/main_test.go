@@ -152,6 +152,11 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 			t.Fatalf("%s is implemented by Go and must not use the Node bridge", path)
 		}
 	}
+	for _, path := range []string{"/api/admin/presets", "/api/admin/presets/batch-video-sd/3/draft"} {
+		if shouldBridgeLegacyAPI(path) {
+			t.Fatalf("%s is implemented by Go and must not use the Node bridge", path)
+		}
+	}
 	if shouldBridgeLegacyAPI("/api/script-video") {
 		t.Fatal("script video must use Go routes")
 	}

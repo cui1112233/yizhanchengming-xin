@@ -530,6 +530,9 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	if path == "/api/presets" || strings.HasPrefix(path, "/api/presets/") {
 		return false
 	}
+	if path == "/api/admin/presets" || strings.HasPrefix(path, "/api/admin/presets/") {
+		return false
+	}
 	if path == "/api/script-constraint-prompts" || strings.HasPrefix(path, "/api/script-constraint-prompts/") {
 		return false
 	}
