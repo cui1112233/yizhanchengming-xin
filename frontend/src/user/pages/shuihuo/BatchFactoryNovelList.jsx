@@ -826,6 +826,75 @@ function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImage
   });
 }
 
+function escapePromptHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+}
+
+function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
+  let text = compactUnifiedAssetDescriptions(prompt, book);
+  (book?.assetRecords || [])
+    .map(asset => assetName(asset))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .forEach(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`(^|[^@])${escaped}`, 'g'), `$1@${name}`);
+    });
+  const selectedIds = readStoryboardAssetSelection(book, video).selectedIds;
+  const assets = (book?.assetRecords || [])
+    .filter(asset => selectedIds.has(String(asset?.id || '')) || text.includes(`@${assetName(asset)}`))
+    .map(asset => ({ ...asset, mention: `@${assetName(asset)}`, imageUrl: assetImages[String(asset.id || '')] || asset?.imageUrl || asset?.image_url || asset?.thumbnailUrl || '' }))
+    .filter(asset => asset.mention.length > 1)
+    .sort((left, right) => right.mention.length - left.mention.length);
+  if (!text || !assets.length) return escapePromptHTML(text);
+  const pattern = new RegExp(`(${assets.map(asset => asset.mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+  const assetByMention = new Map(assets.map(asset => [asset.mention, asset]));
+  return text.split(pattern).map(part => {
+    const asset = assetByMention.get(part);
+    if (!asset) return escapePromptHTML(part);
+    const kind = asset.kind || 'asset';
+    const fallback = kind === 'character' ? '人' : kind === 'scene' ? '景' : '物';
+    const avatar = asset.imageUrl
+      ? `<img src="${escapePromptHTML(asset.imageUrl)}" alt="" />`
+      : `<span class="batch-factory-asset-mention-fallback" data-fallback="${fallback}" aria-hidden="true"></span>`;
+    return `<span class="batch-factory-asset-mention is-${escapePromptHTML(kind)}" data-asset-mention="${escapePromptHTML(asset.mention)}"><span class="batch-factory-asset-mention-avatar">${avatar}</span>${escapePromptHTML(part)}</span>`;
+  }).join('');
+}
+
+function contentEditableTextOffset(root) {
+  const selection = typeof window !== 'undefined' ? window.getSelection() : null;
+  if (!selection?.rangeCount || !root.contains(selection.anchorNode)) return String(root.innerText || '').length;
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.setEnd(selection.anchorNode, selection.anchorOffset);
+  return range.toString().length;
+}
+
+function setContentEditableTextOffset(root, offset) {
+  if (!root) return;
+  const selection = window.getSelection();
+  const range = document.createRange();
+  let remaining = Math.max(0, Number(offset) || 0);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (remaining <= node.nodeValue.length) {
+      range.setStart(node, remaining);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      root.focus();
+      return;
+    }
+    remaining -= node.nodeValue.length;
+  }
+  range.selectNodeContents(root);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  root.focus();
+}
+
 function InlineStoryboardAssets({ book, batchId, selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage, onSaved }) {
   const videos = book?.videos || [];
   const precompiledWorkspace = resolvePrecompiledVideoWorkspace(book);
@@ -1137,6 +1206,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const [visualPrompt, setVisualPrompt] = useState('');
   const [assetMentionMenu, setAssetMentionMenu] = useState(null);
   const promptInputRef = useRef(null);
+  const promptEditableRef = useRef(null);
   const [h3TraceOpen, setH3TraceOpen] = useState(false);
   const [openingVariantsOpen, setOpeningVariantsOpen] = useState(false);
   const [h3TraceBusy, setH3TraceBusy] = useState(false);
@@ -1183,6 +1253,10 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     })).then(entries => { if (active) setAssetThumbs(Object.fromEntries(entries)); });
     return () => { active = false; };
   }, [batchId, book?.id, book?.revision, book?.assetRecords?.length]);
+  useEffect(() => {
+    if (!editing || promptKind !== 'video' || !promptEditableRef.current) return;
+    promptEditableRef.current.innerHTML = renderStoryboardPromptHTML(videoPrompt, book, selectedVideo, assetThumbs);
+  }, [editing, promptKind, selectedVideoId, selectedVideo?.revision, promptEditTrace, assetThumbs]);
   async function savePrompt() {
     if (!selectedVideo) return;
     setSaving(true);
@@ -1237,6 +1311,21 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
   }
 
+  function updateEditablePromptValue(event) {
+    const root = event.currentTarget;
+    const nextValue = String(root.innerText || '').replace(/\u00a0/g, ' ');
+    setVideoPrompt(nextValue);
+    const cursor = contentEditableTextOffset(root);
+    const match = nextValue.slice(0, cursor).match(/@([^\s@]*)$/);
+    if (!match) { setAssetMentionMenu(null); return; }
+    const query = match[1].toLowerCase();
+    const candidates = (book?.assetRecords || []).filter(asset => {
+      const imageUrl = assetThumbs[String(asset.id)] || asset?.imageUrl || asset?.image_url || asset?.thumbnailUrl || '';
+      return asset?.id && imageUrl && String(assetName(asset) || '').toLowerCase().includes(query);
+    });
+    setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
+  }
+
   function insertAssetMention(asset) {
     const menu = assetMentionMenu;
     if (!menu || !asset) return;
@@ -1246,6 +1335,11 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     setVideoPrompt(next);
     setAssetMentionMenu(null);
     requestAnimationFrame(() => {
+      if (promptEditableRef.current) {
+        promptEditableRef.current.innerHTML = renderStoryboardPromptHTML(next, book, selectedVideo, assetThumbs);
+        setContentEditableTextOffset(promptEditableRef.current, menu.start + mention.length);
+        return;
+      }
       const input = promptInputRef.current?.resizableTextArea?.textArea || promptInputRef.current?.textArea;
       if (input) { input.focus(); const position = menu.start + mention.length; input.setSelectionRange(position, position); }
     });
@@ -1310,8 +1404,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       <label className="shuihuo-form-label batch-factory-prompt-editor-label">
         {activeLabel}
         {!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div> : editing && promptKind === 'video' ? <div className="batch-factory-prompt-editor-rich-wrap">
-          <div className="batch-factory-prompt-rich-view is-editing">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div>
-          <Input.TextArea className="batch-factory-prompt-editor-input-overlay" ref={promptInputRef} rows={14} value={activeValue} onChange={updatePromptValue} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} placeholder="输入 @ 选择有图片的资产" />
+          <div ref={promptEditableRef} className="batch-factory-prompt-rich-view is-editing" contentEditable suppressContentEditableWarning role="textbox" aria-label="可编辑分镜视频提示词" onInput={updateEditablePromptValue} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} />
           {assetMentionMenu ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates?.length ? assetMentionMenu.candidates.map(asset => <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}><img src={assetThumbs[String(asset.id)] || asset.imageUrl || asset.image_url || asset.thumbnailUrl} alt="" /><span>{assetName(asset)}</span><small>{asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'}</small></button>) : <div className="batch-factory-asset-mention-empty">暂无带图片的资产，请先在资产设置上传或生成图片</div>}</div> : null}
         </div> : <div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} value={activeValue} onChange={event => setVisualPrompt(event.target.value)} placeholder="仅用于生成当前分镜的画面图片" /></div>}
       </label>
