@@ -46,11 +46,12 @@ export function uploadBatch(payload) {
   });
 }
 
-export function getWebSubmitConfig() { return apiRequest('/api/batch-rewrite/web-submit/config'); }
-export function saveWebSubmitConfig(payload) { return apiRequest('/api/batch-rewrite/web-submit/config', { method: 'POST', body: JSON.stringify(payload) }); }
-export function checkWebSubmitEnvironment() { return apiRequest('/api/batch-rewrite/web-submit/environment'); }
-export function syncWebSubmitConfigs(payload = {}) { return apiRequest('/api/batch-rewrite/web-submit/sync-configs', { method: 'POST', body: JSON.stringify(payload) }); }
-export function syncWebSubmitStyles(payload = {}) { return apiRequest('/api/batch-rewrite/web-submit/sync-styles', { method: 'POST', body: JSON.stringify(payload) }); }
-export function testWebSubmitVisible(payload = {}) { return apiRequest('/api/batch-rewrite/web-submit/test-visible', { method: 'POST', body: JSON.stringify(payload) }); }
-export function previewWebSubmit(payload) { return apiRequest('/api/batch-rewrite/web-submit/preview', { method: 'POST', body: JSON.stringify(payload) }); }
-export function startWebSubmit(payload) { return apiRequest('/api/batch-rewrite/web-submit/submit', { method: 'POST', body: JSON.stringify(payload) }); }
+const WEB_SUBMIT_API = '/api/novel-fetch-workshop/web-submit';
+export function getWebSubmitConfig() { return apiRequest(`${WEB_SUBMIT_API}/config`); }
+export function saveWebSubmitConfig(payload) { return apiRequest(`${WEB_SUBMIT_API}/config`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function checkWebSubmitEnvironment() { return apiRequest(`${WEB_SUBMIT_API}/environment`); }
+export function syncWebSubmitConfigs(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-configs`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function syncWebSubmitStyles(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-styles`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function testWebSubmitVisible(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/test-visible`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function previewWebSubmit(payload) { return apiRequest(`${WEB_SUBMIT_API}/preview`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function startWebSubmit(payload) { return apiRequest(`${WEB_SUBMIT_API}/submit`, { method: 'POST', body: JSON.stringify(payload) }); }

@@ -103,6 +103,28 @@ func TestBatchRewriteWebSubmitHistoryReadsGoDocumentLogs(t *testing.T) {
 	}
 }
 
+func TestCanonicalNovelFetchWebSubmitConfigUsesTheSharedGoHandler(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"enabled": true}}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/web-submit/config", nil, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("canonical config status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	settings, ok := payload["settings"].(map[string]any)
+	if !ok || settings["enabled"] != true {
+		t.Fatalf("canonical config payload=%#v", payload)
+	}
+}
+
 func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T) {
 	payload := legacyBatchRewriteConfig(map[string]any{
 		"appConfig": map[string]any{
@@ -134,8 +156,8 @@ func TestLegacyBatchRewriteConfigRestoresKnowledgeCatalog(t *testing.T) {
 	payload := legacyBatchRewriteConfig(map[string]any{
 		"appConfig": map[string]any{
 			"knowledge": map[string]any{
-				"opening_phrases": map[string]any{"items": []any{}},
-				"high_imitation":  map[string]any{"prompts": []any{}, "references": []any{}},
+				"opening_phrases":   map[string]any{"items": []any{}},
+				"high_imitation":    map[string]any{"prompts": []any{}, "references": []any{}},
 				"rewrite_templates": map[string]any{"profiles": []any{}, "temporary_instructions": []any{}},
 			},
 		},

@@ -454,6 +454,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("GET /api/web-submit/operations/", novelAuth.Middleware(http.HandlerFunc(legacyWebSubmitAlias)))
 		root.Handle("PATCH /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("DELETE /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		registerCanonicalNovelFetchWebSubmitAliases(root, auth)
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
 	root.HandleFunc("GET /health", func(w http.ResponseWriter, req *http.Request) {
@@ -464,6 +465,31 @@ func NewRouter(options RouterOptions) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	return root
+}
+
+// registerCanonicalNovelFetchWebSubmitAliases keeps the novel-fetch page on
+// one Go-owned namespace. The implementation is still shared with the
+// compatibility handlers until the old embedded workbench is retired; this
+// adapter only translates the request path and its signed path component.
+func registerCanonicalNovelFetchWebSubmitAliases(root *http.ServeMux, bridge BridgeAuth) {
+	if root == nil {
+		return
+	}
+	root.Handle("/api/novel-fetch-workshop/web-submit/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		clone := req.Clone(req.Context())
+		legacyPath := strings.Replace(clone.URL.Path, "/api/novel-fetch-workshop/web-submit/", "/api/batch-rewrite/web-submit/", 1)
+		clone.URL.Path = legacyPath
+		// Bridge signatures include the request path. Re-sign the internal
+		// canonical-to-compatibility hop so the shared Go handler can verify it
+		// without weakening authentication or exposing a second service.
+		username := clone.Header.Get(HeaderUsername)
+		issued := clone.Header.Get(HeaderIssuedAt)
+		owner := clone.Header.Get(HeaderIsOwner)
+		if username != "" && issued != "" && owner != "" && bridge.Secret != "" {
+			clone.Header.Set(HeaderSignature, bridgeSignature(bridge.Secret, canonicalBridgePayload(username, issued, owner, clone.Method, legacyPath)))
+		}
+		root.ServeHTTP(w, clone)
+	}))
 }
 
 func shuihuoImageModelReady(model map[string]any) bool {
