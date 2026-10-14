@@ -13,6 +13,33 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
+func TestRuntimeHandlerKeepsAllAPIRequestsOnGo(t *testing.T) {
+	api := http.NewServeMux()
+	api.HandleFunc("/api/known", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	static := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+	handler := newRuntimeHandler(api, static)
+
+	for _, path := range []string{"/api/known", "/api/unknown", "/health"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code == http.StatusTeapot {
+			t.Fatalf("API path %s was sent to the static handler", path)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/index.html", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTeapot {
+		t.Fatalf("page path reached API handler, status=%d", rec.Code)
+	}
+}
+
 func TestHealthURLNormalizesWildcardListenAddresses(t *testing.T) {
 	for _, tc := range []struct {
 		listen string

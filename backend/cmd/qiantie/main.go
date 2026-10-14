@@ -17,7 +17,6 @@ import (
 
 	"qiantie/backend/internal/app"
 	"qiantie/backend/internal/config"
-	"qiantie/backend/internal/runtimeaudit"
 	webassets "qiantie/backend/web"
 )
 
@@ -49,190 +48,24 @@ func main() {
 		log.Fatal(err)
 	}
 	staticHandler := webassets.Handler()
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if (req.Method == http.MethodGet || req.Method == http.MethodPost) && strings.HasPrefix(req.URL.Path, "/api/login/invite/") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/login/passkey/options" || req.URL.Path == "/api/login/passkey/verify") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if strings.HasPrefix(req.URL.Path, "/api/login/") && req.URL.Path != "/api/login/logout" && req.URL.Path != "/api/login/session" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		// /novel-fetch and its complete batch-rewrite API are served by Go.
-		// Unknown endpoints stay on Go and return an explicit response; they are
-		// never silently sent to the retired Node service.
-		if isGoNovelFetchCompatRequest(req) || isGoAgentReadRequest(req) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && (req.URL.Path == "/api/team-admin/teams" || strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/members"))) || (req.Method == http.MethodPatch && strings.HasPrefix(req.URL.Path, "/api/team-admin/teams/") && strings.HasSuffix(req.URL.Path, "/governance")) || (req.Method == http.MethodPut && (strings.HasSuffix(req.URL.Path, "/co-managers") || strings.HasSuffix(req.URL.Path, "/api-scopes"))) || (req.Method == http.MethodPost && (strings.HasSuffix(req.URL.Path, "/status") || strings.HasSuffix(req.URL.Path, "/reset-password"))) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && req.URL.Path == "/api/account-recovery/passkeys") || (req.Method == http.MethodDelete && strings.HasPrefix(req.URL.Path, "/api/account-recovery/passkeys/")) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/account-recovery/passkeys/options" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/account-recovery/passkeys" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && req.URL.Path == "/api/member/team/audit" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/account-admin/accounts/") && strings.HasSuffix(req.URL.Path, "/transfer-preview") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodPost && req.URL.Path == "/api/client-errors") || (req.Method == http.MethodGet && req.URL.Path == "/api/client-errors/mine") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/account-admin/accounts/") && strings.HasSuffix(req.URL.Path, "/transfer") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && (req.URL.Path == "/api/build-info" || req.URL.Path == "/api/novel-panel/build-info" || req.URL.Path == "/api/novel-panel/character-core/health" || req.URL.Path == "/api/novel-panel/clean-core/health")) || isAdminAgentSkillRequest(req) || isGoAdminReadRequest(req) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && req.URL.Path == "/api/novel-fetch-upload/upload-session") || (req.Method == http.MethodPost && (req.URL.Path == "/api/novel-fetch-upload/upload-login" || req.URL.Path == "/api/novel-fetch-upload/upload-batch")) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/novel-panel/character-core/parse-slots" || req.URL.Path == "/api/novel-panel/character-core/resolve-scene-cast" || req.URL.Path == "/api/novel-panel/character-core/build-scene-context" || req.URL.Path == "/api/novel-panel/character-core/migrate-project" || req.URL.Path == "/api/novel-panel/character-core/analyze" || req.URL.Path == "/api/novel-panel/character-core/project-lease") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/analyze" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/novel-panel/") && (strings.HasSuffix(req.URL.Path, "/optimize-character") || strings.HasSuffix(req.URL.Path, "/optimize-character-copy") || strings.HasSuffix(req.URL.Path, "/optimize-all-characters") || strings.HasSuffix(req.URL.Path, "/optimize-style-copy") || strings.HasSuffix(req.URL.Path, "/instruction-assist")) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/novel-panel/outline-scenes" || req.URL.Path == "/api/novel-panel/regenerate-scene-outline" || req.URL.Path == "/api/novel-panel/generate-scene-prompts") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/reference-assets/describe" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/reference-assets/generate" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/settings/test" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/native-clipboard/copy-rich" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet || req.Method == http.MethodPost) && (req.URL.Path == "/api/batch-rewrite/web-submit/config" || req.URL.Path == "/api/batch-rewrite/web-submit/environment" || req.URL.Path == "/api/batch-rewrite/web-submit/history") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && req.URL.Path == "/api/batch-rewrite/issues" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/batch-rewrite/web-submit/test-visible" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-configs" || req.URL.Path == "/api/batch-rewrite/web-submit/sync-styles" || req.URL.Path == "/api/batch-rewrite/web-submit/preview" || req.URL.Path == "/api/batch-rewrite/web-submit/submit") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && req.URL.Path == "/api/batch-factory/v12/publish-121/organizations" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/config/models/test" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/test/text" || req.URL.Path == "/api/test/image") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/batch-rewrite/knowledge/") && strings.HasSuffix(req.URL.Path, "/optimize") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/member/security/mfa/") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && (req.URL.Path == "/api/account-recovery/email/request" || req.URL.Path == "/api/account-recovery/email/verify" || req.URL.Path == "/api/account-recovery/password/request" || req.URL.Path == "/api/account-recovery/password/reset") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/character-core/trace" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if strings.HasPrefix(req.URL.Path, "/api/novel-panel/history") || strings.HasPrefix(req.URL.Path, "/api/novel-panel/settings") || strings.HasPrefix(req.URL.Path, "/api/novel-panel/runtime-config") || strings.HasPrefix(req.URL.Path, "/api/novel-panel/image-settings") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/novel-panel/reference-assets/public/") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodGet && req.URL.Path == "/api/novel-panel/reference-assets/legacy" {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && (req.URL.Path == "/api/novel-panel/diagnostics" || req.URL.Path == "/api/novel-panel/diagnostics/traces" || req.URL.Path == "/api/novel-panel/diagnostics/self-check" || req.URL.Path == "/api/novel-panel/projects" || req.URL.Path == "/api/novel-panel/draft" || strings.HasPrefix(req.URL.Path, "/api/novel-panel/projects/") || strings.HasPrefix(req.URL.Path, "/api/novel-panel/diagnostics/trace/"))) || (req.Method == http.MethodPut && req.URL.Path == "/api/novel-panel/draft") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodPost && req.URL.Path == "/api/novel-panel/projects") || (req.Method == http.MethodDelete && strings.HasPrefix(req.URL.Path, "/api/novel-panel/projects/")) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/novel-panel/") && strings.HasSuffix(req.URL.Path, "/export") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/api/reference-assets/file/")) || (req.Method == http.MethodPost && (req.URL.Path == "/api/reference-assets/upload" || req.URL.Path == "/api/reference-assets/use-source-as-main")) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if (req.Method == http.MethodGet && (req.URL.Path == "/api/member/me" || req.URL.Path == "/api/member/team" || req.URL.Path == "/api/member/team/meta" || req.URL.Path == "/api/member/team/governance" || req.URL.Path == "/api/member/team/invites" || req.URL.Path == "/api/admin/error-logs" || req.URL.Path == "/api/admin/accounts" || strings.HasPrefix(req.URL.Path, "/api/member/team/members/") && strings.HasSuffix(req.URL.Path, "/usage") || req.URL.Path == "/api/account-recovery/email/status")) || (req.Method == http.MethodPost && (req.URL.Path == "/api/account-admin/accounts" || req.URL.Path == "/api/member/team/members" || req.URL.Path == "/api/member/team/invites" || strings.HasSuffix(req.URL.Path, "/status") || strings.HasSuffix(req.URL.Path, "/reset-password") || strings.HasSuffix(req.URL.Path, "/archive") || strings.HasSuffix(req.URL.Path, "/restore") || strings.HasSuffix(req.URL.Path, "/api"))) || (req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/api-scopes")) || (req.Method == http.MethodPatch && (req.URL.Path == "/api/member/profile" || strings.HasPrefix(req.URL.Path, "/api/account-admin/accounts/") || strings.HasPrefix(req.URL.Path, "/api/member/team/members/") || strings.HasPrefix(req.URL.Path, "/api/member/team/governance/") || strings.HasPrefix(req.URL.Path, "/api/member/team/meta/"))) || (req.Method == http.MethodPost && req.URL.Path == "/api/member/avatar") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/security/password") || (req.Method == http.MethodGet && req.URL.Path == "/api/member/security") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/security/sessions/revoke-others") || (req.Method == http.MethodGet && req.URL.Path == "/api/member/notifications") || (req.Method == http.MethodPost && req.URL.Path == "/api/member/notifications/read-all") || (req.Method == http.MethodPost && strings.HasPrefix(req.URL.Path, "/api/member/notifications/") && strings.HasSuffix(req.URL.Path, "/read")) || ((req.Method == http.MethodGet || req.Method == http.MethodPost) && req.URL.Path == "/api/config") || ((req.Method == http.MethodGet && (req.URL.Path == "/api/batch-rewrite/config" || req.URL.Path == "/api/batch-rewrite/bootstrap" || req.URL.Path == "/api/batch-rewrite/tasks" || strings.HasPrefix(req.URL.Path, "/api/batch-rewrite/tasks/"))) || (req.Method == http.MethodPost && (req.URL.Path == "/api/batch-rewrite/work-form" || req.URL.Path == "/api/batch-rewrite/tasks/batch-delete" || req.URL.Path == "/api/batch-rewrite/tasks/batch-retry" || strings.HasSuffix(req.URL.Path, "/fetch") || strings.HasSuffix(req.URL.Path, "/restore-original") || strings.HasSuffix(req.URL.Path, "/generate-ai")))) || ((req.Method == http.MethodGet && req.URL.Path == "/api/storage/list") || (req.Method == http.MethodPost && (req.URL.Path == "/api/storage/restore" || req.URL.Path == "/api/storage/save-media"))) || (req.Method == http.MethodGet && req.URL.Path == "/api/novel-fetch/saved") || (req.Method == http.MethodPost && (req.URL.Path == "/api/novel-fetch" || req.URL.Path == "/api/novel-fetch/save")) || (req.Method == http.MethodGet && req.URL.Path == "/api/platform-projects") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if strings.HasPrefix(req.URL.Path, "/downloads/local-executor/") {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
-		if shouldBridgeLegacyAPIRequest(req, cfg.Slice) {
-			runtimeaudit.Default().RecordBridge(req.URL.Path)
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.WriteHeader(http.StatusNotImplemented)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "该功能尚未迁移到 Go 服务"})
-			return
-		}
-		if req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") {
+	handler := newRuntimeHandler(apiHandler, staticHandler)
+	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
+	log.Fatal(server.ListenAndServe())
+}
+
+// newRuntimeHandler keeps the live HTTP topology single-path: API requests
+// are always handled by Go, while non-API requests are served from the
+// embedded web assets. Unknown API paths intentionally remain visible as Go
+// 404/405 responses instead of reviving a second runtime.
+func newRuntimeHandler(apiHandler, staticHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req != nil && req.URL != nil && (req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/")) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
 		staticHandler.ServeHTTP(w, req)
 	})
-	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
-	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
-	log.Fatal(server.ListenAndServe())
 }
 
 // isLegacyNovelFetchBridgeRequest is retained for contract tests and release
