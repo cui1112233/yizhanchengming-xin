@@ -4,9 +4,9 @@
 #   docker compose -f docker-compose.yml \
 #     -f /opt/qiantie/v88/direct/docker-compose.direct.yml config -q
 #   docker compose -f docker-compose.yml \
-#     -f /opt/qiantie/v88/direct/docker-compose.direct.yml up -d --force-recreate go-api v88-node
+#     -f /opt/qiantie/v88/direct/docker-compose.direct.yml up -d --force-recreate go-api
 #
-# 原理：基础镜像只提供操作系统/运行环境（ffmpeg、node 等），业务程序改为
+# 原理：基础镜像只提供操作系统/运行环境（ffmpeg 等），业务程序改为
 # 挂载宿主机上直传上来的成品。以后改小细节只需替换 current 软链指向的
 # 成品并重启容器，不再从国外镜像仓库整包下载。
 #
@@ -31,6 +31,9 @@ services:
       start_period: 5s
 
   v88-node:
+    # Retained only as an explicit rollback profile. Normal direct releases
+    # must never start the retired Node application.
+    profiles: ["node-legacy"]
     environment:
       QIANTIE_RELEASE_SHA: ${DIRECT_RELEASE_SHA}
     volumes:
