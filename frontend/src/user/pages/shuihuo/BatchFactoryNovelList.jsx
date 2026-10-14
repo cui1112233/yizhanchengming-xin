@@ -3627,9 +3627,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     } catch (error) { message.error(error?.message || '保存小说元数据失败'); } finally { setMetadataSaving(false); }
   }
   async function saveSettings(patch) {
-    const audioPlanningWasEnabled = batch?.settingsState?.patch?.audioPlanningEnabled === true;
     const normalized = normalizeAudioSourceSettings({ ...patch, audioDurationSeconds: 0 });
-    const shouldPrepareAudio = audioPlanningWasEnabled === false && normalized.audioPlanningEnabled === true;
+    // TTS and line-duration measurement are always part of the production
+    // timeline. The audio source switch only changes the final mix, so every
+    // save that keeps the shared audio flow enabled must refresh the measured
+    // TTS before recompiling the director cards.
+    const shouldPrepareAudio = normalized.audioPlanningEnabled === true;
     try {
       await saveBatchSettings(batch.id, { patch: normalized, expectedRevision: Number(batch?.settingsState?.revision || 0) }, { suppressGlobalError: true });
     } catch (error) {
@@ -3661,12 +3664,15 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       await syncUnifiedSettingsToBooks(savedBatch);
 			const syncedResult = await getBatch(batch.id);
 			const syncedBatch = resultData(syncedResult, 'batch');
-			const recompileResult = await recompileUnifiedH3Prompts(syncedBatch);
       if (shouldPrepareAudio) {
-			const refreshedResult = await getBatch(batch.id);
-			const refreshedBatch = resultData(refreshedResult, 'batch');
-        await prepareAudioPlanningForBatch(refreshedBatch);
+        await prepareAudioPlanningForBatch(syncedBatch);
       }
+      // Re-read after measurements so compilation uses the just-saved audio
+      // asset, line durations and fingerprint instead of the pre-measurement
+      // snapshot.
+      const compiledResult = await getBatch(batch.id);
+      const compiledBatch = resultData(compiledResult, 'batch');
+			const recompileResult = await recompileUnifiedH3Prompts(compiledBatch);
       await refreshBatch();
 			if (recompileResult.failed.length) message.warning(`统一配置已同步；${recompileResult.failed.join('；')}`);
 			else if (recompileResult.waitingForAudio || recompileResult.manual) {

@@ -938,15 +938,19 @@ test('lets each book measure temporary TTS audio for storyboard planning without
   assert.match(settingsSource, /音频不会保存或加入最终合并/);
 });
 
-test('prepares only temporary audio duration when unified audio planning is enabled', () => {
+test('always prepares TTS timing before recompiling when unified settings are saved', () => {
   const start = source.indexOf('async function prepareAudioPlanningForBatch(currentBatch)');
   const end = source.indexOf('async function compileBookH3Videos(book,', start);
   const preparation = start >= 0 && end > start ? source.slice(start, end) : '';
-  assert.match(source, /const audioPlanningWasEnabled = batch\?\.settingsState\?\.patch\?\.audioPlanningEnabled === true;/);
-  assert.match(source, /audioPlanningWasEnabled === false && normalized\.audioPlanningEnabled === true/);
-  assert.match(source, /await prepareAudioPlanningForBatch\(refreshedBatch\)/);
+  assert.match(source, /const shouldPrepareAudio = normalized\.audioPlanningEnabled === true;/);
+  assert.match(source, /await prepareAudioPlanningForBatch\(syncedBatch\)/);
   assert.match(preparation, /await ensureBookAudioDuration\(book, \{ force: true, quiet: true, batchSnapshot: currentBatch \}\)/);
   assert.doesNotMatch(preparation, /runBookStage|runBatchDirector|submitBatchProduction|runProduction/);
+
+  const saveStart = source.indexOf('async function saveSettings(patch)');
+  const saveEnd = source.indexOf('  async function previewChangeImpact', saveStart);
+  const saveBody = saveStart >= 0 && saveEnd > saveStart ? source.slice(saveStart, saveEnd) : '';
+  assert.ok(saveBody.indexOf('await prepareAudioPlanningForBatch(syncedBatch)') < saveBody.indexOf('recompileUnifiedH3Prompts(compiledBatch)'), 'TTS timing must be prepared before director recompilation');
 });
 
 test('keeps a saved audio duration usable when its fingerprint is stale and refresh fails', () => {

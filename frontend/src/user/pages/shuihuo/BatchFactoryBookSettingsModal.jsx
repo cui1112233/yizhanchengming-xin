@@ -574,7 +574,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             </div>
             <div className="batch-factory-audio-options">
               <AudioOptionCard title="完整配音与逐行时长" description="系统固定执行，用于建立原文时间计划。" value={true} inherited={false} onChange={() => {}} />
-              <AudioOptionCard disabled={normalizeAudioSource(form.audioSource) === 'original'} title="合并跟随配音" description={normalizeAudioSource(form.audioSource) === 'original' ? '原声模式不合入 TTS。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
+              <AudioOptionCard disabled={normalizeAudioSource(form.audioSource) === 'original'} title="合并跟随配音" description={normalizeAudioSource(form.audioSource) === 'original' ? '仅最终合成不合入 TTS；配音与逐行时长仍固定执行。' : '成片按真实配音总时长校正倍率。'} value={form.audioMergeEnabled} inherited={inherited.audioMergeEnabled} onChange={audioMergeEnabled => patch({ audioMergeEnabled })} />
             </div>
             <div className="batch-factory-engine-grid">
               <label className="batch-factory-engine-field"><span><b>配音音色</b><HelpTip title="配音音色">当前书 TTS。</HelpTip></span><Select value={tts.voice} options={TTS_VOICE_OPTIONS} onChange={voice => patchTts({ voice })} /></label>
