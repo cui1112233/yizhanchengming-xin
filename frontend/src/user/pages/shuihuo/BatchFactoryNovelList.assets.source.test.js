@@ -51,3 +51,8 @@ test('batch card keeps the prompt and asset mentions in one content layer', () =
   assert.match(source, /batch-factory-prompt-entry-rich-view/);
   assert.doesNotMatch(source, /<small title=\{assetPromptText\}>/);
 });
+
+test('batch card keeps rich prompt text visible after legacy span hiding rules', () => {
+  const css = fs.readFileSync(path.join(here, '..', 'shuihuo-production.css'), 'utf8');
+  assert.match(css, /batch-factory-prompt-entry-rich-view>span\{display:inline!important;/);
+});

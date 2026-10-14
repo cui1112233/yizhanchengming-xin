@@ -2925,6 +2925,9 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   color:var(--sh-text)!important;font-size:11px!important;font-weight:600!important;line-height:1.62!important;
   white-space:pre-wrap!important;-webkit-line-clamp:7!important;-webkit-box-orient:vertical!important
 }
+.batch-factory-prompt-entry-rich-view>span{display:inline!important;margin:0!important;color:inherit!important;font-size:inherit!important}
+.batch-factory-prompt-entry-rich-view>.batch-factory-asset-mention{display:inline-flex!important;margin:0 3px 2px 0!important;color:#dffcf4!important;font-size:12px!important}
+.batch-factory-prompt-entry-rich-view>.batch-factory-asset-mention-avatar{display:inline-grid!important;margin:-1px 5px -1px -4px!important;color:#eff8ff!important;font-size:10px!important}
 .batch-factory-prompt-entry-content small{align-self:end;color:var(--sh-muted);font-size:9px}
 
 .batch-factory-inline-media{
