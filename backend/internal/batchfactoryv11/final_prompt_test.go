@@ -525,6 +525,39 @@ func TestFinalPromptExcludesDeselectedStoryboardAssetFromTextAndReferences(t *te
 	}
 }
 
+func TestExplicitAssetMentionsLimitVideoReferenceImages(t *testing.T) {
+	store, batch, book, video := seedCompiledVideo(t)
+	var character, scene BookAsset
+	for _, asset := range book.AssetRecords {
+		if asset.Kind == "character" && asset.Name == "林晚" {
+			character = asset
+		}
+		if asset.Kind == "scene" && asset.Name == "林家客厅" {
+			scene = asset
+		}
+	}
+	for _, asset := range []BookAsset{character, scene} {
+		if _, err := store.CreateBookAssetImage(context.Background(), "alice", batch.ID, book.ID, asset.ID, CreateBookAssetImageInput{URL: "https://images.example/" + asset.ID + ".png", MediaType: "image/png", Source: "provider"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"videoPrompt": rawSetting(t, "镜头中出现 @林家客厅。")}, ExpectedRevision: video.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, video.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(compiled.ReferenceImageURLs, "https://images.example/"+character.ID+".png") {
+		t.Fatalf("unmentioned @ asset was uploaded: %+v", compiled.ReferenceImageURLs)
+	}
+	if !slices.Contains(compiled.ReferenceImageURLs, "https://images.example/"+scene.ID+".png") {
+		t.Fatalf("mentioned asset image missing: %+v", compiled.ReferenceImageURLs)
+	}
+}
+
 func TestFinalPromptOmitsTextForImageBackedAssets(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	var scene BookAsset

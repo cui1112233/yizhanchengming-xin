@@ -370,6 +370,35 @@ func selectedAssets(kind string, names []string, records map[string]compiledAsse
 	return selected
 }
 
+// explicitAssetIDsFromPrompt is the production-side counterpart of the rich
+// editor's @ picker.  A director may recommend a whole character/scene/prop
+// set, but only assets the user actually referenced with @ are reference-image
+// inputs for the video request.  Matching the durable name (longest first)
+// keeps names that contain one another deterministic.
+func explicitAssetIDsFromPrompt(prompt string, records map[string]compiledAsset) []string {
+	text := strings.TrimSpace(prompt)
+	if text == "" {
+		return nil
+	}
+	assets := make([]compiledAsset, 0, len(records))
+	for _, asset := range records {
+		if asset.ID == "" || strings.TrimSpace(asset.Name) == "" {
+			continue
+		}
+		assets = append(assets, asset)
+	}
+	sort.SliceStable(assets, func(i, j int) bool { return len(assets[i].Name) > len(assets[j].Name) })
+	ids := make([]string, 0, len(assets))
+	seen := map[string]bool{}
+	for _, asset := range assets {
+		if strings.Contains(text, "@"+asset.Name) && !seen[asset.ID] {
+			ids = append(ids, asset.ID)
+			seen[asset.ID] = true
+		}
+	}
+	return uniqueAssetIDs(ids)
+}
+
 func storyboardAssetMentions(groups ...[]compiledAsset) string {
 	seen := map[string]bool{}
 	mentions := []string{}
@@ -668,7 +697,18 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 	if err != nil {
 		return FinalPrompt{}, err
 	}
+	promptForAssetReferences := draft.FinalPrompt
+	if override, ok := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); ok {
+		promptForAssetReferences = override
+	}
 	selection, hasSelection := decodeVideoAssetSelection(video.SettingsState.Patch)
+	// An explicit @ mention is the user's final asset choice.  It takes
+	// precedence over automatic director recommendations and manual legacy
+	// selection records, so unmentioned images are never uploaded by surprise.
+	if mentionedIDs := explicitAssetIDsFromPrompt(promptForAssetReferences, records); len(mentionedIDs) > 0 {
+		selection = VideoAssetSelection{AddedAssetIDs: mentionedIDs}
+		hasSelection = true
+	}
 	selectedIDs := selection.effectiveAssetIDSet()
 	characters := selectedAssets("character", characterRefs, records, primaryImages, selectedIDs, hasSelection)
 	scenes := selectedAssets("scene", sceneRefs, records, primaryImages, selectedIDs, hasSelection)

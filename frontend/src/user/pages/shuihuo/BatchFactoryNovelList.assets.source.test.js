@@ -77,3 +77,9 @@ test('prompt editor opens asset mentions from an explicit at-key trigger', () =>
   assert.match(source, /function handleEditablePromptKeyDown\(event\)/);
   assert.doesNotMatch(source, /asset\?\.id && imageUrl && String\(assetName\(asset\)/);
 });
+
+test('asset picker shows a kind fallback when an asset has no image', () => {
+  assert.match(source, /batch-factory-asset-mention-fallback/);
+  assert.match(source, /暂无可用资产，请先在资产设置添加人物、场景或道具/);
+  assert.match(source, /asset\.kind === 'character' \? '人' : asset\.kind === 'scene' \? '景' : '物'/);
+});

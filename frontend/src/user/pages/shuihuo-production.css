@@ -713,6 +713,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-asset-mention-menu button { display:grid; grid-template-columns:28px 1fr auto; gap:8px; align-items:center; width:100%; padding:7px 8px; border:0; border-radius:6px; color:#f5f7fb; background:transparent; text-align:left; cursor:pointer; }
 .batch-factory-asset-mention-menu button:hover { background:rgba(255,255,255,.1); }
 .batch-factory-asset-mention-menu img { width:24px; height:24px; border-radius:4px; object-fit:cover; }
+.batch-factory-asset-mention-menu-fallback { display:grid; place-items:center; width:24px; height:24px; border:1px solid rgba(255,255,255,.2); border-radius:4px; color:#b9c4d6; background:#2b3340; font-size:11px; font-weight:700; }
 .batch-factory-asset-mention-menu span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:700; }
 .batch-factory-asset-mention-menu small { color:#9ca5b6; font-size:10px; }
 .batch-factory-asset-mention-empty { padding:10px 8px; color:#aeb8c7; font-size:12px; line-height:1.5; }
