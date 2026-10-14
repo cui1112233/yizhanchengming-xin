@@ -410,19 +410,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		}{
 			{http.MethodGet, "/api/novel-fetch-workshop/bootstrap"},
 			{http.MethodGet, "/api/novel-fetch-workshop/knowledge"},
-			{http.MethodGet, "/api/novel-fetch-workshop/logs"},
-			{http.MethodGet, "/api/novel-fetch-workshop/schedules"},
-			{http.MethodPost, "/api/novel-fetch-workshop/schedules"},
-			{http.MethodGet, "/api/novel-fetch-workshop/batches/current"},
-			{http.MethodGet, "/api/novel-fetch-workshop/realtime/status"},
-			{http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-delete"},
-			{http.MethodPost, "/api/novel-fetch-workshop/tasks/apply-rules"},
-			{http.MethodPost, "/api/novel-fetch-workshop/tasks/reprocess-sensitive"},
-			{http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-ai-count"},
-			{http.MethodPost, "/api/novel-fetch-workshop/knowledge/optimize"},
 			{http.MethodPost, "/api/novel-fetch-workshop/work-form"},
-			{http.MethodPatch, "/api/novel-fetch-workshop/schedules/{id}"},
-			{http.MethodDelete, "/api/novel-fetch-workshop/schedules/{id}"},
 		} {
 			root.Handle(route.method+" "+route.path, http.HandlerFunc(canonicalWorkshopLegacyAlias))
 		}
