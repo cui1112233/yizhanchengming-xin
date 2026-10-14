@@ -1,7 +1,7 @@
 (() => {
   if (window.QiantieNovelFetchRuntime) return;
 
-  const API_ROOT = '/api/batch-rewrite';
+  const API_ROOT = '/api/novel-fetch-workshop';
   const WEB_SUBMIT_API = '/api/novel-fetch-workshop/web-submit';
   const inFlight = new Map();
   const controllers = new Map();

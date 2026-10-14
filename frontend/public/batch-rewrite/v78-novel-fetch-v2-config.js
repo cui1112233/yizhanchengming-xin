@@ -1,5 +1,5 @@
 (() => {
-  const API_ROOT = '/api/batch-rewrite';
+  const API_ROOT = '/api/novel-fetch-workshop';
   let sensitiveFixGuardInstalled = false;
 
   function byId(id) { return document.getElementById(id); }

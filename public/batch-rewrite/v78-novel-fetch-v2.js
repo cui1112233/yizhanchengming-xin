@@ -1,5 +1,5 @@
 (() => {
-  const API_ROOT = '/api/batch-rewrite';
+  const API_ROOT = '/api/novel-fetch-workshop';
   const taskFilters = { date: '', bookId: '', status: '', scope: '' };
   const previewState = { active: false, tasks: [], selected: new Set(), originalInput: '' };
   let rerunSourceBatchId = '';

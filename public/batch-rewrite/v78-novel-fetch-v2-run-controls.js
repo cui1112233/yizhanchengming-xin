@@ -1,5 +1,5 @@
 (() => {
-  const API_ROOT = '/api/batch-rewrite';
+  const API_ROOT = '/api/novel-fetch-workshop';
   const STYLE_ID = 'v78RunControlsStyles';
   const METHOD_OPTIONS = [
     ['', '自动轮换'],

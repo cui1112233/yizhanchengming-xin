@@ -1,5 +1,5 @@
 (() => {
-  const API_ROOT = '/api/batch-rewrite';
+  const API_ROOT = '/api/novel-fetch-workshop';
   const LAYOUT_ID = 'v78ImageAlignedStyles';
   let mounted = false;
 

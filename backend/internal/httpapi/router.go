@@ -396,6 +396,36 @@ func NewRouter(options RouterOptions) http.Handler {
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/rules/preview", "/api/novel-fetch-workshop/rules/preview", 1)
 			novelFetch.ServeHTTP(w, clone)
 		}
+		// The embedded V78 workbench now uses the canonical Go namespace. These
+		// few endpoints are still implemented by the same Go compatibility
+		// handlers below, so translate only the path and never cross into Node.
+		canonicalWorkshopLegacyAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/novel-fetch-workshop/", "/api/batch-rewrite/", 1)
+			root.ServeHTTP(w, clone)
+		}
+		for _, route := range []struct {
+			method string
+			path   string
+		}{
+			{http.MethodGet, "/api/novel-fetch-workshop/bootstrap"},
+			{http.MethodGet, "/api/novel-fetch-workshop/knowledge"},
+			{http.MethodGet, "/api/novel-fetch-workshop/logs"},
+			{http.MethodGet, "/api/novel-fetch-workshop/schedules"},
+			{http.MethodPost, "/api/novel-fetch-workshop/schedules"},
+			{http.MethodGet, "/api/novel-fetch-workshop/batches/current"},
+			{http.MethodGet, "/api/novel-fetch-workshop/realtime/status"},
+			{http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-delete"},
+			{http.MethodPost, "/api/novel-fetch-workshop/tasks/apply-rules"},
+			{http.MethodPost, "/api/novel-fetch-workshop/tasks/reprocess-sensitive"},
+			{http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-ai-count"},
+			{http.MethodPost, "/api/novel-fetch-workshop/knowledge/optimize"},
+			{http.MethodPost, "/api/novel-fetch-workshop/work-form"},
+			{http.MethodPatch, "/api/novel-fetch-workshop/schedules/{id}"},
+			{http.MethodDelete, "/api/novel-fetch-workshop/schedules/{id}"},
+		} {
+			root.Handle(route.method+" "+route.path, http.HandlerFunc(canonicalWorkshopLegacyAlias))
+		}
 		root.Handle("/api/batch-rewrite/knowledge/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/knowledge", novelAuth.Middleware(http.HandlerFunc(legacyKnowledgeSummaryAlias)))
 		root.Handle("/api/batch-rewrite/opening/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
