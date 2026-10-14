@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +23,17 @@ type scriptVideoLocalInput struct {
 	ImageURLs   []string `json:"imageUrls"`
 }
 
+func validateLocalScriptVideoInput(input scriptVideoLocalInput) error {
+	spec, ok := scriptVideoModelSpec(strings.TrimSpace(input.ModelKey))
+	if !ok || spec.Provider != "doubao_local_executor" {
+		return fmt.Errorf("unsupported local video model")
+	}
+	if strings.TrimSpace(input.Prompt) == "" {
+		return fmt.Errorf("prompt is required")
+	}
+	return nil
+}
+
 func RegisterLocalScriptVideoRoutes(root *http.ServeMux, auth BridgeAuth, service *localexecutor.Service) {
 	if root == nil || service == nil {
 		return
@@ -38,8 +50,8 @@ func RegisterLocalScriptVideoRoutes(root *http.ServeMux, auth BridgeAuth, servic
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request"})
 				return
 			}
-			if strings.TrimSpace(input.Prompt) == "" {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "prompt is required"})
+			if err := validateLocalScriptVideoInput(input); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 				return
 			}
 			model := strings.TrimSpace(input.Model)

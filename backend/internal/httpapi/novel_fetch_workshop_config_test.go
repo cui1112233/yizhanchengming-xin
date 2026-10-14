@@ -1,15 +1,98 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 )
+
+func doLegacyBatchRewriteRequest(t *testing.T, handler http.Handler, method, path string, body any, now time.Time, secret string) *httptest.ResponseRecorder {
+	t.Helper()
+	var raw []byte
+	if body != nil {
+		var err error
+		raw, err = json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	SignBridgeRequest(req, "tester", true, now, secret)
+	result := httptest.NewRecorder()
+	handler.ServeHTTP(result, req)
+	return result
+}
+
+func TestLegacyBatchRewriteConfigPostSavesAndReturnsConfig(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	for _, path := range []string{"/api/batch-rewrite/bootstrap", "/api/batch-rewrite/config"} {
+		get := doLegacyBatchRewriteRequest(t, handler, http.MethodGet, path, nil, now, secret)
+		if get.Code != http.StatusOK {
+			t.Fatalf("legacy config GET path=%s status=%d body=%s", path, get.Code, get.Body.String())
+		}
+	}
+	post := doLegacyBatchRewriteRequest(t, handler, http.MethodPost, "/api/batch-rewrite/config", map[string]any{
+		"appConfig": map[string]any{"fetch": map[string]any{"default_max_txt": 4000}},
+	}, now, secret)
+	if post.Code == http.StatusNotFound {
+		t.Fatalf("legacy config POST was not routed: status=%d body=%s", post.Code, post.Body.String())
+	}
+	if post.Code != http.StatusOK {
+		t.Fatalf("legacy config POST status=%d body=%s", post.Code, post.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(post.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	config, ok := payload["config"].(map[string]any)
+	if !ok || config["app_config"] == nil {
+		t.Fatalf("legacy config response=%#v", payload)
+	}
+	saved, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved["appConfig"] == nil {
+		t.Fatalf("legacy config was not saved: %#v", saved)
+	}
+	get := doLegacyBatchRewriteRequest(t, handler, http.MethodGet, "/api/batch-rewrite/config", nil, now, secret)
+	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), "default_max_txt") {
+		t.Fatalf("legacy config GET did not reflect saved config: status=%d body=%s", get.Code, get.Body.String())
+	}
+}
+
+func TestLegacyBatchRewriteConfigPostRequiresAuthentication(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: "test-secret", Now: func() time.Time { return now }, NovelFetchStore: store})
+	before, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	post := doLegacyBatchRewriteRequest(t, handler, http.MethodPost, "/api/batch-rewrite/config", map[string]any{"appConfig": map[string]any{"fetch": map[string]any{"default_max_txt": 4000}}}, now, "")
+	if post.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated legacy config POST status=%d body=%s", post.Code, post.Body.String())
+	}
+	if after, err := store.GetConfig(context.Background(), "tester"); err != nil {
+		t.Fatal(err)
+	} else if !reflect.DeepEqual(before, after) {
+		t.Fatalf("unauthenticated request changed config")
+	}
+}
 
 func TestNovelFetchWorkshopConfigHidesCredentialsAndPreservesOnEdit(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
