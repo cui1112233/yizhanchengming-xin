@@ -3083,6 +3083,17 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row{background:color-mix(in srgb,var(--sh-panel-strong) 55%,transparent);color:var(--sh-muted)}
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row .ant-btn{padding:0;color:var(--sh-accent,#58d6b1);font-weight:700}
 .batch-factory-novel-list-v13 .batch-factory-novel-add-row small{color:var(--sh-muted);font-size:10px}
+.batch-factory-novel-list-v13 .batch-factory-novel-add-row{min-height:58px;border-top:1px dashed color-mix(in srgb,var(--sh-accent,#58d6b1) 38%,var(--sh-line));background:linear-gradient(90deg,color-mix(in srgb,var(--sh-accent,#58d6b1) 7%,transparent),transparent 70%)}
+.batch-factory-novel-list-v13 .batch-factory-novel-add-row .is-order{color:var(--sh-accent,#58d6b1);font-size:18px}
+.batch-factory-add-books-modal .ant-modal-content{overflow:hidden;border:1px solid color-mix(in srgb,var(--sh-accent,#58d6b1) 28%,var(--sh-line));background:var(--sh-panel-strong);box-shadow:0 18px 55px rgba(0,0,0,.38)}
+.batch-factory-add-books-modal .ant-modal-header{padding:18px 22px 14px;background:transparent;border-bottom:1px solid var(--sh-line)}
+.batch-factory-add-books-modal .ant-modal-body{padding:18px 22px 20px}
+.batch-factory-add-books-modal .ant-modal-footer{padding:13px 22px 18px;border-top:1px solid var(--sh-line)}
+.batch-factory-add-books-title{display:flex;align-items:baseline;gap:10px;color:var(--sh-text)}
+.batch-factory-add-books-title small{color:var(--sh-muted);font-size:11px;font-weight:400}
+.batch-factory-add-books-modal .ant-alert{border-radius:9px}
+.batch-factory-add-books-modal .ant-input-textarea textarea{min-height:150px!important;padding:12px 13px;line-height:1.7;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.batch-factory-add-books-modal .batch-factory-engine-field{gap:7px}
 .batch-factory-novel-list-v13 .is-order{display:flex;align-items:center;gap:8px}.batch-factory-novel-list-v13 .is-order b{font-variant-numeric:tabular-nums}
 .batch-factory-novel-list-v13 .is-book{display:grid;gap:3px}.batch-factory-novel-list-v13 .is-book strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-text)}.batch-factory-novel-list-v13 .is-book small{color:var(--sh-muted);font-size:10px}
 .batch-factory-content-mode{display:inline-flex;padding:2px 7px;border:1px solid var(--sh-line);border-radius:999px;color:var(--sh-muted);background:var(--sh-panel-strong);font-size:10px;font-style:normal}

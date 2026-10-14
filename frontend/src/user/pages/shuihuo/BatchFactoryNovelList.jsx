@@ -561,7 +561,7 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
       <span className="is-book"><Button type="link" size="small" onClick={() => setOpen(true)}>添加新书</Button><small>输入多个书 ID 或“书 ID + 书名”</small></span>
       <span>—</span><span>—</span><span>—</span><span>—</span><span>选择书城后添加</span>
     </div>
-    <Modal title="添加新书到当前批次" open={open} onCancel={() => setOpen(false)} onOk={submit} confirmLoading={busy} okText="添加到当前批次" width={620} destroyOnClose>
+    <Modal className="batch-factory-add-books-modal" title={<span className="batch-factory-add-books-title"><b>添加新书</b><small>写入当前批次小说列表</small></span>} open={open} onCancel={() => setOpen(false)} onOk={submit} confirmLoading={busy} okText="添加到当前批次" width={620} destroyOnClose>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         <Alert type="info" showIcon message="添加后自动继承当前批次配置" description="新书不会加入正在运行的队列；会先写入当前批次，后续按批次行数和正文规则处理。" />
         <label className="batch-factory-engine-field"><span><b>书城</b></span><Select value={platform || undefined} onChange={value => setPlatform(String(value || ''))} options={options.map(item => ({ value: String(item.value), label: item.label }))} placeholder="请选择书城" style={{ width: '100%' }} /></label>
