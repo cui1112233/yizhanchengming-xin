@@ -521,6 +521,12 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	if path == "/api/script/director-pipeline" {
 		return false
 	}
+	// The owner-scoped effective configuration is served by Go. Keep the
+	// legacy /api/config URL on that handler; only its still-unmigrated child
+	// settings endpoints may remain on the compatibility bridge.
+	if path == "/api/config" {
+		return false
+	}
 	// This prefix already ends with a slash; do not add a second slash when
 	// matching script endpoints such as /api/script/director-pipeline.
 	if strings.HasPrefix(path, "/api/script/") {

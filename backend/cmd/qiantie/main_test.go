@@ -131,13 +131,16 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 }
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
-	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects"} {
+	for _, path := range []string{"/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects"} {
 		if !shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s should use the temporary Node bridge", path)
 		}
 	}
 	if shouldBridgeLegacyAPI("/api/script/director-pipeline") {
 		t.Fatal("director pipeline is implemented by Go and must not use the Node bridge")
+	}
+	if shouldBridgeLegacyAPI("/api/config") {
+		t.Fatal("owner config is implemented by Go and must not use the Node bridge")
 	}
 	if shouldBridgeLegacyAPI("/api/script-video") {
 		t.Fatal("script video must use Go routes")
