@@ -85,11 +85,13 @@ test('121 backend transport also defaults to a 15 second deadline', () => {
   assert.match(source, /timeoutMs\s*=\s*15000/);
 });
 
-test('candidate image injects the guard even when tracked frontend dist is stale', () => {
+test('candidate image is the Go embedded runtime and carries no Node application layer', () => {
   const dockerfile = fs.readFileSync(path.join(repoDir, 'Dockerfile'), 'utf8');
-  assert.match(dockerfile, /COPY frontend\/public\/batch-rewrite\/121-login-hotfix\.js/);
-  assert.match(dockerfile, /qiantie-121-login-hotfix/);
-  assert.match(dockerfile, /frontend\/dist\/batch-rewrite\/index\.html/);
+  assert.match(dockerfile, /FROM golang:[^\n]+ AS build/);
+  assert.match(dockerfile, /COPY backend\/ \.\//);
+  assert.match(dockerfile, /go build[^\n]+cmd\/qiantie/);
+  assert.doesNotMatch(dockerfile, /node:/);
+  assert.doesNotMatch(dockerfile, /COPY frontend\//);
 });
 
 test('novel status center survives frontend rebuild and direct ECS image packaging', () => {
@@ -99,8 +101,9 @@ test('novel status center survives frontend rebuild and direct ECS image packagi
   assert.match(source, /视频管理系统提交/);
 
   const dockerfile = fs.readFileSync(path.join(repoDir, 'Dockerfile'), 'utf8');
-  assert.match(dockerfile, /COPY frontend\/dist\/ \.\/frontend\/dist\//);
-  assert.match(dockerfile, /COPY frontend\/public\/batch-rewrite\/121-login-hotfix\.js/);
+  assert.match(dockerfile, /backend\/web\/dist/);
+  assert.match(dockerfile, /COPY --from=build \/out\/qiantie \/qiantie/);
+  assert.doesNotMatch(dockerfile, /COPY frontend\//);
 });
 
 test('121 login delegates to the asynchronous operation flow', () => {
