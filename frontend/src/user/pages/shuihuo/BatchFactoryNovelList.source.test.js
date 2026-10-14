@@ -372,6 +372,17 @@ test('renders storyboard @asset mentions as compact visual pills', () => {
   assert.match(source, /renderStoryboardPromptWithAssetMentions\(activePrompt, book, video\)/);
 });
 
+test('starts each storyboard asset mention on its own display line', () => {
+  assert.match(source, /function separateStoryboardAssetMentions\(text, book\)/);
+  assert.match(source, /function renderStoryboardPromptTextPart\(part, keyPrefix\)/);
+  assert.match(source, /展示层把每个资产当作一个独立条目/);
+  assert.match(source, /const start = value\.search\(\/基础设定/);
+  assert.match(source, /value\.indexOf\('视频提示词', start\)/);
+  assert.match(source, /\(\^\|\[\^\\\\n\]\)\(@\$\{escaped\}\)/);
+  assert.match(source, /lineIndex \? <br key=/);
+  assert.match(source, /separateStoryboardAssetMentions\(compactUnifiedAssetDescriptions/);
+});
+
 test('binds the current storyboard to selectable asset cards whose grey state is saved as a video override', () => {
   assert.match(source, /function InlineStoryboardAssets/);
   assert.match(source, /assetSelection/);

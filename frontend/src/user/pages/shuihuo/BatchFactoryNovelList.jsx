@@ -846,8 +846,41 @@ function compactUnifiedAssetDescriptions(prompt, book) {
   return `${text.slice(0, start)}${block}${text.slice(end)}`;
 }
 
+function separateStoryboardAssetMentions(text, book) {
+  let value = String(text || '');
+  const start = value.search(/基础设定\s*[：:]/);
+  if (start < 0) return value;
+  const endCandidates = [
+    value.indexOf('视频提示词', start),
+    value.indexOf('分镜视频提示词', start),
+    value.indexOf('段内执行约束', start),
+    value.indexOf('[场景', start),
+    value.indexOf('【场景', start)
+  ].filter(index => index >= 0);
+  const end = endCandidates.length ? Math.min(...endCandidates) : value.length;
+  let assetBlock = value.slice(start, end);
+  (book?.assetRecords || [])
+    .map(asset => assetName(asset))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .forEach(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // 展示层把每个资产当作一个独立条目：同一段描述中的下一个人物、场景
+      // 或道具另起一行，但不改写实际保存/提交的 VIDEO Prompt。
+      assetBlock = assetBlock.replace(new RegExp(`(^|[^\\n])(@${escaped})`, 'g'), '$1\n$2');
+    });
+  return `${value.slice(0, start)}${assetBlock}${value.slice(end)}`;
+}
+
+function renderStoryboardPromptTextPart(part, keyPrefix) {
+  return String(part || '').split('\n').flatMap((line, lineIndex) => [
+    lineIndex ? <br key={`${keyPrefix}-br-${lineIndex}`} /> : null,
+    <span key={`${keyPrefix}-text-${lineIndex}`}>{line}</span>
+  ].filter(Boolean));
+}
+
 function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImages = {}) {
-  let text = compactUnifiedAssetDescriptions(withStoryboardAssetMentions(prompt, book, video), book);
+  let text = separateStoryboardAssetMentions(compactUnifiedAssetDescriptions(withStoryboardAssetMentions(prompt, book, video), book), book);
   // Director/SD cards from older runs often contain the asset name followed by
   // its full appearance description instead of an @ reference. Normalize only
   // the durable asset name for display; the description remains readable after
@@ -860,6 +893,7 @@ function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImage
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       text = text.replace(new RegExp(`(^|[^@])${escaped}`, 'g'), `$1@${name}`);
     });
+  text = separateStoryboardAssetMentions(text, book);
   const selectedIds = readStoryboardAssetSelection(book, video).selectedIds;
   const assets = (book?.assetRecords || [])
     .filter(asset => selectedIds.has(String(asset?.id || '')) || text.includes(`@${assetName(asset)}`))
@@ -873,7 +907,7 @@ function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImage
     const asset = assetByMention.get(part);
     return asset
       ? <span key={`${asset.id || asset.mention}-${index}`} contentEditable={false} className={`batch-factory-asset-mention is-${asset.kind || 'asset'}`} title={`${asset.kind || '资产'}：${assetName(asset)}`}><span className="batch-factory-asset-mention-avatar">{asset.imageUrl ? <img src={asset.imageUrl} alt="" /> : asset.kind === 'character' ? '人' : asset.kind === 'scene' ? '景' : '物'}</span>{assetName(asset)}</span>
-      : <span key={`prompt-text-${index}`}>{part}</span>;
+      : renderStoryboardPromptTextPart(part, `prompt-text-${index}`);
   });
 }
 
@@ -882,7 +916,7 @@ function escapePromptHTML(value) {
 }
 
 function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
-  let text = compactUnifiedAssetDescriptions(withStoryboardAssetMentions(prompt, book, video), book);
+  let text = separateStoryboardAssetMentions(compactUnifiedAssetDescriptions(withStoryboardAssetMentions(prompt, book, video), book), book);
   (book?.assetRecords || [])
     .map(asset => assetName(asset))
     .filter(Boolean)
@@ -891,6 +925,7 @@ function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       text = text.replace(new RegExp(`(^|[^@])${escaped}`, 'g'), `$1@${name}`);
     });
+  text = separateStoryboardAssetMentions(text, book);
   const selectedIds = readStoryboardAssetSelection(book, video).selectedIds;
   const assets = (book?.assetRecords || [])
     .filter(asset => selectedIds.has(String(asset?.id || '')) || text.includes(`@${assetName(asset)}`))
@@ -900,9 +935,9 @@ function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
   if (!text || !assets.length) return escapePromptHTML(text);
   const pattern = new RegExp(`(${assets.map(asset => asset.mention.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
   const assetByMention = new Map(assets.map(asset => [asset.mention, asset]));
-  return text.split(pattern).map(part => {
+  return text.split(pattern).map((part, index) => {
     const asset = assetByMention.get(part);
-    if (!asset) return escapePromptHTML(part);
+    if (!asset) return escapePromptHTML(part).replace(/\n/g, '<br>');
     const kind = asset.kind || 'asset';
     const fallback = kind === 'character' ? '人' : kind === 'scene' ? '景' : '物';
     const avatar = asset.imageUrl
