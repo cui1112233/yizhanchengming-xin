@@ -51,7 +51,7 @@ func (s *DirectorService) compileH3CharacterBatch(ctx context.Context, book Book
 	}
 	_, appearanceRule := h3CharacterPromptPhases(preset.Body)
 	response, err := s.Provider.Complete(ctx, TextCompletionRequest{
-		SystemPrompt: appearanceRule + "\n\n传输协议：一次返回全部人物的 JSON 对象 {\"characters\":[{\"character_id\":\"原样返回输入标识\",\"name\":\"原样返回姓名\",\"prompt\":\"完整外形正文\"}]}。不得遗漏、重复或新增人物。",
+		SystemPrompt: appearanceRule + "\n" + staticAssetPromptRule + "\n\n传输协议：一次返回全部人物的 JSON 对象 {\"characters\":[{\"character_id\":\"原样返回输入标识\",\"name\":\"原样返回姓名\",\"prompt\":\"完整外形正文\"}]}。不得遗漏、重复或新增人物。",
 		UserPrompt:   string(payload), Temperature: 0.2, MaxTokens: 32000,
 	})
 	if err != nil {

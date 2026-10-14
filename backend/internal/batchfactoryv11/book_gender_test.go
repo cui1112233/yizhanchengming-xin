@@ -65,3 +65,15 @@ func TestBuildAssetExtractionContractCarriesBookGenderFallback(t *testing.T) {
 		t.Fatalf("book gender fallback missing from contract: system=%q user=%q", contract.SystemPrompt, contract.UserPrompt)
 	}
 }
+
+func TestAssetExtractionContractSeparatesStaticAppearanceFromStoryActions(t *testing.T) {
+	contract, err := BuildAssetExtractionContract(Book{ID: "book-static", Title: "静态资产", SourceText: "她走进厅堂。"}, DirectorSnapshot{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"只写静态", "不得写镜头动作", "端坐", "抬手", "走动"} {
+		if !strings.Contains(contract.SystemPrompt, required) {
+			t.Fatalf("asset contract missing static-only rule %q: %s", required, contract.SystemPrompt)
+		}
+	}
+}

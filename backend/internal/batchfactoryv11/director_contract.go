@@ -372,6 +372,7 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 只输出一个合法 JSON 对象，格式严格为：
 {"characters":[{"name":"人物名","formal_name":"正式人物名单中的标准名","facts":"人物事实：身份、性别、年龄阶段、别名等","appearance":"人物外形：脸型、发型、服装、体态等跨镜头锚点","relationships":"人物关系：与其他人物的关系及依据","prompt":"把以上四项合并后的完整视觉提示词"}],"scenes":[{"name":"场景名","prompt":"空间、时段、陈设、氛围等可见特征"}],"props":[{"name":"道具名","prompt":"材质、外观、状态等可见特征"}]}
 每个数组可以为空；每个元素必须同时有非空 name 与 prompt。`)
+	system += "\n" + staticAssetPromptRule
 	config := aiReasoningPromptConfig(snapshot.Effective)
 	h3AssetSelected := config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)
 	h3CharacterSelected := config.Assets.appliesTo(book, config.Assets.Character) && usesH3CharacterRenderer(config.Assets.Character)

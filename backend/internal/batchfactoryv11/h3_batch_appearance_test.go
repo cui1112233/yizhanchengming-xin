@@ -31,6 +31,9 @@ func TestH3AppearanceBatchOneRequestAndIdentityMapping(t *testing.T) {
 	if !strings.Contains(provider.calls[0].SystemPrompt, "后台统一人物外形要求") {
 		t.Fatal("selected backend preset not used")
 	}
+	if !strings.Contains(provider.calls[0].SystemPrompt, "不得写镜头动作") {
+		t.Fatal("H3 appearance prompt must enforce static asset boundaries")
+	}
 }
 
 func TestH3AppearanceBatchRejectsIncompleteWithoutFallback(t *testing.T) {
