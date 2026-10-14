@@ -1127,12 +1127,15 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const [saving, setSaving] = useState(false);
   const [videoPrompt, setVideoPrompt] = useState('');
   const [visualPrompt, setVisualPrompt] = useState('');
+  const [assetMentionMenu, setAssetMentionMenu] = useState(null);
+  const promptInputRef = useRef(null);
   const [h3TraceOpen, setH3TraceOpen] = useState(false);
   const [openingVariantsOpen, setOpeningVariantsOpen] = useState(false);
   const [h3TraceBusy, setH3TraceBusy] = useState(false);
   const [h3Trace, setH3Trace] = useState(null);
   const [h3TraceError, setH3TraceError] = useState('');
   const [promptEditTrace, setPromptEditTrace] = useState(null);
+  const [assetThumbs, setAssetThumbs] = useState({});
   const selectedIndex = Math.max(0, videos.findIndex(video => video.id === selectedVideoId));
   const selectedVideo = videos[selectedIndex] || null;
   const selectedPrecompiledFrame = resolvePrecompiledStoryboardFrame(book, selectedVideoId || initialVideoId);
@@ -1156,7 +1159,22 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     setVideoPrompt(selectedVideo?.videoPrompt || '');
     setVisualPrompt(selectedVideo?.visualPrompt || '');
     setEditing(false);
+    setAssetMentionMenu(null);
   }, [selectedVideoId, selectedVideo?.revision]);
+  useEffect(() => {
+    let active = true;
+    const records = (book?.assetRecords || []).filter(asset => asset?.id);
+    if (!batchId || !book?.id || !records.length) { setAssetThumbs({}); return () => { active = false; }; }
+    Promise.all(records.map(async asset => {
+      try {
+        const response = await listBookAssetImages(batchId, book.id, asset.id);
+        const images = resultData(response, 'images');
+        const primary = Array.isArray(images) ? (images.find(image => image?.isPrimary) || images[0]) : null;
+        return [String(asset.id), String(primary?.url || primary?.imageUrl || '')];
+      } catch (_) { return [String(asset.id), '']; }
+    })).then(entries => { if (active) setAssetThumbs(Object.fromEntries(entries)); });
+    return () => { active = false; };
+  }, [batchId, book?.id, book?.revision, book?.assetRecords?.length]);
   async function savePrompt() {
     if (!selectedVideo) return;
     setSaving(true);
@@ -1194,6 +1212,32 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   function movePrecompiledFrame(direction) {
     const frame = precompiledWorkspace.frames?.[(selectedPrecompiledFrame?.index || 0) + direction];
     if (frame) setSelectedVideoId(frame.key);
+  }
+
+  function updatePromptValue(event) {
+    const nextValue = event.target.value;
+    if (promptKind === 'visual') { setVisualPrompt(nextValue); return; }
+    setVideoPrompt(nextValue);
+    const cursor = Number(event.target.selectionStart || nextValue.length);
+    const match = nextValue.slice(0, cursor).match(/@([^\s@]*)$/);
+    if (!match) { setAssetMentionMenu(null); return; }
+    const query = match[1].toLowerCase();
+    const candidates = (book?.assetRecords || []).filter(asset => asset?.id && assetThumbs[String(asset.id)] && String(assetName(asset) || '').toLowerCase().includes(query));
+    setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
+  }
+
+  function insertAssetMention(asset) {
+    const menu = assetMentionMenu;
+    if (!menu || !asset) return;
+    const value = videoPrompt;
+    const mention = `@${assetName(asset)} `;
+    const next = `${value.slice(0, menu.start)}${mention}${value.slice(menu.end)}`;
+    setVideoPrompt(next);
+    setAssetMentionMenu(null);
+    requestAnimationFrame(() => {
+      const input = promptInputRef.current?.resizableTextArea?.textArea || promptInputRef.current?.textArea;
+      if (input) { input.focus(); const position = menu.start + mention.length; input.setSelectionRange(position, position); }
+    });
   }
 	  const activeLabel = promptKind === 'visual' ? '画面提示词' : '分镜视频提示词';
   const rawSubmittedVideoPrompt = compiledPrompt || displayPrompt || videoPrompt;
@@ -1253,7 +1297,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       <span className="batch-factory-prompt-meta-item"><b>视频模型：</b>{videoModelLabel}</span>
     </div>
     {!activeReady ? <Alert type="info" showIcon message={smartUnifiedPending && promptKind === 'video' ? '智能统一待分析' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看'} description={smartUnifiedPending && promptKind === 'video' ? '智能统一与资产提示词分开获取；未取得基线不会阻断资产、分镜或视频。可在资产区单独刷新。' : '当前分镜尚未有这一类提示词；切换分镜时会保持当前查看类型。'} /> : <>
-      <label className="shuihuo-form-label batch-factory-prompt-editor-label">{activeLabel}<Input.TextArea rows={14} readOnly={!editing} value={editing ? activeValue : renderedActiveValue} onChange={event => promptKind === 'visual' ? setVisualPrompt(event.target.value) : setVideoPrompt(event.target.value)} placeholder={promptKind === 'visual' ? '仅用于生成当前分镜的画面图片' : '会进入当前分镜的最终视频编译'} /></label>
+      <label className="shuihuo-form-label batch-factory-prompt-editor-label">{activeLabel}{!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(renderedActiveValue, book, video, assetThumbs)}</div> : <div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} readOnly={!editing} value={activeValue} onChange={updatePromptValue} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} placeholder={promptKind === 'visual' ? '仅用于生成当前分镜的画面图片' : '编辑时输入 @ 选择有图片的资产'} />{editing && promptKind === 'video' && assetMentionMenu?.candidates?.length ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates.map(asset => <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}><img src={assetThumbs[String(asset.id)]} alt="" /><span>{assetName(asset)}</span><small>{asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'}</small></button>)}</div> : null}</div>}</label>
       <div className="batch-factory-prompt-modal-actions">
         <Button type="primary" loading={saving} disabled={!editing || !selectedVideo} onClick={savePrompt}>保存</Button>
         <Tooltip title={promptKind === 'visual' ? '按当前小说原文重新生成画面提示词。' : '按当前小说原文重新生成导演分镜，并重编最终 VIDEO 提示词；不会提交视频生成任务。'}><Button icon={promptKind === 'visual' ? <ReloadOutlined /> : null} loading={regenerating} disabled={regenerating || !regenerateCurrentPrompt} onClick={regenerateCurrentPrompt}>{promptKind === 'visual' ? '重新生成画面提示词' : '重新生成导演分镜'}</Button></Tooltip>
