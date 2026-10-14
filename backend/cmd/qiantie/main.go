@@ -235,6 +235,8 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
+// isLegacyNovelFetchBridgeRequest is retained for contract tests and release
+// audit tooling. The live handler never uses it to forward traffic to Node.
 func isLegacyNovelFetchBridgeRequest(req *http.Request) bool {
 	return req != nil && req.URL != nil && strings.HasPrefix(req.URL.Path, "/api/batch-rewrite") && !isGoNovelFetchCompatRequest(req)
 }
