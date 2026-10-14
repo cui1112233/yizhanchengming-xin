@@ -541,7 +541,7 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 			return false
 		}
 	}
-	for _, prefix := range []string{"/api/platform-projects", "/api/storage", "/api/novel-panel", "/api/member"} {
+	for _, prefix := range []string{"/api/platform-projects", "/api/storage", "/api/novel-panel", "/api/member", "/api/account-admin", "/api/team-admin", "/api/agent"} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return false
 		}

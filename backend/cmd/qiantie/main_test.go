@@ -131,7 +131,7 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 }
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
-	for _, path := range []string{"/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request"} {
+	for _, path := range []string{"/api/account-recovery/password/request"} {
 		if !shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s should use the temporary Node bridge", path)
 		}
@@ -157,7 +157,7 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 			t.Fatalf("%s is implemented by Go and must not use the Node bridge", path)
 		}
 	}
-	for _, path := range []string{"/api/platform-projects", "/api/storage/list", "/api/storage/restore", "/api/novel-panel/projects", "/api/novel-panel/reference-assets/upload", "/api/member/profile", "/api/member/team"} {
+	for _, path := range []string{"/api/platform-projects", "/api/storage/list", "/api/storage/restore", "/api/novel-panel/projects", "/api/novel-panel/reference-assets/upload", "/api/member/profile", "/api/member/team", "/api/account-admin/accounts", "/api/team-admin/teams", "/api/agent/tasks", "/api/agent/chat"} {
 		if shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s is implemented by Go and must not use the Node bridge", path)
 		}
