@@ -73,7 +73,14 @@ if (-not $SkipGoBuild) {
     go build -o qiantie-local.exe ./cmd/qiantie
     $executorDownloads = Join-Path $goDist 'downloads/local-executor'
     New-Item -ItemType Directory -Force $executorDownloads | Out-Null
-    go build -o (Join-Path $executorDownloads 'qiantie-executor-v88-0.1.0-win-x64.exe') ./cmd/qiantie-executor
+    $executorFile = Join-Path $executorDownloads 'qiantie-executor-v88-0.1.0-win-x64.exe'
+    go build -o $executorFile ./cmd/qiantie-executor
+    # The API serves operator-provided downloads from data/downloads, while
+    # backend/web/dist is the embedded fallback. Keep both copies in sync so
+    # a freshly built Go runtime never advertises a 503 installer URL.
+    $runtimeDownloads = Join-Path $repo 'data/downloads'
+    New-Item -ItemType Directory -Force $runtimeDownloads | Out-Null
+    Copy-Item -LiteralPath $executorFile -Destination (Join-Path $runtimeDownloads (Split-Path $executorFile -Leaf)) -Force
   } finally {
     Pop-Location
   }
