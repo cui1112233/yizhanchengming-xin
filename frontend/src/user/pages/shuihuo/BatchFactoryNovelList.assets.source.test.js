@@ -46,3 +46,8 @@ test('prompt panel renders image-backed mentions and opens the picker in edit mo
   assert.match(source, /aria-label="可编辑分镜视频提示词"/);
   assert.match(source, /assetThumbs\[String\(asset\.id\)\]/);
 });
+
+test('batch card keeps the prompt and asset mentions in one content layer', () => {
+  assert.match(source, /batch-factory-prompt-entry-rich-view/);
+  assert.doesNotMatch(source, /<small title=\{assetPromptText\}>/);
+});

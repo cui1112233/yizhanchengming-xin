@@ -2920,6 +2920,11 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   color:var(--sh-text)!important;font-size:11px!important;font-weight:600!important;line-height:1.62!important;
   white-space:pre-wrap!important;-webkit-line-clamp:7!important;-webkit-box-orient:vertical!important
 }
+.batch-factory-prompt-entry-rich-view{
+  display:-webkit-box!important;max-height:none!important;overflow:hidden!important;margin:0!important;
+  color:var(--sh-text)!important;font-size:11px!important;font-weight:600!important;line-height:1.62!important;
+  white-space:pre-wrap!important;-webkit-line-clamp:7!important;-webkit-box-orient:vertical!important
+}
 .batch-factory-prompt-entry-content small{align-self:end;color:var(--sh-muted);font-size:9px}
 
 .batch-factory-inline-media{
