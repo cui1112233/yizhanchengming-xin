@@ -520,10 +520,10 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	if strings.HasPrefix(path, "/api/script/") {
 		return true
 	}
-	// V12 is the public workbench contract. Its summary, direct-fetch and
-	// orchestration adapters still live in Node, while Go owns capabilities,
-	// intake handoff, and native H3 routes. Keep only the remaining adapters on
-	// the local compatibility bridge so 4001 does not expose false 404s.
+	// V12 is the public workbench contract. All current V12 routes are handled
+	// by Go below (including the former summary/direct-fetch adapters). Keep the
+	// compatibility check explicit so a new or misspelled V12 path cannot
+	// silently resurrect the retired Node service.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
 		// This legacy repair endpoint was removed from the Node router. Do not
 		// resurrect it through the broad V12 compatibility fallback.
@@ -548,7 +548,10 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		if strings.Contains(path, "/h3/") {
 			return true
 		}
-		return true
+		// Unknown V12 endpoints must fail on Go rather than being forwarded to
+		// Node. This makes the remaining migration gap visible and prevents a
+		// second runtime from handling a new batch-factory request by accident.
+		return false
 	}
 	for _, prefix := range []string{
 		"/api/config",

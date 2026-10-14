@@ -212,6 +212,13 @@ func TestRemovedLegacyAutomationRepairDoesNotBridge(t *testing.T) {
 	}
 }
 
+func TestUnknownBatchFactoryV12RouteDoesNotBridge(t *testing.T) {
+	path := "/api/batch-factory/v12/unknown-future-route"
+	if shouldBridgeLegacyAPI(path) {
+		t.Fatal("unknown V12 routes must not be forwarded to the retired Node service")
+	}
+}
+
 func TestBatchFactoryV12IntakeReadIsNativeGo(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/intake-1") {
 		t.Fatal("V12 intake reads must use the Go batch store")
