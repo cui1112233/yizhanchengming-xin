@@ -60,6 +60,10 @@ test('applies the unified button treatment inside batch factory modals', () => {
   assert.match(stylesheet, /BF_MODAL_BUTTONS_UNIFIED_BEGIN[\s\S]*batch-factory-add-books-modal[\s\S]*batch-factory-engine-modal-final[\s\S]*batch-factory-unified-settings-modal[\s\S]*box-shadow/);
 });
 
+test('draws one full-width boundary between consecutive batch books', () => {
+  assert.match(stylesheet, /BF_BOOK_ROW_BOUNDARY_BEGIN[\s\S]*batch-factory-book-row \+ \.batch-factory-book-row[\s\S]*border-top:\s*1px solid var\(--sh-line\)/);
+});
+
 test('TXT download uses the complete captured source instead of the production line preview', () => {
   assert.match(source, /const productionText = batchFactoryCleanSourceText\(book\.sourceText\);/);
 });

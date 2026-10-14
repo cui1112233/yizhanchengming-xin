@@ -3884,6 +3884,20 @@ body.shuihuo-reference-shell
 }
 /* BF_MODAL_BUTTONS_UNIFIED_END */
 
+/* BF_BOOK_ROW_BOUNDARY_BEGIN */
+/* Draw the book-to-book separator on the row itself so it spans all visible
+   columns as one continuous boundary. */
+.batch-factory-book-row {
+  position: relative;
+  border-bottom: 1px solid var(--sh-line) !important;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--sh-line) 72%, transparent);
+}
+.batch-factory-book-row + .batch-factory-book-row {
+  margin-top: 0 !important;
+  border-top: 1px solid var(--sh-line) !important;
+}
+/* BF_BOOK_ROW_BOUNDARY_END */
+
 /* The storyboard asset rail is now represented by @asset mentions in the
    storyboard prompt. Keep the workbench grid aligned to its six visible
    columns after removing that rail. */
