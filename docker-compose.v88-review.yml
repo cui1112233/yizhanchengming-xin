@@ -105,6 +105,9 @@ services:
     restart: "no"
 
   platform:
+    # The public application runtime is Go. Keep the historical Node shell
+    # available only for an explicit rollback/audit profile.
+    profiles: ["node-legacy"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -124,12 +127,11 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-      novel-fetch-121-worker:
-        condition: service_healthy
     networks: [v88-review]
     restart: "no"
 
   novel-fetch-121-worker:
+    profiles: ["full"]
     build:
       context: ./services/121-browser-worker
       dockerfile: Dockerfile
@@ -141,16 +143,11 @@ services:
       QIANTIE_121_STORAGE_STATE_SECRET: ${QIANTIE_V88_121_STORAGE_STATE_SECRET:?required}
       QIANTIE_121_HEADED_ENABLED: "1"
       QIANTIE_121_SESSION_DIR: /data/sessions
-    expose:
-      - "8787"
+    expose: ["8787"]
     volumes:
       - ${QIANTIE_V88_WORKER_DATA_DIR:?required}:/data
     healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "require('http').get({host:'127.0.0.1',port:8787,path:'/healthz',headers:{'x-qiantie-internal-secret':process.env.QIANTIE_121_WORKER_SECRET}},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      test: ["CMD", "node", "-e", "require('http').get({host:'127.0.0.1',port:8787,path:'/healthz',headers:{'x-qiantie-internal-secret':process.env.QIANTIE_121_WORKER_SECRET}},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 20
