@@ -125,6 +125,15 @@ func TestCanonicalNovelFetchWebSubmitConfigUsesTheSharedGoHandler(t *testing.T) 
 	}
 }
 
+func TestLegacyNovelFetchEndpointIsNoLongerMounted(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	handler := NewRouter(RouterOptions{BridgeSecret: "test-secret", Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
+	response := doLegacyBatchRewriteRequest(t, handler, http.MethodPost, "/api/novel-fetch", map[string]any{"platform": 15, "bookIds": []string{"2091926811672429633"}, "maxTxt": 4000}, now, "test-secret")
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("legacy novel-fetch endpoint is still mounted: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestLegacyBatchRewriteConfigIncludesTextModelAndParserDefaults(t *testing.T) {
 	payload := legacyBatchRewriteConfig(map[string]any{
 		"appConfig": map[string]any{
