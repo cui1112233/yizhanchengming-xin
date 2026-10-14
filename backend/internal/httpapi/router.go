@@ -261,7 +261,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerScriptSmartUnifiedRoute(root, auth, options.TextProvider)
 		registerChatRoute(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
 	}
-	root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
+	if legacyV11Public() {
+		root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
+	}
 	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
