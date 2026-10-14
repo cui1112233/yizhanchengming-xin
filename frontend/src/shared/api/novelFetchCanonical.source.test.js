@@ -7,6 +7,7 @@ const workshopSource = fs.readFileSync(path.resolve(process.cwd(), 'src/shared/a
 const embeddedWorkbenchSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/app.js'), 'utf8');
 const embeddedRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/v78-novel-fetch-v2-runtime.js'), 'utf8');
 const packagedRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), '../public/batch-rewrite/v78-novel-fetch-v2-runtime.js'), 'utf8');
+const embeddedLoginHotfixSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/121-login-hotfix.js'), 'utf8');
 const embeddedV78Sources = [
   'v78-novel-fetch-v2.js',
   'v78-novel-fetch-v2-config.js',
@@ -48,7 +49,7 @@ describe('novel fetch workshop uses one canonical Go workshop API', () => {
   });
 
   it('keeps every embedded V78 API helper on the canonical Go workshop namespace', () => {
-    for (const source of [embeddedWorkbenchSource, embeddedRuntimeSource, packagedRuntimeSource, ...embeddedV78Sources, ...packagedV78Sources]) {
+    for (const source of [embeddedWorkbenchSource, embeddedRuntimeSource, packagedRuntimeSource, embeddedLoginHotfixSource, ...embeddedV78Sources, ...packagedV78Sources]) {
       expect(source).not.toContain("'/api/batch-rewrite'");
       expect(source).not.toContain('"/api/batch-rewrite"');
     }

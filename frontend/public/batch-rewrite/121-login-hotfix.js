@@ -15,7 +15,7 @@
       return '小说获取配置加载失败：主站登录已失效，请重新登录后刷新页面。';
     }
     if (/404|not found/i.test(raw)) {
-      return '小说获取配置加载失败：当前运行版本缺少 /api/batch-rewrite/config。';
+      return '小说获取配置加载失败：当前运行版本缺少 /api/novel-fetch-workshop/config。';
     }
     return `小说获取配置加载失败：${raw || '未知错误'}`;
   }
