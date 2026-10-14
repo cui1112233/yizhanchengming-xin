@@ -53,7 +53,7 @@ test('book content exposes production-content edit and TXT download actions', ()
 });
 
 test('keeps the batch factory header and rows on the same six-column grid', () => {
-  assert.match(stylesheet, /BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_BEGIN[\s\S]*grid-template-columns:\s*64px minmax\(300px,\s*1\.04fr\) minmax\(170px,\s*\.60fr\) minmax\(330px,\s*1\.16fr\) minmax\(300px,\s*1\.02fr\) minmax\(210px,\s*\.72fr\)\s*!important/);
+  assert.match(stylesheet, /BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_BEGIN[\s\S]*grid-template-columns:\s*56px minmax\(300px,\s*1\.04fr\) minmax\(170px,\s*\.60fr\) minmax\(330px,\s*1\.16fr\) minmax\(300px,\s*1\.02fr\) minmax\(210px,\s*\.72fr\)\s*!important/);
 });
 
 test('applies the unified button treatment inside batch factory modals', () => {
@@ -62,6 +62,10 @@ test('applies the unified button treatment inside batch factory modals', () => {
 
 test('draws one full-width boundary between consecutive batch books', () => {
   assert.match(stylesheet, /BF_BOOK_ROW_BOUNDARY_BEGIN[\s\S]*batch-factory-book-row \+ \.batch-factory-book-row[\s\S]*border-top:\s*1px solid var\(--sh-line\)/);
+});
+
+test('keeps the first column resizable from its right boundary', () => {
+  assert.match(source, /index < BATCH_FACTORY_TABLE_COLUMNS\.length - 1 \? <button type="button" draggable/);
 });
 
 test('TXT download uses the complete captured source instead of the production line preview', () => {

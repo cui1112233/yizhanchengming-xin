@@ -3125,8 +3125,8 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
    prompt column. */
 .batch-factory-workbench-table .shuihuo-workbench-head,
 .batch-factory-book-row {
-  grid-template-columns: 64px minmax(300px,1.04fr) minmax(170px,.60fr) minmax(330px,1.16fr) minmax(300px,1.02fr) minmax(210px,.72fr) !important;
-  min-width: 1374px !important;
+  grid-template-columns: 56px minmax(300px,1.04fr) minmax(170px,.60fr) minmax(330px,1.16fr) minmax(300px,1.02fr) minmax(210px,.72fr) !important;
+  min-width: 1366px !important;
 }
 /* BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_END */
 
