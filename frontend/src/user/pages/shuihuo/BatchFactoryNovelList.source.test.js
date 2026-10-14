@@ -55,6 +55,10 @@ test('book detail renders captured source instead of the short production draft'
 
 test('keeps the workbench editor on the selected lines while reserving full source editing for the detail view', () => {
   assert.match(source, /setEditingContentValue\(runtimeResolveBookProductionText\(currentBook\)\);/);
+  assert.match(source, /const rangeLines = contentRangeLinesForBook\(currentBook\);/);
+  assert.match(source, /内容范围<small>本次生产使用的正文行数<\/small>/);
+  assert.match(source, /setEditingContentRangeLines\(rangeLines\);/);
+  assert.match(source, /contentRangeLines: rangeLines/);
   assert.match(source, /function openSourceEditor\(book\)/);
   assert.match(source, /openSourceEditor\(viewingBook\)/);
 });
