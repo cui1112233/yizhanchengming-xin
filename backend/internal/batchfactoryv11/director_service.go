@@ -513,6 +513,10 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	if err != nil {
 		return nil, retryableModelOutputError(err)
 	}
+	// The book classification is a deterministic fallback for an ambiguous
+	// first-person role. Apply it before and after optional prompt compilation
+	// so the final persisted asset cannot lose the resolved gender anchor.
+	assets = applyBookGenderFallback(book, assets)
 	// The selected full H3 assets preset already returns detailed appearances
 	// together with characters/scenes/props. Other renderer selections retain
 	// their historical post-extraction compilation behavior.
@@ -523,6 +527,7 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 			return nil, err
 		}
 	}
+	assets = applyBookGenderFallback(book, assets)
 	persisted, err := s.Store.PersistExtractedBookAssets(ctx, owner, book, snapshot, assets)
 	if err != nil {
 		return nil, err

@@ -401,6 +401,9 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 		system += "\n\n当前场景提示词输出规则：\n" + strings.TrimSpace(config.Assets.Scene.Body)
 	}
 	payloadValues := map[string]any{"book_id": book.ID, "title": book.Title, "source_text": book.SourceText}
+	if bookGender := bookGenderForPrompt(book); bookGender != "" {
+		payloadValues["book_gender"] = bookGender
+	}
 	// style.system is produced before asset extraction and frozen on the book.
 	// Every selected asset rule receives the result as production context; the
 	// visual-prefix switch later controls only whether this result is shown or
@@ -420,6 +423,12 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 
 【资产预设四项权威】
 一次调用内先完成并综合：正式人物名单、人物事实、人物外形、人物关系；四项结果必须分别保留在结构化字段，并合并进 characters 的最终 prompt，绑定人物姓名、别名、性别、年龄阶段、关系和跨镜头外形锚点。不得把四项拆成后续调用，也不得只返回摘要或只返回人物外形。`
+	if bookGender := bookGenderForPrompt(book); bookGender != "" {
+		system += fmt.Sprintf(`
+
+【第一人称角色性别补判】
+本书已由小说获取链路确定为%s。若正式人物名单中出现“我”或“（我）”角色，且原文与人物事实、人物外形都没有明确性别，必须将其性别按本书分类补判为%s；若原文明确性别，则以原文事实优先，不得覆盖。`, bookGender, map[string]string{"男频": "男性", "女频": "女性"}[bookGender])
+	}
 	return PromptContract{SystemPrompt: system, UserPrompt: string(payload), Temperature: 0.2, MaxTokens: 4000}, nil
 }
 
@@ -528,6 +537,9 @@ prefix_key 只能从指定列表选择。
 	if len(rules) > 0 {
 		system += "\n\n当前批量已启用的 AI 推理规则：\n" + strings.Join(rules, "\n\n")
 	}
+	if genderRule := firstPersonGenderRule(book); genderRule != "" {
+		system += "\n\n" + genderRule
+	}
 	// The public workbench persists Markdown cards. V11 preserves the same
 	// boundaries and duration semantics, but its durable director output is JSON.
 	// This final instruction resolves the transport difference without changing
@@ -538,6 +550,9 @@ prefix_key 只能从指定列表选择。
 		"title":       book.Title,
 		"mode":        mode,
 		"source_text": book.SourceText,
+	}
+	if bookGender := bookGenderForPrompt(book); bookGender != "" {
+		payload["book_gender"] = bookGender
 	}
 	if assets := payloadAssets(book); len(assets) > 0 {
 		payload["assets"] = assets
@@ -612,11 +627,17 @@ func buildSDDirectorContract(book Book, hook HookRevision, snapshot DirectorSnap
 	if rawString(snapshot.Effective, "storyTimelineVersion", "") == sdOriginalStoryVersion {
 		system += "\n本次采用 sd.original-story.v1 单次视频提示词流程：你必须在同一次输出中先为每个原文行写出对应的画面故事剧本，再紧接着写该行的场景环境与固定镜头；不得等待第二次调用，也不得只输出摘要。原文行、顺序、已测量时长和镜头时间契约由系统冻结，不得新增、删除、合并、拆分或改写原文。"
 	}
+	if genderRule := firstPersonGenderRule(book); genderRule != "" {
+		system += "\n" + genderRule
+	}
 	payload := map[string]any{
 		"book_id":     book.ID,
 		"title":       book.Title,
 		"mode":        snapshot.Mode,
 		"source_text": book.SourceText,
+	}
+	if bookGender := bookGenderForPrompt(book); bookGender != "" {
+		payload["book_gender"] = bookGender
 	}
 	if assets := payloadAssets(book); len(assets) > 0 {
 		payload["assets"] = assets
