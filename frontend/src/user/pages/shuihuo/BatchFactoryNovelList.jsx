@@ -1675,7 +1675,11 @@ function PassiveMediaPoster({ className = 'batch-factory-media-poster', label, d
 }
 
 function batchFactoryPassiveMediaUrl(media) {
-  return String(media?.mediaUrl || media?.outputUrl || '').trim();
+  const value = String(media?.mediaUrl || media?.outputUrl || '').trim();
+  // Merge jobs created by the local Go worker may still contain the
+  // historical v11 path. The public workbench is mounted on the v12
+  // contract; normalize the relative URL before the browser requests it.
+  return value.replace(/^\/api\/batch-factory\/v11\//, '/api/batch-factory/v12/');
 }
 
 function batchFactoryPassivePosterUrl(media) {
@@ -1898,6 +1902,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
       key,
       width,
       height,
+      duration: Number(cached.duration || job?.durationSeconds || 0),
       ratio,
       orientation: batchFactoryMediaOrientation(ratio),
       ratioText: batchFactoryRatioText(width, height, ratio)
@@ -2347,7 +2352,7 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
         {current.status === 'succeeded' && String(current.outputUrl || '').trim()
           ? renderThumb(current, currentInfo, `合成成片 ${batchFactoryStableMediaLabel('M', current.id)}`)
           : <PassiveMediaPoster className="batch-factory-media-pickstation-thumb is-landscape" label="等待成片" detail={current.status === 'failed' ? '合成失败' : '处理中'} />}
-        <span><b>{batchFactoryStableMediaLabel('M', current.id)}</b><small>{mergeJobSpeed(current).toFixed(1)}x · {currentInfo.ratioText}</small><em>{selectedMerge?.id === current.id ? '当前上传来源' : '历史成片'}</em></span>
+        <span><b>{batchFactoryStableMediaLabel('M', current.id)}</b><small>{currentInfo.duration > 0 ? `${currentInfo.duration.toFixed(1)}s · ` : ''}{mergeJobSpeed(current).toFixed(1)}x · {currentInfo.ratioText}</small><em>{selectedMerge?.id === current.id ? '当前上传来源' : '历史成片'}</em></span>
       </button> : <div className="batch-factory-media-pickstation-empty">全部分镜选定主版本后，可在底部发起合成。</div>}
       <div className="batch-factory-media-pickstation-versions">
         {mergeJobsNewest.map(job => {
@@ -2432,13 +2437,13 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
   const viewerVersion = viewerKind === 'video' ? selectedVersion : null;
   const viewerInfo = viewerKind === 'merge' ? mergeInfo(viewerMerge) : mediaInfo(viewerVersion, viewerVideo);
   const viewerUrl = viewerKind === 'merge'
-    ? String(viewerMerge?.outputUrl || '').trim()
+    ? batchFactoryPassiveMediaUrl(viewerMerge)
     : String(viewerVersion?.mediaUrl || '').trim();
   const viewerTitle = viewerKind === 'merge'
     ? (viewerMerge ? `合成成片 ${batchFactoryStableMediaLabel('M', viewerMerge.id)}` : '合成成片')
     : (viewerVideo ? label(viewerVideo) : '分镜');
   const viewerMeta = viewerKind === 'merge'
-    ? (viewerMerge ? `${mergeJobSpeed(viewerMerge).toFixed(1)}x · ${viewerInfo.ratioText}` : '—')
+    ? (viewerMerge ? `${viewerInfo.duration > 0 ? `${viewerInfo.duration.toFixed(1)}s · ` : ''}${mergeJobSpeed(viewerMerge).toFixed(1)}x · ${viewerInfo.ratioText}` : '—')
     : (viewerVersion ? `${batchFactoryStableMediaLabel('V', viewerVersion.id)} · ${viewerInfo.ratioText}` : '—');
 
   const primaryVideoDurationRows = videos.map(video => {
