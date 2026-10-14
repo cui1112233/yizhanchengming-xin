@@ -93,6 +93,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerConfiguredImageGenerationRoute(v11, options.Store, options.NovelFetchStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, options.NovelFetchStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
+		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.NovelFetchStore)
 	}
 	if options.NovelFetchFetcher != nil {
 		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher, batchFetchClassification{

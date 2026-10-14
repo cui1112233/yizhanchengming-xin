@@ -209,6 +209,12 @@ func TestBatchFactoryV12IntakeReadIsNativeGo(t *testing.T) {
 	}
 }
 
+func TestBatchFactoryV12AssetImageGenerationIsNativeGo(t *testing.T) {
+	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/batch-1/books/book-1/assets/images/generate") {
+		t.Fatal("V12 asset image generation must use the Go provider boundary")
+	}
+}
+
 func TestShuihuoProductionBatchFactoryPathsStayOnGo(t *testing.T) {
 	paths := []string{
 		"/api/batch-factory/v12/batches/demo",
