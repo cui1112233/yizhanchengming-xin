@@ -1343,7 +1343,14 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     if (!match) { setAssetMentionMenu(null); return; }
     const query = match[1].toLowerCase();
     const candidates = (book?.assetRecords || []).filter(asset => asset?.id && String(assetName(asset) || '').toLowerCase().includes(query));
-    setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates });
+    const selection = typeof window !== 'undefined' ? window.getSelection() : null;
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const parent = root?.parentElement;
+    const caretRect = range?.getBoundingClientRect?.();
+    const parentRect = parent?.getBoundingClientRect?.();
+    const left = caretRect && parentRect ? Math.max(8, caretRect.left - parentRect.left) : 8;
+    const top = caretRect && parentRect ? Math.max(8, caretRect.bottom - parentRect.top + 6) : 8;
+    setAssetMentionMenu({ start: cursor - match[0].length, end: cursor, candidates, left, top });
   }
 
   function handleEditablePromptKeyUp(event) {
@@ -1462,7 +1469,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
         {activeLabel}
         {!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div> : editing && promptKind === 'video' ? <div className="batch-factory-prompt-editor-rich-wrap">
           <div ref={promptEditableRef} className="batch-factory-prompt-rich-view is-editing" contentEditable suppressContentEditableWarning role="textbox" aria-label="可编辑分镜视频提示词" onInput={updateEditablePromptValue} onKeyDown={handleEditablePromptKeyDown} onKeyUp={handleEditablePromptKeyUp} onBlur={() => setTimeout(() => setAssetMentionMenu(null), 120)} />
-          {assetMentionMenu ? <div className="batch-factory-asset-mention-menu">{assetMentionMenu.candidates?.length ? assetMentionMenu.candidates.map(asset => { const imageUrl = assetThumbs[String(asset.id)] || asset.imageUrl || asset.image_url || asset.thumbnailUrl; const kindLabel = asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'; return <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}>{imageUrl ? <img src={imageUrl} alt="" /> : <span className="batch-factory-asset-mention-fallback" aria-hidden="true">{asset.kind === 'character' ? '人' : asset.kind === 'scene' ? '景' : '物'}</span>}<span>{assetName(asset)}</span><small>{kindLabel}</small></button>; }) : <div className="batch-factory-asset-mention-empty">暂无可用资产，请先在资产设置添加人物、场景或道具</div>}</div> : null}
+          {assetMentionMenu ? <div className="batch-factory-asset-mention-menu" style={{ left: assetMentionMenu.left, top: assetMentionMenu.top }}>{assetMentionMenu.candidates?.length ? assetMentionMenu.candidates.map(asset => { const imageUrl = assetThumbs[String(asset.id)] || asset.imageUrl || asset.image_url || asset.thumbnailUrl; const kindLabel = asset.kind === 'character' ? '角色' : asset.kind === 'scene' ? '场景' : '道具'; return <button type="button" key={asset.id} onMouseDown={event => event.preventDefault()} onClick={() => insertAssetMention(asset)}>{imageUrl ? <img src={imageUrl} alt="" /> : <span className="batch-factory-asset-mention-fallback" aria-hidden="true">{asset.kind === 'character' ? '人' : asset.kind === 'scene' ? '景' : '物'}</span>}<span>{assetName(asset)}</span><small>{kindLabel}</small></button>; }) : <div className="batch-factory-asset-mention-empty">暂无可用资产，请先在资产设置添加人物、场景或道具</div>}</div> : null}
         </div> : <div className="batch-factory-prompt-editor-wrap"><Input.TextArea ref={promptInputRef} rows={14} value={activeValue} onChange={event => setVisualPrompt(event.target.value)} placeholder="仅用于生成当前分镜的画面图片" /></div>}
       </label>
       <div className="batch-factory-prompt-modal-actions">

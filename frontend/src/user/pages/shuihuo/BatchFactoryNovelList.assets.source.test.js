@@ -83,3 +83,8 @@ test('asset picker shows a kind fallback when an asset has no image', () => {
   assert.match(source, /暂无可用资产，请先在资产设置添加人物、场景或道具/);
   assert.match(source, /asset\.kind === 'character' \? '人' : asset\.kind === 'scene' \? '景' : '物'/);
 });
+
+test('asset picker is positioned below the active caret', () => {
+  assert.match(source, /getBoundingClientRect/);
+  assert.match(source, /style=\{\{ left: assetMentionMenu\.left, top: assetMentionMenu\.top \}\}/);
+});
