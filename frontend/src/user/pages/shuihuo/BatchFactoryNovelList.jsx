@@ -333,11 +333,25 @@ function h3ConstraintPreview(settings = {}) {
 function storyboardAssetPromptText(book = {}) {
   return (Array.isArray(book?.assetRecords) ? book.assetRecords : [])
     .map(asset => {
+      const structured = [
+        asset?.formalName ? `正式名称：${asset.formalName}` : '',
+        asset?.facts ? `人物事实：${asset.facts}` : '',
+        asset?.appearance ? `人物外形：${asset.appearance}` : '',
+        asset?.relationships ? `人物关系：${asset.relationships}` : ''
+      ].filter(Boolean);
       const prompt = assetPrompt(asset);
-      return prompt ? `${assetKindLabel(asset?.kind)}「${assetName(asset)}」：${prompt}` : '';
+      if (prompt && !structured.some(value => value.endsWith(prompt))) structured.push(`资产提示词：${prompt}`);
+      return structured.length ? `${assetKindLabel(asset?.kind)}「${assetName(asset)}」：${structured.join('；')}` : '';
     })
     .filter(Boolean)
     .join('\n');
+}
+
+function composeStoryboardDisplayPrompt(prompt, assetText) {
+  const body = String(prompt || '').trim();
+  const assets = String(assetText || '').trim();
+  if (!assets || body.includes('【基础设定】')) return body;
+  return `【基础设定】\n${assets}${body ? `\n\n${body}` : ''}`;
 }
 function assetKindLabel(kind) {
   return kind === 'character' ? '人物' : kind === 'scene' ? '场景' : kind === 'prop' ? '道具' : '资产';
@@ -1175,7 +1189,10 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const videoPromptWithUnifiedStyle = unifiedStyleText && !videoPrompt.includes(unifiedStyleText)
     ? `【统一风格】\n${unifiedStyleText}\n\n${videoPrompt}`
     : videoPrompt;
-  const activePrompt = promptKind === 'visual' ? visualPrompt : videoPromptWithUnifiedStyle;
+  const displayVideoPrompt = baseSetupEnabledForBook
+    ? composeStoryboardDisplayPrompt(videoPromptWithUnifiedStyle, assetPromptText || storyboardAssetPromptText(book))
+    : videoPromptWithUnifiedStyle;
+  const activePrompt = promptKind === 'visual' ? visualPrompt : displayVideoPrompt;
 
   useEffect(() => {
     const first = book?.videos?.[0]?.id || '';
@@ -1465,8 +1482,11 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     ? `【统一风格】\n${String(smartUnifiedAnalysis.prompt).trim()}\n\n${rawSubmittedVideoPrompt}`
     : rawSubmittedVideoPrompt;
   const submittedVideoPrompt = baseSetupEnabled(engineSettings) ? rawPromptWithUnifiedStyle : stripBaseSetupSection(rawPromptWithUnifiedStyle);
-  const activeValue = promptKind === 'visual' ? visualPrompt : editing ? videoPrompt : submittedVideoPrompt;
-  const activeReady = promptKind === 'visual' ? hasVisualPrompt : Boolean(submittedVideoPrompt.trim());
+  const displaySubmittedVideoPrompt = baseSetupEnabled(engineSettings)
+    ? composeStoryboardDisplayPrompt(submittedVideoPrompt, storyboardAssetPromptText(book))
+    : submittedVideoPrompt;
+  const activeValue = promptKind === 'visual' ? visualPrompt : editing ? videoPrompt : displaySubmittedVideoPrompt;
+  const activeReady = promptKind === 'visual' ? hasVisualPrompt : Boolean(displaySubmittedVideoPrompt.trim());
   const regenerateCurrentPrompt = promptKind === 'visual' ? onRegenerateVisual : onRegenerate;
   const h3Segments = h3Trace?.compilation?.compilation?.segments || [];
   const h3Segment = h3Segments[selectedIndex] || null;
