@@ -33,6 +33,14 @@ func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 		t.Fatal("node route inventory is empty")
 	}
 	blocked := 0
+	requiredMigrated := map[string]bool{
+		"/api/novel-fetch":         false,
+		"/api/novel-fetch-upload": false,
+		"/api/novel-fetch-workshop": false,
+		"/api/batch-rewrite":      false,
+		"/api/batch-factory":      false,
+		"/api/script-video":       false,
+	}
 	for _, route := range inventory.Routes {
 		if route.Path == "" || route.Method == "" || route.Owner == "" || route.Status == "" {
 			t.Fatalf("incomplete route record: %+v", route)
@@ -44,11 +52,20 @@ func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 			}
 		case "blocked":
 			blocked++
+		case "migrated":
+			if _, ok := requiredMigrated[route.Path]; ok {
+				requiredMigrated[route.Path] = true
+			}
 		default:
 			t.Fatalf("unknown route status %q for %s", route.Status, route.Path)
 		}
 	}
 	if blocked != 0 {
 		t.Fatalf("expected no blocked legacy contracts, got %d", blocked)
+	}
+	for path, migrated := range requiredMigrated {
+		if !migrated {
+			t.Fatalf("required Go migration is not complete: %s", path)
+		}
 	}
 }
