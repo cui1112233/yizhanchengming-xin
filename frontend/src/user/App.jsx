@@ -14,7 +14,6 @@ const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage')
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
 const NovelFetchWorkshopPage = lazy(() => import('./pages/NovelFetchWorkshopPage'));
-const BatchFactoryPage = lazy(() => import('./pages/BatchFactoryPage'));
 const BatchFactoryWorkbenchPage = lazy(loadBatchFactoryWorkbenchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
@@ -69,7 +68,6 @@ function getPage(pathname) {
     '/novel-fetch': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchWorkshopPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
-    '/batch-factory-preview': BatchFactoryPage,
     '/novel-panel': NovelPanelPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
