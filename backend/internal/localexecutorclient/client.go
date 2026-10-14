@@ -31,8 +31,9 @@ type PairInput struct {
 }
 
 type PairResult struct {
-	ExecutorID string `json:"executorId"`
-	Token      string `json:"token"`
+	ExecutorID               string `json:"executorId"`
+	Token                    string `json:"token"`
+	HeartbeatIntervalSeconds int    `json:"heartbeatIntervalSeconds"`
 }
 
 type Lease struct {
@@ -41,10 +42,19 @@ type Lease struct {
 }
 
 type HeartbeatInput struct {
-	DeviceName string         `json:"deviceName"`
-	OS         string         `json:"os"`
-	Version    string         `json:"version"`
-	Accounts   map[string]any `json:"accounts,omitempty"`
+	DeviceName string       `json:"deviceName"`
+	OS         string       `json:"os"`
+	Version    string       `json:"version"`
+	Accounts   AccountStats `json:"accounts"`
+}
+
+type AccountStats struct {
+	Total             int `json:"total"`
+	Available         int `json:"available"`
+	Busy              int `json:"busy"`
+	QuotaExhausted    int `json:"quotaExhausted"`
+	LoginError        int `json:"loginError"`
+	HumanVerification int `json:"humanVerification"`
 }
 
 type Job struct {
