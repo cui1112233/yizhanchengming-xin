@@ -16,6 +16,8 @@ import (
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
+	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -30,6 +32,7 @@ type BatchAutomationCoordinator struct {
 	external     *external.Service
 	ttsStore     novelfetchworkshop.Store
 	audioProbe   batchfactoryv11.H3AudioDurationProbe
+	localFiles   *localartifact.Store
 	path         string
 	now          func() time.Time
 	providerSync func(context.Context, string) error
@@ -55,6 +58,12 @@ func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets Automati
 		syncProvider = providerSync[0]
 	}
 	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now, providerSync: syncProvider}
+}
+
+func (c *BatchAutomationCoordinator) SetLocalFiles(files *localartifact.Store) {
+	if c != nil {
+		c.localFiles = files
+	}
 }
 
 func (c *BatchAutomationCoordinator) loadLocked() (automationStateFile, error) {
@@ -309,16 +318,26 @@ func hasReusableAudioPlan(book batchfactoryv11.Book) bool {
 // The switch only chooses which track is used during the final merge; every
 // production run still creates TTS and measures every selected source line so
 // the storyboard timeline is based on real durations.
-func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner, batchID string, book batchfactoryv11.Book) error {
+func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner, batchID string, book batchfactoryv11.Book) (string, error) {
 	if c == nil || c.ttsStore == nil || c.store == nil {
-		return fmt.Errorf("配音与逐行时长服务未配置")
+		return "", fmt.Errorf("配音与逐行时长服务未配置")
 	}
 	if hasReusableAudioPlan(book) {
-		return nil
+		var artifactID string
+		_ = json.Unmarshal(book.SettingsState.Patch["ttsAudioArtifactId"], &artifactID)
+		if strings.TrimSpace(artifactID) != "" && c.localFiles != nil {
+			if file, err := c.localFiles.Open(strings.TrimSpace(artifactID) + ".mp3"); err == nil {
+				_ = file.Close()
+				return strings.TrimSpace(artifactID), nil
+			}
+		}
+	}
+	if c.localFiles == nil {
+		return "", fmt.Errorf("TTS 音频存储未配置")
 	}
 	lines := productionLines(book)
 	if len(lines) == 0 {
-		return fmt.Errorf("正文没有可测量的生产行")
+		return "", fmt.Errorf("正文没有可测量的生产行")
 	}
 	model, ok := configuredTTSModel(ctx, c.ttsStore, owner)
 	probe := c.audioProbe
@@ -326,8 +345,14 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 		probe = batchfactoryv11.FFprobeH3AudioDuration{}
 	}
 	durations := make([]float64, 0, len(lines))
+	tempDir, err := os.MkdirTemp("", "qiantie-tts-plan-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tempDir)
+	audioInputs := make([]string, 0, len(lines))
 	hash := sha256.New()
-	for _, line := range lines {
+	for index, line := range lines {
 		lineCtx, cancel := context.WithTimeout(ctx, 75*time.Second)
 		ttsInput := ttsRequest{Input: line, Voice: "zh-CN-XiaoxiaoNeural", Speed: 1.8, Pitch: "10", Style: "general"}
 		var audio []byte
@@ -341,11 +366,16 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 		}
 		cancel()
 		if err != nil {
-			return fmt.Errorf("TTS 生成失败：%w", err)
+			return "", fmt.Errorf("TTS 生成失败：%w", err)
 		}
+		linePath := filepath.Join(tempDir, fmt.Sprintf("line-%04d.mp3", index))
+		if writeErr := os.WriteFile(linePath, audio, 0o600); writeErr != nil {
+			return "", writeErr
+		}
+		audioInputs = append(audioInputs, linePath)
 		durationMS, err := probe.DurationMS(ctx, audio)
 		if err != nil {
-			return fmt.Errorf("TTS 时长测量失败：%w", err)
+			return "", fmt.Errorf("TTS 时长测量失败：%w", err)
 		}
 		durations = append(durations, float64(durationMS)/1000)
 		_, _ = hash.Write(audio)
@@ -354,9 +384,24 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 	for _, duration := range durations {
 		total += duration
 	}
+	combinedPath := filepath.Join(tempDir, "tts.mp3")
+	if err := (&mergeworker.FFmpegRunner{}).ConcatAudioFiles(ctx, audioInputs, combinedPath); err != nil {
+		return "", fmt.Errorf("TTS 音频合成失败：%w", err)
+	}
+	digest := hash.Sum(nil)
+	artifactID := fmt.Sprintf("tts-%x", digest[:20])
+	combined, err := os.Open(combinedPath)
+	if err != nil {
+		return "", err
+	}
+	_, saveErr := c.localFiles.SaveMedia(artifactID, "audio/mpeg", "mp3", combined)
+	_ = combined.Close()
+	if saveErr != nil && !errors.Is(saveErr, localartifact.ErrAlreadyExists) {
+		return "", fmt.Errorf("保存 TTS 音频失败：%w", saveErr)
+	}
 	latest, err := c.store.GetBatch(ctx, owner, batchID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	for _, candidate := range latest.Books {
 		if candidate.ID != book.ID {
@@ -371,12 +416,13 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 				"audioDurationSeconds": totalRaw,
 				"audioLineDurations":   lineRaw,
 				"ttsFingerprint":       json.RawMessage(fmt.Sprintf("%q", func() string { digest := hash.Sum(nil); return fmt.Sprintf("tts-%x", digest[:12]) }())),
+				"ttsAudioArtifactId":   json.RawMessage(fmt.Sprintf("%q", artifactID)),
 			},
 			ExpectedRevision: candidate.Revision,
 		})
-		return err
+		return artifactID, err
 	}
-	return batchfactoryv11.ErrNotFound
+	return "", batchfactoryv11.ErrNotFound
 }
 
 func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
@@ -415,7 +461,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		entry["updatedAt"] = c.now()
 		persist()
 		stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-		stageErr := c.ensureAudioPlan(stageCtx, owner, batchID, book)
+		ttsArtifactID, stageErr := c.ensureAudioPlan(stageCtx, owner, batchID, book)
 		cancel()
 		if stageErr != nil {
 			fail("audio_planning", stageErr, "配音与逐行时长失败")
@@ -475,7 +521,11 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		entry["stage"], entry["message"], entry["updatedAt"] = "merge", "正在合成最终视频", c.now()
 		persist()
 		mergeCtx, mergeCancel := context.WithTimeout(ctx, stageTimeout)
-		mergeJobs, mergeErr := c.merge.SubmitBookMerge(mergeCtx, owner, batchID, book.ID, jobID+"-merge-"+book.ID, batchfactoryv11.MergeOptions{TimingMode: "audio", AudioDurationSeconds: productionAudioDuration(production)})
+		audioSource := "tts"
+		if raw, ok := book.SettingsState.Patch["audioSource"]; ok {
+			_ = json.Unmarshal(raw, &audioSource)
+		}
+		mergeJobs, mergeErr := c.merge.SubmitBookMerge(mergeCtx, owner, batchID, book.ID, jobID+"-merge-"+book.ID, batchfactoryv11.MergeOptions{TimingMode: "audio", AudioSource: strings.ToLower(strings.TrimSpace(audioSource)), AudioArtifactID: ttsArtifactID, AudioDurationSeconds: productionAudioDuration(production)})
 		if mergeErr == nil {
 			_, mergeErr = c.waitMerge(mergeCtx, owner, batchID, book.ID, mergeJobs)
 		}

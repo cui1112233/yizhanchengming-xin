@@ -74,6 +74,8 @@ func (a *HTTPMergeAdapter) Submit(ctx context.Context, batchID string, sources [
 		"batchId":              batchID,
 		"sources":              sources,
 		"timingMode":           options.TimingMode,
+		"audioSource":          options.AudioSource,
+		"audioArtifactId":      options.AudioArtifactID,
 		"speed":                options.Speed,
 		"ttsSpeed":             options.TTSSpeed,
 		"audioDurationSeconds": options.AudioDurationSeconds,

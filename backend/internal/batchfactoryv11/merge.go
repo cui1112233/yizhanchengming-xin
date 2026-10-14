@@ -34,6 +34,8 @@ type MergeMedia struct {
 
 type MergeOptions struct {
 	TimingMode           string  `json:"timingMode,omitempty"`
+	AudioSource          string  `json:"audioSource,omitempty"`
+	AudioArtifactID      string  `json:"audioArtifactId,omitempty"`
 	Speed                float64 `json:"speed,omitempty"`
 	TTSSpeed             float64 `json:"ttsSpeed,omitempty"`
 	AudioDurationSeconds float64 `json:"audioDurationSeconds,omitempty"`
@@ -48,6 +50,8 @@ type MergeJob struct {
 	OpeningVariantIndex int          `json:"openingVariantIndex,omitempty"`
 	RequestID           string       `json:"requestId"`
 	TimingMode          string       `json:"timingMode,omitempty"`
+	AudioSource         string       `json:"audioSource,omitempty"`
+	AudioArtifactID     string       `json:"audioArtifactId,omitempty"`
 	Speed               float64      `json:"speed,omitempty"`
 	ProviderTaskID      string       `json:"providerTaskId,omitempty"`
 	Status              MergeState   `json:"status"`
@@ -93,6 +97,16 @@ type MergeService struct {
 }
 
 func normalizeMergeOptions(options MergeOptions) (MergeOptions, error) {
+	options.AudioSource = strings.ToLower(strings.TrimSpace(options.AudioSource))
+	if options.AudioSource == "" {
+		options.AudioSource = "original"
+	}
+	if options.AudioSource != "tts" && options.AudioSource != "original" {
+		return MergeOptions{}, fmt.Errorf("%w: unsupported audio source", ErrInvalid)
+	}
+	if options.AudioSource == "tts" && strings.TrimSpace(options.AudioArtifactID) == "" {
+		return MergeOptions{}, fmt.Errorf("%w: TTS audio artifact is required", ErrInvalid)
+	}
 	options.TimingMode = strings.TrimSpace(options.TimingMode)
 	if options.TimingMode == "" {
 		options.TimingMode = "speed"
@@ -273,6 +287,9 @@ func sameMergeVersion(left, right MergeJob) bool {
 	if left.BookID != right.BookID || left.OpeningVariantIndex != right.OpeningVariantIndex {
 		return false
 	}
+	if left.AudioSource != right.AudioSource || left.AudioArtifactID != right.AudioArtifactID {
+		return false
+	}
 	return left.Speed-right.Speed < 0.000001 && right.Speed-left.Speed < 0.000001
 }
 
@@ -297,6 +314,8 @@ func (s *MergeService) mergeVersion(ctx context.Context, repository MergeReposit
 		return MergeJob{}, false, nil
 	}
 	failed.TimingMode = candidate.TimingMode
+	failed.AudioSource = candidate.AudioSource
+	failed.AudioArtifactID = candidate.AudioArtifactID
 	failed.Speed = candidate.Speed
 	failed.ProviderTaskID = ""
 	failed.Status = MergeQueued
@@ -427,7 +446,7 @@ func (s *MergeService) submitMerge(ctx context.Context, owner, batchID, onlyBook
 		}
 	}
 	now := time.Now().UTC()
-	candidate := MergeJob{Owner: owner, BatchID: batchID, BookID: onlyBookID, OpeningVariantIndex: variantIndex, RequestID: requestID, TimingMode: options.TimingMode, Speed: options.Speed, Status: MergeQueued, ProgressPhase: "queued", ProgressTotal: len(sources), Sources: sources, CreatedAt: now, UpdatedAt: now}
+	candidate := MergeJob{Owner: owner, BatchID: batchID, BookID: onlyBookID, OpeningVariantIndex: variantIndex, RequestID: requestID, TimingMode: options.TimingMode, AudioSource: options.AudioSource, AudioArtifactID: options.AudioArtifactID, Speed: options.Speed, Status: MergeQueued, ProgressPhase: "queued", ProgressTotal: len(sources), Sources: sources, CreatedAt: now, UpdatedAt: now}
 	job, reused, err := s.mergeVersion(ctx, repository, owner, batchID, candidate)
 	if err != nil {
 		return MergeJob{}, err

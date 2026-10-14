@@ -80,6 +80,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
 		}, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
+		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()

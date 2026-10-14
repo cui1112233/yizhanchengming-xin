@@ -58,6 +58,10 @@ type aspectAwareLocalMergeRunner interface {
 	MergeWithAspect(context.Context, []string, string, float64, string) error
 }
 
+type audioAwareLocalMergeRunner interface {
+	MergeWithAudio(context.Context, []string, string, string, float64, string) error
+}
+
 type safeLocalMergeDownloader struct{ delegate *mergeworker.Downloader }
 
 func (d safeLocalMergeDownloader) Download(ctx context.Context, sources []MergeMedia, dir string, onProgress func(int, int)) ([]string, error) {
@@ -137,7 +141,7 @@ func (a *LocalMergeAdapter) Submit(_ context.Context, batchID string, sources []
 	if err != nil {
 		return MergeJob{}, err
 	}
-	job := MergeJob{ProviderTaskID: taskID, Status: MergeQueued, ProgressPhase: "queued", ProgressTotal: len(sources)}
+	job := MergeJob{ProviderTaskID: taskID, Status: MergeQueued, ProgressPhase: "queued", ProgressTotal: len(sources), AudioSource: options.AudioSource, AudioArtifactID: options.AudioArtifactID}
 	a.mu.Lock()
 	a.tasks[taskID] = job
 	a.mu.Unlock()
@@ -175,7 +179,7 @@ func (a *LocalMergeAdapter) Poll(_ context.Context, batchID string, job MergeJob
 		if resumeBatchID == "" {
 			resumeBatchID = strings.TrimSpace(batchID)
 		}
-		go a.run(job.ProviderTaskID, resumeBatchID, append([]MergeMedia(nil), job.Sources...), MergeOptions{TimingMode: job.TimingMode, Speed: job.Speed})
+		go a.run(job.ProviderTaskID, resumeBatchID, append([]MergeMedia(nil), job.Sources...), MergeOptions{TimingMode: job.TimingMode, AudioSource: job.AudioSource, AudioArtifactID: job.AudioArtifactID, Speed: job.Speed})
 	} else {
 		resumed = result
 	}
@@ -223,7 +227,28 @@ func (a *LocalMergeAdapter) run(taskID, batchID string, sources []MergeMedia, op
 		speed = 1
 	}
 	var mergeErr error
-	if runner, ok := a.Merger.(aspectAwareLocalMergeRunner); ok {
+	audioSource := strings.ToLower(strings.TrimSpace(options.AudioSource))
+	if audioSource == "" {
+		audioSource = "original"
+	}
+	if audioSource == "tts" {
+		if strings.TrimSpace(options.AudioArtifactID) == "" || a.Artifacts == nil {
+			a.fail(taskID, fmt.Errorf("TTS 音频资产不存在"))
+			return
+		}
+		audioFile, openErr := a.Artifacts.Open(strings.TrimSpace(options.AudioArtifactID) + ".mp3")
+		if openErr != nil {
+			a.fail(taskID, fmt.Errorf("打开 TTS 音频失败：%w", openErr))
+			return
+		}
+		audioPath := audioFile.Name()
+		_ = audioFile.Close()
+		if runner, ok := a.Merger.(audioAwareLocalMergeRunner); ok {
+			mergeErr = runner.MergeWithAudio(ctx, inputs, audioPath, outputPath, speed, options.AspectRatio)
+		} else {
+			mergeErr = fmt.Errorf("本地合成器不支持 TTS 音轨")
+		}
+	} else if runner, ok := a.Merger.(aspectAwareLocalMergeRunner); ok {
 		mergeErr = runner.MergeWithAspect(ctx, inputs, outputPath, speed, options.AspectRatio)
 	} else {
 		mergeErr = a.Merger.Merge(ctx, inputs, outputPath, speed)
