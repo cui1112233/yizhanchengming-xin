@@ -504,8 +504,8 @@ func shouldBridgeLegacyAPIRequest(req *http.Request, slice int) bool {
 // the existing Node implementation remains the functional fallback instead
 // of returning a misleading Go 404.
 func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
-	// These catalog endpoints are now implemented by the Go service. Keep the
-	// broader /api/config bridge for the remaining legacy settings endpoints.
+	// These catalog endpoints are now implemented by the Go service. The
+	// remaining /api/config children below are still audited independently.
 	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
 		return false
 	}
@@ -586,26 +586,14 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	}
 	for _, prefix := range []string{
 		"/api/config",
-		"/api/agent",
-		"/api/account-admin",
 		"/api/account-recovery",
 		"/api/accountAdmin",
 		"/api/accountRecovery",
 		"/api/admin",
-		"/api/batch-rewrite",
 		"/api/client-errors",
-		"/api/member",
 		"/api/modelCatalog",
-		"/api/novel-fetch",
-		"/api/novel-fetch-upload",
-		"/api/novel-panel",
-		"/api/platform-projects",
-		"/api/storage",
-		"/api/team-admin",
 		"/api/teamAdmin",
 		"/api/test",
-		"/api/models",
-		"/api/chat",
 	} {
 		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true
