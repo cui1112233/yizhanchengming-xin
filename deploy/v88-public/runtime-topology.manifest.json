@@ -47,7 +47,7 @@
       },
       "dependsOn": ["mysql"],
       "persistentDataPurpose": ["local-executor-artifacts"],
-      "publicExposure": {"internalPorts": [4000], "publishedPorts": [], "owner": "internal-only"},
+      "publicExposure": {"internalPorts": [3000], "publishedPorts": [], "owner": "internal-only"},
       "retirementGate": "Verify replacement API contracts, real persisted batch stages, artifact readback and rollback with matching Go runtime identity before retiring this service."
     },
     {
