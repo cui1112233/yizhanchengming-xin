@@ -770,9 +770,9 @@ function storyboardAssetMentions(book, video) {
 
 function withStoryboardAssetMentions(prompt, book, video) {
   const text = String(prompt || '').trim();
-  const mentions = storyboardAssetMentions(book, video);
-  if (!text || !mentions || mentions.split(' ').every(mention => text.includes(mention))) return text;
-  return `${text}\n资产：${mentions}`;
+  // 展示层只负责把正文中已有的资产名称渲染成标签；不能额外追加一行
+  // “资产：@...” ，否则卡片和编辑器会与最终 VIDEO Prompt 重复显示。
+  return text;
 }
 
 function compactUnifiedAssetDescriptions(prompt, book) {
