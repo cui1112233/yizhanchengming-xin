@@ -132,8 +132,8 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
 	for _, path := range []string{"/api/account-recovery/purge/member"} {
-		if !shouldBridgeLegacyAPI(path) {
-			t.Fatalf("%s should stay on the temporary bridge until Go purge parity exists", path)
+		if shouldBridgeLegacyAPI(path) {
+			t.Fatalf("%s must not revive the temporary Node bridge", path)
 		}
 	}
 	if shouldBridgeLegacyAPI("/api/script/director-pipeline") {

@@ -522,9 +522,9 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		return false
 	}
 	// These account-recovery actions are registered by the Go security
-	// handlers. Keep the one legacy purge action on the bridge until its
-	// destructive account-store parity is implemented; all user-facing
-	// recovery flows must stay on the single Go runtime.
+	// handlers. The destructive purge action is intentionally not exposed as a
+	// Node fallback until its account-store parity is implemented; all
+	// user-facing recovery flows stay on the single Go runtime.
 	for _, exact := range []string{
 		"/api/account-recovery/email/status",
 		"/api/account-recovery/email/request",
@@ -616,17 +616,9 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		// second runtime from handling a new batch-factory request by accident.
 		return false
 	}
-	for _, prefix := range []string{
-		"/api/config",
-		"/api/account-recovery",
-		"/api/admin",
-		"/api/client-errors",
-		"/api/test",
-	} {
-		if path == prefix || strings.HasPrefix(path, prefix+"/") {
-			return true
-		}
-	}
+	// Every known non-provider API namespace is now routed through Go above.
+	// Unknown paths must stay on Go and return an explicit 404/405 instead of
+	// reviving the old Node service through a broad namespace fallback.
 	return false
 }
 
