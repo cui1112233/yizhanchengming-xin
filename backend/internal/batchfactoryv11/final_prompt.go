@@ -261,11 +261,12 @@ func selectPrompts(names []string, library map[string]string) string {
 }
 
 type compiledAsset struct {
-	ID       string
-	Kind     string
-	Name     string
-	Prompt   string
-	ImageURL string
+	ID         string
+	Kind       string
+	Name       string
+	FormalName string
+	Prompt     string
+	ImageURL   string
 }
 
 func assetKey(kind, name string) string { return kind + "\x00" + name }
@@ -276,7 +277,7 @@ func recordsByKindAndName(book Book, fallback map[string][]NamedPrompt) map[stri
 		if strings.TrimSpace(asset.Name) == "" || strings.TrimSpace(asset.Kind) == "" {
 			continue
 		}
-		records[assetKey(asset.Kind, asset.Name)] = compiledAsset{ID: asset.ID, Kind: asset.Kind, Name: asset.Name, Prompt: strings.TrimSpace(asset.Prompt)}
+		records[assetKey(asset.Kind, asset.Name)] = compiledAsset{ID: asset.ID, Kind: asset.Kind, Name: asset.Name, FormalName: strings.TrimSpace(asset.FormalName), Prompt: strings.TrimSpace(asset.Prompt)}
 	}
 	for kind, values := range fallback {
 		for _, value := range values {
@@ -329,11 +330,55 @@ func namedPromptNames(items []NamedPrompt) []string {
 	return names
 }
 
+func normalizeAssetReferenceName(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, "（", "(")
+	value = strings.ReplaceAll(value, "）", ")")
+	return strings.TrimSpace(value)
+}
+
+func resolveCompiledAsset(kind, reference string, records map[string]compiledAsset) (compiledAsset, bool) {
+	if asset, ok := records[assetKey(kind, reference)]; ok {
+		return asset, true
+	}
+	reference = normalizeAssetReferenceName(reference)
+	if reference == "" {
+		return compiledAsset{}, false
+	}
+	type candidate struct {
+		asset compiledAsset
+		name  string
+	}
+	matches := make([]candidate, 0)
+	for _, asset := range records {
+		if asset.Kind != kind {
+			continue
+		}
+		for _, name := range []string{asset.Name, asset.FormalName} {
+			name = normalizeAssetReferenceName(name)
+			if name == "" || (reference != name && !strings.Contains(reference, name) && !strings.Contains(name, reference)) {
+				continue
+			}
+			matches = append(matches, candidate{asset: asset, name: name})
+		}
+	}
+	if len(matches) == 0 {
+		return compiledAsset{}, false
+	}
+	sort.SliceStable(matches, func(i, j int) bool {
+		if len(matches[i].name) != len(matches[j].name) {
+			return len(matches[i].name) > len(matches[j].name)
+		}
+		return matches[i].asset.Name < matches[j].asset.Name
+	})
+	return matches[0].asset, true
+}
+
 func selectedAssets(kind string, names []string, records map[string]compiledAsset, images map[string]string, selectedIDs map[string]bool, hasSelection bool) []compiledAsset {
 	selected := make([]compiledAsset, 0, len(names))
 	seen := map[string]bool{}
 	for _, name := range names {
-		asset, ok := records[assetKey(kind, name)]
+		asset, ok := resolveCompiledAsset(kind, name, records)
 		if !ok || (hasSelection && !selectedIDs[asset.ID]) {
 			continue
 		}

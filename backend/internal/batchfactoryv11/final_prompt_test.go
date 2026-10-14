@@ -754,6 +754,16 @@ func TestSelectedAssetsSuppressesRepeatedNames(t *testing.T) {
 	}
 }
 
+func TestSelectedAssetsResolvesDirectorAliasesToCurrentAssetRecords(t *testing.T) {
+	assets := selectedAssets("character", []string{"妾室（我）", "当家夫人"}, map[string]compiledAsset{
+		assetKey("character", "我"):  {ID: "character-1", Kind: "character", Name: "我", FormalName: "妾室", Prompt: "妾室外形"},
+		assetKey("character", "夫人"): {ID: "character-2", Kind: "character", Name: "夫人", FormalName: "当家主母", Prompt: "夫人外形"},
+	}, map[string]string{}, nil, false)
+	if got := selectResolvedPrompts(assets, map[string]bool{}); got != "我：妾室外形；夫人：夫人外形" {
+		t.Fatalf("director aliases must resolve to current assets, got %q", got)
+	}
+}
+
 func TestSDDirectorSplitsMultipleVideosByDurationLimit(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
