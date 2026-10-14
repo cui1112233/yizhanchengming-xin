@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"io"
 	"net/http"
 	"regexp"
 	"sort"
@@ -284,13 +283,11 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			}
 			var connected videomanagementconnector.Session
 			var loginErr error
-			if len(targets) > 0 && targets[0] != nil {
-				connected, loginErr = targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: username, Password: password})
-			} else {
-				var cookie string
-				cookie, loginErr = loginTargetSite(req, username, password)
-				connected = videomanagementconnector.Session{Cookie: cookie, TargetUsername: username}
+			if len(targets) == 0 || targets[0] == nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频管理系统 Go 连接器未配置"})
+				return
 			}
+			connected, loginErr = targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: username, Password: password})
 			if loginErr != nil || strings.TrimSpace(connected.Cookie) == "" {
 				if loginErr == nil {
 					loginErr = fmt.Errorf("121 登录未返回会话")
@@ -298,11 +295,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": loginErr.Error()})
 				return
 			}
-			mode := "http_cookie"
-			if len(targets) > 0 && targets[0] != nil {
-				mode = "go_connector"
-			}
-			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": mode, "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "上传会话保存失败"})
 				return
 			}
@@ -342,27 +335,7 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 					detail = "已登录（Go 连接器共享会话）"
 				}
 			} else {
-				check, requestErr := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
-				if requestErr != nil {
-					detail = "小说获取共享会话检查失败"
-				} else {
-					check.Header.Set("Cookie", cookie)
-					response, probeErr := (&http.Client{Timeout: 30 * time.Second}).Do(check)
-					if probeErr != nil {
-						detail = "小说获取共享会话连接失败"
-					} else {
-						body, readErr := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-						response.Body.Close()
-						if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-							detail = "小说获取共享会话检查失败"
-						} else if !targetPageLooksAuthenticated(string(body)) {
-							detail = "共享登录会话已失效，请先到小说获取重新登录"
-						} else {
-							loggedIn = true
-							detail = "已登录（共享小说获取会话）"
-						}
-					}
-				}
+				detail = "视频管理系统 Go 连接器未配置"
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
@@ -458,12 +431,8 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			}
 			styles = parseTargetStyles([]byte(page))
 		} else {
-			response, err := targetGET(req, "http://two.121w.com/tttadmin/zidingyi.php", cookie)
-			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
-				return
-			}
-			styles = parseTargetStyles(response)
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频管理系统 Go 连接器未配置"})
+			return
 		}
 		if len(styles) == 0 {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用风格目录"})
@@ -521,15 +490,8 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			}
 			payload = mapOrEmpty(value)
 		} else {
-			response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
-			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档读取失败"})
-				return
-			}
-			if json.Unmarshal(response, &payload) != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档返回格式无效"})
-				return
-			}
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频管理系统 Go 连接器未配置"})
+			return
 		}
 		items, hasItems := targetConfigItems(payload)
 		if !hasItems || len(items) == 0 {
@@ -823,23 +785,6 @@ func batchRewriteIssueEntry(bookID, bookName, event, at string, data map[string]
 	return entry
 }
 
-func targetGET(req *http.Request, url, cookie string) ([]byte, error) {
-	check, err := http.NewRequestWithContext(req.Context(), http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	check.Header.Set("Cookie", cookie)
-	response, err := (&http.Client{Timeout: 30 * time.Second}).Do(check)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if err != nil || response.StatusCode < 200 || response.StatusCode >= 300 || strings.Contains(string(body), "管理员登录") {
-		return nil, fmt.Errorf("target request failed")
-	}
-	return body, nil
-}
 func parseTargetStyles(body []byte) []map[string]any {
 	re := regexp.MustCompile(`(?is)<select[^>]*\bid=["']style["'][^>]*>(.*?)</select>`)
 	match := re.FindSubmatch(body)

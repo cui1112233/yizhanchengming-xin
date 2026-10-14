@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -218,13 +217,7 @@ func syncTargetConfigProfiles(req *http.Request, store novelfetchworkshop.Store,
 		}
 		payload = mapOrEmpty(value)
 	} else {
-		response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
-		if err != nil {
-			return nil, fmt.Errorf("目标站配置档读取失败")
-		}
-		if json.Unmarshal(response, &payload) != nil {
-			return nil, fmt.Errorf("目标站配置档返回格式无效")
-		}
+		return nil, fmt.Errorf("视频管理系统 Go 连接器未配置")
 	}
 	items, hasItems := targetConfigItems(payload)
 	if !hasItems || len(items) == 0 {

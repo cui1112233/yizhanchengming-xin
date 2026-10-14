@@ -1,10 +1,8 @@
 package httpapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -141,55 +139,7 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 					}
 					continue
 				}
-				multipartBody, contentType, buildErr := buildUploadMultipart(fields, bookID+".txt", []byte(content.Content))
-				if buildErr != nil {
-					failedVersion("上传内容组装失败", false)
-					continue
-				}
-				uploadReq, reqErr := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/zbooklist_upload.php", bytes.NewReader(multipartBody))
-				if reqErr != nil {
-					failedVersion("上传请求创建失败", false)
-					continue
-				}
-				uploadReq.Header.Set("Cookie", cookie)
-				uploadReq.Header.Set("Content-Type", contentType)
-				response, requestErr := (&http.Client{Timeout: 120 * time.Second}).Do(uploadReq)
-				if requestErr != nil {
-					failedVersion("上传失败", true)
-					continue
-				}
-				responseBody, responseErr := io.ReadAll(io.LimitReader(response.Body, 2<<20))
-				response.Body.Close()
-				if responseErr != nil {
-					failedVersion("上传失败", true)
-					continue
-				}
-				textBody := string(responseBody)
-				if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || strings.Contains(textBody, "管理员登录") {
-					failedVersion("目标站登录已失效，请重新登录", true)
-					doc.Meta = meta
-					_ = store.PutDocument(req.Context(), identity.Username, doc)
-					writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "notLoggedIn": true, "error": "目标站登录已失效，请重新登录"})
-					return
-				}
-				var remote map[string]any
-				_ = json.Unmarshal(responseBody, &remote)
-				if response.StatusCode < 200 || response.StatusCode >= 300 || remote["success"] != true {
-					failedVersion(firstText(remote["message"], remote["msg"], "上传失败"), true)
-					continue
-				}
-				row["status"] = "submitted"
-				row["error"] = nil
-				results = append(results, row)
-				success++
-				meta["siteSubmitStatus"] = "submitted"
-				done = append(done, version)
-				meta["siteSubmitDoneVersions"] = uniqueStrings(done)
-				meta["siteSubmitFailedVersions"] = removeString(anyStrings(meta["siteSubmitFailedVersions"]), version)
-				if errors := mapOrEmpty(meta["siteSubmitFailedErrors"]); len(errors) > 0 {
-					delete(errors, version)
-					meta["siteSubmitFailedErrors"] = errors
-				}
+				failedVersion("视频管理系统 Go 连接器未执行上传", false)
 			}
 			doc.Meta = meta
 			_ = store.PutDocument(req.Context(), identity.Username, doc)
