@@ -92,7 +92,7 @@ import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { BatchFactoryUnifiedSettingsModal } from './BatchFactoryUnifiedSettingsModal';
 import { BatchFactoryBookSettingsModal } from './BatchFactoryBookSettingsModal';
-import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
+import { audioPlanningRequired, normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { BatchFactoryGiantMaterialPendingProgress } from './BatchFactoryGiantMaterialPendingProgress';
 import { batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, contentRangeLinesForBook, sourceTextAfterViralAdoption } from './batchFactoryContentRange';
@@ -314,7 +314,7 @@ function baseSetupEnabled(settings = {}) {
   return settings?.aiPromptConfig?.constraints?.baseSetup?.enabled !== false;
 }
 function h3CompilationStatus(settings = {}) {
-  if (settings.audioPlanningEnabled === true) return '等待真实配音时长编译最终 VIDEO';
+  if (audioPlanningRequired(settings)) return '等待真实配音时长编译最终 VIDEO';
   const seconds = Number(settings.storyboardDurationLimit) === 15 ? 15 : 10;
   return `将按 ${seconds} 秒确定性切段并编译最终 VIDEO`;
 }
@@ -2826,7 +2826,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   async function ensureBookAudioDuration(book, { force = false, quiet = false, batchSnapshot = batch } = {}) {
     const currentBatch = batchSnapshot || batch;
     const settings = effectiveBookSettings(currentBatch, book);
-    if (settings.audioPlanningEnabled !== true) return Number(settings.audioDurationSeconds || 0);
+    if (!audioPlanningRequired(settings)) return Number(settings.audioDurationSeconds || 0);
     const input = batchFactoryBookAudioInput(book);
     const tts = await batchFactoryBookTts(settings);
     const fingerprint = batchFactoryAudioFingerprint(input, tts);
@@ -2849,7 +2849,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   async function prepareAudioPlanningForBatch(currentBatch) {
     const candidates = (currentBatch?.books || []).filter(book => {
       const settings = effectiveBookSettings(currentBatch, book);
-      return settings.audioPlanningEnabled === true;
+      return audioPlanningRequired(settings);
     });
     if (!candidates.length) return;
     message.info(`正在逐本生成配音并读取 ${candidates.length} 本小说的真实时长…`);
@@ -2914,7 +2914,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 			if (!confirmed) throw new Error('已保留手动提示词，当前配置尚未应用到最终分镜');
 		}
 		let audioResult = null;
-    if (settings.audioPlanningEnabled === true) {
+    if (audioPlanningRequired(settings)) {
 			const tts = await batchFactoryBookTts(settings);
 			const previousMeasurement = priorTrace?.timeline?.timeline?.audio_measurement;
 			if (!allowAudioSynthesis && !previousMeasurement?.asset_id) return { skipped: 'audio' };
@@ -2933,7 +2933,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 		await compileH3Video(latestBatch.id, latestBook.id, {
 			director_revision_id: director.id,
 			audio_asset_id: audioResult?.audio_asset_id || audioResult?.audioMeasurement?.measurement?.asset_id || audioResult?.audio_measurement?.measurement?.asset_id,
-			allow_semantic_timeline: settings.audioPlanningEnabled !== true,
+			allow_semantic_timeline: !audioPlanningRequired(settings),
 			preset: {
 				key: String(videoPreset.presetKey || videoPreset.presetId || videoPreset.id || 'h3-video-normal'),
 				revision: Math.max(1, Number(videoPreset.presetVersion || videoPreset.version || 1)),
@@ -3251,7 +3251,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         return;
       }
       const requestedMode = stage === 'director' && mode === 'compile' ? 'missing' : mode;
-      if (stage === 'director' && settings.audioPlanningEnabled === true) {
+      if (stage === 'director' && audioPlanningRequired(settings)) {
         await ensureBookAudioDuration(book);
       }
       const stageResult = await runBookStage(batch.id, book.id, stage, {
@@ -3324,7 +3324,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       // still an explicit retry target for this storyboard.
       const retryAsVideo = failedVideo?.status === 'failed';
       const settings = effectiveBookSettings(batch, book);
-      if (summary?.lastFailed?.stage === 'director' && settings.audioPlanningEnabled === true) await ensureBookAudioDuration(book);
+      if (summary?.lastFailed?.stage === 'director' && audioPlanningRequired(settings)) await ensureBookAudioDuration(book);
       await retryBookStage(batch.id, book.id, {
         h3: usesH3VideoPrompt(settings),
         videoId: effectiveVideoID,
@@ -3385,7 +3385,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (scope?.id) { await runBookStageAction(scope, 'director', 'missing', '', textModelId); return; }
     setActionBusy('director');
     try {
-      const audioBooks = books.filter(book => { const settings = effectiveBookSettings(batch, book); return settings.audioPlanningEnabled === true; });
+      const audioBooks = books.filter(book => { const settings = effectiveBookSettings(batch, book); return audioPlanningRequired(settings); });
       if (audioBooks.length) message.info(`正在逐本读取 ${audioBooks.length} 本小说的真实配音时长…`);
       for (const book of audioBooks) await ensureBookAudioDuration(book, { quiet: true });
       await runBatchDirector(batch.id, { textModelId: textModelId || batch?.settingsState?.patch?.textModelId });

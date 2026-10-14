@@ -24,6 +24,27 @@ func TestAudioMinimumVideoCountV13(t *testing.T) {
 	}
 }
 
+func TestAudioPlanningRequiredForNewFlowAndLegacyCompatibility(t *testing.T) {
+	newFlow := SettingsPatch{
+		"storyTimelineVersion": rawSettingV13(t, sdOriginalStoryVersion),
+		"audioPlanningEnabled": rawSettingV13(t, false),
+	}
+	if !audioPlanningRequired(newFlow) {
+		t.Fatal("new story-timeline flow must always require measured audio planning")
+	}
+	legacyExplicitOff := SettingsPatch{"audioPlanningEnabled": rawSettingV13(t, false)}
+	if audioPlanningRequired(legacyExplicitOff) {
+		t.Fatal("historical tasks with an explicit false must keep their legacy behavior")
+	}
+	measuredLegacy := SettingsPatch{"audioDurationSeconds": rawSettingV13(t, 12.4)}
+	if !audioPlanningRequired(measuredLegacy) {
+		t.Fatal("a legacy snapshot with measured audio must use the measured timeline")
+	}
+	if audioPlanningRequired(SettingsPatch{}) {
+		t.Fatal("unmarked historical snapshots must keep their legacy behavior")
+	}
+}
+
 func TestSnapshotRejectsFixedOpeningWithAudioPlanningV13(t *testing.T) {
 	batch := Batch{SettingsState: SettingsState{Patch: SettingsPatch{
 		"storyboardDurationLimit": rawSettingV13(t, 10),

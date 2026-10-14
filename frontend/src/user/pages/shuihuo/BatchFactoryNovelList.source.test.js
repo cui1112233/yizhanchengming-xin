@@ -1189,12 +1189,12 @@ test('compiles a successful H3 director run from real TTS audio before exposing 
   assert.match(source, /director_revision_id/);
 });
 
-test('uses semantic 10 or 15 second compilation without TTS when follow-audio is disabled', () => {
+test('always measures TTS line timing before H3 compilation; audio source only affects final merge', () => {
   const start = source.indexOf('async function compileBookH3Videos(book,');
   const end = source.indexOf('async function refreshAfterBookSettingsSaved()', start);
   const compile = start >= 0 && end > start ? source.slice(start, end) : '';
-  assert.match(compile, /if \(settings\.audioPlanningEnabled === true\)\s*\{[\s\S]*?measureH3VideoLines/);
-  assert.match(compile, /allow_semantic_timeline:\s*settings\.audioPlanningEnabled !== true/);
+  assert.match(compile, /if \(audioPlanningRequired\(settings\)\)\s*\{[\s\S]*?measureH3VideoLines/);
+  assert.match(compile, /allow_semantic_timeline:\s*!audioPlanningRequired\(settings\)/);
 });
 
 test('returns only a persisted line measurement identity for subsequent H3 compilation', async () => {

@@ -457,7 +457,7 @@ func BuildDirectorContract(book Book, hook HookRevision, snapshot DirectorSnapsh
 	if snapshot.FixedSingleVideo {
 		durationRule = fmt.Sprintf("固定开头已开启：只生产 VIDEO01；其 duration_sec 必须为 1-%d 的整数。其他 storyboard 仍需按原文完整分析并保留，但不会进入视频生产。", snapshot.MaxVideoDuration)
 	}
-	if rawBool(snapshot.Effective, "audioPlanningEnabled", false) {
+	if audioPlanningRequired(snapshot.Effective) {
 		audioSeconds := snapshot.AudioTargetSeconds
 		if audioSeconds > 0 {
 			minimumVideos := audioMinimumVideoCount(audioSeconds, snapshot.MaxVideoDuration)

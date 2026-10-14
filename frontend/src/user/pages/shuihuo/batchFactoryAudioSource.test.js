@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource.js';
+import { audioPlanningRequired, normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource.js';
 
 test('defaults missing audio source to TTS', () => {
   assert.equal(normalizeAudioSource(undefined), 'tts');
@@ -25,4 +25,9 @@ test('TTS audio enables final audio merge and always keeps the shared timing flo
     audioPlanningEnabled: true,
     audioMergeEnabled: true
   });
+});
+
+test('audio source never disables shared timing planning', () => {
+  assert.equal(audioPlanningRequired({ audioSource: 'original', audioPlanningEnabled: false }), true);
+  assert.equal(audioPlanningRequired({ audioSource: 'tts', audioPlanningEnabled: false }), true);
 });

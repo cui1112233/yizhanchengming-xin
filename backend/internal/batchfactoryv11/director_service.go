@@ -55,6 +55,25 @@ func rawBool(patch SettingsPatch, key string, fallback bool) bool {
 	return value
 }
 
+// audioPlanningRequired keeps the complete timing chain independent from the
+// final audio mix choice. New SD timeline tasks cannot opt out; a historical
+// snapshot with an explicit false remains on the legacy semantic timeline.
+func audioPlanningRequired(patch SettingsPatch) bool {
+	if rawString(patch, "storyTimelineVersion", "") == sdOriginalStoryVersion {
+		return true
+	}
+	if source := rawString(patch, "audioSource", ""); source == "original" || source == "tts" {
+		return true
+	}
+	if rawPositiveNumber(patch, "audioDurationSeconds") {
+		return true
+	}
+	if _, exists := patch["audioPlanningEnabled"]; !exists {
+		return false
+	}
+	return rawBool(patch, "audioPlanningEnabled", true)
+}
+
 func rawInt(patch SettingsPatch, key string, fallback int) int {
 	raw, ok := patch[key]
 	if !ok {
@@ -67,13 +86,25 @@ func rawInt(patch SettingsPatch, key string, fallback int) int {
 	return value
 }
 
+func rawPositiveNumber(patch SettingsPatch, key string) bool {
+	raw, ok := patch[key]
+	if !ok {
+		return false
+	}
+	var value float64
+	if json.Unmarshal(raw, &value) != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return false
+	}
+	return value > 0
+}
+
 // storyboard durations are integer seconds. Keep the measured audio value in
 // settings, but plan against the same ceiling rule used by script generation.
 func measuredAudioDurationSeconds(patch SettingsPatch) float64 {
-	// Full TTS and line timing are part of every new production flow. Keep
-	// explicit false values for historical snapshots, but default missing
-	// configuration to enabled so audio source only controls the final mix.
-	if !rawBool(patch, "audioPlanningEnabled", true) {
+	// Full TTS and line timing are part of every marked production flow. Keep
+	// unmarked historical snapshots compatible, while a saved audio source
+	// makes the new flow explicit and leaves audio source only to final mixing.
+	if !audioPlanningRequired(patch) {
 		return 0
 	}
 	raw, ok := patch["audioDurationSeconds"]
@@ -138,8 +169,7 @@ func snapshotForBookWithAudioRequirement(batch Batch, book Book, requireMeasured
 	// 新链路始终先做完整配音和逐行时长测量；audioPlanningEnabled 只作为
 	// 历史任务的兼容开关。新 SD 原文时间轴任务缺省即开启，旧任务仍尊重
 	// 明确保存的 false，避免历史快照被静默升级。
-	audioPlanningDefault := rawString(effective, "storyTimelineVersion", "") == sdOriginalStoryVersion
-	audioPlanning := rawBool(effective, "audioPlanningEnabled", audioPlanningDefault)
+	audioPlanning := audioPlanningRequired(effective)
 	if requireMeasuredAudio && fixed && audioPlanning {
 		return DirectorSnapshot{}, fmt.Errorf("%w: 固定开头只生产 VIDEO01，不能同时启用分镜规划跟随配音", ErrConflict)
 	}
