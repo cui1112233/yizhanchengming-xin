@@ -104,3 +104,31 @@ func TestV12NovelFetchIntakeRejectsEmptyBookList(t *testing.T) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestV12NovelFetchIntakeCanAppendBooksToBatch(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "追加测试"})
+	if err != nil {
+		t.Fatalf("create batch: %v", err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	created := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v12/intakes/novel-fetch", map[string]any{
+		"books": []map[string]any{{"id": "book-append", "bookId": "book-append", "title": "追加小说"}},
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create intake status=%d body=%s", created.Code, created.Body.String())
+	}
+	var payload struct{ Intake batchfactoryv11.Intake `json:"intake"` }
+	if err := json.NewDecoder(bytes.NewReader(created.Body.Bytes())).Decode(&payload); err != nil {
+		t.Fatalf("decode intake: %v", err)
+	}
+	appended := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/batch-factory/v12/batches/"+batch.ID+"/intakes/"+payload.Intake.ID+"/books", map[string]any{})
+	if appended.Code != http.StatusOK {
+		t.Fatalf("append status=%d body=%s", appended.Code, appended.Body.String())
+	}
+	updated, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil || len(updated.Books) != 1 || updated.Books[0].BookID != "book-append" {
+		t.Fatalf("batch books after append = %#v, err=%v", updated.Books, err)
+	}
+}

@@ -533,12 +533,14 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
   const [platform, setPlatform] = useState('');
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const [busy, setBusy] = useState(false);
-  const options = Array.isArray(platformOptions) ? platformOptions : [];
+  const options = Array.isArray(platformOptions) && platformOptions.length
+    ? platformOptions
+    : batchFactoryPlatformOptions([], { fallback: true });
   useEffect(() => {
     if (!platform && options.length) setPlatform(String(options[0].value));
   }, [options, platform]);
   const parsed = useMemo(() => String(inputText || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
-    const match = line.match(/^(\d{6,25})(?:\s+|[，,、|])?(.*)$/);
+    const match = line.match(/^(\d{1,25})(?:\s+|[，,、|])?(.*)$/);
     return match ? { bookId: match[1], title: String(match[2] || '').trim() || `小说 ${match[1]}` } : null;
   }).filter(Boolean), [inputText]);
   const existing = useMemo(() => new Set(books.map(book => String(book?.bookId || '').trim()).filter(Boolean)), [books]);
@@ -553,6 +555,8 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
       setInputText('');
       setAllowDuplicate(false);
       setOpen(false);
+    } catch (error) {
+      message.error(error?.message || '添加新书失败');
     } finally { setBusy(false); }
   }
   return <>
@@ -2920,7 +2924,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     await onBatchChanged?.();
   }
   async function addBooksToBatch(items, platform, allowDuplicate) {
-    if (!batch?.id || !items?.length) return;
+    if (!batch?.id) throw new Error('当前批次尚未加载完成，请刷新后重试');
+    if (!items?.length) throw new Error('没有可添加的书籍');
     const option = platformOptions.find(item => String(item.value) === String(platform));
     const booksInput = items.map(item => ({
       id: item.bookId,
