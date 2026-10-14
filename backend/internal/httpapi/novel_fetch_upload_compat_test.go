@@ -23,6 +23,18 @@ func TestNovelFetchUploadSessionMissingCookie(t *testing.T) {
 	}
 }
 
+func TestNovelFetchUploadCanonicalSessionAliasUsesGoHandler(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterNovelFetchUploadSessionCompat(mux, BridgeAuth{Secret: "secret", Now: time.Now, AuthStore: &authTestStore{}}, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/novel-fetch-workshop/upload/session", nil)
+	SignBridgeRequest(req, "alice", false, time.Now(), "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `"loggedIn":false`) {
+		t.Fatalf("canonical alias response=%d %s", res.Code, res.Body.String())
+	}
+}
+
 func TestNovelFetchUploadSessionDoesNotFallBackToDuplicateDirectHTTP(t *testing.T) {
 	usersDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(usersDir, "alice"), 0o700); err != nil {

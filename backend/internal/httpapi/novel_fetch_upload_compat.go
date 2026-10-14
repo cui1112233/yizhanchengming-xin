@@ -19,7 +19,7 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
-	root.Handle("GET /api/novel-fetch-upload/upload-session", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	sessionHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -42,8 +42,11 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "loggedIn": true, "status": "ready", "lastVerifiedAt": time.Now().UTC().Format(time.RFC3339)})
-	})))
-	root.Handle("POST /api/novel-fetch-upload/upload-login", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	}))
+	root.Handle("GET /api/novel-fetch-upload/upload-session", sessionHandler)
+	root.Handle("GET /api/novel-fetch-workshop/upload/session", sessionHandler)
+
+	loginHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -71,7 +74,9 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "username": strings.TrimSpace(input.Username), "status": "ready"})
-	})))
+	}))
+	root.Handle("POST /api/novel-fetch-upload/upload-login", loginHandler)
+	root.Handle("POST /api/novel-fetch-workshop/upload/login", loginHandler)
 }
 
 func saveUploadTargetSession(usersDir, username string, value map[string]any) error {

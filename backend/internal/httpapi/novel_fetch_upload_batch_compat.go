@@ -26,7 +26,7 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
-	root.Handle("POST /api/novel-fetch-upload/upload-batch", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	batchHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -128,7 +128,9 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 			results = append(results, result)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "results": results})
-	})))
+	}))
+	root.Handle("POST /api/novel-fetch-upload/upload-batch", batchHandler)
+	root.Handle("POST /api/novel-fetch-workshop/upload/batch", batchHandler)
 }
 
 func readUploadTargetSession(usersDir, username string) map[string]any {

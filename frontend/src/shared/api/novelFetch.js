@@ -29,18 +29,18 @@ export function listSavedNovels() {
 }
 
 export function uploadLogin({ username, password }) {
-  return apiRequest('/api/novel-fetch-upload/upload-login', {
+  return apiRequest('/api/novel-fetch-workshop/upload/login', {
     method: 'POST',
     body: JSON.stringify({ username, password })
   });
 }
 
 export function getUploadSession() {
-  return apiRequest('/api/novel-fetch-upload/upload-session');
+  return apiRequest('/api/novel-fetch-workshop/upload/session');
 }
 
 export function uploadBatch(payload) {
-  return apiRequest('/api/novel-fetch-upload/upload-batch', {
+  return apiRequest('/api/novel-fetch-workshop/upload/batch', {
     method: 'POST',
     body: JSON.stringify(payload)
   });

@@ -1794,7 +1794,7 @@ async function openWebLoginDialog() {
         const username = $("webLoginUsername").value.trim();
         const password = $("webLoginPassword").value;
         const token = localStorage.getItem("auth_token") || "";
-        const response = await fetch("/api/novel-fetch-upload/upload-login", {
+        const response = await fetch("/api/novel-fetch-workshop/upload/login", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ username, password }),

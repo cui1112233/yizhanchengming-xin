@@ -33,7 +33,8 @@ test('Go-native novel fetch exposes the target upload flow instead of returning 
   assert.match(pageSource, /uploadBatch/);
   assert.match(pageSource, /label: '上传'/);
   assert.match(pageSource, /uploadBatch/);
-  assert.match(apiSource, /\/api\/novel-fetch-upload\/upload-batch/);
+  assert.match(apiSource, /\/api\/novel-fetch-workshop\/upload\/batch/);
+  assert.doesNotMatch(apiSource, /\/api\/novel-fetch-upload\/upload-batch/);
   assert.doesNotMatch(pageSource, /window\.location\.assign\(['"]\/novel-fetch['"]\)/);
 });
 
