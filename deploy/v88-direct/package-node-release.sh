@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# This is retained only as a rollback/archive tool while the legacy retirement
+# gate is open. It must never be used by a normal release: the supported
+# package is deploy/v88-direct/build-direct-release.ps1 and contains Go only.
+if [ "${QIANTIE_ALLOW_NODE_LEGACY_RELEASE:-}" != "1" ]; then
+  echo 'Node legacy release packaging is disabled. Use the Go-only direct release builder.' >&2
+  echo 'For an explicitly approved rollback archive, set QIANTIE_ALLOW_NODE_LEGACY_RELEASE=1.' >&2
+  exit 78
+fi
+
 sha="${1:-${GITHUB_SHA:-}}"
 out="${2:-}"
 
