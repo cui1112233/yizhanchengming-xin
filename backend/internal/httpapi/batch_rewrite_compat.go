@@ -444,12 +444,27 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先保存账号密码并登录目标站"})
 			return
 		}
-		response, err := targetGET(req, "http://two.121w.com/tttadmin/zidingyi.php", cookie)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
-			return
+		var styles []map[string]any
+		if len(targets) > 0 && targets[0] != nil {
+			reader, ok := targets[0].(videomanagementconnector.StyleCatalogService)
+			if !ok {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "视频管理系统 Go 连接器不支持风格目录读取"})
+				return
+			}
+			page, err := reader.RefreshStyles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
+				return
+			}
+			styles = parseTargetStyles([]byte(page))
+		} else {
+			response, err := targetGET(req, "http://two.121w.com/tttadmin/zidingyi.php", cookie)
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
+				return
+			}
+			styles = parseTargetStyles(response)
 		}
-		styles := parseTargetStyles(response)
 		if len(styles) == 0 {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用风格目录"})
 			return
@@ -490,15 +505,31 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先保存账号密码并登录目标站"})
 			return
 		}
-		response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档读取失败"})
-			return
-		}
 		var payload map[string]any
-		if json.Unmarshal(response, &payload) != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档返回格式无效"})
-			return
+		if len(targets) > 0 && targets[0] != nil {
+			reader, ok := targets[0].(interface {
+				RefreshProfiles(context.Context, videomanagementconnector.Session) (any, error)
+			})
+			if !ok {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "视频管理系统 Go 连接器不支持配置档读取"})
+				return
+			}
+			value, err := reader.RefreshProfiles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档读取失败"})
+				return
+			}
+			payload = mapOrEmpty(value)
+		} else {
+			response, err := targetGET(req, "http://two.121w.com/tttadmin/api/zdy_config.php?action=list", cookie)
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档读取失败"})
+				return
+			}
+			if json.Unmarshal(response, &payload) != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档返回格式无效"})
+				return
+			}
 		}
 		items, hasItems := targetConfigItems(payload)
 		if !hasItems || len(items) == 0 {

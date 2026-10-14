@@ -22,6 +22,10 @@ type VideoUploadService interface {
 	UploadVideo(context.Context, Session, string, []byte) (string, error)
 }
 
+type StyleCatalogService interface {
+	RefreshStyles(context.Context, Session) (string, error)
+}
+
 // TargetHTTPService is the Go-owned transport for the video-management site.
 // It deliberately contains no browser or Node dependency. A CDP implementation
 // can be added behind the same Service interface for sites that require a UI.
@@ -107,6 +111,23 @@ func (s *TargetHTTPService) RefreshProfiles(ctx context.Context, session Session
 		return nil, fmt.Errorf("target site profiles returned invalid JSON: %w", err)
 	}
 	return value, nil
+}
+
+func (s *TargetHTTPService) RefreshStyles(ctx context.Context, session Session) (string, error) {
+	base, err := s.base()
+	if err != nil {
+		return "", err
+	}
+	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/zidingyi.php", session.Cookie, nil)
+	if err != nil {
+		return "", fmt.Errorf("target site styles: %w", err)
+	}
+	defer response.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return "", fmt.Errorf("target site styles returned HTTP %d", response.StatusCode)
+	}
+	return string(raw), nil
 }
 
 func (s *TargetHTTPService) CheckSession(ctx context.Context, session Session) error {
