@@ -36,6 +36,7 @@ type BatchFactory121Publisher struct {
 	MergedFiles mergeworker.ObjectReader
 	Client      *http.Client
 	TargetBase  string
+	Connector   videomanagementconnector.Service
 }
 
 func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, bookID string, input map[string]any) (map[string]any, error) {
@@ -142,53 +143,77 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if err != nil || len(videoBytes) == 0 {
 		return nil, fmt.Errorf("最终合成视频为空")
 	}
-	head, err := p.presignAndUpload(ctx, client, base, cookie, book.BookID+".mp4", videoBytes)
-	if err != nil {
-		return nil, err
-	}
-	fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
-	fields["jieya_ai_head_video_mode"] = "0"
-	fields["jieya_ai_head_horizontal_flip"] = "0"
-	body, contentType, err := batchFactoryBuildUploadMultipart(fields, book.BookID+".txt", content)
-	if err != nil {
-		return nil, err
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/tttadmin/api/zbooklist_upload.php", bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Set("Cookie", cookie)
-	request.Header.Set("Content-Type", contentType)
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("上传到视频管理系统失败：%w", err)
-	}
-	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || strings.Contains(string(responseBody), "管理员登录") {
-		return nil, fmt.Errorf("目标站登录已失效，请重新登录")
-	}
-	var remote map[string]any
-	_ = json.Unmarshal(responseBody, &remote)
-	if response.StatusCode < 200 || response.StatusCode >= 300 || remote["success"] != true {
-		return nil, fmt.Errorf("视频管理系统上传失败：%s", firstText(remote["message"], remote["msg"], "上传失败"))
-	}
-	readbackURL := base + "/tttadmin/api/zbooklist_get.php?bookid=" + url.QueryEscape(book.BookID) + "&page=1&pageSize=10"
-	readbackRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, readbackURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	readbackRequest.Header.Set("Cookie", cookie)
-	readbackResponse, err := client.Do(readbackRequest)
-	if err != nil {
-		return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
-	}
-	defer readbackResponse.Body.Close()
-	readbackBody, _ := io.ReadAll(io.LimitReader(readbackResponse.Body, 2<<20))
-	var readback map[string]any
-	_ = json.Unmarshal(readbackBody, &readback)
-	if readbackResponse.StatusCode < 200 || readbackResponse.StatusCode >= 300 || readback["success"] != true {
-		return nil, fmt.Errorf("视频管理系统回读失败：%s", firstText(readback["message"], readback["msg"], "后台记录未确认"))
+	var remote, readback map[string]any
+	if p.Connector != nil {
+		videoUploader, ok := p.Connector.(videomanagementconnector.VideoUploadService)
+		if !ok {
+			return nil, fmt.Errorf("视频管理系统 Go 连接器不支持视频上传")
+		}
+		session := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
+		head, err := videoUploader.UploadVideo(ctx, session, book.BookID+".mp4", videoBytes)
+		if err != nil {
+			return nil, err
+		}
+		fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
+		fields["jieya_ai_head_video_mode"] = "0"
+		fields["jieya_ai_head_horizontal_flip"] = "0"
+		submission, err := p.Connector.Submit(ctx, session, videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields})
+		if err != nil {
+			return nil, fmt.Errorf("视频管理系统上传失败：%w", err)
+		}
+		remote = mapOrEmpty(submission.ReadbackRaw)
+		confirmed, err := p.Connector.GetSubmission(ctx, session, book.BookID)
+		if err != nil {
+			return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
+		}
+		readback = mapOrEmpty(confirmed.ReadbackRaw)
+	} else {
+		head, err := p.presignAndUpload(ctx, client, base, cookie, book.BookID+".mp4", videoBytes)
+		if err != nil {
+			return nil, err
+		}
+		fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
+		fields["jieya_ai_head_video_mode"] = "0"
+		fields["jieya_ai_head_horizontal_flip"] = "0"
+		body, contentType, err := batchFactoryBuildUploadMultipart(fields, book.BookID+".txt", content)
+		if err != nil {
+			return nil, err
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/tttadmin/api/zbooklist_upload.php", bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set("Cookie", cookie)
+		request.Header.Set("Content-Type", contentType)
+		response, err := client.Do(request)
+		if err != nil {
+			return nil, fmt.Errorf("上传到视频管理系统失败：%w", err)
+		}
+		defer response.Body.Close()
+		responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+		if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || strings.Contains(string(responseBody), "管理员登录") {
+			return nil, fmt.Errorf("目标站登录已失效，请重新登录")
+		}
+		_ = json.Unmarshal(responseBody, &remote)
+		if response.StatusCode < 200 || response.StatusCode >= 300 || remote["success"] != true {
+			return nil, fmt.Errorf("视频管理系统上传失败：%s", firstText(remote["message"], remote["msg"], "上传失败"))
+		}
+		readbackURL := base + "/tttadmin/api/zbooklist_get.php?bookid=" + url.QueryEscape(book.BookID) + "&page=1&pageSize=10"
+		readbackRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, readbackURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		readbackRequest.Header.Set("Cookie", cookie)
+		readbackResponse, err := client.Do(readbackRequest)
+		if err != nil {
+			return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
+		}
+		defer readbackResponse.Body.Close()
+		readbackBody, _ := io.ReadAll(io.LimitReader(readbackResponse.Body, 2<<20))
+		_ = json.Unmarshal(readbackBody, &readback)
+		if readbackResponse.StatusCode < 200 || readbackResponse.StatusCode >= 300 || readback["success"] != true {
+			return nil, fmt.Errorf("视频管理系统回读失败：%s", firstText(readback["message"], readback["msg"], "后台记录未确认"))
+		}
 	}
 	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	// The Go publisher is the single upload owner. Persist the confirmed

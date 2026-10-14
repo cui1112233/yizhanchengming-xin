@@ -212,7 +212,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if candidate, ok := options.MergeOutput.(mergeworker.ObjectReader); ok {
 		mergeReader = candidate
 	}
-	publish121 := &BatchFactory121Publisher{Store: options.Store, UsersDir: options.UserDataDir, LocalFiles: options.LocalArtifacts, MergedFiles: mergeReader}
+	publish121 := &BatchFactory121Publisher{Store: options.Store, UsersDir: options.UserDataDir, LocalFiles: options.LocalArtifacts, MergedFiles: mergeReader, Connector: options.VideoManagementConnector}
 	if options.AutomationCoordinator != nil {
 		options.AutomationCoordinator.publish121 = publish121
 	}

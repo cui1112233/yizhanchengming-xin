@@ -3,6 +3,8 @@ package videomanagementconnector
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +14,13 @@ import (
 	"strings"
 	"time"
 )
+
+// VideoUploadService is the optional media step used by the batch publisher.
+// Keeping it optional avoids changing the smaller connector test doubles while
+// making the production TargetHTTPService the single owner of target uploads.
+type VideoUploadService interface {
+	UploadVideo(context.Context, Session, string, []byte) (string, error)
+}
 
 // TargetHTTPService is the Go-owned transport for the video-management site.
 // It deliberately contains no browser or Node dependency. A CDP implementation
@@ -172,6 +181,58 @@ func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input S
 	return Submission{ID: id, Status: "submitted", ReadbackRaw: result}, nil
 }
 
+func (s *TargetHTTPService) UploadVideo(ctx context.Context, session Session, filename string, data []byte) (string, error) {
+	base, err := s.base()
+	if err != nil {
+		return "", err
+	}
+	digest := md5.Sum(data)
+	payload, _ := json.Marshal(map[string]any{
+		"files":  []map[string]string{{"name": filename, "md5": hex.EncodeToString(digest[:])}},
+		"kind":   "ai_head_video",
+		"source": "zbooklist_upload_ai_head",
+	})
+	response, err := s.doWithContentType(ctx, s.client(), http.MethodPost, base+"/tttadmin/api/music_put_url.php", session.Cookie, bytes.NewReader(payload), "application/json")
+	if err != nil {
+		return "", fmt.Errorf("target site video presign: %w", err)
+	}
+	defer response.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	var result map[string]any
+	_ = json.Unmarshal(raw, &result)
+	if response.StatusCode < 200 || response.StatusCode >= 300 || result["success"] != true {
+		return "", fmt.Errorf("target site did not return video upload URL")
+	}
+	dataObject := mapOrEmpty(result["data"])
+	files := arrayOfMaps(dataObject["files"])
+	if len(files) == 0 {
+		return "", fmt.Errorf("target site video upload URL is incomplete")
+	}
+	item := files[0]
+	uploadURL := strings.TrimSpace(fmt.Sprint(item["upload_url"]))
+	objectKey := strings.TrimSpace(fmt.Sprint(item["object_key"]))
+	bucketURL := strings.TrimSpace(fmt.Sprint(item["bucket_url"]))
+	if uploadURL == "" || objectKey == "" {
+		return "", fmt.Errorf("target site video upload URL is incomplete")
+	}
+	put, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	for key, value := range mapString(item["headers"]) {
+		put.Header.Set(key, value)
+	}
+	putResponse, err := s.client().Do(put)
+	if err != nil {
+		return "", fmt.Errorf("target site video upload: %w", err)
+	}
+	putResponse.Body.Close()
+	if putResponse.StatusCode < 200 || putResponse.StatusCode >= 300 {
+		return "", fmt.Errorf("target site video upload returned HTTP %d", putResponse.StatusCode)
+	}
+	return fmt.Sprintf(`{"name":%q,"original_name":%q,"url":%q,"object_key":%q}`, filename, filename, bucketURL, objectKey), nil
+}
+
 func (s *TargetHTTPService) GetSubmission(ctx context.Context, session Session, id string) (Submission, error) {
 	base, err := s.base()
 	if err != nil {
@@ -242,4 +303,34 @@ func mergeCookies(values []string) string {
 		}
 	}
 	return strings.Join(parts, "; ")
+}
+
+func mapOrEmpty(value any) map[string]any {
+	if result, ok := value.(map[string]any); ok {
+		return result
+	}
+	return map[string]any{}
+}
+
+func arrayOfMaps(value any) []map[string]any {
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if row, ok := item.(map[string]any); ok {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+func mapString(value any) map[string]string {
+	row := mapOrEmpty(value)
+	out := make(map[string]string, len(row))
+	for key, item := range row {
+		out[key] = fmt.Sprint(item)
+	}
+	return out
 }
