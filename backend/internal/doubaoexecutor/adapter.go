@@ -2,10 +2,12 @@ package doubaoexecutor
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,8 +34,9 @@ type Adapter struct {
 }
 
 type account struct {
-	cancel context.CancelFunc
-	ctx    context.Context
+	cancel    context.CancelFunc
+	ctx       context.Context
+	tempFiles []string
 }
 
 type Job struct {
@@ -101,13 +104,41 @@ func (a *Adapter) Prepare(ctx context.Context, accountID string, job Job) error 
 	if prompt == "" {
 		return errors.New("video prompt is required")
 	}
-	return chromedp.Run(page,
+	if err := a.clearTempFiles(accountID); err != nil {
+		return err
+	}
+	if err := chromedp.Run(page,
 		chromedp.Navigate(a.cfg.WorkspaceURL),
 		chromedp.WaitReady("body", chromedp.ByQuery),
 		chromedp.ActionFunc(func(actionCtx context.Context) error {
 			return evaluateSetPrompt(actionCtx, page, prompt)
 		}),
-	)
+	); err != nil {
+		return err
+	}
+	imageURLs := asStrings(payload["imageUrls"], payload["image_urls"], payload["referenceImageURLs"], payload["reference_image_urls"])
+	if len(imageURLs) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(imageURLs))
+	for index, imageURL := range imageURLs {
+		path, err := downloadReference(ctx, imageURL, index)
+		if err != nil {
+			_ = a.clearTempFiles(accountID)
+			return fmt.Errorf("reference image %d: %w", index+1, err)
+		}
+		paths = append(paths, path)
+	}
+	a.mu.Lock()
+	if item := a.accounts[safeID(accountID)]; item != nil {
+		item.tempFiles = paths
+	}
+	a.mu.Unlock()
+	if err := chromedp.Run(page, chromedp.SetUploadFiles(`input[type="file"]`, paths, chromedp.ByQuery)); err != nil {
+		_ = a.clearTempFiles(accountID)
+		return fmt.Errorf("upload reference images: %w", err)
+	}
+	return nil
 }
 
 func (a *Adapter) Submit(ctx context.Context, accountID string) (Submission, error) {
@@ -179,8 +210,32 @@ func (a *Adapter) Close(accountID string) {
 	delete(a.accounts, safeID(accountID))
 	a.mu.Unlock()
 	if item != nil {
+		for _, path := range item.tempFiles {
+			_ = os.Remove(path)
+		}
 		item.cancel()
 	}
+}
+
+func (a *Adapter) clearTempFiles(accountID string) error {
+	a.mu.Lock()
+	item := a.accounts[safeID(accountID)]
+	var paths []string
+	if item != nil {
+		paths = append(paths, item.tempFiles...)
+		item.tempFiles = nil
+	}
+	a.mu.Unlock()
+	if len(paths) == 0 {
+		return nil
+	}
+	var firstErr error
+	for _, path := range paths {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func evaluateSetPrompt(ctx context.Context, page context.Context, prompt string) error {
@@ -230,6 +285,105 @@ func asString(values ...any) string {
 		}
 	}
 	return ""
+}
+
+func asStrings(values ...any) []string {
+	for _, value := range values {
+		switch typed := value.(type) {
+		case []string:
+			return nonEmptyStrings(typed)
+		case []any:
+			out := make([]string, 0, len(typed))
+			for _, item := range typed {
+				if text, ok := item.(string); ok && strings.TrimSpace(text) != "" {
+					out = append(out, strings.TrimSpace(text))
+				}
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+	}
+	return nil
+}
+
+func nonEmptyStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if text := strings.TrimSpace(value); text != "" {
+			out = append(out, text)
+		}
+	}
+	return out
+}
+
+func downloadReference(ctx context.Context, value string, index int) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", errors.New("image URL is empty")
+	}
+	file, err := os.CreateTemp("", fmt.Sprintf("qiantie-reference-%d-*.img", index))
+	if err != nil {
+		return "", err
+	}
+	path := file.Name()
+	cleanup := func(err error) (string, error) {
+		_ = file.Close()
+		_ = os.Remove(path)
+		return "", err
+	}
+	if strings.HasPrefix(value, "data:") {
+		comma := strings.IndexByte(value, ',')
+		if comma < 0 {
+			return cleanup(errors.New("invalid data image"))
+		}
+		encoded := value[comma+1:]
+		var data []byte
+		if strings.Contains(value[:comma], ";base64") {
+			data, err = base64.StdEncoding.DecodeString(encoded)
+		} else {
+			var decoded string
+			decoded, err = url.QueryUnescape(encoded)
+			data = []byte(decoded)
+		}
+		if err != nil {
+			return cleanup(fmt.Errorf("decode image: %w", err))
+		}
+		if _, err := file.Write(data); err != nil {
+			return cleanup(err)
+		}
+	} else if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, value, nil)
+		if err != nil {
+			return cleanup(err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return cleanup(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return cleanup(fmt.Errorf("HTTP %d", resp.StatusCode))
+		}
+		if _, err := copyWithContext(ctx, file, io.LimitReader(resp.Body, 50<<20)); err != nil {
+			return cleanup(err)
+		}
+	} else {
+		input, err := os.Open(value)
+		if err != nil {
+			return cleanup(err)
+		}
+		_, copyErr := copyWithContext(ctx, file, io.LimitReader(input, 50<<20))
+		_ = input.Close()
+		if copyErr != nil {
+			return cleanup(copyErr)
+		}
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
 }
 func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, error) {
 	if ctx == nil {
