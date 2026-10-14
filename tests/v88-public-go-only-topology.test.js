@@ -12,6 +12,7 @@ const files = [
 ];
 
 const baseFiles = ['-f', 'deploy/v88-public/docker-compose.yml'];
+const standaloneFiles = ['-f', 'deploy/v88-public/docker-compose.go-only-standalone.yml'];
 
 function environmentValue(service, key) {
   if (Array.isArray(service.environment)) {
@@ -39,6 +40,16 @@ function publicBaseConfig() {
     { cwd: root, encoding: 'utf8' },
   );
   assert.equal(result.status, 0, result.stderr || 'Public compose config failed');
+  return JSON.parse(result.stdout);
+}
+
+function publicStandaloneGoOnlyConfig() {
+  const result = spawnSync(
+    'docker',
+    ['compose', ...standaloneFiles, 'config', '--no-interpolate', '--format', 'json'],
+    { cwd: root, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr || 'Standalone Go-only compose config failed');
   return JSON.parse(result.stdout);
 }
 
@@ -73,4 +84,13 @@ test('public base topology is Go-first without a second default request path', (
   assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['shuihuo-compat'].profiles, ['node-legacy']);
+});
+
+test('standalone Go-only topology contains no historical Node service definitions', () => {
+  const config = publicStandaloneGoOnlyConfig();
+  assert.deepEqual(Object.keys(config.services).sort(), ['go-api', 'nginx']);
+  assert.ok(config.services['go-api']);
+  assert.ok(config.services.nginx);
+  const serialized = JSON.stringify(config);
+  assert.doesNotMatch(serialized, /node|browser-worker|shuihuo-compat/i);
 });
