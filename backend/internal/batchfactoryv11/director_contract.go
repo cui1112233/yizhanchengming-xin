@@ -370,7 +370,7 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 	system := strings.TrimSpace(`你是短剧制作资产提取器。只从小说原文提取实际出现的人物、场景与关键道具，并为每项写可直接用于图片生成的中文视觉提示词。
 不要生成分镜、镜头、VIDEO、改写正文或解释。不要杜撰原文没有出现的重要资产。
 只输出一个合法 JSON 对象，格式严格为：
-{"characters":[{"name":"人物名","prompt":"外形、服装、年龄感、气质等可见特征"}],"scenes":[{"name":"场景名","prompt":"空间、时段、陈设、氛围等可见特征"}],"props":[{"name":"道具名","prompt":"材质、外观、状态等可见特征"}]}
+{"characters":[{"name":"人物名","formal_name":"正式人物名单中的标准名","facts":"人物事实：身份、性别、年龄阶段、别名等","appearance":"人物外形：脸型、发型、服装、体态等跨镜头锚点","relationships":"人物关系：与其他人物的关系及依据","prompt":"把以上四项合并后的完整视觉提示词"}],"scenes":[{"name":"场景名","prompt":"空间、时段、陈设、氛围等可见特征"}],"props":[{"name":"道具名","prompt":"材质、外观、状态等可见特征"}]}
 每个数组可以为空；每个元素必须同时有非空 name 与 prompt。`)
 	config := aiReasoningPromptConfig(snapshot.Effective)
 	h3AssetSelected := config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)
@@ -412,16 +412,14 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 	if err != nil {
 		return PromptContract{}, err
 	}
-	if h3AssetSelected {
-		system += `
+	system += `
 
 【批量工厂统一返回契约】
-在同一个合法 JSON 对象中返回 characters、scenes、props 三个数组。characters 的每项必须同时返回 name 与 prompt；prompt 必须是该人物可直接用于图片和视频一致性的完整详细外形，而不是简短标签。scenes 与 props 的每项也必须同时有非空 name 与 prompt。不得返回第二份外形结果、不得要求后续逐人调用。`
-		system += `
+在同一个合法 JSON 对象中返回 characters、scenes、props 三个数组。characters 的每项必须同时返回 name、formal_name、facts、appearance、relationships 与 prompt；prompt 必须把前四项合并为可直接用于图片和视频一致性的完整详细外形，而不是简短标签。scenes 与 props 的每项也必须同时有非空 name 与 prompt。不得返回第二份外形结果、不得要求后续逐人调用。`
+	system += `
 
-【SD 资产预设四项权威】
-一次调用内先完成并综合：正式人物名单、人物事实、人物外形、人物关系；四项结果必须合并进 characters 的最终 prompt，并绑定人物姓名、别名、性别、年龄阶段、关系和跨镜头外形锚点。不得把四项拆成后续调用，也不得只返回摘要或只返回人物外形。`
-	}
+【资产预设四项权威】
+一次调用内先完成并综合：正式人物名单、人物事实、人物外形、人物关系；四项结果必须分别保留在结构化字段，并合并进 characters 的最终 prompt，绑定人物姓名、别名、性别、年龄阶段、关系和跨镜头外形锚点。不得把四项拆成后续调用，也不得只返回摘要或只返回人物外形。`
 	return PromptContract{SystemPrompt: system, UserPrompt: string(payload), Temperature: 0.2, MaxTokens: 4000}, nil
 }
 

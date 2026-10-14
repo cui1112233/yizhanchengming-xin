@@ -589,9 +589,17 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
     const existing = assets.find(asset => asset.id === editing.id);
     setSavingId(existing?.id || 'new');
     try {
+      const assetDetails = {
+        name: editing.name,
+        formalName: editing.formalName,
+        facts: editing.facts,
+        appearance: editing.appearance || editing.prompt,
+        relationships: editing.relationships,
+        prompt: editing.prompt
+      };
       const result = existing
-        ? await updateBookAsset(batchId, book.id, existing.id, { name: editing.name, prompt: editing.prompt, expectedRevision: Number(existing.revision || 0) })
-        : await createBookAsset(batchId, book.id, { kind: editing.kind, name: editing.name, prompt: editing.prompt });
+        ? await updateBookAsset(batchId, book.id, existing.id, { ...assetDetails, expectedRevision: Number(existing.revision || 0) })
+        : await createBookAsset(batchId, book.id, { kind: editing.kind, ...assetDetails });
       const savedAsset = resultData(result, 'asset');
       if (close) setEditing(null);
       await loadAssets({ quiet: true });
@@ -705,7 +713,13 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
 	    <div className="batch-factory-asset-editor-fields">
 	      <label className="shuihuo-form-label">资产分类<Select value={editing?.kind} options={kindOptions} onChange={value => setEditing(current => ({ ...current, kind: value }))} /></label>
 	      <label className="shuihuo-form-label">名称<Input value={editing?.name || ''} onChange={event => setEditing(current => ({ ...current, name: event.target.value }))} /></label>
-	      <label className="shuihuo-form-label">外观描述 / AI 生图提示词<Input.TextArea rows={12} value={editing?.prompt || ''} onChange={event => setEditing(current => ({ ...current, prompt: event.target.value }))} placeholder="输入人物、场景或道具的可视化提示词" /></label>
+	      {editing?.kind === 'character' ? <>
+	        <label className="shuihuo-form-label">正式人物名单<Input value={editing?.formalName || ''} onChange={event => setEditing(current => ({ ...current, formalName: event.target.value }))} placeholder="例如：赵姨娘（正式人物名）" /></label>
+	        <label className="shuihuo-form-label">人物事实<Input.TextArea rows={3} value={editing?.facts || ''} onChange={event => setEditing(current => ({ ...current, facts: event.target.value }))} placeholder="身份、性别、年龄阶段、别名等原文事实" /></label>
+	        <label className="shuihuo-form-label">人物外形<Input.TextArea rows={5} value={editing?.appearance || editing?.prompt || ''} onChange={event => setEditing(current => ({ ...current, appearance: event.target.value }))} placeholder="脸型、发型、服装、体态等跨镜头一致性锚点" /></label>
+	        <label className="shuihuo-form-label">人物关系<Input.TextArea rows={3} value={editing?.relationships || ''} onChange={event => setEditing(current => ({ ...current, relationships: event.target.value }))} placeholder="与其他人物的关系及原文依据" /></label>
+	      </> : null}
+	      <label className="shuihuo-form-label">合并资产提示词 / AI 生图提示词<Input.TextArea rows={editing?.kind === 'character' ? 6 : 12} value={editing?.prompt || ''} onChange={event => setEditing(current => ({ ...current, prompt: event.target.value }))} placeholder="输入最终合并后的可视化提示词" /></label>
 	      <p className="batch-factory-asset-editor-hint">规则：这个资产有图片时，生成视频走“图片生视频”，不发文字设定；没图片时，按上面的文字走“文字生视频”。</p>
 	    </div>
 	    <div className="batch-factory-asset-editor-panel">

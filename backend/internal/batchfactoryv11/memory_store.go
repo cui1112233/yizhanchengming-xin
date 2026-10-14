@@ -1003,6 +1003,10 @@ func validBookAssetKind(kind string) bool {
 func normalizeBookAssetInput(input CreateBookAssetInput) (CreateBookAssetInput, error) {
 	input.Kind = strings.TrimSpace(input.Kind)
 	input.Name = strings.TrimSpace(input.Name)
+	input.FormalName = strings.TrimSpace(input.FormalName)
+	input.Facts = strings.TrimSpace(input.Facts)
+	input.Appearance = strings.TrimSpace(input.Appearance)
+	input.Relationships = strings.TrimSpace(input.Relationships)
 	input.Prompt = strings.TrimSpace(input.Prompt)
 	if !validBookAssetKind(input.Kind) || input.Name == "" || input.Prompt == "" || len(input.Name) > 255 {
 		return CreateBookAssetInput{}, ErrInvalid
@@ -1043,13 +1047,17 @@ func (s *MemoryStore) CreateBookAsset(_ context.Context, owner, batchID, bookID 
 		return BookAsset{}, ErrNotFound
 	}
 	now := time.Now().UTC()
-	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, Prompt: input.Prompt, Source: "manual", Revision: 1, CreatedAt: now, UpdatedAt: now}
+	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, Source: "manual", Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.bookAssets[asset.ID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	return asset, nil
 }
 
 func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID, assetID string, input UpdateBookAssetInput) (BookAsset, error) {
 	input.Name = strings.TrimSpace(input.Name)
+	input.FormalName = strings.TrimSpace(input.FormalName)
+	input.Facts = strings.TrimSpace(input.Facts)
+	input.Appearance = strings.TrimSpace(input.Appearance)
+	input.Relationships = strings.TrimSpace(input.Relationships)
 	input.Prompt = strings.TrimSpace(input.Prompt)
 	if input.Name == "" || input.Prompt == "" || len(input.Name) > 255 {
 		return BookAsset{}, ErrInvalid
@@ -1067,7 +1075,7 @@ func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID,
 	if input.ExpectedRevision != asset.Revision {
 		return BookAsset{}, ErrConflict
 	}
-	asset.Name, asset.Prompt, asset.Source, asset.Revision, asset.UpdatedAt = input.Name, input.Prompt, "manual", asset.Revision+1, time.Now().UTC()
+	asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, asset.Source, asset.Revision, asset.UpdatedAt = input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, "manual", asset.Revision+1, time.Now().UTC()
 	s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	return asset, nil
 }

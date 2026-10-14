@@ -34,7 +34,7 @@ func TestV11BookStageRunsMigrationIsAdditiveAndDurable(t *testing.T) {
 		t.Fatalf("stage migration=%+v", migrations)
 	}
 	last := migrations[len(migrations)-1]
-	if last.Version != 1100023 || last.CallbackChecksum != "batch-factory-v11-shuihuo-config-v1" {
+	if last.Version != 1100024 || last.CallbackChecksum != "batch-factory-v11-book-asset-details-v1" {
 		t.Fatalf("last migration=%+v", last)
 	}
 	if joined := strings.ToLower(strings.Join(V11ShuihuoConfigStatements(), "\n")); !strings.Contains(joined, "batch_factory_v11_shuihuo_configs") || !strings.Contains(joined, "config_json") {

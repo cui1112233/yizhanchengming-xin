@@ -71,6 +71,23 @@ func TestDirectorParseFencedJSON(t *testing.T) {
 	}
 }
 
+func TestNormalizeAssetExtractionOutputKeepsCharacterStructure(t *testing.T) {
+	assets, err := NormalizeAssetExtractionOutput(json.RawMessage(`{
+		"characters":[{"name":"赵姨娘","formal_name":"赵姨娘","facts":"侯府侍妾，做侍妾二十年","appearance":"瘦削瓜子脸，黛青暗纹袄裙","relationships":"与侯门主母为主仆关系","prompt":"赵姨娘，侯府侍妾，瘦削瓜子脸，黛青暗纹袄裙"}],
+		"scenes":[],"props":[]
+	}`))
+	if err != nil {
+		t.Fatalf("NormalizeAssetExtractionOutput returned error: %v", err)
+	}
+	if len(assets.Characters) != 1 {
+		t.Fatalf("characters=%+v", assets.Characters)
+	}
+	character := assets.Characters[0]
+	if character.FormalName != "赵姨娘" || character.Facts == "" || character.Appearance == "" || character.Relationships == "" {
+		t.Fatalf("structured character fields were lost: %+v", character)
+	}
+}
+
 func TestSDDirectorTextPreservesStructuredAssetReferences(t *testing.T) {
 	result, err := parseSDDirectorText(`===VIDEO 01===
 时长：10秒

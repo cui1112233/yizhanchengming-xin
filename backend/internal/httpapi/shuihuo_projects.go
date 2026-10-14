@@ -24,6 +24,7 @@ import (
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 )
 
 func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
@@ -121,7 +122,7 @@ func shuihuoRedisHealth(ctx context.Context, rawURL string) (bool, string) {
 	return false, "Redis 未返回 PONG"
 }
 
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, redisURL string) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, redisURL string) {
 	if store == nil {
 		return
 	}
@@ -191,7 +192,21 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"presets": []any{}})
+		presets := make([]map[string]any, 0)
+		if presetCatalog != nil {
+			published, err := presetCatalog.Published("shuihuo-production")
+			if err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "提示词预设目录不可用"})
+				return
+			}
+			for _, item := range published {
+				if item.Slot == nil || strings.TrimSpace(*item.Slot) == "" {
+					continue
+				}
+				presets = append(presets, map[string]any{"id": item.ID, "name": item.Name, "slot": *item.Slot, "version": item.Version})
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"presets": presets})
 	})))
 	root.Handle("/api/shuihuo-production/admin/models", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		identity, ok := BridgeIdentityFromContext(r.Context())
@@ -500,6 +515,31 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if item["id"] != id {
 				continue
 			}
+			if r.Method == http.MethodPut {
+				if item["system"] == true {
+					writeJSON(w, http.StatusConflict, map[string]string{"error": "system asset type cannot be edited"})
+					return
+				}
+				var input map[string]any
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				name := strings.TrimSpace(modelString(input, "name"))
+				if name == "" {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "type name is required"})
+					return
+				}
+				item["name"] = name
+				item["category"] = strings.TrimSpace(modelString(input, "category"))
+				types[index] = item
+				config["assetTypes"] = types
+				if err := saveShuihuoOwnerConfig(r.Context(), store, owner, config); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"assetType": item})
+				return
+			}
 			if item["system"] == true {
 				writeJSON(w, http.StatusConflict, map[string]string{"error": "system asset type cannot be deleted"})
 				return
@@ -589,6 +629,30 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		for index, item := range templates {
 			if item["id"] != id {
 				continue
+			}
+			if r.Method == http.MethodPut {
+				var input map[string]any
+				if !decodeJSON(w, r, &input) {
+					return
+				}
+				name := strings.TrimSpace(modelString(input, "name"))
+				if name == "" {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "template name is required"})
+					return
+				}
+				item["name"] = name
+				item["prompt"] = strings.TrimSpace(modelString(input, "prompt"))
+				if assetTypeID := strings.TrimSpace(modelString(input, "assetTypeId")); assetTypeID != "" {
+					item["assetTypeId"] = assetTypeID
+				}
+				templates[index] = item
+				config["assetTemplates"] = templates
+				if err := saveShuihuoOwnerConfig(r.Context(), store, owner, config); err != nil {
+					writeStoreError(w, err)
+					return
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"assetTemplate": item})
+				return
 			}
 			if r.Method != http.MethodDelete {
 				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
@@ -1163,7 +1227,11 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				if prompt == "" {
 					prompt = strings.TrimSpace(modelString(candidate, "description"))
 				}
-				if _, createErr := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: name, Prompt: prompt}); createErr != nil {
+				formalName := modelString(candidate, "formalName")
+				if formalName == "" {
+					formalName = modelString(candidate, "formal_name")
+				}
+				if _, createErr := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: name, FormalName: formalName, Facts: modelString(candidate, "facts"), Appearance: modelString(candidate, "appearance"), Relationships: modelString(candidate, "relationships"), Prompt: prompt}); createErr != nil {
 					writeStoreError(w, createErr)
 					return
 				}
@@ -1287,10 +1355,14 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		if len(parts) == 2 && parts[1] == "assets" && r.Method == http.MethodPost {
 			var input struct {
-				Category string `json:"category"`
-				Kind     string `json:"kind"`
-				Name     string `json:"name"`
-				Prompt   string `json:"prompt"`
+				Category      string `json:"category"`
+				Kind          string `json:"kind"`
+				Name          string `json:"name"`
+				FormalName    string `json:"formalName"`
+				Facts         string `json:"facts"`
+				Appearance    string `json:"appearance"`
+				Relationships string `json:"relationships"`
+				Prompt        string `json:"prompt"`
 			}
 			if !decodeJSON(w, r, &input) {
 				return
@@ -1306,7 +1378,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if kind == "" {
 				kind = "character"
 			}
-			if _, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), Prompt: strings.TrimSpace(input.Prompt)}); err != nil {
+			if _, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: strings.TrimSpace(input.Prompt)}); err != nil {
 				writeStoreError(w, err)
 				return
 			}
@@ -1324,11 +1396,15 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			var input struct {
-				Category string `json:"category"`
-				Kind     string `json:"kind"`
-				Name     string `json:"name"`
-				Prompt   string `json:"prompt"`
-				DataURL  string `json:"dataUrl"`
+				Category      string `json:"category"`
+				Kind          string `json:"kind"`
+				Name          string `json:"name"`
+				FormalName    string `json:"formalName"`
+				Facts         string `json:"facts"`
+				Appearance    string `json:"appearance"`
+				Relationships string `json:"relationships"`
+				Prompt        string `json:"prompt"`
+				DataURL       string `json:"dataUrl"`
 			}
 			if !decodeJSON(w, r, &input) {
 				return
@@ -1345,7 +1421,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if kind == "" {
 				kind = "character"
 			}
-			asset, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), Prompt: strings.TrimSpace(input.Prompt)})
+			asset, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: strings.TrimSpace(input.Prompt)})
 			if err != nil {
 				writeStoreError(w, err)
 				return
@@ -1836,6 +1912,10 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if len(parts) == 1 && r.Method == http.MethodPut {
 				var input struct {
 					Name             string `json:"name"`
+					FormalName       string `json:"formalName"`
+					Facts            string `json:"facts"`
+					Appearance       string `json:"appearance"`
+					Relationships    string `json:"relationships"`
 					Prompt           string `json:"prompt"`
 					ExpectedRevision int64  `json:"expectedRevision"`
 				}
@@ -1845,7 +1925,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				if input.ExpectedRevision == 0 {
 					input.ExpectedRevision = asset.Revision
 				}
-				updated, updateErr := store.UpdateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, batchfactoryv11.UpdateBookAssetInput{Name: input.Name, Prompt: input.Prompt, ExpectedRevision: input.ExpectedRevision})
+				updated, updateErr := store.UpdateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, batchfactoryv11.UpdateBookAssetInput{Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ExpectedRevision: input.ExpectedRevision})
 				if updateErr != nil {
 					writeStoreError(w, updateErr)
 					return

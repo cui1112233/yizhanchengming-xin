@@ -21,8 +21,12 @@ type DirectorSettings struct {
 }
 
 type NamedPrompt struct {
-	Name   string `json:"name"`
-	Prompt string `json:"prompt"`
+	Name          string `json:"name"`
+	FormalName    string `json:"formal_name,omitempty"`
+	Facts         string `json:"facts,omitempty"`
+	Appearance    string `json:"appearance,omitempty"`
+	Relationships string `json:"relationships,omitempty"`
+	Prompt        string `json:"prompt"`
 }
 
 type DirectorShot struct {
@@ -316,7 +320,14 @@ func normalizeDirectorNamedPrompts(value any, label string) ([]NamedPrompt, erro
 			return nil, fmt.Errorf("%s[%d] 格式无效", label, index)
 		}
 		name := firstDirectorText(entry, "name", "名称", "角色名称", "场景名称")
+		formalName := firstDirectorText(entry, "formal_name", "formalName", "正式人物名单", "正式名称", "canonical_name")
+		facts := firstDirectorText(entry, "facts", "人物事实", "事实", "character_facts")
+		appearance := firstDirectorText(entry, "appearance", "人物外形", "外形", "character_appearance")
+		relationships := firstDirectorText(entry, "relationships", "人物关系", "关系", "character_relationships")
 		prompt := firstDirectorText(entry, "prompt", "提示词", "description", "描述")
+		if prompt == "" {
+			prompt = appearance
+		}
 		if name == "" {
 			return nil, fmt.Errorf("%s[%d] 缺少名称", label, index)
 		}
@@ -327,7 +338,7 @@ func normalizeDirectorNamedPrompts(value any, label string) ([]NamedPrompt, erro
 			return nil, fmt.Errorf("%s存在重复名称：%s", label, name)
 		}
 		seen[name] = struct{}{}
-		out = append(out, NamedPrompt{Name: name, Prompt: prompt})
+		out = append(out, NamedPrompt{Name: name, FormalName: formalName, Facts: facts, Appearance: appearance, Relationships: relationships, Prompt: prompt})
 	}
 	return out, nil
 }

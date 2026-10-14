@@ -32,6 +32,17 @@ test('SD plain-text storyboards fall back to their final prompt when structured 
   assert.match(helper, /promptReferences/);
 });
 
+test('asset editor exposes and persists the four character structure fields', () => {
+  assert.match(source, /正式人物名单/);
+  assert.match(source, /人物事实/);
+  assert.match(source, /人物外形/);
+  assert.match(source, /人物关系/);
+  assert.match(source, /formalName: editing\.formalName/);
+  assert.match(source, /facts: editing\.facts/);
+  assert.match(source, /appearance: editing\.appearance/);
+  assert.match(source, /relationships: editing\.relationships/);
+});
+
 test('prompt panel renders image-backed mentions and opens the picker in edit mode', () => {
   assert.match(source, /batch-factory-prompt-rich-view/);
   assert.match(source, /batch-factory-prompt-editor-rich-wrap/);

@@ -14,7 +14,7 @@ func directorBookAssets(book Book, snapshot DirectorSnapshot, output DirectorRes
 				continue
 			}
 			seen[key] = true
-			assets = append(assets, BookAsset{BatchID: book.BatchID, BookID: book.ID, Kind: kind, Name: name, Prompt: prompt, Source: "director", ExtractionPresetID: preset.ID, ExtractionPresetVersion: int64(preset.Version)})
+			assets = append(assets, BookAsset{BatchID: book.BatchID, BookID: book.ID, Kind: kind, Name: name, FormalName: strings.TrimSpace(value.FormalName), Facts: strings.TrimSpace(value.Facts), Appearance: strings.TrimSpace(value.Appearance), Relationships: strings.TrimSpace(value.Relationships), Prompt: prompt, Source: "director", ExtractionPresetID: preset.ID, ExtractionPresetVersion: int64(preset.Version)})
 		}
 	}
 	characterPreset := config.Character

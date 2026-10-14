@@ -458,6 +458,17 @@ func reconcileV11BookAssetsLedger(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
+// V11BookAssetDetailsStatements adds structured asset fields in a new
+// migration, leaving the checksum of the original book-assets migration intact.
+func V11BookAssetDetailsStatements() []string {
+	return []string{
+		`ALTER TABLE batch_factory_v11_book_assets ADD COLUMN formal_name VARCHAR(255) NULL AFTER name`,
+		`ALTER TABLE batch_factory_v11_book_assets ADD COLUMN facts MEDIUMTEXT NULL AFTER formal_name`,
+		`ALTER TABLE batch_factory_v11_book_assets ADD COLUMN appearance MEDIUMTEXT NULL AFTER facts`,
+		`ALTER TABLE batch_factory_v11_book_assets ADD COLUMN relationships MEDIUMTEXT NULL AFTER appearance`,
+	}
+}
+
 // reconcileV11SeparateVideoPromptLedger repairs the matching historical
 // ledger/schema split for the prompt separation migration. When the column is
 // absent, run the original one-time copy before clearing visual_prompt; once
@@ -712,6 +723,7 @@ func V11Migrations() []Migration {
 		{Version: 1100021, SQL: V11OpeningVariantStatements(), CallbackChecksum: "batch-factory-v11-opening-variant-v1", Adopt: adoptV11OpeningVariantLedger},
 		{Version: 1100022, SQL: V11LocalArtifactPurgeStatements(), CallbackChecksum: "batch-factory-v11-local-artifact-purge-v1"},
 		{Version: 1100023, SQL: V11ShuihuoConfigStatements(), CallbackChecksum: "batch-factory-v11-shuihuo-config-v1"},
+		{Version: 1100024, SQL: V11BookAssetDetailsStatements(), CallbackChecksum: "batch-factory-v11-book-asset-details-v1"},
 	}
 }
 

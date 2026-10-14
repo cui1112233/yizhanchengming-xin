@@ -209,6 +209,10 @@ type BookAsset struct {
 	BookID                  string    `json:"bookId"`
 	Kind                    string    `json:"kind"`
 	Name                    string    `json:"name"`
+	FormalName              string    `json:"formalName,omitempty"`
+	Facts                   string    `json:"facts,omitempty"`
+	Appearance              string    `json:"appearance,omitempty"`
+	Relationships           string    `json:"relationships,omitempty"`
 	Prompt                  string    `json:"prompt"`
 	Source                  string    `json:"source"`
 	ExtractionPresetID      string    `json:"extractionPresetId,omitempty"`
@@ -219,13 +223,21 @@ type BookAsset struct {
 }
 
 type CreateBookAssetInput struct {
-	Kind   string `json:"kind"`
-	Name   string `json:"name"`
-	Prompt string `json:"prompt"`
+	Kind          string `json:"kind"`
+	Name          string `json:"name"`
+	FormalName    string `json:"formalName,omitempty"`
+	Facts         string `json:"facts,omitempty"`
+	Appearance    string `json:"appearance,omitempty"`
+	Relationships string `json:"relationships,omitempty"`
+	Prompt        string `json:"prompt"`
 }
 
 type UpdateBookAssetInput struct {
 	Name             string `json:"name"`
+	FormalName       string `json:"formalName,omitempty"`
+	Facts            string `json:"facts,omitempty"`
+	Appearance       string `json:"appearance,omitempty"`
+	Relationships    string `json:"relationships,omitempty"`
 	Prompt           string `json:"prompt"`
 	ExpectedRevision int64  `json:"expectedRevision"`
 }
