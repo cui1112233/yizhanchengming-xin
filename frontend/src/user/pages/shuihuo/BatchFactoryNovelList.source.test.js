@@ -42,6 +42,10 @@ test('book content exposes production-content edit and TXT download actions', ()
   assert.match(source, /下载 TXT/);
   assert.match(source, /downloadProductionContent\(/);
   assert.match(source, /openContentEditor\(book\)/);
+  assert.match(source, /batch-factory-book-content-action is-edit/);
+  assert.match(source, /batch-factory-book-content-action is-download/);
+  assert.match(source, /batch-factory-book-content-action is-delete/);
+  assert.match(stylesheet, /\.batch-factory-book-content-action\.ant-btn/);
 });
 
 test('TXT download uses the complete captured source instead of the production line preview', () => {

@@ -509,6 +509,64 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-book-content strong { color: var(--sh-text); font-size: 14px; }
 .batch-factory-book-content > span, .batch-factory-placeholder > span, .batch-factory-actions > span { color: var(--sh-muted); line-height: 1.55; font-size: 12px; }
 .batch-factory-book-content p { margin-bottom: 0; color: var(--sh-muted); font-size: 12px; font-weight: 400; line-height: 1.65; white-space: pre-wrap; }
+.batch-factory-book-content-actions {
+  gap: 8px !important;
+  margin-top: 10px;
+}
+.batch-factory-book-content-action.ant-btn {
+  height: 30px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--sh-line) 72%, #fff 8%);
+  border-radius: 999px;
+  color: var(--sh-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+  background: var(--sh-panel-strong);
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, .28), inset -2px -2px 5px rgba(255, 255, 255, .045), 0 2px 5px rgba(0, 0, 0, .18);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, color .18s ease;
+}
+.batch-factory-book-content-action.ant-btn:hover,
+.batch-factory-book-content-action.ant-btn:focus-visible {
+  color: var(--sh-text) !important;
+  border-color: color-mix(in srgb, var(--sh-accent) 74%, var(--sh-line));
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .25), inset -1px -1px 3px rgba(255, 255, 255, .05), 0 3px 8px rgba(0, 0, 0, .24);
+  transform: translateY(-1px);
+}
+.batch-factory-book-content-action.ant-btn:active {
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, .3), inset -1px -1px 3px rgba(255, 255, 255, .04);
+  transform: translateY(0);
+}
+.batch-factory-book-content-action.is-edit.ant-btn {
+  color: #dffcf4;
+  border-color: color-mix(in srgb, var(--sh-accent) 70%, var(--sh-line));
+  background: color-mix(in srgb, var(--sh-accent) 17%, var(--sh-panel-strong));
+}
+.batch-factory-book-content-action.is-download.ant-btn {
+  color: #d9e9ff;
+}
+.batch-factory-book-content-action.is-delete.ant-btn {
+  color: #ffb8b8;
+  border-color: color-mix(in srgb, #ff6f6f 55%, var(--sh-line));
+  background: color-mix(in srgb, #7d3038 18%, var(--sh-panel-strong));
+}
+.batch-factory-book-content-action.ant-btn[disabled],
+.batch-factory-book-content-action.ant-btn[disabled]:hover {
+  color: var(--sh-muted) !important;
+  border-color: var(--sh-line);
+  background: var(--sh-panel);
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .2);
+  transform: none;
+}
+[data-theme='light'] .batch-factory-book-content-action.ant-btn {
+  color: #30465b;
+  border-color: #b8c9d8;
+  background: #edf4fa;
+  box-shadow: inset 2px 2px 5px rgba(129, 151, 171, .26), inset -2px -2px 5px rgba(255, 255, 255, .9), 0 2px 5px rgba(57, 78, 98, .12);
+}
+[data-theme='light'] .batch-factory-book-content-action.is-edit.ant-btn { color: #075e55; border-color: #62c7b4; background: #e5f8f2; }
+[data-theme='light'] .batch-factory-book-content-action.is-download.ant-btn { color: #22547d; }
+[data-theme='light'] .batch-factory-book-content-action.is-delete.ant-btn { color: #a13e46; border-color: #e29ca0; background: #fff1f1; }
 .batch-factory-book-config-cell { align-content: center; }
 .batch-factory-video-ready { color:var(--sh-accent); font-weight:800; }
 .batch-factory-book-config-regions { display: grid; gap: 7px; width: 100%; }
