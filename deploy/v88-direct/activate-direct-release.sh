@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# V88 代码直传：在服务器上把 current 软链切到指定版本并重启 go-api / v88-node。
+# V88 Go 代码直传：在服务器上把 current 软链切到指定版本并重启 go-api。
 # 由 Windows 端 deploy-v88-direct.ps1 通过 SSH 调用，也可手工执行：
 #   bash activate-direct-release.sh <git-sha>
 #
 # 安全保证：
-#   - 只重建 go-api、v88-node，以及反代它们的 Nginx；不碰 MySQL/浏览器工人；
+#   - 只重建 go-api 以及反代它的 Nginx；不碰 MySQL/浏览器工人；
 #   - 切换前记录上一版软链，健康检查失败自动回滚并恢复旧版本；
 #   - 不修改、不依赖任何国外镜像拉取。
 set -Eeuo pipefail
@@ -19,7 +19,6 @@ OVERRIDE="$DIRECT_ROOT/docker-compose.direct.yml"
 RELEASE_DIR="$DIRECT_ROOT/releases/$SHA"
 
 [ -x "$RELEASE_DIR/go/qiantie" ] || { echo "STATUS=FAILED missing go binary: $RELEASE_DIR/go/qiantie" >&2; exit 3; }
-[ -f "$RELEASE_DIR/node/server.js" ] || { echo "STATUS=FAILED missing node app: $RELEASE_DIR/node/server.js" >&2; exit 4; }
 [ -s "$BASE_COMPOSE" ] || { echo "STATUS=FAILED missing $BASE_COMPOSE" >&2; exit 5; }
 [ -s "$OVERRIDE" ] || { echo "STATUS=FAILED missing $OVERRIDE" >&2; exit 6; }
 cd "$DEPLOY_DIR"
@@ -57,19 +56,12 @@ try:
     if manifest.exists():
         identity = json.loads(manifest.read_text(encoding="utf-8"))
         sha = identity["gitSha"]
-        if identity.get("nodeSourceSha") != sha:
-            raise ValueError("previous Node identity is inconsistent")
     else:
         # Legacy direct releases may predate both manifests and RELEASE-SHA.
         # Only the already-active exact .env identity may bridge that gap; a
         # malformed existing identity remains a hard failure rather than being
         # silently hidden by the fallback.
-        legacy_identity = release / "node" / "RELEASE-SHA"
-        if legacy_identity.exists():
-            sha = legacy_identity.read_text(encoding="utf-8").strip()
-            if re.fullmatch(r"[0-9a-f]{40}", fallback_sha) and sha != fallback_sha:
-                raise ValueError("previous release identity conflicts with DIRECT_RELEASE_SHA")
-        elif re.fullmatch(r"[0-9a-f]{40}", fallback_sha):
+        if re.fullmatch(r"[0-9a-f]{40}", fallback_sha):
             sha = fallback_sha
         else:
             raise ValueError("previous release has no identity and DIRECT_RELEASE_SHA is not exact")
@@ -96,7 +88,7 @@ try:
     release = Path(sys.argv[1])
     with (release / "runtime-release.json").open(encoding="utf-8") as stream:
         manifest = json.load(stream)
-    if manifest.get("gitSha") != sys.argv[2] or manifest.get("nodeSourceSha") != sys.argv[2]:
+    if manifest.get("gitSha") != sys.argv[2]:
         raise ValueError("generated manifest does not match requested Git SHA")
     if manifest.get("previousReleaseGitSha") != (sys.argv[3] or None):
         raise ValueError("generated manifest does not match previous Git SHA")
@@ -152,7 +144,6 @@ rollback() {
     if [ -n "$PREV_SHA" ]; then set_env DIRECT_RELEASE_SHA "$PREV_SHA"; fi
     docker compose -f "$BASE_COMPOSE" -f "$OVERRIDE" up -d --no-deps --force-recreate --pull never go-api >/dev/null 2>&1 || true
     wait_for_go_api >/dev/null 2>&1 || true
-    docker compose -f "$BASE_COMPOSE" -f "$OVERRIDE" up -d --no-deps --force-recreate --pull never v88-node >/dev/null 2>&1 || true
     docker compose -f "$BASE_COMPOSE" restart nginx >/dev/null 2>&1 || true
   else
     # First direct release has no prior release symlink. Restore the base
@@ -160,7 +151,6 @@ rollback() {
     rm -f "$DIRECT_ROOT/current"
     set_env DIRECT_RELEASE_SHA ""
     docker compose -f "$BASE_COMPOSE" up -d --no-deps --force-recreate --pull never go-api >/dev/null 2>&1 || true
-    docker compose -f "$BASE_COMPOSE" up -d --no-deps --force-recreate --pull never v88-node >/dev/null 2>&1 || true
     docker compose -f "$BASE_COMPOSE" restart nginx >/dev/null 2>&1 || true
   fi
   exit "$status"
@@ -174,13 +164,11 @@ set_env DIRECT_RELEASE_SHA "$SHA"
 # 3) 校验合并后的 compose 配置。
 docker compose -f "$BASE_COMPOSE" -f "$OVERRIDE" config -q
 
-# 4) 先让 Go API 通过容器内健康检查，再切 Node/Nginx。此前同时拉起两个
-# 服务会让 Node 在 Go 尚未监听时先对外响应，进而把暂时的读取失败误显示成空作品库。
+# 4) 先让 Go API 通过容器内健康检查，再重载 Nginx。单一应用入口避免
+# 两套服务同时响应造成读取时序错乱。
 docker compose -f "$BASE_COMPOSE" -f "$OVERRIDE" up -d --no-deps --force-recreate --pull never go-api
 wait_for_go_api
-docker compose -f "$BASE_COMPOSE" -f "$OVERRIDE" up -d --no-deps --force-recreate --pull never v88-node
-
-# Nginx 在启动时会缓存上游容器 IP。Node 重建后必须让它重载一次，否则公网会
+# Nginx 在启动时会缓存上游容器 IP。Go 重建后必须让它重载一次，否则公网会
 # 继续转发到已退出的旧 IP 并表现为 502；这不改变任何业务数据或依赖容器。
 docker compose -f "$BASE_COMPOSE" restart nginx
 

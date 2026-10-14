@@ -22,11 +22,8 @@ function fixture(t, { sha = SHA, previous = true, relative = false, legacyPrevio
   const bin = path.join(root, 'bin');
   const log = path.join(root, 'docker.log');
   fs.mkdirSync(path.join(release, 'go'), { recursive: true });
-  fs.mkdirSync(path.join(release, 'node'), { recursive: true });
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(release, 'go', 'qiantie'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  fs.writeFileSync(path.join(release, 'node', 'server.js'), '');
-  fs.writeFileSync(path.join(release, 'node', 'RELEASE-SHA'), `${sha}\n`);
   fs.mkdirSync(deploy);
   fs.writeFileSync(path.join(deploy, 'docker-compose.yml'), 'services: {}\n');
   fs.writeFileSync(path.join(deploy, '.env'), `DIRECT_RELEASE_SHA=${previous ? PREVIOUS_SHA : ''}\n`);
@@ -39,8 +36,6 @@ function fixture(t, { sha = SHA, previous = true, relative = false, legacyPrevio
     fs.copyFileSync(source, path.join(direct, path.basename(source)));
   }
   if (previous) {
-    fs.mkdirSync(path.join(previousRelease, 'node'), { recursive: true });
-    if (!legacyPrevious) fs.writeFileSync(path.join(previousRelease, 'node', 'RELEASE-SHA'), `${PREVIOUS_SHA}\n`);
     fs.symlinkSync(relative ? `releases/${PREVIOUS_SHA}` : previousRelease, path.join(direct, 'current'));
     fs.symlinkSync(previousRelease, path.join(direct, 'previous'));
   }
@@ -78,29 +73,28 @@ function assertNoCutover(f, result) {
   assert.equal(fs.existsSync(f.log), false, 'identity rejection must precede every Docker command');
 }
 
-test('uploaded activation writes exact Node and Go identity and retains the prior release', (t) => {
+test('uploaded activation writes exact Go identity and retains the prior release', (t) => {
   const f = fixture(t);
   const result = f.activate();
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const manifest = JSON.parse(fs.readFileSync(path.join(f.release, 'runtime-release.json'), 'utf8'));
-  assert.deepEqual(Object.keys(manifest).sort(), ['activatedAtUtc', 'gitSha', 'goBinarySha256', 'nodeSourceSha', 'previousReleaseGitSha']);
+  assert.deepEqual(Object.keys(manifest).sort(), ['activatedAtUtc', 'gitSha', 'goBinarySha256', 'previousReleaseGitSha']);
   assert.equal(manifest.gitSha, SHA);
-  assert.equal(manifest.nodeSourceSha, SHA);
   assert.equal(manifest.goBinarySha256, GO_HASH);
   assert.equal(manifest.previousReleaseGitSha, PREVIOUS_SHA);
   assert.match(manifest.activatedAtUtc, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   assert.equal(fs.readlinkSync(path.join(f.direct, 'current')), f.release);
   assert.equal(fs.readlinkSync(path.join(f.direct, 'previous')), f.previousRelease);
-  assert.deepEqual(fs.readdirSync(f.release).sort(), ['go', 'node', 'runtime-release.json']);
+  assert.deepEqual(fs.readdirSync(f.release).sort(), ['go', 'runtime-release.json']);
 });
 
-test('direct activation waits for Go health before recreating Node and Nginx', (t) => {
+test('direct activation waits for Go health before reloading Nginx', (t) => {
   const f = fixture(t);
   const result = f.activate();
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const calls = fs.readFileSync(f.log, 'utf8');
-  assert.match(calls, /up -d --no-deps --force-recreate --pull never go-api[\s\S]*inspect --format[\s\S]*up -d --no-deps --force-recreate --pull never v88-node[\s\S]*restart nginx/);
-  assert.doesNotMatch(calls, /go-api v88-node/);
+  assert.match(calls, /up -d --no-deps --force-recreate --pull never go-api[\s\S]*inspect --format[\s\S]*restart nginx/);
+  assert.doesNotMatch(calls, /v88-node/);
 });
 
 for (const sha of ['abcdef0', 'g'.repeat(40), 'a'.repeat(41)]) {
@@ -110,21 +104,11 @@ for (const sha of ['abcdef0', 'g'.repeat(40), 'a'.repeat(41)]) {
   });
 }
 
-for (const identity of [null, 'abcdef0', 'b'.repeat(40)]) {
-  test(`activation rejects ${identity === null ? 'missing' : 'invalid or mismatched'} Node source identity before cutover`, (t) => {
-    const f = fixture(t);
-    const identityFile = path.join(f.release, 'node', 'RELEASE-SHA');
-    if (identity === null) fs.unlinkSync(identityFile);
-    else fs.writeFileSync(identityFile, `${identity}\n`);
-    assertNoCutover(f, f.activate());
-  });
-}
-
 test('a manifest write failure cannot switch current or change rollback state', (t) => {
   const f = fixture(t);
   fs.mkdirSync(path.join(f.release, 'runtime-release.json'));
   assertNoCutover(f, f.activate());
-  assert.deepEqual(fs.readdirSync(f.release).sort(), ['go', 'node', 'runtime-release.json']);
+  assert.deepEqual(fs.readdirSync(f.release).sort(), ['go', 'runtime-release.json']);
 });
 
 test('activation independently rejects a generated manifest with the wrong Git identity', (t) => {
@@ -143,7 +127,7 @@ for (const [name, override] of [
   test(`activation rejects a generated manifest with ${name} before cutover`, (t) => {
     const f = fixture(t);
     const manifest = {
-      gitSha: SHA, nodeSourceSha: SHA, goBinarySha256: GO_HASH,
+      gitSha: SHA, goBinarySha256: GO_HASH,
       activatedAtUtc: '2026-10-06T00:00:00Z', previousReleaseGitSha: PREVIOUS_SHA,
       ...override
     };
@@ -160,7 +144,8 @@ test('a missing uploaded manifest generator fails before cutover', (t) => {
 
 test('a malformed previous runtime identity fails before cutover', (t) => {
   const f = fixture(t);
-  fs.writeFileSync(path.join(f.previousRelease, 'runtime-release.json'), JSON.stringify({ gitSha: 'short', nodeSourceSha: 'short' }));
+  fs.mkdirSync(path.join(f.previousRelease), { recursive: true });
+  fs.writeFileSync(path.join(f.previousRelease, 'runtime-release.json'), JSON.stringify({ gitSha: 'short' }));
   assertNoCutover(f, f.activate());
 });
 
@@ -171,21 +156,6 @@ test('activation resolves the previous identity from a relative current symlink'
   const manifest = JSON.parse(fs.readFileSync(path.join(f.release, 'runtime-release.json'), 'utf8'));
   assert.equal(manifest.previousReleaseGitSha, PREVIOUS_SHA);
   assert.equal(fs.readlinkSync(path.join(f.direct, 'previous')), f.previousRelease);
-});
-
-test('activation accepts an unmanifested legacy previous release when .env has its exact identity', (t) => {
-  const f = fixture(t, { legacyPrevious: true });
-  const result = f.activate();
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  const manifest = JSON.parse(fs.readFileSync(path.join(f.release, 'runtime-release.json'), 'utf8'));
-  assert.equal(manifest.previousReleaseGitSha, PREVIOUS_SHA);
-  assert.equal(fs.readlinkSync(path.join(f.direct, 'previous')), f.previousRelease);
-});
-
-test('activation rejects a legacy previous identity that conflicts with the active .env identity', (t) => {
-  const f = fixture(t);
-  fs.writeFileSync(path.join(f.previousRelease, 'node', 'RELEASE-SHA'), `${'b'.repeat(40)}\n`);
-  assertNoCutover(f, f.activate());
 });
 
 test('first activation explicitly records no previous direct release', (t) => {
