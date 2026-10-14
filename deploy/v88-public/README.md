@@ -29,6 +29,6 @@ The dated inventory also mentions a separate legacy Novel Fetch worker outside t
 
 ## Validation and retirement
 
-Run `node --test tests/v88-runtime-topology.test.js` to check the six-service contract, dependency references, existing repository-relative configuration paths, public listener ownership and exclusion of host paths/populated environment material.
+Run `node --test tests/v88-runtime-topology.test.js` to check the Go-owned public contract, retained legacy service retirement gates, dependency references, existing repository-relative configuration paths, public listener ownership and exclusion of host paths/populated environment material.
 
 Each service carries its own `retirementGate`. Passing this contract test validates the manifest only. Retirement additionally requires source-owned replacement configuration, authenticated business-route evidence, durable data/media readback where relevant, restorable storage and a known rollback point. Do not remove containers, networks, volumes, legacy implementations or release paths based solely on this declaration.
