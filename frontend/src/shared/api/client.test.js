@@ -22,30 +22,23 @@ test('does not treat downstream bridge 401 responses as session expiry', () => {
   assert.equal(isSessionAuthFailure(responseWithHeader('bridge')), false);
 });
 
-test('shares the local login token across the 3001 and 4001 frontends', () => {
+test('reads and clears the Go application session token from local storage', () => {
   const previousStorage = globalThis.localStorage;
-  const previousDocument = globalThis.document;
-  const values = new Map([['auth_token', 'node-session-token']]);
-  let cookie = '';
+  const values = new Map([['auth_token', 'go-session-token']]);
   globalThis.localStorage = {
     getItem(key) { return values.get(key) || null; },
     setItem(key, value) { values.set(key, value); },
     removeItem(key) { values.delete(key); }
   };
-  globalThis.document = {
-    get cookie() { return cookie; },
-    set cookie(value) { cookie = value; }
-  };
   try {
-    assert.equal(getToken(), 'node-session-token');
-    assert.match(cookie, /qiantie_auth_token=node-session-token/);
+    assert.equal(getToken(), 'go-session-token');
     values.delete('auth_token');
-    assert.equal(getToken(), 'node-session-token');
-    assert.equal(values.get('auth_token'), 'node-session-token');
+    assert.equal(getToken(), '');
+    setToken('go-session-token-2');
+    assert.equal(getToken(), 'go-session-token-2');
     setToken('');
-    assert.match(cookie, /Max-Age=0/);
+    assert.equal(getToken(), '');
   } finally {
     globalThis.localStorage = previousStorage;
-    globalThis.document = previousDocument;
   }
 });
