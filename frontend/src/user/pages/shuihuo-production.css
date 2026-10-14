@@ -3946,6 +3946,37 @@ body.shuihuo-reference-shell
 }
 /* BF_CREATE_BATCH_BUTTONS_END */
 
+/* BF_AUTOMATION_PRESET_BUTTONS_BEGIN */
+.batch-factory-automation-preset-modal .ant-btn:not(.ant-btn-link) {
+  min-height: 32px;
+  padding-inline: 14px;
+  color: var(--sh-text);
+  border: 1px solid color-mix(in srgb, var(--sh-line) 78%, #fff 8%);
+  border-radius: 999px;
+  background: var(--sh-panel-strong);
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, .24), inset -2px -2px 5px rgba(255, 255, 255, .04), 0 2px 5px rgba(0, 0, 0, .16);
+}
+.batch-factory-automation-preset-modal .ant-btn:not(.ant-btn-link):not(:disabled):hover,
+.batch-factory-automation-preset-modal .ant-btn:not(.ant-btn-link):not(:disabled):focus-visible {
+  color: var(--sh-text);
+  border-color: color-mix(in srgb, var(--sh-accent) 70%, var(--sh-line));
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .22), inset -1px -1px 3px rgba(255, 255, 255, .05), 0 3px 8px rgba(0, 0, 0, .22);
+  transform: translateY(-1px);
+}
+.batch-factory-automation-preset-modal .ant-btn.ant-btn-primary {
+  color: #08261f !important;
+  border-color: color-mix(in srgb, var(--sh-accent) 82%, #fff 10%);
+  background: var(--sh-accent) !important;
+  box-shadow: inset 2px 2px 4px rgba(255, 255, 255, .14), inset -2px -2px 5px rgba(0, 63, 53, .2), 0 3px 8px rgba(0, 0, 0, .2);
+}
+.batch-factory-automation-preset-modal .ant-btn[disabled] {
+  color: var(--sh-muted) !important;
+  border-color: var(--sh-line);
+  background: var(--sh-panel) !important;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .18);
+}
+/* BF_AUTOMATION_PRESET_BUTTONS_END */
+
 /* BF_BOOK_ROW_BOUNDARY_BEGIN */
 /* Draw the book-to-book separator on the row itself so it spans all visible
    columns as one continuous boundary. */

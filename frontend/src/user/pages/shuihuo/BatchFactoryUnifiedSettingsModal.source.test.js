@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const sourcePath = path.join(directory, 'BatchFactoryUnifiedSettingsModal.jsx');
 const source = fs.readFileSync(sourcePath, 'utf8');
+const stylesheet = fs.readFileSync(path.join(directory, '..', 'shuihuo-production.css'), 'utf8');
 
 test('unified configuration owns models, AI reasoning and publication in one editable patch', () => {
   assert.match(source, /模型配置/);
@@ -109,6 +110,11 @@ test('marks the video-management session stale and refreshes organizations after
 
 test('treats the legacy novel-fetch browser session as the same shared 121 login', () => {
   assert.match(source, /SESSION_CHECK_NAMES\s*=\s*\[\s*'视频管理系统登录会话',\s*'121 后台登录会话',\s*'目标站登录会话'\s*\]/);
+});
+
+test('automation preset dialog uses the unified button treatment', () => {
+  assert.match(source, /className="batch-factory-automation-preset-modal"/);
+  assert.match(stylesheet, /BF_AUTOMATION_PRESET_BUTTONS_BEGIN[\s\S]*batch-factory-automation-preset-modal[\s\S]*box-shadow/);
 });
 
 test('opens the shared login form when rechecking finds an expired session', () => {
