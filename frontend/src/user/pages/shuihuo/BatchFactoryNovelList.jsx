@@ -779,22 +779,24 @@ function compactUnifiedAssetDescriptions(prompt, book) {
   let text = String(prompt || '');
   const records = (book?.assetRecords || []).filter(asset => asset?.kind === 'character' || asset?.kind === 'scene' || asset?.kind === 'prop');
   if (!text || !records.length) return text;
+  const names = records.map(asset => assetName(asset)).filter(Boolean).sort((left, right) => right.length - left.length);
+  const compact = (value, includeColonDetails = false) => names.reduce((result, name) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let next = result
+      // 人物名后面的完整外形描述只保留资产引用，避免卡片和最终展示重复展开。
+      .replace(new RegExp(`(?<!@)${escaped}\\s*[（(][^\\n；;。]*[）)]`, 'g'), `@${name}`);
+    if (includeColonDetails) {
+      next = next.replace(new RegExp(`(?<!@)${escaped}\\s*[：:]\\s*[^；;\\n]+`, 'g'), `@${name}`);
+    }
+    return next;
+  }, String(value || ''));
   const start = text.search(/统一人物\s*[：:]/);
-  if (start < 0) return text;
-  const endCandidates = [text.indexOf('段内执行约束', start), text.indexOf('[场景', start), text.indexOf('【场景', start)].filter(index => index >= 0);
-  const end = endCandidates.length ? Math.min(...endCandidates) : text.length;
-  let block = text.slice(start, end);
-  records
-    .map(asset => assetName(asset))
-    .filter(Boolean)
-    .sort((left, right) => right.length - left.length)
-    .forEach(name => {
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // 统一人物区只展示 @资产；括号里的完整外形仍保留在完整提示词中，
-      // 卡片上不再把一大段人物描述误当成资产名称。
-      block = block.replace(new RegExp(`${escaped}\\s*[（(][^\\n）)]*[）)]`, 'g'), `@${name}`);
-    });
-  return `${text.slice(0, start)}${block}${text.slice(end)}`;
+  if (start >= 0) {
+    const endCandidates = [text.indexOf('段内执行约束', start), text.indexOf('[场景', start), text.indexOf('【场景', start)].filter(index => index >= 0);
+    const end = endCandidates.length ? Math.min(...endCandidates) : text.length;
+    text = `${text.slice(0, start)}${compact(text.slice(start, end), true)}${text.slice(end)}`;
+  }
+  return compact(text);
 }
 
 function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImages = {}) {
@@ -1200,6 +1202,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     : rawSubmittedVideoPrompt;
   const submittedVideoPrompt = baseSetupEnabled(engineSettings) ? rawPromptWithUnifiedStyle : stripBaseSetupSection(rawPromptWithUnifiedStyle);
   const activeValue = promptKind === 'visual' ? visualPrompt : editing ? videoPrompt : submittedVideoPrompt;
+  const renderedActiveValue = compactUnifiedAssetDescriptions(activeValue, book);
   const activeReady = promptKind === 'visual' ? hasVisualPrompt : Boolean(submittedVideoPrompt.trim());
   const regenerateCurrentPrompt = promptKind === 'visual' ? onRegenerateVisual : onRegenerate;
   const h3Segments = h3Trace?.compilation?.compilation?.segments || [];
@@ -1250,7 +1253,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
       <span className="batch-factory-prompt-meta-item"><b>视频模型：</b>{videoModelLabel}</span>
     </div>
     {!activeReady ? <Alert type="info" showIcon message={smartUnifiedPending && promptKind === 'video' ? '智能统一待分析' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看'} description={smartUnifiedPending && promptKind === 'video' ? '智能统一与资产提示词分开获取；未取得基线不会阻断资产、分镜或视频。可在资产区单独刷新。' : '当前分镜尚未有这一类提示词；切换分镜时会保持当前查看类型。'} /> : <>
-      <label className="shuihuo-form-label batch-factory-prompt-editor-label">{activeLabel}<Input.TextArea rows={14} readOnly={!editing} value={activeValue} onChange={event => promptKind === 'visual' ? setVisualPrompt(event.target.value) : setVideoPrompt(event.target.value)} placeholder={promptKind === 'visual' ? '仅用于生成当前分镜的画面图片' : '会进入当前分镜的最终视频编译'} /></label>
+      <label className="shuihuo-form-label batch-factory-prompt-editor-label">{activeLabel}{!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(renderedActiveValue, book, video, assetThumbs)}</div> : <Input.TextArea rows={14} readOnly={!editing} value={activeValue} onChange={event => promptKind === 'visual' ? setVisualPrompt(event.target.value) : setVideoPrompt(event.target.value)} placeholder={promptKind === 'visual' ? '仅用于生成当前分镜的画面图片' : '会进入当前分镜的最终视频编译'} />}</label>
       <div className="batch-factory-prompt-modal-actions">
         <Button type="primary" loading={saving} disabled={!editing || !selectedVideo} onClick={savePrompt}>保存</Button>
         <Tooltip title={promptKind === 'visual' ? '按当前小说原文重新生成画面提示词。' : '按当前小说原文重新生成导演分镜，并重编最终 VIDEO 提示词；不会提交视频生成任务。'}><Button icon={promptKind === 'visual' ? <ReloadOutlined /> : null} loading={regenerating} disabled={regenerating || !regenerateCurrentPrompt} onClick={regenerateCurrentPrompt}>{promptKind === 'visual' ? '重新生成画面提示词' : '重新生成导演分镜'}</Button></Tooltip>
