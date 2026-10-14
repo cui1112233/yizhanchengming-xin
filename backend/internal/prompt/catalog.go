@@ -9,8 +9,8 @@ import (
 )
 
 // Catalog reads the published prompt catalog written by the existing system
-// store. It is deliberately read-only: Node remains the writer until the
-// prompt data has a durable Go migration.
+// store. Go owns the catalog writes; the file-backed data remains a migration
+// and read fallback for installations that have not moved to MySQL yet.
 type Catalog struct {
 	path string
 }

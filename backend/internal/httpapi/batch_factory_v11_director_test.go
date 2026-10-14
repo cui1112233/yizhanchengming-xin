@@ -46,9 +46,10 @@ func TestSliceTwoDirectorRoutePersistsRevision(t *testing.T) {
 	}
 }
 
-func TestDirectorForRequestUsesBridgeScopedProviderWithoutChangingSharedService(t *testing.T) {
+func TestDirectorForRequestUsesGoConfiguredProviderAndIgnoresLegacyRequestCredentials(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
-	shared := &batchfactoryv11.DirectorService{Store: store}
+	provider := &directorHTTPProvider{output: directorHTTPJSON}
+	shared := &batchfactoryv11.DirectorService{Store: store, Provider: provider}
 	scoped, err := directorForRequest(shared, &textProviderInput{
 		Endpoint: "https://example.com/v1/chat/completions",
 		APIKey:   "test-key",
@@ -57,18 +58,11 @@ func TestDirectorForRequestUsesBridgeScopedProviderWithoutChangingSharedService(
 	if err != nil {
 		t.Fatalf("unexpected scoped provider error: %v", err)
 	}
-	if scoped == shared {
-		t.Fatal("expected a request-scoped director copy")
+	if scoped != shared {
+		t.Fatal("request must use the Go-configured director service")
 	}
-	if shared.Provider != nil {
-		t.Fatal("shared director must not retain an account credential")
-	}
-	provider, ok := scoped.Provider.(*batchfactoryv11.OpenAICompatibleProvider)
-	if !ok {
-		t.Fatalf("expected OpenAI-compatible provider, got %T", scoped.Provider)
-	}
-	if provider.Endpoint != "https://example.com/v1/chat/completions" || provider.Model != "test-model" {
-		t.Fatalf("unexpected scoped provider: %+v", provider)
+	if shared.Provider != provider {
+		t.Fatal("request credentials must not replace the Go-configured provider")
 	}
 }
 

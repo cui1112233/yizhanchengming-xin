@@ -2,15 +2,14 @@ package httpapi
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
-// textProviderInput is accepted only from the signed Node-to-Go bridge. The
-// browser supplies a model ID; Node resolves its account-scoped credential and
-// forwards this short-lived request configuration without ever returning it.
+// textProviderInput remains a wire-compatible, ignored field for older clients.
+// Provider selection and credentials are resolved once by Go from the account
+// configuration; request bodies must never be able to override them.
 type textProviderInput struct {
 	Endpoint string `json:"endpoint"`
 	APIKey   string `json:"apiKey"`
@@ -18,19 +17,11 @@ type textProviderInput struct {
 }
 
 func directorForRequest(service *batchfactoryv11.DirectorService, input *textProviderInput) (*batchfactoryv11.DirectorService, error) {
-	if input == nil || (input.Endpoint == "" && input.APIKey == "" && input.Model == "") {
-		return service, nil
-	}
-	provider := &batchfactoryv11.OpenAICompatibleProvider{Endpoint: input.Endpoint, APIKey: input.APIKey, Model: input.Model}
-	if err := provider.Validate(); err != nil {
-		return nil, fmt.Errorf("%w: %v", batchfactoryv11.ErrInvalid, err)
-	}
+	_ = input
 	if service == nil || service.Store == nil {
 		return nil, batchfactoryv11.ErrUnavailable
 	}
-	copy := *service
-	copy.Provider = provider
-	return &copy, nil
+	return service, nil
 }
 
 func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.DirectorService, store batchfactoryv11.Store) {

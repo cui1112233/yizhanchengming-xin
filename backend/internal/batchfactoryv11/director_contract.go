@@ -39,9 +39,9 @@ type PromptContract struct {
 // in the V11 settings patch so batch, book and VIDEO overrides still resolve
 // through the same settings chain. Prompt text is generation guidance only;
 // it never bypasses the director output validation.
-// PresetSnapshot is resolved by the trusted Node bridge. The browser may only
-// choose its ID; the current published body is frozen here with its identity so
-// a director revision can always be traced to the actual rule it used.
+// PresetSnapshot is resolved by Go from the published preset catalog. The
+// browser may only choose its ID; the current published body is frozen here
+// with its identity so a director revision can always be traced to the rule it used.
 type PresetSnapshot struct {
 	ID                 string `json:"presetId"`
 	Name               string `json:"presetName"`
@@ -80,13 +80,13 @@ type AIReasoningPromptModule struct {
 	AIReasoningScope
 	PresetSnapshot
 	// Prompt only reads legacy settings saved before typed selection support.
-	// The Node bridge no longer accepts or creates it.
+	// Go owns the current typed selection and keeps this field for migration.
 	Prompt string `json:"prompt"`
 }
 
 // ScriptStoryboardComposition is the trusted snapshot of the normal public
-// Script workbench contract. Node resolves these published preset bodies before
-// Go receives settings, so Batch Factory never has to call the public chat API.
+// Script workbench contract. Go resolves these published preset bodies before
+// execution, so Batch Factory never has to call a browser or Node bridge.
 type ScriptStoryboardComposition struct {
 	Segmented         PresetSnapshot `json:"segmented"`
 	Shotlist          PresetSnapshot `json:"shotlist"`

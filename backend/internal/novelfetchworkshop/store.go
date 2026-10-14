@@ -50,8 +50,8 @@ type BodyRecord struct {
 }
 
 // RunRecord is the credential-free execution audit record for one book stage.
-// Model credentials stay in the Node model catalog and are intentionally not
-// represented here.
+// Model credentials stay in Go's account-scoped catalog and are intentionally
+// not represented in the novel-fetch audit record.
 type RunRecord struct {
 	RunID            string `json:"runId"`
 	BookID           string `json:"bookId"`
