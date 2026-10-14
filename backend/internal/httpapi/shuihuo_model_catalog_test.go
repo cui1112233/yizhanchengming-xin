@@ -93,6 +93,21 @@ func TestShuihuoModelKindConfiguredUsesCredentialReferenceAndAudioFields(t *test
 	}
 }
 
+func TestShuihuoAudioModelConfiguredUsesBuiltInDefaultTTS(t *testing.T) {
+	if !shuihuoAudioModelConfigured(map[string]any{}) {
+		t.Fatal("the built-in Go TTS HTTP fallback should make audio readiness available")
+	}
+	if !shuihuoAudioModelConfigured(map[string]any{
+		"modelCatalog": []any{map[string]any{
+			"kind": "audio", "enabled": false, "modelId": "tts-model",
+			"endpoint": "https://audio.example/speech", "credential": "secret",
+			"requestTemplate": `{}`, "responseMapping": `{"resultUrl":"data.url"}`,
+		}},
+	}) {
+		t.Fatal("the built-in TTS fallback should remain available when a custom audio model is disabled")
+	}
+}
+
 func TestShuihuoImageModelReadyUsesBaseURLAndCredentialRef(t *testing.T) {
 	t.Setenv("V88_IMAGE_MODEL_KEY", "image-secret")
 	model := map[string]any{

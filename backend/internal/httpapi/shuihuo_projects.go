@@ -98,6 +98,16 @@ func shuihuoModelKindConfigured(config map[string]any, kind string) bool {
 	return false
 }
 
+// shuihuoAudioModelConfigured includes the built-in Go TTS HTTP adapter. A
+// custom audio entry in modelCatalog can override it, but the absence of one
+// does not mean that配音与时长 is unavailable: /api/tts falls back to the
+// maintained tts3.121w.com adapter and the batch timeline depends on it.
+const shuihuoDefaultTTSServiceURL = "http://tts3.121w.com/v1/audio/speech"
+
+func shuihuoAudioModelConfigured(config map[string]any) bool {
+	return shuihuoModelKindConfigured(config, "audio") || strings.TrimSpace(shuihuoDefaultTTSServiceURL) != ""
+}
+
 // registerShuihuoProjectCompatRoutes keeps the legacy shared-work library
 // contract available while the browser still reads its project cards through
 // /api/platform-projects. The source of truth is the Go batch store.
@@ -150,7 +160,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		if ownerConfig != nil && shuihuoModelKindConfigured(ownerConfig, "image") {
 			enabledKinds = append(enabledKinds, "image")
 		}
-		if ownerConfig != nil && shuihuoModelKindConfigured(ownerConfig, "audio") {
+		if shuihuoAudioModelConfigured(ownerConfig) {
 			enabledKinds = append(enabledKinds, "audio")
 		}
 		redisReady, redisReason := shuihuoRedisHealth(r.Context(), redisURL)
@@ -2905,7 +2915,7 @@ func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Stor
 	}
 	if payload == nil {
 		body, _ := json.Marshal(map[string]any{"input": text, "voice": input.Voice, "speed": input.Speed, "pitch": input.Pitch, "style": input.Style})
-		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, "http://tts3.121w.com/v1/audio/speech", bytes.NewReader(body))
+		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, shuihuoDefaultTTSServiceURL, bytes.NewReader(body))
 		if requestErr != nil {
 			return nil, fmt.Errorf("%w: TTS request failed", batchfactoryv11.ErrUpstream)
 		}

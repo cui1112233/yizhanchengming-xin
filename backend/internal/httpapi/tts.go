@@ -62,7 +62,7 @@ func registerTTSRoute(root *http.ServeMux, auth BridgeAuth, catalogStore novelfe
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://tts3.121w.com/v1/audio/speech", bytes.NewReader(payload))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, shuihuoDefaultTTSServiceURL, bytes.NewReader(payload))
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "TTS 请求创建失败"})
 			return
