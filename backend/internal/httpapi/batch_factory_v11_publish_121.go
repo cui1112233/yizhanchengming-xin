@@ -100,10 +100,7 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 			}
 		}
 	}
-	organization := strings.TrimSpace(toString(input["organization"]))
-	if organization == "" {
-		organization = strings.TrimSpace(toString(settings["organization"]))
-	}
+	organization := publishOrganization(input, settings)
 	if organization == "" {
 		return nil, fmt.Errorf("请选择组织归属")
 	}
@@ -193,6 +190,27 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 		return nil, fmt.Errorf("视频管理系统回读失败：%s", firstText(readback["message"], readback["msg"], "后台记录未确认"))
 	}
 	return map[string]any{"status": "accepted_pending", "bookId": book.BookID, "internalBookId": book.ID, "sourceTextFile": book.BookID + ".txt", "aiHeadVideoFile": book.BookID + ".mp4", "uploadedAt": time.Now().UTC().Format(time.RFC3339Nano), "response": remote, "readback": readback}, nil
+}
+
+func publishOrganization(input map[string]any, settings map[string]json.RawMessage) string {
+	organization := strings.TrimSpace(toString(input["organization"]))
+	if organization != "" {
+		return organization
+	}
+	if raw, ok := settings["publishSettings"]; ok {
+		var publish map[string]any
+		if json.Unmarshal(raw, &publish) == nil {
+			for _, value := range []any{publish["organization"], publish["organizationId"], publish["organization_id"], publish["orgId"], publish["org_id"]} {
+				if value != nil {
+					organization = strings.TrimSpace(fmt.Sprint(value))
+					if organization != "" {
+						break
+					}
+				}
+			}
+		}
+	}
+	return organization
 }
 
 func (p *BatchFactory121Publisher) readMerge(ctx context.Context, output string) (io.ReadCloser, error) {
