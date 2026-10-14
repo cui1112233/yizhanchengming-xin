@@ -113,6 +113,9 @@ function resolveNovelFetchBridge(env = process.env) {
 
 function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptConstraintPromptStore, shuihuoGateway, agentStore, agentSkillStore, agentResponder, errorLogStore, novelPanelAiDiagnosticStore, novelPanelHistoryStore, novelPanelPremiumStore, novelFetchStore, memberStore, usageStore, passkeyStore, accountRecoveryStore, mailer, configReader, configWriter, tosCleaner } = {}) {
   const app = express();
+  // 这些业务链路已经由 Go API 承接。Node 只保留显式打开的兼容开关，
+  // 默认不挂载，避免同一请求同时存在两套实现、重复占用内存或误走旧逻辑。
+  const nodeLegacyAPIEnabled = String(process.env.QIANTIE_NODE_LEGACY_API || '') === '1';
   const authRuntime = createAuthRuntime({ accountStore, tokenMap, sessionsPath });
   const systemDir = path.dirname(authRuntime.accountStore.files.audit);
   const dataDir = path.dirname(systemDir);
@@ -445,8 +448,10 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
   app.use('/api/script-constraint-prompts', createScriptConstraintPromptsRouter({ promptStore: resolvedScriptConstraintPromptStore }));
   app.use('/api/novel-panel/settings', apiAuth, restrictMemberNovelPanelSettings);
   app.use('/api/novel-panel', trackNovelPanelUsage, novelPanelApiRouter);
-  app.use('/api/novel-fetch', createNovelFetchRouter({ presetStore: resolvedPresetStore, novelFetchStore: resolvedNovelFetchStore }));
-  app.use('/api/novel-fetch-upload', createNovelFetchUploadRouter({ store: resolvedNovelFetchStore, workshopGateway: shuihuoGateway }));
+  if (nodeLegacyAPIEnabled) {
+    app.use('/api/novel-fetch', createNovelFetchRouter({ presetStore: resolvedPresetStore, novelFetchStore: resolvedNovelFetchStore }));
+    app.use('/api/novel-fetch-upload', createNovelFetchUploadRouter({ store: resolvedNovelFetchStore, workshopGateway: shuihuoGateway }));
+  }
   const novelFetchBridge = resolveNovelFetchBridge();
   const workshopOptions = {
     ...shuihuoGateway,
@@ -459,14 +464,18 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     novelFetchStore: resolvedNovelFetchStore,
     resolveRuntimeModel: app.locals.resolveRuntimeModel
   });
-  app.use('/api/novel-fetch-workshop', createNovelFetchWorkshopRouter({ ...workshopOptions, processRouter: batchRewriteRouter }));
-  app.use('/api/batch-rewrite', batchRewriteRouter);
+  if (nodeLegacyAPIEnabled) {
+    app.use('/api/novel-fetch-workshop', createNovelFetchWorkshopRouter({ ...workshopOptions, processRouter: batchRewriteRouter }));
+    app.use('/api/batch-rewrite', batchRewriteRouter);
+  }
   const resolvedConfigReader = configReader || readConfig;
   // 批量工厂运行时统一由 Go 提供；Node 仅保留通用页面与历史兼容模块，
   // 不再加载旧 V11/V12 路由或 Node 定时调度器，避免重复链路和常驻内存。
-  app.use('/api/batch-factory', createBatchFactoryIntakeRouter({ store: resolvedBatchFactoryStore }));
-  app.use('/api/batch-factory', createBatchFactoryRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway, configReader: teamConfigReader, upstreamRequest: createTeamUpstreamRequest({ usageStore: resolvedUsageStore, feature: 'batch-factory' }) }));
-  app.use('/api/batch-factory', createBatchFactoryProductionRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway }));
+  if (nodeLegacyAPIEnabled) {
+    app.use('/api/batch-factory', createBatchFactoryIntakeRouter({ store: resolvedBatchFactoryStore }));
+    app.use('/api/batch-factory', createBatchFactoryRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway, configReader: teamConfigReader, upstreamRequest: createTeamUpstreamRequest({ usageStore: resolvedUsageStore, feature: 'batch-factory' }) }));
+    app.use('/api/batch-factory', createBatchFactoryProductionRouter({ store: resolvedBatchFactoryStore, presetStore: resolvedPresetStore, shuihuoGateway }));
+  }
   const resolvedConfigWriter = configWriter || require('./lib/shared').writeConfig;
   const isModelReferenced = createModelReferenceResolver({
     configReader: resolvedConfigReader,
@@ -501,12 +510,14 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     configWriter: resolvedConfigWriter,
     isModelReferenced
   })); // GET/POST /api/config
-  app.use('/api/script-video', createScriptVideoRouter({
-    shuihuoGateway,
-    memberStore: resolvedMemberStore,
-    accountStore: authRuntime.accountStore,
-    configReader: teamVideoConfigReader
-  }));
+  if (nodeLegacyAPIEnabled) {
+    app.use('/api/script-video', createScriptVideoRouter({
+      shuihuoGateway,
+      memberStore: resolvedMemberStore,
+      accountStore: authRuntime.accountStore,
+      configReader: teamVideoConfigReader
+    }));
+  }
   app.use(['/api/test', '/api/test/text', '/api/test/image'], apiAuth, requireOwnModelConfig);
   app.use('/api', resolvedChatRouter); // POST /api/test, POST /api/chat
   app.use('/api/tts', ttsRouter); // POST /api/tts
@@ -525,7 +536,9 @@ function createApp({ accountStore, tokenMap, sessionsPath, presetStore, scriptCo
     goBaseUrl: process.env.QIANTIE_GO_BASE_URL,
     bridgeSecret: process.env.QIANTIE_BRIDGE_SECRET
   }));
-  app.use('/api/shuihuo-production', apiAuth, requireShuihuoAiAccess, createShuihuoProductionRouter({ ...shuihuoGateway, presetStore: resolvedPresetStore }));
+  if (nodeLegacyAPIEnabled) {
+    app.use('/api/shuihuo-production', apiAuth, requireShuihuoAiAccess, createShuihuoProductionRouter({ ...shuihuoGateway, presetStore: resolvedPresetStore }));
+  }
   // 本地存储文件夹：createStorageRouter 返回的子应用内部自带 /api/storage 前缀，
   // 此处无前缀挂载，避免前缀叠加（见 routes/storage.js）。
   app.use(createStorageRouter());
