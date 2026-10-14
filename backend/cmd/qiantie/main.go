@@ -521,10 +521,42 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	if path == "/api/script/director-pipeline" {
 		return false
 	}
+	// These account-recovery actions are registered by the Go security
+	// handlers. Keep the one legacy purge action on the bridge until its
+	// destructive account-store parity is implemented; all user-facing
+	// recovery flows must stay on the single Go runtime.
+	for _, exact := range []string{
+		"/api/account-recovery/email/status",
+		"/api/account-recovery/email/request",
+		"/api/account-recovery/email/verify",
+		"/api/account-recovery/password/request",
+		"/api/account-recovery/password/reset",
+		"/api/account-recovery/passkeys",
+		"/api/account-recovery/passkeys/options",
+	} {
+		if path == exact {
+			return false
+		}
+	}
+	if strings.HasPrefix(path, "/api/account-recovery/passkeys/") {
+		return false
+	}
 	// The owner-scoped effective configuration is served by Go. Keep the
 	// legacy /api/config URL on that handler; only its still-unmigrated child
 	// settings endpoints may remain on the compatibility bridge.
 	if path == "/api/config" {
+		return false
+	}
+	if path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
+		return false
+	}
+	if path == "/api/test" || strings.HasPrefix(path, "/api/test/") {
+		return false
+	}
+	if path == "/api/client-errors" || strings.HasPrefix(path, "/api/client-errors/") {
+		return false
+	}
+	if path == "/api/admin" || strings.HasPrefix(path, "/api/admin/") {
 		return false
 	}
 	if path == "/api/presets" || strings.HasPrefix(path, "/api/presets/") {

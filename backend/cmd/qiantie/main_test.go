@@ -131,9 +131,9 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 }
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
-	for _, path := range []string{"/api/account-recovery/password/request"} {
+	for _, path := range []string{"/api/account-recovery/purge/member"} {
 		if !shouldBridgeLegacyAPI(path) {
-			t.Fatalf("%s should use the temporary Node bridge", path)
+			t.Fatalf("%s should stay on the temporary bridge until Go purge parity exists", path)
 		}
 	}
 	if shouldBridgeLegacyAPI("/api/script/director-pipeline") {
@@ -177,6 +177,11 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	for _, path := range []string{"/api/models", "/api/models?kind=text", "/api/config/models", "/api/config/models/text-demo"} {
 		if shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s should be handled by Go model catalog", path)
+		}
+	}
+	for _, path := range []string{"/api/config/models/test-audio", "/api/test/text", "/api/test/image", "/api/client-errors", "/api/client-errors/mine", "/api/admin/accounts", "/api/admin/applications", "/api/account-recovery/email/status", "/api/account-recovery/password/request", "/api/account-recovery/password/reset", "/api/account-recovery/passkeys/credential-1"} {
+		if shouldBridgeLegacyAPI(path) {
+			t.Fatalf("%s is implemented by Go and must not use the Node bridge", path)
 		}
 	}
 	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/chat") || shouldBridgeLegacyAPI("/api/script/smart-unified-style") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/summary") || shouldBridgeLegacyAPI("/api/batch-factory/v12/fetch-originals") || shouldBridgeLegacyAPI("/api/batch-factory/v12/image-generation") || shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/h3/director") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/source") || shouldBridgeLegacyAPI("/api/batch-factory/v12/config-versions") || shouldBridgeLegacyAPI("/api/batch-factory/v12/drafts") || shouldBridgeLegacyAPI("/api/batch-factory/v12/automation-presets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/automation-presets/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/automation-presets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/automation") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/status") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/stages") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/stages/director") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/assets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/assets/asset-1/images/image-1/content") {
