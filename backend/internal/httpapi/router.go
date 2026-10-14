@@ -392,9 +392,9 @@ func NewRouter(options RouterOptions) http.Handler {
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/rules/preview", "/api/novel-fetch-workshop/rules/preview", 1)
 			novelFetch.ServeHTTP(w, clone)
 		}
-		// The embedded V78 workbench now uses the canonical Go namespace. These
-		// few endpoints are still implemented by the same Go compatibility
-		// handlers below, so translate only the path and never cross into Node.
+		// These legacy compatibility handlers remain Go-owned, but the workshop
+		// auth middleware must stay in front of them because the canonical page
+		// signs requests with its workshop session, not the old bridge headers.
 		canonicalWorkshopLegacyAlias := func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/novel-fetch-workshop/", "/api/batch-rewrite/", 1)
@@ -408,7 +408,7 @@ func NewRouter(options RouterOptions) http.Handler {
 			{http.MethodGet, "/api/novel-fetch-workshop/knowledge"},
 			{http.MethodPost, "/api/novel-fetch-workshop/work-form"},
 		} {
-			root.Handle(route.method+" "+route.path, http.HandlerFunc(canonicalWorkshopLegacyAlias))
+			root.Handle(route.method+" "+route.path, novelAuth.Middleware(http.HandlerFunc(canonicalWorkshopLegacyAlias)))
 		}
 		root.Handle("/api/batch-rewrite/knowledge/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("/api/batch-rewrite/knowledge", novelAuth.Middleware(http.HandlerFunc(legacyKnowledgeSummaryAlias)))
@@ -481,10 +481,11 @@ func NewRouter(options RouterOptions) http.Handler {
 	return root
 }
 
-// registerCanonicalNovelFetchWebSubmitAliases keeps the novel-fetch page on
-// one Go-owned namespace. The implementation is still shared with the
-// compatibility handlers until the old embedded workbench is retired; this
-// adapter only translates the request path and its signed path component.
+// registerCanonicalNovelFetchWebSubmitAliases keeps the public workshop
+// namespace on Go while reusing the tested compatibility handlers. The
+// canonical request is authenticated with NovelFetchBridgeAuth; the internal
+// hop is re-signed only because the compatibility handler uses the legacy
+// bridge payload path. No Node service is involved.
 func registerCanonicalNovelFetchWebSubmitAliases(root *http.ServeMux, bridge BridgeAuth) {
 	if root == nil {
 		return
@@ -493,9 +494,6 @@ func registerCanonicalNovelFetchWebSubmitAliases(root *http.ServeMux, bridge Bri
 		clone := req.Clone(req.Context())
 		legacyPath := strings.Replace(clone.URL.Path, "/api/novel-fetch-workshop/web-submit/", "/api/batch-rewrite/web-submit/", 1)
 		clone.URL.Path = legacyPath
-		// Bridge signatures include the request path. Re-sign the internal
-		// canonical-to-compatibility hop so the shared Go handler can verify it
-		// without weakening authentication or exposing a second service.
 		username := clone.Header.Get(HeaderUsername)
 		issued := clone.Header.Get(HeaderIssuedAt)
 		owner := clone.Header.Get(HeaderIsOwner)

@@ -14,7 +14,7 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 	if root == nil || store == nil {
 		return
 	}
-	root.Handle("POST /api/batch-rewrite/web-submit/preview", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	previewHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -65,6 +65,10 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "该版本已确认提交"})
 					continue
 				}
+				if styleNeedsResolution(meta) {
+					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "blocked", "error": webSubmitUnclassifiedStyleError})
+					continue
+				}
 				content, bodyErr := store.GetBody(req.Context(), identity.Username, id, version)
 				if bodyErr != nil || strings.TrimSpace(content.Content) == "" {
 					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "未找到正文版本"})
@@ -96,10 +100,14 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 			result = append(result, groups[key])
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"material_limit": 8, "groups": result, "skipped": skipped})
-	})))
+	}))
+	root.Handle("POST /api/batch-rewrite/web-submit/preview", previewHandler)
 }
 
 func anyStrings(value any) []string {
+	if values, ok := value.([]string); ok {
+		return append([]string(nil), values...)
+	}
 	result := []string{}
 	for _, item := range arrayOrEmpty(value) {
 		result = append(result, toString(item))
