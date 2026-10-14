@@ -166,6 +166,14 @@ test('does not expose the retired fixed-opening switch in the current book engin
   assert.match(source, /batch-factory-audio-option/);
 });
 
+test('keeps help buttons from hijacking prompt-select clicks', () => {
+  const start = source.indexOf('function PromptSelect');
+  const end = source.indexOf('function RuleModule', start);
+  const promptSelect = source.slice(start, end);
+  assert.match(promptSelect, /return <div className="batch-factory-engine-field">/);
+  assert.doesNotMatch(promptSelect, /return <label className="batch-factory-engine-field">/);
+});
+
 test('uses the current Personal Center TTS defaults for each book and persists only a book-level TTS override', () => {
   assert.match(source, /import \{ getConfig \} from '\.\.\/\.\.\/\.\.\/shared\/api\/config'/);
   assert.match(source, /'tts'/);

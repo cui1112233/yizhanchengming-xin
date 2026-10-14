@@ -239,7 +239,7 @@ function InheritedNumberField({ label, value, inherited, min, max, onChange }) {
 
 function InheritedStoryboardDurationField({ value, inherited, onChange }) {
   const duration = Number(value ?? inherited) === 15 ? 15 : 10;
-  return <label className="batch-factory-engine-field"><span><b>分镜时长</b><HelpTip title="分镜时长">视频提示词按此上限切分。</HelpTip></span><Segmented value={duration} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={onChange} /></label>;
+  return <div className="batch-factory-engine-field"><span><b>分镜时长</b><HelpTip title="分镜时长">视频提示词按此上限切分。</HelpTip></span><Segmented value={duration} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={onChange} /></div>;
 }
 
 function InheritedSwitchField({ label, value, inherited, onChange }) {
@@ -254,7 +254,9 @@ function ConfigCard({ title, description, children }) {
 
 function PromptSelect({ label, value, options, onChange, disabled, required = false }) {
   const catalog = optionsWithCurrent(options.catalog || [], value, label);
-  return <label className="batch-factory-engine-field"><span><b>{label}</b><HelpTip title={label}>从个人中心已发布预设词选择。</HelpTip></span><Select allowClear={!required} disabled={disabled} value={value?.presetId || undefined} options={catalog.map(optionFor)} placeholder={required ? '请选择已发布视频提示词' : '未选择'} onChange={id => onChange(selectedMeta(catalog, id))} /></label>;
+  // 这里不能用 label 包住整个字段：帮助按钮也是 label 的可点击子元素，
+  // 浏览器会把点击 Select 当成激活“？”按钮，导致下拉框被 Popover 抢走。
+  return <div className="batch-factory-engine-field"><span><b>{label}</b><HelpTip title={label}>从个人中心已发布预设词选择。</HelpTip></span><Select allowClear={!required} disabled={disabled} value={value?.presetId || undefined} options={catalog.map(optionFor)} placeholder={required ? '请选择已发布视频提示词' : '未选择'} onChange={id => onChange(selectedMeta(catalog, id))} /></div>;
 }
 
 function RuleModule({ title, value, onChange, children, required = false }) {

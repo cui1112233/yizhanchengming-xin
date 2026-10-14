@@ -174,6 +174,10 @@ test('explains that the video prompt preset controls rules while the video model
   assert.match(source, /与上面的具体视频模型相互独立/);
 });
 
+test('keeps the unified video prompt selector independent from its help tip', () => {
+  assert.match(source, /<div className="batch-factory-engine-field"><span><b>视频提示词<\/b><HelpTip/);
+});
+
 test('keeps the automation gear beside the unified configuration label', () => {
   assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
 });
