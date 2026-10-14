@@ -152,7 +152,7 @@ func TestCreateBatchFromOtherOwnersIntakeReturnsNotFound(t *testing.T) {
 	}
 }
 
-func TestNovelFetchIntakeSkipsExistingSourceBookInCurrentBatch(t *testing.T) {
+func TestNovelFetchIntakeAllowsExplicitDuplicateSourceBookInCurrentBatch(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "当前批量", Books: []batchfactoryv11.CreateBookInput{{BookID: "source-1", Title: "原书"}}})
@@ -170,8 +170,8 @@ func TestNovelFetchIntakeSkipsExistingSourceBookInCurrentBatch(t *testing.T) {
 		t.Fatalf("skip status=%d body=%s", joined.Code, joined.Body.String())
 	}
 	got := decodeBody[map[string]batchfactoryv11.Batch](t, joined)["batch"]
-	if len(got.Books) != 1 || got.Books[0].BookID != "source-1" || got.Books[0].Title != "原书" {
-		t.Fatalf("same-source book must not create a second current-batch record: %+v", got)
+	if len(got.Books) != 2 || got.Books[1].BookID != "source-1" || got.Books[1].Title != "AI1·原书" {
+		t.Fatalf("explicit duplicate should create a second current-batch record: %+v", got)
 	}
 }
 

@@ -134,10 +134,10 @@ export function createBatchFromIntake(intakeId, payload = {}) {
 
 // The novel-fetch source is already frozen in the intake. The service appends
 // only source books not already present in the selected batch.
-export function appendNovelFetchIntake(batchId, intakeId) {
+export function appendNovelFetchIntake(batchId, intakeId, options = {}) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/intakes/${id(intakeId)}/books`), {
     method: 'POST',
-    body: body({})
+    body: body({ allowDuplicate: options.allowDuplicate === true })
   });
 }
 
@@ -385,10 +385,10 @@ export function getFinalPrompt(batchId, bookId, videoId, options = {}) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/videos/${id(videoId)}/final-prompt`), options);
 }
 
-export function submitBookProduction(batchId, bookId, requestId, provider = 'personal_api') {
+export function submitBookProduction(batchId, bookId, requestId, provider = 'personal_api', videoModelId = '') {
   return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/production`), {
     method: 'POST',
-    body: body({ requestId, provider })
+    body: body({ requestId, provider, ...(videoModelId ? { videoModelId } : {}) })
   });
 }
 

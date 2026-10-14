@@ -556,7 +556,7 @@ func (s *MemoryStore) CreateBatchFromIntake(ctx context.Context, owner, intakeID
 
 // AppendBooksFromIntake adds only new source books to the selected batch. The
 // intake remains single-use even when every incoming book was already present.
-func (s *MemoryStore) AppendBooksFromIntake(_ context.Context, owner, batchID, intakeID string, _ bool) (Batch, error) {
+func (s *MemoryStore) AppendBooksFromIntake(_ context.Context, owner, batchID, intakeID string, allowDuplicate bool) (Batch, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ownedIntake, ok := s.intakes[intakeID]
@@ -575,13 +575,16 @@ func (s *MemoryStore) AppendBooksFromIntake(_ context.Context, owner, batchID, i
 		return Batch{}, ErrInvalid
 	}
 	batch := ownedBatch.Value
-	existing := map[string]bool{}
-	for _, book := range batch.Books {
-		if key := batchBookKey(CreateBookInput{BookID: book.BookID, Platform: book.Platform}); key != "" {
-			existing[key] = true
+	books := intake.Books
+	if !allowDuplicate {
+		existing := map[string]bool{}
+		for _, book := range batch.Books {
+			if key := batchBookKey(CreateBookInput{BookID: book.BookID, Platform: book.Platform}); key != "" {
+				existing[key] = true
+			}
 		}
+		books = uniqueBatchBooks(intake.Books, existing)
 	}
-	books := uniqueBatchBooks(intake.Books, existing)
 	now := time.Now().UTC()
 	for _, bookInput := range books {
 		bookID := s.id("book")

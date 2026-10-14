@@ -40,6 +40,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createBookAsset,
+	createNovelFetchIntake,
 	backfillBatch121Metadata,
 	  cancelBatchProduction,
   fetchBookOriginal,
@@ -486,7 +487,7 @@ function bookVideoReady(book, productionStatus) {
   return videoIds.every(videoId => completed.has(videoId));
 }
 
-function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, platformNames, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata }) {
+function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, onViewBook, platformNames, platformOptions, productionStatus, mergeStatus, stageSummaries, batchId, onContentReady, onBackfill121Metadata, backfilling121Metadata, onAddBooks }) {
   const selected = new Set(selectedBookIds);
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
   const selectedCount = selectedBookIds.length;
@@ -522,7 +523,54 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
         <span><Button size="small" onClick={() => onViewBook(book)}>查看</Button></span>
       </div>;
     })}
+    <AddBooksRow books={books} platformOptions={platformOptions} onAddBooks={onAddBooks} />
   </div>;
+}
+
+function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
+  const [open, setOpen] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [platform, setPlatform] = useState('');
+  const [allowDuplicate, setAllowDuplicate] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const options = Array.isArray(platformOptions) ? platformOptions : [];
+  useEffect(() => {
+    if (!platform && options.length) setPlatform(String(options[0].value));
+  }, [options, platform]);
+  const parsed = useMemo(() => String(inputText || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+    const match = line.match(/^(\d{6,25})(?:\s+|[，,、|])?(.*)$/);
+    return match ? { bookId: match[1], title: String(match[2] || '').trim() || `小说 ${match[1]}` } : null;
+  }).filter(Boolean), [inputText]);
+  const existing = useMemo(() => new Set(books.map(book => String(book?.bookId || '').trim()).filter(Boolean)), [books]);
+  const duplicates = parsed.filter(item => existing.has(item.bookId));
+  async function submit() {
+    if (!parsed.length) { message.warning('请按每行“书 ID”或“书 ID + 书名”输入'); return; }
+    if (!platform) { message.warning('请选择书城'); return; }
+    if (duplicates.length && !allowDuplicate) { message.warning(`发现 ${duplicates.length} 本已存在的书，勾选“重复 ID 仍然添加”后再提交`); return; }
+    setBusy(true);
+    try {
+      await onAddBooks(parsed, platform, allowDuplicate);
+      setInputText('');
+      setAllowDuplicate(false);
+      setOpen(false);
+    } finally { setBusy(false); }
+  }
+  return <>
+    <div className="batch-factory-novel-list-row batch-factory-novel-add-row" role="row">
+      <span className="is-order"><b>＋</b></span>
+      <span className="is-book"><Button type="link" size="small" onClick={() => setOpen(true)}>添加新书</Button><small>输入多个书 ID 或“书 ID + 书名”</small></span>
+      <span>—</span><span>—</span><span>—</span><span>—</span><span>选择书城后添加</span>
+    </div>
+    <Modal title="添加新书到当前批次" open={open} onCancel={() => setOpen(false)} onOk={submit} confirmLoading={busy} okText="添加到当前批次" width={620} destroyOnClose>
+      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Alert type="info" showIcon message="添加后自动继承当前批次配置" description="新书不会加入正在运行的队列；会先写入当前批次，后续按批次行数和正文规则处理。" />
+        <label className="batch-factory-engine-field"><span><b>书城</b></span><Select value={platform || undefined} onChange={value => setPlatform(String(value || ''))} options={options.map(item => ({ value: String(item.value), label: item.label }))} placeholder="请选择书城" style={{ width: '100%' }} /></label>
+        <label className="batch-factory-engine-field"><span><b>书 ID / 书名</b><small>每行一本，例如：2091926811672429633\t书名</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'2091926811672429633\n209208048803840415\t第二本小说'} /></label>
+        {duplicates.length ? <Alert type="warning" showIcon message={`发现 ${duplicates.length} 本已存在的书`} description={duplicates.map(item => item.bookId).join('、')} /> : null}
+        <Checkbox checked={allowDuplicate} onChange={event => setAllowDuplicate(event.target.checked)}>重复 ID 仍然添加</Checkbox>
+      </Space>
+    </Modal>
+  </>;
 }
 
 function readImageAsDataURL(file) {
@@ -2828,6 +2876,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [uploadMode, setUploadMode] = useState('');
   const [selectedBookIds, setSelectedBookIds] = useState([]);
   const [platformNames, setPlatformNames] = useState({});
+  const [platformOptions, setPlatformOptions] = useState([]);
   const [columnWidths, setColumnWidths] = useState(null);
   const resizeActiveRef = useRef(false);
   const resizeStateRef = useRef(null);
@@ -2869,6 +2918,23 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 
   async function refreshBatch() {
     await onBatchChanged?.();
+  }
+  async function addBooksToBatch(items, platform, allowDuplicate) {
+    if (!batch?.id || !items?.length) return;
+    const option = platformOptions.find(item => String(item.value) === String(platform));
+    const booksInput = items.map(item => ({
+      id: item.bookId,
+      bookId: item.bookId,
+      title: item.title,
+      platform: String(platform),
+      sourceMetadata: { platformId: String(platform), platformName: option?.label || String(platform), sourceMode: 'manual_original', contentRangeLines: Number(contentRangeLines || 5), contentCaptureCharacters: Number(contentCaptureCharacters || 4000), queueStatus: 'manual_pending' }
+    }));
+    const intakeResult = await createNovelFetchIntake({ books: booksInput, metadata: { sourceMode: 'manual_original', platformId: String(platform), platformName: option?.label || String(platform), contentRangeLines: Number(contentRangeLines || 5), contentCaptureCharacters: Number(contentCaptureCharacters || 4000) } });
+    const intake = resultData(intakeResult, 'intake');
+    if (!intake?.id) throw new Error('新增书籍暂存失败');
+    await appendNovelFetchIntake(batch.id, intake.id, { allowDuplicate: allowDuplicate === true });
+    await refreshBatch();
+    message.success(`已添加 ${items.length} 本书到当前批次`);
   }
   async function deleteBook(book) {
     if (!batch?.id || !book?.id || actionBusy) return;
@@ -3135,7 +3201,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     let active = true;
     getWorkshopPlatforms({ suppressGlobalError: true }).then(result => {
       if (!active) return;
-      setPlatformNames(Object.fromEntries(batchFactoryPlatformOptions(result?.platforms).map(option => [String(option.value), option.label])));
+      const options = batchFactoryPlatformOptions(result?.platforms);
+      setPlatformOptions(options);
+      setPlatformNames(Object.fromEntries(options.map(option => [String(option.value), option.label])));
     }).catch(() => { if (active) setPlatformNames({}); });
     return () => { active = false; };
   }, []);
@@ -3831,7 +3899,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       {!books.length ? <div className="shuihuo-workbench-empty">当前批量还没有小说。返回个人作品后，从“批量工厂”新建书单。</div> : null}
     </div>
 
-    <Modal title={`小说列表 · ${books.length} 本`} open={novelListOpen} onCancel={() => setNovelListOpen(false)} footer={null} width="min(1480px, calc(100vw - 48px))" className="batch-factory-novel-modal"><NovelMetadata books={books} createdAt={batch?.createdAt} selectedBookIds={selectedBookIds} onSelectionChange={setSelectedBookIds} onViewBook={setViewingBook} platformNames={platformNames} productionStatus={productionStatus} mergeStatus={mergeStatus} stageSummaries={stageSummaries} batchId={batch?.id} onContentReady={refreshBatch} onBackfill121Metadata={backfill121Metadata} backfilling121Metadata={actionBusy === 'backfill-121-metadata'} /></Modal>
+    <Modal title={`小说列表 · ${books.length} 本`} open={novelListOpen} onCancel={() => setNovelListOpen(false)} footer={null} width="min(1480px, calc(100vw - 48px))" className="batch-factory-novel-modal"><NovelMetadata books={books} createdAt={batch?.createdAt} selectedBookIds={selectedBookIds} onSelectionChange={setSelectedBookIds} onViewBook={setViewingBook} platformNames={platformNames} platformOptions={platformOptions} productionStatus={productionStatus} mergeStatus={mergeStatus} stageSummaries={stageSummaries} batchId={batch?.id} onContentReady={refreshBatch} onBackfill121Metadata={backfill121Metadata} backfilling121Metadata={actionBusy === 'backfill-121-metadata'} onAddBooks={addBooksToBatch} /></Modal>
     <Modal title={viewingBook?.title || '小说详情'} open={Boolean(viewingBook)} onCancel={() => setViewingBook(null)} footer={viewingBook ? <Space><Button loading={actionBusy === `classify-${viewingBook.id}`} onClick={() => classifyBookMetadata(viewingBook)}>AI 判断发布信息</Button>{isBookUploadedTo121(viewingBook) ? <Button danger onClick={() => { setSelectedBookIds([viewingBook.id]); setUploadMode('reupload'); }}>重新上传</Button> : null}<Button onClick={() => openSourceEditor(viewingBook)}>编辑完整正文</Button><Button onClick={() => openMetadataEditor(viewingBook)}>编辑列表信息</Button></Space> : null} width={860} className="batch-factory-book-detail-modal">{viewingBook ? (() => { const summary = stageSummaries[viewingBook.id]; const state = batchFactoryBookState(viewingBook, { productionStatus, mergeStatus, stageSummary: summary }); const timeline = batchFactoryBookTimeline(viewingBook, { productionStatus, mergeStatus, stageSummaries: stageSummaries?.[viewingBook.id] }); const uploadProgress = uploadProgressForBook(viewingBook); const uploadHistory = Array.isArray(viewingBook?.sourceMetadata?.websiteSubmitHistory) ? viewingBook.sourceMetadata.websiteSubmitHistory : []; const classifyBusy = actionBusy === `classify-${viewingBook.id}`; const classifyFailed = String(viewingBook?.sourceMetadata?.classifyStatus || '').trim() === 'failed'; return <div className="batch-factory-book-detail"><section className="batch-factory-book-detail-status"><h3>流程异常与生成状态</h3><div><Tag color={state.tone}>{state.label}</Tag><strong>{state.detail}</strong></div>{classifyBusy ? <Alert type="info" showIcon message="正在识别男女频、风格和标签…" description="识别完成后会自动写入当前书；不会阻塞生产流程。" /> : null}{classifyFailed ? <Alert type="warning" showIcon message="AI 判断未完成" description={classificationDetail(viewingBook.sourceMetadata)} /> : null}{uploadProgress ? <Alert type={uploadProgress.status === 'failed' ? 'error' : 'info'} showIcon message={`121 上传：${uploadProgress.message || uploadProgress.phase}`} description={`阶段：${uploadProgress.phase || '—'} · ${uploadProgress.updatedAt || '—'}`} /> : null}{state.label === '异常' ? <Button danger size="small" loading={actionBusy === stageActionKey('retry', viewingBook.id)} onClick={() => retryLastFailedStage(viewingBook)}>重试失败步骤</Button> : null}<div className="batch-factory-production-timeline is-detail">{timeline.map(item => <div className={`is-${item.status}`} key={item.key}><i aria-hidden="true" /><span>{item.label}</span><small>{item.detail}</small></div>)}</div></section><section className="batch-factory-book-detail-content"><h3>小说正文</h3><pre>{viewingBook.workingFrontContent || batchFactoryCleanSourceText(viewingBook.sourceText) || '尚未获取原文。'}</pre></section><Descriptions bordered size="small" column={2}><Descriptions.Item label="Book ID">{viewingBook.bookId || '—'}</Descriptions.Item><Descriptions.Item label="书城">{bookPlatformName(viewingBook, platformNames)}</Descriptions.Item><Descriptions.Item label="风格">{value(viewingBook.sourceMetadata, 'style')}</Descriptions.Item><Descriptions.Item label="男女频">{value(viewingBook.sourceMetadata, 'gender')}</Descriptions.Item><Descriptions.Item label="标签">{value(viewingBook.sourceMetadata, 'tags')}</Descriptions.Item><Descriptions.Item label="AI 判断">{classificationLabel(viewingBook.sourceMetadata)}</Descriptions.Item><Descriptions.Item label="来源">{value(viewingBook.sourceMetadata, 'sourceMode') === 'manual_original' ? '手动书单' : '小说获取'}</Descriptions.Item></Descriptions>{!classifyBusy ? <Alert type={classifyFailed ? 'warning' : 'info'} showIcon message={`AI 判断：${classificationLabel(viewingBook.sourceMetadata)}`} description={classificationDetail(viewingBook.sourceMetadata)} /> : null}{uploadHistory.length ? <section className="batch-factory-book-upload-history"><h3>121 上传历史</h3>{uploadHistory.slice().reverse().map((item, index) => <p key={`${item.submittedAt || 'history'}-${index}`}>{item.submittedAt || '—'} · {item.status || '—'} · {item.detail || '—'}</p>)}</section> : null}</div>; })() : null}</Modal>
     <Modal title={metadataBook ? `编辑列表信息 · ${metadataBook.title}` : '编辑列表信息'} open={Boolean(metadataBook)} onCancel={() => setMetadataBook(null)} onOk={saveBookMetadata} confirmLoading={metadataSaving} okText="保存" width={620}>{metadataBook ? <Space direction="vertical" size={12} style={{ width: '100%' }}><Alert type="info" showIcon message="此处保存风格、男女频、标签、推荐理由和评级" description="不会改动小说正文或书城来源。" />{[['style', '风格'], ['gender', '男女频'], ['tags', '标签'], ['reason', '推荐理由'], ['rating', '评级']].map(([key, label]) => <label key={key} className="batch-factory-engine-field"><span><b>{label}</b></span><Input value={metadataValue[key] || ''} onChange={event => setMetadataValue(current => ({ ...current, [key]: event.target.value }))} /></label>)}</Space> : null}</Modal>
     <Modal title={editingContentBook ? `编辑生产内容 · ${editingContentBook.title}` : '编辑生产内容'} open={Boolean(editingContentBook)} onCancel={() => setEditingContentBook(null)} onOk={saveWorkingContent} confirmLoading={contentSaving} okText="保存生产内容" width={820} destroyOnClose><Space direction="vertical" size={14} style={{ width: '100%' }}><Alert type="info" showIcon message="这里只展示和编辑当前书所选行数的生产内容" description="完整正文只在“查看资料”中展示；录用爆款候选时才会替换完整正文。" />{editingContentBook ? <BatchFactoryGiantMaterialPendingProgress book={editingContentBook} batchId={batch?.id} onContentReady={refreshBatch} /> : null}<Input.TextArea rows={16} value={editingContentValue} onChange={event => { setEditingContentValue(event.target.value); setEditingContentMode('custom'); }} placeholder="输入当前小说的生产内容" /><label className="shuihuo-form-label"><span>衍生开篇</span><Select value={derivedOpeningPresetId || undefined} onChange={setDerivedOpeningPresetId} options={derivedOpeningOptions} loading={!derivedOpeningOptions.length} placeholder="选择已发布的衍生开篇提示词" style={{ width: 320 }} /></label>{!workingFrontCapability.available ? <Alert type="warning" showIcon message="当前不能生成爆款候选" description={workingFrontCapability.reason || '请先完成当前书的可执行配置。'} /> : null}<Space wrap><Tooltip title={workingFrontCapability.available ? '按选中的衍生开篇提示词生成候选；不会立即改动完整正文。' : workingFrontCapability.reason}><Button type="primary" onClick={createViralCandidate} loading={rewritingFront} disabled={!workingFrontCapability.available || !String(editingContentValue || '').trim() || !derivedOpeningPresetId}>生成爆款候选</Button></Tooltip><Tooltip title={workingFrontCapability.available ? '按当前选择的同一提示词重新生成候选；不会立即改动完整正文。' : workingFrontCapability.reason}><Button onClick={createViralCandidate} loading={rewritingFront} disabled={!workingFrontCapability.available || !String(editingContentValue || '').trim() || !derivedOpeningPresetId}>重试生成爆款候选</Button></Tooltip></Space>{viralCandidate ? <Alert type="warning" showIcon message="爆款候选尚未录用" description={<Space direction="vertical" size={8} style={{ width: '100%' }}><pre className="batch-factory-viral-candidate">{viralCandidate}</pre><Space><Button type="primary" loading={sourceSaving} onClick={adoptViralCandidate}>录用并替换完整正文</Button><Button onClick={cancelViralCandidate}>取消候选</Button></Space></Space>} /> : null}</Space></Modal>

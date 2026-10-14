@@ -3080,6 +3080,9 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-novel-list-v13 .batch-factory-novel-list-head>span,
 .batch-factory-novel-list-v13 .batch-factory-novel-list-row>span{min-width:0;padding:8px 10px!important;border-right:1px solid var(--sh-line);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .batch-factory-novel-list-v13 .batch-factory-novel-list-row{min-height:48px}
+.batch-factory-novel-list-v13 .batch-factory-novel-add-row{background:color-mix(in srgb,var(--sh-panel-strong) 55%,transparent);color:var(--sh-muted)}
+.batch-factory-novel-list-v13 .batch-factory-novel-add-row .ant-btn{padding:0;color:var(--sh-accent,#58d6b1);font-weight:700}
+.batch-factory-novel-list-v13 .batch-factory-novel-add-row small{color:var(--sh-muted);font-size:10px}
 .batch-factory-novel-list-v13 .is-order{display:flex;align-items:center;gap:8px}.batch-factory-novel-list-v13 .is-order b{font-variant-numeric:tabular-nums}
 .batch-factory-novel-list-v13 .is-book{display:grid;gap:3px}.batch-factory-novel-list-v13 .is-book strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-text)}.batch-factory-novel-list-v13 .is-book small{color:var(--sh-muted);font-size:10px}
 .batch-factory-content-mode{display:inline-flex;padding:2px 7px;border:1px solid var(--sh-line);border-radius:999px;color:var(--sh-muted);background:var(--sh-panel-strong);font-size:10px;font-style:normal}

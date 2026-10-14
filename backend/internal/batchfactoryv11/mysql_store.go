@@ -107,7 +107,7 @@ func (s *MySQLStore) CreateBatchFromIntake(ctx context.Context, owner, intakeID 
 // new book record in an existing batch. It never replaces previously produced
 // book data, and it consumes the one-time intake only after the whole append
 // transaction succeeds.
-func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, intakeID string, _ bool) (Batch, error) {
+func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, intakeID string, allowDuplicate bool) (Batch, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Batch{}, err
@@ -133,27 +133,30 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 	if err = json.Unmarshal(payload, &intake); err != nil {
 		return Batch{}, ErrInvalid
 	}
-	existing := map[string]bool{}
-	rows, err := tx.QueryContext(ctx, `SELECT COALESCE(source_book_id,''),COALESCE(platform,'') FROM batch_factory_v11_book_records r JOIN batch_factory_v11_books b ON b.id=r.book_id WHERE b.batch_id=? AND b.owner_username=? FOR UPDATE`, batchID, owner)
-	if err != nil {
-		return Batch{}, err
-	}
-	for rows.Next() {
-		var sourceID, platform string
-		if err := rows.Scan(&sourceID, &platform); err != nil {
+	books := intake.Books
+	if !allowDuplicate {
+		existing := map[string]bool{}
+		rows, err := tx.QueryContext(ctx, `SELECT COALESCE(source_book_id,''),COALESCE(platform,'') FROM batch_factory_v11_book_records r JOIN batch_factory_v11_books b ON b.id=r.book_id WHERE b.batch_id=? AND b.owner_username=? FOR UPDATE`, batchID, owner)
+		if err != nil {
+			return Batch{}, err
+		}
+		for rows.Next() {
+			var sourceID, platform string
+			if err := rows.Scan(&sourceID, &platform); err != nil {
+				rows.Close()
+				return Batch{}, err
+			}
+			if key := batchBookKey(CreateBookInput{BookID: sourceID, Platform: platform}); key != "" {
+				existing[key] = true
+			}
+		}
+		if err := rows.Err(); err != nil {
 			rows.Close()
 			return Batch{}, err
 		}
-		if key := batchBookKey(CreateBookInput{BookID: sourceID, Platform: platform}); key != "" {
-			existing[key] = true
-		}
-	}
-	if err := rows.Err(); err != nil {
 		rows.Close()
-		return Batch{}, err
+		books = uniqueBatchBooks(intake.Books, existing)
 	}
-	rows.Close()
-	books := uniqueBatchBooks(intake.Books, existing)
 	var nextOrdinal int
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(ordinal)+1,0) FROM batch_factory_v11_books WHERE batch_id=? AND owner_username=?`, batchID, owner).Scan(&nextOrdinal); err != nil {
 		return Batch{}, err

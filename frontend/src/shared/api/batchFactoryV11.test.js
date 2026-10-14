@@ -70,6 +70,70 @@ test('unsupported scope fails instead of falling back to a legacy API', () => {
   assert.throws(() => bf11ScopePath({ scope: 'project', batchId: 'b1' }), /Unsupported V11 scope/);
 });
 
+test('submitBookMerge sends the complete payload to the encoded V12 book merge route', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options, headers: new Headers(options.headers || {}) });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  const payload = { requestId: 'req-1', timingMode: 'speed', speed: 1.2, ttsSpeed: 1.7, audioDurationSeconds: 10 };
+  await batchFactoryV11.submitBookMerge('batch 1', 'book/1', payload);
+
+  assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/merge');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), payload);
+  assert.match(calls[0].headers.get('authorization') || '', /^Bearer\s+contract-test-token$/);
+});
+
+test('single-book production sends the selected video model in its V12 request', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.submitBookProduction('batch 1', 'book/1', 'request-1', 'p', 'model-1');
+
+  assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/production');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    requestId: 'request-1',
+    provider: 'p',
+    videoModelId: 'model-1'
+  });
+});
+
+test('batch production keeps its selected video model in the V12 request', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.submitBatchProduction('batch 1', 'request-1', 'p', 'model-1');
+
+  assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/production');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    requestId: 'request-1',
+    provider: 'p',
+    videoModelId: 'model-1'
+  });
+});
+
 test('batch factory direct fetch uses its native V12 endpoint', async t => {
   const originalLocalStorage = globalThis.localStorage;
   const originalFetch = globalThis.fetch;
@@ -135,7 +199,7 @@ test('a frozen Novel Fetch intake joins the selected V12 batch without a duplica
   await batchFactoryV11.appendNovelFetchIntake('batch 1', 'intake/1');
   assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/intakes/intake%2F1/books');
   assert.equal(calls[0].options.method, 'POST');
-  assert.deepEqual(JSON.parse(calls[0].options.body), {});
+  assert.deepEqual(JSON.parse(calls[0].options.body), { allowDuplicate: false });
 });
 
 test('protected local executor media is fetched as an authenticated blob', async t => {
