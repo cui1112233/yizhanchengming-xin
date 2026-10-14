@@ -3,9 +3,12 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -51,6 +54,9 @@ func (p ownerTextProvider) Complete(ctx context.Context, request batchfactoryv11
 		}
 	}
 	if p.fallback != nil {
+		if configured, ok := p.fallback.(*batchfactoryv11.OpenAICompatibleProvider); ok && configured == nil {
+			return "", errors.New("text provider is not configured")
+		}
 		return p.fallback.Complete(ctx, request)
 	}
 	return "", errors.New("text provider is not configured")
@@ -202,6 +208,30 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		if providerErr != nil {
 			return nil, providerErr
 		}
+		// Keep the Go runtime aligned with the visible API Config page even
+		// when MySQL contains an older redacted/empty catalog row. The legacy
+		// file is local runtime configuration, not a second request path.
+		if provider == nil && strings.TrimSpace(cfg.ScriptHistoryDir) != "" {
+			raw, readErr := os.ReadFile(filepath.Join(cfg.ScriptHistoryDir, owner, "api-config.json"))
+			if readErr == nil {
+				var legacy map[string]any
+				if json.Unmarshal(raw, &legacy) == nil {
+					if catalog, ok := legacy["modelCatalog"]; ok {
+						settings["modelCatalog"] = catalog
+					}
+					selected := selectedTextModelID(settings)
+					if selected == "" {
+						if value, ok := legacy["textModelId"].(string); ok {
+							selected = strings.TrimSpace(value)
+						}
+					}
+					provider, providerErr = configuredTextProvider(settings, selected)
+					if providerErr != nil {
+						return nil, providerErr
+					}
+				}
+			}
+		}
 		return provider, nil
 	}
 	novelFetchRewriteResolver = func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
@@ -325,7 +355,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 			Key:     cfg.ExternalCredentialsKey,
 		}
 	}
-	effectiveTextProvider := ownerTextProvider{fallback: textProvider, resolve: func(ctx context.Context, owner string) (batchfactoryv11.DirectorProvider, error) {
+	var fallbackTextProvider batchfactoryv11.DirectorProvider
+	if textProvider != nil {
+		fallbackTextProvider = textProvider
+	}
+	effectiveTextProvider := ownerTextProvider{fallback: fallbackTextProvider, resolve: func(ctx context.Context, owner string) (batchfactoryv11.DirectorProvider, error) {
 		return resolveCatalogTextProvider(ctx, owner)
 	}}
 	// Slice 2+ director routes must use the same account-scoped model catalog

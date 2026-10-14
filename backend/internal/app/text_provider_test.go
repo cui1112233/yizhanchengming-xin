@@ -26,6 +26,14 @@ func TestOwnerTextProviderUsesFallbackProvider(t *testing.T) {
 	}
 }
 
+func TestOwnerTextProviderRejectsTypedNilFallback(t *testing.T) {
+	var typedNil *batchfactoryv11.OpenAICompatibleProvider
+	provider := ownerTextProvider{fallback: typedNil}
+	if _, err := provider.Complete(context.Background(), batchfactoryv11.TextCompletionRequest{UserPrompt: "ping"}); err == nil {
+		t.Fatal("typed nil fallback must return an unavailable-provider error")
+	}
+}
+
 func TestConfiguredTextProviderUsesFirstEnabledCatalogModelWhenNoSelection(t *testing.T) {
 	provider, err := configuredTextProvider(map[string]any{
 		"modelCatalog": []any{

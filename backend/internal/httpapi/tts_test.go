@@ -73,6 +73,24 @@ func TestRequestConfiguredTTSBytesAcceptsAudioAndRejectsJSON(t *testing.T) {
 	}
 }
 
+func TestRequestDefaultTTSBytesAcceptsAudio(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+			t.Fatalf("unexpected default TTS request: method=%s content-type=%q", r.Method, r.Header.Get("Content-Type"))
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("default-audio"))
+	}))
+	defer server.Close()
+	previous := defaultTTSEndpoint
+	defaultTTSEndpoint = server.URL
+	defer func() { defaultTTSEndpoint = previous }()
+	payload, contentType, err := requestDefaultTTSBytes(context.Background(), ttsRequest{Input: "测试"})
+	if err != nil || string(payload) != "default-audio" || contentType != "audio/mpeg" {
+		t.Fatalf("payload=%q contentType=%q err=%v", payload, contentType, err)
+	}
+}
+
 func serverURLForTest(r *http.Request, path string) string {
 	return "http://" + r.Host + path
 }

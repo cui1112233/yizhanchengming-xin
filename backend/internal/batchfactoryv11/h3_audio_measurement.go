@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -21,6 +22,8 @@ type H3AudioDurationProbe interface {
 type FFprobeH3AudioDuration struct {
 	Binary string
 }
+
+var ffmpegDurationPattern = regexp.MustCompile(`Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)`)
 
 func (p FFprobeH3AudioDuration) DurationMS(ctx context.Context, audio []byte) (int64, error) {
 	if len(audio) == 0 {
@@ -45,7 +48,28 @@ func (p FFprobeH3AudioDuration) DurationMS(ctx context.Context, audio []byte) (i
 	}
 	out, err := exec.CommandContext(ctx, binary, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path).Output()
 	if err != nil {
-		return 0, fmt.Errorf("%w: audio probe failed: %v", ErrInvalid, err)
+		// The local Windows bundle may ship ffmpeg without a separate ffprobe.
+		// Use ffmpeg's stable Duration line as a compatible fallback instead of
+		// making the whole automation stop before video generation.
+		fallback, lookErr := exec.LookPath("ffmpeg")
+		if lookErr != nil {
+			return 0, fmt.Errorf("%w: audio probe failed: %v", ErrInvalid, err)
+		}
+		probeOut, probeErr := exec.CommandContext(ctx, fallback, "-hide_banner", "-i", path, "-f", "null", "-").CombinedOutput()
+		if probeErr != nil && len(probeOut) == 0 {
+			return 0, fmt.Errorf("%w: audio probe failed: %v", ErrInvalid, err)
+		}
+		match := ffmpegDurationPattern.FindSubmatch(probeOut)
+		if len(match) != 4 {
+			return 0, fmt.Errorf("%w: audio probe failed: %v", ErrInvalid, err)
+		}
+		hours, hourErr := strconv.ParseFloat(string(match[1]), 64)
+		minutes, minuteErr := strconv.ParseFloat(string(match[2]), 64)
+		seconds, secondErr := strconv.ParseFloat(string(match[3]), 64)
+		if hourErr != nil || minuteErr != nil || secondErr != nil {
+			return 0, fmt.Errorf("%w: audio probe returned invalid duration", ErrInvalid)
+		}
+		return int64(math.Round((hours*3600 + minutes*60 + seconds) * 1000)), nil
 	}
 	seconds, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
 	if err != nil || seconds <= 0 || math.IsNaN(seconds) || math.IsInf(seconds, 0) {

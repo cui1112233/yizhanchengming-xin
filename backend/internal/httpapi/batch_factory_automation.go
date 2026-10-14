@@ -22,16 +22,17 @@ import (
 // It intentionally persists the same public job shape that the old worker
 // used, so the existing workbench does not need a second status protocol.
 type BatchAutomationCoordinator struct {
-	store      batchfactoryv11.Store
-	presets    AutomationPresetStore
-	stages     *batchfactoryv11.BookStageService
-	merge      *batchfactoryv11.MergeService
-	external   *external.Service
-	ttsStore   novelfetchworkshop.Store
-	audioProbe batchfactoryv11.H3AudioDurationProbe
-	path       string
-	now        func() time.Time
-	mu         sync.Mutex
+	store        batchfactoryv11.Store
+	presets      AutomationPresetStore
+	stages       *batchfactoryv11.BookStageService
+	merge        *batchfactoryv11.MergeService
+	external     *external.Service
+	ttsStore     novelfetchworkshop.Store
+	audioProbe   batchfactoryv11.H3AudioDurationProbe
+	path         string
+	now          func() time.Time
+	providerSync func(context.Context, string) error
+	mu           sync.Mutex
 }
 
 type automationStateFile struct {
@@ -39,7 +40,7 @@ type automationStateFile struct {
 	Jobs    map[string]map[string]any `json:"jobs"`
 }
 
-func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets AutomationPresetStore, stages *batchfactoryv11.BookStageService, merge *batchfactoryv11.MergeService, publisher *external.Service, ttsStore novelfetchworkshop.Store, audioProbe batchfactoryv11.H3AudioDurationProbe, reader *FileAutomationStatusReader, now func() time.Time) *BatchAutomationCoordinator {
+func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets AutomationPresetStore, stages *batchfactoryv11.BookStageService, merge *batchfactoryv11.MergeService, publisher *external.Service, ttsStore novelfetchworkshop.Store, audioProbe batchfactoryv11.H3AudioDurationProbe, reader *FileAutomationStatusReader, now func() time.Time, providerSync ...func(context.Context, string) error) *BatchAutomationCoordinator {
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
@@ -47,7 +48,11 @@ func NewBatchAutomationCoordinator(store batchfactoryv11.Store, presets Automati
 	if reader != nil {
 		path = reader.Path()
 	}
-	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now}
+	var syncProvider func(context.Context, string) error
+	if len(providerSync) > 0 {
+		syncProvider = providerSync[0]
+	}
+	return &BatchAutomationCoordinator{store: store, presets: presets, stages: stages, merge: merge, external: publisher, ttsStore: ttsStore, audioProbe: audioProbe, path: path, now: now, providerSync: syncProvider}
 }
 
 func (c *BatchAutomationCoordinator) loadLocked() (automationStateFile, error) {
@@ -115,6 +120,14 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	if err != nil {
 		return nil, err
 	}
+	// Automatic production enters the same provider-sync boundary as the
+	// explicit production endpoint. Without this, the UI can show a configured
+	// video model while the Go worker's in-memory registry is still empty.
+	if c.providerSync != nil {
+		if err := c.providerSync(ctx, owner); err != nil {
+			return nil, err
+		}
+	}
 	jobID := fmt.Sprintf("go-auto-%d", c.now().UnixNano())
 	job := map[string]any{
 		"id": jobID, "owner": owner, "batchId": batchID, "state": "running",
@@ -130,7 +143,12 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	if err := c.setJob(owner, batchID, jobID, job); err != nil {
 		return nil, err
 	}
-	go c.run(context.Background(), owner, batchID, jobID, job, batch)
+	// The worker runs after the HTTP request has returned, so preserve the
+	// authenticated owner in its context. Account-scoped text/video providers
+	// must not fall back to an anonymous, unconfigured context in background
+	// stages.
+	automationCtx := context.WithValue(context.Background(), bridgeIdentityKey{}, BridgeIdentity{Username: owner})
+	go c.run(automationCtx, owner, batchID, jobID, job, batch)
 	return publicAutomationJob(job), nil
 }
 
@@ -192,9 +210,6 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 		return fmt.Errorf("正文没有可测量的生产行")
 	}
 	model, ok := configuredTTSModel(ctx, c.ttsStore, owner)
-	if !ok {
-		return fmt.Errorf("缺少已启用的配音模型")
-	}
 	probe := c.audioProbe
 	if probe == nil {
 		probe = batchfactoryv11.FFprobeH3AudioDuration{}
@@ -203,7 +218,16 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 	hash := sha256.New()
 	for _, line := range lines {
 		lineCtx, cancel := context.WithTimeout(ctx, 75*time.Second)
-		audio, _, err := requestConfiguredTTSBytes(lineCtx, ttsRequest{Input: line, Voice: "zh-CN-XiaoxiaoNeural", Speed: 1.8, Pitch: "10", Style: "general"}, model)
+		ttsInput := ttsRequest{Input: line, Voice: "zh-CN-XiaoxiaoNeural", Speed: 1.8, Pitch: "10", Style: "general"}
+		var audio []byte
+		var err error
+		if ok {
+			audio, _, err = requestConfiguredTTSBytes(lineCtx, ttsInput, model)
+		} else {
+			// Match the /api/tts route: an enabled catalog model wins, otherwise
+			// the configured default TTS service remains the valid fallback.
+			audio, _, err = requestDefaultTTSBytes(lineCtx, ttsInput)
+		}
 		cancel()
 		if err != nil {
 			return fmt.Errorf("TTS 生成失败：%w", err)

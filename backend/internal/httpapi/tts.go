@@ -22,6 +22,11 @@ type ttsRequest struct {
 	Style string  `json:"style,omitempty"`
 }
 
+// defaultTTSEndpoint is kept as a variable so the shared fallback path can be
+// tested without calling the real service. The UI already treats this service
+// as the configured default when no catalog audio model is present.
+var defaultTTSEndpoint = shuihuoDefaultTTSServiceURL
+
 func registerTTSRoute(root *http.ServeMux, auth BridgeAuth, catalogStore novelfetchworkshop.Store) {
 	root.Handle("/api/tts", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -55,51 +60,57 @@ func registerTTSRoute(root *http.ServeMux, auth BridgeAuth, catalogStore novelfe
 				return
 			}
 		}
-		payload, err := json.Marshal(map[string]any{"input": text, "voice": input.Voice, "speed": input.Speed, "pitch": input.Pitch, "style": input.Style})
+		body, contentType, err := requestDefaultTTSBytes(r.Context(), input)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "TTS 请求组装失败"})
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, shuihuoDefaultTTSServiceURL, bytes.NewReader(payload))
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "TTS 请求创建失败"})
-			return
-		}
-		req.Header.Set("Host", "tts3.121w.com")
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		req.Header.Set("Accept", "*/*")
-		req.Header.Set("Content-Type", "application/json")
-		response, err := (&http.Client{}).Do(req)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "TTS 服务请求失败: " + err.Error()})
-			return
-		}
-		defer response.Body.Close()
-		body, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
-		if readErr != nil || len(body) == 0 || response.StatusCode >= 400 {
-			message := strings.TrimSpace(string(body))
-			if len(message) > 500 {
-				message = message[:500]
-			}
-			if message == "" {
-				message = response.Status
-			}
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": fmt.Sprintf("TTS 服务错误: %s", message)})
-			return
-		}
-		if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "application/json") {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "TTS 服务返回错误: " + string(body)})
-			return
-		}
-		if contentType := response.Header.Get("Content-Type"); contentType != "" {
-			w.Header().Set("Content-Type", contentType)
-		}
+		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(body)
 	})))
+}
+
+func requestDefaultTTSBytes(ctx context.Context, input ttsRequest) ([]byte, string, error) {
+	payload, err := json.Marshal(map[string]any{"input": input.Input, "voice": input.Voice, "speed": input.Speed, "pitch": input.Pitch, "style": input.Style})
+	if err != nil {
+		return nil, "", fmt.Errorf("TTS 请求组装失败")
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodPost, defaultTTSEndpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, "", fmt.Errorf("TTS 请求创建失败")
+	}
+	req.Header.Set("Host", "tts3.121w.com")
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	response, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("TTS 服务请求失败: %w", err)
+	}
+	defer response.Body.Close()
+	body, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	if readErr != nil || len(body) == 0 || response.StatusCode >= 400 {
+		message := strings.TrimSpace(string(body))
+		if len(message) > 500 {
+			message = message[:500]
+		}
+		if message == "" {
+			message = response.Status
+		}
+		return nil, "", fmt.Errorf("TTS 服务错误: %s", message)
+	}
+	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "application/json") {
+		return nil, "", fmt.Errorf("TTS 服务返回错误: %s", string(body))
+	}
+	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if contentType == "" {
+		contentType = "audio/mpeg"
+	}
+	return body, contentType, nil
 }
 
 func configuredTTSModel(ctx context.Context, store novelfetchworkshop.Store, owner string) (map[string]any, bool) {

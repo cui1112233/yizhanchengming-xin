@@ -71,9 +71,15 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.Production = &batchfactoryv11.ProductionService{Store: options.Store, Compiler: options.Compiler}
 	}
 	if options.AutomationCoordinator == nil && options.Store != nil && options.Director != nil && options.AutomationStatusReader != nil {
+		var providerSync func(context.Context, string) error
+		if options.Production != nil && options.Production.ProviderRegistry != nil {
+			providerSync = func(ctx context.Context, owner string) error {
+				return syncShuihuoConfiguredVideoModels(ctx, options.Store, options.Production.ProviderRegistry, owner, options.NovelFetchStore)
+			}
+		}
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
-		}, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now)
+		}, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
