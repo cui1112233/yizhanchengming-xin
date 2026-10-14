@@ -38,3 +38,12 @@ func TestV11MigrationsRegisterMergeAfterProduction(t *testing.T) {
 		t.Fatalf("external publish migration missing: %+v", migrations[7])
 	}
 }
+
+func TestV11MergeAudioMigrationPersistsDeduplicationInputs(t *testing.T) {
+	joined := strings.ToLower(strings.Join(V11MergeAudioStatements(), "\n"))
+	for _, required := range []string{"audio_source", "audio_artifact_id", "alter table batch_factory_v11_merge_jobs"} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("merge audio migration misses %q: %s", required, joined)
+		}
+	}
+}

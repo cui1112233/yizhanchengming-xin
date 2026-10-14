@@ -343,6 +343,16 @@ func V11MergePollerStatements() []string {
 	}
 }
 
+// V11MergeAudioStatements persists the final audio selection used for a
+// merge. Without these fields a restart loses the TTS artifact identity, so
+// the same merge can look new and create another final video.
+func V11MergeAudioStatements() []string {
+	return []string{
+		`ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN audio_source VARCHAR(16) NOT NULL DEFAULT 'original' AFTER speed`,
+		`ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN audio_artifact_id VARCHAR(255) NULL AFTER audio_source`,
+	}
+}
+
 // V11ExternalStatements stores only encrypted provider credentials, immutable
 // submission intents, and bounded redacted audit rows. No provider secret is
 // represented in a JSON response or in cleartext columns.
@@ -724,6 +734,7 @@ func V11Migrations() []Migration {
 		{Version: 1100022, SQL: V11LocalArtifactPurgeStatements(), CallbackChecksum: "batch-factory-v11-local-artifact-purge-v1"},
 		{Version: 1100023, SQL: V11ShuihuoConfigStatements(), CallbackChecksum: "batch-factory-v11-shuihuo-config-v1"},
 		{Version: 1100024, SQL: V11BookAssetDetailsStatements(), CallbackChecksum: "batch-factory-v11-book-asset-details-v1"},
+		{Version: 1100025, SQL: V11MergeAudioStatements(), CallbackChecksum: "batch-factory-v11-merge-audio-v1"},
 	}
 }
 

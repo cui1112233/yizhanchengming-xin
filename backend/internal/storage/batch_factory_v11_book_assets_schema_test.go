@@ -20,7 +20,13 @@ func TestV11BookAssetsMigrationIsAdditiveAndDurable(t *testing.T) {
 	if assetMigration.Reconcile == nil {
 		t.Fatal("book-assets migration must repair the verified historical ledger/table split before later foreign keys run")
 	}
-	detailsMigration := migrations[len(migrations)-1]
+	var detailsMigration Migration
+	for _, candidate := range migrations {
+		if candidate.Version == 1100024 {
+			detailsMigration = candidate
+			break
+		}
+	}
 	if detailsMigration.Version != 1100024 || !strings.Contains(strings.ToLower(strings.Join(detailsMigration.SQL, "\n")), "formal_name") || !strings.Contains(strings.ToLower(strings.Join(detailsMigration.SQL, "\n")), "relationships") {
 		t.Fatalf("structured asset details migration=%+v", detailsMigration)
 	}

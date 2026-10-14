@@ -22,6 +22,8 @@ import (
 type mergeSubmitInput struct {
 	RequestID            string  `json:"requestId"`
 	TimingMode           string  `json:"timingMode"`
+	AudioSource          string  `json:"audioSource"`
+	AudioArtifactID      string  `json:"audioArtifactId"`
 	Speed                float64 `json:"speed"`
 	TTSSpeed             float64 `json:"ttsSpeed"`
 	AudioDurationSeconds float64 `json:"audioDurationSeconds"`
@@ -94,7 +96,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}
-		job, err := service.SubmitBatchMerge(r.Context(), owner, r.PathValue("batchId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
+		job, err := service.SubmitBatchMerge(r.Context(), owner, r.PathValue("batchId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, AudioSource: input.AudioSource, AudioArtifactID: input.AudioArtifactID, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -115,7 +117,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}
-		jobs, err := service.SubmitBookMerge(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
+		jobs, err := service.SubmitBookMerge(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, AudioSource: input.AudioSource, AudioArtifactID: input.AudioArtifactID, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
 		if err != nil {
 			writeStoreError(w, err)
 			return

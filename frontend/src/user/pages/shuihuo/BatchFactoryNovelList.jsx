@@ -468,7 +468,9 @@ function mergeJobSpeed(job) {
 
 function defaultBookMerge(jobs) {
   const completed = jobs.filter(job => job?.status === 'succeeded' && String(job?.outputUrl || '').trim());
-  return [...completed].reverse().find(job => Math.abs(mergeJobSpeed(job) - 1) < 0.001) || completed.at(-1) || null;
+  // The newest successful output is the only default upload source. Older
+  // speed variants remain history and must never silently become current.
+  return completed.at(-1) || null;
 }
 
 function latestBookMerge(status, bookId) {
@@ -1851,9 +1853,13 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
   const mergeUploadInputRef = useRef(null);
 
   const completedMerges = mergeJobs.filter(job => job?.status === 'succeeded' && String(job?.outputUrl || '').trim());
-  const mergeJobsNewest = mergeJobs
-    .filter(job => String(job?.status || '').toLowerCase() !== 'failed')
-    .sort((left, right) => String(right?.updatedAt || right?.createdAt || '').localeCompare(String(left?.updatedAt || left?.createdAt || '')));
+  // A book can have several persisted merge attempts after retries or an
+  // earlier test run.  They are history, not several current deliverables.
+  // The media rail must have one source of truth: the newest merge attempt.
+  const mergeJobsHistory = [...mergeJobs].sort((left, right) => String(right?.updatedAt || right?.createdAt || '').localeCompare(String(left?.updatedAt || left?.createdAt || '')));
+  const currentMergeJob = mergeJobsHistory[0] || null;
+  const mergeJobsNewest = currentMergeJob ? [currentMergeJob] : [];
+  const historicalMergeCount = Math.max(0, mergeJobsHistory.length - (currentMergeJob ? 1 : 0));
   const selectedUpload = book?.settingsState?.patch?.primaryUploadSource || {};
   const selectedMerge = selectedUpload?.kind === 'merged'
     ? completedMerges.find(job => job.id === selectedUpload.mergeJobId) || null
@@ -1955,10 +1961,10 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
     || selectedVideoState.main
     || selectedVideoState.list.at(-1)
     || null;
-  const mergePreview = mergeJobs.find(job => job.id === selectedMergePreviewId)
-    || selectedMerge
-    || mergeJobsNewest[0]
-    || null;
+  // Do not let a stale selected history item become the visible current
+  // output after refresh.  History is only available from the task/log view;
+  // this rail always follows the newest persisted attempt.
+  const mergePreview = currentMergeJob || selectedMerge || null;
 
   const readyVideos = videos.filter(video => videoState(video).ready);
   const missingVideos = videos.filter(video => !videoState(video).ready);
@@ -2341,12 +2347,12 @@ function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, m
   }
 
   function renderMergeRail() {
-    const current = mergePreview || selectedMerge || mergeJobsNewest[0] || null;
+    const current = currentMergeJob || mergePreview || selectedMerge || null;
     const currentInfo = mergeInfo(current);
     return <section className={`batch-factory-media-pickstation-rail-card is-merge${viewerKind === 'merge' ? ' is-active' : ''}`}>
       <header>
         <div><span className="batch-factory-media-pickstation-index">成</span><b>合成成片</b></div>
-        <small>{current ? `当前 ${batchFactoryStableMediaLabel('M', current.id)}` : '尚无成片'}</small>
+        <small>{current ? `当前 ${batchFactoryStableMediaLabel('M', current.id)}${historicalMergeCount ? ` · 历史 ${historicalMergeCount} 条` : ''}` : '尚无成片'}</small>
       </header>
       {current ? <button type="button" className="batch-factory-media-pickstation-main" onClick={() => selectMergePreview(current)}>
         {current.status === 'succeeded' && String(current.outputUrl || '').trim()
@@ -3556,6 +3562,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     return {
       requestId: requestID(prefix),
       timingMode: followAudio ? 'audio' : 'speed',
+      audioSource: normalizeAudioSource(settings.audioSource),
+      audioArtifactId: String(settings.ttsAudioArtifactId || '').trim(),
       speed: followAudio ? 0 : Number(overrides.speed ?? speed ?? 1),
       audioDurationSeconds: followAudio ? audioDurationSeconds : 0
     };

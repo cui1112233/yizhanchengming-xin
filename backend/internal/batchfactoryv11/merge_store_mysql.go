@@ -33,8 +33,9 @@ func loadMergeJob(ctx context.Context, q productionQueryer, owner, id string) (M
 	var state string
 	var outputURL, errorMessage, timingMode, progressPhase sql.NullString
 	var providerTaskID sql.NullString
-	err := q.QueryRowContext(ctx, `SELECT id,batch_id,COALESCE(book_id,''),COALESCE(opening_variant_index,0),request_id,timing_mode,speed,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at FROM batch_factory_v11_merge_jobs WHERE id=? AND owner_username=?`, id, owner).Scan(
-		&value.ID, &value.BatchID, &value.BookID, &value.OpeningVariantIndex, &value.RequestID, &timingMode, &value.Speed, &providerTaskID, &state, &progressPhase, &value.ProgressCurrent, &value.ProgressTotal, &outputURL, &errorMessage, &value.CreatedAt, &value.UpdatedAt,
+	var audioSource, audioArtifactID sql.NullString
+	err := q.QueryRowContext(ctx, `SELECT id,batch_id,COALESCE(book_id,''),COALESCE(opening_variant_index,0),request_id,timing_mode,speed,COALESCE(audio_source,'original'),audio_artifact_id,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at FROM batch_factory_v11_merge_jobs WHERE id=? AND owner_username=?`, id, owner).Scan(
+		&value.ID, &value.BatchID, &value.BookID, &value.OpeningVariantIndex, &value.RequestID, &timingMode, &value.Speed, &audioSource, &audioArtifactID, &providerTaskID, &state, &progressPhase, &value.ProgressCurrent, &value.ProgressTotal, &outputURL, &errorMessage, &value.CreatedAt, &value.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return MergeJob{}, ErrNotFound
@@ -45,6 +46,11 @@ func loadMergeJob(ctx context.Context, q productionQueryer, owner, id string) (M
 	value.Owner = owner
 	value.Status = MergeState(state)
 	value.TimingMode = timingMode.String
+	value.AudioSource = audioSource.String
+	if value.AudioSource == "" {
+		value.AudioSource = "original"
+	}
+	value.AudioArtifactID = audioArtifactID.String
 	value.ProgressPhase = progressPhase.String
 	value.ProviderTaskID = providerTaskID.String
 	value.OutputURL = outputURL.String
@@ -91,7 +97,7 @@ func (s *MySQLStore) CreateMergeJob(ctx context.Context, value MergeJob) (MergeJ
 	value.ID = jobID
 	value.Status = normalizeMergeState(value.Status)
 	value.CreatedAt, value.UpdatedAt = now, now
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_merge_jobs(id,owner_username,batch_id,book_id,opening_variant_index,request_id,timing_mode,speed,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, nullableString(value.BookID), value.OpeningVariantIndex, value.RequestID, nullableString(value.TimingMode), value.Speed, nullableString(value.ProviderTaskID), value.Status, nullableString(value.ProgressPhase), value.ProgressCurrent, value.ProgressTotal, nullableString(value.OutputURL), nullableString(value.ErrorMessage), now, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_merge_jobs(id,owner_username,batch_id,book_id,opening_variant_index,request_id,timing_mode,speed,audio_source,audio_artifact_id,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, nullableString(value.BookID), value.OpeningVariantIndex, value.RequestID, nullableString(value.TimingMode), value.Speed, value.AudioSource, nullableString(value.AudioArtifactID), nullableString(value.ProviderTaskID), value.Status, nullableString(value.ProgressPhase), value.ProgressCurrent, value.ProgressTotal, nullableString(value.OutputURL), nullableString(value.ErrorMessage), now, now); err != nil {
 		var duplicate *mysql.MySQLError
 		if errors.As(err, &duplicate) && duplicate.Number == 1062 {
 			_ = tx.Rollback()
@@ -133,7 +139,7 @@ func (s *MySQLStore) CreateUploadedMergeJob(ctx context.Context, value MergeJob)
 	if value.UpdatedAt.IsZero() {
 		value.UpdatedAt = now
 	}
-	if _, err := s.db.ExecContext(ctx, `INSERT INTO batch_factory_v11_merge_jobs(id,owner_username,batch_id,book_id,request_id,timing_mode,speed,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, nullableString(value.BookID), value.RequestID, nullableString(value.TimingMode), value.Speed, nullableString(value.ProviderTaskID), value.Status, nullableString(value.ProgressPhase), value.ProgressCurrent, value.ProgressTotal, nullableString(value.OutputURL), nullableString(value.ErrorMessage), value.CreatedAt, value.UpdatedAt); err != nil {
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO batch_factory_v11_merge_jobs(id,owner_username,batch_id,book_id,request_id,timing_mode,speed,audio_source,audio_artifact_id,provider_task_id,status,progress_phase,progress_current,progress_total,output_url,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, nullableString(value.BookID), value.RequestID, nullableString(value.TimingMode), value.Speed, value.AudioSource, nullableString(value.AudioArtifactID), nullableString(value.ProviderTaskID), value.Status, nullableString(value.ProgressPhase), value.ProgressCurrent, value.ProgressTotal, nullableString(value.OutputURL), nullableString(value.ErrorMessage), value.CreatedAt, value.UpdatedAt); err != nil {
 		var duplicate *mysql.MySQLError
 		if errors.As(err, &duplicate) && duplicate.Number == 1062 {
 			return s.FindMergeJob(ctx, value.Owner, value.BatchID, value.RequestID)
@@ -154,7 +160,7 @@ func (s *MySQLStore) UpdateMergeJob(ctx context.Context, owner, jobID string, va
 		return MergeJob{}, err
 	}
 	defer tx.Rollback()
-	result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_merge_jobs SET opening_variant_index=?,timing_mode=?,speed=?,provider_task_id=?,status=?,progress_phase=?,progress_current=?,progress_total=?,output_url=?,error_message=?,updated_at=? WHERE id=? AND owner_username=?`, value.OpeningVariantIndex, nullableString(value.TimingMode), value.Speed, nullableString(value.ProviderTaskID), value.Status, nullableString(value.ProgressPhase), value.ProgressCurrent, value.ProgressTotal, nullableString(value.OutputURL), nullableString(value.ErrorMessage), now, jobID, owner)
+	result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_merge_jobs SET opening_variant_index=?,timing_mode=?,speed=?,audio_source=?,audio_artifact_id=?,provider_task_id=?,status=?,progress_phase=?,progress_current=?,progress_total=?,output_url=?,error_message=?,updated_at=? WHERE id=? AND owner_username=?`, value.OpeningVariantIndex, nullableString(value.TimingMode), value.Speed, value.AudioSource, nullableString(value.AudioArtifactID), nullableString(value.ProviderTaskID), value.Status, nullableString(value.ProgressPhase), value.ProgressCurrent, value.ProgressTotal, nullableString(value.OutputURL), nullableString(value.ErrorMessage), now, jobID, owner)
 	if err != nil {
 		return MergeJob{}, err
 	}
