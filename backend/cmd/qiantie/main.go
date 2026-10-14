@@ -578,11 +578,8 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 			return false
 		}
 	}
-	// This prefix already ends with a slash; do not add a second slash when
-	// matching script endpoints such as /api/script/director-pipeline.
-	if strings.HasPrefix(path, "/api/script/") {
-		return true
-	}
+	// The supported script endpoints are handled by Go above. Unknown script
+	// paths must fail on Go instead of reviving the old Express router.
 	// V12 is the public workbench contract. All current V12 routes are handled
 	// by Go below (including the former summary/direct-fetch adapters). Keep the
 	// compatibility check explicit so a new or misspelled V12 path cannot

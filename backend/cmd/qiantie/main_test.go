@@ -189,6 +189,9 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 			t.Fatalf("retired alias %s must not use the Node bridge", path)
 		}
 	}
+	if shouldBridgeLegacyAPI("/api/script/unknown") {
+		t.Fatal("unknown script paths must not revive the Node bridge")
+	}
 	if shouldBridgeLegacyAPI("/api/health") || shouldBridgeLegacyAPI("/api/chat") || shouldBridgeLegacyAPI("/api/script/smart-unified-style") || shouldBridgeLegacyAPI("/api/batch-factory/v11/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/capabilities") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/summary") || shouldBridgeLegacyAPI("/api/batch-factory/v12/fetch-originals") || shouldBridgeLegacyAPI("/api/batch-factory/v12/image-generation") || shouldBridgeLegacyAPI("/api/batch-factory/v12/intakes/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/h3/director") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/source") || shouldBridgeLegacyAPI("/api/batch-factory/v12/config-versions") || shouldBridgeLegacyAPI("/api/batch-factory/v12/drafts") || shouldBridgeLegacyAPI("/api/batch-factory/v12/automation-presets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/automation-presets/demo") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/automation-presets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/automation") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/status") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/stages") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/stages/director") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/assets") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/assets/asset-1/images/image-1/content") {
 		t.Fatal("migrated Go API paths must not use the Node bridge")
 	}
