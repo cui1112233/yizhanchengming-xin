@@ -16,9 +16,9 @@ type nodeRouteInventory struct {
 	} `json:"routes"`
 }
 
-// The inventory is the cutover guardrail: every public Express mount must be
-// fully owned by Go before the Node runtime can be retired.  A shadow entry is
-// useful during migration, but it is not an acceptable final state.
+// The inventory is the cutover guardrail: every historical Express mount is
+// now fully owned by Go. The file remains as an audit record, not as a runtime
+// routing table, and a shadow/blocked entry is never acceptable.
 func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "migration", "node-api-contract-inventory.json"))
 	if err != nil {

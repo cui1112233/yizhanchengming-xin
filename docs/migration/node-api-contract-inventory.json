@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-14T18:00:29.5572291Z",
-  "purpose": "Node public API mounts retained for Go cutover audit; shadow means Go exists but Node source remains for rollback.",
+  "purpose": "Historical Node API mount inventory retained for Go cutover audit; all listed public mounts are Go-owned and Node is not a runtime fallback.",
   "routes": [
     {
       "method": "*",
