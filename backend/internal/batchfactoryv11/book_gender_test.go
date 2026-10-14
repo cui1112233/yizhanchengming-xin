@@ -71,7 +71,7 @@ func TestAssetExtractionContractSeparatesStaticAppearanceFromStoryActions(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"只写静态", "不得写镜头动作", "端坐", "抬手", "走动", "电影级景深", "神情深不可测"} {
+	for _, required := range []string{"只写静态", "必须详细展开", "肤色与皮肤细节", "服装材质与颜色", "不得写镜头动作", "端坐", "抬手", "走动", "电影级景深", "神情深不可测"} {
 		if !strings.Contains(contract.SystemPrompt, required) {
 			t.Fatalf("asset contract missing static-only rule %q: %s", required, contract.SystemPrompt)
 		}
