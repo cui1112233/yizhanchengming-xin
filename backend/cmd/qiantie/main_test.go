@@ -185,11 +185,8 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 	if shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/effective-settings") || shouldBridgeLegacyAPI("/api/batch-factory/v12/batches/demo/books/book-1/videos/video-1/final-prompt") {
 		t.Fatal("read-only V12 compiler previews must use Go")
 	}
-	if !shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 1) {
-		t.Fatal("H3 execution must stay on the Node bridge before slice 3 is enabled")
-	}
-	if shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 3) {
-		t.Fatal("H3 execution should use Go once slice 3 is enabled")
+	if shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 1) || shouldBridgeLegacyAPIForSlice("/api/batch-factory/v12/batches/demo/books/book-1/h3/director", 3) {
+		t.Fatal("H3 execution must always use the Go chain")
 	}
 	for _, path := range []string{
 		"/api/batch-factory/v12/batches/demo/director",
@@ -270,8 +267,8 @@ func TestShouldBridgeLegacyAPIRequestKeepsH3TraceReadOnGo(t *testing.T) {
 		t.Fatal("H3 trace read should use Go while H3 writes remain bridged")
 	}
 	write := httptest.NewRequest(http.MethodPost, "/api/batch-factory/v12/batches/demo/books/book-1/h3/trace", nil)
-	if !shouldBridgeLegacyAPIRequest(write, 1) {
-		t.Fatal("non-GET H3 trace path should keep the legacy bridge")
+	if shouldBridgeLegacyAPIRequest(write, 1) {
+		t.Fatal("non-GET H3 trace path must not use the legacy bridge")
 	}
 }
 

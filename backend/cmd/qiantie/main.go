@@ -435,8 +435,8 @@ func shouldBridgeLegacyAPI(path string) bool {
 	return shouldBridgeLegacyAPIForSlice(path, -1)
 }
 
-// Read-only H3 traces are safe to serve from the Go store while the
-// provider-backed H3 writes continue using the legacy bridge.
+// H3 traces and writes are served by the Go runtime. The old Node bridge is
+// not a runtime fallback, even when a caller carries an old slice value.
 func shouldBridgeLegacyAPIRequest(req *http.Request, slice int) bool {
 	if req != nil && req.URL != nil && req.Method == http.MethodGet &&
 		strings.HasPrefix(req.URL.Path, "/api/batch-factory/v12/") &&
@@ -449,11 +449,11 @@ func shouldBridgeLegacyAPIRequest(req *http.Request, slice int) bool {
 	return shouldBridgeLegacyAPIForSlice(req.URL.Path, slice)
 }
 
-// shouldBridgeLegacyAPIForSlice keeps staged V12 routes honest. A route is
-// only kept on Go when the corresponding slice is actually enabled; otherwise
-// the existing Node implementation remains the functional fallback instead
-// of returning a misleading Go 404.
+// shouldBridgeLegacyAPIForSlice is retained as a compatibility-shaped helper
+// for callers and tests, but it never forwards traffic to Node. Slice values
+// are no longer a routing switch; one Go chain owns the API surface.
 func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
+	_ = slice
 	// These catalog endpoints are now implemented by the Go service. The
 	// remaining /api/config children below are still audited independently.
 	if path == "/api/models" || strings.HasPrefix(path, "/api/models/") || path == "/api/config/models" || strings.HasPrefix(path, "/api/config/models/") {
@@ -552,11 +552,8 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		if strings.HasSuffix(path, "/automation/start") || strings.HasSuffix(path, "/automation/cancel") || strings.HasSuffix(path, "/automation/pause") || strings.HasSuffix(path, "/automation/resume") || strings.HasSuffix(path, "/automation/retry") {
 			return false
 		}
-		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || path == "/api/batch-factory/v12/image-generation" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || (strings.Contains(path, "/h3/") && (slice < 0 || slice >= 3)) || isGoV12AliasPath(path) {
+		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || path == "/api/batch-factory/v12/image-generation" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || strings.Contains(path, "/h3/") || isGoV12AliasPath(path) {
 			return false
-		}
-		if strings.Contains(path, "/h3/") {
-			return true
 		}
 		// Unknown V12 endpoints must fail on Go rather than being forwarded to
 		// Node. This makes the remaining migration gap visible and prevents a
