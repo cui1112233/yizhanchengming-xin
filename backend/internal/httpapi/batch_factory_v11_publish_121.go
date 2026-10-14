@@ -1,16 +1,11 @@
 package httpapi
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
-	"net/url"
 	"path"
 	"regexp"
 	"strings"
@@ -22,8 +17,6 @@ import (
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
-const publish121BaseURL = "http://two.121w.com"
-
 var publish121BookID = regexp.MustCompile(`^(?:\d{1,20}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`)
 
 // BatchFactory121Publisher is the Go owner of the Batch Factory upload path.
@@ -34,22 +27,12 @@ type BatchFactory121Publisher struct {
 	UsersDir    string
 	LocalFiles  *localartifact.Store
 	MergedFiles mergeworker.ObjectReader
-	Client      *http.Client
-	TargetBase  string
 	Connector   videomanagementconnector.Service
 }
 
 func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, bookID string, input map[string]any) (map[string]any, error) {
-	if p == nil || p.Store == nil {
+	if p == nil || p.Store == nil || p.Connector == nil {
 		return nil, fmt.Errorf("视频管理系统上传服务未配置")
-	}
-	base := strings.TrimRight(strings.TrimSpace(p.TargetBase), "/")
-	if base == "" {
-		base = publish121BaseURL
-	}
-	client := p.Client
-	if client == nil {
-		client = &http.Client{Timeout: 120 * time.Second}
 	}
 	session := readUploadTargetSession(p.UsersDir, owner)
 	cookie := strings.TrimSpace(toString(session["cookie"]))
@@ -143,78 +126,28 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if err != nil || len(videoBytes) == 0 {
 		return nil, fmt.Errorf("最终合成视频为空")
 	}
-	var remote, readback map[string]any
-	if p.Connector != nil {
-		videoUploader, ok := p.Connector.(videomanagementconnector.VideoUploadService)
-		if !ok {
-			return nil, fmt.Errorf("视频管理系统 Go 连接器不支持视频上传")
-		}
-		session := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
-		head, err := videoUploader.UploadVideo(ctx, session, book.BookID+".mp4", videoBytes)
-		if err != nil {
-			return nil, err
-		}
-		fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
-		fields["jieya_ai_head_video_mode"] = "0"
-		fields["jieya_ai_head_horizontal_flip"] = "0"
-		submission, err := p.Connector.Submit(ctx, session, videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields})
-		if err != nil {
-			return nil, fmt.Errorf("视频管理系统上传失败：%w", err)
-		}
-		remote = mapOrEmpty(submission.ReadbackRaw)
-		confirmed, err := p.Connector.GetSubmission(ctx, session, book.BookID)
-		if err != nil {
-			return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
-		}
-		readback = mapOrEmpty(confirmed.ReadbackRaw)
-	} else {
-		head, err := p.presignAndUpload(ctx, client, base, cookie, book.BookID+".mp4", videoBytes)
-		if err != nil {
-			return nil, err
-		}
-		fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
-		fields["jieya_ai_head_video_mode"] = "0"
-		fields["jieya_ai_head_horizontal_flip"] = "0"
-		body, contentType, err := batchFactoryBuildUploadMultipart(fields, book.BookID+".txt", content)
-		if err != nil {
-			return nil, err
-		}
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/tttadmin/api/zbooklist_upload.php", bytes.NewReader(body))
-		if err != nil {
-			return nil, err
-		}
-		request.Header.Set("Cookie", cookie)
-		request.Header.Set("Content-Type", contentType)
-		response, err := client.Do(request)
-		if err != nil {
-			return nil, fmt.Errorf("上传到视频管理系统失败：%w", err)
-		}
-		defer response.Body.Close()
-		responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-		if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || strings.Contains(string(responseBody), "管理员登录") {
-			return nil, fmt.Errorf("目标站登录已失效，请重新登录")
-		}
-		_ = json.Unmarshal(responseBody, &remote)
-		if response.StatusCode < 200 || response.StatusCode >= 300 || remote["success"] != true {
-			return nil, fmt.Errorf("视频管理系统上传失败：%s", firstText(remote["message"], remote["msg"], "上传失败"))
-		}
-		readbackURL := base + "/tttadmin/api/zbooklist_get.php?bookid=" + url.QueryEscape(book.BookID) + "&page=1&pageSize=10"
-		readbackRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, readbackURL, nil)
-		if err != nil {
-			return nil, err
-		}
-		readbackRequest.Header.Set("Cookie", cookie)
-		readbackResponse, err := client.Do(readbackRequest)
-		if err != nil {
-			return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
-		}
-		defer readbackResponse.Body.Close()
-		readbackBody, _ := io.ReadAll(io.LimitReader(readbackResponse.Body, 2<<20))
-		_ = json.Unmarshal(readbackBody, &readback)
-		if readbackResponse.StatusCode < 200 || readbackResponse.StatusCode >= 300 || readback["success"] != true {
-			return nil, fmt.Errorf("视频管理系统回读失败：%s", firstText(readback["message"], readback["msg"], "后台记录未确认"))
-		}
+	videoUploader, ok := p.Connector.(videomanagementconnector.VideoUploadService)
+	if !ok {
+		return nil, fmt.Errorf("视频管理系统 Go 连接器不支持视频上传")
 	}
+	targetSession := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
+	head, err := videoUploader.UploadVideo(ctx, targetSession, book.BookID+".mp4", videoBytes)
+	if err != nil {
+		return nil, err
+	}
+	fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
+	fields["jieya_ai_head_video_mode"] = "0"
+	fields["jieya_ai_head_horizontal_flip"] = "0"
+	submission, err := p.Connector.Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields})
+	if err != nil {
+		return nil, fmt.Errorf("视频管理系统上传失败：%w", err)
+	}
+	remote := mapOrEmpty(submission.ReadbackRaw)
+	confirmed, err := p.Connector.GetSubmission(ctx, targetSession, book.BookID)
+	if err != nil {
+		return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
+	}
+	readback := mapOrEmpty(confirmed.ReadbackRaw)
 	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	// The Go publisher is the single upload owner. Persist the confirmed
 	// response back to the book so the workbench can show the same success
@@ -313,87 +246,6 @@ func (p *BatchFactory121Publisher) readMerge(ctx context.Context, output string)
 	return nil, fmt.Errorf("找不到合成视频文件")
 }
 
-func (p *BatchFactory121Publisher) presignAndUpload(ctx context.Context, client *http.Client, base, cookie, filename string, data []byte) (string, error) {
-	digest := md5.Sum(data)
-	body, _ := json.Marshal(map[string]any{"files": []map[string]string{{"name": filename, "md5": hex.EncodeToString(digest[:])}}, "kind": "ai_head_video", "source": "zbooklist_upload_ai_head"})
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/tttadmin/api/music_put_url.php", bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	request.Header.Set("Cookie", cookie)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := client.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("获取视频上传地址失败：%w", err)
-	}
-	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
-	var payload map[string]any
-	_ = json.Unmarshal(responseBody, &payload)
-	if response.StatusCode < 200 || response.StatusCode >= 300 || payload["success"] != true {
-		return "", fmt.Errorf("视频管理系统未返回视频上传地址")
-	}
-	dataObject, _ := payload["data"].(map[string]any)
-	files, _ := dataObject["files"].([]any)
-	if len(files) == 0 {
-		return "", fmt.Errorf("视频上传地址不完整")
-	}
-	item, _ := files[0].(map[string]any)
-	uploadURL := strings.TrimSpace(toString(item["upload_url"]))
-	objectKey := strings.TrimSpace(toString(item["object_key"]))
-	bucketURL := strings.TrimSpace(toString(item["bucket_url"]))
-	if uploadURL == "" || objectKey == "" {
-		return "", fmt.Errorf("视频上传地址不完整")
-	}
-	put, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(data))
-	if err != nil {
-		return "", err
-	}
-	for key, value := range mapStringAny(item["headers"]) {
-		put.Header.Set(key, value)
-	}
-	putResponse, err := client.Do(put)
-	if err != nil {
-		return "", fmt.Errorf("上传视频对象失败：%w", err)
-	}
-	putResponse.Body.Close()
-	if putResponse.StatusCode < 200 || putResponse.StatusCode >= 300 {
-		return "", fmt.Errorf("上传视频对象失败：HTTP %d", putResponse.StatusCode)
-	}
-	return fmt.Sprintf(`{"name":%q,"original_name":%q,"url":%q,"object_key":%q}`, filename, filename, bucketURL, objectKey), nil
-}
-
-func mapStringAny(value any) map[string]string {
-	out := map[string]string{}
-	if raw, ok := value.(map[string]any); ok {
-		for key, value := range raw {
-			out[key] = fmt.Sprint(value)
-		}
-	}
-	return out
-}
-
-func batchFactoryBuildUploadMultipart(fields map[string]string, filename string, content []byte) ([]byte, string, error) {
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	for key, value := range fields {
-		if err := writer.WriteField(key, value); err != nil {
-			return nil, "", err
-		}
-	}
-	part, err := writer.CreateFormFile("files[]", filename)
-	if err != nil {
-		return nil, "", err
-	}
-	if _, err := part.Write(content); err != nil {
-		return nil, "", err
-	}
-	if err := writer.Close(); err != nil {
-		return nil, "", err
-	}
-	return body.Bytes(), writer.FormDataContentType(), nil
-}
-
 func publish121OrganizationsHandler(root *http.ServeMux, middleware BridgeAuth, usersDir string, targets ...videomanagementconnector.Service) {
 	root.Handle("GET /api/batch-factory/v11/publish-121/organizations", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
@@ -407,25 +259,16 @@ func publish121OrganizationsHandler(root *http.ServeMux, middleware BridgeAuth, 
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请先保存账号密码并登录目标站"})
 			return
 		}
-		var payload any
-		if len(targets) > 0 && targets[0] != nil {
-			catalogs, err := targets[0].RefreshCatalogs(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
-			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
-				return
-			}
-			payload = catalogs.Raw
-		} else {
-			body, err := targetGET(req, publish121BaseURL+"/tttadmin/api/organization.php", cookie)
-			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
-				return
-			}
-			if json.Unmarshal(body, &payload) != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录返回了无效数据"})
-				return
-			}
+		if len(targets) == 0 || targets[0] == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器未配置"})
+			return
 		}
+		catalogs, err := targets[0].RefreshCatalogs(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
+			return
+		}
+		payload := any(catalogs.Raw)
 		organizations := normalizeOrganizationOptions(payload)
 		if len(organizations) == 0 {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统未返回可用组织目录"})
