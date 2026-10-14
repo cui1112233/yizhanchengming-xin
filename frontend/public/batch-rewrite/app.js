@@ -93,7 +93,9 @@ async function api(path, options = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
   try {
-    const requestUrl = String(path || "").startsWith(WEB_SUBMIT_API)
+    const requestUrl = String(path || "").startsWith(API_ROOT)
+      ? String(path)
+      : String(path || "").startsWith(WEB_SUBMIT_API)
       ? String(path)
       : /^\/api\/models(?:\?|$)/.test(String(path || ""))
       ? String(path)
@@ -2916,8 +2918,8 @@ async function ensureKnowledgeLoaded() {
 
 async function loadTasks(options = {}) {
   const taskPath = state.viewMode === "date" && state.taskDate
-    ? `/api/tasks?${new URLSearchParams({ date: state.taskDate }).toString()}`
-    : "/api/tasks";
+    ? `${API_ROOT}/tasks?${new URLSearchParams({ date: state.taskDate }).toString()}`
+    : `${API_ROOT}/tasks`;
   const data = await api(taskPath);
   const incomingTasks = Array.isArray(data.tasks) ? data.tasks : [];
   if (options.preserveOnEmpty && incomingTasks.length === 0 && Array.isArray(state.allTasks) && state.allTasks.length > 0) {
@@ -3146,7 +3148,7 @@ function stopTaskDetailRefresh() {
 async function refreshTaskDetail(id) {
   if (!id || state.detailViewKind !== "task" || String(state.selectedId) !== String(id)) return;
   try {
-    const data = await api(`/api/tasks/${id}`);
+    const data = await api(`${API_ROOT}/tasks/${id}`);
     if (state.detailViewKind === "task" && String(state.selectedId) === String(id)) renderDetail(data);
   } catch (error) {
     setBatchStatus(`详情刷新失败：${error.message || "请稍后重试"}`);
@@ -3162,7 +3164,7 @@ function startTaskDetailRefresh(id) {
 async function showTask(id) {
   stopTaskDetailRefresh();
   state.selectedId = id;
-  const data = await api(`/api/tasks/${id}`);
+  const data = await api(`${API_ROOT}/tasks/${id}`);
   state.detailViewKind = "task";
   renderDetail(data);
   activateTab("tasks");
@@ -3191,7 +3193,7 @@ async function showSensitiveLog(id) {
   stopTaskDetailRefresh();
   state.detailViewKind = "sensitive";
   state.selectedId = id;
-  const data = await api(`/api/tasks/${id}/sensitive-log`);
+  const data = await api(`${API_ROOT}/tasks/${id}/sensitive-log`);
   renderSensitiveLog(data);
   activateTab("tasks");
   document.body.classList.add("detail-modal-open");
@@ -3202,7 +3204,7 @@ async function showRulesTrace(id) {
   stopTaskDetailRefresh();
   state.detailViewKind = "rules";
   state.selectedId = id;
-  const data = await api(`/api/tasks/${id}/rules-trace`);
+  const data = await api(`${API_ROOT}/tasks/${id}/rules-trace`);
   renderRulesTrace(data);
   activateTab("tasks");
   document.body.classList.add("detail-modal-open");
@@ -3213,7 +3215,7 @@ async function showSiteSubmitLog(id) {
   stopTaskDetailRefresh();
   state.detailViewKind = "site-submit";
   state.selectedId = id;
-  const data = await api(`/api/tasks/${id}/site-submit-log`);
+  const data = await api(`${API_ROOT}/tasks/${id}/site-submit-log`);
   renderSiteSubmitLog(data);
   activateTab("tasks");
   document.body.classList.add("detail-modal-open");
@@ -3222,7 +3224,7 @@ async function showSiteSubmitLog(id) {
 
 async function refetchTask(id) {
   if (!id) return;
-  const result = await api(`/api/tasks/${id}/fetch`, {
+  const result = await api(`${API_ROOT}/tasks/${id}/fetch`, {
     method: "POST",
     body: JSON.stringify({ sensitive_ai_enabled: sensitiveAiProcessEnabled() }),
   });
@@ -3234,7 +3236,7 @@ async function refetchTask(id) {
 async function restoreOriginal(id) {
   if (!id) return;
   if (!confirm("确认从备份恢复原文？恢复时会自动重新套用系统处理规则。")) return;
-  await api(`/api/tasks/${id}/restore-original`, {
+  await api(`${API_ROOT}/tasks/${id}/restore-original`, {
     method: "POST",
     body: JSON.stringify({ sensitive_ai_enabled: sensitiveAiProcessEnabled() }),
   });
@@ -3256,14 +3258,14 @@ async function generateAi(id) {
   setBatchStatus(`正在生成AI文案：${label}`);
   try {
     const selectedVersions = asArray(task?.selected_versions).length ? task.selected_versions : selectedProcessVersions();
-    const response = await api(`/api/tasks/${id}/generate-ai`, {
+    const response = await api(`${API_ROOT}/tasks/${id}/generate-ai`, {
       method: "POST",
       body: JSON.stringify({ selected_versions: selectedVersions, ai_slot_methods: task?.ai_slot_methods || processAiMethods(), sensitive_ai_enabled: sensitiveAiProcessEnabled() }),
     });
     if (response?.status && response.status !== "done") {
       throw new Error(response.error || response.result?.error || `AI文案生成${response.status}`);
     }
-    const verification = await api(`/api/tasks/${encodeURIComponent(id)}`);
+    const verification = await api(`${API_ROOT}/tasks/${encodeURIComponent(id)}`);
     const verifiedMeta = verification?.meta || {};
     const requestedAi = selectedVersions.filter(version => /^ai[1-5]$/.test(String(version || "").toLowerCase())).map(version => String(version).toLowerCase());
     const generatedAi = asArray(verifiedMeta.ai_generated_versions || verifiedMeta.ai_files).map(version => String(version || "").toLowerCase());
@@ -3329,7 +3331,7 @@ async function transferSelectedToBatchFactory() {
   button.disabled = true;
   setBatchStatus(`正在检查 ${ids.length} 个任务的原文…`);
   try {
-    const details = await Promise.all(ids.map(id => api(`/api/tasks/${encodeURIComponent(id)}`)));
+    const details = await Promise.all(ids.map(id => api(`${API_ROOT}/tasks/${encodeURIComponent(id)}`)));
     const selectedVersions = selectedProcessVersions().map(version => String(version || '').trim().toLowerCase()).filter(Boolean);
     if (!selectedVersions.length) {
       throw new Error("请先选择要转入的版本（原文或 AI1-AI5）");
@@ -3446,7 +3448,7 @@ async function batchDelete(mode) {
   if (!confirm(`确认删除${label}？会删除对应 ID 的本地内容文件。`)) return;
   setBatchStatus("删除中...");
   try {
-    const result = await api("/api/tasks/batch-delete", {
+    const result = await api(`${API_ROOT}/tasks/batch-delete`, {
       method: "POST",
       body: JSON.stringify({ mode, ids }),
     });
@@ -3492,7 +3494,7 @@ async function batchRetry(mode) {
   const label = mode === "failed" ? "失败任务" : `${ids.length} 个选中任务`;
   setBatchStatus(`重试${label}中...`);
   try {
-    const result = await api("/api/tasks/batch-retry", {
+    const result = await api(`${API_ROOT}/tasks/batch-retry`, {
       method: "POST",
       // “重试失败”固定使用当前任务表可见的失败 ID，保持表格从上到下的执行顺序，
       // 不把日期筛选外的历史失败任务混入本次队列。
@@ -3536,7 +3538,7 @@ async function applyRules(mode) {
   const label = mode === "all" ? "全部任务" : `${ids.length} 个选中任务`;
   setBatchStatus(`规则处理${label}中...`);
   try {
-    const result = await api("/api/tasks/apply-rules", {
+    const result = await api(`${API_ROOT}/tasks/apply-rules`, {
       method: "POST",
       body: JSON.stringify({
         mode,
@@ -3571,7 +3573,7 @@ async function reprocessSensitive(ids, restoreFromBackup) {
     setBatchStatus(`${label}中：第 ${index + 1}/${selected.length} 条`);
     renderTasks(latestTasks);
     try {
-      const result = await api("/api/tasks/reprocess-sensitive", {
+      const result = await api(`${API_ROOT}/tasks/reprocess-sensitive`, {
         method: "POST",
         body: JSON.stringify({
           ids: [id],
@@ -3626,7 +3628,7 @@ async function updateSelectedAiCount() {
   if (!Number.isInteger(count) || count < 1 || count > 20) return setBatchStatus("AI数量需为 1 到 20");
   setBatchStatus("正在调整 AI 数量...");
   try {
-    const result = await api("/api/tasks/batch-ai-count", { method: "POST", body: JSON.stringify({ ids, ai_count: count }) });
+    const result = await api(`${API_ROOT}/tasks/batch-ai-count`, { method: "POST", body: JSON.stringify({ ids, ai_count: count }) });
     setBatchStatus(`已调整 ${result.updated || 0} 个任务的 AI 数量为 ${count}`);
     await refreshTasksAndSubmitHistory();
   } catch (error) { setBatchStatus(error.message); }
