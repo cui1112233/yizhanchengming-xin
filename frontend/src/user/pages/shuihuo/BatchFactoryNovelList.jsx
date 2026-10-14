@@ -840,7 +840,7 @@ function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImage
   return text.split(pattern).map((part, index) => {
     const asset = assetByMention.get(part);
     return asset
-      ? <span key={`${asset.id || asset.mention}-${index}`} className={`batch-factory-asset-mention is-${asset.kind || 'asset'}`} title={`${asset.kind || '资产'}：${assetName(asset)}`}><span className="batch-factory-asset-mention-avatar">{asset.imageUrl ? <img src={asset.imageUrl} alt="" /> : asset.kind === 'character' ? '人' : asset.kind === 'scene' ? '景' : '物'}</span>{part}</span>
+      ? <span key={`${asset.id || asset.mention}-${index}`} contentEditable={false} className={`batch-factory-asset-mention is-${asset.kind || 'asset'}`} title={`${asset.kind || '资产'}：${assetName(asset)}`}><span className="batch-factory-asset-mention-avatar">{asset.imageUrl ? <img src={asset.imageUrl} alt="" /> : asset.kind === 'character' ? '人' : asset.kind === 'scene' ? '景' : '物'}</span>{assetName(asset)}</span>
       : <span key={`prompt-text-${index}`}>{part}</span>;
   });
 }
@@ -876,17 +876,44 @@ function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
     const avatar = asset.imageUrl
       ? `<img src="${escapePromptHTML(asset.imageUrl)}" alt="" />`
       : `<span class="batch-factory-asset-mention-fallback" data-fallback="${fallback}" aria-hidden="true"></span>`;
-    return `<span class="batch-factory-asset-mention is-${escapePromptHTML(kind)}" data-asset-mention="${escapePromptHTML(asset.mention)}"><span class="batch-factory-asset-mention-avatar">${avatar}</span>${escapePromptHTML(part)}</span>`;
+    return `<span class="batch-factory-asset-mention is-${escapePromptHTML(kind)}" contenteditable="false" data-asset-mention="${escapePromptHTML(asset.mention)}"><span class="batch-factory-asset-mention-avatar">${avatar}</span>${escapePromptHTML(assetName(asset))}</span>`;
   }).join('');
 }
 
 function contentEditableTextOffset(root) {
   const selection = typeof window !== 'undefined' ? window.getSelection() : null;
-  if (!selection?.rangeCount || !root.contains(selection.anchorNode)) return String(root.innerText || '').length;
-  const range = document.createRange();
-  range.selectNodeContents(root);
-  range.setEnd(selection.anchorNode, selection.anchorOffset);
-  return range.toString().length;
+  if (!selection?.rangeCount || !root.contains(selection.anchorNode)) return contentEditablePromptText(root).length;
+  let offset = 0;
+  let found = false;
+  const walk = node => {
+    if (found) return;
+    if (node === selection.anchorNode) {
+      offset += Number(selection.anchorOffset || 0);
+      found = true;
+      return;
+    }
+    if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.assetMention) {
+      offset += node.dataset.assetMention.length;
+      if (node.contains(selection.anchorNode)) found = true;
+      return;
+    }
+    if (node.nodeType === Node.TEXT_NODE) {
+      offset += String(node.nodeValue || '').length;
+      return;
+    }
+    Array.from(node.childNodes || []).forEach(walk);
+  };
+  walk(root);
+  return offset;
+}
+
+function contentEditablePromptText(root) {
+  const walk = node => {
+    if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || '');
+    if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.assetMention) return String(node.dataset.assetMention);
+    return Array.from(node.childNodes || []).map(walk).join('');
+  };
+  return walk(root).replace(/\u00a0/g, ' ');
 }
 
 function setContentEditableTextOffset(root, offset) {
@@ -1332,7 +1359,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
 
   function updateEditablePromptValue(event) {
     const root = event.currentTarget;
-    const nextValue = String(root.innerText || '').replace(/\u00a0/g, ' ');
+    const nextValue = contentEditablePromptText(root);
     setVideoPrompt(nextValue);
     updateAssetMentionMenu(root, nextValue);
   }

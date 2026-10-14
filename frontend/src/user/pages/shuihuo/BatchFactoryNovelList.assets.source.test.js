@@ -89,3 +89,14 @@ test('asset picker is positioned below the active caret', () => {
   assert.match(source, /style=\{\{ left: assetMentionMenu\.left, top: assetMentionMenu\.top \}\}/);
   assert.match(source, /const trailingMatch = value\.match/);
 });
+
+test('asset chips hide the trigger @ while preserving the underlying mention token', () => {
+  assert.match(source, /data-asset-mention=\"\$\{escapePromptHTML\(asset\.mention\)\}\"/);
+  assert.match(source, /escapePromptHTML\(assetName\(asset\)\)/);
+  assert.match(source, /\{assetName\(asset\)\}/);
+  assert.match(source, /function contentEditablePromptText\(root\)/);
+  assert.match(source, /node\.dataset\?\.assetMention/);
+  assert.match(source, /const nextValue = contentEditablePromptText\(root\)/);
+  assert.match(source, /contentEditable=\{false\} className=\{`batch-factory-asset-mention/);
+  assert.match(source, /contenteditable=\"false\" data-asset-mention=/);
+});
