@@ -1,10 +1,17 @@
 param(
   [int]$Port = $(if ($env:QIANTIE_NODE_PORT) { [int]$env:QIANTIE_NODE_PORT } else { 3001 }),
-  [string]$EnvFile = ''
+  [string]$EnvFile = '',
+  [switch]$EnableLegacyNode
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
+
+if (-not $EnableLegacyNode) {
+  Write-Error 'Node 兼容服务默认已停用，请使用 start-local-go-review.ps1；仅在明确回滚时附加 -EnableLegacyNode。'
+  exit 78
+}
+$env:QIANTIE_NODE_LEGACY_API = '1'
 
 if ([string]::IsNullOrWhiteSpace($EnvFile)) { $EnvFile = Join-Path $repo '.env.v88-review' }
 if (Test-Path -LiteralPath $EnvFile) {
