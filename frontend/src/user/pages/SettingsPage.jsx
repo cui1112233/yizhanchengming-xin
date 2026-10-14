@@ -239,6 +239,7 @@ export function SettingsPage() {
         disabled={loading}
         initialValues={{ storageRoot: '', productionRetentionDays: 3, petId: DEFAULT_PET_ID, soundEnabled: true, soundVolume: 60, petVisible: true }}
       >
+        <div className="settings-top-grid">
         <section className="settings-section settings-model-section" aria-labelledby="settings-model-title">
           <div>
             <h2 id="settings-model-title">工作台与桌面宠物</h2>
@@ -271,7 +272,9 @@ export function SettingsPage() {
               window.dispatchEvent(new CustomEvent(PET_COMPANION_SETTINGS_EVENT, { detail: { active: checked, username } }));
             }} />
           </Form.Item>
-          <Button type="primary" icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => saveSection('workspace')} loading={savingSection === 'workspace'}>保存工作台与宠物</Button>
+          <div className="settings-section-footer settings-workspace-actions">
+            <Button type="primary" icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => saveSection('workspace')} loading={savingSection === 'workspace'}>保存工作台与宠物</Button>
+          </div>
         </section>
 
         <section className="settings-section settings-storage-section" aria-labelledby="settings-storage-title">
@@ -286,7 +289,7 @@ export function SettingsPage() {
             <Select options={[3, 7, 14, 30].map(days => ({ value: days, label: `${days} 天` }))} />
           </Form.Item>
           <Typography.Paragraph type="secondary">已删除作品的本地合并视频会按当前账号的保留期进入回收队列；当前公网尚未启用 TOS 清理，已提交到 121 的内容不受影响。</Typography.Paragraph>
-          <div className="settings-storage-actions">
+          <div className="settings-section-footer settings-storage-actions">
             <Button type="primary" icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => saveSection('storage')} loading={savingSection === 'storage'}>保存存储设置</Button>
             <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={handleRestore} loading={restoring}>恢复</Button>
             <Button icon={<FolderOpen size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={handleList} loading={listing}>查看文件清单</Button>
@@ -340,6 +343,7 @@ export function SettingsPage() {
             </div>
           )}
         </section>
+        </div>
 
         <section className="settings-section settings-executor-section" aria-labelledby="settings-executor-title">
           <div>
@@ -355,11 +359,15 @@ export function SettingsPage() {
               </div>
             </div>
             {pairing ? <p className="settings-executor-pairing">请在本地执行器中输入配对码：<strong>{pairing.code}</strong></p> : null}
-            <div className="settings-executor-actions">
-              <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={loadLocalExecutors} loading={loadingExecutors}>刷新状态</Button>
-              <Button type="primary" onClick={createLocalExecutorPairing}>生成配对码</Button>
-              <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} disabled>Mac 版暂未发布</Button>
-              <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/local-executor/yizhan-local-executor-v88-1.0.3-win-x64.exe">下载 Windows 版 1.0.3</Button>
+            <div className="settings-executor-actions settings-executor-actions-doubao">
+              <div className="settings-executor-action-row settings-executor-action-row-top">
+                <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={loadLocalExecutors} loading={loadingExecutors}>刷新状态</Button>
+                <Button type="primary" onClick={createLocalExecutorPairing}>生成配对码</Button>
+              </div>
+              <div className="settings-executor-action-row settings-executor-action-row-downloads">
+                <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} disabled>Mac 版暂未发布</Button>
+                <Button type="primary" icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/local-executor/qiantie-executor-v88-0.1.0-win-x64.exe">下载 Go Windows 执行器 0.1.0</Button>
+              </div>
             </div>
           </div>
         </section>
@@ -410,11 +418,15 @@ export function SettingsPage() {
                 })}
               </ul>
             )}
-            <div className="settings-executor-actions">
-              <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={loadGiantMaterialExecutors} loading={loadingGiantMaterialExecutors}>刷新状态</Button>
-              <Button onClick={createGiantMaterialExecutorPairing} loading={giantPairingBusy}>生成配对码</Button>
-              <Button type="primary" icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/giant-material-executor/GiantMaterialExecutor-windows-x64.zip">下载 Windows 执行器{giantLatestVersions.windows ? ` ${giantLatestVersions.windows}` : ''}</Button>
-              <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/giant-material-executor/GiantMaterialExecutor-macos-universal.zip">下载 macOS 执行器{giantLatestVersions.macos ? ` ${giantLatestVersions.macos}` : ''}</Button>
+            <div className="settings-executor-actions settings-executor-actions-giant">
+              <div className="settings-executor-action-row settings-executor-action-row-top">
+                <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={loadGiantMaterialExecutors} loading={loadingGiantMaterialExecutors}>刷新状态</Button>
+                <Button onClick={createGiantMaterialExecutorPairing} loading={giantPairingBusy}>生成配对码</Button>
+              </div>
+              <div className="settings-executor-action-row settings-executor-action-row-downloads">
+                <Button type="primary" icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/giant-material-executor/GiantMaterialExecutor-windows-x64.zip">下载 Windows 执行器{giantLatestVersions.windows ? ` ${giantLatestVersions.windows}` : ''}</Button>
+                <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/giant-material-executor/GiantMaterialExecutor-macos-universal.zip">下载 macOS 执行器{giantLatestVersions.macos ? ` ${giantLatestVersions.macos}` : ''}</Button>
+              </div>
             </div>
             {giantPairing?.code ? <p className="settings-executor-pairing">配对码：<strong>{giantPairing.code}</strong>（10 分钟内有效）。请在执行器首次启动窗口或本机配对页中输入；绑定成功后这里会显示在线状态。</p> : null}
             <p className="settings-executor-pairing">Windows 解压后双击 GiantMaterialExecutor.exe；macOS 解压后打开 GiantMaterialExecutor.app。首次绑定一次后会在后台自动连接；有新版本时，请在本机执行器中点击“立即更新”，不会替其他电脑远程更新。</p>

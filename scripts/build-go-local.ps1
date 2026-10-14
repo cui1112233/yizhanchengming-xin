@@ -71,6 +71,9 @@ if (-not $SkipGoBuild) {
   Push-Location (Join-Path $repo 'backend')
   try {
     go build -o qiantie-local.exe ./cmd/qiantie
+    $executorDownloads = Join-Path $goDist 'downloads/local-executor'
+    New-Item -ItemType Directory -Force $executorDownloads | Out-Null
+    go build -o (Join-Path $executorDownloads 'qiantie-executor-v88-0.1.0-win-x64.exe') ./cmd/qiantie-executor
   } finally {
     Pop-Location
   }

@@ -11,7 +11,13 @@ import (
 
 const localExecutorReleaseVersion = "1.0.3"
 
+// The native Go executor is now the only installer linked from the UI.  The
+// older Electron installer remains addressable for rollback only and is not
+// advertised by the manifest.
+const goLocalExecutorReleaseVersion = "0.1.0"
+
 var localExecutorUpdateFilePattern = regexp.MustCompile(`^yizhan-local-executor-v88-[0-9]+\.[0-9]+\.[0-9]+-win-x64\.exe$`)
+var goLocalExecutorFilePattern = regexp.MustCompile(`^qiantie-executor-v88-[0-9]+\.[0-9]+\.[0-9]+-win-x64\.exe$`)
 
 // RegisterLocalExecutorDownloadRoutes keeps the local executor download API
 // available on Go 4001. The actual installer remains an operator-provided
@@ -20,10 +26,11 @@ func RegisterLocalExecutorDownloadRoutes(root *http.ServeMux, downloadsDir strin
 	root.HandleFunc("GET /downloads/local-executor/manifest.json", func(w http.ResponseWriter, req *http.Request) {
 		origin := "http://" + req.Host
 		writeJSON(w, http.StatusOK, map[string]any{
-			"version": localExecutorReleaseVersion,
+			"version": goLocalExecutorReleaseVersion,
+			"runtime": "go",
 			"downloads": map[string]any{
 				"mac":     nil,
-				"windows": strings.TrimRight(origin, "/") + "/downloads/local-executor/yizhan-local-executor-v88-" + localExecutorReleaseVersion + "-win-x64.exe",
+				"windows": strings.TrimRight(origin, "/") + "/downloads/local-executor/qiantie-executor-v88-" + goLocalExecutorReleaseVersion + "-win-x64.exe",
 			},
 		})
 	})
@@ -45,7 +52,9 @@ func RegisterLocalExecutorDownloadRoutes(root *http.ServeMux, downloadsDir strin
 	})
 	root.HandleFunc("GET /downloads/local-executor/{file}", func(w http.ResponseWriter, req *http.Request) {
 		file := req.PathValue("file")
-		if file != "yizhan-local-executor-v88-"+localExecutorReleaseVersion+"-win-x64.exe" {
+		canonical := "qiantie-executor-v88-" + goLocalExecutorReleaseVersion + "-win-x64.exe"
+		legacy := "yizhan-local-executor-v88-" + localExecutorReleaseVersion + "-win-x64.exe"
+		if file != canonical && file != legacy {
 			writeLocalExecutorDownloadError(w, http.StatusNotFound, "下载文件不存在")
 			return
 		}
