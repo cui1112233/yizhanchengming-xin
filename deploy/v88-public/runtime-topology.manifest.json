@@ -75,13 +75,13 @@
         "composeService": "nginx"
       },
       "runtimeImageOrBinary": {"kind": "image", "image": "nginx:1.27-alpine"},
-      "dependsOn": ["node"],
+      "dependsOn": ["go-api"],
       "persistentDataPurpose": ["acme-challenge-storage-outside-git"],
       "publicExposure": {
         "internalPorts": [80],
         "publishedPorts": [{"host": 80, "target": 80}, {"host": 3000, "target": 80}],
         "owner": "public-ingress",
-        "upstream": "node",
+        "upstream": "go-api:3000 (v88-node is a compatibility DNS alias)",
         "https": "not declared; do not publish 443 until a tracked TLS listener and certificate renewal contract are verified."
       },
       "retirementGate": "Verify replacement listener ownership, application proxy routes, certificate renewal, external exact-SHA identity and rollback before changing public ingress."
@@ -101,13 +101,15 @@
         "releaseIdentitySelector": "QIANTIE_NODE_RELEASE_SHA"
       },
       "dependsOn": ["go-api", "browser-worker", "shuihuo-compat"],
+      "activation": "legacy profile only; not part of the default public chain",
       "persistentDataPurpose": ["batch-book-data", "business-output-media"],
       "publicExposure": {"internalPorts": [3000], "publishedPorts": [], "owner": "internal-only; public requests arrive through nginx"},
       "retirementGate": "Verify replacement authenticated UI/API, source text persistence, batch ledger and media readback with exact release identity and a tested rollback before retiring Node or its persistent stores."
     },
     {
       "id": "shuihuo-compat",
-      "classification": "required",
+      "classification": "legacy-opt-in",
+      "activation": "legacy profile only; not part of the default public chain",
       "source": {
         "kind": "retained-compatibility-image",
         "configurationFiles": ["deploy/v88-public/docker-compose.yml"],
@@ -127,19 +129,19 @@
         {
           "id": "shuihuo-production-signed-bridge",
           "publicRoute": "/api/shuihuo-production/*",
-          "owner": "node authentication and transformations; shuihuo-compat remaining production API",
-          "upstreamRoute": "/api/shuihuo-production/* after earlier Node handlers",
+          "owner": "retained legacy compatibility only; Go owns the default /api/shuihuo-production/* chain",
+          "upstreamRoute": "/api/shuihuo-production/* only when the node-legacy profile is explicitly enabled",
           "nodeOwnedExceptions": ["/models", "/preset-slots", "/local-executor-artifacts/*", "giant-material executor bridge routes"],
           "internalDependency": "AI requests may first PUT /api/shuihuo-production/account-ai-config to the same compatibility target.",
-          "retirementGate": "Enumerate every forwarded method/path including config sync; prove equivalent Node behavior, account isolation, presets, persistence and object readback for each before removing this dependency.",
+          "retirementGate": "Keep only for rollback until the Go Shuihuo route and persisted-data migration have a signed rollback snapshot; it is not a default runtime dependency.",
           "rollbackTest": "Restore the previous exact Node SHA and retained compatibility image/database/objects; run the signed production forwarding test in tests/v88-shuihuo-compat-boundary.test.js and authenticated project/write/object-readback checks. Live rollback checks remain pending."
         },
         {
           "id": "platform-shuihuo-project-aggregation",
           "publicRoute": "GET /api/platform-projects",
-          "owner": "node aggregation; shuihuo-compat Shuihuo project records",
+          "owner": "Go platform aggregation; legacy compatibility remains opt-in",
           "upstreamRoute": "GET /api/shuihuo-production/projects",
-          "retirementGate": "Prove equivalent Node behavior for account-scoped project listing, IDs, navigation, timestamps and unavailable-source handling before removing this caller.",
+          "retirementGate": "Retire after the Go project listing has a production readback and rollback snapshot.",
           "rollbackTest": "Restore the previous exact Node SHA and compatibility target; run the platform aggregation test in tests/v88-shuihuo-compat-boundary.test.js and verify authenticated existing-project listing. Live rollback checks remain pending."
         }
       ],
@@ -151,7 +153,7 @@
         "reason": "No accessible Nginx access log was found in supplied read-only inspection; no 24-hour observation occurred and no zero-traffic claim is supported.",
         "requiredEvidence": "Record UTC window bounds, normalized method/route/upstream counts and internal Node callers; omit IPs, authorization headers, cookies, query text and bodies. Ingress counts alone cannot prove absence of internal config-sync calls."
       },
-      "retirementGate": "Retain required classification until equivalent Node behavior replaces every forwarded route and internal caller, isolated database/object migration and exact-SHA rollback pass, and a complete 24-hour sanitized traffic observation proves no remaining compatibility dependency. Missing logs never count as zero traffic."
+      "retirementGate": "Retire after Go read/write/object readback and exact-SHA rollback are verified; this service is already excluded from the default Compose profile."
     }
   ]
 }

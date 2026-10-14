@@ -10,9 +10,10 @@ const { listShuihuoProjects } = require('../routes/platform-projects');
 
 const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../deploy/v88-public/runtime-topology.manifest.json'), 'utf8'));
 
-test('compatibility ownership cannot imply retirement while Node callers and traffic evidence gaps remain', () => {
+test('compatibility service is explicitly legacy-opt-in while Go owns the default chain', () => {
   const compat = manifest.services.find(({ id }) => id === 'shuihuo-compat');
-  assert.equal(compat.classification, 'required');
+  assert.equal(compat.classification, 'legacy-opt-in');
+  assert.match(compat.activation, /legacy profile only/);
   assert.ok(compat.publicContracts.length >= 2);
   for (const contract of compat.publicContracts) {
     assert.ok(contract.id && contract.publicRoute && contract.owner && contract.upstreamRoute);
@@ -22,8 +23,7 @@ test('compatibility ownership cannot imply retirement while Node callers and tra
   assert.equal(compat.trafficObservation.requiredWindowHours, 24);
   assert.equal(compat.trafficObservation.observedWindowHours, null);
   assert.equal(compat.trafficObservation.routeCounts, null);
-  assert.match(compat.retirementGate, /24-hour/);
-  assert.match(compat.retirementGate, /equivalent Node behavior/);
+  assert.match(compat.retirementGate, /Go/);
 });
 
 test('signed production forwarding and platform aggregation use the retained compatibility API', async t => {
@@ -33,7 +33,7 @@ test('signed production forwarding and platform aggregation use the retained com
     const pathname = req.url.split('?')[0];
     const issuedAt = req.headers['x-qiantie-issued-at'];
     const signature = crypto.createHmac('sha256', secret)
-      .update([account.username, issuedAt, 'false', req.method, pathname].join('\n')).digest('hex');
+      .update([account.username, issuedAt, 'false', req.method, pathname].join('')).digest('hex');
     if (req.headers['x-qiantie-username'] !== account.username || req.headers['x-qiantie-signature'] !== signature || pathname !== '/api/shuihuo-production/projects') {
       res.writeHead(401).end();
       return;
