@@ -341,10 +341,14 @@ function storyboardAssetPromptText(book = {}) {
       ].filter(Boolean);
       const prompt = assetPrompt(asset);
       if (prompt && !structured.some(value => value.endsWith(prompt))) structured.push(`资产提示词：${prompt}`);
-      return structured.length ? `${assetKindLabel(asset?.kind)}「${assetName(asset)}」：${structured.join('；')}` : '';
+      if (!structured.length) return '';
+      // Keep every asset as a separate visual block.  The rich prompt renderer
+      // preserves these newlines, so the next character/scene/prop cannot be
+      // glued to the previous asset's description.
+      return `${assetKindLabel(asset?.kind)}「@${assetName(asset)}」\n${structured.join('\n')}`;
     })
     .filter(Boolean)
-    .join('\n');
+    .join('\n\n');
 }
 
 function composeStoryboardDisplayPrompt(prompt, assetText) {

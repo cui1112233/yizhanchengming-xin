@@ -1233,6 +1233,8 @@ test('shows asset prompt text on storyboard cards before and after VIDEO compila
   assert.match(source, /资产提示词：/);
   assert.match(source, /资产提示词已注入：/);
   assert.match(source, /【资产提示词】/);
+  assert.match(source, /structured\.join\('\\n'\)/);
+  assert.match(source, /\.join\('\\n\\n'\)/);
 });
 
 test('passes only the selected V11 final template and its H3 protocol key to compilation', () => {
