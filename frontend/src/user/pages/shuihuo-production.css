@@ -3783,6 +3783,107 @@ body.shuihuo-reference-shell
   font-size: 12px;
 }
 
+/* BF_MODAL_BUTTONS_UNIFIED_BEGIN */
+/* Modal dialogs render outside .batch-factory-workbench, so they need the
+   same neumorphic treatment explicitly instead of inheriting the table-only
+   button rules. */
+:is(
+  .batch-factory-add-books-modal,
+  .batch-factory-engine-modal-final,
+  .batch-factory-book-engine-modal,
+  .batch-factory-unified-settings-modal,
+  .batch-factory-automation-modal,
+  .batch-factory-ai-modal,
+  .batch-factory-ai-preset-modal,
+  .batch-factory-book-detail-modal,
+  .batch-factory-assets-modal,
+  .batch-factory-prompt-modal,
+  .batch-factory-media-library-modal,
+  .batch-factory-vms-login-modal
+) .ant-btn:not(.ant-btn-link) {
+  min-height: 32px;
+  padding-inline: 14px;
+  color: var(--sh-text);
+  border: 1px solid color-mix(in srgb, var(--sh-line) 78%, #fff 8%);
+  border-radius: 999px;
+  background: var(--sh-panel-strong);
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, .24), inset -2px -2px 5px rgba(255, 255, 255, .04), 0 2px 5px rgba(0, 0, 0, .16);
+  font-weight: 600;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
+}
+:is(
+  .batch-factory-add-books-modal,
+  .batch-factory-engine-modal-final,
+  .batch-factory-book-engine-modal,
+  .batch-factory-unified-settings-modal,
+  .batch-factory-automation-modal,
+  .batch-factory-ai-modal,
+  .batch-factory-ai-preset-modal,
+  .batch-factory-book-detail-modal,
+  .batch-factory-assets-modal,
+  .batch-factory-prompt-modal,
+  .batch-factory-media-library-modal,
+  .batch-factory-vms-login-modal
+) .ant-btn:not(.ant-btn-link):not(:disabled):hover,
+:is(
+  .batch-factory-add-books-modal,
+  .batch-factory-engine-modal-final,
+  .batch-factory-book-engine-modal,
+  .batch-factory-unified-settings-modal,
+  .batch-factory-automation-modal,
+  .batch-factory-ai-modal,
+  .batch-factory-ai-preset-modal,
+  .batch-factory-book-detail-modal,
+  .batch-factory-assets-modal,
+  .batch-factory-prompt-modal,
+  .batch-factory-media-library-modal,
+  .batch-factory-vms-login-modal
+) .ant-btn:not(.ant-btn-link):not(:disabled):focus-visible {
+  color: var(--sh-text) !important;
+  border-color: color-mix(in srgb, var(--sh-accent) 70%, var(--sh-line));
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .22), inset -1px -1px 3px rgba(255, 255, 255, .05), 0 3px 8px rgba(0, 0, 0, .22);
+  transform: translateY(-1px);
+}
+:is(
+  .batch-factory-add-books-modal,
+  .batch-factory-engine-modal-final,
+  .batch-factory-book-engine-modal,
+  .batch-factory-unified-settings-modal,
+  .batch-factory-automation-modal,
+  .batch-factory-ai-modal,
+  .batch-factory-ai-preset-modal,
+  .batch-factory-book-detail-modal,
+  .batch-factory-assets-modal,
+  .batch-factory-prompt-modal,
+  .batch-factory-media-library-modal,
+  .batch-factory-vms-login-modal
+) .ant-btn.ant-btn-primary {
+  color: #08261f !important;
+  border-color: color-mix(in srgb, var(--sh-accent) 82%, #fff 10%);
+  background: var(--sh-accent) !important;
+  box-shadow: inset 2px 2px 4px rgba(255, 255, 255, .14), inset -2px -2px 5px rgba(0, 63, 53, .2), 0 3px 8px rgba(0, 0, 0, .2);
+}
+:is(
+  .batch-factory-add-books-modal,
+  .batch-factory-engine-modal-final,
+  .batch-factory-book-engine-modal,
+  .batch-factory-unified-settings-modal,
+  .batch-factory-automation-modal,
+  .batch-factory-ai-modal,
+  .batch-factory-ai-preset-modal,
+  .batch-factory-book-detail-modal,
+  .batch-factory-assets-modal,
+  .batch-factory-prompt-modal,
+  .batch-factory-media-library-modal,
+  .batch-factory-vms-login-modal
+) .ant-btn[disabled] {
+  color: var(--sh-muted) !important;
+  border-color: var(--sh-line);
+  background: var(--sh-panel) !important;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .18);
+}
+/* BF_MODAL_BUTTONS_UNIFIED_END */
+
 /* The storyboard asset rail is now represented by @asset mentions in the
    storyboard prompt. Keep the workbench grid aligned to its six visible
    columns after removing that rail. */
