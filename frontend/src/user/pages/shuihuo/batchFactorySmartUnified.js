@@ -4,6 +4,19 @@ function object(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+function savedAnalysisFromBook(book) {
+  const patch = object(object(book?.settingsState).patch);
+  let value = patch.h3StyleAnalysis;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return null; }
+  }
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return null; }
+  }
+  const analysis = object(value);
+  return String(analysis.prompt || '').trim() ? analysis : null;
+}
+
 function effectivePromptConfig(batch, book) {
   const batchConfig = object(object(batch?.settingsState?.patch).aiPromptConfig);
   const bookConfig = object(object(book?.settingsState?.patch).aiPromptConfig);
@@ -32,5 +45,6 @@ export function smartUnifiedAnalysisForBook(book) {
   const analysis = object(output.smart_unified_analysis || output.smartUnifiedAnalysis);
   if (String(analysis.prompt || '').trim()) return analysis;
   const legacyPrompt = String(output.smart_unified_style || output.smartUnifiedStyle || '').trim();
-  return legacyPrompt ? { prompt: legacyPrompt, fields: {}, preset: {} } : null;
+  if (legacyPrompt) return { prompt: legacyPrompt, fields: {}, preset: {} };
+  return savedAnalysisFromBook(book);
 }

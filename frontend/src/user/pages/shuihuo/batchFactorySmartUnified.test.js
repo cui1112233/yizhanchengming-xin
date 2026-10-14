@@ -20,3 +20,8 @@ test('enables the saved style.system result only for the smart-unified prefix se
   const book = { directorRevision: { output: { smart_unified_analysis: analysis } }, settingsState: { patch: {} } };
   assert.equal(smartUnifiedDisplayEnabled(batch, book), true);
 });
+
+test('reads the Go-persisted style analysis from the book settings patch', () => {
+  const book = { settingsState: { patch: { h3StyleAnalysis: JSON.stringify(analysis) } } };
+  assert.deepEqual(smartUnifiedAnalysisForBook(book), analysis);
+});

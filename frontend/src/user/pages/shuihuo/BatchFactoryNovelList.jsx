@@ -992,7 +992,11 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const rawCompiledPrompt = compiledPrompt || displayPrompt || rawVideoPrompt;
   const videoPrompt = withStoryboardAssetMentions(baseSetupEnabledForBook ? rawCompiledPrompt : stripBaseSetupSection(rawCompiledPrompt), book, video);
   const assetPromptText = baseSetupEnabledForBook ? String(baseSetupPrompt || '').trim() : '';
-  const activePrompt = promptKind === 'visual' ? visualPrompt : videoPrompt;
+  const unifiedStyleText = showSmartUnified ? String(smartUnifiedAnalysis.prompt || '').trim() : '';
+  const videoPromptWithUnifiedStyle = unifiedStyleText && !videoPrompt.includes(unifiedStyleText)
+    ? `【统一风格】\n${unifiedStyleText}\n\n${videoPrompt}`
+    : videoPrompt;
+  const activePrompt = promptKind === 'visual' ? visualPrompt : videoPromptWithUnifiedStyle;
 
   useEffect(() => {
     const first = book?.videos?.[0]?.id || '';
@@ -1056,7 +1060,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
       <button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(video.id)}>
         <span className="batch-factory-prompt-status">{stateLabel}</span>
         <p>{activePrompt ? renderStoryboardPromptWithAssetMentions(activePrompt, book, video) : (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
-        <small title={assetPromptText}>{assetPromptText ? `资产提示词已注入：${promptPreview(assetPromptText)}` : '当前分镜暂无资产提示词'} · 视频提示词：{videoPromptLabel} · 点击打开完整提示词</small>
+        <small title={assetPromptText}>{unifiedStyleText ? '统一风格已注入' : '未获取统一风格'} · {assetPromptText ? `资产提示词已注入：${promptPreview(assetPromptText)}` : '当前分镜暂无资产提示词'} · 视频提示词：{videoPromptLabel} · 点击打开完整提示词</small>
       </button>
       <div className="batch-factory-cell-pager">
         <button type="button" aria-label="上一分镜" disabled={selectedIndex === 0} onClick={() => move(-1)}><LeftOutlined /></button>
