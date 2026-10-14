@@ -363,6 +363,13 @@ test('manual add-books flow appends the new intake to the active batch', () => {
   assert.match(source, /await appendNovelFetchIntake\(batch\.id, intake\.id, \{ allowDuplicate: allowDuplicate === true \}\)/);
 });
 
+test('manual add-books flow fetches original text and classification for each newly appended book', () => {
+  assert.match(source, /const beforeBookIDs = new Set\(books\.map\(book => String\(book\?\.id \|\| ''\)\)\)/);
+  assert.match(source, /const newlyAddedBooks = \(appendedBatch\?\.books \|\| \[\]\)\.filter/);
+  assert.match(source, /await fetchBookOriginal\(batch\.id, book\.id, \{ maxTxt: Number\(contentCaptureCharacters \|\| 4000\), platform: String\(platform\) \}\)/);
+  assert.match(source, /自动获取正文并识别风格、男女频/);
+});
+
 test('puts selected storyboard assets into the storyboard prompt as @ mentions', () => {
   assert.match(source, /function storyboardAssetMentions\(book, video\)/);
   assert.match(source, /map\(asset => `@\$\{assetName\(asset\)\}`\)/);

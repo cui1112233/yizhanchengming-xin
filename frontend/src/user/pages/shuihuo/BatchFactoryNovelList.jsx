@@ -568,7 +568,7 @@ function AddBooksRow({ books, platformOptions = [], onAddBooks }) {
     </div>
     <Modal className="batch-factory-add-books-modal" title={<span className="batch-factory-add-books-title"><b>添加新书</b><small>写入当前批次小说列表</small></span>} open={open} onCancel={() => setOpen(false)} onOk={submit} confirmLoading={busy} okText="添加到当前批次" width={620} destroyOnClose>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        <Alert type="info" showIcon message="添加后自动继承当前批次配置" description="新书不会加入正在运行的队列；会先写入当前批次，后续按批次行数和正文规则处理。" />
+        <Alert type="info" showIcon message="添加后自动获取正文与分类信息" description="新书会继承当前批次配置，自动获取正文并识别风格、男女频；不会加入正在运行的生产队列。" />
         <label className="batch-factory-engine-field"><span><b>书城</b></span><Select value={platform || undefined} onChange={value => setPlatform(String(value || ''))} options={options.map(item => ({ value: String(item.value), label: item.label }))} placeholder="请选择书城" style={{ width: '100%' }} /></label>
         <label className="batch-factory-engine-field"><span><b>书 ID / 书名</b><small>每行一本，例如：2091926811672429633\t书名</small></span><Input.TextArea rows={8} value={inputText} onChange={event => setInputText(event.target.value)} placeholder={'2091926811672429633\n209208048803840415\t第二本小说'} /></label>
         {duplicates.length ? <Alert type="warning" showIcon message={`发现 ${duplicates.length} 本已存在的书`} description={duplicates.map(item => item.bookId).join('、')} /> : null}
@@ -2935,12 +2935,27 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       platform: String(platform),
       sourceMetadata: { platformId: String(platform), platformName: option?.label || String(platform), sourceMode: 'manual_original', contentRangeLines: Number(contentRangeLines || 5), contentCaptureCharacters: Number(contentCaptureCharacters || 4000), queueStatus: 'manual_pending' }
     }));
+    const beforeBookIDs = new Set(books.map(book => String(book?.id || '')));
     const intakeResult = await createNovelFetchIntake({ books: booksInput, metadata: { sourceMode: 'manual_original', platformId: String(platform), platformName: option?.label || String(platform), contentRangeLines: Number(contentRangeLines || 5), contentCaptureCharacters: Number(contentCaptureCharacters || 4000) } });
     const intake = resultData(intakeResult, 'intake');
     if (!intake?.id) throw new Error('新增书籍暂存失败');
-    await appendNovelFetchIntake(batch.id, intake.id, { allowDuplicate: allowDuplicate === true });
+    const appendedResult = await appendNovelFetchIntake(batch.id, intake.id, { allowDuplicate: allowDuplicate === true });
+    const appendedBatch = resultData(appendedResult, 'batch') || resultData(await getBatch(batch.id), 'batch');
+    const newlyAddedBooks = (appendedBatch?.books || []).filter(book => !beforeBookIDs.has(String(book?.id || '')) && booksInput.some(item => String(item.bookId) === String(book?.bookId)));
+    const fetchFailures = [];
+    for (const book of newlyAddedBooks) {
+      try {
+        await fetchBookOriginal(batch.id, book.id, { maxTxt: Number(contentCaptureCharacters || 4000), platform: String(platform) });
+      } catch (error) {
+        fetchFailures.push(`${book.title || book.bookId}: ${error?.message || '获取失败'}`);
+      }
+    }
     await refreshBatch();
-    message.success(`已添加 ${items.length} 本书到当前批次`);
+    if (fetchFailures.length) {
+      message.warning(`已添加 ${newlyAddedBooks.length} 本书；${fetchFailures.length} 本正文或分类获取失败，可在书籍详情中重试。`);
+    } else {
+      message.success(`已添加并获取 ${newlyAddedBooks.length} 本书的正文与分类信息`);
+    }
   }
   async function deleteBook(book) {
     if (!batch?.id || !book?.id || actionBusy) return;

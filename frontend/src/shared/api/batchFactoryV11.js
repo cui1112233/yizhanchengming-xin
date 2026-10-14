@@ -159,8 +159,14 @@ export function fetchDirectOriginals(payload) {
   return apiRequest(bf11Path('fetch-originals'), { method: 'POST', body: body(payload) });
 }
 
-export function fetchBookOriginal(batchId, bookId) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/fetch-original`), { method: 'POST', body: body({}) });
+export function fetchBookOriginal(batchId, bookId, options = {}) {
+  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/fetch-original`), {
+    method: 'POST',
+    body: body({
+      ...(Number(options.maxTxt) > 0 ? { maxTxt: Number(options.maxTxt) } : {}),
+      ...(String(options.platform || '').trim() ? { platform: String(options.platform).trim() } : {})
+    })
+  });
 }
 
 // Runs after a manual batch has been created.  The API isolates failures per
