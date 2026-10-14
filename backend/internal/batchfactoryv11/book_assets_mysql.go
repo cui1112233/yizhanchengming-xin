@@ -94,6 +94,22 @@ func (s *MySQLStore) PersistExtractedBookAssets(ctx context.Context, owner strin
 	if err := persistDirectorBookAssets(ctx, tx, owner, book, snapshot, output, time.Now().UTC()); err != nil {
 		return nil, err
 	}
+	// Older records may have been manually saved before the structured asset
+	// fields were added. Keep their hand-written prompt, but fill only empty
+	// structured fields from the new extraction result.
+	now := time.Now().UTC()
+	for _, seed := range directorBookAssets(book, snapshot, output) {
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_book_assets SET
+			formal_name=CASE WHEN TRIM(COALESCE(formal_name,''))='' THEN ? ELSE formal_name END,
+			facts=CASE WHEN TRIM(COALESCE(facts,''))='' THEN ? ELSE facts END,
+			appearance=CASE WHEN TRIM(COALESCE(appearance,''))='' THEN ? ELSE appearance END,
+			relationships=CASE WHEN TRIM(COALESCE(relationships,''))='' THEN ? ELSE relationships END,
+			updated_at=?
+			WHERE owner_username=? AND batch_id=? AND book_id=? AND source='manual' AND kind=? AND name=?`,
+			seed.FormalName, seed.Facts, seed.Appearance, seed.Relationships, now, owner, book.BatchID, book.ID, seed.Kind, seed.Name); err != nil {
+			return nil, err
+		}
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, book.BatchID, book.ID)
 	if err != nil {
 		return nil, err

@@ -1392,6 +1392,27 @@ func (s *MemoryStore) PersistExtractedBookAssets(_ context.Context, owner string
 				asset.Revision++
 				asset.UpdatedAt = now
 				s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
+			} else {
+				// Keep the user's prompt, but backfill newly introduced structured
+				// fields when an older manual asset did not have them yet.
+				changed := false
+				if asset.FormalName == "" && seed.FormalName != "" {
+					asset.FormalName, changed = seed.FormalName, true
+				}
+				if asset.Facts == "" && seed.Facts != "" {
+					asset.Facts, changed = seed.Facts, true
+				}
+				if asset.Appearance == "" && seed.Appearance != "" {
+					asset.Appearance, changed = seed.Appearance, true
+				}
+				if asset.Relationships == "" && seed.Relationships != "" {
+					asset.Relationships, changed = seed.Relationships, true
+				}
+				if changed {
+					asset.Revision++
+					asset.UpdatedAt = now
+					s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
+				}
 			}
 			break
 		}

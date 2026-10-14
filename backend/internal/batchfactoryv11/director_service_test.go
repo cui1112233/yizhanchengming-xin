@@ -1108,6 +1108,40 @@ func TestAssetRefreshReplacesOnlyGeneratedAssetsAndKeepsManualAssets(t *testing.
 	}
 }
 
+func TestAssetRefreshBackfillsStructuredFieldsOnManualAsset(t *testing.T) {
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "batch", Books: []CreateBookInput{{Title: "book", SourceText: "第一行"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	manual, err := store.CreateBookAsset(context.Background(), "alice", batch.ID, book.ID, CreateBookAssetInput{
+		Kind: "character", Name: "夫人", Prompt: "人工合并提示词",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assets, err := store.PersistExtractedBookAssets(context.Background(), "alice", book, DirectorSnapshot{}, DirectorAssets{Characters: []NamedPrompt{{
+		Name: "夫人", FormalName: "侯门主母", Facts: "侯府当家主母", Appearance: "端庄丰润，绛紫缎袍", Relationships: "与妾室为主仆关系", Prompt: "AI 合并提示词",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got BookAsset
+	for _, asset := range assets {
+		if asset.ID == manual.ID {
+			got = asset
+			break
+		}
+	}
+	if got.FormalName != "侯门主母" || got.Facts != "侯府当家主母" || got.Appearance != "端庄丰润，绛紫缎袍" || got.Relationships != "与妾室为主仆关系" {
+		t.Fatalf("manual asset structured fields were not backfilled: %#v", got)
+	}
+	if got.Prompt != "人工合并提示词" || got.Source != "manual" {
+		t.Fatalf("manual asset prompt/source must remain unchanged: %#v", got)
+	}
+}
+
 func TestOriginalAudioSourceKeepsAudioPlanningMeasurement(t *testing.T) {
 	_, batch, book := seedDirectorBook(t, "original", false)
 	batch.SettingsState.Patch["audioSource"] = rawSetting(t, "original")
