@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -206,6 +207,38 @@ func productionLines(book batchfactoryv11.Book) []string {
 	return lines
 }
 
+// hasReusableAudioPlan prevents a retry from needlessly calling TTS again when
+// the selected source text and every measured line duration are already stored
+// on the book. The plan remains part of the production chain; this only reuses
+// the immutable result of the earlier timing step.
+func hasReusableAudioPlan(book batchfactoryv11.Book) bool {
+	lines := productionLines(book)
+	if len(lines) == 0 {
+		return false
+	}
+	patch := book.SettingsState.Patch
+	var enabled bool
+	if raw, ok := patch["audioPlanningEnabled"]; !ok || json.Unmarshal(raw, &enabled) != nil || !enabled {
+		return false
+	}
+	var durations []float64
+	if raw, ok := patch["audioLineDurations"]; !ok || json.Unmarshal(raw, &durations) != nil || len(durations) != len(lines) {
+		return false
+	}
+	var total float64
+	if raw, ok := patch["audioDurationSeconds"]; !ok || json.Unmarshal(raw, &total) != nil || total <= 0 || math.IsNaN(total) || math.IsInf(total, 0) {
+		return false
+	}
+	measured := 0.0
+	for _, duration := range durations {
+		if duration <= 0 || math.IsNaN(duration) || math.IsInf(duration, 0) {
+			return false
+		}
+		measured += duration
+	}
+	return math.Abs(measured-total) <= 0.05
+}
+
 // ensureAudioPlan is deliberately independent of the final audioSource switch.
 // The switch only chooses which track is used during the final merge; every
 // production run still creates TTS and measures every selected source line so
@@ -213,6 +246,9 @@ func productionLines(book batchfactoryv11.Book) []string {
 func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner, batchID string, book batchfactoryv11.Book) error {
 	if c == nil || c.ttsStore == nil || c.store == nil {
 		return fmt.Errorf("配音与逐行时长服务未配置")
+	}
+	if hasReusableAudioPlan(book) {
+		return nil
 	}
 	lines := productionLines(book)
 	if len(lines) == 0 {
@@ -343,7 +379,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 			continue
 		}
 		stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
-		production, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID)
+		production, waitErr := c.waitProduction(stageCtx, owner, batchID, book.ID, jobID+"-video-"+book.ID)
 		cancel()
 		if waitErr != nil {
 			fail("video", waitErr, "视频生成失败")
@@ -414,7 +450,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	_ = c.setJob(owner, batchID, jobID, job)
 }
 
-func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.ProductionJob, error) {
+func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, batchID, bookID, requestID string) (batchfactoryv11.ProductionJob, error) {
 	if c.stages == nil || c.stages.Production == nil {
 		return batchfactoryv11.ProductionJob{}, fmt.Errorf("视频生产服务未配置")
 	}
@@ -423,10 +459,7 @@ func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, 
 		if err != nil {
 			return batchfactoryv11.ProductionJob{}, err
 		}
-		for _, job := range status.Jobs {
-			if job.BookID != bookID {
-				continue
-			}
+		if job, ok := productionJobForRequest(status.Jobs, bookID, requestID); ok {
 			if productionJobFailed(job) {
 				return job, fmt.Errorf("视频任务失败：%s", productionJobError(job))
 			}
@@ -440,6 +473,15 @@ func (c *BatchAutomationCoordinator) waitProduction(ctx context.Context, owner, 
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+func productionJobForRequest(jobs []batchfactoryv11.ProductionJob, bookID, requestID string) (batchfactoryv11.ProductionJob, bool) {
+	for _, job := range jobs {
+		if job.BookID == bookID && job.RequestID == requestID {
+			return job, true
+		}
+	}
+	return batchfactoryv11.ProductionJob{}, false
 }
 
 func productionJobComplete(job batchfactoryv11.ProductionJob) bool {
