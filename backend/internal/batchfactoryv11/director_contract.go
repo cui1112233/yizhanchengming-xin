@@ -417,6 +417,10 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 
 【批量工厂统一返回契约】
 在同一个合法 JSON 对象中返回 characters、scenes、props 三个数组。characters 的每项必须同时返回 name 与 prompt；prompt 必须是该人物可直接用于图片和视频一致性的完整详细外形，而不是简短标签。scenes 与 props 的每项也必须同时有非空 name 与 prompt。不得返回第二份外形结果、不得要求后续逐人调用。`
+		system += `
+
+【SD 资产预设四项权威】
+一次调用内先完成并综合：正式人物名单、人物事实、人物外形、人物关系；四项结果必须合并进 characters 的最终 prompt，并绑定人物姓名、别名、性别、年龄阶段、关系和跨镜头外形锚点。不得把四项拆成后续调用，也不得只返回摘要或只返回人物外形。`
 	}
 	return PromptContract{SystemPrompt: system, UserPrompt: string(payload), Temperature: 0.2, MaxTokens: 4000}, nil
 }

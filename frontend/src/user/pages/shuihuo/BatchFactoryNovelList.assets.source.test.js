@@ -100,3 +100,11 @@ test('asset chips hide the trigger @ while preserving the underlying mention tok
   assert.match(source, /contentEditable=\{false\} className=\{`batch-factory-asset-mention/);
   assert.match(source, /contenteditable=\"false\" data-asset-mention=/);
 });
+
+test('prompt caret offset tolerates a missing editor root', () => {
+  const start = source.indexOf('function contentEditableTextOffset(root)');
+  const end = source.indexOf('\nfunction contentEditablePromptText(root)', start);
+  const helper = start >= 0 && end > start ? source.slice(start, end) : '';
+  assert.match(helper, /if \(!root\)/);
+  assert.match(helper, /if \(!selection\?\.rangeCount \|\| !root\.contains\(selection\.anchorNode\)\)/);
+});

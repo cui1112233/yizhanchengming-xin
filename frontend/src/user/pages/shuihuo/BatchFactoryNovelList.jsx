@@ -881,6 +881,7 @@ function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
 }
 
 function contentEditableTextOffset(root) {
+  if (!root) return 0;
   const selection = typeof window !== 'undefined' ? window.getSelection() : null;
   if (!selection?.rangeCount || !root.contains(selection.anchorNode)) return contentEditablePromptText(root).length;
   let offset = 0;

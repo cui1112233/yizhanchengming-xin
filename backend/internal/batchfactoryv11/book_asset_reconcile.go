@@ -78,7 +78,6 @@ func addCoreNameLookups(ids map[string]string, kind string, rows [][2]string) {
 	}
 }
 
-
 // reconcileDirectorAssets matches the freshly extracted director assets onto
 // the rows already saved for the book, then decides what to keep, insert and
 // delete. Matching rules:
@@ -87,10 +86,9 @@ func addCoreNameLookups(ids map[string]string, kind string, rows [][2]string) {
 //     least one side has no note and the match is unique on both sides.
 //
 // Matched rows are frozen: the saved name, prompt and preset stay as they are,
-// even if the AI reworded them in this run. Stale director rows are deleted
-// only when they have no image; manual rows are never changed or removed. New
-// videos are rebuilt after this step, so no active video can reference rows
-// that the new output dropped.
+// even if the AI reworded them in this run. Asset extraction is a merge, not a
+// destructive replacement: stale director rows remain available when a model
+// response omits them, while manual rows are never changed or removed.
 func reconcileDirectorAssets(existing []existingAssetRow, desired []BookAsset, hasImage map[string]bool) directorAssetReconcile {
 	existingMatch := make([]int, len(existing)) // -> desired index
 	desiredMatch := make([]int, len(desired))   // -> existing index
@@ -171,14 +169,8 @@ func reconcileDirectorAssets(existing []existingAssetRow, desired []BookAsset, h
 		// bump — and no duplicate is inserted.
 		plan.MatchedIDs = append(plan.MatchedIDs, existing[ei].ID)
 	}
-	for ei, row := range existing {
-		if row.Source != "director" || existingMatch[ei] != -1 {
-			continue
-		}
-		if hasImage[row.ID] {
-			continue // keep rows with uploaded/generated visuals even if output dropped them
-		}
-		plan.Deletes = append(plan.Deletes, row.ID)
-	}
+	// Do not delete unmatched rows here. A partial AI response must not remove
+	// a previously extracted prop, scene, or character and break existing @
+	// references. Explicit user deletion remains the only deletion path.
 	return plan
 }

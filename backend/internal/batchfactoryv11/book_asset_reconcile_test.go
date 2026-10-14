@@ -44,7 +44,7 @@ func TestReconcileDirectorAssetsFreezesMatchedRow(t *testing.T) {
 	}
 }
 
-func TestReconcileDirectorAssetsDeletesStaleRowsWithoutImages(t *testing.T) {
+func TestReconcileDirectorAssetsPreservesExistingRowsWhenOutputOmitsThem(t *testing.T) {
 	existing := []existingAssetRow{
 		{ID: "asset-keep", Kind: "character", Name: "林溪", Source: "director"},
 		{ID: "asset-stale", Kind: "character", Name: "路人甲", Source: "director"},
@@ -56,8 +56,8 @@ func TestReconcileDirectorAssetsDeletesStaleRowsWithoutImages(t *testing.T) {
 	if len(plan.MatchedIDs) != 1 || plan.MatchedIDs[0] != "asset-keep" {
 		t.Fatalf("kept asset missing: %+v", plan)
 	}
-	if len(plan.Deletes) != 1 || plan.Deletes[0] != "asset-stale" {
-		t.Fatalf("stale asset must be deleted: %+v", plan)
+	if len(plan.Deletes) != 0 {
+		t.Fatalf("an incomplete asset output must not delete existing rows: %+v", plan)
 	}
 }
 
@@ -103,8 +103,8 @@ func TestReconcileDirectorAssetsReplacesDifferentNotesWhenNoImages(t *testing.T)
 	if len(plan.Inserts) != 1 || plan.Inserts[0].Name != "儿子（小火山）" {
 		t.Fatalf("new different-note character must be inserted: %+v", plan)
 	}
-	if len(plan.Deletes) != 1 || plan.Deletes[0] != "asset-son-a" {
-		t.Fatalf("imageless old same-core row must be replaced: %+v", plan)
+	if len(plan.Deletes) != 0 {
+		t.Fatalf("different-note output must not delete the old row during a merge: %+v", plan)
 	}
 
 	// If the old row has a generated/uploaded image, it is protected and both
@@ -143,8 +143,8 @@ func TestReconcileDirectorAssetsSkipsAmbiguousCoreMatches(t *testing.T) {
 	if len(plan2.MatchedIDs) != 0 {
 		t.Fatalf("ambiguous desired core must not match in place: %+v", plan2)
 	}
-	if len(plan2.Inserts) != 2 || len(plan2.Deletes) != 1 {
-		t.Fatalf("ambiguous desired rows insert; old imageless row is replaced: %+v", plan2)
+	if len(plan2.Inserts) != 2 || len(plan2.Deletes) != 0 {
+		t.Fatalf("ambiguous desired rows insert; old row remains available: %+v", plan2)
 	}
 }
 

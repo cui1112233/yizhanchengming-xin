@@ -121,6 +121,30 @@ func TestBuildAssetExtractionContractCarriesSavedStyleSystemIntoSelectedAssetRul
 	}
 }
 
+func TestBuildAssetExtractionContractRequiresTheFourSDAssetAuthorities(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+			"assets": map[string]any{"enabled": true, "extraction": map[string]any{
+				"presetId": "batch-assets-sd-character-scene", "presetKey": "sd-character-scene", "body": "SD ASSET RULE",
+			}},
+		})}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+	contract, err := BuildAssetExtractionContract(book, DirectorSnapshot{Effective: batch.SettingsState.Patch})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"正式人物名单", "人物事实", "人物外形", "人物关系", "一次调用", "合并"} {
+		if !strings.Contains(contract.SystemPrompt, required) {
+			t.Fatalf("SD asset contract missing %q:\n%s", required, contract.SystemPrompt)
+		}
+	}
+}
+
 func TestDirectorReadbackUsesShotTimelineUnlessTheUserEditedThatVideo(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	provider := &queuedDirectorProvider{values: []string{validDirectorJSON()}}
