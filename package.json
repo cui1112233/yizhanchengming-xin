@@ -2,7 +2,6 @@
   "name": "qiantie",
   "scripts": {
     "start": "pwsh -File scripts/start-local-go-review.ps1",
-    "start:node-legacy": "node server.js",
     "frontend:install": "npm --prefix frontend install",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",

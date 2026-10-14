@@ -44,3 +44,9 @@ test('runtime topology declares every public V88 service and excludes host-local
     assert.ok(manifest.services.find((service) => service.id === id).dependsOn.includes('mysql'));
   }
 });
+
+test('package defaults to Go and exposes no Node application start script', () => {
+  const pkg = loadManifest('package.json');
+  assert.match(pkg.scripts.start, /start-local-go-review\.ps1/);
+  assert.equal(Object.prototype.hasOwnProperty.call(pkg.scripts, 'start:node-legacy'), false);
+});
