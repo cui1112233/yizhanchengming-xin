@@ -14,6 +14,8 @@
   "services": [
     {
       "id": "browser-worker",
+      "classification": "legacy-opt-in",
+      "activation": "required only for authenticated 视频管理系统 browser login/upload flows",
       "source": {
         "kind": "v88-build",
         "buildFile": "services/121-browser-worker/Dockerfile",
@@ -81,13 +83,14 @@
         "internalPorts": [80],
         "publishedPorts": [{"host": 80, "target": 80}, {"host": 3000, "target": 80}],
         "owner": "public-ingress",
-        "upstream": "go-api:3000 (v88-node is a compatibility DNS alias)",
+        "upstream": "go-api:3000",
         "https": "not declared; do not publish 443 until a tracked TLS listener and certificate renewal contract are verified."
       },
       "retirementGate": "Verify replacement listener ownership, application proxy routes, certificate renewal, external exact-SHA identity and rollback before changing public ingress."
     },
     {
       "id": "node",
+      "classification": "legacy-opt-in",
       "source": {
         "kind": "v88-build",
         "buildFile": "Dockerfile",
@@ -101,7 +104,7 @@
         "releaseIdentitySelector": "QIANTIE_NODE_RELEASE_SHA"
       },
       "dependsOn": ["go-api", "browser-worker", "shuihuo-compat"],
-      "activation": "legacy profile only; not part of the default public chain",
+      "activation": "legacy profile only; not part of the default public chain or public ingress",
       "persistentDataPurpose": ["batch-book-data", "business-output-media"],
       "publicExposure": {"internalPorts": [3000], "publishedPorts": [], "owner": "internal-only; public requests arrive through nginx"},
       "retirementGate": "Verify replacement authenticated UI/API, source text persistence, batch ledger and media readback with exact release identity and a tested rollback before retiring Node or its persistent stores."

@@ -53,7 +53,7 @@ test('public Go-only topology routes nginx to Go and isolates legacy services', 
   assert.deepEqual(nginx.depends_on, {
     'go-api': { condition: 'service_started', required: true },
   });
-  assert.ok(goApi.networks.qiantie_internal.aliases.includes('v88-node'));
+  assert.equal(goApi.networks?.qiantie_internal?.aliases, undefined);
   assert.equal(environmentValue(goApi, 'QIANTIE_BATCH_FACTORY_V11_SLICE'), '${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}');
   assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);
@@ -68,7 +68,7 @@ test('public base topology is Go-first without a second default request path', (
   assert.equal(nginx.depends_on['go-api'].condition, 'service_started');
   assert.equal(nginx.depends_on['v88-node'], undefined);
   assert.ok(goApi.expose.includes('3000'));
-  assert.ok(goApi.networks.qiantie_internal.aliases.includes('v88-node'));
+  assert.equal(goApi.networks?.qiantie_internal?.aliases, undefined);
   assert.equal(environmentValue(goApi, 'QIANTIE_BATCH_FACTORY_V11_SLICE'), '${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}');
   assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);

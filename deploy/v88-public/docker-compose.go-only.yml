@@ -1,14 +1,13 @@
 # Go-only public topology.
 #
 # Use with docker-compose.yml and the existing protected env file.  The Go
-# binary embeds the web UI, so nginx keeps its existing upstream name through
-# a network alias while the Node platform, browser worker, and old Shuihuo
-# compatibility service are all opt-in legacy profiles.
+# binary embeds the web UI, so nginx points directly at Go while the Node
+# platform, browser worker, and old Shuihuo compatibility service remain
+# opt-in legacy profiles.
 
 services:
   go-api:
-    # Keep the existing Nginx upstream name/port working while the upstream
-    # process itself is the native Go API.
+    # The upstream process itself is the native Go API.
     expose:
       - "3000"
     environment:
@@ -25,9 +24,7 @@ services:
       - v88_data:/app/data
       - go_api_artifacts:/data/local-executor-artifacts
     networks:
-      qiantie_internal:
-        aliases:
-          - v88-node
+      - qiantie_internal
 
   browser-worker:
     profiles: ["node-legacy"]

@@ -15,41 +15,31 @@ function composeConfig() {
   ], { cwd: root, encoding: 'utf8' }));
 }
 
-test('public Compose renders V88 and isolated Shuihuo DNS-only request chains', () => {
+test('public Compose renders the Go ingress by default and keeps legacy services opt-in', () => {
   const config = composeConfig();
   const services = config.services;
 
-  assert.deepEqual(Object.keys(services).sort(), ['browser-worker', 'go-api', 'nginx', 'shuihuo-compat', 'v88-node']);
-  assert.equal(services['v88-node'].environment.QIANTIE_GO_BASE_URL, 'http://go-api:4000');
-  assert.equal(services['v88-node'].environment.QIANTIE_SHUIHUO_COMPAT_BASE_URL, 'http://shuihuo-compat:4100');
-  assert.equal(services['v88-node'].environment.QIANTIE_121_BROWSER_WORKER_URL, 'http://browser-worker:8787');
-  assert.equal(services['v88-node'].environment.QIANTIE_121_CLIENT_TIMEOUT_MS, '40000');
-  assert.equal(services['v88-node'].depends_on['browser-worker'].condition, 'service_healthy');
-  assert.ok(services['browser-worker'].healthcheck);
+  assert.deepEqual(Object.keys(services).sort(), ['go-api', 'nginx']);
   assert.equal(services['go-api'].environment.QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER, '1');
   assert.equal(services['go-api'].environment.QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED, '1');
   assert.match(services['go-api'].environment.QIANTIE_MYSQL_DSN, /@tcp\(mysql:3306\)\//);
-  assert.match(services['shuihuo-compat'].environment.QIANTIE_MYSQL_DSN, /\/qiantie_shuihuo_compat\?/);
-  assert.doesNotMatch(services['shuihuo-compat'].environment.QIANTIE_MYSQL_DSN, /\/qiantie_shuihuo\?/);
-  assert.equal(services['shuihuo-compat'].environment.QIANTIE_ADDR, ':4100');
   assert.deepEqual(services.nginx.ports, [
     { mode: 'ingress', target: 80, published: '80', protocol: 'tcp' },
     { mode: 'ingress', target: 80, published: '3000', protocol: 'tcp' },
   ]);
   assert.ok(services.nginx.volumes.some(volume => volume.target === '/etc/letsencrypt' && volume.read_only));
-  assert.equal(services['v88-node'].build, undefined);
   assert.equal(services['go-api'].build, undefined);
   assert.equal(config.networks.qiantie_internal.external, true);
 });
 
-test('public Nginx proxies application requests only through the Node service', () => {
+test('public Nginx proxies application requests only through the Go service', () => {
   const nginx = fs.readFileSync(nginxFile, 'utf8');
 
-  assert.match(nginx, /proxy_pass http:\/\/v88-node:3000;/);
+  assert.match(nginx, /proxy_pass http:\/\/go-api:3000;/);
   assert.match(nginx, /server_name yzcm\.site;/);
   assert.match(nginx, /ssl_session_cache shared:SSL:10m;/);
   assert.match(nginx, /ssl_session_timeout 1d;/);
   assert.match(nginx, /keepalive_requests 1000;/);
-  assert.doesNotMatch(nginx, /proxy_pass http:\/\/go-api:4000;/);
+  assert.doesNotMatch(nginx, /proxy_pass http:\/\/v88-node:3000;/);
   assert.doesNotMatch(nginx, /18081|172\.19\.|host\.docker\.internal/);
 });

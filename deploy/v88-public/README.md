@@ -14,12 +14,12 @@ The only permitted secret material is deploy-time environment values and certifi
 
 | Manifest ID | Runtime role | Source-owned configuration | Dependencies |
 | --- | --- | --- | --- |
-| `node` | Frontend and authenticated application/API entry; Compose name `v88-node` | `docker-compose.yml`, root `Dockerfile`, `server.js` | Go API, Browser Worker, Shuihuo compatibility |
-| `go-api` | Batch/business Go API and persistent local executor artifacts | `docker-compose.yml`, `backend/Dockerfile` | MySQL |
+| `node` | Legacy opt-in compatibility entry only; never part of the default public path | `docker-compose.yml`, root `Dockerfile`, `server.js` | Go API, Browser Worker, Shuihuo compatibility |
+| `go-api` | Default frontend, authenticated application/API entry, batch/business API and persistent local executor artifacts | `docker-compose.yml`, `backend/Dockerfile` | MySQL |
 | `browser-worker` | 视频管理系统 browser login, session reuse and upload operations | `docker-compose.yml`, `services/121-browser-worker/Dockerfile` | None declared internally |
 | `shuihuo-compat` | Retained compatibility API with isolated database and object storage | `docker-compose.yml`; retained image provenance remains a gap | MySQL |
 | `mysql` | Retained account/business database and isolated compatibility database | Public startup definition remains a Git ownership gap | None declared internally |
-| `nginx` | Public ingress forwarding application traffic to Node | `docker-compose.yml`, `nginx.conf` | Node |
+| `nginx` | Public ingress forwarding application traffic to Go | `docker-compose.yml`, `nginx.conf` | Go API |
 
 The manifest includes runtime dependencies even when Compose does not declare startup ordering: both Go and Shuihuo compatibility use the internal MySQL alias. The current base Compose declares five services; MySQL remains external. Its exact image, startup inputs, network ownership and live listener bindings require sanitized evidence before adding a source-owned definition. Do not infer a public MySQL image from a local preview configuration.
 

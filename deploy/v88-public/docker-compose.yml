@@ -60,9 +60,7 @@ services:
     expose:
       - "3000"
     networks:
-      qiantie_internal:
-        aliases:
-          - v88-node
+      - qiantie_internal
 
   browser-worker:
     profiles: ["node-legacy"]
