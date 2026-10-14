@@ -94,7 +94,8 @@ test('direct activation waits for Go health before reloading Nginx', (t) => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const calls = fs.readFileSync(f.log, 'utf8');
   assert.match(calls, /up -d --no-deps --force-recreate --pull never go-api[\s\S]*inspect --format[\s\S]*restart nginx/);
-  assert.doesNotMatch(calls, /v88-node/);
+  assert.match(calls, /restart nginx[\s\S]*rm -sf v88-node/);
+  assert.doesNotMatch(calls, /up -d[^\n]*v88-node/);
 });
 
 for (const sha of ['abcdef0', 'g'.repeat(40), 'a'.repeat(41)]) {

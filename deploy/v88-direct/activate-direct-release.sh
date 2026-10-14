@@ -193,6 +193,11 @@ if [ "$ext" != "$SHA" ]; then
   exit 8
 fi
 
+# 7) Go 已通过内网健康检查和公网精确 SHA 验收后，才清理仍残留的旧
+# Node 容器。配置文件和镜像仍保留为明确的回滚资料，但默认运行态只
+# 保留 Go，避免两个应用同时处理同一条业务链路。
+docker compose -f "$BASE_COMPOSE" -f "$OVERRIDE" rm -sf v88-node >/dev/null 2>&1 || true
+
 # 成功：把上一版记成 previous，方便手工一键回退。
 if [ -n "$PREV_DIR" ] && [ -d "$PREV_DIR" ]; then
   ln -sfn "$PREV_DIR" "$DIRECT_ROOT/previous"
