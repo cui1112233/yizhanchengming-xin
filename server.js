@@ -20,6 +20,16 @@ const { HOST, PORT } = require('./lib/shared');
 const { createApp } = require('./app');
 const { apiAuth } = require('./middleware/auth');
 const { migrateLegacyScriptPromptPresets } = require('./lib/script-prompt-preset-migration');
+const nodeLegacyAPIEnabled = String(process.env.QIANTIE_NODE_LEGACY_API || '') === '1';
+
+// Go is the only default application runtime. Refuse direct Node startup too,
+// so bypassing start-local-node.ps1 cannot accidentally create a second
+// resident business service. Legacy Node remains available only as an
+// explicit, temporary rollback profile.
+if (!nodeLegacyAPIEnabled) {
+  console.error('Node 兼容服务默认已停用，请使用 Go 服务；仅在明确回滚时设置 QIANTIE_NODE_LEGACY_API=1。');
+  process.exit(78);
+}
 
 // ============================================================
 // 启动服务器
@@ -28,7 +38,6 @@ const { migrateLegacyScriptPromptPresets } = require('./lib/script-prompt-preset
 // 其余请求继续原样进入现有 V78 Express 应用，避免重写旧兼容页面或 API。
 const app = express();
 const coreApp = createApp();
-const nodeLegacyAPIEnabled = String(process.env.QIANTIE_NODE_LEGACY_API || '') === '1';
 
 // 2026-09-06 剧本提示词收口：只有仍等于旧系统默认正文的后台预设才自动
 // 升级为当前“分段开头 / 分镜模式 / 通用规则”元提示词。管理员已经编辑过
