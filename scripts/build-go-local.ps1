@@ -46,7 +46,12 @@ if (-not (Test-Path (Join-Path $novelFetchPatchSource 'v78-novel-fetch-v2-runtim
   throw "Novel fetch V78 compatibility scripts are missing: $novelFetchPatchSource"
 }
 Copy-Item -Path (Join-Path $novelFetchPatchSource '*') -Destination $novelFetchDist -Recurse -Force
-node (Join-Path $repo 'scripts/compose-novel-fetch-v2.js') (Join-Path $novelFetchSource 'index.html') (Join-Path $novelFetchDist 'index.html')
+Push-Location (Join-Path $repo 'backend')
+try {
+  go run ./cmd/compose-novel-fetch (Join-Path $novelFetchSource 'index.html') (Join-Path $novelFetchDist 'index.html')
+} finally {
+  Pop-Location
+}
 
 if (-not (Test-Path (Join-Path $petsSource 'stacky/spritesheet.webp'))) {
   throw "Pet assets are missing: $petsSource"
