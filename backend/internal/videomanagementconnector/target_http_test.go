@@ -3,6 +3,7 @@ package videomanagementconnector
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -70,5 +71,51 @@ func TestTargetHTTPServiceRejectsInvalidTargetURL(t *testing.T) {
 	_, err := service.Login(context.Background(), LoginInput{Username: "u", Password: "p"})
 	if err == nil || !strings.Contains(fmt.Sprint(err), "target site") {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestTargetHTTPServiceOwnsMediaAndConfigurationReads(t *testing.T) {
+	var uploaded []byte
+	serverURLPlaceholder := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/tttadmin/api/music_put_url.php":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"success":true,"data":{"files":[{"upload_url":%q,"object_key":"obj-1","bucket_url":"https://bucket.example/obj-1","headers":{"X-Test":"ok"}}]}}`, serverURLPlaceholder)))
+		case "/object":
+			if r.Method != http.MethodPut || r.Header.Get("X-Test") != "ok" {
+				t.Errorf("unexpected object upload: %s %q", r.Method, r.Header.Get("X-Test"))
+			}
+			var err error
+			uploaded, err = io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+		case "/tttadmin/api/zdy_config.php":
+			_, _ = w.Write([]byte(`{"data":[{"id":"1","config_name":"测试档"}]}`))
+		case "/tttadmin/zidingyi.php":
+			_, _ = w.Write([]byte(`<option value="101">古风虐文</option>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	// The handler needs the server URL before serving the presign response.
+	serverURLPlaceholder = server.URL + "/object"
+	service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+	session := Session{Cookie: "sid=ok"}
+	if _, err := service.UploadVideo(context.Background(), session, "head.mp4", []byte("video")); err != nil {
+		t.Fatal(err)
+	}
+	if string(uploaded) != "video" {
+		t.Fatalf("uploaded=%q", uploaded)
+	}
+	profiles, err := service.RefreshProfiles(context.Background(), session)
+	if err != nil || len(arrayOfMaps(mapOrEmpty(profiles)["data"])) != 1 {
+		t.Fatalf("profiles=%#v err=%v", profiles, err)
+	}
+	styles, err := service.RefreshStyles(context.Background(), session)
+	if err != nil || !strings.Contains(styles, "古风虐文") {
+		t.Fatalf("styles=%q err=%v", styles, err)
 	}
 }
