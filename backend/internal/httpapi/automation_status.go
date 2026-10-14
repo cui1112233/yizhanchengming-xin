@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
@@ -47,6 +49,7 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	if err := json.Unmarshal(raw, &state); err != nil {
 		return nil, fmt.Errorf("decode automation status: %w", err)
 	}
+	matched := make([]map[string]any, 0, len(state.Jobs))
 	for _, encoded := range state.Jobs {
 		var job map[string]any
 		if json.Unmarshal(encoded, &job) != nil {
@@ -55,9 +58,39 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		if strings.TrimSpace(toString(job["owner"])) != strings.TrimSpace(owner) || strings.TrimSpace(toString(job["batchId"])) != strings.TrimSpace(batchID) {
 			continue
 		}
-		return publicAutomationJob(job), nil
+		matched = append(matched, job)
+	}
+	if len(matched) > 0 {
+		// Jobs are persisted in a JSON object, whose iteration order is not
+		// defined. Always expose the newest run; otherwise an old failed run
+		// can randomly hide a later successful run in the UI.
+		sort.SliceStable(matched, func(i, j int) bool {
+			left := automationJobTime(matched[i])
+			right := automationJobTime(matched[j])
+			if left.Equal(right) {
+				return toString(matched[i]["id"]) > toString(matched[j]["id"])
+			}
+			return left.After(right)
+		})
+		return publicAutomationJob(matched[0]), nil
 	}
 	return idle, nil
+}
+
+func automationJobTime(job map[string]any) time.Time {
+	for _, key := range []string{"updatedAt", "completedAt", "startedAt", "createdAt"} {
+		value := strings.TrimSpace(toString(job[key]))
+		if value == "" {
+			continue
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			return parsed
+		}
+		if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }
 
 func idleAutomationCounts() map[string]any {

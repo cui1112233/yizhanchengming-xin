@@ -34,6 +34,21 @@ func TestFileAutomationStatusReaderMatchesNodePublicShape(t *testing.T) {
 	}
 }
 
+func TestFileAutomationStatusReaderUsesNewestMatchingRun(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "automation.json")
+	raw := `{"jobs":{"old":{"owner":"alice","batchId":"batch-1","id":"old-run","state":"failed","updatedAt":"2026-10-14T12:10:33Z","books":{}},"new":{"owner":"alice","batchId":"batch-1","id":"new-run","state":"completed","updatedAt":"2026-10-14T12:44:22Z","books":{}}}}`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewFileAutomationStatusReader(path).Status("alice", "batch-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status["id"] != "new-run" || status["state"] != "completed" {
+		t.Fatalf("reader returned stale run: %#v", status)
+	}
+}
+
 func TestV12AutomationStatusRouteUsesPersistedState(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	path := filepath.Join(t.TempDir(), "automation.json")
