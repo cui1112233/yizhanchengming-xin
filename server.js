@@ -19,8 +19,6 @@ if (process.env.NODE_ENV === 'production' && !String(process.env.QIANTIE_BRIDGE_
 const { HOST, PORT } = require('./lib/shared');
 const { createApp } = require('./app');
 const { apiAuth } = require('./middleware/auth');
-const { createNovelFetchV2PageMiddleware } = require('./lib/novel-fetch-workshop/v2-page');
-const { attachV78NovelFetchV2 } = require('./lib/novel-fetch-workshop/v2-compose');
 const { migrateLegacyScriptPromptPresets } = require('./lib/script-prompt-preset-migration');
 
 // ============================================================
@@ -40,8 +38,12 @@ migrateLegacyScriptPromptPresets(coreApp.locals.presetStore, 'choushiyiguai');
 // Shell-level V31 routes must authenticate against exactly the same runtime as
 // coreApp; otherwise a valid core session would be rejected before reaching it.
 app.locals.authRuntime = coreApp.locals.authRuntime;
-app.get(['/batch-rewrite/index.html', '/batch-rewrite/'], createNovelFetchV2PageMiddleware());
-attachV78NovelFetchV2({ shellApp: app, coreApp, bodyParser: express.json({ limit: '50mb' }) });
+if (nodeLegacyAPIEnabled) {
+  const { createNovelFetchV2PageMiddleware } = require('./lib/novel-fetch-workshop/v2-page');
+  const { attachV78NovelFetchV2 } = require('./lib/novel-fetch-workshop/v2-compose');
+  app.get(['/batch-rewrite/index.html', '/batch-rewrite/'], createNovelFetchV2PageMiddleware());
+  attachV78NovelFetchV2({ shellApp: app, coreApp, bodyParser: express.json({ limit: '50mb' }) });
+}
 
 // V88 script smart-unified semantics: when the user explicitly selects
 // “画面前缀词 → 智能统一”, run an independent full-source visual analysis first.
