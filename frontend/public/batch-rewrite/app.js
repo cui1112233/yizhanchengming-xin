@@ -25,6 +25,7 @@ const DEFAULT_COLUMN_ORDER = "书籍ID,书名,推荐理由,男女频,标签,评�
 const WORK_FORM_STORAGE_KEY = "batchRewrite.workForm.v1";
 const LEGACY_WORK_INPUT_SAMPLE_PREFIX = "7674515088685943832\t";
 const API_ROOT = "/api/batch-rewrite";
+const WEB_SUBMIT_API = "/api/novel-fetch-workshop/web-submit";
 const PLATFORM_API_TIMEOUT_MS = 15000;
 const PER_BOOK_MATERIAL_LIMIT = 8;
 const PROCESS_JOB_TIMEOUT_MS = 10 * 60 * 1000;
@@ -92,7 +93,9 @@ async function api(path, options = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
   try {
-    const requestUrl = /^\/api\/models(?:\?|$)/.test(String(path || ""))
+    const requestUrl = String(path || "").startsWith(WEB_SUBMIT_API)
+      ? String(path)
+      : /^\/api\/models(?:\?|$)/.test(String(path || ""))
       ? String(path)
       : `${API_ROOT}${legacyPath}`;
     response = await fetch(requestUrl, { headers, ...options });
@@ -1915,7 +1918,7 @@ function setVersionConfigStatus(text) {
 async function saveWebSubmitConfig(silent = false) {
   if (!silent) setSiteSubmitStatus("网站提交配置保存中...");
   try {
-    const result = await api("/api/web-submit/config", {
+    const result = await api(`${WEB_SUBMIT_API}/config`, {
       method: "POST",
       body: JSON.stringify({ settings: syncFormToWebSubmitConfig() }),
     });
@@ -1994,7 +1997,7 @@ function renderWebSubmitOperation(operation) {
 async function waitWebSubmitOperation(id) {
   const deadline = Date.now() + (5 * 60 * 1000);
   for (;;) {
-    const operation = await api(`/api/web-submit/operations/${encodeURIComponent(id)}`);
+    const operation = await api(`${WEB_SUBMIT_API}/operations/${encodeURIComponent(id)}`);
     renderWebSubmitOperation(operation);
     if (operation.status === "done" || operation.status === "failed") return operation;
     if (Date.now() >= deadline) throw new Error("121 后台操作等待超时，请稍后刷新查看状态");
@@ -2009,7 +2012,7 @@ async function syncWebSubmit(kind) {
   setModalBusy("versionConfigCard", true);
   try {
     await saveWebSubmitConfig(true);
-    const operation = await api("/api/web-submit/operations", {
+    const operation = await api(`${WEB_SUBMIT_API}/operations`, {
       method: "POST",
       body: JSON.stringify({ kind }),
     });
@@ -2038,7 +2041,7 @@ async function checkWebEnvironment() {
   setSiteSubmitStatus("正在检查内置运行环境...");
   try {
     await saveWebSubmitConfig(true);
-    const result = await api("/api/web-submit/environment");
+    const result = await api(`${WEB_SUBMIT_API}/environment`);
     const rows = asArray(result.checks).map((item) => `
       <div class="site-skipped-row">
         <code>${escapeHtml(item.ok ? "正常" : "异常")}</code>
@@ -2136,7 +2139,7 @@ function renderWebSubmitHistory(records = []) {
 
 async function loadWebSubmitHistory() {
   try {
-    const data = await api("/api/web-submit/history");
+    const data = await api(`${WEB_SUBMIT_API}/history`);
     renderWebSubmitHistory(data.records || []);
   } catch (error) {
     const box = $("siteSubmitHistory");
@@ -2175,7 +2178,7 @@ async function previewWebSubmit(mode) {
   setSiteSubmitStatus("正在预览网站提交分组...");
   try {
     await saveWebSubmitConfig(true);
-    const result = await api("/api/web-submit/preview", {
+    const result = await api(`${WEB_SUBMIT_API}/preview`, {
       method: "POST",
       body: JSON.stringify(webSubmitRequestPayload(mode, false)),
     });
@@ -2202,7 +2205,7 @@ async function submitWebSubmit(mode, explicitIds = null) {
   try {
     await saveWebSubmitConfig(true);
     setBatchStatus(`上传中：${label}`);
-    const submitPromise = api("/api/web-submit/submit", {
+    const submitPromise = api(`${WEB_SUBMIT_API}/submit`, {
       method: "POST",
       body: JSON.stringify(webSubmitRequestPayload(mode, mode === "failed", selectedIdsForSubmit)),
     });
@@ -2220,7 +2223,7 @@ async function submitWebSubmit(mode, explicitIds = null) {
     renderWebSubmitGroups(result);
     renderTasks(result.tasks || state.tasks);
     await loadWebSubmitHistory();
-    if (Number(result.failed_groups) > 0) reportBatchIssue("result", "/api/web-submit/submit", `网站提交失败 ${result.failed_groups} 组`);
+    if (Number(result.failed_groups) > 0) reportBatchIssue("result", `${WEB_SUBMIT_API}/submit`, `网站提交失败 ${result.failed_groups} 组`);
     const summary = `提交完成：已确认 ${result.success_groups || 0} 组，121 待确认 ${result.accepted_groups || 0} 组，失败 ${result.failed_groups || 0} 组`;
     setSiteSubmitStatus(summary);
     setBatchStatus(summary);
@@ -3602,7 +3605,7 @@ async function reprocessSensitive(ids, restoreFromBackup) {
 // session with a transient timeout).
 window.qiantieEnsureWebLoginEnvironment = function qiantieEnsureWebLoginEnvironment() {
   if (window.__qiantieWebLoginEnvironmentPromise) return window.__qiantieWebLoginEnvironmentPromise;
-  window.__qiantieWebLoginEnvironmentPromise = api("/api/web-submit/environment")
+  window.__qiantieWebLoginEnvironmentPromise = api(`${WEB_SUBMIT_API}/environment`)
     .then(environment => {
       state.webLoginSession = environment?.ok === true;
       renderWebLoginStatus(state.config?.web_submit || {});

@@ -108,7 +108,8 @@ test('121 login delegates to the asynchronous operation flow', () => {
   assert.doesNotMatch(source, /stopImmediatePropagation/);
   assert.doesNotMatch(source, /api\('\/api\/web-submit\/config'/);
   const appSource = readRequired('public/batch-rewrite/app.js');
-  assert.match(appSource, /api\("\/api\/web-submit\/operations"/);
+  assert.match(appSource, /WEB_SUBMIT_API\s*=\s*["']\/api\/novel-fetch-workshop\/web-submit["']/);
+  assert.match(appSource, /api\(`\$\{WEB_SUBMIT_API\}\/operations`/);
   assert.match(appSource, /waitWebSubmitOperation\(operation\.id\)/);
   assert.match(appSource, /121 后台操作等待超时/);
   assert.match(appSource, /passwordInput\.value\s*=\s*""/);

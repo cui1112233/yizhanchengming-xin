@@ -2,6 +2,7 @@
   if (window.QiantieNovelFetchRuntime) return;
 
   const API_ROOT = '/api/batch-rewrite';
+  const WEB_SUBMIT_API = '/api/novel-fetch-workshop/web-submit';
   const inFlight = new Map();
   const controllers = new Map();
   const cache = new Map();
@@ -33,6 +34,7 @@
 
   function requestUrl(normalized) {
     // 文本模型目录属于统一 API 配置路由，不属于旧工作台资源路由。
+    if (normalized.startsWith(WEB_SUBMIT_API.slice(4))) return `/api${normalized}`;
     return /^\/models(?:\?|$)/.test(normalized) ? `/api${normalized}` : `${API_ROOT}${normalized}`;
   }
 
