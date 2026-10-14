@@ -525,6 +525,12 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
+		// Batch Factory's final 121 upload is implemented by the Go publisher;
+		// keep it on the native router instead of sending it to the retired Node
+		// compatibility response.
+		if strings.HasSuffix(path, "/publish-121") {
+			return false
+		}
 		// V12 automation start is owned by the native Go coordinator. Keep the
 		// legacy Node controller out of this request so one click cannot create
 		// two different jobs or silently fall back to the old runtime.

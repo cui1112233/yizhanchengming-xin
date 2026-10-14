@@ -204,6 +204,16 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
+	var mergeReader mergeworker.ObjectReader
+	if candidate, ok := options.MergeOutput.(mergeworker.ObjectReader); ok {
+		mergeReader = candidate
+	}
+	publish121 := &BatchFactory121Publisher{Store: options.Store, UsersDir: options.UserDataDir, LocalFiles: options.LocalArtifacts, MergedFiles: mergeReader}
+	if options.AutomationCoordinator != nil {
+		options.AutomationCoordinator.publish121 = publish121
+	}
+	registerBatchFactory121Publish(v11, auth, publish121)
+	registerBatchFactory121Publish(v12, auth, publish121)
 	if options.Store != nil {
 		registerV12SmartUnifiedRefresh(v12, auth, options.Store, options.TextProvider)
 	}
@@ -278,6 +288,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir)
 	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore)
 	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir)
+	publish121OrganizationsHandler(root, auth, options.UserDataDir)
 	if options.UserConfigStore != nil {
 		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)
 		RegisterAgentChatCompat(root, auth, options.UserConfigStore.BaseDir, options.TextProvider)

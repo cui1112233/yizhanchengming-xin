@@ -32,6 +32,7 @@ type BatchAutomationCoordinator struct {
 	path         string
 	now          func() time.Time
 	providerSync func(context.Context, string) error
+	publish121   *BatchFactory121Publisher
 	mu           sync.Mutex
 }
 
@@ -373,22 +374,31 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		if automationBoolValue(job["autoPublish"]) {
 			entry["stage"], entry["message"], entry["updatedAt"] = "upload", "正在上传视频管理系统", c.now()
 			persist()
-			if c.external == nil {
+			if c.publish121 != nil {
+				publishCtx, publishCancel := context.WithTimeout(ctx, stageTimeout)
+				_, publishErr := c.publish121.Submit(publishCtx, owner, batchID, book.ID, map[string]any{})
+				publishCancel()
+				if publishErr != nil {
+					fail("upload", publishErr, "上传失败")
+					continue
+				}
+			} else if c.external == nil {
 				fail("upload", fmt.Errorf("视频管理系统上传服务未配置"), "上传失败")
 				continue
-			}
-			publishCtx, publishCancel := context.WithTimeout(ctx, stageTimeout)
-			intent, publishErr := c.external.CreateIntent(publishCtx, owner, string(external.Provider121), batchID, book.ID, json.RawMessage(`{}`))
-			if publishErr == nil {
-				_, publishErr = c.external.ConfirmIntent(publishCtx, owner, intent.ID)
-			}
-			if publishErr == nil {
-				_, publishErr = c.external.Submit(publishCtx, owner, string(external.Provider121), intent.ID)
-			}
-			publishCancel()
-			if publishErr != nil {
-				fail("upload", publishErr, "上传失败")
-				continue
+			} else {
+				publishCtx, publishCancel := context.WithTimeout(ctx, stageTimeout)
+				intent, publishErr := c.external.CreateIntent(publishCtx, owner, string(external.Provider121), batchID, book.ID, json.RawMessage(`{}`))
+				if publishErr == nil {
+					_, publishErr = c.external.ConfirmIntent(publishCtx, owner, intent.ID)
+				}
+				if publishErr == nil {
+					_, publishErr = c.external.Submit(publishCtx, owner, string(external.Provider121), intent.ID)
+				}
+				publishCancel()
+				if publishErr != nil {
+					fail("upload", publishErr, "上传失败")
+					continue
+				}
 			}
 		}
 		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "completed", "已完成视频生成、合成与上传", c.now()
