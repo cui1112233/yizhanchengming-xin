@@ -1,9 +1,9 @@
 # Go-only public topology.
 #
-# Use with docker-compose.yml and the existing protected env file.  The Go
-# binary embeds the web UI, so nginx points directly at Go while the Node
-# platform, browser worker, and old Shuihuo compatibility service remain
-# opt-in legacy profiles.
+# Use with docker-compose.yml and the existing protected env file. The Go
+# binary embeds the web UI, so this overlay removes the Node platform,
+# browser worker, and old Shuihuo compatibility service from the active
+# compose graph instead of merely hiding them behind a legacy profile.
 
 services:
   go-api:
@@ -26,14 +26,11 @@ services:
     networks:
       - qiantie_internal
 
-  browser-worker:
-    profiles: ["node-legacy"]
+  browser-worker: !reset null
 
-  shuihuo-compat:
-    profiles: ["node-legacy"]
+  shuihuo-compat: !reset null
 
-  v88-node:
-    profiles: ["node-legacy"]
+  v88-node: !reset null
 
   nginx:
     # Replace the legacy dependency map with a Go-only dependency list. The

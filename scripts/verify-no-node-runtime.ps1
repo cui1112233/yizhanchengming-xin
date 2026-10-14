@@ -50,7 +50,11 @@ foreach ($root in $ConfigRoots) {
         foreach ($line in $nodeLines) {
           # Profiles marked node-legacy are retained rollback evidence, not a
           # default runtime. They remain reported but non-blocking.
-          $legacy = $text -match 'profiles:\s*\[\s*["'']node-legacy["'']\s*\]' -or
+          # A Compose !reset entry explicitly removes a legacy service from
+          # the active Go-only merge and is therefore not a runtime finding.
+          $removedByGoOnlyOverlay = $line -match '(?i)!reset\s+null'
+          $legacy = $removedByGoOnlyOverlay -or
+            $text -match 'profiles:\s*\[\s*["'']node-legacy["'']\s*\]' -or
             $relative -match '(?i)(^|[\\/])v78-public([\\/]|$)'
           Add-Finding 'compose-node-reference' $relative $line.Trim() (-not $legacy)
         }

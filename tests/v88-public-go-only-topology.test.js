@@ -42,7 +42,7 @@ function publicBaseConfig() {
   return JSON.parse(result.stdout);
 }
 
-test('public Go-only topology routes nginx to Go and isolates legacy services', () => {
+test('public Go-only topology routes nginx to Go and removes legacy services', () => {
   const config = publicGoOnlyConfig();
   const goApi = config.services['go-api'];
   const nginx = config.services.nginx;
@@ -55,9 +55,9 @@ test('public Go-only topology routes nginx to Go and isolates legacy services', 
   });
   assert.equal(goApi.networks?.qiantie_internal?.aliases, undefined);
   assert.equal(environmentValue(goApi, 'QIANTIE_BATCH_FACTORY_V11_SLICE'), '${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}');
-  assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
-  assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);
-  assert.deepEqual(config.services['shuihuo-compat'].profiles, ['node-legacy']);
+  assert.equal(config.services['v88-node'], undefined);
+  assert.equal(config.services['browser-worker'], undefined);
+  assert.equal(config.services['shuihuo-compat'], undefined);
 });
 
 test('public base topology is Go-first without a second default request path', () => {
