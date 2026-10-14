@@ -293,7 +293,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
 	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
 	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
-	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir)
+	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
 	publish121OrganizationsHandler(root, auth, options.UserDataDir)
 	if options.UserConfigStore != nil {
 		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)

@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
-func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
+func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, targets ...videomanagementconnector.Service) {
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
@@ -25,21 +27,27 @@ func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAu
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请先保存账号密码并登录目标站"})
 			return
 		}
-		check, err := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "验证失败"})
-			return
+		valid := false
+		if len(targets) > 0 && targets[0] != nil {
+			err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			valid = err == nil
+		} else {
+			check, err := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "验证失败"})
+				return
+			}
+			check.Header.Set("Cookie", cookie)
+			response, err := (&http.Client{Timeout: 30 * time.Second}).Do(check)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "目标站连接失败"})
+				return
+			}
+			defer response.Body.Close()
+			body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+			page := string(body)
+			valid = response.StatusCode >= 200 && response.StatusCode < 300 && targetPageLooksAuthenticated(page)
 		}
-		check.Header.Set("Cookie", cookie)
-		response, err := (&http.Client{Timeout: 30 * time.Second}).Do(check)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "目标站连接失败"})
-			return
-		}
-		defer response.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-		page := string(body)
-		valid := response.StatusCode >= 200 && response.StatusCode < 300 && targetPageLooksAuthenticated(page)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": valid, "output": []any{}, "result": map[string]any{"checks": map[string]any{"login_session": valid, "upload_endpoint": "/tttadmin/api/zbooklist_upload.php"}}})
 	})))
 	root.Handle("GET /api/batch-factory/v12/publish-121/organizations", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -54,15 +62,24 @@ func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAu
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请先保存账号密码并登录目标站"})
 			return
 		}
-		body, err := targetGET(req, "http://two.121w.com/tttadmin/api/organization.php", cookie)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
-			return
-		}
 		var payload any
-		if err := json.Unmarshal(body, &payload); err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录返回了无效数据"})
-			return
+		if len(targets) > 0 && targets[0] != nil {
+			catalogs, err := targets[0].RefreshCatalogs(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
+				return
+			}
+			payload = catalogs.Raw
+		} else {
+			body, err := targetGET(req, "http://two.121w.com/tttadmin/api/organization.php", cookie)
+			if err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录读取失败"})
+				return
+			}
+			if err := json.Unmarshal(body, &payload); err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统组织目录返回了无效数据"})
+				return
+			}
 		}
 		organizations := normalizeOrganizationOptions(payload)
 		if len(organizations) == 0 {
