@@ -41,10 +41,22 @@ export function smartUnifiedDisplayEnabled(batch, book) {
 }
 
 export function smartUnifiedAnalysisForBook(book) {
+  // h3StyleAnalysis is the current book-scoped result. A director revision is
+  // a frozen historical snapshot and must only be used when no current result
+  // exists; otherwise a refresh would show two different unified styles.
+  const saved = savedAnalysisFromBook(book);
+  if (saved) return saved;
   const output = object(book?.directorRevision?.output);
   const analysis = object(output.smart_unified_analysis || output.smartUnifiedAnalysis);
   if (String(analysis.prompt || '').trim()) return analysis;
   const legacyPrompt = String(output.smart_unified_style || output.smartUnifiedStyle || '').trim();
   if (legacyPrompt) return { prompt: legacyPrompt, fields: {}, preset: {} };
-  return savedAnalysisFromBook(book);
+  return null;
+}
+
+export function prependSmartUnifiedStyle(prompt, style) {
+  const body = String(prompt || '').trim();
+  const unified = String(style || '').trim();
+  if (!unified || body.includes('【统一风格】')) return body;
+  return `【统一风格】\n${unified}${body ? `\n\n${body}` : ''}`;
 }

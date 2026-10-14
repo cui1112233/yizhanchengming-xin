@@ -540,14 +540,17 @@ func smartUnifiedStyleForRevision(book Book, config AIReasoningPromptConfig) str
 	if !smartUnifiedSelectedForRevision(book, config) {
 		return ""
 	}
-	if book.DirectorRevision != nil && strings.TrimSpace(book.DirectorRevision.Output.SmartUnifiedStyle) != "" {
-		return strings.TrimSpace(book.DirectorRevision.Output.SmartUnifiedStyle)
-	}
+	// The book-scoped analysis is the current canonical result. A director
+	// revision is frozen history and is only a compatibility fallback; using it
+	// first makes a refresh appear as a second, conflicting Smart Unified call.
 	if analysis, err := parseSmartUnifiedAnalysis(rawString(book.SettingsState.Patch, "h3StyleAnalysis", "")); err == nil && analysis != nil {
 		if selectedSDVideoPreset(config.Video) && strings.TrimSpace(analysis.SDUnifiedStyle) != "" {
 			return strings.TrimSpace(analysis.SDUnifiedStyle)
 		}
 		return analysis.Prompt
+	}
+	if book.DirectorRevision != nil && strings.TrimSpace(book.DirectorRevision.Output.SmartUnifiedStyle) != "" {
+		return strings.TrimSpace(book.DirectorRevision.Output.SmartUnifiedStyle)
 	}
 	return ""
 }

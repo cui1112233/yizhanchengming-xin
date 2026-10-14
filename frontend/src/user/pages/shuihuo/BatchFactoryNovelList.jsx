@@ -1,7 +1,7 @@
 import { h3PromptEditRequest } from './h3PromptEditing.js';
 import { measureH3VideoLines } from './h3LineAudio.js';
 import { buildBatchFactoryH3Constraints } from './batchFactoryH3Constraints.js';
-import { smartUnifiedAnalysisForBook, smartUnifiedDisplayEnabled } from './batchFactorySmartUnified.js';
+import { prependSmartUnifiedStyle, smartUnifiedAnalysisForBook, smartUnifiedDisplayEnabled } from './batchFactorySmartUnified.js';
 import { publicationMetadataValue } from './batchFactoryPublicationMetadata.js';
 import { resolvePrecompiledStoryboardAssets, resolvePrecompiledStoryboardFrame, resolvePrecompiledVideoWorkspace } from './batchFactoryPrecompiledStoryboard.js';
 import {
@@ -1186,9 +1186,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const videoPrompt = withStoryboardAssetMentions(baseSetupEnabledForBook ? rawCompiledPrompt : stripBaseSetupSection(rawCompiledPrompt), book, video);
   const assetPromptText = baseSetupEnabledForBook ? String(baseSetupPrompt || '').trim() : '';
   const unifiedStyleText = showSmartUnified ? String(smartUnifiedAnalysis.prompt || '').trim() : '';
-  const videoPromptWithUnifiedStyle = unifiedStyleText && !videoPrompt.includes(unifiedStyleText)
-    ? `【统一风格】\n${unifiedStyleText}\n\n${videoPrompt}`
-    : videoPrompt;
+  const videoPromptWithUnifiedStyle = prependSmartUnifiedStyle(videoPrompt, unifiedStyleText);
   const displayVideoPrompt = baseSetupEnabledForBook
     ? composeStoryboardDisplayPrompt(videoPromptWithUnifiedStyle, assetPromptText || storyboardAssetPromptText(book))
     : videoPromptWithUnifiedStyle;
@@ -1478,8 +1476,8 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   }
 	  const activeLabel = promptKind === 'visual' ? '画面提示词' : '分镜视频提示词';
   const rawSubmittedVideoPrompt = compiledPrompt || displayPrompt || videoPrompt;
-  const rawPromptWithUnifiedStyle = showSmartUnified && String(smartUnifiedAnalysis.prompt || '').trim() && !rawSubmittedVideoPrompt.includes(String(smartUnifiedAnalysis.prompt).trim())
-    ? `【统一风格】\n${String(smartUnifiedAnalysis.prompt).trim()}\n\n${rawSubmittedVideoPrompt}`
+  const rawPromptWithUnifiedStyle = showSmartUnified
+    ? prependSmartUnifiedStyle(rawSubmittedVideoPrompt, smartUnifiedAnalysis.prompt)
     : rawSubmittedVideoPrompt;
   const submittedVideoPrompt = baseSetupEnabled(engineSettings) ? rawPromptWithUnifiedStyle : stripBaseSetupSection(rawPromptWithUnifiedStyle);
   const displaySubmittedVideoPrompt = baseSetupEnabled(engineSettings)
