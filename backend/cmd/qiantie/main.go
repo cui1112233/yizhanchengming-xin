@@ -541,6 +541,11 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 			return false
 		}
 	}
+	for _, prefix := range []string{"/api/platform-projects", "/api/storage"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return false
+		}
+	}
 	// This prefix already ends with a slash; do not add a second slash when
 	// matching script endpoints such as /api/script/director-pipeline.
 	if strings.HasPrefix(path, "/api/script/") {
