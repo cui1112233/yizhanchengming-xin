@@ -457,7 +457,7 @@ export function ProductionSettingsDrawer({
 
       <div className="bf11-settings-footer-note">
         <TimerReset size={16} />
-        <Typography.Text type="secondary">保存写入 `/api/batch-factory/v11/...` 的 Go SettingsState；Book / VIDEO sparse override 不会被清空。</Typography.Text>
+        <Typography.Text type="secondary">保存统一写入批量工厂 V12 Go 服务的 SettingsState；Book / VIDEO sparse override 不会被清空。</Typography.Text>
       </div>
     </div>
   </Drawer>;
