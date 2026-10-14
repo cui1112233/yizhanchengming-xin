@@ -207,7 +207,7 @@ func decodeImageDataURL(value string) (string, []byte, error) {
 
 func bookAssetImageResponse(image batchfactoryv11.BookAssetImage, batchID, bookID, assetID string) batchfactoryv11.BookAssetImage {
 	if image.StorageRef != "" {
-		image.URL = "/api/batch-factory/v11/batches/" + batchID + "/books/" + bookID + "/assets/" + assetID + "/images/" + image.ID + "/content"
+		image.URL = "/api/batch-factory/v12/batches/" + batchID + "/books/" + bookID + "/assets/" + assetID + "/images/" + image.ID + "/content"
 	}
 	return image
 }

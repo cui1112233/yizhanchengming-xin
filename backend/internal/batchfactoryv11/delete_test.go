@@ -80,7 +80,7 @@ func TestDeleteBookStmtsRemoveV12DependentsBeforeTheirParents(t *testing.T) {
 }
 
 func TestLocalMergedArtifactStorageRefAcceptsOnlyTheExactBatchURL(t *testing.T) {
-	storageRef, ok := localMergedArtifactStorageRef("batch_123", "/api/batch-factory/v11/batches/batch_123/merge-media/merge_AbC-123")
+	storageRef, ok := localMergedArtifactStorageRef("batch_123", "/api/batch-factory/v12/batches/batch_123/merge-media/merge_AbC-123")
 	if !ok {
 		t.Fatal("local merge URL was not recognized")
 	}
@@ -92,9 +92,9 @@ func TestLocalMergedArtifactStorageRefAcceptsOnlyTheExactBatchURL(t *testing.T) 
 func TestLocalMergedArtifactStorageRefRejectsRemoteAndOtherBatchURLs(t *testing.T) {
 	for _, output := range []string{
 		"https://tos.example/batch-merged/merge_AbC-123.mp4",
-		"/api/batch-factory/v11/batches/other/merge-media/merge_AbC-123",
-		"/api/batch-factory/v11/batches/batch_123/merge-media/../../sessions",
-		"/api/batch-factory/v11/batches/batch_123/merge-media/local-merge_AbC-123",
+		"/api/batch-factory/v12/batches/other/merge-media/merge_AbC-123",
+		"/api/batch-factory/v12/batches/batch_123/merge-media/../../sessions",
+		"/api/batch-factory/v12/batches/batch_123/merge-media/local-merge_AbC-123",
 	} {
 		if storageRef, ok := localMergedArtifactStorageRef("batch_123", output); ok || storageRef != "" {
 			t.Fatalf("output %q was incorrectly accepted as %q", output, storageRef)
@@ -118,7 +118,7 @@ func TestQueueLocalMergedArtifactPurgesQueuesOnlyLocalMergeURLs(t *testing.T) {
 	mock.ExpectQuery("SELECT COALESCE\\(book_id,''\\),COALESCE\\(output_url,''\\) FROM batch_factory_v11_merge_jobs").
 		WithArgs("alice", "batch-1").
 		WillReturnRows(sqlmock.NewRows([]string{"book_id", "output_url"}).
-			AddRow("book-1", "/api/batch-factory/v11/batches/batch-1/merge-media/merge_keep123").
+			AddRow("book-1", "/api/batch-factory/v12/batches/batch-1/merge-media/merge_keep123").
 			AddRow("book-2", "tos://private-bucket/batch-merged/remote.mp4"))
 	mock.ExpectExec("INSERT IGNORE INTO batch_factory_v11_local_artifact_purges").
 		WithArgs("alice", "batch-1", "book-1", "merge_keep123.mp4", purgeAfter).

@@ -63,7 +63,7 @@ func TestLocalMergeAdapterCreatesProtectedArtifactForCompletedMerge(t *testing.T
 			if result.ProgressPhase != "completed" || result.ProgressCurrent != 1 || result.ProgressTotal != 1 {
 				t.Fatalf("completed progress=%+v", result)
 			}
-			if !strings.HasPrefix(result.OutputURL, "/api/batch-factory/v11/batches/batch-1/merge-media/") {
+			if !strings.HasPrefix(result.OutputURL, "/api/batch-factory/v12/batches/batch-1/merge-media/") {
 				t.Fatalf("output=%q", result.OutputURL)
 			}
 			artifactID := filepath.Base(result.OutputURL)

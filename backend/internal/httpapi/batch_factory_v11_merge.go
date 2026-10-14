@@ -53,7 +53,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 		}
 		migrated, retained := 0, 0
 		for _, job := range jobs {
-			prefix := "/api/batch-factory/v11/batches/" + batchID + "/merge-media/"
+			prefix := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/"
 			if job.Status != batchfactoryv11.MergeSucceeded || !strings.HasPrefix(strings.TrimSpace(job.OutputURL), prefix) {
 				continue
 			}
@@ -142,7 +142,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, err)
 			return
 		}
-		expectedOutput := "/api/batch-factory/v11/batches/" + batchID + "/merge-media/" + artifactID
+		expectedOutput := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/" + artifactID
 		found := false
 		for _, job := range jobs {
 			if job.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(job.OutputURL) == expectedOutput {
@@ -196,7 +196,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, err)
 			return
 		}
-		expectedOutput := "/api/batch-factory/v11/batches/" + batchID + "/merge-media/" + artifactID
+		expectedOutput := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/" + artifactID
 		found := false
 		for _, job := range jobs {
 			if job.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(job.OutputURL) == expectedOutput {

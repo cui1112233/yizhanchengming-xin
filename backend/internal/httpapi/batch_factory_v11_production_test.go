@@ -151,7 +151,7 @@ func TestSliceFiveServesOnlyTheOwnersLocalMergedArtifact(t *testing.T) {
 	if _, err := files.SaveMP4(artifactID, strings.NewReader("0000ftypisom-local-merged-video")); err != nil {
 		t.Fatal(err)
 	}
-	output := "/api/batch-factory/v11/batches/" + batch.ID + "/merge-media/" + artifactID
+	output := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-media/" + artifactID
 	if _, err := store.CreateMergeJob(context.Background(), batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, RequestID: "local-media", Status: batchfactoryv11.MergeSucceeded, OutputURL: output, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
@@ -184,13 +184,13 @@ func TestSliceFiveServesCachedMergeCoverOnlyToItsOwner(t *testing.T) {
 	if _, err := files.SaveImage(artifactID, "image/jpeg", bytes.NewReader(coverBytes)); err != nil {
 		t.Fatal(err)
 	}
-	output := "/api/batch-factory/v11/batches/" + batch.ID + "/merge-media/" + artifactID
+	output := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-media/" + artifactID
 	if _, err := store.CreateMergeJob(context.Background(), batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, RequestID: "local-cover", Status: batchfactoryv11.MergeSucceeded, OutputURL: output, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	merge := &batchfactoryv11.MergeService{Store: store, Enabled: true}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 5, Store: store, Merge: merge, LocalArtifacts: files})
-	coverPath := "/api/batch-factory/v11/batches/" + batch.ID + "/merge-cover/" + artifactID
+	coverPath := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-cover/" + artifactID
 	owner := signedJSONRequest(t, api, now, "alice", http.MethodGet, coverPath, nil)
 	if owner.Code != http.StatusOK || owner.Header().Get("Content-Type") != "image/jpeg" || owner.Body.Len() == 0 {
 		t.Fatalf("owner cover status=%d type=%q bytes=%d", owner.Code, owner.Header().Get("Content-Type"), owner.Body.Len())
@@ -213,7 +213,7 @@ func TestSliceFiveMigratesLocalMergeOnlyAfterRemoteStoreAcceptsIt(t *testing.T) 
 	if _, err := files.SaveMP4(artifactID, strings.NewReader("0000ftypisom-local-merged-video")); err != nil {
 		t.Fatal(err)
 	}
-	output := "/api/batch-factory/v11/batches/" + batch.ID + "/merge-media/" + artifactID
+	output := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-media/" + artifactID
 	job, err := store.CreateMergeJob(context.Background(), batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, RequestID: "local-media-migrate", Status: batchfactoryv11.MergeSucceeded, OutputURL: output, CreatedAt: now, UpdatedAt: now})
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestSliceFiveMigratesLocalMergeOnlyAfterRemoteStoreAcceptsIt(t *testing.T) 
 	})
 	merge := &batchfactoryv11.MergeService{Store: store, Enabled: true}
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 5, Store: store, Merge: merge, LocalArtifacts: files, MergeOutput: remote})
-	path := "/api/batch-factory/v11/batches/" + batch.ID + "/merge-artifacts/migrate-to-tos"
+	path := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-artifacts/migrate-to-tos"
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodPost, path, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"migrated":1`) || !uploaded {
 		t.Fatalf("status=%d body=%s uploaded=%v", rec.Code, rec.Body.String(), uploaded)
@@ -243,7 +243,7 @@ func TestSliceFiveMigratesLocalMergeOnlyAfterRemoteStoreAcceptsIt(t *testing.T) 
 	if err != nil || len(jobs) != 1 {
 		t.Fatalf("jobs=%v err=%v", jobs, err)
 	}
-	if got, want := jobs[0].OutputURL, "/api/batch-factory/v11/batches/"+batch.ID+"/merge-media/"+job.ID; got != want {
+	if got, want := jobs[0].OutputURL, "/api/batch-factory/v12/batches/"+batch.ID+"/merge-media/"+job.ID; got != want {
 		t.Fatalf("output=%q want=%q", got, want)
 	}
 }

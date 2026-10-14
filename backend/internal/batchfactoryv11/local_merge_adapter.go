@@ -275,7 +275,7 @@ func (a *LocalMergeAdapter) run(taskID, batchID string, sources []MergeMedia, op
 		if strings.HasPrefix(outputURL, "tos://") {
 			// Private buckets are served by the authenticated merge-media route;
 			// do not expose an unusable bucket URL to the browser.
-			outputURL = "/api/batch-factory/v11/batches/" + batchID + "/merge-media/" + taskID
+			outputURL = "/api/batch-factory/v12/batches/" + batchID + "/merge-media/" + taskID
 		}
 	} else {
 		file, openErr := os.Open(outputPath)
@@ -293,7 +293,7 @@ func (a *LocalMergeAdapter) run(taskID, batchID string, sources []MergeMedia, op
 			a.fail(taskID, saveErr)
 			return
 		}
-		outputURL = "/api/batch-factory/v11/batches/" + batchID + "/merge-media/" + artifactID
+		outputURL = "/api/batch-factory/v12/batches/" + batchID + "/merge-media/" + artifactID
 	}
 	a.update(taskID, func(job *MergeJob) {
 		job.Status, job.ProgressPhase, job.ProgressCurrent, job.ProgressTotal = MergeSucceeded, "completed", len(sources), len(sources)

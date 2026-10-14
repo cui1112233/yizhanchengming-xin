@@ -34,7 +34,7 @@ func localMergedArtifactStorageRef(batchID, outputURL string) (string, bool) {
 	if batchID == "" {
 		return "", false
 	}
-	prefix := "/api/batch-factory/v11/batches/" + url.PathEscape(batchID) + "/merge-media/"
+	prefix := "/api/batch-factory/v12/batches/" + url.PathEscape(batchID) + "/merge-media/"
 	artifactID, ok := strings.CutPrefix(strings.TrimSpace(outputURL), prefix)
 	if !ok || !localMergedArtifactID.MatchString(artifactID) {
 		return "", false

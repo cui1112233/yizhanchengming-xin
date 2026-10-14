@@ -41,7 +41,7 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 				"bookCount": len(books), "books": books,
 			}
 			if strings.TrimSpace(batch.ProjectCoverJobID) != "" {
-				item["coverMedia"] = map[string]any{"kind": "image", "url": "/api/batch-factory/v11/batches/" + url.PathEscape(batch.ID) + "/merge-cover/" + url.PathEscape(batch.ProjectCoverJobID)}
+				item["coverMedia"] = map[string]any{"kind": "image", "url": "/api/batch-factory/v12/batches/" + url.PathEscape(batch.ID) + "/merge-cover/" + url.PathEscape(batch.ProjectCoverJobID)}
 			}
 			summaries = append(summaries, item)
 		}
