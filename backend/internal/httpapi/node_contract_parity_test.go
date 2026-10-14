@@ -44,14 +44,14 @@ func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 			}
 		case "blocked":
 			blocked++
-			if route.Path != "/api/account-recovery/purge/:username" {
+			if route.Path != "/api/account-recovery/purge/:username" && route.Path != "/api/applications" {
 				t.Fatalf("unexpected blocked Node route: %+v", route)
 			}
 		default:
 			t.Fatalf("unknown route status %q for %s", route.Status, route.Path)
 		}
 	}
-	if blocked != 1 {
-		t.Fatalf("expected exactly one explicitly blocked legacy contract, got %d", blocked)
+	if blocked != 2 {
+		t.Fatalf("expected exactly two explicitly blocked legacy contracts, got %d", blocked)
 	}
 }
