@@ -129,9 +129,17 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 		}
 	}
 	jobID := fmt.Sprintf("go-auto-%d", c.now().UnixNano())
+	runMode := automationStringValue(input["runMode"], "full_submit")
+	autoPublish := automationBoolValue(input["autoPublish"])
+	// full_submit is the user-facing “生成并提交” mode. Keep the server
+	// authoritative so older frontends that omitted autoPublish cannot silently
+	// finish without the upload step.
+	if runMode == "full_submit" {
+		autoPublish = true
+	}
 	job := map[string]any{
 		"id": jobID, "owner": owner, "batchId": batchID, "state": "running",
-		"runMode": automationStringValue(input["runMode"], "full_submit"), "autoPublish": automationBoolValue(input["autoPublish"]),
+		"runMode": runMode, "autoPublish": autoPublish,
 		"concurrency": automationNumberValue(input["concurrency"], 1), "preset": input["preset"],
 		"createdAt": c.now(), "startedAt": c.now(), "updatedAt": c.now(),
 		"counts": automationCounts(len(batch.Books), len(batch.Books), 0, 0), "books": map[string]any{},
