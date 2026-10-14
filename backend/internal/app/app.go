@@ -40,8 +40,13 @@ func (p ownerTextProvider) Complete(ctx context.Context, request batchfactoryv11
 			if err != nil {
 				return "", err
 			}
+			// A catalog with no enabled text model can return a typed nil
+			// *OpenAICompatibleProvider inside the interface. Treat that as
+			// unavailable instead of calling Validate through a nil receiver.
 			if provider != nil {
-				return provider.Complete(ctx, request)
+				if configured, ok := provider.(*batchfactoryv11.OpenAICompatibleProvider); !ok || configured != nil {
+					return provider.Complete(ctx, request)
+				}
 			}
 		}
 	}

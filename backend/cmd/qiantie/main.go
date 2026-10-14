@@ -91,10 +91,6 @@ func main() {
 			authProxy.ServeHTTP(w, req)
 			return
 		}
-		if isLocalScriptVideoRequest(req) {
-			apiHandler.ServeHTTP(w, req)
-			return
-		}
 		// /novel-fetch and its complete batch-rewrite API are served by Go.
 		// Unknown endpoints stay on Go and return an explicit response; they are
 		// never silently sent to the retired Node service.
@@ -529,6 +525,12 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 	// intake handoff, and native H3 routes. Keep only the remaining adapters on
 	// the local compatibility bridge so 4001 does not expose false 404s.
 	if strings.HasPrefix(path, "/api/batch-factory/v12/") {
+		// V12 automation start is owned by the native Go coordinator. Keep the
+		// legacy Node controller out of this request so one click cannot create
+		// two different jobs or silently fall back to the old runtime.
+		if strings.HasSuffix(path, "/automation/start") || strings.HasSuffix(path, "/automation/cancel") {
+			return false
+		}
 		if path == "/api/batch-factory/v12/capabilities" || path == "/api/batch-factory/v12/batches" || path == "/api/batch-factory/v12/batches/summary" || path == "/api/batch-factory/v12/fetch-originals" || path == "/api/batch-factory/v12/image-generation" || strings.HasPrefix(path, "/api/batch-factory/v12/intakes/") || (strings.Contains(path, "/h3/") && (slice < 0 || slice >= 3)) || isGoV12AliasPath(path) {
 			return false
 		}
@@ -553,7 +555,6 @@ func shouldBridgeLegacyAPIForSlice(path string, slice int) bool {
 		"/api/novel-fetch-upload",
 		"/api/novel-panel",
 		"/api/platform-projects",
-		"/api/script-video",
 		"/api/storage",
 		"/api/team-admin",
 		"/api/teamAdmin",

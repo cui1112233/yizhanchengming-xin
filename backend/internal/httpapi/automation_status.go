@@ -15,6 +15,16 @@ type FileAutomationStatusReader struct {
 	path string
 }
 
+// Path exposes the shared persistence location to the native Go coordinator.
+// The status reader and writer must use the same file so the UI observes one
+// job regardless of which endpoint created it.
+func (r *FileAutomationStatusReader) Path() string {
+	if r == nil {
+		return ""
+	}
+	return r.path
+}
+
 func NewFileAutomationStatusReader(path string) *FileAutomationStatusReader {
 	return &FileAutomationStatusReader{path: strings.TrimSpace(path)}
 }

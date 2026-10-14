@@ -17,11 +17,13 @@ import (
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
+	"qiantie/backend/internal/runtimeaudit"
 )
 
 type RouterOptions struct {
 	BridgeSecret                    string
 	ReleaseSHA                      string
+	RuntimeAudit                    *runtimeaudit.Registry
 	Health                          func(context.Context) error
 	Now                             func() time.Time
 	Users                           BridgeUserResolver
@@ -45,6 +47,7 @@ type RouterOptions struct {
 	PresetCatalog                   *prompt.Catalog
 	AutomationPresetStore           AutomationPresetStore
 	AutomationStatusReader          *FileAutomationStatusReader
+	AutomationCoordinator           *BatchAutomationCoordinator
 	PersonalPromptStore             *prompt.PersonalStore
 	ScriptHistoryStore              *ScriptHistoryStore
 	MemberProfileStore              *MemberProfileStore
@@ -67,6 +70,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		// the service disabled for all write/submit operations.
 		options.Production = &batchfactoryv11.ProductionService{Store: options.Store, Compiler: options.Compiler}
 	}
+	if options.AutomationCoordinator == nil && options.Store != nil && options.Director != nil && options.AutomationStatusReader != nil {
+		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, &batchfactoryv11.BookStageService{
+			Store: options.Store, Director: options.Director, Production: options.Production,
+		}, options.AutomationStatusReader, options.Now)
+	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
 	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, options.External != nil && options.External.Enabled[external.Provider121], options.External != nil && options.External.Enabled[external.ProviderYadi]))
@@ -81,7 +89,10 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
 	}
 	if options.NovelFetchFetcher != nil {
-		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher)
+		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher, batchFetchClassification{
+			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
+			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
+		})
 		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchFetcher, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
@@ -172,9 +183,19 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	registerV12V11Aliases(v12, v11)
 
+	if options.RuntimeAudit == nil {
+		options.RuntimeAudit = runtimeaudit.Default()
+	}
 	root := http.NewServeMux()
 	root.HandleFunc("GET /api/runtime-build-info", func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"service": "go-api", "git_sha": options.ReleaseSHA})
+		audit := options.RuntimeAudit.Snapshot()
+		writeJSON(w, http.StatusOK, map[string]any{
+			"service":      "go-api",
+			"runtime":      "go",
+			"git_sha":      options.ReleaseSHA,
+			"bridge_hits":  audit.BridgeHits,
+			"bridge_paths": audit.Paths,
+		})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 	if options.Store != nil {
@@ -189,6 +210,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	if options.AutomationStatusReader != nil {
 		registerAutomationStatusRoute(v12, auth, options.AutomationStatusReader, "v12")
+	}
+	if options.AutomationCoordinator != nil {
+		registerBatchAutomationRoutes(v12, auth, options.AutomationCoordinator, "v12")
 	}
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
 	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, "v12", options.NovelFetchStore)
@@ -268,12 +292,22 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}
-	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore, options.RedisURL)
+	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore, options.PresetCatalog, options.RedisURL)
 	registerTTSRoute(root, auth, options.NovelFetchStore)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorArtifactRoutes(root, auth, options.LocalExecutors, options.LocalArtifacts)
-	RegisterLocalScriptVideoRoutes(root, auth, options.LocalExecutors)
+	if options.NovelFetchStore != nil {
+		RegisterScriptVideoRoutes(root, auth, options.LocalExecutors, func(ctx context.Context, owner, modelKey string) (batchfactoryv11.VideoProviderConfig, error) {
+			config, err := loadShuihuoOwnerConfig(ctx, options.Store, owner, options.NovelFetchStore)
+			if err != nil {
+				return batchfactoryv11.VideoProviderConfig{}, err
+			}
+			return scriptVideoModelConfig(ctx, options.Store, owner, config, modelKey)
+		})
+	} else {
+		RegisterLocalScriptVideoRoutes(root, auth, options.LocalExecutors)
+	}
 	RegisterLocalExecutorDownloadRoutes(root, options.LocalExecutorDownloadsDir)
 	RegisterGiantMaterialExecutorRoutes(root, auth, options.GiantMaterialExecutor)
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
@@ -293,7 +327,12 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterLegacyNovelFetchRoutes(root, auth, options.NovelFetchStore, options.NovelFetchFetcher, options.UserConfigStore)
 		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore, options.UserDataDir)
 		RegisterWebSubmitPreviewCompat(root, auth, options.NovelFetchStore)
-		RegisterWebSubmitSubmitCompat(root, auth, options.UserDataDir, options.NovelFetchStore, func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
+		RegisterWebSubmitSubmitCompat(root, auth, options.UserDataDir, options.NovelFetchStore, func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
+			if options.NovelFetchAIGenderJudgeResolver == nil {
+				return options.NovelFetchAIGenderJudge, nil
+			}
+			return options.NovelFetchAIGenderJudgeResolver(ctx, owner)
+		}, func(ctx context.Context, owner string) (novelfetchworkshop.RewriteProvider, error) {
 			if options.NovelFetchRewriteResolver == nil {
 				return options.NovelFetchRewrite, nil
 			}
@@ -365,7 +404,11 @@ func NewRouter(options RouterOptions) http.Handler {
 			}
 			counts := map[string]int{"running": 0, "queued": 0, "waiting_retry": 0, "failed": 0, "stopped": 0}
 			for _, document := range documents {
-				status := strings.ToLower(firstText(document.Meta["status"], document.Meta["taskStatus"], document.Meta["aiStatus"]))
+				// AI bodies are durable evidence of completion. Do not keep the
+				// queue summary stuck on an old in-flight aiStatus after versions
+				// have been saved.
+				task := legacyNovelFetchTask(document)
+				status := strings.ToLower(firstText(task["ai_status"], document.Meta["status"], document.Meta["taskStatus"], document.Meta["aiStatus"]))
 				switch {
 				case strings.Contains(status, "running") || strings.Contains(status, "processing"):
 					counts["running"]++

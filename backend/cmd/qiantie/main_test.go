@@ -131,10 +131,13 @@ func TestAuthProxyForwardsLoginRequestsToNode(t *testing.T) {
 }
 
 func TestShouldBridgeLegacyAPI(t *testing.T) {
-	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects", "/api/script-video", "/api/script/director-pipeline"} {
+	for _, path := range []string{"/api/config", "/api/agent/tasks", "/api/agent/tasks/demo", "/api/account-recovery/password/request", "/api/member/profile", "/api/novel-panel/projects", "/api/script/director-pipeline"} {
 		if !shouldBridgeLegacyAPI(path) {
 			t.Fatalf("%s should use the temporary Node bridge", path)
 		}
+	}
+	if shouldBridgeLegacyAPI("/api/script-video") {
+		t.Fatal("script video must use Go routes")
 	}
 	if shouldBridgeLegacyAPI("/api/tts") {
 		t.Fatal("/api/tts is implemented by Go and must not use the Node bridge")
@@ -190,6 +193,13 @@ func TestShouldBridgeLegacyAPI(t *testing.T) {
 		if shouldBridgeLegacyAPIForSlice(path, 3) {
 			t.Fatalf("slice 3 director path must stay on Go: %s", path)
 		}
+	}
+}
+
+func TestAutomationStartIsNativeGo(t *testing.T) {
+	path := "/api/batch-factory/v12/batches/demo/automation/start"
+	if shouldBridgeLegacyAPI(path) {
+		t.Fatalf("automation start must be handled by the Go coordinator")
 	}
 }
 
