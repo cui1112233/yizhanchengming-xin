@@ -13,6 +13,15 @@ const files = [
 
 const baseFiles = ['-f', 'deploy/v88-public/docker-compose.yml'];
 
+function environmentValue(service, key) {
+  if (Array.isArray(service.environment)) {
+    return service.environment
+      .find((entry) => entry.startsWith(`${key}=`))
+      ?.slice(key.length + 1);
+  }
+  return service.environment?.[key];
+}
+
 function publicGoOnlyConfig() {
   const result = spawnSync(
     'docker',
@@ -37,17 +46,15 @@ test('public Go-only topology routes nginx to Go and isolates legacy services', 
   const config = publicGoOnlyConfig();
   const goApi = config.services['go-api'];
   const nginx = config.services.nginx;
-  const environment = Object.fromEntries(
-    goApi.environment.map((entry) => entry.split('=', 2)),
-  );
 
   assert.ok(goApi);
-  assert.equal(environment.QIANTIE_GO_LISTEN_ADDR, ':3000');
+  assert.equal(environmentValue(goApi, 'QIANTIE_GO_LISTEN_ADDR'), ':3000');
   assert.ok(goApi.expose.includes('3000'));
   assert.deepEqual(nginx.depends_on, {
     'go-api': { condition: 'service_started', required: true },
   });
   assert.ok(goApi.networks.qiantie_internal.aliases.includes('v88-node'));
+  assert.equal(environmentValue(goApi, 'QIANTIE_BATCH_FACTORY_V11_SLICE'), '${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}');
   assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['shuihuo-compat'].profiles, ['node-legacy']);
@@ -62,6 +69,7 @@ test('public base topology is Go-first without a second default request path', (
   assert.equal(nginx.depends_on['v88-node'], undefined);
   assert.ok(goApi.expose.includes('3000'));
   assert.ok(goApi.networks.qiantie_internal.aliases.includes('v88-node'));
+  assert.equal(environmentValue(goApi, 'QIANTIE_BATCH_FACTORY_V11_SLICE'), '${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}');
   assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['shuihuo-compat'].profiles, ['node-legacy']);

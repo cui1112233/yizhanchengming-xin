@@ -22,7 +22,10 @@ services:
       # Service-side Qingyu credential for giant-material metadata resolution.
       # The value lives only in the protected production .env file.
       QINGYU_N8_ADMIN_TOKEN: ${QINGYU_N8_ADMIN_TOKEN:-}
-      QIANTIE_BATCH_FACTORY_V11_SLICE: ${QIANTIE_BATCH_FACTORY_V11_SLICE:-1}
+      # The public Go API exposes the complete native chain by default.  A
+      # lower slice is now an explicit rollback/debug choice, never the
+      # normal deployment path.
+      QIANTIE_BATCH_FACTORY_V11_SLICE: ${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}
       QIANTIE_BATCH_FACTORY_V11_TEXT_ENDPOINT: ${QIANTIE_BATCH_FACTORY_V11_TEXT_ENDPOINT:-}
       QIANTIE_BATCH_FACTORY_V11_TEXT_API_KEY: ${QIANTIE_BATCH_FACTORY_V11_TEXT_API_KEY:-}
       QIANTIE_BATCH_FACTORY_V11_TEXT_MODEL: ${QIANTIE_BATCH_FACTORY_V11_TEXT_MODEL:-}
@@ -121,7 +124,7 @@ services:
     environment:
       NODE_ENV: production
       QIANTIE_NODE_PORT: 3000
-      QIANTIE_GO_BASE_URL: http://go-api:4000
+      QIANTIE_GO_BASE_URL: http://go-api:3000
       QIANTIE_SHUIHUO_COMPAT_BASE_URL: http://shuihuo-compat:4100
       QIANTIE_BRIDGE_SECRET: ${QIANTIE_BRIDGE_SECRET}
       QIANTIE_121_BROWSER_WORKER_URL: http://browser-worker:8787
