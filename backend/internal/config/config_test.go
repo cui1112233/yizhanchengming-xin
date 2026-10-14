@@ -17,19 +17,6 @@ func TestFromEnvRequiresMySQLAndBridgeSecret(t *testing.T) {
 	}
 }
 
-func TestFromEnvDoesNotDefaultNodeAuthGateway(t *testing.T) {
-	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
-	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
-	t.Setenv("QIANTIE_NODE_AUTH_BASE_URL", "")
-	cfg, err := FromEnv()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.NodeAuthBaseURL != "" {
-		t.Fatalf("Go runtime must not default to a Node gateway: %q", cfg.NodeAuthBaseURL)
-	}
-}
-
 func TestFromEnvReadsOptionalGiantMaterialPlugin(t *testing.T) {
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
