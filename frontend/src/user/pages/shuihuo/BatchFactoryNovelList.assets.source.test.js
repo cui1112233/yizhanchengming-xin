@@ -38,6 +38,7 @@ test('prompt panel renders image-backed mentions and opens the picker in edit mo
   assert.match(source, /className="batch-factory-prompt-rich-view is-editing"[\s\S]{0,220}contentEditable/);
   assert.match(source, /renderStoryboardPromptHTML/);
   assert.match(source, /data-fallback/);
+  assert.match(source, /compactUnifiedAssetDescriptions\(withStoryboardAssetMentions\(prompt, book, video\), book\)/g);
   assert.match(source, /contentEditableTextOffset/);
   assert.match(source, /batch-factory-asset-mention-menu/);
   assert.match(source, /aria-label="可编辑分镜视频提示词"/);

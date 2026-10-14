@@ -796,7 +796,7 @@ function compactUnifiedAssetDescriptions(prompt, book) {
 }
 
 function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImages = {}) {
-  let text = compactUnifiedAssetDescriptions(prompt, book);
+  let text = compactUnifiedAssetDescriptions(withStoryboardAssetMentions(prompt, book, video), book);
   // Director/SD cards from older runs often contain the asset name followed by
   // its full appearance description instead of an @ reference. Normalize only
   // the durable asset name for display; the description remains readable after
@@ -831,7 +831,7 @@ function escapePromptHTML(value) {
 }
 
 function renderStoryboardPromptHTML(prompt, book, video, assetImages = {}) {
-  let text = compactUnifiedAssetDescriptions(prompt, book);
+  let text = compactUnifiedAssetDescriptions(withStoryboardAssetMentions(prompt, book, video), book);
   (book?.assetRecords || [])
     .map(asset => assetName(asset))
     .filter(Boolean)
