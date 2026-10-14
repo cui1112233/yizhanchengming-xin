@@ -268,6 +268,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore, options.PresetCatalog)
 	RegisterAdminGovernanceCompat(root, auth, options.AuthStore, options.MemberProfileStore)
+	RegisterApplicationsCompat(root, options.AuthStore, options.MemberProfileStore, options.Now)
 	RegisterClientErrorCompat(root, auth, options.MemberProfileStore)
 	if options.MemberProfileStore != nil {
 		RegisterAccountRecoveryStatusCompat(root, auth, options.MemberProfileStore.SystemDir)

@@ -14,7 +14,7 @@ if (-not (Test-Path -LiteralPath $app)) { throw "app.js not found: $app" }
 # separately in the manifest for human review.
 $goOwned = @(
   '/api/login', '/api/account-recovery', '/api/member', '/api/team-admin',
-  '/api/account-admin', '/api/client-errors', '/api/admin',
+  '/api/account-admin', '/api/client-errors', '/api/applications', '/api/admin',
   '/api/presets', '/api/script-constraint-prompts', '/api/novel-panel',
   '/api/novel-fetch', '/api/novel-fetch-upload', '/api/novel-fetch-workshop',
   '/api/batch-rewrite', '/api/batch-factory', '/api/script-video', '/api/config',
@@ -34,7 +34,7 @@ foreach ($line in (Get-Content -LiteralPath $app)) {
   $handler = 'none'
   $test = 'add focused Go contract test before removal'
   $match = $goOwned | Where-Object { $path -eq $_ -or $path.StartsWith($_ + '/') } | Select-Object -First 1
-  if ($path -eq '/api/account-recovery/purge/:username' -or $path -eq '/api/applications') { $match = $null }
+  if ($path -eq '/api/account-recovery/purge/:username') { $match = $null }
   if ($match) {
     $owner = 'go'
     $status = 'shadow'

@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-10-14T17:53:12.2844212Z",
+    "generatedAt":  "2026-10-14T17:56:09.5144104Z",
     "purpose":  "Node public API mounts retained for Go cutover audit; shadow means Go exists but Node source remains for rollback.",
     "routes":  [
                    {
@@ -125,10 +125,10 @@
                    {
                        "method":  "*",
                        "path":  "/api/applications",
-                       "owner":  "node-legacy",
-                       "status":  "blocked",
-                       "goHandler":  "none",
-                       "test":  "add focused Go contract test before removal",
+                       "owner":  "go",
+                       "status":  "shadow",
+                       "goHandler":  "backend/internal/httpapi (mount /api/applications)",
+                       "test":  "backend/internal/httpapi/*_test.go",
                        "source":  "app.js",
                        "line":  439
                    },
