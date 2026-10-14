@@ -14,13 +14,14 @@ import (
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 // RegisterBatchRewriteConfigCompat exposes the read-only configuration shape
 // expected by the legacy novel-fetch workbench. The actual settings are still
 // stored in the Go workshop store, so the page no longer needs Node just to
 // bootstrap its form.
-func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth, store novelfetchworkshop.Store, usersDir string) {
+func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth, store novelfetchworkshop.Store, usersDir string, targets ...videomanagementconnector.Service) {
 	if root == nil || store == nil {
 		return
 	}
@@ -281,12 +282,27 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入账号和密码"})
 				return
 			}
-			cookie, loginErr := loginTargetSite(req, username, password)
-			if loginErr != nil {
+			var connected videomanagementconnector.Session
+			var loginErr error
+			if len(targets) > 0 && targets[0] != nil {
+				connected, loginErr = targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: username, Password: password})
+			} else {
+				var cookie string
+				cookie, loginErr = loginTargetSite(req, username, password)
+				connected = videomanagementconnector.Session{Cookie: cookie, TargetUsername: username}
+			}
+			if loginErr != nil || strings.TrimSpace(connected.Cookie) == "" {
+				if loginErr == nil {
+					loginErr = fmt.Errorf("121 登录未返回会话")
+				}
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": loginErr.Error()})
 				return
 			}
-			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "http_cookie", "cookie": cookie, "sessionKey": cookie, "targetUsername": username, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+			mode := "http_cookie"
+			if len(targets) > 0 && targets[0] != nil {
+				mode = "go_connector"
+			}
+			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": mode, "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "上传会话保存失败"})
 				return
 			}
@@ -318,24 +334,33 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		loggedIn := false
 		detail := "未登录"
 		if cookie != "" {
-			check, requestErr := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
-			if requestErr != nil {
-				detail = "小说获取共享会话检查失败"
-			} else {
-				check.Header.Set("Cookie", cookie)
-				response, probeErr := (&http.Client{Timeout: 30 * time.Second}).Do(check)
-				if probeErr != nil {
-					detail = "小说获取共享会话连接失败"
+			if len(targets) > 0 && targets[0] != nil {
+				if err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}); err != nil {
+					detail = "共享登录会话已失效，请先到小说获取重新登录"
 				} else {
-					body, readErr := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-					response.Body.Close()
-					if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-						detail = "小说获取共享会话检查失败"
-					} else if !targetPageLooksAuthenticated(string(body)) {
-						detail = "共享登录会话已失效，请先到小说获取重新登录"
+					loggedIn = true
+					detail = "已登录（Go 连接器共享会话）"
+				}
+			} else {
+				check, requestErr := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
+				if requestErr != nil {
+					detail = "小说获取共享会话检查失败"
+				} else {
+					check.Header.Set("Cookie", cookie)
+					response, probeErr := (&http.Client{Timeout: 30 * time.Second}).Do(check)
+					if probeErr != nil {
+						detail = "小说获取共享会话连接失败"
 					} else {
-						loggedIn = true
-						detail = "已登录（共享小说获取会话）"
+						body, readErr := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+						response.Body.Close()
+						if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+							detail = "小说获取共享会话检查失败"
+						} else if !targetPageLooksAuthenticated(string(body)) {
+							detail = "共享登录会话已失效，请先到小说获取重新登录"
+						} else {
+							loggedIn = true
+							detail = "已登录（共享小说获取会话）"
+						}
 					}
 				}
 			}

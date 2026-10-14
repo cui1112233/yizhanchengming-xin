@@ -349,7 +349,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))
 		RegisterLegacyNovelFetchRoutes(root, auth, options.NovelFetchStore, options.NovelFetchFetcher, options.UserConfigStore)
-		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore, options.UserDataDir)
+		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore, options.UserDataDir, options.VideoManagementConnector)
 		RegisterWebSubmitPreviewCompat(root, auth, options.NovelFetchStore)
 		RegisterWebSubmitSubmitCompat(root, auth, options.UserDataDir, options.NovelFetchStore, func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
 			if options.NovelFetchAIGenderJudgeResolver == nil {
