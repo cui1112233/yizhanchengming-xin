@@ -11,89 +11,50 @@ test('unified V88 release can be explicitly requested from v88 without using ret
   assert.doesNotMatch(workflow, /(?:curl|proxy_pass)[^\n]*18081/);
 });
 
-test('Node-only V88 release keeps the unchanged Go service running', () => {
-  assert.match(workflow, /qiantie-v88-node:\$\{\{ github\.sha \}\}/);
-  assert.match(workflow, /deploy:\s*[\s\S]*needs:\s*release/);
-  assert.match(workflow, /QIANTIE_NODE_IMAGE/);
-  assert.match(workflow, /QIANTIE_RELEASE_SHA/);
-  assert.match(workflow, /docker compose[^\n]*config -q/);
-  assert.match(workflow, /go_id="\$\(docker compose[^\n]*ps -q go-api\)"/);
-  assert.match(workflow, /docker inspect[^\n]*\.State\.Running/);
-  assert.match(workflow, /up -d[^\n]*v88-node/);
-  assert.doesNotMatch(workflow, /up -d[^\n]*(?:go-api|browser-worker)/);
+test('V88 release publishes only the immutable Go image', () => {
+  assert.match(workflow, /qiantie-v88-go:\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /QIANTIE_RELEASE_SHA=\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /qiantie-v88-node|QIANTIE_NODE_IMAGE|v88-node/);
 });
 
-test('unified V88 deploy updates the Node-specific build identity used by the public endpoint', () => {
-  assert.match(workflow, /set_env QIANTIE_NODE_RELEASE_SHA "\$expected_sha"/);
+test('unified V88 release reports the Go runtime identity', () => {
+  assert.match(workflow, /runtime=go-api/);
+  assert.match(workflow, /node=retired/);
 });
 
-test('unified V88 deploy records rollback state and restores it on failed acceptance', () => {
-  assert.match(workflow, /PREVIOUS_PUBLIC_BUILD/);
-  assert.match(workflow, /backup_env/);
-  assert.match(workflow, /rollback/);
-  assert.match(workflow, /cp -a "\$backup_env" \.env/);
+test('unified V88 release no longer contains the retired remote deploy path', () => {
+  assert.doesNotMatch(workflow, /ECS_HOST|V88_ECS_SSH_PRIVATE_KEY|docker compose/);
 });
 
-test('unified V88 deploy installs the Git-managed Nginx route and restores it on failed acceptance', () => {
-  assert.match(workflow, /scp[\s\S]*deploy\/v88-public\/nginx\.conf/);
-  assert.match(workflow, /backup_nginx/);
-  assert.match(workflow, /cp -a "\$backup_nginx" nginx\.conf/);
-  assert.match(workflow, /trap rollback EXIT/);
-  assert.match(workflow, /trap - EXIT ERR/);
-  assert.doesNotMatch(workflow, /trap rollback ERR/);
-  assert.match(workflow, /docker compose[^\n]*up -d[^\n]*--force-recreate[^\n]*nginx/);
-  assert.match(workflow, /ECS_PUBLIC_HOST/);
-  assert.match(workflow, /docker compose[^\n]*exec -T nginx nginx -t/);
-  assert.match(workflow, /nginx\.conf\.pre-unified-20260912T103106Z/);
+test('unified V88 release keeps the Git-managed trigger path', () => {
+  assert.match(workflow, /deploy\/v88-public\/UNIFIED-DEPLOY-REQUEST/);
 });
 
-test('unified V88 deploy synchronizes the Git-managed Compose contract before recreating services', () => {
-  assert.match(workflow, /scp[\s\S]*deploy\/v88-public\/docker-compose\.yml/);
-  assert.match(workflow, /backup_compose/);
-  assert.match(workflow, /cp -a "\$backup_compose" docker-compose\.yml/);
-  assert.match(workflow, /cp "\/tmp\/v88-public-compose-\$\{expected_sha\}\.yml" docker-compose\.yml/);
-  assert.match(workflow, /docker-compose\.yml\.pre-unified-\$\{backup_id\}/);
+test('unified V88 release builds from the repository Dockerfile', () => {
+  assert.match(workflow, /context:\s*\.\s*\n\s*file:\s*Dockerfile/);
+  assert.match(workflow, /docker\/build-push-action/);
 });
 
-test('unified V88 deploy lets ECS pull immutable images with a short-lived GHCR token', () => {
-  assert.match(workflow, /name: Pull immutable release images directly on ECS/);
-  assert.match(workflow, /timeout-minutes: 75/);
-  assert.match(workflow, /timeout 3600 ssh/);
-  assert.match(workflow, /GHCR_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
-  // The remote command is embedded in a shell string, so its quotes may be
-  // escaped in YAML source; the token must still be consumed by password-stdin.
-  assert.match(workflow, /docker login ghcr\.io --username \\?"\$registry_user\\?" --password-stdin/);
-  assert.match(workflow, /docker pull \\?"\$node_image\\?"/);
-  assert.match(workflow, /docker logout ghcr\.io/);
-  assert.doesNotMatch(workflow, /docker pull \\?"\$go_image\\?"/);
-  assert.doesNotMatch(workflow, /gzip -d \| docker load/);
+test('unified V88 release publishes through GHCR with the short-lived GitHub token', () => {
+  assert.match(workflow, /password: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
+  assert.match(workflow, /push:\s*true/);
+  assert.match(workflow, /qiantie-v88-go/);
 });
 
-test('unified V88 deploy rolls back if the runner external verification rejects a release', () => {
-  assert.match(workflow, /id: deploy_public/);
-  assert.match(workflow, /name: Roll back ECS after external rejection/);
-  assert.match(workflow, /if: failure\(\) && steps\.deploy_public\.outcome == 'success'/);
+test('unified V88 release does not claim external deployment acceptance', () => {
+  assert.doesNotMatch(workflow, /external rejection|deploy_public|ECS_PUBLIC_HOST/);
 });
 
-test('unified V88 deploy accepts the public runtime only when exact release identity and Batch Factory routes are reachable', () => {
-  assert.match(workflow, /api\/build-info/);
-  assert.match(workflow, /batch-factory/);
-  assert.match(workflow, /api\/batch-factory\/v11\/capabilities/);
-  assert.match(workflow, /expected_sha/);
+test('unified V88 release verifies source contracts before publishing', () => {
+  assert.match(workflow, /Verify Go-only release contracts/);
+  assert.match(workflow, /tests\/v88-public-release-identity\.test\.js/);
 });
 
-test('unified V88 deploy enables the production and local-merge stages required by the public Batch Factory', () => {
-  // The UI always reads production status for every book.  Shipping a
-  // director-only Go slice makes that read look like an upstream outage and
-  // prevents the promised video-to-publish workflow from ever starting.
-  assert.match(workflow, /set_env QIANTIE_BATCH_FACTORY_V11_SLICE 5/);
-  assert.match(workflow, /set_env QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED 1/);
-  assert.match(workflow, /set_env QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED 1/);
-  assert.match(workflow, /set_env QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER 1/);
+test('unified V88 release embeds the frontend bundle into Go', () => {
+  assert.match(workflow, /rm -rf backend\/web\/dist/);
+  assert.match(workflow, /cp -a frontend\/dist\/\. backend\/web\/dist\//);
 });
 
-test('unified V88 deploy feeds smoke scripts and JSON through unambiguous stdin channels', () => {
-  assert.match(workflow, /docker exec -i "\$node_id" node -/);
-  assert.doesNotMatch(workflow, /python3 - "\$expected_sha" <[^\n]+ <<['"]?PY/);
-  assert.match(workflow, /python3 -c ['"][^\n]*json\.load\(sys\.stdin\)[^\n]*['"] "\$expected_sha" <\/tmp\/v88-public-build\.json/);
+test('unified V88 release has no Node runtime smoke step', () => {
+  assert.doesNotMatch(workflow, /docker exec[^\n]*node|node_image|npm ci --omit=dev/);
 });

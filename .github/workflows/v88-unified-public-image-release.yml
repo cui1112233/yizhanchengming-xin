@@ -1,4 +1,4 @@
-name: V88 Unified Public Image Release
+name: V88 Unified Public Go Image Release
 
 on:
   workflow_dispatch:
@@ -6,18 +6,18 @@ on:
     branches: [v88]
     paths:
       - 'deploy/v88-public/UNIFIED-DEPLOY-REQUEST'
+      - 'Dockerfile'
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/v88-unified-public-image-release.yml'
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: v88-public-release
+  group: v88-public-go-release
   cancel-in-progress: false
-
-env:
-  ECS_HOST: 115.190.156.223
-  ECS_USER: root
 
 jobs:
   release:
@@ -25,18 +25,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify release contracts
-        run: node --test tests/v88-public-unified-topology.test.js tests/v88-public-release-identity.test.js tests/v88-unified-public-deploy.test.js test/v88-release-manifest.test.js
-
-      - uses: actions/setup-node@v4
+      - name: Build the frontend assets embedded by Go
+        uses: actions/setup-node@v4
         with:
           node-version: '24.19.0'
 
-      - name: Build the exact frontend bundle included in the Node image
+      - name: Build frontend bundle
         run: |
-          npm ci --omit=dev
+          set -Eeuo pipefail
           npm --prefix frontend ci
           npm --prefix frontend run build
+          rm -rf backend/web/dist
+          mkdir -p backend/web/dist
+          cp -a frontend/dist/. backend/web/dist/
+
+      - name: Verify Go-only release contracts
+        run: node --test tests/v88-public-unified-topology.test.js tests/v88-public-release-identity.test.js
 
       - uses: docker/login-action@v3
         with:
@@ -46,306 +50,24 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build and publish immutable V88 Node image
+      - name: Build and publish immutable V88 Go image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/qiantie-v88-node:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/qiantie-v88-go:${{ github.sha }}
           build-args: |
             QIANTIE_RELEASE_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=v88-node
-          cache-to: type=gha,mode=max,scope=v88-node
+          cache-from: type=gha,scope=v88-go
+          cache-to: type=gha,mode=max,scope=v88-go
 
-      - name: Report immutable release identity
+      - name: Report immutable Go release identity
         run: |
-          echo "release_sha=${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "node=ghcr.io/${{ github.repository_owner }}/qiantie-v88-node:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "go=unchanged (the current Go service is retained; this release changes Node-only source)" >> "$GITHUB_STEP_SUMMARY"
-
-  deploy:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: release
-    runs-on: ubuntu-24.04
-    # ECS pulls the immutable GHCR images over a slow cross-region link. Keep
-    # this bounded, but allow the full image layers to finish before cutover.
-    timeout-minutes: 75
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Prepare ECS SSH
-        shell: bash
-        env:
-          V88_ECS_SSH_PRIVATE_KEY: ${{ secrets.V88_ECS_SSH_PRIVATE_KEY }}
-        run: |
-          set -Eeuo pipefail
-          test -n "${V88_ECS_SSH_PRIVATE_KEY:-}"
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$V88_ECS_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/v88_ecs"
-          chmod 600 "$HOME/.ssh/v88_ecs"
-          : > "$HOME/.ssh/known_hosts"
-          for attempt in 1 2 3 4 5; do
-            if timeout 15 ssh-keyscan -H "$ECS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null && test -s "$HOME/.ssh/known_hosts"; then
-              break
-            fi
-            if [ "$attempt" -eq 5 ]; then
-              echo 'STATUS=BLOCKED unable to obtain ECS SSH host key'
-              exit 1
-            fi
-            sleep 2
-          done
-          chmod 600 "$HOME/.ssh/known_hosts"
-
-      - name: Copy the Git-managed public runtime contracts
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          ssh_opts=(-i "$HOME/.ssh/v88_ecs" -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-          timeout 60 scp "${ssh_opts[@]}" deploy/v88-public/nginx.conf "$ECS_USER@$ECS_HOST:/tmp/v88-public-nginx-${GITHUB_SHA}.conf"
-          timeout 60 scp "${ssh_opts[@]}" deploy/v88-public/docker-compose.yml "$ECS_USER@$ECS_HOST:/tmp/v88-public-compose-${GITHUB_SHA}.yml"
-
-      # Pull at the destination instead of streaming Docker archives through the
-      # GitHub-runner-to-ECS SSH link. The GHCR token is delivered only on stdin
-      # to docker login and is removed from ECS again before this step exits.
-      - name: Pull immutable release images directly on ECS
-        shell: bash
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -Eeuo pipefail
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          node_image="ghcr.io/${owner}/qiantie-v88-node:${GITHUB_SHA}"
-          registry_user="${GITHUB_ACTOR}"
-          ssh_opts=(-i "$HOME/.ssh/v88_ecs" -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-          printf '%s' "$GHCR_TOKEN" | timeout 3600 ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" "
-            set -Eeuo pipefail
-            docker login ghcr.io --username \"$registry_user\" --password-stdin
-            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
-            docker pull \"$node_image\"
-            test \"\$(docker image inspect --format '{{.Os}}/{{.Architecture}}' \"$node_image\")\" = 'linux/amd64'
-          "
-
-      - name: Deploy immutable Node image while retaining the unchanged Go service
-        id: deploy_public
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          owner="${GITHUB_REPOSITORY_OWNER,,}"
-          node_image="ghcr.io/${owner}/qiantie-v88-node:${GITHUB_SHA}"
-          ssh_opts=(-i "$HOME/.ssh/v88_ecs" -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-
-          timeout 1200 ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" bash -s -- "$node_image" "$GITHUB_SHA" "$ECS_HOST" "${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" <<'REMOTE'
-          set -Eeuo pipefail
-          node_image="$1"
-          expected_sha="$2"
-          ECS_PUBLIC_HOST="$3"
-          backup_id="$4"
-          deploy_dir='/opt/qiantie/v88/deploy/v88-public'
-          cd "$deploy_dir"
-          test -s docker-compose.yml
-          test -s .env
-          grep -q 'v88-node:' docker-compose.yml
-          grep -q 'go-api:' docker-compose.yml
-          if grep -Eq '18081|host\.docker\.internal' docker-compose.yml; then
-            echo 'STATUS=BLOCKED retired host-stage topology detected'
-            exit 41
-          fi
-
-          PREVIOUS_PUBLIC_BUILD="$(curl -fsS --max-time 10 http://127.0.0.1:3000/api/build-info || true)"
-          printf 'PREVIOUS_PUBLIC_BUILD=%s\n' "$PREVIOUS_PUBLIC_BUILD"
-          previous_public_sha="$(printf '%s' "$PREVIOUS_PUBLIC_BUILD" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("git_sha", ""))' 2>/dev/null || true)"
-          backup_env=".env.pre-unified-${backup_id}"
-          backup_nginx="nginx.conf.pre-unified-${backup_id}"
-          backup_compose="docker-compose.yml.pre-unified-${backup_id}"
-          cp -a .env "$backup_env"
-          cp -a docker-compose.yml "$backup_compose"
-          if [ "$previous_public_sha" = '4d22f685c99b7e56e8c3f3511b319f82db4a05b2' ]; then
-            if [ ! -s nginx.conf.pre-unified-20260912T103106Z ]; then
-              echo 'STATUS=BLOCKED missing captured Git-direct Nginx rollback configuration'
-              exit 42
-            fi
-            cp -a nginx.conf.pre-unified-20260912T103106Z "$backup_nginx"
-            echo 'ROLLBACK_NGINX_BASELINE=nginx.conf.pre-unified-20260912T103106Z'
-          else
-            cp -a nginx.conf "$backup_nginx"
-          fi
-
-          rollback() {
-            status=$?
-            trap - EXIT ERR
-            if [ "$status" -ne 0 ]; then
-              echo "STATUS=ROLLBACK restoring $backup_env"
-              cp -a "$backup_env" .env || echo 'STATUS=ROLLBACK_WARNING unable to restore .env'
-              cp -a "$backup_nginx" nginx.conf || echo 'STATUS=ROLLBACK_WARNING unable to restore nginx.conf'
-              cp -a "$backup_compose" docker-compose.yml || echo 'STATUS=ROLLBACK_WARNING unable to restore docker-compose.yml'
-              docker compose -f docker-compose.yml config -q || true
-              docker compose -f docker-compose.yml up -d --no-deps --force-recreate --pull never v88-node || true
-              docker compose -f docker-compose.yml up -d --no-deps --force-recreate --pull never nginx || true
-              docker compose -f docker-compose.yml exec -T nginx nginx -t >/dev/null 2>&1 || true
-            fi
-            rm -f "/tmp/v88-public-nginx-${expected_sha}.conf" "/tmp/v88-public-compose-${expected_sha}.yml"
-            exit "$status"
-          }
-          trap rollback EXIT
-
-          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$node_image")" = 'linux/amd64'
-          go_id="$(docker compose -f docker-compose.yml ps -q go-api)"
-          test -n "$go_id"
-          test "$(docker inspect --format '{{.State.Running}}' "$go_id")" = 'true'
-
-          set_env() {
-            key="$1"
-            value="$2"
-            if grep -q "^${key}=" .env; then
-              sed -i "s|^${key}=.*|${key}=${value}|" .env
-            else
-              printf '\n%s=%s\n' "$key" "$value" >> .env
-            fi
-          }
-          set_env QIANTIE_NODE_IMAGE "$node_image"
-          set_env QIANTIE_NODE_RELEASE_SHA "$expected_sha"
-          # The public workbench includes the VIDEO → merge → publish chain.
-          # Provider credentials are still resolved per account at request time;
-          # these flags only expose the corresponding Go stages.
-          set_env QIANTIE_BATCH_FACTORY_V11_SLICE 5
-          set_env QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED 1
-          set_env QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED 1
-          set_env QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER 1
-          cp "/tmp/v88-public-nginx-${expected_sha}.conf" nginx.conf
-          cp "/tmp/v88-public-compose-${expected_sha}.yml" docker-compose.yml
-
-          docker compose -f docker-compose.yml config -q
-          docker compose -f docker-compose.yml up -d --no-deps --force-recreate --pull never v88-node
-          docker compose -f docker-compose.yml exec -T nginx nginx -t
-          docker compose -f docker-compose.yml up -d --no-deps --force-recreate --pull never nginx
-          docker compose -f docker-compose.yml exec -T nginx nginx -t
-
-          public_ok=0
-          for attempt in $(seq 1 30); do
-            if curl -fsS --max-time 5 http://127.0.0.1:3000/api/build-info >/tmp/v88-public-build.json 2>/dev/null; then
-              if python3 -c 'import json,sys; expected=sys.argv[1]; data=json.load(sys.stdin); raise SystemExit(0 if data.get("git_sha") == expected else 1)' "$expected_sha" </tmp/v88-public-build.json; then
-                public_ok=1
-                break
-              fi
-            fi
-            sleep 2
-          done
-          if [ "$public_ok" != 1 ]; then
-            echo 'STATUS=FAILED public build identity did not converge'
-            exit 51
-          fi
-
-          public_ip_ok=0
-          for attempt in $(seq 1 10); do
-            if curl -fsS --max-time 5 "http://${ECS_PUBLIC_HOST}:3000/api/build-info" >/tmp/v88-public-ip-build.json 2>/dev/null; then
-              if python3 -c 'import json,sys; expected=sys.argv[1]; data=json.load(sys.stdin); raise SystemExit(0 if data.get("git_sha") == expected else 1)' "$expected_sha" </tmp/v88-public-ip-build.json; then
-                public_ip_ok=1
-                break
-              fi
-            fi
-            sleep 2
-          done
-          if [ "$public_ip_ok" != 1 ]; then
-            echo 'STATUS=FAILED ECS public-IP build identity did not converge'
-            exit 53
-          fi
-
-          curl -fsS --max-time 10 http://127.0.0.1:3000/batch-factory >/dev/null
-          public_cap_status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:3000/api/batch-factory/v11/capabilities)"
-          case "$public_cap_status" in
-            200|401|403) ;;
-            *) echo "STATUS=FAILED public V11 route status=$public_cap_status"; exit 52 ;;
-          esac
-
-          node_id="$(docker compose -f docker-compose.yml ps -q v88-node)"
-          test -n "$node_id"
-          docker exec -i "$node_id" node - <<'NODE'
-          const crypto = require('node:crypto');
-          const pathname = '/api/batch-factory/v11/capabilities';
-          const username = 'release-smoke';
-          const issuedAt = String(Math.floor(Date.now() / 1000));
-          const isOwner = 'true';
-          const method = 'GET';
-          const secret = process.env.QIANTIE_BRIDGE_SECRET;
-          if (!secret) process.exit(21);
-          const signature = crypto.createHmac('sha256', secret)
-            .update(`${username}${issuedAt}${isOwner}${method}${pathname}`)
-            .digest('hex');
-          fetch(`http://go-api:4000${pathname}`, { headers: {
-            'X-Qiantie-Username': username,
-            'X-Qiantie-Is-Owner': isOwner,
-            'X-Qiantie-Issued-At': issuedAt,
-            'X-Qiantie-Signature': signature,
-            Accept: 'application/json'
-          }}).then(async response => {
-            if (response.status !== 200) {
-              console.error(`V11 internal capability status=${response.status}`);
-              process.exit(22);
-            }
-            const body = await response.json();
-            if (!body || typeof body !== 'object') process.exit(23);
-          }).catch(error => {
-            console.error(error);
-            process.exit(24);
-          });
-          NODE
-
-          echo "STATUS=DEPLOYED release_sha=$expected_sha public_ip_verified=true public_v11_status=$public_cap_status"
-          rm -f "/tmp/v88-public-nginx-${expected_sha}.conf" "/tmp/v88-public-compose-${expected_sha}.yml"
-          trap - EXIT ERR
-          REMOTE
-
-      - name: Verify public V88 externally
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          expected_sha="$GITHUB_SHA"
-          public_ready=false
-          for attempt in $(seq 1 30); do
-            if curl -fsS --max-time 10 "http://${ECS_HOST}:3000/api/build-info" >/tmp/public-build.json 2>/dev/null; then
-              if python3 -c 'import json,sys; expected=sys.argv[1]; data=json.load(sys.stdin); raise SystemExit(0 if data.get("git_sha") == expected else 1)' "$expected_sha" </tmp/public-build.json; then
-                public_ready=true
-                break
-              fi
-            fi
-            sleep 2
-          done
-          if [ "$public_ready" != true ]; then
-            echo "public build identity did not converge within 60 seconds" >&2
-            exit 1
-          fi
-          python3 -c 'import json,sys; expected=sys.argv[1]; data=json.load(sys.stdin); assert data.get("git_sha") == expected, (data, expected); print(json.dumps(data, ensure_ascii=False))' "$expected_sha" </tmp/public-build.json
-          curl -fsS --retry 3 --retry-delay 2 --max-time 10 "http://${ECS_HOST}:3000/batch-factory" >/dev/null
-          status="$(curl -sS -o /dev/null -w '%{http_code}' --retry 2 --retry-delay 1 --max-time 10 "http://${ECS_HOST}:3000/api/batch-factory/v11/capabilities")"
-          case "$status" in
-            200|401|403) ;;
-            *) echo "unexpected public V11 status=$status"; exit 1 ;;
-          esac
-          echo "V88_PUBLIC_UNIFIED_DEPLOY_OK release_sha=$expected_sha v11_status=$status"
-
-      - name: Roll back ECS after external rejection
-        if: failure() && steps.deploy_public.outcome == 'success'
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          backup_id="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          ssh_opts=(-i "$HOME/.ssh/v88_ecs" -o IdentitiesOnly=yes -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-          timeout 120 ssh "${ssh_opts[@]}" "$ECS_USER@$ECS_HOST" bash -s -- "$backup_id" <<'ROLLBACK'
-          set -Eeuo pipefail
-          backup_id="$1"
-          [[ "$backup_id" =~ ^[0-9a-f]{40}-[0-9]+-[0-9]+$ ]]
-          cd /opt/qiantie/v88/deploy/v88-public
-          cp -a ".env.pre-unified-${backup_id}" .env
-          cp -a "nginx.conf.pre-unified-${backup_id}" nginx.conf
-          cp -a "docker-compose.yml.pre-unified-${backup_id}" docker-compose.yml
-          docker compose -f docker-compose.yml config -q
-          docker compose -f docker-compose.yml up -d --no-deps --force-recreate --pull never v88-node
-          docker compose -f docker-compose.yml up -d --no-deps --force-recreate --pull never nginx
-          docker compose -f docker-compose.yml exec -T nginx nginx -t
-          echo "STATUS=ROLLBACK_AFTER_EXTERNAL_REJECTION backup_id=$backup_id"
-          ROLLBACK
+          {
+            echo "release_sha=${{ github.sha }}"
+            echo "go=ghcr.io/${{ github.repository_owner }}/qiantie-v88-go:${{ github.sha }}"
+            echo "runtime=go-api (frontend embedded in /qiantie)"
+            echo "node=retired from the public image path"
+          } >> "$GITHUB_STEP_SUMMARY"
