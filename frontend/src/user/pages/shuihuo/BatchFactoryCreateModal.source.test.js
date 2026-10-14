@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'BatchFactoryCreateModal.jsx'), 'utf8');
+const stylesheet = fs.readFileSync(path.join(here, '..', 'shuihuo-production.css'), 'utf8');
 
 test('uses a full novel-fetch metadata preset by default', () => {
   // 输入格式/列顺序固定为默认值，不再暴露控件（AI 自动分析男女频/风格）
@@ -63,6 +64,11 @@ test('lets a first-time batch owner save unified settings before creating the ba
   assert.match(source, /新建批量 · 统一配置/);
   assert.match(source, /<BatchFactoryAutomationPresetManager value=\{initialBatchSettings\} onLoad=\{setInitialBatchSettings\} \/>/);
   assert.match(source, /initialBatchSettings: clone\(initialBatchSettings\)/);
+});
+
+test('uses the unified button treatment for the new batch toolbar', () => {
+  assert.match(source, /className="shuihuo-create-project-modal"/);
+  assert.match(stylesheet, /BF_CREATE_BATCH_BUTTONS_BEGIN[\s\S]*shuihuo-create-project-modal[\s\S]*box-shadow/);
 });
 
 test('grouped submit surfaces failed book cities and counts only fetched pending books', () => {
