@@ -18,6 +18,7 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/runtimeaudit"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 type RouterOptions struct {
@@ -62,6 +63,7 @@ type RouterOptions struct {
 	LocalArtifacts                  *localartifact.Store
 	LocalExecutorDownloadsDir       string
 	MergeOutput                     mergeworker.ObjectStore
+	VideoManagementConnector        videomanagementconnector.Service
 }
 
 func NewRouter(options RouterOptions) http.Handler {
@@ -287,8 +289,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore, options.NovelFetchStore, options.MemberProfileStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
-	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir)
-	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore)
+	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
+	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
 	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir)
 	publish121OrganizationsHandler(root, auth, options.UserDataDir)
 	if options.UserConfigStore != nil {

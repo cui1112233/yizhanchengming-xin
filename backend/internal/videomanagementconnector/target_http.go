@@ -75,6 +75,25 @@ func (s *TargetHTTPService) RefreshCatalogs(ctx context.Context, session Session
 	return Catalogs{Raw: value}, nil
 }
 
+func (s *TargetHTTPService) CheckSession(ctx context.Context, session Session) error {
+	base, err := s.base()
+	if err != nil {
+		return err
+	}
+	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/zidingyi.php", session.Cookie, nil)
+	if err != nil {
+		return fmt.Errorf("target site session: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+		return fmt.Errorf("target site session expired")
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("target site session returned HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
 func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input SubmissionInput) (Submission, error) {
 	base, err := s.base()
 	if err != nil {

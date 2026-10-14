@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 var uploadBookIDPattern = regexp.MustCompile(`(?i)^(?:\d{1,20}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`)
@@ -23,7 +24,7 @@ var uploadPlatformIDs = map[int]bool{1: true, 2: true, 3: true, 4: true, 6: true
 var uploadGenderIDs = map[string]int{"男": 1, "女": 2}
 var uploadStyleIDs = map[string]int{"古风虐文": 101, "古风甜文": 102, "古风通用": 103, "年代虐文": 201, "年代甜文": 202, "年代通用": 203, "现代虐文": 301, "现代甜文": 302, "现代悬疑": 303, "现代通用": 304, "男频都市": 305, "现代女主": 306, "玄幻": 307, "历史": 308, "爆款BGM": 309, "家庭奇葩": 310, "家庭伤感": 311, "职场打脸": 312}
 
-func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, workshop novelfetchworkshop.Store) {
+func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, workshop novelfetchworkshop.Store, targets ...videomanagementconnector.Service) {
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
@@ -111,6 +112,18 @@ func RegisterNovelFetchUploadBatchCompat(root *http.ServeMux, middleware BridgeA
 			fields, fieldErr := buildUploadFieldsCompat(input.PlatformID, gender, style, input.Advanced, item)
 			if fieldErr != nil {
 				result["error"] = fieldErr.Error()
+				results = append(results, result)
+				continue
+			}
+			if len(targets) > 0 && targets[0] != nil {
+				submission, submitErr := targets[0].Submit(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}, videomanagementconnector.SubmissionInput{BookID: bookID, Filename: bookID + ".txt", Content: content, FormFields: fields})
+				if submitErr != nil {
+					result["error"] = "上传失败"
+				} else {
+					result["status"] = "ok"
+					result["submissionId"] = submission.ID
+					result["error"] = nil
+				}
 				results = append(results, result)
 				continue
 			}

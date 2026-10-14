@@ -38,6 +38,7 @@ type Submission struct {
 
 type Service interface {
 	Login(context.Context, LoginInput) (Session, error)
+	CheckSession(context.Context, Session) error
 	RefreshCatalogs(context.Context, Session) (Catalogs, error)
 	Submit(context.Context, Session, SubmissionInput) (Submission, error)
 	GetSubmission(context.Context, Session, string) (Submission, error)

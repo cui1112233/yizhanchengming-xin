@@ -10,13 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
 // RegisterNovelFetchUploadSessionCompat moves the read-only target-site
 // session check to Go while preserving the legacy upload-target.json format.
 // The cookie is still verified against the real target site; a local file alone
 // is never treated as proof of a live login.
-func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string) {
+func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, targets ...videomanagementconnector.Service) {
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
@@ -34,6 +36,14 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			return
 		}
 		cookie := strings.TrimSpace(toString(session["cookie"]))
+		if len(targets) > 0 && targets[0] != nil {
+			if err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}); err != nil {
+				writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "loggedIn": false, "notLoggedIn": true, "status": "expired", "lastVerifiedAt": nil, "error": "目标站登录已失效，请重新登录", "code": "SESSION_EXPIRED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "loggedIn": true, "status": "ready", "lastVerifiedAt": time.Now().UTC().Format(time.RFC3339)})
+			return
+		}
 		check, err := http.NewRequestWithContext(req.Context(), http.MethodGet, "http://two.121w.com/tttadmin/zidingyi.php", nil)
 		if err != nil {
 			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 会话验证失败"})
@@ -69,6 +79,19 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 		}
 		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&input) != nil || strings.TrimSpace(input.Username) == "" || input.Password == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请输入账号和密码"})
+			return
+		}
+		if len(targets) > 0 && targets[0] != nil {
+			connected, err := targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: strings.TrimSpace(input.Username), Password: input.Password})
+			if err != nil || strings.TrimSpace(connected.Cookie) == "" {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录失败"})
+				return
+			}
+			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "上传会话保存失败"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "username": strings.TrimSpace(input.Username), "status": "ready"})
 			return
 		}
 		client := &http.Client{Timeout: 30 * time.Second}

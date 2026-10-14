@@ -17,6 +17,8 @@ func (fakeService) Login(context.Context, LoginInput) (Session, error) {
 func (fakeService) RefreshCatalogs(context.Context, Session) (Catalogs, error) {
 	return Catalogs{Organizations: []CatalogItem{{ID: "org-1", Name: "默认组织"}}}, nil
 }
+
+func (fakeService) CheckSession(context.Context, Session) error { return nil }
 func (fakeService) Submit(context.Context, Session, SubmissionInput) (Submission, error) {
 	return Submission{ID: "submission-1", Status: "submitted"}, nil
 }
