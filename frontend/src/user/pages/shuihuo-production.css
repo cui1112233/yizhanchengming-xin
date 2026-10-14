@@ -708,6 +708,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-asset-mention-menu img { width:24px; height:24px; border-radius:4px; object-fit:cover; }
 .batch-factory-asset-mention-menu span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:700; }
 .batch-factory-asset-mention-menu small { color:#9ca5b6; font-size:10px; }
+.batch-factory-asset-mention-empty { padding:10px 8px; color:#aeb8c7; font-size:12px; line-height:1.5; }
 .batch-factory-prompt-rich-view { max-height:420px; overflow:auto; padding:14px 16px; border:1px solid rgba(112,183,255,.24); border-radius:8px; color:var(--sh-text); background:rgba(7,18,31,.92); font-size:13px; line-height:1.8; white-space:pre-wrap; }
 .batch-factory-prompt-rich-view .batch-factory-asset-mention { display:inline-flex; align-items:center; margin:0 3px 2px 0; padding:1px 7px; border:1px solid rgba(93,215,190,.55); border-radius:999px; color:#dffcf4; background:rgba(46,145,127,.28); font-size:12px; font-weight:700; line-height:1.45; white-space:nowrap; vertical-align:baseline; }
 .batch-factory-prompt-rich-view .batch-factory-asset-mention-avatar { display:inline-grid; width:18px; height:18px; margin:-1px 5px -1px -4px; place-items:center; overflow:hidden; border:1px solid rgba(255,255,255,.42); border-radius:50%; color:#eff8ff; background:rgba(15,35,58,.82); font-size:10px; line-height:1; }
