@@ -26,6 +26,7 @@ describe('novel fetch workshop uses one canonical Go workshop API', () => {
   });
 
   it('keeps the embedded workbench on the same canonical web-submit namespace', () => {
+    expect(embeddedWorkbenchSource).not.toContain('/api/batch-rewrite/web-submit/');
     expect(embeddedWorkbenchSource).not.toContain('/api/web-submit/');
     expect(embeddedWorkbenchSource).toContain('const WEB_SUBMIT_API = "/api/novel-fetch-workshop/web-submit"');
     expect(embeddedRuntimeSource).not.toContain("'/api/web-submit/");

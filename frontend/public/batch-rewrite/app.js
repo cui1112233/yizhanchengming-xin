@@ -2071,7 +2071,7 @@ async function testVisibleWebFlow() {
   setSiteSubmitStatus("正在验证 121 登录会话...");
   try {
     await saveWebSubmitConfig(true);
-    const result = await novelFetchPlatformApi("/api/batch-rewrite/web-submit/test-visible", {
+    const result = await novelFetchPlatformApi(`${WEB_SUBMIT_API}/test-visible`, {
       method: "POST",
       body: JSON.stringify(webSubmitRequestPayload(state.selectedIds.size ? "selected" : "all", true)),
     });
