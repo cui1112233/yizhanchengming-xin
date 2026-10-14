@@ -361,7 +361,7 @@ func NewRouter(options RouterOptions) http.Handler {
 				return options.NovelFetchRewrite, nil
 			}
 			return options.NovelFetchRewriteResolver(ctx, owner)
-		})
+		}, options.VideoManagementConnector)
 		root.Handle("/api/batch-rewrite/tasks/", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			clone := req.Clone(req.Context())
 			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/batch-rewrite/tasks/", "/api/novel-fetch-workshop/tasks/", 1)

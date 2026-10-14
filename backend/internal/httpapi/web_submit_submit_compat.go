@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
 
-func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, store novelfetchworkshop.Store, rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)) {
+func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, store novelfetchworkshop.Store, genderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error), rewriteResolver func(context.Context, string) (novelfetchworkshop.RewriteProvider, error), targets ...videomanagementconnector.Service) {
 	if root == nil || store == nil || strings.TrimSpace(usersDir) == "" {
 		return
 	}
@@ -78,26 +79,10 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			if meta == nil {
 				meta = map[string]any{}
 			}
-			// A fetched task can still carry the display placeholder “待判定”.
-			// Resolve it here as a last safe fallback instead of silently choosing
-			// a generic upload style or sending an invalid submission.
-			if styleNeedsResolution(meta) {
-				if rewriteResolver != nil {
-					if provider, providerErr := rewriteResolver(req.Context(), identity.Username); providerErr == nil && provider != nil {
-						styleInfo := doc.BookInfo
-						styleInfo.Text = strings.TrimSpace(doc.ProcessedText)
-						if styleInfo.Text == "" {
-							styleInfo.Text = strings.TrimSpace(doc.Original)
-						}
-						decision := novelfetchworkshop.ResolveStyle(req.Context(), styleInfo, provider)
-						if decision.Style != "" {
-							meta["style"] = decision.Style
-							meta["styleSource"] = decision.Source
-							meta["styleReason"] = decision.Reason
-							doc.Meta = meta
-							_ = store.PutDocument(req.Context(), identity.Username, doc)
-						}
-					}
+			if genderNeedsResolution(doc.Gender) && genderJudgeResolver != nil {
+				if judge, judgeErr := genderJudgeResolver(req.Context(), identity.Username); judgeErr == nil {
+					resolveSubmissionGender(req.Context(), &doc, judge)
+					meta = doc.Meta
 				}
 			}
 			done := anyStrings(meta["siteSubmitDoneVersions"])
@@ -106,64 +91,91 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			}
 			for _, version := range versions {
 				row := map[string]any{"bookId": bookID, "version": version, "status": "error"}
+				failedVersion := func(message string, externalRequested bool) {
+					row["error"] = message
+					markSubmissionFailure(meta, version, message)
+					doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "version": version, "status": "failed", "error": message, "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": externalRequested})
+					results = append(results, row)
+					failed++
+				}
 				if containsVersion(done, version) {
 					row["status"] = "skipped"
 					row["error"] = "该版本已确认提交"
 					results = append(results, row)
 					continue
 				}
+				if styleNeedsResolution(meta) {
+					failedVersion(webSubmitUnclassifiedStyleError, false)
+					continue
+				}
 				content, bodyErr := store.GetBody(req.Context(), identity.Username, bookID, version)
 				if bodyErr != nil || strings.TrimSpace(content.Content) == "" {
-					row["error"] = "未找到正文版本"
-					results = append(results, row)
-					failed++
+					failedVersion("未找到正文版本", false)
 					continue
 				}
 				platform, _ := strconv.Atoi(firstText(meta["platformId"], meta["platform_id"]))
 				gender, style := submissionGenderStyle(doc)
 				fields, fieldErr := buildUploadFieldsCompat(platform, gender, style, mapOrEmpty(web["advanced"]), map[string]any{})
 				if fieldErr != nil {
-					row["error"] = fieldErr.Error()
+					failedVersion(fieldErr.Error(), false)
+					continue
+				}
+				if len(targets) > 0 && targets[0] != nil {
+					submission, submitErr := targets[0].Submit(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}, videomanagementconnector.SubmissionInput{BookID: bookID, Filename: bookID + ".txt", Content: []byte(content.Content), FormFields: fields})
+					if submitErr != nil {
+						failedVersion("上传失败", true)
+						continue
+					}
+					row["status"] = "submitted"
+					row["submissionId"] = submission.ID
+					row["error"] = nil
 					results = append(results, row)
-					failed++
+					success++
+					meta["siteSubmitStatus"] = "submitted"
+					done = append(done, version)
+					meta["siteSubmitDoneVersions"] = uniqueStrings(done)
+					meta["siteSubmitFailedVersions"] = removeString(anyStrings(meta["siteSubmitFailedVersions"]), version)
+					if errors := mapOrEmpty(meta["siteSubmitFailedErrors"]); len(errors) > 0 {
+						delete(errors, version)
+						meta["siteSubmitFailedErrors"] = errors
+					}
 					continue
 				}
 				multipartBody, contentType, buildErr := buildUploadMultipart(fields, bookID+".txt", []byte(content.Content))
 				if buildErr != nil {
-					row["error"] = "上传内容组装失败"
-					results = append(results, row)
-					failed++
+					failedVersion("上传内容组装失败", false)
 					continue
 				}
 				uploadReq, reqErr := http.NewRequestWithContext(req.Context(), http.MethodPost, "http://two.121w.com/tttadmin/api/zbooklist_upload.php", bytes.NewReader(multipartBody))
 				if reqErr != nil {
-					row["error"] = "上传请求创建失败"
-					results = append(results, row)
-					failed++
+					failedVersion("上传请求创建失败", false)
 					continue
 				}
 				uploadReq.Header.Set("Cookie", cookie)
 				uploadReq.Header.Set("Content-Type", contentType)
 				response, requestErr := (&http.Client{Timeout: 120 * time.Second}).Do(uploadReq)
 				if requestErr != nil {
-					row["error"] = "上传失败"
-					results = append(results, row)
-					failed++
+					failedVersion("上传失败", true)
 					continue
 				}
-				responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+				responseBody, responseErr := io.ReadAll(io.LimitReader(response.Body, 2<<20))
 				response.Body.Close()
+				if responseErr != nil {
+					failedVersion("上传失败", true)
+					continue
+				}
 				textBody := string(responseBody)
 				if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || strings.Contains(textBody, "管理员登录") {
+					failedVersion("目标站登录已失效，请重新登录", true)
+					doc.Meta = meta
+					_ = store.PutDocument(req.Context(), identity.Username, doc)
 					writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "notLoggedIn": true, "error": "目标站登录已失效，请重新登录"})
 					return
 				}
 				var remote map[string]any
 				_ = json.Unmarshal(responseBody, &remote)
 				if response.StatusCode < 200 || response.StatusCode >= 300 || remote["success"] != true {
-					row["error"] = firstText(remote["message"], remote["msg"], "上传失败")
-					results = append(results, row)
-					failed++
+					failedVersion(firstText(remote["message"], remote["msg"], "上传失败"), true)
 					continue
 				}
 				row["status"] = "submitted"
@@ -174,6 +186,10 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 				done = append(done, version)
 				meta["siteSubmitDoneVersions"] = uniqueStrings(done)
 				meta["siteSubmitFailedVersions"] = removeString(anyStrings(meta["siteSubmitFailedVersions"]), version)
+				if errors := mapOrEmpty(meta["siteSubmitFailedErrors"]); len(errors) > 0 {
+					delete(errors, version)
+					meta["siteSubmitFailedErrors"] = errors
+				}
 			}
 			doc.Meta = meta
 			_ = store.PutDocument(req.Context(), identity.Username, doc)
@@ -193,6 +209,22 @@ func submissionGenderStyle(doc novelfetchworkshop.Document) (string, string) {
 	style := firstText(meta["style"], meta["styleName"], meta["style_name"])
 	return strings.TrimSpace(gender), style
 }
+
+func resolveSubmissionGender(ctx context.Context, doc *novelfetchworkshop.Document, judge novelfetchworkshop.AIGenderJudge) {
+	if doc == nil || !genderNeedsResolution(doc.Gender) {
+		return
+	}
+	info := doc.BookInfo
+	info.Text = strings.TrimSpace(doc.ProcessedText)
+	if info.Text == "" {
+		info.Text = strings.TrimSpace(doc.Original)
+	}
+	decision := novelfetchworkshop.ResolveGender(ctx, "", info, judge)
+	doc.Gender, doc.GenderSource, doc.GenderReason = decision.Gender, decision.Source, decision.Reason
+	syncNovelFetchClassificationMetadata(doc)
+}
+
+const webSubmitUnclassifiedStyleError = "该任务尚未识别或选择上传风格，无法提交到视频管理系统。"
 
 func styleNeedsResolution(meta map[string]any) bool {
 	style := strings.TrimSpace(firstText(meta["style"], meta["styleName"], meta["style_name"]))
@@ -219,4 +251,15 @@ func removeString(values []string, target string) []string {
 		}
 	}
 	return out
+}
+
+func markSubmissionFailure(meta map[string]any, version, message string) {
+	if meta == nil {
+		return
+	}
+	meta["siteSubmitStatus"] = "pending_upload"
+	meta["siteSubmitFailedVersions"] = uniqueStrings(append(anyStrings(meta["siteSubmitFailedVersions"]), version))
+	errors := mapOrEmpty(meta["siteSubmitFailedErrors"])
+	errors[version] = strings.TrimSpace(message)
+	meta["siteSubmitFailedErrors"] = errors
 }
