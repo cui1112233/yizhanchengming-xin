@@ -41,6 +41,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createBookAsset,
 	createNovelFetchIntake,
+  appendNovelFetchIntake,
 	backfillBatch121Metadata,
 	  cancelBatchProduction,
   fetchBookOriginal,

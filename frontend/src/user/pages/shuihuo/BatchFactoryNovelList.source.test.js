@@ -358,6 +358,11 @@ test('renders every novel row with prompt and clip-library cells without a separ
 	assert.match(source, /function InlineMediaLibrary/);
 });
 
+test('manual add-books flow appends the new intake to the active batch', () => {
+  assert.match(source, /appendNovelFetchIntake/);
+  assert.match(source, /await appendNovelFetchIntake\(batch\.id, intake\.id, \{ allowDuplicate: allowDuplicate === true \}\)/);
+});
+
 test('puts selected storyboard assets into the storyboard prompt as @ mentions', () => {
   assert.match(source, /function storyboardAssetMentions\(book, video\)/);
   assert.match(source, /map\(asset => `@\$\{assetName\(asset\)\}`\)/);
