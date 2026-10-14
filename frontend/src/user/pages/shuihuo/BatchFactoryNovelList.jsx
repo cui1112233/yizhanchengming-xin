@@ -775,12 +775,34 @@ function withStoryboardAssetMentions(prompt, book, video) {
   return `${text}\n资产：${mentions}`;
 }
 
-function renderStoryboardPromptWithAssetMentions(prompt, book, video) {
-  const text = String(prompt || '');
+function compactUnifiedAssetDescriptions(prompt, book) {
+  let text = String(prompt || '');
+  const records = (book?.assetRecords || []).filter(asset => asset?.kind === 'character' || asset?.kind === 'scene' || asset?.kind === 'prop');
+  if (!text || !records.length) return text;
+  const start = text.search(/统一人物\s*[：:]/);
+  if (start < 0) return text;
+  const endCandidates = [text.indexOf('段内执行约束', start), text.indexOf('[场景', start), text.indexOf('【场景', start)].filter(index => index >= 0);
+  const end = endCandidates.length ? Math.min(...endCandidates) : text.length;
+  let block = text.slice(start, end);
+  records
+    .map(asset => assetName(asset))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+    .forEach(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // 统一人物区只展示 @资产；括号里的完整外形仍保留在完整提示词中，
+      // 卡片上不再把一大段人物描述误当成资产名称。
+      block = block.replace(new RegExp(`${escaped}\\s*[（(][^\\n）)]*[）)]`, 'g'), `@${name}`);
+    });
+  return `${text.slice(0, start)}${block}${text.slice(end)}`;
+}
+
+function renderStoryboardPromptWithAssetMentions(prompt, book, video, assetImages = {}) {
+  const text = compactUnifiedAssetDescriptions(prompt, book);
   const selectedIds = readStoryboardAssetSelection(book, video).selectedIds;
   const assets = (book?.assetRecords || [])
-    .filter(asset => selectedIds.has(String(asset?.id || '')))
-    .map(asset => ({ ...asset, mention: `@${assetName(asset)}` }))
+    .filter(asset => selectedIds.has(String(asset?.id || '')) || text.includes(`@${assetName(asset)}`))
+    .map(asset => ({ ...asset, mention: `@${assetName(asset)}`, imageUrl: assetImages[String(asset.id || '')] || '' }))
     .filter(asset => asset.mention.length > 1)
     .sort((left, right) => right.mention.length - left.mention.length);
   if (!text || !assets.length) return text;
@@ -789,7 +811,7 @@ function renderStoryboardPromptWithAssetMentions(prompt, book, video) {
   return text.split(pattern).map((part, index) => {
     const asset = assetByMention.get(part);
     return asset
-      ? <span key={`${asset.id || asset.mention}-${index}`} className={`batch-factory-asset-mention is-${asset.kind || 'asset'}`} title={`${asset.kind || '资产'}：${assetName(asset)}`}>{part}</span>
+      ? <span key={`${asset.id || asset.mention}-${index}`} className={`batch-factory-asset-mention is-${asset.kind || 'asset'}`} title={`${asset.kind || '资产'}：${assetName(asset)}`}><span className="batch-factory-asset-mention-avatar">{asset.imageUrl ? <img src={asset.imageUrl} alt="" /> : asset.kind === 'character' ? '人' : asset.kind === 'scene' ? '景' : '物'}</span>{part}</span>
       : <span key={`prompt-text-${index}`}>{part}</span>;
   });
 }
@@ -966,6 +988,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const videos = book?.videos || [];
 	const h3Cards = h3DirectorCards(book);
   const precompiledWorkspace = resolvePrecompiledVideoWorkspace(book);
+  const [assetThumbs, setAssetThumbs] = useState({});
   const smartUnifiedAnalysis = smartUnifiedAnalysisForBook(book);
   const showSmartUnified = smartUnifiedDisplayEnabled(batch, book) && smartUnifiedAnalysis;
   const h3CompilationMessage = h3CompilationStatus(effectiveBookSettings(batch, book));
@@ -979,6 +1002,22 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   };
   const selectedIndex = Math.max(0, videos.findIndex(video => video.id === selectedVideoId));
   const video = videos[selectedIndex] || null;
+  useEffect(() => {
+    let active = true;
+    const records = (book?.assetRecords || []).filter(asset => asset?.id);
+    if (!batchId || !book?.id || !records.length) { setAssetThumbs({}); return () => { active = false; }; }
+    Promise.all(records.map(async asset => {
+      try {
+        const response = await listBookAssetImages(batchId, book.id, asset.id);
+        const images = Array.isArray(resultData(response, 'images')) ? resultData(response, 'images') : [];
+        const primary = images.find(image => image?.isPrimary) || images[0];
+        return [String(asset.id), String(primary?.url || primary?.imageUrl || '')];
+      } catch (_) { return [String(asset.id), '']; }
+    })).then(entries => {
+      if (active) setAssetThumbs(Object.fromEntries(entries));
+    });
+    return () => { active = false; };
+  }, [batchId, book?.id, book?.revision, book?.assetRecords?.length]);
   const rawVideoPrompt = String(video?.videoPrompt || '');
   const visualPrompt = String(video?.visualPrompt || '');
   const hasVisualPrompt = Boolean(visualPrompt.trim());
@@ -1059,7 +1098,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
       </header>
       <button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(video.id)}>
         <span className="batch-factory-prompt-status">{stateLabel}</span>
-        <p>{activePrompt ? renderStoryboardPromptWithAssetMentions(activePrompt, book, video) : (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
+        <p>{activePrompt ? renderStoryboardPromptWithAssetMentions(activePrompt, book, video, assetThumbs) : (smartUnifiedPending && promptKind === 'video' ? '智能统一视觉基线尚未取得；不影响本分镜的提示词使用' : loading && promptKind === 'video' ? '正在编译最终视频提示词…' : promptKind === 'visual' ? '请生成画面提示词再查看' : '请生成视频提示词再查看')}</p>
         <small title={assetPromptText}>{unifiedStyleText ? '统一风格已注入' : '未获取统一风格'} · {assetPromptText ? `资产提示词已注入：${promptPreview(assetPromptText)}` : '当前分镜暂无资产提示词'} · 视频提示词：{videoPromptLabel} · 点击打开完整提示词</small>
       </button>
       <div className="batch-factory-cell-pager">
