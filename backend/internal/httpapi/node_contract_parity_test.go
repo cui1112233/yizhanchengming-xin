@@ -16,10 +16,9 @@ type nodeRouteInventory struct {
 	} `json:"routes"`
 }
 
-// The inventory is the cutover guardrail: every remaining Express mount must
-// either have a Go shadow implementation or be explicitly named as a blocker.
-// This keeps cleanup honest and prevents a newly added Node mount from being
-// silently treated as part of the Go-owned API.
+// The inventory is the cutover guardrail: every public Express mount must be
+// fully owned by Go before the Node runtime can be retired.  A shadow entry is
+// useful during migration, but it is not an acceptable final state.
 func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "migration", "node-api-contract-inventory.json"))
 	if err != nil {
@@ -32,40 +31,19 @@ func TestNodeRouteInventoryIsExplicit(t *testing.T) {
 	if len(inventory.Routes) == 0 {
 		t.Fatal("node route inventory is empty")
 	}
-	blocked := 0
-	requiredMigrated := map[string]bool{
-		"/api/novel-fetch":         false,
-		"/api/novel-fetch-upload": false,
-		"/api/novel-fetch-workshop": false,
-		"/api/batch-rewrite":      false,
-		"/api/batch-factory":      false,
-		"/api/script-video":       false,
-	}
 	for _, route := range inventory.Routes {
 		if route.Path == "" || route.Method == "" || route.Owner == "" || route.Status == "" {
 			t.Fatalf("incomplete route record: %+v", route)
 		}
 		switch route.Status {
-		case "shadow":
-			if route.Owner != "go" {
-				t.Fatalf("shadow route is not Go-owned: %+v", route)
-			}
-		case "blocked":
-			blocked++
 		case "migrated":
-			if _, ok := requiredMigrated[route.Path]; ok {
-				requiredMigrated[route.Path] = true
+			if route.Owner != "go" {
+				t.Fatalf("migrated route is not Go-owned: %+v", route)
 			}
+		case "shadow", "blocked":
+			t.Fatalf("unmigrated public route remains: %+v", route)
 		default:
 			t.Fatalf("unknown route status %q for %s", route.Status, route.Path)
-		}
-	}
-	if blocked != 0 {
-		t.Fatalf("expected no blocked legacy contracts, got %d", blocked)
-	}
-	for path, migrated := range requiredMigrated {
-		if !migrated {
-			t.Fatalf("required Go migration is not complete: %s", path)
 		}
 	}
 }
