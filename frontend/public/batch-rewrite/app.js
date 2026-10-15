@@ -2699,9 +2699,9 @@ function renderSensitiveLog(data) {
         </div>
         <div class="meta-grid compact">
           ${metaItem("命中位置", `${hit.start ?? ""} - ${hit.end ?? ""}`)}
-          ${metaItem("处理模型", fixed.model || "")}
-          ${metaItem("尝试次数", fixed.attempt || "")}
-          ${metaItem("错误", fixed.error || "")}
+          ${metaItem("处理模型", fixed.model || fixed.model_id || fixed.modelId || (fixed.source === "system_rule" || fixedData.mode === "system_rule" ? "系统规则" : (fixed.source || "—")))}
+          ${metaItem("尝试次数", fixed.attempt ?? fixed.attempt_count ?? (status ? 1 : "—"))}
+          ${metaItem("错误", fixed.error || fixed.error_message || "—")}
         </div>
         <div class="compare-grid">
           <div class="text-block">
