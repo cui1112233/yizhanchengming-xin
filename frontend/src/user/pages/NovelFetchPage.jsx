@@ -18,6 +18,7 @@ import {
 import { createNovelFetchIntake } from '../../shared/api/batchFactoryV11';
 import { listAvailableModels as listAvailableTextModels, modelSelectOptions } from '../../shared/api/modelCatalog';
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
+import { dispatchGlobalStatus } from '../../shared/notifications/globalTaskCenter.js';
 import './novel-fetch.css';
 
 const TABS = [
@@ -516,6 +517,15 @@ export function LegacyNovelFetchPage() {
       if (options.length) setTextModelOptions(options);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    // 公网 V78 在进入处理台时会把当前空闲/执行状态同步到顶栏；否则本地顶栏会比线上少一段状态文案。
+    dispatchGlobalStatus({
+      text: processing ? '正在处理任务。' : '暂无正在处理的任务。',
+      tone: processing ? 'working' : 'idle'
+    });
+  }, [processing]);
+
   useEffect(() => {
     if (activeTab === 'config') loadConfig();
     if (activeTab === 'knowledge') { loadKnowledge(); loadConfig(); }
