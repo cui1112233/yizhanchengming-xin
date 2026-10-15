@@ -22,16 +22,15 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		// Keep the historical URL as a compatibility redirect only. The single
-		// maintained entry is /novel-fetch.
+		// The React shell owns /novel-fetch so direct visits keep the product
+		// navigation. The legacy Go workbench remains an embedded child at its
+		// explicit /batch-rewrite/v2 URL.
 		if name == "batch-rewrite/v2" {
-			http.Redirect(w, req, "/novel-fetch", http.StatusTemporaryRedirect)
+			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
 			return
 		}
-		// Keep the canonical Novel Fetch URL on the recovered full workbench
-		// until the React replacement reaches feature parity.
 		if name == "novel-fetch" {
-			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
+			serveEmbeddedIndex(w, files, "index.html")
 			return
 		}
 		// The admin app is built as a separate entry so it can keep its own

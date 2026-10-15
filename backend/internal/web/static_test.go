@@ -77,10 +77,15 @@ func TestStaticHandlerServesNovelFetchWorkbench(t *testing.T) {
 	}
 	res := httptest.NewRecorder()
 	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/batch-rewrite/v2", nil))
-	if res.Code != http.StatusTemporaryRedirect || res.Header().Get("Location") != "/novel-fetch" {
-		t.Fatalf("legacy novel-fetch route status = %d location %q", res.Code, res.Header().Get("Location"))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") {
+		t.Fatalf("embedded novel-fetch workbench status = %d body %q", res.Code, res.Body.String())
 	}
-	for _, route := range []string{"/novel-fetch"} {
+	res = httptest.NewRecorder()
+	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-fetch", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "<html>shell</html>") {
+		t.Fatalf("novel-fetch shell status = %d body %q", res.Code, res.Body.String())
+	}
+	for _, route := range []string{"/batch-rewrite/v2"} {
 		res := httptest.NewRecorder()
 		StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, route, nil))
 		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") || !strings.Contains(res.Body.String(), "/batch-rewrite/styles.css") {
