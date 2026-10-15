@@ -224,7 +224,7 @@ function saveWorkFormState() {
   }
   clearTimeout(workFormSaveTimer);
   workFormSaveTimer = setTimeout(() => {
-    api("/api/work-form", {
+    api(`${API_ROOT}/work-form`, {
       method: "POST",
       body: JSON.stringify({ state: formState }),
     }).catch(() => {});
@@ -240,7 +240,7 @@ async function saveWorkFormStateNow() {
   } catch {
     // ignore local save failure
   }
-  await api("/api/work-form", {
+  await api(`${API_ROOT}/work-form`, {
     method: "POST",
     body: JSON.stringify({ state: formState }),
   }).catch(() => {});
@@ -983,7 +983,7 @@ async function optimizeLibraryItem() {
   if (!items[index]) return;
   $("knowledgeStatus").textContent = "AI优化中...";
   try {
-    const result = await api("/api/knowledge/optimize", {
+    const result = await api(`${API_ROOT}/knowledge/optimize`, {
       method: "POST",
       body: JSON.stringify({
         library_type: type,
@@ -1401,7 +1401,7 @@ async function suggestCurrentRuleWithAi() {
   $("ruleAiStatus").textContent = "AI生成中...";
   $("ruleAiResult").textContent = "正在分析样本文案...";
   try {
-    const result = await api("/api/rules/ai-suggest", {
+    const result = await api(`${API_ROOT}/rules/ai-suggest`, {
       method: "POST",
       body: JSON.stringify({
         rule_type: type,
@@ -1578,7 +1578,7 @@ async function persistSelectedTextModel(modelId) {
   state.config.app_config.text_model_id = id;
   state.__persistedTextModelId = id;
   if (textModelPersistPromise) await textModelPersistPromise;
-  textModelPersistPromise = api("/api/config", {
+  textModelPersistPromise = api(`${API_ROOT}/config`, {
     method: "POST",
     body: JSON.stringify({ app_config: { text_model_id: id } }),
   }).then(result => {
@@ -1600,7 +1600,7 @@ async function loadTextModels(selectedId = "") {
   const status = $("textModelStatus");
   if (!select) return;
   try {
-    const result = await api("/api/models?kind=text");
+        const result = await api(`${API_ROOT}/models?kind=text`);
     const models = Array.isArray(result.models) ? result.models : [];
     state.textModels = models;
     select.innerHTML = "";
@@ -1957,7 +1957,7 @@ async function saveVersionConfigAuthority() {
     sensitive: state.config.sensitive || { groups: [] },
     ...(state.config.knowledge_loaded ? { knowledge: state.config.knowledge || {} } : {}),
   };
-  const data = await api("/api/config", { method: "POST", body: JSON.stringify(payload) });
+  const data = await api(`${API_ROOT}/config`, { method: "POST", body: JSON.stringify(payload) });
   if (!data?.config) throw new Error("版本配置保存失败：服务器没有返回保存结果");
   mergeConfigResponse(data.config);
   try { localStorage.setItem(WORK_FORM_STORAGE_KEY, JSON.stringify(formState)); } catch (_) {}
@@ -2902,7 +2902,7 @@ function escapeHtml(value) {
 }
 
 async function loadConfig() {
-  state.config = await api("/api/bootstrap");
+  state.config = await api(`${API_ROOT}/bootstrap`);
   state.config.knowledge_loaded = state.config.knowledge_loaded === true;
   renderConfig();
 }
@@ -2911,7 +2911,7 @@ async function ensureKnowledgeLoaded() {
   if (state.config?.knowledge_loaded) return;
   const status = $("knowledgeStatus");
   if (status) status.textContent = "正在读取知识库...";
-  state.config = { ...state.config, ...await api("/api/config"), knowledge_loaded: true };
+  state.config = { ...state.config, ...await api(`${API_ROOT}/config`), knowledge_loaded: true };
   renderKnowledgeSummary(state.config.knowledge_summary || {});
   if (status) status.textContent = "";
 }
@@ -2945,7 +2945,7 @@ async function refreshTasksAndSubmitHistory() {
 }
 
 async function loadLogs() {
-  const data = await api("/api/logs");
+  const data = await api(`${API_ROOT}/logs`);
   const list = $("logsList");
   list.innerHTML = "";
   for (const item of (data.logs || [])) {
@@ -3039,7 +3039,7 @@ async function restoreLatestProcessJob() {
   const box = $("processResult");
   if (!box) return;
   try {
-    const data = await api("/api/process/jobs/latest");
+    const data = await api(`${API_ROOT}/process/jobs/latest`);
     const job = data.latest || {};
     if (!job.id) {
       box.textContent = "暂无正在处理的任务。";
@@ -3078,7 +3078,7 @@ async function pollProcessJob(jobId) {
   let latest = null;
   const startedAt = Date.now();
   for (;;) {
-    latest = await api(`/api/process/jobs/${encodeURIComponent(jobId)}`);
+    latest = await api(`${API_ROOT}/process/jobs/${encodeURIComponent(jobId)}`);
     $("processResult").textContent = renderProcessJob(latest);
     if (latest.status === "done") return latest.result || {};
     if (latest.status === "failed") throw new Error(latest.error || "处理失败");
@@ -3121,7 +3121,7 @@ async function processInput() {
       sensitive_ai_enabled: sensitiveAiProcessEnabled(),
       text_model_id: textModelId,
     };
-    const job = await api("/api/process/start", {
+    const job = await api(`${API_ROOT}/process/start`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -3727,7 +3727,7 @@ async function saveConfig(throwOnError = false) {
       sensitive: state.config.sensitive || { groups: [] },
       ...(state.config.knowledge_loaded ? { knowledge: state.config.knowledge || {} } : {}),
     };
-    const data = await api("/api/config", {
+    const data = await api(`${API_ROOT}/config`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -3798,7 +3798,7 @@ async function deleteSelectedPreset() {
 async function testAi() {
   $("aiTestStatus").textContent = "测试中...";
   try {
-    const result = await api("/api/ai/test", {
+    const result = await api(`${API_ROOT}/ai/test`, {
       method: "POST",
       body: JSON.stringify({
         purpose: "rewrite",
@@ -3813,7 +3813,7 @@ async function testAi() {
 async function refreshKnowledge() {
   $("knowledgeStatus").textContent = "刷新中...";
   try {
-    const result = await api("/api/knowledge");
+    const result = await api(`${API_ROOT}/knowledge/summary`);
     state.config.knowledge_summary = result.summary || {};
     renderKnowledgeSummary(state.config.knowledge_summary);
     renderRewriteTemplateOptions(state.config?.app_config?.rewrite?.default_template_id || "");
@@ -3832,7 +3832,7 @@ async function analyzeOpeningPhrase() {
   resultBox.value = "";
   state.pendingOpeningItem = null;
   try {
-    const result = await api("/api/opening/analyze", {
+    const result = await api(`${API_ROOT}/opening/analyze`, {
       method: "POST",
       body: JSON.stringify({
         source_text: $("openingSourceText").value,
@@ -3867,7 +3867,7 @@ async function saveAnalyzedOpeningPhrase() {
   }
   status.textContent = "入库中...";
   try {
-    const result = await api("/api/opening/save", {
+    const result = await api(`${API_ROOT}/opening/save`, {
       method: "POST",
       body: JSON.stringify({ item }),
     });
@@ -3885,7 +3885,7 @@ async function normalizeOpeningLibrary() {
   const status = $("knowledgeStatus");
   status.textContent = "矫正中...";
   try {
-    const result = await api("/api/opening/normalize", { method: "POST" });
+    const result = await api(`${API_ROOT}/opening/normalize`, { method: "POST" });
     state.config = result.config || state.config;
     $("libraryTypeSelect").value = "opening_phrases";
     renderConfig();
@@ -3909,7 +3909,7 @@ async function previewRuleResult() {
   $("rulePreviewOutput").value = "处理中...";
   try {
     await saveConfig();
-    const result = await api("/api/rules/preview", {
+    const result = await api(`${API_ROOT}/rules/preview`, {
       method: "POST",
       body: JSON.stringify({
         text: input,
