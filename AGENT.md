@@ -26,3 +26,16 @@
 4. **追查根因，不做表面补丁**：遇到故障必须沿数据流、调用链和实际运行结果定位原因；每个改动都要能回答“为什么这样改”。
 5. **只输出影响决策的信息**：回复、进度和结论说重点，删除不改变决策的背景和重复说明。
 6. **统一使用中文**：所有回复、进度汇报、结论、表格、提问和总结一律使用中文；代码标识符、命令、文件路径和报错原文保持原样。
+
+## 当前代码基线（以仓库实际代码为准）
+
+以下内容是当前 V88 代码的事实基线。发生冲突时，先检查代码、测试和启动脚本，再修改文档；不要用线上编译产物反向覆盖源码。
+
+- **后端入口**：Go module 位于 `backend/go.mod`，主服务入口是 `backend/cmd/qiantie/main.go`。它同时处理 `/health`、`/api/*` 和嵌入的前端静态资源；未知 API 路径由 Go 明确返回 404/405，不再通过 Node 兜底。
+- **前端源码**：可维护的 React 源码位于 `frontend/src`，使用 Vite 构建；用户端和管理端都由 React + Ant Design 组成。路由包括 `/novel-fetch`、`/novel-panel`、`/batch-factory`、`/shuihuo-production`、`/script`、`/tts` 和 `/admin/*` 等。
+- **发布方式**：先构建 `frontend/dist`，再由 `scripts/build-go-local.ps1` 复制到 `backend/web/dist`，通过 `backend/web/assets.go` 的 `embed.FS` 编进 Go 二进制。`frontend/dist` 和 `backend/web/dist` 都是构建结果，不是功能源码，禁止直接编辑或当作源码恢复。
+- **数据职责**：MySQL 保存业务数据和迁移；Redis 负责队列、短时运行状态和分布式锁；TOS 保存对象及合成产物；FFmpeg 参与音视频标准化、配音和合成。提示词正文由后端 `backend/internal/prompt` 管理并在运行时渲染，前端只选择预设和展示结果。
+- **主要业务模块**：`backend/internal/novelfetchworkshop` 负责小说获取、原文保留、截取、风格/男女频判断和敏感词处理；`backend/internal/batchfactoryv11` 与 `backend/internal/httpapi` 负责批量工厂 V11/V12、资产、分镜、视频、合成、上传和恢复接口；`backend/internal/videomanagementconnector` 是视频管理系统的 Go HTTP 插件边界。
+- **旧页面边界**：`frontend/public/batch-rewrite` 只作为明确的 V78 对照/兼容页面，由 `/batch-rewrite/v2` 显式访问；`/novel-fetch` 必须指向 React 页面。`frontend/public/novel-panel/workbench` 已被 Go 静态路由拒绝，不能重新接回线上默认入口。
+- **本地启动**：使用 `scripts/start-local-go-review.ps1`（可按需加 `-UseYcmMysql`、`-EnableBatchProduction`、`-EnableLocalMerge`），服务由 Go 二进制提供；`scripts/verify-no-node-runtime.ps1` 用于检查运行时是否误启动 Node。不得把“浏览器能打开”或“HTTP 200”当成完整链路验证。
+- **文档职责**：`README.md` 说明项目结构、启动、构建、测试和业务链路；本文件只记录协作禁区、源码优先原则和当前代码基线。改动功能时必须同步检查两份文档是否仍准确。
