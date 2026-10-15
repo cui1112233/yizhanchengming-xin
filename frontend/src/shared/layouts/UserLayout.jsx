@@ -84,6 +84,7 @@ export function UserLayout({ children }) {
   const isAgentCanvasRoute = pathname === '/agent/canvas';
   const routeAccess = getRouteAccessState({ pathname, isLoggedIn });
   const displayAvatar = avatarDisplay(avatar, username);
+  // 悬浮助手需要用它区分账号会话；它不能再作为主页面容器的 React key。
   const accountSessionKey = username || 'anonymous';
   const visibleNavItems = navItems;
   const content = isValidElement(children)
@@ -499,7 +500,7 @@ export function UserLayout({ children }) {
           </div>
         ) : null}
       </aside>
-      <Fragment key={accountSessionKey}>
+      <Fragment>
         <main className="legacy-main">
           {!isAgentCanvasRoute ? <header className="legacy-topbar">
             <span className="legacy-page-title">{pageTitle(pathname)}</span>

@@ -29,6 +29,13 @@ test('小说获取侧边栏进入带导航的 Go 工作台外壳', () => {
   assert.match(source, /<Link key=\{item\.href\} href=\{item\.href\} className=/);
 });
 
+test('账号信息异步更新不会卸载正在使用的业务工作台', () => {
+  // 账号资料是异步读取的；不能把用户名当作主内容容器的 React key，
+  // 否则资料回来时会连同小说获取 iframe 一起卸载并重新加载，表现为闪烁。
+  assert.doesNotMatch(source, /<Fragment key=\{accountSessionKey\}>/);
+  assert.match(source, /<Fragment>\s*<main className="legacy-main">/s);
+});
+
 test('avatar enters profile through the client route without opening the menu first', () => {
   const avatarButton = source.slice(
     source.indexOf('className="legacy-sidebar-avatar"'),
