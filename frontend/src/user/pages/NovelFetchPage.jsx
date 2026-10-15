@@ -207,7 +207,9 @@ function KnowledgeLibraryManager({
         <label>资料库<Select value={kind} onChange={onKindChange} options={KNOWLEDGE_LIBRARY_TYPES} /></label>
         <label>搜索<Input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="按名称、分类、标签查找" /></label>
       </div>
-      <Select className="novel-fetch-knowledge-list" value={selectedId || undefined} onChange={onSelect} loading={loading} placeholder="暂无条目" options={filtered.map((item, index) => ({ value: String(item.id || index), label: listLabel(item) }))} />
+      <select className="novel-fetch-knowledge-list" value={selectedId || ''} onChange={event => onSelect(event.target.value)} size={Math.max(5, Math.min(10, filtered.length || 5))} disabled={loading || !filtered.length}>
+        {!filtered.length ? <option value="">暂无条目</option> : filtered.map((item, index) => <option key={String(item.id || index)} value={String(item.id || index)}>{listLabel(item)}</option>)}
+      </select>
       <Space wrap>
         <Button onClick={onAdd}>新增条目</Button>
         <Button disabled={!selectedId} onClick={onDuplicate}>复制条目</Button>

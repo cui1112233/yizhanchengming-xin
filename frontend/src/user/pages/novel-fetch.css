@@ -339,8 +339,9 @@
 .novel-fetch-knowledge-controls label,
 .novel-fetch-knowledge-fields label,
 .novel-fetch-knowledge-editor > label { display:flex; flex-direction:column; gap:5px; color:var(--text-secondary); font-size:12px; margin-bottom:10px; }
-.novel-fetch-knowledge-list { width:100%; min-height:320px; margin-bottom:10px; }
-.novel-fetch-knowledge-list .ant-select-selector { min-height:320px; align-items:flex-start; overflow:auto; }
+.novel-fetch-knowledge-list { width:100%; min-height:320px; margin-bottom:10px; padding:6px; border:1px solid var(--legacy-border-strong); border-radius:6px; background:var(--legacy-input); color:var(--text-primary); }
+.novel-fetch-knowledge-list option { padding:8px 10px; border-radius:4px; }
+.novel-fetch-knowledge-list option:checked { background:var(--legacy-accent); color:#fff; }
 .novel-fetch-knowledge-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .novel-fetch-knowledge-editor .ant-alert { margin-bottom:10px; }
 @media (max-width: 760px) { .novel-fetch-config-grid { grid-template-columns:1fr; } }
