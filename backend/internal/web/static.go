@@ -22,11 +22,8 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		// The legacy novel-fetch workbench is opened at /batch-rewrite/v2,
-		// while its files live in the bundled /batch-rewrite directory. Keep
-		// that public URL stable so relative CSS and scripts still resolve.
-		if name == "batch-rewrite/v2" {
-			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
+		if name == "batch-rewrite/v2" || strings.HasPrefix(name, "batch-rewrite/v2/") {
+			http.NotFound(w, req)
 			return
 		}
 		// The admin app is built as a separate entry so it can keep its own

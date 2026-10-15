@@ -8,9 +8,6 @@ $frontendDist = Join-Path $repo 'frontend/dist'
 $goDist = Join-Path $repo 'backend/web/dist'
 $petsSource = Join-Path $repo 'pets'
 $petsDist = Join-Path $goDist 'pets'
-$novelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
-$novelFetchPatchSource = Join-Path $repo 'frontend/public/batch-rewrite'
-$novelFetchDist = Join-Path $goDist 'batch-rewrite'
 $brandAssetsSource = Join-Path $repo 'frontend/public/assets'
 $brandAssetsDist = Join-Path $goDist 'assets'
 
@@ -30,42 +27,6 @@ foreach ($brandAsset in @('brand-logo-black.png', 'brand-logo-white.png')) {
     throw "Brand asset is missing: $source"
   }
   Copy-Item -LiteralPath $source -Destination (Join-Path $brandAssetsDist $brandAsset) -Force
-}
-
-# The Go composer assembles the novel-fetch page from the tracked frontend
-# workbench and injects the current retry/status/date compatibility scripts.
-# Go 4001 embeds that composed page instead of the older copied dist snapshot.
-if (-not (Test-Path (Join-Path $novelFetchSource 'index.html'))) {
-  throw "Novel fetch workbench assets are missing: $novelFetchSource"
-}
-New-Item -ItemType Directory -Force $novelFetchDist | Out-Null
-Copy-Item -Path (Join-Path $novelFetchSource '*') -Destination $novelFetchDist -Recurse -Force
-if (-not (Test-Path (Join-Path $novelFetchPatchSource 'v78-novel-fetch-v2-runtime.js'))) {
-  throw "Novel fetch V78 compatibility scripts are missing: $novelFetchPatchSource"
-}
-Copy-Item -Path (Join-Path $novelFetchPatchSource '*') -Destination $novelFetchDist -Recurse -Force
-Push-Location (Join-Path $repo 'backend')
-try {
-  go run ./cmd/compose-novel-fetch (Join-Path $novelFetchSource 'index.html') (Join-Path $novelFetchDist 'index.html')
-} finally {
-  Pop-Location
-}
-
-# Give the embedded workbench runtime a content-derived cache key. This keeps
-# an already-open browser from reusing an older compatibility script after a
-# Go rebuild, without modifying the tracked source page on every build.
-$runtimeAsset = Join-Path $novelFetchDist 'v78-novel-fetch-v2-runtime.js'
-$composedIndex = Join-Path $novelFetchDist 'index.html'
-if ((Test-Path -LiteralPath $runtimeAsset) -and (Test-Path -LiteralPath $composedIndex)) {
-  $sha256 = [Security.Cryptography.SHA256]::Create()
-  try {
-    $runtimeVersion = ([BitConverter]::ToString($sha256.ComputeHash([IO.File]::ReadAllBytes($runtimeAsset)))).Replace('-', '').Substring(0, 12).ToLowerInvariant()
-  } finally {
-    $sha256.Dispose()
-  }
-  $indexText = [IO.File]::ReadAllText($composedIndex, [Text.Encoding]::UTF8)
-  $indexText = [Text.RegularExpressions.Regex]::Replace($indexText, 'v78-novel-fetch-v2-runtime\.js\?v=[^"'' ]+', "v78-novel-fetch-v2-runtime.js?v=$runtimeVersion")
-  [IO.File]::WriteAllText($composedIndex, $indexText, (New-Object Text.UTF8Encoding($false)))
 }
 
 if (-not (Test-Path (Join-Path $petsSource 'stacky/spritesheet.webp'))) {

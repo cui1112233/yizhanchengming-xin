@@ -48,18 +48,16 @@ func TestStaticHandlerRejectsNilFilesystem(t *testing.T) {
 	}
 }
 
-func TestStaticHandlerServesLegacyNovelFetchAliasAndAdminShell(t *testing.T) {
+func TestStaticHandlerServesAdminShell(t *testing.T) {
 	assets := fstest.MapFS{
 		"index.html":                       &fstest.MapFile{Data: []byte("<html>shell</html>")},
 		"admin.html":                       &fstest.MapFile{Data: []byte("<html>admin</html>")},
-		"batch-rewrite/index.html":         &fstest.MapFile{Data: []byte("<html>fetch</html>")},
 	}
 	handler := StaticHandler(assets)
 	for _, tc := range []struct {
 		path string
 		want string
 	}{
-		{"/batch-rewrite/v2", "fetch"},
 		{"/admin", "admin"},
 		{"/admin/presets", "admin"},
 		{"/novel-panel", "shell"},
@@ -69,6 +67,15 @@ func TestStaticHandlerServesLegacyNovelFetchAliasAndAdminShell(t *testing.T) {
 		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), tc.want) {
 			t.Fatalf("%s returned status %d body %q, want %q", tc.path, res.Code, res.Body.String(), tc.want)
 		}
+	}
+}
+
+func TestStaticHandlerRejectsRemovedNovelFetchWorkbench(t *testing.T) {
+	assets := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<html>shell</html>")}}
+	res := httptest.NewRecorder()
+	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/batch-rewrite/v2", nil))
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("removed novel-fetch workbench status = %d, want %d", res.Code, http.StatusNotFound)
 	}
 }
 
