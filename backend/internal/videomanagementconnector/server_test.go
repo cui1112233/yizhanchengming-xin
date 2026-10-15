@@ -80,6 +80,22 @@ func TestConnectorLoginAndCatalogUseOwnerSession(t *testing.T) {
 	if book.Code != http.StatusOK || !strings.Contains(book.Body.String(), "success") {
 		t.Fatalf("book status=%d body=%s", book.Code, book.Body.String())
 	}
+	testSession := httptest.NewRecorder()
+	testReq := httptest.NewRequest(http.MethodPost, "/v1/sessions/test", nil)
+	testReq.Header.Set("Authorization", "Bearer internal-token")
+	testReq.Header.Set("X-Owner", "alice")
+	s.Handler().ServeHTTP(testSession, testReq)
+	if testSession.Code != http.StatusOK || !strings.Contains(testSession.Body.String(), `"status":"ready"`) {
+		t.Fatalf("session test status=%d body=%s", testSession.Code, testSession.Body.String())
+	}
+	removed := httptest.NewRecorder()
+	removeReq := httptest.NewRequest(http.MethodDelete, "/v1/sessions", nil)
+	removeReq.Header.Set("Authorization", "Bearer internal-token")
+	removeReq.Header.Set("X-Owner", "alice")
+	s.Handler().ServeHTTP(removed, removeReq)
+	if removed.Code != http.StatusOK || !strings.Contains(removed.Body.String(), `"status":"removed"`) {
+		t.Fatalf("session remove status=%d body=%s", removed.Code, removed.Body.String())
+	}
 }
 
 func TestFileSessionStoreEncryptsCookieAtRest(t *testing.T) {

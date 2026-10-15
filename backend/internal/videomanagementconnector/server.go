@@ -24,6 +24,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("POST /v1/sessions/login", s.login)
+	mux.HandleFunc("POST /v1/sessions/test", s.testSession)
+	mux.HandleFunc("POST /v1/sessions/refresh", s.refreshSession)
+	mux.HandleFunc("DELETE /v1/sessions", s.removeSession)
 	mux.HandleFunc("POST /v1/catalogs/refresh", s.catalogs)
 	mux.HandleFunc("GET /v1/profiles", s.profiles)
 	mux.HandleFunc("GET /v1/styles", s.styles)
@@ -69,6 +72,40 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "ready", "username": session.TargetUsername})
+}
+func (s *Server) testSession(w http.ResponseWriter, r *http.Request) {
+	if s.service == nil || s.store == nil {
+		writeError(w, http.StatusServiceUnavailable, "connector unavailable")
+		return
+	}
+	owner := ownerFrom(r)
+	session, err := s.store.Load(r.Context(), owner)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "session missing")
+		return
+	}
+	if err := s.service.CheckSession(r.Context(), session); err != nil {
+		writeError(w, http.StatusUnauthorized, "session expired")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "ready", "username": session.TargetUsername})
+}
+func (s *Server) refreshSession(w http.ResponseWriter, r *http.Request) {
+	// Refresh deliberately reuses the same Go login path; there is no second
+	// browser-based refresh implementation to drift from the canonical flow.
+	s.login(w, r)
+}
+func (s *Server) removeSession(w http.ResponseWriter, r *http.Request) {
+	remover, ok := s.store.(SessionRemover)
+	if !ok {
+		writeError(w, http.StatusNotImplemented, "session removal is not supported")
+		return
+	}
+	if err := remover.Remove(r.Context(), ownerFrom(r)); err != nil {
+		writeError(w, http.StatusInternalServerError, "session removal failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "removed"})
 }
 func (s *Server) catalogs(w http.ResponseWriter, r *http.Request) {
 	s.withSession(w, r, func(session Session) (any, error) { return s.service.RefreshCatalogs(r.Context(), session) })

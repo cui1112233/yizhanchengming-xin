@@ -20,6 +20,12 @@ type SessionStore interface {
 	Load(context.Context, string) (Session, error)
 }
 
+// SessionRemover is optional so existing stores and test doubles remain
+// compatible while the Go connector takes over the browser-worker lifecycle.
+type SessionRemover interface {
+	Remove(context.Context, string) error
+}
+
 type MemorySessionStore struct{ values map[string]Session }
 
 func NewMemorySessionStore() *MemorySessionStore {
@@ -35,6 +41,10 @@ func (s *MemorySessionStore) Load(_ context.Context, owner string) (Session, err
 		return Session{}, os.ErrNotExist
 	}
 	return value, nil
+}
+func (s *MemorySessionStore) Remove(_ context.Context, owner string) error {
+	delete(s.values, owner)
+	return nil
 }
 func (s *MemorySessionStore) RawForTest(owner string) string {
 	value, _ := s.values[owner]
@@ -106,6 +116,13 @@ func (s *FileSessionStore) Load(_ context.Context, owner string) (Session, error
 		return Session{}, err
 	}
 	return value, nil
+}
+func (s *FileSessionStore) Remove(_ context.Context, owner string) error {
+	err := os.Remove(s.pathForTest(owner))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
 }
 
 var ownerPattern = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
