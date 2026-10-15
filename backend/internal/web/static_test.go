@@ -71,3 +71,12 @@ func TestStaticHandlerServesLegacyNovelFetchAliasAndAdminShell(t *testing.T) {
 		}
 	}
 }
+
+func TestStaticHandlerRejectsRemovedNovelPanelWorkbench(t *testing.T) {
+	assets := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<html>shell</html>")}}
+	res := httptest.NewRecorder()
+	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-panel/workbench/index.html", nil))
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("removed workbench status = %d, want %d", res.Code, http.StatusNotFound)
+	}
+}

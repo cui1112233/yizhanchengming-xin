@@ -18,6 +18,10 @@ func StaticHandler(files fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(files))
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		name := strings.TrimPrefix(path.Clean(req.URL.Path), "/")
+		if name == "novel-panel/workbench" || strings.HasPrefix(name, "novel-panel/workbench/") {
+			http.NotFound(w, req)
+			return
+		}
 		// The legacy novel-fetch workbench is opened at /batch-rewrite/v2,
 		// while its files live in the bundled /batch-rewrite directory. Keep
 		// that public URL stable so relative CSS and scripts still resolve.
