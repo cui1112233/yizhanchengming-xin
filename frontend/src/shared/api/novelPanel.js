@@ -31,6 +31,10 @@ export function generateNovelPanelScenePrompts(payload) {
   return apiRequest('/api/novel-panel/generate-scene-prompts', { method: 'POST', body: JSON.stringify(payload) });
 }
 
+export function listNovelPanelHistory() {
+  return apiRequest('/api/novel-panel/history');
+}
+
 export function generateReferenceAssetImage(payload) {
   return apiRequest('/api/novel-panel/reference-assets/generate', {
     method: 'POST',
