@@ -59,7 +59,12 @@ try {
 $runtimeAsset = Join-Path $novelFetchDist 'v78-novel-fetch-v2-runtime.js'
 $composedIndex = Join-Path $novelFetchDist 'index.html'
 if ((Test-Path -LiteralPath $runtimeAsset) -and (Test-Path -LiteralPath $composedIndex)) {
-  $runtimeVersion = (Get-FileHash -LiteralPath $runtimeAsset -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $runtimeVersion = ([BitConverter]::ToString($sha256.ComputeHash([IO.File]::ReadAllBytes($runtimeAsset)))).Replace('-', '').Substring(0, 12).ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
   $indexText = [IO.File]::ReadAllText($composedIndex, [Text.Encoding]::UTF8)
   $indexText = [Text.RegularExpressions.Regex]::Replace($indexText, 'v78-novel-fetch-v2-runtime\.js\?v=[^"'' ]+', "v78-novel-fetch-v2-runtime.js?v=$runtimeVersion")
   [IO.File]::WriteAllText($composedIndex, $indexText, (New-Object Text.UTF8Encoding($false)))
