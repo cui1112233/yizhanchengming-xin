@@ -548,6 +548,17 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
 		job := map[string]any{"id": id, "status": "running", "queue_state": "running", "started_at": now, "updated_at": now, "attempts": 1, "steps": []any{}, "progress": []any{}}
+		textModelID := strings.TrimSpace(input.TextModelID)
+		if textModelID == "" {
+			textModelID = "未指定"
+		}
+		// Registry only exists for the current process. Persist the coarse run
+		// state too, otherwise refreshing or restarting the Go service makes a
+		// completed batch look as if it never ran.
+		_ = store.PutRun(req.Context(), identity.Username, novelfetchworkshop.RunRecord{
+			RunID: id, Stage: "novel_fetch_process", Status: "running", TextModelID: textModelID,
+			ModelID: "novel-fetch-workshop", ModelDisplayName: "小说获取完整流程", StartedAt: now,
+		})
 		batchID := fmt.Sprintf("batch-%d", time.Now().UnixNano())
 		result, err := workshopProcessResult(req.Context(), store, identity.Username, input.InputText, input.PlatformID, batchID, input.MaxTxt)
 		if err != nil {
@@ -596,6 +607,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			}
 		}
 		job["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
+		finalStatus := fmt.Sprint(job["status"])
+		_ = store.PutRun(req.Context(), identity.Username, novelfetchworkshop.RunRecord{
+			RunID: id, Stage: "novel_fetch_process", Status: finalStatus, TextModelID: textModelID,
+			ModelID: "novel-fetch-workshop", ModelDisplayName: "小说获取完整流程", ErrorMessage: fmt.Sprint(job["error"]),
+			StartedAt: now, FinishedAt: job["updated_at"].(string),
+		})
 		registry.put(identity.Username, id, job)
 		writeJSON(w, http.StatusOK, job)
 	})
@@ -604,6 +621,20 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		limit, _ := strconv.Atoi(req.URL.Query().Get("limit"))
 		jobs := registry.latest(identity.Username, limit)
+		if len(jobs) == 0 {
+			runs, err := store.ListRuns(req.Context(), identity.Username, "")
+			if err == nil {
+				for _, run := range runs {
+					if run.Stage != "novel_fetch_process" {
+						continue
+					}
+					jobs = append(jobs, persistedWorkshopRun(run))
+					if limit > 0 && len(jobs) >= limit {
+						break
+					}
+				}
+			}
+		}
 		latest := map[string]any{}
 		if len(jobs) > 0 {
 			latest = jobs[0]
@@ -615,8 +646,18 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		job, ok := registry.get(identity.Username, req.PathValue("jobId"))
 		if !ok {
-			writeJSON(w, http.StatusNotFound, map[string]any{"error": "处理任务不存在"})
-			return
+			runs, err := store.ListRuns(req.Context(), identity.Username, "")
+			for _, run := range runs {
+				if run.RunID == req.PathValue("jobId") && run.Stage == "novel_fetch_process" {
+					job = persistedWorkshopRun(run)
+					ok = true
+					break
+				}
+			}
+			if !ok || err != nil {
+				writeJSON(w, http.StatusNotFound, map[string]any{"error": "处理任务不存在"})
+				return
+			}
 		}
 		writeJSON(w, http.StatusOK, job)
 	})
@@ -1657,6 +1698,18 @@ func seenString(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func persistedWorkshopRun(run novelfetchworkshop.RunRecord) map[string]any {
+	job := map[string]any{
+		"id": run.RunID, "status": run.Status, "queue_state": run.Status,
+		"started_at": run.StartedAt, "updated_at": run.UpdatedAt,
+		"attempts": run.Attempts, "steps": []any{}, "progress": []any{},
+	}
+	if run.ErrorMessage != "" {
+		job["error"] = run.ErrorMessage
+	}
+	return job
 }
 
 // syncNovelFetchClassificationMetadata keeps the legacy flat metadata view in
