@@ -29,6 +29,8 @@
 
 ## 当前代码基线（以仓库实际代码为准）
 
+编码、注释、测试和 commit 规范统一遵循根目录 [CODING_STYLE.md](CODING_STYLE.md)。
+
 以下内容是当前 V88 代码的事实基线。发生冲突时，先检查代码、测试和启动脚本，再修改文档；不要用线上编译产物反向覆盖源码。
 
 - **后端入口**：Go module 位于 `backend/go.mod`，主服务入口是 `backend/cmd/qiantie/main.go`。它同时处理 `/health`、`/api/*` 和嵌入的前端静态资源；未知 API 路径由 Go 明确返回 404/405，不再通过 Node 兜底。
