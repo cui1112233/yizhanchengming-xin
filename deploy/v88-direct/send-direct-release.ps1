@@ -48,7 +48,7 @@ $session = $null
 try {
     $session = New-SSHSession -ComputerName $ComputerName -Credential $cred -AcceptKey -ConnectionTimeout 20 -ErrorAction Stop
 
-    # 2) 首次启用准备：目录 + 服务器侧脚本 + compose 直传片段 ----------------
+    # 2) 首次启用准备：目录 + 服务器侧直接启动脚本 -----------------------------
     Write-Host '==> 准备服务器直传目录与脚本' -ForegroundColor Cyan
     $prep = @"
 set -e
@@ -58,11 +58,11 @@ mkdir -p $directRoot/releases
     if ($r.ExitStatus -ne 0) { Die "服务器目录准备失败：$($r.ErrorOutput -join ' ')" }
 
     Set-SCPItem -ComputerName $ComputerName -Credential $cred -AcceptKey `
-        -Path (Join-Path $RepoRoot 'deploy\v88-direct\docker-compose.direct.yml') -Destination $directRoot -Force
-    Set-SCPItem -ComputerName $ComputerName -Credential $cred -AcceptKey `
         -Path (Join-Path $RepoRoot 'deploy\v88-direct\activate-direct-release.sh') -Destination $directRoot -Force
     Set-SCPItem -ComputerName $ComputerName -Credential $cred -AcceptKey `
         -Path (Join-Path $RepoRoot 'deploy\v88-direct\runtime-release-manifest.sh') -Destination $directRoot -Force
+    Set-SCPItem -ComputerName $ComputerName -Credential $cred -AcceptKey `
+        -Path (Join-Path $RepoRoot 'deploy\v88-direct\qiantie.service') -Destination $directRoot -Force
 
     # 3) 上传成品包 -----------------------------------------------------------
     Write-Host "==> 上传成品包（$sizeMB MB，走你本机到服务器的直连，不经过国外镜像站）" -ForegroundColor Cyan
@@ -77,8 +77,9 @@ cd $directRoot
 rm -rf releases/$sha
 mkdir -p releases/$sha
 tar -xzf $(Split-Path $Tarball -Leaf) -C releases/$sha
-chmod +x releases/$sha/go/qiantie
-bash $directRoot/activate-direct-release.sh $sha
+    chmod +x releases/$sha/go/qiantie activate-direct-release.sh runtime-release-manifest.sh
+    export QIANTIE_SERVICE_TEMPLATE="$directRoot/qiantie.service"
+    bash $directRoot/activate-direct-release.sh $sha
 "@
     $r = Invoke-SSHCommand -SessionId $session.SessionId -Command $activate -TimeOut 300
     $r.Output | ForEach-Object { Write-Host $_ }

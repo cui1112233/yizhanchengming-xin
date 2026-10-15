@@ -44,7 +44,21 @@ $goOut   = Join-Path $staging 'go\qiantie'
 if (Test-Path $staging) { Remove-Item $staging -Recurse -Force }
 New-Item -ItemType Directory -Force -Path (Join-Path $staging 'go') | Out-Null
 
-# 2) 交叉编译 Go（Linux amd64 单文件，与线上镜像同架构）---------------------
+# 2) 前端依赖与构建 ----------------------------------------------------------
+$fe = Join-Path $RepoRoot 'frontend'
+if (-not (Test-Path (Join-Path $fe 'node_modules'))) {
+    Step '安装前端依赖（仅首次较慢）'
+    Push-Location $fe; try { npm ci; if ($LASTEXITCODE -ne 0) { Die '前端依赖安装失败。' } } finally { Pop-Location }
+}
+Step '构建前端'
+Push-Location $fe; try { npm run build; if ($LASTEXITCODE -ne 0) { Die '前端构建失败。' } } finally { Pop-Location }
+
+# 3) 把前端和兼容工作台同步到 Go embed 目录。
+Step '准备 Go embed 静态资源'
+& (Join-Path $RepoRoot 'scripts\build-go-local.ps1') -SkipGoBuild
+if ($LASTEXITCODE -ne 0) { Die 'Go embed 静态资源准备失败。' }
+
+# 4) 交叉编译 Go（Linux amd64 单文件，与线上服务器同架构）-------------------
 Step '交叉编译 Go 后端（linux/amd64 单文件）'
 Push-Location (Join-Path $RepoRoot 'backend')
 try {
@@ -56,19 +70,10 @@ try {
     Pop-Location
 }
 
-# 3) 前端依赖与构建 ----------------------------------------------------------
-$fe = Join-Path $RepoRoot 'frontend'
-if (-not (Test-Path (Join-Path $fe 'node_modules'))) {
-    Step '安装前端依赖（仅首次较慢）'
-    Push-Location $fe; try { npm ci; if ($LASTEXITCODE -ne 0) { Die '前端依赖安装失败。' } } finally { Pop-Location }
-}
-Step '构建前端'
-Push-Location $fe; try { npm run build; if ($LASTEXITCODE -ne 0) { Die '前端构建失败。' } } finally { Pop-Location }
-
-# 4) 把前端和兼容工作台同步到 Go embed 目录，再编译 Go 单文件。
-Step '准备 Go embed 静态资源'
-& (Join-Path $RepoRoot 'scripts\build-go-local.ps1') -SkipGoBuild
-if ($LASTEXITCODE -ne 0) { Die 'Go embed 静态资源准备失败。' }
+# 5) 把直接启动服务定义和激活脚本放入成品包 -------------------------------
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'deploy\v88-direct\qiantie.service') -Destination (Join-Path $staging 'qiantie.service') -Force
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'deploy\v88-direct\activate-direct-release.sh') -Destination (Join-Path $staging 'activate-direct-release.sh') -Force
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'deploy\v88-direct\runtime-release-manifest.sh') -Destination (Join-Path $staging 'runtime-release-manifest.sh') -Force
 
 # 6) 压缩成品 ----------------------------------------------------------------
 Step '压缩成品 tar.gz'
@@ -78,7 +83,7 @@ $tarball = Join-Path $releaseDir "v88-direct-$sha.tar.gz"
 if (Test-Path $tarball) { Remove-Item $tarball -Force }
 Push-Location $staging
 try {
-    tar -czf $tarball go
+    tar -czf $tarball go qiantie.service activate-direct-release.sh runtime-release-manifest.sh
     if ($LASTEXITCODE -ne 0) { Die '打包失败。' }
 } finally { Pop-Location }
 
