@@ -14,6 +14,12 @@
 # 完全沿用主 docker-compose.yml，不做任何改动。
 services:
   go-api:
+    # The shared v88_data volume was created by the retired Node runtime with
+    # root-only permissions (700/600). The native Go process must be able to
+    # read existing presets and write its state during the cutover; keep this
+    # explicit in the direct-release overlay instead of changing persisted
+    # ownership in-place or silently losing old data.
+    user: "0:0"
     environment:
       # 覆盖镜像里烧录的旧 SHA，让 /api/build-info 反映直传版本。
       QIANTIE_RELEASE_SHA: ${DIRECT_RELEASE_SHA}
