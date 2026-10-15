@@ -229,10 +229,10 @@ export function optimizeWorkshopKnowledge(kind, id) {
   });
 }
 
-export function analyzeWorkshopOpening(text) {
+export function analyzeWorkshopOpening(text, options = {}) {
   return apiRequest('/api/novel-fetch-workshop/opening/analyze', {
     method: 'POST',
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, style: options.style || '', extra: options.extra || '' })
   });
 }
 

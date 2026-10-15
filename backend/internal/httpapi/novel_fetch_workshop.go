@@ -1353,6 +1353,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/opening/analyze", func(w http.ResponseWriter, req *http.Request) {
 		var input struct {
 			Text string `json:"text"`
+			Style string `json:"style"`
+			Extra string `json:"extra"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
@@ -1363,7 +1365,14 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": providerErr.Error()})
 			return
 		}
-		items, err := novelfetchworkshop.AnalyzeOpening(req.Context(), provider, input.Text)
+		openingText := input.Text
+		if style := strings.TrimSpace(input.Style); style != "" {
+			openingText = "适用风格：" + style + "\n" + openingText
+		}
+		if extra := strings.TrimSpace(input.Extra); extra != "" {
+			openingText = "补充要求：" + extra + "\n" + openingText
+		}
+		items, err := novelfetchworkshop.AnalyzeOpening(req.Context(), provider, openingText)
 		if err != nil {
 			status := http.StatusBadRequest
 			if provider == nil {
