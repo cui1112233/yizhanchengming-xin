@@ -5,3 +5,14 @@ data/
 # V88 代码直传本地产物（不入库）
 /.direct-staging/
 /release/
+
+# Local review/runtime output and throwaway verification artifacts.
+/.local-review/
+/.local-*.json
+/.local-*.log
+/.local-route-audit.txt
+/.tmp-*
+/tmp-go-*.log
+/.current-novel-config.json
+/.updated-novel-config.json
+/.env.v88-review
