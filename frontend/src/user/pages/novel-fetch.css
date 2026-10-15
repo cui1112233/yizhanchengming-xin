@@ -292,6 +292,10 @@
 .novel-fetch-version-option.is-selected { border-color:#1677ff; background:rgba(22,119,255,.18); }
 .novel-fetch-version-option input { accent-color:#1677ff; }
 .novel-fetch-public-hint { margin-top:10px; color:var(--text-tertiary); font-size:12px; }
+.novel-fetch-content-limit { display:flex; align-items:flex-end; gap:12px; margin-top:12px; }
+.novel-fetch-content-limit .novel-fetch-field { width:190px; }
+.novel-fetch-content-limit .ant-input-number { width:100%; }
+.novel-fetch-content-limit > .ant-typography { padding-bottom:7px; font-size:12px; }
 .novel-fetch-sensitive { background:rgba(77,66,120,.12); padding:12px; border:1px solid var(--legacy-border); border-radius:8px; }
 .novel-fetch-sensitive label { color:var(--text-primary); font-size:13px; }
 .novel-fetch-sensitive input { accent-color:#1677ff; margin-right:8px; }
@@ -329,6 +333,7 @@
 .novel-fetch-login-status.is-ready { color:var(--text-success); }
 .novel-fetch-config-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .novel-fetch-config-grid .ant-form-item { margin-bottom:8px; }
+.novel-fetch-knowledge-summary { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 @media (max-width: 760px) { .novel-fetch-config-grid { grid-template-columns:1fr; } }
 
 /* Pixel-parity layer for the V78 public workbench. Keep the palette inherited
