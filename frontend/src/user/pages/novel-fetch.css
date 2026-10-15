@@ -126,7 +126,19 @@
 .novel-fetch-workbench {
   min-width: 0;
   max-width: none;
+  width: 100%;
+  padding: 0 28px 28px;
+  background: var(--legacy-bg);
+  color: var(--text-primary);
 }
+
+.novel-fetch-public-title {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 0 16px;
+  text-align: center;
+}
+.novel-fetch-public-title .ant-typography { color: var(--text-primary); }
 
 .novel-fetch-original-workbench {
   display: block;
@@ -289,6 +301,34 @@
 .novel-fetch-config-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .novel-fetch-config-grid .ant-form-item { margin-bottom:8px; }
 @media (max-width: 760px) { .novel-fetch-config-grid { grid-template-columns:1fr; } }
+
+/* Pixel-parity layer for the V78 public workbench. Keep the palette inherited
+   from the application theme so the same React source matches both online
+   dark mode and the user's light-theme switch. */
+.novel-fetch-workbench .ant-tabs-nav { margin:0 0 16px; }
+.novel-fetch-workbench .ant-tabs-tab { padding:10px 14px; color:var(--text-secondary); }
+.novel-fetch-workbench .ant-tabs-tab-active .ant-tabs-tab-btn { color:#f07167; font-weight:700; }
+.novel-fetch-workbench .ant-tabs-ink-bar { background:#f07167; }
+.novel-fetch-workbench .ant-form-item-label > label { color:var(--text-primary); font-weight:600; }
+.novel-fetch-workbench .ant-input,
+.novel-fetch-workbench .ant-input-number,
+.novel-fetch-workbench .ant-select-selector { border-color:var(--legacy-border-strong) !important; border-radius:6px !important; background:var(--legacy-panel) !important; color:var(--text-primary) !important; }
+.novel-fetch-workbench .ant-input::placeholder { color:var(--text-tertiary); }
+.novel-fetch-workbench .ant-btn { border-color:var(--legacy-border-strong); border-radius:6px; color:var(--text-primary); background:var(--legacy-panel); box-shadow:none; }
+.novel-fetch-workbench .ant-btn-primary { color:#fff; border-color:#f07167; background:#f07167; }
+.novel-fetch-workbench .novel-fetch-public-title .ant-typography { color:var(--text-primary); }
+.novel-fetch-workbench .novel-fetch-public-workspace,
+.novel-fetch-workbench .novel-fetch-public-result,
+.novel-fetch-workbench .novel-fetch-panel { border-color:var(--legacy-border); background:var(--legacy-card); box-shadow:none; }
+.novel-fetch-workbench .novel-fetch-panel { border:0; border-radius:0; background:transparent; }
+.novel-fetch-workbench .novel-fetch-public-section { border-top-color:var(--legacy-border); }
+.novel-fetch-workbench .novel-fetch-version-option { border-color:var(--legacy-border); background:var(--legacy-panel); color:var(--text-primary); }
+.novel-fetch-workbench .novel-fetch-version-option.is-selected { border-color:#1677ff; background:rgba(22,119,255,.18); }
+.novel-fetch-workbench .novel-fetch-sensitive { background:rgba(77,66,120,.12); border-color:var(--legacy-border); }
+.novel-fetch-workbench .novel-fetch-public-hint { color:var(--text-secondary); }
+.novel-fetch-workbench .ant-table { background:var(--legacy-card); color:var(--text-primary); }
+.novel-fetch-workbench .ant-table-thead > tr > th { background:var(--legacy-panel); color:var(--text-primary); border-bottom-color:var(--legacy-border); }
+.novel-fetch-workbench .ant-table-tbody > tr > td { border-bottom-color:var(--legacy-border); }
 @media (max-width: 900px) { .novel-fetch-public-grid--five { grid-template-columns:repeat(3,minmax(120px,1fr)); } }
 @media (max-width: 640px) { .novel-fetch-public-grid--three, .novel-fetch-public-grid--five { grid-template-columns:1fr; } .novel-fetch-version-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
