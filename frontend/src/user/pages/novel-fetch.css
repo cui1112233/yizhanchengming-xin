@@ -306,6 +306,8 @@
 .novel-fetch-progress-row { display:flex; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid var(--legacy-border); border-radius:6px; color:var(--text-secondary); }
 .novel-fetch-progress-row b { color:var(--legacy-accent); }
 .novel-fetch-live-log pre { min-height:190px; background:var(--legacy-input); border-radius:6px; padding:10px; }
+.novel-fetch-login-status { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; padding:8px 10px; border:1px solid var(--legacy-border); border-radius:6px; color:var(--text-danger); background:var(--legacy-panel); }
+.novel-fetch-login-status.is-ready { color:var(--text-success); }
 .novel-fetch-config-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .novel-fetch-config-grid .ant-form-item { margin-bottom:8px; }
 @media (max-width: 760px) { .novel-fetch-config-grid { grid-template-columns:1fr; } }

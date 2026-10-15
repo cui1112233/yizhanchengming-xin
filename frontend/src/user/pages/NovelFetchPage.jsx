@@ -3,7 +3,7 @@ import { Download, Eye, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   checkWebSubmitEnvironment, getWebSubmitConfig, previewWebSubmit,
-  saveWebSubmitConfig, startWebSubmit, syncWebSubmitConfigs, syncWebSubmitStyles
+  saveWebSubmitConfig, startWebSubmit, syncWebSubmitConfigs, syncWebSubmitStyles, uploadLogin, getUploadSession
 } from '../../shared/api/novelFetch';
 import {
   analyzeWorkshopOpening, deleteWorkshopKnowledge, deleteWorkshopTasks, fetchWorkshopOriginal,
@@ -97,6 +97,10 @@ export function LegacyNovelFetchPage() {
   const [webSubmitPlan, setWebSubmitPlan] = useState(null);
   const [webSubmitResults, setWebSubmitResults] = useState([]);
   const [webSubmitLoading, setWebSubmitLoading] = useState(false);
+  const [uploadSession, setUploadSession] = useState(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [versionConfigOpen, setVersionConfigOpen] = useState(false);
   const [versionPrompts, setVersionPrompts] = useState({ rewrite: '', processingRule: '', knowledgeUsage: '' });
   const [taskDate, setTaskDate] = useState('');
@@ -164,8 +168,11 @@ export function LegacyNovelFetchPage() {
   async function loadWebSubmit() {
     try { setWebSubmitConfig((await getWebSubmitConfig()).config || {}); } catch (error) { message.error(error.message || '读取提交配置失败'); }
   }
+  async function loadUploadSession() {
+    try { setUploadSession(await getUploadSession()); } catch { setUploadSession({ status: 'offline' }); }
+  }
 
-  useEffect(() => { loadTasks(); }, []);
+  useEffect(() => { loadTasks(); loadUploadSession(); }, []);
   useEffect(() => {
     if (activeTab === 'config') loadConfig();
     if (activeTab === 'knowledge') loadKnowledge();
@@ -245,6 +252,17 @@ export function LegacyNovelFetchPage() {
     setWebSubmitLoading(true);
     try { const result = await action(); if (success) message.success(success); return result; } catch (error) { message.error(error.message || '网站提交操作失败'); return null; } finally { setWebSubmitLoading(false); }
   }
+  async function handleUploadLogin() {
+    if (!loginUser.trim() || !loginPassword) return message.warning('请输入视频管理系统账号和密码');
+    setWebSubmitLoading(true);
+    try {
+      await uploadLogin({ username: loginUser.trim(), password: loginPassword });
+      setLoginPassword('');
+      setLoginModalOpen(false);
+      await loadUploadSession();
+      message.success('视频管理系统登录验证成功');
+    } catch (error) { message.error(error.message || '视频管理系统登录失败'); } finally { setWebSubmitLoading(false); }
+  }
   async function updateSelectedAiCount() {
     if (!selectedTaskKeys.length) return message.warning('请先选择任务');
     try { await Promise.all(selectedTaskKeys.map(bookId => generateWorkshopAi(bookId, batchAiCount))); await loadTasks(); message.success(`已调整为 ${batchAiCount} 个 AI 版本`); } catch (error) { message.error(error.message || '调整 AI 数量失败'); }
@@ -300,8 +318,9 @@ export function LegacyNovelFetchPage() {
         <div className="novel-fetch-public-result"><div className="novel-fetch-public-result-title">处理状态</div><div className="novel-fetch-stat-grid">
           {[['总数量', processSummary.total], ['原文已解析', processSummary.originalDone], ['处理中', processSummary.processing], ['AI已完成', processSummary.aiDone], ['失败', processSummary.failed]].map(([label, value]) => <div className="novel-fetch-stat-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
         </div><div className="novel-fetch-progress-row"><span>当前任务</span><b>{processJob?.status || (processing ? 'running' : 'idle')}</b></div><pre>{processRows.length ? JSON.stringify(processRows, null, 2) : '暂无处理结果。提交任务后在这里查看状态。'}</pre></div>
-        <div className="novel-fetch-public-result novel-fetch-live-log"><div className="novel-fetch-public-result-title">实时日志</div><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : processing ? '正在执行：读取原文、分类、敏感处理和 AI 版本。' : '暂无正在处理的任务。'}</pre></div>
+        <div className="novel-fetch-public-result novel-fetch-live-log"><div className="novel-fetch-public-result-title">实时日志</div><div className={`novel-fetch-login-status ${uploadSession?.status === 'ready' ? 'is-ready' : 'is-offline'}`}><span>{uploadSession?.status === 'ready' ? '● 已登录视频管理系统' : '● 未登录视频管理系统'}</span><Button size="small" onClick={() => setLoginModalOpen(true)}>更换账号</Button></div><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : processing ? '正在执行：读取原文、分类、敏感处理和 AI 版本。' : '暂无正在处理的任务。'}</pre></div>
       </div>
+      <Modal open={loginModalOpen} title="登录视频管理系统" confirmLoading={webSubmitLoading} okText="保存并验证" cancelText="取消" onCancel={() => setLoginModalOpen(false)} onOk={handleUploadLogin}><Form layout="vertical"><Form.Item label="账号"><Input value={loginUser} onChange={event => setLoginUser(event.target.value)} autoComplete="username" /></Form.Item><Form.Item label="密码"><Input.Password value={loginPassword} onChange={event => setLoginPassword(event.target.value)} autoComplete="current-password" /></Form.Item></Form></Modal>
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <div className="novel-fetch-panel"><Space wrap><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button disabled={!selectedTaskKeys.length} onClick={handleRetryTasks}>批量重试</Button><Button danger disabled={!selectedTaskKeys.length} onClick={handleDeleteTasks}>删除选中</Button><Button disabled={!selectedTask} onClick={handleGenerateAi}>生成 AI 改文</Button></Space></div>
