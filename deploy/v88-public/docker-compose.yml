@@ -125,6 +125,9 @@ services:
       QIANTIE_GO_BASE_URL: http://go-api:3000
       QIANTIE_SHUIHUO_COMPAT_BASE_URL: http://shuihuo-compat:4100
       QIANTIE_BRIDGE_SECRET: ${QIANTIE_BRIDGE_SECRET}
+      # Go is the normal target connector. The legacy Node profile must not
+      # silently revive the browser-worker chain when it is used for rollback.
+      QIANTIE_121_USE_BROWSER_WORKER: "0"
       QIANTIE_121_BROWSER_WORKER_URL: http://browser-worker:8787
       QIANTIE_121_WORKER_SECRET: ${QIANTIE_121_WORKER_SECRET}
       QIANTIE_121_CREDENTIAL_SECRET: ${QIANTIE_121_CREDENTIAL_SECRET}
