@@ -22,10 +22,10 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		// The recovered public Novel Fetch workbench keeps its stable /v2 URL,
-		// while the embedded files live under /batch-rewrite.
+		// Keep the historical URL as a compatibility redirect only. The single
+		// maintained entry is /novel-fetch.
 		if name == "batch-rewrite/v2" {
-			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
+			http.Redirect(w, req, "/novel-fetch", http.StatusTemporaryRedirect)
 			return
 		}
 		// Keep the canonical Novel Fetch URL on the recovered full workbench
