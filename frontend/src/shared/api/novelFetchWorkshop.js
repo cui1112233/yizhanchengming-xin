@@ -40,6 +40,25 @@ export function getWorkshopJobs(limit = 10) {
   return apiRequest(`/api/novel-fetch-workshop/process/jobs/latest?limit=${encodeURIComponent(limit)}`);
 }
 
+export function listWorkshopSchedules() {
+  return apiRequest('/api/novel-fetch-workshop/schedules');
+}
+
+export function saveWorkshopSchedule(schedule) {
+  return apiRequest('/api/novel-fetch-workshop/schedules', {
+    method: 'POST',
+    body: JSON.stringify(schedule)
+  });
+}
+
+export function deleteWorkshopSchedule(id) {
+  return apiRequest(`/api/novel-fetch-workshop/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function getWorkshopLogs() {
+  return apiRequest('/api/novel-fetch-workshop/logs');
+}
+
 // 任务列表
 export function listWorkshopTasks() {
   return apiRequest('/api/novel-fetch-workshop/tasks');
