@@ -127,9 +127,23 @@
   min-width: 0;
   max-width: none;
   width: 100%;
-  padding: 0 28px 28px;
+  padding: 0 18px 28px;
   background: var(--legacy-bg);
   color: var(--text-primary);
+}
+
+/* V78 的处理台是独立的深色工作区；页面级变量避免被全局主题的蓝色面板覆盖。 */
+[data-theme='dark'] .novel-fetch-workbench {
+  --legacy-bg: #0a0a14;
+  --legacy-card: #171726;
+  --legacy-panel: #1e1e36;
+  --legacy-input: #171726;
+  --legacy-border: rgba(255,255,255,.08);
+  --legacy-border-strong: rgba(255,255,255,.16);
+  --text-primary: #e8e8f0;
+  --text-secondary: #c9c9d6;
+  --text-tertiary: #8b8ba0;
+  --legacy-accent: #f07167;
 }
 
 .novel-fetch-public-title {
@@ -299,6 +313,9 @@
 .novel-fetch-sensitive { background:rgba(77,66,120,.12); padding:12px; border:1px solid var(--legacy-border); border-radius:8px; }
 .novel-fetch-sensitive label { color:var(--text-primary); font-size:13px; }
 .novel-fetch-sensitive input { accent-color:#1677ff; margin-right:8px; }
+.novel-fetch-auth-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; }
+.novel-fetch-login-card { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:0; }
+.novel-fetch-login-card .ant-typography { margin:0; }
 .novel-fetch-public-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .novel-fetch-public-result-title { font-weight:600; color:var(--text-primary); margin-bottom:8px; }
 .novel-fetch-public-result pre { margin:0; min-height:54px; max-height:220px; overflow:auto; color:var(--text-secondary); white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
@@ -307,7 +324,7 @@
 .novel-fetch-preview-row:hover { border-color:var(--legacy-border-strong); background:var(--legacy-card); }
 .novel-fetch-preview-row input { accent-color:#1677ff; }
 .novel-fetch-status-layout { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(260px, .8fr); gap:12px; width:100%; }
-.novel-fetch-process-grid { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(320px, .9fr); gap:12px; width:100%; align-items:start; }
+.novel-fetch-process-grid { display:grid; grid-template-columns:minmax(0, 1.34fr) minmax(320px, 1fr); gap:12px; width:100%; align-items:start; }
 .novel-fetch-version-card { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:12px 0; padding:12px 14px; border:1px solid var(--border-color, #30384a); border-radius:8px; background:rgba(35, 33, 61, .72); }
 .novel-fetch-version-card > div { display:flex; flex-direction:column; gap:4px; }
 .novel-fetch-current-batch-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -377,6 +394,7 @@
 @media (max-width: 1100px) { .novel-fetch-process-grid { grid-template-columns:1fr; } .novel-fetch-process-side .novel-fetch-status-layout { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(260px,.8fr); } }
 @media (max-width: 900px) { .novel-fetch-status-layout { grid-template-columns:1fr; } .novel-fetch-process-side .novel-fetch-status-layout { grid-template-columns:1fr; } .novel-fetch-stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (max-width: 640px) { .novel-fetch-public-grid--three, .novel-fetch-public-grid--five { grid-template-columns:1fr; } .novel-fetch-version-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width: 760px) { .novel-fetch-auth-pair { grid-template-columns:1fr; } }
 @media (max-width: 900px) { .novel-fetch-knowledge-layout { grid-template-columns:1fr; } .novel-fetch-knowledge-fields { grid-template-columns:1fr; } }
 
 @media (max-width: 860px) {
