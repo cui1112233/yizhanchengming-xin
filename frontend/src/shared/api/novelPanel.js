@@ -1,5 +1,20 @@
 import { apiRequest } from './client';
 
+export function getNovelPanelProject(projectId) {
+  return apiRequest(`/api/novel-panel/projects/${encodeURIComponent(String(projectId || ''))}`);
+}
+
+export function listNovelPanelProjects() {
+  return apiRequest('/api/novel-panel/projects');
+}
+
+export function saveNovelPanelProject(payload) {
+  return apiRequest('/api/novel-panel/projects', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
 export function generateReferenceAssetImage(payload) {
   return apiRequest('/api/novel-panel/reference-assets/generate', {
     method: 'POST',
