@@ -164,9 +164,9 @@ export default defineConfig({
   plugins: [react(), adminRouteEntry, giantMaterialTestApi],
   assetsInclude: ['**/*.glb'],
   build: {
-    // 保留本地 downloads 目录，避免 Vite 清空输出目录时触发 Windows 文件系统崩溃。
-    // Generated output must not retain removed compatibility bundles between builds.
-    emptyOutDir: true,
+    // clean-dist.mjs 已经在构建前清理旧派生产物，同时保留 downloads；
+    // 这里关闭 Vite 二次清空，避免 Windows 对大量旧文件执行原生删除时崩溃。
+    emptyOutDir: false,
     rollupOptions: {
       input: {
         user: resolve(rootDir, 'index.html'),
