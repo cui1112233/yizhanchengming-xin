@@ -1,6 +1,15 @@
-import { Alert, Button, Spin } from 'antd';
+import { Alert, Button, Spin, Tabs } from 'antd';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getNovelPanelProject } from '../../../shared/api/novelPanel';
+import {
+  generateNovelPanelScenePrompts,
+  getNovelPanelProject,
+  listNovelPanelHistory,
+  saveNovelPanelProject
+} from '../../../shared/api/novelPanel';
+import AssetWorkspace from './AssetWorkspace';
+import GenerationPanel from './GenerationPanel';
+import HistoryPanel from './HistoryPanel';
+import StoryOutlineWorkspace from './StoryOutlineWorkspace';
 import { normalizeNovelPanelError } from './novelPanelContracts';
 import { createNovelPanelViewState } from './novelPanelPageState';
 import './novel-panel-react.css';
@@ -9,6 +18,7 @@ export function NovelPanelReactPage({ theme = 'dark', projectId = '', onFallback
   const [loading, setLoading] = useState(Boolean(projectId));
   const [project, setProject] = useState(null);
   const [error, setError] = useState(null);
+  const [history, setHistory] = useState(null);
 
   const loadProject = useCallback(async () => {
     if (!String(projectId || '').trim()) {
@@ -21,6 +31,11 @@ export function NovelPanelReactPage({ theme = 'dark', projectId = '', onFallback
     try {
       const response = await getNovelPanelProject(projectId);
       setProject(response?.project || response);
+      try {
+        setHistory(await listNovelPanelHistory());
+      } catch {
+        setHistory(null);
+      }
     } catch (requestError) {
       setProject(null);
       setError(normalizeNovelPanelError(requestError));
@@ -32,6 +47,28 @@ export function NovelPanelReactPage({ theme = 'dark', projectId = '', onFallback
   useEffect(() => { loadProject(); }, [loadProject]);
 
   const state = useMemo(() => createNovelPanelViewState({ projectId, loading, project, error }), [projectId, loading, project, error]);
+
+  const saveProject = useCallback(async nextData => {
+    const current = state.project;
+    const response = await saveNovelPanelProject({
+      project_id: current.id,
+      name: current.name,
+      data: nextData
+    });
+    setProject(response?.project || response);
+  }, [state.project]);
+
+  const generatePrompts = useCallback(async () => {
+    const data = state.project.data || {};
+    const response = await generateNovelPanelScenePrompts({
+      project_id: state.project.id,
+      outline_shots: data.outline_shots || [],
+      assets: data.assets || data.referenceAssets || []
+    });
+    const nextData = { ...data, ...(response?.data || response) };
+    setProject(current => ({ ...current, data: nextData }));
+    return nextData;
+  }, [state.project]);
 
   if (state.kind === 'loading') {
     return <main className={`novel-panel-react novel-panel-react--${theme}`}><Spin tip="正在加载小说面板…" /></main>;
@@ -56,10 +93,14 @@ export function NovelPanelReactPage({ theme = 'dark', projectId = '', onFallback
         </div>
         <Button onClick={onFallback}>兼容工作台</Button>
       </header>
-      <section className="novel-panel-react__empty">
-        <h2>React 小说面板</h2>
-        <p>项目已加载，资产、剧本、分镜和生成模块将在后续迁移阶段接入。</p>
-      </section>
+      <Tabs
+        items={[
+          { key: 'assets', label: '资产设置', children: <AssetWorkspace project={state.project} /> },
+          { key: 'story', label: '故事与分镜', children: <StoryOutlineWorkspace outline={state.project.data?.outline || state.project.data} onSave={model => saveProject({ ...state.project.data, outline_shots: model.scenes.flatMap(scene => scene.shots.map(shot => ({ scene_index: scene.index, shot_index: shot.shotIndex, prompt: shot.prompt }))) })} onGenerate={generatePrompts} /> },
+          { key: 'generation', label: '生成状态', children: <GenerationPanel onGenerate={async () => generatePrompts()} /> },
+          { key: 'history', label: '历史记录', children: <HistoryPanel history={history} /> }
+        ]}
+      />
     </main>
   );
 }
