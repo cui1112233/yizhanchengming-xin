@@ -19,7 +19,8 @@ test('workbench pages keep their asynchronous loading boundaries', async () => {
     fs.readFile(new URL('./pages/NovelPanelPage.jsx', import.meta.url), 'utf8'),
     fs.readFile(new URL('./pages/BatchFactoryWorkbenchPage.jsx', import.meta.url), 'utf8')
   ]);
-  assert.match(novelFetch, /batch-rewrite\/v2\?theme=dark/);
+  assert.match(novelFetch, /src=\{`\/batch-rewrite\/v2\?theme=\$\{effectiveTheme\}`\}/);
+  assert.match(novelFetch, /qiantie-theme-sync/);
   assert.match(novelPanel, /NovelPanelReactPage/);
   assert.doesNotMatch(novelPanel, /iframe|workbenchSrc/);
   assert.match(batchFactory, /listBatchSummaries\(\)/);
@@ -28,6 +29,7 @@ test('workbench pages keep their asynchronous loading boundaries', async () => {
 test('novel fetch canonical entry keeps the public V78 visual baseline during React parity work', async () => {
   const app = await fs.readFile(appPath, 'utf8');
   const novelFetch = await fs.readFile(new URL('./pages/NovelFetchPage.jsx', import.meta.url), 'utf8');
-  assert.match(app, /const loadNovelFetchPage = \(\) => import\('\.\/pages\/NovelFetchWorkshopPage'\)/);
-  assert.match(novelFetch, /src="\/batch-rewrite\/v2\?theme=dark"/);
+  assert.match(app, /const loadNovelFetchPage = \(\) => import\('\.\/pages\/NovelFetchPage'\)/);
+  assert.match(novelFetch, /effectiveTheme/);
+  assert.match(novelFetch, /onLoad=/);
 });
