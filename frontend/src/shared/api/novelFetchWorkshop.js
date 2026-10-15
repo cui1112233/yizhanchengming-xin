@@ -89,6 +89,27 @@ export function generateWorkshopAi(bookId, count) {
   });
 }
 
+export function updateWorkshopAiCount(ids, count) {
+  return apiRequest('/api/novel-fetch-workshop/tasks/batch-ai-count', {
+    method: 'POST',
+    body: JSON.stringify({ ids, count })
+  });
+}
+
+export function applyWorkshopRules(ids, scope = 'both', sensitiveAiEnabled = false) {
+  return apiRequest('/api/novel-fetch-workshop/tasks/apply-rules', {
+    method: 'POST',
+    body: JSON.stringify({ ids, scope, sensitive_ai_enabled: sensitiveAiEnabled })
+  });
+}
+
+export function reprocessWorkshopSensitive(ids, sensitiveAiEnabled = true) {
+  return apiRequest('/api/novel-fetch-workshop/tasks/reprocess-sensitive', {
+    method: 'POST',
+    body: JSON.stringify({ ids, sensitive_ai_enabled: sensitiveAiEnabled })
+  });
+}
+
 // 读取工作台配置（appConfig / platforms / styles / aiConfig）
 export function getWorkshopConfig() {
   return apiRequest('/api/novel-fetch-workshop/config');

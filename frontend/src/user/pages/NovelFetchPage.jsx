@@ -10,6 +10,7 @@ import {
   generateWorkshopAi, getWorkshopConfig, getWorkshopKnowledge, getWorkshopKnowledgeSummary,
   getWorkshopTask, listWorkshopTasks, normalizeWorkshopOpening, optimizeWorkshopKnowledge,
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
+  updateWorkshopAiCount, applyWorkshopRules,
   saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, suggestWorkshopRules, testWorkshopAi
 } from '../../shared/api/novelFetchWorkshop';
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
@@ -265,7 +266,7 @@ export function LegacyNovelFetchPage() {
   }
   async function updateSelectedAiCount() {
     if (!selectedTaskKeys.length) return message.warning('请先选择任务');
-    try { await Promise.all(selectedTaskKeys.map(bookId => generateWorkshopAi(bookId, batchAiCount))); await loadTasks(); message.success(`已调整为 ${batchAiCount} 个 AI 版本`); } catch (error) { message.error(error.message || '调整 AI 数量失败'); }
+    try { await updateWorkshopAiCount(selectedTaskKeys, batchAiCount); await loadTasks(); message.success(`已调整为 ${batchAiCount} 个 AI 版本`); } catch (error) { message.error(error.message || '调整 AI 数量失败'); }
   }
   async function retryFailedTasks() {
     const failed = tasks.filter(task => String(task.status || task.aiStatus || '').includes('fail')).map(task => task.bookId);
@@ -273,6 +274,26 @@ export function LegacyNovelFetchPage() {
     try { await retryWorkshopTasks(failed); await loadTasks(); message.success('失败任务已加入重试'); } catch (error) { message.error(error.message || '重试失败任务失败'); }
   }
   function selectAllTasks() { setSelectedTaskKeys(visibleTasks.map(task => task.bookId || task.book_id).filter(Boolean)); }
+  function shiftTaskDate(days) {
+    const base = taskDate ? new Date(`${taskDate}T00:00:00`) : new Date();
+    base.setDate(base.getDate() + days);
+    setTaskDate(base.toISOString().slice(0, 10));
+  }
+  async function applySelectedRules() {
+    if (!selectedTaskKeys.length) return message.warning('请先选择任务');
+    try { await applyWorkshopRules(selectedTaskKeys, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success('已完成规则处理'); } catch (error) { message.error(error.message || '规则处理失败'); }
+  }
+  async function submitVisibleTasks() {
+    const ids = visibleTasks.map(task => task.bookId || task.book_id).filter(Boolean);
+    if (!ids.length) return message.info('当前没有可提交任务');
+    const result = await handleWebSubmit(() => startWebSubmit({ taskIds: ids }), '已提交当前任务');
+    if (result) setWebSubmitResults(result.results || []);
+  }
+  async function deleteTasksByFilter(filter, emptyMessage) {
+    const ids = tasks.filter(filter).map(task => task.bookId || task.book_id).filter(Boolean);
+    if (!ids.length) return message.info(emptyMessage);
+    Modal.confirm({ title: '确认删除任务', content: '删除后无法恢复，确认继续？', onOk: async () => { await deleteWorkshopTasks(ids); setSelectedTaskKeys(current => current.filter(id => !ids.includes(id))); await loadTasks(); message.success('任务已删除'); } });
+  }
   function transferToBatchFactory() { window.location.assign('/batch-factory'); }
   async function saveVersionConfig() {
     try {
@@ -324,7 +345,7 @@ export function LegacyNovelFetchPage() {
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <div className="novel-fetch-panel"><Space wrap><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button disabled={!selectedTaskKeys.length} onClick={handleRetryTasks}>批量重试</Button><Button danger disabled={!selectedTaskKeys.length} onClick={handleDeleteTasks}>删除选中</Button><Button disabled={!selectedTask} onClick={handleGenerateAi}>生成 AI 改文</Button></Space></div>
-      <div className="novel-fetch-panel"><Space wrap><Typography.Text>查看日期</Typography.Text><Input type="date" value={taskDate} onChange={event => setTaskDate(event.target.value)} /><Button onClick={() => setTaskDate(new Date().toISOString().slice(0, 10))}>今天</Button><Button onClick={() => setTaskDate('')}>默认视图</Button><Button onClick={selectAllTasks}>全选</Button><Button onClick={() => setSelectedTaskKeys([])}>清空</Button><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button><Button onClick={() => message.info('提交网络请先在网站提交配置中完成登录')}>提交网络</Button><Typography.Text>AI数量</Typography.Text><InputNumber min={1} max={20} value={batchAiCount} onChange={value => setBatchAiCount(value || 1)} /><Button onClick={updateSelectedAiCount}>调整选中</Button><Select value={ruleApplyScope} onChange={setRuleApplyScope} options={[{ value: 'both', label: '规则处理原文+AI' }, { value: 'original', label: '只处理原文' }, { value: 'ai', label: '只处理AI' }]} /><Button onClick={() => message.info(`规则处理范围：${ruleApplyScope}`)}>规则处理选中</Button><Button danger onClick={handleDeleteTasks}>删除选中</Button></Space></div>
+      <div className="novel-fetch-panel"><Space wrap><Typography.Text>查看日期</Typography.Text><Button onClick={() => shiftTaskDate(-1)}>前一天</Button><Input type="date" value={taskDate} onChange={event => setTaskDate(event.target.value)} /><Button onClick={() => setTaskDate(new Date().toISOString().slice(0, 10))}>今天</Button><Button onClick={() => shiftTaskDate(1)}>后一天</Button><Button onClick={() => setTaskDate('')}>默认视图</Button><Button onClick={selectAllTasks}>全选</Button><Button onClick={() => setSelectedTaskKeys([])}>清空</Button><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button><Button onClick={submitVisibleTasks}>提交网络</Button><Button onClick={submitVisibleTasks}>提交全部</Button><Typography.Text>AI数量</Typography.Text><InputNumber min={1} max={20} value={batchAiCount} onChange={value => setBatchAiCount(value || 1)} /><Button onClick={updateSelectedAiCount}>调整选中</Button><Select value={ruleApplyScope} onChange={setRuleApplyScope} options={[{ value: 'both', label: '规则处理原文+AI' }, { value: 'original', label: '只处理原文' }, { value: 'ai', label: '只处理AI' }]} /><Button onClick={applySelectedRules}>规则处理选中</Button><Button danger onClick={handleDeleteTasks}>删除选中</Button><Button danger onClick={() => deleteTasksByFilter(task => /fail|error/.test(String(task.status || task.aiStatus || task.ai_status)), '当前没有失败任务')}>删除失败</Button><Button danger onClick={() => deleteTasksByFilter(() => true, '当前没有任务')}>删除全部</Button></Space></div>
       <Table className="novel-fetch-panel" rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20 }} columns={[
         { title: '书名', dataIndex: 'bookName', render: (value, row) => value || row.book_name || row.bookId }, { title: '平台', render: (_, row) => row.platformName || row.platform_name }, { title: '风格', dataIndex: 'style', render: value => value || '待判定' }, { title: '男女频', dataIndex: 'gender', render: value => value || '待确认' }, { title: '原文状态', render: (_, row) => <Tag color={statusColor(row.originalStatus || row.original_status)}>{row.originalStatus || row.original_status || '未抓取'}</Tag> },
         { title: 'AI 状态', render: (_, row) => <Tag color={statusColor(row.aiStatus || row.ai_status)}>{row.aiGeneratedCount || row.ai_generated_count ? `${row.aiGeneratedCount || row.ai_generated_count} 版` : row.aiStatus || row.ai_status || '未生成'}</Tag> }, { title: '网站提交', render: (_, row) => row.site_submit_status || row.siteSubmitStatus || '未提交' }, { title: '操作', render: (_, row) => <Space><Button size="small" onClick={() => selectTask(row.bookId || row.book_id)}>选择</Button><Button size="small" icon={<Eye size={14} />} onClick={async () => setTaskDetail({ bookId: row.bookId || row.book_id, data: await getWorkshopTask(row.bookId || row.book_id) })}>详情</Button><Button size="small" onClick={() => fetchWorkshopOriginal(row.bookId || row.book_id, row.maxTxt).then(loadTasks)}>重新抓取</Button><Button size="small" onClick={() => restoreWorkshopOriginal(row.bookId || row.book_id).then(loadTasks)}>恢复原文</Button></Space> }
