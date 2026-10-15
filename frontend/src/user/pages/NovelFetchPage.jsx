@@ -15,6 +15,8 @@ import {
   saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, suggestWorkshopRules, testWorkshopAi, reprocessWorkshopSensitive,
   previewWorkshopProcess, getWorkshopCurrentBatch, getWorkshopBatches, rerunWorkshopBatch, stopWorkshopTasks
 } from '../../shared/api/novelFetchWorkshop';
+import { createNovelFetchIntake } from '../../shared/api/batchFactoryV11';
+import { listAvailableModels as listAvailableTextModels, modelSelectOptions } from '../../shared/api/modelCatalog';
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
 import './novel-fetch.css';
 
@@ -136,6 +138,7 @@ export function LegacyNovelFetchPage() {
   const [rewriteMethods, setRewriteMethods] = useState(() => savedProcessSettings.rewriteMethods);
   const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => savedProcessSettings.sensitiveAiProcessEnabled);
   const [textModel, setTextModel] = useState(() => savedProcessSettings.textModel);
+  const [textModelOptions, setTextModelOptions] = useState([]);
   const [processPreview, setProcessPreview] = useState(null);
   const [previewSelected, setPreviewSelected] = useState([]);
   const [currentBatch, setCurrentBatch] = useState(null);
@@ -232,6 +235,10 @@ export function LegacyNovelFetchPage() {
     getWorkshopPlatforms().then(data => {
       const items = data.platforms || data.items || data;
       if (Array.isArray(items) && items.length) setPlatformOptions(items.map(item => ({ value: Number(item.id ?? item.platform_id ?? item.value), label: item.name || item.platform_name || item.label || String(item.id ?? item.platform_id ?? item.value) })));
+    }).catch(() => {});
+    listAvailableTextModels('text').then(models => {
+      const options = modelSelectOptions(models, 'text');
+      if (options.length) setTextModelOptions(options);
     }).catch(() => {});
   }, []);
   useEffect(() => {
@@ -396,6 +403,11 @@ export function LegacyNovelFetchPage() {
     if (!selectedTaskKeys.length) return message.warning('请先选择任务');
     try { await applyWorkshopRules(selectedTaskKeys, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success('已完成规则处理'); } catch (error) { message.error(error.message || '规则处理失败'); }
   }
+  async function applyAllRules() {
+    const ids = tasks.map(task => task.bookId || task.book_id).filter(Boolean);
+    if (!ids.length) return message.warning('当前没有可处理任务');
+    try { await applyWorkshopRules(ids, ruleApplyScope, sensitiveAiProcessEnabled); await loadTasks(); message.success('已完成全部任务规则处理'); } catch (error) { message.error(error.message || '规则处理失败'); }
+  }
   async function submitVisibleTasks(all = false) {
     const source = all ? tasks : visibleTasks;
     const ids = source.map(task => task.bookId || task.book_id).filter(Boolean);
@@ -408,7 +420,60 @@ export function LegacyNovelFetchPage() {
     if (!ids.length) return message.info(emptyMessage);
     Modal.confirm({ title: '确认删除任务', content: '删除后无法恢复，确认继续？', onOk: async () => { await deleteWorkshopTasks(ids); setSelectedTaskKeys(current => current.filter(id => !ids.includes(id))); await loadTasks(); message.success('任务已删除'); } });
   }
-  function transferToBatchFactory() { window.location.assign('/batch-factory'); }
+  async function transferToBatchFactory() {
+    if (!selectedTaskKeys.length) {
+      message.warning('请先选择要进入批量工厂的任务');
+      return;
+    }
+    setTasksLoading(true);
+    try {
+      // 批量工厂必须接收已经确认的正文版本，而不是只带 bookId 跳转；
+      // 否则新批次会显示“已登记”却没有可生产的 sourceText。
+      const selectedRows = tasks.filter(task => selectedTaskKeys.includes(task.bookId || task.book_id));
+      const details = await Promise.all(selectedRows.map(row => getWorkshopTask(row.bookId || row.book_id)));
+      const books = details.map((detail, index) => {
+        const row = selectedRows[index] || {};
+        const meta = detail?.meta || {};
+        const versions = detail?.versions && typeof detail.versions === 'object' ? detail.versions : {};
+        const selectedVersion = String(meta.sourceContentVersion || '').trim();
+        const versionText = selectedVersion && typeof versions[selectedVersion] === 'string' ? versions[selectedVersion] : '';
+        const sourceText = String(versionText || detail?.processedText || detail?.original || detail?.originalRaw || '').trim();
+        if (!sourceText) throw new Error(`《${row.bookName || row.book_name || row.bookId || row.book_id}》没有可用正文`);
+        const bookId = String(detail?.bookId || row.bookId || row.book_id || '').trim();
+        const title = String(meta.bookName || detail?.bookName || row.bookName || row.book_name || bookId).trim();
+        return {
+          id: bookId,
+          bookId,
+          sourceTaskId: bookId,
+          title,
+          platform: String(meta.platformId || row.platformId || row.platform_id || ''),
+          sourceText,
+          txtText: sourceText,
+          sourceMetadata: {
+            sourceMode: 'novel_fetch',
+            sourceContentVersion: selectedVersion || (versionText ? 'selected' : 'original'),
+            style: row.style || detail?.style || meta.style || '',
+            gender: row.gender || detail?.gender || meta.gender || '',
+            bookName: title,
+            originalRawChars: detail?.originalRawChars || 0,
+            processedChars: detail?.processedChars || sourceText.length
+          }
+        };
+      });
+      const result = await createNovelFetchIntake({
+        books,
+        metadata: { sourceMode: 'novel_fetch', selectedTaskIds: selectedTaskKeys }
+      });
+      const intake = result?.intake || result;
+      if (!intake?.id) throw new Error('批量工厂接收失败：没有返回 intake');
+      const redirectTo = result?.redirectTo || `/batch-factory?intake=${encodeURIComponent(intake.id)}`;
+      window.location.assign(redirectTo);
+    } catch (error) {
+      message.error(error.message || '进入批量工厂失败');
+    } finally {
+      setTasksLoading(false);
+    }
+  }
   async function saveVersionConfig() {
     try {
       await saveWorkshopConfig({ rewrite: { prompt: versionPrompts.rewrite, processing_rule_prompt: versionPrompts.processingRule, ai_slot_methods: rewriteMethods }, knowledge: { usage_prompt: versionPrompts.knowledgeUsage }, selected_versions: selectedVersions, sensitive_ai_enabled: sensitiveAiProcessEnabled });
@@ -449,7 +514,7 @@ export function LegacyNovelFetchPage() {
         <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台：{platformOptions.length}</Typography.Text></div>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--three">
           <Form.Item name="platform" label="平台"><Select options={platformOptions} /></Form.Item>
-          <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={[{ value: '[anti-2]gemini-3.8-flash', label: '[anti-2]gemini-3.8-flash' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }]} /><small>执行时使用此模型；修改后作为后续批次默认值</small></label>
+          <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={textModelOptions.length ? textModelOptions : [{ value: textModel || '[anti-2]gemini-3.8-flash', label: textModel || '[anti-2]gemini-3.8-flash' }]} /><small>执行时使用此模型；修改后作为后续批次默认值</small></label>
         </div>
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className="novel-fetch-public-input" rows={5} placeholder={'每一行：书籍 ID、书名、推荐理由、男女频、标签、评级。\n示例：123456789\t书名\t打脸逆袭、复仇反转\t女频\t现代世情、爽文\tS'} /></Form.Item>
         {processPreview ? <div className="novel-fetch-preview-list"><Typography.Text strong>解析预览：已识别 {processPreview.tasks?.length || 0} 本，已选 {previewSelected.length} 本</Typography.Text>{(processPreview.tasks || []).map(row => { const id = row.bookId || row.book_id || row.id; return <label key={id} className="novel-fetch-preview-row"><input type="checkbox" checked={previewSelected.includes(id)} onChange={event => togglePreviewBook(id, event.target.checked)} /><span>{id}</span><span>{row.bookName || row.book_name || ''}</span><span>{row.gender || '待判断'}</span><span>{row.style || '待判定'}</span></label>; })}</div> : null}
@@ -474,7 +539,7 @@ export function LegacyNovelFetchPage() {
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <div className="novel-fetch-panel"><Space wrap><Button type={taskView === 'current' ? 'primary' : 'default'} onClick={() => setTaskView('current')}>当前任务</Button><Button type={taskView === 'history' ? 'primary' : 'default'} onClick={() => { setTaskView('history'); loadHistoryBatches(); }}>历史批次</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</Button><Button disabled={!selectedTaskKeys.length} onClick={handleRetryTasks}>批量重试</Button><Button danger disabled={!selectedTaskKeys.length} onClick={handleDeleteTasks}>删除选中</Button><Button danger disabled={!selectedTaskKeys.length} onClick={async () => { await stopWorkshopTasks(selectedTaskKeys); await loadTasks(); message.success('已停止选中任务'); }}>停止选中</Button><Button disabled={!selectedTask} onClick={handleGenerateAi}>生成 AI 改文</Button><Button disabled={!selectedTaskKeys.length} onClick={handleSensitiveRepair}>敏感词 AI 修复</Button></Space></div>
-      <div className="novel-fetch-panel"><Space wrap><Typography.Text>查看日期</Typography.Text><Button onClick={() => shiftTaskDate(-1)}>前一天</Button><Input type="date" value={taskDate} onChange={event => setTaskDate(event.target.value)} /><Button onClick={() => setTaskDate(new Date().toISOString().slice(0, 10))}>今天</Button><Button onClick={() => shiftTaskDate(1)}>后一天</Button><Button onClick={() => setTaskDate('')}>默认视图</Button><Button onClick={selectAllTasks}>全选</Button><Button onClick={() => setSelectedTaskKeys([])}>清空</Button><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button><Button onClick={() => submitVisibleTasks(false)}>提交网络</Button><Button onClick={() => submitVisibleTasks(true)}>提交全部</Button><Typography.Text>AI数量</Typography.Text><InputNumber min={1} max={20} value={batchAiCount} onChange={value => setBatchAiCount(value || 1)} /><Button onClick={updateSelectedAiCount}>调整选中</Button><Select value={ruleApplyScope} onChange={setRuleApplyScope} options={[{ value: 'both', label: '规则处理原文+AI' }, { value: 'original', label: '只处理原文' }, { value: 'ai', label: '只处理AI' }]} /><Button onClick={applySelectedRules}>规则处理选中</Button><Button danger onClick={handleDeleteTasks}>删除选中</Button><Button danger onClick={() => deleteTasksByFilter(task => /fail|error/.test(String(task.status || task.aiStatus || task.ai_status)), '当前没有失败任务')}>删除失败</Button><Button danger onClick={() => deleteTasksByFilter(() => true, '当前没有任务')}>删除全部</Button></Space></div>
+      <div className="novel-fetch-panel"><Space wrap><Typography.Text>查看日期</Typography.Text><Button onClick={() => shiftTaskDate(-1)}>前一天</Button><Input type="date" value={taskDate} onChange={event => setTaskDate(event.target.value)} /><Button onClick={() => setTaskDate(new Date().toISOString().slice(0, 10))}>今天</Button><Button onClick={() => shiftTaskDate(1)}>后一天</Button><Button onClick={() => setTaskDate('')}>默认视图</Button><Button onClick={selectAllTasks}>全选</Button><Button onClick={() => setSelectedTaskKeys([])}>清空</Button><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button><Button onClick={() => submitVisibleTasks(false)}>提交网络</Button><Button onClick={() => submitVisibleTasks(true)}>提交全部</Button><Typography.Text>AI数量</Typography.Text><InputNumber min={1} max={20} value={batchAiCount} onChange={value => setBatchAiCount(value || 1)} /><Button onClick={updateSelectedAiCount}>调整选中</Button><Select value={ruleApplyScope} onChange={setRuleApplyScope} options={[{ value: 'both', label: '规则处理原文+AI' }, { value: 'original', label: '只处理原文' }, { value: 'ai', label: '只处理AI' }]} /><Button onClick={applySelectedRules}>规则处理选中</Button><Button onClick={applyAllRules}>规则处理全部</Button><Button danger onClick={handleDeleteTasks}>删除选中</Button><Button danger onClick={() => deleteTasksByFilter(task => /fail|error/.test(String(task.status || task.aiStatus || task.ai_status)), '当前没有失败任务')}>删除失败</Button><Button danger onClick={() => deleteTasksByFilter(() => true, '当前没有任务')}>删除全部</Button></Space></div>
       {taskView === 'history' ? <div className="novel-fetch-panel"><Typography.Title level={5}>历史批次</Typography.Title><Table size="small" rowKey="id" dataSource={historyBatches.filter(batch => batch.id !== currentBatch?.id)} columns={[{ title: '批次', dataIndex: 'id' }, { title: '书籍数', render: (_, row) => row.taskIds?.length || 0 }, { title: '状态', dataIndex: 'status' }, { title: '操作', render: (_, row) => <Space><Button size="small" onClick={async () => { const data = await rerunWorkshopBatch(row.id, 'all'); setProcessPreview({ tasks: data.preselected_book_ids.map(bookId => ({ bookId })), selectedInputText: data.input_snapshot }); setPreviewSelected(data.preselected_book_ids || []); changeTab('process'); message.success('历史批次已载入解析预览'); }}>全部重跑</Button><Button size="small" disabled={!row.taskIds?.length} onClick={async () => { const data = await rerunWorkshopBatch(row.id, 'abnormal'); setProcessPreview({ tasks: data.preselected_book_ids.map(bookId => ({ bookId })), selectedInputText: data.input_snapshot }); setPreviewSelected(data.preselected_book_ids || []); changeTab('process'); }}>重跑异常</Button></Space> }]} /></div> : null}
       {taskView === 'current' ? <><Typography.Text type="secondary">已选 {selectedTaskKeys.length} 个任务；当前显示 {visibleTasks.length} 个</Typography.Text><Table className="novel-fetch-panel" rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20 }} columns={[
         { title: '书名', dataIndex: 'bookName', render: (value, row) => value || row.book_name || row.bookId }, { title: '平台', render: (_, row) => row.platformName || row.platform_name }, { title: '风格', dataIndex: 'style', render: value => value || '待判定' }, { title: '男女频', dataIndex: 'gender', render: value => value || '待确认' }, { title: '原文状态', render: (_, row) => <Tag color={statusColor(row.originalStatus || row.original_status)}>{row.originalStatus || row.original_status || '未抓取'}</Tag> },
