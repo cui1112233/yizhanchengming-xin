@@ -106,6 +106,20 @@
       #v78CurrentBatchTable tbody tr:hover{background:rgba(22,119,255,.045)}
       .v78-cell-ok{color:var(--v78-green);font-weight:700}.v78-cell-run{color:var(--v78-blue)}.v78-cell-fail{color:var(--v78-red);font-weight:700}.v78-cell-muted{color:var(--muted)}
       .v78-table-view{padding:4px 8px!important;min-height:auto!important;color:var(--v78-blue)}
+      [data-theme="light"] body.v78-reference-shell .topbar{background:var(--panel);border-bottom-color:var(--line)}
+      [data-theme="light"] body.v78-reference-shell .topbar h1,
+      [data-theme="light"] body.v78-reference-shell .section-title h2,
+      [data-theme="light"] body.v78-reference-shell .v78-status-subtitle{color:var(--text)}
+      [data-theme="light"] #v78ImageInputPanel,
+      [data-theme="light"] #v78ImageStatusPanel,
+      [data-theme="light"] #v78CurrentBatchPanel{background:var(--panel);border-color:var(--line)}
+      [data-theme="light"] #v78ImageInputPanel .input-area{background:var(--panel-soft)}
+      [data-theme="light"] #v78TargetVersions .v78-version-item,
+      [data-theme="light"] .v78-setting-card,
+      [data-theme="light"] .v78-status-metric{background:var(--panel-soft);color:var(--text)}
+      [data-theme="light"] #v78ImageStatusPanel #processResult{background:var(--panel);border-color:var(--line);color:var(--text)}
+      [data-theme="light"] #v78CurrentBatchTable th{background:var(--panel-soft);color:var(--text)}
+      [data-theme="light"] #v78CurrentBatchTable td{color:var(--text)}
       .v78-preview-login-note{padding:14px 16px;color:var(--muted);font-size:12px;text-align:left}
       @media(max-width:1120px){body.v78-reference-shell .topbar{grid-template-columns:1fr auto}body.v78-reference-shell .tabs{grid-column:2}#work .workspace#v78ImageWorkGrid{grid-template-columns:1fr}#v78ImageInputPanel,#v78ImageStatusPanel{min-height:auto}.v78-settings-cards{grid-template-columns:1fr}#v78TargetVersions .v78-version-grid#v78CompactTargets{grid-template-columns:repeat(3,minmax(100px,1fr))}}
       @media(max-width:720px){body.v78-reference-shell .topbar{display:flex;flex-wrap:wrap}body.v78-reference-shell .tabs{width:100%;justify-content:flex-start;overflow:auto}#v78ImageInputPanel .control-grid{grid-template-columns:1fr 1fr}#v78StatusMetrics{grid-template-columns:repeat(2,1fr)}.v78-run-meta{grid-template-columns:1fr}#v78TargetVersions .v78-version-grid#v78CompactTargets{grid-template-columns:repeat(2,1fr)}}
@@ -223,7 +237,18 @@
       tasksTab?.click();
       // Submit directly through the legacy runtime. The old target can be
       // replaced while switching task panels, so a synthetic click may do nothing.
-      if (targetId === 'openWebSubmitBtn') window.qiantieSubmitSelectedTasks?.(window.qiantieV78SelectedTaskIds?.());
+      if (targetId === 'openWebSubmitBtn') {
+        const ids = window.qiantieV78SelectedTaskIds?.() || [];
+        if (!ids.length) {
+          window.qiantiePublishNovelFetchStatus?.('请先选择至少一条任务再提交网络', 'error');
+          return;
+        }
+        if (typeof window.qiantieSubmitSelectedTasks !== 'function') {
+          window.qiantiePublishNovelFetchStatus?.('提交网络按钮未准备好，请刷新页面后重试', 'error');
+          return;
+        }
+        window.qiantieSubmitSelectedTasks(ids);
+      }
       window.setTimeout(() => {
         target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         target?.focus?.();
@@ -336,6 +361,17 @@
     ].map(value => text(value).toLowerCase()).filter(Boolean));
   }
 
+  // The old worker may leave task.status/aiStatus at "ai_processing" after
+  // an AI body has been saved. The persisted version is authoritative for
+  // the current-batch table, otherwise this view contradicts the task list.
+  function currentBatchTaskStatus(task, generated, aiTargets) {
+    const expected = list(aiTargets);
+    const allRequestedAIReady = expected.length > 0 && expected.every(version => generated.has(text(version).toLowerCase()));
+    if (allRequestedAIReady) return 'ai_done';
+    if (!expected.length && generated.size > 0 && /ai_processing|generating|processing/i.test(text(task.ai_status || task.aiStatus || task.status))) return 'ai_done';
+    return task.status || task.site_submit_status || task.siteSubmitStatus || task.ai_status || task.aiStatus || task.original_status || task.originalStatus || '';
+  }
+
   function emptyBatchTable(message) {
     return `<table><thead><tr><th>ID</th><th>书名</th><th>Book ID</th><th>原文</th><th>AI文案</th><th>网站提交</th><th>状态</th><th>字数</th><th>创建时间</th><th>操作</th></tr></thead><tbody><tr><td colspan="10" class="v78-preview-login-note">${safe(message)}</td></tr></tbody></table>`;
   }
@@ -395,13 +431,13 @@
       const originalStatus = task.original_status || task.originalStatus || '';
       const aiStatus = task.ai_status || task.aiStatus || '';
       const siteStatus = task.site_submit_status || task.siteSubmitStatus || '';
-      const status = task.status || snap.status || '';
+      const effectiveStatus = currentBatchTaskStatus(task, generated, aiTargets);
       const versionCells = `${showOriginal ? `<td>${statusMark(originalStatus, /done|complete|成功|已完成/i.test(text(originalStatus)))}</td>` : ''}${aiTargets.map(version => `<td>${statusMark(aiStatus, generated.has(version))}</td>`).join('')}`;
       const targetReadyCount = targets.filter(version => version === 'original' ? /done|complete|成功|已完成/i.test(text(originalStatus)) : generated.has(version)).length;
       const submitReady = targets.length > 0 && (confirmed.size ? targets.every(version => confirmed.has(version)) : /submitted|confirmed|done|success|成功|已提交/i.test(text(siteStatus)));
       const submitCell = statusMark(siteStatus, submitReady);
-      const displayStatus = statusLabel(status || siteStatus || aiStatus || originalStatus, targetReadyCount === targets.length && targets.length ? '已完成' : '处理中');
-      return `<tr data-v78-current-id="${safe(id)}"><td>${index + 1}</td><td>${safe(task.book_name || task.bookName || '-')}</td><td>${safe(id)}</td>${versionCells}<td>${submitCell}</td><td class="${statusClass(status || siteStatus || aiStatus || originalStatus)}">${safe(displayStatus)}</td><td>${wordLabel(task, targets)}</td><td>${dateLabel(task.created_at || task.createdAt || batch.createdAt)}</td><td><button type="button" class="v78-table-view" data-v78-open-task="${safe(id)}">查看</button></td></tr>`;
+      const displayStatus = statusLabel(effectiveStatus, targetReadyCount === targets.length && targets.length ? '已完成' : '处理中');
+      return `<tr data-v78-current-id="${safe(id)}"><td>${index + 1}</td><td>${safe(task.book_name || task.bookName || '-')}</td><td>${safe(id)}</td>${versionCells}<td>${submitCell}</td><td class="${statusClass(effectiveStatus)}">${safe(displayStatus)}</td><td>${wordLabel(task, targets)}</td><td>${dateLabel(task.created_at || task.createdAt || batch.createdAt)}</td><td><button type="button" class="v78-table-view" data-v78-open-task="${safe(id)}">查看</button></td></tr>`;
     }).join('');
     wrap.innerHTML = `<table><thead><tr><th>ID</th><th>书名</th><th>Book ID</th>${versionHeads}<th>网站提交</th><th>状态</th><th>字数</th><th>创建时间</th><th>操作</th></tr></thead><tbody>${rows || `<tr><td colspan="${8 + aiTargets.length + (showOriginal ? 1 : 0)}" class="v78-cell-muted">本批次任务尚未生成</td></tr>`}</tbody></table>`;
     wrap.onclick = event => {
@@ -422,14 +458,16 @@
     }, 100);
   }
 
-  function taskCounters(batch) {
-    const states = list(batch?.taskStates);
+  function taskCounters(batch, tasks) {
+    const live = new Map(list(tasks).map(task => [taskId(task), task]));
+    const states = list(batch?.taskStates).map(snapshot => ({ ...(live.get(taskId(snapshot)) || {}), ...snapshot }));
     const total = list(batch?.taskIds).length || states.length;
     let running = 0;
     let done = 0;
     let failed = 0;
+    const aiTargets = targetVersions(batch).filter(version => /^ai[1-5]$/.test(version));
     for (const task of states) {
-      const joined = [task.status, task.originalStatus, task.aiStatus, task.siteSubmitStatus, task.error].filter(Boolean).join(' ');
+      const joined = [currentBatchTaskStatus(task, generatedVersions(task), aiTargets), task.originalStatus, task.siteSubmitStatus, task.error].filter(Boolean).join(' ');
       if (/fail|error|timeout|partial|失败|错误|超时|异常/i.test(joined)) failed += 1;
       else if (/done|complete|已完成|成功/i.test(text(task.status))) done += 1;
       else if (/run|process|queue|pending|处理中|等待|排队/i.test(joined)) running += 1;
@@ -467,7 +505,12 @@
   }
 
   function updateStatus(batch, tasks) {
-    const counters = taskCounters(batch);
+    const counters = taskCounters(batch, tasks);
+    const progress = progressCounts(batch, tasks);
+    if (counters.total && progress.ai.total && progress.ai.done === progress.ai.total) {
+      counters.running = 0;
+      counters.done = counters.total;
+    }
     const map = {
       v78MetricTotal: counters.total,
       v78MetricParsed: counters.parsed,
@@ -478,7 +521,6 @@
     for (const [id, value] of Object.entries(map)) if ($(id)) $(id).textContent = `${value} 本`;
     const rows = $('v78ProgressRows');
     if (rows) {
-      const progress = progressCounts(batch, tasks);
       rows.innerHTML = [
         progressRow('原文获取', progress.original, 'ok'),
         progressRow('AI文案生成', progress.ai, ''),

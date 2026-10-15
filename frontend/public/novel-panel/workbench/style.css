@@ -22,11 +22,15 @@ button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .58; }
 code { font-family: Consolas, "Cascadia Code", monospace; font-size: .93em; }
 .app-shell { width: min(1540px, calc(100% - 42px)); margin: 30px auto 68px; }
-.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
 .brand-block h1 { margin: 0; font-size: clamp(28px, 3.2vw, 42px); letter-spacing: -.7px; }
 .eyebrow, .step { margin: 0 0 4px; color: var(--primary); font-size: 12px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .subtitle, .final-subtitle { margin: 9px 0 0; color: var(--muted); max-width: 780px; }
-.top-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; max-width: 650px; }
+.top-actions { display: grid; grid-template-columns: 1fr; gap: 8px; justify-items: end; min-width: 0; }
+.top-actions-row { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.top-actions-row-primary { min-height: 36px; }
+.top-actions-row-secondary { min-height: 36px; }
+.top-actions-row .btn, .top-actions-row .mode-toggle { min-height: 36px; }
 .status-pill { display: inline-flex; align-items: center; min-height: 34px; padding: 7px 11px; border: 1px solid #d5ddf5; border-radius: 999px; background: var(--primary-soft); color: #354aaf; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .status-pill.ready { background: #eafff5; border-color: #bfe7d7; color: var(--success); }
 .status-pill.warning { background: var(--warning-soft); border-color: #ebd59e; color: var(--warning); }
@@ -162,8 +166,8 @@ label { display: grid; gap: 5px; color: #45526b; font-size: 13px; font-weight: 8
 .project-row span { margin-top: 3px; color: var(--muted); font-size: 12px; }
 .project-row > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 @media (max-width: 1150px) {
-  .topbar { flex-direction: column; }
-  .top-actions { justify-content: flex-start; max-width: none; }
+  .topbar { gap: 16px; }
+  .top-actions { width: min(100%, 650px); }
   .workspace { grid-template-columns: 1fr; }
   .output-list { max-height: none; }
 }

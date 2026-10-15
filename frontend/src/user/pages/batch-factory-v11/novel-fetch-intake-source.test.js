@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = relative => fs.readFileSync(path.join(here, relative), 'utf8');
 const readRepo = relative => fs.readFileSync(path.resolve(here, '../../../../../', relative), 'utf8');
-const readRepoPublic = relative => fs.readFileSync(path.resolve(here, '../../../../../', relative), 'utf8');
+const readRepoPublic = relative => fs.readFileSync(path.resolve(here, '../../../../../', relative.replace(/^public\//, 'frontend/public/')), 'utf8');
 
 test('Novel Fetch transfer targets the unified V12 intake and preserves source fields', () => {
   const source = read('../../../../public/batch-rewrite/app.js');

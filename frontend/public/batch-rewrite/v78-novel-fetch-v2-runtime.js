@@ -10,11 +10,40 @@
   const POLL_MS = 5000;
   let pollTimer = null;
   let pollCallback = null;
-  let authToken = localStorage.getItem('auth_token') || '';
+  function authTokenFromSharedSession() {
+    let localToken = localStorage.getItem('auth_token') || '';
+    if (!localToken && window.parent && window.parent !== window) {
+      try { localToken = window.parent.localStorage.getItem('auth_token') || ''; } catch (_) {}
+    }
+    if (localToken) return localToken;
+    let cookieText = document.cookie;
+    if (!cookieText && window.parent && window.parent !== window) {
+      try { cookieText = window.parent.document.cookie; } catch (_) {}
+    }
+    const cookie = cookieText.split(';').map(item => item.trim()).find(item => item.startsWith('qiantie_auth_token='));
+    if (!cookie) return '';
+    try {
+      const value = decodeURIComponent(cookie.slice('qiantie_auth_token='.length));
+      if (value) localStorage.setItem('auth_token', value);
+      return value;
+    } catch (_) { return ''; }
+  }
+
+  let authToken = authTokenFromSharedSession();
   let authScope = 0;
 
+  window.addEventListener('message', event => {
+    if (event.origin !== window.location.origin || event.data?.type !== 'qiantie-auth-token') return;
+    const next = String(event.data?.token || '').trim();
+    if (!next || next === authToken) return;
+    authToken = next;
+    try { localStorage.setItem('auth_token', next); } catch (_) {}
+    authScope += 1;
+    cache.clear();
+  });
+
   function syncAuthScope() {
-    const current = localStorage.getItem('auth_token') || '';
+    const current = authTokenFromSharedSession();
     if (current !== authToken) {
       authToken = current;
       authScope += 1;
@@ -23,7 +52,7 @@
   }
 
   function tokenHeaders(extra = {}) {
-    const token = localStorage.getItem('auth_token') || '';
+    const token = authTokenFromSharedSession();
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
   }
 
@@ -35,9 +64,9 @@
   function requestUrl(normalized) {
     // 文本模型目录属于统一 API 配置路由，不属于旧工作台资源路由。
     if (normalized.startsWith(WEB_SUBMIT_API.slice(4))) return `/api${normalized}`;
-    // 调用方有时传入完整的 /api/novel-fetch-workshop/... 路径。
-    // normalizePath 已去掉了 /api 前缀，此时不能再次拼接 API_ROOT，
-    // 否则会请求 /api/novel-fetch-workshop/novel-fetch-workshop/... 并得到 404。
+    // 调用方可能传入完整的 /api/novel-fetch-workshop/... 路径。
+    // normalizePath 已去掉 /api 前缀，此时直接还原即可，不能再次拼接
+    // API_ROOT，否则会变成 /api/novel-fetch-workshop/novel-fetch-workshop/...
     if (normalized.startsWith(API_ROOT.slice(4))) return `/api${normalized}`;
     return /^\/models(?:\?|$)/.test(normalized) ? `/api${normalized}` : `${API_ROOT}${normalized}`;
   }
@@ -136,4 +165,5 @@
     tasks: (query = '') => request(`/tasks${query}`),
     currentBatch: () => request('/batches/current')
   };
+  window.qiantieNovelFetchAuthToken = authTokenFromSharedSession;
 })();

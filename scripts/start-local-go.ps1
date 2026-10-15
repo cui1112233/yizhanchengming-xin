@@ -45,13 +45,12 @@ if (-not $needsBuild) {
 if (-not $needsBuild) {
   $assetRoots = @(
     (Join-Path $repo 'frontend/dist'),
-    # The embedded Go workbench is copied from frontend/public as well as
-    # public/. Include it here so a changed novel-fetch page cannot leave an
-    # older qiantie-local.exe running just because the Go files are unchanged.
+    # The embedded Go workbench is copied from frontend/public. Include it
+    # here so a changed workbench cannot leave an older qiantie-local.exe
+    # running just because the Go files are unchanged.
     (Join-Path $repo 'frontend/public/batch-rewrite'),
-    (Join-Path $repo 'public/novel-panel'),
-    (Join-Path $repo 'public/batch-rewrite'),
-    (Join-Path $repo 'public/assets'),
+    (Join-Path $repo 'frontend/public/novel-panel'),
+    (Join-Path $repo 'frontend/public/assets'),
     (Join-Path $repo 'pets')
   ) | Where-Object { Test-Path $_ }
   $latestAsset = $assetRoots |

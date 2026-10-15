@@ -8,12 +8,12 @@ $frontendDist = Join-Path $repo 'frontend/dist'
 $goDist = Join-Path $repo 'backend/web/dist'
 $petsSource = Join-Path $repo 'pets'
 $petsDist = Join-Path $goDist 'pets'
-$novelPanelSource = Join-Path $repo 'public/novel-panel'
+$novelPanelSource = Join-Path $repo 'frontend/public/novel-panel'
 $novelPanelDist = Join-Path $goDist 'novel-panel'
 $novelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
-$novelFetchPatchSource = Join-Path $repo 'public/batch-rewrite'
+$novelFetchPatchSource = Join-Path $repo 'frontend/public/batch-rewrite'
 $novelFetchDist = Join-Path $goDist 'batch-rewrite'
-$brandAssetsSource = Join-Path $repo 'public/assets'
+$brandAssetsSource = Join-Path $repo 'frontend/public/assets'
 $brandAssetsDist = Join-Path $goDist 'assets'
 
 if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
@@ -34,7 +34,7 @@ foreach ($brandAsset in @('brand-logo-black.png', 'brand-logo-white.png')) {
   Copy-Item -LiteralPath $source -Destination (Join-Path $brandAssetsDist $brandAsset) -Force
 }
 
-# The Go composer assembles the novel-fetch page from the tracked public
+# The Go composer assembles the novel-fetch page from the tracked frontend
 # workbench and injects the current retry/status/date compatibility scripts.
 # Go 4001 embeds that composed page instead of the older copied dist snapshot.
 if (-not (Test-Path (Join-Path $novelFetchSource 'index.html'))) {

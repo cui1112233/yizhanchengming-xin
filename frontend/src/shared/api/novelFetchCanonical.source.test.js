@@ -6,7 +6,7 @@ const source = fs.readFileSync(path.resolve(process.cwd(), 'src/shared/api/novel
 const workshopSource = fs.readFileSync(path.resolve(process.cwd(), 'src/shared/api/novelFetchWorkshop.js'), 'utf8');
 const embeddedWorkbenchSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/app.js'), 'utf8');
 const embeddedRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/v78-novel-fetch-v2-runtime.js'), 'utf8');
-const packagedRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), '../public/batch-rewrite/v78-novel-fetch-v2-runtime.js'), 'utf8');
+const packagedRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/v78-novel-fetch-v2-runtime.js'), 'utf8');
 const embeddedLoginHotfixSource = fs.readFileSync(path.resolve(process.cwd(), 'public/batch-rewrite/121-login-hotfix.js'), 'utf8');
 const embeddedV78Sources = [
   'v78-novel-fetch-v2.js',
@@ -19,7 +19,7 @@ const packagedV78Sources = [
   'v78-novel-fetch-v2-config.js',
   'v78-novel-fetch-v2-layout.js',
   'v78-novel-fetch-v2-run-controls.js',
-].map((name) => fs.readFileSync(path.resolve(process.cwd(), `../public/batch-rewrite/${name}`), 'utf8'));
+].map((name) => fs.readFileSync(path.resolve(process.cwd(), `public/batch-rewrite/${name}`), 'utf8'));
 
 describe('novel fetch uses one canonical Go workshop submit API', () => {
   it('does not create a second batch-rewrite submit path', () => {

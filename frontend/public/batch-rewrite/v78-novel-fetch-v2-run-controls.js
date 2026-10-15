@@ -14,7 +14,7 @@
   const text = value => String(value == null ? '' : value);
 
   function headers(extra = {}) {
-    const token = localStorage.getItem('auth_token') || '';
+    const token = window.qiantieNovelFetchAuthToken?.() || localStorage.getItem('auth_token') || '';
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
   }
 

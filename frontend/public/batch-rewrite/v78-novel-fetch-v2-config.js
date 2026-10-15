@@ -5,7 +5,7 @@
   function byId(id) { return document.getElementById(id); }
   function object(value) { return value && typeof value === 'object' && !Array.isArray(value) ? value : {}; }
   function tokenHeaders(extra = {}) {
-    const token = localStorage.getItem('auth_token') || '';
+    const token = window.qiantieNovelFetchAuthToken?.() || localStorage.getItem('auth_token') || '';
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
   }
   async function v2Api(path, options = {}) {

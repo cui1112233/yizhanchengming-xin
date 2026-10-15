@@ -10,10 +10,16 @@
     if (!button) return;
 
     const ids = checkedTaskIds();
-    if (!ids.length || typeof window.qiantieSubmitSelectedTasks !== 'function') return;
-
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (!ids.length) {
+      window.qiantiePublishNovelFetchStatus?.('请先在任务列表勾选需要提交的任务', 'error');
+      return;
+    }
+    if (typeof window.qiantieSubmitSelectedTasks !== 'function') {
+      window.qiantiePublishNovelFetchStatus?.('提交网络按钮未准备好，请刷新页面后重试', 'error');
+      return;
+    }
     window.qiantieSubmitSelectedTasks(ids);
   }, true);
 })();

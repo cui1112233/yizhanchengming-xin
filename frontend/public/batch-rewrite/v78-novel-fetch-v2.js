@@ -13,7 +13,7 @@
   function value(id, fallback = '') { return byId(id)?.value ?? fallback; }
   function asArray(value) { return Array.isArray(value) ? value : []; }
   function tokenHeaders(extra = {}) {
-    const token = localStorage.getItem('auth_token') || '';
+    const token = window.qiantieNovelFetchAuthToken?.() || localStorage.getItem('auth_token') || '';
     return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra };
   }
   async function v2Api(path, options = {}) {
@@ -301,11 +301,7 @@
         .map(task => String(task.bookId || task.book_id || task.id || ''))
         .filter(id => id && (!wanted || wanted.has(id))));
       renderParsedBooks();
-      // Keep the original input visible after preview. The preview is only a
-      // validation/selection step; hiding the source text made a failed start
-      // look like the user's ID had been lost and prevented quick correction.
-      byId('inputText').hidden = false;
-      byId('inputText').setAttribute('aria-describedby', 'v78PreviewStatus');
+      byId('inputText').hidden = true;
       byId('v78ParsedBooks').hidden = false;
       byId('v78BackToInput').hidden = false;
       setText('v78PreviewStatus', `已解析 ${previewState.tasks.length} 本，已选 ${previewState.selected.size} 本`);

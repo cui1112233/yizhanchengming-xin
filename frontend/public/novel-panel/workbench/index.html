@@ -14,21 +14,23 @@
   <main class="app-shell">
     <header class="topbar">
       <div class="brand-block">
-        <p class="eyebrow">9:16 · 小说短剧 · 整段时间轴生成 · 强制人物卡槽位唯一权威 · 同名不同阶段独立 · 独立可编辑人物关系图 · 称呼指代与对白解析 · 本镜人物语义匹配 · 当前界面修改即时生效 · 统一风格独立判断 · 强制名单人物卡独立生成 · CharacterCore 2.0全题材人物引擎 · 年龄阶段驱动外形重构 · 多窗口独立缓存 · V78 Clean Core 正式主链 · 普通/精品双模式与参考图资产</p>
         <h1>视频画面提示词工具</h1>
-        <p class="subtitle">先独立判断内容类型与统一风格，再由强制名单按钮生成人物卡、AI人物关系图和本地关键词勾选，最后生成导演级时间轴；当前工作区有什么资料就使用什么资料，不因缺少前置步骤阻断生成。</p>
       </div>
       <div class="top-actions">
-        <span id="aiStatus" class="status-pill">AI 通道加载中</span>
-        <div id="outputModeToggle" class="mode-toggle" aria-label="生成模式">
-          <button type="button" class="mode-toggle-btn active" data-output-mode="normal">普通模式</button>
-          <button type="button" class="mode-toggle-btn" data-output-mode="premium">精品带图</button>
+        <div class="top-actions-row top-actions-row-primary">
+          <span id="aiStatus" class="status-pill">AI 通道加载中</span>
+          <div id="outputModeToggle" class="mode-toggle" aria-label="生成模式">
+            <button type="button" class="mode-toggle-btn active" data-output-mode="normal">普通模式</button>
+            <button type="button" class="mode-toggle-btn" data-output-mode="premium">精品带图</button>
+          </div>
         </div>
-        <input id="projectName" type="hidden" value="视频画面提示词" />
-        <button id="historyBtn" class="btn secondary">历史记录</button>
-        <button id="saveProjectBtn" class="btn secondary">保存当前记录</button>
-        <button id="promptSettingsBtn" class="btn secondary prompt-settings-entry">AI 指令</button>
-        <button id="settingsBtn" class="btn primary">AI 设置</button>
+        <div class="top-actions-row top-actions-row-secondary">
+          <input id="projectName" type="hidden" value="视频画面提示词" />
+          <button id="historyBtn" class="btn secondary">历史记录</button>
+          <button id="saveProjectBtn" class="btn secondary">保存当前记录</button>
+          <button id="promptSettingsBtn" class="btn secondary prompt-settings-entry">AI 指令</button>
+          <button id="settingsBtn" class="btn primary">AI 设置</button>
+        </div>
       </div>
     </header>
 
