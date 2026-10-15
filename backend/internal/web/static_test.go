@@ -73,12 +73,12 @@ func TestStaticHandlerServesAdminShell(t *testing.T) {
 func TestStaticHandlerServesNovelFetchWorkbench(t *testing.T) {
 	assets := fstest.MapFS{
 		"index.html":                   &fstest.MapFile{Data: []byte("<html>shell</html>")},
-		"batch-rewrite/index.html":    &fstest.MapFile{Data: []byte("<html>novel-fetch-v78</html>")},
+		"batch-rewrite/index.html":    &fstest.MapFile{Data: []byte("<html>novel-fetch-v78</html><link rel=\"stylesheet\" href=\"/batch-rewrite/styles.css\">")},
 	}
 	for _, route := range []string{"/batch-rewrite/v2", "/novel-fetch"} {
 		res := httptest.NewRecorder()
 		StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, route, nil))
-		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") {
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") || !strings.Contains(res.Body.String(), "/batch-rewrite/styles.css") {
 			t.Fatalf("novel-fetch workbench route %s status = %d body %q", route, res.Code, res.Body.String())
 		}
 	}
