@@ -26,6 +26,14 @@ type StyleCatalogService interface {
 	RefreshStyles(context.Context, Session) (string, error)
 }
 
+// BookReadbackService is the Go-owned equivalent of the legacy browser-worker
+// "book_list" action. It is deliberately optional so existing connector
+// fakes and integrations remain source-compatible while the migration is
+// rolled out.
+type BookReadbackService interface {
+	GetBook(context.Context, Session, string, int, int) (any, error)
+}
+
 // TargetHTTPService is the Go-owned transport for the video-management site.
 // It deliberately contains no browser or Node dependency. A CDP implementation
 // can be added behind the same Service interface for sites that require a UI.
@@ -128,6 +136,45 @@ func (s *TargetHTTPService) RefreshStyles(ctx context.Context, session Session) 
 		return "", fmt.Errorf("target site styles returned HTTP %d", response.StatusCode)
 	}
 	return string(raw), nil
+}
+
+// GetBook reads one book's current target-site metadata. The target site uses
+// the same endpoint for the novel upload readback and the old browser-worker
+// book_list action; keeping it here makes Go the single owner of that request.
+func (s *TargetHTTPService) GetBook(ctx context.Context, session Session, bookID string, page, pageSize int) (any, error) {
+	base, err := s.base()
+	if err != nil {
+		return nil, err
+	}
+	bookID = strings.TrimSpace(bookID)
+	if bookID == "" || !numericBookID(bookID) {
+		return nil, fmt.Errorf("target site book id is invalid")
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+	query := url.Values{
+		"bookid":   []string{bookID},
+		"page":     []string{fmt.Sprint(page)},
+		"pageSize": []string{fmt.Sprint(pageSize)},
+	}.Encode()
+	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/api/zbooklist_get.php?"+query, session.Cookie, nil)
+	if err != nil {
+		return nil, fmt.Errorf("target site book readback: %w", err)
+	}
+	defer response.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("target site book readback returned HTTP %d", response.StatusCode)
+	}
+	var value any
+	if json.Unmarshal(raw, &value) != nil {
+		value = string(raw)
+	}
+	return value, nil
 }
 
 func (s *TargetHTTPService) CheckSession(ctx context.Context, session Session) error {
@@ -354,4 +401,16 @@ func mapString(value any) map[string]string {
 		out[key] = fmt.Sprint(item)
 	}
 	return out
+}
+
+func numericBookID(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(value) <= 20
 }

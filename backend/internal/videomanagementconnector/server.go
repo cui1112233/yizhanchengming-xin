@@ -1,8 +1,10 @@
 package videomanagementconnector
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -23,6 +25,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("POST /v1/sessions/login", s.login)
 	mux.HandleFunc("POST /v1/catalogs/refresh", s.catalogs)
+	mux.HandleFunc("GET /v1/profiles", s.profiles)
+	mux.HandleFunc("GET /v1/styles", s.styles)
+	mux.HandleFunc("GET /v1/books/{id}", s.book)
 	mux.HandleFunc("POST /v1/submissions", s.submit)
 	mux.HandleFunc("GET /v1/submissions/{id}", s.readback)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +72,36 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) catalogs(w http.ResponseWriter, r *http.Request) {
 	s.withSession(w, r, func(session Session) (any, error) { return s.service.RefreshCatalogs(r.Context(), session) })
+}
+func (s *Server) profiles(w http.ResponseWriter, r *http.Request) {
+	service, ok := s.service.(interface {
+		RefreshProfiles(context.Context, Session) (any, error)
+	})
+	if !ok {
+		writeError(w, http.StatusNotImplemented, "profiles are not supported by this connector")
+		return
+	}
+	s.withSession(w, r, func(session Session) (any, error) { return service.RefreshProfiles(r.Context(), session) })
+}
+func (s *Server) styles(w http.ResponseWriter, r *http.Request) {
+	service, ok := s.service.(StyleCatalogService)
+	if !ok {
+		writeError(w, http.StatusNotImplemented, "styles are not supported by this connector")
+		return
+	}
+	s.withSession(w, r, func(session Session) (any, error) { return service.RefreshStyles(r.Context(), session) })
+}
+func (s *Server) book(w http.ResponseWriter, r *http.Request) {
+	service, ok := s.service.(BookReadbackService)
+	if !ok {
+		writeError(w, http.StatusNotImplemented, "book readback is not supported by this connector")
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	s.withSession(w, r, func(session Session) (any, error) {
+		return service.GetBook(r.Context(), session, r.PathValue("id"), page, pageSize)
+	})
 }
 func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 	var input SubmissionInput

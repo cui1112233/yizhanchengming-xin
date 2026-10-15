@@ -25,6 +25,15 @@ func (fakeService) Submit(context.Context, Session, SubmissionInput) (Submission
 func (fakeService) GetSubmission(context.Context, Session, string) (Submission, error) {
 	return Submission{ID: "submission-1", Status: "published"}, nil
 }
+func (fakeService) RefreshProfiles(context.Context, Session) (any, error) {
+	return map[string]any{"profiles": []any{map[string]any{"id": "p1"}}}, nil
+}
+func (fakeService) RefreshStyles(context.Context, Session) (string, error) {
+	return "古风虐文", nil
+}
+func (fakeService) GetBook(context.Context, Session, string, int, int) (any, error) {
+	return map[string]any{"success": true, "data": []any{}}, nil
+}
 
 func TestConnectorRejectsMissingInternalToken(t *testing.T) {
 	s := NewServer(Config{InternalToken: "internal-token"}, fakeService{}, NewMemorySessionStore())
@@ -54,6 +63,22 @@ func TestConnectorLoginAndCatalogUseOwnerSession(t *testing.T) {
 	s.Handler().ServeHTTP(catalogs, refresh)
 	if catalogs.Code != http.StatusOK || !strings.Contains(catalogs.Body.String(), "默认组织") {
 		t.Fatalf("catalog status=%d body=%s", catalogs.Code, catalogs.Body.String())
+	}
+	profiles := httptest.NewRecorder()
+	profileReq := httptest.NewRequest(http.MethodGet, "/v1/profiles", nil)
+	profileReq.Header.Set("Authorization", "Bearer internal-token")
+	profileReq.Header.Set("X-Owner", "alice")
+	s.Handler().ServeHTTP(profiles, profileReq)
+	if profiles.Code != http.StatusOK || !strings.Contains(profiles.Body.String(), "p1") {
+		t.Fatalf("profiles status=%d body=%s", profiles.Code, profiles.Body.String())
+	}
+	book := httptest.NewRecorder()
+	bookReq := httptest.NewRequest(http.MethodGet, "/v1/books/123", nil)
+	bookReq.Header.Set("Authorization", "Bearer internal-token")
+	bookReq.Header.Set("X-Owner", "alice")
+	s.Handler().ServeHTTP(book, bookReq)
+	if book.Code != http.StatusOK || !strings.Contains(book.Body.String(), "success") {
+		t.Fatalf("book status=%d body=%s", book.Code, book.Body.String())
 	}
 }
 

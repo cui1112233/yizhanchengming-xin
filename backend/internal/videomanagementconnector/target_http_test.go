@@ -39,7 +39,7 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"success":true,"id":"submission-1"}`))
 		case "/tttadmin/api/zbooklist_get.php":
-			if r.URL.Query().Get("bookid") != "book-1" || r.URL.Query().Get("page") != "1" || r.URL.Query().Get("pageSize") != "10" {
+			if (r.URL.Query().Get("bookid") != "book-1" && r.URL.Query().Get("bookid") != "1") || r.URL.Query().Get("page") != "1" || r.URL.Query().Get("pageSize") != "10" {
 				t.Errorf("unexpected readback query: %s", r.URL.RawQuery)
 			}
 			_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
@@ -63,6 +63,13 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 	readback, err := service.GetSubmission(context.Background(), session, "book-1")
 	if err != nil || readback.ID != "book-1" || readback.Status != "readback" {
 		t.Fatalf("readback=%#v err=%v", readback, err)
+	}
+	book, err := service.GetBook(context.Background(), session, "1", 1, 10)
+	if err != nil {
+		t.Fatalf("book readback: %v", err)
+	}
+	if value, ok := book.(map[string]any); !ok || value["success"] != true {
+		t.Fatalf("book=%#v", book)
 	}
 }
 
