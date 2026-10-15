@@ -20,7 +20,8 @@ test('workbench pages keep their asynchronous loading boundaries', async () => {
     fs.readFile(new URL('./pages/BatchFactoryWorkbenchPage.jsx', import.meta.url), 'utf8')
   ]);
   assert.match(novelFetch, /NovelFetchWorkshopPage as NovelFetchPage/);
-  assert.match(novelPanel, /workbenchSrc/);
+  assert.match(novelPanel, /NovelPanelReactPage/);
+  assert.doesNotMatch(novelPanel, /iframe|workbenchSrc/);
   assert.match(batchFactory, /listBatchSummaries\(\)/);
 });
 

@@ -8,6 +8,10 @@ export function listNovelPanelProjects() {
   return apiRequest('/api/novel-panel/projects');
 }
 
+export function createNovelPanelProject(payload = {}) {
+  return saveNovelPanelProject(payload);
+}
+
 export function saveNovelPanelProject(payload) {
   return apiRequest('/api/novel-panel/projects', {
     method: 'POST',

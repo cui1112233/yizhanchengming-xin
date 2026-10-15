@@ -165,7 +165,8 @@ export default defineConfig({
   assetsInclude: ['**/*.glb'],
   build: {
     // 保留本地 downloads 目录，避免 Vite 清空输出目录时触发 Windows 文件系统崩溃。
-    emptyOutDir: false,
+    // Generated output must not retain removed compatibility bundles between builds.
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         user: resolve(rootDir, 'index.html'),

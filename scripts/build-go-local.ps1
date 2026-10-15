@@ -8,8 +8,6 @@ $frontendDist = Join-Path $repo 'frontend/dist'
 $goDist = Join-Path $repo 'backend/web/dist'
 $petsSource = Join-Path $repo 'pets'
 $petsDist = Join-Path $goDist 'pets'
-$novelPanelSource = Join-Path $repo 'frontend/public/novel-panel'
-$novelPanelDist = Join-Path $goDist 'novel-panel'
 $novelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
 $novelFetchPatchSource = Join-Path $repo 'frontend/public/batch-rewrite'
 $novelFetchDist = Join-Path $goDist 'batch-rewrite'
@@ -76,13 +74,6 @@ if (-not (Test-Path (Join-Path $petsSource 'stacky/spritesheet.webp'))) {
 
 New-Item -ItemType Directory -Force $petsDist | Out-Null
 Copy-Item -Path (Join-Path $petsSource '*') -Destination $petsDist -Recurse -Force
-
-if (-not (Test-Path (Join-Path $novelPanelSource 'workbench/index.html'))) {
-  throw "Novel panel workbench assets are missing: $novelPanelSource"
-}
-
-New-Item -ItemType Directory -Force $novelPanelDist | Out-Null
-Copy-Item -Path (Join-Path $novelPanelSource '*') -Destination $novelPanelDist -Recurse -Force
 
 if (-not $SkipGoBuild) {
   Push-Location (Join-Path $repo 'backend')

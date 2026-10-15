@@ -39,9 +39,8 @@ func StaticHandler(files fs.FS) http.Handler {
 					serveEmbeddedIndex(w, files, indexName)
 					return
 				}
-				// A directory used only to hold a nested page (for example
-				// /novel-panel/workbench) must not turn the SPA route itself
-				// into a directory listing.
+				// A directory used only to hold a nested page must not turn the
+				// SPA route itself into a directory listing.
 				name = ""
 			} else if err != nil && path.Ext(name) == "" {
 				indexName := path.Join(name, "index.html")

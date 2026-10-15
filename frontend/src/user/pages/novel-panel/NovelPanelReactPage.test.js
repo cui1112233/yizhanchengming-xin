@@ -11,11 +11,10 @@ test('shows a loading state while the project request is pending', () => {
   });
 });
 
-test('returns a recoverable error when project id is missing', () => {
+test('shows the project selector when project id is missing', () => {
   const state = createNovelPanelViewState({ projectId: '', loading: false });
-  assert.equal(state.kind, 'error');
-  assert.equal(state.error.code, 400);
-  assert.equal(state.error.retryable, false);
+  assert.equal(state.kind, 'select');
+  assert.deepEqual(state.projects, []);
 });
 
 test('returns a project-ready state after normalization', () => {

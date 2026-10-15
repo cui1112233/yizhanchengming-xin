@@ -1,11 +1,14 @@
 import { normalizeNovelPanelError, normalizeNovelProject } from './novelPanelContracts.js';
 
-export function createNovelPanelViewState({ projectId, loading = false, project = null, error = null } = {}) {
+export function createNovelPanelViewState({ projectId, loading = false, project = null, error = null, projects = [], projectListLoading = false } = {}) {
   if (!String(projectId || '').trim()) {
+    if (projectListLoading || loading) return { kind: 'loading', project: null, error: null, canFallback: true };
+    if (error) return { kind: 'error', project: null, error: normalizeNovelPanelError(error), canFallback: true };
     return {
-      kind: 'error',
+      kind: 'select',
       project: null,
-      error: { code: 400, message: '缺少小说面板项目', retryable: false },
+      projects: Array.isArray(projects) ? projects : [],
+      error: null,
       canFallback: true
     };
   }

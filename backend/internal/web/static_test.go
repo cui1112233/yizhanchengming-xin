@@ -48,11 +48,10 @@ func TestStaticHandlerRejectsNilFilesystem(t *testing.T) {
 	}
 }
 
-func TestStaticHandlerServesNestedWorkbenchAndLegacyV2Alias(t *testing.T) {
+func TestStaticHandlerServesLegacyNovelFetchAliasAndAdminShell(t *testing.T) {
 	assets := fstest.MapFS{
 		"index.html":                       &fstest.MapFile{Data: []byte("<html>shell</html>")},
 		"admin.html":                       &fstest.MapFile{Data: []byte("<html>admin</html>")},
-		"novel-panel/workbench/index.html": &fstest.MapFile{Data: []byte("<html>panel</html>")},
 		"batch-rewrite/index.html":         &fstest.MapFile{Data: []byte("<html>fetch</html>")},
 	}
 	handler := StaticHandler(assets)
@@ -60,7 +59,6 @@ func TestStaticHandlerServesNestedWorkbenchAndLegacyV2Alias(t *testing.T) {
 		path string
 		want string
 	}{
-		{"/novel-panel/workbench", "panel"},
 		{"/batch-rewrite/v2", "fetch"},
 		{"/admin", "admin"},
 		{"/admin/presets", "admin"},
