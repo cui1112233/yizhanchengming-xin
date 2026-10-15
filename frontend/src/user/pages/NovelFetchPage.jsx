@@ -12,6 +12,7 @@ import {
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
   saveWorkshopKnowledge, saveWorkshopOpening, suggestWorkshopRules, testWorkshopAi
 } from '../../shared/api/novelFetchWorkshop';
+import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
 import './novel-fetch.css';
 
 const TABS = [
@@ -30,10 +31,6 @@ const REWRITE_METHODS = [
   { value: 'opening_instruction', label: '爆款开头' },
   { value: 'instruction', label: '自定义规则' }
 ];
-const PROCESS_SETTINGS_KEY = 'novel-fetch-v78-process-settings';
-function readProcessSettings() {
-  try { return JSON.parse(window.localStorage.getItem(PROCESS_SETTINGS_KEY) || '{}'); } catch { return {}; }
-}
 const PLATFORMS = [
   { value: 1, label: '黑岩付费' }, { value: 2, label: '番茄付费' }, { value: 3, label: '七猫付费' },
   { value: 4, label: '点众付费' }, { value: 7, label: '番茄免费' }, { value: 15, label: '知乎付费' },
@@ -71,6 +68,7 @@ export function NovelFetchPage() {
 
 export function LegacyNovelFetchPage() {
   const [processForm] = Form.useForm();
+  const savedProcessSettings = useMemo(() => readNovelFetchProcessSettings(), []);
   const [configForm] = Form.useForm();
   const [knowledgeForm] = Form.useForm();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -102,14 +100,21 @@ export function LegacyNovelFetchPage() {
   const [taskDate, setTaskDate] = useState('');
   const [batchAiCount, setBatchAiCount] = useState(1);
   const [ruleApplyScope, setRuleApplyScope] = useState('both');
-  const [selectedVersions, setSelectedVersions] = useState(() => readProcessSettings().selectedVersions || ['original', 'ai1']);
-  const [rewriteMethods, setRewriteMethods] = useState(() => readProcessSettings().rewriteMethods || Object.fromEntries(AI_VERSIONS.slice(1).map(key => [key, 'auto'])));
-  const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => readProcessSettings().sensitiveAiProcessEnabled ?? true);
-  const [textModel, setTextModel] = useState(() => readProcessSettings().textModel || '[anti-2]gemini-3.8-flash');
+  const [selectedVersions, setSelectedVersions] = useState(() => savedProcessSettings.selectedVersions);
+  const [rewriteMethods, setRewriteMethods] = useState(() => savedProcessSettings.rewriteMethods);
+  const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => savedProcessSettings.sensitiveAiProcessEnabled);
+  const [textModel, setTextModel] = useState(() => savedProcessSettings.textModel);
 
   useEffect(() => {
-    window.localStorage.setItem(PROCESS_SETTINGS_KEY, JSON.stringify({ selectedVersions, rewriteMethods, sensitiveAiProcessEnabled, textModel }));
-  }, [selectedVersions, rewriteMethods, sensitiveAiProcessEnabled, textModel]);
+    writeNovelFetchProcessSettings({
+      ...savedProcessSettings,
+      ...processForm.getFieldsValue(['platform', 'maxTxt']),
+      selectedVersions,
+      rewriteMethods,
+      sensitiveAiProcessEnabled,
+      textModel
+    });
+  }, [processForm, savedProcessSettings, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled, textModel]);
 
   const selectedTask = useMemo(() => selectedTaskKeys[0] || '', [selectedTaskKeys]);
   const visibleTasks = useMemo(() => {
@@ -241,7 +246,16 @@ export function LegacyNovelFetchPage() {
 
   const panels = {
     process: <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Form className="novel-fetch-public-workspace" form={processForm} layout="vertical" initialValues={{ platform: 2, maxTxt: 4000 }}>
+      <Form className="novel-fetch-public-workspace" form={processForm} layout="vertical" initialValues={{ platform: savedProcessSettings.platform, maxTxt: savedProcessSettings.maxTxt }} onValuesChange={() => {
+        writeNovelFetchProcessSettings({
+          ...savedProcessSettings,
+          ...processForm.getFieldsValue(),
+          selectedVersions,
+          rewriteMethods,
+          sensitiveAiProcessEnabled,
+          textModel
+        });
+      }}>
         <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台：{PLATFORMS.length}</Typography.Text></div>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--three">
           <Form.Item name="platform" label="平台"><Select options={PLATFORMS.map(item => ({ ...item, label: `${item.label} (1)` }))} /></Form.Item>
