@@ -26,7 +26,6 @@ const TABS = [
   { key: 'config', label: '配置' },
   { key: 'knowledge', label: '知识库' },
   { key: 'rules', label: '处理规则' },
-  { key: 'submit', label: '提交' },
   { key: 'logs', label: '记录' }
 ];
 const AI_VERSIONS = ['original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'];
@@ -38,9 +37,9 @@ const REWRITE_METHODS = [
   { value: 'instruction', label: '自定义规则' }
 ];
 const PLATFORMS = [
-  { value: 1, label: '黑岩付费' }, { value: 2, label: '番茄付费' }, { value: 3, label: '七猫付费' },
-  { value: 4, label: '点众付费' }, { value: 7, label: '番茄免费' }, { value: 15, label: '知乎付费' },
-  { value: 20, label: '掌阅付费' }, { value: 26, label: '卓越付费' }, { value: 29, label: '九州书城' }, { value: 31, label: '掌文付费' }
+  { value: 1, label: '黑岩付费 (1)' }, { value: 2, label: '番茄付费 (2)' }, { value: 3, label: '七猫付费 (3)' },
+  { value: 4, label: '点众付费 (4)' }, { value: 7, label: '番茄免费 (7)' }, { value: 15, label: '知乎付费 (15)' },
+  { value: 20, label: '掌阅付费 (20)' }, { value: 26, label: '卓越付费 (26)' }, { value: 29, label: '九州书城 (29)' }, { value: 31, label: '掌文付费 (31)' }
 ];
 const KNOWLEDGE_TABS = [
   ['high_imitation', '高仿库'], ['opening_phrases', '爆款开头'], ['rewrite_templates', '改文模板'],
@@ -184,6 +183,7 @@ export function LegacyNovelFetchPage() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [processRows, setProcessRows] = useState([]);
   const [platformOptions, setPlatformOptions] = useState(PLATFORMS);
+  const [selectedPlatform, setSelectedPlatform] = useState(() => savedProcessSettings.platform || '');
   const [processJob, setProcessJob] = useState(null);
   const [schedules, setSchedules] = useState([]);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
@@ -309,7 +309,7 @@ export function LegacyNovelFetchPage() {
         styles: catalogText(data.styles || config.styles)
       });
       const configuredPlatforms = Array.isArray(data.platforms) ? data.platforms : Array.isArray(config.platforms) ? config.platforms : [];
-      if (configuredPlatforms.length) setPlatformOptions(configuredPlatforms.map(item => ({ value: Number(item.id ?? item.platform_id ?? item.value), label: item.name || item.platform_name || item.label || String(item.id ?? item.platform_id ?? item.value) })));
+      if (configuredPlatforms.length) setPlatformOptions(configuredPlatforms.map(item => { const id = Number(item.id ?? item.platform_id ?? item.value); const name = item.name || item.platform_name || item.label || String(id); return { value: id, label: `${name} (${id})` }; }));
     } catch (error) { message.error(error.message || '读取配置失败'); } finally { setConfigLoading(false); }
   }
   async function loadRuleConfig(kind = ruleKind) {
@@ -347,7 +347,7 @@ export function LegacyNovelFetchPage() {
     loadGlobalLogs();
     getWorkshopPlatforms().then(data => {
       const items = data.platforms || data.items || data;
-      if (Array.isArray(items) && items.length) setPlatformOptions(items.map(item => ({ value: Number(item.id ?? item.platform_id ?? item.value), label: item.name || item.platform_name || item.label || String(item.id ?? item.platform_id ?? item.value) })));
+      if (Array.isArray(items) && items.length) setPlatformOptions(items.map(item => { const id = Number(item.id ?? item.platform_id ?? item.value); const name = item.name || item.platform_name || item.label || String(id); return { value: id, label: `${name} (${id})` }; }));
     }).catch(() => {});
     listAvailableTextModels('text').then(models => {
       const options = modelSelectOptions(models, 'text');
@@ -442,8 +442,9 @@ export function LegacyNovelFetchPage() {
     } catch (error) { message.error(error.message || '保存定时任务失败'); }
   }
   async function handleSensitiveRepair() {
-    if (!selectedTaskKeys.length) return message.warning('请先在任务页选择任务');
-    try { await reprocessWorkshopSensitive(selectedTaskKeys, true); await loadTasks(); message.success('敏感词 AI 修复已加入处理'); } catch (error) { message.error(error.message || '敏感词 AI 修复失败'); }
+    const ids = selectedTaskKeys.length ? selectedTaskKeys : tasks.map(task => task.bookId || task.book_id).filter(Boolean);
+    if (!ids.length) return message.warning('当前没有可处理的任务');
+    try { await reprocessWorkshopSensitive(ids, true); await loadTasks(); message.success('敏感词 AI 修复已加入处理'); } catch (error) { message.error(error.message || '敏感词 AI 修复失败'); }
   }
   async function handleGenerateAi() {
     if (!selectedTask) return message.warning('请先选择一个任务');
@@ -631,6 +632,8 @@ export function LegacyNovelFetchPage() {
 
   const panels = {
     process: <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <div className="novel-fetch-process-grid">
+      <div className="novel-fetch-process-main">
       <Form className="novel-fetch-public-workspace" form={processForm} layout="vertical" initialValues={{ platform: savedProcessSettings.platform, maxTxt: savedProcessSettings.maxTxt }} onValuesChange={() => {
         writeNovelFetchProcessSettings({
           ...savedProcessSettings,
@@ -641,16 +644,17 @@ export function LegacyNovelFetchPage() {
           textModel
         });
       }}>
-        <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台：{platformOptions.length}</Typography.Text></div>
+        <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台ID：{selectedPlatform || '—'}</Typography.Text></div>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--three">
-          <Form.Item name="platform" label="平台"><Select options={platformOptions} /></Form.Item>
+          <Form.Item name="platform" label="平台"><Select options={platformOptions} onChange={value => setSelectedPlatform(String(value || ''))} /></Form.Item>
           <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={textModelOptions.length ? textModelOptions : [{ value: textModel || '[anti-2]gemini-3.8-flash', label: textModel || '[anti-2]gemini-3.8-flash' }]} /><small>执行时使用此模型；修改后作为后续批次默认值</small></label>
         </div>
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className="novel-fetch-public-input" rows={5} placeholder={'每一行：书籍 ID、书名、推荐理由、男女频、标签、评级。\n示例：123456789\t书名\t打脸逆袭、复仇反转\t女频\t现代世情、爽文\tS'} /></Form.Item>
         {processPreview ? <div className="novel-fetch-preview-list"><Typography.Text strong>解析预览：已识别 {processPreview.tasks?.length || 0} 本，已选 {previewSelected.length} 本</Typography.Text>{(processPreview.tasks || []).map(row => { const id = row.bookId || row.book_id || row.id; return <label key={id} className="novel-fetch-preview-row"><input type="checkbox" checked={previewSelected.includes(id)} onChange={event => togglePreviewBook(id, event.target.checked)} /><span>{id}</span><span>{row.bookName || row.book_name || ''}</span><span>{row.gender || '待判断'}</span><span>{row.style || '待判定'}</span></label>; })}</div> : null}
         <section className="novel-fetch-public-section"><Typography.Title level={5}>本次处理设置</Typography.Title><Typography.Text type="secondary">AI 文案（选择本次需要生成的版本）</Typography.Text><div className="novel-fetch-version-grid">{AI_VERSIONS.map(version => <label key={version} className={`novel-fetch-version-option ${selectedVersions.includes(version) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedVersions.includes(version)} onChange={event => setSelectedVersions(current => event.target.checked ? [...current, version] : current.filter(item => item !== version))} /><span>{AI_VERSION_LABELS[version]}</span></label>)}</div><div className="novel-fetch-public-grid novel-fetch-public-grid--five">{AI_VERSIONS.slice(1).map(version => <label className="novel-fetch-field" key={version}><span>{AI_VERSION_LABELS[version]} 改文方式</span><Select value={rewriteMethods[version]} onChange={value => setRewriteMethods(current => ({ ...current, [version]: value }))} disabled={!selectedVersions.includes(version)} options={REWRITE_METHODS} /></label>)}</div><div className="novel-fetch-public-hint">AI 文案处理优先方案：跟随“配置”中 AI1～AI5 的现有设置。</div></section>
         <section className="novel-fetch-public-section novel-fetch-sensitive"><Typography.Title level={5}>敏感处理</Typography.Title><label><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</label></section>
-        <div className="novel-fetch-public-actions"><Button onClick={handlePreviewProcess}>解析预览</Button><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button onClick={() => setScheduleModalOpen(true)}>开始定时</Button><Button onClick={() => { loadSchedules(); setScheduleModalOpen(true); }}>定时任务</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button onClick={() => { processForm.resetFields(); setProcessPreview(null); setPreviewSelected([]); }}>清空</Button><Button onClick={openVersionConfig}>版本配置</Button></div>
+        <div className="novel-fetch-version-card"><div><Typography.Text strong>版本对应配置档</Typography.Text><Typography.Text type="secondary">点击打开卡片，同步视频管理系统配置档并设置各版本绑定。</Typography.Text></div><Space><Button onClick={openVersionConfig}>打开版本配置</Button><Typography.Text type="secondary">{selectedVersions.map(version => AI_VERSION_LABELS[version]).join('、') || '未选择'}</Typography.Text></Space></div>
+        <div className="novel-fetch-public-actions"><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button onClick={() => setScheduleModalOpen(true)}>开始定时</Button><Button onClick={() => { loadSchedules(); setScheduleModalOpen(true); }}>定时任务</Button><Button onClick={handleSensitiveRepair}>敏感词 AI 修复</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button></div>
       </Form>
       <Modal open={scheduleModalOpen} title="定时任务" okText="保存定时任务" cancelText="取消" onCancel={() => setScheduleModalOpen(false)} onOk={handleScheduleProcess}>
         <Typography.Paragraph type="secondary">保存后由 Go 后端统一调度；不会立即加入正在执行的队列。</Typography.Paragraph>
@@ -658,13 +662,18 @@ export function LegacyNovelFetchPage() {
         <Table size="small" pagination={false} rowKey="id" dataSource={schedules} locale={{ emptyText: '暂无定时任务' }} columns={[{ title: '开始时间', dataIndex: 'run_at' }, { title: '状态', dataIndex: 'status', render: value => value || '待执行' }, { title: '操作', render: (_, row) => <Button size="small" danger onClick={async () => { await deleteWorkshopSchedule(row.id); await loadSchedules(); }}>删除</Button> }]} />
       </Modal>
       <Modal open={versionConfigOpen} title="版本配置" onCancel={() => setVersionConfigOpen(false)} onOk={saveVersionConfig}><Alert type="info" showIcon message="版本配置会保存到当前工作台，切换页面后仍然保留。" /><Typography.Paragraph>版本配置：{selectedVersions.map(version => AI_VERSION_LABELS[version]).join('、') || '未选择'}</Typography.Paragraph><Space wrap><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button onClick={() => handleWebSubmit(syncWebSubmitStyles, '已同步批量风格类型')}>同步批量风格类型</Button></Space><Form layout="vertical" style={{ marginTop: 12 }}><Form.Item label="默认上传配置档"><Select value={selectedUploadProfile || undefined} placeholder="选择默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={setSelectedUploadProfile} /></Form.Item><Typography.Text type="secondary">每个版本可绑定独立配置档；未绑定时使用默认配置档。</Typography.Text>{selectedVersions.map(version => <Form.Item key={version} label={`${AI_VERSION_LABELS[version]} 配置档`}><Select allowClear value={profileBindings[version] || undefined} placeholder="跟随默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={value => setProfileBindings(current => ({ ...current, [version]: value || '' }))} /></Form.Item>)}<Form.Item label="改文提示词"><Input.TextArea rows={3} value={versionPrompts.rewrite} onChange={event => setVersionPrompts(current => ({ ...current, rewrite: event.target.value }))} placeholder="本次处理的改文提示词" /></Form.Item><Form.Item label="处理规则提示词"><Input.TextArea rows={3} value={versionPrompts.processingRule} onChange={event => setVersionPrompts(current => ({ ...current, processingRule: event.target.value }))} placeholder="整本书共同遵守的规则" /></Form.Item><Form.Item label="知识库使用提示词"><Input.TextArea rows={3} value={versionPrompts.knowledgeUsage} onChange={event => setVersionPrompts(current => ({ ...current, knowledgeUsage: event.target.value }))} placeholder="知识库的使用要求" /></Form.Item></Form></Modal>
+      </div>
+      <div className="novel-fetch-process-side">
       <div className="novel-fetch-status-layout">
         <div className="novel-fetch-public-result"><div className="novel-fetch-public-result-title">处理状态</div><div className="novel-fetch-stat-grid">
-          {[['总数量', processSummary.total], ['原文已解析', processSummary.originalDone], ['处理中', processSummary.processing], ['AI已完成', processSummary.aiDone], ['失败', processSummary.failed]].map(([label, value]) => <div className="novel-fetch-stat-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
-        </div><div className="novel-fetch-progress-row"><span>当前任务</span><b>{processJob?.status || (processing ? 'running' : 'idle')}</b></div><pre>{processRows.length ? JSON.stringify(processRows, null, 2) : '暂无处理结果。提交任务后在这里查看状态。'}</pre></div>
+          {[['总数量', processSummary.total], ['已解析', processSummary.originalDone], ['处理中', processSummary.processing], ['已完成', processSummary.aiDone], ['失败', processSummary.failed]].map(([label, value]) => <div className="novel-fetch-stat-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
+        </div><div className="novel-fetch-progress-row"><span>当前任务</span><b>{processJob?.status || (processing ? 'running' : 'idle')}</b></div><div className="novel-fetch-progress-list"><div><span>原文获取</span><b>{processSummary.originalDone} / {processSummary.total}</b></div><div><span>AI 文案生成</span><b>{processSummary.aiDone} / {processSummary.total}</b></div><div><span>121 网站提交</span><b>{webSubmitResults.filter(item => item.status === 'done' || item.status === 'success').length} / {processSummary.total}</b></div></div><pre>{processRows.length ? JSON.stringify(processRows, null, 2) : '暂无处理结果。提交任务后在这里查看状态。'}</pre></div>
         <div className="novel-fetch-public-result novel-fetch-live-log"><div className="novel-fetch-public-result-title">实时日志</div><div className={`novel-fetch-login-status ${uploadSession?.status === 'ready' ? 'is-ready' : 'is-offline'}`}><span>{uploadSession?.status === 'ready' ? '● 已登录视频管理系统' : '● 未登录视频管理系统'}</span><Button size="small" onClick={() => setLoginModalOpen(true)}>更换账号</Button></div><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : processing ? '正在执行：读取原文、分类、敏感处理和 AI 版本。' : '暂无正在处理的任务。'}</pre></div>
       </div>
-      <div className="novel-fetch-panel"><Typography.Title level={5}>当前批次</Typography.Title>{currentBatch ? <><Typography.Text type="secondary">{currentBatch.id} · {currentBatch.taskIds?.length || 0} 本</Typography.Text><Table size="small" pagination={false} rowKey={row => row.bookId || row.book_id} dataSource={currentBatch.taskStates || []} columns={[{ title: '书籍', render: (_, row) => row.bookName || row.book_name || row.bookId || row.book_id }, { title: '状态', render: (_, row) => row.status || row.aiStatus || '排队中' }]} /></> : <Typography.Text type="secondary">暂无当前批次</Typography.Text>}</div>
+      <div className="novel-fetch-public-actions novel-fetch-process-secondary-actions"><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={applyAllRules}>规则处理</Button><Button onClick={() => submitVisibleTasks(false)}>提交网络</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button></div>
+      </div>
+      </div>
+      <div className="novel-fetch-panel"><div className="novel-fetch-current-batch-heading"><Typography.Title level={5}>当前批次</Typography.Title><Space><Button size="small" icon={<RefreshCw size={14} />} onClick={loadCurrentBatch}>刷新</Button><Button size="small" danger onClick={async () => { const ids = currentBatch?.taskIds || currentBatch?.task_ids || (currentBatch?.taskStates || currentBatch?.task_states || []).map(row => row.bookId || row.book_id).filter(Boolean); if (ids.length) { await stopWorkshopTasks(ids); await loadCurrentBatch(); message.success('已停止处理'); } }}>停止处理</Button><Button size="small" onClick={() => changeTab('tasks')}>查看全部任务</Button></Space></div>{currentBatch ? <><Typography.Text type="secondary">{currentBatch.id} · {currentBatch.taskIds?.length || currentBatch.task_ids?.length || currentBatch.taskStates?.length || currentBatch.task_states?.length || 0} 本</Typography.Text><Table size="small" pagination={false} rowKey={row => row.bookId || row.book_id} dataSource={currentBatch.taskStates || currentBatch.task_states || []} columns={[{ title: 'ID', render: (_, row) => row.bookId || row.book_id }, { title: '书名', render: (_, row) => row.bookName || row.book_name || row.bookId || row.book_id }, { title: '状态', render: (_, row) => row.status || row.aiStatus || '排队中' }, { title: '操作', render: (_, row) => <Button size="small" onClick={() => selectTask(row.bookId || row.book_id)}>查看</Button> }]} /></> : <Typography.Text type="secondary">暂无当前批次</Typography.Text>}</div>
       <Modal open={loginModalOpen} title="登录视频管理系统" confirmLoading={webSubmitLoading} okText="保存并验证" cancelText="取消" onCancel={() => setLoginModalOpen(false)} onOk={handleUploadLogin}><Form layout="vertical"><Form.Item label="账号"><Input value={loginUser} onChange={event => setLoginUser(event.target.value)} autoComplete="username" /></Form.Item><Form.Item label="密码"><Input.Password value={loginPassword} onChange={event => setLoginPassword(event.target.value)} autoComplete="current-password" /></Form.Item></Form></Modal>
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>

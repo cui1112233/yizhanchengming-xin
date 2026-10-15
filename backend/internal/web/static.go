@@ -40,6 +40,15 @@ func StaticHandler(files fs.FS) http.Handler {
 			serveEmbeddedIndex(w, files, "admin.html")
 			return
 		}
+		if name == "" {
+			index, readErr := fs.ReadFile(files, "index.html")
+			if readErr != nil {
+				http.Error(w, "frontend index is unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			writeIndex(w, index)
+			return
+		}
 		if name != "" {
 			if info, err := fs.Stat(files, name); err == nil && info.IsDir() {
 				indexName := path.Join(name, "index.html")
@@ -61,18 +70,7 @@ func StaticHandler(files fs.FS) http.Handler {
 					http.Error(w, "frontend index is unavailable", http.StatusServiceUnavailable)
 					return
 				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				_, _ = w.Write(index)
-				return
-			}
-			if name == "" {
-				index, readErr := fs.ReadFile(files, "index.html")
-				if readErr != nil {
-					http.Error(w, "frontend index is unavailable", http.StatusServiceUnavailable)
-					return
-				}
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				_, _ = w.Write(index)
+				writeIndex(w, index)
 				return
 			}
 		}
@@ -86,6 +84,13 @@ func serveEmbeddedIndex(w http.ResponseWriter, files fs.FS, name string) {
 		http.Error(w, "frontend page is unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	writeIndex(w, index)
+}
+
+func writeIndex(w http.ResponseWriter, index []byte) {
+	// index.html names the current hashed asset graph; caching it lets a browser
+	// keep booting an older React bundle after a Go binary replacement.
+	w.Header().Set("Cache-Control", "no-store, must-revalidate")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(index)
 }

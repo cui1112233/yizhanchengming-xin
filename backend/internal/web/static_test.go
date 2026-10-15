@@ -35,6 +35,9 @@ func TestStaticHandlerServesIndexAndAssets(t *testing.T) {
 		if res.Code != tc.want {
 			t.Fatalf("%s status = %d, want %d", tc.path, res.Code, tc.want)
 		}
+		if tc.want == http.StatusOK && tc.path != "/assets/app.js" && tc.path != "/pets/stacky/spritesheet.webp" && res.Header().Get("Cache-Control") != "no-store, must-revalidate" {
+			t.Fatalf("%s Cache-Control = %q, want no-store", tc.path, res.Header().Get("Cache-Control"))
+		}
 	}
 }
 
