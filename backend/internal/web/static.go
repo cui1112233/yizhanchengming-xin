@@ -22,8 +22,16 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		if name == "batch-rewrite/v2" || strings.HasPrefix(name, "batch-rewrite/v2/") {
-			http.NotFound(w, req)
+		// The recovered public Novel Fetch workbench keeps its stable /v2 URL,
+		// while the embedded files live under /batch-rewrite.
+		if name == "batch-rewrite/v2" {
+			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
+			return
+		}
+		// Keep the canonical Novel Fetch URL on the recovered full workbench
+		// until the React replacement reaches feature parity.
+		if name == "novel-fetch" {
+			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
 			return
 		}
 		// The admin app is built as a separate entry so it can keep its own

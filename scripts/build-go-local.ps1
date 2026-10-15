@@ -10,6 +10,8 @@ $petsSource = Join-Path $repo 'pets'
 $petsDist = Join-Path $goDist 'pets'
 $brandAssetsSource = Join-Path $repo 'frontend/public/assets'
 $brandAssetsDist = Join-Path $goDist 'assets'
+$legacyNovelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
+$legacyNovelFetchDist = Join-Path $goDist 'batch-rewrite'
 
 if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
   throw "Frontend build output is missing: $frontendDist"
@@ -18,6 +20,13 @@ if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
 New-Item -ItemType Directory -Force $goDist | Out-Null
 Get-ChildItem -LiteralPath $goDist -Force | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Recurse -Force
 Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -Force
+
+# Keep the recovered public V78 Novel Fetch baseline available inside the Go
+# embed bundle while the React replacement is brought to feature parity. It is
+# an isolated static reference page, not a Node service dependency.
+if (Test-Path $legacyNovelFetchSource) {
+  Copy-Item -Path $legacyNovelFetchSource -Destination $legacyNovelFetchDist -Recurse -Force
+}
 
 # The liquid-metal brand component reads these stable, non-hashed images from
 # /assets. Keep them beside the hashed Vite assets in the embedded Go bundle.

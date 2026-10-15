@@ -4,7 +4,8 @@ import { HomeRoute } from './pages/HomeRoute';
 import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
 
 const loadNovelPanelPage = () => import('./pages/NovelPanelPage');
-const loadNovelFetchPage = () => import('./pages/NovelFetchWorkshopPage');
+const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
+const loadNovelFetchWorkshopPage = () => import('./pages/NovelFetchWorkshopPage');
 const loadBatchFactoryWorkbenchPage = () => import('./pages/BatchFactoryWorkbenchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
@@ -13,7 +14,7 @@ const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ def
 const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
-const NovelFetchWorkshopPage = lazy(loadNovelFetchPage);
+const NovelFetchWorkshopPage = lazy(loadNovelFetchWorkshopPage);
 const BatchFactoryWorkbenchPage = lazy(loadBatchFactoryWorkbenchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));

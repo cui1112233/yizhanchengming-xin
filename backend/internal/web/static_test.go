@@ -70,12 +70,17 @@ func TestStaticHandlerServesAdminShell(t *testing.T) {
 	}
 }
 
-func TestStaticHandlerRejectsRemovedNovelFetchWorkbench(t *testing.T) {
-	assets := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<html>shell</html>")}}
-	res := httptest.NewRecorder()
-	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/batch-rewrite/v2", nil))
-	if res.Code != http.StatusNotFound {
-		t.Fatalf("removed novel-fetch workbench status = %d, want %d", res.Code, http.StatusNotFound)
+func TestStaticHandlerServesNovelFetchWorkbench(t *testing.T) {
+	assets := fstest.MapFS{
+		"index.html":                   &fstest.MapFile{Data: []byte("<html>shell</html>")},
+		"batch-rewrite/index.html":    &fstest.MapFile{Data: []byte("<html>novel-fetch-v78</html>")},
+	}
+	for _, route := range []string{"/batch-rewrite/v2", "/novel-fetch"} {
+		res := httptest.NewRecorder()
+		StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, route, nil))
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") {
+			t.Fatalf("novel-fetch workbench route %s status = %d body %q", route, res.Code, res.Body.String())
+		}
 	}
 }
 
