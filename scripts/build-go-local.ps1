@@ -53,6 +53,18 @@ try {
   Pop-Location
 }
 
+# Give the embedded workbench runtime a content-derived cache key. This keeps
+# an already-open browser from reusing an older compatibility script after a
+# Go rebuild, without modifying the tracked source page on every build.
+$runtimeAsset = Join-Path $novelFetchDist 'v78-novel-fetch-v2-runtime.js'
+$composedIndex = Join-Path $novelFetchDist 'index.html'
+if ((Test-Path -LiteralPath $runtimeAsset) -and (Test-Path -LiteralPath $composedIndex)) {
+  $runtimeVersion = (Get-FileHash -LiteralPath $runtimeAsset -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
+  $indexText = [IO.File]::ReadAllText($composedIndex, [Text.Encoding]::UTF8)
+  $indexText = [Text.RegularExpressions.Regex]::Replace($indexText, 'v78-novel-fetch-v2-runtime\.js\?v=[^"'' ]+', "v78-novel-fetch-v2-runtime.js?v=$runtimeVersion")
+  [IO.File]::WriteAllText($composedIndex, $indexText, (New-Object Text.UTF8Encoding($false)))
+}
+
 if (-not (Test-Path (Join-Path $petsSource 'stacky/spritesheet.webp'))) {
   throw "Pet assets are missing: $petsSource"
 }
