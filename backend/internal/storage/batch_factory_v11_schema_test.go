@@ -82,3 +82,20 @@ func TestV11MigrationsSeparateVideoAndVisualPrompts(t *testing.T) {
 		t.Fatalf("prompt separation migration=%+v", statements)
 	}
 }
+
+func TestV11ShuihuoConfigAcceptsVerifiedPublicChecksum(t *testing.T) {
+	migrations := V11Migrations()
+	var migration *Migration
+	for i := range migrations {
+		if migrations[i].Version == 1100023 {
+			migration = &migrations[i]
+			break
+		}
+	}
+	if migration == nil {
+		t.Fatal("shuihuo config migration missing")
+	}
+	if !checksumMatches(*migration, "27ba1a709f19049ce933a5be670e703c6bef140999611daa0757d64952fc5b20", ChecksumFor(*migration)) {
+		t.Fatal("verified public checksum must be accepted")
+	}
+}

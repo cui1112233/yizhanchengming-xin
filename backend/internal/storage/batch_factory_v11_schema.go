@@ -732,7 +732,10 @@ func V11Migrations() []Migration {
 		{Version: 1100020, SQL: V11MergeProgressStatements(), CallbackChecksum: "batch-factory-v11-merge-progress-v1", Adopt: adoptV11MergeProgressLedger},
 		{Version: 1100021, SQL: V11OpeningVariantStatements(), CallbackChecksum: "batch-factory-v11-opening-variant-v1", Adopt: adoptV11OpeningVariantLedger},
 		{Version: 1100022, SQL: V11LocalArtifactPurgeStatements(), CallbackChecksum: "batch-factory-v11-local-artifact-purge-v1"},
-		{Version: 1100023, SQL: V11ShuihuoConfigStatements(), CallbackChecksum: "batch-factory-v11-shuihuo-config-v1"},
+		// The first public Go deployment recorded this additive table migration
+		// with the SQL-era checksum below. Accept that exact ledger value so the
+		// unified Go runtime can start without rerunning the idempotent DDL.
+		{Version: 1100023, SQL: V11ShuihuoConfigStatements(), CallbackChecksum: "batch-factory-v11-shuihuo-config-v1", LegacyChecksums: []string{"27ba1a709f19049ce933a5be670e703c6bef140999611daa0757d64952fc5b20"}},
 		{Version: 1100024, SQL: V11BookAssetDetailsStatements(), CallbackChecksum: "batch-factory-v11-book-asset-details-v1"},
 		{Version: 1100025, SQL: V11MergeAudioStatements(), CallbackChecksum: "batch-factory-v11-merge-audio-v1"},
 	}
