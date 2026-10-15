@@ -101,3 +101,24 @@ func TestGenerateAIRewritesUsesCompactInstructionBlock(t *testing.T) {
 		t.Fatalf("unexpected merged rewrite: %q", got)
 	}
 }
+
+func TestGenerateAIRewritesForVersionsOnlySavesExplicitSelections(t *testing.T) {
+	store := NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-selected", Original: "原文"}); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	document, err := GenerateAIRewritesForVersions(context.Background(), store, "alice", "book-selected", []string{"ai3", "ai3", "original"}, rewriteProviderFunc(func(_ context.Context, _ RewriteRequest) (string, error) {
+		calls++
+		return "ai3改写", nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || document.Versions["ai3"] != "ai3改写" {
+		t.Fatalf("only selected version should be generated: calls=%d versions=%#v", calls, document.Versions)
+	}
+	if _, exists := document.Versions["ai1"]; exists {
+		t.Fatalf("unselected version was generated: %#v", document.Versions)
+	}
+}

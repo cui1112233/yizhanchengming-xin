@@ -157,6 +157,38 @@ func TestNovelFetchProcessStartRunsFetchAndSensitiveAIRepair(t *testing.T) {
 	}
 }
 
+func TestNovelFetchProcessStartGeneratesOnlySelectedAIVersion(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"msg":"ok","data":"原文第一行","bookinfo":{"category":"男频","genre":"都市"}}`))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	calls := 0
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		calls++
+		return "改写后的正文", nil
+	})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
+		"inputText": "12345678901\t测试书", "selected_versions": []string{"original", "ai3"},
+	}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("process start status=%d body=%s", response.Code, response.Body.String())
+	}
+	document, err := store.GetDocument(context.Background(), "tester", "12345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || document.Versions["ai3"] != "改写后的正文" {
+		t.Fatalf("selected AI version was not generated exactly once: calls=%d versions=%#v", calls, document.Versions)
+	}
+	if _, exists := document.Versions["ai1"]; exists {
+		t.Fatalf("unselected AI version was generated: %#v", document.Versions)
+	}
+}
+
 type rewriteProviderFunc func(context.Context, novelfetchworkshop.RewriteRequest) (string, error)
 
 func (f rewriteProviderFunc) Complete(ctx context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {

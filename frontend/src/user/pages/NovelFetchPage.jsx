@@ -2,7 +2,7 @@ import { Alert, Button, Collapse, Drawer, Form, Input, InputNumber, Modal, Selec
 import { Download, Eye, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  checkWebSubmitEnvironment, fetchNovelContent, getWebSubmitConfig, previewWebSubmit,
+  checkWebSubmitEnvironment, getWebSubmitConfig, previewWebSubmit,
   saveWebSubmitConfig, startWebSubmit, syncWebSubmitConfigs, syncWebSubmitStyles
 } from '../../shared/api/novelFetch';
 import {
@@ -10,7 +10,7 @@ import {
   generateWorkshopAi, getWorkshopConfig, getWorkshopKnowledge, getWorkshopKnowledgeSummary,
   getWorkshopTask, listWorkshopTasks, normalizeWorkshopOpening, optimizeWorkshopKnowledge,
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
-  saveWorkshopKnowledge, saveWorkshopOpening, suggestWorkshopRules, testWorkshopAi
+  saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, suggestWorkshopRules, testWorkshopAi
 } from '../../shared/api/novelFetchWorkshop';
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
 import './novel-fetch.css';
@@ -164,17 +164,25 @@ export function LegacyNovelFetchPage() {
   }
   async function handleProcess() {
     const values = await processForm.validateFields();
-    const bookIds = parseIds(values.bookIds);
+    const inputText = String(values.bookIds || '').trim();
+    const bookIds = parseIds(inputText);
     if (!bookIds.length) return message.warning('请填写至少一个书籍 ID');
     setProcessing(true);
     setProcessRows(bookIds.map(bookId => ({ bookId, status: 'loading' })));
     try {
-      const data = await fetchNovelContent({
-        platform: values.platform, bookIds, maxTxt: values.maxTxt,
-        textModel, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled
+      const data = await startWorkshopProcess({
+        inputText,
+        platform_id: String(values.platform),
+        maxTxt: values.maxTxt,
+        text_model_id: textModel,
+        selected_versions: selectedVersions,
+        rewrite_methods: rewriteMethods,
+        sensitive_ai_enabled: sensitiveAiProcessEnabled
       });
-      const results = data.results || [];
-      setProcessRows(results.map(row => ({ ...row, status: row.status === 'ok' ? 'done' : 'failed' })));
+      const results = data.result?.tasks || data.tasks || [];
+      setProcessRows(results.length
+        ? results.map(row => ({ ...row, bookId: row.bookId || row.book_id, status: row.status === 'ok' || row.originalStatus === 'done' ? 'done' : (row.status || 'failed') }))
+        : bookIds.map(bookId => ({ bookId, status: data.status === 'done' ? 'done' : data.status || 'failed', error: data.error || '' })));
       await loadTasks();
     } catch (error) {
       setProcessRows(bookIds.map(bookId => ({ bookId, status: 'failed', error: error.message })));

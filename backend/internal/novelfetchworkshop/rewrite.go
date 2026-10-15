@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -123,8 +124,54 @@ func GenerateAIRewrites(ctx context.Context, store Store, owner, bookID string, 
 	if original == "" {
 		return Document{}, errors.New("请先抓取原文，再生成 AI 改文")
 	}
-	document = normalizeDocument(document)
+	versions := make([]string, 0, count)
 	for index := 1; index <= count; index++ {
+		versions = append(versions, fmt.Sprintf("ai%d", index))
+	}
+	return GenerateAIRewritesForVersions(ctx, store, owner, bookID, versions, provider)
+}
+
+// GenerateAIRewritesForVersions 按调用方明确选择的版本生成改文。
+// 不能用“最大编号”推断数量，否则用户只选 ai3 时会额外生成 ai1、ai2，
+// 任务列表会出现用户没有要求的版本，后续提交也可能误选它们。
+func GenerateAIRewritesForVersions(ctx context.Context, store Store, owner, bookID string, versions []string, provider RewriteProvider) (Document, error) {
+	if provider == nil {
+		return Document{}, errors.New("AI 改文模型未配置")
+	}
+	document, err := store.GetDocument(ctx, owner, bookID)
+	if err != nil {
+		return Document{}, err
+	}
+	original := strings.TrimSpace(document.Original)
+	if original == "" {
+		original = strings.TrimSpace(document.ProcessedText)
+	}
+	if original == "" {
+		return Document{}, errors.New("请先抓取原文，再生成 AI 改文")
+	}
+	document = normalizeDocument(document)
+	seen := map[string]bool{}
+	requested := make([]string, 0, len(versions))
+	for _, versionID := range versions {
+		versionID = strings.ToLower(strings.TrimSpace(versionID))
+		if versionID == "" || versionID == "original" || seen[versionID] {
+			continue
+		}
+		if !strings.HasPrefix(versionID, "ai") {
+			return Document{}, fmt.Errorf("不支持的改文版本：%s", versionID)
+		}
+		index, parseErr := strconv.Atoi(strings.TrimPrefix(versionID, "ai"))
+		if parseErr != nil || index < 1 || index > 20 {
+			return Document{}, fmt.Errorf("不支持的改文版本：%s", versionID)
+		}
+		seen[versionID] = true
+		requested = append(requested, versionID)
+	}
+	if len(requested) == 0 {
+		return document, nil
+	}
+	for _, versionID := range requested {
+		index, _ := strconv.Atoi(strings.TrimPrefix(versionID, "ai"))
 		userPrompt, processCount, targetChars := buildRewritePrompt(document, original, index)
 		request := RewriteRequest{
 			SystemPrompt: "你是短剧小说改文编辑。只处理用户标出的待处理片段，不得扩写、续写或解释；保持人物身份、关键因果、时间顺序和男女频风格不变。只输出改写后的正文。",
@@ -166,8 +213,7 @@ func GenerateAIRewrites(ctx context.Context, store Store, owner, bookID string, 
 			}
 		}
 		result = mergeRewriteBlock(original, result, processCount)
-		document.Versions[fmt.Sprintf("ai%d", index)] = result
-		versionID := fmt.Sprintf("ai%d", index)
+		document.Versions[versionID] = result
 		ref, bodyErr := store.PutBody(ctx, owner, BodyRecord{
 			BookID:  document.BookID,
 			BodyRef: BodyRef{VersionID: versionID, State: "ready"},
@@ -182,7 +228,7 @@ func GenerateAIRewrites(ctx context.Context, store Store, owner, bookID string, 
 		document.BodyRefs[versionID] = ref
 	}
 	document.Meta["aiStatus"] = "done"
-	document.Meta["aiGeneratedCount"] = count
+	document.Meta["aiGeneratedCount"] = len(requested)
 	document.Meta["aiError"] = ""
 	document.Meta["aiUpdatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 	if err := store.PutDocument(ctx, owner, document); err != nil {

@@ -515,13 +515,16 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process/start", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			InputText          string `json:"inputText"`
-			InputTextLegacy    string `json:"input_text"`
-			MaxTxt             int    `json:"maxTxt"`
-			MaxTxtLegacy       int    `json:"max_txt"`
-			PlatformID         string `json:"platform_id"`
-			PlatformIDCamel    string `json:"platformId"`
-			SensitiveAIEnabled bool   `json:"sensitive_ai_enabled"`
+			InputText          string            `json:"inputText"`
+			InputTextLegacy    string            `json:"input_text"`
+			MaxTxt             int               `json:"maxTxt"`
+			MaxTxtLegacy       int               `json:"max_txt"`
+			PlatformID         string            `json:"platform_id"`
+			PlatformIDCamel    string            `json:"platformId"`
+			SensitiveAIEnabled bool              `json:"sensitive_ai_enabled"`
+			SelectedVersions   []string          `json:"selected_versions"`
+			RewriteMethods     map[string]string `json:"rewrite_methods"`
+			TextModelID        string            `json:"text_model_id"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
@@ -564,6 +567,22 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 						job["queue_state"] = "failed"
 						job["error"] = fetchErr.Error()
 						break
+					}
+					selectedAI := selectedNovelFetchAIVersions(input.SelectedVersions)
+					if len(selectedAI) > 0 {
+						provider, providerErr := resolveRewriteProvider(req)
+						if providerErr != nil {
+							job["status"] = "failed"
+							job["queue_state"] = "failed"
+							job["error"] = providerErr.Error()
+							break
+						}
+						if _, rewriteErr := novelfetchworkshop.GenerateAIRewritesForVersions(req.Context(), store, identity.Username, document.BookID, selectedAI, provider); rewriteErr != nil {
+							job["status"] = "failed"
+							job["queue_state"] = "failed"
+							job["error"] = rewriteErr.Error()
+							break
+						}
 					}
 				}
 				if job["status"] == "running" {
@@ -1609,6 +1628,37 @@ func genderNeedsResolution(value string) bool {
 	}
 }
 
+func selectedNovelFetchAIVersions(values []string) []string {
+	selected := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, raw := range values {
+		version := strings.ToLower(strings.TrimSpace(raw))
+		if version == "original" || version == "" || !strings.HasPrefix(version, "ai") {
+			continue
+		}
+		if !novelFetchVersionIDPattern.MatchString(version) || seen[version] {
+			continue
+		}
+		seen[version] = true
+		selected = append(selected, version)
+	}
+	sort.Slice(selected, func(i, j int) bool {
+		left, _ := strconv.Atoi(strings.TrimPrefix(selected[i], "ai"))
+		right, _ := strconv.Atoi(strings.TrimPrefix(selected[j], "ai"))
+		return left < right
+	})
+	return selected
+}
+
+func seenString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 // syncNovelFetchClassificationMetadata keeps the legacy flat metadata view in
 // step with the canonical document fields. The old submit/workbench pages
 // read meta.gender, while the workshop API reads document.gender.
@@ -1835,8 +1885,22 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 		}
 		if state, ok := value.(map[string]any); ok && strings.EqualFold(strings.TrimSpace(fmt.Sprint(state["state"])), "ready") {
 			generated = append(generated, version)
+			continue
+		}
+		// GenerateAIRewrites stores the body text in Versions and the durable
+		// readiness state in BodyRefs. Reading only the old map-shaped state made
+		// completed AI versions disappear from the V78 task table after refresh.
+		if _, ok := document.BodyRefs[version]; ok && strings.EqualFold(strings.TrimSpace(document.BodyRefs[version].State), "ready") {
+			generated = append(generated, version)
 		}
 	}
+	for version, body := range document.BodyRefs {
+		if version == "original" || seenString(generated, version) || !strings.EqualFold(strings.TrimSpace(body.State), "ready") {
+			continue
+		}
+		generated = append(generated, version)
+	}
+	sort.Strings(generated)
 	if len(generated) > 0 {
 		result["ai_files"] = generated
 		result["selected_versions"] = generated
