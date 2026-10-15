@@ -45,6 +45,11 @@ const KNOWLEDGE_TABS = [
   ['high_imitation', '高仿库'], ['opening_phrases', '爆款开头'], ['rewrite_templates', '改文模板'],
   ['layout_rules', '排版规则'], ['symbol_rules', '符号规则'], ['chapter_rules', '章节规则']
 ];
+const KNOWLEDGE_LIBRARY_TYPES = [
+  { value: 'high_imitation', label: '高仿文章库' },
+  { value: 'opening_phrases', label: '爆款开头词库' },
+  { value: 'rewrite_templates', label: '批量改文指令库' }
+];
 
 function initialTab() {
   const tab = new URLSearchParams(window.location.search).get('tab');
@@ -182,6 +187,59 @@ function TaskDetailDrawer({ taskDetail, onClose, onSaved }) {
   </Drawer>;
 }
 
+function KnowledgeLibraryManager({
+  kind, onKindChange, items, loading, search, onSearchChange, selectedId, onSelect,
+  draft, onDraftChange, onAdd, onDuplicate, onDelete, onNormalize, onSave, onOptimize,
+  improveGoal, onImproveGoalChange
+}) {
+  const filtered = (items || []).filter(item => {
+    const query = String(search || '').trim().toLowerCase();
+    if (!query) return true;
+    return `${item.name || item.title || ''} ${item.category || item.style || ''} ${Array.isArray(item.tags) ? item.tags.join(' ') : item.tags || ''}`.toLowerCase().includes(query);
+  });
+  const setField = (field, value) => onDraftChange({ ...(draft || {}), [field]: value });
+  const listLabel = item => `${item.name || item.title || item.id || '未命名'} / ${item.style || item.category || '自动风格'}`;
+  const textList = value => Array.isArray(value) ? value.join('、') : String(value || '');
+  return <div className="novel-fetch-knowledge-layout">
+    <div className="novel-fetch-panel novel-fetch-knowledge-library">
+      <Typography.Title level={5}>资料列表</Typography.Title>
+      <div className="novel-fetch-knowledge-controls">
+        <label>资料库<Select value={kind} onChange={onKindChange} options={KNOWLEDGE_LIBRARY_TYPES} /></label>
+        <label>搜索<Input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="按名称、分类、标签查找" /></label>
+      </div>
+      <Select className="novel-fetch-knowledge-list" value={selectedId || undefined} onChange={onSelect} loading={loading} placeholder="暂无条目" options={filtered.map((item, index) => ({ value: String(item.id || index), label: listLabel(item) }))} />
+      <Space wrap>
+        <Button onClick={onAdd}>新增条目</Button>
+        <Button disabled={!selectedId} onClick={onDuplicate}>复制条目</Button>
+        <Button danger disabled={!selectedId} onClick={onDelete}>删除条目</Button>
+      </Space>
+      {kind === 'opening_phrases' ? <Button style={{ marginTop: 8 }} onClick={onNormalize}>矫正旧开头词库</Button> : null}
+    </div>
+    <div className="novel-fetch-panel novel-fetch-knowledge-editor">
+      <Typography.Title level={5}>条目编辑</Typography.Title>
+      {!draft ? <Typography.Text type="secondary">没有找到条目，可以新增一个。</Typography.Text> : <>
+        {kind === 'high_imitation' ? <Alert type="info" showIcon message="高仿文章库是单独一套改文方法，只给“高仿文章”方案调用。" /> : null}
+        {kind === 'opening_phrases' ? <Alert type="info" showIcon message="爆款开头词库会配合“批量改文指令库”使用，不单独替代整套改文指令。" /> : null}
+        <div className="novel-fetch-knowledge-fields">
+          <label>{kind === 'rewrite_templates' ? '模板ID' : '条目ID'}<Input value={draft.id || ''} onChange={event => setField('id', event.target.value)} /></label>
+          <label>{kind === 'rewrite_templates' ? '模板名称' : '名称'}<Input value={draft.name || draft.title || ''} onChange={event => setField(draft.name !== undefined ? 'name' : 'title', event.target.value)} /></label>
+          {kind !== 'rewrite_templates' ? <label>风格类型<Input value={draft.style || ''} onChange={event => setField('style', event.target.value)} /></label> : null}
+          {kind === 'high_imitation' ? <label>男女频<Input value={draft.gender || ''} onChange={event => setField('gender', event.target.value)} /></label> : null}
+          {kind === 'opening_phrases' ? <label>绑定指令模板 ID<Input value={textList(draft.linked_template_ids)} onChange={event => setField('linked_template_ids', event.target.value.split(/[、,，\s]+/).filter(Boolean))} /></label> : null}
+          {kind === 'rewrite_templates' ? <label>返回方式<Select value={draft.response_mode || 'changed_lines_json'} onChange={value => setField('response_mode', value)} options={[{ value: 'changed_lines_json', label: '只返回改写块 JSON' }, { value: 'plain', label: '直接返回正文' }]} /></label> : null}
+          <label>标签<Input value={textList(draft.tags)} onChange={event => setField('tags', event.target.value.split(/[、,，\s]+/).filter(Boolean))} /></label>
+        </div>
+        <label>启用<input type="checkbox" checked={draft.enabled !== false} onChange={event => setField('enabled', event.target.checked)} /></label>
+        {kind === 'high_imitation' ? <><label>高仿参考正文<Input.TextArea rows={7} value={draft.reference_text || ''} onChange={event => setField('reference_text', event.target.value)} /></label><label>拆解备注<Input.TextArea rows={4} value={draft.analysis || ''} onChange={event => setField('analysis', event.target.value)} /></label></> : null}
+        {kind === 'opening_phrases' ? <><label>开头词骨架<Input.TextArea rows={7} value={draft.content || ''} onChange={event => setField('content', event.target.value)} /></label><label>拆解说明<Input.TextArea rows={4} value={draft.analysis || ''} onChange={event => setField('analysis', event.target.value)} /></label><label>槽位 / 适配提示<Input.TextArea rows={3} value={draft.slot_hint || ''} onChange={event => setField('slot_hint', event.target.value)} /></label></> : null}
+        {kind === 'rewrite_templates' ? <><label>系统提示词<Input.TextArea rows={7} value={draft.system_prompt || ''} onChange={event => setField('system_prompt', event.target.value)} /></label><label>用户提示词模板<Input.TextArea rows={7} value={draft.user_prompt_template || ''} onChange={event => setField('user_prompt_template', event.target.value)} /></label><label>可用变量<Input value={textList(draft.required_variables)} onChange={event => setField('required_variables', event.target.value.split(/[、,，\s]+/).filter(Boolean))} /></label></> : null}
+        <label>AI优化要求<Input.TextArea rows={3} value={improveGoal} onChange={event => onImproveGoalChange(event.target.value)} placeholder="例如：让用户提示词更适合短视频小说开头改文，保留变量，不要让 AI 只返回一小段" /></label>
+        <Space><Button type="primary" onClick={onSave}>保存当前条目</Button><Button onClick={onOptimize}>AI帮我优化</Button></Space>
+      </>}
+    </div>
+  </div>;
+}
+
 export function NovelFetchPage() {
   return <LegacyNovelFetchPage />;
 }
@@ -220,6 +278,9 @@ export function LegacyNovelFetchPage() {
   const [knowledgeModal, setKnowledgeModal] = useState(false);
   const [knowledgeSearch, setKnowledgeSearch] = useState('');
   const [knowledgeDetails, setKnowledgeDetails] = useState('{}');
+  const [knowledgeSelectedId, setKnowledgeSelectedId] = useState('');
+  const [knowledgeDraft, setKnowledgeDraft] = useState(null);
+  const [knowledgeImproveGoal, setKnowledgeImproveGoal] = useState('');
   const [openingText, setOpeningText] = useState('');
   const [openingItems, setOpeningItems] = useState([]);
   const [configLoading, setConfigLoading] = useState(false);
@@ -300,7 +361,10 @@ export function LegacyNovelFetchPage() {
     setKnowledgeLoading(true);
     try {
       const [items, summary] = await Promise.all([getWorkshopKnowledge(knowledgeKind), getWorkshopKnowledgeSummary()]);
-      setKnowledge(items || { items: [] });
+      const loaded = items || { items: [] };
+      setKnowledge(loaded);
+      const loadedItems = Array.isArray(loaded.items) ? loaded.items : [];
+      setKnowledgeSelectedId(current => loadedItems.some(item => String(item.id) === String(current)) ? current : String(loadedItems[0]?.id || ''));
       setKnowledgeSummary(summary?.summary || summary || {});
     } catch (error) { message.error(error.message || '读取知识库失败'); } finally { setKnowledgeLoading(false); }
   }
@@ -383,6 +447,11 @@ export function LegacyNovelFetchPage() {
     if (activeTab === 'submit') loadWebSubmit();
     if (activeTab === 'rules') loadRuleConfig();
   }, [activeTab, knowledgeKind, ruleKind]);
+
+  useEffect(() => {
+    const item = (knowledge.items || []).find(entry => String(entry.id) === String(knowledgeSelectedId));
+    setKnowledgeDraft(item ? { ...item } : null);
+  }, [knowledge.items, knowledgeSelectedId]);
 
   function changeTab(tab) {
     setActiveTab(tab);
@@ -518,6 +587,43 @@ export function LegacyNovelFetchPage() {
       await loadKnowledge();
       message.success('知识条目已保存');
     } catch (error) { message.error(error.message || '保存知识条目失败'); }
+  }
+  async function addKnowledgeLibraryItem() {
+    const defaults = knowledgeKind === 'high_imitation'
+      ? { id: `mimic_${Date.now()}`, name: '新的高仿参考', gender: '', style: '', tags: [], reference_text: '', analysis: '', enabled: true }
+      : knowledgeKind === 'opening_phrases'
+        ? { id: `opening_${Date.now()}`, name: '新的开头词', style: '', content: '', analysis: '', slot_hint: '', tags: [], enabled: true, linked_template_ids: [] }
+        : { id: `rewrite_${Date.now()}`, name: '新的改文指令', system_prompt: '', user_prompt_template: '', required_variables: [], response_mode: 'changed_lines_json', enabled: true };
+    try {
+      const result = await saveWorkshopKnowledge(knowledgeKind, defaults);
+      await loadKnowledge();
+      setKnowledgeSelectedId(String(result?.item?.id || defaults.id));
+      message.success('已新增条目');
+    } catch (error) { message.error(error.message || '新增条目失败'); }
+  }
+  async function duplicateKnowledgeLibraryItem() {
+    if (!knowledgeDraft) return;
+    try {
+      const copy = { ...knowledgeDraft, id: `${knowledgeDraft.id || 'copy'}_${Date.now()}`, name: `${knowledgeDraft.name || knowledgeDraft.title || '复制条目'} 副本` };
+      const result = await saveWorkshopKnowledge(knowledgeKind, copy);
+      await loadKnowledge();
+      setKnowledgeSelectedId(String(result?.item?.id || copy.id));
+      message.success('已复制条目');
+    } catch (error) { message.error(error.message || '复制条目失败'); }
+  }
+  async function deleteKnowledgeLibraryItem() {
+    if (!knowledgeDraft?.id) return;
+    Modal.confirm({ title: '确认删除当前知识库条目？', onOk: async () => {
+      try { await deleteWorkshopKnowledge(knowledgeKind, knowledgeDraft.id); await loadKnowledge(); message.success('已删除条目'); } catch (error) { message.error(error.message || '删除条目失败'); }
+    } });
+  }
+  async function saveKnowledgeLibraryItem() {
+    if (!knowledgeDraft) return;
+    try { await saveWorkshopKnowledge(knowledgeKind, knowledgeDraft); await loadKnowledge(); message.success('条目已保存'); } catch (error) { message.error(error.message || '保存条目失败'); }
+  }
+  async function optimizeKnowledgeLibraryItem() {
+    if (!knowledgeDraft?.id) return;
+    try { await optimizeWorkshopKnowledge(knowledgeKind, knowledgeDraft.id); await loadKnowledge(); message.success('AI 优化已完成'); } catch (error) { message.error(error.message || 'AI 优化失败'); }
   }
   async function saveKnowledgeUsagePrompt() {
     try {
@@ -668,6 +774,11 @@ export function LegacyNovelFetchPage() {
     chapter_rules: (knowledgeSummary.chapter_exact_rules || 0) + (knowledgeSummary.chapter_inline_rules || 0)
   }[key] || 0);
 
+  const knowledgePanel = <Space direction="vertical" size={12} style={{ width: '100%' }}>
+    <div className="novel-fetch-panel"><Typography.Title level={5}>知识库使用提示词</Typography.Title><Input.TextArea rows={4} value={knowledgeUsagePrompt} onChange={event => setKnowledgeUsagePrompt(event.target.value)} placeholder="告诉 AI 如何参考知识库，且不得照搬示例内容" /><Button type="primary" style={{ marginTop: 8 }} onClick={saveKnowledgeUsagePrompt}>保存知识库配置</Button></div>
+    <div className="novel-fetch-panel"><Typography.Title level={5}>三大知识库</Typography.Title><Typography.Text type="secondary">资料库只供 AI 自动取用，任务处理仍然全自动</Typography.Text><div className="novel-fetch-knowledge-summary">{[['开头词', knowledgeSummary.opening_phrases], ['改文模板', knowledgeSummary.rewrite_profiles], ['临时指令', knowledgeSummary.temporary_instructions], ['高仿提示词', knowledgeSummary.high_imitation_prompts], ['高仿参考', knowledgeSummary.high_imitation_references], ['敏感词', knowledgeSummary.sensitive_rules], ['字位符号', knowledgeSummary.symbol_rules], ['成对补符号', knowledgeSummary.pair_fill_rules], ['章节整行', knowledgeSummary.chapter_exact_rules], ['章节开头', knowledgeSummary.chapter_inline_rules]].map(([label, count]) => <Tag key={label}>{label} {Number(count || 0)}</Tag>)}</div></div>
+    <KnowledgeLibraryManager kind={knowledgeKind} onKindChange={value => { setKnowledgeKind(value); setKnowledgeSelectedId(''); }} items={knowledge.items || []} loading={knowledgeLoading} search={knowledgeSearch} onSearchChange={setKnowledgeSearch} selectedId={knowledgeSelectedId} onSelect={setKnowledgeSelectedId} draft={knowledgeDraft} onDraftChange={setKnowledgeDraft} onAdd={addKnowledgeLibraryItem} onDuplicate={duplicateKnowledgeLibraryItem} onDelete={deleteKnowledgeLibraryItem} onNormalize={() => normalizeWorkshopOpening().then(loadKnowledge)} onSave={saveKnowledgeLibraryItem} onOptimize={optimizeKnowledgeLibraryItem} improveGoal={knowledgeImproveGoal} onImproveGoalChange={setKnowledgeImproveGoal} />
+  </Space>;
   const panels = {
     process: <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <div className="novel-fetch-process-grid">
@@ -747,6 +858,10 @@ export function LegacyNovelFetchPage() {
     submit: <Space direction="vertical" size={12} style={{ width: '100%' }}><div className="novel-fetch-panel"><Typography.Title level={5}>网站提交</Typography.Title><Alert type="info" showIcon message="仅在确认“开始自动提交”后执行外部提交。小说获取和批量工厂共用同一份视频管理系统登录会话。" /><Space wrap style={{ marginTop: 12 }}><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(checkWebSubmitEnvironment, '环境检测完成')}>环境检测</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitConfigs, '同步网站配置完成')}>同步网站配置</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitStyles, '同步网站风格完成')}>同步网站风格</Button><Button disabled={!selectedTaskKeys.length} loading={webSubmitLoading} onClick={async () => { const result = await handleWebSubmit(() => previewWebSubmit({ taskIds: selectedTaskKeys }), '提交预览已生成'); if (result) setWebSubmitPlan(result.plan); }}>提交预览</Button><Button type="primary" disabled={!selectedTaskKeys.length} loading={webSubmitLoading} onClick={() => Modal.confirm({ title: '确认开始自动提交', onOk: async () => { const result = await handleWebSubmit(() => startWebSubmit({ taskIds: selectedTaskKeys }), '自动提交完成'); if (result) { setWebSubmitResults(result.results || []); setWebSubmitHistory(current => [...(result.results || []), ...current]); } } })}>开始自动提交</Button></Space><div className="novel-fetch-submit-settings"><Form layout="inline"><Form.Item label="组织归属"><Select style={{ width: 220 }} value={webSubmitConfig?.organization || undefined} placeholder="跟随网站配置档" options={(webSubmitConfig?.organization_catalog || []).map(item => ({ value: String(item.id || item.value), label: item.name || item.label || item.id }))} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), organization: value }))} /></Form.Item><Form.Item label="最少字数"><InputNumber min={0} value={webSubmitConfig?.min_text_chars ?? 0} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), min_text_chars: value || 0 }))} /></Form.Item><Form.Item label="失败重试"><InputNumber min={0} max={10} value={webSubmitConfig?.retry_times ?? 1} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), retry_times: value || 0 }))} /></Form.Item><Button onClick={() => handleWebSubmit(() => saveWebSubmitConfig(webSubmitConfig), '提交配置已保存')}>保存提交配置</Button></Form></div><Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>已选任务：{selectedTaskKeys.length}；配置版本：{(webSubmitConfig?.submit_versions || webSubmitConfig?.submitVersions || []).join('、') || '默认'}；可用组织：{webSubmitConfig?.organization_catalog?.length || 0}</Typography.Paragraph>{webSubmitPlan ? <Alert type="success" message="提交预览已生成" description={`提交组：${webSubmitPlan.groups?.length || 0}，跳过：${webSubmitPlan.skipped?.length || 0}`} /> : null}</div><Table className="novel-fetch-panel" rowKey={row => `${row.bookId}-${row.version}`} dataSource={webSubmitResults} locale={{ emptyText: '暂无本次提交结果' }} columns={[{ title: '任务', dataIndex: 'bookId' }, { title: '版本', dataIndex: 'version' }, { title: '状态', dataIndex: 'status' }, { title: '失败重试', render: (_, row) => row.status === 'error' ? <Button size="small" onClick={() => startWebSubmit({ taskIds: [row.bookId], versions: [row.version] })}>失败重试</Button> : '-' }]} /><div className="novel-fetch-panel"><Typography.Title level={5}>提交历史</Typography.Title><Button size="small" loading={webSubmitLoading} onClick={loadWebSubmit}>刷新历史</Button><Table size="small" rowKey={(row, index) => `${row.book_id || row.bookId}-${row.version}-${index}`} dataSource={webSubmitHistory} pagination={{ pageSize: 10 }} columns={[{ title: '书名', dataIndex: 'book_name' }, { title: '版本', dataIndex: 'version' }, { title: '状态', dataIndex: 'status' }, { title: '结果', dataIndex: 'result' }, { title: '时间', dataIndex: 'time' }]} /></div></Space>,
     logs: <div className="novel-fetch-panel"><Typography.Title level={5}>操作日志</Typography.Title><Select value={selectedTask || undefined} style={{ width: 320, marginBottom: 12 }} placeholder="选择任务查看日志" options={tasks.map(task => ({ value: task.bookId, label: task.bookName || task.bookId }))} onChange={selectTask} />{selectedTaskData ? <Collapse items={(selectedTaskData.logs || []).map((log, index) => ({ key: String(index), label: `${log.time || ''} ${log.event || '操作日志'}`, children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{log.detail || JSON.stringify(log)}</Typography.Paragraph> }))} /> : <Table size="small" pagination={{ pageSize: 20 }} rowKey={(row, index) => row.id || index} dataSource={globalLogs} locale={{ emptyText: '暂无操作记录' }} columns={[{ title: '时间', dataIndex: 'time', render: (value, row) => value || row.createdAt || row.created_at }, { title: '事件', dataIndex: 'event' }, { title: '详情', render: (_, row) => String(row.detail || row.message || '').slice(0, 120) }]} />}</div>
   };
+
+  // 公网 V78 的知识库页不是单纯的表格：左侧负责库类型/条目操作，右侧负责编辑当前条目。
+  // 覆盖旧兼容面板，避免两个入口继续产生不同的数据行为。
+  panels.knowledge = knowledgePanel;
 
   return <Space className="novel-fetch-page novel-fetch-workbench" direction="vertical" size={0} style={{ width: '100%' }}><div className="novel-fetch-public-title"><Typography.Title level={3} style={{ margin: 0 }}>批量原文改文系统 <span className="novel-fetch-version-badge">V78</span></Typography.Title></div><Tabs className="novel-fetch-panel" activeKey={activeTab} onChange={changeTab} items={TABS.map(item => ({ ...item, children: panels[item.key] }))} /><TaskDetailDrawer taskDetail={taskDetail} onClose={() => setTaskDetail(null)} onSaved={loadTasks} /></Space>;
 }
