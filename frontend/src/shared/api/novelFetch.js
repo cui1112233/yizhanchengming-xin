@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest } from './client.js';
 
 export function fetchNovelContent({ platform, bookIds, maxTxt, textModel, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled }) {
   return apiRequest('/api/novel-fetch', {
@@ -48,8 +48,12 @@ export function uploadBatch(payload) {
 
 const WEB_SUBMIT_API = '/api/novel-fetch-workshop/web-submit';
 export function getWebSubmitConfig() { return apiRequest(`${WEB_SUBMIT_API}/config`); }
-export function saveWebSubmitConfig(payload) { return apiRequest(`${WEB_SUBMIT_API}/config`, { method: 'POST', body: JSON.stringify(payload) }); }
+export function saveWebSubmitConfig(payload) {
+  const settings = payload?.settings && typeof payload.settings === 'object' ? payload.settings : payload;
+  return apiRequest(`${WEB_SUBMIT_API}/config`, { method: 'POST', body: JSON.stringify({ settings }) });
+}
 export function checkWebSubmitEnvironment() { return apiRequest(`${WEB_SUBMIT_API}/environment`); }
+export function getWebSubmitHistory() { return apiRequest(`${WEB_SUBMIT_API}/history`); }
 export function syncWebSubmitConfigs(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-configs`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function syncWebSubmitStyles(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-styles`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function testWebSubmitVisible(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/test-visible`, { method: 'POST', body: JSON.stringify(payload) }); }
