@@ -172,24 +172,26 @@ wait_for_go_api
 # 继续转发到已退出的旧 IP 并表现为 502；这不改变任何业务数据或依赖容器。
 docker compose -f "$BASE_COMPOSE" restart nginx
 
-# 5) 健康检查：build-info 必须回报本次 SHA（最多等 90 秒）。
+# 5) 健康检查：Go 的公开运行态接口必须回报本次 SHA（最多等 90 秒）。
+# /api/build-info 属于兼容诊断接口，需要登录；切换验收必须使用不需要
+# 登录的 /api/runtime-build-info，避免把登录状态误判成部署失败。
 ok=0
 for _ in $(seq 1 30); do
-  got="$(curl -fsS --max-time 5 http://127.0.0.1:3000/api/build-info 2>/dev/null \
+  got="$(curl -fsS --max-time 5 http://127.0.0.1:3000/api/runtime-build-info 2>/dev/null \
     | python3 -c 'import json,sys;print(json.load(sys.stdin).get("git_sha",""))' 2>/dev/null || true)"
   if [ "$got" = "$SHA" ]; then ok=1; break; fi
   sleep 3
 done
 if [ "$ok" != 1 ]; then
-  echo "STATUS=FAILED build-info did not converge to $SHA" >&2
+  echo "STATUS=FAILED runtime-build-info did not converge to $SHA" >&2
   exit 7
 fi
 
 # 6) 外网再验一次，防止只在内网通。
-ext="$(curl -fsS --max-time 8 "http://115.190.156.223:3000/api/build-info" 2>/dev/null \
+ext="$(curl -fsS --max-time 8 "http://115.190.156.223:3000/api/runtime-build-info" 2>/dev/null \
   | python3 -c 'import json,sys;print(json.load(sys.stdin).get("git_sha",""))' 2>/dev/null || true)"
 if [ "$ext" != "$SHA" ]; then
-  echo "STATUS=FAILED external build-info mismatch: $ext != $SHA" >&2
+  echo "STATUS=FAILED external runtime-build-info mismatch: $ext != $SHA" >&2
   exit 8
 fi
 
