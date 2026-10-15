@@ -78,7 +78,7 @@ The V88 consolidation line includes the actively maintained website/application 
 - Script / storyboard / constraint / prompt-pipeline work;
 - Node-to-Go bridge runtime;
 - local executor server integration;
-- maintained desktop local executor source under `local-executor/`;
+- maintained desktop local executor source under `executors/local-executor/`;
 - Windows local executor build/update pipeline;
 - account/member/team and other website functionality inherited and consolidated into the V88 source line;
 - current regression and deployment contracts required to keep these functions stable.

@@ -6,10 +6,5 @@
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
     "frontend:preview": "npm --prefix frontend run preview"
-  },
-  "devDependencies": {
-    "express": "^5.2.1",
-    "@volcengine/tos-sdk": "^2.9.1",
-    "https-proxy-agent": "^7.0.6"
   }
 }

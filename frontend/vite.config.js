@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { normalizeGiantMaterialId, normalizeGiantMaterialResponse } from './src/user/pages/giantMaterialTest.js';
-import { extractScrollText, validateMaterial } from '../lib/giant-material/scroll-extractor.mjs';
+import { extractScrollText, validateMaterial } from './tools/giant-material/scroll-extractor.mjs';
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const GIANT_MATERIAL_SELECT_URL = 'https://n8.hnqingyuwen.top/center-api/material/video/select';
@@ -164,6 +164,8 @@ export default defineConfig({
   plugins: [react(), adminRouteEntry, giantMaterialTestApi],
   assetsInclude: ['**/*.glb'],
   build: {
+    // 保留本地 downloads 目录，避免 Vite 清空输出目录时触发 Windows 文件系统崩溃。
+    emptyOutDir: false,
     rollupOptions: {
       input: {
         user: resolve(rootDir, 'index.html'),
