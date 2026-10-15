@@ -186,6 +186,10 @@ export function LegacyNovelFetchPage() {
     setProcessing(true);
     setProcessRows(bookIds.map(bookId => ({ bookId, status: 'loading' })));
     try {
+      // The Go provider resolver reads the account's selected model. Persist the
+      // visible choice before starting so a local draft cannot silently use a
+      // different enabled model.
+      if (textModel) await saveWorkshopConfig({ text_model_id: textModel });
       const data = await startWorkshopProcess({
         inputText,
         platform_id: String(values.platform),
