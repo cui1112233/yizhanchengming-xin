@@ -34,7 +34,10 @@ Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -For
 # Keep the recovered public V78 Novel Fetch baseline available inside the Go
 # embed bundle while the React replacement is brought to feature parity. It is
 # an isolated static reference page, not a Node service dependency.
-Copy-Item -Path $legacyNovelFetchSource -Destination $legacyNovelFetchDist -Recurse -Force
+# Copy the workbench contents into the embedded route directory. Copying the
+# directory itself creates a nested `batch-rewrite/batch-rewrite` tree, which
+# leaves Go serving an older outer index and makes UI fixes appear to vanish.
+Copy-Item -Path (Join-Path $legacyNovelFetchSource '*') -Destination $legacyNovelFetchDist -Recurse -Force
 
 # The liquid-metal brand component reads these stable, non-hashed images from
 # /assets. Keep them beside the hashed Vite assets in the embedded Go bundle.
