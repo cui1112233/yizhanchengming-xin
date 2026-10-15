@@ -2,6 +2,7 @@
 
 ## GitHub Actions 与编译禁用规则
 
+- **源码优先，禁止编译产物覆盖源码或页面**：不得直接把 `frontend/dist`、`frontend/public`、服务器现有静态文件或其他编译产物复制回来，作为页面实现或修复方式。必须先修改可维护的 React/前端源码，经过本地构建验证后，再由 Go 发布新的构建结果。
 - 禁止创建、恢复或提交 `.github/workflows/` 目录及其中的任何 workflow 文件。
 - 禁止通过 GitHub Actions 编译、打包、构建、发布或部署本项目。
 - 不得新增 workflow 配置、Actions job、CI 编译脚本或以 GitHub Actions 为前提的发布流程。

@@ -12,6 +12,7 @@ All agents, chats, Codex sessions, and automation working on this repository mus
 8. **User-visible `121` naming must be `视频管理系统`.** Internal compatibility names may retain `121`.
 9. **Novel Fetch confirmed semantics must not regress:** preserve full `originalRaw`; process only up to `maxTxt`; display processed/raw counts such as `4000/27831`; `input_ready` displays `分类信息已就绪`; `running/processing` displays `正在执行中…`; date filters must use real task dates and must not be bypassed with fake dates such as `2099-12-31`.
 10. If the user says only **“执行”** or **“发布”**, default to the latest Git `v88`, ensure the change is committed to Git first, and use the currently approved deployment path. Do not silently choose direct production edits or a full Docker rebuild.
+10a. **源码优先，禁止编译产物覆盖源码或页面。** Never copy `frontend/dist`, `frontend/public`, server static files, or any other compiled artifact back as the implementation of a page or feature. Maintain the React/source implementation first, run a local build and verification, then publish the newly built result through Go.
 
 ## V88 consolidation freeze
 
