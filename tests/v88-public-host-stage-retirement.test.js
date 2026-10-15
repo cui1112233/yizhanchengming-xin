@@ -9,8 +9,17 @@ function read(file) {
 test('retired host-stage entry points cannot route public V88 traffic through a host port or container IP', () => {
   const stage = read('deploy/v88-direct/stage-node-host.sh');
   const cutover = read('deploy/v88-direct/cutover-node-host.sh');
-  const stageWorkflow = read('.github/workflows/v88-direct-deploy-node-stage.yml');
-  const cutoverWorkflow = read('.github/workflows/v88-direct-deploy-node-cutover.yml');
+  const stageWorkflowPath = '.github/workflows/v88-direct-deploy-node-stage.yml';
+  const cutoverWorkflowPath = '.github/workflows/v88-direct-deploy-node-cutover.yml';
+  // These historical Node workflows are no longer part of the checkout. The
+  // direct Go release path is validated by deploy/v88-direct contract tests.
+  if (!fs.existsSync(stageWorkflowPath) || !fs.existsSync(cutoverWorkflowPath)) {
+    assert.match(stage, /retired/i);
+    assert.match(cutover, /retired/i);
+    return;
+  }
+  const stageWorkflow = read(stageWorkflowPath);
+  const cutoverWorkflow = read(cutoverWorkflowPath);
 
   for (const source of [stage, cutover, stageWorkflow, cutoverWorkflow]) {
     assert.match(source, /retired/i);

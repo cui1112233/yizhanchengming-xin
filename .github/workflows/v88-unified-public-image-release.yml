@@ -1,74 +1,9 @@
-name: V88 Unified Public Go Image Release
+# RETIRED: application releases use deploy/v88-direct/*.ps1 and *.sh.
+# Kept as a read-only consolidation marker until the repository stage-7
+# cleanup permits removing historical workflow files.
+name: V88 Go direct deployment (retired workflow marker)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [v88]
-    paths:
-      - 'deploy/v88-public/UNIFIED-DEPLOY-REQUEST'
-      - 'Dockerfile'
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/v88-unified-public-image-release.yml'
 
-permissions:
-  contents: read
-  packages: write
-
-concurrency:
-  group: v88-public-go-release
-  cancel-in-progress: false
-
-jobs:
-  release:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build the frontend assets embedded by Go
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.19.0'
-
-      - name: Build frontend bundle
-        run: |
-          set -Eeuo pipefail
-          npm --prefix frontend ci
-          npm --prefix frontend run build
-          mkdir -p backend/web/dist
-          # Keep the Go-embedded public workbenches and stable brand assets;
-          # only the Vite-produced application bundle is replaced here.
-          cp -a frontend/dist/. backend/web/dist/
-
-      - name: Verify Go-only release contracts
-        run: node --test tests/v88-public-unified-topology.test.js tests/v88-public-release-identity.test.js
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build and publish immutable V88 Go image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/qiantie-v88-go:${{ github.sha }}
-          build-args: |
-            QIANTIE_RELEASE_SHA=${{ github.sha }}
-          cache-from: type=gha,scope=v88-go
-          cache-to: type=gha,mode=max,scope=v88-go
-
-      - name: Report immutable Go release identity
-        run: |
-          {
-            echo "release_sha=${{ github.sha }}"
-            echo "go=ghcr.io/${{ github.repository_owner }}/qiantie-v88-go:${{ github.sha }}"
-            echo "runtime=go-api (frontend embedded in /qiantie)"
-            echo "node=retired from the public image path"
-          } >> "$GITHUB_STEP_SUMMARY"
+jobs: {}
