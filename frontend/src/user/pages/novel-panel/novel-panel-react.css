@@ -1,0 +1,40 @@
+.novel-panel-react {
+  min-height: 100%;
+  padding: 28px;
+  color: var(--text-primary, #e5edf7);
+  background: var(--surface-page, #0b1220);
+}
+
+.novel-panel-react__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1180px;
+  margin: 0 auto 24px;
+}
+
+.novel-panel-react__eyebrow {
+  margin: 0 0 6px;
+  color: #7dd3fc;
+  font-size: 13px;
+}
+
+.novel-panel-react h1,
+.novel-panel-react h2,
+.novel-panel-react p { margin-top: 0; }
+
+.novel-panel-react__empty {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .72);
+}
+
+.novel-panel-react__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
