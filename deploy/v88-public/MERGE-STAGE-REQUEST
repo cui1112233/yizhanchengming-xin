@@ -1,3 +1,0 @@
-request=bf11-merge-public-stage
-requested_at=2026-09-09T19:27:00+08:00
-purpose=retry stage merge redis and merge worker only after SSH host-key retry fix; keep public slice unchanged

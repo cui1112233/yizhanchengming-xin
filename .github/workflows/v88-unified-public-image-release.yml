@@ -1,9 +1,0 @@
-# RETIRED: application releases use deploy/v88-direct/*.ps1 and *.sh.
-# Kept as a read-only consolidation marker until the repository stage-7
-# cleanup permits removing historical workflow files.
-name: V88 Go direct deployment (retired workflow marker)
-
-on:
-  workflow_dispatch:
-
-jobs: {}

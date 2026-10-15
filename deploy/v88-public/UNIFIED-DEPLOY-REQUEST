@@ -1,3 +1,0 @@
-release_sha=46763e88e1a8b6f172fe78fa17b6ebf3cba021cc
-scope=deploy: batch upload queue recovery and slow-provider isolation
-requested_at=2026-10-03T09:36:00+08:00
