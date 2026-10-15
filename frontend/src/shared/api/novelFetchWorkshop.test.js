@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getWorkshopLogs, listWorkshopSchedules, saveWorkshopSchedule, deleteWorkshopSchedule, workshopPlatformsPath, previewWorkshopProcess, getWorkshopCurrentBatch, getWorkshopBatches, rerunWorkshopBatch, stopWorkshopTasks } from './novelFetchWorkshop.js';
+import { getWorkshopLogs, listWorkshopSchedules, saveWorkshopSchedule, deleteWorkshopSchedule, workshopPlatformsPath, previewWorkshopProcess, getWorkshopCurrentBatch, getWorkshopBatches, rerunWorkshopBatch, stopWorkshopTasks, saveWorkshopBody } from './novelFetchWorkshop.js';
 import { getWebSubmitHistory, saveWebSubmitConfig } from './novelFetch.js';
 
 test('Novel Fetch platform reader uses the dedicated platform endpoint', () => {
@@ -25,4 +25,8 @@ test('Novel Fetch V78 workflow exposes preview, batch history, rerun and stop en
   assert.equal(typeof getWorkshopBatches, 'function');
   assert.equal(typeof rerunWorkshopBatch, 'function');
   assert.equal(typeof stopWorkshopTasks, 'function');
+});
+
+test('Novel Fetch task detail can save edited source through the Go body endpoint', () => {
+  assert.equal(typeof saveWorkshopBody, 'function');
 });

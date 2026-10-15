@@ -50,8 +50,8 @@ func TestStaticHandlerRejectsNilFilesystem(t *testing.T) {
 
 func TestStaticHandlerServesAdminShell(t *testing.T) {
 	assets := fstest.MapFS{
-		"index.html":                       &fstest.MapFile{Data: []byte("<html>shell</html>")},
-		"admin.html":                       &fstest.MapFile{Data: []byte("<html>admin</html>")},
+		"index.html": &fstest.MapFile{Data: []byte("<html>shell</html>")},
+		"admin.html": &fstest.MapFile{Data: []byte("<html>admin</html>")},
 	}
 	handler := StaticHandler(assets)
 	for _, tc := range []struct {
@@ -70,32 +70,21 @@ func TestStaticHandlerServesAdminShell(t *testing.T) {
 	}
 }
 
-func TestStaticHandlerServesNovelFetchWorkbench(t *testing.T) {
+func TestStaticHandlerServesReactNovelFetchOnly(t *testing.T) {
 	assets := fstest.MapFS{
-		"index.html":                   &fstest.MapFile{Data: []byte("<html>shell</html>")},
-		"batch-rewrite/index.html":    &fstest.MapFile{Data: []byte("<html>novel-fetch-v78</html><link rel=\"stylesheet\" href=\"/batch-rewrite/styles.css\">")},
+		"index.html": &fstest.MapFile{Data: []byte("<html>react-shell</html>")},
+	}
+	for _, route := range []string{"/novel-fetch", "/novel-fetch-react"} {
+		res := httptest.NewRecorder()
+		StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, route, nil))
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "react-shell") {
+			t.Fatalf("react novel-fetch route %s status = %d body %q", route, res.Code, res.Body.String())
+		}
 	}
 	res := httptest.NewRecorder()
 	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/batch-rewrite/v2", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") {
-		t.Fatalf("embedded novel-fetch workbench status = %d body %q", res.Code, res.Body.String())
-	}
-	res = httptest.NewRecorder()
-	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-fetch", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "<html>shell</html>") {
-		t.Fatalf("react novel-fetch status = %d body %q", res.Code, res.Body.String())
-	}
-	res = httptest.NewRecorder()
-	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-fetch-react", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "<html>shell</html>") {
-		t.Fatalf("react novel-fetch fallback status = %d body %q", res.Code, res.Body.String())
-	}
-	for _, route := range []string{"/batch-rewrite/v2"} {
-		res := httptest.NewRecorder()
-		StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, route, nil))
-		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") || !strings.Contains(res.Body.String(), "/batch-rewrite/styles.css") {
-			t.Fatalf("novel-fetch workbench route %s status = %d body %q", route, res.Code, res.Body.String())
-		}
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("removed legacy novel-fetch route status = %d, want %d", res.Code, http.StatusNotFound)
 	}
 }
 

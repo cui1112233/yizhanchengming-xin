@@ -114,6 +114,13 @@ export function getWorkshopTask(bookId) {
   return apiRequest(`/api/novel-fetch-workshop/tasks/${encodeURIComponent(bookId)}`);
 }
 
+export function saveWorkshopBody(bookId, versionId, content, state = 'ready') {
+  return apiRequest(`/api/novel-fetch-workshop/tasks/${encodeURIComponent(bookId)}/bodies/${encodeURIComponent(versionId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ content, state })
+  });
+}
+
 // 抓取单本原文
 export function fetchWorkshopOriginal(bookId, maxTxt) {
   return apiRequest(`/api/novel-fetch-workshop/tasks/${encodeURIComponent(bookId)}/fetch`, {

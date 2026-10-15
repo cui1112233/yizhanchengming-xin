@@ -22,11 +22,11 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		// Keep the recovered V78 workbench available under its explicit legacy
-		// route. The public /novel-fetch entry is the React workbench so it keeps
-		// the shared application shell and sidebar.
-		if name == "batch-rewrite/v2" {
-			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
+		// The old V78 page is a reference artifact, not a runtime entry. Keeping
+		// this route out of the SPA fallback prevents a stale page from silently
+		// reappearing when someone follows an old bookmark.
+		if name == "batch-rewrite/v2" || strings.HasPrefix(name, "batch-rewrite/v2/") {
+			http.NotFound(w, req)
 			return
 		}
 		if name == "novel-fetch-react" {

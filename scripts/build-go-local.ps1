@@ -10,34 +10,21 @@ $petsSource = Join-Path $repo 'pets'
 $petsDist = Join-Path $goDist 'pets'
 $brandAssetsSource = Join-Path $repo 'frontend/public/assets'
 $brandAssetsDist = Join-Path $goDist 'assets'
-$legacyNovelFetchSource = Join-Path $repo 'frontend/public/batch-rewrite'
-$legacyNovelFetchDist = Join-Path $goDist 'batch-rewrite'
 
 if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
   throw "Frontend build output is missing: $frontendDist"
 }
 
-# The canonical /novel-fetch route currently uses the recovered public V78
-# workbench while the React replacement is brought to feature parity. Never
-# silently publish a build without this complete page bundle.
-foreach ($requiredNovelFetchFile in @('index.html', 'styles.css', 'app.js')) {
-  $requiredPath = Join-Path $legacyNovelFetchSource $requiredNovelFetchFile
-  if (-not (Test-Path -LiteralPath $requiredPath)) {
-    throw "Novel Fetch workbench asset is missing: $requiredPath"
-  }
-}
-
 New-Item -ItemType Directory -Force $goDist | Out-Null
 Get-ChildItem -LiteralPath $goDist -Force | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Recurse -Force
 Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -Force
-
-# Keep the recovered public V78 Novel Fetch baseline available inside the Go
-# embed bundle while the React replacement is brought to feature parity. It is
-# an isolated static reference page, not a Node service dependency.
-# Copy the workbench contents into the embedded route directory. Copying the
-# directory itself creates a nested `batch-rewrite/batch-rewrite` tree, which
-# leaves Go serving an older outer index and makes UI fixes appear to vanish.
-Copy-Item -Path (Join-Path $legacyNovelFetchSource '*') -Destination $legacyNovelFetchDist -Recurse -Force
+# The reference V78 files remain under frontend/public for comparison, and Vite
+# copies public/ verbatim. They must not enter the Go embed bundle: the only
+# supported Novel Fetch runtime is the React page built from frontend/src.
+$legacyEmbeddedRoute = Join-Path $goDist 'batch-rewrite'
+if (Test-Path -LiteralPath $legacyEmbeddedRoute) {
+  Remove-Item -LiteralPath $legacyEmbeddedRoute -Recurse -Force
+}
 
 # The liquid-metal brand component reads these stable, non-hashed images from
 # /assets. Keep them beside the hashed Vite assets in the embedded Go bundle.
