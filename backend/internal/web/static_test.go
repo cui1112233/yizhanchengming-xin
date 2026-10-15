@@ -82,8 +82,8 @@ func TestStaticHandlerServesNovelFetchWorkbench(t *testing.T) {
 	}
 	res = httptest.NewRecorder()
 	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-fetch", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "novel-fetch-v78") {
-		t.Fatalf("canonical novel-fetch workbench status = %d body %q", res.Code, res.Body.String())
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "<html>shell</html>") {
+		t.Fatalf("react novel-fetch status = %d body %q", res.Code, res.Body.String())
 	}
 	res = httptest.NewRecorder()
 	StaticHandler(assets).ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-fetch-react", nil))

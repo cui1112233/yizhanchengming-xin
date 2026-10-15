@@ -22,10 +22,10 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		// V78 is the canonical novel-fetch workbench. Keep the React migration
-		// available under an explicit diagnostic route so the two implementations
-		// cannot compete for the same public entry.
-		if name == "batch-rewrite/v2" || name == "novel-fetch" {
+		// Keep the recovered V78 workbench available under its explicit legacy
+		// route. The public /novel-fetch entry is the React workbench so it keeps
+		// the shared application shell and sidebar.
+		if name == "batch-rewrite/v2" {
 			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
 			return
 		}
