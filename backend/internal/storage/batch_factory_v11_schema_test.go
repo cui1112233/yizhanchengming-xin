@@ -99,3 +99,13 @@ func TestV11ShuihuoConfigAcceptsVerifiedPublicChecksum(t *testing.T) {
 		t.Fatal("verified public checksum must be accepted")
 	}
 }
+
+func TestAuthSchemaAcceptsVerifiedPublicChecksum(t *testing.T) {
+	migrations := AuthMigrations()
+	if len(migrations) != 1 || migrations[0].Version != 7802004 {
+		t.Fatalf("auth migrations=%+v", migrations)
+	}
+	if !checksumMatches(migrations[0], "bb76069aedb05e6ee9ff9e887edda99b349fdecc5bc2fbdc56400b94cb8375e1", ChecksumFor(migrations[0])) {
+		t.Fatal("verified public auth checksum must be accepted")
+	}
+}
