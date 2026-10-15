@@ -214,3 +214,13 @@ func TestSafeSensitiveReplacementPreviewSetIsStable(t *testing.T) {
 		}
 	}
 }
+
+func TestApplySensitiveRulesDoesNotLoopWhenReplacementContainsFind(t *testing.T) {
+	settings := map[string]any{"sensitive_rules": []any{
+		map[string]any{"find": "我", "replace": "我的"},
+	}}
+	got, changes, items := ApplySensitiveRulesWithDetails("我和我", settings)
+	if got != "我的和我的" || changes != 2 || len(items) != 2 {
+		t.Fatalf("got=%q changes=%d items=%d, want one-pass replacement", got, changes, len(items))
+	}
+}

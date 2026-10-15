@@ -6,47 +6,47 @@ import (
 )
 
 var safeSensitiveReplacements = map[string]string{
-	"绿帽子": "颜色帽子",
-	"绿帽":  "颜色帽",
-	"第三者": "关系介入者",
-	"小三":  "介入关系的人",
-	"出轨":  "关系越界",
-	"勾引":  "主动接近",
-	"一夜情": "短暂关系",
-	"上床":  "私下接触",
-	"强奸":  "非法伤害",
-	"赌博":  "违规下注",
-	"花魁":  "名伶",
-	"轮奸":  "多人伤害",
-	"奸夫":  "关系越界者",
-	"淫妇":  "关系越界者",
-	"贱人":  "失礼之人",
-	"婊子":  "失礼之人",
-	"狗东西": "讨厌家伙",
-	"激情视频": "凌晨快乐视频",
-	"开房": "外面睡觉",
-	"捉奸": "发现关系越界",
-	"爬上床": "深夜留宿",
-	"避孕套": "防护用品",
-	"强上": "强行靠近",
-	"禁脔": "专属对象",
-	"骚货": "轻浮称呼",
-	"私会": "私下见面",
-	"搞我闺蜜": "介入朋友关系",
-	"拉皮条": "私下牵线",
-	"床上技术": "亲密相处方式",
-	"鬼混": "混乱交往",
+	"绿帽子":   "颜色帽子",
+	"绿帽":    "颜色帽",
+	"第三者":   "关系介入者",
+	"小三":    "介入关系的人",
+	"出轨":    "关系越界",
+	"勾引":    "主动接近",
+	"一夜情":   "短暂关系",
+	"上床":    "私下接触",
+	"强奸":    "非法伤害",
+	"赌博":    "违规下注",
+	"花魁":    "名伶",
+	"轮奸":    "多人伤害",
+	"奸夫":    "关系越界者",
+	"淫妇":    "关系越界者",
+	"贱人":    "失礼之人",
+	"婊子":    "失礼之人",
+	"狗东西":   "讨厌家伙",
+	"激情视频":  "凌晨快乐视频",
+	"开房":    "外面睡觉",
+	"捉奸":    "发现关系越界",
+	"爬上床":   "深夜留宿",
+	"避孕套":   "防护用品",
+	"强上":    "强行靠近",
+	"禁脔":    "专属对象",
+	"骚货":    "轻浮称呼",
+	"私会":    "私下见面",
+	"搞我闺蜜":  "介入朋友关系",
+	"拉皮条":   "私下牵线",
+	"床上技术":  "亲密相处方式",
+	"鬼混":    "混乱交往",
 	"与多人有染": "同时与多人交往",
-	"潜规则": "隐性约定",
-	"伟哥": "活力药物",
-	"把妹": "主动结识女生",
-	"约炮": "临时约会",
-	"裸聊": "私密聊天",
-	"卧槽":  "惊讶感叹",
-	"我草":  "惊讶感叹",
-	"我操":  "惊讶感叹",
-	"我擦":  "惊讶感叹",
-	"握草":  "惊讶感叹",
+	"潜规则":   "隐性约定",
+	"伟哥":    "活力药物",
+	"把妹":    "主动结识女生",
+	"约炮":    "临时约会",
+	"裸聊":    "私密聊天",
+	"卧槽":    "惊讶感叹",
+	"我草":    "惊讶感叹",
+	"我操":    "惊讶感叹",
+	"我擦":    "惊讶感叹",
+	"握草":    "惊讶感叹",
 }
 
 var safeSensitiveHomophones = map[rune]rune{
@@ -226,14 +226,23 @@ func ApplySensitiveRulesWithDetails(text string, settings map[string]any) (strin
 		if !enabled || find == "" || find == replace {
 			continue
 		}
+		// Scan a stable snapshot once. Repeatedly searching the mutated result
+		// can loop forever when a replacement contains the original find text
+		// (for example, find="A", replace="A说明").
+		source := result
+		var builder strings.Builder
+		cursor := 0
 		for {
-			index := strings.Index(result, find)
+			index := strings.Index(source[cursor:], find)
 			if index < 0 {
+				builder.WriteString(source[cursor:])
 				break
 			}
-			before := sensitiveLine(result, index)
-			result = result[:index] + replace + result[index+len(find):]
-			after := sensitiveLine(result, index)
+			index += cursor
+			builder.WriteString(source[cursor:index])
+			before := sensitiveLine(source, index)
+			builder.WriteString(replace)
+			after := strings.Replace(before, find, replace, 1)
 			changes++
 			items = append(items, map[string]any{
 				"hit_index": len(items) + 1,
@@ -244,7 +253,9 @@ func ApplySensitiveRulesWithDetails(text string, settings map[string]any) (strin
 				"source":    "system_rule",
 				"error":     "",
 			})
+			cursor = index + len(find)
 		}
+		result = builder.String()
 	}
 	return result, changes, items
 }
