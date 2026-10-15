@@ -75,6 +75,53 @@ func TestNovelFetchWorkshopRealtimeStatusIsAvailableOnCanonicalRoute(t *testing.
 	}
 }
 
+func TestNovelFetchWorkshopTaskListBackfillsPlatformAndGender(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID:   "2093734568914334892",
+		Gender:   "待确认",
+		BookInfo: novelfetchworkshop.BookInfo{Category: "男频", Genre: "都市"},
+		Meta:     map[string]any{"platformId": "1", "originalStatus": "done"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/tasks", nil, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("tasks status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !bytes.Contains(response.Body.Bytes(), []byte(`"platform_name":"黑岩付费"`)) {
+		t.Fatalf("platform name was not backfilled: %s", response.Body.String())
+	}
+	if !bytes.Contains(response.Body.Bytes(), []byte(`"gender":"男频"`)) || !bytes.Contains(response.Body.Bytes(), []byte(`"classify_status":"classified"`)) {
+		t.Fatalf("gender was not backfilled: %s", response.Body.String())
+	}
+}
+
+func TestNovelFetchWorkshopTaskListBackfillsDeterministicStyle(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID:   "book-style-backfill",
+		Gender:   "男频",
+		BookInfo: novelfetchworkshop.BookInfo{Category: "男频", Genre: "古风通用"},
+		Meta:     map[string]any{"platformId": "1", "originalStatus": "done"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/tasks", nil, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("tasks status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !bytes.Contains(response.Body.Bytes(), []byte(`"style":"古风通用"`)) {
+		t.Fatalf("deterministic style was not backfilled: %s", response.Body.String())
+	}
+}
+
 func TestNovelFetchWorkshopSparsePutPreservesExistingGenderSource(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
@@ -99,6 +146,43 @@ func TestNovelFetchWorkshopSparsePutPreservesExistingGenderSource(t *testing.T) 
 	}
 	if document.Gender != "女频" || document.GenderSource != novelfetchworkshop.GenderAI {
 		t.Fatalf("sparse put changed existing gender source: %#v", document)
+	}
+}
+
+func TestNovelFetchWorkshopPutResolvesPendingGenderFromBookInfo(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "book-pending-gender", Gender: "待确认",
+		BookInfo: novelfetchworkshop.BookInfo{Category: "男频", Genre: "都市"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	put := doNovelFetchRequest(t, handler, http.MethodPut, "/api/novel-fetch-workshop/tasks/book-pending-gender", map[string]any{
+		"bookInfo": map[string]string{"category": "男频", "genre": "都市"},
+	}, now, secret)
+	if put.Code != http.StatusOK {
+		t.Fatalf("put status=%d body=%s", put.Code, put.Body.String())
+	}
+	stored, err := store.GetDocument(context.Background(), "tester", "book-pending-gender")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Gender != "男频" || stored.GenderSource != novelfetchworkshop.GenderBookInfo {
+		t.Fatalf("pending gender was not resolved during put: %#v", stored)
+	}
+	get := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/tasks/book-pending-gender", nil, now, secret)
+	if get.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", get.Code, get.Body.String())
+	}
+	var document novelfetchworkshop.Document
+	if err := json.Unmarshal(get.Body.Bytes(), &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Gender != "男频" || document.GenderSource != novelfetchworkshop.GenderBookInfo {
+		t.Fatalf("pending gender was not retained from book info: %#v", document)
 	}
 }
 

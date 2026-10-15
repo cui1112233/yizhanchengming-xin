@@ -510,6 +510,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		// 兼容字段，避免页面把已经保存的元数据误显示为空。
 		legacyTasks := make([]map[string]any, 0, len(tasks))
 		for _, task := range tasks {
+			if backfillNovelFetchClassification(&task) {
+				if err := store.PutDocument(req.Context(), identity.Username, task); err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存分类信息失败"})
+					return
+				}
+			}
 			syncNovelFetchClassificationMetadata(&task)
 			legacyTasks = append(legacyTasks, legacyNovelFetchTask(task))
 		}
@@ -721,6 +727,12 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取正文失败"})
 			return
+		}
+		if backfillNovelFetchClassification(&document) {
+			if err := store.PutDocument(req.Context(), identity.Username, document); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存分类信息失败"})
+				return
+			}
 		}
 		syncNovelFetchClassificationMetadata(&document)
 		writeJSON(w, http.StatusOK, document)
@@ -1195,6 +1207,16 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			document.Gender = decision.Gender
 			document.GenderSource = decision.Source
 			document.GenderReason = decision.Reason
+		} else if genderNeedsResolution(document.Gender) {
+			// A sparse edit of an older task must still apply the deterministic
+			// category mapping.  Pending values are not manual choices and must
+			// not remain stuck just because the user edited another field.
+			genderInfo := document.BookInfo
+			genderInfo.Text = document.ProcessedText
+			decision := novelfetchworkshop.ResolveGender(req.Context(), "", genderInfo, resolveGenderJudge(req))
+			document.Gender = decision.Gender
+			document.GenderSource = decision.Source
+			document.GenderReason = decision.Reason
 		}
 		if styleNeedsResolution(document.Meta) && strings.TrimSpace(document.ProcessedText) != "" {
 			if document.Meta == nil {
@@ -1410,12 +1432,55 @@ func syncNovelFetchClassificationMetadata(document *novelfetchworkshop.Document)
 	if strings.TrimSpace(document.BookInfo.Genre) != "" {
 		document.Meta["genre"] = document.BookInfo.Genre
 	}
+	// Platform metadata often contains a complete style label.  Resolve that
+	// deterministic value here so old tasks do not stay at “待判定” and never
+	// require a second AI call merely because the list page was opened.
+	if styleNeedsResolution(document.Meta) {
+		style := novelfetchworkshop.ResolveStyle(context.Background(), document.BookInfo, nil)
+		if strings.TrimSpace(style.Style) != "" {
+			recordNovelFetchStyleDecision(document.Meta, style, nil)
+		}
+	}
 	inferNovelFetchStyleFailure(document.Meta)
 	if style := strings.TrimSpace(firstText(document.Meta["style"], document.Meta["styleName"], document.Meta["style_name"])); style != "" && style != "待判定" && style != "未判定" {
 		if strings.TrimSpace(fmt.Sprint(document.Meta["styleStatus"])) == "" {
 			document.Meta["styleStatus"] = "classified"
 		}
 	}
+}
+
+// backfillNovelFetchClassification repairs tasks created by older flows.  The
+// old worker stored the upstream book info but did not copy the deterministic
+// platform/gender result into the document, leaving the list stuck at pending.
+// This helper deliberately performs no AI call; AI fallback remains part of
+// the fetch pipeline and is only needed when book metadata is ambiguous.
+func backfillNovelFetchClassification(document *novelfetchworkshop.Document) bool {
+	if document == nil {
+		return false
+	}
+	changed := false
+	if document.Meta == nil {
+		document.Meta = map[string]any{}
+	}
+	if strings.TrimSpace(fmt.Sprint(document.Meta["platformName"])) == "" {
+		platformID := strings.TrimSpace(fmt.Sprint(document.Meta["platformId"]))
+		if number, err := strconv.Atoi(platformID); err == nil {
+			if platformName := legacyNovelFetchPlatforms[number]; platformName != "" {
+				document.Meta["platformName"] = platformName
+				changed = true
+			}
+		}
+	}
+	if genderNeedsResolution(document.Gender) {
+		decision := novelfetchworkshop.ResolveGender(context.Background(), "", document.BookInfo, nil)
+		if !genderNeedsResolution(decision.Gender) {
+			document.Gender = decision.Gender
+			document.GenderSource = decision.Source
+			document.GenderReason = decision.Reason
+			changed = true
+		}
+	}
+	return changed
 }
 
 func applyNovelFetchSensitiveRules(ctx context.Context, store novelfetchworkshop.Store, owner, text string) (string, int, error) {
@@ -1525,9 +1590,19 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 	}
 	bookName := metaString("bookName", "book_name")
 	platformName := metaString("platformName", "platform_name")
+	if platformName == "" {
+		if platformID, err := strconv.Atoi(metaString("platformId", "platform_id")); err == nil {
+			platformName = legacyNovelFetchPlatforms[platformID]
+		}
+	}
 	style := metaString("style", "styleName", "style_name")
 	gender := strings.TrimSpace(document.Gender)
-	if gender == "" {
+	if genderNeedsResolution(gender) {
+		if decision := novelfetchworkshop.ResolveGender(context.Background(), "", document.BookInfo, nil); !genderNeedsResolution(decision.Gender) {
+			gender = decision.Gender
+		}
+	}
+	if gender == "" || genderNeedsResolution(gender) {
 		gender = metaString("gender")
 	}
 	result["id"] = document.BookID
@@ -1537,7 +1612,7 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 	result["style"] = style
 	result["gender"] = gender
 	result["classify_status"] = "classify_failed"
-	if gender != "" {
+	if gender != "" && !genderNeedsResolution(gender) {
 		result["classify_status"] = "classified"
 	}
 	result["original_status"] = metaString("originalStatus", "original_status")
