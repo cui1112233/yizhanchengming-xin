@@ -147,6 +147,7 @@ go test ./...
 ## 相关文档
 
 - [AGENT.md](AGENT.md)：协作禁区、源码优先原则和当前代码基线。
+- [docs/GO_EMBED_DEPLOYMENT.md](docs/GO_EMBED_DEPLOYMENT.md)：Go embed 单二进制构建、启动和发布规范。
 - [CURRENT_VERSION.md](CURRENT_VERSION.md)：V88 合并冻结和历史生产运行时说明。
 - [docs/V88_PROJECT_EXECUTION_MEMORY.md](docs/V88_PROJECT_EXECUTION_MEMORY.md)：V88 项目执行记忆。
 - [docs/obj/2026-09-08-v88-consolidation-stage1-inventory-freeze.md](docs/obj/2026-09-08-v88-consolidation-stage1-inventory-freeze.md)：合并冻结盘点基线。
