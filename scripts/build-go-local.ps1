@@ -17,6 +17,16 @@ if (-not (Test-Path (Join-Path $frontendDist 'index.html'))) {
   throw "Frontend build output is missing: $frontendDist"
 }
 
+# The canonical /novel-fetch route currently uses the recovered public V78
+# workbench while the React replacement is brought to feature parity. Never
+# silently publish a build without this complete page bundle.
+foreach ($requiredNovelFetchFile in @('index.html', 'styles.css', 'app.js')) {
+  $requiredPath = Join-Path $legacyNovelFetchSource $requiredNovelFetchFile
+  if (-not (Test-Path -LiteralPath $requiredPath)) {
+    throw "Novel Fetch workbench asset is missing: $requiredPath"
+  }
+}
+
 New-Item -ItemType Directory -Force $goDist | Out-Null
 Get-ChildItem -LiteralPath $goDist -Force | Where-Object { $_.Name -ne '.gitkeep' } | Remove-Item -Recurse -Force
 Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -Force
@@ -24,9 +34,7 @@ Copy-Item -Path (Join-Path $frontendDist '*') -Destination $goDist -Recurse -For
 # Keep the recovered public V78 Novel Fetch baseline available inside the Go
 # embed bundle while the React replacement is brought to feature parity. It is
 # an isolated static reference page, not a Node service dependency.
-if (Test-Path $legacyNovelFetchSource) {
-  Copy-Item -Path $legacyNovelFetchSource -Destination $legacyNovelFetchDist -Recurse -Force
-}
+Copy-Item -Path $legacyNovelFetchSource -Destination $legacyNovelFetchDist -Recurse -Force
 
 # The liquid-metal brand component reads these stable, non-hashed images from
 # /assets. Keep them beside the hashed Vite assets in the embedded Go bundle.
