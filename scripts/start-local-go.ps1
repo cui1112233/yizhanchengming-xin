@@ -14,6 +14,14 @@ if ($CheckOnly) {
 $binaryPath = Join-Path $repo 'backend/qiantie-local.exe'
 $goSourceRoot = Join-Path $repo 'backend'
 $needsBuild = -not (Test-Path $binaryPath)
+$buildMetaPath = Join-Path $repo '.direct-staging/qiantie-local.build-meta'
+$expectedBuildSHA = (& git -C $repo rev-parse --short HEAD).Trim()
+if (-not $needsBuild) {
+  $buildMeta = if (Test-Path -LiteralPath $buildMetaPath) { Get-Content -LiteralPath $buildMetaPath -Raw } else { '' }
+  if ($buildMeta -notmatch "(?m)^git_sha=$([regex]::Escape($expectedBuildSHA))$") {
+    $needsBuild = $true
+  }
+}
 if (-not $needsBuild) {
   $binaryTime = (Get-Item $binaryPath).LastWriteTimeUtc
   $latestGoSource = Get-ChildItem $goSourceRoot -Recurse -Filter '*.go' -File | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1

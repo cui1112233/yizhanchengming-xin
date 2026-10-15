@@ -93,6 +93,14 @@ if (-not $SkipGoBuild) {
     $runtimeDownloads = Join-Path $repo 'data/downloads'
     New-Item -ItemType Directory -Force $runtimeDownloads | Out-Null
     Copy-Item -LiteralPath $executorFile -Destination (Join-Path $runtimeDownloads (Split-Path $executorFile -Leaf)) -Force
+
+    # Keep a small ignored build marker beside the executable. The launcher
+    # uses it to detect a commit made after the last binary build, including
+    # commits that only changed embedded assets or release scripts.
+    $buildMetaDir = Join-Path $repo '.direct-staging'
+    New-Item -ItemType Directory -Force $buildMetaDir | Out-Null
+    $buildSHA = (& git -C $repo rev-parse --short HEAD).Trim()
+    Set-Content -LiteralPath (Join-Path $buildMetaDir 'qiantie-local.build-meta') -Value @("git_sha=$buildSHA", "runtime_sha=$runtimeVersion") -Encoding utf8
   } finally {
     Pop-Location
   }
