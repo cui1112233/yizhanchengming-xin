@@ -6,6 +6,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 
+# Go is the only supported application runtime. Keep historical Node files on
+# disk for migration/rollback audit, but refuse to start Go alongside an
+# accidentally enabled application Node service. The checker ignores Node
+# processes owned by unrelated tools such as Codex or Photoshop.
+$runtimeGuard = Join-Path $PSScriptRoot 'verify-no-node-runtime.ps1'
+if (Test-Path -LiteralPath $runtimeGuard) {
+  & $runtimeGuard -Strict | Out-Host
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Legacy application Node process detected; Go startup was blocked to prevent two runtimes from serving the same application.'
+  }
+}
+
 if ($CheckOnly) {
   & (Join-Path $PSScriptRoot 'check-local-go.ps1')
   exit $LASTEXITCODE
