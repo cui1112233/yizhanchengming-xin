@@ -52,3 +52,10 @@ test('novel fetch React source keeps the V78 processing controls', async () => {
   }
   assert.doesNotMatch(source, /iframe|batch-rewrite\/index\.html/);
 });
+
+test('novel fetch React source exposes the public V78 batch actions and configuration sections', async () => {
+  const source = await fs.readFile(new URL('./pages/NovelFetchPage.jsx', import.meta.url), 'utf8');
+  for (const marker of ['版本配置', '同步批量后台配置', '查看日期', '进入批量工厂', '提交网络', '抓取并发', '自动补齐风格/男女频']) {
+    assert.match(source, new RegExp(marker));
+  }
+});
