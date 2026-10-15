@@ -298,6 +298,14 @@
 .novel-fetch-public-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .novel-fetch-public-result-title { font-weight:600; color:var(--text-primary); margin-bottom:8px; }
 .novel-fetch-public-result pre { margin:0; min-height:54px; max-height:220px; overflow:auto; color:var(--text-secondary); white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+.novel-fetch-status-layout { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(260px, .8fr); gap:12px; width:100%; }
+.novel-fetch-stat-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:10px 0 12px; }
+.novel-fetch-stat-card { min-width:0; padding:10px 12px; border:1px solid var(--legacy-border); border-radius:7px; background:var(--legacy-panel); }
+.novel-fetch-stat-card span { display:block; color:var(--text-tertiary); font-size:11px; }
+.novel-fetch-stat-card strong { display:block; margin-top:4px; color:var(--text-primary); font-size:20px; line-height:1; }
+.novel-fetch-progress-row { display:flex; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid var(--legacy-border); border-radius:6px; color:var(--text-secondary); }
+.novel-fetch-progress-row b { color:var(--legacy-accent); }
+.novel-fetch-live-log pre { min-height:190px; background:var(--legacy-input); border-radius:6px; padding:10px; }
 .novel-fetch-config-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .novel-fetch-config-grid .ant-form-item { margin-bottom:8px; }
 @media (max-width: 760px) { .novel-fetch-config-grid { grid-template-columns:1fr; } }
@@ -330,6 +338,7 @@
 .novel-fetch-workbench .ant-table-thead > tr > th { background:var(--legacy-panel); color:var(--text-primary); border-bottom-color:var(--legacy-border); }
 .novel-fetch-workbench .ant-table-tbody > tr > td { border-bottom-color:var(--legacy-border); }
 @media (max-width: 900px) { .novel-fetch-public-grid--five { grid-template-columns:repeat(3,minmax(120px,1fr)); } }
+@media (max-width: 900px) { .novel-fetch-status-layout { grid-template-columns:1fr; } .novel-fetch-stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (max-width: 640px) { .novel-fetch-public-grid--three, .novel-fetch-public-grid--five { grid-template-columns:1fr; } .novel-fetch-version-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 @media (max-width: 860px) {
