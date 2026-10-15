@@ -65,8 +65,11 @@ function usePathname() {
 function getPage(pathname) {
   const routes = {
     '/script': ScriptPage,
-    // 小说获取正式入口使用完整 React 工作台；旧静态页面只保留为迁移期间资源。
+    // V78 是小说获取正式入口；React 工作台仅保留在显式迁移地址。
     '/novel-fetch': NovelFetchPage,
+    // V78 is served by Go at /novel-fetch. Keep the React workbench reachable
+    // only through an explicit migration/debug route.
+    '/novel-fetch-react': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchWorkshopPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
     '/novel-panel': NovelPanelPage,

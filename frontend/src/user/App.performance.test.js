@@ -28,10 +28,11 @@ test('workbench pages keep their asynchronous loading boundaries', async () => {
   assert.match(batchFactory, /listBatchSummaries\(\)/);
 });
 
-test('novel fetch canonical entry uses the React workbench as the single visual baseline', async () => {
+test('novel fetch React workbench stays available only behind an explicit migration route', async () => {
   const app = await fs.readFile(appPath, 'utf8');
   const novelFetch = await fs.readFile(new URL('./pages/NovelFetchPage.jsx', import.meta.url), 'utf8');
   assert.match(app, /const loadNovelFetchPage = \(\) => import\('\.\/pages\/NovelFetchPage'\)/);
+  assert.match(app, /'\/novel-fetch-react': NovelFetchPage/);
   assert.match(novelFetch, /export function NovelFetchPage/);
   assert.match(novelFetch, /return <LegacyNovelFetchPage \/>/);
   assert.doesNotMatch(novelFetch, /effectiveTheme|onLoad=/);

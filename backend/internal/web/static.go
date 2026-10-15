@@ -22,14 +22,14 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.NotFound(w, req)
 			return
 		}
-		// The React shell owns /novel-fetch so direct visits keep the product
-		// navigation. The legacy Go workbench remains an embedded child at its
-		// explicit /batch-rewrite/v2 URL.
-		if name == "batch-rewrite/v2" {
+		// V78 is the canonical novel-fetch workbench. Keep the React migration
+		// available under an explicit diagnostic route so the two implementations
+		// cannot compete for the same public entry.
+		if name == "batch-rewrite/v2" || name == "novel-fetch" {
 			serveEmbeddedIndex(w, files, "batch-rewrite/index.html")
 			return
 		}
-		if name == "novel-fetch" {
+		if name == "novel-fetch-react" {
 			serveEmbeddedIndex(w, files, "index.html")
 			return
 		}
