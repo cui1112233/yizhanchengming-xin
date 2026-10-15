@@ -22,7 +22,7 @@ const LOCAL_DOUBAO_MODEL_ID = 'local-doubao-executor-video';
 async function defaultExecutorPairingStatus({ username, account, shuihuoGateway, fetchImpl = globalThis.fetch }) {
   if (!fetchImpl) return false;
   const base = String(shuihuoGateway?.targetBaseUrl || process.env.QIANTIE_GO_BASE_URL || 'http://127.0.0.1:4000').replace(/\/$/, '');
-  const secret = shuihuoGateway?.bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me';
+  const secret = shuihuoGateway?.bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || '';
   const pathname = '/api/shuihuo-production/local-executors';
   try {
     const response = await fetchImpl(`${base}${pathname}`, {

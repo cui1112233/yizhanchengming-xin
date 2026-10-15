@@ -58,7 +58,7 @@ function listShuihuoProjects({ targetBaseUrl, bridgeSecret }, account) {
   const transport = target.protocol === 'https:' ? https : http;
   const pathname = '/api/shuihuo-production/projects';
   const issuedAt = String(Math.floor(Date.now() / 1000));
-  const signature = signBridgeRequest(bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || 'dev-bridge-secret-change-me', {
+  const signature = signBridgeRequest(bridgeSecret || process.env.QIANTIE_BRIDGE_SECRET || '', {
     username: account.username,
     isOwner: account.isOwner === true,
     issuedAt,

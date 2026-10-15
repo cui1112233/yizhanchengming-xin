@@ -67,10 +67,17 @@ function createNovelFetchWorkshopRouter({
   knowledgeStore: injectedKnowledgeStore,
   openingStore: injectedOpeningStore,
   rules = rulesModule,
-  sourceHook
+  sourceHook,
+  processRouter
 } = {}) {
   const router = express.Router();
   router.use(auth);
+  if (processRouter) {
+    router.use((req, res, next) => {
+      if (!req.path.startsWith('/process/')) return next();
+      return processRouter(req, res, next);
+    });
+  }
 
   async function resources(req) {
     const tasks = injectedTasks || createMySQLWorkshopStore({ targetBaseUrl, bridgeSecret, account: req.auth?.account });
