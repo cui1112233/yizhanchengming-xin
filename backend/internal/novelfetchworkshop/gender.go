@@ -104,6 +104,10 @@ func ResolveGender(ctx context.Context, manual string, info BookInfo, judge AIGe
 	}
 	category := normalizeGender(info.Category)
 	genre := normalizeGender(info.Genre)
+	additional := normalizeAdditionalGender(info)
+	if category == "" && genre == "" && additional != "" {
+		return GenderDecision{Gender: additional, Source: GenderBookInfo, Reason: "采用平台主题与标签中的明确男女频倾向"}
+	}
 	if (category != "" && genre != "" && category != genre) || category == "" && genre == "" {
 		if judge != nil {
 			aiGender, err := judge(ctx, info)
@@ -126,6 +130,7 @@ func DecideGender(manual string, info BookInfo, aiGender string) GenderDecision 
 
 	category := normalizeGender(info.Category)
 	genre := normalizeGender(info.Genre)
+	additional := normalizeAdditionalGender(info)
 	if category != "" && genre != "" && category != genre {
 		if gender := normalizeGender(aiGender); gender != "" {
 			return GenderDecision{Gender: gender, Source: GenderAI, Reason: "分类信息冲突，采用 AI 判断结果"}
@@ -137,6 +142,9 @@ func DecideGender(manual string, info BookInfo, aiGender string) GenderDecision 
 			return GenderDecision{Gender: gender, Source: GenderAI, Reason: "分类信息不明确，采用 AI 判断结果"}
 		}
 		return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "分类信息不明确且没有有效 AI 判断结果"}
+	}
+	if category == "" && genre == "" && additional != "" {
+		return GenderDecision{Gender: additional, Source: GenderBookInfo, Reason: "采用平台主题与标签中的明确男女频倾向"}
 	}
 	if category != "" || genre != "" {
 		return GenderDecision{Gender: firstGender(category, genre), Source: GenderBookInfo, Reason: "采用书籍分类信息中的明确男女频"}
@@ -161,6 +169,22 @@ func normalizeGender(value string) string {
 		return "男频"
 	}
 	return "女频"
+}
+
+func normalizeAdditionalGender(info BookInfo) string {
+	value := strings.ToLower(strings.TrimSpace(info.Themes + " " + info.Labels))
+	if value == "" {
+		return ""
+	}
+	female := strings.Contains(value, "言情") || strings.Contains(value, "婚恋") || strings.Contains(value, "女频") || strings.Contains(value, "女性") || strings.Contains(value, "女生") || strings.Contains(value, "女主")
+	male := strings.Contains(value, "男频") || strings.Contains(value, "男性") || strings.Contains(value, "男生") || strings.Contains(value, "男主")
+	if female == male {
+		return ""
+	}
+	if female {
+		return "女频"
+	}
+	return "男频"
 }
 
 func firstGender(category, genre string) string {

@@ -25,6 +25,9 @@ func ResolveStyle(ctx context.Context, info BookInfo, provider RewriteProvider) 
 	if style := matchNovelStyle(info.Category); style != "" {
 		return StyleDecision{Style: style, Source: "bookinfo", Reason: "采用平台返回的明确风格"}
 	}
+	if style := matchNovelStyleMetadata(info); style != "" {
+		return StyleDecision{Style: style, Source: "bookinfo", Reason: "采用平台主题与标签中的明确风格"}
+	}
 	if provider == nil || strings.TrimSpace(info.Text) == "" {
 		return StyleDecision{Reason: "平台未提供明确风格且 AI 风格判断未配置"}
 	}
@@ -66,6 +69,17 @@ func matchNovelStyle(value string) string {
 		if value == style || strings.Contains(value, style) {
 			return style
 		}
+	}
+	return ""
+}
+
+func matchNovelStyleMetadata(info BookInfo) string {
+	metadata := strings.TrimSpace(info.Labels + "、" + info.Themes)
+	if strings.Contains(metadata, "言情") || strings.Contains(metadata, "婚恋") {
+		return "现代女主"
+	}
+	if strings.Contains(metadata, "现代") {
+		return "现代通用"
 	}
 	return ""
 }

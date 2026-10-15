@@ -22,6 +22,17 @@ func TestResolveStyleUsesAIOnlyWhenBookInfoIsNotExplicit(t *testing.T) {
 	}
 }
 
+func TestResolveStyleUsesPlatformLabelsBeforeAI(t *testing.T) {
+	calls := 0
+	got := ResolveStyle(context.Background(), BookInfo{Labels: "现代", Themes: "言情、婚恋", Text: "正文"}, styleProviderFunc(func(context.Context, RewriteRequest) (string, error) {
+		calls++
+		return `{"style":"玄幻"}`, nil
+	}))
+	if got.Style != "现代女主" || got.Source != "bookinfo" || calls != 0 {
+		t.Fatalf("label style decision = %#v, calls=%d", got, calls)
+	}
+}
+
 func TestResolveStyleFallsBackToAIAndKeepsUnknownPending(t *testing.T) {
 	good := ResolveStyle(context.Background(), BookInfo{Text: "正文"}, styleProviderFunc(func(context.Context, RewriteRequest) (string, error) {
 		return `{"style":"现代女主"}`, nil
