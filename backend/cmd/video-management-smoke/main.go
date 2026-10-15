@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -57,11 +58,12 @@ func run() error {
 		return err
 	}
 	result := map[string]any{
-		"runtime":       "go",
-		"session":       "valid",
-		"catalogs":      catalogs.Raw != nil,
-		"profiles":      profiles != nil,
-		"book_readback": false,
+		"runtime":         "go",
+		"session":         "valid",
+		"catalogs":        catalogs.Raw != nil,
+		"profiles":        profiles != nil,
+		"book_readback":   false,
+		"upload_readback": false,
 	}
 	if bookID := strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_SMOKE_BOOK_ID")); bookID != "" {
 		book, err := service.GetBook(ctx, session, bookID, 1, 10)
@@ -70,6 +72,32 @@ func run() error {
 		}
 		result["book_readback"] = book != nil
 		result["book_id"] = bookID
+	}
+	if uploadPath := strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_SMOKE_UPLOAD_FILE")); uploadPath != "" {
+		bookID := strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_SMOKE_BOOK_ID"))
+		if bookID == "" {
+			return fmt.Errorf("QIANTIE_VIDEO_SMOKE_BOOK_ID is required when upload file is provided")
+		}
+		content, err := os.ReadFile(uploadPath)
+		if err != nil {
+			return fmt.Errorf("read smoke upload file: %w", err)
+		}
+		submitted, err := service.Submit(ctx, session, videomanagementconnector.SubmissionInput{
+			BookID: bookID, Filename: filepath.Base(uploadPath), Content: content,
+		})
+		if err != nil {
+			return err
+		}
+		readbackID := submitted.ID
+		if readbackID == "" {
+			readbackID = bookID
+		}
+		readback, err := service.GetSubmission(ctx, session, readbackID)
+		if err != nil {
+			return err
+		}
+		result["upload_readback"] = readback.ReadbackRaw != nil
+		result["upload_id"] = readbackID
 	}
 	encoded, _ := json.Marshal(result)
 	fmt.Println(string(encoded))

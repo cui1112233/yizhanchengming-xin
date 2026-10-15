@@ -20,4 +20,13 @@ go run ./cmd/video-management-smoke
 Pop-Location
 ```
 
-成功输出中的 `runtime` 必须是 `go`，`session` 必须是 `valid`，并且 `book_readback` 为 `true`（提供书号时）。此命令不执行上传，避免未经明确授权修改目标站数据；上传验收必须使用单独的测试书和测试文件。
+成功输出中的 `runtime` 必须是 `go`，`session` 必须是 `valid`，并且 `book_readback` 为 `true`（提供书号时）。默认不执行上传，避免误改目标站数据。
+
+只有明确指定测试文件时才会执行上传并立即读回：
+
+```powershell
+$env:QIANTIE_VIDEO_SMOKE_UPLOAD_FILE = "C:\\path\\to\\test.txt"
+go run ./cmd/video-management-smoke
+```
+
+上传验收必须使用专用测试书和测试文件；成功时 `upload_readback` 必须为 `true`。未完成这次真实验收前，不得删除浏览器 Worker 回滚层。
