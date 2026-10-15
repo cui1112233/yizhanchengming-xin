@@ -164,6 +164,8 @@ func TestNovelFetchWorkshopConfigUnwrapsMigratedSettings(t *testing.T) {
 	var response struct {
 		AppConfig map[string]any   `json:"appConfig"`
 		Platforms []map[string]any `json:"platforms"`
+		Knowledge map[string]any   `json:"knowledge"`
+		Summary   map[string]any   `json:"knowledge_summary"`
 	}
 	if err := json.Unmarshal(get.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
@@ -172,6 +174,9 @@ func TestNovelFetchWorkshopConfigUnwrapsMigratedSettings(t *testing.T) {
 	fetch := response.AppConfig["fetch"].(map[string]any)
 	if workflow["auto_fetch_original"] != true || fetch["default_max_txt"] != float64(4000) || len(response.Platforms) != 1 {
 		t.Fatalf("migrated settings were not unwrapped: %#v", response)
+	}
+	if len(response.Knowledge) == 0 || response.Summary["opening_phrases"] != float64(174) || response.Summary["rewrite_profiles"] != float64(8) || response.Summary["high_imitation_prompts"] != float64(1) {
+		t.Fatalf("canonical config omitted the bundled knowledge catalog: %#v", response)
 	}
 }
 

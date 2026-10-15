@@ -1289,6 +1289,7 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if nested, ok := settings["settings"].(map[string]any); ok {
 			publicSource = nested
 		}
+		publicSource = novelfetchworkshop.EnsureWorkshopDefaults(publicSource)
 		appConfig := novelFetchAppConfig(publicSource)
 		platforms, ok := publicSource["platforms"].([]any)
 		if !ok {
@@ -1309,12 +1310,25 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		publicAppConfig := publicNovelFetchConfig(appConfig)
 		publicAIConfig := publicNovelFetchConfig(aiConfig)
 		publicSettings := publicNovelFetchConfig(publicSource)
+		// The legacy embedded workbench reads the catalog and its counters from
+		// the top-level response.  Keep that view in the same response as the
+		// canonical appConfig so both pages consume one Go-owned configuration
+		// instead of silently falling back to an empty client-side placeholder.
+		knowledge := mapOrEmpty(appConfig["knowledge"])
+		if len(knowledge) == 0 {
+			knowledge = mapOrEmpty(appConfig["knowledgeLibraries"])
+		}
+		knowledge = publicNovelFetchConfig(knowledge)
+		knowledgeSummary := batchKnowledgeSummary(knowledge, false)
 		writeJSON(w, http.StatusOK, map[string]any{
-			"appConfig": publicAppConfig,
-			"platforms": platforms,
-			"styles":    styles,
-			"aiConfig":  publicAIConfig,
-			"settings":  publicSettings,
+			"appConfig":         publicAppConfig,
+			"platforms":         platforms,
+			"styles":            styles,
+			"aiConfig":          publicAIConfig,
+			"settings":          publicSettings,
+			"knowledge":         knowledge,
+			"knowledge_loaded":  true,
+			"knowledge_summary": knowledgeSummary,
 		})
 	})
 

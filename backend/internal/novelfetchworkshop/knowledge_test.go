@@ -91,6 +91,25 @@ func TestEnsureWorkshopDefaultsDoesNotLetEmptyLegacyPlaceholdersHideCatalog(t *t
 	}
 }
 
+func TestEnsureWorkshopDefaultsDoesNotLetStructuredEmptyLibraryHideCatalog(t *testing.T) {
+	settings := EnsureWorkshopDefaults(map[string]any{
+		"knowledgeLibraries": map[string]any{
+			"opening_phrases": map[string]any{
+				"source":     "go",
+				"updated_at": "",
+				"items":      []any{},
+			},
+		},
+	})
+	library, err := ListKnowledge(settings, "opening_phrases")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(normalizeKnowledgeItems(library["items"])); got != 174 {
+		t.Fatalf("opening phrases after structured empty placeholder merge = %d, want 174", got)
+	}
+}
+
 func TestKnowledgeWritesSynchronizeLegacyAppConfigView(t *testing.T) {
 	settings := EnsureWorkshopDefaults(map[string]any{})
 	if _, err := SaveKnowledge(settings, "opening_phrases", map[string]any{"id": "opening_sync", "text": "她推门就看见了遗书", "style": "现代悬疑"}); err != nil {
