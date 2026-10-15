@@ -82,6 +82,7 @@ test('public base topology is Go-first without a second default request path', (
   assert.equal(goApi.networks?.qiantie_internal?.aliases, undefined);
   assert.equal(environmentValue(goApi, 'QIANTIE_BATCH_FACTORY_V11_SLICE'), '${QIANTIE_BATCH_FACTORY_V11_SLICE:-6}');
   assert.deepEqual(config.services['v88-node'].profiles, ['node-legacy']);
+  assert.equal(environmentValue(config.services['v88-node'], 'QIANTIE_121_USE_BROWSER_WORKER'), '0');
   assert.deepEqual(config.services['browser-worker'].profiles, ['node-legacy']);
   assert.deepEqual(config.services['shuihuo-compat'].profiles, ['node-legacy']);
 });
