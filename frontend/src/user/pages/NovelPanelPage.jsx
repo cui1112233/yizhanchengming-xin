@@ -2,6 +2,7 @@ import { Alert } from 'antd';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getToken } from '../../shared/api/client';
 import { dispatchPetContext } from '../../shared/pet/stacky';
+import NovelPanelReactPage from './novel-panel/NovelPanelReactPage';
 
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
 const ALLOWED_HEADERS = new Set(['content-type', 'cache-control', 'pragma', 'x-videoprompttool-session']);
@@ -130,6 +131,7 @@ export function NovelPanelPage({ theme }) {
   const [error, setError] = useState(false);
   const searchParams = new URLSearchParams(window.location.search);
   const projectId = searchParams.get('project');
+  const useReactTrial = searchParams.get('react') === '1';
   // Use the concrete document instead of the directory alias. The Go static
   // server supports both, but an older SPA fallback can mistake the directory
   // URL for the main application and embed the home page inside the panel.
@@ -321,6 +323,16 @@ export function NovelPanelPage({ theme }) {
       </svg>
       <strong>正在连接小说面板</strong><span>工作台加载完成后会显示在这里</span>
     </div>;
+  }
+
+  function fallbackToLegacyWorkbench() {
+    const next = new URL(window.location.href);
+    next.searchParams.delete('react');
+    window.location.assign(next.toString());
+  }
+
+  if (useReactTrial) {
+    return <NovelPanelReactPage theme={theme} projectId={projectId} onFallback={fallbackToLegacyWorkbench} />;
   }
 
   return (
