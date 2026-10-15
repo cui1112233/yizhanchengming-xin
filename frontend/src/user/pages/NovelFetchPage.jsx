@@ -98,6 +98,7 @@ export function LegacyNovelFetchPage() {
   const [webSubmitResults, setWebSubmitResults] = useState([]);
   const [webSubmitLoading, setWebSubmitLoading] = useState(false);
   const [versionConfigOpen, setVersionConfigOpen] = useState(false);
+  const [versionPrompts, setVersionPrompts] = useState({ rewrite: '', processingRule: '', knowledgeUsage: '' });
   const [taskDate, setTaskDate] = useState('');
   const [batchAiCount, setBatchAiCount] = useState(1);
   const [ruleApplyScope, setRuleApplyScope] = useState('both');
@@ -223,10 +224,19 @@ export function LegacyNovelFetchPage() {
   function transferToBatchFactory() { window.location.assign('/batch-factory'); }
   async function saveVersionConfig() {
     try {
-      await saveWebSubmitConfig({ selectedVersions, rewriteMethods, sensitiveAiProcessEnabled });
+      await saveWorkshopConfig({ rewrite: { prompt: versionPrompts.rewrite, processing_rule_prompt: versionPrompts.processingRule, ai_slot_methods: rewriteMethods }, knowledge: { usage_prompt: versionPrompts.knowledgeUsage }, selected_versions: selectedVersions, sensitive_ai_enabled: sensitiveAiProcessEnabled });
       setVersionConfigOpen(false);
       message.success('版本配置已保存');
     } catch (error) { message.error(error.message || '保存版本配置失败'); }
+  }
+  async function openVersionConfig() {
+    try {
+      const data = await getWorkshopConfig();
+      const rewrite = data.appConfig?.rewrite || data.config?.rewrite || {};
+      const knowledgeConfig = data.appConfig?.knowledge || data.config?.knowledge || {};
+      setVersionPrompts({ rewrite: rewrite.prompt || '', processingRule: rewrite.processing_rule_prompt || '', knowledgeUsage: knowledgeConfig.usage_prompt || '' });
+    } catch { /* keep an empty draft when the optional config endpoint is unavailable */ }
+    setVersionConfigOpen(true);
   }
 
   const panels = {
@@ -240,9 +250,9 @@ export function LegacyNovelFetchPage() {
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className="novel-fetch-public-input" rows={5} placeholder={'每一行：书籍 ID、书名、推荐理由、男女频、标签、评级。\n示例：123456789\t书名\t打脸逆袭、复仇反转\t女频\t现代世情、爽文\tS'} /></Form.Item>
         <section className="novel-fetch-public-section"><Typography.Title level={5}>本次处理设置</Typography.Title><Typography.Text type="secondary">AI 文案（选择本次需要生成的版本）</Typography.Text><div className="novel-fetch-version-grid">{AI_VERSIONS.map(version => <label key={version} className={`novel-fetch-version-option ${selectedVersions.includes(version) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedVersions.includes(version)} onChange={event => setSelectedVersions(current => event.target.checked ? [...current, version] : current.filter(item => item !== version))} /><span>{AI_VERSION_LABELS[version]}</span></label>)}</div><div className="novel-fetch-public-grid novel-fetch-public-grid--five">{AI_VERSIONS.slice(1).map(version => <label className="novel-fetch-field" key={version}><span>{AI_VERSION_LABELS[version]} 改文方式</span><Select value={rewriteMethods[version]} onChange={value => setRewriteMethods(current => ({ ...current, [version]: value }))} disabled={!selectedVersions.includes(version)} options={REWRITE_METHODS} /></label>)}</div><div className="novel-fetch-public-hint">AI 文案处理优先方案：跟随“配置”中 AI1～AI5 的现有设置。</div></section>
         <section className="novel-fetch-public-section novel-fetch-sensitive"><Typography.Title level={5}>敏感处理</Typography.Title><label><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</label></section>
-        <div className="novel-fetch-public-actions"><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button onClick={() => processForm.resetFields()}>清空</Button><Button onClick={() => setVersionConfigOpen(true)}>版本配置</Button></div>
+        <div className="novel-fetch-public-actions"><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button onClick={() => processForm.resetFields()}>清空</Button><Button onClick={openVersionConfig}>版本配置</Button></div>
       </Form>
-      <Modal open={versionConfigOpen} title="版本配置" onCancel={() => setVersionConfigOpen(false)} onOk={saveVersionConfig}><Alert type="info" showIcon message="版本配置会保存到当前工作台，切换页面后仍然保留。" /><Typography.Paragraph>版本配置：{selectedVersions.map(version => AI_VERSION_LABELS[version]).join('、') || '未选择'}</Typography.Paragraph><Space wrap><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button onClick={() => handleWebSubmit(syncWebSubmitStyles, '已同步批量风格类型')}>同步批量风格类型</Button></Space><Form layout="vertical" style={{ marginTop: 12 }}><Form.Item label="改文提示词"><Input.TextArea rows={3} placeholder="本次处理的改文提示词" /></Form.Item><Form.Item label="处理规则提示词"><Input.TextArea rows={3} placeholder="整本书共同遵守的规则" /></Form.Item><Form.Item label="知识库使用提示词"><Input.TextArea rows={3} placeholder="知识库的使用要求" /></Form.Item></Form></Modal>
+      <Modal open={versionConfigOpen} title="版本配置" onCancel={() => setVersionConfigOpen(false)} onOk={saveVersionConfig}><Alert type="info" showIcon message="版本配置会保存到当前工作台，切换页面后仍然保留。" /><Typography.Paragraph>版本配置：{selectedVersions.map(version => AI_VERSION_LABELS[version]).join('、') || '未选择'}</Typography.Paragraph><Space wrap><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button onClick={() => handleWebSubmit(syncWebSubmitStyles, '已同步批量风格类型')}>同步批量风格类型</Button></Space><Form layout="vertical" style={{ marginTop: 12 }}><Form.Item label="改文提示词"><Input.TextArea rows={3} value={versionPrompts.rewrite} onChange={event => setVersionPrompts(current => ({ ...current, rewrite: event.target.value }))} placeholder="本次处理的改文提示词" /></Form.Item><Form.Item label="处理规则提示词"><Input.TextArea rows={3} value={versionPrompts.processingRule} onChange={event => setVersionPrompts(current => ({ ...current, processingRule: event.target.value }))} placeholder="整本书共同遵守的规则" /></Form.Item><Form.Item label="知识库使用提示词"><Input.TextArea rows={3} value={versionPrompts.knowledgeUsage} onChange={event => setVersionPrompts(current => ({ ...current, knowledgeUsage: event.target.value }))} placeholder="知识库的使用要求" /></Form.Item></Form></Modal>
       <div className="novel-fetch-public-result"><div className="novel-fetch-public-result-title">处理状态</div><pre>{processRows.length ? JSON.stringify(processRows, null, 2) : '暂无处理结果。提交任务后在这里查看状态。'}</pre></div>
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>
