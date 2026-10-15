@@ -4,7 +4,7 @@ import { HomeRoute } from './pages/HomeRoute';
 import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
 
 const loadNovelPanelPage = () => import('./pages/NovelPanelPage');
-const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
+const loadNovelFetchPage = () => import('./pages/NovelFetchWorkshopPage');
 const loadBatchFactoryWorkbenchPage = () => import('./pages/BatchFactoryWorkbenchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
@@ -13,7 +13,7 @@ const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ def
 const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
-const NovelFetchWorkshopPage = lazy(() => import('./pages/NovelFetchWorkshopPage'));
+const NovelFetchWorkshopPage = lazy(loadNovelFetchPage);
 const BatchFactoryWorkbenchPage = lazy(loadBatchFactoryWorkbenchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
@@ -64,7 +64,7 @@ function usePathname() {
 function getPage(pathname) {
   const routes = {
     '/script': ScriptPage,
-    // 主入口保留完整 V78 工作台布局；iframe 资源由当前 Go 服务提供，不再指向 3001。
+    // 小说获取正式入口使用完整 React 工作台；旧静态页面只保留为迁移期间资源。
     '/novel-fetch': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchWorkshopPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
