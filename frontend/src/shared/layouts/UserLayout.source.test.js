@@ -24,9 +24,9 @@ test('批量工厂工作区沿用水货生产主入口名称', () => {
   assert.match(source, /pathname === '\/batch-factory' \|\| pathname\.startsWith\('\/batch-factory\/'\).*return '水货生产'/s);
 });
 
-test('小说获取侧边栏使用 Go 工作台的完整页面导航', () => {
-  assert.match(source, /href: '\/novel-fetch', icon: BookOpen, label: '小说获取', reload: true/);
-  assert.match(source, /<Link key=\{item\.href\} href=\{item\.href\} reload=\{item\.reload\}/);
+test('小说获取侧边栏进入带导航的 Go 工作台外壳', () => {
+  assert.match(source, /href: '\/novel-fetch', icon: BookOpen, label: '小说获取'/);
+  assert.match(source, /<Link key=\{item\.href\} href=\{item\.href\} className=/);
 });
 
 test('avatar enters profile through the client route without opening the menu first', () => {
