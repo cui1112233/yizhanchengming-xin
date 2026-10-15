@@ -5,7 +5,6 @@ import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
 
 const loadNovelPanelPage = () => import('./pages/NovelPanelPage');
 const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
-const loadNovelFetchWorkshopPage = () => import('./pages/NovelFetchWorkshopPage');
 const loadBatchFactoryWorkbenchPage = () => import('./pages/BatchFactoryWorkbenchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
@@ -14,7 +13,6 @@ const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ def
 const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
-const NovelFetchWorkshopPage = lazy(loadNovelFetchWorkshopPage);
 const BatchFactoryWorkbenchPage = lazy(loadBatchFactoryWorkbenchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
@@ -65,12 +63,11 @@ function usePathname() {
 function getPage(pathname) {
   const routes = {
     '/script': ScriptPage,
-    // V78 是小说获取正式入口；React 工作台仅保留在显式迁移地址。
+    // 小说获取正式入口，直接渲染 React 源码工作台。
     '/novel-fetch': NovelFetchPage,
-    // V78 is served by Go at /novel-fetch. Keep the React workbench reachable
-    // only through an explicit migration/debug route.
+    // 迁移调试地址保留同一份 React 页面，避免出现第二套实现。
     '/novel-fetch-react': NovelFetchPage,
-    '/novel-fetch-workshop': NovelFetchWorkshopPage,
+    '/novel-fetch-workshop': NovelFetchPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
     '/novel-panel': NovelPanelPage,
     '/agent': AgentPage,
