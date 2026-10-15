@@ -163,26 +163,6 @@ export function UserLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    const receiveNovelFetchStatus = event => {
-      if (pathname !== '/novel-fetch') return;
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== 'qiantie:novel-fetch-status') return;
-      const frame = document.querySelector('iframe.novel-fetch-original-workbench');
-      if (!frame || event.source !== frame.contentWindow) return;
-      const text = String(event.data.text || '').trim();
-      if (!text) return;
-      const allowedTones = new Set(['info', 'working', 'success', 'warning', 'error']);
-      const statusText = compactHeaderStatus(text);
-      const tone = headerStatusTone(text, allowedTones.has(event.data.tone) ? event.data.tone : 'info');
-      setGlobalStatus(expiringHeaderStatus(statusText, tone));
-    };
-    window.addEventListener('message', receiveNovelFetchStatus);
-    return () => {
-      window.removeEventListener('message', receiveNovelFetchStatus);
-    };
-  }, [pathname]);
-
-  useEffect(() => {
     const expiresAt = Number(globalStatus.expiresAt || 0);
     if (!globalStatus.text || !expiresAt) return undefined;
     const timer = window.setTimeout(() => {
