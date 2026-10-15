@@ -252,6 +252,147 @@ func workshopProcessResult(ctx context.Context, store novelfetchworkshop.Store, 
 	}, nil
 }
 
+// applySensitiveAIRepair runs only when the user explicitly enables the
+// sensitive-word AI repair switch. Deterministic rules still run first; the
+// model then refines each hit line and the audit item records the source,
+// model and attempt count shown by the workbench.
+func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.RewriteProvider, settings map[string]any, bookID, text string, items []map[string]any) (string, []map[string]any) {
+	if len(items) == 0 {
+		return text, items
+	}
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	app := mapOrEmpty(settings["appConfig"])
+	ai := mapOrEmpty(settings["sensitive_ai"])
+	if len(ai) == 0 {
+		ai = mapOrEmpty(app["sensitive_ai"])
+	}
+	enabled, _ := ai["enabled"].(bool)
+	if !enabled {
+		return text, items
+	}
+	model := firstText(ai["model"], ai["model_id"], ai["modelId"], settings["text_model_id"], settings["textModelId"], "未指定")
+	promptTemplate := strings.TrimSpace(fmt.Sprint(ai["prompt"]))
+	if promptTemplate == "" {
+		promptTemplate = "你是内容合规改写助手。只改写下面命中敏感词的小段内容，保留原剧情、人物关系和情绪，不增加新剧情。只返回改写后的小段，不要解释。\n\n任务ID：{book_id}\n命中词：{keyword}\n\n原片段：\n{snippet}"
+	}
+	maxAttempts := toInt(ai["retries"]) + 1
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+	if maxAttempts > 3 {
+		maxAttempts = 3
+	}
+	for _, item := range items {
+		item["source"] = "AI鉴组处理"
+		item["model"] = model
+		before := strings.TrimSpace(fmt.Sprint(item["before"]))
+		keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
+		attempts := 0
+		var output string
+		var lastErr error
+		if provider == nil {
+			lastErr = errors.New("敏感词 AI 修复模型未配置")
+		} else {
+			userPrompt := strings.NewReplacer("{book_id}", bookID, "{keyword}", keyword, "{snippet}", before).Replace(promptTemplate)
+			for attempts < maxAttempts {
+				attempts++
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: "你是内容合规改写助手。只返回改写后的小段内容。", UserPrompt: userPrompt, Temperature: 0.2, MaxTokens: 1200})
+				output = strings.TrimSpace(output)
+				if lastErr == nil && output != "" {
+					break
+				}
+			}
+		}
+		item["attempt"] = attempts
+		if lastErr != nil || output == "" {
+			item["status"] = "failed"
+			item["error"] = firstText(lastErr, "AI 返回为空")
+			continue
+		}
+		item["status"] = "done"
+		item["error"] = ""
+		// The deterministic pass stores the line in `after`; replace that exact
+		// line once so repeated identical hits do not rewrite every occurrence.
+		target := strings.TrimSpace(fmt.Sprint(item["after"]))
+		if target == "" {
+			target = before
+		}
+		if index := strings.Index(text, target); index >= 0 {
+			text = text[:index] + output + text[index+len(target):]
+		}
+		item["after"] = output
+	}
+	return text, items
+}
+
+// executeWorkshopDocumentFetch is the shared Go-side fetch stage used by the
+// full-workflow start endpoint. It keeps the sensitive-rule pass and optional
+// AI repair in the same order as the manual fetch/reprocess buttons.
+func executeWorkshopDocumentFetch(ctx context.Context, store novelfetchworkshop.Store, owner, bookID string, fetcher *novelfetchworkshop.UpstreamFetcher, maxTxt int, sensitiveAIEnabled bool, sensitiveProvider novelfetchworkshop.RewriteProvider, genderJudge novelfetchworkshop.AIGenderJudge, styleProvider novelfetchworkshop.RewriteProvider) error {
+	document, err := store.GetDocument(ctx, owner, bookID)
+	if err != nil {
+		return err
+	}
+	platformID := "2"
+	if value, ok := document.Meta["platformId"].(string); ok && strings.TrimSpace(value) != "" {
+		platformID = strings.TrimSpace(value)
+	}
+	result, err := fetcher.FetchAndProcess(ctx, bookID, platformID, maxTxt)
+	if err != nil {
+		return err
+	}
+	processedText, sensitiveCount, sensitiveItems, _ := applyNovelFetchSensitiveRulesDetailed(ctx, store, owner, result.ProcessedText)
+	settings, _ := store.GetConfig(ctx, owner)
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	if sensitiveAIEnabled {
+		ai := mapOrEmpty(settings["sensitive_ai"])
+		if len(ai) == 0 {
+			ai = map[string]any{}
+		}
+		ai["enabled"] = true
+		settings["sensitive_ai"] = ai
+	}
+	processedText, sensitiveItems = applySensitiveAIRepair(ctx, sensitiveProvider, settings, bookID, processedText, sensitiveItems)
+	sensitiveCount = len(sensitiveItems)
+	document.OriginalRaw = result.OriginalRaw
+	document.ProcessedText = processedText
+	document.Original = processedText
+	document.OriginalRawChars = result.OriginalRawChars
+	document.ProcessedChars = len([]rune(processedText))
+	document.MaxTxt = result.MaxTxt
+	document.BookInfo = result.BookInfo
+	if document.Meta == nil {
+		document.Meta = map[string]any{}
+	}
+	document.Meta["originalStatus"] = "done"
+	document.Meta["originalRawChars"] = result.OriginalRawChars
+	document.Meta["processedChars"] = document.ProcessedChars
+	document.Meta["sensitiveStatus"] = "done"
+	document.Meta["sensitiveReplaced"] = sensitiveCount
+	setSensitiveDetails(document.Meta, sensitiveItems, sensitiveCount)
+	if err := persistNovelFetchBodies(ctx, store, owner, &document, result.OriginalRaw, processedText); err != nil {
+		return err
+	}
+	if genderNeedsResolution(document.Gender) {
+		genderInfo := result.BookInfo
+		genderInfo.Text = processedText
+		decision := novelfetchworkshop.ResolveGender(ctx, "", genderInfo, genderJudge)
+		document.Gender, document.GenderSource, document.GenderReason = decision.Gender, decision.Source, decision.Reason
+	}
+	if styleNeedsResolution(document.Meta) {
+		document.Meta["styleStatus"] = "processing"
+		styleInfo := result.BookInfo
+		styleInfo.Text = processedText
+		style := novelfetchworkshop.ResolveStyle(ctx, styleInfo, styleProvider)
+		recordNovelFetchStyleDecision(document.Meta, style, nil)
+	}
+	return store.PutDocument(ctx, owner, document)
+}
+
 // workshopPreviewResult parses the same input as the start endpoint without
 // writing documents. The V78 workbench uses this as a first step to show the
 // user how many books were recognised before starting the real run.
@@ -308,12 +449,13 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			InputText       string `json:"inputText"`
-			InputTextLegacy string `json:"input_text"`
-			MaxTxt          int    `json:"maxTxt"`
-			MaxTxtLegacy    int    `json:"max_txt"`
-			PlatformID      string `json:"platform_id"`
-			PlatformIDCamel string `json:"platformId"`
+			InputText          string `json:"inputText"`
+			InputTextLegacy    string `json:"input_text"`
+			MaxTxt             int    `json:"maxTxt"`
+			MaxTxtLegacy       int    `json:"max_txt"`
+			PlatformID         string `json:"platform_id"`
+			PlatformIDCamel    string `json:"platformId"`
+			SensitiveAIEnabled bool   `json:"sensitive_ai_enabled"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			return
@@ -373,12 +515,13 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/process/start", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			InputText       string `json:"inputText"`
-			InputTextLegacy string `json:"input_text"`
-			MaxTxt          int    `json:"maxTxt"`
-			MaxTxtLegacy    int    `json:"max_txt"`
-			PlatformID      string `json:"platform_id"`
-			PlatformIDCamel string `json:"platformId"`
+			InputText          string `json:"inputText"`
+			InputTextLegacy    string `json:"input_text"`
+			MaxTxt             int    `json:"maxTxt"`
+			MaxTxtLegacy       int    `json:"max_txt"`
+			PlatformID         string `json:"platform_id"`
+			PlatformIDCamel    string `json:"platformId"`
+			SensitiveAIEnabled bool   `json:"sensitive_ai_enabled"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "请求内容无效"})
@@ -396,6 +539,9 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		if strings.TrimSpace(input.PlatformID) == "" {
 			input.PlatformID = "2"
 		}
+		if input.MaxTxt <= 0 {
+			input.MaxTxt = 4000
+		}
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 		id := fmt.Sprintf("go-workshop-%d", time.Now().UnixNano())
 		job := map[string]any{"id": id, "status": "running", "queue_state": "running", "started_at": now, "updated_at": now, "attempts": 1, "steps": []any{}, "progress": []any{}}
@@ -406,9 +552,29 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			job["queue_state"] = "failed"
 			job["error"] = err.Error()
 		} else {
-			job["status"] = "done"
-			job["queue_state"] = "done"
-			job["result"] = result
+			if fetcher != nil {
+				documents, _, _, _ := parseWorkshopDocuments(input.InputText, input.MaxTxt)
+				var sensitiveProvider novelfetchworkshop.RewriteProvider
+				if input.SensitiveAIEnabled {
+					sensitiveProvider, _ = resolveRewriteProvider(req)
+				}
+				for _, document := range documents {
+					if fetchErr := executeWorkshopDocumentFetch(req.Context(), store, identity.Username, document.BookID, fetcher, input.MaxTxt, input.SensitiveAIEnabled, sensitiveProvider, resolveGenderJudge(req), sensitiveProvider); fetchErr != nil {
+						job["status"] = "failed"
+						job["queue_state"] = "failed"
+						job["error"] = fetchErr.Error()
+						break
+					}
+				}
+				if job["status"] == "running" {
+					result["tasks"], _ = store.ListDocuments(req.Context(), identity.Username)
+				}
+			}
+			if job["status"] == "running" {
+				job["status"] = "done"
+				job["queue_state"] = "done"
+				job["result"] = result
+			}
 		}
 		job["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 		registry.put(identity.Username, id, job)
@@ -526,7 +692,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/batch-retry", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
-			IDs []string `json:"ids"`
+			IDs                []string `json:"ids"`
+			SensitiveAIEnabled bool     `json:"sensitive_ai_enabled"`
 		}
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请求内容无效"})
@@ -576,6 +743,25 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 					continue
 				}
 				processedText, sensitiveCount, sensitiveItems, _ := applyNovelFetchSensitiveRulesDetailed(req.Context(), store, identity.Username, result.ProcessedText)
+				settings, _ := store.GetConfig(req.Context(), identity.Username)
+				if input.SensitiveAIEnabled {
+					ai := mapOrEmpty(settings["sensitive_ai"])
+					if len(ai) == 0 {
+						ai = map[string]any{}
+					}
+					ai["enabled"] = true
+					settings["sensitive_ai"] = ai
+				}
+				var sensitiveProvider novelfetchworkshop.RewriteProvider
+				if input.SensitiveAIEnabled {
+					if rewriteResolver != nil {
+						sensitiveProvider, _ = rewriteResolver(req.Context(), identity.Username)
+					} else {
+						sensitiveProvider = rewriteProvider
+					}
+				}
+				processedText, sensitiveItems = applySensitiveAIRepair(req.Context(), sensitiveProvider, settings, bookID, processedText, sensitiveItems)
+				sensitiveCount = len(sensitiveItems)
 				document.OriginalRaw = result.OriginalRaw
 				document.Original = processedText
 				document.ProcessedText = processedText
@@ -759,7 +945,8 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		var input struct {
-			MaxTxt int `json:"maxTxt"`
+			MaxTxt             int  `json:"maxTxt"`
+			SensitiveAIEnabled bool `json:"sensitive_ai_enabled"`
 		}
 		if req.ContentLength != 0 {
 			if err := decodeNovelFetchJSON(w, req, &input); err != nil {
@@ -784,6 +971,21 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 			return
 		}
 		processedText, sensitiveCount, sensitiveItems, _ := applyNovelFetchSensitiveRulesDetailed(req.Context(), store, identity.Username, result.ProcessedText)
+		settings, _ := store.GetConfig(req.Context(), identity.Username)
+		if input.SensitiveAIEnabled {
+			ai := mapOrEmpty(settings["sensitive_ai"])
+			if len(ai) == 0 {
+				ai = map[string]any{}
+			}
+			ai["enabled"] = true
+			settings["sensitive_ai"] = ai
+		}
+		var sensitiveProvider novelfetchworkshop.RewriteProvider
+		if input.SensitiveAIEnabled {
+			sensitiveProvider, _ = resolveRewriteProvider(req)
+		}
+		processedText, sensitiveItems = applySensitiveAIRepair(req.Context(), sensitiveProvider, settings, bookID, processedText, sensitiveItems)
+		sensitiveCount = len(sensitiveItems)
 		document.OriginalRaw = result.OriginalRaw
 		document.ProcessedText = processedText
 		document.Original = processedText

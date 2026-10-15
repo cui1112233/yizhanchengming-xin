@@ -143,8 +143,8 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 	})
 
 	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/batch-ai-count", func(w http.ResponseWriter, req *http.Request) { updateTaskMeta(w, req, store, "aiCount") })
-	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/apply-rules", func(w http.ResponseWriter, req *http.Request) { applySensitive(w, req, store, false) })
-	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/reprocess-sensitive", func(w http.ResponseWriter, req *http.Request) { applySensitive(w, req, store, true) })
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/apply-rules", func(w http.ResponseWriter, req *http.Request) { applySensitive(w, req, store, false, rewriteProvider) })
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/reprocess-sensitive", func(w http.ResponseWriter, req *http.Request) { applySensitive(w, req, store, true, rewriteProvider) })
 	mux.HandleFunc("POST /api/novel-fetch-workshop/web-submit/operations", func(w http.ResponseWriter, req *http.Request) {
 		var input map[string]any
 		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
@@ -325,12 +325,13 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": changed})
 }
 
-func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, restore bool) {
+func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, restore bool, resolveProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error)) {
 	identity, _ := BridgeIdentityFromContext(req.Context())
 	var in struct {
-		IDs     []string `json:"ids"`
-		BookIDs []string `json:"bookIds"`
-		Text    string   `json:"text"`
+		IDs                []string `json:"ids"`
+		BookIDs            []string `json:"bookIds"`
+		Text               string   `json:"text"`
+		SensitiveAIEnabled bool     `json:"sensitive_ai_enabled"`
 	}
 	if err := decodeNovelFetchJSON(w, req, &in); err != nil {
 		return
@@ -340,6 +341,18 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		ids = in.BookIDs
 	}
 	settings, _ := store.GetConfig(req.Context(), identity.Username)
+	if in.SensitiveAIEnabled {
+		ai := mapOrEmpty(settings["sensitive_ai"])
+		if len(ai) == 0 {
+			ai = map[string]any{}
+		}
+		ai["enabled"] = true
+		settings["sensitive_ai"] = ai
+	}
+	var provider novelfetchworkshop.RewriteProvider
+	if in.SensitiveAIEnabled && resolveProvider != nil {
+		provider, _ = resolveProvider(req)
+	}
 	changed := 0
 	replacements := 0
 	for _, id := range ids {
@@ -359,6 +372,8 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 			d.ProcessedText = d.Original
 		}
 		processed, count, sensitiveItems := novelfetchworkshop.ApplySensitiveRulesWithDetails(d.ProcessedText, settings)
+		processed, sensitiveItems = applySensitiveAIRepair(req.Context(), provider, settings, d.BookID, processed, sensitiveItems)
+		count = len(sensitiveItems)
 		d.ProcessedText = processed
 		d.Original = processed
 		replacements += count
