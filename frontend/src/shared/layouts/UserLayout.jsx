@@ -23,7 +23,7 @@ const navItems = [
   { href: '/script', icon: FilePenLine, label: '剧本生成' },
   // Novel Fetch is served as the Go-embedded canonical workbench. Force a
   // document navigation so the SPA cannot swap in a stale React-only page.
-  { href: '/novel-fetch', icon: BookOpen, label: '小说获取' },
+  { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
   { href: '/novel-panel', icon: NotebookTabs, label: '小说面板' },
   { href: '/shuihuo-production', icon: Clapperboard, label: '水货生产' },
   { href: '/agent', icon: Bot, label: 'Agent 工作区' },
@@ -451,7 +451,7 @@ export function UserLayout({ children }) {
           {visibleNavItems.map(item => {
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={pathname === item.href ? 'active' : ''}>
+              <Link key={item.href} href={item.href} reload={item.reload} className={pathname === item.href ? 'active' : ''}>
                 <span className="legacy-nav-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span>
                 <span className="legacy-nav-label">{item.label}</span>
                 <span className="legacy-nav-tooltip" aria-hidden="true">{item.label}</span>
