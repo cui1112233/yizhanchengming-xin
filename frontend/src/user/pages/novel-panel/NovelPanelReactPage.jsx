@@ -4,6 +4,7 @@ import {
   generateNovelPanelScenePrompts,
   getNovelPanelProject,
   createNovelPanelProject,
+  listNovelPanelProjects,
   listNovelPanelHistory,
   saveNovelPanelProject
 } from '../../../shared/api/novelPanel';
