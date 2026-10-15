@@ -127,7 +127,9 @@
   min-width: 0;
   max-width: none;
   width: 100%;
-  padding: 0 18px 28px;
+  /* 线上 V78 的内容区直接贴合主工作区；多一层横向 padding 会让
+     标题、表格和右侧状态栏整体向内缩，导致 React 页面与线上错位。 */
+  padding: 0 0 28px;
   background: var(--legacy-bg);
   color: var(--text-primary);
 }
@@ -276,6 +278,12 @@
   min-width: 0;
 }
 
+/* 线上标题占据左侧固定区域，业务标签从中部开始；否则 Ant Tabs 会
+   紧贴标题，形成“标题 + 标签挤在一起”的非 V78 布局。 */
+.novel-fetch-workbench .ant-tabs-extra-content-left {
+  min-width: 40%;
+}
+
 /* V78 workbench styling is kept in React source, rather than loading the
    historical public bundle.  These tokens intentionally follow the server
    reference palette while still using the application's theme variables. */
@@ -324,17 +332,21 @@
 .novel-fetch-preview-row:hover { border-color:var(--legacy-border-strong); background:var(--legacy-card); }
 .novel-fetch-preview-row input { accent-color:#1677ff; }
 .novel-fetch-status-layout { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(260px, .8fr); gap:12px; width:100%; }
-.novel-fetch-process-grid { display:grid; grid-template-columns:minmax(0, 1.34fr) minmax(320px, 1fr); gap:12px; width:100%; align-items:start; }
+.novel-fetch-process-grid { display:grid; grid-template-columns:minmax(0, 1.34fr) minmax(320px, 1fr); gap:12px; width:100%; align-items:stretch; }
 .novel-fetch-version-card { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:12px 0; padding:12px 14px; border:1px solid var(--border-color, #30384a); border-radius:8px; background:rgba(35, 33, 61, .72); }
 .novel-fetch-version-card > div { display:flex; flex-direction:column; gap:4px; }
 .novel-fetch-current-batch-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .novel-fetch-current-batch-heading h5 { margin:0; }
 .novel-fetch-process-main,
 .novel-fetch-process-side { min-width:0; }
-.novel-fetch-process-side .novel-fetch-status-layout { display:flex; flex-direction:column; gap:12px; }
+.novel-fetch-process-side { display:flex; flex-direction:column; min-height:100%; }
+.novel-fetch-process-side .novel-fetch-status-layout { display:flex; flex-direction:column; gap:12px; flex:1; }
 .novel-fetch-process-side .novel-fetch-public-result { min-height:0; }
+.novel-fetch-process-side .novel-fetch-live-log { flex:1; }
 .novel-fetch-process-side .novel-fetch-live-log pre { min-height:300px; }
 .novel-fetch-progress-list { display:grid; gap:8px; margin:12px 0; }
+.novel-fetch-progress-title,
+.novel-fetch-live-log-title { margin: 6px 0 8px; color: #1684ff; font-size: 13px; font-weight: 600; }
 .novel-fetch-progress-list > div { display:grid; grid-template-columns:92px minmax(0,1fr) auto; gap:8px; align-items:center; color:var(--text-secondary); font-size:12px; }
 .novel-fetch-progress-list > div::after { content:''; grid-column:2; grid-row:1; height:7px; border:1px solid var(--legacy-border-strong); border-radius:999px; background:linear-gradient(90deg, #26c46b 0 38%, transparent 38%); opacity:.9; }
 .novel-fetch-progress-list > div b { grid-column:3; grid-row:1; color:var(--text-primary); font-weight:500; }
