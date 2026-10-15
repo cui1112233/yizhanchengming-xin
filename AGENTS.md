@@ -6,7 +6,7 @@ All agents, chats, Codex sessions, and automation working on this repository mus
 2. **Every feature and bug fix must be written into Git first.** Normal flow: feature/fix branch -> tests -> merge into `v88` -> record commit SHA -> deploy/sync production.
 3. **Production/ECS is a runtime copy, not a development source.** Do not complete a task by editing only the running server/container. Emergency production edits must be ported back to `v88` immediately; otherwise the task is incomplete.
 4. **Before modifying or deploying, verify the current `v88` HEAD.** Never overwrite current V88 with an older `app.js`, old hotfix bundle, old image, or historical branch snapshot.
-5. **Daily small changes should prefer Git -> ECS incremental direct deployment, not full Docker rebuilds.** Frontend-only changes should rebuild only frontend; Node-only changes restart Node; Go changes rebuild/restart Go; migrations run Goose only when required; Worker changes update/restart Worker only when required.
+5. **Daily small changes should use the Go binary release path.** Frontend changes rebuild React and then the embedded Go binary; Go changes rebuild/restart Go; migrations run Goose only when required; Worker changes update/restart Worker only when required.
 6. **Do not interpret “no Docker for daily releases” as “delete all existing Docker infrastructure.”** Existing MySQL/Redis/Worker/containerized infrastructure may remain until intentionally migrated. Docker is not the default release mechanism for small application changes.
 7. **Every production release must be traceable to a Git SHA** and have a known previous stable SHA/rollback point.
 8. **User-visible `121` naming must be `视频管理系统`.** Internal compatibility names may retain `121`.
@@ -30,9 +30,9 @@ During stages 1-6, apply these additional rules:
 
 11. **Historical branches are read-only reference sources.** Do not continue maintained development on V78, old feature/fix/integration/ops/design/release/archive/tmp branches. New maintained work must end in `v88`.
 12. **Do not delete historical branches or workflows before stage 7.** First prove their functionality and runtime dependencies have been consolidated and replaced.
-13. **Do not introduce another public release path during consolidation.** The approved Node public release path is `V88 Direct Deploy Node Stage` -> exact staged SHA -> `V88 Direct Deploy Node Cutover` -> external exact-SHA verification/rollback protection.
-14. **Old Docker/GHCR emergency/one-time workflows are not normal release entry points.** They may remain temporarily for audit or recovery until stage 7, but must not be selected for ordinary deployment unless the user explicitly approves an emergency recovery path.
-15. **Production is still a hybrid runtime while stage 6 is pending.** The Git-direct host Node currently depends on the existing Docker network and existing Go API / Browser Worker / Nginx services. Do not remove Docker networks, containers, overlays, or ECS-only runtime configuration merely because Node release is Git-direct.
+13. **The approved application release path is the Go embed binary script.** Use `scripts/deploy-go-embedded.ps1`; do not introduce or restore a Node release path.
+14. **Historical Docker/Node/GHCR workflows are not release entry points.** They are outside the refactored application and must not be selected for ordinary deployment.
+15. **The refactored application runtime is Go-only.** MySQL, Redis, TOS, FFmpeg and external connectors remain infrastructure dependencies, but the application API and embedded frontend are served by the Go binary.
 16. **Before starting a V88 task in any chat, read the current consolidation inventory OBJ and `docs/V88_PROJECT_EXECUTION_MEMORY.md`.** Do not rely on stale `master`, historical production snapshots, or prior-chat assumptions.
 
 For the full project memory and deployment rationale, read:
@@ -42,3 +42,7 @@ For the full project memory and deployment rationale, read:
 For the current consolidation inventory/freeze baseline, read:
 
 `docs/obj/2026-09-08-v88-consolidation-stage1-inventory-freeze.md`
+
+## 重构模式补充规则
+
+本项目当前按全量重构处理，不为旧 Node 发布链路保留兼容入口。`deploy/v88-direct` 已退出维护并删除；部署统一使用 `scripts/deploy-go-embedded.ps1`。历史文档只作为背景资料，不得重新创建已删除的 Node 部署目录或脚本。

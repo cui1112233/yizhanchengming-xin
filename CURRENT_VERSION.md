@@ -29,35 +29,15 @@ That release passed:
 
 The Git `v88` HEAD may be newer than the public runtime SHA because documentation, rules, tests, or future un-released work can be committed after a production release. Do not assume `HEAD == production` without checking `/api/build-info` or the release record.
 
-## Current formal Node release path
+## Current Go binary release path
 
-Normal Node/public releases use:
+本次重构统一使用：
 
-`Git v88 -> V88 Direct Deploy Node Stage -> exact staged SHA -> CUTOVER-REQUEST -> V88 Direct Deploy Node Cutover -> external exact-SHA verification`
+`Git v88 -> scripts/deploy-go-embedded.ps1 -> frontend build -> Go embed binary -> scp/systemd`
 
-The old automatic Docker/GHCR public image release is retired as the normal application release path.
+应用 API 和前端页面由 Go 二进制提供，不再使用 Node 应用发布路径。旧 Node/Docker 发布目录已从当前代码中移除。
 
-`v88-node-emergency-redeploy.yml`, `*-once.yml`, registry diagnostics, and other historical recovery workflows are not normal release entry points during consolidation.
-
-## Current production runtime mode
-
-Production is currently **hybrid**, not fully migrated away from Docker.
-
-The Git-direct host Node stage uses:
-
-- pinned Node runtime `24.19.0`;
-- release directories under `/opt/qiantie/releases/v88-stage/`;
-- systemd service `qiantie-v88-node-stage.service`;
-- stage port `18081`;
-- current persistent data/output mounts.
-
-It still depends on the existing production Docker network and services, including:
-
-- Go API;
-- Browser Worker;
-- Nginx;
-- the current Docker network used to resolve those upstreams;
-- existing production environment/mount information inherited from the running Node container during staging.
+MySQL、Redis、TOS、FFmpeg 和外部连接器仍属于运行基础设施，不会被打进应用二进制；它们由目标环境提供。
 
 Therefore “daily Node releases are Git-direct” must not be interpreted as “Docker can be deleted now”. Production-runtime consolidation is stage 6.
 

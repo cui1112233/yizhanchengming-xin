@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-生产应用使用 `deploy/v88-direct` 的 Go 二进制直部署。活动应用只有
-`qiantie.service` 启动的 Go API 和主机 Nginx；MySQL、Redis、TOS、FFmpeg
+生产应用使用 `scripts/deploy-go-embedded.ps1` 生成的 Go 二进制直部署。活动应用只有
+systemd 启动的 Go API；MySQL、Redis、TOS、FFmpeg
 作为外部基础设施存在。`v88-node`、浏览器 Worker、旧 `shuihuo-compat`
 不再作为默认应用运行时。历史容器配置仅保留作审计和回滚参考，不能作为
 新的发布入口。
