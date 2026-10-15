@@ -28,7 +28,7 @@
 
 ---
 
-### Task 1: 小说获取 React 正式入口
+### Task 1: 小说获取 React 正式入口（已完成）
 
 **Files:**
 - Modify: `frontend/src/user/pages/NovelFetchPage.jsx`
@@ -41,29 +41,35 @@
 - Consumes: existing `LegacyNovelFetchPage` and `novelFetchWorkshop` API helpers.
 - Produces: default `NovelFetchPage` renders the React implementation; no iframe is created.
 
-- [ ] **Step 1: Write the failing source test**
+- [x] **Step 1: Write the failing source test**
 
   Assert that the exported default page uses the React implementation and that the canonical page source no longer contains `src={\`/batch-rewrite/v2` or `novel-fetch-original-workbench`.
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
   Run: `node --test frontend/src/user/App.performance.test.js test/novel-fetch-performance.test.js`
 
-- [ ] **Step 3: Switch the default export**
+- [x] **Step 3: Switch the default export**
 
   Make `NovelFetchPage` render the existing React workbench implementation, keep `LegacyNovelFetchPage` as the named compatibility export only while tests and UI parity are completed, and remove iframe-only status handling from the default path.
 
-- [ ] **Step 4: Update layout/status tests and styles**
+- [x] **Step 4: Update layout/status tests and styles**
 
   Replace iframe visibility assertions with React page assertions; keep the shared page spacing and loading states.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
   Expected: all focused tests pass and no canonical novel-fetch page test references the old iframe.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   `git add frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch.css frontend/src/user/App.performance.test.js test/novel-fetch-performance.test.js && git commit -m "refactor: make novel fetch react entry canonical"`
+
+**实际结果：** `/novel-fetch` 和 `/novel-fetch-workshop` 现在共用完整的
+`NovelFetchWorkshopPage` React 工作台，小说获取、任务、配置、知识库、处理规则、网站提交和日志都走 Go 的
+`/api/novel-fetch-workshop/*` 接口；`NovelFetchPage.jsx` 只保留稳定的模块转出，不再包含旧 iframe。
+本次提交：`92d2548f`。验证：`node --test frontend/src/user/App.performance.test.js` 3/3，
+`npm --prefix frontend run build` 通过。
 
 ### Task 2: 小说获取链路验收与 Go 接口边界
 
