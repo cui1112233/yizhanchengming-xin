@@ -19,7 +19,9 @@ test('workbench pages keep their asynchronous loading boundaries', async () => {
     fs.readFile(new URL('./pages/NovelPanelPage.jsx', import.meta.url), 'utf8'),
     fs.readFile(new URL('./pages/BatchFactoryWorkbenchPage.jsx', import.meta.url), 'utf8')
   ]);
-  assert.match(novelFetch, /NovelFetchWorkshopPage/);
+  assert.match(novelFetch, /export function LegacyNovelFetchPage/);
+  assert.match(novelFetch, /知识库/);
+  assert.match(novelFetch, /处理规则/);
   assert.doesNotMatch(novelFetch, /batch-rewrite\/v2|<iframe/);
   assert.match(novelPanel, /NovelPanelReactPage/);
   assert.doesNotMatch(novelPanel, /iframe|workbenchSrc/);
@@ -30,6 +32,7 @@ test('novel fetch canonical entry uses the React workbench as the single visual 
   const app = await fs.readFile(appPath, 'utf8');
   const novelFetch = await fs.readFile(new URL('./pages/NovelFetchPage.jsx', import.meta.url), 'utf8');
   assert.match(app, /const loadNovelFetchPage = \(\) => import\('\.\/pages\/NovelFetchPage'\)/);
-  assert.match(novelFetch, /export \{ default, NovelFetchWorkshopPage as NovelFetchPage \}/);
+  assert.match(novelFetch, /export function NovelFetchPage/);
+  assert.match(novelFetch, /return <LegacyNovelFetchPage \/>/);
   assert.doesNotMatch(novelFetch, /effectiveTheme|onLoad=/);
 });
