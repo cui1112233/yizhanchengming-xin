@@ -2,6 +2,7 @@ package novelfetchworkshop
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -97,6 +98,16 @@ func TestUpstreamFetchParsesNestedThemeAndLabels(t *testing.T) {
 	}
 	if result.BookInfo.WorkTitle != "测试书" || result.BookInfo.Themes != "现实情感、婚恋" || result.BookInfo.Labels != "现代" {
 		t.Fatalf("nested bookinfo = %#v", result.BookInfo)
+	}
+}
+
+func TestBookInfoUnmarshalAcceptsPersistedStringThemeAndLabels(t *testing.T) {
+	var info BookInfo
+	if err := json.Unmarshal([]byte(`{"category":"","genre":"","theme":"言情、现实情感","labels":"现代"}`), &info); err != nil {
+		t.Fatal(err)
+	}
+	if info.Themes != "言情、现实情感" || info.Labels != "现代" {
+		t.Fatalf("persisted book info = %#v", info)
 	}
 }
 

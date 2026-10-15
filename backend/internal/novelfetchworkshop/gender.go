@@ -18,8 +18,8 @@ const (
 )
 
 type BookInfo struct {
-	Category string `json:"category"`
-	Genre    string `json:"genre"`
+	Category  string `json:"category"`
+	Genre     string `json:"genre"`
 	WorkTitle string `json:"workTitle,omitempty"`
 	Themes    string `json:"themes,omitempty"`
 	Labels    string `json:"labels,omitempty"`
@@ -38,8 +38,8 @@ func (info *BookInfo) UnmarshalJSON(data []byte) error {
 		Category  string          `json:"category"`
 		Genre     json.RawMessage `json:"genre"`
 		WorkTitle string          `json:"work_title"`
-		Theme     []struct{ Name string `json:"name"` } `json:"theme"`
-		Labels    []struct{ Name string `json:"name"` } `json:"labels"`
+		Theme     json.RawMessage `json:"theme"`
+		Labels    json.RawMessage `json:"labels"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -48,19 +48,32 @@ func (info *BookInfo) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	themes := make([]string, 0, len(raw.Theme))
-	for _, item := range raw.Theme {
-		if text := strings.TrimSpace(item.Name); text != "" {
-			themes = append(themes, text)
-		}
-	}
-	labels := make([]string, 0, len(raw.Labels))
-	for _, item := range raw.Labels {
-		if text := strings.TrimSpace(item.Name); text != "" {
-			labels = append(labels, text)
-		}
-	}
+	themes := decodeBookInfoNames(raw.Theme)
+	labels := decodeBookInfoNames(raw.Labels)
 	*info = BookInfo{Category: raw.Category, Genre: genre, WorkTitle: raw.WorkTitle, Themes: strings.Join(themes, "、"), Labels: strings.Join(labels, "、")}
+	return nil
+}
+
+func decodeBookInfoNames(raw json.RawMessage) []string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var items []struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(raw, &items) == nil {
+		result := make([]string, 0, len(items))
+		for _, item := range items {
+			if text := strings.TrimSpace(item.Name); text != "" {
+				result = append(result, text)
+			}
+		}
+		return result
+	}
+	var text string
+	if json.Unmarshal(raw, &text) == nil && strings.TrimSpace(text) != "" {
+		return []string{strings.TrimSpace(text)}
+	}
 	return nil
 }
 
