@@ -8,6 +8,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      document.addEventListener('click', (event) => {
+        const link = event.target.closest?.('a[href="/novel-fetch"]');
+        if (!link) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.location.assign('/novel-fetch');
+      }, true);
+    </script>
     <script type="module" src="/src/user/main.jsx"></script>
   </body>
 </html>
