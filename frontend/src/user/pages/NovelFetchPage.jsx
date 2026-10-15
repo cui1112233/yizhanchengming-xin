@@ -8,7 +8,7 @@ import {
 import {
   analyzeWorkshopOpening, deleteWorkshopKnowledge, deleteWorkshopTasks, fetchWorkshopOriginal,
   generateWorkshopAi, getWorkshopConfig, getWorkshopKnowledge, getWorkshopKnowledgeSummary,
-  getWorkshopTask, listWorkshopTasks, normalizeWorkshopOpening, optimizeWorkshopKnowledge,
+  getWorkshopPlatforms, getWorkshopTask, listWorkshopTasks, normalizeWorkshopOpening, optimizeWorkshopKnowledge,
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
   updateWorkshopAiCount, applyWorkshopRules,
   saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, suggestWorkshopRules, testWorkshopAi
@@ -75,6 +75,7 @@ export function LegacyNovelFetchPage() {
   const [knowledgeForm] = Form.useForm();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [processRows, setProcessRows] = useState([]);
+  const [platformOptions, setPlatformOptions] = useState(PLATFORMS);
   const [processJob, setProcessJob] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [tasks, setTasks] = useState([]);
@@ -107,7 +108,7 @@ export function LegacyNovelFetchPage() {
   const [uploadProfiles, setUploadProfiles] = useState([]);
   const [selectedUploadProfile, setSelectedUploadProfile] = useState('');
   const [profileBindings, setProfileBindings] = useState({});
-  const [taskDate, setTaskDate] = useState('');
+  const [taskDate, setTaskDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [batchAiCount, setBatchAiCount] = useState(1);
   const [ruleApplyScope, setRuleApplyScope] = useState('both');
   const [selectedVersions, setSelectedVersions] = useState(() => savedProcessSettings.selectedVersions);
@@ -166,7 +167,10 @@ export function LegacyNovelFetchPage() {
     setConfigLoading(true);
     try {
       const data = await getWorkshopConfig();
-      configForm.setFieldsValue(data.appConfig || data.config || {});
+      const config = data.appConfig || data.config || {};
+      configForm.setFieldsValue(config);
+      const configuredPlatforms = Array.isArray(data.platforms) ? data.platforms : Array.isArray(config.platforms) ? config.platforms : [];
+      if (configuredPlatforms.length) setPlatformOptions(configuredPlatforms.map(item => ({ value: Number(item.id ?? item.platform_id ?? item.value), label: item.name || item.platform_name || item.label || String(item.id ?? item.platform_id ?? item.value) })));
     } catch (error) { message.error(error.message || '读取配置失败'); } finally { setConfigLoading(false); }
   }
   async function loadWebSubmit() {
@@ -176,7 +180,14 @@ export function LegacyNovelFetchPage() {
     try { setUploadSession(await getUploadSession()); } catch { setUploadSession({ status: 'offline' }); }
   }
 
-  useEffect(() => { loadTasks(); loadUploadSession(); }, []);
+  useEffect(() => {
+    loadTasks();
+    loadUploadSession();
+    getWorkshopPlatforms().then(data => {
+      const items = data.platforms || data.items || data;
+      if (Array.isArray(items) && items.length) setPlatformOptions(items.map(item => ({ value: Number(item.id ?? item.platform_id ?? item.value), label: item.name || item.platform_name || item.label || String(item.id ?? item.platform_id ?? item.value) })));
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     if (activeTab === 'config') loadConfig();
     if (activeTab === 'knowledge') loadKnowledge();
@@ -335,9 +346,9 @@ export function LegacyNovelFetchPage() {
           textModel
         });
       }}>
-        <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台：{PLATFORMS.length}</Typography.Text></div>
+        <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台：{platformOptions.length}</Typography.Text></div>
         <div className="novel-fetch-public-grid novel-fetch-public-grid--three">
-          <Form.Item name="platform" label="平台"><Select options={PLATFORMS.map(item => ({ ...item, label: `${item.label} (1)` }))} /></Form.Item>
+          <Form.Item name="platform" label="平台"><Select options={platformOptions} /></Form.Item>
           <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={[{ value: '[anti-2]gemini-3.8-flash', label: '[anti-2]gemini-3.8-flash' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }]} /><small>执行时使用此模型；修改后作为后续批次默认值</small></label>
         </div>
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className="novel-fetch-public-input" rows={5} placeholder={'每一行：书籍 ID、书名、推荐理由、男女频、标签、评级。\n示例：123456789\t书名\t打脸逆袭、复仇反转\t女频\t现代世情、爽文\tS'} /></Form.Item>
