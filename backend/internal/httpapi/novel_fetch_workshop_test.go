@@ -470,6 +470,55 @@ func TestNovelFetchWorkshopCurrentBatchOnlyContainsLatestInput(t *testing.T) {
 	}
 }
 
+func TestNovelFetchWorkshopBatchHistoryRerunAndStopStayOnGoStore(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	first := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process", map[string]any{"inputText": "12345678901\t第一批"}, now, secret)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first process status=%d body=%s", first.Code, first.Body.String())
+	}
+	second := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process", map[string]any{"inputText": "22345678901\t第二批"}, now, secret)
+	if second.Code != http.StatusOK {
+		t.Fatalf("second process status=%d body=%s", second.Code, second.Body.String())
+	}
+	var firstResult struct{ BatchID string `json:"batch_id"` }
+	if err := json.Unmarshal(first.Body.Bytes(), &firstResult); err != nil {
+		t.Fatal(err)
+	}
+	var secondResult struct{ BatchID string `json:"batch_id"` }
+	if err := json.Unmarshal(second.Body.Bytes(), &secondResult); err != nil {
+		t.Fatal(err)
+	}
+	history := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/batches", nil, now, secret)
+	if history.Code != http.StatusOK {
+		t.Fatalf("history status=%d body=%s", history.Code, history.Body.String())
+	}
+	var historyResult struct{ Batches []struct{ ID string `json:"id"`; TaskIDs []string `json:"taskIds"` } `json:"batches"` }
+	if err := json.Unmarshal(history.Body.Bytes(), &historyResult); err != nil {
+		t.Fatal(err)
+	}
+	if len(historyResult.Batches) < 2 || firstResult.BatchID == "" || secondResult.BatchID == "" {
+		t.Fatalf("batch history missing: first=%q second=%q history=%#v", firstResult.BatchID, secondResult.BatchID, historyResult.Batches)
+	}
+	rerun := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/batches/"+firstResult.BatchID+"/rerun", map[string]any{"mode": "all"}, now, secret)
+	if rerun.Code != http.StatusOK || !bytes.Contains(rerun.Body.Bytes(), []byte(`"12345678901"`)) {
+		t.Fatalf("rerun status=%d body=%s", rerun.Code, rerun.Body.String())
+	}
+	stop := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/stop-selected", map[string]any{"ids": []string{"22345678901"}}, now, secret)
+	if stop.Code != http.StatusOK || !bytes.Contains(stop.Body.Bytes(), []byte(`"updated":1`)) {
+		t.Fatalf("stop status=%d body=%s", stop.Code, stop.Body.String())
+	}
+	document, err := store.GetDocument(context.Background(), "tester", "22345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Meta["status"] != "stopped" {
+		t.Fatalf("stop did not persist status: %#v", document.Meta)
+	}
+}
+
 func TestNovelFetchWorkshopProcessPreviewDoesNotPersistTasks(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

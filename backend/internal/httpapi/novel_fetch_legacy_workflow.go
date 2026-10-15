@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -71,6 +72,112 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"batch": map[string]any{"id": currentBatchID, "taskIds": ids, "bookIds": ids, "taskStates": states, "settingsSnapshot": map[string]any{"target_versions": targets}, "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}})
+	})
+
+	// V78 的历史批次不是另建一套队列；批次快照直接从 Go 文档的 currentBatchId
+	// 归并，避免页面刷新后又回到旧 Node 的内存批次列表。
+	mux.HandleFunc("GET /api/novel-fetch-workshop/batches", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		docs, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取历史批次失败"})
+			return
+		}
+		groups := map[string][]novelfetchworkshop.Document{}
+		for _, doc := range docs {
+			batchID := strings.TrimSpace(fmt.Sprint(doc.Meta["currentBatchId"]))
+			if batchID == "" {
+				continue
+			}
+			groups[batchID] = append(groups[batchID], doc)
+		}
+		batches := make([]map[string]any, 0, len(groups))
+		for id, rows := range groups {
+			ids := make([]string, 0, len(rows))
+			states := make([]map[string]any, 0, len(rows))
+			for _, row := range rows {
+				ids = append(ids, row.BookID)
+				states = append(states, legacyNovelFetchTask(row))
+			}
+			batches = append(batches, map[string]any{
+				"id": id, "taskIds": ids, "bookIds": ids, "taskStates": states,
+				"createdAt":        firstText(rows[0].Meta["batchCreatedAt"], rows[0].Meta["createdAt"]),
+				"status":           "done",
+				"settingsSnapshot": map[string]any{"target_versions": []string{"original"}},
+			})
+		}
+		sort.Slice(batches, func(i, j int) bool { return fmt.Sprint(batches[i]["id"]) > fmt.Sprint(batches[j]["id"]) })
+		writeJSON(w, http.StatusOK, map[string]any{"batches": batches})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/batches/{batchId}/rerun", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		batchID := strings.TrimSpace(req.PathValue("batchId"))
+		var input struct {
+			Mode string `json:"mode"`
+		}
+		_ = decodeNovelFetchJSON(w, req, &input)
+		rows, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "读取重跑批次失败"})
+			return
+		}
+		ids := make([]string, 0)
+		lines := make([]string, 0)
+		for _, row := range rows {
+			if strings.TrimSpace(fmt.Sprint(row.Meta["currentBatchId"])) != batchID {
+				continue
+			}
+			failed := strings.Contains(strings.ToLower(fmt.Sprint(row.Meta["status"])), "fail") || strings.Contains(strings.ToLower(fmt.Sprint(row.Meta["aiStatus"])), "fail")
+			if strings.EqualFold(input.Mode, "abnormal") && !failed {
+				continue
+			}
+			ids = append(ids, row.BookID)
+			name := firstText(row.BookInfo.WorkTitle, row.Meta["bookName"])
+			lines = append(lines, row.BookID+func() string {
+				if name == "" {
+					return ""
+				}
+				return "\t" + name
+			}())
+		}
+		if len(ids) == 0 {
+			writeJSON(w, http.StatusNotFound, map[string]any{"error": "批次不存在或没有可重跑任务"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"source_batch_id": batchID, "preselected_book_ids": ids, "input_snapshot": strings.Join(lines, "\n"), "payload": map[string]any{"target_versions": []string{"original"}, "input_text": strings.Join(lines, "\n")}})
+	})
+
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/stop-selected", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		var input struct {
+			IDs     []string `json:"ids"`
+			BookIDs []string `json:"bookIds"`
+		}
+		if err := decodeNovelFetchJSON(w, req, &input); err != nil {
+			return
+		}
+		ids := input.IDs
+		if len(ids) == 0 {
+			ids = input.BookIDs
+		}
+		updated := 0
+		for _, id := range ids {
+			row, err := store.GetDocument(req.Context(), identity.Username, strings.TrimSpace(id))
+			if err != nil {
+				continue
+			}
+			if row.Meta == nil {
+				row.Meta = map[string]any{}
+			}
+			row.Meta["status"] = "stopped"
+			row.Meta["queueState"] = "stopped"
+			row.Logs = append(row.Logs, map[string]any{"type": "stopped", "at": time.Now().UTC().Format(time.RFC3339Nano)})
+			if err := store.PutDocument(req.Context(), identity.Username, row); err == nil {
+				updated++
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": updated})
 	})
 
 	mux.HandleFunc("GET /api/novel-fetch-workshop/schedules", func(w http.ResponseWriter, req *http.Request) {

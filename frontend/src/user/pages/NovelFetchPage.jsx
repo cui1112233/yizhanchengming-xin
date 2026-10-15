@@ -12,7 +12,8 @@ import {
   getWorkshopLogs, listWorkshopSchedules, deleteWorkshopSchedule, saveWorkshopSchedule,
   previewWorkshopRules, restoreWorkshopOriginal, retryWorkshopTasks, saveWorkshopConfig,
   updateWorkshopAiCount, applyWorkshopRules,
-  saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, suggestWorkshopRules, testWorkshopAi, reprocessWorkshopSensitive
+  saveWorkshopKnowledge, saveWorkshopOpening, startWorkshopProcess, suggestWorkshopRules, testWorkshopAi, reprocessWorkshopSensitive,
+  previewWorkshopProcess, getWorkshopCurrentBatch, getWorkshopBatches, rerunWorkshopBatch, stopWorkshopTasks
 } from '../../shared/api/novelFetchWorkshop';
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
 import './novel-fetch.css';
@@ -50,6 +51,19 @@ function initialTab() {
 }
 function parseIds(value) {
   return [...new Set(String(value || '').split(/[\s,，;；]+/).map(item => item.trim()).filter(Boolean))];
+}
+function buildSelectedPreviewInput(preview, selectedIds, fallback) {
+  const selected = new Set(selectedIds);
+  const rows = Array.isArray(preview?.tasks) ? preview.tasks : [];
+  const sourceLines = rows
+    .filter(row => selected.has(row.bookId || row.book_id || row.id))
+    .map(row => row.sourceLine || row.source_line)
+    .filter(Boolean);
+  if (sourceLines.length) return sourceLines.join('\n');
+  return String(preview?.selectedInputText || fallback || '')
+    .split(/\r?\n/)
+    .filter(line => selected.has(String(line).trim().split(/[\t\s,，;；]+/)[0]))
+    .join('\n');
 }
 function statusColor(value) {
   if (String(value || '').includes('fail')) return 'red';
@@ -122,6 +136,11 @@ export function LegacyNovelFetchPage() {
   const [rewriteMethods, setRewriteMethods] = useState(() => savedProcessSettings.rewriteMethods);
   const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => savedProcessSettings.sensitiveAiProcessEnabled);
   const [textModel, setTextModel] = useState(() => savedProcessSettings.textModel);
+  const [processPreview, setProcessPreview] = useState(null);
+  const [previewSelected, setPreviewSelected] = useState([]);
+  const [currentBatch, setCurrentBatch] = useState(null);
+  const [historyBatches, setHistoryBatches] = useState([]);
+  const [taskView, setTaskView] = useState('current');
 
   useEffect(() => {
     writeNovelFetchProcessSettings({
@@ -157,6 +176,12 @@ export function LegacyNovelFetchPage() {
       setTasks(taskData.tasks || []);
       if (jobData.latest && Object.keys(jobData.latest).length) setProcessJob(jobData.latest);
     } catch (error) { message.error(error.message || '读取任务失败'); } finally { setTasksLoading(false); }
+  }
+  async function loadCurrentBatch() {
+    try { const data = await getWorkshopCurrentBatch(); setCurrentBatch(data.batch || null); } catch { setCurrentBatch(null); }
+  }
+  async function loadHistoryBatches() {
+    try { const data = await getWorkshopBatches(); setHistoryBatches(data.batches || []); } catch (error) { message.error(error.message || '读取历史批次失败'); }
   }
   async function selectTask(bookId) {
     if (!bookId) return;
@@ -199,6 +224,8 @@ export function LegacyNovelFetchPage() {
 
   useEffect(() => {
     loadTasks();
+    loadCurrentBatch();
+    loadHistoryBatches();
     loadUploadSession();
     loadSchedules();
     loadGlobalLogs();
@@ -222,8 +249,12 @@ export function LegacyNovelFetchPage() {
   async function handleProcess() {
     const values = await processForm.validateFields();
     const inputText = String(values.bookIds || '').trim();
-    const bookIds = parseIds(inputText);
+    const bookIds = processPreview ? previewSelected : parseIds(inputText);
     if (!bookIds.length) return message.warning('请填写至少一个书籍 ID');
+    const selectedInputText = processPreview
+      ? buildSelectedPreviewInput(processPreview, previewSelected, inputText)
+      : inputText;
+    if (!selectedInputText.trim()) return message.warning('请至少保留一条解析结果');
     setProcessing(true);
     setProcessRows(bookIds.map(bookId => ({ bookId, status: 'loading' })));
     try {
@@ -232,7 +263,7 @@ export function LegacyNovelFetchPage() {
       // different enabled model.
       if (textModel) await saveWorkshopConfig({ text_model_id: textModel });
       const data = await startWorkshopProcess({
-        inputText,
+        inputText: selectedInputText,
         platform_id: String(values.platform),
         maxTxt: values.maxTxt,
         text_model_id: textModel,
@@ -241,15 +272,33 @@ export function LegacyNovelFetchPage() {
         sensitive_ai_enabled: sensitiveAiProcessEnabled
       });
       setProcessJob(data);
+      setProcessPreview(null);
+      setPreviewSelected([]);
       const results = data.result?.tasks || data.tasks || [];
       setProcessRows(results.length
         ? results.map(row => ({ ...row, bookId: row.bookId || row.book_id, status: row.status === 'ok' || row.originalStatus === 'done' ? 'done' : (row.status || 'failed') }))
         : bookIds.map(bookId => ({ bookId, status: data.status === 'done' ? 'done' : data.status || 'failed', error: data.error || '' })));
       await loadTasks();
+      await Promise.all([loadCurrentBatch(), loadHistoryBatches()]);
     } catch (error) {
       setProcessRows(bookIds.map(bookId => ({ bookId, status: 'failed', error: error.message })));
       message.error(error.message || '处理失败');
     } finally { setProcessing(false); }
+  }
+  async function handlePreviewProcess() {
+    const values = await processForm.validateFields();
+    const inputText = String(values.bookIds || '').trim();
+    if (!inputText) return message.warning('请填写待处理清单');
+    try {
+      const data = await previewWorkshopProcess({ input_text: inputText, max_txt: values.maxTxt });
+      const rows = data.tasks || [];
+      setProcessPreview({ ...data, selectedInputText: inputText });
+      setPreviewSelected(rows.map(row => row.bookId || row.book_id || row.id).filter(Boolean));
+      message.success(`已解析 ${rows.length} 本，可勾选后开始处理`);
+    } catch (error) { message.error(error.message || '解析输入失败'); }
+  }
+  function togglePreviewBook(bookId, checked) {
+    setPreviewSelected(current => checked ? [...new Set([...current, bookId])] : current.filter(id => id !== bookId));
   }
   async function handleScheduleProcess() {
     const values = await processForm.validateFields();
@@ -403,9 +452,10 @@ export function LegacyNovelFetchPage() {
           <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={[{ value: '[anti-2]gemini-3.8-flash', label: '[anti-2]gemini-3.8-flash' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }]} /><small>执行时使用此模型；修改后作为后续批次默认值</small></label>
         </div>
         <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className="novel-fetch-public-input" rows={5} placeholder={'每一行：书籍 ID、书名、推荐理由、男女频、标签、评级。\n示例：123456789\t书名\t打脸逆袭、复仇反转\t女频\t现代世情、爽文\tS'} /></Form.Item>
+        {processPreview ? <div className="novel-fetch-preview-list"><Typography.Text strong>解析预览：已识别 {processPreview.tasks?.length || 0} 本，已选 {previewSelected.length} 本</Typography.Text>{(processPreview.tasks || []).map(row => { const id = row.bookId || row.book_id || row.id; return <label key={id} className="novel-fetch-preview-row"><input type="checkbox" checked={previewSelected.includes(id)} onChange={event => togglePreviewBook(id, event.target.checked)} /><span>{id}</span><span>{row.bookName || row.book_name || ''}</span><span>{row.gender || '待判断'}</span><span>{row.style || '待判定'}</span></label>; })}</div> : null}
         <section className="novel-fetch-public-section"><Typography.Title level={5}>本次处理设置</Typography.Title><Typography.Text type="secondary">AI 文案（选择本次需要生成的版本）</Typography.Text><div className="novel-fetch-version-grid">{AI_VERSIONS.map(version => <label key={version} className={`novel-fetch-version-option ${selectedVersions.includes(version) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedVersions.includes(version)} onChange={event => setSelectedVersions(current => event.target.checked ? [...current, version] : current.filter(item => item !== version))} /><span>{AI_VERSION_LABELS[version]}</span></label>)}</div><div className="novel-fetch-public-grid novel-fetch-public-grid--five">{AI_VERSIONS.slice(1).map(version => <label className="novel-fetch-field" key={version}><span>{AI_VERSION_LABELS[version]} 改文方式</span><Select value={rewriteMethods[version]} onChange={value => setRewriteMethods(current => ({ ...current, [version]: value }))} disabled={!selectedVersions.includes(version)} options={REWRITE_METHODS} /></label>)}</div><div className="novel-fetch-public-hint">AI 文案处理优先方案：跟随“配置”中 AI1～AI5 的现有设置。</div></section>
         <section className="novel-fetch-public-section novel-fetch-sensitive"><Typography.Title level={5}>敏感处理</Typography.Title><label><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</label></section>
-        <div className="novel-fetch-public-actions"><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button onClick={() => setScheduleModalOpen(true)}>开始定时</Button><Button onClick={() => { loadSchedules(); setScheduleModalOpen(true); }}>定时任务</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button onClick={() => processForm.resetFields()}>清空</Button><Button onClick={openVersionConfig}>版本配置</Button></div>
+        <div className="novel-fetch-public-actions"><Button onClick={handlePreviewProcess}>解析预览</Button><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button onClick={() => setScheduleModalOpen(true)}>开始定时</Button><Button onClick={() => { loadSchedules(); setScheduleModalOpen(true); }}>定时任务</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button onClick={() => { processForm.resetFields(); setProcessPreview(null); setPreviewSelected([]); }}>清空</Button><Button onClick={openVersionConfig}>版本配置</Button></div>
       </Form>
       <Modal open={scheduleModalOpen} title="定时任务" okText="保存定时任务" cancelText="取消" onCancel={() => setScheduleModalOpen(false)} onOk={handleScheduleProcess}>
         <Typography.Paragraph type="secondary">保存后由 Go 后端统一调度；不会立即加入正在执行的队列。</Typography.Paragraph>
@@ -419,15 +469,17 @@ export function LegacyNovelFetchPage() {
         </div><div className="novel-fetch-progress-row"><span>当前任务</span><b>{processJob?.status || (processing ? 'running' : 'idle')}</b></div><pre>{processRows.length ? JSON.stringify(processRows, null, 2) : '暂无处理结果。提交任务后在这里查看状态。'}</pre></div>
         <div className="novel-fetch-public-result novel-fetch-live-log"><div className="novel-fetch-public-result-title">实时日志</div><div className={`novel-fetch-login-status ${uploadSession?.status === 'ready' ? 'is-ready' : 'is-offline'}`}><span>{uploadSession?.status === 'ready' ? '● 已登录视频管理系统' : '● 未登录视频管理系统'}</span><Button size="small" onClick={() => setLoginModalOpen(true)}>更换账号</Button></div><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : processing ? '正在执行：读取原文、分类、敏感处理和 AI 版本。' : '暂无正在处理的任务。'}</pre></div>
       </div>
+      <div className="novel-fetch-panel"><Typography.Title level={5}>当前批次</Typography.Title>{currentBatch ? <><Typography.Text type="secondary">{currentBatch.id} · {currentBatch.taskIds?.length || 0} 本</Typography.Text><Table size="small" pagination={false} rowKey={row => row.bookId || row.book_id} dataSource={currentBatch.taskStates || []} columns={[{ title: '书籍', render: (_, row) => row.bookName || row.book_name || row.bookId || row.book_id }, { title: '状态', render: (_, row) => row.status || row.aiStatus || '排队中' }]} /></> : <Typography.Text type="secondary">暂无当前批次</Typography.Text>}</div>
       <Modal open={loginModalOpen} title="登录视频管理系统" confirmLoading={webSubmitLoading} okText="保存并验证" cancelText="取消" onCancel={() => setLoginModalOpen(false)} onOk={handleUploadLogin}><Form layout="vertical"><Form.Item label="账号"><Input value={loginUser} onChange={event => setLoginUser(event.target.value)} autoComplete="username" /></Form.Item><Form.Item label="密码"><Input.Password value={loginPassword} onChange={event => setLoginPassword(event.target.value)} autoComplete="current-password" /></Form.Item></Form></Modal>
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      <div className="novel-fetch-panel"><Space wrap><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button disabled={!selectedTaskKeys.length} onClick={handleRetryTasks}>批量重试</Button><Button danger disabled={!selectedTaskKeys.length} onClick={handleDeleteTasks}>删除选中</Button><Button disabled={!selectedTask} onClick={handleGenerateAi}>生成 AI 改文</Button><Button disabled={!selectedTaskKeys.length} onClick={handleSensitiveRepair}>敏感词 AI 修复</Button></Space></div>
+      <div className="novel-fetch-panel"><Space wrap><Button type={taskView === 'current' ? 'primary' : 'default'} onClick={() => setTaskView('current')}>当前任务</Button><Button type={taskView === 'history' ? 'primary' : 'default'} onClick={() => { setTaskView('history'); loadHistoryBatches(); }}>历史批次</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</Button><Button disabled={!selectedTaskKeys.length} onClick={handleRetryTasks}>批量重试</Button><Button danger disabled={!selectedTaskKeys.length} onClick={handleDeleteTasks}>删除选中</Button><Button danger disabled={!selectedTaskKeys.length} onClick={async () => { await stopWorkshopTasks(selectedTaskKeys); await loadTasks(); message.success('已停止选中任务'); }}>停止选中</Button><Button disabled={!selectedTask} onClick={handleGenerateAi}>生成 AI 改文</Button><Button disabled={!selectedTaskKeys.length} onClick={handleSensitiveRepair}>敏感词 AI 修复</Button></Space></div>
       <div className="novel-fetch-panel"><Space wrap><Typography.Text>查看日期</Typography.Text><Button onClick={() => shiftTaskDate(-1)}>前一天</Button><Input type="date" value={taskDate} onChange={event => setTaskDate(event.target.value)} /><Button onClick={() => setTaskDate(new Date().toISOString().slice(0, 10))}>今天</Button><Button onClick={() => shiftTaskDate(1)}>后一天</Button><Button onClick={() => setTaskDate('')}>默认视图</Button><Button onClick={selectAllTasks}>全选</Button><Button onClick={() => setSelectedTaskKeys([])}>清空</Button><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button><Button onClick={() => submitVisibleTasks(false)}>提交网络</Button><Button onClick={() => submitVisibleTasks(true)}>提交全部</Button><Typography.Text>AI数量</Typography.Text><InputNumber min={1} max={20} value={batchAiCount} onChange={value => setBatchAiCount(value || 1)} /><Button onClick={updateSelectedAiCount}>调整选中</Button><Select value={ruleApplyScope} onChange={setRuleApplyScope} options={[{ value: 'both', label: '规则处理原文+AI' }, { value: 'original', label: '只处理原文' }, { value: 'ai', label: '只处理AI' }]} /><Button onClick={applySelectedRules}>规则处理选中</Button><Button danger onClick={handleDeleteTasks}>删除选中</Button><Button danger onClick={() => deleteTasksByFilter(task => /fail|error/.test(String(task.status || task.aiStatus || task.ai_status)), '当前没有失败任务')}>删除失败</Button><Button danger onClick={() => deleteTasksByFilter(() => true, '当前没有任务')}>删除全部</Button></Space></div>
-      <Typography.Text type="secondary">已选 {selectedTaskKeys.length} 个任务；当前显示 {visibleTasks.length} 个</Typography.Text><Table className="novel-fetch-panel" rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20 }} columns={[
+      {taskView === 'history' ? <div className="novel-fetch-panel"><Typography.Title level={5}>历史批次</Typography.Title><Table size="small" rowKey="id" dataSource={historyBatches.filter(batch => batch.id !== currentBatch?.id)} columns={[{ title: '批次', dataIndex: 'id' }, { title: '书籍数', render: (_, row) => row.taskIds?.length || 0 }, { title: '状态', dataIndex: 'status' }, { title: '操作', render: (_, row) => <Space><Button size="small" onClick={async () => { const data = await rerunWorkshopBatch(row.id, 'all'); setProcessPreview({ tasks: data.preselected_book_ids.map(bookId => ({ bookId })), selectedInputText: data.input_snapshot }); setPreviewSelected(data.preselected_book_ids || []); changeTab('process'); message.success('历史批次已载入解析预览'); }}>全部重跑</Button><Button size="small" disabled={!row.taskIds?.length} onClick={async () => { const data = await rerunWorkshopBatch(row.id, 'abnormal'); setProcessPreview({ tasks: data.preselected_book_ids.map(bookId => ({ bookId })), selectedInputText: data.input_snapshot }); setPreviewSelected(data.preselected_book_ids || []); changeTab('process'); }}>重跑异常</Button></Space> }]} /></div> : null}
+      {taskView === 'current' ? <><Typography.Text type="secondary">已选 {selectedTaskKeys.length} 个任务；当前显示 {visibleTasks.length} 个</Typography.Text><Table className="novel-fetch-panel" rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20 }} columns={[
         { title: '书名', dataIndex: 'bookName', render: (value, row) => value || row.book_name || row.bookId }, { title: '平台', render: (_, row) => row.platformName || row.platform_name }, { title: '风格', dataIndex: 'style', render: value => value || '待判定' }, { title: '男女频', dataIndex: 'gender', render: value => value || '待确认' }, { title: '原文状态', render: (_, row) => <Tag color={statusColor(row.originalStatus || row.original_status)}>{row.originalStatus || row.original_status || '未抓取'}</Tag> },
         { title: 'AI 状态', render: (_, row) => <Tag color={statusColor(row.aiStatus || row.ai_status)}>{row.aiGeneratedCount || row.ai_generated_count ? `${row.aiGeneratedCount || row.ai_generated_count} 版` : row.aiStatus || row.ai_status || '未生成'}</Tag> }, { title: '网站提交', render: (_, row) => row.site_submit_status || row.siteSubmitStatus || '未提交' }, { title: '状态', render: (_, row) => <Tag color={statusColor(row.status)}>{row.status || '待处理'}</Tag> }, { title: '操作', render: (_, row) => <Space><Button size="small" onClick={() => selectTask(row.bookId || row.book_id)}>选择</Button><Button size="small" icon={<Eye size={14} />} onClick={async () => setTaskDetail({ bookId: row.bookId || row.book_id, data: await getWorkshopTask(row.bookId || row.book_id) })}>详情</Button><Button size="small" onClick={() => fetchWorkshopOriginal(row.bookId || row.book_id, row.maxTxt).then(loadTasks)}>重新抓取</Button><Button size="small" onClick={() => restoreWorkshopOriginal(row.bookId || row.book_id).then(loadTasks)}>恢复原文</Button></Space> }
-      ]} />
+      ]} /></> : null}
     </Space>,
     config: <Form className="novel-fetch-panel" form={configForm} layout="vertical" style={{ maxWidth: 980 }}><Typography.Title level={5}>配置</Typography.Title><div className="novel-fetch-config-grid"><Form.Item name="base_url" label="AI 基础接口"><Input /></Form.Item><Form.Item name="api_key" label="API Key"><Input.Password /></Form.Item><Form.Item name="model" label="模型"><Input /></Form.Item><Form.Item name="fetch_endpoint" label="原文抓取接口"><Input placeholder="https://txt.121w.com/api.php" /></Form.Item><Form.Item name="default_max_txt" label="默认抓取字数"><InputNumber min={100} max={100000} /></Form.Item><Form.Item name="default_ai_count" label="默认 AI 数量"><InputNumber min={1} max={20} /></Form.Item><Form.Item name="fetch_concurrency" label="抓取并发"><InputNumber min={1} max={20} /></Form.Item><Form.Item name="fetch_retries" label="抓取重试"><InputNumber min={0} max={10} /></Form.Item><Form.Item name="fetch_timeout" label="抓取超时（秒）"><InputNumber min={1} max={300} /></Form.Item><Form.Item name="process_line_count" label="默认处理行数"><InputNumber min={1} max={100} /></Form.Item><Form.Item name="anchor_line_count" label="锚点行数"><InputNumber min={1} max={100} /></Form.Item><Form.Item name="rewrite_temp" label="改文温度"><InputNumber min={0} max={2} step={0.01} /></Form.Item><Form.Item name="method_sequence" label="改文方式顺序"><Input placeholder="high_imitation,opening_instruction,instruction" /></Form.Item><Form.Item name="opening_phrase_mode" label="爆款开头模式"><Select options={[{ value: 'auto', label: '自动' }, { value: 'off', label: '关闭' }]} /></Form.Item><Form.Item name="high_imitation_mode" label="高仿改写模式"><Select options={[{ value: 'auto', label: '自动' }, { value: 'off', label: '关闭' }]} /></Form.Item></div><Space wrap><Form.Item name="workflow_auto_classify" valuePropName="checked" noStyle><label><input type="checkbox" /> 自动补齐风格/男女频</label></Form.Item><Form.Item name="workflow_auto_fetch" valuePropName="checked" noStyle><label><input type="checkbox" /> 自动抓取原文</label></Form.Item><Form.Item name="workflow_auto_rewrite" valuePropName="checked" noStyle><label><input type="checkbox" /> 抓取后自动生成 AI 文案</label></Form.Item><Form.Item name="fetch_auto_detect_platform" valuePropName="checked" noStyle><label><input type="checkbox" /> 自动识别平台</label></Form.Item><Form.Item name="sensitive_ai_enabled" valuePropName="checked" noStyle><label><input type="checkbox" /> 默认启用敏感词 AI 修复</label></Form.Item></Space><Form.Item name="rewrite_prompt" label="改文提示词"><Input.TextArea rows={5} /></Form.Item><Form.Item name="processing_rule_prompt" label="处理规则提示词"><Input.TextArea rows={5} /></Form.Item><Space><Button type="primary" loading={configLoading} onClick={async () => { await saveWorkshopConfig(configForm.getFieldsValue()); message.success('配置已保存'); }}>保存配置</Button><Button onClick={() => testWorkshopAi('rewrite').then(() => message.success('测试接口成功')).catch(error => message.error(error.message || '测试失败'))}>测试接口</Button></Space></Form>,
     knowledge: <Space direction="vertical" size={12} style={{ width: '100%' }}><div className="novel-fetch-panel"><Tabs activeKey={knowledgeKind} onChange={setKnowledgeKind} items={KNOWLEDGE_TABS.map(([key, label]) => ({ key, label: `${label}（${knowledgeSummary[key] || 0}）` }))} /><Space wrap><Input allowClear value={knowledgeSearch} onChange={event => setKnowledgeSearch(event.target.value)} placeholder="搜索标题或内容" style={{ width: 260 }} /><Button onClick={() => { knowledgeForm.resetFields(); setKnowledgeModal(true); }}>新增条目</Button><Button loading={knowledgeLoading} onClick={loadKnowledge}>刷新</Button>{knowledgeKind === 'opening_phrases' ? <Button onClick={() => normalizeWorkshopOpening().then(loadKnowledge)}>规范化开头词</Button> : null}</Space></div>{knowledgeKind === 'opening_phrases' ? <div className="novel-fetch-panel"><Input.TextArea rows={4} value={openingText} onChange={event => setOpeningText(event.target.value)} placeholder="粘贴爆款开头进行分析" /><Space style={{ marginTop: 8 }}><Button onClick={handleOpeningAnalyze}>分析爆款开头</Button>{openingItems.map((item, index) => <Button key={item.id || index} onClick={() => saveWorkshopOpening(item).then(loadKnowledge)}>保存分析项</Button>)}</Space></div> : null}<Table className="novel-fetch-panel" rowKey="id" loading={knowledgeLoading} dataSource={(knowledge.items || []).filter(item => { const q = knowledgeSearch.trim().toLowerCase(); return !q || `${item.title || item.name || ''} ${item.content || item.prompt || item.text || ''}`.toLowerCase().includes(q); })} columns={[{ title: '条目', render: (_, item) => item.title || item.name || item.text || item.id }, { title: '内容', render: (_, item) => String(item.content || item.prompt || item.text || '').slice(0, 100) }, { title: '操作', render: (_, item) => <Space><Button size="small" onClick={() => { knowledgeForm.setFieldsValue(item); setKnowledgeModal(true); }}>编辑</Button><Button size="small" onClick={() => saveWorkshopKnowledge(knowledgeKind, { ...item, id: undefined, title: `${item.title || item.name || '未命名'}（副本）` }).then(loadKnowledge)}>复制</Button><Button size="small" onClick={() => optimizeWorkshopKnowledge(knowledgeKind, item.id).then(loadKnowledge)}>AI 优化</Button><Button size="small" danger onClick={() => deleteWorkshopKnowledge(knowledgeKind, item.id).then(loadKnowledge)}>删除</Button></Space> }]} /><Modal open={knowledgeModal} title="知识条目" onCancel={() => setKnowledgeModal(false)} onOk={saveKnowledge}><Form form={knowledgeForm} layout="vertical"><Form.Item name="id" hidden><Input /></Form.Item><Form.Item name="title" label="标题"><Input /></Form.Item><Form.Item name="content" label="内容"><Input.TextArea rows={7} /></Form.Item></Form></Modal></Space>,

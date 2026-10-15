@@ -40,6 +40,35 @@ export function getWorkshopJobs(limit = 10) {
   return apiRequest(`/api/novel-fetch-workshop/process/jobs/latest?limit=${encodeURIComponent(limit)}`);
 }
 
+export function previewWorkshopProcess(payload) {
+  return apiRequest('/api/novel-fetch-workshop/process/preview', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getWorkshopCurrentBatch() {
+  return apiRequest('/api/novel-fetch-workshop/batches/current');
+}
+
+export function getWorkshopBatches() {
+  return apiRequest('/api/novel-fetch-workshop/batches');
+}
+
+export function rerunWorkshopBatch(batchId, mode = 'all') {
+  return apiRequest(`/api/novel-fetch-workshop/batches/${encodeURIComponent(batchId)}/rerun`, {
+    method: 'POST',
+    body: JSON.stringify({ mode })
+  });
+}
+
+export function stopWorkshopTasks(ids) {
+  return apiRequest('/api/novel-fetch-workshop/tasks/stop-selected', {
+    method: 'POST',
+    body: JSON.stringify({ ids })
+  });
+}
+
 export function listWorkshopSchedules() {
   return apiRequest('/api/novel-fetch-workshop/schedules');
 }
