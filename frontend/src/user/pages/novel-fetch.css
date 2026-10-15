@@ -125,6 +125,7 @@
 
 .novel-fetch-workbench {
   min-width: 0;
+  max-width: none;
 }
 
 .novel-fetch-original-workbench {
@@ -248,6 +249,45 @@
 .novel-fetch-workbench .ant-alert {
   min-width: 0;
 }
+
+/* V78 workbench styling is kept in React source, rather than loading the
+   historical public bundle.  These tokens intentionally follow the server
+   reference palette while still using the application's theme variables. */
+.novel-fetch-public-workspace,
+.novel-fetch-public-result {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid var(--legacy-border);
+  border-radius: 10px;
+  background: var(--legacy-card);
+  box-sizing: border-box;
+}
+.novel-fetch-public-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:14px; }
+.novel-fetch-public-heading .ant-typography { margin:0; }
+.novel-fetch-version-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; background:#1677ff; color:#fff; font-size:12px; vertical-align:middle; }
+.novel-fetch-public-grid { display:grid; gap:12px; }
+.novel-fetch-public-grid--three { grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.5fr); }
+.novel-fetch-public-grid--five { grid-template-columns: repeat(5, minmax(120px, 1fr)); margin-top:14px; }
+.novel-fetch-public-grid .ant-form-item, .novel-fetch-public-grid .novel-fetch-field { min-width:0; }
+.novel-fetch-field { display:flex; flex-direction:column; gap:5px; color:var(--text-primary); }
+.novel-fetch-field > span { font-size:12px; color:var(--text-secondary); }
+.novel-fetch-field small { color:var(--text-tertiary); font-size:11px; line-height:1.35; }
+.novel-fetch-public-input textarea, .novel-fetch-public-input { min-height:132px; }
+.novel-fetch-public-section { margin-top:16px; padding-top:14px; border-top:1px solid var(--legacy-border); }
+.novel-fetch-public-section .ant-typography { margin:0 0 8px; }
+.novel-fetch-version-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:8px; }
+.novel-fetch-version-option { display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; border:1px solid var(--legacy-border); border-radius:7px; background:var(--legacy-panel); color:var(--text-primary); cursor:pointer; }
+.novel-fetch-version-option.is-selected { border-color:#1677ff; background:rgba(22,119,255,.18); }
+.novel-fetch-version-option input { accent-color:#1677ff; }
+.novel-fetch-public-hint { margin-top:10px; color:var(--text-tertiary); font-size:12px; }
+.novel-fetch-sensitive { background:rgba(77,66,120,.12); padding:12px; border:1px solid var(--legacy-border); border-radius:8px; }
+.novel-fetch-sensitive label { color:var(--text-primary); font-size:13px; }
+.novel-fetch-sensitive input { accent-color:#1677ff; margin-right:8px; }
+.novel-fetch-public-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.novel-fetch-public-result-title { font-weight:600; color:var(--text-primary); margin-bottom:8px; }
+.novel-fetch-public-result pre { margin:0; min-height:54px; max-height:220px; overflow:auto; color:var(--text-secondary); white-space:pre-wrap; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+@media (max-width: 900px) { .novel-fetch-public-grid--five { grid-template-columns:repeat(3,minmax(120px,1fr)); } }
+@media (max-width: 640px) { .novel-fetch-public-grid--three, .novel-fetch-public-grid--five { grid-template-columns:1fr; } .novel-fetch-version-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 @media (max-width: 860px) {
   .novel-fetch-summary,

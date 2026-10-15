@@ -44,3 +44,11 @@ test('all novel fetch entry routes use the same migrated React source', async ()
   assert.match(app, /'\/novel-fetch-react': NovelFetchPage/);
   assert.match(app, /'\/novel-fetch-workshop': NovelFetchPage/);
 });
+
+test('novel fetch React source keeps the V78 processing controls', async () => {
+  const source = await fs.readFile(new URL('./pages/NovelFetchPage.jsx', import.meta.url), 'utf8');
+  for (const marker of ['批量原文改文系统', 'V78', '批量输入', '本次处理设置', 'AI1', 'AI5', '敏感处理', '启用敏感词 AI 修复']) {
+    assert.match(source, new RegExp(marker));
+  }
+  assert.doesNotMatch(source, /iframe|batch-rewrite\/index\.html/);
+});

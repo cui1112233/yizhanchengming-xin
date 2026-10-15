@@ -20,9 +20,20 @@ const TABS = [
   { key: 'config', label: '配置' },
   { key: 'knowledge', label: '知识库' },
   { key: 'rules', label: '处理规则' },
-  { key: 'submit', label: '网站提交' },
-  { key: 'logs', label: '日志' }
+  { key: 'logs', label: '记录' }
 ];
+const AI_VERSIONS = ['original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'];
+const AI_VERSION_LABELS = { original: '原文', ai1: 'AI1', ai2: 'AI2', ai3: 'AI3', ai4: 'AI4', ai5: 'AI5' };
+const REWRITE_METHODS = [
+  { value: 'auto', label: '自动轮换' },
+  { value: 'high_imitation', label: '高仿改写' },
+  { value: 'opening_instruction', label: '爆款开头' },
+  { value: 'instruction', label: '自定义规则' }
+];
+const PROCESS_SETTINGS_KEY = 'novel-fetch-v78-process-settings';
+function readProcessSettings() {
+  try { return JSON.parse(window.localStorage.getItem(PROCESS_SETTINGS_KEY) || '{}'); } catch { return {}; }
+}
 const PLATFORMS = [
   { value: 1, label: '黑岩付费' }, { value: 2, label: '番茄付费' }, { value: 3, label: '七猫付费' },
   { value: 4, label: '点众付费' }, { value: 7, label: '番茄免费' }, { value: 15, label: '知乎付费' },
@@ -86,6 +97,14 @@ export function LegacyNovelFetchPage() {
   const [webSubmitPlan, setWebSubmitPlan] = useState(null);
   const [webSubmitResults, setWebSubmitResults] = useState([]);
   const [webSubmitLoading, setWebSubmitLoading] = useState(false);
+  const [selectedVersions, setSelectedVersions] = useState(() => readProcessSettings().selectedVersions || ['original', 'ai1']);
+  const [rewriteMethods, setRewriteMethods] = useState(() => readProcessSettings().rewriteMethods || Object.fromEntries(AI_VERSIONS.slice(1).map(key => [key, 'auto'])));
+  const [sensitiveAiProcessEnabled, setSensitiveAiProcessEnabled] = useState(() => readProcessSettings().sensitiveAiProcessEnabled ?? true);
+  const [textModel, setTextModel] = useState(() => readProcessSettings().textModel || '[anti-2]gemini-3.8-flash');
+
+  useEffect(() => {
+    window.localStorage.setItem(PROCESS_SETTINGS_KEY, JSON.stringify({ selectedVersions, rewriteMethods, sensitiveAiProcessEnabled, textModel }));
+  }, [selectedVersions, rewriteMethods, sensitiveAiProcessEnabled, textModel]);
 
   const selectedTask = useMemo(() => selectedTaskKeys[0] || '', [selectedTaskKeys]);
 
@@ -136,7 +155,10 @@ export function LegacyNovelFetchPage() {
     setProcessing(true);
     setProcessRows(bookIds.map(bookId => ({ bookId, status: 'loading' })));
     try {
-      const data = await fetchNovelContent({ platform: values.platform, bookIds, maxTxt: values.maxTxt });
+      const data = await fetchNovelContent({
+        platform: values.platform, bookIds, maxTxt: values.maxTxt,
+        textModel, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled
+      });
       const results = data.results || [];
       setProcessRows(results.map(row => ({ ...row, status: row.status === 'ok' ? 'done' : 'failed' })));
       await loadTasks();
@@ -183,19 +205,18 @@ export function LegacyNovelFetchPage() {
 
   const panels = {
     process: <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <div className="novel-fetch-grid">
-        <Form className="novel-fetch-panel" form={processForm} layout="vertical" initialValues={{ platform: 2, maxTxt: 2000 }}>
-          <Typography.Title level={5}>获取并处理原文</Typography.Title>
-          <Form.Item name="platform" label="平台"><Select options={PLATFORMS} /></Form.Item>
-          <Form.Item name="bookIds" label="书籍 ID" rules={[{ required: true, message: '请输入书籍 ID' }]}><Input.TextArea rows={5} placeholder="每行一个 ID，支持空格或逗号分隔" /></Form.Item>
-          <Form.Item name="maxTxt" label="截取字数"><InputNumber min={100} max={100000} /></Form.Item>
-          <Space><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button onClick={() => processForm.resetFields()}>清空</Button></Space>
-        </Form>
-        <div className="novel-fetch-panel"><Typography.Title level={5}>处理结果</Typography.Title><Table size="small" rowKey="bookId" pagination={false} dataSource={processRows} locale={{ emptyText: '提交任务后在这里查看处理结果' }} columns={[
-          { title: '书籍 ID', dataIndex: 'bookId' }, { title: '状态', dataIndex: 'status', render: value => <Tag color={statusColor(value)}>{value === 'done' ? '完成' : value === 'failed' ? '失败' : '处理中'}</Tag> },
-          { title: '内容', render: (_, row) => row.data ? <Button size="small" icon={<Download size={14} />} onClick={() => downloadText(`${row.bookId}.txt`, row.data)}>下载</Button> : row.error || '-' }
-        ]} /></div>
-      </div>
+      <Form className="novel-fetch-public-workspace" form={processForm} layout="vertical" initialValues={{ platform: 2, maxTxt: 4000 }}>
+        <div className="novel-fetch-public-heading"><div><Typography.Title level={3}>批量原文改文系统 <span className="novel-fetch-version-badge">V78</span></Typography.Title><Typography.Title level={4}>批量输入</Typography.Title></div><Typography.Text type="secondary">平台：{PLATFORMS.length}</Typography.Text></div>
+        <div className="novel-fetch-public-grid novel-fetch-public-grid--three">
+          <Form.Item name="platform" label="平台"><Select options={PLATFORMS.map(item => ({ ...item, label: `${item.label} (1)` }))} /></Form.Item>
+          <label className="novel-fetch-field"><span>文本模型</span><Select value={textModel} onChange={setTextModel} options={[{ value: '[anti-2]gemini-3.8-flash', label: '[anti-2]gemini-3.8-flash' }, { value: 'gpt-4o-mini', label: 'gpt-4o-mini' }]} /><small>执行时使用此模型；修改后作为后续批次默认值</small></label>
+        </div>
+        <Form.Item name="bookIds" label="待处理清单（一行一本书）" rules={[{ required: true, message: '请输入至少一个书籍 ID' }]}><Input.TextArea className="novel-fetch-public-input" rows={5} placeholder={'每一行：书籍 ID、书名、推荐理由、男女频、标签、评级。\n示例：123456789\t书名\t打脸逆袭、复仇反转\t女频\t现代世情、爽文\tS'} /></Form.Item>
+        <section className="novel-fetch-public-section"><Typography.Title level={5}>本次处理设置</Typography.Title><Typography.Text type="secondary">AI 文案（选择本次需要生成的版本）</Typography.Text><div className="novel-fetch-version-grid">{AI_VERSIONS.map(version => <label key={version} className={`novel-fetch-version-option ${selectedVersions.includes(version) ? 'is-selected' : ''}`}><input type="checkbox" checked={selectedVersions.includes(version)} onChange={event => setSelectedVersions(current => event.target.checked ? [...current, version] : current.filter(item => item !== version))} /><span>{AI_VERSION_LABELS[version]}</span></label>)}</div><div className="novel-fetch-public-grid novel-fetch-public-grid--five">{AI_VERSIONS.slice(1).map(version => <label className="novel-fetch-field" key={version}><span>{AI_VERSION_LABELS[version]} 改文方式</span><Select value={rewriteMethods[version]} onChange={value => setRewriteMethods(current => ({ ...current, [version]: value }))} disabled={!selectedVersions.includes(version)} options={REWRITE_METHODS} /></label>)}</div><div className="novel-fetch-public-hint">AI 文案处理优先方案：跟随“配置”中 AI1～AI5 的现有设置。</div></section>
+        <section className="novel-fetch-public-section novel-fetch-sensitive"><Typography.Title level={5}>敏感处理</Typography.Title><label><input type="checkbox" checked={sensitiveAiProcessEnabled} onChange={event => setSensitiveAiProcessEnabled(event.target.checked)} /> 启用敏感词 AI 修复（关闭则直接替换）</label></section>
+        <div className="novel-fetch-public-actions"><Button type="primary" loading={processing} onClick={handleProcess}>开始处理</Button><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button onClick={() => processForm.resetFields()}>清空</Button></div>
+      </Form>
+      <div className="novel-fetch-public-result"><div className="novel-fetch-public-result-title">处理状态</div><pre>{processRows.length ? JSON.stringify(processRows, null, 2) : '暂无处理结果。提交任务后在这里查看状态。'}</pre></div>
     </Space>,
     tasks: <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <div className="novel-fetch-panel"><Space wrap><Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={loadTasks}>刷新任务</Button><Button disabled={!selectedTaskKeys.length} onClick={handleRetryTasks}>批量重试</Button><Button danger disabled={!selectedTaskKeys.length} onClick={handleDeleteTasks}>删除选中</Button><Button disabled={!selectedTask} onClick={handleGenerateAi}>生成 AI 改文</Button></Space></div>

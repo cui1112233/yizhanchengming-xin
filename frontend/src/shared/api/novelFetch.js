@@ -1,9 +1,9 @@
 import { apiRequest } from './client';
 
-export function fetchNovelContent({ platform, bookIds, maxTxt }) {
+export function fetchNovelContent({ platform, bookIds, maxTxt, textModel, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled }) {
   return apiRequest('/api/novel-fetch', {
     method: 'POST',
-    body: JSON.stringify({ platform, bookIds, maxTxt })
+    body: JSON.stringify({ platform, bookIds, maxTxt, textModel, selectedVersions, rewriteMethods, sensitiveAiProcessEnabled })
   });
 }
 export function listNovelFetchProcessPresets() {
