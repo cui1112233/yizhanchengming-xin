@@ -20,6 +20,9 @@ const (
 type BookInfo struct {
 	Category string `json:"category"`
 	Genre    string `json:"genre"`
+	WorkTitle string `json:"workTitle,omitempty"`
+	Themes    string `json:"themes,omitempty"`
+	Labels    string `json:"labels,omitempty"`
 	// Text is supplied only to the AI fallback. It is deliberately omitted
 	// from the persisted book-info JSON because it is already stored as the
 	// document body.
@@ -32,8 +35,11 @@ type BookInfo struct {
 // which representation the upstream used.
 func (info *BookInfo) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Category string          `json:"category"`
-		Genre    json.RawMessage `json:"genre"`
+		Category  string          `json:"category"`
+		Genre     json.RawMessage `json:"genre"`
+		WorkTitle string          `json:"work_title"`
+		Theme     []struct{ Name string `json:"name"` } `json:"theme"`
+		Labels    []struct{ Name string `json:"name"` } `json:"labels"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -42,7 +48,19 @@ func (info *BookInfo) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*info = BookInfo{Category: raw.Category, Genre: genre}
+	themes := make([]string, 0, len(raw.Theme))
+	for _, item := range raw.Theme {
+		if text := strings.TrimSpace(item.Name); text != "" {
+			themes = append(themes, text)
+		}
+	}
+	labels := make([]string, 0, len(raw.Labels))
+	for _, item := range raw.Labels {
+		if text := strings.TrimSpace(item.Name); text != "" {
+			labels = append(labels, text)
+		}
+	}
+	*info = BookInfo{Category: raw.Category, Genre: genre, WorkTitle: raw.WorkTitle, Themes: strings.Join(themes, "、"), Labels: strings.Join(labels, "、")}
 	return nil
 }
 

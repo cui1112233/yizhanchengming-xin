@@ -469,6 +469,36 @@ func registerNovelFetchWorkshopRoutes(mux *http.ServeMux, store novelfetchworksh
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 
+	// The current Novel Fetch page reads its queue summary from the canonical
+	// workshop route. Keep this route beside the rest of the canonical handlers
+	// so a refresh does not fall through to the default 404 page.
+	mux.HandleFunc("GET /api/novel-fetch-workshop/realtime/status", func(w http.ResponseWriter, req *http.Request) {
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		documents, err := store.ListDocuments(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取任务队列失败"})
+			return
+		}
+		counts := map[string]int{"running": 0, "queued": 0, "waiting_retry": 0, "failed": 0, "stopped": 0}
+		for _, document := range documents {
+			task := legacyNovelFetchTask(document)
+			status := strings.ToLower(firstText(task["ai_status"], document.Meta["status"], document.Meta["taskStatus"], document.Meta["aiStatus"]))
+			switch {
+			case strings.Contains(status, "running") || strings.Contains(status, "processing"):
+				counts["running"]++
+			case strings.Contains(status, "queued") || strings.Contains(status, "queue"):
+				counts["queued"]++
+			case strings.Contains(status, "retry"):
+				counts["waiting_retry"]++
+			case strings.Contains(status, "failed") || strings.Contains(status, "error"):
+				counts["failed"]++
+			case strings.Contains(status, "stopped") || strings.Contains(status, "cancel"):
+				counts["stopped"]++
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"counts": counts})
+	})
+
 	mux.HandleFunc("GET /api/novel-fetch-workshop/tasks", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		tasks, err := store.ListDocuments(req.Context(), identity.Username)

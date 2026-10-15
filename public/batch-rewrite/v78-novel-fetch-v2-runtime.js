@@ -64,6 +64,10 @@
   function requestUrl(normalized) {
     // 文本模型目录属于统一 API 配置路由，不属于旧工作台资源路由。
     if (normalized.startsWith(WEB_SUBMIT_API.slice(4))) return `/api${normalized}`;
+    // 调用方可能传入完整的 /api/novel-fetch-workshop/... 路径。
+    // normalizePath 已去掉 /api 前缀，此时直接还原即可，不能再次拼接
+    // API_ROOT，否则会变成 /api/novel-fetch-workshop/novel-fetch-workshop/...
+    if (normalized.startsWith(API_ROOT.slice(4))) return `/api${normalized}`;
     return /^\/models(?:\?|$)/.test(normalized) ? `/api${normalized}` : `${API_ROOT}${normalized}`;
   }
 

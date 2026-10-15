@@ -49,6 +49,32 @@ func doNovelFetchRequest(t *testing.T, handler http.Handler, method, path string
 	return rr
 }
 
+func TestNovelFetchWorkshopRealtimeStatusIsAvailableOnCanonicalRoute(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "book-realtime-status",
+		Meta:   map[string]any{"aiStatus": "running"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/realtime/status", nil, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("canonical realtime status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Counts map[string]int `json:"counts"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Counts["running"] != 1 {
+		t.Fatalf("counts=%#v, want one running task", payload.Counts)
+	}
+}
+
 func TestNovelFetchWorkshopSparsePutPreservesExistingGenderSource(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

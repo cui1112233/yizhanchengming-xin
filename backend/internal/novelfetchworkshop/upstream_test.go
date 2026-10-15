@@ -85,6 +85,21 @@ func TestUpstreamFetchParsesBodyAndBookInfo(t *testing.T) {
 	}
 }
 
+func TestUpstreamFetchParsesNestedThemeAndLabels(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"msg":"成功","data":"完整正文","bookinfo":{"work_title":"测试书","theme":[{"id":1,"name":"现实情感"},{"id":2,"name":"婚恋"}],"labels":[{"id":75,"name":"现代"}]}}`))
+	}))
+	defer server.Close()
+
+	result, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "15", 4000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.BookInfo.WorkTitle != "测试书" || result.BookInfo.Themes != "现实情感、婚恋" || result.BookInfo.Labels != "现代" {
+		t.Fatalf("nested bookinfo = %#v", result.BookInfo)
+	}
+}
+
 func TestUpstreamFetchRejectsBusinessErrorWithoutBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"code":403,"msg":"无权访问","data":"错误页面"}`))
