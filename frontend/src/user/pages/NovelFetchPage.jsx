@@ -503,6 +503,9 @@ export function LegacyNovelFetchPage() {
       const config = data.appConfig || data.config || {};
       const knowledgeConfig = config.knowledge || {};
       const selected = knowledgeConfig[kind] || (kind === 'sensitive' ? knowledgeConfig.sensitive_rules : {}) || {};
+      // 处理规则提示词与规则 JSON 都保存在统一配置里；只恢复 JSON 会让用户切换回来时误以为规则丢失。
+      setRuleText(String(config.processing_rule_prompt || config.rewrite?.processing_rule_prompt || ''));
+      setRuleScope(String(config.processing_rule_scope || 'both'));
       setRuleConfigText(JSON.stringify(selected, null, 2));
     } catch (error) { message.error(error.message || '读取处理规则配置失败'); }
   }
