@@ -8,6 +8,10 @@ import (
 var safeSensitiveReplacements = map[string]string{
 	"绿帽子":   "颜色帽子",
 	"绿帽":    "颜色帽",
+	"家暴":    "家庭伤害",
+	"家庭暴力":  "家庭伤害",
+	"虐童":    "儿童伤害",
+	"虐待":    "伤害行为",
 	"第三者":   "关系介入者",
 	"小三":    "介入关系的人",
 	"出轨":    "关系越界",
@@ -83,10 +87,31 @@ func EnsureSensitiveRuleReplacements(settings map[string]any) int {
 				continue
 			}
 			find := strings.TrimSpace(fmt.Sprint(item["find"]))
-			if find == "" || strings.TrimSpace(fmt.Sprint(item["replace"])) != "" {
+			if find == "" {
 				continue
 			}
-			item["replace"] = safeSensitiveReplacement(find)
+			existing := strings.TrimSpace(fmt.Sprint(item["replace"]))
+			replacement := safeSensitiveReplacement(find)
+			// A previous version could persist the original word as its own
+			// replacement. That makes the rule look enabled while leaving the
+			// prohibited expression untouched, so only that broken value is
+			// repaired; a real user-authored replacement still wins.
+			if existing != "" && existing != find {
+				continue
+			}
+			if replacement == find {
+				// Unknown/benign catalog entries keep their readable original
+				// wording when no reviewed neutral phrase exists yet. This is
+				// only for an empty value; a persisted same-as-find value is
+				// left alone until its term gets an explicit mapping.
+				if existing != "" {
+					continue
+				}
+				item["replace"] = find
+				changed++
+				continue
+			}
+			item["replace"] = replacement
 			changed++
 		}
 	}
@@ -131,6 +156,8 @@ func safeSensitiveReplacement(find string) string {
 		return "惊讶感叹"
 	case containsAny(find, "强奸", "轮奸", "奸杀", "先奸", "强上", "绑架", "虐待"):
 		return "伤害行为"
+	case containsAny(find, "家暴", "家庭暴力", "虐童", "虐待老人", "殴打家人"):
+		return "家庭伤害"
 	case containsAny(find, "第三者", "小三", "出轨", "情妇", "偷情", "私会", "私奔", "绿帽", "绿茶"):
 		return "关系介入者"
 	case containsAny(find, "赌博", "赌", "博彩", "下注"):

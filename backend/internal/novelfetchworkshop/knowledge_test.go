@@ -68,8 +68,13 @@ func TestDefaultWorkshopSettingsIncludeImportedKnowledgeAndRules(t *testing.T) {
 	if sensitive, ok := knowledge["sensitive"].(map[string]any); ok {
 		for _, group := range arrayMap(sensitive["groups"]) {
 			for _, rule := range arrayMap(group["rules"]) {
-				if strings.TrimSpace(fmt.Sprint(rule["find"])) != "" && strings.TrimSpace(fmt.Sprint(rule["replace"])) == "" {
+				find := strings.TrimSpace(fmt.Sprint(rule["find"]))
+				replace := strings.TrimSpace(fmt.Sprint(rule["replace"]))
+				if find != "" && replace == "" {
 					t.Fatalf("sensitive rule replacement missing for %q", rule["find"])
+				}
+				if find != "" && replace == find && find == "家暴" {
+					t.Fatalf("sensitive rule replacement still equals original for %q", find)
 				}
 			}
 		}
@@ -164,6 +169,19 @@ func TestEnsureSensitiveRuleReplacementsFillsSafeWords(t *testing.T) {
 	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
 	if rules[0].(map[string]any)["replace"] != "颜色帽子" || rules[1].(map[string]any)["replace"] != "惊讶感叹" || rules[2].(map[string]any)["replace"] != "自定义" {
 		t.Fatalf("unexpected safe replacements: %#v", rules)
+	}
+}
+
+func TestEnsureSensitiveRuleReplacementsRepairsPersistedOriginalReplacement(t *testing.T) {
+	settings := map[string]any{"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
+		map[string]any{"find": "家暴", "replace": "家暴"},
+	}}}}}
+	if got := EnsureSensitiveRuleReplacements(settings); got != 1 {
+		t.Fatalf("changed=%d, want 1", got)
+	}
+	rules := settings["sensitive"].(map[string]any)["groups"].([]any)[0].(map[string]any)["rules"].([]any)
+	if got := rules[0].(map[string]any)["replace"]; got != "家庭伤害" {
+		t.Fatalf("replacement=%q, want 家庭伤害", got)
 	}
 }
 
