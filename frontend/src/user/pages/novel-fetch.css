@@ -366,10 +366,10 @@
 .novel-fetch-process-main,
 .novel-fetch-process-side { min-width:0; }
 .novel-fetch-process-side { display:flex; flex-direction:column; min-height:100%; }
-.novel-fetch-process-side .novel-fetch-status-layout { display:flex; flex-direction:column; gap:12px; flex:1; }
+.novel-fetch-process-side .novel-fetch-status-layout { display:flex; flex-direction:column; gap:12px; flex:0 0 auto; }
 .novel-fetch-process-side .novel-fetch-public-result { min-height:0; }
-.novel-fetch-process-side .novel-fetch-live-log { flex:1; }
-.novel-fetch-process-side .novel-fetch-live-log pre { min-height:300px; }
+.novel-fetch-process-side .novel-fetch-live-log { flex:0 0 auto; }
+.novel-fetch-process-side .novel-fetch-live-log pre { min-height:180px; max-height:260px; overflow:auto; }
 .novel-fetch-progress-list { display:grid; gap:8px; margin:12px 0; }
 .novel-fetch-progress-title,
 .novel-fetch-live-log-title { margin: 6px 0 8px; color: #1684ff; font-size: 13px; font-weight: 600; }
