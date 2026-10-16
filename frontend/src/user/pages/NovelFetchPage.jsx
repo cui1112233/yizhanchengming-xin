@@ -436,6 +436,9 @@ export function LegacyNovelFetchPage() {
     () => summarizeWorkshopProgress(progressRows, webSubmitResults),
     [progressRows, webSubmitResults]
   );
+  const progressPercent = value => processSummary.total
+    ? Math.min(100, Math.round((Number(value) / processSummary.total) * 100))
+    : 0;
 
   async function loadTasks() {
     setTasksLoading(true);
@@ -976,8 +979,8 @@ export function LegacyNovelFetchPage() {
       <div className="novel-fetch-status-layout">
         <div className="novel-fetch-public-result"><div className="novel-fetch-public-result-title">处理状态</div><div className="novel-fetch-stat-grid">
           {[['总数量', processSummary.total], ['已解析', processSummary.originalDone], ['处理中', processSummary.processing], ['已完成', processSummary.aiDone], ['失败', processSummary.failed]].map(([label, value]) => <div className="novel-fetch-stat-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
-        </div><div className="novel-fetch-progress-title">实时进度</div><div className="novel-fetch-progress-list"><div><span>原文获取</span><b>{processSummary.originalDone} / {processSummary.total}</b></div><div><span>AI 文案生成</span><b>{processSummary.aiDone} / {processSummary.total}</b></div><div><span>121 网站提交</span><b>{processSummary.submissionDone} / {processSummary.total}</b></div></div></div>
-        <div className="novel-fetch-live-log-title">实时日志</div><div className="novel-fetch-public-result novel-fetch-live-log"><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : processing ? '正在执行：读取原文、分类、敏感处理和 AI 版本。' : '暂无正在处理的任务。'}</pre></div>
+        </div><div className="novel-fetch-progress-title">实时进度</div><div className="novel-fetch-progress-list"><div><span>原文获取</span><i style={{ '--progress': `${progressPercent(processSummary.originalDone)}%` }} /><b>{processSummary.originalDone} / {processSummary.total}</b></div><div><span>AI 文案生成</span><i style={{ '--progress': `${progressPercent(processSummary.aiDone)}%` }} /><b>{processSummary.aiDone} / {processSummary.total}</b></div><div><span>视频管理系统提交</span><i style={{ '--progress': `${progressPercent(processSummary.submissionDone)}%` }} /><b>{processSummary.submissionDone} / {processSummary.total}</b></div></div></div>
+        {(processing || processJob) ? <><div className="novel-fetch-live-log-title">实时日志</div><div className="novel-fetch-public-result novel-fetch-live-log"><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : '正在执行：读取原文、分类、敏感处理和 AI 版本。'}</pre></div></> : null}
       </div>
       <div className="novel-fetch-public-actions novel-fetch-process-secondary-actions"><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={applyAllRules}>规则处理</Button><Button onClick={() => submitVisibleTasks(false)}>提交网络</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button></div>
       </div>

@@ -483,3 +483,82 @@
     overflow-x: auto;
   }
 }
+
+/* 交互重排：把处理页做成“输入 → 处理策略 → 状态反馈”的工作台。
+   这里用窄栏、明确层级和固定节奏，避免长表单变成一整块没有重点的面板。 */
+.novel-fetch-workbench {
+  --workbench-gap: 14px;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 0 20px 32px;
+}
+.novel-fetch-workbench > .ant-tabs { width: 100%; }
+.novel-fetch-workbench > .ant-tabs > .ant-tabs-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-bottom: 16px;
+  padding: 10px 0 0;
+  background: var(--legacy-bg);
+}
+.novel-fetch-workbench > .ant-tabs > .ant-tabs-nav .ant-tabs-tab {
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 6px 6px 0 0;
+  transition: color .2s ease, background .2s ease;
+}
+.novel-fetch-workbench > .ant-tabs > .ant-tabs-nav .ant-tabs-tab:hover { background: rgba(22,119,255,.08); }
+.novel-fetch-workbench .novel-fetch-public-workspace {
+  padding: 18px;
+  border-color: var(--legacy-border);
+  border-radius: 10px;
+  background: var(--legacy-card);
+  box-shadow: none;
+}
+.novel-fetch-public-heading {
+  align-items: flex-end;
+  margin: -2px 0 16px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid rgba(120, 148, 190, .18);
+}
+.novel-fetch-public-heading .ant-typography { letter-spacing: .02em; }
+.novel-fetch-public-heading > .ant-typography { padding-bottom: 4px; }
+.novel-fetch-process-grid { grid-template-columns: minmax(0, 1fr) 320px; gap: var(--workbench-gap); }
+.novel-fetch-process-side { position: sticky; top: 62px; align-self: start; }
+.novel-fetch-public-section { margin-top: 18px; padding-top: 16px; }
+.novel-fetch-public-section > .ant-typography:first-child { font-size: 16px; letter-spacing: .02em; }
+.novel-fetch-content-limit { align-items: center; padding: 10px 12px; border: 1px solid var(--legacy-border); border-radius: 8px; background: var(--legacy-panel); }
+.novel-fetch-version-grid { gap: 8px; }
+.novel-fetch-version-option { min-height: 52px; border-radius: 8px; background: var(--legacy-panel); transition: border-color .18s ease, background .18s ease; }
+.novel-fetch-version-option:hover { border-color: #4096ff; background: rgba(22,119,255,.08); }
+.novel-fetch-version-option.is-selected { box-shadow: inset 3px 0 0 #1677ff; }
+.novel-fetch-auth-pair { margin-top: 18px; }
+.novel-fetch-sensitive { min-height: 76px; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.novel-fetch-version-card { min-height: 66px; margin: 18px 0 0; border-radius: 10px; }
+.novel-fetch-public-actions { align-items: center; margin-top: 14px; }
+.novel-fetch-public-actions .ant-btn { min-height: 34px; border-radius: 6px; }
+.novel-fetch-process-secondary-actions { padding: 10px 12px; border-top: 1px solid var(--legacy-border); border-bottom: 1px solid var(--legacy-border); background: transparent; }
+.novel-fetch-public-result { padding: 14px; border-radius: 10px; border-color: var(--legacy-border); background: var(--legacy-card); }
+.novel-fetch-stat-grid { gap: 8px; }
+.novel-fetch-stat-card { min-height: 60px; padding: 10px 11px; border-radius: 8px; background: var(--legacy-panel); }
+.novel-fetch-stat-card strong { font-size: 20px; }
+.novel-fetch-progress-list { gap: 10px; }
+.novel-fetch-progress-list > div { grid-template-columns: 108px minmax(0,1fr) auto; min-height: 18px; }
+.novel-fetch-progress-list > div::after { display: none; }
+.novel-fetch-progress-list > div i { grid-column: 2; grid-row: 1; display: block; height: 7px; overflow: hidden; border: 1px solid rgba(140,160,190,.28); border-radius: 999px; background: linear-gradient(90deg, #25c77a var(--progress), rgba(255,255,255,.05) var(--progress)); }
+.novel-fetch-live-log { margin-top: 2px; }
+.novel-fetch-live-log pre { min-height: 170px; padding: 12px; border: 1px solid var(--legacy-border); border-radius: 8px; background: var(--legacy-input); }
+.novel-fetch-current-batch { margin-top: var(--workbench-gap); padding: 14px; border: 1px solid var(--legacy-border); border-radius: 10px; background: var(--legacy-card); }
+.novel-fetch-current-batch-heading { padding-bottom: 12px; border-bottom: 1px solid rgba(120,148,190,.16); }
+.novel-fetch-current-batch-table { margin-top: 10px; }
+.novel-fetch-workbench .ant-table-container { border-radius: 10px; overflow: hidden; }
+@media (max-width: 1100px) {
+  .novel-fetch-process-side { position: static; }
+}
+@media (max-width: 640px) {
+  .novel-fetch-workbench { padding: 0 12px 28px; }
+  .novel-fetch-workbench .novel-fetch-public-workspace { padding: 15px; }
+  .novel-fetch-content-limit { align-items: stretch; flex-direction: column; }
+  .novel-fetch-content-limit .novel-fetch-field { width: 100%; }
+  .novel-fetch-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
