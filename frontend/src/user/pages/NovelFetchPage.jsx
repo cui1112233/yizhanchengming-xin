@@ -61,6 +61,28 @@ function parseRuleEditorValue(value) {
   }
 }
 
+function summarizeWorkshopProgress(rows, fallbackSubmissions = []) {
+  const source = Array.isArray(rows) ? rows : [];
+  const text = value => String(value ?? '').trim().toLowerCase();
+  const isDone = value => /^(done|success|completed|complete|ready|ai_done|uploaded|已完成|完成|成功|已上传)$/.test(text(value));
+  const isFailed = value => /fail|error|failed|失败|错误/.test(text(value));
+  const isActive = value => /processing|running|pending|queued|queue|waiting|排队|处理中|执行中|待处理/.test(text(value));
+  const originalDone = source.filter(row => isDone(row.originalStatus ?? row.original_status) || Number(row.originalRawChars ?? row.original_raw_chars) > 0).length;
+  const aiDone = source.filter(row => isDone(row.aiStatus ?? row.ai_status) || Number(row.aiGeneratedCount ?? row.ai_generated_count) > 0 || (Array.isArray(row.aiFiles ?? row.ai_files) && (row.aiFiles ?? row.ai_files).length > 0)).length;
+  const failed = source.filter(row => isFailed(row.status) || isFailed(row.originalStatus ?? row.original_status) || isFailed(row.aiStatus ?? row.ai_status) || isFailed(row.siteSubmitStatus ?? row.site_submit_status)).length;
+  const processing = source.filter(row => isActive(row.status) || isActive(row.originalStatus ?? row.original_status) || isActive(row.aiStatus ?? row.ai_status) || isActive(row.siteSubmitStatus ?? row.site_submit_status)).length;
+  const submissionDone = source.filter(row => isDone(row.siteSubmitStatus ?? row.site_submit_status)).length;
+  const fallbackSubmissionDone = fallbackSubmissions.filter(row => isDone(row.status)).length;
+  return {
+    total: source.length,
+    originalDone,
+    aiDone,
+    processing,
+    failed,
+    submissionDone: source.length ? submissionDone : fallbackSubmissionDone
+  };
+}
+
 // 规则编辑器保留 V78 的业务边界：规则结构由 Go 保存，React 只编辑字段，不在前端复制处理逻辑。
 function RuleEditor({ kind, value, onChange }) {
   const [groupIndex, setGroupIndex] = useState(0);
@@ -404,16 +426,15 @@ export function LegacyNovelFetchPage() {
     if (!taskDate) return tasks;
     return tasks.filter(task => String(task.createdAt || task.created_at || task.updatedAt || '').slice(0, 10) === taskDate);
   }, [tasks, taskDate]);
-  const processSummary = useMemo(() => {
-    const rows = visibleTasks;
-    return {
-      total: rows.length,
-      originalDone: rows.filter(row => String(row.originalStatus || row.original_status).includes('done')).length,
-      processing: rows.filter(row => /processing|running|pending/.test(String(row.status || row.aiStatus || row.ai_status))).length,
-      aiDone: rows.filter(row => String(row.aiStatus || row.ai_status).includes('done') || Number(row.aiGeneratedCount || row.ai_generated_count) > 0).length,
-      failed: rows.filter(row => /fail|error/.test(String(row.status || row.aiStatus || row.ai_status))).length
-    };
-  }, [visibleTasks]);
+  const currentBatchRows = useMemo(() => {
+    const rows = currentBatch?.taskStates || currentBatch?.task_states;
+    return Array.isArray(rows) ? rows : [];
+  }, [currentBatch]);
+  const progressRows = currentBatchRows.length ? currentBatchRows : visibleTasks;
+  const processSummary = useMemo(
+    () => summarizeWorkshopProgress(progressRows, webSubmitResults),
+    [progressRows, webSubmitResults]
+  );
 
   async function loadTasks() {
     setTasksLoading(true);
@@ -517,6 +538,17 @@ export function LegacyNovelFetchPage() {
       if (options.length) setTextModelOptions(options);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    // 当前批次状态由 Go 后端持久化；处理期间轮询，避免按钮操作后右侧仍停留在旧快照。
+    const timer = window.setInterval(() => {
+      if (processing || currentBatchRows.length) {
+        loadTasks();
+        loadCurrentBatch();
+      }
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [processing, currentBatchRows.length]);
 
   useEffect(() => {
     // 公网 V78 在进入处理台时会把当前空闲/执行状态同步到顶栏；否则本地顶栏会比线上少一段状态文案。
@@ -917,7 +949,7 @@ export function LegacyNovelFetchPage() {
       <div className="novel-fetch-status-layout">
         <div className="novel-fetch-public-result"><div className="novel-fetch-public-result-title">处理状态</div><div className="novel-fetch-stat-grid">
           {[['总数量', processSummary.total], ['已解析', processSummary.originalDone], ['处理中', processSummary.processing], ['已完成', processSummary.aiDone], ['失败', processSummary.failed]].map(([label, value]) => <div className="novel-fetch-stat-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
-        </div><div className="novel-fetch-progress-title">实时进度</div><div className="novel-fetch-progress-list"><div><span>原文获取</span><b>{processSummary.originalDone} / {processSummary.total}</b></div><div><span>AI 文案生成</span><b>{processSummary.aiDone} / {processSummary.total}</b></div><div><span>121 网站提交</span><b>{webSubmitResults.filter(item => item.status === 'done' || item.status === 'success').length} / {processSummary.total}</b></div></div></div>
+        </div><div className="novel-fetch-progress-title">实时进度</div><div className="novel-fetch-progress-list"><div><span>原文获取</span><b>{processSummary.originalDone} / {processSummary.total}</b></div><div><span>AI 文案生成</span><b>{processSummary.aiDone} / {processSummary.total}</b></div><div><span>121 网站提交</span><b>{processSummary.submissionDone} / {processSummary.total}</b></div></div></div>
         <div className="novel-fetch-live-log-title">实时日志</div><div className="novel-fetch-public-result novel-fetch-live-log"><pre>{processJob?.error ? processJob.error : processJob?.status === 'done' ? '完整流程已完成。' : processing ? '正在执行：读取原文、分类、敏感处理和 AI 版本。' : '暂无正在处理的任务。'}</pre></div>
       </div>
       <div className="novel-fetch-public-actions novel-fetch-process-secondary-actions"><Button onClick={retryFailedTasks}>重试失败</Button><Button onClick={applyAllRules}>规则处理</Button><Button onClick={() => submitVisibleTasks(false)}>提交网络</Button><Button onClick={transferToBatchFactory}>进入批量工厂</Button></div>
