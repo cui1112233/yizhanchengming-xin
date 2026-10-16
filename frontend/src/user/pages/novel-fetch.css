@@ -383,6 +383,10 @@
 .novel-fetch-stat-card strong { display:block; margin-top:4px; color:var(--text-primary); font-size:20px; line-height:1; }
 .novel-fetch-progress-row { display:flex; justify-content:space-between; gap:12px; padding:8px 10px; border:1px solid var(--legacy-border); border-radius:6px; color:var(--text-secondary); }
 .novel-fetch-progress-row b { color:var(--legacy-accent); }
+.novel-fetch-current-batch { min-width:0; overflow:hidden; }
+.novel-fetch-current-batch-table { min-width:0; }
+.novel-fetch-current-batch-table .ant-table-container { overflow-x:auto; }
+.novel-fetch-current-batch-table .ant-table-cell { white-space:nowrap; }
 .novel-fetch-live-log pre { min-height:190px; background:var(--legacy-input); border-radius:6px; padding:10px; }
 .novel-fetch-login-status { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; padding:8px 10px; border:1px solid var(--legacy-border); border-radius:6px; color:var(--text-danger); background:var(--legacy-panel); }
 .novel-fetch-login-status.is-ready { color:var(--text-success); }
