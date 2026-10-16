@@ -196,6 +196,10 @@ func TestSafeSensitiveReplacementCoversCommonSensitiveCategories(t *testing.T) {
 		{find: "乱伦", want: "不当关系"},
 		{find: "迷药", want: "特殊药物"},
 		{find: "人贩子", want: "非法拐卖者"},
+		{find: "玩了多少小明星", want: "与多位公众人物交往"},
+		{find: "知三当三", want: "明知介入关系"},
+		{find: "龟儿子", want: "失礼称呼"},
+		{find: "狗男女", want: "关系失当者"},
 	} {
 		if got := safeSensitiveReplacement(item.find); got != item.want {
 			t.Fatalf("%s replacement=%q, want %q", item.find, got, item.want)
