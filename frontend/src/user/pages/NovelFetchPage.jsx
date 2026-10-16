@@ -27,7 +27,8 @@ const TABS = [
   { key: 'config', label: '配置' },
   { key: 'knowledge', label: '知识库' },
   { key: 'rules', label: '处理规则' },
-  { key: 'logs', label: '日志' }
+  { key: 'submit', label: '提交' },
+  { key: 'logs', label: '记录' }
 ];
 const AI_VERSIONS = ['original', 'ai1', 'ai2', 'ai3', 'ai4', 'ai5'];
 const AI_VERSION_LABELS = { original: '原文', ai1: 'AI1', ai2: 'AI2', ai3: 'AI3', ai4: 'AI4', ai5: 'AI5' };

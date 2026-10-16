@@ -127,9 +127,9 @@
   min-width: 0;
   max-width: none;
   width: 100%;
-  /* 线上 V78 的内容区直接贴合主工作区；多一层横向 padding 会让
-     标题、表格和右侧状态栏整体向内缩，导致 React 页面与线上错位。 */
-  padding: 0 0 28px;
+  /* 线上 V78 的工作区在公共侧栏后保留固定内边距；没有这层间距时，
+     标题、标签和两列工作卡会贴到边界，页面看起来像另一套旧工作台。 */
+  padding: 0 20px 28px;
   background: var(--legacy-bg);
   color: var(--text-primary);
 }
@@ -294,7 +294,9 @@
 }
 
 .novel-fetch-workbench > .ant-tabs > .ant-tabs-nav .ant-tabs-extra-content {
-  flex: 0 0 40%;
+  /* 线上标题只占一个窄的固定栏，业务标签紧跟其后；按比例分配会
+     在不同窗口宽度下把标签推到页面中部，造成明显的布局漂移。 */
+  flex: 0 0 230px;
   min-width: 0;
   text-align: left;
 }
@@ -358,7 +360,7 @@
 .novel-fetch-preview-row:hover { border-color:var(--legacy-border-strong); background:var(--legacy-card); }
 .novel-fetch-preview-row input { accent-color:#1677ff; }
 .novel-fetch-status-layout { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(260px, .8fr); gap:12px; width:100%; }
-.novel-fetch-process-grid { display:grid; grid-template-columns:minmax(0, 1.34fr) minmax(320px, 1fr); gap:12px; width:100%; align-items:stretch; }
+.novel-fetch-process-grid { display:grid; grid-template-columns:minmax(0, 1.5fr) minmax(320px, 1fr); gap:12px; width:100%; align-items:stretch; }
 .novel-fetch-version-card { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:12px 0; padding:12px 14px; border:1px solid var(--border-color, #30384a); border-radius:8px; background:rgba(35, 33, 61, .72); }
 .novel-fetch-version-card > div { display:flex; flex-direction:column; gap:4px; }
 .novel-fetch-current-batch-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
