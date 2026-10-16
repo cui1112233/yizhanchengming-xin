@@ -134,6 +134,13 @@
   color: var(--text-primary);
 }
 
+/* 小说获取是长表单/任务台，公共壳层默认裁剪溢出；这里只让本页内容区滚动，避免影响其他工作台的固定布局。 */
+.legacy-content:has(.novel-fetch-workbench) {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 /* V78 的处理台是独立的深色工作区；页面级变量避免被全局主题的蓝色面板覆盖。 */
 [data-theme='dark'] .novel-fetch-workbench {
   --legacy-bg: #0a0a14;
