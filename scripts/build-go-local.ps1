@@ -25,6 +25,13 @@ $legacyEmbeddedRoute = Join-Path $goDist 'batch-rewrite'
 if (Test-Path -LiteralPath $legacyEmbeddedRoute) {
   Remove-Item -LiteralPath $legacyEmbeddedRoute -Recurse -Force
 }
+# Vite copies frontend/public verbatim. The old V78 workbench remains there as
+# a reference source, but it must not survive in the generated dist either:
+# otherwise a stale browser route can load the old page and call retired APIs.
+$legacyFrontendDist = Join-Path $frontendDist 'batch-rewrite'
+if (Test-Path -LiteralPath $legacyFrontendDist) {
+  Remove-Item -LiteralPath $legacyFrontendDist -Recurse -Force
+}
 
 # The liquid-metal brand component reads these stable, non-hashed images from
 # /assets. Keep them beside the hashed Vite assets in the embedded Go bundle.
