@@ -399,15 +399,21 @@
    dark mode and the user's light-theme switch. */
 .novel-fetch-workbench .ant-tabs-nav { margin:0 0 16px; }
 .novel-fetch-workbench .ant-tabs-tab { padding:10px 14px; color:var(--text-secondary); }
-.novel-fetch-workbench .ant-tabs-tab-active .ant-tabs-tab-btn { color:#f07167; font-weight:700; }
-.novel-fetch-workbench .ant-tabs-ink-bar { background:#f07167; }
+.novel-fetch-workbench .ant-tabs-tab-active .ant-tabs-tab-btn { color:#1677ff !important; font-weight:700; }
+.novel-fetch-workbench .ant-tabs-ink-bar { background:#1677ff !important; }
+.novel-fetch-workbench .novel-fetch-public-workspace > .ant-typography,
+.novel-fetch-workbench .novel-fetch-public-section > .ant-typography,
+.novel-fetch-workbench .novel-fetch-public-result > .ant-typography,
+.novel-fetch-workbench .novel-fetch-current-batch-heading > .ant-typography { color:#1677ff; }
 .novel-fetch-workbench .ant-form-item-label > label { color:var(--text-primary); font-weight:600; }
 .novel-fetch-workbench .ant-input,
 .novel-fetch-workbench .ant-input-number,
 .novel-fetch-workbench .ant-select-selector { border-color:var(--legacy-border-strong) !important; border-radius:6px !important; background:var(--legacy-panel) !important; color:var(--text-primary) !important; }
 .novel-fetch-workbench .ant-input::placeholder { color:var(--text-tertiary); }
 .novel-fetch-workbench .ant-btn { border-color:var(--legacy-border-strong); border-radius:6px; color:var(--text-primary); background:var(--legacy-panel); box-shadow:none; }
-.novel-fetch-workbench .ant-btn-primary { color:#fff; border-color:#f07167; background:#f07167; }
+.novel-fetch-workbench .ant-btn-primary { color:#fff; border-color:#1677ff; background:#1677ff; }
+.novel-fetch-workbench .ant-btn-primary:hover,
+.novel-fetch-workbench .ant-btn-primary:focus { border-color:#4096ff; background:#4096ff; }
 .novel-fetch-workbench .novel-fetch-public-title .ant-typography { color:var(--text-primary); }
 .novel-fetch-workbench .novel-fetch-public-workspace,
 .novel-fetch-workbench .novel-fetch-public-result,
