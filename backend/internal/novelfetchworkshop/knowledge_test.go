@@ -185,6 +185,24 @@ func TestEnsureSensitiveRuleReplacementsRepairsPersistedOriginalReplacement(t *t
 	}
 }
 
+func TestSafeSensitiveReplacementCoversCommonSensitiveCategories(t *testing.T) {
+	for _, item := range []struct {
+		find string
+		want string
+	}{
+		{find: "家暴", want: "家庭伤害"},
+		{find: "龌龊", want: "不雅表达"},
+		{find: "荡妇", want: "失礼称呼"},
+		{find: "乱伦", want: "不当关系"},
+		{find: "迷药", want: "特殊药物"},
+		{find: "人贩子", want: "非法拐卖者"},
+	} {
+		if got := safeSensitiveReplacement(item.find); got != item.want {
+			t.Fatalf("%s replacement=%q, want %q", item.find, got, item.want)
+		}
+	}
+}
+
 func TestSafeSensitiveReplacementUsesMeaningfulNeutralLanguage(t *testing.T) {
 	settings := map[string]any{"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{
 		map[string]any{"find": "第三者", "replace": ""},
