@@ -104,8 +104,13 @@ func EnsureSensitiveRuleReplacements(settings map[string]any) int {
 	for _, root := range []map[string]any{settings, mapOrEmpty(settings["appConfig"]), mapOrEmpty(settings["app_config"])} {
 		fillGroups(mapOrEmpty(root["sensitive"])["groups"])
 		knowledge := mapOrEmpty(root["knowledge"])
+		// The rules editor reads the canonical knowledge.sensitive catalog. The
+		// older locations above are kept for compatibility, but leaving this
+		// view untouched makes the same words appear without replacements.
+		fillGroups(mapOrEmpty(knowledge["sensitive"])["groups"])
 		fill(mapOrEmpty(knowledge["layout_rules"])["sensitive_rules"])
 		libraries := mapOrEmpty(root["knowledgeLibraries"])
+		fillGroups(mapOrEmpty(libraries["sensitive"])["groups"])
 		fill(mapOrEmpty(libraries["layout_rules"])["sensitive_rules"])
 	}
 	return changed
