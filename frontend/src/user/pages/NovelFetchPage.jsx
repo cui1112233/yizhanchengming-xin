@@ -501,11 +501,34 @@ export function LegacyNovelFetchPage() {
     try {
       const data = await getWorkshopConfig();
       const config = data.appConfig || data.config || {};
-      const knowledgeConfig = config.knowledge || {};
-      const selected = knowledgeConfig[kind] || (kind === 'sensitive' ? knowledgeConfig.sensitive_rules : {}) || {};
+      // The Go API keeps both V78's legacy knowledge view and the canonical
+      // library view. An empty legacy object must not hide a populated library
+      // after switching tabs or migrating an older account.
+      const knowledgeConfig = {};
+      [data.knowledgeLibraries, config.knowledgeLibraries, data.knowledge, config.knowledge]
+        .filter(candidate => candidate && typeof candidate === 'object' && !Array.isArray(candidate))
+        .forEach(candidate => Object.entries(candidate).forEach(([key, value]) => {
+          const existing = knowledgeConfig[key];
+          const emptyObject = value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
+          if (emptyObject && existing && typeof existing === 'object' && Object.keys(existing).length > 0) return;
+          knowledgeConfig[key] = value;
+        }));
+      const rewrite = config.rewrite || data.rewrite || data.settings?.rewrite || {};
+      const chapterRules = knowledgeConfig.chapter_rules || {};
+      const symbolRules = knowledgeConfig.symbol_rules || {};
+      // V78 stores chapter/symbol rules inside their library documents. Map
+      // the editor's visible kind to that canonical object instead of showing
+      // an empty placeholder after switching back to this tab.
+      const selected = knowledgeConfig[kind]
+        || (kind === 'chapter_exact_rules' ? { chapter_exact_rules: chapterRules.chapter_exact_rules || [] } : null)
+        || (kind === 'chapter_inline_rules' ? { chapter_inline_rules: chapterRules.chapter_inline_rules || [] } : null)
+        || (kind === 'pair_fill_rules' ? { pair_fill_rules: symbolRules.pair_fill_rules || [] } : null)
+        || (kind === 'symbol_rules' ? symbolRules : null)
+        || (kind === 'sensitive' ? (knowledgeConfig.sensitive_rules ? { groups: [{ name: '系统敏感词', enabled: true, apply_to_original: true, apply_to_ai: true, rules: knowledgeConfig.sensitive_rules }] } : {}) : {})
+        || {};
       // 处理规则提示词与规则 JSON 都保存在统一配置里；只恢复 JSON 会让用户切换回来时误以为规则丢失。
-      setRuleText(String(config.processing_rule_prompt || config.rewrite?.processing_rule_prompt || ''));
-      setRuleScope(String(config.processing_rule_scope || 'both'));
+      setRuleText(String(config.processing_rule_prompt || rewrite.processing_rule_prompt || data.processing_rule_prompt || data.settings?.processing_rule_prompt || ''));
+      setRuleScope(String(config.processing_rule_scope || rewrite.processing_rule_scope || data.processing_rule_scope || 'both'));
       setRuleConfigText(JSON.stringify(selected, null, 2));
     } catch (error) { message.error(error.message || '读取处理规则配置失败'); }
   }

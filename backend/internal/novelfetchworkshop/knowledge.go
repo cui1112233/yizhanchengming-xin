@@ -31,7 +31,7 @@ func SyncKnowledgeConfigViews(settings, patch map[string]any) {
 	}
 	apply := func(source map[string]any) {
 		for kind, value := range source {
-			if kind == "high_imitation" || kind == "opening_phrases" || kind == "rewrite_templates" || kind == "layout_rules" || kind == "symbol_rules" || kind == "chapter_rules" || kind == "opening_analyzer" {
+			if kind == "high_imitation" || kind == "opening_phrases" || kind == "rewrite_templates" || kind == "sensitive" || kind == "layout_rules" || kind == "symbol_rules" || kind == "chapter_rules" || kind == "opening_analyzer" {
 				if library, ok := value.(map[string]any); ok {
 					libraries[kind] = cloneMap(library)
 				}

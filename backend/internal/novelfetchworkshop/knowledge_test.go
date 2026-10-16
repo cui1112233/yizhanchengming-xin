@@ -60,6 +60,9 @@ func TestDefaultWorkshopSettingsIncludeImportedKnowledgeAndRules(t *testing.T) {
 	settings := DefaultWorkshopSettings()
 	app, _ := settings["appConfig"].(map[string]any)
 	knowledge, _ := app["knowledge"].(map[string]any)
+	if sensitive, ok := knowledge["sensitive"].(map[string]any); !ok || len(arrayMap(sensitive["groups"])) == 0 {
+		t.Fatalf("sensitive rule catalog missing from visible knowledge: %#v", knowledge["sensitive"])
+	}
 	if analyzer, ok := knowledge["opening_analyzer"].(map[string]any); !ok || analyzer["name"] != "爆款开头拆解" {
 		t.Fatalf("opening analyzer seed missing: %#v", knowledge["opening_analyzer"])
 	}

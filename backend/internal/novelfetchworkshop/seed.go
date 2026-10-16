@@ -77,6 +77,10 @@ func importedKnowledge() (map[string]any, map[string]any) {
 		"opening_analyzer":  openingAnalyzer,
 		"high_imitation":    high,
 		"rewrite_templates": rewrite,
+		// The rules page edits the canonical sensitive catalog directly. Keeping
+		// it only as layout_rules.sensitive_rules made the page look empty even
+		// though the same rules were present in the imported seed.
+		"sensitive":         sensitive,
 		"layout_rules":      layout,
 		"symbol_rules":      symbol,
 		"chapter_rules":     chapter,

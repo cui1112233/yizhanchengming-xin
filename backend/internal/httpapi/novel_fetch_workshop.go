@@ -1842,6 +1842,7 @@ func novelFetchAppConfig(source map[string]any) map[string]any {
 		"workflow", "fetch", "ai", "ai_presets", "ai_assignments", "rewrite",
 		"storage", "parser", "knowledge", "knowledgeLibraries", "modelCatalog",
 		"modelCatalogVersion", "sensitive_ai", "text_model_id", "web_submit", "work_form",
+		"processing_rule_prompt", "processing_rule_scope",
 	} {
 		if value, ok := source[key]; ok {
 			base[key] = value
