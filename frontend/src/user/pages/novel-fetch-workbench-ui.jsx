@@ -32,6 +32,7 @@ export function NovelFetchCylinderList({
   items = [],
   selectedId,
   onSelect,
+  getId = (item, index) => item?.id ?? index,
   getTitle = item => item?.title || item?.name || item?.id || '未命名',
   getMeta = item => item?.category || item?.style || '',
   ariaLabel = '知识库条目'
@@ -49,8 +50,8 @@ export function NovelFetchCylinderList({
     let nearestItem = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
 
-    items.forEach(item => {
-      const id = String(item?.id ?? '');
+    items.forEach((item, index) => {
+      const id = String(getId(item, index));
       const element = itemRefs.current.get(id);
       if (!element) return;
       const rect = element.getBoundingClientRect();
@@ -67,7 +68,11 @@ export function NovelFetchCylinderList({
       }
     });
 
-    if (nearestItem && String(nearestItem.id) !== String(selectedId ?? '')) onSelect?.(nearestItem.id);
+    if (nearestItem) {
+      const nearestIndex = items.indexOf(nearestItem);
+      const nearestId = getId(nearestItem, nearestIndex);
+      if (String(nearestId) !== String(selectedId ?? '')) onSelect?.(nearestId);
+    }
   }
 
   function scheduleVisualUpdate() {
@@ -95,12 +100,13 @@ export function NovelFetchCylinderList({
   function handleKeyDown(event) {
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    const currentIndex = Math.max(0, items.findIndex(item => String(item?.id) === String(selectedId ?? '')));
+    const currentIndex = Math.max(0, items.findIndex((item, index) => String(getId(item, index)) === String(selectedId ?? '')));
     const nextIndex = nextCylinderIndex(items.length, currentIndex, event.key === 'ArrowUp' ? -1 : 1);
     const nextItem = items[nextIndex];
     if (!nextItem) return;
-    onSelect?.(nextItem.id);
-    scrollItemIntoView(nextItem.id);
+    const nextId = getId(nextItem, nextIndex);
+    onSelect?.(nextId);
+    scrollItemIntoView(nextId);
   }
 
   return <div className="novel-fetch-cylinder-shell">
@@ -114,8 +120,9 @@ export function NovelFetchCylinderList({
       onScroll={scheduleVisualUpdate}
       onKeyDown={handleKeyDown}
     >
-      {items.map(item => {
-        const id = String(item?.id ?? '');
+      {items.map((item, index) => {
+        const rawId = getId(item, index);
+        const id = String(rawId);
         const selected = id === String(selectedId ?? '');
         return <button
           type="button"
@@ -128,8 +135,8 @@ export function NovelFetchCylinderList({
             else itemRefs.current.delete(id);
           }}
           onClick={() => {
-            onSelect?.(item.id);
-            scrollItemIntoView(item.id);
+            onSelect?.(rawId);
+            scrollItemIntoView(rawId);
           }}
         >
           <strong>{getTitle(item)}</strong>

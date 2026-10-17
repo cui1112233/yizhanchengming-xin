@@ -64,7 +64,10 @@ const KNOWLEDGE_TABS = [
 const KNOWLEDGE_LIBRARY_TYPES = [
   { value: 'high_imitation', label: '高仿文章库' },
   { value: 'opening_phrases', label: '爆款开头词库' },
-  { value: 'rewrite_templates', label: '批量改文指令库' }
+  { value: 'rewrite_templates', label: '批量改文指令库' },
+  { value: 'layout_rules', label: '排版规则' },
+  { value: 'symbol_rules', label: '符号规则' },
+  { value: 'chapter_rules', label: '章节规则' }
 ];
 
 function parseRuleEditorValue(value) {
@@ -302,14 +305,23 @@ function KnowledgeLibraryManager({
   draft, onDraftChange, onAdd, onDuplicate, onDelete, onNormalize, onSave, onOptimize,
   improveGoal, onImproveGoalChange
 }) {
+  const [jsonDraft, setJsonDraft] = useState('{}');
   const filtered = (items || []).filter(item => {
     const query = String(search || '').trim().toLowerCase();
     if (!query) return true;
     return `${item.name || item.title || ''} ${item.category || item.style || ''} ${Array.isArray(item.tags) ? item.tags.join(' ') : item.tags || ''}`.toLowerCase().includes(query);
   });
   const setField = (field, value) => onDraftChange({ ...(draft || {}), [field]: value });
-  const listLabel = item => `${item.name || item.title || item.id || '未命名'} / ${item.style || item.category || '自动风格'}`;
   const textList = value => Array.isArray(value) ? value.join('、') : String(value || '');
+  useEffect(() => { setJsonDraft(JSON.stringify(draft || {}, null, 2)); }, [draft]);
+  const applyJsonDraft = () => {
+    try {
+      const parsed = JSON.parse(jsonDraft || '{}');
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('完整字段必须是 JSON 对象');
+      onDraftChange(parsed);
+      message.success('完整字段已应用到当前草稿');
+    } catch (error) { message.error(error.message || '完整字段 JSON 格式不正确'); }
+  };
   return <div className="novel-fetch-knowledge-layout">
     <div className="novel-fetch-panel novel-fetch-knowledge-library">
       <Typography.Title level={5}>资料列表</Typography.Title>
@@ -317,9 +329,7 @@ function KnowledgeLibraryManager({
         <label>资料库<Select value={kind} onChange={onKindChange} options={KNOWLEDGE_LIBRARY_TYPES} /></label>
         <label>搜索<Input value={search} onChange={event => onSearchChange(event.target.value)} placeholder="按名称、分类、标签查找" /></label>
       </div>
-      <select className="novel-fetch-knowledge-list" value={selectedId || ''} onChange={event => onSelect(event.target.value)} size={Math.max(5, Math.min(10, filtered.length || 5))} disabled={loading || !filtered.length}>
-        {!filtered.length ? <option value="">暂无条目</option> : filtered.map((item, index) => <option key={String(item.id || index)} value={String(item.id || index)}>{listLabel(item)}</option>)}
-      </select>
+      {loading ? <div className="novel-fetch-cylinder-empty">正在读取资料…</div> : filtered.length ? <NovelFetchCylinderList items={filtered} selectedId={selectedId} onSelect={value => onSelect(String(value))} getTitle={item => item.name || item.title || item.id || '未命名'} getMeta={item => `${item.style || item.category || '自动风格'}${Array.isArray(item.tags) && item.tags.length ? ` · ${item.tags.join('、')}` : ''}`} /> : <div className="novel-fetch-cylinder-empty">暂无条目</div>}
       <Space wrap>
         <Button onClick={onAdd}>新增条目</Button>
         <Button disabled={!selectedId} onClick={onDuplicate}>复制条目</Button>
@@ -345,7 +355,9 @@ function KnowledgeLibraryManager({
         {kind === 'high_imitation' ? <><label>高仿参考正文<Input.TextArea rows={7} value={draft.reference_text || ''} onChange={event => setField('reference_text', event.target.value)} /></label><label>拆解备注<Input.TextArea rows={4} value={draft.analysis || ''} onChange={event => setField('analysis', event.target.value)} /></label></> : null}
         {kind === 'opening_phrases' ? <><label>开头词骨架<Input.TextArea rows={7} value={draft.content || ''} onChange={event => setField('content', event.target.value)} /></label><label>拆解说明<Input.TextArea rows={4} value={draft.analysis || ''} onChange={event => setField('analysis', event.target.value)} /></label><label>槽位 / 适配提示<Input.TextArea rows={3} value={draft.slot_hint || ''} onChange={event => setField('slot_hint', event.target.value)} /></label></> : null}
         {kind === 'rewrite_templates' ? <><label>系统提示词<Input.TextArea rows={7} value={draft.system_prompt || ''} onChange={event => setField('system_prompt', event.target.value)} /></label><label>用户提示词模板<Input.TextArea rows={7} value={draft.user_prompt_template || ''} onChange={event => setField('user_prompt_template', event.target.value)} /></label><label>可用变量<Input value={textList(draft.required_variables)} onChange={event => setField('required_variables', event.target.value.split(/[、,，\s]+/).filter(Boolean))} /></label></> : null}
+        {['layout_rules', 'symbol_rules', 'chapter_rules'].includes(kind) ? <><label>命中内容<Input value={draft.find || ''} onChange={event => setField('find', event.target.value)} /></label><label>替换内容<Input value={draft.replace || ''} onChange={event => setField('replace', event.target.value)} /></label><label>内容 / 提示词<Input.TextArea rows={6} value={draft.content || draft.prompt || ''} onChange={event => setField(draft.prompt !== undefined ? 'prompt' : 'content', event.target.value)} /></label></> : null}
         <label>AI优化要求<Input.TextArea rows={3} value={improveGoal} onChange={event => onImproveGoalChange(event.target.value)} placeholder="例如：让用户提示词更适合短视频小说开头改文，保留变量，不要让 AI 只返回一小段" /></label>
+        <details className="novel-fetch-knowledge-json"><summary>完整字段（JSON）</summary><Input.TextArea className="mono" rows={8} value={jsonDraft} onChange={event => setJsonDraft(event.target.value)} /><Button onClick={applyJsonDraft}>应用 JSON</Button></details>
         <Space><Button type="primary" onClick={onSave}>保存当前条目</Button><Button onClick={onOptimize}>AI帮我优化</Button></Space>
       </>}
     </div>
@@ -399,6 +411,7 @@ export function LegacyNovelFetchPage() {
   const [knowledgeSelectedId, setKnowledgeSelectedId] = useState('');
   const [knowledgeDraft, setKnowledgeDraft] = useState(null);
   const [knowledgeImproveGoal, setKnowledgeImproveGoal] = useState('');
+  const [knowledgeView, setKnowledgeView] = useState('library');
   const [openingText, setOpeningText] = useState('');
   const [openingStyle, setOpeningStyle] = useState('');
   const [openingExtra, setOpeningExtra] = useState('');
@@ -1002,12 +1015,13 @@ export function LegacyNovelFetchPage() {
     chapter_rules: (knowledgeSummary.chapter_exact_rules || 0) + (knowledgeSummary.chapter_inline_rules || 0)
   }[key] || 0);
 
+  const knowledgeMetrics = [['开头词', knowledgeSummary.opening_phrases], ['改文模板', knowledgeSummary.rewrite_profiles], ['临时指令', knowledgeSummary.temporary_instructions], ['高仿提示词', knowledgeSummary.high_imitation_prompts], ['高仿参考', knowledgeSummary.high_imitation_references], ['敏感词', knowledgeSummary.sensitive_rules], ['字位符号', knowledgeSummary.symbol_rules], ['成对补符号', knowledgeSummary.pair_fill_rules], ['章节整行', knowledgeSummary.chapter_exact_rules], ['章节开头', knowledgeSummary.chapter_inline_rules]].map(([label, value]) => ({ key: label, label, value: Number(value || 0) }));
   const knowledgePanel = <Space direction="vertical" size={12} style={{ width: '100%' }}>
-    <div className="novel-fetch-panel"><Typography.Title level={5}>知识库使用提示词</Typography.Title><Input.TextArea rows={4} value={knowledgeUsagePrompt} onChange={event => setKnowledgeUsagePrompt(event.target.value)} placeholder="告诉 AI 如何参考知识库，且不得照搬示例内容" /><Button type="primary" style={{ marginTop: 8 }} onClick={saveKnowledgeUsagePrompt}>保存知识库配置</Button></div>
-    <div className="novel-fetch-panel"><Typography.Title level={5}>三大知识库</Typography.Title><Typography.Text type="secondary">资料库只供 AI 自动取用，任务处理仍然全自动</Typography.Text><div className="novel-fetch-knowledge-summary">{[['开头词', knowledgeSummary.opening_phrases], ['改文模板', knowledgeSummary.rewrite_profiles], ['临时指令', knowledgeSummary.temporary_instructions], ['高仿提示词', knowledgeSummary.high_imitation_prompts], ['高仿参考', knowledgeSummary.high_imitation_references], ['敏感词', knowledgeSummary.sensitive_rules], ['字位符号', knowledgeSummary.symbol_rules], ['成对补符号', knowledgeSummary.pair_fill_rules], ['章节整行', knowledgeSummary.chapter_exact_rules], ['章节开头', knowledgeSummary.chapter_inline_rules]].map(([label, count]) => <Tag key={label}>{label} {Number(count || 0)}</Tag>)}</div></div>
+    <NovelFetchMetricStrip items={knowledgeMetrics} />
+    <div className="novel-fetch-panel novel-fetch-knowledge-prompt"><div><Typography.Title level={5}>知识库使用提示词</Typography.Title><Typography.Text type="secondary">告诉 AI 如何参考资料，但不得照搬示例内容。</Typography.Text></div><Input.TextArea rows={4} value={knowledgeUsagePrompt} onChange={event => setKnowledgeUsagePrompt(event.target.value)} /><Button type="primary" onClick={saveKnowledgeUsagePrompt}>保存知识库配置</Button></div>
     <KnowledgeLibraryManager kind={knowledgeKind} onKindChange={value => { setKnowledgeKind(value); setKnowledgeSelectedId(''); }} items={knowledge.items || []} loading={knowledgeLoading} search={knowledgeSearch} onSearchChange={setKnowledgeSearch} selectedId={knowledgeSelectedId} onSelect={setKnowledgeSelectedId} draft={knowledgeDraft} onDraftChange={setKnowledgeDraft} onAdd={addKnowledgeLibraryItem} onDuplicate={duplicateKnowledgeLibraryItem} onDelete={deleteKnowledgeLibraryItem} onNormalize={() => normalizeWorkshopOpening().then(loadKnowledge)} onSave={saveKnowledgeLibraryItem} onOptimize={optimizeKnowledgeLibraryItem} improveGoal={knowledgeImproveGoal} onImproveGoalChange={setKnowledgeImproveGoal} />
-    {knowledgeKind === 'opening_phrases' ? <div className="novel-fetch-panel novel-fetch-opening-analyzer"><Typography.Title level={5}>爆款开头拆解入库</Typography.Title><Space wrap style={{ width: '100%' }}><Input value={openingStyle} onChange={event => setOpeningStyle(event.target.value)} placeholder="适用风格类型（可选）" style={{ flex: 1, minWidth: 240 }} /><Input value={openingExtra} onChange={event => setOpeningExtra(event.target.value)} placeholder="补充要求（可选）" style={{ flex: 1, minWidth: 240 }} /></Space><Input.TextArea rows={5} value={openingText} onChange={event => setOpeningText(event.target.value)} placeholder="爆款开头原文" style={{ marginTop: 12 }} /><Input.TextArea rows={5} value={openingResult} onChange={event => setOpeningResult(event.target.value)} placeholder="拆解结果（分析后可编辑）" className="mono" style={{ marginTop: 12 }} /><Space style={{ marginTop: 8 }} wrap><Button type="primary" onClick={handleOpeningAnalyze}>AI 拆解开头词</Button><Button onClick={handleOpeningSaveAnalyzed}>确认加入开头词库</Button><Button onClick={() => { setOpeningText(''); setOpeningStyle(''); setOpeningExtra(''); setOpeningResult(''); setOpeningItems([]); }}>清空</Button></Space></div> : null}
   </Space>;
+  const openingPanel = <div className="novel-fetch-panel novel-fetch-opening-analyzer"><div className="novel-fetch-toolbar"><div><Typography.Title level={5}>爆款开头拆解入库</Typography.Title><Typography.Text type="secondary">拆解结构、情绪和钩子后再确认入库。</Typography.Text></div><span className="novel-fetch-toolbar-spacer" /><Button onClick={() => normalizeWorkshopOpening().then(loadKnowledge)}>规范化现有开头词</Button></div><div className="novel-fetch-opening-fields"><Input value={openingStyle} onChange={event => setOpeningStyle(event.target.value)} placeholder="适用风格类型（可选）" /><Input value={openingExtra} onChange={event => setOpeningExtra(event.target.value)} placeholder="补充要求（可选）" /></div><div className="novel-fetch-opening-compare"><label>爆款开头原文<Input.TextArea rows={9} value={openingText} onChange={event => setOpeningText(event.target.value)} /></label><label>拆解结果（可编辑）<Input.TextArea rows={9} value={openingResult} onChange={event => setOpeningResult(event.target.value)} className="mono" /></label></div><Space wrap><Button type="primary" onClick={handleOpeningAnalyze}>AI 拆解开头词</Button><Button onClick={handleOpeningSaveAnalyzed}>确认加入开头词库</Button><Button onClick={() => { setOpeningText(''); setOpeningStyle(''); setOpeningExtra(''); setOpeningResult(''); setOpeningItems([]); }}>清空</Button></Space></div>;
   const versionConfigPanel = <div className="novel-fetch-panel novel-fetch-version-config-panel">
     <div className="novel-fetch-public-heading"><div><Typography.Title level={4}>版本对应配置档</Typography.Title><Typography.Text type="secondary">统一管理视频管理系统配置档、版本提示词和提交版本。</Typography.Text></div></div>
     <Space wrap><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步组织归属')}>同步组织归属</Button><Button onClick={() => handleWebSubmit(syncWebSubmitStyles, '已同步批量风格类型')}>同步批量风格类型</Button></Space>
@@ -1127,7 +1141,7 @@ export function LegacyNovelFetchPage() {
   const activePanel = activeTab === 'process'
     ? panels.process
     : activeTab === 'knowledge'
-      ? <div className="novel-fetch-workbench-combined">{panels.knowledge}{panels.rules}</div>
+      ? <NovelFetchSubpageShell title="知识库" description="维护 AI 参考资料、爆款开头和自动处理规则" onBack={() => changeTab('process')} actions={<><Button icon={<RefreshCw size={14} />} loading={knowledgeLoading} onClick={loadKnowledge}>刷新</Button><Button type="primary" onClick={addKnowledgeLibraryItem}>新增资料</Button></>}><Tabs className="novel-fetch-section-tabs" activeKey={knowledgeView} onChange={setKnowledgeView} items={[{ key: 'library', label: '资料库', children: panels.knowledge }, { key: 'opening', label: '爆款开头拆解', children: openingPanel }, { key: 'rules', label: '处理规则', children: panels.rules }]} /></NovelFetchSubpageShell>
       : activeTab === 'submit'
         ? <div className="novel-fetch-workbench-combined">{panels.submit}{panels.logs}</div>
     : <div className="novel-fetch-workbench-subpage">
