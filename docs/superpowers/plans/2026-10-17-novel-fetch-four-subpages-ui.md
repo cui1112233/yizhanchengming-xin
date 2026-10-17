@@ -2,368 +2,147 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rebuild the existing task, knowledge, configuration, and submission/history views as four clear independent React + Antd subpages while preserving every existing action and backend contract.
+**Goal:** Rebuild task, knowledge, configuration, and submission/history as four clear independent React + Antd subpages while preserving every existing action and backend contract.
 
-**Architecture:** `NovelFetchPage.jsx` remains the owner of loading, mutation, and routing state. New focused presentation components provide the shared subpage header, compact status strips, and controlled cylinder list; the existing API calls remain in the owner and are passed into the new layouts as callbacks. CSS is scoped under `.novel-fetch-workbench` and responsive behavior degrades the cylinder list to a flat list.
+**Architecture:** `NovelFetchPage.jsx` remains the owner of data and mutations. Focused presentation components provide the common subpage shell and controlled cylinder list; pure cylinder math and keyboard-selection behavior live in a separately tested JavaScript module. CSS stays scoped under `.novel-fetch-workbench`.
 
 **Tech Stack:** React 18, Ant Design 5, Lucide React, CSS, Node test runner, Vite, Go embed local review service.
 
 ## Global Constraints
 
-- Work directly on branch `v88`; do not create a feature branch.
-- Modify source first; never copy `frontend/dist` or other compiled output back into source.
+- Work directly on branch `v88`; do not create another branch or worktree.
+- Modify React source first; never copy compiled output back into source.
 - User-facing `121` naming remains `视频管理系统`.
-- Preserve full `originalRaw`, process only up to `maxTxt`, and keep processed/raw counts visible.
+- Preserve full `originalRaw`, process only to `maxTxt`, and show processed/raw counts.
 - Preserve `input_ready` as `分类信息已就绪` and `running/processing` as `正在执行中…`.
-- Do not change Go APIs, MySQL, Redis, queue protocols, or TOS for this UI task.
-- Do not trigger real external submission, delete real tasks, overwrite knowledge data, or deploy publicly.
-- Formal pages must not contain the four-page review navigation shown in the mockup.
+- Do not change Go APIs, MySQL, Redis, queue protocols, or TOS.
+- Do not trigger real submission, delete real data, or deploy publicly.
+- Formal pages must not contain the mockup review navigation.
 
 ---
 
-### Task 1: Lock the page structure with source contract tests
+### Task 1: Implement and test cylinder-list behavior
 
 **Files:**
-- Create: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-- Read: `frontend/src/user/pages/NovelFetchPage.jsx`
-- Read: `frontend/src/user/pages/novel-fetch.css`
+- Create: `frontend/src/user/pages/novel-fetch-cylinder.js`
+- Create: `frontend/src/user/pages/novel-fetch-cylinder.test.js`
 
 **Interfaces:**
-- Consumes: the current `NovelFetchPage.jsx` source and CSS source as UTF-8 strings.
-- Produces: regression assertions for independent subpage shells, task batch menu, detail drawer, knowledge/rules tabs, configuration groups, submit/history/log tabs, and responsive cylinder fallback.
+- Produces: `cylinderVisualState(distance: number): { rotateX: number, translateZ: number, scale: number, opacity: number, brightness: number }`.
+- Produces: `nextCylinderIndex(length: number, currentIndex: number, direction: -1 | 1): number`.
 
-- [ ] **Step 1: Write the failing source contract test**
-
-```js
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-
-const page = fs.readFileSync(new URL('./NovelFetchPage.jsx', import.meta.url), 'utf8');
-const css = fs.readFileSync(new URL('./novel-fetch.css', import.meta.url), 'utf8');
-
-test('novel fetch exposes four independent subpage shells without review navigation', () => {
-  assert.match(page, /NovelFetchSubpageShell/);
-  assert.match(page, /title="任务"/);
-  assert.match(page, /title="知识库"/);
-  assert.match(page, /title="配置"/);
-  assert.match(page, /title="提交与记录"/);
-  assert.doesNotMatch(page, /设计稿预览工具/);
-});
-
-test('task detail is a drawer and current batch actions are collapsed', () => {
-  assert.match(page, /TaskDetailDrawer/);
-  assert.match(page, /当前批次操作/);
-  assert.match(page, /重试当前批次失败/);
-  assert.match(page, /删除全部/);
-});
-
-test('knowledge includes controlled cylinder list and complete rule workspace', () => {
-  assert.match(page, /NovelFetchCylinderList/);
-  for (const label of ['资料库', '爆款开头拆解', '处理规则', '规则 AI 助手', '高级 JSON']) assert.match(page, new RegExp(label));
-  assert.match(css, /prefers-reduced-motion/);
-});
-```
-
-- [ ] **Step 2: Run the new test and verify it fails**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL because the shared shell, cylinder component, and final layout markers do not exist yet.
-
-- [ ] **Step 3: Commit the failing contract test**
-
-```powershell
-git add -- frontend/src/user/pages/novel-fetch-subpages.layout.test.js
-git commit -m "test: 固定小说获取四页交互契约"
-```
+- [ ] Write failing tests with hand-derived boundary values: distance `0` returns the centered state; large distances clamp rotation to 48 degrees, scale to 0.78, opacity to 0.18; keyboard movement clamps at list boundaries.
+- [ ] Run `node --test frontend/src/user/pages/novel-fetch-cylinder.test.js` and confirm failure because the module is missing.
+- [ ] Implement the two pure functions without DOM access.
+- [ ] Re-run the test and confirm PASS.
+- [ ] Commit both files with `git commit -m "web: 增加知识库圆柱列表计算"`.
 
 ### Task 2: Add focused presentation components
 
 **Files:**
 - Create: `frontend/src/user/pages/novel-fetch-workbench-ui.jsx`
 - Modify: `frontend/src/user/pages/NovelFetchPage.jsx`
-- Test: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
 
 **Interfaces:**
-- Consumes: `activeKey`, `items`, `onChange`, `title`, `description`, `onBack`, and existing Antd children.
-- Produces: `NovelFetchSubpageShell`, `NovelFetchMetricStrip`, and `NovelFetchCylinderList` exports.
-- `NovelFetchCylinderList` signature: `{ items, selectedId, onSelect, getTitle, getMeta, ariaLabel }`.
+- Produces: `NovelFetchSubpageShell({ title, description, onBack, actions, children })`.
+- Produces: `NovelFetchMetricStrip({ items })`.
+- Produces: `NovelFetchCylinderList({ items, selectedId, onSelect, getTitle, getMeta, ariaLabel })`.
+- Consumes: `cylinderVisualState` and `nextCylinderIndex` from Task 1.
 
-- [ ] **Step 1: Add component export assertions**
+- [ ] Implement the shell with an icon-only back button whose tooltip/accessible name is “返回处理页”.
+- [ ] Implement the metric strip as a stable responsive grid.
+- [ ] Implement the controlled cylinder list using `requestAnimationFrame`, center snapping, click selection, and ArrowUp/ArrowDown selection.
+- [ ] Import the components in `NovelFetchPage.jsx` without changing data behavior.
+- [ ] Run `node --test frontend/src/user/pages/novel-fetch-cylinder.test.js` and `pnpm --dir frontend build`; both must pass.
+- [ ] Commit with `git commit -m "web: 增加小说获取子页面展示组件"`.
 
-```js
-const ui = fs.readFileSync(new URL('./novel-fetch-workbench-ui.jsx', import.meta.url), 'utf8');
-for (const name of ['NovelFetchSubpageShell', 'NovelFetchMetricStrip', 'NovelFetchCylinderList']) {
-  assert.match(ui, new RegExp(`export function ${name}`));
-}
-```
-
-- [ ] **Step 2: Run the test and verify missing component failure**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL because `novel-fetch-workbench-ui.jsx` does not exist.
-
-- [ ] **Step 3: Implement the shared shell and controlled list**
-
-Use Antd `Button`, `Tabs`, and Lucide `ArrowLeft`. The cylinder list must calculate visual distance in `requestAnimationFrame`, set `aria-selected`, scroll the selected item to center, accept keyboard ArrowUp/ArrowDown, and call `onSelect` without mutating item data.
-
-```jsx
-export function NovelFetchSubpageShell({ title, description, onBack, actions, children }) {
-  return <section className="novel-fetch-subpage">
-    <header className="novel-fetch-subpage__header">
-      <Button aria-label="返回处理页" icon={<ArrowLeft size={16} />} onClick={onBack} />
-      <div className="novel-fetch-subpage__title"><Typography.Title level={3}>{title}</Typography.Title><Typography.Text type="secondary">{description}</Typography.Text></div>
-      <Space wrap>{actions}</Space>
-    </header>
-    {children}
-  </section>;
-}
-```
-
-- [ ] **Step 4: Import the components into `NovelFetchPage.jsx`**
-
-```jsx
-import { NovelFetchCylinderList, NovelFetchMetricStrip, NovelFetchSubpageShell } from './novel-fetch-workbench-ui.jsx';
-```
-
-- [ ] **Step 5: Run the source contract test**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: shared component assertions PASS; page layout assertions may still fail until later tasks.
-
-- [ ] **Step 6: Commit the focused UI primitives**
-
-```powershell
-git add -- frontend/src/user/pages/novel-fetch-workbench-ui.jsx frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch-subpages.layout.test.js
-git commit -m "web: 增加小说获取子页面展示组件"
-```
-
-### Task 3: Rebuild the task subpage without persistent detail panels
+### Task 3: Rebuild the task subpage
 
 **Files:**
 - Modify: `frontend/src/user/pages/NovelFetchPage.jsx`
 - Modify: `frontend/src/user/pages/novel-fetch.css`
-- Test: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
 
 **Interfaces:**
-- Consumes: existing task state and callbacks including `loadTasks`, `loadCurrentBatch`, `loadHistoryBatches`, `handleRetryTasks`, `handleDeleteTasks`, `handleGenerateAi`, `handleSensitiveRepair`, `applySelectedRules`, `applyAllRules`, `submitVisibleTasks`, `transferToBatchFactory`, and `TaskDetailDrawer`.
-- Produces: `tasksPanel` rendered inside `NovelFetchSubpageShell`; no API signature changes.
+- Consumes all existing task callbacks and `TaskDetailDrawer`.
+- Produces a task page with current/history tabs, date toolbar, conditional selection toolbar, task table, batch summary, and collapsed current-batch menu.
 
-- [ ] **Step 1: Extend the test for collapsed whole-batch actions and row details**
+- [ ] Wrap the page in `NovelFetchSubpageShell` and retain current/history switching.
+- [ ] Separate date controls from selected-task controls.
+- [ ] Show selected-task actions only when one or more tasks are selected; retain retry, stop, delete, AI generation, sensitive repair, AI count, rule scope, rule processing, and selected submission.
+- [ ] Move whole-batch retry, factory transfer, rule processing, submit, resubmit, delete-failed, and delete-all into an Antd `Dropdown` labelled “当前批次操作”.
+- [ ] Keep task detail hidden until the row “详情” button opens `TaskDetailDrawer`; preserve refetch and restore-original actions.
+- [ ] Run `node --test frontend/src/user/pages/novel-fetch-status.test.js frontend/src/user/pages/novel-fetch-cylinder.test.js` and `pnpm --dir frontend build`.
+- [ ] Commit with `git commit -m "web: 重整小说获取任务页面"`.
 
-Assert the page contains `Dropdown`, `当前批次操作`, `TaskDetailDrawer`, `详情`, `重新抓取`, and `恢复原文`, while the CSS contains `.novel-fetch-task-selection-bar` and `.novel-fetch-task-summary`.
-
-- [ ] **Step 2: Run the test and verify the new assertions fail**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL on task layout class names and collapsed action marker.
-
-- [ ] **Step 3: Compose the task page**
-
-Use Antd `Tabs` for current/history views, a separate date toolbar, a conditional selected-task action bar, the existing table, and an Antd `Dropdown` for whole-batch operations. Put delete actions in a danger group. Keep `TaskDetailDrawer` closed until the row `详情` button sets `taskDetail`.
-
-- [ ] **Step 4: Preserve task behavior and status semantics**
-
-Verify every existing callback remains reachable and keep `TaskStatusTag`, processed/raw counts, real date filtering, pagination, and historical rerun actions unchanged.
-
-- [ ] **Step 5: Run task and status tests**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js frontend/src/user/pages/novel-fetch-status.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit the task page**
-
-```powershell
-git add -- frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch.css frontend/src/user/pages/novel-fetch-subpages.layout.test.js
-git commit -m "web: 重整小说获取任务页面"
-```
-
-### Task 4: Separate knowledge, opening analysis, and processing rules
+### Task 4: Rebuild knowledge and processing rules
 
 **Files:**
 - Modify: `frontend/src/user/pages/NovelFetchPage.jsx`
 - Modify: `frontend/src/user/pages/novel-fetch.css`
-- Test: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
 
 **Interfaces:**
-- Consumes: existing knowledge and rule state, `loadKnowledge`, `saveKnowledgeUsagePrompt`, `saveKnowledge`, `handleOpeningAnalyze`, `handleOpeningSaveAnalyzed`, `handleRulePreview`, `handleRuleSuggest`, `saveRuleConfiguration`, and `RuleEditor`.
-- Produces: one knowledge subpage with internal keys `library`, `opening`, and `rules`; selection stays controlled by `knowledgeSelectedId`.
+- Consumes existing knowledge/rule state and callbacks.
+- Produces internal workspaces `library`, `opening`, and `rules`; cylinder selection remains controlled by `knowledgeSelectedId`.
 
-- [ ] **Step 1: Add exhaustive labels to the layout test**
+- [ ] Replace vertical `knowledge + rules` rendering with three internal tabs.
+- [ ] In “资料库”, retain usage prompt, all ten statistics, six knowledge types, search, refresh, add, edit, duplicate, delete, AI optimize, full JSON, and use `NovelFetchCylinderList` for item selection.
+- [ ] In “爆款开头拆解”, retain style, extra requirement, source, editable result, AI analysis, normalize, confirm-save, and clear.
+- [ ] In “处理规则”, retain all six rule types, all three scopes, load current source, preview, AI suggestion, save, full editor, AI helper, advanced JSON, test text, processed result, trace, and suggestions.
+- [ ] Preserve local drafts when selection changes; loading and empty states must never call save methods.
+- [ ] Run `node --test frontend/src/user/pages/novel-fetch-cylinder.test.js test/novel-fetch-knowledge-recovery.test.js` and `pnpm --dir frontend build`.
+- [ ] Commit with `git commit -m "web: 整理知识库与处理规则工作区"`.
 
-Assert all six rule types, three rule scopes, knowledge actions, opening analysis actions, `处理后文本`, `阶段追踪`, and `规则建议` remain in the source.
-
-- [ ] **Step 2: Run the test and observe missing grouped layout markers**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL until the internal workspace tabs and cylinder component are used.
-
-- [ ] **Step 3: Build the three internal workspaces**
-
-Replace the current `panels.knowledge + panels.rules` vertical concatenation with Antd tabs. The library tab contains usage prompt, all ten statistics, type/search controls, `NovelFetchCylinderList`, and the complete entry editor. The opening tab contains style, extra requirement, source, editable result, analyze, save, normalize, and clear. The rules tab retains the complete `RuleEditor`, AI helper, advanced JSON, test text, result, trace, and suggestions.
-
-- [ ] **Step 4: Protect drafts and empty knowledge responses**
-
-Keep selection controlled, preserve the current draft before changing the centered cylinder item, and do not call a save method from load or empty-state handling.
-
-- [ ] **Step 5: Run knowledge and layout tests**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js test/novel-fetch-knowledge-recovery.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit the knowledge and rule page**
-
-```powershell
-git add -- frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch.css frontend/src/user/pages/novel-fetch-subpages.layout.test.js
-git commit -m "web: 整理知识库与处理规则工作区"
-```
-
-### Task 5: Reorganize configuration with effective-value feedback
+### Task 5: Reorganize configuration
 
 **Files:**
 - Modify: `frontend/src/user/pages/NovelFetchPage.jsx`
 - Modify: `frontend/src/user/pages/novel-fetch.css`
-- Test: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
 
 **Interfaces:**
-- Consumes: `configForm`, `loadConfig`, `saveWorkshopConfig`, `testWorkshopAi`, version profile state, sync callbacks, and `saveVersionConfig`.
-- Produces: five controlled configuration sections and a read-only effective-value summary; persisted payload remains unchanged.
+- Consumes `configForm`, existing config load/save/test callbacks, profile state, sync callbacks, and `saveVersionConfig`.
+- Produces five mounted configuration sections and a read-only effective-value summary.
 
-- [ ] **Step 1: Add configuration coverage assertions**
+- [ ] Replace the all-open collapse with navigation for workflow/fetch, supplement, AI, platform/style catalogs, and version profiles.
+- [ ] Keep one Antd Form mounted so switching sections cannot erase unsaved values.
+- [ ] Use `Form.useWatch` plus `onValuesChange` to show selected values and unsaved state; clear dirty state only after a successful save.
+- [ ] Retain every existing field, test-text-model action, all three sync actions, default/per-version profiles, three version prompts, and both save actions.
+- [ ] Keep real system prompt contents backend-owned; add no new frontend prompt literal.
+- [ ] Run `node --test frontend/src/shared/api/novelFetchWorkshop.test.js` and `pnpm --dir frontend build`.
+- [ ] Commit with `git commit -m "web: 重组小说获取配置页面"`.
 
-Assert the five group labels, `当前生效值`, `有未保存的更改`, `保存配置`, `测试文本模型`, all sync actions, and `保存版本配置` are present.
-
-- [ ] **Step 2: Run the test and verify grouped configuration failure**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL on effective-value and dirty-state markers.
-
-- [ ] **Step 3: Replace the all-open collapse with controlled section navigation**
-
-Keep one Antd `Form` mounted while switching visible sections so values are never unmounted or cleared. Use `Form.useWatch` and `onValuesChange` to show selected values and an unsaved badge; reset the dirty flag only after a successful save.
-
-- [ ] **Step 4: Integrate the existing version profile panel as the fifth section**
-
-Keep all sync callbacks, default profile, per-version bindings, three prompts, and save action. Do not hardcode system prompt contents in the frontend.
-
-- [ ] **Step 5: Run layout and API source tests**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js frontend/src/shared/api/novelFetchWorkshop.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit the configuration page**
-
-```powershell
-git add -- frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch.css frontend/src/user/pages/novel-fetch-subpages.layout.test.js
-git commit -m "web: 重组小说获取配置页面"
-```
-
-### Task 6: Rebuild submission, result, history, and logs as stages
+### Task 6: Rebuild submission and records
 
 **Files:**
 - Modify: `frontend/src/user/pages/NovelFetchPage.jsx`
 - Modify: `frontend/src/user/pages/novel-fetch.css`
-- Test: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
 
 **Interfaces:**
-- Consumes: existing web submission config, plan, result, history, global logs, `handleWebSubmit`, and all existing environment/sync/preview/start/retry callbacks.
-- Produces: one submission subpage with internal keys `ready`, `result`, `history`, and `logs`; no submission runs on mount.
+- Consumes existing web submission config, plan, result, history, logs, and callbacks.
+- Produces internal stages `ready`, `result`, `history`, and `logs`; mounting the page performs no external submission.
 
-- [ ] **Step 1: Add submission-stage coverage assertions**
+- [ ] Add a non-interactive environment/config/preview/execute status strip and four internal tabs.
+- [ ] Keep environment detection, three sync actions, preview, organization, minimum chars, retries, skip-submitted, save configuration, selection summary, and start confirmation in “提交准备”.
+- [ ] Keep current results and exact single-version failure retry in “本次结果”.
+- [ ] Keep refreshable history in “提交历史”.
+- [ ] Keep task-specific and global logs in “操作日志”.
+- [ ] Disable start until tasks are selected and preview data exists; do not call start on mount.
+- [ ] Run `node --test test/novel-fetch-selected-submit-payload-guard.test.js test/novel-fetch-upload-policy.test.js` and `pnpm --dir frontend build`.
+- [ ] Commit with `git commit -m "web: 整理小说获取提交与记录页面"`.
 
-Assert all four stage labels, all four sync/check actions, preview, start, settings, summary, single-version retry, refresh history, task log selection, and global logs remain discoverable.
-
-- [ ] **Step 2: Run the test and verify stage layout failure**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL until submit and logs stop rendering as one vertical page.
-
-- [ ] **Step 3: Compose the four submission stages**
-
-Use a stage strip plus Antd tabs. Keep preparation controls in `ready`, current-run rows in `result`, persisted records in `history`, and task/global logs in `logs`. Preserve confirmation before `startWebSubmit` and disable start until tasks are selected and a preview exists.
-
-- [ ] **Step 4: Preserve retry and duplicate-skip safety**
-
-Single-version retry passes only `{ taskIds: [row.bookId], versions: [row.version] }`; `skip_submitted` remains enabled unless explicitly turned off.
-
-- [ ] **Step 5: Run submission guard and layout tests**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js test/novel-fetch-selected-submit-payload-guard.test.js test/novel-fetch-upload-policy.test.js`
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit the submission page**
-
-```powershell
-git add -- frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch.css frontend/src/user/pages/novel-fetch-subpages.layout.test.js
-git commit -m "web: 整理小说获取提交与记录页面"
-```
-
-### Task 7: Responsive polish, build, and local Go acceptance
+### Task 7: Responsive polish and real local acceptance
 
 **Files:**
 - Modify: `frontend/src/user/pages/novel-fetch.css`
-- Test: `frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-- Generated by build only: `frontend/dist/**`
+- Generated by build: `frontend/dist/**`
 
 **Interfaces:**
-- Consumes: all completed subpages and the approved Go embed review scripts.
-- Produces: responsive desktop/mobile layouts, reduced-motion fallback, successful frontend build, and local route acceptance.
+- Consumes all completed subpages and existing Go local review scripts.
+- Produces responsive desktop/mobile UI and verified local Go embed rendering.
 
-- [ ] **Step 1: Add responsive source assertions**
-
-Assert CSS contains breakpoints for subpage grids, task actions, configuration navigation, submit stages, flat cylinder fallback, and `prefers-reduced-motion: reduce`.
-
-- [ ] **Step 2: Run the layout test and verify any missing responsive markers**
-
-Run: `node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js`
-
-Expected: FAIL only for missing responsive rules.
-
-- [ ] **Step 3: Complete responsive CSS**
-
-Ensure page-level horizontal overflow is absent, tables scroll within their own containers, button text is not clipped, the drawer fits narrow screens, and the cylinder list becomes flat at the mobile breakpoint and under reduced motion.
-
-- [ ] **Step 4: Run focused tests and the frontend build**
-
-Run:
-
-```powershell
-node --test frontend/src/user/pages/novel-fetch-subpages.layout.test.js frontend/src/user/pages/novel-fetch-status.test.js frontend/src/shared/api/novelFetchWorkshop.test.js
-pnpm --dir frontend build
-```
-
-Expected: all tests PASS and Vite build exits 0.
-
-- [ ] **Step 5: Build and start the Go embedded local review service**
-
-Run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/build-go-local.ps1
-powershell -ExecutionPolicy Bypass -File scripts/start-local-go-review.ps1 -UseYcmMysql
-powershell -ExecutionPolicy Bypass -File scripts/check-local-go.ps1
-```
-
-Expected: health and `/novel-fetch` checks pass on the local review service. This proves local serving, not real provider submission.
-
-- [ ] **Step 6: Inspect desktop and narrow viewports**
-
-Open `/novel-fetch?tab=tasks`, `knowledge`, `config`, and `submit`. Verify return actions, menu/drawer behavior, internal tabs, no overlap, and no page-level horizontal overflow. Do not click destructive or external submission actions.
-
-- [ ] **Step 7: Commit the final responsive and verification changes**
-
-```powershell
-git add -- frontend/src/user/pages/NovelFetchPage.jsx frontend/src/user/pages/novel-fetch-workbench-ui.jsx frontend/src/user/pages/novel-fetch.css frontend/src/user/pages/novel-fetch-subpages.layout.test.js frontend/dist
-git commit -m "web: 完成小说获取四个子页面重设计"
-```
+- [ ] Add desktop and narrow layout rules for the subpage shell, task toolbar/menu, cylinder list, configuration navigation, submission stages, tables, and drawer.
+- [ ] Under `prefers-reduced-motion: reduce` and the mobile breakpoint, remove cylinder transforms and smooth scrolling while retaining selection highlight.
+- [ ] Run focused Node tests and `pnpm --dir frontend build`; all must pass.
+- [ ] Run `scripts/build-go-local.ps1`, `scripts/start-local-go-review.ps1 -UseYcmMysql`, and `scripts/check-local-go.ps1`.
+- [ ] In the local browser, visit `?tab=tasks`, `knowledge`, `config`, and `submit`; exercise only navigation, menu, drawer, tabs, scrolling, and responsive layouts. Do not click delete or external submission actions.
+- [ ] Verify no page-level horizontal overflow, clipped button text, overlap, console error, or blank panel at desktop and narrow sizes.
+- [ ] Commit source plus newly built embed assets with `git commit -m "web: 完成小说获取四个子页面重设计"`.
