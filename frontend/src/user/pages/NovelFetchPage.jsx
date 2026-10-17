@@ -19,6 +19,7 @@ import { createNovelFetchIntake } from '../../shared/api/batchFactoryV11';
 import { listAvailableModels as listAvailableTextModels, modelSelectOptions } from '../../shared/api/modelCatalog';
 import { readNovelFetchProcessSettings, writeNovelFetchProcessSettings } from './novel-fetch-process-settings';
 import { beijingDateKey, currentBatchBookIds, novelFetchCharCount, novelFetchTaskStatus, stoppableCurrentBatchBookIds } from './novel-fetch-status.js';
+import { singleVersionRetryPayload, submissionPreviewMatches } from './novel-fetch-submit.js';
 import { NovelFetchCylinderList, NovelFetchMetricStrip, NovelFetchSubpageShell } from './novel-fetch-workbench-ui.jsx';
 import { dispatchGlobalStatus } from '../../shared/notifications/globalTaskCenter.js';
 import './novel-fetch.css';
@@ -456,9 +457,12 @@ export function LegacyNovelFetchPage() {
   const [configDirty, setConfigDirty] = useState(false);
   const [webSubmitConfig, setWebSubmitConfig] = useState(null);
   const [webSubmitPlan, setWebSubmitPlan] = useState(null);
+  const [webSubmitPreviewTaskIds, setWebSubmitPreviewTaskIds] = useState([]);
+  const [webSubmitEnvironment, setWebSubmitEnvironment] = useState(null);
   const [webSubmitResults, setWebSubmitResults] = useState([]);
   const [webSubmitHistory, setWebSubmitHistory] = useState([]);
   const [webSubmitLoading, setWebSubmitLoading] = useState(false);
+  const [submitView, setSubmitView] = useState('ready');
   const [uploadSession, setUploadSession] = useState(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [loginUser, setLoginUser] = useState('');
@@ -511,6 +515,7 @@ export function LegacyNovelFetchPage() {
   const progressPercent = value => processSummary.total
     ? Math.min(100, Math.round((Number(value) / processSummary.total) * 100))
     : 0;
+  const webSubmitPreviewReady = submissionPreviewMatches(selectedTaskKeys, webSubmitPreviewTaskIds, webSubmitPlan);
 
   async function loadTasks() {
     setTasksLoading(true);
@@ -666,7 +671,8 @@ export function LegacyNovelFetchPage() {
   useEffect(() => {
     if (activeTab === 'config') { loadConfig(); openVersionConfig(); }
     if (activeTab === 'knowledge') { loadKnowledge(); loadConfig(); loadRuleConfig(); }
-    if (activeTab === 'submit') loadWebSubmit();
+    if (activeTab === 'submit' || activeTab === 'logs') loadWebSubmit();
+    if (activeTab === 'logs') setSubmitView('logs');
     if (activeTab === 'rules') loadRuleConfig();
   }, [activeTab, knowledgeKind, ruleKind]);
 
@@ -917,6 +923,34 @@ export function LegacyNovelFetchPage() {
     setWebSubmitLoading(true);
     try { const result = await action(); if (success) message.success(success); return result; } catch (error) { message.error(error.message || '网站提交操作失败'); return null; } finally { setWebSubmitLoading(false); }
   }
+  async function handleWebSubmitPreview() {
+    if (!selectedTaskKeys.length) return message.warning('请先选择需要提交的任务');
+    const result = await handleWebSubmit(() => previewWebSubmit({ taskIds: selectedTaskKeys }), '提交预览已生成');
+    if (!result) return;
+    setWebSubmitPlan(result.plan);
+    setWebSubmitPreviewTaskIds([...selectedTaskKeys]);
+  }
+  function confirmWebSubmit() {
+    if (!webSubmitPreviewReady) return message.warning('请先为当前选中任务生成提交预览');
+    Modal.confirm({
+      title: '确认开始自动提交',
+      content: `将按当前预览提交 ${selectedTaskKeys.length} 个任务，确认继续？`,
+      onOk: async () => {
+        const result = await handleWebSubmit(() => startWebSubmit({ taskIds: selectedTaskKeys }), '自动提交完成');
+        if (!result) return;
+        setWebSubmitResults(result.results || []);
+        setWebSubmitHistory(current => [...(result.results || []), ...current]);
+        setSubmitView('result');
+      }
+    });
+  }
+  async function retryWebSubmitVersion(row) {
+    const payload = singleVersionRetryPayload(row);
+    if (!payload) return message.error('失败记录缺少任务或版本信息');
+    const bookId = payload.taskIds[0];
+    const result = await handleWebSubmit(() => startWebSubmit(payload), `${row.version} 已重新提交`);
+    if (result?.results) setWebSubmitResults(current => current.map(item => (item.bookId || item.book_id) === bookId && item.version === row.version ? (result.results[0] || item) : item));
+  }
   async function handleUploadLogin() {
     if (!loginUser.trim() || !loginPassword) return message.warning('请输入视频管理系统账号和密码');
     setWebSubmitLoading(true);
@@ -1086,6 +1120,23 @@ export function LegacyNovelFetchPage() {
     <Space wrap><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步组织归属')}>同步组织归属</Button><Button onClick={() => handleWebSubmit(syncWebSubmitStyles, '已同步批量风格类型')}>同步批量风格类型</Button></Space>
     <div className="novel-fetch-version-profile-grid"><label>默认上传配置档<Select value={selectedUploadProfile || undefined} placeholder="选择默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={setSelectedUploadProfile} /></label>{selectedVersions.map(version => <label key={version}>{AI_VERSION_LABELS[version]} 配置档<Select allowClear value={profileBindings[version] || undefined} placeholder="跟随默认配置档" options={uploadProfiles.map(profile => ({ value: String(profile.id || profile.name), label: profile.name || profile.id }))} onChange={value => setProfileBindings(current => ({ ...current, [version]: value || '' }))} /></label>)}</div><Typography.Text type="secondary">未绑定版本统一跟随默认配置档。</Typography.Text><div className="novel-fetch-version-prompts"><label>改文提示词<Input.TextArea rows={3} value={versionPrompts.rewrite} onChange={event => setVersionPrompts(current => ({ ...current, rewrite: event.target.value }))} placeholder="本次处理的改文提示词" /></label><label>处理规则提示词<Input.TextArea rows={3} value={versionPrompts.processingRule} onChange={event => setVersionPrompts(current => ({ ...current, processingRule: event.target.value }))} placeholder="整本书共同遵守的规则" /></label><label>知识库使用提示词<Input.TextArea rows={3} value={versionPrompts.knowledgeUsage} onChange={event => setVersionPrompts(current => ({ ...current, knowledgeUsage: event.target.value }))} placeholder="知识库的使用要求" /></label></div><Button type="primary" onClick={saveVersionConfig}>保存版本配置</Button>
   </div>;
+  const submissionStatus = [
+    { key: 'environment', label: '环境', value: webSubmitEnvironment ? '已检测' : '待检测' },
+    { key: 'config', label: '配置', value: webSubmitConfig ? '已加载' : '待加载' },
+    { key: 'preview', label: '预览', value: webSubmitPreviewReady ? '当前选择已预览' : '待预览' },
+    { key: 'execute', label: '执行', value: webSubmitResults.length ? `${webSubmitResults.length} 条结果` : '未执行' }
+  ];
+  const submitReadyPanel = <Space direction="vertical" size={12} style={{ width: '100%' }}>
+    <Alert type="info" showIcon message="仅在确认“开始自动提交”后执行外部提交。小说获取和批量工厂共用同一份视频管理系统登录会话。" />
+    <div className="novel-fetch-panel novel-fetch-submit-actions"><Typography.Title level={5}>提交前检查</Typography.Title><Space wrap><Button loading={webSubmitLoading} onClick={async () => { const result = await handleWebSubmit(checkWebSubmitEnvironment, '环境检测完成'); if (result) setWebSubmitEnvironment(result); }}>环境检测</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步批量后台配置')}>同步批量后台配置</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitConfigs, '已同步组织归属')}>同步组织归属</Button><Button loading={webSubmitLoading} onClick={() => handleWebSubmit(syncWebSubmitStyles, '同步网站风格完成')}>同步网站风格</Button><Button disabled={!selectedTaskKeys.length} loading={webSubmitLoading} onClick={handleWebSubmitPreview}>生成提交预览</Button><Button type="primary" disabled={!webSubmitPreviewReady} loading={webSubmitLoading} onClick={confirmWebSubmit}>开始自动提交</Button></Space></div>
+    <div className="novel-fetch-panel novel-fetch-submit-settings"><Typography.Title level={5}>提交配置</Typography.Title><div className="novel-fetch-submit-config-grid"><label>组织归属<Select value={webSubmitConfig?.organization || undefined} placeholder="跟随网站配置档" options={(webSubmitConfig?.organization_catalog || []).map(item => ({ value: String(item.id || item.value), label: item.name || item.label || item.id }))} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), organization: value }))} /></label><label>最少字数<InputNumber min={0} value={webSubmitConfig?.min_text_chars ?? 0} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), min_text_chars: value || 0 }))} /></label><label>失败重试<InputNumber min={0} max={10} value={webSubmitConfig?.retry_times ?? 1} onChange={value => setWebSubmitConfig(current => ({ ...(current || {}), retry_times: value || 0 }))} /></label><label className="novel-fetch-submit-check"><Checkbox checked={webSubmitConfig?.skip_submitted !== false} onChange={event => setWebSubmitConfig(current => ({ ...(current || {}), skip_submitted: event.target.checked }))}>跳过已提交版本</Checkbox></label></div><Button onClick={() => handleWebSubmit(() => saveWebSubmitConfig(webSubmitConfig), '提交配置已保存')}>保存提交配置</Button></div>
+    <div className="novel-fetch-panel novel-fetch-submit-summary"><Typography.Text>已选任务 <strong>{selectedTaskKeys.length}</strong></Typography.Text><Typography.Text>配置版本 <strong>{(webSubmitConfig?.submit_versions || webSubmitConfig?.submitVersions || []).join('、') || '默认'}</strong></Typography.Text><Typography.Text>可用组织 <strong>{webSubmitConfig?.organization_catalog?.length || 0}</strong></Typography.Text></div>
+    {webSubmitPlan ? <Alert type={webSubmitPreviewReady ? 'success' : 'warning'} message={webSubmitPreviewReady ? '当前选择的提交预览已生成' : '任务选择已变化，请重新生成预览'} description={`提交组：${webSubmitPlan.groups?.length || 0}，跳过：${webSubmitPlan.skipped?.length || 0}`} /> : null}
+  </Space>;
+  const submitResultPanel = <Table className="novel-fetch-panel" scroll={{ x: 720 }} rowKey={(row, index) => `${row.bookId || row.book_id}-${row.version}-${index}`} dataSource={webSubmitResults} locale={{ emptyText: '暂无本次提交结果' }} columns={[{ title: '任务', render: (_, row) => row.bookId || row.book_id }, { title: '版本', dataIndex: 'version' }, { title: '状态', dataIndex: 'status' }, { title: '结果', render: (_, row) => row.result || row.message || row.error || '-' }, { title: '操作', render: (_, row) => /error|fail|失败/i.test(String(row.status || '')) ? <Button size="small" loading={webSubmitLoading} onClick={() => retryWebSubmitVersion(row)}>重试该版本</Button> : '-' }]} />;
+  const submitHistoryPanel = <div className="novel-fetch-panel"><div className="novel-fetch-toolbar"><Typography.Title level={5}>提交历史</Typography.Title><span className="novel-fetch-toolbar-spacer" /><Button size="small" icon={<RefreshCw size={14} />} loading={webSubmitLoading} onClick={loadWebSubmit}>刷新历史</Button></div><Table size="small" scroll={{ x: 760 }} rowKey={(row, index) => `${row.book_id || row.bookId}-${row.version}-${index}`} dataSource={webSubmitHistory} pagination={{ pageSize: 10 }} columns={[{ title: '书名', render: (_, row) => row.book_name || row.bookName || row.book_id || row.bookId }, { title: '版本', dataIndex: 'version' }, { title: '状态', dataIndex: 'status' }, { title: '结果', dataIndex: 'result' }, { title: '时间', render: (_, row) => row.time || row.created_at || row.createdAt }]} /></div>;
+  const submitLogsPanel = <div className="novel-fetch-panel"><div className="novel-fetch-toolbar"><Typography.Title level={5}>操作日志</Typography.Title><span className="novel-fetch-toolbar-spacer" /><Button size="small" icon={<RefreshCw size={14} />} onClick={loadGlobalLogs}>刷新日志</Button></div><Select value={selectedTask || undefined} className="novel-fetch-log-task-select" placeholder="选择任务查看日志" options={tasks.map(task => ({ value: task.bookId || task.book_id, label: task.bookName || task.book_name || task.bookId || task.book_id }))} onChange={selectTask} />{selectedTaskData ? <Collapse items={(selectedTaskData.logs || []).map((log, index) => ({ key: String(index), label: `${log.time || ''} ${log.event || '操作日志'}`, children: <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>{log.detail || JSON.stringify(log)}</Typography.Paragraph> }))} /> : <Table size="small" pagination={{ pageSize: 20 }} rowKey={(row, index) => row.id || index} dataSource={globalLogs} locale={{ emptyText: '暂无操作记录' }} columns={[{ title: '时间', dataIndex: 'time', render: (value, row) => value || row.createdAt || row.created_at }, { title: '事件', dataIndex: 'event' }, { title: '详情', render: (_, row) => String(row.detail || row.message || '').slice(0, 120) }]} />}</div>;
+  const submissionPanel = <Space direction="vertical" size={12} style={{ width: '100%' }}><NovelFetchMetricStrip items={submissionStatus} /><Tabs className="novel-fetch-section-tabs" activeKey={submitView} onChange={setSubmitView} items={[{ key: 'ready', label: '提交准备', children: submitReadyPanel }, { key: 'result', label: `本次结果${webSubmitResults.length ? ` (${webSubmitResults.length})` : ''}`, children: submitResultPanel }, { key: 'history', label: '提交历史', children: submitHistoryPanel }, { key: 'logs', label: '操作日志', children: submitLogsPanel }]} /></Space>;
   const currentBatchMenuItems = [
     { key: 'retry-failed', label: '重试当前批次失败', onClick: retryFailedTasks },
     { key: 'factory', label: '当前批次进入批量工厂', onClick: transferToBatchFactory },
@@ -1178,6 +1229,7 @@ export function LegacyNovelFetchPage() {
   // 公网 V78 的知识库页不是单纯的表格：左侧负责库类型/条目操作，右侧负责编辑当前条目。
   // 覆盖旧兼容面板，避免两个入口继续产生不同的数据行为。
   panels.knowledge = knowledgePanel;
+  panels.submit = submissionPanel;
 
   const activePanel = activeTab === 'process'
     ? panels.process
@@ -1185,8 +1237,8 @@ export function LegacyNovelFetchPage() {
       ? <NovelFetchSubpageShell title="知识库" description="维护 AI 参考资料、爆款开头和自动处理规则" onBack={() => changeTab('process')} actions={<><Button icon={<RefreshCw size={14} />} loading={knowledgeLoading} onClick={loadKnowledge}>刷新</Button><Button type="primary" onClick={addKnowledgeLibraryItem}>新增资料</Button></>}><Tabs className="novel-fetch-section-tabs" activeKey={knowledgeView} onChange={setKnowledgeView} items={[{ key: 'library', label: '资料库', children: panels.knowledge }, { key: 'opening', label: '爆款开头拆解', children: openingPanel }, { key: 'rules', label: '处理规则', children: panels.rules }]} /></NovelFetchSubpageShell>
       : activeTab === 'config'
         ? <NovelFetchSubpageShell title="配置" description="统一管理抓取、处理、AI 和版本配置" onBack={() => changeTab('process')} actions={<><Tag color={configDirty ? 'gold' : 'green'}>{configDirty ? '未保存' : '已同步'}</Tag><Button onClick={() => testWorkshopAi('rewrite').then(() => message.success('测试接口成功')).catch(error => message.error(error.message || '测试失败'))}>测试文本模型</Button><Button type="primary" loading={configLoading} onClick={saveConfig}>保存配置</Button></>}>{panels.config}</NovelFetchSubpageShell>
-      : activeTab === 'submit'
-        ? <div className="novel-fetch-workbench-combined">{panels.submit}{panels.logs}</div>
+      : activeTab === 'submit' || activeTab === 'logs'
+        ? <NovelFetchSubpageShell title="提交与记录" description="预览确认后提交，并集中查看结果、历史和操作日志" onBack={() => changeTab('process')} actions={<Button icon={<RefreshCw size={14} />} loading={webSubmitLoading} onClick={() => { loadWebSubmit(); loadGlobalLogs(); }}>刷新状态</Button>}>{panels.submit}</NovelFetchSubpageShell>
     : <div className="novel-fetch-workbench-subpage">
         <div className="novel-fetch-workbench-subpage-header">
           <Button onClick={() => changeTab('process')}>返回处理</Button>

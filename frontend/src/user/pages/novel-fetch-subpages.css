@@ -74,6 +74,16 @@
 .novel-fetch-version-profile-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:14px 0 8px; }
 .novel-fetch-version-profile-grid label,.novel-fetch-version-prompts label { display:flex; flex-direction:column; gap:6px; color:var(--text-secondary); font-size:12px; }
 .novel-fetch-version-prompts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:14px 0; }
+.novel-fetch-submit-actions,.novel-fetch-submit-settings { padding:14px; }
+.novel-fetch-submit-actions h5.ant-typography,.novel-fetch-submit-settings h5.ant-typography { margin:0 0 12px; }
+.novel-fetch-submit-config-grid { display:grid; grid-template-columns:1.4fr repeat(2,minmax(120px,.7fr)) minmax(180px,1fr); gap:12px; align-items:end; margin-bottom:12px; }
+.novel-fetch-submit-config-grid > label { display:flex; flex-direction:column; gap:6px; min-width:0; color:var(--text-secondary); font-size:12px; }
+.novel-fetch-submit-config-grid .ant-input-number { width:100%; }
+.novel-fetch-submit-check { min-height:32px; justify-content:center; }
+.novel-fetch-submit-summary { display:flex; gap:22px; flex-wrap:wrap; padding:12px 14px; }
+.novel-fetch-submit-summary .ant-typography { margin:0; }
+.novel-fetch-submit-summary strong { margin-left:5px; color:var(--text-primary); }
+.novel-fetch-log-task-select { width:min(360px,100%); margin:12px 0; }
 
 @media (max-width:760px) {
   .novel-fetch-subpage-header { align-items:flex-start; flex-wrap:wrap; }
@@ -90,6 +100,8 @@
   .novel-fetch-config-nav { position:static; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .novel-fetch-config-summary { position:static; padding:14px 0 0; border-top:1px solid var(--legacy-border); border-left:0; }
   .novel-fetch-version-profile-grid,.novel-fetch-version-prompts { grid-template-columns:1fr; }
+  .novel-fetch-submit-config-grid { grid-template-columns:1fr; }
+  .novel-fetch-submit-check { min-height:0; justify-content:flex-start; }
 }
 @media (prefers-reduced-motion:reduce) {
   .novel-fetch-cylinder-list { scroll-behavior:auto; }
