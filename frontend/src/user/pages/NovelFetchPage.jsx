@@ -670,10 +670,10 @@ export function LegacyNovelFetchPage() {
 
   useEffect(() => {
     if (activeTab === 'config') { loadConfig(); openVersionConfig(); }
-    if (activeTab === 'knowledge') { loadKnowledge(); loadConfig(); loadRuleConfig(); }
+    if (activeTab === 'knowledge' || activeTab === 'rules') { loadKnowledge(); loadConfig(); loadRuleConfig(); }
+    if (activeTab === 'rules') setKnowledgeView('rules');
     if (activeTab === 'submit' || activeTab === 'logs') loadWebSubmit();
     if (activeTab === 'logs') setSubmitView('logs');
-    if (activeTab === 'rules') loadRuleConfig();
   }, [activeTab, knowledgeKind, ruleKind]);
 
   useEffect(() => {
@@ -1233,8 +1233,10 @@ export function LegacyNovelFetchPage() {
 
   const activePanel = activeTab === 'process'
     ? panels.process
-    : activeTab === 'knowledge'
+    : activeTab === 'knowledge' || activeTab === 'rules'
       ? <NovelFetchSubpageShell title="知识库" description="维护 AI 参考资料、爆款开头和自动处理规则" onBack={() => changeTab('process')} actions={<><Button icon={<RefreshCw size={14} />} loading={knowledgeLoading} onClick={loadKnowledge}>刷新</Button><Button type="primary" onClick={addKnowledgeLibraryItem}>新增资料</Button></>}><Tabs className="novel-fetch-section-tabs" activeKey={knowledgeView} onChange={setKnowledgeView} items={[{ key: 'library', label: '资料库', children: panels.knowledge }, { key: 'opening', label: '爆款开头拆解', children: openingPanel }, { key: 'rules', label: '处理规则', children: panels.rules }]} /></NovelFetchSubpageShell>
+      : activeTab === 'tasks'
+        ? <NovelFetchSubpageShell title="任务" description="查看当前任务、历史批次和每本书的处理详情" onBack={() => changeTab('process')} actions={<Button icon={<RefreshCw size={14} />} loading={tasksLoading} onClick={() => { loadTasks(); loadCurrentBatch(); loadHistoryBatches(); }}>刷新任务</Button>}>{panels.tasks}</NovelFetchSubpageShell>
       : activeTab === 'config'
         ? <NovelFetchSubpageShell title="配置" description="统一管理抓取、处理、AI 和版本配置" onBack={() => changeTab('process')} actions={<><Tag color={configDirty ? 'gold' : 'green'}>{configDirty ? '未保存' : '已同步'}</Tag><Button onClick={() => testWorkshopAi('rewrite').then(() => message.success('测试接口成功')).catch(error => message.error(error.message || '测试失败'))}>测试文本模型</Button><Button type="primary" loading={configLoading} onClick={saveConfig}>保存配置</Button></>}>{panels.config}</NovelFetchSubpageShell>
       : activeTab === 'submit' || activeTab === 'logs'
