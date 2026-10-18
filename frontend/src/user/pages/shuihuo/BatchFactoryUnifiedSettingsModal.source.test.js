@@ -163,8 +163,8 @@ test('keeps configuration explanations behind question-mark tips and removes fix
 });
 
 test('unified AI reasoning keeps one asset extraction prompt and preserves video prompt selection', () => {
-  assert.match(source, /value=\{assets\.extraction\?\.presetId \|\| undefined\}/);
-  assert.match(source, /bySlot\('script\.asset-extraction'\)/);
+  assert.match(source, /value=\{comic\.assets\?\.presetId \|\| assets\.extraction\?\.presetId \|\| undefined\}/);
+  assert.match(source, /bySlots\(\['script\.asset-extraction', 'batch\.comic-assets'\]\)/);
   assert.doesNotMatch(source, /<b>人物提示词<\/b>/);
   assert.doesNotMatch(source, /<b>场景提示词<\/b>/);
   assert.match(source, /noPromptOption = \{ value: '__none__', label: '无' \}/);
@@ -174,14 +174,17 @@ test('unified AI reasoning keeps one asset extraction prompt and preserves video
   assert.match(source, /video: \{ \.\.\.video, \.\.\.presetValue\(catalog\.find\(item => item\.id === normalizedId\)\), enabled: Boolean\(normalizedId\) \}/);
 });
 
-test('unified AI reasoning exposes the five dedicated comic preset slots', () => {
-  assert.match(source, /batch\.comic-assets/);
-  assert.match(source, /batch\.comic-page/);
-  assert.match(source, /漫画资产提示词/);
-  assert.match(source, /漫画画质约束/);
-  assert.match(source, /漫画画面限制/);
-  assert.match(source, /漫画负面提示词/);
-  assert.match(source, /漫画提示词/);
+test('unified AI reasoning keeps one selector per setting and includes comic presets in it', () => {
+  assert.match(source, /bySlots\(\['script\.asset-extraction', 'batch\.comic-assets'\]\)/);
+  assert.match(source, /byConstraint\(\['quality', 'comic_quality'\]\)/);
+  assert.match(source, /byConstraint\(\['restriction', 'comic_restriction'\]\)/);
+  assert.match(source, /byConstraint\(\['negative', 'comic_negative'\]\)/);
+  assert.match(source, /bySlots\(\['batch\.visual-meta', 'batch\.comic-page'\]\)/);
+  assert.doesNotMatch(source, /<b>漫画资产提示词<\/b>/);
+  assert.doesNotMatch(source, /<b>漫画画质约束<\/b>/);
+  assert.doesNotMatch(source, /<b>漫画画面限制<\/b>/);
+  assert.doesNotMatch(source, /<b>漫画负面提示词<\/b>/);
+  assert.doesNotMatch(source, /<b>漫画提示词<\/b>/);
 });
 
 test('explains that the video prompt preset controls rules while the video model controls execution', () => {
@@ -211,18 +214,23 @@ test('unified AI reasoning exposes all four constraint layers plus the base-setu
   assert.match(source, /<b>画质约束<\/b>/);
   assert.match(source, /<b>画面限制<\/b>/);
   assert.match(source, /<b>负面提示词<\/b>/);
-  for (const category of ['prefix', 'quality', 'restriction', 'negative']) {
-    assert.match(source, new RegExp(`selectedConstraint\\('${category}'\\)`));
-    assert.match(source, new RegExp(`byConstraint\\('${category}'\\)`));
-    assert.match(source, new RegExp(`updateConstraint\\('${category}', presetId\\)`));
-  }
+  assert.match(source, /selectedConstraint\('prefix'\)/);
+  assert.match(source, /byConstraint\('prefix'\)/);
+  assert.match(source, /updateConstraint\('prefix', null, presetId\)/);
+  assert.match(source, /byConstraint\(\['quality', 'comic_quality'\]\)/);
+  assert.match(source, /updateConstraint\('quality', 'comic_quality', presetId\)/);
+  assert.match(source, /byConstraint\(\['restriction', 'comic_restriction'\]\)/);
+  assert.match(source, /updateConstraint\('restriction', 'comic_restriction', presetId\)/);
+  assert.match(source, /byConstraint\(\['negative', 'comic_negative'\]\)/);
+  assert.match(source, /updateConstraint\('negative', 'comic_negative', presetId\)/);
 });
 
 test('unified constraint selector fetches and persists the preset body instead of saving an empty selection', () => {
   assert.match(source, /import \{ getConstraintPresetTexts \} from '..\/..\/..\/shared\/api\/generation'/);
-  assert.match(source, /getConstraintPresetTexts\(\[presetId\]\)/);
-  assert.match(source, /const body = String\(result\?\.texts\?\.\[presetId\] \|\| ''\)/);
-  assert.match(source, /selections: \[\.\.\.rest, \{ \.\.\.presetValue\(selected\), body \}\]/);
+  assert.match(source, /getConstraintPresetTexts\(\[normalizedId\]\)/);
+  assert.match(source, /apply\(String\(result\?\.texts\?\.\[normalizedId\] \|\| ''\)\)/);
+  assert.match(source, /\{ \.\.\.presetValue\(selected\), constraintCategory: comicCategory, body \}/);
+  assert.match(source, /\{ \.\.\.presetValue\(selected\), body \}/);
 });
 
 test('persists the default SD video prompt when unified settings are saved without a video selection', () => {
