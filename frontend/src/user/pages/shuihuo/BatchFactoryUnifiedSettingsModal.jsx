@@ -283,6 +283,7 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
     ? config.video
     : { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
   const visual = config.visual || {};
+  const comic = config.comic || {};
   useEffect(() => {
     let active = true;
     Promise.all([listSystemPresetCatalog('script'), listSystemPresetCatalog('batch-factory')]).then(results => {
@@ -297,6 +298,7 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
   const presetFor = presetId => presetValue(catalog.find(item => item.id === presetId));
   const bySlots = slots => promptOptions(catalog.filter(item => slots.includes(item.slot)).map(selectOption));
   const selectedConstraint = category => (constraints.selections || []).find(item => item.constraintCategory === category)?.presetId || constraints[category]?.presetId || '';
+  const selectedComicConstraint = category => (comic.constraints || []).find(item => item.constraintCategory === category)?.presetId || '';
   const byConstraint = category => promptOptions(catalog.filter(item => item.kind === 'addon' && item.constraintCategory === category).map(selectOption));
   const updateConstraint = (category, presetId) => {
     presetId = normalizePromptId(presetId);
@@ -315,10 +317,26 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
       })
       .catch(() => message.error('系统预设提示词读取失败，请重试'));
   };
+  const updateComicConstraint = (category, presetId) => {
+    presetId = normalizePromptId(presetId);
+    const rest = (comic.constraints || []).filter(item => item.constraintCategory !== category);
+    if (!presetId) {
+      onChange({ ...config, comic: { ...comic, enabled: true, constraints: rest } });
+      return;
+    }
+    const selected = catalog.find(item => item.id === presetId);
+    getConstraintPresetTexts([presetId])
+      .then(result => {
+        const body = String(result?.texts?.[presetId] || '');
+        onChange({ ...config, comic: { ...comic, enabled: true, constraints: [...rest, { ...presetValue(selected), constraintCategory: category, body }] } });
+      })
+      .catch(() => message.error('漫画系统预设提示词读取失败，请重试'));
+  };
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>AI 推理 <HelpTip title="AI 推理">选择规则后，资产提取、智能统一、导演分镜和最终 Prompt 都共用同一份批量草稿。</HelpTip></span>} />
     <section className="batch-factory-engine-card"><header><b>资产设置</b><HelpTip title="资产设置">人物、场景和道具统一使用提取提示词；选择“无”表示不使用提示词。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
       <label className="batch-factory-engine-field"><span><b>人物场景道具提取提示词</b></span><Select allowClear value={assets.extraction?.presetId || undefined} options={bySlot('script.asset-extraction')} placeholder="选择提示词或无" onChange={presetId => onChange({ ...config, assets: { ...assets, enabled: Boolean(normalizePromptId(presetId)), extraction: presetFor(normalizePromptId(presetId)) } })} /></label>
+      <label className="batch-factory-engine-field"><span><b>漫画资产提示词</b></span><Select allowClear value={comic.assets?.presetId || undefined} options={bySlot('batch.comic-assets')} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, comic: { ...comic, enabled: Boolean(normalizedId) || comic.enabled === true, assets: presetFor(normalizedId) } }); }} /></label>
       <label className="batch-factory-engine-field"><span className="batch-factory-option-title"><b>换开头</b><Tooltip title="开启后，2 个及以上分镜的书会为分镜一生成多个开场变体并分别合成上传；数量包含原始开头。"><span className="batch-factory-help-button" aria-label="换开头说明">?</span></Tooltip></span><Space><Switch checked={config.openingEnabled === true} onChange={enabled => onChange({ ...config, openingEnabled: enabled, openingCount: config.openingCount ?? 4 })} /><InputNumber min={1} max={8} precision={0} disabled={config.openingEnabled !== true} value={config.openingCount ?? 4} onChange={count => onChange({ ...config, openingCount: count ?? 4 })} addonAfter="条（含原始）" /></Space></label>
     </div></section>
     <section className="batch-factory-engine-card"><header><b>约束设置</b><HelpTip title="约束设置">画面前缀、画质、画面限制和负面提示词在这里统一选择；不选的类别不会注入，可在单书配置里单独覆盖。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
@@ -326,12 +344,16 @@ export function BatchFactoryAiReasoningForm({ value, onChange }) {
       <label className="batch-factory-engine-field"><span><b>画质约束</b></span><Select allowClear value={selectedConstraint('quality')} options={byConstraint('quality')} placeholder="选择提示词或无" onChange={presetId => updateConstraint('quality', presetId)} /></label>
       <label className="batch-factory-engine-field"><span><b>画面限制</b></span><Select allowClear value={selectedConstraint('restriction')} options={byConstraint('restriction')} placeholder="选择提示词或无" onChange={presetId => updateConstraint('restriction', presetId)} /></label>
       <label className="batch-factory-engine-field"><span><b>负面提示词</b></span><Select allowClear value={selectedConstraint('negative')} options={byConstraint('negative')} placeholder="选择提示词或无" onChange={presetId => updateConstraint('negative', presetId)} /></label>
+      <label className="batch-factory-engine-field"><span><b>漫画画质约束</b></span><Select allowClear value={selectedComicConstraint('comic_quality') || undefined} options={byConstraint('comic_quality')} placeholder="选择提示词或无" onChange={presetId => updateComicConstraint('comic_quality', presetId)} /></label>
+      <label className="batch-factory-engine-field"><span><b>漫画画面限制</b></span><Select allowClear value={selectedComicConstraint('comic_restriction') || undefined} options={byConstraint('comic_restriction')} placeholder="选择提示词或无" onChange={presetId => updateComicConstraint('comic_restriction', presetId)} /></label>
+      <label className="batch-factory-engine-field"><span><b>漫画负面提示词</b></span><Select allowClear value={selectedComicConstraint('comic_negative') || undefined} options={byConstraint('comic_negative')} placeholder="选择提示词或无" onChange={presetId => updateComicConstraint('comic_negative', presetId)} /></label>
       <Space style={{ justifyContent: 'space-between', width: '100%' }}><span>基础设定</span><Switch checked={constraints.baseSetup?.enabled !== false} onChange={enabled => onChange({ ...config, constraints: { ...constraints, baseSetup: { enabled } } })} /></Space>
     </div></section>
     <section className="batch-factory-engine-card"><header><b>视频设置</b><HelpTip title="视频设置">视频提示词决定结构化导演分镜的输出规则与最终模板。</HelpTip></header><div className="batch-factory-engine-card-body">
       <label className="batch-factory-engine-field"><span><b>衍生开篇</b></span><Select allowClear value={derivedOpening.presetId || undefined} options={bySlots(['batch.hook-adaptation', 'batch.original-director', 'batch.viral-director'])} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, derivedOpening: { ...derivedOpening, ...presetValue(catalog.find(item => item.id === normalizedId)), enabled: Boolean(normalizedId) } }); }} /></label>
       <div className="batch-factory-engine-field"><span><b>视频提示词</b><HelpTip title="视频提示词">决定导演分镜和最终 VIDEO Prompt 的规则与格式；与上面的具体视频模型相互独立。</HelpTip></span><Select allowClear value={video.presetId || undefined} options={bySlot('batch.video-meta')} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, video: { ...video, ...presetValue(catalog.find(item => item.id === normalizedId)), enabled: Boolean(normalizedId) } }); }} /></div>
       <label className="batch-factory-engine-field"><span><b>画面提示词</b></span><Select allowClear value={visual.presetId || undefined} options={bySlot('batch.visual-meta')} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, visual: { ...visual, ...presetValue(catalog.find(item => item.id === normalizedId)) } }); }} /></label>
+      <label className="batch-factory-engine-field"><span><b>漫画提示词</b></span><Select allowClear value={comic.presetId || undefined} options={bySlot('batch.comic-page')} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, comic: { ...comic, ...presetFor(normalizedId), enabled: Boolean(normalizedId) } }); }} /></label>
     </div></section>
   </Space>;
 }

@@ -174,6 +174,16 @@ test('unified AI reasoning keeps one asset extraction prompt and preserves video
   assert.match(source, /video: \{ \.\.\.video, \.\.\.presetValue\(catalog\.find\(item => item\.id === normalizedId\)\), enabled: Boolean\(normalizedId\) \}/);
 });
 
+test('unified AI reasoning exposes the five dedicated comic preset slots', () => {
+  assert.match(source, /batch\.comic-assets/);
+  assert.match(source, /batch\.comic-page/);
+  assert.match(source, /漫画资产提示词/);
+  assert.match(source, /漫画画质约束/);
+  assert.match(source, /漫画画面限制/);
+  assert.match(source, /漫画负面提示词/);
+  assert.match(source, /漫画提示词/);
+});
+
 test('explains that the video prompt preset controls rules while the video model controls execution', () => {
   assert.match(source, /不决定导演分镜或提示词内容/);
   assert.match(source, /决定导演分镜和最终 VIDEO Prompt 的规则与格式/);
