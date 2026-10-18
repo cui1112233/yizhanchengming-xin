@@ -32,7 +32,7 @@ func TestBuildComicPromptContractUsesComicAssetsAndConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(contract.SystemPrompt, "完整3:4竖版条漫页") || !strings.Contains(contract.SystemPrompt, "Q版日系条漫") || !strings.Contains(contract.SystemPrompt, "必须有分格") || !strings.Contains(contract.SystemPrompt, "不要水印") {
+	if !strings.Contains(contract.SystemPrompt, "完整3:4竖版条漫页") || !strings.Contains(contract.SystemPrompt, "二点五至三点五头身") || !strings.Contains(contract.SystemPrompt, "Q版日系条漫") || !strings.Contains(contract.SystemPrompt, "必须有分格") || !strings.Contains(contract.SystemPrompt, "不要水印") {
 		t.Fatalf("system prompt misses comic rules: %s", contract.SystemPrompt)
 	}
 	if strings.Contains(contract.SystemPrompt, "10秒镜头缓慢推进") {

@@ -13,6 +13,11 @@ const (
 	comicNegativeConstraint    = "comic_negative"
 )
 
+// comicReferenceStyleLock protects already-saved batches that still contain
+// an older editable preset body. The durable presets remain the source for
+// detailed direction, while this preserves the agreed reference-image floor.
+const comicReferenceStyleLock = "【参考图风格硬性锁】成图为3:4竖版中文彩色条漫：白色外留边和等宽白色格间距，深灰近黑清晰格线；可爱大头短身比例（二点五至三点五头身）、圆脸大眼、淡腮红、低饱和柔和赛璐璐平涂。优先三格或四格的从上到下、从左到右阅读顺序。旁白为白底黑边矩形，对白为白底黑边圆形或椭圆气泡，使用短句简体中文且不遮挡脸部、手部或关键道具。不要写实摄影、3D渲染、厚涂油画、水印、乱码、倾斜分格、单张海报或后期拼图。"
+
 // BuildComicPromptContract creates a complete page prompt. It never receives
 // video motion text, so a comic page cannot inherit timing or camera movement.
 func BuildComicPromptContract(book Book, video Video, snapshot DirectorSnapshot) (PromptContract, error) {
@@ -28,6 +33,7 @@ func BuildComicPromptContract(book Book, video Video, snapshot DirectorSnapshot)
 		"你是 Batch Factory 的漫画提示词生成器。只输出一条可直接交给图片模型生成完整漫画页的中文提示词，不要输出 Markdown、JSON、标题或解释。",
 		"该提示词必须生成一张完整3:4竖版条漫页，直接包含分格、角色、场景、动作、表情、旁白框、对话气泡及必须出现的中文文案。禁止后期拼图或另行叠字。",
 		"不得包含视频时长、运镜、镜头推进、音频、配音或视频生成指令。",
+		comicReferenceStyleLock,
 		"漫画提示词预设：\n" + config.Comic.body(),
 	}
 	for _, category := range []string{comicQualityConstraint, comicRestrictionConstraint, comicNegativeConstraint} {
@@ -38,9 +44,9 @@ func BuildComicPromptContract(book Book, video Video, snapshot DirectorSnapshot)
 		}
 	}
 	payload, err := json.Marshal(map[string]any{
-		"book_title": book.Title,
-		"source_text": book.SourceText,
-		"page_label":  video.Label,
+		"book_title":   book.Title,
+		"source_text":  book.SourceText,
+		"page_label":   video.Label,
 		"comic_assets": assets,
 		"aspect_ratio": "3:4",
 	})

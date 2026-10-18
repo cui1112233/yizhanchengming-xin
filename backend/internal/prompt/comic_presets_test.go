@@ -29,15 +29,22 @@ func TestEnsureComicPresetsSeedsOnlyMissingRecords(t *testing.T) {
 }
 
 func TestSystemComicPresetsArePublishedAndUsable(t *testing.T) {
-	catalog := NewCatalog(filepath.Join("..", "..", "..", "data", "system", "presets.json"))
+	path := filepath.Join(t.TempDir(), "presets.json")
+	if err := os.WriteFile(path, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(path)
 	tests := []struct {
 		id, module, slot, category, phrase string
 	}{
-		{"batch-comic-assets", "batch-factory", "batch.comic-assets", "", "人物、场景、道具"},
-		{"script-constraint-comic-quality", "script", "", "comic_quality", "清晰"},
-		{"script-constraint-comic-restriction", "script", "", "comic_restriction", "分格"},
-		{"script-constraint-comic-negative", "script", "", "comic_negative", "水印"},
-		{"batch-comic-page", "batch-factory", "batch.comic-page", "", "3:4"},
+		{"batch-comic-assets", "batch-factory", "batch.comic-assets", "", "二点五至三点五头身"},
+		{"script-constraint-comic-quality", "script", "", "comic_quality", "1440×1920"},
+		{"script-constraint-comic-restriction", "script", "", "comic_restriction", "三格版式"},
+		{"script-constraint-comic-negative", "script", "", "comic_negative", "成人写实比例"},
+		{"batch-comic-page", "batch-factory", "batch.comic-page", "", "本页版式"},
 	}
 	for _, test := range tests {
 		preset, found, err := catalog.PublishedBody(test.module, test.id)
