@@ -1,78 +1,54 @@
-# Batch Factory Comic Mode Design
+# 批量工厂漫画模式设计说明
 
-## Goal
+## 目标
 
-Add a comic production mode to Batch Factory so one novel can independently
-produce static vertical comic pages as well as its existing video output.
+在批量工厂中增加漫画生产模式。一本小说可在原有短剧视频之外，独立生成静态竖版条漫。
 
-## Scope
+## 范围
 
-The source novel remains shared. Video and comic production are separate from
-asset extraction onward. Existing video data, prompts, constraints, generated
-videos, and controls must remain unchanged.
+小说正文共用。从资产提取开始，视频和漫画是两条独立生产线。已有的视频资产、提示词、约束、视频成品和操作入口必须保持原样。
 
-## Production Modes
+## 两种生产模式
 
-### Video mode
+### 视频模式
 
-Keep the existing video asset prompts, quality constraints, visual limits,
-negative prompts, storyboard/video prompts, and video-generation flow.
+继续使用现有的视频人物、场景、道具资产提示词，画质约束、画面限制、负面提示词、分镜视频提示词和视频生成流程。
 
-### Comic mode
+### 漫画模式
 
-Comic mode has its own book-scoped data:
+漫画模式为每本小说单独保存以下内容：
 
-- character, scene, and prop asset prompts;
-- generated asset images;
-- comic quality constraint prompt;
-- comic visual-limit prompt;
-- comic negative prompt;
-- a comic prompt for each existing storyboard item;
-- the generated complete comic-page image.
+- 漫画人物、场景、道具资产提示词；
+- 漫画资产图；
+- 漫画画质约束提示词；
+- 漫画画面限制提示词；
+- 漫画负面提示词；
+- 每条现有分镜对应的一条漫画提示词；
+- 由该漫画提示词直接生成的一张完整漫画页图片。
 
-No comic field may overwrite its video-mode counterpart, and no video field
-may be reinterpreted as a comic field.
+漫画数据不能覆盖视频数据，视频数据也不能被解释为漫画数据。
 
-## Comic Prompt Contract
+## 漫画提示词规则
 
-Each comic prompt produces one complete vertical `3:4` comic page directly
-from an image model. It must include the chosen comic assets, page-wide art
-style, panel layout, panel-by-panel actions and expressions, narration boxes,
-speech bubbles, and their required Chinese text. The system does not compose
-panels or overlay text after image generation.
+一条漫画提示词直接生成一张完整的 `3:4` 竖版条漫页。提示词必须包含：选中的漫画资产、整页画风、分格布局、每一格的人物动作和表情、旁白框、对话气泡以及需要出现的中文文字。
 
-The prompt must exclude video-specific timing, camera movement, audio, and
-video generation instructions. It includes the comic quality, visual-limit,
-and negative-prompt settings selected for that book.
+系统不做后期拼格，也不在图片生成后另外覆盖文字。漫画提示词不得包含视频时长、运镜、音频和视频生成指令；它必须带入当前书选择的漫画画质约束、漫画画面限制和漫画负面提示词。
 
-## User Interface
+## 页面改动
 
-1. Asset settings gains a mode switch: `视频资产` and `漫画资产`.
-2. Constraint settings gains a mode switch. Comic mode exposes `漫画画质约束`,
-   `漫画画面限制`, and `漫画负面提示词`.
-3. The storyboard dialog gains `视频提示词` and `漫画提示词` tabs. The comic tab
-   allows generation, editing, saving, and direct image generation for the
-   selected page.
-4. The production row exposes comic prompt generation and comic-page image
-   generation without replacing its current video controls.
+1. **资产设置**增加“视频资产”和“漫画资产”切换。
+2. **约束设置**增加模式切换。漫画模式显示“漫画画质约束”“漫画画面限制”“漫画负面提示词”。
+3. **分镜提示词**弹窗增加“视频提示词”和“漫画提示词”标签。漫画标签支持生成、编辑、保存和直接出图。
+4. 小说生产行增加漫画提示词提取与漫画页图片生成入口，不替换现有视频操作。
 
-## Data and Compatibility
+## 数据与兼容性
 
-The existing `visualPrompt` field remains untouched for compatibility. Comic
-data uses distinct persisted keys and storage records. Existing books load
-with comic mode empty and continue to work in video mode without migration of
-their saved content.
+现有 `visualPrompt` 字段继续保留，避免历史数据和现有接口失效。漫画使用独立的持久化字段和存储记录。已有小说初次进入时漫画模式为空，视频模式继续按原逻辑使用。
 
-## Error Handling
+## 异常处理
 
-Comic prompt generation requires comic assets and a configured text model.
-Comic-page generation requires a non-empty comic prompt and a configured image
-model. Errors identify the missing prerequisite and keep all previously saved
-comic and video data intact.
+提取漫画提示词前，必须已配置文本模型并有可用漫画资产。生成漫画页前，必须已有非空漫画提示词并已配置图片模型。缺少条件时，页面明确说明缺少什么；已保存的视频和漫画数据不得被清空或覆盖。
 
-## Verification
+## 验证范围
 
-Tests cover mode isolation, comic prompt construction, comic asset selection,
-comic constraint inclusion, and the visible labels/actions in the Batch
-Factory page. Local browser verification confirms that existing video prompt
-controls still work and that comic prompt controls are separately available.
+测试覆盖两种模式互不影响、漫画提示词内容、漫画资产选择、漫画约束注入和批量工厂页面上的中文标签与操作入口。最后使用本地浏览器确认视频提示词仍可正常使用，漫画提示词和漫画页生成功能独立可见。
