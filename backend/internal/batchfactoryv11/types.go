@@ -62,6 +62,7 @@ type Video struct {
 	// optional still-image generation chain.
 	VideoPrompt        string        `json:"videoPrompt,omitempty"`
 	VisualPrompt       string        `json:"visualPrompt,omitempty"`
+	ComicPrompt        string        `json:"comicPrompt,omitempty"`
 	DurationSeconds    float64       `json:"durationSeconds,omitempty"`
 	CompatibilityState string        `json:"compatibilityState"`
 	Revision           int64         `json:"revision"`

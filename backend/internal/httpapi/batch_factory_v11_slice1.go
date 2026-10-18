@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/prompt"
 )
 
 type batchRuntimeIndexReader interface {
@@ -51,7 +53,7 @@ func deleteBatchWithRetention(ctx context.Context, store batchfactoryv11.Store, 
 	return store.DeleteBatch(ctx, owner, batchID)
 }
 
-func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
+func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, catalog *prompt.Catalog) {
 	mux.HandleFunc("POST /api/batch-factory/v11/intakes/manual", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -322,7 +324,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/settings", settingsHandler(store, batchfactoryv11.ScopeBatch))
+	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/settings", settingsHandler(store, catalog, batchfactoryv11.ScopeBatch))
 	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/books/{bookId}/metadata", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -357,8 +359,8 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"book": book})
 	})
-	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/books/{bookId}/override", settingsHandler(store, batchfactoryv11.ScopeBook))
-	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/books/{bookId}/videos/{videoId}/override", settingsHandler(store, batchfactoryv11.ScopeVideo))
+	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/books/{bookId}/override", settingsHandler(store, catalog, batchfactoryv11.ScopeBook))
+	mux.HandleFunc("PUT /api/batch-factory/v11/batches/{batchId}/books/{bookId}/videos/{videoId}/override", settingsHandler(store, catalog, batchfactoryv11.ScopeVideo))
 	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/change-impact", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -494,7 +496,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 	})
 }
 
-func settingsHandler(store batchfactoryv11.Store, kind batchfactoryv11.ScopeKind) http.HandlerFunc {
+func settingsHandler(store batchfactoryv11.Store, catalog *prompt.Catalog, kind batchfactoryv11.ScopeKind) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -504,6 +506,14 @@ func settingsHandler(store batchfactoryv11.Store, kind batchfactoryv11.ScopeKind
 		var input batchfactoryv11.SettingsUpdate
 		if !decodeJSON(w, r, &input) {
 			return
+		}
+		if raw, exists := input.Patch["aiPromptConfig"]; exists {
+			hydrated, err := hydrateBatchFactoryPromptConfig(catalog, raw)
+			if err != nil {
+				writeStoreError(w, fmt.Errorf("%w: %v", batchfactoryv11.ErrInvalid, err))
+				return
+			}
+			input.Patch["aiPromptConfig"] = hydrated
 		}
 		ref := batchfactoryv11.ScopeRef{Kind: kind, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId"), VideoID: r.PathValue("videoId")}
 		result, err := store.SaveSettings(r.Context(), owner, ref, input)

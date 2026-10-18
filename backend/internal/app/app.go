@@ -161,6 +161,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
+	if err := prompt.EnsureComicPresets(cfg.PresetPath); err != nil {
+		return nil, err
+	}
 	migrations := append(storage.AppMigrations(), storage.NovelFetchWorkshopMigrations()...)
 	migrations = append(migrations, storage.AuthMigrations()...)
 	if err := storage.RunMigrations(ctx, db, migrations); err != nil {

@@ -55,7 +55,7 @@ func (s *BookStageService) availability(ctx context.Context, owner string, stage
 			return BookStageAvailability{Stage: stage, Available: true}
 		}
 		return BookStageAvailability{Stage: stage, Reason: "文本模型未配置"}
-	case BookStageDirector, BookStageVisual:
+	case BookStageDirector, BookStageVisual, BookStageComic:
 		if s != nil && s.Director != nil && s.Director.Store != nil && s.Director.Provider != nil {
 			return BookStageAvailability{Stage: stage, Available: true}
 		}
@@ -104,7 +104,7 @@ func (s *BookStageService) Summary(ctx context.Context, owner, batchID, bookID s
 	if err != nil {
 		return BookStageSummary{}, err
 	}
-	availability := []BookStageAvailability{s.availability(ctx, owner, BookStageAssets), s.availability(ctx, owner, BookStageDirector), s.availability(ctx, owner, BookStageOpening), s.availability(ctx, owner, BookStageVisual), s.availability(ctx, owner, BookStageImage), s.availability(ctx, owner, BookStageVideo)}
+	availability := []BookStageAvailability{s.availability(ctx, owner, BookStageAssets), s.availability(ctx, owner, BookStageDirector), s.availability(ctx, owner, BookStageOpening), s.availability(ctx, owner, BookStageVisual), s.availability(ctx, owner, BookStageComic), s.availability(ctx, owner, BookStageImage), s.availability(ctx, owner, BookStageVideo)}
 	return BookStageSummary{BookID: bookID, Runs: runs, Availability: availability, LastFailed: LatestFailedBookStageRun(runs)}, nil
 }
 
@@ -145,7 +145,7 @@ func (s *BookStageService) finish(ctx context.Context, owner string, run BookSta
 }
 
 func normalizeStageExecutionError(stage BookStage, err error) error {
-	if err == nil || (stage != BookStageAssets && stage != BookStageDirector && stage != BookStageVisual && stage != BookStageOpening) {
+	if err == nil || (stage != BookStageAssets && stage != BookStageDirector && stage != BookStageVisual && stage != BookStageComic && stage != BookStageOpening) {
 		return err
 	}
 	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrConflict) || errors.Is(err, ErrInvalid) || errors.Is(err, ErrUnavailable) {
@@ -221,6 +221,8 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		}
 	case BookStageVisual:
 		_, err = s.Director.RunVisualPromptExtraction(ctx, owner, batchID, bookID)
+	case BookStageComic:
+		_, err = s.Director.RunComicPromptExtraction(ctx, owner, batchID, bookID)
 	case BookStageImage:
 		if s.ImageGenerator == nil {
 			err = fmt.Errorf("%w: 图片模型或图片生成服务未配置", ErrUnavailable)

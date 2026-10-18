@@ -18,6 +18,9 @@ func applyVideoPromptOverrides(video *Video) {
 	if value, ok := optionalPromptValue(video.SettingsState.Patch, "visualPrompt"); ok {
 		video.VisualPrompt = value
 	}
+	if value, ok := optionalPromptValue(video.SettingsState.Patch, "comicPrompt"); ok {
+		video.ComicPrompt = value
+	}
 }
 
 func optionalPromptValue(patch SettingsPatch, key string) (string, bool) {

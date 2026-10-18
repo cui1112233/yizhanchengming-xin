@@ -84,6 +84,41 @@ type AIReasoningPromptModule struct {
 	Prompt string `json:"prompt"`
 }
 
+// AIReasoningComicModule keeps the comic selections beside the existing
+// video/visual selections without changing either production path.
+type AIReasoningComicModule struct {
+	Enabled             bool             `json:"enabled"`
+	Scope               string           `json:"scope"`
+	BookIDs             []string         `json:"bookIds"`
+	ID                  string           `json:"presetId"`
+	Name                string           `json:"presetName"`
+	Slot                string           `json:"presetSlot"`
+	Version             int              `json:"presetVersion"`
+	Key                 string           `json:"presetKey"`
+	Body                string           `json:"body"`
+	Assets      PresetSnapshot   `json:"assets"`
+	Constraints []PresetSnapshot `json:"constraints"`
+}
+
+func (m AIReasoningComicModule) body() string {
+	return strings.TrimSpace(m.Body)
+}
+
+func (m AIReasoningComicModule) appliesTo(book Book) bool {
+	if !m.Enabled || m.body() == "" {
+		return false
+	}
+	if m.Scope != "custom" {
+		return true
+	}
+	for _, id := range m.BookIDs {
+		if id == book.ID {
+			return true
+		}
+	}
+	return false
+}
+
 // ScriptStoryboardComposition is the trusted snapshot of the normal public
 // Script workbench contract. Go resolves these published preset bodies before
 // execution, so Batch Factory never has to call a browser or Node bridge.
@@ -105,6 +140,7 @@ type AIReasoningPromptConfig struct {
 	ViralDirector     AIReasoningPromptModule     `json:"viralDirector"`
 	Video             AIReasoningPromptModule     `json:"video"`
 	Visual            AIReasoningPromptModule     `json:"visual"`
+	Comic             AIReasoningComicModule      `json:"comic"`
 	Prefix            AIReasoningPromptModule     `json:"prefix"`
 	ScriptComposition ScriptStoryboardComposition `json:"scriptComposition"`
 }

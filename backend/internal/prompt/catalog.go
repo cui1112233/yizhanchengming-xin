@@ -50,6 +50,20 @@ type PublicPreset struct {
 	ProcessOperation   string   `json:"processOperation,omitempty"`
 }
 
+// PublishedPresetBody is the server-side snapshot used when a workbench saves
+// a preset selection. The browser receives catalog metadata only; the body is
+// resolved here and frozen into the durable job configuration.
+type PublishedPresetBody struct {
+	ID                 string
+	Module             string
+	Name               string
+	Version            int
+	Revision           int
+	Body               string
+	Slot               string
+	ConstraintCategory string
+}
+
 func NewCatalog(path string) *Catalog { return &Catalog{path: strings.TrimSpace(path)} }
 
 func (c *Catalog) Path() string {
@@ -147,6 +161,29 @@ func (c *Catalog) PublishedByID(id string) (presetRecord, bool, error) {
 		}
 	}
 	return presetRecord{}, false, nil
+}
+
+// PublishedBody returns one published preset body for trusted backend callers.
+// It must not be used to expose prompt bodies through the public catalog API.
+func (c *Catalog) PublishedBody(module, id string) (PublishedPresetBody, bool, error) {
+	record, found, err := c.PublishedByID(id)
+	if err != nil || !found || record.Module != strings.TrimSpace(module) {
+		return PublishedPresetBody{}, false, err
+	}
+	revision := record.Revision
+	if revision < 1 {
+		revision = 1
+	}
+	return PublishedPresetBody{
+		ID:                 record.ID,
+		Module:             record.Module,
+		Name:               record.Name,
+		Version:            record.Version,
+		Revision:           revision,
+		Body:               record.Body,
+		Slot:               record.ProtocolLock.Slot,
+		ConstraintCategory: record.ProtocolLock.Category,
+	}, true, nil
 }
 
 func (c *Catalog) ConstraintText(ids []string) (map[string]string, error) {
