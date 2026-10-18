@@ -87,7 +87,7 @@ function HelpTip({ title, children }) {
 function equal(left, right) { return JSON.stringify(left ?? null) === JSON.stringify(right ?? null); }
 function mergePromptConfig(base, override) {
   const merged = { ...(base || {}), ...(override || {}) };
-  for (const key of ['assets', 'constraints', 'hook', 'originalDirector', 'viralDirector', 'video', 'visual']) {
+  for (const key of ['assets', 'constraints', 'hook', 'originalDirector', 'viralDirector', 'video', 'visual', 'comic']) {
     merged[key] = { ...(base?.[key] || {}), ...(override?.[key] || {}) };
   }
   return merged;
@@ -217,7 +217,7 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
     else if (Object.hasOwn(bookPatch || {}, 'starredCharacterNames')) restoreKeys.push('starredCharacterNames');
   }
   const rawBookAI = bookPatch?.aiPromptConfig && typeof bookPatch.aiPromptConfig === 'object' ? { ...bookPatch.aiPromptConfig } : {};
-  const moduleKeys = region === 'video' || region === 'media' ? ['video'] : [moduleKey];
+  const moduleKeys = region === 'media' ? ['video', 'comic'] : region === 'video' ? ['video'] : [moduleKey];
   for (const key of moduleKeys) {
     const inheritedModule = inherited?.aiPromptConfig?.[key] || {};
     const editedModule = edited?.aiPromptConfig?.[key] || {};
@@ -259,12 +259,12 @@ function PromptSelect({ label, value, options, onChange, disabled, required = fa
   return <div className="batch-factory-engine-field"><span><b>{label}</b><HelpTip title={label}>从个人中心已发布预设词选择。</HelpTip></span><Select allowClear={!required} disabled={disabled} value={value?.presetId || undefined} options={catalog.map(optionFor)} placeholder={required ? '请选择已发布视频提示词' : '未选择'} onChange={id => onChange(selectedMeta(catalog, id))} /></div>;
 }
 
-function RuleModule({ title, value, onChange, children, required = false }) {
+function RuleModule({ title, value, onChange, children, required = false, showWhenDisabled = false }) {
   const module = value || {};
   const enabled = required || module.enabled === true;
   return <section className="batch-factory-ai-module">
     <div className="batch-factory-ai-module-head"><div><b>{title}</b><HelpTip title={title}>保存后只覆盖当前小说；所选预设及当前编辑内容会随本书配置保存。</HelpTip></div>{required ? null : <Switch checked={enabled} onChange={enabled => onChange({ ...module, enabled })} />}</div>
-    {enabled ? <div className="batch-factory-ai-module-body">{children}</div> : null}
+    {enabled || showWhenDisabled ? <div className="batch-factory-ai-module-body">{children}</div> : null}
   </section>;
 }
 
@@ -385,6 +385,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const scriptConstraints = useMemo(() => catalog.script.filter(item => item.kind === 'addon' && item.constraintCategory), [catalog.script]);
   const videoRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.video-meta'), [catalog.batch]);
   const visualRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.visual-meta'), [catalog.batch]);
+  const comicPageRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-page'), [catalog.batch]);
   const ai = form.aiPromptConfig || {};
   const assetRules = ai.assets || {};
   const starredCharacterNames = Array.isArray(form.starredCharacterNames) ? form.starredCharacterNames : [];
@@ -403,7 +404,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       : ENGINE_MODEL_OVERRIDE_FIELDS.some(key => Object.hasOwn(bookPatch, key)) || Object.hasOwn(bookPatch, 'openingEnabled') || Object.hasOwn(bookPatch, 'openingCount')
     : region === 'assets'
       ? Object.hasOwn(bookPatch, 'starredCharacterNames') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'assets')
-    : region === 'video'
+    : region === 'media'
+      ? Object.hasOwn(bookPatch.aiPromptConfig || {}, 'video') || Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')
+      : region === 'video'
       ? Object.hasOwn(bookPatch.aiPromptConfig || {}, 'video')
       : Boolean(moduleKey && Object.hasOwn(bookPatch.aiPromptConfig || {}, moduleKey));
 
@@ -630,8 +633,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       <RuleModule required title="视频生成" value={ai.video} onChange={next => patchAI('video', scoped({ ...next, enabled: true }))}>
         <PromptSelect required label="视频提示词" value={ai.video} options={Object.assign(videoRules.map(optionFor), { catalog: videoRules })} disabled={loading} onChange={selection => patchAI('video', scoped({ ...ai.video, ...selection, enabled: true }))} />
       </RuleModule>
-      <RuleModule title="画面生成" value={ai.visual} onChange={next => patchAI('visual', scoped(next))}>
-        <PromptSelect label="画面提示词" value={ai.visual} options={Object.assign(visualRules.map(optionFor), { catalog: visualRules })} disabled={loading} onChange={selection => patchAI('visual', scoped({ ...ai.visual, ...selection }))} />
+      <RuleModule title="漫画生成" value={ai.comic} onChange={next => patchAI('comic', scoped(next))} showWhenDisabled>
+        <PromptSelect label="漫画提示词" value={ai.comic} options={Object.assign(comicPageRules.map(optionFor), { catalog: comicPageRules })} disabled={loading} onChange={selection => patchAI('comic', scoped({ ...ai.comic, ...selection, enabled: Boolean(selection.presetId) }))} />
       </RuleModule>
     </div>;
   } else if (region === 'video') {

@@ -60,9 +60,9 @@ test('single-book constraints support the same system, personal and editable pro
   assert.match(source, /开启后，当前书每个分镜自动带入已提取的人物与场景设定/);
 });
 
-test('single-book media configuration saves the video module instead of dropping the combined region', () => {
+test('single-book media configuration saves video and comic modules together instead of dropping the combined region', () => {
   assert.match(source, /const moduleKey = region === 'media' \? 'video' : AI_REGION_KEYS\.get\(region\)/);
-  assert.match(source, /region === 'media' \? \['video'\] : \[moduleKey\]/);
+  assert.match(source, /region === 'media' \? \['video', 'comic'\] : region === 'video' \? \['video'\] : \[moduleKey\]/);
 });
 
 test('single-book configuration opens and saves one explicit region at a time', () => {
@@ -139,6 +139,13 @@ test('keeps derived-opening presets out of single-book video settings', () => {
   assert.match(videoRegion, /<PromptSelect required label="视频提示词"/);
   assert.match(source, /const DEFAULT_VIDEO_PROMPT = \{ presetId: 'batch-video-sd'/);
 	assert.match(source, /video: requiredVideoPrompt\(aiPromptConfig\.video\)/);
+});
+
+test('uses the comic page preset for a book comic-generation override', () => {
+  assert.match(source, /const comicPageRules = useMemo\(\(\) => catalog\.batch\.filter\(item => item\.slot === 'batch\.comic-page'\)/);
+  assert.match(source, /const moduleKeys = region === 'media' \? \['video', 'comic'\]/);
+  assert.match(source, /<RuleModule title="漫画生成" value=\{ai\.comic\}/);
+  assert.match(source, /<PromptSelect label="漫画提示词" value=\{ai\.comic\}/);
 });
 
 

@@ -387,7 +387,7 @@ test('renders every novel row with prompt and clip-library cells without a separ
   assert.match(source, /shuihuo-prompt-cell batch-factory-book-prompt-cell/);
   assert.match(source, /shuihuo-library-cell batch-factory-book-library-cell/);
 	assert.doesNotMatch(source, /label: '分镜资产'/);
-  assert.match(source, /画面提示词/);
+  assert.match(source, /漫画提示词/);
 	assert.match(source, /function InlineMediaLibrary/);
 });
 
@@ -461,11 +461,11 @@ test('moves through the same storyboard and VIDEO with visible previous and next
   assert.match(source, /function StoryboardVideoNavigator/);
 });
 
-test('keeps visual and video prompts as separate per-video saved fields', () => {
+test('keeps comic and video prompts as separate per-video saved fields', () => {
   assert.match(source, /saveVideoOverride/);
-  assert.match(source, /visualPrompt/);
+  assert.match(source, /comicPrompt/);
   assert.match(source, /videoPrompt/);
-  assert.match(source, /画面提示词/);
+  assert.match(source, /漫画提示词/);
   assert.match(source, /视频提示词/);
 });
 
@@ -475,7 +475,7 @@ test('shows the submitted H3 prompt while keeping its editable director copy sep
 	assert.match(source, /setCompiledPrompt\(String\(response\?\.finalPrompt\?\.compiledPrompt/);
 	assert.match(source, /editing \? videoPrompt : submittedVideoPrompt/);
 	assert.doesNotMatch(source, /displayPrompt \|\| response\?\.finalPrompt\?\.compiledPrompt/);
-	assert.match(source, /const activeLabel = promptKind === 'visual' \? '画面提示词' : '分镜视频提示词';/);
+  assert.match(source, /const activeLabel = promptKind === 'visual' \? '漫画提示词' : '分镜视频提示词';/);
 });
 
 test('defers compiled prompt reads until the user opens the prompt editor', () => {
@@ -719,7 +719,7 @@ test('groups per-book operations into the requested acquisition and recovery con
   assert.match(actions, /batch-factory-action-group is-recovery/);
   assert.match(actions, /batch-factory-action-button-grid/);
   assert.match(actions, /资产获取/);
-  assert.match(actions, /画面获取/);
+  assert.match(actions, /漫画获取/);
   assert.match(actions, /视频获取/);
   assert.match(actions, />提取</);
   assert.match(actions, /生成图片/);
@@ -768,7 +768,7 @@ test('offers explicit regenerate and retry controls in assets, prompts and video
   assert.match(source, /重新生成资产/);
   assert.match(source, /重试资产/);
   assert.match(source, /重新生成文案/);
-  assert.match(source, /重新生成画面提示词/);
+  assert.match(source, /重新生成漫画提示词/);
   assert.match(source, />重试</);
   assert.match(source, /重新生成视频/);
   assert.match(source, /重试视频/);
@@ -777,14 +777,14 @@ test('offers explicit regenerate and retry controls in assets, prompts and video
 
 test('keeps one modal prompt mode through horizontal storyboard navigation', () => {
   assert.match(source, /const \[promptKind, setPromptKind\] = useState\('video'\)/);
-  assert.match(source, /const hasVisualPrompt = Boolean\(String\(visualPrompt \|\| ''\)\.trim\(\)\)/);
+  assert.match(source, /const hasVisualPrompt = Boolean\(String\(comicPrompt \|\| ''\)\.trim\(\)\)/);
   assert.match(source, /请生成视频提示词再查看/);
   assert.match(source, /切换分镜时会保持当前查看类型/);
 });
 
-test('renders stacked visual and video prompt controls with an explicit copy regeneration action', () => {
+test('renders stacked comic and video prompt controls with an explicit regeneration action', () => {
   assert.match(source, /batch-factory-prompt-modal-tabs/);
-  assert.match(source, /promptKind === 'visual' \? '重新生成画面提示词' : '重新生成文案'/);
+  assert.match(source, /promptKind === 'visual' \? '重新生成漫画提示词' : '重新生成导演分镜'/);
   assert.match(source, /重新执行智能统一分析/);
   assert.match(source, /生成图片/);
   assert.match(source, /生成视频/);
@@ -1166,14 +1166,14 @@ test('initializes the selected primary video before an autoplay effect reads it'
 });
 
 test('compiles existing H3 director cards instead of regenerating them from video extraction', () => {
-  assert.match(source, /画面获取[\s\S]{0,500}runBookStageAction\(book, 'visual', 'force'\)/);
+  assert.match(source, /漫画获取[\s\S]{0,500}runBookStageAction\(book, 'comic', 'force'\)/);
   const start = source.indexOf('async function runBookStageAction(book, stage');
   const end = source.indexOf('async function retryLastFailedStage', start);
   const action = start >= 0 && end > start ? source.slice(start, end) : '';
   assert.match(source, /视频获取[\s\S]{0,500}runBookStageAction\(book, 'director', 'compile'\)/);
   assert.match(action, /if \(stage === 'director' && mode === 'compile' && h3DirectorCards\(book\)\.length\) \{[\s\S]*?await compileBookH3Videos\(book\);[\s\S]*?return;/);
   assert.match(action, /await runBookStage\(batch\.id, book\.id, stage/);
-  assert.match(source, /onRegenerateVisual=\{\(\) => runBookStageAction\(promptBook, 'visual', 'force'\)\}/);
+  assert.match(source, /onRegenerateVisual=\{\(\) => runBookStageAction\(promptBook, 'comic', 'force'\)\}/);
 });
 
 test('refreshes the open storyboard modal after director regeneration', () => {
@@ -1184,8 +1184,8 @@ test('refreshes the open storyboard modal after director regeneration', () => {
   assert.match(source, /<PromptPanel key=\{`\$\{promptBook\.id\}:\$\{promptBook\.revision \|\| 0\}:\$\{promptBook\.directorRevision\?\.id \|\| ''\}`\}/);
 });
 
-test('names the prompt workbench as storyboard cards carrying video prompts', () => {
-  assert.match(source, /title=\{promptBook \? `分镜卡（视频提示词） · \$\{promptBook\.title\}` : '分镜卡（视频提示词）'\}/);
+test('names the prompt workbench as storyboard cards carrying video and comic prompts', () => {
+  assert.match(source, /title=\{promptBook \? `分镜卡（视频与漫画提示词） · \$\{promptBook\.title\}` : '分镜卡（视频与漫画提示词）'\}/);
 });
 
 test('lets a VIDEO card inspect the actual submitted prompt and compile trace', () => {
@@ -1351,4 +1351,11 @@ test('uses the VIDEO card plus button only for local MP4 upload', () => {
   assert.doesNotMatch(mediaPanel, />重新生成视频</);
   const uploadControl = mediaPanel.match(/<span className="batch-factory-media-pickstation-add"[\s\S]*?<\/span>/)?.[0] || '';
   assert.doesNotMatch(uploadControl, /onRegenerate/);
+});
+
+test('uses comic prompts rather than legacy visual prompts in the storyboard comic view', () => {
+  assert.match(source, /const comicPrompt = String\(video\?\.comicPrompt \|\| ''\);/);
+  assert.match(source, /promptKind === 'visual' \? \{ comicPrompt \} : \{ videoPrompt \}/);
+  assert.match(source, />漫画提示词<\/button>/);
+  assert.match(source, /runBookStageAction\(book, 'comic', 'force'\)/);
 });
