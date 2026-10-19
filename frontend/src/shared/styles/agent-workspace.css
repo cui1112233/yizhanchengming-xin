@@ -18,6 +18,10 @@
   --agent-accent-hover: #f78378;
   --agent-accent-soft: rgba(240, 113, 103, 0.11);
   --agent-success: #5dba8a;
+  --agent-edge-coral: #f07167;
+  --agent-edge-cyan: #55c9d6;
+  --agent-edge-violet: #ae8be7;
+  --agent-edge-gold: #e8bb68;
 
   display: grid;
   width: 100%;
@@ -378,9 +382,10 @@
 .agent-page .agent-canvas-main .agent-canvas,
 .agent-page .agent-canvas-main .react-flow { width: 100%; height: 100%; min-height: 0; background: var(--agent-elevated); }
 .agent-page .agent-canvas-main .agent-canvas { position: relative; overflow: hidden; outline: none; }
-.agent-page .agent-canvas-node { width: 168px; border: 1px solid var(--agent-border); border-radius: 8px; padding: 10px; background: var(--agent-panel); color: var(--agent-text); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12); }
+.agent-page .agent-canvas-node { width: 176px; border: 1px solid var(--agent-border); border-radius: 8px; padding: 10px; background: color-mix(in srgb, var(--agent-panel) 97%, #000); color: var(--agent-text); box-shadow: 0 7px 16px rgba(0, 0, 0, 0.16); }
 .agent-page .agent-canvas-node--image { border-color: color-mix(in srgb, var(--agent-accent) 58%, var(--agent-border)); }
 .agent-page .agent-canvas-node--failed { border-color: #d84b4b; }
+.agent-page .react-flow__node.selected .agent-canvas-node { border-color: var(--agent-accent); box-shadow: 0 0 0 2px var(--agent-accent-soft), 0 10px 22px rgba(0, 0, 0, 0.2); }
 .agent-page .agent-canvas-node header { display: grid; gap: 3px; }
 .agent-page .agent-canvas-node header span,
 .agent-page .agent-canvas-node footer { color: var(--agent-muted); font-size: 10px; }
@@ -459,6 +464,36 @@
 .agent-page .agent-canvas-tool-divider { width: 1px; height: 24px; flex: 0 0 auto; margin: 0 3px; background: var(--agent-border); }
 .agent-page .agent-canvas-zoom-value { min-width: 48px; color: var(--agent-secondary); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
 
+.agent-page .agent-canvas-edge-flow {
+  fill: none;
+  stroke: var(--agent-edge-color);
+  stroke-width: var(--agent-edge-width);
+  stroke-dasharray: 8 10;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: agent-canvas-edge-flow 1.1s linear infinite;
+}
+
+@keyframes agent-canvas-edge-flow { to { stroke-dashoffset: -36; } }
+
+.agent-page .agent-canvas-guide { position: absolute; z-index: 8; display: block; pointer-events: none; background: color-mix(in srgb, var(--agent-accent) 65%, transparent); opacity: 0.7; }
+.agent-page .agent-canvas-guide--vertical { top: 0; bottom: 0; left: 50%; width: 1px; }
+.agent-page .agent-canvas-guide--horizontal { right: 0; bottom: 50%; left: 0; height: 1px; }
+
+.agent-canvas-appearance-popover { max-width: min(320px, calc(100vw - 24px)); }
+.agent-canvas-appearance-popover .ant-popover-inner { border: 1px solid var(--border-default); border-radius: 8px; background: var(--surface-panel); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24); }
+.agent-page .agent-canvas-appearance-panel { display: grid; width: 272px; gap: 10px; color: var(--text-primary); }
+.agent-canvas-appearance-panel { display: grid; width: 272px; gap: 10px; color: var(--text-primary); }
+.agent-canvas-appearance-row { display: flex; min-height: 28px; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: 12px; }
+.agent-canvas-appearance-row--stack { align-items: flex-start; flex-direction: column; gap: 6px; }
+.agent-canvas-color-options { display: flex; gap: 6px; }
+.agent-canvas-color-swatch { width: 22px; height: 16px; border: 1px solid transparent; border-radius: 5px; cursor: pointer; }
+.agent-canvas-color-swatch.is-active { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--surface-panel), 0 0 0 3px var(--agent-border-strong); }
+.agent-canvas-color-swatch.is-coral { background: var(--agent-edge-coral); }
+.agent-canvas-color-swatch.is-cyan { background: var(--agent-edge-cyan); }
+.agent-canvas-color-swatch.is-violet { background: var(--agent-edge-violet); }
+.agent-canvas-color-swatch.is-gold { background: var(--agent-edge-gold); }
+
 .agent-page .agent-canvas-group {
   position: absolute;
   z-index: 0;
@@ -517,6 +552,9 @@
   .agent-page .agent-canvas-editbar { top: 58px; max-width: calc(100% - 72px); overflow-x: auto; }
   .agent-page .agent-canvas-zoombar { max-width: calc(100% - 24px); overflow-x: auto; }
   .agent-page .agent-canvas-workspace:not(.is-conversation-collapsed) .agent-canvas-zoombar { bottom: calc(min(72dvh, 620px) + 12px); }
+  .agent-canvas-appearance-popover { max-width: calc(100vw - 24px); }
+  .agent-page .agent-canvas-appearance-panel { width: min(272px, calc(100vw - 56px)); }
+  .agent-canvas-appearance-panel { width: min(272px, calc(100vw - 56px)); }
   .agent-page .agent-creation-home { place-items: start stretch; padding: 22px 12px; }
   .agent-page .agent-creation-home-inner { width: 100%; }
   .agent-page .agent-creation-composer { padding: 14px; }
@@ -528,6 +566,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .agent-page .agent-canvas-edge-flow { animation: none; }
   .agent-page *,
   .agent-page *::before,
   .agent-page *::after {
