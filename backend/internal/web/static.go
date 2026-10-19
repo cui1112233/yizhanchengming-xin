@@ -18,6 +18,17 @@ func StaticHandler(files fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(files))
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		name := strings.TrimPrefix(path.Clean(req.URL.Path), "/")
+		// There is one production workspace. Keep the historical URL as a
+		// server-side redirect so it cannot render a second shell or get stuck
+		// behind the login gate before React mounts.
+		if name == "shuihuo-production" {
+			target := "/batch-factory"
+			if req.URL.RawQuery != "" {
+				target += "?" + req.URL.RawQuery
+			}
+			http.Redirect(w, req, target, http.StatusFound)
+			return
+		}
 		if name == "novel-panel/workbench" || strings.HasPrefix(name, "novel-panel/workbench/") {
 			http.NotFound(w, req)
 			return
@@ -74,6 +85,9 @@ func StaticHandler(files fs.FS) http.Handler {
 				return
 			}
 		}
+		// React's entry script selects the whole hashed module graph. Do not let a
+		// browser keep an old entry script after this embedded Go binary changes.
+		w.Header().Set("Cache-Control", "no-store, must-revalidate")
 		fileServer.ServeHTTP(w, req)
 	})
 }

@@ -46,6 +46,19 @@ export default function BatchFactoryWorkbenchPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [openAutomationOnLoad, setOpenAutomationOnLoad] = useState(false);
   const handoffRef = useRef('');
+  // When arriving from Novel Fetch, the intake must win over the previously
+  // remembered batch. Otherwise the two async loads can race and put the old
+  // project back on screen after the new intake has already been created.
+  const pendingHandoffRef = useRef(
+    pendingNovelFetchIntakeId(typeof window !== 'undefined' ? window.location.search : '')
+  );
+  const pendingBatchIdRef = useRef(typeof window !== 'undefined'
+    ? (() => {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('batch') || params.get('project') || '';
+    })()
+    : '');
+  const pendingBatchId = pendingBatchIdRef.current;
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -89,6 +102,7 @@ export default function BatchFactoryWorkbenchPage() {
   useEffect(() => { refreshBatches({ quiet: true }); }, [refreshBatches]);
 
   useEffect(() => {
+    if (pendingHandoffRef.current || pendingBatchId) return undefined;
     const activeBatchId = localStorage.getItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY) || '';
     if (!activeBatchId) return undefined;
     void openBatch(activeBatchId);
@@ -96,7 +110,22 @@ export default function BatchFactoryWorkbenchPage() {
   }, [openBatch]);
 
   useEffect(() => {
-    const intakeId = pendingNovelFetchIntakeId(window.location.search);
+    if (!pendingBatchId || pendingHandoffRef.current) return undefined;
+    let cancelled = false;
+    getBatch(pendingBatchId).then(result => {
+      if (cancelled) return;
+      const batch = asBatch(result);
+      localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
+      setActiveBatch(batch);
+      window.history.replaceState({}, '', '/batch-factory');
+    }).catch(requestError => {
+      if (!cancelled) message.error(requestError?.message || '读取批量工程失败');
+    });
+    return () => { cancelled = true; };
+  }, [pendingBatchId]);
+
+  useEffect(() => {
+    const intakeId = pendingHandoffRef.current;
     if (!intakeId || handoffRef.current === intakeId) return undefined;
     handoffRef.current = intakeId;
     let cancelled = false;

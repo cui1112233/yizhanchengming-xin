@@ -28,6 +28,14 @@ const IssueLogPage = lazy(() => import('./pages/IssueLogPage'));
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage'));
 const RecoveryPage = lazy(() => import('./pages/RecoveryPage'));
 
+function CanonicalBatchFactoryRedirect() {
+  useEffect(() => {
+    const suffix = `${window.location.search}${window.location.hash}`;
+    window.location.replace(`/batch-factory${suffix}`);
+  }, []);
+  return <div className="route-loading" role="status">正在打开批量工厂</div>;
+}
+
 export async function preloadWorkbenchPages(loaders = {
   novelFetch: loadNovelFetchPage,
   novelPanel: loadNovelPanelPage,
@@ -74,9 +82,10 @@ function getPage(pathname) {
     '/novel-panel': NovelPanelPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
-    // Shuihuo is the unified production overview; Batch Factory remains its
-    // dedicated batch workspace opened by the overview button.
-    '/shuihuo-production': ShuihuoProductionPage,
+    // Keep the old URL as a hard compatibility redirect so there is only one
+    // production workspace. The legacy comic-work library remains available
+    // from the explicit creative entry.
+    '/shuihuo-production': CanonicalBatchFactoryRedirect,
     '/shuihuo-production/creative': ShuihuoProductionPage,
     '/tts': TtsPage,
     '/settings': SettingsPage,

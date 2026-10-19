@@ -127,7 +127,7 @@ func RegisterPlatformProjectsRoute(root *http.ServeMux, middleware BridgeAuth, h
 			for _, batch := range batches {
 				created := batch.CreatedAt.UTC().Format(time.RFC3339)
 				updated := batch.UpdatedAt.UTC().Format(time.RFC3339)
-				entries = append(entries, map[string]any{"id": "shuihuo-production:" + batch.ID, "sourceId": batch.ID, "kind": "shuihuo-production", "typeLabel": "水货生产", "name": batch.Title, "summary": "水货生产项目", "createdAt": created, "updatedAt": updated, "route": "/shuihuo-production?project=" + batch.ID})
+				entries = append(entries, map[string]any{"id": "shuihuo-production:" + batch.ID, "sourceId": batch.ID, "kind": "shuihuo-production", "typeLabel": "水货生产", "name": batch.Title, "summary": "水货生产项目", "createdAt": created, "updatedAt": updated, "route": "/batch-factory?batch=" + batch.ID})
 			}
 		}
 		sort.SliceStable(entries, func(i, j int) bool {

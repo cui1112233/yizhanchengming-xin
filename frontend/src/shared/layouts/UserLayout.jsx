@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, History, Home, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun, Bug } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
@@ -26,11 +26,8 @@ const navItems = [
   // document navigation so the SPA cannot swap in a stale React-only page.
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
   { href: '/novel-panel', icon: NotebookTabs, label: '小说面板' },
-  { href: '/shuihuo-production', icon: Clapperboard, label: '水货生产' },
+  { href: '/batch-factory', icon: Clapperboard, label: '水货生产' },
   { href: '/agent', icon: Bot, label: 'Agent 工作区' },
-  // 公网 V78 工作台把历史与问题日志作为主导航入口；保留在同一 React shell，避免用户切换到旧页面。
-  { href: '/history', icon: History, label: '历史' },
-  { href: '/issues', icon: Bug, label: '问题日志' },
   { href: '/tts', icon: AudioLines, label: '配音' }
 ];
 
@@ -44,7 +41,7 @@ function initialTheme() {
 
 function pageTitle(pathname) {
   if (isAccountCenterPath(pathname)) return '个人中心';
-  if (pathname === '/batch-factory' || pathname.startsWith('/batch-factory/')) return '水货生产';
+  if (pathname === '/batch-factory' || pathname.startsWith('/batch-factory/') || pathname === '/shuihuo-production') return '水货生产';
   const item = navItems.find(nav => nav.href === pathname);
   return item ? item.label : '一战晟铭';
 }
