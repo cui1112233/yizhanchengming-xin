@@ -66,3 +66,9 @@ test('canvas loads or uploads a project asset before committing a media node', (
   assert.match(canvasSource, /uploadAgentAsset\(taskId, file\)/);
   assert.match(canvasSource, /createNodeAt\(\{[\s\S]*asset/);
 });
+
+test('canvas opens a manual editor on double click and saves node content through commit', () => {
+  assert.match(canvasSource, /onNodeDoubleClick=\{handleNodeDoubleClick\}/);
+  assert.match(canvasSource, /handleManualNodeSave/);
+  assert.match(canvasSource, /title="手动编辑节点"/);
+});

@@ -1,6 +1,6 @@
 import { Background, BaseEdge, Handle, MarkerType, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Button, Dropdown, Popover, Segmented, Switch, Tooltip } from 'antd';
+import { Button, Dropdown, Input, Modal, Popover, Segmented, Select, Switch, Tooltip } from 'antd';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
@@ -128,6 +128,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const [assets, setAssets] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
   const [assetError, setAssetError] = useState('');
+  const [manualNode, setManualNode] = useState(null);
+  const [manualNodeDraft, setManualNodeDraft] = useState({ title: '', summary: '', status: 'draft' });
   const [, setHistoryVersion] = useState(0);
   const rootRef = useRef(null);
   const nodesRef = useRef([]);
@@ -226,6 +228,28 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     setNodes(next);
     setSelectedIds(ids);
     onSelectionChange?.(ids);
+  }
+
+  function handleNodeDoubleClick(event, node) {
+    event.preventDefault();
+    setContextMenu(null);
+    setManualNode(node);
+    setManualNodeDraft({
+      title: node.data?.title || '',
+      summary: node.data?.summary || '',
+      status: node.data?.status || 'draft'
+    });
+  }
+
+  function handleManualNodeSave() {
+    if (!manualNode) return;
+    const title = manualNodeDraft.title.trim();
+    if (!title) return;
+    const next = nodesRef.current.map(node => node.id === manualNode.id
+      ? { ...node, data: { ...node.data, title, summary: manualNodeDraft.summary.trim(), status: manualNodeDraft.status } }
+      : node);
+    commit(next, edgesRef.current);
+    setManualNode(null);
   }
 
   function handleConnect(connection) {
@@ -489,6 +513,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         onEdgesChange={handleEdgesChange}
         onSelectionChange={handleSelectionChange}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onPaneClick={() => setContextMenu(null)}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
@@ -570,6 +595,20 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         {!assetLoading && !assets.length ? <p className="agent-canvas-asset-empty">还没有可用素材</p> : null}
         <div className="agent-canvas-asset-list">{assets.map(asset => <button type="button" key={asset.id} onClick={() => commitAsset(asset)}><strong>{asset.name}</strong><span>{asset.kind === 'image' ? '图片' : '视频'}</span></button>)}</div>
       </aside> : null}
+
+      <Modal
+        title="手动编辑节点"
+        open={Boolean(manualNode)}
+        onCancel={() => setManualNode(null)}
+        onOk={handleManualNodeSave}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <label className="agent-canvas-manual-field">标题<Input value={manualNodeDraft.title} maxLength={191} onChange={event => setManualNodeDraft(current => ({ ...current, title: event.target.value }))} /></label>
+        <label className="agent-canvas-manual-field">内容<Input.TextArea value={manualNodeDraft.summary} rows={6} maxLength={8000} onChange={event => setManualNodeDraft(current => ({ ...current, summary: event.target.value }))} /></label>
+        <label className="agent-canvas-manual-field">状态<Select value={manualNodeDraft.status} onChange={status => setManualNodeDraft(current => ({ ...current, status }))} options={[{ value: 'draft', label: '草稿' }, { value: 'confirmed', label: '已确认' }, { value: 'failed', label: '需处理' }]} /></label>
+      </Modal>
 
       {appearance.alignmentGuides && nodeDragActive ? <><span className="agent-canvas-guide agent-canvas-guide--vertical" /><span className="agent-canvas-guide agent-canvas-guide--horizontal" /></> : null}
 

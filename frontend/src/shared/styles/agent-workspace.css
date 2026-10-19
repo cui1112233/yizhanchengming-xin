@@ -494,6 +494,7 @@
 .agent-page .agent-canvas-asset-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-page .agent-canvas-asset-list span, .agent-page .agent-canvas-asset-empty, .agent-page .agent-canvas-asset-error { margin: 0; color: var(--agent-muted); font-size: 11px; }
 .agent-page .agent-canvas-asset-error { color: #e98080; }
+.agent-page .agent-canvas-manual-field { display: grid; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: 12px; }
 
 .agent-page .agent-canvas-edge-flow {
   fill: none;
