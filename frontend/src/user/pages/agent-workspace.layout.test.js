@@ -88,6 +88,7 @@ test('画布外观包含轻量动效和窄屏安全规则', () => {
   assert.match(css, /\.agent-page \.agent-canvas-edge-flow\s*\{[^}]*animation:/);
   assert.match(css, /@keyframes agent-canvas-edge-flow/);
   assert.match(css, /\.agent-page \.agent-canvas-appearance-panel\s*\{/);
+  assert.match(css, /\.agent-canvas-appearance-popover\s*\{[^}]*--agent-edge-coral:\s*#f07167/);
   assert.match(css, /@media \(max-width: 560px\)[\s\S]*?\.agent-canvas-appearance-popover[^}]*max-width:\s*calc\(100vw - 24px\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.agent-canvas-edge-flow\s*\{[^}]*animation:\s*none/);
 });

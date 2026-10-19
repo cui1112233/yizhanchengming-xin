@@ -480,7 +480,7 @@
 .agent-page .agent-canvas-guide--vertical { top: 0; bottom: 0; left: 50%; width: 1px; }
 .agent-page .agent-canvas-guide--horizontal { right: 0; bottom: 50%; left: 0; height: 1px; }
 
-.agent-canvas-appearance-popover { max-width: min(320px, calc(100vw - 24px)); }
+.agent-canvas-appearance-popover { --agent-edge-coral: #f07167; --agent-edge-cyan: #55c9d6; --agent-edge-violet: #ae8be7; --agent-edge-gold: #e8bb68; max-width: min(320px, calc(100vw - 24px)); }
 .agent-canvas-appearance-popover .ant-popover-inner { border: 1px solid var(--border-default); border-radius: 8px; background: var(--surface-panel); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24); }
 .agent-page .agent-canvas-appearance-panel { display: grid; width: 272px; gap: 10px; color: var(--text-primary); }
 .agent-canvas-appearance-panel { display: grid; width: 272px; gap: 10px; color: var(--text-primary); }
