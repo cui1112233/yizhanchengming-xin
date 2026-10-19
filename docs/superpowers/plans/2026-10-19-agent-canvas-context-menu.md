@@ -53,7 +53,11 @@ type AssetStore interface {
     CreateAsset(context.Context, string, Asset) error
     Asset(context.Context, string, string, string) (Asset, error)
 }
-type AssetObjectStore interface { Put(context.Context, Asset, io.Reader) error }
+type AssetObjectStore interface {
+    Put(context.Context, Asset, io.Reader) error
+    Open(context.Context, Asset) (io.ReadCloser, error)
+    Delete(context.Context, Asset) error
+}
 ```
 
 ```js
@@ -251,7 +255,7 @@ git commit -m "feat(agent): add project asset storage"
 
 **Consumes:** Task 3 stores and current Volcengine TOS SDK.
 
-**Produces:** Authenticated project-asset list/upload endpoints and explicit unconfigured-storage errors.
+**Produces:** Authenticated project-asset list, content-read and upload endpoints and explicit unconfigured-storage errors.
 
 - [ ] **Step 1: Write failing HTTP tests**
 
@@ -276,9 +280,10 @@ Expected: FAIL because the routes do not exist.
 ```text
 GET  /api/agent/tasks/{id}/assets?kind=image|video
 POST /api/agent/tasks/{id}/assets
+GET  /api/agent/tasks/{id}/assets/{assetId}/content
 ```
 
-Read one bounded multipart file, sniff and validate its media type, generate an asset ID/key, put bytes to TOS, then insert metadata. If MySQL insert fails after upload, delete the TOS object. Add five explicit Agent TOS config values (endpoint, region, bucket, access key, secret key); create the object store only when all are present. Return an authenticated Agent URL, never a raw bucket path.
+Read one bounded multipart file, sniff and validate its media type, generate an asset ID/key, put bytes to TOS, then insert metadata. If MySQL insert fails after upload, delete the TOS object. The content route resolves the asset through the owner/project-scoped store and streams it from TOS with the stored content type; its URL is returned in list/upload responses, never a raw bucket path. Add five explicit Agent TOS config values (endpoint, region, bucket, access key, secret key); create the object store only when all are present.
 
 - [ ] **Step 4: Run tests and commit**
 
