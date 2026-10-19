@@ -1,11 +1,11 @@
-import { Background, Handle, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
+import { Background, BaseEdge, Handle, MarkerType, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Button, Dropdown, Tooltip } from 'antd';
+import { Button, Dropdown, Popover, Segmented, Switch, Tooltip } from 'antd';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, Focus, GitBranch, Group, Hand, Maximize2,
-  MousePointer2, Plus, Redo2, Undo2, Ungroup, ZoomIn, ZoomOut
+  MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,6 +14,10 @@ import {
   moveCanvasGroup, selectCanvasNodes, ungroupCanvasNodes
 } from '../pages/agent-canvas-commands';
 import { createCanvasHistory } from '../pages/agent-canvas-history';
+import {
+  appearanceCssVariables, canvasEdgeColorOptions, canvasEdgeWidthOptions,
+  edgeStyleForAppearance, normalizeCanvasAppearance
+} from '../pages/agent-canvas-appearance';
 
 function CanvasNode({ data }) {
   return (
@@ -26,6 +30,18 @@ function CanvasNode({ data }) {
     </article>
   );
 }
+
+function CanvasEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, data, markerEnd }) {
+  const appearance = normalizeCanvasAppearance(data?.appearance);
+  const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  const style = edgeStyleForAppearance(appearance);
+  return <>
+    <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+    {appearance.edgeAnimated ? <path d={edgePath} className="agent-canvas-edge-flow" style={style} /> : null}
+  </>;
+}
+
+const canvasEdgeTypes = { canvas: CanvasEdge };
 
 function toFlowNode(node) {
   return {
@@ -46,11 +62,22 @@ function toFlowNode(node) {
   };
 }
 
-function toCanvas(nodes, edges, revision, viewport) {
+function toFlowEdge(edge, appearance) {
+  const style = edgeStyleForAppearance(appearance);
+  return {
+    ...edge,
+    type: 'canvas',
+    markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
+    data: { relation: edge.relation || edge.data?.relation || 'reference', appearance }
+  };
+}
+
+function toCanvas(nodes, edges, revision, viewport, appearance) {
   return {
     version: 1,
     revision,
     ...(viewport ? { viewport } : {}),
+    appearance: normalizeCanvasAppearance(appearance),
     nodes: nodes.map(node => ({
       id: node.id,
       type: node.data.type,
@@ -67,8 +94,8 @@ function toCanvas(nodes, edges, revision, viewport) {
   };
 }
 
-function canvasSignature(nodes, edges, viewport) {
-  return JSON.stringify(toCanvas(nodes, edges, 0, viewport));
+function canvasSignature(nodes, edges, viewport, appearance) {
+  return JSON.stringify(toCanvas(nodes, edges, 0, viewport, appearance));
 }
 
 function IconTool({ label, disabled = false, active = false, onClick, children }) {
@@ -81,7 +108,7 @@ function IconTool({ label, disabled = false, active = false, onClick, children }
   );
 }
 
-export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportChange }) {
+export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionChange, onViewportChange }) {
   const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -89,11 +116,14 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
   const [interactionMode, setInteractionMode] = useState('select');
   const [flowInstance, setFlowInstance] = useState(null);
   const [viewport, setViewport] = useState(currentCanvas.viewport || { x: 0, y: 0, zoom: 1 });
+  const [appearance, setAppearance] = useState(() => normalizeCanvasAppearance(currentCanvas.appearance));
+  const [nodeDragActive, setNodeDragActive] = useState(false);
   const [, setHistoryVersion] = useState(0);
   const rootRef = useRef(null);
   const nodesRef = useRef([]);
   const edgesRef = useRef([]);
   const viewportRef = useRef(viewport);
+  const appearanceRef = useRef(appearance);
   const signatureRef = useRef('');
   const groupDragRef = useRef(null);
   const nodeSequenceRef = useRef(0);
@@ -105,30 +135,33 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
     .filter(group => group.bounds), [nodes]);
 
-  function updateRefs(nextNodes, nextEdges, nextViewport = viewportRef.current) {
+  function updateRefs(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
     nodesRef.current = nextNodes;
     edgesRef.current = nextEdges;
     viewportRef.current = nextViewport;
-    signatureRef.current = canvasSignature(nextNodes, nextEdges, nextViewport);
+    appearanceRef.current = nextAppearance;
+    signatureRef.current = canvasSignature(nextNodes, nextEdges, nextViewport, nextAppearance);
   }
 
   useEffect(() => {
     const nextNodes = (currentCanvas.nodes || []).map(toFlowNode);
-    const nextEdges = (currentCanvas.edges || []).map(edge => ({ ...edge, data: { relation: edge.relation } }));
+    const nextAppearance = normalizeCanvasAppearance(currentCanvas.appearance);
+    const nextEdges = (currentCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
     const nextViewport = currentCanvas.viewport || { x: 0, y: 0, zoom: 1 };
-    if (canvasSignature(nextNodes, nextEdges, nextViewport) === signatureRef.current) return;
+    if (canvasSignature(nextNodes, nextEdges, nextViewport, nextAppearance) === signatureRef.current) return;
     setNodes(nextNodes);
     setEdges(nextEdges);
     setSelectedIds([]);
     setViewport(nextViewport);
-    updateRefs(nextNodes, nextEdges, nextViewport);
+    setAppearance(nextAppearance);
+    updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
     historyRef.current.reset({ nodes: nextNodes, edges: nextEdges });
     setHistoryVersion(value => value + 1);
   }, [canvas]);
 
-  function emitChange(nextNodes, nextEdges, nextViewport = viewportRef.current) {
-    updateRefs(nextNodes, nextEdges, nextViewport);
-    onChange?.(toCanvas(nextNodes, nextEdges, currentCanvas.revision, nextViewport));
+  function emitChange(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
+    updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
+    onChange?.(toCanvas(nextNodes, nextEdges, currentCanvas.revision, nextViewport, nextAppearance));
   }
 
   function commit(nextNodes, nextEdges, { record = true, nextViewport = viewportRef.current } = {}) {
@@ -179,7 +212,7 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
 
   function handleConnect(connection) {
     const next = connectCanvasNodes(edgesRef.current, connection);
-    if (next !== edgesRef.current) commit(nodesRef.current, next);
+    if (next !== edgesRef.current) commit(nodesRef.current, next.map(edge => toFlowEdge(edge, appearanceRef.current)));
   }
 
   function runNodeCommand(command) {
@@ -223,6 +256,15 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
     emitChange(nodesRef.current, edgesRef.current, nextViewport);
   }
 
+  function updateAppearance(nextValue) {
+    const nextAppearance = normalizeCanvasAppearance({ ...appearanceRef.current, ...nextValue });
+    const nextEdges = edgesRef.current.map(edge => toFlowEdge(edge, nextAppearance));
+    setAppearance(nextAppearance);
+    setEdges(nextEdges);
+    onAppearanceChange?.(nextAppearance);
+    emitChange(nodesRef.current, nextEdges, viewportRef.current, nextAppearance);
+  }
+
   function startGroupDrag(event, groupId) {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -254,18 +296,20 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
   ];
 
   return (
-    <div ref={rootRef} className="agent-canvas" aria-label="创作画布" tabIndex={0} onKeyDown={handleKeyDown}>
+    <div ref={rootRef} className="agent-canvas" aria-label="创作画布" tabIndex={0} onKeyDown={handleKeyDown} style={appearanceCssVariables(appearance)}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={canvasNodeTypes}
+        edgeTypes={canvasEdgeTypes}
         onInit={setFlowInstance}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onSelectionChange={handleSelectionChange}
         onNodeClick={handleNodeClick}
         onConnect={handleConnect}
-        onNodeDragStop={() => commit(nodesRef.current, edgesRef.current)}
+        onNodeDragStart={() => setNodeDragActive(true)}
+        onNodeDragStop={() => { setNodeDragActive(false); commit(nodesRef.current, edgesRef.current); }}
         minZoom={0.25}
         maxZoom={2}
         fitView={!currentCanvas.viewport}
@@ -280,9 +324,11 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
         nodesDraggable={interactionMode !== 'pan'}
         elementsSelectable={interactionMode !== 'pan'}
         selectionOnDrag={interactionMode === 'select'}
+        snapToGrid={appearance.alignmentGuides}
+        snapGrid={[20, 20]}
         multiSelectionKeyCode="Shift"
       >
-        <Background gap={20} size={1} />
+        {appearance.backgroundDots ? <Background variant="dots" gap={20} size={1} /> : null}
         <ViewportPortal>
           {groups.map(({ groupId, bounds }) => (
             <section className="agent-canvas-group" key={groupId} style={{ left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }}>
@@ -299,11 +345,22 @@ export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportCha
         </ViewportPortal>
       </ReactFlow>
 
+      {appearance.alignmentGuides && nodeDragActive ? <><span className="agent-canvas-guide agent-canvas-guide--vertical" /><span className="agent-canvas-guide agent-canvas-guide--horizontal" /></> : null}
+
       <nav className="agent-canvas-toolrail" aria-label="画布工具">
         <IconTool label="选择节点" active={interactionMode === 'select'} onClick={() => setInteractionMode('select')}><MousePointer2 size={17} /></IconTool>
         <IconTool label="拖动画布" active={interactionMode === 'pan'} onClick={() => setInteractionMode('pan')}><Hand size={17} /></IconTool>
         <IconTool label="连接节点" active={interactionMode === 'connect'} onClick={() => setInteractionMode('connect')}><GitBranch size={17} /></IconTool>
         <IconTool label="添加节点" onClick={addNode}><Plus size={17} /></IconTool>
+        <Popover trigger="click" placement="rightTop" overlayClassName="agent-canvas-appearance-popover" content={<section className="agent-canvas-appearance-panel" aria-label="画布外观设置">
+          <div className="agent-canvas-appearance-row"><span>连线颜色</span><div className="agent-canvas-color-options">{canvasEdgeColorOptions.map(option => <button key={option.value} type="button" className={`agent-canvas-color-swatch is-${option.value}${appearance.edgeColor === option.value ? ' is-active' : ''}`} aria-label={option.label} aria-pressed={appearance.edgeColor === option.value} onClick={() => updateAppearance({ edgeColor: option.value })} />)}</div></div>
+          <div className="agent-canvas-appearance-row"><span>连线动效</span><Switch size="small" checked={appearance.edgeAnimated} onChange={edgeAnimated => updateAppearance({ edgeAnimated })} /></div>
+          <div className="agent-canvas-appearance-row agent-canvas-appearance-row--stack"><span>连线粗细</span><Segmented size="small" value={appearance.edgeWidth} options={canvasEdgeWidthOptions} onChange={edgeWidth => updateAppearance({ edgeWidth })} /></div>
+          <div className="agent-canvas-appearance-row"><span>背景网点</span><Switch size="small" checked={appearance.backgroundDots} onChange={backgroundDots => updateAppearance({ backgroundDots })} /></div>
+          <div className="agent-canvas-appearance-row"><span>辅助线对齐</span><Switch size="small" checked={appearance.alignmentGuides} onChange={alignmentGuides => updateAppearance({ alignmentGuides })} /></div>
+        </section>}>
+          <span><IconTool label="画布外观"><SlidersHorizontal size={17} /></IconTool></span>
+        </Popover>
       </nav>
 
       <nav className="agent-canvas-editbar" aria-label="节点编辑工具">

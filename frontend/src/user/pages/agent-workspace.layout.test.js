@@ -71,3 +71,15 @@ test('节点点击明确支持 Ctrl Shift 和 Command 多选', () => {
   assert.match(canvasSource, /event\.ctrlKey\s*\|\|\s*event\.metaKey\s*\|\|\s*event\.shiftKey/);
   assert.match(canvasSource, /selectCanvasNodes\([\s\S]*?nodesRef\.current,[\s\S]*?node\.id,[\s\S]*?selectedIds/);
 });
+
+test('画布提供持久外观设置和按方向流动的连线', () => {
+  for (const label of ['连线颜色', '连线动效', '连线粗细', '背景网点', '辅助线对齐']) {
+    assert.match(canvasSource, new RegExp(label));
+  }
+  assert.match(canvasSource, /label="画布外观"/);
+  assert.match(canvasSource, /edgeTypes=\{canvasEdgeTypes\}/);
+  assert.match(canvasSource, /edgeAnimated/);
+  assert.match(canvasSource, /markerEnd/);
+  assert.match(canvasSource, /appearance:\s*normalizeCanvasAppearance\(appearance\)/);
+  assert.match(canvasSource, /onAppearanceChange/);
+});
