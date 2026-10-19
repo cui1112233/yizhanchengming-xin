@@ -1,11 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   copyCanvasSelection,
   createNodeAt,
   pasteCanvasSelection,
   removeCanvasNodes
 } from './agent-canvas-context-menu.js';
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
 
 const imageNode = {
   id: 'image-1', type: 'agent', position: { x: 20, y: 40 }, selected: true,
@@ -46,4 +52,17 @@ test('creating a media node keeps only a serializable asset reference', () => {
   assert.equal(node.data.title, '封面.png');
   assert.equal(node.data.assetRef.id, 'asset-1');
   assert.equal(node.data.status, 'draft');
+});
+
+test('canvas registers pane and node context-menu handlers', () => {
+  assert.match(canvasSource, /onPaneContextMenu=\{handlePaneContextMenu\}/);
+  assert.match(canvasSource, /onNodeContextMenu=\{handleNodeContextMenu\}/);
+  assert.match(canvasSource, /handleContextPaste/);
+  assert.match(canvasSource, /handleContextDelete/);
+});
+
+test('canvas loads or uploads a project asset before committing a media node', () => {
+  assert.match(canvasSource, /listAgentAssets\(taskId, assetKind\)/);
+  assert.match(canvasSource, /uploadAgentAsset\(taskId, file\)/);
+  assert.match(canvasSource, /createNodeAt\(\{[\s\S]*asset/);
 });

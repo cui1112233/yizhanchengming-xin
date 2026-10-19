@@ -484,6 +484,16 @@
 .agent-page .agent-canvas-context-menu button:disabled { color: var(--agent-muted); cursor: not-allowed; opacity: 0.48; }
 .agent-page .agent-canvas-context-menu button.is-danger { color: #e98080; }
 .agent-page .agent-canvas-context-menu-divider { height: 1px; margin: 4px 3px; background: var(--agent-border); }
+.agent-page .agent-canvas-asset-panel { position: absolute; z-index: 31; top: 12px; right: 12px; display: grid; width: min(280px, calc(100% - 24px)); gap: 8px; border: 1px solid var(--agent-border-strong); border-radius: 8px; padding: 10px; background: var(--agent-panel); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28); }
+.agent-page .agent-canvas-asset-panel header { display: flex; align-items: center; justify-content: space-between; color: var(--agent-text); font-size: 12px; }
+.agent-page .agent-canvas-asset-panel header button { border: 0; background: transparent; color: var(--agent-secondary); cursor: pointer; font-size: 18px; }
+.agent-page .agent-canvas-upload-input { display: none; }
+.agent-page .agent-canvas-asset-list { display: grid; max-height: 260px; gap: 5px; overflow: auto; }
+.agent-page .agent-canvas-asset-list button { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--agent-border); border-radius: 6px; padding: 8px; background: var(--agent-elevated); color: var(--agent-text); cursor: pointer; font: inherit; font-size: 11px; text-align: left; }
+.agent-page .agent-canvas-asset-list button:hover { border-color: var(--agent-accent); background: var(--agent-hover); }
+.agent-page .agent-canvas-asset-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-canvas-asset-list span, .agent-page .agent-canvas-asset-empty, .agent-page .agent-canvas-asset-error { margin: 0; color: var(--agent-muted); font-size: 11px; }
+.agent-page .agent-canvas-asset-error { color: #e98080; }
 
 .agent-page .agent-canvas-edge-flow {
   fill: none;

@@ -544,6 +544,7 @@ export function AgentPageV2({ theme }) {
         <main className="agent-canvas-main" aria-label="创作画布">
           <AgentCanvas
             key={activeTaskId}
+            taskId={activeTaskId}
             canvas={canvas}
             onSelectionChange={setSelectedCanvasNodes}
             onViewportChange={setCanvasViewport}

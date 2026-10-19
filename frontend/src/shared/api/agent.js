@@ -39,6 +39,17 @@ export function listAgentExecutions(taskId) {
   return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/executions`);
 }
 
+export function listAgentAssets(taskId, kind = '') {
+  const query = kind ? `?kind=${encodeURIComponent(kind)}` : '';
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/assets${query}`);
+}
+
+export function uploadAgentAsset(taskId, file) {
+  const body = new FormData();
+  body.append('file', file);
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/assets`, { method: 'POST', body });
+}
+
 export function listAgentSkills() {
   return apiRequest('/api/agent/skills');
 }

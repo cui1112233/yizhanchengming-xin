@@ -21,6 +21,7 @@ import {
 import {
   copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes
 } from '../pages/agent-canvas-context-menu';
+import { listAgentAssets, uploadAgentAsset } from '../../shared/api/agent';
 
 function CanvasNode({ data }) {
   return (
@@ -112,7 +113,7 @@ function IconTool({ label, disabled = false, active = false, onClick, children }
   );
 }
 
-export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionChange, onViewportChange }) {
+export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSelectionChange, onViewportChange }) {
   const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -123,6 +124,10 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
   const [appearance, setAppearance] = useState(() => normalizeCanvasAppearance(currentCanvas.appearance));
   const [nodeDragActive, setNodeDragActive] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
+  const [assetPanel, setAssetPanel] = useState(null);
+  const [assets, setAssets] = useState([]);
+  const [assetLoading, setAssetLoading] = useState(false);
+  const [assetError, setAssetError] = useState('');
   const [, setHistoryVersion] = useState(0);
   const rootRef = useRef(null);
   const nodesRef = useRef([]);
@@ -133,6 +138,7 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
   const groupDragRef = useRef(null);
   const nodeSequenceRef = useRef(0);
   const clipboardRef = useRef(null);
+  const uploadInputRef = useRef(null);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
 
   const canvasNodeTypes = useMemo(() => ({ agent: CanvasNode }), []);
@@ -296,6 +302,60 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
     onSelectionChange?.([nextNode.id]);
     commit(next, edgesRef.current);
     setContextMenu(null);
+  }
+
+  async function openAssetPanel(assetKind, replaceNodeId = '') {
+    if (!taskId) return;
+    setContextMenu(null);
+    setAssetPanel({ assetKind, replaceNodeId, position: contextMenu?.position || { x: 0, y: 0 } });
+    setAssetLoading(true);
+    setAssetError('');
+    try {
+      const result = await listAgentAssets(taskId, assetKind);
+      setAssets(result.assets || []);
+    } catch (error) {
+      setAssets([]);
+      setAssetError(error?.message || '素材库读取失败');
+    } finally {
+      setAssetLoading(false);
+    }
+  }
+
+  function commitAsset(asset) {
+    if (!assetPanel || !asset) return;
+    if (assetPanel.replaceNodeId) {
+      const next = nodesRef.current.map(node => node.id === assetPanel.replaceNodeId
+        ? { ...node, data: { ...node.data, type: asset.kind, title: asset.name, assetRef: asset } }
+        : node);
+      commit(next, edgesRef.current);
+    } else {
+      const nextNode = createNodeAt({ id: nextCanvasID(asset.kind), kind: asset.kind, position: assetPanel.position, asset });
+      const next = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
+      setSelectedIds([nextNode.id]);
+      onSelectionChange?.([nextNode.id]);
+      commit(next, edgesRef.current);
+    }
+    setAssetPanel(null);
+  }
+
+  function startAssetUpload() {
+    uploadInputRef.current?.click();
+  }
+
+  async function handleAssetUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !taskId || !assetPanel) return;
+    setAssetLoading(true);
+    setAssetError('');
+    try {
+      const result = await uploadAgentAsset(taskId, file);
+      commitAsset(result.asset);
+    } catch (error) {
+      setAssetError(error?.message || '素材上传失败');
+    } finally {
+      setAssetLoading(false);
+    }
   }
 
   function handleContextCopy() {
@@ -480,8 +540,8 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
         {contextMenu.target === 'pane' ? <>
           <p className="agent-canvas-context-menu-title">新建节点</p>
           <button type="button" role="menuitem" onClick={() => handleContextCreate('text')}>文本</button>
-          <button type="button" role="menuitem" onClick={() => handleContextCreate('image')}>图片</button>
-          <button type="button" role="menuitem" onClick={() => handleContextCreate('video')}>视频</button>
+          <button type="button" role="menuitem" onClick={() => openAssetPanel('image')}>从素材库添加图片</button>
+          <button type="button" role="menuitem" onClick={() => openAssetPanel('video')}>从素材库添加视频</button>
           <span className="agent-canvas-context-menu-divider" />
           <button type="button" role="menuitem" disabled={!clipboardRef.current} onClick={handleContextPaste}>粘贴</button>
           <button type="button" role="menuitem" disabled={!historyRef.current.canUndo()} onClick={() => { applyHistory('undo'); setContextMenu(null); }}>撤销</button>
@@ -489,6 +549,7 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
         </> : <>
           <p className="agent-canvas-context-menu-title">{contextMenu.nodeIds.length > 1 ? `已选 ${contextMenu.nodeIds.length} 个节点` : '节点操作'}</p>
           <button type="button" role="menuitem" onClick={handleContextCopy}>复制</button>
+          {contextMenu.nodeIds.length === 1 && ['image', 'video'].includes(nodes.find(node => node.id === contextMenu.nodeIds[0])?.data?.type) ? <button type="button" role="menuitem" onClick={() => openAssetPanel(nodes.find(node => node.id === contextMenu.nodeIds[0])?.data?.type, contextMenu.nodeIds[0])}>替换素材</button> : null}
           <button type="button" role="menuitem" onClick={handleContextDisconnect}>断开连线</button>
           <span className="agent-canvas-context-menu-divider" />
           <button type="button" role="menuitem" disabled={!contextAvailability?.canGroup} onClick={() => handleContextNodeCommand((current, ids) => groupCanvasNodes(current, ids, `group-${Date.now()}`))}>分组</button>
@@ -499,6 +560,16 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
           <button type="button" role="menuitem" className="is-danger" onClick={handleContextDelete}>删除</button>
         </>}
       </section> : null}
+
+      {assetPanel ? <aside className="agent-canvas-asset-panel" aria-label="项目素材库">
+        <header><strong>{assetPanel.replaceNodeId ? '替换素材' : '添加素材'}</strong><button type="button" aria-label="关闭素材库" onClick={() => setAssetPanel(null)}>×</button></header>
+        <input ref={uploadInputRef} className="agent-canvas-upload-input" type="file" accept={assetPanel.assetKind === 'image' ? 'image/*' : 'video/*'} onChange={handleAssetUpload} />
+        <Button size="small" onClick={startAssetUpload} disabled={assetLoading}>上传{assetPanel.assetKind === 'image' ? '图片' : '视频'}</Button>
+        {assetError ? <p className="agent-canvas-asset-error">{assetError}</p> : null}
+        {assetLoading ? <p className="agent-canvas-asset-empty">正在读取素材...</p> : null}
+        {!assetLoading && !assets.length ? <p className="agent-canvas-asset-empty">还没有可用素材</p> : null}
+        <div className="agent-canvas-asset-list">{assets.map(asset => <button type="button" key={asset.id} onClick={() => commitAsset(asset)}><strong>{asset.name}</strong><span>{asset.kind === 'image' ? '图片' : '视频'}</span></button>)}</div>
+      </aside> : null}
 
       {appearance.alignmentGuides && nodeDragActive ? <><span className="agent-canvas-guide agent-canvas-guide--vertical" /><span className="agent-canvas-guide agent-canvas-guide--horizontal" /></> : null}
 
