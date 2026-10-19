@@ -7,7 +7,7 @@ import {
   AlignVerticalDistributeCenter, Focus, GitBranch, Group, Hand, Maximize2,
   MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   alignCanvasNodes, canvasGroupBounds, canvasKeyboardCommand, commandAvailability,
   connectCanvasNodes, createCanvasNode, distributeCanvasNodes, groupCanvasNodes,
@@ -23,9 +23,16 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { listAgentAssets, uploadAgentAsset } from '../../shared/api/agent';
 
-function CanvasNode({ data }) {
+function CanvasNode({ data, id, onManualEdit }) {
   return (
-    <article className={`agent-canvas-node agent-canvas-node--${data.type} agent-canvas-node--${data.status}`}>
+    <article
+      className={`agent-canvas-node agent-canvas-node--${data.type} agent-canvas-node--${data.status}`}
+      onDoubleClick={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        onManualEdit?.(id);
+      }}
+    >
       <Handle type="target" position={Position.Left} />
       <header><span>{data.type}</span><strong>{data.title}</strong></header>
       <p>{data.summary || '等待 Agent 写入结果'}</p>
@@ -143,7 +150,22 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const uploadInputRef = useRef(null);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
 
-  const canvasNodeTypes = useMemo(() => ({ agent: CanvasNode }), []);
+  const openManualNode = useCallback(node => {
+    if (!node) return;
+    setContextMenu(null);
+    setManualNode(node);
+    setManualNodeDraft({
+      title: node.data?.title || '',
+      summary: node.data?.summary || '',
+      status: node.data?.status || 'draft'
+    });
+  }, []);
+  const handleNodeContentDoubleClick = useCallback(nodeID => {
+    openManualNode(nodesRef.current.find(node => node.id === nodeID));
+  }, [openManualNode]);
+  const canvasNodeTypes = useMemo(() => ({
+    agent: props => <CanvasNode {...props} onManualEdit={handleNodeContentDoubleClick} />
+  }), [handleNodeContentDoubleClick]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -232,13 +254,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   function handleNodeDoubleClick(event, node) {
     event.preventDefault();
-    setContextMenu(null);
-    setManualNode(node);
-    setManualNodeDraft({
-      title: node.data?.title || '',
-      summary: node.data?.summary || '',
-      status: node.data?.status || 'draft'
-    });
+    openManualNode(node);
   }
 
   function handleManualNodeSave() {
