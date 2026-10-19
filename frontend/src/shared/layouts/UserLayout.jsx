@@ -14,6 +14,7 @@ import { createAntTheme } from '../styles/theme';
 import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAccess.js';
 import { AccountCenterLayout } from './AccountCenterLayout';
 import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
+import { shouldAutoCollapseAgentNavigation } from './agentNavigation.js';
 
 // 动态 Logo 包含 WebGL shader，不能阻塞任何已登录业务页的首屏，按真正使用时再下载。
 const SuperOpcLiquidMetalLogo = lazy(() => import('../components/SuperOpcLiquidMetalLogo'));
@@ -71,7 +72,7 @@ export function UserLayout({ children }) {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [loginForm] = Form.useForm();
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => shouldAutoCollapseAgentNavigation(window.location.pathname));
   const [theme, setTheme] = useState(initialTheme);
   const [petVisible, setPetVisible] = useState(true);
   const [globalStatus, setGlobalStatus] = useState({ text: '', tone: 'idle', expiresAt: 0 });
@@ -102,6 +103,10 @@ export function UserLayout({ children }) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (shouldAutoCollapseAgentNavigation(pathname)) setSidebarCollapsed(true);
+  }, [pathname]);
 
   useEffect(() => {
     if (isAccountCenterRoute) return;

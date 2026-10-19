@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
@@ -56,6 +57,7 @@ type RouterOptions struct {
 	UserDataDir                     string
 	UserConfigStore                 *UserConfigStore
 	TextProvider                    batchfactoryv11.DirectorProvider
+	AgentWorkspace                  agentworkspace.Store
 	RedisURL                        string
 	LocalExecutors                  *localexecutor.Service
 	GiantMaterialExecutor           *giantmaterialexecutor.Service
@@ -296,8 +298,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
 	publish121OrganizationsHandler(root, auth, options.UserDataDir, options.VideoManagementConnector)
 	if options.UserConfigStore != nil {
-		RegisterAgentReadCompat(root, auth, options.UserConfigStore.BaseDir)
-		RegisterAgentChatCompat(root, auth, options.UserConfigStore.BaseDir, options.TextProvider)
+		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
 		systemDir := ""
 		if options.MemberProfileStore != nil {
 			systemDir = options.MemberProfileStore.SystemDir

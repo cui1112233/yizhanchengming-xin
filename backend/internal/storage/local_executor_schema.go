@@ -99,5 +99,6 @@ func AppMigrations() []Migration {
 	out = append(out, V12Migrations()...)
 	out = append(out, LocalExecutorMigrations()...)
 	out = append(out, GiantMaterialExecutorMigrations()...)
+	out = append(out, AgentWorkspaceMigrations()...)
 	return out
 }

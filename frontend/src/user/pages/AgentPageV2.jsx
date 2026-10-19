@@ -1,10 +1,11 @@
 import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
-import { ChevronDown, ChevronUp, Clock3, FilePenLine, MessageCircle, MessageSquarePlus, MoreHorizontal, Pencil, Pin, RotateCcw, SearchCheck, Send, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock3, FilePenLine, MessageCircle, MessageSquarePlus, MoreHorizontal, Pencil, Pin, RotateCcw, Save, SearchCheck, Send, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { askAgent, clearAgentTask, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentExecutions, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, updateMyAgentSkill } from '../../shared/api/agent';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
 import { AgentCanvas } from '../components/AgentCanvas';
+import { buildSelectedNodeContext, canvasSaveAction, canvasSaveStatusText, createCanvasSaveQueue, shouldKeepPendingCreatedTask } from './agent-canvas-state';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -61,6 +62,8 @@ export function AgentPageV2({ theme }) {
   const [loading, setLoading] = useState(true);
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [canvas, setCanvas] = useState({ version: 1, revision: 0, nodes: [], edges: [] });
+  const [canvasSaveStatus, setCanvasSaveStatus] = useState('idle');
+  const [canvasViewport, setCanvasViewport] = useState({ x: 0, y: 0, zoom: 1 });
   const [executions, setExecutions] = useState([]);
   const [selectedCanvasNodes, setSelectedCanvasNodes] = useState([]);
   const [asking, setAsking] = useState(false);
@@ -82,6 +85,7 @@ export function AgentPageV2({ theme }) {
   const tasksRef = useRef([]);
   const taskDetailLoadingRef = useRef(false);
   const composerTriggerRef = useRef(null);
+  const canvasSaveQueueRef = useRef(null);
   const composerMenuId = 'agent-composer-menu';
 
   function syncTaskUrl(taskId, historyMode = 'replace') {
@@ -225,6 +229,10 @@ export function AgentPageV2({ theme }) {
         if (activeTaskIdRef.current !== requestedTask.id) selectTask(requestedTask.id, { historyMode: 'none' });
         return;
       }
+      if (nextIsCanvasWorkspace && shouldKeepPendingCreatedTask({ requestedTaskId, activeTaskId: activeTaskIdRef.current, knownTaskIds: tasksRef.current.map(task => task.id) })) {
+        setInvalidCanvasTask(false);
+        return;
+      }
       if (nextIsCanvasWorkspace && requestedTaskId) setInvalidCanvasTask(true);
       if (activeTaskIdRef.current !== null || taskDetailLoadingRef.current) {
         taskRequestRef.current += 1;
@@ -258,8 +266,13 @@ export function AgentPageV2({ theme }) {
 
   useEffect(() => {
     let cancelled = false;
+    let saveQueue = null;
+    canvasSaveQueueRef.current?.dispose();
+    canvasSaveQueueRef.current = null;
     if (!isCanvasWorkspace || !activeTaskId) {
       setCanvas({ version: 1, revision: 0, nodes: [], edges: [] });
+      setCanvasSaveStatus('idle');
+      setCanvasViewport({ x: 0, y: 0, zoom: 1 });
       setExecutions([]);
       setSelectedCanvasNodes([]);
       return undefined;
@@ -267,25 +280,33 @@ export function AgentPageV2({ theme }) {
     Promise.all([getAgentCanvas(activeTaskId), listAgentExecutions(activeTaskId)])
       .then(([canvasResult, executionResult]) => {
         if (cancelled) return;
-        setCanvas(canvasResult.canvas || { version: 1, revision: 0, nodes: [], edges: [] });
+        const loadedCanvas = canvasResult.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
+        setCanvas(loadedCanvas);
+        setCanvasViewport(loadedCanvas.viewport || { x: 0, y: 0, zoom: 1 });
+        setCanvasSaveStatus('idle');
+        saveQueue = createCanvasSaveQueue({
+          revision: loadedCanvas.revision,
+          save: (nextCanvas, revision) => saveAgentCanvas(activeTaskId, nextCanvas, revision),
+          reload: () => getAgentCanvas(activeTaskId),
+          onCanvas: setCanvas,
+          onStatus: setCanvasSaveStatus
+        });
+        canvasSaveQueueRef.current = saveQueue;
         setExecutions(Array.isArray(executionResult.executions) ? executionResult.executions : []);
       })
       .catch(error => { if (!cancelled) message.error(error.message || '读取创作画布失败'); });
-    return () => { cancelled = true; };
-  }, [activeTaskId]);
+    return () => {
+      cancelled = true;
+      saveQueue?.dispose();
+      if (canvasSaveQueueRef.current === saveQueue) canvasSaveQueueRef.current = null;
+    };
+  }, [activeTaskId, isCanvasWorkspace]);
 
   const visibleSkills = useMemo(() => skills.filter(skill => source === 'all' || skill.source === source), [skills, source]);
   const selectedSkills = skills.filter(skill => selectedSkillIds.includes(skill.id));
   const messages = activeTask?.messages || [];
-  const selectedNodeContext = canvas.nodes.filter(node => selectedCanvasNodes.includes(node.id)).map(node => ({
-    id: node.id,
-    type: node.type,
-    title: node.title,
-    version: node.version,
-    status: node.status,
-    summary: node.summary,
-    ...(node.assetRef ? { assetRef: node.assetRef } : {})
-  }));
+  const selectedNodeContext = buildSelectedNodeContext(canvas, selectedCanvasNodes);
+  const saveAction = canvasSaveAction(canvasSaveStatus);
   const taskGroups = useMemo(() => tasks.reduce((groups, task) => {
     const key = taskGroup(task.updatedAt);
     groups[key].push(task);
@@ -487,14 +508,22 @@ export function AgentPageV2({ theme }) {
     }
   }
 
+  function saveCanvasNow() {
+    const queue = canvasSaveQueueRef.current;
+    if (!queue || !saveAction.method) return;
+    if (saveAction.method === 'retry') void queue.retry();
+    else void queue.flush();
+  }
+
   return (
     <div className={`agent-page utility-workbench agent-workspace-v3${isCanvasWorkspace && !taskDrawerOpen ? ' agent-task-drawer-collapsed' : ''}`}>
       {isCanvasWorkspace ? <div className={conversationPanelOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}>
         <header className="agent-canvas-toolbar">
           <button className="agent-canvas-toolbar-button" type="button" aria-expanded={taskDrawerOpen} aria-controls="agent-project-drawer" onClick={() => setTaskDrawerOpen(open => !open)}>项目</button>
           <button className="agent-canvas-project-title" type="button" onClick={openRenameTask}>{activeTask?.title || '未选择项目'}<Pencil size={14} /></button>
-          <span className="agent-canvas-save-status">{asking ? '正在执行…' : '已保存'} · {canvas.nodes.length} 个节点</span>
-          <span className="agent-canvas-view-info">缩放 100% · 聚焦全部</span>
+          <span className={`agent-canvas-save-status is-${canvasSaveStatus}`}>{asking ? '正在执行…' : canvasSaveStatusText[canvasSaveStatus]} · {canvas.nodes.length} 个节点</span>
+          <Tooltip title={saveAction.label}><span><button className="agent-canvas-toolbar-button" type="button" aria-label={saveAction.label} disabled={saveAction.disabled} onClick={saveCanvasNow}><Save size={14} />{saveAction.label}</button></span></Tooltip>
+          <span className="agent-canvas-view-info">缩放 {Math.round((canvasViewport.zoom || 1) * 100)}%</span>
           <button className="agent-canvas-toolbar-button" type="button" aria-pressed={conversationPanelOpen} onClick={() => setConversationPanelOpen(open => !open)}>{conversationPanelOpen ? '收起对话' : '打开对话'}</button>
         </header>
 
@@ -514,16 +543,14 @@ export function AgentPageV2({ theme }) {
 
         <main className="agent-canvas-main" aria-label="创作画布">
           <AgentCanvas
+            key={activeTaskId}
             canvas={canvas}
             onSelectionChange={setSelectedCanvasNodes}
+            onViewportChange={setCanvasViewport}
             onChange={nextCanvas => {
               if (!activeTaskId) return;
-              saveAgentCanvas(activeTaskId, nextCanvas, canvas.revision)
-                .then(result => setCanvas(result.canvas))
-                .catch(error => {
-                  if (error.status === 409) getAgentCanvas(activeTaskId).then(result => setCanvas(result.canvas)).catch(() => undefined);
-                  else message.error(error.message || '保存画布失败');
-                });
+              setCanvas(nextCanvas);
+              canvasSaveQueueRef.current?.enqueue(nextCanvas);
             }}
           />
         </main>

@@ -1,8 +1,19 @@
-import { Background, Controls, Handle, Position, ReactFlow, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
+import { Background, Handle, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useEffect, useMemo, useState } from 'react';
-
-const nodeTypes = ['input', 'copy', 'storyboard', 'image', 'video', 'voice', 'delivery'];
+import { Button, Dropdown, Tooltip } from 'antd';
+import {
+  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
+  AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
+  AlignVerticalDistributeCenter, Focus, GitBranch, Group, Hand, Maximize2,
+  MousePointer2, Plus, Redo2, Undo2, Ungroup, ZoomIn, ZoomOut
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  alignCanvasNodes, canvasGroupBounds, canvasKeyboardCommand, commandAvailability,
+  connectCanvasNodes, createCanvasNode, distributeCanvasNodes, groupCanvasNodes,
+  moveCanvasGroup, selectCanvasNodes, ungroupCanvasNodes
+} from '../pages/agent-canvas-commands';
+import { createCanvasHistory } from '../pages/agent-canvas-history';
 
 function CanvasNode({ data }) {
   return (
@@ -29,15 +40,17 @@ function toFlowNode(node) {
       version: node.version,
       sourceNodeIds: node.sourceNodeIds,
       status: node.status,
-      assetRef: node.assetRef || null
+      assetRef: node.assetRef || null,
+      ...(node.groupId ? { groupId: node.groupId } : {})
     }
   };
 }
 
-function toCanvas(nodes, edges, revision) {
+function toCanvas(nodes, edges, revision, viewport) {
   return {
     version: 1,
     revision,
+    ...(viewport ? { viewport } : {}),
     nodes: nodes.map(node => ({
       id: node.id,
       type: node.data.type,
@@ -47,62 +60,272 @@ function toCanvas(nodes, edges, revision) {
       sourceNodeIds: [...(node.data.sourceNodeIds || [])],
       status: node.data.status,
       summary: node.data.summary || '',
-      ...(node.data.assetRef ? { assetRef: node.data.assetRef } : {})
+      ...(node.data.assetRef ? { assetRef: node.data.assetRef } : {}),
+      ...(node.data.groupId ? { groupId: node.data.groupId } : {})
     })),
     edges: edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, relation: edge.data?.relation || 'reference' }))
   };
 }
 
-export function AgentCanvas({ canvas, onChange, onSelectionChange }) {
+function canvasSignature(nodes, edges, viewport) {
+  return JSON.stringify(toCanvas(nodes, edges, 0, viewport));
+}
+
+function IconTool({ label, disabled = false, active = false, onClick, children }) {
+  return (
+    <Tooltip title={label}>
+      <span>
+        <Button className={active ? 'is-active' : ''} type="text" aria-label={label} disabled={disabled} icon={children} onClick={onClick} />
+      </span>
+    </Tooltip>
+  );
+}
+
+export function AgentCanvas({ canvas, onChange, onSelectionChange, onViewportChange }) {
+  const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
-  const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
-
-  useEffect(() => {
-    setNodes((currentCanvas.nodes || []).map(toFlowNode));
-    setEdges((currentCanvas.edges || []).map(edge => ({ ...edge, data: { relation: edge.relation } })));
-  }, [canvas]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [interactionMode, setInteractionMode] = useState('select');
+  const [flowInstance, setFlowInstance] = useState(null);
+  const [viewport, setViewport] = useState(currentCanvas.viewport || { x: 0, y: 0, zoom: 1 });
+  const [, setHistoryVersion] = useState(0);
+  const rootRef = useRef(null);
+  const nodesRef = useRef([]);
+  const edgesRef = useRef([]);
+  const viewportRef = useRef(viewport);
+  const signatureRef = useRef('');
+  const groupDragRef = useRef(null);
+  const nodeSequenceRef = useRef(0);
+  const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
 
   const canvasNodeTypes = useMemo(() => ({ agent: CanvasNode }), []);
+  const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
+  const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
+    .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
+    .filter(group => group.bounds), [nodes]);
 
-  function emitChange(nextNodes, nextEdges) {
-    onChange?.(toCanvas(nextNodes, nextEdges, currentCanvas.revision));
+  function updateRefs(nextNodes, nextEdges, nextViewport = viewportRef.current) {
+    nodesRef.current = nextNodes;
+    edgesRef.current = nextEdges;
+    viewportRef.current = nextViewport;
+    signatureRef.current = canvasSignature(nextNodes, nextEdges, nextViewport);
+  }
+
+  useEffect(() => {
+    const nextNodes = (currentCanvas.nodes || []).map(toFlowNode);
+    const nextEdges = (currentCanvas.edges || []).map(edge => ({ ...edge, data: { relation: edge.relation } }));
+    const nextViewport = currentCanvas.viewport || { x: 0, y: 0, zoom: 1 };
+    if (canvasSignature(nextNodes, nextEdges, nextViewport) === signatureRef.current) return;
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    setSelectedIds([]);
+    setViewport(nextViewport);
+    updateRefs(nextNodes, nextEdges, nextViewport);
+    historyRef.current.reset({ nodes: nextNodes, edges: nextEdges });
+    setHistoryVersion(value => value + 1);
+  }, [canvas]);
+
+  function emitChange(nextNodes, nextEdges, nextViewport = viewportRef.current) {
+    updateRefs(nextNodes, nextEdges, nextViewport);
+    onChange?.(toCanvas(nextNodes, nextEdges, currentCanvas.revision, nextViewport));
+  }
+
+  function commit(nextNodes, nextEdges, { record = true, nextViewport = viewportRef.current } = {}) {
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    if (record) historyRef.current.push({ nodes: nextNodes, edges: nextEdges });
+    setHistoryVersion(value => value + 1);
+    emitChange(nextNodes, nextEdges, nextViewport);
   }
 
   function handleNodesChange(changes) {
-    setNodes(current => {
-      const next = applyNodeChanges(changes, current);
-      emitChange(next, edges);
-      const selectedIds = next.filter(node => node.selected).map(node => node.id);
-      onSelectionChange?.(selectedIds);
-      return next;
-    });
+    const next = applyNodeChanges(changes, nodesRef.current);
+    nodesRef.current = next;
+    setNodes(next);
+    if (changes.some(change => change.type === 'remove')) {
+      const remaining = new Set(next.map(node => node.id));
+      const nextEdges = edgesRef.current.filter(edge => remaining.has(edge.source) && remaining.has(edge.target));
+      commit(next, nextEdges);
+    }
   }
 
   function handleEdgesChange(changes) {
-    setEdges(current => {
-      const next = applyEdgeChanges(changes, current);
-      emitChange(nodes, next);
-      return next;
-    });
+    const next = applyEdgeChanges(changes, edgesRef.current);
+    edgesRef.current = next;
+    setEdges(next);
+    if (changes.some(change => change.type === 'remove' || change.type === 'add')) commit(nodesRef.current, next);
   }
 
-  if (!nodeTypes.length) return null;
+  function handleSelectionChange(selection) {
+    const ids = (selection?.nodes || []).map(node => node.id);
+    setSelectedIds(ids);
+    onSelectionChange?.(ids);
+  }
+
+  function handleNodeClick(event, node) {
+    const next = selectCanvasNodes(
+      nodesRef.current,
+      node.id,
+      event.ctrlKey || event.metaKey || event.shiftKey,
+      selectedIds
+    );
+    const ids = next.filter(item => item.selected).map(item => item.id);
+    nodesRef.current = next;
+    setNodes(next);
+    setSelectedIds(ids);
+    onSelectionChange?.(ids);
+  }
+
+  function handleConnect(connection) {
+    const next = connectCanvasNodes(edgesRef.current, connection);
+    if (next !== edgesRef.current) commit(nodesRef.current, next);
+  }
+
+  function runNodeCommand(command) {
+    const next = command(nodesRef.current);
+    if (next !== nodesRef.current) commit(next, edgesRef.current);
+  }
+
+  function addNode() {
+    const bounds = rootRef.current?.getBoundingClientRect();
+    const screenPoint = bounds ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 } : { x: 0, y: 0 };
+    const position = flowInstance?.screenToFlowPosition(screenPoint) || { x: 0, y: 0 };
+    nodeSequenceRef.current += 1;
+    const nextNode = createCanvasNode(`node-${Date.now()}-${nodeSequenceRef.current}`, position);
+    const next = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
+    setSelectedIds([nextNode.id]);
+    onSelectionChange?.([nextNode.id]);
+    commit(next, edgesRef.current);
+  }
+
+  function applyHistory(direction) {
+    const snapshot = direction === 'undo' ? historyRef.current.undo() : historyRef.current.redo();
+    commit(snapshot.nodes, snapshot.edges, { record: false });
+  }
+
+  function handleKeyDown(event) {
+    const command = canvasKeyboardCommand({
+      ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey, key: event.key,
+      targetTagName: event.target?.tagName, isContentEditable: event.target?.isContentEditable
+    });
+    if (!command) return;
+    if (command === 'undo' && !historyRef.current.canUndo()) return;
+    if (command === 'redo' && !historyRef.current.canRedo()) return;
+    event.preventDefault();
+    applyHistory(command);
+  }
+
+  function handleMoveEnd(_event, nextViewport) {
+    setViewport(nextViewport);
+    viewportRef.current = nextViewport;
+    onViewportChange?.(nextViewport);
+    emitChange(nodesRef.current, edgesRef.current, nextViewport);
+  }
+
+  function startGroupDrag(event, groupId) {
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    groupDragRef.current = { groupId, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startNodes: nodesRef.current };
+  }
+
+  function moveGroupDrag(event) {
+    const drag = groupDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const next = moveCanvasGroup(drag.startNodes, drag.groupId, { x: event.clientX - drag.startX, y: event.clientY - drag.startY });
+    nodesRef.current = next;
+    setNodes(next);
+  }
+
+  function endGroupDrag(event) {
+    const drag = groupDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    groupDragRef.current = null;
+    commit(nodesRef.current, edgesRef.current);
+  }
+
+  const alignItems = [
+    { key: 'left', label: '左对齐', icon: <AlignStartVertical size={15} /> },
+    { key: 'centerX', label: '水平居中', icon: <AlignCenterVertical size={15} /> },
+    { key: 'right', label: '右对齐', icon: <AlignEndVertical size={15} /> },
+    { key: 'top', label: '顶对齐', icon: <AlignStartHorizontal size={15} /> },
+    { key: 'centerY', label: '垂直居中', icon: <AlignCenterHorizontal size={15} /> },
+    { key: 'bottom', label: '底对齐', icon: <AlignEndHorizontal size={15} /> }
+  ];
+
   return (
-    <div className="agent-canvas" aria-label="创作画布">
+    <div ref={rootRef} className="agent-canvas" aria-label="创作画布" tabIndex={0} onKeyDown={handleKeyDown}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={canvasNodeTypes}
+        onInit={setFlowInstance}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
-        fitView
+        onSelectionChange={handleSelectionChange}
+        onNodeClick={handleNodeClick}
+        onConnect={handleConnect}
+        onNodeDragStop={() => commit(nodesRef.current, edgesRef.current)}
         minZoom={0.25}
         maxZoom={2}
+        fitView={!currentCanvas.viewport}
+        defaultViewport={currentCanvas.viewport}
+        onMove={(_event, nextViewport) => {
+          setViewport(nextViewport);
+          viewportRef.current = nextViewport;
+          onViewportChange?.(nextViewport);
+        }}
+        onMoveEnd={handleMoveEnd}
+        panOnDrag={interactionMode === 'pan'}
+        nodesDraggable={interactionMode !== 'pan'}
+        elementsSelectable={interactionMode !== 'pan'}
+        selectionOnDrag={interactionMode === 'select'}
+        multiSelectionKeyCode="Shift"
       >
         <Background gap={20} size={1} />
-        <Controls showInteractive={false} />
+        <ViewportPortal>
+          {groups.map(({ groupId, bounds }) => (
+            <section className="agent-canvas-group" key={groupId} style={{ left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }}>
+              <button
+                type="button"
+                className="agent-canvas-group-handle"
+                onPointerDown={event => startGroupDrag(event, groupId)}
+                onPointerMove={moveGroupDrag}
+                onPointerUp={endGroupDrag}
+                onPointerCancel={endGroupDrag}
+              >节点分组</button>
+            </section>
+          ))}
+        </ViewportPortal>
       </ReactFlow>
+
+      <nav className="agent-canvas-toolrail" aria-label="画布工具">
+        <IconTool label="选择节点" active={interactionMode === 'select'} onClick={() => setInteractionMode('select')}><MousePointer2 size={17} /></IconTool>
+        <IconTool label="拖动画布" active={interactionMode === 'pan'} onClick={() => setInteractionMode('pan')}><Hand size={17} /></IconTool>
+        <IconTool label="连接节点" active={interactionMode === 'connect'} onClick={() => setInteractionMode('connect')}><GitBranch size={17} /></IconTool>
+        <IconTool label="添加节点" onClick={addNode}><Plus size={17} /></IconTool>
+      </nav>
+
+      <nav className="agent-canvas-editbar" aria-label="节点编辑工具">
+        <IconTool label="撤销 Ctrl+Z" disabled={!historyRef.current.canUndo()} onClick={() => applyHistory('undo')}><Undo2 size={17} /></IconTool>
+        <IconTool label="重做 Ctrl+Shift+Z" disabled={!historyRef.current.canRedo()} onClick={() => applyHistory('redo')}><Redo2 size={17} /></IconTool>
+        <span className="agent-canvas-tool-divider" />
+        <IconTool label={availability.canGroup ? '分组' : availability.groupReason} disabled={!availability.canGroup} onClick={() => runNodeCommand(current => groupCanvasNodes(current, selectedIds, `group-${Date.now()}`))}><Group size={17} /></IconTool>
+        <IconTool label={availability.canUngroup ? '解组' : availability.ungroupReason} disabled={!availability.canUngroup} onClick={() => runNodeCommand(current => ungroupCanvasNodes(current, selectedIds))}><Ungroup size={17} /></IconTool>
+        <Dropdown disabled={!availability.canAlign} menu={{ items: alignItems, onClick: ({ key }) => runNodeCommand(current => alignCanvasNodes(current, selectedIds, key)) }} trigger={['click']}>
+          <span><IconTool label={availability.canAlign ? '对齐' : availability.alignReason} disabled={!availability.canAlign}><AlignCenterHorizontal size={17} /></IconTool></span>
+        </Dropdown>
+        <IconTool label={availability.canDistribute ? '水平等距' : availability.distributeReason} disabled={!availability.canDistribute} onClick={() => runNodeCommand(current => distributeCanvasNodes(current, selectedIds, 'horizontal'))}><AlignHorizontalDistributeCenter size={17} /></IconTool>
+        <IconTool label={availability.canDistribute ? '垂直等距' : availability.distributeReason} disabled={!availability.canDistribute} onClick={() => runNodeCommand(current => distributeCanvasNodes(current, selectedIds, 'vertical'))}><AlignVerticalDistributeCenter size={17} /></IconTool>
+      </nav>
+
+      <nav className="agent-canvas-zoombar" aria-label="画布缩放工具">
+        <IconTool label="缩小" onClick={() => flowInstance?.zoomOut()}><ZoomOut size={17} /></IconTool>
+        <span className="agent-canvas-zoom-value">{Math.round((viewport.zoom || 1) * 100)}%</span>
+        <IconTool label="放大" onClick={() => flowInstance?.zoomIn()}><ZoomIn size={17} /></IconTool>
+        <IconTool label="适合屏幕" onClick={() => flowInstance?.fitView({ padding: 0.18 })}><Maximize2 size={17} /></IconTool>
+        <IconTool label={selectedIds.length ? '聚焦选中' : '请先选择节点'} disabled={!selectedIds.length} onClick={() => flowInstance?.fitView({ nodes: nodesRef.current.filter(node => selectedIds.includes(node.id)), padding: 0.3 })}><Focus size={17} /></IconTool>
+      </nav>
     </div>
   );
 }
