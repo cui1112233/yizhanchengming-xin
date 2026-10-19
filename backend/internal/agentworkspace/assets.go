@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -35,6 +36,12 @@ type AssetStore interface {
 	ListAssets(context.Context, string, string, string) ([]Asset, error)
 	CreateAsset(context.Context, string, Asset) error
 	Asset(context.Context, string, string, string) (Asset, error)
+}
+
+type AssetObjectStore interface {
+	Put(context.Context, Asset, io.Reader) error
+	Open(context.Context, Asset) (io.ReadCloser, error)
+	Delete(context.Context, Asset) error
 }
 
 func ValidAssetKind(kind string) bool {

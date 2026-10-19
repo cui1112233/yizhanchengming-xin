@@ -3,7 +3,9 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -22,9 +24,27 @@ import (
 	"qiantie/backend/internal/videomanagementconnector"
 )
 
+type runtimeManifest struct {
+	GitSHA        string `json:"gitSha"`
+	FrontendEntry string `json:"frontendEntry"`
+}
+
+func readRuntimeManifest(path string) runtimeManifest {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return runtimeManifest{}
+	}
+	var manifest runtimeManifest
+	if json.Unmarshal([]byte(strings.TrimPrefix(string(contents), "\ufeff")), &manifest) != nil {
+		return runtimeManifest{}
+	}
+	return manifest
+}
+
 type RouterOptions struct {
 	BridgeSecret                    string
 	ReleaseSHA                      string
+	RuntimeManifestPath             string
 	RuntimeAudit                    *runtimeaudit.Registry
 	Health                          func(context.Context) error
 	Now                             func() time.Time
@@ -41,6 +61,7 @@ type RouterOptions struct {
 	Merge                           *batchfactoryv11.MergeService
 	External                        *external.Service
 	NovelFetchStore                 novelfetchworkshop.LifecycleStore
+	NovelFetchQueue                 novelfetchworkshop.ProcessQueue
 	NovelFetchAIGenderJudge         novelfetchworkshop.AIGenderJudge
 	NovelFetchAIGenderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error)
 	NovelFetchFetcher               *novelfetchworkshop.UpstreamFetcher
@@ -58,6 +79,8 @@ type RouterOptions struct {
 	UserConfigStore                 *UserConfigStore
 	TextProvider                    batchfactoryv11.DirectorProvider
 	AgentWorkspace                  agentworkspace.Store
+	AgentAssets                     agentworkspace.AssetStore
+	AgentAssetObjects               agentworkspace.AssetObjectStore
 	RedisURL                        string
 	LocalExecutors                  *localexecutor.Service
 	GiantMaterialExecutor           *giantmaterialexecutor.Service
@@ -85,6 +108,12 @@ func NewRouter(options RouterOptions) http.Handler {
 			Store: options.Store, Director: options.Director, Production: options.Production,
 		}, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
+		options.AutomationCoordinator.SetSourceFetcher(options.NovelFetchFetcher)
+	}
+	if options.AutomationCoordinator != nil {
+		if err := options.AutomationCoordinator.RecoverInterruptedJobs(); err != nil {
+			log.Printf("recover interrupted batch automation jobs: %v", err)
+		}
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
@@ -95,6 +124,10 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.Store != nil && options.Slice >= 1 {
 		registerSliceOneRoutes(v11, options.Store, options.PresetCatalog)
 		registerV12IntakeRoutes(v12, options.Store)
+		registerV12PublishClassificationRoute(v12, options.Store, batchFetchClassification{
+			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
+			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
+		})
 		registerConfiguredImageGenerationRoute(v11, options.Store, options.NovelFetchStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, options.NovelFetchStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
@@ -174,12 +207,15 @@ func NewRouter(options RouterOptions) http.Handler {
 			registerVideoUploadRoutes(v11, options.Production, options.Merge, options.LocalArtifacts, output)
 		}
 	}
-	if options.Merge != nil && options.Slice >= 5 {
+	// Completed local merge artifacts must remain readable in the ordinary
+	// review runtime. This only exposes owner-scoped GET routes; merge writes
+	// remain gated by the production slice below.
+	if mergeStatus != nil && options.LocalArtifacts != nil {
 		var mergeReader mergeworker.ObjectReader
 		if candidate, ok := options.MergeOutput.(mergeworker.ObjectReader); ok {
 			mergeReader = candidate
 		}
-		registerMergeRoutes(v11, options.Merge, options.LocalArtifacts, options.MergeOutput, mergeReader)
+		registerMergeRoutes(v11, mergeStatus, options.LocalArtifacts, options.MergeOutput, mergeReader, options.Merge != nil && options.Slice >= 5)
 	}
 	if options.External != nil && options.Slice >= 6 {
 		registerExternalRoutes(v11, options.External)
@@ -201,15 +237,21 @@ func NewRouter(options RouterOptions) http.Handler {
 	root := http.NewServeMux()
 	root.HandleFunc("GET /api/runtime-build-info", func(w http.ResponseWriter, req *http.Request) {
 		audit := options.RuntimeAudit.Snapshot()
+		manifest := readRuntimeManifest(options.RuntimeManifestPath)
 		writeJSON(w, http.StatusOK, map[string]any{
-			"service":      "go-api",
-			"runtime":      "go",
-			"git_sha":      options.ReleaseSHA,
-			"bridge_hits":  audit.BridgeHits,
-			"bridge_paths": audit.Paths,
+			"service":              "go-api",
+			"runtime":              "go",
+			"git_sha":              options.ReleaseSHA,
+			"frontend_entry":       manifest.FrontendEntry,
+			"runtime_manifest_sha": manifest.GitSHA,
+			"bridge_hits":          audit.BridgeHits,
+			"bridge_paths":         audit.Paths,
 		})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
+	novelScope := novelFetchAccountScopeResolver(options.AuthStore, options.MemberProfileStore)
+	novelCompatAuth := auth
+	novelCompatAuth.IdentityScope = novelScope
 	var mergeReader mergeworker.ObjectReader
 	if candidate, ok := options.MergeOutput.(mergeworker.ObjectReader); ok {
 		mergeReader = candidate
@@ -293,12 +335,13 @@ func NewRouter(options RouterOptions) http.Handler {
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore, options.NovelFetchStore, options.MemberProfileStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
-	RegisterNovelFetchUploadSessionCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
-	RegisterNovelFetchUploadBatchCompat(root, auth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
-	RegisterWebSubmitTargetCheckCompat(root, auth, options.UserDataDir, options.VideoManagementConnector)
-	publish121OrganizationsHandler(root, auth, options.UserDataDir, options.VideoManagementConnector)
+	RegisterNovelFetchUploadSessionCompat(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
+	RegisterNovelFetchUploadBatchCompat(root, novelCompatAuth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
+	RegisterWebSubmitTargetCheckCompat(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
+	publish121OrganizationsHandler(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
 	if options.UserConfigStore != nil {
 		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
+		RegisterAgentAssetRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
 		systemDir := ""
 		if options.MemberProfileStore != nil {
 			systemDir = options.MemberProfileStore.SystemDir
@@ -338,8 +381,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()
-		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver)
-		registerNovelFetchLegacyWorkflowRoutes(novelFetch, options.NovelFetchStore, options.UserDataDir, func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
+		registerNovelFetchWorkshopRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchQueue, options.NovelFetchAIGenderJudge, options.NovelFetchAIGenderJudgeResolver, options.NovelFetchFetcher, options.NovelFetchRewrite, options.NovelFetchRewriteResolver, options.UserDataDir, options.VideoManagementConnector)
+		registerNovelFetchLegacyWorkflowRoutes(novelFetch, options.NovelFetchStore, options.NovelFetchQueue, options.UserDataDir, func(req *http.Request) (novelfetchworkshop.RewriteProvider, error) {
 			if options.NovelFetchRewriteResolver == nil {
 				return options.NovelFetchRewrite, nil
 			}
@@ -347,11 +390,11 @@ func NewRouter(options RouterOptions) http.Handler {
 			return options.NovelFetchRewriteResolver(req.Context(), identity.Username)
 		}, options.VideoManagementConnector)
 		registerNovelFetchCleanupRoutes(novelFetch, options.NovelFetchStore, options.Now)
-		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
+		novelAuth := NovelFetchBridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver, IdentityScope: novelScope}
 		root.Handle("/api/novel-fetch-workshop/", novelAuth.Middleware(novelFetch))
-		RegisterBatchRewriteConfigCompat(root, auth, options.NovelFetchStore, options.UserDataDir, options.VideoManagementConnector)
-		RegisterWebSubmitPreviewCompat(root, auth, options.NovelFetchStore)
-		RegisterWebSubmitSubmitCompat(root, auth, options.UserDataDir, options.NovelFetchStore, func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
+		RegisterBatchRewriteConfigCompat(root, novelCompatAuth, options.NovelFetchStore, options.UserDataDir, options.VideoManagementConnector)
+		RegisterWebSubmitPreviewCompat(root, novelCompatAuth, options.NovelFetchStore)
+		RegisterWebSubmitSubmitCompat(root, novelCompatAuth, options.UserDataDir, options.NovelFetchStore, func(ctx context.Context, owner string) (novelfetchworkshop.AIGenderJudge, error) {
 			if options.NovelFetchAIGenderJudgeResolver == nil {
 				return options.NovelFetchAIGenderJudge, nil
 			}

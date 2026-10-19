@@ -118,13 +118,22 @@ func configuredTextProvider(settings map[string]any, selected string) (*batchfac
 }
 
 func selectedTextModelID(settings map[string]any) string {
-	selected, _ := settings["textModelId"].(string)
+	selected := firstConfiguredString(settings, "textModelId", "text_model_id")
 	if aiConfig, ok := settings["aiConfig"].(map[string]any); ok {
-		if value, ok := aiConfig["textModelId"].(string); ok && strings.TrimSpace(value) != "" {
+		if value := firstConfiguredString(aiConfig, "textModelId", "text_model_id"); value != "" {
 			selected = value
 		}
 	}
 	return strings.TrimSpace(selected)
+}
+
+func firstConfiguredString(settings map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(fmt.Sprint(settings[key])); value != "" && value != "<nil>" {
+			return value
+		}
+	}
+	return ""
 }
 
 func textGenderJudge(provider *batchfactoryv11.OpenAICompatibleProvider) novelfetchworkshop.AIGenderJudge {
@@ -177,7 +186,23 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	novelFetchStore := novelfetchworkshop.NewMySQLStore(db)
 	agentWorkspaceStore := agentworkspace.NewMySQLStore(db)
+	agentAssetStore := agentworkspace.NewMySQLAssetStore(db)
+	var agentAssetObjects agentworkspace.AssetObjectStore
 	novelFetchStore.LegacyConfigDir = cfg.ScriptHistoryDir
+	if cfg.NovelFetchTOSEndpoint != "" || cfg.NovelFetchTOSRegion != "" || cfg.NovelFetchTOSBucket != "" || cfg.NovelFetchTOSAccessKey != "" || cfg.NovelFetchTOSSecretKey != "" {
+		bodyStore, bodyStoreErr := novelfetchworkshop.NewBodyTOSStore(novelfetchworkshop.BodyTOSConfig{Endpoint: cfg.NovelFetchTOSEndpoint, Region: cfg.NovelFetchTOSRegion, Bucket: cfg.NovelFetchTOSBucket, AccessKey: cfg.NovelFetchTOSAccessKey, SecretKey: cfg.NovelFetchTOSSecretKey})
+		if bodyStoreErr != nil {
+			return nil, bodyStoreErr
+		}
+		novelFetchStore.ObjectBodies = bodyStore
+	}
+	if cfg.AgentAssetTOSEndpoint != "" || cfg.AgentAssetTOSRegion != "" || cfg.AgentAssetTOSBucket != "" || cfg.AgentAssetTOSAccessKey != "" || cfg.AgentAssetTOSSecretKey != "" {
+		store, storeErr := agentworkspace.NewTOSAssetObjectStore(agentworkspace.AssetTOSConfig{Endpoint: cfg.AgentAssetTOSEndpoint, Region: cfg.AgentAssetTOSRegion, Bucket: cfg.AgentAssetTOSBucket, AccessKey: cfg.AgentAssetTOSAccessKey, SecretKey: cfg.AgentAssetTOSSecretKey})
+		if storeErr != nil {
+			return nil, storeErr
+		}
+		agentAssetObjects = store
+	}
 	var director *batchfactoryv11.DirectorService
 	var textProvider *batchfactoryv11.OpenAICompatibleProvider
 	if cfg.DirectorEndpoint != "" || cfg.DirectorAPIKey != "" || cfg.DirectorModel != "" {
@@ -260,6 +285,14 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		}
 		return novelFetchAIGenderJudge, nil
 	}
+	var novelFetchQueue novelfetchworkshop.ProcessQueue
+	if strings.TrimSpace(cfg.RedisURL) != "" {
+		redisTransport, redisErr := mergeworker.NewRedisStore(cfg.RedisURL, "qiantie:novel-fetch")
+		if redisErr != nil {
+			return nil, redisErr
+		}
+		novelFetchQueue = novelfetchworkshop.NewRedisQueueWithDo("qiantie:novel-fetch", novelfetchworkshop.RedisDoFunc(redisTransport.Do))
+	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
 	videoRegistry := batchfactoryv11.NewMemoryVideoProviderRegistry()
 	localExecutorService := localexecutor.NewService(localexecutor.NewMySQLStore(db), nil)
@@ -278,8 +311,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	// A deleted Batch Factory project is removed from its UI immediately, while
 	// only its ledgered local merge MP4s are released after their retention
-	// deadline. This worker deliberately has no TOS authority.
-	if cfg.Slice >= 5 && cfg.LocalMergeEnabled {
+	// deadline. Cleanup also recovers files queued by an earlier Slice 5 run, so
+	// it must not depend on whether video production or merging is enabled now.
+	// This worker deliberately has no TOS authority.
+	if shouldStartLocalArtifactPurger(cfg) {
 		batchfactoryv11.LocalArtifactPurger{Repository: store, Artifacts: artifactStore}.Start(time.Hour)
 	}
 	// Keep a read-only production service available for status queries even
@@ -374,9 +409,18 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	if director != nil {
 		director.Provider = effectiveTextProvider
 	}
-	targetBaseURL := strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL"))
-	if targetBaseURL == "" {
-		targetBaseURL = "http://two.121w.com"
+	targetBaseURL := videoManagementTargetBaseURL()
+	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}}), nil
+}
+
+func shouldStartLocalArtifactPurger(cfg config.Config) bool {
+	return strings.TrimSpace(cfg.LocalExecutorArtifactDir) != ""
+}
+
+func videoManagementTargetBaseURL() string {
+	raw := strings.TrimRight(strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL")), "/")
+	if raw == "" || strings.EqualFold(raw, "http://two.121w.com") {
+		return "https://two.121w.com"
 	}
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, AgentWorkspace: agentWorkspaceStore, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}}), nil
+	return raw
 }

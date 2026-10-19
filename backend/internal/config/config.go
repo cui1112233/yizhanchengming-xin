@@ -15,6 +15,16 @@ type Config struct {
 	MySQLDSN                      string
 	BridgeSecret                  string
 	RedisURL                      string
+	NovelFetchTOSEndpoint         string
+	NovelFetchTOSRegion           string
+	NovelFetchTOSBucket           string
+	NovelFetchTOSAccessKey        string
+	NovelFetchTOSSecretKey        string
+	AgentAssetTOSEndpoint         string
+	AgentAssetTOSRegion           string
+	AgentAssetTOSBucket           string
+	AgentAssetTOSAccessKey        string
+	AgentAssetTOSSecretKey        string
 	Slice                         int
 	DirectorEndpoint              string
 	DirectorAPIKey                string
@@ -83,6 +93,31 @@ func FromEnv() (Config, error) {
 	cfg.MemberSystemDir = envOr("QIANTIE_MEMBER_SYSTEM_DIR", "data/system")
 	cfg.MemberAvatarDir = envOr("QIANTIE_MEMBER_AVATAR_DIR", "data/avatars")
 	cfg.RedisURL = strings.TrimSpace(os.Getenv("QIANTIE_REDIS_URL"))
+	cfg.NovelFetchTOSEndpoint = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT"))
+	cfg.NovelFetchTOSRegion = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_REGION"))
+	cfg.NovelFetchTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_BUCKET"))
+	cfg.NovelFetchTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_ACCESS_KEY"))
+	cfg.NovelFetchTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_NOVEL_FETCH_TOS_SECRET_KEY"))
+	cfg.AgentAssetTOSEndpoint = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_ENDPOINT"))
+	cfg.AgentAssetTOSRegion = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_REGION"))
+	cfg.AgentAssetTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_BUCKET"))
+	cfg.AgentAssetTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_ACCESS_KEY"))
+	cfg.AgentAssetTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_SECRET_KEY"))
+	if cfg.NovelFetchTOSEndpoint == "" {
+		cfg.NovelFetchTOSEndpoint = cfg.MergeTOSEndpoint
+	}
+	if cfg.NovelFetchTOSRegion == "" {
+		cfg.NovelFetchTOSRegion = cfg.MergeTOSRegion
+	}
+	if cfg.NovelFetchTOSBucket == "" {
+		cfg.NovelFetchTOSBucket = cfg.MergeTOSBucket
+	}
+	if cfg.NovelFetchTOSAccessKey == "" {
+		cfg.NovelFetchTOSAccessKey = cfg.MergeTOSAccessKey
+	}
+	if cfg.NovelFetchTOSSecretKey == "" {
+		cfg.NovelFetchTOSSecretKey = cfg.MergeTOSSecretKey
+	}
 	if cfg.MySQLDSN == "" {
 		return Config{}, fmt.Errorf("QIANTIE_MYSQL_DSN is required")
 	}
