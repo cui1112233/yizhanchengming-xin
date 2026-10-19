@@ -87,6 +87,9 @@ test('画布提供持久外观设置和按方向流动的连线', () => {
 test('画布外观包含轻量动效和窄屏安全规则', () => {
   assert.match(css, /\.agent-page \.agent-canvas-edge-flow\s*\{[^}]*animation:/);
   assert.match(css, /@keyframes agent-canvas-edge-flow/);
+  assert.match(canvasSource, /const energyStyle = \{ \.\.\.style, strokeWidth: Number\(style\.strokeWidth\) \+ 1 \}/);
+  assert.match(css, /\.agent-page \.agent-canvas-edge-flow\s*\{[^}]*stroke-dasharray:\s*10 26[^}]*filter:\s*drop-shadow/);
+  assert.match(css, /@keyframes agent-canvas-edge-flow\s*\{\s*to\s*\{\s*stroke-dashoffset:\s*-72/);
   assert.match(css, /\.agent-page \.agent-canvas-appearance-panel\s*\{/);
   assert.match(css, /\.agent-canvas-appearance-popover\s*\{[^}]*--agent-edge-coral:\s*#f07167/);
   assert.match(css, /@media \(max-width: 560px\)[\s\S]*?\.agent-canvas-appearance-popover[^}]*max-width:\s*calc\(100vw - 24px\)/);

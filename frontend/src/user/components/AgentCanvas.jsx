@@ -35,9 +35,10 @@ function CanvasEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, ta
   const appearance = normalizeCanvasAppearance(data?.appearance);
   const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   const style = edgeStyleForAppearance(appearance);
+  const energyStyle = { ...style, strokeWidth: Number(style.strokeWidth) + 1 };
   return <>
     <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
-    {appearance.edgeAnimated ? <path d={edgePath} className="agent-canvas-edge-flow" style={style} /> : null}
+    {appearance.edgeAnimated ? <path d={edgePath} className="agent-canvas-edge-flow" style={energyStyle} /> : null}
   </>;
 }
 
