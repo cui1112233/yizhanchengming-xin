@@ -79,6 +79,9 @@ func normalizeProject(project Project) Project {
 	}
 	if project.Canvas.Version == 0 {
 		project.Canvas = EmptyCanvas()
+	} else {
+		project.Canvas.Appearance = normalizeCanvasAppearance(project.Canvas.Appearance, project.Canvas.appearanceConfigured)
+		project.Canvas.appearanceConfigured = true
 	}
 	if project.Executions == nil {
 		project.Executions = []Execution{}
@@ -180,6 +183,8 @@ func (s *MemoryStore) SaveCanvas(_ context.Context, owner, id string, canvas Can
 	}
 	canvas.Version = 1
 	canvas.Revision = expected + 1
+	canvas.Appearance = normalizeCanvasAppearance(canvas.Appearance, canvas.appearanceConfigured)
+	canvas.appearanceConfigured = true
 	if canvas.Nodes == nil {
 		canvas.Nodes = []Node{}
 	}

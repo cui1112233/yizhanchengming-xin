@@ -75,6 +75,33 @@ func TestMemoryStoreCanvasRevisionPreventsLostUpdates(t *testing.T) {
 	}
 }
 
+func TestEmptyCanvasUsesPersistentAppearanceDefaults(t *testing.T) {
+	appearance := EmptyCanvas().Appearance
+	if appearance.EdgeColor != "coral" || !appearance.EdgeAnimated || appearance.EdgeWidth != "default" || !appearance.BackgroundDots || !appearance.AlignmentGuides {
+		t.Fatalf("appearance=%+v", appearance)
+	}
+}
+
+func TestMemoryStoreNormalizesInvalidCanvasAppearance(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 19, 1, 2, 3, 0, time.UTC)
+	if err := store.CreateProject(ctx, "alice", Project{ID: "project-appearance", Title: "项目", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := store.SaveCanvas(ctx, "alice", "project-appearance", Canvas{
+		Appearance: Appearance{EdgeColor: "unknown", EdgeWidth: "huge"},
+		Nodes:      []Node{},
+		Edges:      []Edge{},
+	}, 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Appearance.EdgeColor != "coral" || saved.Appearance.EdgeWidth != "default" || !saved.Appearance.EdgeAnimated || !saved.Appearance.BackgroundDots || !saved.Appearance.AlignmentGuides {
+		t.Fatalf("saved appearance=%+v", saved.Appearance)
+	}
+}
+
 func TestMemoryStoreDeleteIsOwnerScoped(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

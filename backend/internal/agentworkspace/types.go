@@ -1,6 +1,10 @@
 package agentworkspace
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
 
 type ProjectSummary struct {
 	ID           string    `json:"id"`
@@ -58,12 +62,77 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 
+type Appearance struct {
+	EdgeColor       string `json:"edgeColor"`
+	EdgeAnimated    bool   `json:"edgeAnimated"`
+	EdgeWidth       string `json:"edgeWidth"`
+	BackgroundDots  bool   `json:"backgroundDots"`
+	AlignmentGuides bool   `json:"alignmentGuides"`
+}
+
+func DefaultAppearance() Appearance {
+	return Appearance{
+		EdgeColor:       "coral",
+		EdgeAnimated:    true,
+		EdgeWidth:       "default",
+		BackgroundDots:  true,
+		AlignmentGuides: true,
+	}
+}
+
+func normalizeCanvasAppearance(input Appearance, configured bool) Appearance {
+	if !configured {
+		return DefaultAppearance()
+	}
+	appearance := DefaultAppearance()
+	if color := strings.ToLower(strings.TrimSpace(input.EdgeColor)); color == "coral" || color == "cyan" || color == "violet" || color == "gold" {
+		appearance.EdgeColor = color
+	}
+	if width := strings.ToLower(strings.TrimSpace(input.EdgeWidth)); width == "thin" || width == "default" || width == "thick" {
+		appearance.EdgeWidth = width
+	}
+	appearance.EdgeAnimated = input.EdgeAnimated
+	appearance.BackgroundDots = input.BackgroundDots
+	appearance.AlignmentGuides = input.AlignmentGuides
+	return appearance
+}
+
 type Canvas struct {
-	Version  int            `json:"version"`
-	Revision int64          `json:"revision"`
-	Viewport map[string]any `json:"viewport,omitempty"`
-	Nodes    []Node         `json:"nodes"`
-	Edges    []Edge         `json:"edges"`
+	Version              int            `json:"version"`
+	Revision             int64          `json:"revision"`
+	Viewport             map[string]any `json:"viewport,omitempty"`
+	Appearance           Appearance     `json:"appearance"`
+	Nodes                []Node         `json:"nodes"`
+	Edges                []Edge         `json:"edges"`
+	appearanceConfigured bool
+}
+
+func (canvas *Canvas) UnmarshalJSON(data []byte) error {
+	var decoded struct {
+		Version    int            `json:"version"`
+		Revision   int64          `json:"revision"`
+		Viewport   map[string]any `json:"viewport,omitempty"`
+		Appearance Appearance     `json:"appearance"`
+		Nodes      []Node         `json:"nodes"`
+		Edges      []Edge         `json:"edges"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	canvas.Version = decoded.Version
+	canvas.Revision = decoded.Revision
+	canvas.Viewport = decoded.Viewport
+	canvas.Nodes = decoded.Nodes
+	canvas.Edges = decoded.Edges
+	canvas.Appearance = decoded.Appearance
+	rawAppearance, configured := fields["appearance"]
+	canvas.appearanceConfigured = configured && string(rawAppearance) != "null"
+	canvas.Appearance = normalizeCanvasAppearance(canvas.Appearance, canvas.appearanceConfigured)
+	return nil
 }
 
 type Execution struct {
@@ -85,5 +154,5 @@ type LegacyImport struct {
 }
 
 func EmptyCanvas() Canvas {
-	return Canvas{Version: 1, Nodes: []Node{}, Edges: []Edge{}}
+	return Canvas{Version: 1, Appearance: DefaultAppearance(), Nodes: []Node{}, Edges: []Edge{}, appearanceConfigured: true}
 }

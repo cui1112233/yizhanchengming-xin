@@ -81,7 +81,7 @@ Assert PATCH and subsequent GET /canvas return the exact cyan value. Add MySQL m
 Run:
 
 ~~~powershell
-go test ./backend/internal/agentworkspace ./backend/internal/httpapi ./backend/internal/storage
+go test ./internal/agentworkspace ./internal/httpapi ./internal/storage
 ~~~
 
 Expected: failure because Canvas has no Appearance field and migration 8800003 does not exist.
@@ -113,8 +113,8 @@ Marshal NormalizeAppearance(canvas.Appearance) next to viewport_json in project 
 - [ ] **Step 6: Run verification and commit only these files.**
 
 ~~~powershell
-go test ./backend/internal/agentworkspace ./backend/internal/httpapi ./backend/internal/storage
-go test -tags mysql84 ./backend/internal/storage
+go test ./internal/agentworkspace ./internal/httpapi ./internal/storage
+go test -tags mysql84 ./internal/storage
 git add backend/internal/agentworkspace backend/internal/httpapi/agent_workspace_test.go backend/internal/storage
 git commit -m "feat(agent): persist canvas appearance settings"
 ~~~
@@ -281,7 +281,7 @@ git commit -m "feat(agent): restyle canvas workspace"
 - [ ] **Step 1: Run final automated suites.**
 
 ~~~powershell
-go test ./backend/internal/agentworkspace ./backend/internal/httpapi ./backend/internal/storage
+go test ./internal/agentworkspace ./internal/httpapi ./internal/storage
 node --test src/user/pages/agent-canvas-appearance.test.js src/user/pages/agent-canvas-state.test.js src/user/pages/agent-canvas-commands.test.js src/user/pages/agent-workspace.layout.test.js
 ~~~
 

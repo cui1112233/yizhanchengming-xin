@@ -65,11 +65,15 @@ func TestAgentWorkspaceImportsLegacyAndUsesStoreForCanvasAndChat(t *testing.T) {
 		t.Fatalf("create body=%s err=%v", created.Body.String(), err)
 	}
 
-	canvasBody := `{"canvas":{"version":1,"revision":0,"nodes":[{"id":"node-1","type":"input","position":{"x":12,"y":24},"title":"小说原文","version":1,"sourceNodeIds":[],"status":"confirmed","summary":"第一章"}],"edges":[]},"revision":0}`
+	canvasBody := `{"canvas":{"version":1,"revision":0,"appearance":{"edgeColor":"cyan","edgeAnimated":false,"edgeWidth":"thick","backgroundDots":false,"alignmentGuides":true},"nodes":[{"id":"node-1","type":"input","position":{"x":12,"y":24},"title":"小说原文","version":1,"sourceNodeIds":[],"status":"confirmed","summary":"第一章"}],"edges":[]},"revision":0}`
 	canvasPath := "/api/agent/tasks/" + createBody.Task.ID + "/canvas"
 	saved := agentRequest(t, mux, now, http.MethodPatch, canvasPath, canvasBody)
-	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), `"revision":1`) {
+	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), `"revision":1`) || !strings.Contains(saved.Body.String(), `"edgeColor":"cyan"`) {
 		t.Fatalf("save status=%d body=%s", saved.Code, saved.Body.String())
+	}
+	loaded := agentRequest(t, mux, now, http.MethodGet, canvasPath, "")
+	if loaded.Code != http.StatusOK || !strings.Contains(loaded.Body.String(), `"edgeColor":"cyan"`) {
+		t.Fatalf("load status=%d body=%s", loaded.Code, loaded.Body.String())
 	}
 	stale := agentRequest(t, mux, now, http.MethodPatch, canvasPath, canvasBody)
 	if stale.Code != http.StatusConflict {

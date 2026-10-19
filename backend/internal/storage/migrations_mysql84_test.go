@@ -55,4 +55,11 @@ WHERE table_schema = DATABASE() AND table_name = 'agent_canvas_nodes' AND column
 	if count != 1 {
 		t.Fatalf("agent_canvas_nodes.group_id count=%d, want 1", count)
 	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = 'agent_canvases' AND column_name = 'appearance_json' AND data_type = 'json'`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("agent_canvases.appearance_json count=%d, want 1", count)
+	}
 }

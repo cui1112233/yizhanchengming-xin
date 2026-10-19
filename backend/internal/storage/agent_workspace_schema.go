@@ -109,5 +109,12 @@ func AgentWorkspaceMigrations() []Migration {
 			},
 			CallbackChecksum: "v88-agent-canvas-groups-v1",
 		},
+		{
+			Version: 8800003,
+			SQL: []string{
+				`ALTER TABLE agent_canvases ADD COLUMN appearance_json JSON NULL AFTER viewport_json`,
+			},
+			CallbackChecksum: "v88-agent-canvas-appearance-v1",
+		},
 	}
 }
