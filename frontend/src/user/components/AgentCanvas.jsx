@@ -18,6 +18,9 @@ import {
   appearanceCssVariables, canvasEdgeColorOptions, canvasEdgeWidthOptions,
   edgeStyleForAppearance, normalizeCanvasAppearance
 } from '../pages/agent-canvas-appearance';
+import {
+  copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes
+} from '../pages/agent-canvas-context-menu';
 
 function CanvasNode({ data }) {
   return (
@@ -119,6 +122,7 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
   const [viewport, setViewport] = useState(currentCanvas.viewport || { x: 0, y: 0, zoom: 1 });
   const [appearance, setAppearance] = useState(() => normalizeCanvasAppearance(currentCanvas.appearance));
   const [nodeDragActive, setNodeDragActive] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
   const [, setHistoryVersion] = useState(0);
   const rootRef = useRef(null);
   const nodesRef = useRef([]);
@@ -128,6 +132,7 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
   const signatureRef = useRef('');
   const groupDragRef = useRef(null);
   const nodeSequenceRef = useRef(0);
+  const clipboardRef = useRef(null);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
 
   const canvasNodeTypes = useMemo(() => ({ agent: CanvasNode }), []);
@@ -135,6 +140,10 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
     .filter(group => group.bounds), [nodes]);
+  const contextAvailability = useMemo(
+    () => contextMenu ? commandAvailability(nodes, contextMenu.nodeIds) : null,
+    [contextMenu, nodes]
+  );
 
   function updateRefs(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
     nodesRef.current = nextNodes;
@@ -153,6 +162,7 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
     setNodes(nextNodes);
     setEdges(nextEdges);
     setSelectedIds([]);
+    setContextMenu(null);
     setViewport(nextViewport);
     setAppearance(nextAppearance);
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
@@ -198,6 +208,7 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
   }
 
   function handleNodeClick(event, node) {
+    setContextMenu(null);
     const next = selectCanvasNodes(
       nodesRef.current,
       node.id,
@@ -233,12 +244,122 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
     commit(next, edgesRef.current);
   }
 
+  function nextCanvasID(prefix = 'node') {
+    nodeSequenceRef.current += 1;
+    return `${prefix}-${Date.now()}-${nodeSequenceRef.current}`;
+  }
+
+  function openContextMenu(event, target, nodeIds = []) {
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = rootRef.current?.getBoundingClientRect();
+    const clickPosition = { x: event.clientX, y: event.clientY };
+    const position = flowInstance?.screenToFlowPosition(clickPosition) || { x: 0, y: 0 };
+    const maxX = Math.max(8, (bounds?.width || 216) - 216);
+    const maxY = Math.max(8, (bounds?.height || 304) - 304);
+    setContextMenu({
+      target,
+      nodeIds,
+      position,
+      left: Math.max(8, Math.min((event.clientX - (bounds?.left || 0)), maxX)),
+      top: Math.max(8, Math.min((event.clientY - (bounds?.top || 0)), maxY))
+    });
+  }
+
+  function handlePaneContextMenu(event) {
+    const next = nodesRef.current.map(node => ({ ...node, selected: false }));
+    nodesRef.current = next;
+    setNodes(next);
+    setSelectedIds([]);
+    onSelectionChange?.([]);
+    openContextMenu(event, 'pane');
+  }
+
+  function handleNodeContextMenu(event, node) {
+    const keepSelection = selectedIds.includes(node.id);
+    const nodeIds = keepSelection ? selectedIds : [node.id];
+    if (!keepSelection) {
+      const next = nodesRef.current.map(item => ({ ...item, selected: item.id === node.id }));
+      nodesRef.current = next;
+      setNodes(next);
+      setSelectedIds(nodeIds);
+      onSelectionChange?.(nodeIds);
+    }
+    openContextMenu(event, 'nodes', nodeIds);
+  }
+
+  function handleContextCreate(kind) {
+    if (!contextMenu) return;
+    const nextNode = createNodeAt({ id: nextCanvasID(kind), kind, position: contextMenu.position });
+    const next = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
+    setSelectedIds([nextNode.id]);
+    onSelectionChange?.([nextNode.id]);
+    commit(next, edgesRef.current);
+    setContextMenu(null);
+  }
+
+  function handleContextCopy() {
+    if (!contextMenu?.nodeIds.length) return;
+    clipboardRef.current = copyCanvasSelection({
+      nodes: nodesRef.current,
+      edges: edgesRef.current,
+      selectedIds: contextMenu.nodeIds
+    });
+    setContextMenu(null);
+  }
+
+  function handleContextPaste() {
+    if (!contextMenu || !clipboardRef.current) return;
+    const pasted = pasteCanvasSelection({
+      clipboard: clipboardRef.current,
+      position: contextMenu.position,
+      nextID: sourceID => nextCanvasID(`copy-${sourceID}`)
+    });
+    if (!pasted.nodes.length) return;
+    const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(pasted.nodes);
+    const nextEdges = edgesRef.current.concat(pasted.edges.map(edge => toFlowEdge(edge, appearanceRef.current)));
+    const ids = pasted.nodes.map(node => node.id);
+    setSelectedIds(ids);
+    onSelectionChange?.(ids);
+    commit(nextNodes, nextEdges);
+    setContextMenu(null);
+  }
+
+  function handleContextDelete() {
+    if (!contextMenu?.nodeIds.length) return;
+    const result = removeCanvasNodes({ nodes: nodesRef.current, edges: edgesRef.current, ids: contextMenu.nodeIds });
+    setSelectedIds([]);
+    onSelectionChange?.([]);
+    commit(result.nodes, result.edges);
+    setContextMenu(null);
+  }
+
+  function handleContextDisconnect() {
+    if (!contextMenu?.nodeIds.length) return;
+    const ids = new Set(contextMenu.nodeIds);
+    const nextEdges = edgesRef.current.filter(edge => !ids.has(edge.source) && !ids.has(edge.target));
+    if (nextEdges.length !== edgesRef.current.length) commit(nodesRef.current, nextEdges);
+    setContextMenu(null);
+  }
+
+  function handleContextNodeCommand(command) {
+    if (!contextMenu?.nodeIds.length) return;
+    const next = command(nodesRef.current, contextMenu.nodeIds);
+    if (next !== nodesRef.current) commit(next, edgesRef.current);
+    setContextMenu(null);
+  }
+
   function applyHistory(direction) {
     const snapshot = direction === 'undo' ? historyRef.current.undo() : historyRef.current.redo();
     commit(snapshot.nodes, snapshot.edges, { record: false });
   }
 
   function handleKeyDown(event) {
+    if (event.key === 'Escape' && contextMenu) {
+      event.preventDefault();
+      setContextMenu(null);
+      return;
+    }
     const command = canvasKeyboardCommand({
       ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey, key: event.key,
       targetTagName: event.target?.tagName, isContentEditable: event.target?.isContentEditable
@@ -308,8 +429,11 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
         onEdgesChange={handleEdgesChange}
         onSelectionChange={handleSelectionChange}
         onNodeClick={handleNodeClick}
+        onPaneClick={() => setContextMenu(null)}
+        onPaneContextMenu={handlePaneContextMenu}
+        onNodeContextMenu={handleNodeContextMenu}
         onConnect={handleConnect}
-        onNodeDragStart={() => setNodeDragActive(true)}
+        onNodeDragStart={() => { setNodeDragActive(true); setContextMenu(null); }}
         onNodeDragStop={() => { setNodeDragActive(false); commit(nodesRef.current, edgesRef.current); }}
         minZoom={0.25}
         maxZoom={2}
@@ -345,6 +469,36 @@ export function AgentCanvas({ canvas, onChange, onAppearanceChange, onSelectionC
           ))}
         </ViewportPortal>
       </ReactFlow>
+
+      {contextMenu ? <section
+        className="agent-canvas-context-menu"
+        role="menu"
+        aria-label="画布右键菜单"
+        style={{ left: contextMenu.left, top: contextMenu.top }}
+        onContextMenu={event => event.preventDefault()}
+      >
+        {contextMenu.target === 'pane' ? <>
+          <p className="agent-canvas-context-menu-title">新建节点</p>
+          <button type="button" role="menuitem" onClick={() => handleContextCreate('text')}>文本</button>
+          <button type="button" role="menuitem" onClick={() => handleContextCreate('image')}>图片</button>
+          <button type="button" role="menuitem" onClick={() => handleContextCreate('video')}>视频</button>
+          <span className="agent-canvas-context-menu-divider" />
+          <button type="button" role="menuitem" disabled={!clipboardRef.current} onClick={handleContextPaste}>粘贴</button>
+          <button type="button" role="menuitem" disabled={!historyRef.current.canUndo()} onClick={() => { applyHistory('undo'); setContextMenu(null); }}>撤销</button>
+          <button type="button" role="menuitem" disabled={!historyRef.current.canRedo()} onClick={() => { applyHistory('redo'); setContextMenu(null); }}>重做</button>
+        </> : <>
+          <p className="agent-canvas-context-menu-title">{contextMenu.nodeIds.length > 1 ? `已选 ${contextMenu.nodeIds.length} 个节点` : '节点操作'}</p>
+          <button type="button" role="menuitem" onClick={handleContextCopy}>复制</button>
+          <button type="button" role="menuitem" onClick={handleContextDisconnect}>断开连线</button>
+          <span className="agent-canvas-context-menu-divider" />
+          <button type="button" role="menuitem" disabled={!contextAvailability?.canGroup} onClick={() => handleContextNodeCommand((current, ids) => groupCanvasNodes(current, ids, `group-${Date.now()}`))}>分组</button>
+          <button type="button" role="menuitem" disabled={!contextAvailability?.canUngroup} onClick={() => handleContextNodeCommand(ungroupCanvasNodes)}>取消分组</button>
+          <button type="button" role="menuitem" disabled={!contextAvailability?.canAlign} onClick={() => handleContextNodeCommand((current, ids) => alignCanvasNodes(current, ids, 'left'))}>左对齐</button>
+          <button type="button" role="menuitem" disabled={!contextAvailability?.canDistribute} onClick={() => handleContextNodeCommand((current, ids) => distributeCanvasNodes(current, ids, 'horizontal'))}>水平等距</button>
+          <span className="agent-canvas-context-menu-divider" />
+          <button type="button" role="menuitem" className="is-danger" onClick={handleContextDelete}>删除</button>
+        </>}
+      </section> : null}
 
       {appearance.alignmentGuides && nodeDragActive ? <><span className="agent-canvas-guide agent-canvas-guide--vertical" /><span className="agent-canvas-guide agent-canvas-guide--horizontal" /></> : null}
 

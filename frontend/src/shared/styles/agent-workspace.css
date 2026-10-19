@@ -464,6 +464,27 @@
 .agent-page .agent-canvas-tool-divider { width: 1px; height: 24px; flex: 0 0 auto; margin: 0 3px; background: var(--agent-border); }
 .agent-page .agent-canvas-zoom-value { min-width: 48px; color: var(--agent-secondary); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
 
+.agent-page .agent-canvas-context-menu {
+  position: absolute;
+  z-index: 30;
+  display: grid;
+  min-width: 184px;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  border: 1px solid var(--agent-border-strong);
+  border-radius: 8px;
+  padding: 5px;
+  background: color-mix(in srgb, var(--agent-panel) 97%, #000);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px);
+}
+.agent-page .agent-canvas-context-menu-title { margin: 3px 7px 5px; color: var(--agent-muted); font-size: 11px; }
+.agent-page .agent-canvas-context-menu button { width: 100%; min-height: 30px; border: 0; border-radius: 5px; padding: 0 8px; background: transparent; color: var(--agent-text); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+.agent-page .agent-canvas-context-menu button:hover:not(:disabled) { background: var(--agent-hover); }
+.agent-page .agent-canvas-context-menu button:disabled { color: var(--agent-muted); cursor: not-allowed; opacity: 0.48; }
+.agent-page .agent-canvas-context-menu button.is-danger { color: #e98080; }
+.agent-page .agent-canvas-context-menu-divider { height: 1px; margin: 4px 3px; background: var(--agent-border); }
+
 .agent-page .agent-canvas-edge-flow {
   fill: none;
   stroke: var(--agent-edge-color);
@@ -557,6 +578,7 @@
   .agent-canvas-appearance-popover { max-width: calc(100vw - 24px); }
   .agent-page .agent-canvas-appearance-panel { width: min(272px, calc(100vw - 56px)); }
   .agent-canvas-appearance-panel { width: min(272px, calc(100vw - 56px)); }
+  .agent-page .agent-canvas-context-menu { max-width: calc(100% - 16px); }
   .agent-page .agent-creation-home { place-items: start stretch; padding: 22px 12px; }
   .agent-page .agent-creation-home-inner { width: 100%; }
   .agent-page .agent-creation-composer { padding: 14px; }
