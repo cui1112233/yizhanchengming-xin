@@ -116,5 +116,24 @@ func AgentWorkspaceMigrations() []Migration {
 			},
 			CallbackChecksum: "v88-agent-canvas-appearance-v1",
 		},
+		{
+			Version: 8800004,
+			SQL: []string{
+				`CREATE TABLE IF NOT EXISTS agent_assets (
+  id VARCHAR(96) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  kind VARCHAR(16) NOT NULL,
+  name VARCHAR(191) NOT NULL,
+  content_type VARCHAR(127) NOT NULL,
+  object_key VARCHAR(512) NOT NULL,
+  byte_size BIGINT NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (project_id, id),
+  KEY idx_agent_assets_owner_project_created (owner_username, project_id, created_at, id)
+) ENGINE=InnoDB`,
+			},
+			CallbackChecksum: "v88-agent-project-assets-v1",
+		},
 	}
 }

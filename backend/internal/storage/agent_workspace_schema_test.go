@@ -37,11 +37,11 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 
 func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800003 {
-		t.Fatalf("last migration=%v, want 8800003", migrations[len(migrations)-1].Version)
+	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800004 {
+		t.Fatalf("last migration=%v, want 8800004", migrations[len(migrations)-1].Version)
 	}
 	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800003 {
+		if migration.Version >= 8800004 {
 			t.Fatalf("agent migration must be greater than existing version %d", migration.Version)
 		}
 	}
@@ -49,8 +49,8 @@ func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 
 func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	if len(migrations) != 3 {
-		t.Fatalf("AgentWorkspaceMigrations length=%d, want 3", len(migrations))
+	if len(migrations) != 4 {
+		t.Fatalf("AgentWorkspaceMigrations length=%d, want 4", len(migrations))
 	}
 	if migrations[0].Version != 8800001 || migrations[0].CallbackChecksum != "v88-agent-workspace-foundation-v1" {
 		t.Fatalf("historical migration changed: %+v", migrations[0])
@@ -68,5 +68,13 @@ func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(strings.Join(appearance.SQL, "\n")), "add column appearance_json") {
 		t.Fatalf("missing appearance_json migration: %v", appearance.SQL)
+	}
+	assets := migrations[3]
+	if assets.Version != 8800004 || assets.CallbackChecksum != "v88-agent-project-assets-v1" {
+		t.Fatalf("asset migration=%+v", assets)
+	}
+	assetSchema := strings.ToLower(strings.Join(assets.SQL, "\n"))
+	if !strings.Contains(assetSchema, "create table if not exists agent_assets") || !strings.Contains(assetSchema, "idx_agent_assets_owner_project_created") {
+		t.Fatalf("missing project asset table or owner index: %v", assets.SQL)
 	}
 }
