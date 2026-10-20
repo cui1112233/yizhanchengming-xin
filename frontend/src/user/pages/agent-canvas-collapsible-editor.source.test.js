@@ -33,6 +33,19 @@ test('loaded and serialized nodes both use the canonical type', () => {
   assert.ok(workspaceStyles.includes('.agent-page .agent-canvas-generation-panel'));
 });
 
+test('connection handles belong to the visible preview shell and stay hidden until relevant', () => {
+  assert.match(canvasSource, /className="agent-canvas-node-preview-shell"[\s\S]*?<Handle type="target"[\s\S]*?<Handle type="source"/);
+  assert.match(canvasSource, /selected,\s*isEditorOpen/);
+  assert.match(canvasSource, /useLayoutEffect\(\(\) => \{\s*updateNodeInternals\(id\);\s*\}, \[id, isEditorOpen, updateNodeInternals\]\)/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-preview-shell\s*\{[^}]*position:\s*relative/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node--image,[\s\S]*?\.agent-canvas-node--audio\s*\{[^}]*width:\s*340px/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-panel\s*\{[^}]*width:\s*100%/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-quick-add\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
+  assert.match(workspaceStyles, /\.react-flow__node\.selected[\s\S]*?\.agent-canvas-node-quick-add/);
+  assert.match(workspaceStyles, /\.agent-canvas\.is-connecting[\s\S]*?\.agent-canvas-node-target/);
+  assert.match(workspaceStyles, /\.agent-canvas-node-target\.connecting\.valid/);
+});
+
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
   for (const label of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
     assert.match(canvasSource, new RegExp(`aria-label="${label}"`));

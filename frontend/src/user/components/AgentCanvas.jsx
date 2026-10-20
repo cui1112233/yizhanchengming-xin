@@ -34,7 +34,7 @@ function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
   onNodeConfigChange, onSubmitVideo, onCancelVideo, onRetryVideo, onConfirmVideo,
   videoJob, videoState, videoBusy, videoActionError, imageModelOptions, videoModelOptions, modelLoadError,
-  isEditorOpen, onOpenEditor
+  selected, isEditorOpen, onOpenEditor
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
   const stopCanvasEvent = event => event.stopPropagation();
@@ -51,6 +51,7 @@ function CanvasNode({
     updateNodeInternals(id);
   }, [id, isEditorOpen, updateNodeInternals]);
   const config = data.config || {};
+  const nodeType = normalizeCanvasNodeType(data.type);
   const referenceAssets = Array.isArray(config.referenceAssets) ? config.referenceAssets : [];
   const updateConfig = patch => onNodeConfigChange?.(id, patch);
   const inputLabel = data.type === 'image' ? '图片提示词' : data.type === 'video' ? '视频提示词' : '音频文案';
@@ -103,22 +104,25 @@ function CanvasNode({
   </section> : null;
   return (
     <article
-      className={`agent-canvas-node agent-canvas-node--${data.type} agent-canvas-node--${data.status}`}
+      className={`agent-canvas-node agent-canvas-node--${nodeType} agent-canvas-node--${data.status}${selected ? ' is-selected' : ''}`}
       onDoubleClick={handleNodeDoubleClick}
     >
-      <Handle type="target" position={Position.Left} className="agent-canvas-node-target" aria-label="连接到此节点" />
-      <div className="agent-canvas-node-card">
-        <header><span>{data.type}</span><strong>{data.title}</strong></header>
-        {data.type === 'image' ? <button type="button" className="agent-canvas-node-image-select" aria-label="展开图片编辑" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
-          {data.assetRef?.url ? <img className="agent-canvas-node-media" src={data.assetRef.url} alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
-        </button> : null}
-        {data.type === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
-        {data.type === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
-        {data.type === 'text' ? <p>{data.summary || '等待 Agent 写入结果'}</p> : null}
-        {generationPanel}
-        <footer><span>v{data.version}</span><span>{data.status}</span></footer>
+      <div className="agent-canvas-node-preview-shell">
+        <Handle type="target" position={Position.Left} className="agent-canvas-node-target" aria-label="连接到此节点" />
+        <div className="agent-canvas-node-card">
+          <header><span>{nodeType}</span><strong>{data.title}</strong></header>
+          {nodeType === 'image' ? <button type="button" className="agent-canvas-node-image-select" aria-label="展开图片编辑" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
+            {data.assetRef?.url ? <img className="agent-canvas-node-media" src={data.assetRef.url} alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
+          </button> : null}
+          {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
+          {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
+          {nodeType === 'audio' ? <button type="button" className="agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>音频设置</button> : null}
+          {nodeType === 'text' ? <p>{data.summary || '等待 Agent 写入结果'}</p> : null}
+          <footer><span>v{data.version}</span><span>{data.status}</span></footer>
+        </div>
+        <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" />
       </div>
-      <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="从此节点拉出连线" />
+      {generationPanel}
     </article>
   );
 }

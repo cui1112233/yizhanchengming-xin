@@ -205,10 +205,11 @@ test('clicking a context-menu parent keeps its child choices open', () => {
 });
 
 test('node plus control is a real source handle for dragging a connection', () => {
-  assert.match(canvasSource, /<Handle type="source" position=\{Position\.Right\} className="agent-canvas-node-quick-add" aria-label="从此节点拉出连线" \/>/);
+  assert.match(canvasSource, /className="agent-canvas-node-preview-shell"[\s\S]*?<Handle type="source" position=\{Position\.Right\} className="agent-canvas-node-quick-add" aria-label="拖出连接" \/>/);
   assert.doesNotMatch(canvasSource, /onQuickAdd=/);
   assert.doesNotMatch(canvasSource, /createLinkedNode\(/);
   assert.match(canvasStyles, /\.agent-page \.agent-canvas-node-quick-add::before \{ content: '\+';/);
+  assert.match(canvasStyles, /\.agent-page \.agent-canvas-node-quick-add\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
 });
 
 test('empty connection drops offer text and image nodes instead of silently creating a default node', () => {
@@ -219,11 +220,12 @@ test('empty connection drops offer text and image nodes instead of silently crea
   assert.match(canvasSource, /handleConnectionDropCreate\('image'\)/);
 });
 
-test('canvas exposes visible target ports and a forgiving connection hit area', () => {
-  assert.match(canvasSource, /<Handle type="target" position=\{Position\.Left\} className="agent-canvas-node-target" aria-label="连接到此节点" \/>/);
+test('canvas exposes preview-bound target ports only while connecting and keeps a forgiving hit area', () => {
+  assert.match(canvasSource, /className="agent-canvas-node-preview-shell"[\s\S]*?<Handle type="target" position=\{Position\.Left\} className="agent-canvas-node-target" aria-label="连接到此节点" \/>/);
   assert.match(canvasSource, /connectionRadius=\{24\}/);
   assert.match(canvasSource, /isValidConnection=\{isValidCanvasConnection\}/);
-  assert.match(canvasStyles, /\.agent-page \.agent-canvas-node-target/);
+  assert.match(canvasStyles, /\.agent-page \.agent-canvas-node-target\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
+  assert.match(canvasStyles, /\.agent-page \.agent-canvas\.is-connecting \.agent-canvas-node-target\s*\{[^}]*pointer-events:\s*auto/);
 });
 
 test('successful connections are remembered so the empty-drop menu does not also open', () => {
@@ -265,7 +267,7 @@ test('generation panel uses the workspace palette with restrained spacing instea
   const panelRule = canvasStyles.match(/\.agent-page \.agent-canvas-generation-panel \{([\s\S]*?)\n\}/);
   assert.ok(panelRule, 'generation panel rule should exist');
   assert.match(panelRule[1], /background:\s*var\(--agent-panel\)/);
-  assert.match(panelRule[1], /border-radius:\s*10px/);
+  assert.match(panelRule[1], /border-radius:\s*8px/);
   assert.doesNotMatch(panelRule[1], /#193727|#315b43/);
   assert.match(canvasStyles, /color:\s*var\(--agent-accent\)/);
 });
