@@ -26,14 +26,15 @@ type agentVideoCoordinator struct {
 }
 
 type agentVideoJobRequest struct {
-	NodeID           string `json:"nodeId"`
-	IdempotencyKey   string `json:"idempotencyKey"`
-	Prompt           string `json:"prompt"`
-	ModelKey         string `json:"modelKey"`
-	Duration         any    `json:"duration"`
-	AspectRatio      string `json:"aspectRatio"`
-	Resolution       string `json:"resolution"`
-	IgnoreReferences bool   `json:"ignoreReferences"`
+	NodeID            string   `json:"nodeId"`
+	IdempotencyKey    string   `json:"idempotencyKey"`
+	Prompt            string   `json:"prompt"`
+	ModelKey          string   `json:"modelKey"`
+	Duration          any      `json:"duration"`
+	AspectRatio       string   `json:"aspectRatio"`
+	Resolution        string   `json:"resolution"`
+	ReferenceAssetIDs []string `json:"referenceAssetIds"`
+	IgnoreReferences  bool     `json:"ignoreReferences"`
 }
 
 func RegisterAgentVideoJobRoutes(root *http.ServeMux, middleware BridgeAuth, coordinator *agentVideoCoordinator) {
@@ -144,7 +145,7 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 	if node.Type != "video" {
 		return agentworkspace.VideoJob{}, fmt.Errorf("只能为视频节点生成视频")
 	}
-	references, ids, err := s.referenceURLs(ctx, owner, projectID, canvas, node.ID, request.IgnoreReferences)
+	references, ids, err := s.referenceURLs(ctx, owner, projectID, request.ReferenceAssetIDs, request.IgnoreReferences)
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
 	}
@@ -163,26 +164,22 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 	return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
 }
 
-func (s *agentVideoCoordinator) referenceURLs(ctx context.Context, owner, projectID string, canvas agentworkspace.Canvas, videoNodeID string, ignore bool) ([]string, []string, error) {
+func (s *agentVideoCoordinator) referenceURLs(ctx context.Context, owner, projectID string, requestedIDs []string, ignore bool) ([]string, []string, error) {
 	if ignore {
 		return []string{}, []string{}, nil
 	}
-	ids := make([]string, 0)
+	ids := make([]string, 0, len(requestedIDs))
 	seen := map[string]bool{}
-	for _, edge := range canvas.Edges {
-		if edge.Target != videoNodeID || seen[edge.Source] {
+	for _, requestedID := range requestedIDs {
+		id := strings.TrimSpace(requestedID)
+		if id == "" || seen[id] {
 			continue
 		}
-		source, ok := agentVideoNode(canvas, edge.Source)
-		if !ok || source.Type != "image" {
-			continue
+		seen[id] = true
+		ids = append(ids, id)
+		if len(ids) == 10 {
+			break
 		}
-		assetID, _ := source.AssetRef["id"].(string)
-		if strings.TrimSpace(assetID) == "" {
-			continue
-		}
-		seen[edge.Source] = true
-		ids = append(ids, assetID)
 	}
 	if len(ids) == 0 {
 		return []string{}, []string{}, nil
@@ -285,7 +282,7 @@ func valueString(value any) string {
 	return ""
 }
 func requestFromJob(job agentworkspace.VideoJob, key string) agentVideoJobRequest {
-	return agentVideoJobRequest{NodeID: job.NodeID, IdempotencyKey: key, Prompt: valueString(job.Settings["prompt"]), ModelKey: job.ModelKey, Duration: job.Settings["duration"], AspectRatio: valueString(job.Settings["aspectRatio"]), Resolution: valueString(job.Settings["resolution"]), IgnoreReferences: true}
+	return agentVideoJobRequest{NodeID: job.NodeID, IdempotencyKey: key, Prompt: valueString(job.Settings["prompt"]), ModelKey: job.ModelKey, Duration: job.Settings["duration"], AspectRatio: valueString(job.Settings["aspectRatio"]), Resolution: valueString(job.Settings["resolution"]), ReferenceAssetIDs: append([]string(nil), job.ReferenceAssetIDs...)}
 }
 
 func writeAgentVideoJobError(w http.ResponseWriter, err error) {

@@ -557,7 +557,8 @@ export function AgentPageV2({ theme }) {
               if (!activeTaskId) return;
               const result = await getAgentCanvas(activeTaskId);
               const nextCanvas = result.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
-              setCanvas(nextCanvas);
+              if (canvasSaveQueueRef.current) await canvasSaveQueueRef.current?.acceptServerCanvas(nextCanvas);
+              else setCanvas(nextCanvas);
               setCanvasViewport(nextCanvas.viewport || { x: 0, y: 0, zoom: 1 });
             }}
           />

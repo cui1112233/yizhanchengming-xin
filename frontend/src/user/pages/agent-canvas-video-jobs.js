@@ -17,6 +17,16 @@ export function collectVideoReferences({ nodes = [], edges = [], videoNodeId = '
   });
 }
 
+export function videoReferenceAssetIDs(config = {}) {
+  const seen = new Set();
+  return (Array.isArray(config?.referenceAssets) ? config.referenceAssets : []).flatMap(asset => {
+    const id = String(asset?.id || '').trim();
+    if (asset?.kind !== 'image' || !id || seen.has(id)) return [];
+    seen.add(id);
+    return [id];
+  });
+}
+
 export function videoNodeViewState(job) {
   const state = String(job?.state || 'draft');
   return {

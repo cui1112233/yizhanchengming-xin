@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState } from './agent-canvas-video-jobs.js';
+import { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs } from './agent-canvas-video-jobs.js';
 
 test('video creation requires a non-empty prompt from the inline node settings', () => {
   assert.equal(canSubmitVideoFromConfig({ prompt: '' }), false);
@@ -19,6 +19,16 @@ test('collectVideoReferences keeps only directly connected confirmed image asset
     edges: [{ source: 'image-1', target: 'video-1' }, { source: 'image-2', target: 'video-1' }, { source: 'text-1', target: 'video-1' }]
   });
   assert.deepEqual(refs.map(item => item.id), ['asset-1']);
+});
+
+test('videoReferenceAssetIDs sends selected existing images once and rejects videos', () => {
+  assert.deepEqual(videoReferenceAssetIDs({ referenceAssets: [
+    { id: 'manual-image', kind: 'image' },
+    { id: 'connected-image', kind: 'image' },
+    { id: 'manual-image', kind: 'image' },
+    { id: 'video-asset', kind: 'video' },
+    { id: '', kind: 'image' }
+  ] }), ['manual-image', 'connected-image']);
 });
 
 test('videoNodeViewState exposes confirmation instead of auto-applying result', () => {

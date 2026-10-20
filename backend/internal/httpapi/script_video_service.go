@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -69,11 +70,45 @@ func (s *scriptVideoService) Submit(ctx context.Context, owner string, input scr
 		return scriptVideoSubmission{}, err
 	}
 	setScriptVideoClient(adapter, s.client)
-	ref, err := adapter.Submit(ctx, batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15, MaxReferenceImages: 9}, batchfactoryv11.FinalPrompt{CompiledPrompt: input.Prompt, DurationSeconds: durationValue(input.Duration), ReferenceImageURLs: input.ImageURLs, EffectiveSettings: batchfactoryv11.EffectiveSettings{Values: batchfactoryv11.SettingsPatch{}}})
+	settings := scriptVideoEffectiveSettings(spec.Provider, input.AspectRatio, input.Resolution)
+	ref, err := adapter.Submit(ctx, batchfactoryv11.FrozenVideoModel{ID: cfg.Model, MaxDuration: 15, MaxReferenceImages: 9}, batchfactoryv11.FinalPrompt{CompiledPrompt: input.Prompt, DurationSeconds: durationValue(input.Duration), ReferenceImageURLs: input.ImageURLs, EffectiveSettings: batchfactoryv11.EffectiveSettings{Values: settings}})
 	if err != nil {
 		return scriptVideoSubmission{}, err
 	}
 	return scriptVideoSubmission{TaskID: spec.PublicTaskPrefix + ref.ProviderTaskID, Status: "processing", Provider: spec.Provider}, nil
+}
+
+func scriptVideoEffectiveSettings(provider, aspectRatio, resolution string) batchfactoryv11.SettingsPatch {
+	aspectRatio = strings.TrimSpace(aspectRatio)
+	switch {
+	case strings.HasPrefix(aspectRatio, "16:9"):
+		aspectRatio = "16:9"
+	case strings.HasPrefix(aspectRatio, "9:16"):
+		aspectRatio = "9:16"
+	default:
+		aspectRatio = ""
+	}
+	resolution = strings.TrimSpace(resolution)
+	if strings.EqualFold(resolution, "auto") {
+		resolution = ""
+	}
+	if provider == batchfactoryv11.VideoProviderAutoDLH3 && resolution != "" && !strings.HasSuffix(resolution, "横") && !strings.HasSuffix(resolution, "竖") {
+		if aspectRatio == "16:9" {
+			resolution += "横"
+		} else if aspectRatio == "9:16" {
+			resolution += "竖"
+		}
+	}
+	settings := batchfactoryv11.SettingsPatch{}
+	if aspectRatio != "" {
+		encoded, _ := json.Marshal(aspectRatio)
+		settings["videoAspectRatio"] = encoded
+	}
+	if resolution != "" {
+		encoded, _ := json.Marshal(resolution)
+		settings["videoResolution"] = encoded
+	}
+	return settings
 }
 
 func (s *scriptVideoService) Poll(ctx context.Context, owner, taskID string) (scriptVideoStatus, error) {

@@ -193,11 +193,14 @@ func (s *MySQLStore) ConfirmVideoJob(ctx context.Context, owner, projectID, id s
 	var sourceJSON, assetJSON, configJSON []byte
 	var groupID sql.NullString
 	err = tx.QueryRowContext(ctx, `SELECT id, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id = ? FOR UPDATE`, job.ProjectID, owner, job.NodeID).Scan(&node.ID, &node.Type, &node.Title, &node.Summary, &node.Position.X, &node.Position.Y, &node.Version, &node.Status, &sourceJSON, &assetJSON, &configJSON, &groupID)
-	if errors.Is(err, sql.ErrNoRows) || node.Type != "video" || node.Version != job.NodeVersion {
+	if errors.Is(err, sql.ErrNoRows) {
 		return VideoJob{}, ErrVideoJobNodeChanged
 	}
 	if err != nil {
 		return VideoJob{}, err
+	}
+	if node.Type != "video" || node.Version != job.NodeVersion {
+		return VideoJob{}, ErrVideoJobNodeChanged
 	}
 	_ = json.Unmarshal(sourceJSON, &node.SourceNodeIDs)
 	_ = json.Unmarshal(configJSON, &node.Config)

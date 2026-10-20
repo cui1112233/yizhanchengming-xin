@@ -5,7 +5,7 @@ import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, Focus, GitBranch, Group, Hand, Maximize2,
-  ArrowUp, ImagePlus, Keyboard, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
+  ArrowUp, ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,14 +24,15 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, videoNodeViewState } from '../pages/agent-canvas-video-jobs';
+import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, videoNodeViewState, videoReferenceAssetIDs } from '../pages/agent-canvas-video-jobs';
 import { isMediaCanvasNodeType, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 
 const LOCAL_DOUBAO_VIDEO_MODEL_OPTION = { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' };
 
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
-  onNodeConfigChange, onSubmitVideo, imageModelOptions, videoModelOptions, modelLoadError,
+  onNodeConfigChange, onSubmitVideo, onCancelVideo, onRetryVideo, onConfirmVideo,
+  videoJob, videoState, videoBusy, videoActionError, imageModelOptions, videoModelOptions, modelLoadError,
   isEditorOpen, onOpenEditor
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
@@ -74,7 +75,7 @@ function CanvasNode({
       </> : null}
       {data.type === 'video' ? <>
         <Select aria-label="视频模型" variant="borderless" size="small" value={config.model || undefined} placeholder={modelLoadError || '选择模型'} options={videoModelOptions} onChange={model => updateConfig({ model })} />
-        <Select aria-label="视频比例" variant="borderless" size="small" value={config.ratio || undefined} placeholder="比例" options={['16:9 · 720p', '9:16 · 720p', '1:1 · 720p'].map(value => ({ value, label: value }))} onChange={ratio => updateConfig({ ratio })} />
+        <Select aria-label="视频比例" variant="borderless" size="small" value={config.ratio || undefined} placeholder="比例" options={[{ value: '16:9', label: '16:9 · 横屏' }, { value: '9:16', label: '9:16 · 竖屏' }]} onChange={ratio => updateConfig({ ratio })} />
         <Select aria-label="视频时长（秒）" variant="borderless" size="small" value={config.durationSeconds || 10} options={[5, 10, 15].map(value => ({ value, label: `${value}s` }))} onChange={durationSeconds => updateConfig({ durationSeconds })} />
         <Select aria-label="视频自动设置" variant="borderless" size="small" value={config.resolution || 'auto'} options={[{ value: 'auto', label: '自动设置' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} onChange={resolution => updateConfig({ resolution })} />
       </> : null}
@@ -82,8 +83,18 @@ function CanvasNode({
         <Input aria-label="音色" variant="borderless" size="small" value={config.voice || ''} placeholder="音色" maxLength={191} onChange={event => updateConfig({ voice: event.target.value })} />
         <Input aria-label="语速" variant="borderless" size="small" type="number" min={0.5} max={2} step={0.1} value={config.speed ?? 1} onChange={event => updateConfig({ speed: event.target.value === '' ? 1 : Number(event.target.value) })} />
       </> : null}
-      {!generationAvailable ? <span className="agent-canvas-generation-unavailable">暂未接入生成执行器</span> : null}
-      <button type="button" className="agent-canvas-generation-submit" aria-label={generationAvailable ? '生成视频' : '暂未接入生成执行器'} title={generationAvailable ? '生成视频' : '暂未接入生成执行器'} disabled={!generationAvailable || !String(config.prompt || '').trim()} onClick={event => { stopCanvasEvent(event); if (generationAvailable) onSubmitVideo?.(id); }}><ArrowUp size={19} /></button>
+      {!generationAvailable ? <>
+        <span className="agent-canvas-generation-unavailable">暂未接入生成执行器</span>
+        <button type="button" className="agent-canvas-generation-submit" aria-label="暂未接入生成执行器" title="暂未接入生成执行器" disabled={!generationAvailable || !String(config.prompt || '').trim()}><ArrowUp size={19} /></button>
+      </> : null}
+      {data.type === 'video' ? <>
+        <span className="agent-canvas-generation-state" aria-live="polite">{videoJob ? videoState.state : '尚未生成'}</span>
+        {videoActionError ? <span className="agent-canvas-generation-error" role="alert">{videoActionError}</span> : null}
+        {videoState.canCancel ? <button type="button" aria-label="取消视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onCancelVideo?.(id); }}>取消</button> : null}
+        {videoState.canRetry ? <button type="button" aria-label="重试视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onRetryVideo?.(id); }}>重试</button> : null}
+        {videoState.canConfirm ? <button type="button" aria-label="确认视频结果" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onConfirmVideo?.(id); }}>确认</button> : null}
+        <button type="button" className="agent-canvas-generation-submit" aria-label="生成视频" title="生成视频" disabled={videoBusy || !videoState.canGenerate || !String(config.prompt || '').trim()} onClick={event => { stopCanvasEvent(event); onSubmitVideo?.(id); }}><ArrowUp size={19} /></button>
+      </> : null}
     </div>
   </section> : null;
   return (
@@ -209,10 +220,9 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const [assetError, setAssetError] = useState('');
   const [manualNode, setManualNode] = useState(null);
   const [manualNodeDraft, setManualNodeDraft] = useState({ title: '', summary: '', status: 'draft', config: {} });
-  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [videoJobs, setVideoJobs] = useState({});
-  const [videoBusy, setVideoBusy] = useState(false);
-  const [videoActionError, setVideoActionError] = useState('');
+  const [videoBusyByNode, setVideoBusyByNode] = useState({});
+  const [videoActionErrors, setVideoActionErrors] = useState({});
   const [configuredImageModels, setConfiguredImageModels] = useState([]);
   const [configuredVideoModels, setConfiguredVideoModels] = useState([]);
   const [modelLoadError, setModelLoadError] = useState('');
@@ -231,8 +241,6 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const connectionCompletedRef = useRef(false);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
 
-  const activeVideoJob = manualNode ? videoJobs[manualNode.id] : null;
-  const activeVideoState = videoNodeViewState(activeVideoJob);
   const configuredImageModelOptions = useMemo(() => modelSelectOptions(configuredImageModels, 'image'), [configuredImageModels]);
   const configuredVideoModelOptions = useMemo(() => {
     const options = modelSelectOptions(configuredVideoModels, 'video');
@@ -284,11 +292,18 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       onRemoveReference={removeReference}
       onNodeConfigChange={handleNodeConfigChange}
       onSubmitVideo={submitVideoForNode}
+      onCancelVideo={cancelVideo}
+      onRetryVideo={retryVideo}
+      onConfirmVideo={confirmVideo}
+      videoJob={videoJobs[props.id] || null}
+      videoState={videoNodeViewState(videoJobs[props.id])}
+      videoBusy={Boolean(videoBusyByNode[props.id])}
+      videoActionError={videoActionErrors[props.id] || ''}
       imageModelOptions={configuredImageModelOptions}
       videoModelOptions={configuredVideoModelOptions}
       modelLoadError={modelLoadError}
     />
-  }), [activeEditorNodeID, configuredImageModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError]);
+  }), [activeEditorNodeID, configuredImageModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError, videoActionErrors, videoBusyByNode, videoJobs]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -500,15 +515,9 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       aspectRatio: config.ratio || '',
       resolution: config.resolution || '',
       duration: config.durationSeconds || 10,
+      referenceAssetIds: videoReferenceAssetIDs(config),
       ignoreReferences
     };
-  }
-
-  function videoRequestPayload(ignoreReferences = false) {
-    return videoRequestPayloadForNode({
-      id: manualNode.id,
-      data: { ...manualNode.data, summary: manualNodeDraft.summary, config: manualNodeDraft.config }
-    }, ignoreReferences);
   }
 
   async function submitVideoForNode(nodeID, ignoreReferences = false) {
@@ -517,8 +526,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     if (!node || node.data?.type !== 'video') return;
     const payload = videoRequestPayloadForNode(node, ignoreReferences);
     if (!canSubmitVideoFromConfig({ prompt: payload.prompt })) return;
-    setVideoBusy(true);
-    setVideoActionError('');
+    setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
+    setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
       const result = await createAgentVideoJob(taskId, payload);
       setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
@@ -531,45 +540,57 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
           onOk: () => submitVideoForNode(nodeID, true)
         });
       } else {
-        setVideoActionError(error?.message || '视频任务创建失败');
+        setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '视频任务创建失败' }));
       }
     } finally {
-      setVideoBusy(false);
+      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
   }
 
-  async function submitVideo(ignoreReferences = false) {
-    if (!taskId || !manualNode) return;
-    return submitVideoForNode(manualNode.id, ignoreReferences);
+  async function cancelVideo(nodeID) {
+    const job = videoJobs[nodeID];
+    if (!taskId || !job) return;
+    setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
+    setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
+    try {
+      const result = await cancelAgentVideoJob(taskId, job.id);
+      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
+    } catch (error) {
+      setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '取消视频任务失败' }));
+    } finally {
+      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+    }
   }
 
-  async function cancelVideo() {
-    if (!taskId || !activeVideoJob) return;
-    setVideoBusy(true); setVideoActionError('');
+  async function retryVideo(nodeID) {
+    const job = videoJobs[nodeID];
+    if (!taskId || !job) return;
+    setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
+    setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
-      const result = await cancelAgentVideoJob(taskId, activeVideoJob.id);
-      setVideoJobs(current => ({ ...current, [manualNode.id]: result.job }));
-    } catch (error) { setVideoActionError(error?.message || '取消视频任务失败'); } finally { setVideoBusy(false); }
+      const result = await retryAgentVideoJob(taskId, job.id, makeVideoJobIdempotencyKey());
+      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
+    } catch (error) {
+      setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '重试视频任务失败' }));
+    } finally {
+      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+    }
   }
 
-  async function retryVideo() {
-    if (!taskId || !activeVideoJob) return;
-    setVideoBusy(true); setVideoActionError('');
+  async function confirmVideo(nodeID) {
+    const job = videoJobs[nodeID];
+    if (!taskId || !job) return;
+    setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
+    setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
-      const result = await retryAgentVideoJob(taskId, activeVideoJob.id, makeVideoJobIdempotencyKey());
-      setVideoJobs(current => ({ ...current, [manualNode.id]: result.job }));
-    } catch (error) { setVideoActionError(error?.message || '重试视频任务失败'); } finally { setVideoBusy(false); }
-  }
-
-  async function confirmVideo() {
-    if (!taskId || !activeVideoJob) return;
-    setVideoBusy(true); setVideoActionError('');
-    try {
-      const result = await confirmAgentVideoJob(taskId, activeVideoJob.id);
-      setVideoJobs(current => ({ ...current, [manualNode.id]: result.job }));
-      setManualNode(null);
+      const result = await confirmAgentVideoJob(taskId, job.id);
+      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
       await onServerCanvasChange?.();
-    } catch (error) { setVideoActionError(error?.message || '确认回填失败'); } finally { setVideoBusy(false); }
+    } catch (error) {
+      setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '确认回填失败' }));
+    } finally {
+      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+    }
   }
 
   function handleConnect(connection) {
@@ -884,41 +905,6 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   function applyKeyboardCommand(command) {
     switch (command) {
-      case 'select_all':
-        setCanvasSelection(nodesRef.current.map(node => node.id));
-        return;
-      case 'copy':
-        copySelection();
-        return;
-      case 'paste':
-        pasteClipboardAt(keyboardPastePosition());
-        return;
-      case 'duplicate':
-        if (copySelection()) pasteClipboardAt(keyboardPastePosition());
-        return;
-      case 'delete':
-        deleteCanvasNodes();
-        return;
-      case 'group':
-        if (selectedIds.length >= 2) runNodeCommand(current => groupCanvasNodes(current, selectedIds, `group-${Date.now()}`));
-        return;
-      case 'ungroup':
-        runNodeCommand(current => ungroupCanvasNodes(current, selectedIds));
-        return;
-      case 'fit_canvas':
-        flowInstance?.fitView({ padding: 0.18 });
-        return;
-      case 'focus_selection': {
-        const selected = nodesRef.current.filter(node => selectedIds.includes(node.id));
-        if (selected.length) flowInstance?.fitView({ nodes: selected, padding: 0.3 });
-        return;
-      }
-      case 'zoom_in':
-        flowInstance?.zoomIn();
-        return;
-      case 'zoom_out':
-        flowInstance?.zoomOut();
-        return;
       case 'undo':
       case 'redo':
         if ((command === 'undo' && historyRef.current.canUndo()) || (command === 'redo' && historyRef.current.canRedo())) applyHistory(command);
@@ -1148,21 +1134,6 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         <label className="agent-canvas-manual-field">状态<Select value={manualNodeDraft.status} onChange={status => setManualNodeDraft(current => ({ ...current, status }))} options={[{ value: 'draft', label: '草稿' }, { value: 'confirmed', label: '已确认' }, { value: 'failed', label: '需处理' }]} /></label>
       </Modal>
 
-      <Modal title="快捷键操作" open={shortcutHelpOpen} footer={null} onCancel={() => setShortcutHelpOpen(false)}>
-        <section className="agent-canvas-shortcut-help" aria-label="快捷键操作说明">
-          <p><kbd>中键拖动</kbd><span>拖动画布</span></p>
-          <p><kbd>Ctrl/Cmd + 滚轮</kbd><span>缩放画布</span></p>
-          <p><kbd>Ctrl/Cmd + A</kbd><span>全选节点</span></p>
-          <p><kbd>Ctrl/Cmd + C / V</kbd><span>复制 / 粘贴</span></p>
-          <p><kbd>Ctrl/Cmd + D</kbd><span>复制选中节点</span></p>
-          <p><kbd>Delete / Backspace</kbd><span>删除选中节点</span></p>
-          <p><kbd>Ctrl/Cmd + Z / Shift + Z</kbd><span>撤销 / 重做</span></p>
-          <p><kbd>Ctrl/Cmd + G / Shift + G</kbd><span>分组 / 解组</span></p>
-          <p><kbd>Shift + 1</kbd><span>适合屏幕</span></p>
-          <p><kbd>Shift + 2</kbd><span>聚焦选中节点</span></p>
-        </section>
-      </Modal>
-
       {appearance.alignmentGuides && nodeDragActive ? <><span className="agent-canvas-guide agent-canvas-guide--vertical" /><span className="agent-canvas-guide agent-canvas-guide--horizontal" /></> : null}
 
       <nav className="agent-canvas-toolrail" aria-label="画布工具">
@@ -1200,7 +1171,6 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         <IconTool label="放大" onClick={() => flowInstance?.zoomIn()}><ZoomIn size={17} /></IconTool>
         <IconTool label="适合屏幕" onClick={() => flowInstance?.fitView({ padding: 0.18 })}><Maximize2 size={17} /></IconTool>
         <IconTool label={selectedIds.length ? '聚焦选中' : '请先选择节点'} disabled={!selectedIds.length} onClick={() => flowInstance?.fitView({ nodes: nodesRef.current.filter(node => selectedIds.includes(node.id)), padding: 0.3 })}><Focus size={17} /></IconTool>
-        <Tooltip title="快捷键"><span><Button type="text" aria-label="快捷键" icon={<Keyboard size={17} />} onClick={() => setShortcutHelpOpen(true)} /></span></Tooltip>
       </nav>
     </div>
   );

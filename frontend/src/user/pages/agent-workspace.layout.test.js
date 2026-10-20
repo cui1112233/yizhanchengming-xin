@@ -48,6 +48,10 @@ test('进入画布页后会重新读取当前项目画布', () => {
   assert.match(canvasLoadEffect[1], /isCanvasWorkspace/);
 });
 
+test('视频确认回读会把服务端 revision 同步给保存队列', () => {
+  assert.match(pageSource, /await canvasSaveQueueRef\.current\?\.acceptServerCanvas\(nextCanvas\)/);
+});
+
 test('A 方案画布工具使用固定尺寸且不会因禁用状态位移', () => {
   for (const selector of ['.agent-page .agent-canvas-toolrail', '.agent-page .agent-canvas-editbar', '.agent-page .agent-canvas-zoombar']) {
     const block = cssBlock(selector);

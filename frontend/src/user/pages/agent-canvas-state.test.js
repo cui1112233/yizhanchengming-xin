@@ -64,6 +64,57 @@ test('canvas save queue keeps the newest change and advances server revision', a
   queue.dispose();
 });
 
+test('canvas save queue accepts a confirmed server canvas before the next edit', async () => {
+  const calls = [];
+  const accepted = [];
+  const queue = createCanvasSaveQueue({
+    revision: 2,
+    delay: 5000,
+    save: async (canvas, revision) => {
+      calls.push({ canvas, revision });
+      return { canvas: { ...canvas, revision: revision + 1 } };
+    },
+    reload: async () => ({ canvas: { version: 1, revision: 2, nodes: [], edges: [] } }),
+    onCanvas: canvas => accepted.push(canvas)
+  });
+
+  const confirmed = { version: 1, revision: 3, nodes: [{ id: 'video-1', version: 2, status: 'confirmed' }], edges: [] };
+  await queue.acceptServerCanvas(confirmed);
+  queue.enqueue({ ...confirmed, nodes: [...confirmed.nodes, { id: 'text-1', version: 1 }] });
+  await queue.flush();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].revision, 3);
+  assert.equal(calls[0].canvas.nodes.at(-1).id, 'text-1');
+  assert.equal(accepted.at(-1).revision, 4);
+  queue.dispose();
+});
+
+test('canvas save queue merges a pending edit with a confirmed server node', async () => {
+  const calls = [];
+  const queue = createCanvasSaveQueue({
+    revision: 2,
+    delay: 5000,
+    save: async (canvas, revision) => {
+      calls.push({ canvas, revision });
+      return { canvas: { ...canvas, revision: revision + 1 } };
+    },
+    reload: async () => ({ canvas: { version: 1, revision: 2, nodes: [], edges: [] } })
+  });
+  queue.enqueue({ version: 1, revision: 2, nodes: [{ id: 'video-1', version: 1, status: 'draft', config: { prompt: '本地新提示词' } }], edges: [] });
+
+  await queue.acceptServerCanvas({ version: 1, revision: 3, nodes: [{ id: 'video-1', version: 2, status: 'confirmed', assetRef: { id: 'result-1', kind: 'video' }, config: { prompt: '旧提示词' } }], edges: [] });
+  await queue.flush();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].revision, 3);
+  assert.equal(calls[0].canvas.nodes[0].config.prompt, '本地新提示词');
+  assert.equal(calls[0].canvas.nodes[0].status, 'confirmed');
+  assert.equal(calls[0].canvas.nodes[0].version, 2);
+  assert.equal(calls[0].canvas.nodes[0].assetRef.id, 'result-1');
+  queue.dispose();
+});
+
 test('canvas save queue reloads authoritative canvas on revision conflict', async () => {
   const statuses = [];
   const canvases = [];

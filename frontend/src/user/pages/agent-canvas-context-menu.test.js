@@ -304,14 +304,29 @@ test('canvas keeps media asset actions in the opened editor instead of the manua
   assert.doesNotMatch(canvasSource, /manualNode\?\.data\?\.type === 'audio'/);
 });
 
-test('canvas keeps middle mouse panning available and exposes real shortcut help', () => {
+test('expanded video editor exposes create cancel retry confirm and per-node errors', () => {
+  assert.match(canvasSource, /videoJob=\{videoJobs\[props\.id\]\s*\|\|\s*null\}/);
+  assert.match(canvasSource, /videoState=\{videoNodeViewState\(videoJobs\[props\.id\]\)\}/);
+  assert.match(canvasSource, /videoBusy=\{Boolean\(videoBusyByNode\[props\.id\]\)\}/);
+  assert.match(canvasSource, /videoActionError=\{videoActionErrors\[props\.id\]\s*\|\|\s*''\}/);
+  for (const action of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
+    assert.match(canvasSource, new RegExp(`aria-label="${action}"`));
+  }
+  assert.match(canvasSource, /onCancelVideo\?\.\(id\)/);
+  assert.match(canvasSource, /onRetryVideo\?\.\(id\)/);
+  assert.match(canvasSource, /onConfirmVideo\?\.\(id\)/);
+  assert.doesNotMatch(canvasSource, /const activeVideoJob = manualNode/);
+});
+
+test('canvas keeps middle mouse panning and advertises only implemented undo redo keys', () => {
   assert.match(canvasSource, /panOnDrag=\{interactionMode === 'pan' \? \[0, 1\] : \[1\]\}/);
-  assert.match(canvasSource, /aria-label="快捷键"/);
-  assert.match(canvasSource, /title="快捷键操作"/);
-  assert.match(canvasSource, /中键拖动/);
-  assert.match(canvasSource, /Ctrl\/Cmd \+ A/);
-  assert.match(canvasSource, /Shift \+ 1/);
-  assert.match(canvasSource, /applyKeyboardCommand/);
+  assert.match(canvasSource, /case 'undo':\s*case 'redo':/);
+  assert.doesNotMatch(canvasSource, /aria-label="快捷键"/);
+  assert.doesNotMatch(canvasSource, /title="快捷键操作"/);
+  assert.doesNotMatch(canvasSource, /case 'select_all':/);
+  assert.doesNotMatch(canvasSource, /case 'copy':/);
+  assert.doesNotMatch(canvasSource, /case 'delete':/);
+  assert.doesNotMatch(canvasSource, /case 'focus_selection':/);
 });
 
 test('canvas reads image and video models from the shared API configuration instead of hard-coding its own catalog', () => {

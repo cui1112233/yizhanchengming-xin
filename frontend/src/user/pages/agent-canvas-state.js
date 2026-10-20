@@ -123,6 +123,26 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
     timer = null;
   }
 
+  function mergePendingCanvas(serverCanvas, localCanvas) {
+    const serverNodes = new Map((serverCanvas?.nodes || []).map(node => [node.id, node]));
+    return {
+      ...serverCanvas,
+      ...localCanvas,
+      revision: Number(serverCanvas?.revision) || 0,
+      nodes: (localCanvas?.nodes || []).map(node => {
+        const serverNode = serverNodes.get(node.id);
+        if (!serverNode) return node;
+        return {
+          ...serverNode,
+          ...node,
+          version: serverNode.version,
+          status: serverNode.status,
+          ...(serverNode.assetRef ? { assetRef: serverNode.assetRef } : {})
+        };
+      })
+    };
+  }
+
   return {
     enqueue(canvas) {
       if (disposed) return;
@@ -142,6 +162,23 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
       setStatus('dirty');
       clearTimer();
       return savePending();
+    },
+    async acceptServerCanvas(canvas) {
+      if (disposed || !canvas) return;
+      clearTimer();
+      if (active) await active;
+      if (disposed) return;
+      currentRevision = Number(canvas.revision) || 0;
+      failed = null;
+      if (pending) {
+        pending = mergePendingCanvas(canvas, pending);
+        onCanvas?.(pending);
+        setStatus('dirty');
+        schedule(0);
+        return;
+      }
+      onCanvas?.(canvas);
+      setStatus('saved');
     },
     dispose() {
       disposed = true;

@@ -160,3 +160,39 @@ func TestMySQLStoreSaveCanvasWritesNodeGroupAndConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMySQLStoreConfirmVideoJobReturnsNodeQueryError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLStore(db)
+	now := time.Date(2026, 10, 20, 1, 20, 0, 0, time.UTC)
+	nodeErr := errors.New("node query failed")
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT `+videoJobColumns+` FROM agent_video_jobs WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("job-1", "project-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "owner_username", "node_id", "node_version", "state", "model_key", "provider_task_id", "settings_json", "reference_asset_ids_json", "result_asset_id", "error_message", "idempotency_key", "created_at", "updated_at"}).
+			AddRow("job-1", "project-1", "alice", "video-1", int64(1), VideoJobAwaitingConfirmation, "minimax-h3-video", "provider-1", `{"prompt":"雨夜追逐"}`, `[]`, "result-1", nil, "request-1", now, now))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, project_id, kind, name, content_type, object_key, byte_size, created_at FROM agent_assets WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("result-1", "project-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "kind", "name", "content_type", "object_key", "byte_size", "created_at"}).
+			AddRow("result-1", "project-1", "video", "result.mp4", "video/mp4", "agent-assets/alice/project-1/result.mp4", int64(128), now))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id = ? FOR UPDATE`)).
+		WithArgs("project-1", "alice", "video-1").
+		WillReturnError(nodeErr)
+	mock.ExpectRollback()
+
+	_, err = store.ConfirmVideoJob(context.Background(), "alice", "project-1", "job-1", now)
+	if err != nodeErr {
+		t.Fatalf("err=%v, want exact node query error", err)
+	}
+	if errors.Is(err, ErrVideoJobNodeChanged) {
+		t.Fatalf("node query error was mapped to ErrVideoJobNodeChanged")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
