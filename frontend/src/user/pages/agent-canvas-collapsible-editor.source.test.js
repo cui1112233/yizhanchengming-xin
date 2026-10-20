@@ -52,6 +52,14 @@ test('connection handles belong to the visible preview shell and stay hidden unt
   assert.doesNotMatch(workspaceStyles, /\.agent-canvas-node-target\.connecting\.valid/);
 });
 
+test('edge visibility changes rendering without deleting serialized edges', () => {
+  assert.match(canvasSource, /hidden:\s*!appearance\.edgesVisible/);
+  assert.match(canvasSource, /appearance\.edgesVisible \? '隐藏连线' : '显示连线'/);
+  assert.match(canvasSource, /updateAppearance\(\{ edgesVisible: !appearance\.edgesVisible \}\)/);
+  assert.match(canvasSource, /appearance\.edgesVisible \? <EyeOff size=\{17\} \/> : <Eye size=\{17\} \/>/);
+  assert.doesNotMatch(canvasSource, /appearance\.edgesVisible \? edges : \[\]/);
+});
+
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
   for (const label of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
     assert.match(canvasSource, new RegExp(`aria-label="${label}"`));

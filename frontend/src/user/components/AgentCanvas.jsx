@@ -4,7 +4,7 @@ import { Button, Dropdown, Input, Modal, Popover, Segmented, Select, Switch, Too
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
-  AlignVerticalDistributeCenter, Focus, GitBranch, Group, Hand, Maximize2,
+  AlignVerticalDistributeCenter, Eye, EyeOff, Focus, GitBranch, Group, Hand, Maximize2,
   ArrowUp, ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -165,6 +165,7 @@ function toFlowEdge(edge, appearance) {
   return {
     ...edge,
     type: 'canvas',
+    hidden: !appearance.edgesVisible,
     markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
     data: { relation: edge.relation || edge.data?.relation || 'reference', appearance }
   };
@@ -1186,6 +1187,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         <IconTool label="选择节点" active={interactionMode === 'select'} onClick={() => setInteractionMode('select')}><MousePointer2 size={17} /></IconTool>
         <IconTool label="拖动画布" active={interactionMode === 'pan'} onClick={() => setInteractionMode('pan')}><Hand size={17} /></IconTool>
         <IconTool label="连接节点" active={interactionMode === 'connect'} onClick={() => setInteractionMode('connect')}><GitBranch size={17} /></IconTool>
+        <IconTool label={appearance.edgesVisible ? '隐藏连线' : '显示连线'} active={!appearance.edgesVisible} onClick={() => updateAppearance({ edgesVisible: !appearance.edgesVisible })}>{appearance.edgesVisible ? <EyeOff size={17} /> : <Eye size={17} />}</IconTool>
         <IconTool label="添加节点" onClick={addNode}><Plus size={17} /></IconTool>
         <Popover trigger="click" placement="rightTop" overlayClassName="agent-canvas-appearance-popover" content={<section className="agent-canvas-appearance-panel" aria-label="画布外观设置">
           <div className="agent-canvas-appearance-row"><span>连线颜色</span><div className="agent-canvas-color-options">{canvasEdgeColorOptions.map(option => <button key={option.value} type="button" className={`agent-canvas-color-swatch is-${option.value}${appearance.edgeColor === option.value ? ' is-active' : ''}`} aria-label={option.label} aria-pressed={appearance.edgeColor === option.value} onClick={() => updateAppearance({ edgeColor: option.value })} />)}</div></div>
