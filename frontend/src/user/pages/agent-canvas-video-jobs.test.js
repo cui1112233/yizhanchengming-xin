@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs } from './agent-canvas-video-jobs.js';
+import { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from './agent-canvas-video-jobs.js';
 
 test('video creation requires a non-empty prompt from the inline node settings', () => {
   assert.equal(canSubmitVideoFromConfig({ prompt: '' }), false);
@@ -36,4 +36,22 @@ test('videoNodeViewState exposes confirmation instead of auto-applying result', 
   assert.equal(state.canConfirm, true);
   assert.equal(state.canGenerate, false);
   assert.equal(state.polling, false);
+});
+
+test('videoResultPreview exposes only a playable public video reference', () => {
+  assert.deepEqual(videoResultPreview({ resultAsset: {
+    id: 'result-1',
+    kind: 'video',
+    name: '成片.mp4',
+    url: ' /api/agent/tasks/project-1/assets/result-1/content ',
+    objectKey: 'private/alice/project-1/result-1.mp4',
+    credentials: 'never-return-this'
+  } }), {
+    id: 'result-1',
+    kind: 'video',
+    name: '成片.mp4',
+    url: '/api/agent/tasks/project-1/assets/result-1/content'
+  });
+  assert.equal(videoResultPreview({ resultAsset: { id: 'result-1', kind: 'video' } }), null);
+  assert.equal(videoResultPreview({ resultAsset: { id: 'result-1', kind: 'image', url: '/image' } }), null);
 });

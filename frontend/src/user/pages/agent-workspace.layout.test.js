@@ -48,8 +48,11 @@ test('进入画布页后会重新读取当前项目画布', () => {
   assert.match(canvasLoadEffect[1], /isCanvasWorkspace/);
 });
 
-test('视频确认回读会把服务端 revision 同步给保存队列', () => {
-  assert.match(pageSource, /await canvasSaveQueueRef\.current\?\.acceptServerCanvas\(nextCanvas\)/);
+test('视频确认回读只把服务端 revision 同步给发起请求时的任务和保存队列', () => {
+  assert.match(pageSource, /const requestedTaskId = activeTaskId/);
+  assert.match(pageSource, /const requestedQueue = canvasSaveQueueRef\.current/);
+  assert.match(pageSource, /shouldAcceptCanvasRefresh/);
+  assert.match(pageSource, /await requestedQueue\.acceptServerCanvas\(nextCanvas\)/);
 });
 
 test('A 方案画布工具使用固定尺寸且不会因禁用状态位移', () => {

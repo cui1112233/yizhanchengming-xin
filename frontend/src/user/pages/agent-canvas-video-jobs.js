@@ -27,6 +27,15 @@ export function videoReferenceAssetIDs(config = {}) {
   });
 }
 
+export function videoResultPreview(job) {
+  const asset = job?.resultAsset;
+  const id = String(asset?.id || '').trim();
+  const url = String(asset?.url || '').trim();
+  if (asset?.kind !== 'video' || !id || !url) return null;
+  const name = String(asset?.name || '').trim();
+  return { id, kind: 'video', ...(name ? { name } : {}), url };
+}
+
 export function videoNodeViewState(job) {
   const state = String(job?.state || 'draft');
   return {

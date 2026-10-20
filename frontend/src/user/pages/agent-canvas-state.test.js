@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSelectedNodeContext, canvasSaveAction, createCanvasSaveQueue, shouldKeepPendingCreatedTask, shouldPersistFlowChanges } from './agent-canvas-state.js';
+import { buildSelectedNodeContext, canvasSaveAction, createCanvasSaveQueue, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask, shouldPersistFlowChanges } from './agent-canvas-state.js';
 
 function deferred() {
   let resolve;
@@ -88,6 +88,61 @@ test('canvas save queue accepts a confirmed server canvas before the next edit',
   assert.equal(calls[0].canvas.nodes.at(-1).id, 'text-1');
   assert.equal(accepted.at(-1).revision, 4);
   queue.dispose();
+});
+
+test('canvas save queue ignores older server revisions and keeps the newest revision for the next edit', async () => {
+  const calls = [];
+  const accepted = [];
+  const queue = createCanvasSaveQueue({
+    revision: 2,
+    delay: 5000,
+    save: async (canvas, revision) => {
+      calls.push({ canvas, revision });
+      return { canvas: { ...canvas, revision: revision + 1 } };
+    },
+    reload: async () => ({ canvas: { version: 1, revision: 5, nodes: [], edges: [] } }),
+    onCanvas: canvas => accepted.push(canvas)
+  });
+
+  assert.equal(await queue.acceptServerCanvas({ version: 1, revision: 5, nodes: [{ id: 'newest' }], edges: [] }), true);
+  assert.equal(await queue.acceptServerCanvas({ version: 1, revision: 4, nodes: [{ id: 'stale' }], edges: [] }), false);
+  queue.enqueue({ version: 1, revision: 5, nodes: [{ id: 'edited' }], edges: [] });
+  await queue.flush();
+
+  assert.deepEqual(accepted.slice(0, 1).map(canvas => canvas.nodes[0].id), ['newest']);
+  assert.equal(calls[0].revision, 5);
+  queue.dispose();
+});
+
+test('canvas save queue keeps the highest revision when confirmation rereads resolve out of order', async () => {
+  const older = deferred();
+  const newer = deferred();
+  const accepted = [];
+  const queue = createCanvasSaveQueue({
+    revision: 2,
+    delay: 5000,
+    save: async canvas => ({ canvas }),
+    reload: async () => ({ canvas: { version: 1, revision: 2, nodes: [], edges: [] } }),
+    onCanvas: canvas => accepted.push(canvas)
+  });
+  const acceptOlder = older.promise.then(canvas => queue.acceptServerCanvas(canvas));
+  const acceptNewer = newer.promise.then(canvas => queue.acceptServerCanvas(canvas));
+
+  newer.resolve({ version: 1, revision: 4, nodes: [{ id: 'newest' }], edges: [] });
+  assert.equal(await acceptNewer, true);
+  older.resolve({ version: 1, revision: 3, nodes: [{ id: 'older' }], edges: [] });
+  assert.equal(await acceptOlder, false);
+
+  assert.deepEqual(accepted.map(canvas => canvas.nodes[0].id), ['newest']);
+  queue.dispose();
+});
+
+test('canvas refresh belongs to the task and save queue that requested it', () => {
+  const requestedQueue = {};
+  assert.equal(shouldAcceptCanvasRefresh({ requestedTaskId: 'task-1', currentTaskId: 'task-1', requestedQueue, currentQueue: requestedQueue }), true);
+  assert.equal(shouldAcceptCanvasRefresh({ requestedTaskId: 'task-1', currentTaskId: 'task-2', requestedQueue, currentQueue: requestedQueue }), false);
+  assert.equal(shouldAcceptCanvasRefresh({ requestedTaskId: 'task-1', currentTaskId: 'task-1', requestedQueue, currentQueue: {} }), false);
+  assert.equal(shouldAcceptCanvasRefresh({ requestedTaskId: 'task-1', currentTaskId: 'task-1', requestedQueue, currentQueue: requestedQueue, mounted: false }), false);
 });
 
 test('canvas save queue merges a pending edit with a confirmed server node', async () => {

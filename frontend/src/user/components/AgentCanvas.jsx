@@ -24,7 +24,7 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, videoNodeViewState, videoReferenceAssetIDs } from '../pages/agent-canvas-video-jobs';
+import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from '../pages/agent-canvas-video-jobs';
 import { isMediaCanvasNodeType, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 
 const LOCAL_DOUBAO_VIDEO_MODEL_OPTION = { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' };
@@ -55,6 +55,7 @@ function CanvasNode({
   const inputLabel = data.type === 'image' ? '图片提示词' : data.type === 'video' ? '视频提示词' : '音频文案';
   const supportsReferences = data.type === 'image' || data.type === 'video';
   const generationAvailable = data.type === 'video';
+  const videoResult = videoResultPreview(videoJob);
   const generationPanel = isEditorOpen && isMediaCanvasNodeType(data.type) ? <section className="agent-canvas-generation-panel nodrag nopan" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent}>
     {data.type === 'image' ? <button type="button" className="agent-canvas-generation-image-picker" aria-label={data.assetRef?.url ? '更换图片素材' : '添加图片素材'} onClick={event => { stopCanvasEvent(event); onPickImageAsset?.(id, event); }}>
       {data.assetRef?.url ? '更换图片素材' : '添加图片素材'}
@@ -67,6 +68,7 @@ function CanvasNode({
       <button type="button" className="agent-canvas-generation-add-reference" aria-label="添加参考素材" onClick={event => { stopCanvasEvent(event); onPickReferenceAsset?.(id, event); }}><Plus size={22} /></button>
       <span className="agent-canvas-generation-reference-count">{referenceAssets.length}/10<br />参考图</span>
     </div> : null}
+    {data.type === 'video' && videoResult ? <video className="agent-canvas-generation-result" src={videoResult.url} preload="metadata" muted controls /> : null}
     <Input.TextArea aria-label={inputLabel} className="agent-canvas-generation-prompt" value={config.prompt || ''} maxLength={data.type === 'audio' ? 8000 : 4000} autoSize={{ minRows: 3, maxRows: 7 }} placeholder={data.type === 'audio' ? '输入要合成的文案。' : data.type === 'video' ? '输入提示词或@参考图，描述你想要生成的视频。' : '输入提示词或@参考图，描述你想要生成的图片。'} onChange={event => updateConfig({ prompt: event.target.value })} />
     <div className="agent-canvas-generation-toolbar">
       {data.type === 'image' ? <>
@@ -89,6 +91,7 @@ function CanvasNode({
       </> : null}
       {data.type === 'video' ? <>
         <span className="agent-canvas-generation-state" aria-live="polite">{videoJob ? videoState.state : '尚未生成'}</span>
+        {videoJob?.errorMessage ? <span className="agent-canvas-generation-error" role="alert">{videoJob.errorMessage}</span> : null}
         {videoActionError ? <span className="agent-canvas-generation-error" role="alert">{videoActionError}</span> : null}
         {videoState.canCancel ? <button type="button" aria-label="取消视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onCancelVideo?.(id); }}>取消</button> : null}
         {videoState.canRetry ? <button type="button" aria-label="重试视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onRetryVideo?.(id); }}>重试</button> : null}

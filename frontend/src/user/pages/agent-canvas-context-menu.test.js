@@ -318,6 +318,13 @@ test('expanded video editor exposes create cancel retry confirm and per-node err
   assert.doesNotMatch(canvasSource, /const activeVideoJob = manualNode/);
 });
 
+test('expanded video editor previews the pending result and reports provider failures', () => {
+  assert.match(canvasSource, /videoResultPreview\(videoJob\)/);
+  assert.match(canvasSource, /<video[^>]+src=\{videoResult\.url\}/);
+  assert.match(canvasSource, /videoJob\?\.errorMessage/);
+  assert.match(canvasSource, /\{videoJob\.errorMessage\}/);
+});
+
 test('canvas keeps middle mouse panning and advertises only implemented undo redo keys', () => {
   assert.match(canvasSource, /panOnDrag=\{interactionMode === 'pan' \? \[0, 1\] : \[1\]\}/);
   assert.match(canvasSource, /case 'undo':\s*case 'redo':/);

@@ -115,12 +115,13 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	handle("GET /api/agent/tasks/{id}/canvas", func(w http.ResponseWriter, req *http.Request, owner string) {
-		canvas, err := store.Canvas(req.Context(), owner, req.PathValue("id"))
+		projectID := req.PathValue("id")
+		canvas, err := store.Canvas(req.Context(), owner, projectID)
 		if err != nil {
 			writeAgentStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"canvas": canvas})
+		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(projectID, canvas)})
 	})
 	handle("PATCH /api/agent/tasks/{id}/canvas", func(w http.ResponseWriter, req *http.Request, owner string) {
 		var body struct {
@@ -136,7 +137,7 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 			writeAgentStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"canvas": canvas})
+		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(req.PathValue("id"), canvas)})
 	})
 	handle("GET /api/agent/tasks/{id}/executions", func(w http.ResponseWriter, req *http.Request, owner string) {
 		executions, err := store.Executions(req.Context(), owner, req.PathValue("id"))
@@ -184,6 +185,30 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 			writeJSON(w, http.StatusOK, map[string]any{"task": project, "user": userMessage, "assistant": assistantMessage})
 		})
 	}
+}
+
+func agentCanvasForResponse(projectID string, canvas agentworkspace.Canvas) agentworkspace.Canvas {
+	canvas.Nodes = append([]agentworkspace.Node(nil), canvas.Nodes...)
+	publicFields := []string{"id", "assetId", "projectId", "kind", "mediaType", "name", "contentType", "byteSize", "width", "height", "duration"}
+	for index := range canvas.Nodes {
+		ref := canvas.Nodes[index].AssetRef
+		if len(ref) == 0 {
+			continue
+		}
+		publicRef := make(map[string]any, len(publicFields)+1)
+		for _, field := range publicFields {
+			if value, exists := ref[field]; exists {
+				publicRef[field] = value
+			}
+		}
+		assetID, _ := publicRef["id"].(string)
+		kind, _ := publicRef["kind"].(string)
+		if strings.TrimSpace(assetID) != "" && (kind == "image" || kind == "video") {
+			publicRef["url"] = agentAssetContentURL(projectID, strings.TrimSpace(assetID))
+		}
+		canvas.Nodes[index].AssetRef = publicRef
+	}
+	return canvas
 }
 
 func newAgentID(prefix string) string {

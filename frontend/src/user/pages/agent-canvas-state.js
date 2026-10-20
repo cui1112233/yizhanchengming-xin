@@ -48,6 +48,10 @@ export function shouldKeepPendingCreatedTask({ requestedTaskId, activeTaskId, kn
   return Boolean(requestedTaskId && requestedTaskId === activeTaskId && !new Set(knownTaskIds || []).has(requestedTaskId));
 }
 
+export function shouldAcceptCanvasRefresh({ requestedTaskId, currentTaskId, requestedQueue, currentQueue, mounted = true }) {
+  return Boolean(mounted && requestedTaskId && requestedTaskId === currentTaskId && requestedQueue === currentQueue);
+}
+
 export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload, onCanvas, onStatus }) {
   let currentRevision = Number(revision) || 0;
   let pending = null;
@@ -164,21 +168,24 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
       return savePending();
     },
     async acceptServerCanvas(canvas) {
-      if (disposed || !canvas) return;
-      clearTimer();
+      if (disposed || !canvas) return false;
       if (active) await active;
-      if (disposed) return;
-      currentRevision = Number(canvas.revision) || 0;
+      if (disposed) return false;
+      const incomingRevision = Number(canvas.revision) || 0;
+      if (incomingRevision < currentRevision) return false;
+      clearTimer();
+      currentRevision = incomingRevision;
       failed = null;
       if (pending) {
         pending = mergePendingCanvas(canvas, pending);
         onCanvas?.(pending);
         setStatus('dirty');
         schedule(0);
-        return;
+        return true;
       }
       onCanvas?.(canvas);
       setStatus('saved');
+      return true;
     },
     dispose() {
       disposed = true;

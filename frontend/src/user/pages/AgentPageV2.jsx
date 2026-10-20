@@ -5,7 +5,7 @@ import { askAgent, clearAgentTask, createAgentTask, createMyAgentSkill, deleteAg
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
 import { AgentCanvas } from '../components/AgentCanvas';
-import { buildSelectedNodeContext, canvasSaveAction, canvasSaveStatusText, createCanvasSaveQueue, shouldKeepPendingCreatedTask } from './agent-canvas-state';
+import { buildSelectedNodeContext, canvasSaveAction, canvasSaveStatusText, createCanvasSaveQueue, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask } from './agent-canvas-state';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -554,10 +554,23 @@ export function AgentPageV2({ theme }) {
               canvasSaveQueueRef.current?.enqueue(nextCanvas);
             }}
             onServerCanvasChange={async () => {
-              if (!activeTaskId) return;
-              const result = await getAgentCanvas(activeTaskId);
+              const requestedTaskId = activeTaskId;
+              const requestedQueue = canvasSaveQueueRef.current;
+              if (!requestedTaskId) return;
+              const result = await getAgentCanvas(requestedTaskId);
+              const isCurrentRefresh = () => shouldAcceptCanvasRefresh({
+                requestedTaskId,
+                currentTaskId: activeTaskIdRef.current,
+                requestedQueue,
+                currentQueue: canvasSaveQueueRef.current,
+                mounted: mountedRef.current
+              });
+              if (!isCurrentRefresh()) return;
               const nextCanvas = result.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
-              if (canvasSaveQueueRef.current) await canvasSaveQueueRef.current?.acceptServerCanvas(nextCanvas);
+              if (requestedQueue) {
+                const accepted = await requestedQueue.acceptServerCanvas(nextCanvas);
+                if (!accepted || !isCurrentRefresh()) return;
+              }
               else setCanvas(nextCanvas);
               setCanvasViewport(nextCanvas.viewport || { x: 0, y: 0, zoom: 1 });
             }}

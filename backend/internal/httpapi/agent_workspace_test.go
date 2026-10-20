@@ -94,3 +94,44 @@ func TestAgentWorkspaceImportsLegacyAndUsesStoreForCanvasAndChat(t *testing.T) {
 		t.Fatalf("context=%+v", project.Messages[0].Context)
 	}
 }
+
+func TestAgentWorkspaceCanvasReadAddsSafeAssetContentURL(t *testing.T) {
+	now := time.Date(2026, 10, 20, 4, 0, 0, 0, time.UTC)
+	store := agentworkspace.NewMemoryStore()
+	project := agentworkspace.Project{ID: "agent-1", Title: "视频项目", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
+	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
+		t.Fatal(err)
+	}
+	canvas := agentworkspace.EmptyCanvas()
+	canvas.Nodes = []agentworkspace.Node{{
+		ID: "video-1", Type: "video", Title: "成片", Version: 2, Status: "confirmed",
+		AssetRef: map[string]any{
+			"id": "asset-1", "kind": "video", "name": "成片.mp4",
+			"objectKey": "private/alice/agent-1/asset-1.mp4",
+		},
+	}}
+	if _, err := store.SaveCanvas(context.Background(), "alice", project.ID, canvas, 0, now); err != nil {
+		t.Fatal(err)
+	}
+
+	mux := http.NewServeMux()
+	auth := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}
+	RegisterAgentWorkspaceCompat(mux, auth, store, "", nil, func() time.Time { return now })
+	loaded := agentRequest(t, mux, now, http.MethodGet, "/api/agent/tasks/agent-1/canvas", "")
+	if loaded.Code != http.StatusOK {
+		t.Fatalf("load status=%d body=%s", loaded.Code, loaded.Body.String())
+	}
+	var body struct {
+		Canvas agentworkspace.Canvas `json:"canvas"`
+	}
+	if err := json.Unmarshal(loaded.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	ref := body.Canvas.Nodes[0].AssetRef
+	if ref["url"] != "/api/agent/tasks/agent-1/assets/asset-1/content" {
+		t.Fatalf("asset url=%v", ref["url"])
+	}
+	if _, exists := ref["objectKey"]; exists {
+		t.Fatalf("private object key leaked: %+v", ref)
+	}
+}
