@@ -291,7 +291,7 @@ test('generated media refreshes connected downstream references before rendering
   );
   assert.match(
     canvasSource,
-    /onChange\?\.\(toCanvas\(nextNodes, nextEdges, serverCanvas\.revision, nextViewport, nextAppearance\)\);/
+    /onChange\?\.\(toCanvas\(nextNodes, nextEdges, serverCanvas\.revision, nextViewport, nextAppearance, serverCanvas\.viewState \|\| currentCanvas\.viewState\)\);/
   );
 });
 

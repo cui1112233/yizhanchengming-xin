@@ -1,10 +1,11 @@
 import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
-import { ChevronDown, ChevronUp, Clock3, FilePenLine, MessageCircle, MessageSquarePlus, MoreHorizontal, Pin, RotateCcw, SearchCheck, Send, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock3, FilePenLine, MessageCircle, MoreHorizontal, Pin, RotateCcw, SearchCheck, Send, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { askAgent, clearAgentTask, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentExecutions, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, updateMyAgentSkill } from '../../shared/api/agent';
+import { askAgent, clearAgentTask, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, updateMyAgentSkill } from '../../shared/api/agent';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
 import { AgentCanvas } from '../components/AgentCanvas';
+import { AgentWorkspaceDrawer } from '../components/AgentWorkspaceDrawer';
 import { AgentWorkspaceHeader } from '../components/AgentWorkspaceHeader';
 import { buildSelectedNodeContext, canvasSaveAction, canvasSaveStatusText, createCanvasSaveQueue, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask } from './agent-canvas-state';
 import { normalizeWorkspaceView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
@@ -15,17 +16,6 @@ function formatTaskTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
-}
-
-function taskGroup(value) {
-  const date = new Date(value || 0);
-  if (Number.isNaN(date.getTime())) return '更早';
-  const today = new Date();
-  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  const startYesterday = startToday - 24 * 60 * 60 * 1000;
-  if (date.getTime() >= startToday) return '今天';
-  if (date.getTime() >= startYesterday) return '昨天';
-  return '更早';
 }
 
 function createProblemSearchPrompt(text) {
@@ -67,6 +57,9 @@ export function AgentPageV2({ theme }) {
   const [canvas, setCanvas] = useState({ version: 1, revision: 0, nodes: [], edges: [] });
   const [canvasSaveStatus, setCanvasSaveStatus] = useState('idle');
   const [canvasViewport, setCanvasViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const [workspaceAssets, setWorkspaceAssets] = useState([]);
+  const [workspaceAssetsLoading, setWorkspaceAssetsLoading] = useState(false);
+  const [workspaceAssetsError, setWorkspaceAssetsError] = useState('');
   const [executions, setExecutions] = useState([]);
   const [selectedCanvasNodes, setSelectedCanvasNodes] = useState([]);
   const [asking, setAsking] = useState(false);
@@ -89,6 +82,7 @@ export function AgentPageV2({ theme }) {
   const taskDetailLoadingRef = useRef(false);
   const composerTriggerRef = useRef(null);
   const canvasSaveQueueRef = useRef(null);
+  const canvasRef = useRef(null);
   const viewStateRef = useRef(viewState);
   const composerMenuId = 'agent-composer-menu';
 
@@ -355,17 +349,36 @@ export function AgentPageV2({ theme }) {
     };
   }, [activeTaskId, isCanvasWorkspace]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!isCanvasWorkspace || !activeTaskId) {
+      setWorkspaceAssets([]);
+      setWorkspaceAssetsLoading(false);
+      setWorkspaceAssetsError('');
+      return undefined;
+    }
+    setWorkspaceAssetsLoading(true);
+    setWorkspaceAssetsError('');
+    listAgentAssets(activeTaskId)
+      .then(result => {
+        if (!cancelled) setWorkspaceAssets(Array.isArray(result.assets) ? result.assets : []);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setWorkspaceAssets([]);
+        setWorkspaceAssetsError(error.message || '读取项目素材失败');
+      })
+      .finally(() => { if (!cancelled) setWorkspaceAssetsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTaskId, isCanvasWorkspace]);
+
   const visibleSkills = useMemo(() => skills.filter(skill => source === 'all' || skill.source === source), [skills, source]);
   const selectedSkills = skills.filter(skill => selectedSkillIds.includes(skill.id));
   const messages = activeTask?.messages || [];
   const selectedNodeContext = buildSelectedNodeContext(canvas, selectedCanvasNodes);
   const saveAction = canvasSaveAction(canvasSaveStatus);
-  const taskGroups = useMemo(() => tasks.reduce((groups, task) => {
-    const key = taskGroup(task.updatedAt);
-    groups[key].push(task);
-    return groups;
-  }, { 今天: [], 昨天: [], 更早: [] }), [tasks]);
-
+  const canvasGroups = useMemo(() => [...new Set((canvas.nodes || []).map(node => node.groupId).filter(Boolean))]
+    .map(groupId => ({ id: groupId, title: groupId })), [canvas.nodes]);
   function toggleSkill(id) {
     setSelectedSkillIds(current => current.includes(id) ? current.filter(value => value !== id) : current.length >= 3 ? current : [...current, id]);
   }
@@ -580,7 +593,7 @@ export function AgentPageV2({ theme }) {
           saveLabel={asking ? '正在执行…' : (canvasSaveStatusText[canvasSaveStatus] || saveAction.label)}
           saveDisabled={saveAction.disabled}
           nodeCount={canvas.nodes.length}
-          materialCount={0}
+          materialCount={workspaceAssets.length}
           zoom={Math.round((canvasViewport.zoom || 1) * 100)}
           isRunning={asking}
           onRename={openRenameTask}
@@ -590,22 +603,30 @@ export function AgentPageV2({ theme }) {
           onSave={saveCanvasNow}
         />
 
-        <aside id="agent-project-drawer" className={`agent-project-drawer${viewState.drawerOpen ? ' is-open' : ''}`} aria-hidden={!viewState.drawerOpen}>
-          <header><strong>项目</strong><Button className="agent-task-new" icon={<MessageSquarePlus size={15} />} onClick={() => { updateWorkspaceView({ drawerOpen: false }); createTask(); }}>新建项目</Button></header>
-          <div className="agent-task-list" aria-live="polite">
-            {loading ? <div className="agent-task-loading" role="status">正在读取项目...</div> : null}
-            {!loading && tasks.length === 0 ? <div className="agent-task-empty">还没有项目<br />从一段新对话开始。</div> : null}
-            {Object.entries(taskGroups).map(([group, groupTasks]) => groupTasks.length ? <section className="agent-task-group" key={group}><h4>{group}</h4>{groupTasks.map(task => (
-              <button className={`agent-task-row${task.id === activeTaskId ? ' active' : ''}`} type="button" key={task.id} onClick={() => { selectTask(task.id, { historyMode: 'push' }); updateWorkspaceView({ drawerOpen: false }); }}>
-                <strong>{task.title}</strong><span>{task.preview || '尚未开始对话'}</span>
-              </button>
-            ))}</section> : null)}
-          </div>
-          {activeTask ? <footer><Button type="text" icon={<RotateCcw size={15} />} disabled={messages.length === 0} onClick={clearCurrentTask}>清空对话</Button><Popconfirm title="删除当前项目？" description="删除后无法恢复，不会影响其他项目。" okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={deleteCurrentTask}><Button type="text" danger icon={<Trash2 size={15} />}>删除项目</Button></Popconfirm></footer> : null}
-        </aside>
+        <AgentWorkspaceDrawer
+          open={viewState.drawerOpen}
+          width={viewState.drawerWidth}
+          activeTab={viewState.drawerTab}
+          nodes={canvas.nodes}
+          groups={canvasGroups}
+          assets={workspaceAssets}
+          assetsLoading={workspaceAssetsLoading}
+          assetsError={workspaceAssetsError}
+          tasks={tasks}
+          activeTaskId={activeTaskId}
+          onTabChange={drawerTab => updateWorkspaceView({ drawerTab })}
+          onWidthChange={drawerWidth => updateWorkspaceView({ drawerWidth })}
+          onLocateNode={nodeId => canvasRef.current?.locateNode(nodeId)}
+          onCreateFromAsset={asset => canvasRef.current?.createFromAsset(asset)}
+          onSelectTask={taskId => selectTask(taskId, { historyMode: 'push' })}
+          onNewProject={() => createTask()}
+          onClose={() => updateWorkspaceView({ drawerOpen: false })}
+          footer={activeTask ? <><Button type="text" icon={<RotateCcw size={15} />} disabled={messages.length === 0} onClick={clearCurrentTask}>清空对话</Button><Popconfirm title="删除当前项目？" description="删除后无法恢复，不会影响其他项目。" okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={deleteCurrentTask}><Button type="text" danger icon={<Trash2 size={15} />}>删除项目</Button></Popconfirm></> : null}
+        />
 
         <main className="agent-canvas-main" aria-label="创作画布">
           <AgentCanvas
+            ref={canvasRef}
             key={activeTaskId}
             taskId={activeTaskId}
             canvas={canvas}

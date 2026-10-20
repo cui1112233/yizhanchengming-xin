@@ -1,13 +1,13 @@
 import { Background, BaseEdge, Handle, MarkerType, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath, useUpdateNodeInternals } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Button, Dropdown, Input, Modal, Popover, Segmented, Select, Switch, Tooltip } from 'antd';
+import { Button, Dropdown, Input, Modal, Popover, Segmented, Select, Switch, Tooltip, message } from 'antd';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, Eye, EyeOff, Focus, GitBranch, Group, Hand, Maximize2,
   ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   alignCanvasNodes, canvasGroupBounds, canvasKeyboardCommand, commandAvailability,
   connectCanvasNodes, createCanvasNode, distributeCanvasNodes, groupCanvasNodes,
@@ -139,11 +139,12 @@ function toFlowEdge(edge, appearance) {
   }, appearance);
 }
 
-function toCanvas(nodes, edges, revision, viewport, appearance) {
+function toCanvas(nodes, edges, revision, viewport, appearance, viewState) {
   return {
     version: 1,
     revision,
     ...(viewport ? { viewport } : {}),
+    ...(viewState ? { viewState } : {}),
     appearance: normalizeCanvasAppearance(appearance),
     nodes: nodes.map(node => ({
       id: node.id,
@@ -176,7 +177,7 @@ function IconTool({ label, disabled = false, active = false, onClick, children }
   );
 }
 
-export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onServerCanvasChange }) {
+export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onServerCanvasChange }, ref) {
   const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
@@ -379,7 +380,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   function emitChange(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
-    onChange?.(toCanvas(nextNodes, nextEdges, currentCanvas.revision, nextViewport, nextAppearance));
+    onChange?.(toCanvas(nextNodes, nextEdges, currentCanvas.revision, nextViewport, nextAppearance, currentCanvas.viewState));
   }
 
   function commit(nextNodes, nextEdges, { record = true, nextViewport = viewportRef.current } = {}) {
@@ -541,7 +542,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
     historyRef.current.push({ nodes: nextNodes, edges: nextEdges });
     setHistoryVersion(value => value + 1);
-    onChange?.(toCanvas(nextNodes, nextEdges, serverCanvas.revision, nextViewport, nextAppearance));
+    onChange?.(toCanvas(nextNodes, nextEdges, serverCanvas.revision, nextViewport, nextAppearance, serverCanvas.viewState || currentCanvas.viewState));
     onServerCanvasChange?.(serverCanvas);
   }
 
@@ -1073,6 +1074,58 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     commit(nodesRef.current, edgesRef.current);
   }
 
+  function addAssetNode(asset, position) {
+    if (!asset) return;
+    const nextNode = createNodeAt({ id: nextCanvasID(asset.kind), kind: asset.kind, position, asset });
+    const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
+    setSelectedIds([nextNode.id]);
+    onSelectionChange?.([nextNode.id]);
+    commit(nextNodes, edgesRef.current);
+  }
+
+  function canvasCenterPosition() {
+    const bounds = rootRef.current?.getBoundingClientRect();
+    if (!bounds || !flowInstance?.screenToFlowPosition) return { x: 80, y: 80 };
+    return flowInstance.screenToFlowPosition({ x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 });
+  }
+
+  function locateNode(nodeID) {
+    const node = nodesRef.current.find(item => item.id === nodeID);
+    if (!node) return false;
+    const nextNodes = nodesRef.current.map(item => ({ ...item, selected: item.id === nodeID }));
+    setNodes(nextNodes);
+    nodesRef.current = nextNodes;
+    setSelectedIds([nodeID]);
+    onSelectionChange?.([nodeID]);
+    flowInstance?.fitView({ nodes: [node], padding: 0.38, duration: 260 });
+    return true;
+  }
+
+  async function handleExternalAssetDrop(event) {
+    const payload = event.dataTransfer.getData('application/x-agent-asset');
+    if (!payload || !taskId) return;
+    event.preventDefault();
+    try {
+      const reference = JSON.parse(payload);
+      const result = await listAgentAssets(taskId, reference.kind || '');
+      const asset = (result.assets || []).find(item => item.id === reference.id);
+      if (!asset) throw new Error('素材已不存在');
+      const position = flowInstance?.screenToFlowPosition
+        ? flowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY })
+        : canvasCenterPosition();
+      addAssetNode(asset, position);
+    } catch (error) {
+      message.error(error.message || '添加素材失败');
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    locateNode,
+    createFromAsset(asset) {
+      addAssetNode(asset, canvasCenterPosition());
+    }
+  }));
+
   const alignItems = [
     { key: 'left', label: '左对齐', icon: <AlignStartVertical size={15} /> },
     { key: 'centerX', label: '水平居中', icon: <AlignCenterVertical size={15} /> },
@@ -1083,7 +1136,18 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   ];
 
   return (
-    <div ref={rootRef} className={`agent-canvas${connectingSourceID ? ' is-connecting' : ''}`} aria-label="创作画布" tabIndex={0} onKeyDown={handleKeyDown} style={appearanceCssVariables(appearance)}>
+    <div
+      ref={rootRef}
+      className={`agent-canvas${connectingSourceID ? ' is-connecting' : ''}`}
+      aria-label="创作画布"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onDragOver={event => {
+        if (event.dataTransfer.types.includes('application/x-agent-asset')) event.preventDefault();
+      }}
+      onDrop={handleExternalAssetDrop}
+      style={appearanceCssVariables(appearance)}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -1284,4 +1348,4 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       </nav>
     </div>
   );
-}
+});
