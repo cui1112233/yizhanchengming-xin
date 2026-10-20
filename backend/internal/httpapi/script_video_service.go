@@ -52,7 +52,11 @@ func (s *scriptVideoService) Submit(ctx context.Context, owner string, input scr
 		if s.localExecutor == nil {
 			return scriptVideoSubmission{}, fmt.Errorf("本地执行器服务不可用")
 		}
-		job, err := s.localExecutor.CreateJob(ctx, owner, localexecutor.CreateJobInput{SourceTaskID: "agent-video", Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": input.ImageURLs}})
+		sourceTaskID := strings.TrimSpace(input.SourceTaskID)
+		if sourceTaskID == "" {
+			sourceTaskID = newAgentID("agent-video-source")
+		}
+		job, err := s.localExecutor.CreateJob(ctx, owner, localexecutor.CreateJobInput{SourceTaskID: sourceTaskID, Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": input.ImageURLs}})
 		if err != nil {
 			return scriptVideoSubmission{}, err
 		}

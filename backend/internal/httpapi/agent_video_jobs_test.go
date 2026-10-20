@@ -17,6 +17,7 @@ import (
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localexecutor"
 )
 
 type recordingAgentReferenceURLProvider struct {
@@ -404,6 +405,44 @@ func TestAgentVideoRetryRouteRejectsNonRetryableStatesBeforeProviderSubmit(t *te
 				t.Fatalf("provider calls=%d, want 0", providerCalls)
 			}
 		})
+	}
+}
+
+func TestAgentVideoRetryCreatesDistinctLocalExecutorJob(t *testing.T) {
+	now := time.Date(2026, 10, 21, 2, 0, 0, 0, time.UTC)
+	projects := agentworkspace.NewMemoryStore()
+	if err := projects.CreateProject(context.Background(), "alice", agentworkspace.Project{
+		ID: "agent-1", Title: "项目", CreatedAt: now, UpdatedAt: now,
+		Canvas: agentworkspace.Canvas{Version: 1, Nodes: []agentworkspace.Node{{ID: "video-1", Type: "video", Title: "镜头", Version: 1, Status: "draft"}}, Edges: []agentworkspace.Edge{}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	executor := localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return now })
+	coordinator := &agentVideoCoordinator{
+		projects: projects,
+		assets:   agentworkspace.NewMemoryAssetStore(),
+		videos:   &scriptVideoService{localExecutor: executor},
+		now:      func() time.Time { return now },
+	}
+
+	first, err := coordinator.submit(context.Background(), "alice", "agent-1", agentVideoJobRequest{
+		NodeID: "video-1", IdempotencyKey: "request-1", Prompt: "雨夜追逐", ModelKey: "local-doubao-executor-video", Duration: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.State, first.ErrorMessage = agentworkspace.VideoJobFailed, "模拟首次执行失败"
+	first, err = projects.UpdateVideoJob(context.Background(), "alice", first, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	retried, err := coordinator.retry(context.Background(), "alice", "agent-1", first.ID, "request-2")
+	if err != nil {
+		t.Fatalf("retry err=%v", err)
+	}
+	if retried.ProviderTaskID == "" || retried.ProviderTaskID == first.ProviderTaskID {
+		t.Fatalf("first provider task=%q retry provider task=%q, want distinct tasks", first.ProviderTaskID, retried.ProviderTaskID)
 	}
 }
 

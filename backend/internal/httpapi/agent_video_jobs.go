@@ -187,7 +187,7 @@ func (s *agentVideoCoordinator) retry(ctx context.Context, owner, projectID, job
 
 func (s *agentVideoCoordinator) submitCreated(ctx context.Context, owner string, job agentworkspace.VideoJob, references []string) (agentworkspace.VideoJob, error) {
 	settings := job.Settings
-	submission, err := s.videos.Submit(ctx, owner, scriptVideoLocalInput{ModelKey: job.ModelKey, Prompt: valueString(settings["prompt"]), Duration: settings["duration"], AspectRatio: valueString(settings["aspectRatio"]), Resolution: valueString(settings["resolution"]), ImageURLs: references})
+	submission, err := s.videos.Submit(ctx, owner, scriptVideoLocalInput{SourceTaskID: "agent-video:" + job.ID, ModelKey: job.ModelKey, Prompt: valueString(settings["prompt"]), Duration: settings["duration"], AspectRatio: valueString(settings["aspectRatio"]), Resolution: valueString(settings["resolution"]), ImageURLs: references})
 	if err != nil {
 		job.State, job.ErrorMessage = agentworkspace.VideoJobFailed, err.Error()
 		failedJob, updateErr := s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
