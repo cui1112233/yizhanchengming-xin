@@ -44,6 +44,11 @@ export function nodeGenerationIdempotencyKey({ taskId, nodeId, nodeVersion, kind
     .join(':');
 }
 
+export function submitNodeGeneration({ event, onSubmit, nodeID, modelID } = {}) {
+  event?.stopPropagation?.();
+  onSubmit?.(nodeID, modelID);
+}
+
 export function composerShouldClose(eventState = {}) {
   if (eventState.insideComposer || eventState.insidePortal) return false;
   return Boolean(eventState.paneClick || eventState.escape || eventState.switchedNode || eventState.nodeDeleted || eventState.projectChanged);

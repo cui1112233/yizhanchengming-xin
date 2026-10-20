@@ -7,7 +7,8 @@ import {
   composerModelSelection,
   composerShouldClose,
   nodeGenerationIdempotencyKey,
-  nodeGenerationViewState
+  nodeGenerationViewState,
+  submitNodeGeneration
 } from './agent-canvas-node-generation.js';
 
 test('Agent canvas keeps local Doubao image and video models available first', () => {
@@ -20,6 +21,21 @@ test('Agent canvas keeps local Doubao image and video models available first', (
   ], 'video'), [
     { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' },
     { value: 'minimax-h3-video', label: 'MiniMax H3 多图生视频' }
+  ]);
+});
+
+test('composer submit stops the canvas event before starting generation', () => {
+  const calls = [];
+  submitNodeGeneration({
+    event: { stopPropagation: () => calls.push('stop') },
+    onSubmit: (nodeID, modelID) => calls.push(['submit', nodeID, modelID]),
+    nodeID: 'image-1',
+    modelID: 'local-doubao-executor-image'
+  });
+
+  assert.deepEqual(calls, [
+    'stop',
+    ['submit', 'image-1', 'local-doubao-executor-image']
   ]);
 });
 

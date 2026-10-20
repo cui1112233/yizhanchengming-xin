@@ -3,6 +3,7 @@ import { ArrowUp, ImagePlus, Plus } from 'lucide-react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { videoResultPreview } from '../pages/agent-canvas-video-jobs';
+import { submitNodeGeneration } from '../pages/agent-canvas-node-generation';
 
 const PROMPT_LABELS = { text: '文字生成要求', image: '图片提示词', video: '视频提示词' };
 const PROMPT_PLACEHOLDERS = {
@@ -82,7 +83,7 @@ export default function AgentNodeComposer({
       {kind === 'video' && videoState.canCancel ? <button type="button" onClick={() => onCancelVideo?.(node.id)} disabled={busy}>取消</button> : null}
       {kind === 'video' && videoState.canRetry ? <button type="button" onClick={() => onRetryVideo?.(node.id)} disabled={busy}>重试</button> : null}
       {kind === 'video' && videoState.canConfirm ? <button type="button" onClick={() => onConfirmVideo?.(node.id)} disabled={busy}>确认</button> : null}
-      <button type="button" className="agent-node-composer__submit" aria-label={`生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : '视频'}`} title={selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型'} disabled={submitDisabled} onClick={() => onSubmit?.(node.id, selectedModel)}>
+      <button type="button" className="agent-node-composer__submit" aria-label={`生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : '视频'}`} title={selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型'} disabled={submitDisabled} onClick={event => submitNodeGeneration({ event, onSubmit, nodeID: node.id, modelID: selectedModel })}>
         <ArrowUp size={17} /><span>生成</span>
       </button>
     </div>
