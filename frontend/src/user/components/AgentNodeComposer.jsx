@@ -83,7 +83,7 @@ export default function AgentNodeComposer({
       {kind === 'video' && videoState.canCancel ? <button type="button" onClick={() => onCancelVideo?.(node.id)} disabled={busy}>取消</button> : null}
       {kind === 'video' && videoState.canRetry ? <button type="button" onClick={() => onRetryVideo?.(node.id)} disabled={busy}>重试</button> : null}
       {kind === 'video' && videoState.canConfirm ? <button type="button" onClick={() => onConfirmVideo?.(node.id)} disabled={busy}>确认</button> : null}
-      <button type="button" className="agent-node-composer__submit" aria-label={`生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : '视频'}`} title={selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型'} disabled={submitDisabled} onClick={event => submitNodeGeneration({ event, onSubmit, nodeID: node.id, modelID: selectedModel })}>
+      <button type="button" className="agent-node-composer__submit" aria-label={`生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : '视频'}`} title={selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型'} disabled={submitDisabled} onPointerDown={stop} onClick={event => submitNodeGeneration({ event, onSubmit, nodeID: node.id, modelID: selectedModel })}>
         <ArrowUp size={17} /><span>生成</span>
       </button>
     </div>
