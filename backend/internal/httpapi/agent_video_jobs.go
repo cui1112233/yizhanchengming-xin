@@ -37,6 +37,10 @@ type agentVideoJobRequest struct {
 	IgnoreReferences  bool     `json:"ignoreReferences"`
 }
 
+var errUnsupportedVideoReference = errors.New("unsupported video reference")
+
+const agentVideoIngestLease = 5 * time.Minute
+
 func RegisterAgentVideoJobRoutes(root *http.ServeMux, middleware BridgeAuth, coordinator *agentVideoCoordinator) {
 	if root == nil || coordinator == nil || coordinator.projects == nil || coordinator.assets == nil || coordinator.videos == nil || coordinator.ingestor == nil {
 		return
@@ -119,13 +123,7 @@ func RegisterAgentVideoJobRoutes(root *http.ServeMux, middleware BridgeAuth, coo
 		if err := decodeAgentVideoJobRequest(w, req, &input); err != nil {
 			return
 		}
-		current, err := coordinator.projects.VideoJob(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"))
-		if err != nil {
-			writeAgentVideoJobError(w, err)
-			return
-		}
-		request := requestFromJob(current, input.IdempotencyKey)
-		job, err := coordinator.submit(req.Context(), owner, current.ProjectID, request)
+		job, err := coordinator.retry(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"), input.IdempotencyKey)
 		if err != nil {
 			writeAgentVideoJobSubmissionError(w, req.Context(), coordinator, owner, job, err)
 			return
@@ -166,6 +164,29 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
 	}
+	return s.submitCreated(ctx, owner, job, references)
+}
+
+func (s *agentVideoCoordinator) retry(ctx context.Context, owner, projectID, jobID, idempotencyKey string) (agentworkspace.VideoJob, error) {
+	job, err := s.projects.RetryVideoJob(ctx, owner, strings.TrimSpace(projectID), strings.TrimSpace(jobID), agentworkspace.RetryVideoJobInput{ID: newAgentID("video-job"), IdempotencyKey: strings.TrimSpace(idempotencyKey), Now: s.now().UTC()})
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
+	ignoreReferences, _ := job.Settings["ignoreReferences"].(bool)
+	references, _, err := s.referenceURLs(ctx, owner, job.ProjectID, job.ReferenceAssetIDs, ignoreReferences)
+	if err != nil {
+		job.State, job.ErrorMessage = agentworkspace.VideoJobFailed, err.Error()
+		failed, updateErr := s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+		if updateErr != nil {
+			return agentworkspace.VideoJob{}, updateErr
+		}
+		return failed, err
+	}
+	return s.submitCreated(ctx, owner, job, references)
+}
+
+func (s *agentVideoCoordinator) submitCreated(ctx context.Context, owner string, job agentworkspace.VideoJob, references []string) (agentworkspace.VideoJob, error) {
+	settings := job.Settings
 	submission, err := s.videos.Submit(ctx, owner, scriptVideoLocalInput{ModelKey: job.ModelKey, Prompt: valueString(settings["prompt"]), Duration: settings["duration"], AspectRatio: valueString(settings["aspectRatio"]), Resolution: valueString(settings["resolution"]), ImageURLs: references})
 	if err != nil {
 		job.State, job.ErrorMessage = agentworkspace.VideoJobFailed, err.Error()
@@ -180,9 +201,6 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 }
 
 func (s *agentVideoCoordinator) referenceURLs(ctx context.Context, owner, projectID string, requestedIDs []string, ignore bool) ([]string, []string, error) {
-	if ignore {
-		return []string{}, []string{}, nil
-	}
 	ids := make([]string, 0, len(requestedIDs))
 	seen := map[string]bool{}
 	for _, requestedID := range requestedIDs {
@@ -199,18 +217,25 @@ func (s *agentVideoCoordinator) referenceURLs(ctx context.Context, owner, projec
 	if len(ids) == 0 {
 		return []string{}, []string{}, nil
 	}
-	if s.references == nil {
-		return nil, nil, agentworkspace.ErrReferenceURLUnavailable
-	}
-	urls := make([]string, 0, len(ids))
+	assets := make([]agentworkspace.Asset, 0, len(ids))
 	for _, id := range ids {
 		asset, err := s.assets.Asset(ctx, owner, projectID, id)
 		if err != nil {
 			return nil, nil, err
 		}
 		if asset.Kind != "image" {
-			return nil, nil, fmt.Errorf("视频参考素材必须是图片")
+			return nil, nil, fmt.Errorf("%w: 当前视频生成暂不支持视频参考素材，请移除后重试", errUnsupportedVideoReference)
 		}
+		assets = append(assets, asset)
+	}
+	if ignore {
+		return []string{}, []string{}, nil
+	}
+	if s.references == nil {
+		return nil, nil, agentworkspace.ErrReferenceURLUnavailable
+	}
+	urls := make([]string, 0, len(ids))
+	for _, asset := range assets {
 		ref, err := s.references.ReferenceURL(ctx, asset, 15*time.Minute)
 		if err != nil {
 			return nil, nil, err
@@ -221,10 +246,13 @@ func (s *agentVideoCoordinator) referenceURLs(ctx context.Context, owner, projec
 }
 
 func (s *agentVideoCoordinator) poll(ctx context.Context, owner string, job agentworkspace.VideoJob) (agentworkspace.VideoJob, error) {
-	if job.State != agentworkspace.VideoJobPreparing && job.State != agentworkspace.VideoJobQueued && job.State != agentworkspace.VideoJobRunning && job.State != agentworkspace.VideoJobResultReady {
+	if job.State != agentworkspace.VideoJobPreparing && job.State != agentworkspace.VideoJobQueued && job.State != agentworkspace.VideoJobRunning && job.State != agentworkspace.VideoJobResultReady && job.State != agentworkspace.VideoJobIngesting {
 		return job, nil
 	}
 	if strings.TrimSpace(job.ProviderTaskID) == "" {
+		return job, nil
+	}
+	if job.State == agentworkspace.VideoJobIngesting && s.now().UTC().Sub(job.UpdatedAt) < agentVideoIngestLease {
 		return job, nil
 	}
 	status, err := s.videos.Poll(ctx, owner, job.ProviderTaskID)
@@ -236,39 +264,68 @@ func (s *agentVideoCoordinator) poll(ctx context.Context, owner string, job agen
 	}
 	if status.Status != "succeeded" {
 		job.State = agentworkspace.VideoJobRunning
-		return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+		return s.updateOrLatest(ctx, owner, job)
 	}
-	job.State = agentworkspace.VideoJobResultReady
+	if job.State != agentworkspace.VideoJobResultReady && job.State != agentworkspace.VideoJobIngesting {
+		job.State = agentworkspace.VideoJobResultReady
+		transition := job
+		job, err = s.projects.UpdateVideoJob(ctx, owner, transition, s.now().UTC())
+		if err != nil {
+			if errors.Is(err, agentworkspace.ErrVideoJobState) {
+				return s.projects.VideoJob(ctx, owner, transition.ProjectID, transition.ID)
+			}
+			return agentworkspace.VideoJob{}, err
+		}
+	}
+	job.State = agentworkspace.VideoJobIngesting
 	job, err = s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
 	if err != nil {
+		if errors.Is(err, agentworkspace.ErrVideoJobState) {
+			return s.projects.VideoJob(ctx, owner, job.ProjectID, job.ID)
+		}
 		return agentworkspace.VideoJob{}, err
 	}
 	var asset agentworkspace.Asset
+	resultAssetID := "video-result-" + job.ID
 	if status.ArtifactID != "" {
-		asset, err = s.ingestor.SaveLocal(ctx, owner, job.ProjectID, status.ArtifactID, s.executor, s.artifacts)
+		asset, err = s.ingestor.SaveLocal(ctx, owner, job.ProjectID, resultAssetID, status.ArtifactID, s.executor, s.artifacts)
 	} else {
-		asset, err = s.ingestor.SaveRemote(ctx, owner, job.ProjectID, status.VideoURL)
+		asset, err = s.ingestor.SaveRemote(ctx, owner, job.ProjectID, resultAssetID, status.VideoURL)
 	}
 	if err != nil {
 		return s.fail(ctx, owner, job, err)
 	}
 	job.State, job.ResultAssetID, job.ErrorMessage = agentworkspace.VideoJobAwaitingConfirmation, asset.ID, ""
-	return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+	return s.updateOrLatest(ctx, owner, job)
 }
 
 func (s *agentVideoCoordinator) fail(ctx context.Context, owner string, job agentworkspace.VideoJob, err error) (agentworkspace.VideoJob, error) {
 	job.State, job.ErrorMessage = agentworkspace.VideoJobFailed, strings.TrimSpace(err.Error())
-	return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+	return s.updateOrLatest(ctx, owner, job)
 }
 
 func (s *agentVideoCoordinator) cancel(ctx context.Context, owner string, job agentworkspace.VideoJob) (agentworkspace.VideoJob, error) {
-	err := s.videos.Cancel(ctx, owner, job.ProviderTaskID)
+	job.State = agentworkspace.VideoJobCanceling
+	claimed, err := s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
+	job = claimed
+	err = s.videos.Cancel(ctx, owner, job.ProviderTaskID)
 	if err != nil {
 		job.State, job.ErrorMessage = agentworkspace.VideoJobAbandoned, err.Error()
 	} else {
 		job.State, job.ErrorMessage = agentworkspace.VideoJobCanceled, ""
 	}
-	return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+	return s.updateOrLatest(ctx, owner, job)
+}
+
+func (s *agentVideoCoordinator) updateOrLatest(ctx context.Context, owner string, job agentworkspace.VideoJob) (agentworkspace.VideoJob, error) {
+	updated, err := s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+	if !errors.Is(err, agentworkspace.ErrVideoJobState) {
+		return updated, err
+	}
+	return s.projects.VideoJob(ctx, owner, job.ProjectID, job.ID)
 }
 
 func (s *agentVideoCoordinator) viewJob(ctx context.Context, owner string, job agentworkspace.VideoJob) map[string]any {
@@ -296,10 +353,6 @@ func valueString(value any) string {
 	}
 	return ""
 }
-func requestFromJob(job agentworkspace.VideoJob, key string) agentVideoJobRequest {
-	return agentVideoJobRequest{NodeID: job.NodeID, IdempotencyKey: key, Prompt: valueString(job.Settings["prompt"]), ModelKey: job.ModelKey, Duration: job.Settings["duration"], AspectRatio: valueString(job.Settings["aspectRatio"]), Resolution: valueString(job.Settings["resolution"]), ReferenceAssetIDs: append([]string(nil), job.ReferenceAssetIDs...)}
-}
-
 func writeAgentVideoJobError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, agentworkspace.ErrVideoJobNotFound):
@@ -314,6 +367,8 @@ func writeAgentVideoJobError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "当前素材存储无法提供模型参考图"})
 	case errors.Is(err, errUnsupportedReferenceImages):
 		writeJSON(w, http.StatusConflict, map[string]any{"code": "UNSUPPORTED_REFERENCE_IMAGES", "error": "当前视频模型不支持参考图，是否允许无参考图生成"})
+	case errors.Is(err, errUnsupportedVideoReference):
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "UNSUPPORTED_VIDEO_REFERENCE", "error": "当前视频生成暂不支持视频参考素材，请移除后重试"})
 	case errors.Is(err, agentworkspace.ErrAssetNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "参考素材不存在"})
 	case errors.Is(err, agentworkspace.ErrProjectNotFound):

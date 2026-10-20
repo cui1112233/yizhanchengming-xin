@@ -59,17 +59,18 @@ export function createAuthenticatedMediaStore({
 
 export const agentCanvasMediaStore = createAuthenticatedMediaStore();
 
-export function createAuthenticatedMediaSession(source, { store = agentCanvasMediaStore, onState } = {}) {
+export function createAuthenticatedMediaSession(source, { store = agentCanvasMediaStore, onState, loadErrorMessage = '媒体读取失败' } = {}) {
   if (!source) {
     onState?.({ url: '', loading: false, error: '' });
     return { reportPlaybackError() {}, dispose() {} };
   }
 
   let active = true;
+  let released = false;
   const lease = store.acquire(source);
-  const release = () => {
-    if (!active) return false;
-    active = false;
+  const releaseLease = () => {
+    if (released) return false;
+    released = true;
     lease.release();
     return true;
   };
@@ -79,16 +80,21 @@ export function createAuthenticatedMediaSession(source, { store = agentCanvasMed
       if (active) onState?.({ url, loading: false, error: '' });
     })
     .catch(error => {
-      if (active) onState?.({ url: '', loading: false, error: error?.message || '视频读取失败' });
+      if (!active) return;
+      releaseLease();
+      onState?.({ url: '', loading: false, error: error?.message || loadErrorMessage });
     });
 
   return {
     reportPlaybackError(message = '视频源无法播放') {
-      if (!release()) return;
+      if (!active) return;
+      active = false;
+      releaseLease();
       onState?.({ url: '', loading: false, error: String(message || '').trim() || '视频源无法播放' });
     },
     dispose() {
-      release();
+      active = false;
+      releaseLease();
     }
   };
 }

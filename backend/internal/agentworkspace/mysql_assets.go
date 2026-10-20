@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type MySQLAssetStore struct{ db *sql.DB }
@@ -41,6 +43,10 @@ func (s *MySQLAssetStore) CreateAsset(ctx context.Context, owner string, asset A
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO agent_assets (id, project_id, owner_username, kind, name, content_type, object_key, byte_size, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, asset.ID, asset.ProjectID, owner, asset.Kind, asset.Name, asset.ContentType, asset.ObjectKey, asset.ByteSize, asset.CreatedAt)
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		return ErrAssetExists
+	}
 	return err
 }
 

@@ -110,7 +110,7 @@ func (s *MySQLStore) ListVideoJobs(ctx context.Context, owner, projectID string)
 
 func (s *MySQLStore) UpdateVideoJob(ctx context.Context, owner string, input VideoJob, now time.Time) (VideoJob, error) {
 	owner = strings.TrimSpace(owner)
-	if owner == "" || strings.TrimSpace(input.ID) == "" || strings.TrimSpace(input.ProjectID) == "" || !validVideoJobState(input.State) || now.IsZero() {
+	if owner == "" || strings.TrimSpace(input.ID) == "" || strings.TrimSpace(input.ProjectID) == "" || !validVideoJobState(input.State) || now.IsZero() || input.UpdatedAt.IsZero() {
 		return VideoJob{}, ErrVideoJobInvalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -126,7 +126,7 @@ func (s *MySQLStore) UpdateVideoJob(ctx context.Context, owner string, input Vid
 	if err != nil {
 		return VideoJob{}, err
 	}
-	if current.State == VideoJobApplied || current.State == VideoJobCanceled || current.State == VideoJobAbandoned {
+	if !normalizeVideoJobTime(input.UpdatedAt).Equal(normalizeVideoJobTime(current.UpdatedAt)) || !validVideoJobTransition(current.State, input.State) {
 		return VideoJob{}, ErrVideoJobState
 	}
 	current.State = input.State
@@ -140,7 +140,7 @@ func (s *MySQLStore) UpdateVideoJob(ctx context.Context, owner string, input Vid
 	if input.Settings != nil {
 		current.Settings = input.Settings
 	}
-	current.UpdatedAt = now.UTC()
+	current.UpdatedAt = nextVideoJobUpdatedAt(current.UpdatedAt, now)
 	settingsJSON, marshalErr := json.Marshal(current.Settings)
 	if marshalErr != nil {
 		return VideoJob{}, ErrVideoJobInvalid
@@ -162,6 +162,7 @@ func nullableString(value string) any {
 }
 
 func (s *MySQLStore) ConfirmVideoJob(ctx context.Context, owner, projectID, id string, now time.Time) (VideoJob, error) {
+	now = normalizeVideoJobTime(now)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return VideoJob{}, err
@@ -228,7 +229,7 @@ func (s *MySQLStore) ConfirmVideoJob(ctx context.Context, owner, projectID, id s
 		return VideoJob{}, err
 	}
 	job.State = VideoJobApplied
-	job.UpdatedAt = now.UTC()
+	job.UpdatedAt = now
 	if _, err := tx.ExecContext(ctx, `UPDATE agent_video_jobs SET state = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`, job.State, job.UpdatedAt, job.ID, job.ProjectID, owner); err != nil {
 		return VideoJob{}, err
 	}
@@ -239,14 +240,63 @@ func (s *MySQLStore) ConfirmVideoJob(ctx context.Context, owner, projectID, id s
 }
 
 func (s *MySQLStore) RetryVideoJob(ctx context.Context, owner, projectID, id string, input RetryVideoJobInput) (VideoJob, error) {
-	current, err := s.VideoJob(ctx, owner, projectID, id)
+	owner, projectID, id = strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(id)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return VideoJob{}, err
+	}
+	defer tx.Rollback()
+	current, err := scanVideoJob(tx.QueryRowContext(ctx, `SELECT `+videoJobColumns+` FROM agent_video_jobs WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`, id, projectID, owner))
+	if errors.Is(err, sql.ErrNoRows) {
+		return VideoJob{}, ErrVideoJobNotFound
+	}
 	if err != nil {
 		return VideoJob{}, err
 	}
 	if !isRetryableVideoJob(current.State) {
 		return VideoJob{}, ErrVideoJobState
 	}
-	return s.CreateVideoJob(ctx, owner, CreateVideoJobInput{ID: input.ID, ProjectID: projectID, NodeID: current.NodeID, NodeVersion: current.NodeVersion, ModelKey: current.ModelKey, Settings: current.Settings, ReferenceAssetIDs: current.ReferenceAssetIDs, IdempotencyKey: input.IdempotencyKey, Now: input.Now})
+	var activeProjectID string
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM agent_projects WHERE id = ? AND owner_username = ? AND deleted_at IS NULL FOR UPDATE`, projectID, owner).Scan(&activeProjectID); errors.Is(err, sql.ErrNoRows) {
+		return VideoJob{}, ErrProjectNotFound
+	} else if err != nil {
+		return VideoJob{}, err
+	}
+	var nodeType string
+	var nodeVersion int64
+	if err := tx.QueryRowContext(ctx, `SELECT node_type, current_version FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id = ? FOR UPDATE`, projectID, owner, current.NodeID).Scan(&nodeType, &nodeVersion); errors.Is(err, sql.ErrNoRows) {
+		return VideoJob{}, ErrVideoJobNodeChanged
+	} else if err != nil {
+		return VideoJob{}, err
+	}
+	if nodeType != "video" || nodeVersion != current.NodeVersion {
+		return VideoJob{}, ErrVideoJobNodeChanged
+	}
+	create, err := normalizeCreateVideoJob(CreateVideoJobInput{ID: input.ID, ProjectID: projectID, NodeID: current.NodeID, NodeVersion: current.NodeVersion, ModelKey: current.ModelKey, Settings: current.Settings, ReferenceAssetIDs: current.ReferenceAssetIDs, IdempotencyKey: input.IdempotencyKey, Now: input.Now})
+	if err != nil || owner == "" {
+		return VideoJob{}, ErrVideoJobInvalid
+	}
+	settingsJSON, err := json.Marshal(create.Settings)
+	if err != nil {
+		return VideoJob{}, ErrVideoJobInvalid
+	}
+	referencesJSON, err := json.Marshal(create.ReferenceAssetIDs)
+	if err != nil {
+		return VideoJob{}, ErrVideoJobInvalid
+	}
+	job := VideoJob{ID: create.ID, ProjectID: create.ProjectID, OwnerUsername: owner, NodeID: create.NodeID, NodeVersion: create.NodeVersion, State: VideoJobPreparing, ModelKey: create.ModelKey, Settings: create.Settings, ReferenceAssetIDs: create.ReferenceAssetIDs, IdempotencyKey: create.IdempotencyKey, CreatedAt: create.Now.UTC(), UpdatedAt: create.Now.UTC()}
+	_, err = tx.ExecContext(ctx, `INSERT INTO agent_video_jobs (id, project_id, owner_username, node_id, node_version, state, model_key, settings_json, reference_asset_ids_json, idempotency_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, job.ID, job.ProjectID, owner, job.NodeID, job.NodeVersion, job.State, job.ModelKey, string(settingsJSON), string(referencesJSON), job.IdempotencyKey, job.CreatedAt, job.UpdatedAt)
+	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return VideoJob{}, ErrVideoJobExists
+		}
+		return VideoJob{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return VideoJob{}, err
+	}
+	return job, nil
 }
 
 var _ VideoJobStore = (*MySQLStore)(nil)

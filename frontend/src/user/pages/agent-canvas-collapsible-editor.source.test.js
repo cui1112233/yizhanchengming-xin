@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(dirname, '../../..');
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
+const authenticatedImagePath = path.resolve(dirname, '../components/AuthenticatedAgentImage.jsx');
+const authenticatedImageSource = fs.existsSync(authenticatedImagePath) ? fs.readFileSync(authenticatedImagePath, 'utf8') : '';
 const workspaceStyles = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-workspace.css'), 'utf8');
 const packageLock = JSON.parse(fs.readFileSync(path.resolve(frontendRoot, 'package-lock.json'), 'utf8'));
 const reactFlowSource = fs.readFileSync(path.resolve(frontendRoot, 'node_modules/@xyflow/react/dist/esm/index.js'), 'utf8');
@@ -84,14 +86,28 @@ test('edge visibility changes rendering without deleting serialized edges', () =
 });
 
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
-  for (const label of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
-    assert.match(canvasSource, new RegExp(`aria-label="${label}"`));
+  for (const label of ['生成视频', '取消生成', '重试生成', '确认回填']) {
+    assert.match(canvasSource, new RegExp(`>${label}<`));
   }
   assert.match(canvasSource, /onSubmitVideo\?\.\(id\)/);
   assert.match(canvasSource, /onCancelVideo\?\.\(id\)/);
   assert.match(canvasSource, /onRetryVideo\?\.\(id\)/);
   assert.match(canvasSource, /onConfirmVideo\?\.\(id\)/);
   assert.match(canvasSource, /videoState=\{videoNodeViewState\(/);
+});
+
+test('every private Agent image surface uses an authenticated Blob session', () => {
+  assert.match(canvasSource, /import \{ AuthenticatedAgentImage \}/);
+  assert.match(canvasSource, /<AuthenticatedAgentImage source=\{data\.assetRef\.url\}/);
+  assert.match(canvasSource, /<AuthenticatedAgentImage source=\{asset\.url\}/);
+  assert.doesNotMatch(canvasSource, /<img\s+src=\{(?:data\.assetRef|asset)\.url\}/);
+  assert.match(authenticatedImageSource, /createAuthenticatedMediaSession\(source/);
+  assert.match(authenticatedImageSource, /reportPlaybackError\('图片源无法显示'\)/);
+});
+
+test('video submission refuses selected video references before calling the API', () => {
+  assert.match(canvasSource, /videoReferenceCapabilityError\(node\.data\?\.config/);
+  assert.match(canvasSource, /setVideoActionErrors[\s\S]*?return;[\s\S]*?createAgentVideoJob/);
 });
 
 test('canvas restores project video jobs and rejects stale project responses', () => {

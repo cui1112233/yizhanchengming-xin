@@ -1,4 +1,4 @@
-const runningStates = new Set(['preparing', 'queued', 'running', 'result_ready']);
+const runningStates = new Set(['preparing', 'queued', 'running', 'result_ready', 'ingesting', 'canceling']);
 
 export function canSubmitVideoFromConfig(config = {}) {
   return Boolean(String(config?.prompt || '').trim());
@@ -21,10 +21,16 @@ export function videoReferenceAssetIDs(config = {}) {
   const seen = new Set();
   return (Array.isArray(config?.referenceAssets) ? config.referenceAssets : []).flatMap(asset => {
     const id = String(asset?.id || '').trim();
-    if (asset?.kind !== 'image' || !id || seen.has(id)) return [];
+    if (!['image', 'video'].includes(asset?.kind) || !id || seen.has(id)) return [];
     seen.add(id);
     return [id];
   });
+}
+
+export function videoReferenceCapabilityError(config = {}) {
+  const unsupported = (Array.isArray(config?.referenceAssets) ? config.referenceAssets : [])
+    .find(asset => asset?.kind === 'video' && String(asset?.id || '').trim());
+  return unsupported ? '当前视频生成暂不支持视频参考素材，请移除视频参考后再生成。' : '';
 }
 
 export function videoResultPreview(job) {
@@ -60,11 +66,13 @@ function videoJobStateRank(job) {
     queued: 1,
     running: 2,
     result_ready: 3,
-    awaiting_confirmation: 4,
-    failed: 5,
-    canceled: 5,
-    abandoned: 5,
-    applied: 6
+    ingesting: 4,
+    canceling: 4,
+    awaiting_confirmation: 5,
+    failed: 6,
+    canceled: 6,
+    abandoned: 6,
+    applied: 7
   }[String(job?.state || '')] ?? -1;
 }
 

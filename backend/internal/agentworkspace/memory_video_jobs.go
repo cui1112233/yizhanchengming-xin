@@ -92,10 +92,10 @@ func (s *MemoryStore) UpdateVideoJob(_ context.Context, owner string, input Vide
 	if !exists || current.ProjectID != strings.TrimSpace(input.ProjectID) {
 		return VideoJob{}, ErrVideoJobNotFound
 	}
-	if !validVideoJobState(input.State) || now.IsZero() {
+	if !validVideoJobState(input.State) || now.IsZero() || input.UpdatedAt.IsZero() {
 		return VideoJob{}, ErrVideoJobInvalid
 	}
-	if current.State == VideoJobApplied || current.State == VideoJobCanceled || current.State == VideoJobAbandoned {
+	if !normalizeVideoJobTime(input.UpdatedAt).Equal(normalizeVideoJobTime(current.UpdatedAt)) || !validVideoJobTransition(current.State, input.State) {
 		return VideoJob{}, ErrVideoJobState
 	}
 	current.State = input.State
@@ -105,7 +105,7 @@ func (s *MemoryStore) UpdateVideoJob(_ context.Context, owner string, input Vide
 	if input.Settings != nil {
 		current.Settings = input.Settings
 	}
-	current.UpdatedAt = now.UTC()
+	current.UpdatedAt = nextVideoJobUpdatedAt(current.UpdatedAt, now)
 	s.videoJobs[key] = cloneVideoJob(current)
 	return cloneVideoJob(current), nil
 }
@@ -144,25 +144,56 @@ func (s *MemoryStore) ConfirmVideoJob(_ context.Context, owner, projectID, id st
 		return VideoJob{}, ErrVideoJobNodeChanged
 	}
 	project.Canvas.Revision++
-	project.UpdatedAt = now.UTC()
+	project.UpdatedAt = normalizeVideoJobTime(now)
 	s.projects[projectKey(owner, projectID)] = project
 	job.State = VideoJobApplied
-	job.UpdatedAt = now.UTC()
+	job.UpdatedAt = normalizeVideoJobTime(now)
 	s.videoJobs[key] = cloneVideoJob(job)
 	return cloneVideoJob(job), nil
 }
 
 func (s *MemoryStore) RetryVideoJob(ctx context.Context, owner, projectID, id string, input RetryVideoJobInput) (VideoJob, error) {
-	current, err := s.VideoJob(ctx, owner, projectID, id)
-	if err != nil {
-		return VideoJob{}, err
+	_ = ctx
+	owner, projectID, id = strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(id)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, exists := s.videoJobs[videoJobKey(owner, id)]
+	if !exists || current.ProjectID != projectID {
+		return VideoJob{}, ErrVideoJobNotFound
 	}
 	if !isRetryableVideoJob(current.State) {
 		return VideoJob{}, ErrVideoJobState
 	}
-	return s.CreateVideoJob(ctx, owner, CreateVideoJobInput{
+	create, err := normalizeCreateVideoJob(CreateVideoJobInput{
 		ID: input.ID, ProjectID: projectID, NodeID: current.NodeID, NodeVersion: current.NodeVersion,
 		ModelKey: current.ModelKey, Settings: current.Settings, ReferenceAssetIDs: current.ReferenceAssetIDs,
 		IdempotencyKey: input.IdempotencyKey, Now: input.Now,
 	})
+	if err != nil || owner == "" {
+		return VideoJob{}, ErrVideoJobInvalid
+	}
+	project, exists := s.projects[projectKey(owner, projectID)]
+	if !exists || project.DeletedAt != nil {
+		return VideoJob{}, ErrProjectNotFound
+	}
+	nodeValid := false
+	for _, node := range project.Canvas.Nodes {
+		if node.ID == current.NodeID && node.Type == "video" && node.Version == current.NodeVersion {
+			nodeValid = true
+			break
+		}
+	}
+	if !nodeValid {
+		return VideoJob{}, ErrVideoJobNodeChanged
+	}
+	if _, exists := s.videoJobs[videoJobKey(owner, create.ID)]; exists {
+		return VideoJob{}, ErrVideoJobExists
+	}
+	if _, exists := s.videoIdempotency[videoIdempotencyKey(owner, create.IdempotencyKey)]; exists {
+		return VideoJob{}, ErrVideoJobExists
+	}
+	job := VideoJob{ID: create.ID, ProjectID: create.ProjectID, OwnerUsername: owner, NodeID: create.NodeID, NodeVersion: create.NodeVersion, State: VideoJobPreparing, ModelKey: create.ModelKey, Settings: create.Settings, ReferenceAssetIDs: create.ReferenceAssetIDs, IdempotencyKey: create.IdempotencyKey, CreatedAt: create.Now.UTC(), UpdatedAt: create.Now.UTC()}
+	s.videoJobs[videoJobKey(owner, job.ID)] = cloneVideoJob(job)
+	s.videoIdempotency[videoIdempotencyKey(owner, job.IdempotencyKey)] = job.ID
+	return cloneVideoJob(job), nil
 }

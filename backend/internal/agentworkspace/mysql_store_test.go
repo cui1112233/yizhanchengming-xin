@@ -234,3 +234,74 @@ func TestMySQLStoreConfirmVideoJobReturnsNodeQueryError(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMySQLRetryVideoJobLocksAndRejectsNonRetryableStateBeforeInsert(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLStore(db)
+	now := time.Date(2026, 10, 20, 4, 20, 0, 0, time.UTC)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT `+videoJobColumns+` FROM agent_video_jobs WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("job-1", "project-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "owner_username", "node_id", "node_version", "state", "model_key", "provider_task_id", "settings_json", "reference_asset_ids_json", "result_asset_id", "error_message", "idempotency_key", "created_at", "updated_at"}).
+			AddRow("job-1", "project-1", "alice", "video-1", int64(1), VideoJobQueued, "minimax-h3-video", "provider-1", `{"prompt":"雨夜追逐"}`, `[]`, nil, nil, "request-1", now, now))
+	mock.ExpectRollback()
+
+	_, err = store.RetryVideoJob(context.Background(), "alice", "project-1", "job-1", RetryVideoJobInput{ID: "job-2", IdempotencyKey: "request-2", Now: now.Add(time.Second)})
+	if !errors.Is(err, ErrVideoJobState) {
+		t.Fatalf("err=%v, want ErrVideoJobState", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLRetryVideoJobRejectsDeletedProjectBeforeInsert(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLStore(db)
+	now := time.Date(2026, 10, 20, 6, 20, 0, 0, time.UTC)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT `+videoJobColumns+` FROM agent_video_jobs WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("job-1", "project-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "project_id", "owner_username", "node_id", "node_version", "state", "model_key", "provider_task_id", "settings_json", "reference_asset_ids_json", "result_asset_id", "error_message", "idempotency_key", "created_at", "updated_at"}).
+			AddRow("job-1", "project-1", "alice", "video-1", int64(1), VideoJobFailed, "minimax-h3-video", "provider-1", `{"prompt":"雨夜追逐"}`, `[]`, nil, "failed", "request-1", now, now))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id FROM agent_projects WHERE id = ? AND owner_username = ? AND deleted_at IS NULL FOR UPDATE`)).
+		WithArgs("project-1", "alice").
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectRollback()
+
+	_, err = store.RetryVideoJob(context.Background(), "alice", "project-1", "job-1", RetryVideoJobInput{ID: "job-2", IdempotencyKey: "request-2", Now: now.Add(time.Second)})
+	if !errors.Is(err, ErrProjectNotFound) {
+		t.Fatalf("err=%v, want ErrProjectNotFound", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMySQLAssetStoreMapsDuplicateKeyToAssetExists(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLAssetStore(db)
+	asset := Asset{ID: "video-result-job-1", ProjectID: "project-1", Kind: "video", Name: "result.mp4", ContentType: "video/mp4", ObjectKey: "agent-assets/alice/project-1/video-result-job-1.mp4", ByteSize: 3, CreatedAt: time.Now()}
+	mock.ExpectExec("INSERT INTO agent_assets").WillReturnError(&mysql.MySQLError{Number: 1062, Message: "duplicate"})
+
+	if err := store.CreateAsset(context.Background(), "alice", asset); !errors.Is(err, ErrAssetExists) {
+		t.Fatalf("err=%v, want ErrAssetExists", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}

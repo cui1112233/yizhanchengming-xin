@@ -24,8 +24,9 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from '../pages/agent-canvas-video-jobs';
+import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError, videoResultPreview } from '../pages/agent-canvas-video-jobs';
 import { isMediaCanvasNodeType, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
+import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 
 const LOCAL_DOUBAO_VIDEO_MODEL_OPTION = { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' };
@@ -64,7 +65,10 @@ function CanvasNode({
     </button> : null}
     {supportsReferences ? <div className="agent-canvas-generation-reference-strip" aria-label="参考素材">
       {referenceAssets.map(asset => <span className="agent-canvas-node-reference" key={asset.id} title={asset.name || asset.id}>
-        {asset.url ? <img src={asset.url} alt="" /> : <ImagePlus size={14} />}
+        {asset.url ? asset.kind === 'video'
+          ? <AuthenticatedAgentVideo source={asset.url} aria-label="视频参考素材" preload="metadata" muted />
+          : <AuthenticatedAgentImage source={asset.url} alt="" />
+          : <ImagePlus size={14} />}
         <button type="button" aria-label="移除参考素材" onClick={event => { stopCanvasEvent(event); onRemoveReference?.(id, asset.id); }}>×</button>
       </span>)}
       <button type="button" className="agent-canvas-generation-add-reference" aria-label="添加参考素材" onClick={event => { stopCanvasEvent(event); onPickReferenceAsset?.(id, event); }}><Plus size={22} /></button>
@@ -95,10 +99,10 @@ function CanvasNode({
         <span className="agent-canvas-generation-state" aria-live="polite">{videoJob ? videoState.state : '尚未生成'}</span>
         {videoJob?.errorMessage ? <span className="agent-canvas-generation-error" role="alert">{videoJob.errorMessage}</span> : null}
         {videoActionError ? <span className="agent-canvas-generation-error" role="alert">{videoActionError}</span> : null}
-        {videoState.canCancel ? <button type="button" aria-label="取消视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onCancelVideo?.(id); }}>取消</button> : null}
-        {videoState.canRetry ? <button type="button" aria-label="重试视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onRetryVideo?.(id); }}>重试</button> : null}
-        {videoState.canConfirm ? <button type="button" aria-label="确认视频结果" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onConfirmVideo?.(id); }}>确认</button> : null}
-        <button type="button" className="agent-canvas-generation-submit" aria-label="生成视频" title="生成视频" disabled={videoBusy || !videoState.canGenerate || !String(config.prompt || '').trim()} onClick={event => { stopCanvasEvent(event); onSubmitVideo?.(id); }}><ArrowUp size={19} /></button>
+        {videoState.canCancel ? <button type="button" aria-label="取消视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onCancelVideo?.(id); }}>取消生成</button> : null}
+        {videoState.canRetry ? <button type="button" aria-label="重试视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onRetryVideo?.(id); }}>重试生成</button> : null}
+        {videoState.canConfirm ? <button type="button" aria-label="确认视频结果" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onConfirmVideo?.(id); }}>确认回填</button> : null}
+        <button type="button" className="agent-canvas-generation-submit agent-canvas-generation-submit--video" aria-label="生成视频" title="生成视频" disabled={videoBusy || !videoState.canGenerate || !String(config.prompt || '').trim()} onClick={event => { stopCanvasEvent(event); onSubmitVideo?.(id); }}><ArrowUp size={17} /><span>生成视频</span></button>
       </> : null}
     </div>
   </section> : null;
@@ -112,7 +116,7 @@ function CanvasNode({
         <div className="agent-canvas-node-card">
           <header><span>{nodeType}</span><strong>{data.title}</strong></header>
           {nodeType === 'image' ? <button type="button" className="agent-canvas-node-image-select" aria-label="展开图片编辑" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
-            {data.assetRef?.url ? <img className="agent-canvas-node-media" src={data.assetRef.url} alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
+            {data.assetRef?.url ? <AuthenticatedAgentImage source={data.assetRef.url} className="agent-canvas-node-media" alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
           </button> : null}
           {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
           {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
@@ -563,6 +567,11 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId) return;
     const node = nodesRef.current.find(item => item.id === nodeID);
     if (!node || node.data?.type !== 'video') return;
+    const referenceError = videoReferenceCapabilityError(node.data?.config || {});
+    if (referenceError) {
+      setVideoActionErrors(current => ({ ...current, [nodeID]: referenceError }));
+      return;
+    }
     const payload = videoRequestPayloadForNode(node, ignoreReferences);
     if (!canSubmitVideoFromConfig({ prompt: payload.prompt })) return;
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
@@ -1165,7 +1174,10 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         {assetError ? <p className="agent-canvas-asset-error">{assetError}</p> : null}
         {assetLoading ? <p className="agent-canvas-asset-empty">正在读取素材...</p> : null}
         {!assetLoading && !assets.length ? <p className="agent-canvas-asset-empty">还没有可用素材</p> : null}
-        <div className="agent-canvas-asset-list">{assets.map(asset => <button type="button" key={asset.id} onClick={() => commitAsset(asset)}>{asset.url ? <img src={asset.url} alt="" /> : <ImagePlus size={16} />}<strong>{asset.name}</strong><span>{asset.kind === 'image' ? '图片' : '视频'}</span></button>)}</div>
+        <div className="agent-canvas-asset-list">{assets.map(asset => <button type="button" key={asset.id} onClick={() => commitAsset(asset)}>{asset.url ? asset.kind === 'video'
+          ? <AuthenticatedAgentVideo source={asset.url} aria-label="视频素材缩略图" preload="metadata" muted />
+          : <AuthenticatedAgentImage source={asset.url} alt="" />
+          : <ImagePlus size={16} />}<strong>{asset.name}</strong><span>{asset.kind === 'image' ? '图片' : '视频'}</span></button>)}</div>
       </aside> : null}
 
       <Modal

@@ -330,8 +330,14 @@ test('expanded video editor previews the pending result and reports provider fai
 
 test('formal and pending Agent videos use the authenticated media component', () => {
   assert.match(canvasSource, /import \{ AuthenticatedAgentVideo \}/);
-  assert.equal((canvasSource.match(/<AuthenticatedAgentVideo/g) || []).length, 2);
+  assert.ok((canvasSource.match(/<AuthenticatedAgentVideo/g) || []).length >= 2);
   assert.doesNotMatch(canvasSource, /<video className="agent-canvas-(?:node-media|generation-result)"/);
+});
+
+test('node images, reference thumbnails, and material thumbnails use authenticated media', () => {
+  assert.match(canvasSource, /import \{ AuthenticatedAgentImage \}/);
+  assert.ok((canvasSource.match(/<AuthenticatedAgentImage/g) || []).length >= 3);
+  assert.doesNotMatch(canvasSource, /<img\s+src=\{(?:data\.assetRef|asset)\.url\}/);
 });
 
 test('canvas keeps middle mouse panning and advertises only implemented undo redo keys', () => {

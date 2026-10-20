@@ -22,6 +22,8 @@ const (
 	VideoJobQueued               VideoJobState = "queued"
 	VideoJobRunning              VideoJobState = "running"
 	VideoJobResultReady          VideoJobState = "result_ready"
+	VideoJobIngesting            VideoJobState = "ingesting"
+	VideoJobCanceling            VideoJobState = "canceling"
 	VideoJobAwaitingConfirmation VideoJobState = "awaiting_confirmation"
 	VideoJobApplied              VideoJobState = "applied"
 	VideoJobFailed               VideoJobState = "failed"
@@ -76,7 +78,7 @@ type VideoJobStore interface {
 
 func validVideoJobState(state VideoJobState) bool {
 	switch state {
-	case VideoJobPreparing, VideoJobQueued, VideoJobRunning, VideoJobResultReady,
+	case VideoJobPreparing, VideoJobQueued, VideoJobRunning, VideoJobResultReady, VideoJobIngesting, VideoJobCanceling,
 		VideoJobAwaitingConfirmation, VideoJobApplied, VideoJobFailed, VideoJobCanceled, VideoJobAbandoned:
 		return true
 	default:
@@ -100,6 +102,7 @@ func normalizeCreateVideoJob(input CreateVideoJobInput) (CreateVideoJobInput, er
 	if input.Now.IsZero() {
 		return CreateVideoJobInput{}, ErrVideoJobInvalid
 	}
+	input.Now = normalizeVideoJobTime(input.Now)
 	return input, nil
 }
 
@@ -122,4 +125,36 @@ func uniqueNonEmpty(input []string) []string {
 
 func isRetryableVideoJob(state VideoJobState) bool {
 	return state == VideoJobFailed || state == VideoJobCanceled || state == VideoJobAbandoned
+}
+
+func validVideoJobTransition(from, to VideoJobState) bool {
+	switch from {
+	case VideoJobPreparing:
+		return to == VideoJobQueued || to == VideoJobCanceling || to == VideoJobFailed || to == VideoJobCanceled || to == VideoJobAbandoned
+	case VideoJobQueued:
+		return to == VideoJobRunning || to == VideoJobResultReady || to == VideoJobCanceling || to == VideoJobFailed || to == VideoJobCanceled || to == VideoJobAbandoned
+	case VideoJobRunning:
+		return to == VideoJobRunning || to == VideoJobResultReady || to == VideoJobCanceling || to == VideoJobFailed || to == VideoJobCanceled || to == VideoJobAbandoned
+	case VideoJobResultReady:
+		return to == VideoJobIngesting || to == VideoJobFailed
+	case VideoJobIngesting:
+		return to == VideoJobIngesting || to == VideoJobAwaitingConfirmation || to == VideoJobFailed
+	case VideoJobCanceling:
+		return to == VideoJobCanceled || to == VideoJobAbandoned
+	default:
+		return false
+	}
+}
+
+func normalizeVideoJobTime(value time.Time) time.Time {
+	return value.UTC().Truncate(time.Microsecond)
+}
+
+func nextVideoJobUpdatedAt(current, requested time.Time) time.Time {
+	current = normalizeVideoJobTime(current)
+	requested = normalizeVideoJobTime(requested)
+	if !requested.After(current) {
+		return current.Add(time.Microsecond)
+	}
+	return requested
 }

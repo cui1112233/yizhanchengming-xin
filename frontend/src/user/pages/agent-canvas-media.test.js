@@ -153,6 +153,28 @@ test('authenticated media session reports errors and ignores late results after 
   assert.deepEqual(lateStates, [{ url: '', loading: true, error: '' }]);
 });
 
+test('authenticated media session releases its lease when a protected image download fails', async () => {
+  const states = [];
+  let releases = 0;
+  const session = createAuthenticatedMediaSession('/private/image', {
+    store: {
+      acquire: () => ({
+        promise: Promise.reject(new Error('登录已失效')),
+        release: () => { releases += 1; }
+      })
+    },
+    loadErrorMessage: '图片读取失败',
+    onState: state => states.push(state)
+  });
+
+  await flushPromises();
+  assert.equal(releases, 1);
+  assert.deepEqual(states.at(-1), { url: '', loading: false, error: '登录已失效' });
+
+  session.dispose();
+  assert.equal(releases, 1);
+});
+
 test('authenticated media session releases once and clears its URL after playback error', async () => {
   const states = [];
   let releases = 0;

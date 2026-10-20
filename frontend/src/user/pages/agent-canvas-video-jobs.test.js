@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as videoJobs from './agent-canvas-video-jobs.js';
 
-const { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } = videoJobs;
+const { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError, videoResultPreview } = videoJobs;
 
 test('video creation requires a non-empty prompt from the inline node settings', () => {
   assert.equal(canSubmitVideoFromConfig({ prompt: '' }), false);
@@ -23,14 +23,25 @@ test('collectVideoReferences keeps only directly connected confirmed image asset
   assert.deepEqual(refs.map(item => item.id), ['asset-1']);
 });
 
-test('videoReferenceAssetIDs sends selected existing images once and rejects videos', () => {
+test('videoReferenceAssetIDs keeps every selected media ID so video references cannot disappear silently', () => {
   assert.deepEqual(videoReferenceAssetIDs({ referenceAssets: [
     { id: 'manual-image', kind: 'image' },
     { id: 'connected-image', kind: 'image' },
     { id: 'manual-image', kind: 'image' },
     { id: 'video-asset', kind: 'video' },
     { id: '', kind: 'image' }
-  ] }), ['manual-image', 'connected-image']);
+  ] }), ['manual-image', 'connected-image', 'video-asset']);
+});
+
+test('video references disclose the unsupported video-to-video capability before submission', () => {
+  assert.equal(typeof videoReferenceCapabilityError, 'function');
+  if (typeof videoReferenceCapabilityError !== 'function') return;
+  assert.equal(videoReferenceCapabilityError({ referenceAssets: [
+    { id: 'image-asset', kind: 'image' }
+  ] }), '');
+  assert.match(videoReferenceCapabilityError({ referenceAssets: [
+    { id: 'video-asset', kind: 'video', name: '上游成片.mp4' }
+  ] }), /暂不支持视频参考素材/);
 });
 
 test('videoNodeViewState exposes confirmation instead of auto-applying result', () => {
@@ -38,6 +49,20 @@ test('videoNodeViewState exposes confirmation instead of auto-applying result', 
   assert.equal(state.canConfirm, true);
   assert.equal(state.canGenerate, false);
   assert.equal(state.polling, false);
+});
+
+test('video result ingestion remains visible as an active polling state', () => {
+  const state = videoNodeViewState({ state: 'ingesting' });
+  assert.equal(state.polling, true);
+  assert.equal(state.canGenerate, false);
+  assert.equal(state.canConfirm, false);
+});
+
+test('video cancellation claim remains visible as an active state', () => {
+  const state = videoNodeViewState({ state: 'canceling' });
+  assert.equal(state.polling, true);
+  assert.equal(state.canCancel, false);
+  assert.equal(state.canGenerate, false);
 });
 
 test('videoResultPreview exposes only a playable public video reference', () => {
