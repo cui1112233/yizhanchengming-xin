@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -349,7 +350,21 @@ func NewRouter(options RouterOptions) http.Handler {
 				return resolveAgentTextModel(ctx, options.NovelFetchStore, owner, modelID)
 			}
 		}
-		RegisterAgentNodeGenerationRoutes(root, auth, AgentNodeGenerationServices{Projects: options.AgentWorkspace, TextModels: textModels, Now: options.Now})
+		imageGenerate := AgentImageGenerator(nil)
+		if options.Store != nil && options.NovelFetchStore != nil {
+			imageGenerate = func(ctx context.Context, owner, modelID, imagePrompt, size string) (string, int, error) {
+				result, status, err := configuredBatchImage(ctx, options.Store, options.NovelFetchStore, owner, imagePrompt, modelID, size)
+				if err != nil {
+					return "", status, err
+				}
+				imageURL, _ := result["imageUrl"].(string)
+				if strings.TrimSpace(imageURL) == "" {
+					return "", http.StatusBadGateway, fmt.Errorf("图片模型未返回图片结果")
+				}
+				return imageURL, status, nil
+			}
+		}
+		RegisterAgentNodeGenerationRoutes(root, auth, AgentNodeGenerationServices{Projects: options.AgentWorkspace, TextModels: textModels, Assets: options.AgentAssets, Objects: options.AgentAssetObjects, ImageGenerate: imageGenerate, Now: options.Now})
 		if options.NovelFetchStore != nil && options.AgentWorkspace != nil && options.AgentAssets != nil {
 			var references agentworkspace.ReferenceURLProvider
 			if options.AgentAssetObjects != nil {

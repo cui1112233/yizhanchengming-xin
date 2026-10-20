@@ -16,11 +16,15 @@ import (
 )
 
 type AgentTextModelResolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error)
+type AgentImageGenerator func(context.Context, string, string, string, string) (string, int, error)
 
 type AgentNodeGenerationServices struct {
-	Projects   agentworkspace.Store
-	TextModels AgentTextModelResolver
-	Now        func() time.Time
+	Projects      agentworkspace.Store
+	TextModels    AgentTextModelResolver
+	Assets        agentworkspace.AssetStore
+	Objects       agentworkspace.AssetObjectStore
+	ImageGenerate AgentImageGenerator
+	Now           func() time.Time
 }
 
 func resolveAgentTextModel(ctx context.Context, store novelfetchworkshop.Store, owner, modelID string) (batchfactoryv11.DirectorProvider, error) {
@@ -58,6 +62,16 @@ type agentTextGenerationRequest struct {
 	ModelID        string `json:"modelId"`
 	Prompt         string `json:"prompt"`
 	IdempotencyKey string `json:"idempotencyKey"`
+}
+
+type agentImageGenerationRequest struct {
+	NodeID            string   `json:"nodeId"`
+	NodeVersion       int64    `json:"nodeVersion"`
+	ModelID           string   `json:"modelId"`
+	Prompt            string   `json:"prompt"`
+	Size              string   `json:"size"`
+	ReferenceAssetIDs []string `json:"referenceAssetIds"`
+	IdempotencyKey    string   `json:"idempotencyKey"`
 }
 
 func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAuth, services AgentNodeGenerationServices) {
@@ -137,6 +151,88 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(projectID, updatedCanvas), "execution": completed, "result": result})
+	})))
+	root.Handle("POST /api/agent/tasks/{id}/image-generations", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok || strings.TrimSpace(identity.Username) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input agentImageGenerationRequest
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&input) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "图片生成参数无效"})
+			return
+		}
+		input.NodeID = strings.TrimSpace(input.NodeID)
+		input.ModelID = strings.TrimSpace(input.ModelID)
+		input.Prompt = strings.TrimSpace(input.Prompt)
+		input.Size = strings.TrimSpace(input.Size)
+		input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
+		if input.NodeID == "" || input.NodeVersion < 1 || input.ModelID == "" || input.Prompt == "" || input.IdempotencyKey == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请选择图片模型并填写生成要求"})
+			return
+		}
+		projectID := strings.TrimSpace(req.PathValue("id"))
+		canvas, err := services.Projects.Canvas(req.Context(), identity.Username, projectID)
+		if err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
+		if !agentGenerationNodeMatches(canvas, input.NodeID, "image", input.NodeVersion) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "图片节点已变化，请重新打开后再生成"})
+			return
+		}
+		for _, referenceID := range input.ReferenceAssetIDs {
+			if services.Assets == nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "项目素材存储尚未配置"})
+				return
+			}
+			if _, err := services.Assets.Asset(req.Context(), identity.Username, projectID, strings.TrimSpace(referenceID)); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "引用素材不存在或不属于当前项目"})
+				return
+			}
+		}
+		if services.ImageGenerate == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "图片模型执行器未配置"})
+			return
+		}
+		now := services.Now().UTC()
+		execution, err := services.Projects.BeginNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.Execution{
+			ID: newAgentID("execution"), ToolName: "image-generation", Status: "running",
+			Detail:         map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID},
+			IdempotencyKey: input.IdempotencyKey, CreatedAt: now, UpdatedAt: now,
+		})
+		if err != nil {
+			writeAgentNodeGenerationError(w, err)
+			return
+		}
+		resultURL, status, err := services.ImageGenerate(req.Context(), identity.Username, input.ModelID, input.Prompt, input.Size)
+		if err != nil {
+			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"modelId": input.ModelID, "error": err.Error()}, services.Now().UTC())
+			if status < 400 || status > 599 {
+				status = http.StatusBadGateway
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
+			return
+		}
+		ingestor := newAgentMediaAssetIngestor(services.Assets, services.Objects, nil, services.Now)
+		asset, err := ingestor.SaveImageResult(req.Context(), identity.Username, projectID, newAgentID("asset"), resultURL)
+		if err != nil {
+			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"modelId": input.ModelID, "error": err.Error()}, services.Now().UTC())
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "图片结果保存失败：" + err.Error()})
+			return
+		}
+		assetRef := map[string]any{"id": asset.ID, "assetId": asset.ID, "kind": asset.Kind, "url": asset.URL, "contentType": asset.ContentType}
+		updatedCanvas, completed, err := services.Projects.ApplyNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.ApplyNodeExecutionInput{
+			ExecutionID: execution.ID, NodeID: input.NodeID, NodeVersion: input.NodeVersion, NodeType: "image", AssetRef: assetRef,
+			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID, "assetId": asset.ID}, Now: services.Now().UTC(),
+		})
+		if err != nil {
+			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"error": "节点版本已变化", "assetId": asset.ID}, services.Now().UTC())
+			writeAgentNodeGenerationError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(projectID, updatedCanvas), "execution": completed, "resultAsset": asset})
 	})))
 }
 

@@ -2,12 +2,63 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+
+	"qiantie/backend/internal/agentworkspace"
 )
+
+func TestAgentMediaAssetIngestSavesPNGDataURL(t *testing.T) {
+	assets := agentworkspace.NewMemoryAssetStore()
+	objects := &recordingAgentNodeObjectStore{}
+	ingestor := newAgentMediaAssetIngestor(assets, objects, nil, func() time.Time {
+		return time.Date(2026, 10, 20, 10, 0, 0, 0, time.UTC)
+	})
+	asset, err := ingestor.SaveImageResult(context.Background(), "alice", "project-1", "asset-1", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asset.Kind != "image" || asset.ContentType != "image/png" || asset.URL != "/api/agent/tasks/project-1/assets/asset-1/content" {
+		t.Fatalf("asset=%+v", asset)
+	}
+	if len(objects.putContents) == 0 {
+		t.Fatal("image bytes were not stored")
+	}
+}
+
+func TestAgentMediaAssetIngestRejectsNonImageDataURL(t *testing.T) {
+	ingestor := newAgentMediaAssetIngestor(agentworkspace.NewMemoryAssetStore(), &recordingAgentNodeObjectStore{}, nil, time.Now)
+	if _, err := ingestor.SaveImageResult(context.Background(), "alice", "project-1", "asset-1", "data:text/plain;base64,aGVsbG8="); err == nil {
+		t.Fatal("non-image data URL was accepted")
+	}
+}
+
+func TestAgentMediaAssetIngestRejectsBodyThatLiesAboutImageType(t *testing.T) {
+	ingestor := newAgentMediaAssetIngestor(agentworkspace.NewMemoryAssetStore(), &recordingAgentNodeObjectStore{}, nil, time.Now)
+	ingestor.fetch = func(context.Context, string) (io.ReadCloser, string, error) {
+		return io.NopCloser(strings.NewReader("this is not an image")), "image/png", nil
+	}
+	if _, err := ingestor.SaveImageResult(context.Background(), "alice", "project-1", "asset-1", "https://assets.example/result.png"); err == nil {
+		t.Fatal("non-image body with image content type was accepted")
+	}
+}
+
+func TestAgentMediaAssetIngestRollsBackObjectWhenAssetCreateFails(t *testing.T) {
+	objects := &recordingAgentNodeObjectStore{}
+	ingestor := newAgentMediaAssetIngestor(failingAgentNodeAssetStore{err: errors.New("database unavailable")}, objects, nil, time.Now)
+	_, err := ingestor.SaveImageResult(context.Background(), "alice", "project-1", "asset-1", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB")
+	if err == nil {
+		t.Fatal("asset store failure was ignored")
+	}
+	if len(objects.deleted) != 1 || objects.deleted[0] != "asset-1" {
+		t.Fatalf("deleted=%v", objects.deleted)
+	}
+}
 
 func TestAgentVideoSafeDialRejectsPrivateResolvedAddressBeforeConnect(t *testing.T) {
 	dialCalls := 0
