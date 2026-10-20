@@ -232,7 +232,7 @@ The bottom controls use compact icon or icon-plus-label buttons. They are not a 
 The image toolbar contains:
 
 - Image model picker.
-- Compact parameter summary, for example `16:9 · 标准画质 · 2K · 1张`.
+- Compact parameter summary defaults to exactly `16:9 · 标准画质 · 2K · 1张`; changing any parameter updates this same line immediately.
 - Preset entry.
 - Settings entry.
 - Generate action.
@@ -507,7 +507,7 @@ The program is complete only when all of the following are true in the rebuilt G
 - Workflow and storyboard are both usable views of the same durable project.
 - The workspace navigation, drawer, canvas controls, node library, generation history, and project material flow are present and functional.
 - Text, image, video, and audio nodes use the unified editor pattern and per-node provider/model/settings.
-- Image summary can truthfully display values such as `16:9 · 标准画质 · 2K · 1张` and drives the real request.
+- Image summary defaults to `16:9 · 标准画质 · 2K · 1张`, updates from the current node values, and those same values drive the real request.
 - Video summary truthfully represents ratio, resolution, duration, count, and audio setting.
 - Connections synchronize eligible references without deleting manual references.
 - Model controls are capability-driven from Go and API configuration.
@@ -516,4 +516,3 @@ The program is complete only when all of the following are true in the rebuilt G
 - Save/reload restores canvas, panels, groups, references, storyboard state, and task results.
 - Focused tests, frontend build, Go tests, embedded build, and authenticated browser acceptance pass.
 - No public deployment is implied by local completion.
-
