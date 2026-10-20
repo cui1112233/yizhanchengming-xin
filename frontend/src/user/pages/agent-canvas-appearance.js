@@ -15,6 +15,7 @@ export const defaultCanvasAppearance = Object.freeze({
   edgeColor: 'coral',
   edgeAnimated: true,
   edgeWidth: 'default',
+  edgesVisible: true,
   backgroundDots: true,
   alignmentGuides: true
 });
@@ -31,6 +32,7 @@ export function normalizeCanvasAppearance(value) {
     edgeColor,
     edgeAnimated: typeof input.edgeAnimated === 'boolean' ? input.edgeAnimated : defaultCanvasAppearance.edgeAnimated,
     edgeWidth,
+    edgesVisible: typeof input.edgesVisible === 'boolean' ? input.edgesVisible : defaultCanvasAppearance.edgesVisible,
     backgroundDots: typeof input.backgroundDots === 'boolean' ? input.backgroundDots : defaultCanvasAppearance.backgroundDots,
     alignmentGuides: typeof input.alignmentGuides === 'boolean' ? input.alignmentGuides : defaultCanvasAppearance.alignmentGuides
   };

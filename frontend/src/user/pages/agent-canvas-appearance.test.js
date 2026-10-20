@@ -12,6 +12,7 @@ test('canvas appearance defaults enable the V88 flow presentation', () => {
     edgeColor: 'coral',
     edgeAnimated: true,
     edgeWidth: 'default',
+    edgesVisible: true,
     backgroundDots: true,
     alignmentGuides: true
   });
@@ -23,6 +24,7 @@ test('canvas appearance retains explicit false settings and rejects unsupported 
     edgeColor: 'unsupported',
     edgeAnimated: false,
     edgeWidth: 'huge',
+    edgesVisible: false,
     backgroundDots: false,
     alignmentGuides: false
   });
@@ -30,6 +32,7 @@ test('canvas appearance retains explicit false settings and rejects unsupported 
     edgeColor: 'coral',
     edgeAnimated: false,
     edgeWidth: 'default',
+    edgesVisible: false,
     backgroundDots: false,
     alignmentGuides: false
   });

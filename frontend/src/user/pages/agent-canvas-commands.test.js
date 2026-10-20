@@ -122,10 +122,21 @@ test('command availability explains selection requirements', () => {
   assert.equal(three.canDistribute, true);
 });
 
-test('keyboard command recognizes undo and redo outside editable controls', () => {
+test('keyboard command recognizes every supported canvas shortcut outside editable controls', () => {
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'a', targetTagName: 'div' }), 'select_all');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'c', targetTagName: 'div' }), 'copy');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'v', targetTagName: 'div' }), 'paste');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'd', targetTagName: 'div' }), 'duplicate');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'g', targetTagName: 'div' }), 'group');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, shiftKey: true, key: 'g', targetTagName: 'div' }), 'ungroup');
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'z', targetTagName: 'div' }), 'undo');
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, shiftKey: true, key: 'z', targetTagName: 'div' }), 'redo');
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'y', targetTagName: 'div' }), 'redo');
+  assert.equal(canvasKeyboardCommand({ key: 'Delete', targetTagName: 'div' }), 'delete');
+  assert.equal(canvasKeyboardCommand({ shiftKey: true, key: '1', targetTagName: 'div' }), 'fit_canvas');
+  assert.equal(canvasKeyboardCommand({ shiftKey: true, key: '2', targetTagName: 'div' }), 'focus_selection');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: '+', targetTagName: 'div' }), 'zoom_in');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: '-', targetTagName: 'div' }), 'zoom_out');
   assert.equal(canvasKeyboardCommand({ metaKey: true, key: 'z', targetTagName: 'textarea' }), null);
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'z', isContentEditable: true }), null);
 });
@@ -137,7 +148,7 @@ test('new canvas node has stable persistent defaults at requested position', () 
     position: { x: 120, y: 240 },
     selected: true,
     data: {
-      type: 'copy',
+      type: 'text',
       title: '新节点',
       summary: '',
       version: 1,
