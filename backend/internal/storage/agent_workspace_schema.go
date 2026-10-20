@@ -167,5 +167,12 @@ func AgentWorkspaceMigrations() []Migration {
 			},
 			CallbackChecksum: "v88-agent-video-jobs-v1",
 		},
+		{
+			Version: 8800007,
+			SQL: []string{
+				`ALTER TABLE agent_canvases ADD COLUMN view_state_json JSON NULL AFTER appearance_json`,
+			},
+			CallbackChecksum: "v88-agent-workspace-view-state-v1",
+		},
 	}
 }

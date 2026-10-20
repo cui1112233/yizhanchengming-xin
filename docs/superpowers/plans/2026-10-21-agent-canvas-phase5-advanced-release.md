@@ -122,7 +122,7 @@ git commit -m "feat(agent): gate creative tools by capability"
 
 Run: `rg -n "Version: 880000" backend/internal/storage/agent_workspace_schema.go`
 
-Expected: after Phase 3, `8800007` is the latest Agent workspace migration and `8800008` is unused; otherwise use the next unused version consistently.
+Expected: after Phase 3, `8800008` is the latest Agent workspace migration and `8800009` is unused; otherwise use the next unused version consistently.
 
 ```go
 func TestPresetRejectsCredentialFieldsAndStaysOwnerScoped(t *testing.T) {
@@ -148,7 +148,7 @@ Expected: FAIL because preset persistence and picker are absent.
 />
 ```
 
-Append migration version `8800008` to `AgentWorkspaceMigrations()` with a new checksum and the account-scoped preset table. Reject keys matching `token|key|secret|password|authorization|credential|url` recursively. Rename/update requires the current version; delete affects the preset only and never modifies nodes that previously applied it.
+Append migration version `8800009` to `AgentWorkspaceMigrations()` with a new checksum and the account-scoped preset table. Reject keys matching `token|key|secret|password|authorization|credential|url` recursively. Rename/update requires the current version; delete affects the preset only and never modifies nodes that previously applied it.
 
 - [ ] **Step 4: Run preset and schema tests**
 

@@ -38,11 +38,18 @@
 - Create: `frontend/src/user/pages/agent-workspace-view.test.js`
 - Modify: `frontend/src/user/pages/agent-canvas-state.js`
 - Modify: `frontend/src/user/pages/agent-canvas-state.test.js`
+- Modify: `backend/internal/agentworkspace/types.go`
+- Modify: `backend/internal/agentworkspace/mysql_store.go`
+- Modify: `backend/internal/agentworkspace/store_test.go`
+- Modify: `backend/internal/agentworkspace/mysql_store_test.go`
+- Modify: `backend/internal/storage/agent_workspace_schema.go`
+- Modify: `backend/internal/storage/agent_workspace_schema_test.go`
 
 **Interfaces:**
 - Consumes: persisted canvas object from `getAgentCanvas(taskId)`.
 - Produces: `normalizeWorkspaceView(value) -> WorkspaceViewState`, `workspaceViewPatch(current, patch) -> WorkspaceViewState`, and `workspaceViewQuery(value) -> 'workflow'|'storyboard'`.
 - `WorkspaceViewState` shape: `{ activeView, drawerOpen, drawerTab, drawerWidth, conversationOpen, conversationWidth, snapToGrid, showMinimap, showConnections }`.
+- Go `Canvas.ViewState map[string]any` persists the normalized object in append-only migration `8800007` column `agent_canvases.view_state_json`.
 
 - [ ] **Step 1: Write failing normalization and save-queue tests**
 
@@ -65,11 +72,13 @@ test('merging a pending save retains local view state', () => {
 });
 ```
 
+Add Go store/schema tests that save and reload `Canvas.ViewState`, require migration `8800007`, and verify the MySQL column is `view_state_json`.
+
 - [ ] **Step 2: Run the tests and verify the missing helper fails**
 
-Run: `node --test frontend/src/user/pages/agent-workspace-view.test.js frontend/src/user/pages/agent-canvas-state.test.js`
+Run: `node --test frontend/src/user/pages/agent-workspace-view.test.js frontend/src/user/pages/agent-canvas-state.test.js; Set-Location backend; go test ./internal/agentworkspace ./internal/storage -run 'Test.*(CanvasRevision|Workspace.*Migration)' -count=1`
 
-Expected: FAIL because `normalizeWorkspaceView` is absent and the save merge does not preserve `viewState`.
+Expected: FAIL because `normalizeWorkspaceView`, the save merge, Go `Canvas.ViewState`, and migration `8800007` are absent.
 
 - [ ] **Step 3: Implement normalization and merge behavior**
 
@@ -94,16 +103,18 @@ export function normalizeWorkspaceView(value = {}) {
 
 Export `mergePendingCanvas` for its test and merge `viewState` from the newest local snapshot while accepting the server revision.
 
+Add `ViewState map[string]any` to the Go canvas JSON contract, append migration `8800007` without editing migrations `8800001..8800006`, and include `view_state_json` in MySQL project creation, canvas read, and canvas save.
+
 - [ ] **Step 4: Run focused tests**
 
-Run: `node --test frontend/src/user/pages/agent-workspace-view.test.js frontend/src/user/pages/agent-canvas-state.test.js`
+Run: `node --test frontend/src/user/pages/agent-workspace-view.test.js frontend/src/user/pages/agent-canvas-state.test.js; Set-Location backend; go test ./internal/agentworkspace ./internal/storage -count=1`
 
 Expected: PASS.
 
 - [ ] **Step 5: Commit the state contract**
 
 ```powershell
-git add frontend/src/user/pages/agent-workspace-view.js frontend/src/user/pages/agent-workspace-view.test.js frontend/src/user/pages/agent-canvas-state.js frontend/src/user/pages/agent-canvas-state.test.js
+git add frontend/src/user/pages/agent-workspace-view.js frontend/src/user/pages/agent-workspace-view.test.js frontend/src/user/pages/agent-canvas-state.js frontend/src/user/pages/agent-canvas-state.test.js backend/internal/agentworkspace/types.go backend/internal/agentworkspace/mysql_store.go backend/internal/agentworkspace/store_test.go backend/internal/agentworkspace/mysql_store_test.go backend/internal/storage/agent_workspace_schema.go backend/internal/storage/agent_workspace_schema_test.go docs/superpowers/plans/2026-10-21-agent-canvas-phase1-workspace-shell.md docs/superpowers/plans/2026-10-21-agent-canvas-phase3-generation-history-audio.md docs/superpowers/plans/2026-10-21-agent-canvas-phase5-advanced-release.md
 git commit -m "feat(agent): persist workspace view state"
 ```
 

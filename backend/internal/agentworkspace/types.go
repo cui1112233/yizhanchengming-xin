@@ -115,6 +115,7 @@ type Canvas struct {
 	Version              int            `json:"version"`
 	Revision             int64          `json:"revision"`
 	Viewport             map[string]any `json:"viewport,omitempty"`
+	ViewState            map[string]any `json:"viewState,omitempty"`
 	Appearance           Appearance     `json:"appearance"`
 	Nodes                []Node         `json:"nodes"`
 	Edges                []Edge         `json:"edges"`
@@ -126,6 +127,7 @@ func (canvas *Canvas) UnmarshalJSON(data []byte) error {
 		Version    int            `json:"version"`
 		Revision   int64          `json:"revision"`
 		Viewport   map[string]any `json:"viewport,omitempty"`
+		ViewState  map[string]any `json:"viewState,omitempty"`
 		Appearance Appearance     `json:"appearance"`
 		Nodes      []Node         `json:"nodes"`
 		Edges      []Edge         `json:"edges"`
@@ -140,6 +142,7 @@ func (canvas *Canvas) UnmarshalJSON(data []byte) error {
 	canvas.Version = decoded.Version
 	canvas.Revision = decoded.Revision
 	canvas.Viewport = decoded.Viewport
+	canvas.ViewState = decoded.ViewState
 	canvas.Nodes = decoded.Nodes
 	canvas.Edges = decoded.Edges
 	canvas.Appearance = decoded.Appearance

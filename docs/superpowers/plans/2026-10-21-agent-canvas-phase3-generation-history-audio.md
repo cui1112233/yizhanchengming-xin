@@ -50,7 +50,7 @@
 
 Run: `rg -n "Version: 880000" backend/internal/storage/agent_workspace_schema.go`
 
-Expected: `8800006` is the latest Agent workspace migration and `8800007` is unused. If it is already used, replace `8800007` in this plan with the next unused version before editing.
+Expected: `8800007` is the latest Agent workspace migration and `8800008` is unused. If it is already used, replace `8800008` in this plan with the next unused version before editing.
 
 ```go
 func TestGenerationTaskTransitionsAndVersionConflict(t *testing.T) {
@@ -84,7 +84,7 @@ type GenerationTask struct {
 }
 ```
 
-Append migration version `8800007` to `AgentWorkspaceMigrations()` with new task/result tables and a new callback checksum. The transaction that confirms a result locks task, node, and selected asset rows, verifies ownership and node version, updates the node asset reference, and then marks the task completed.
+Append migration version `8800008` to `AgentWorkspaceMigrations()` with new task/result tables and a new callback checksum. The transaction that confirms a result locks task, node, and selected asset rows, verifies ownership and node version, updates the node asset reference, and then marks the task completed.
 
 - [ ] **Step 4: Run store and schema tests**
 

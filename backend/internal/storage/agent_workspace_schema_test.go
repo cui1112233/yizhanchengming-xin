@@ -37,11 +37,11 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 
 func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800006 {
-		t.Fatalf("last migration=%v, want 8800006", migrations[len(migrations)-1].Version)
+	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800007 {
+		t.Fatalf("last migration=%v, want 8800007", migrations[len(migrations)-1].Version)
 	}
 	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800006 {
+		if migration.Version >= 8800007 {
 			t.Fatalf("agent migration must be greater than existing version %d", migration.Version)
 		}
 	}
@@ -49,8 +49,8 @@ func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 
 func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	if len(migrations) != 6 {
-		t.Fatalf("AgentWorkspaceMigrations length=%d, want 6", len(migrations))
+	if len(migrations) != 7 {
+		t.Fatalf("AgentWorkspaceMigrations length=%d, want 7", len(migrations))
 	}
 	if migrations[0].Version != 8800001 || migrations[0].CallbackChecksum != "v88-agent-workspace-foundation-v1" {
 		t.Fatalf("historical migration changed: %+v", migrations[0])
@@ -93,5 +93,12 @@ func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 		if !strings.Contains(jobSchema, clause) {
 			t.Fatalf("missing video job schema clause %q: %v", clause, jobs.SQL)
 		}
+	}
+	viewState := migrations[6]
+	if viewState.Version != 8800007 || viewState.CallbackChecksum != "v88-agent-workspace-view-state-v1" {
+		t.Fatalf("workspace view state migration=%+v", viewState)
+	}
+	if !strings.Contains(strings.ToLower(strings.Join(viewState.SQL, "\n")), "add column view_state_json json") {
+		t.Fatalf("missing view_state_json migration: %v", viewState.SQL)
 	}
 }

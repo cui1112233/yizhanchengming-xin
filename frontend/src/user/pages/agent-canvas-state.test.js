@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSelectedNodeContext, canvasSaveAction, createCanvasSaveQueue, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask, shouldPersistFlowChanges } from './agent-canvas-state.js';
+import { buildSelectedNodeContext, canvasSaveAction, createCanvasSaveQueue, mergePendingCanvas, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask, shouldPersistFlowChanges } from './agent-canvas-state.js';
 
 function deferred() {
   let resolve;
@@ -168,6 +168,15 @@ test('canvas save queue merges a pending edit with a confirmed server node', asy
   assert.equal(calls[0].canvas.nodes[0].version, 2);
   assert.equal(calls[0].canvas.nodes[0].assetRef.id, 'result-1');
   queue.dispose();
+});
+
+test('pending canvas merge retains local workspace view state', () => {
+  const merged = mergePendingCanvas(
+    { version: 1, revision: 4, viewState: { activeView: 'workflow', drawerWidth: 288 }, nodes: [], edges: [] },
+    { version: 1, revision: 3, viewState: { activeView: 'storyboard', drawerWidth: 340 }, nodes: [], edges: [] }
+  );
+  assert.equal(merged.revision, 4);
+  assert.deepEqual(merged.viewState, { activeView: 'storyboard', drawerWidth: 340 });
 });
 
 test('canvas save queue reloads authoritative canvas on revision conflict', async () => {

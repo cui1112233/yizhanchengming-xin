@@ -52,6 +52,26 @@ export function shouldAcceptCanvasRefresh({ requestedTaskId, currentTaskId, requ
   return Boolean(mounted && requestedTaskId && requestedTaskId === currentTaskId && requestedQueue === currentQueue);
 }
 
+export function mergePendingCanvas(serverCanvas, localCanvas) {
+  const serverNodes = new Map((serverCanvas?.nodes || []).map(node => [node.id, node]));
+  return {
+    ...serverCanvas,
+    ...localCanvas,
+    revision: Number(serverCanvas?.revision) || 0,
+    nodes: (localCanvas?.nodes || []).map(node => {
+      const serverNode = serverNodes.get(node.id);
+      if (!serverNode) return node;
+      return {
+        ...serverNode,
+        ...node,
+        version: serverNode.version,
+        status: serverNode.status,
+        ...(serverNode.assetRef ? { assetRef: serverNode.assetRef } : {})
+      };
+    })
+  };
+}
+
 export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload, onCanvas, onStatus }) {
   let currentRevision = Number(revision) || 0;
   let pending = null;
@@ -125,26 +145,6 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
   function clearTimer() {
     if (timer) clearTimeout(timer);
     timer = null;
-  }
-
-  function mergePendingCanvas(serverCanvas, localCanvas) {
-    const serverNodes = new Map((serverCanvas?.nodes || []).map(node => [node.id, node]));
-    return {
-      ...serverCanvas,
-      ...localCanvas,
-      revision: Number(serverCanvas?.revision) || 0,
-      nodes: (localCanvas?.nodes || []).map(node => {
-        const serverNode = serverNodes.get(node.id);
-        if (!serverNode) return node;
-        return {
-          ...serverNode,
-          ...node,
-          version: serverNode.version,
-          status: serverNode.status,
-          ...(serverNode.assetRef ? { assetRef: serverNode.assetRef } : {})
-        };
-      })
-    };
   }
 
   return {

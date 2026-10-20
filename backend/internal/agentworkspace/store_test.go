@@ -52,16 +52,17 @@ func TestMemoryStoreCanvasRevisionPreventsLostUpdates(t *testing.T) {
 	}
 
 	input := Canvas{
-		Version:  1,
-		Nodes:    []Node{{ID: "node-1", Type: "input", Title: "小说原文", Summary: "第一章", Position: Position{X: 120, Y: 80}, Version: 1, Status: "confirmed", GroupID: "group-1"}},
-		Edges:    []Edge{},
-		Viewport: map[string]any{"x": float64(10), "y": float64(20), "zoom": float64(1)},
+		Version:   1,
+		Nodes:     []Node{{ID: "node-1", Type: "input", Title: "小说原文", Summary: "第一章", Position: Position{X: 120, Y: 80}, Version: 1, Status: "confirmed", GroupID: "group-1"}},
+		Edges:     []Edge{},
+		Viewport:  map[string]any{"x": float64(10), "y": float64(20), "zoom": float64(1)},
+		ViewState: map[string]any{"activeView": "storyboard", "drawerWidth": float64(340)},
 	}
 	saved, err := store.SaveCanvas(ctx, "alice", "project-1", input, 0, now.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved.Revision != 1 || len(saved.Nodes) != 1 || saved.Viewport["zoom"] != float64(1) {
+	if saved.Revision != 1 || len(saved.Nodes) != 1 || saved.Viewport["zoom"] != float64(1) || saved.ViewState["activeView"] != "storyboard" || saved.ViewState["drawerWidth"] != float64(340) {
 		t.Fatalf("saved=%+v", saved)
 	}
 	if saved.Nodes[0].GroupID != "group-1" {
@@ -71,7 +72,7 @@ func TestMemoryStoreCanvasRevisionPreventsLostUpdates(t *testing.T) {
 		t.Fatalf("stale save err=%v", err)
 	}
 	loaded, err := store.Canvas(ctx, "alice", "project-1")
-	if err != nil || loaded.Revision != 1 || loaded.Nodes[0].Title != "小说原文" || loaded.Nodes[0].GroupID != "group-1" {
+	if err != nil || loaded.Revision != 1 || loaded.Nodes[0].Title != "小说原文" || loaded.Nodes[0].GroupID != "group-1" || loaded.ViewState["activeView"] != "storyboard" {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
 	}
 }
