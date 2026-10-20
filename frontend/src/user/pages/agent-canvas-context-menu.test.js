@@ -344,8 +344,9 @@ test('expanded video editor exposes create cancel retry confirm and per-node err
   assert.doesNotMatch(canvasSource, /const activeVideoJob = manualNode/);
 });
 
-test('expanded video editor previews the pending result and reports provider failures', () => {
+test('expanded video editor previews only unapplied results and reports provider failures', () => {
   assert.match(composerSource, /videoResultPreview\(videoJob\)/);
+  assert.match(composerSource, /videoResult && !node\.data\?\.assetRef\?\.url/);
   assert.match(composerSource, /<AuthenticatedAgentVideo source=\{videoResult\.url\}/);
   assert.match(composerSource, /videoJob\?\.errorMessage/);
 });

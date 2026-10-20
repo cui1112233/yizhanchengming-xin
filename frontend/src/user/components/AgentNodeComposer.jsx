@@ -53,7 +53,7 @@ export default function AgentNodeComposer({
       <span className="agent-node-composer__reference-count">{references.length}/10</span>
     </div> : null}
 
-    {videoResult ? <AuthenticatedAgentVideo source={videoResult.url} className="agent-node-composer__result" aria-label="待确认视频结果" preload="metadata" muted controls /> : null}
+    {videoResult && !node.data?.assetRef?.url ? <AuthenticatedAgentVideo source={videoResult.url} className="agent-node-composer__result" aria-label="待确认视频结果" preload="metadata" muted controls /> : null}
 
     <Input.TextArea
       aria-label={PROMPT_LABELS[kind]}
