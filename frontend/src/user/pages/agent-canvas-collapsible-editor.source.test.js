@@ -5,8 +5,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+const frontendRoot = path.resolve(dirname, '../../..');
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
 const workspaceStyles = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-workspace.css'), 'utf8');
+const packageLock = JSON.parse(fs.readFileSync(path.resolve(frontendRoot, 'package-lock.json'), 'utf8'));
+const reactFlowSource = fs.readFileSync(path.resolve(frontendRoot, 'node_modules/@xyflow/react/dist/esm/index.js'), 'utf8');
 
 test('media nodes render one temporary inline editor controlled by preview activation', () => {
   assert.match(canvasSource, /const \[activeEditorNodeID, setActiveEditorNodeID\] = useState\(''\)/);
@@ -43,7 +46,10 @@ test('connection handles belong to the visible preview shell and stay hidden unt
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-quick-add\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
   assert.match(workspaceStyles, /\.react-flow__node\.selected[\s\S]*?\.agent-canvas-node-quick-add/);
   assert.match(workspaceStyles, /\.agent-canvas\.is-connecting[\s\S]*?\.agent-canvas-node-target/);
-  assert.match(workspaceStyles, /\.agent-canvas-node-target\.connecting\.valid/);
+  assert.equal(packageLock.packages['node_modules/@xyflow/react']?.version, '12.11.6');
+  assert.match(reactFlowSource, /connectingto:\s*connectingTo/);
+  assert.match(workspaceStyles, /\.agent-canvas-node-target\.connectingto\.valid/);
+  assert.doesNotMatch(workspaceStyles, /\.agent-canvas-node-target\.connecting\.valid/);
 });
 
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
