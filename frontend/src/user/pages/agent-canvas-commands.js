@@ -138,20 +138,8 @@ export function canvasGroupBounds(nodes, groupId, padding = 16) {
 export function canvasKeyboardCommand(event) {
   const tag = String(event?.targetTagName || '').toLowerCase();
   if (event?.isContentEditable || ['input', 'textarea', 'select'].includes(tag)) return null;
+  if (!event?.ctrlKey && !event?.metaKey) return null;
   const key = String(event?.key || '').toLowerCase();
-  const modifier = Boolean(event?.ctrlKey || event?.metaKey);
-  if (key === 'delete' || key === 'backspace') return 'delete';
-  if (event?.shiftKey && key === '1') return 'fit_canvas';
-  if (event?.shiftKey && key === '2') return 'focus_selection';
-  if (!modifier) return null;
-  if (key === 'a') return 'select_all';
-  if (key === 'c') return 'copy';
-  if (key === 'v') return 'paste';
-  if (key === 'd') return 'duplicate';
-  if (key === 'g' && event?.shiftKey) return 'ungroup';
-  if (key === 'g') return 'group';
-  if (key === '+' || key === '=') return 'zoom_in';
-  if (key === '-') return 'zoom_out';
   if (key === 'z' && event?.shiftKey) return 'redo';
   if (key === 'z') return 'undo';
   if (key === 'y') return 'redo';
