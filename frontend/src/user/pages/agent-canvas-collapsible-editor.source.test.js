@@ -47,8 +47,11 @@ test('generation editor expands horizontally while the prompt stays compact', ()
   const primarySelectRule = workspaceStyles.match(/\.agent-page \.agent-canvas-generation-toolbar \.ant-select:first-child\s*\{([^}]*)\}/);
   assert.match(canvasSource, /autoSize=\{\{ minRows: 3, maxRows: 7 \}\}/);
   assert.ok(generationPanelRule, 'the expanded editor should have its own layout rule');
+  assert.match(generationPanelRule[1], /position:\s*relative/);
+  assert.match(generationPanelRule[1], /left:\s*50%/);
   assert.match(generationPanelRule[1], /width:\s*800px/);
   assert.match(generationPanelRule[1], /max-width:\s*calc\(100vw - 96px\)/);
+  assert.match(generationPanelRule[1], /transform:\s*translateX\(-50%\)/);
   assert.ok(promptRule, 'the prompt should have its own layout rule');
   assert.doesNotMatch(promptRule[1], /min-height:\s*96px/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-toolbar\s*\{[^}]*flex-wrap:\s*wrap/);
