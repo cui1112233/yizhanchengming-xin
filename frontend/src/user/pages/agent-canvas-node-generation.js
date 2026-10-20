@@ -1,3 +1,5 @@
+import { normalizeNodeConfig } from './agent-node-config.js';
+
 const KIND_LABELS = Object.freeze({ text: '文字', image: '图片', video: '视频' });
 const LOCAL_EXECUTOR_MODELS = Object.freeze({
   image: { value: 'local-doubao-executor-image', label: '豆包本地执行器（图片）' },
@@ -42,6 +44,33 @@ export function nodeGenerationIdempotencyKey({ taskId, nodeId, nodeVersion, kind
   return ['agent-node', taskId, nodeId, kind, Number(nodeVersion) || 0, Number(attempt) || 0]
     .map(value => encodeURIComponent(String(value || '')))
     .join(':');
+}
+
+export function buildNodeGenerationRequest(node, { taskId = '', attempt = 0, modelId = '' } = {}) {
+  const kind = String(node?.data?.type || '').trim();
+  const config = normalizeNodeConfig(kind, node?.data?.config || {});
+  const referenceAssetIds = (config.referenceAssets || [])
+    .filter(asset => kind === 'image' ? asset?.kind === 'image' : true)
+    .map(asset => String(asset?.id || asset?.assetId || '').trim())
+    .filter(Boolean);
+  return {
+    nodeId: String(node?.id || '').trim(),
+    nodeVersion: Number(node?.data?.version) || 0,
+    provider: config.provider,
+    modelId: String(modelId || config.modelId).trim(),
+    mode: config.mode,
+    prompt: String(config.prompt || '').trim(),
+    parameters: { ...config.parameters },
+    advanced: { ...config.advanced },
+    referenceAssetIds: [...new Set(referenceAssetIds)],
+    idempotencyKey: nodeGenerationIdempotencyKey({
+      taskId,
+      nodeId: node?.id,
+      nodeVersion: node?.data?.version,
+      kind,
+      attempt
+    })
+  };
 }
 
 export function submitNodeGeneration({ event, onSubmit, nodeID, modelID } = {}) {

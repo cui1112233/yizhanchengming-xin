@@ -65,7 +65,11 @@ func includesString(values []string, value string) bool {
 }
 
 func settingString(settings map[string]any, key string) string {
-	return strings.TrimSpace(fmt.Sprint(settings[key]))
+	value, ok := settings[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
 }
 
 func settingInt(settings map[string]any, key string) int {

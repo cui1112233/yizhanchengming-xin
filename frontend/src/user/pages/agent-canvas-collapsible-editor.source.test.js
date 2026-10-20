@@ -119,7 +119,8 @@ test('edge visibility changes rendering without deleting serialized edges', () =
 });
 
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
-  assert.match(composerSource, /aria-label=\{`生成\$\{[^}]*'视频'\}\`\}/);
+  assert.match(composerSource, /aria-label=\{`生成\$\{/);
+  assert.match(composerSource, /kind === 'video' \? '视频'/);
   for (const label of ['取消', '重试', '确认']) assert.match(composerSource, new RegExp(`>${label}<`));
   assert.match(composerSource, /onPointerDown=\{stop\}/);
   assert.match(composerSource, /submitNodeGeneration\(\{ event, onSubmit, nodeID: node\.id, modelID: selectedModel \}\)/);

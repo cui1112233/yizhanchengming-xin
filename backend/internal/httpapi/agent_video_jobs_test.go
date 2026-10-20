@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -88,6 +89,126 @@ func TestAgentVideoJobSubmitUsesRequestedReferenceAndEffectiveH3Settings(t *test
 	}
 	if providerPayload["ref_image_0"] != references.url || providerPayload["resolution"] != "768p横" {
 		t.Fatalf("provider payload=%+v", providerPayload)
+	}
+}
+
+func TestAgentVideoJobSubmitCarriesDisplayedSettingsIntoLocalExecutor(t *testing.T) {
+	now := time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC)
+	projects := agentworkspace.NewMemoryStore()
+	if err := projects.CreateProject(context.Background(), "alice", agentworkspace.Project{
+		ID: "agent-1", Title: "项目", CreatedAt: now, UpdatedAt: now,
+		Canvas: agentworkspace.Canvas{Version: 1, Nodes: []agentworkspace.Node{{ID: "video-1", Type: "video", Title: "镜头", Version: 2, Status: "draft"}}, Edges: []agentworkspace.Edge{}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	executorStore := localexecutor.NewMemoryStore()
+	executor := localexecutor.NewService(executorStore, func() time.Time { return now })
+	coordinator := &agentVideoCoordinator{
+		projects: projects,
+		assets:   agentworkspace.NewMemoryAssetStore(),
+		videos:   &scriptVideoService{localExecutor: executor},
+		now:      func() time.Time { return now },
+	}
+
+	job, err := coordinator.submit(context.Background(), "alice", "agent-1", agentVideoJobRequest{
+		NodeID: "video-1", NodeVersion: 2, IdempotencyKey: "request-settings", Prompt: "缓慢推进",
+		Provider: "doubao_local_executor", ModelID: "Seedance 2.5", Mode: "first_frame",
+		Parameters: map[string]any{
+			"ratio": "16:9", "resolution": "1080P", "durationSeconds": 10,
+			"count": 1, "generateAudio": true,
+		},
+		Advanced: map[string]any{"camera_motion": "push_in"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.ModelKey != "local-doubao-executor-video" {
+		t.Fatalf("model key=%q", job.ModelKey)
+	}
+	for key, want := range map[string]any{
+		"provider": "doubao_local_executor", "modelId": "Seedance 2.5", "mode": "first_frame",
+		"durationSeconds": 10, "count": 1, "generateAudio": true,
+	} {
+		if got := job.Settings[key]; fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Fatalf("setting %s=%v, want %v; all=%+v", key, got, want, job.Settings)
+		}
+	}
+	localJob, err := executor.GetJob(context.Background(), "alice", strings.TrimPrefix(job.ProviderTaskID, localScriptVideoTaskPrefix))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(localJob.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["model"] != "Seedance 2.5" || payload["generateAudio"] != true || payload["duration"] != float64(10) {
+		t.Fatalf("executor payload=%+v", payload)
+	}
+}
+
+func TestAgentVideoJobSubmitRejectsUnsupportedDisplayedSettingsBeforeCreatingJob(t *testing.T) {
+	now := time.Date(2026, 10, 21, 3, 10, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name       string
+		parameters map[string]any
+	}{
+		{name: "resolution", parameters: map[string]any{"ratio": "16:9", "resolution": "4K", "durationSeconds": 10, "count": 1}},
+		{name: "duration", parameters: map[string]any{"ratio": "16:9", "resolution": "1080P", "durationSeconds": 20, "count": 1}},
+		{name: "count", parameters: map[string]any{"ratio": "16:9", "resolution": "1080P", "durationSeconds": 10, "count": 2}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			projects := agentworkspace.NewMemoryStore()
+			if err := projects.CreateProject(context.Background(), "alice", agentworkspace.Project{
+				ID: "agent-1", Title: "项目", CreatedAt: now, UpdatedAt: now,
+				Canvas: agentworkspace.Canvas{Version: 1, Nodes: []agentworkspace.Node{{ID: "video-1", Type: "video", Title: "镜头", Version: 1, Status: "draft"}}, Edges: []agentworkspace.Edge{}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			coordinator := &agentVideoCoordinator{
+				projects: projects, assets: agentworkspace.NewMemoryAssetStore(),
+				videos: &scriptVideoService{localExecutor: localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return now })},
+				now:    func() time.Time { return now },
+			}
+			_, err := coordinator.submit(context.Background(), "alice", "agent-1", agentVideoJobRequest{
+				NodeID: "video-1", IdempotencyKey: "invalid-" + tc.name, Prompt: "缓慢推进",
+				Provider: "doubao_local_executor", ModelID: "Seedance 2.5", Mode: "text_to_video", Parameters: tc.parameters,
+			})
+			if err == nil || !strings.Contains(err.Error(), tc.name) {
+				t.Fatalf("err=%v, want field %s", err, tc.name)
+			}
+			jobs, listErr := projects.ListVideoJobs(context.Background(), "alice", "agent-1")
+			if listErr != nil || len(jobs) != 0 {
+				t.Fatalf("jobs=%+v err=%v, want no created job", jobs, listErr)
+			}
+		})
+	}
+}
+
+func TestAgentVideoJobRouteReturnsUnprocessableEntityForUnsupportedDisplayedSettings(t *testing.T) {
+	now := time.Date(2026, 10, 21, 3, 20, 0, 0, time.UTC)
+	projects := agentworkspace.NewMemoryStore()
+	if err := projects.CreateProject(context.Background(), "alice", agentworkspace.Project{
+		ID: "agent-1", Title: "项目", CreatedAt: now, UpdatedAt: now,
+		Canvas: agentworkspace.Canvas{Version: 1, Nodes: []agentworkspace.Node{{ID: "video-1", Type: "video", Title: "镜头", Version: 1, Status: "draft"}}, Edges: []agentworkspace.Edge{}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	coordinator := &agentVideoCoordinator{
+		projects: projects, assets: agentworkspace.NewMemoryAssetStore(),
+		videos:   &scriptVideoService{localExecutor: localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return now })},
+		ingestor: &agentVideoAssetIngestor{}, now: func() time.Time { return now },
+	}
+	mux := http.NewServeMux()
+	RegisterAgentVideoJobRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, coordinator)
+	request := agentVideoJSONRequest(t, now, http.MethodPost, "/api/agent/tasks/agent-1/video-jobs", `{"nodeId":"video-1","nodeVersion":1,"idempotencyKey":"invalid-resolution","prompt":"缓慢推进","provider":"doubao_local_executor","modelId":"Seedance 2.5","mode":"text_to_video","parameters":{"ratio":"16:9","resolution":"4K","durationSeconds":10,"count":1,"generateAudio":true},"advanced":{}}`)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "resolution") {
+		t.Fatalf("response=%d %s", recorder.Code, recorder.Body.String())
+	}
+	jobs, err := projects.ListVideoJobs(context.Background(), "alice", "agent-1")
+	if err != nil || len(jobs) != 0 {
+		t.Fatalf("jobs=%+v err=%v, want no created job", jobs, err)
 	}
 }
 

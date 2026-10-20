@@ -4,12 +4,56 @@ import assert from 'node:assert/strict';
 import { createAgentImageGeneration, createAgentTextGeneration } from '../../shared/api/agent.js';
 import {
   agentCanvasModelOptions,
+  buildNodeGenerationRequest,
   composerModelSelection,
   composerShouldClose,
   nodeGenerationIdempotencyKey,
   nodeGenerationViewState,
   submitNodeGeneration
 } from './agent-canvas-node-generation.js';
+
+test('图片生成请求原样携带节点显示的渠道模型和四项参数', () => {
+  const payload = buildNodeGenerationRequest({
+    id: 'image-1',
+    data: {
+      type: 'image', version: 3,
+      config: {
+        provider: 'doubao_local_executor', modelId: 'Seedream 5.0 Pro', mode: 'image_to_image', prompt: '电影感雨夜',
+        parameters: { ratio: '9:16', quality: 'high', resolution: '4K', count: 2 },
+        advanced: { seed: 42 },
+        referenceAssets: [{ id: 'asset-1', kind: 'image' }, { id: 'video-1', kind: 'video' }]
+      }
+    }
+  }, { taskId: 'project-1', attempt: 1 });
+
+  assert.deepEqual(payload, {
+    nodeId: 'image-1', nodeVersion: 3,
+    provider: 'doubao_local_executor', modelId: 'Seedream 5.0 Pro', mode: 'image_to_image', prompt: '电影感雨夜',
+    parameters: { ratio: '9:16', quality: 'high', resolution: '4K', count: 2 },
+    advanced: { seed: 42 }, referenceAssetIds: ['asset-1'],
+    idempotencyKey: 'agent-node:project-1:image-1:image:3:1'
+  });
+});
+
+test('视频生成请求保留当前节点的类型数量和声音设置', () => {
+  const payload = buildNodeGenerationRequest({
+    id: 'video-1',
+    data: {
+      type: 'video', version: 2,
+      config: {
+        provider: 'doubao_local_executor', modelId: 'Seedance 2.5', mode: 'first_frame', prompt: '缓慢推进',
+        parameters: { ratio: '16:9', resolution: '1080P', durationSeconds: 10, count: 1, generateAudio: true },
+        referenceAssets: [{ id: 'first-frame', kind: 'image' }]
+      }
+    }
+  }, { taskId: 'project-1' });
+
+  assert.equal(payload.provider, 'doubao_local_executor');
+  assert.equal(payload.modelId, 'Seedance 2.5');
+  assert.equal(payload.mode, 'first_frame');
+  assert.deepEqual(payload.parameters, { ratio: '16:9', resolution: '1080P', durationSeconds: 10, count: 1, generateAudio: true });
+  assert.deepEqual(payload.referenceAssetIds, ['first-frame']);
+});
 
 test('Agent canvas keeps local Doubao image and video models available first', () => {
   assert.deepEqual(agentCanvasModelOptions([], 'image'), [

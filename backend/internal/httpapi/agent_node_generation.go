@@ -17,13 +17,16 @@ import (
 
 type AgentTextModelResolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error)
 type AgentImageGenerationInput struct {
+	Provider    string
 	ModelID     string
+	Mode        string
 	Prompt      string
 	Size        string
 	AspectRatio string
 	Quality     string
 	Resolution  string
 	Count       int
+	Advanced    map[string]any
 }
 
 type AgentImageGenerator func(context.Context, string, AgentImageGenerationInput) ([]string, int, error)
@@ -67,25 +70,34 @@ func resolveAgentTextModel(ctx context.Context, store novelfetchworkshop.Store, 
 }
 
 type agentTextGenerationRequest struct {
-	NodeID         string `json:"nodeId"`
-	NodeVersion    int64  `json:"nodeVersion"`
-	ModelID        string `json:"modelId"`
-	Prompt         string `json:"prompt"`
-	IdempotencyKey string `json:"idempotencyKey"`
+	NodeID            string         `json:"nodeId"`
+	NodeVersion       int64          `json:"nodeVersion"`
+	Provider          string         `json:"provider"`
+	ModelID           string         `json:"modelId"`
+	Mode              string         `json:"mode"`
+	Prompt            string         `json:"prompt"`
+	Parameters        map[string]any `json:"parameters"`
+	Advanced          map[string]any `json:"advanced"`
+	ReferenceAssetIDs []string       `json:"referenceAssetIds"`
+	IdempotencyKey    string         `json:"idempotencyKey"`
 }
 
 type agentImageGenerationRequest struct {
-	NodeID            string   `json:"nodeId"`
-	NodeVersion       int64    `json:"nodeVersion"`
-	ModelID           string   `json:"modelId"`
-	Prompt            string   `json:"prompt"`
-	Size              string   `json:"size"`
-	AspectRatio       string   `json:"aspectRatio"`
-	Quality           string   `json:"quality"`
-	Resolution        string   `json:"resolution"`
-	Count             int      `json:"count"`
-	ReferenceAssetIDs []string `json:"referenceAssetIds"`
-	IdempotencyKey    string   `json:"idempotencyKey"`
+	NodeID            string         `json:"nodeId"`
+	NodeVersion       int64          `json:"nodeVersion"`
+	Provider          string         `json:"provider"`
+	ModelID           string         `json:"modelId"`
+	Mode              string         `json:"mode"`
+	Prompt            string         `json:"prompt"`
+	Parameters        map[string]any `json:"parameters"`
+	Advanced          map[string]any `json:"advanced"`
+	Size              string         `json:"size"`
+	AspectRatio       string         `json:"aspectRatio"`
+	Quality           string         `json:"quality"`
+	Resolution        string         `json:"resolution"`
+	Count             int            `json:"count"`
+	ReferenceAssetIDs []string       `json:"referenceAssetIds"`
+	IdempotencyKey    string         `json:"idempotencyKey"`
 }
 
 func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAuth, services AgentNodeGenerationServices) {
@@ -107,11 +119,21 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			return
 		}
 		input.NodeID = strings.TrimSpace(input.NodeID)
+		input.Provider = strings.TrimSpace(input.Provider)
 		input.ModelID = strings.TrimSpace(input.ModelID)
+		input.Mode = strings.TrimSpace(input.Mode)
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
 		if input.NodeID == "" || input.NodeVersion < 1 || input.ModelID == "" || input.Prompt == "" || input.IdempotencyKey == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请选择文字模型并填写生成要求"})
+			return
+		}
+		textSettings := cloneAgentSettings(input.Parameters)
+		if input.Mode != "" {
+			textSettings["mode"] = input.Mode
+		}
+		if err := ValidateModelSettings(map[string]any{"kind": "text"}, "text", textSettings); err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
 			return
 		}
 		projectID := strings.TrimSpace(req.PathValue("id"))
@@ -136,7 +158,7 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 		now := services.Now().UTC()
 		execution, err := services.Projects.BeginNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.Execution{
 			ID: newAgentID("execution"), ToolName: "text-generation", Status: "running",
-			Detail:         map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID},
+			Detail:         map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "provider": input.Provider, "modelId": input.ModelID, "mode": input.Mode, "parameters": input.Parameters, "advanced": input.Advanced},
 			IdempotencyKey: input.IdempotencyKey, CreatedAt: now, UpdatedAt: now,
 		})
 		if err != nil {
@@ -157,7 +179,7 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 		}
 		updatedCanvas, completed, err := services.Projects.ApplyNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.ApplyNodeExecutionInput{
 			ExecutionID: execution.ID, NodeID: input.NodeID, NodeVersion: input.NodeVersion, NodeType: "text", Summary: result,
-			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID}, Now: services.Now().UTC(),
+			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "provider": input.Provider, "modelId": input.ModelID, "mode": input.Mode, "parameters": input.Parameters, "advanced": input.Advanced}, Now: services.Now().UTC(),
 		})
 		if err != nil {
 			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"error": "节点版本已变化", "result": result}, services.Now().UTC())
@@ -178,7 +200,9 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			return
 		}
 		input.NodeID = strings.TrimSpace(input.NodeID)
+		input.Provider = strings.TrimSpace(input.Provider)
 		input.ModelID = strings.TrimSpace(input.ModelID)
+		input.Mode = strings.TrimSpace(input.Mode)
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.Size = strings.TrimSpace(input.Size)
 		input.AspectRatio = strings.TrimSpace(input.AspectRatio)
@@ -213,19 +237,19 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "图片模型执行器未配置"})
 			return
 		}
+		generationInput, settingsErr := normalizeAgentImageGenerationInput(input)
+		if settingsErr != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": settingsErr.Error()})
+			return
+		}
 		now := services.Now().UTC()
 		execution, err := services.Projects.BeginNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.Execution{
 			ID: newAgentID("execution"), ToolName: "image-generation", Status: "running",
-			Detail:         map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID},
+			Detail:         map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "provider": input.Provider, "modelId": input.ModelID, "mode": input.Mode, "parameters": input.Parameters, "advanced": input.Advanced},
 			IdempotencyKey: input.IdempotencyKey, CreatedAt: now, UpdatedAt: now,
 		})
 		if err != nil {
 			writeAgentNodeGenerationError(w, err)
-			return
-		}
-		generationInput, settingsErr := normalizeAgentImageGenerationInput(input)
-		if settingsErr != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": settingsErr.Error()})
 			return
 		}
 		resultURLs, status, err := services.ImageGenerate(req.Context(), identity.Username, generationInput)
@@ -261,7 +285,7 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 		assetRef := map[string]any{"id": asset.ID, "assetId": asset.ID, "kind": asset.Kind, "url": asset.URL, "contentType": asset.ContentType}
 		updatedCanvas, completed, err := services.Projects.ApplyNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.ApplyNodeExecutionInput{
 			ExecutionID: execution.ID, NodeID: input.NodeID, NodeVersion: input.NodeVersion, NodeType: "image", AssetRef: assetRef,
-			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID, "assetId": asset.ID, "aspectRatio": generationInput.AspectRatio, "quality": generationInput.Quality, "resolution": generationInput.Resolution, "count": generationInput.Count}, Now: services.Now().UTC(),
+			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "provider": input.Provider, "modelId": input.ModelID, "mode": input.Mode, "parameters": input.Parameters, "advanced": input.Advanced, "assetId": asset.ID, "aspectRatio": generationInput.AspectRatio, "quality": generationInput.Quality, "resolution": generationInput.Resolution, "count": generationInput.Count}, Now: services.Now().UTC(),
 		})
 		if err != nil {
 			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"error": "节点版本已变化", "assetId": asset.ID}, services.Now().UTC())
@@ -273,26 +297,45 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 }
 
 func normalizeAgentImageGenerationInput(input agentImageGenerationRequest) (AgentImageGenerationInput, error) {
-	ratio := input.AspectRatio
+	parameters := cloneAgentSettings(input.Parameters)
+	if _, ok := parameters["ratio"]; !ok && input.AspectRatio != "" {
+		parameters["ratio"] = input.AspectRatio
+	}
+	if _, ok := parameters["quality"]; !ok && input.Quality != "" {
+		parameters["quality"] = input.Quality
+	}
+	if _, ok := parameters["resolution"]; !ok && input.Resolution != "" {
+		parameters["resolution"] = input.Resolution
+	}
+	if _, ok := parameters["count"]; !ok && input.Count != 0 {
+		parameters["count"] = input.Count
+	}
+	if input.Mode != "" {
+		parameters["mode"] = input.Mode
+	}
+	if err := ValidateModelSettings(map[string]any{"kind": "image"}, "image", parameters); err != nil {
+		return AgentImageGenerationInput{}, err
+	}
+	ratio := settingString(parameters, "ratio")
 	if ratio == "" {
 		ratio = "16:9"
 	}
-	quality := input.Quality
+	quality := settingString(parameters, "quality")
 	if quality == "" {
 		quality = "standard"
 	}
-	resolution := strings.ToUpper(input.Resolution)
+	resolution := strings.ToUpper(settingString(parameters, "resolution"))
 	if resolution == "" {
 		resolution = "2K"
 	}
-	count := input.Count
+	count := settingInt(parameters, "count")
 	if count == 0 {
 		count = 1
 	}
 	if ratio != "16:9" && ratio != "9:16" && ratio != "1:1" {
 		return AgentImageGenerationInput{}, fmt.Errorf("图片比例无效")
 	}
-	if quality != "standard" && quality != "high" {
+	if quality != "low" && quality != "standard" && quality != "high" {
 		return AgentImageGenerationInput{}, fmt.Errorf("图片画质无效")
 	}
 	if resolution != "1K" && resolution != "2K" && resolution != "4K" {
@@ -306,7 +349,15 @@ func normalizeAgentImageGenerationInput(input agentImageGenerationRequest) (Agen
 		"2K": {"16:9": "2048x1152", "9:16": "1152x2048", "1:1": "2048x2048"},
 		"4K": {"16:9": "4096x2304", "9:16": "2304x4096", "1:1": "4096x4096"},
 	}
-	return AgentImageGenerationInput{ModelID: input.ModelID, Prompt: input.Prompt, Size: sizes[resolution][ratio], AspectRatio: ratio, Quality: quality, Resolution: resolution, Count: count}, nil
+	return AgentImageGenerationInput{Provider: input.Provider, ModelID: input.ModelID, Mode: input.Mode, Prompt: input.Prompt, Size: sizes[resolution][ratio], AspectRatio: ratio, Quality: quality, Resolution: resolution, Count: count, Advanced: cloneAgentSettings(input.Advanced)}, nil
+}
+
+func cloneAgentSettings(value map[string]any) map[string]any {
+	result := make(map[string]any, len(value))
+	for key, item := range value {
+		result[key] = item
+	}
+	return result
 }
 
 func agentGenerationNodeMatches(canvas agentworkspace.Canvas, nodeID, nodeType string, version int64) bool {

@@ -103,6 +103,44 @@ func TestAgentTextGenerationUsesRequestedOwnerModelAndAppliesResult(t *testing.T
 	}
 }
 
+func TestNormalizeAgentImageGenerationInputUsesNestedNodeSettings(t *testing.T) {
+	input, err := normalizeAgentImageGenerationInput(agentImageGenerationRequest{
+		Provider: "doubao_local_executor", ModelID: "Seedream 5.0 Pro", Prompt: "电影感雨夜",
+		Mode:       "image_to_image",
+		Parameters: map[string]any{"ratio": "9:16", "quality": "high", "resolution": "4K", "count": float64(2)},
+		Advanced:   map[string]any{"seed": float64(42)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if input.Provider != "doubao_local_executor" || input.ModelID != "Seedream 5.0 Pro" || input.AspectRatio != "9:16" || input.Quality != "high" || input.Resolution != "4K" || input.Count != 2 || input.Size != "2304x4096" {
+		t.Fatalf("normalized input=%+v", input)
+	}
+}
+
+func TestAgentImageGenerationRejectsUnsupportedNestedCapabilityValue(t *testing.T) {
+	now := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "图片", Version: 1, Status: "draft"})
+	calls := 0
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
+		Projects: store, Assets: agentworkspace.NewMemoryAssetStore(),
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+			calls++
+			return nil, http.StatusOK, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	body := `{"nodeId":"image-1","nodeVersion":1,"provider":"doubao_local_executor","modelId":"Seedream 5.0 Pro","prompt":"电影感雨夜","mode":"text_to_image","parameters":{"ratio":"16:9","quality":"standard","resolution":"8K","count":1},"idempotencyKey":"image-invalid-resolution"}`
+	recorder := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", body)
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.Contains(recorder.Body.String(), "resolution") {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if calls != 0 {
+		t.Fatalf("image generator calls=%d, want 0", calls)
+	}
+}
+
 func TestAgentTextGenerationFailureDoesNotChangeNode(t *testing.T) {
 	now := time.Date(2026, 10, 20, 9, 10, 0, 0, time.UTC)
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "text-1", Type: "text", Title: "故事", Summary: "保留内容", Version: 1, Status: "draft"})

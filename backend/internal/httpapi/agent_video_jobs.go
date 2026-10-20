@@ -26,18 +26,25 @@ type agentVideoCoordinator struct {
 }
 
 type agentVideoJobRequest struct {
-	NodeID            string   `json:"nodeId"`
-	IdempotencyKey    string   `json:"idempotencyKey"`
-	Prompt            string   `json:"prompt"`
-	ModelKey          string   `json:"modelKey"`
-	Duration          any      `json:"duration"`
-	AspectRatio       string   `json:"aspectRatio"`
-	Resolution        string   `json:"resolution"`
-	ReferenceAssetIDs []string `json:"referenceAssetIds"`
-	IgnoreReferences  bool     `json:"ignoreReferences"`
+	NodeID            string         `json:"nodeId"`
+	NodeVersion       int64          `json:"nodeVersion"`
+	IdempotencyKey    string         `json:"idempotencyKey"`
+	Prompt            string         `json:"prompt"`
+	Provider          string         `json:"provider"`
+	ModelID           string         `json:"modelId"`
+	Mode              string         `json:"mode"`
+	Parameters        map[string]any `json:"parameters"`
+	Advanced          map[string]any `json:"advanced"`
+	ModelKey          string         `json:"modelKey"`
+	Duration          any            `json:"duration"`
+	AspectRatio       string         `json:"aspectRatio"`
+	Resolution        string         `json:"resolution"`
+	ReferenceAssetIDs []string       `json:"referenceAssetIds"`
+	IgnoreReferences  bool           `json:"ignoreReferences"`
 }
 
 var errUnsupportedVideoReference = errors.New("unsupported video reference")
+var errAgentVideoSettings = errors.New("invalid agent video settings")
 
 const agentVideoIngestLease = 5 * time.Minute
 
@@ -155,12 +162,18 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 	if node.Type != "video" {
 		return agentworkspace.VideoJob{}, fmt.Errorf("只能为视频节点生成视频")
 	}
+	if request.NodeVersion > 0 && request.NodeVersion != node.Version {
+		return agentworkspace.VideoJob{}, agentworkspace.ErrVideoJobNodeChanged
+	}
+	normalized, settings, err := normalizeAgentVideoJobRequest(request)
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
 	references, ids, err := s.referenceURLs(ctx, owner, projectID, request.ReferenceAssetIDs, request.IgnoreReferences)
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
 	}
-	settings := map[string]any{"prompt": strings.TrimSpace(request.Prompt), "duration": request.Duration, "aspectRatio": strings.TrimSpace(request.AspectRatio), "resolution": strings.TrimSpace(request.Resolution), "ignoreReferences": request.IgnoreReferences}
-	job, err := s.projects.CreateVideoJob(ctx, owner, agentworkspace.CreateVideoJobInput{ID: newAgentID("video-job"), ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version, ModelKey: strings.TrimSpace(request.ModelKey), Settings: settings, ReferenceAssetIDs: ids, IdempotencyKey: strings.TrimSpace(request.IdempotencyKey), Now: s.now().UTC()})
+	job, err := s.projects.CreateVideoJob(ctx, owner, agentworkspace.CreateVideoJobInput{ID: newAgentID("video-job"), ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version, ModelKey: normalized.ModelKey, Settings: settings, ReferenceAssetIDs: ids, IdempotencyKey: strings.TrimSpace(request.IdempotencyKey), Now: s.now().UTC()})
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
 	}
@@ -187,7 +200,11 @@ func (s *agentVideoCoordinator) retry(ctx context.Context, owner, projectID, job
 
 func (s *agentVideoCoordinator) submitCreated(ctx context.Context, owner string, job agentworkspace.VideoJob, references []string) (agentworkspace.VideoJob, error) {
 	settings := job.Settings
-	submission, err := s.videos.Submit(ctx, owner, scriptVideoLocalInput{SourceTaskID: "agent-video:" + job.ID, ModelKey: job.ModelKey, Prompt: valueString(settings["prompt"]), Duration: settings["duration"], AspectRatio: valueString(settings["aspectRatio"]), Resolution: valueString(settings["resolution"]), ImageURLs: references})
+	submission, err := s.videos.Submit(ctx, owner, scriptVideoLocalInput{
+		SourceTaskID: "agent-video:" + job.ID, ModelKey: job.ModelKey, Model: valueString(settings["modelId"]),
+		Prompt: valueString(settings["prompt"]), Duration: settings["durationSeconds"], AspectRatio: valueString(settings["aspectRatio"]),
+		Resolution: valueString(settings["resolution"]), ImageURLs: references, GenerateAudio: valueBool(settings["generateAudio"]),
+	})
 	if err != nil {
 		job.State, job.ErrorMessage = agentworkspace.VideoJobFailed, err.Error()
 		failedJob, updateErr := s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
@@ -198,6 +215,78 @@ func (s *agentVideoCoordinator) submitCreated(ctx context.Context, owner string,
 	}
 	job.State, job.ProviderTaskID, job.ErrorMessage = agentworkspace.VideoJobQueued, submission.TaskID, ""
 	return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+}
+
+func normalizeAgentVideoJobRequest(request agentVideoJobRequest) (agentVideoJobRequest, map[string]any, error) {
+	parameters := map[string]any{}
+	for key, value := range request.Parameters {
+		parameters[key] = value
+	}
+	if _, ok := parameters["durationSeconds"]; !ok && request.Duration != nil {
+		parameters["durationSeconds"] = request.Duration
+	}
+	if _, ok := parameters["ratio"]; !ok && strings.TrimSpace(request.AspectRatio) != "" {
+		parameters["ratio"] = strings.TrimSpace(request.AspectRatio)
+	}
+	if _, ok := parameters["resolution"]; !ok && strings.TrimSpace(request.Resolution) != "" {
+		parameters["resolution"] = strings.ToUpper(strings.TrimSpace(request.Resolution))
+	}
+	if strings.TrimSpace(request.Mode) != "" {
+		parameters["mode"] = strings.TrimSpace(request.Mode)
+	}
+	if err := ValidateModelSettings(map[string]any{"kind": "video"}, "video", parameters); err != nil {
+		return agentVideoJobRequest{}, nil, fmt.Errorf("%w: %v", errAgentVideoSettings, err)
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(request.Provider))
+	modelID := strings.TrimSpace(request.ModelID)
+	modelKey := strings.TrimSpace(request.ModelKey)
+	if provider == "doubao_local_executor" {
+		if !supportedAgentLocalVideoModel(modelID) {
+			return agentVideoJobRequest{}, nil, fmt.Errorf("%w: modelId: 所选豆包视频模型不可用", errAgentVideoSettings)
+		}
+		modelKey = "local-doubao-executor-video"
+	} else if modelKey == "local-doubao-executor-video" && provider == "" {
+		provider, modelID = "doubao_local_executor", "Seedance 2.0 Fast"
+	} else if modelKey == "" {
+		modelKey = modelID
+	}
+	if modelKey == "" {
+		return agentVideoJobRequest{}, nil, fmt.Errorf("%w: modelId: 请选择视频模型", errAgentVideoSettings)
+	}
+	if provider == "" {
+		if spec, ok := scriptVideoModelSpec(modelKey); ok {
+			provider = spec.Provider
+		}
+	}
+	if modelID == "" {
+		modelID = modelKey
+	}
+
+	duration := parameters["durationSeconds"]
+	ratio := settingString(parameters, "ratio")
+	resolution := strings.ToUpper(settingString(parameters, "resolution"))
+	count := settingInt(parameters, "count")
+	if count == 0 {
+		count = 1
+	}
+	settings := map[string]any{
+		"prompt": strings.TrimSpace(request.Prompt), "provider": provider, "modelId": modelID,
+		"mode": strings.TrimSpace(request.Mode), "parameters": parameters, "advanced": request.Advanced,
+		"duration": duration, "durationSeconds": duration, "aspectRatio": ratio, "resolution": resolution,
+		"count": count, "generateAudio": valueBool(parameters["generateAudio"]), "ignoreReferences": request.IgnoreReferences,
+	}
+	request.Provider, request.ModelID, request.ModelKey = provider, modelID, modelKey
+	return request, settings, nil
+}
+
+func supportedAgentLocalVideoModel(modelID string) bool {
+	for _, supported := range []string{"Seedance 2.5", "Seedance 2.0", "Seedance 2.0 Fast", "Seedance 2.0 Mini"} {
+		if strings.TrimSpace(modelID) == supported {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *agentVideoCoordinator) referenceURLs(ctx context.Context, owner, projectID string, requestedIDs []string, ignore bool) ([]string, []string, error) {
@@ -353,8 +442,14 @@ func valueString(value any) string {
 	}
 	return ""
 }
+func valueBool(value any) bool {
+	value, _ = value.(bool)
+	return value == true
+}
 func writeAgentVideoJobError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, errAgentVideoSettings):
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": strings.TrimPrefix(err.Error(), errAgentVideoSettings.Error()+": ")})
 	case errors.Is(err, agentworkspace.ErrVideoJobNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "视频任务不存在"})
 	case errors.Is(err, agentworkspace.ErrVideoJobExists):

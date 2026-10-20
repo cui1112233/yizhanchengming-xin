@@ -16,12 +16,33 @@ import (
 
 const agentLocalDoubaoImageModelID = "local-doubao-executor-image"
 
+func agentLocalDoubaoImageModel(input AgentImageGenerationInput) (string, bool) {
+	provider := strings.ToLower(strings.TrimSpace(input.Provider))
+	modelID := strings.TrimSpace(input.ModelID)
+	if modelID == agentLocalDoubaoImageModelID && provider == "" {
+		return "Seedream 4.5", true
+	}
+	if provider != "doubao_local_executor" {
+		return "", false
+	}
+	for _, supported := range []string{"Seedream 5.0 Flash", "Seedream 5.0 Pro", "Seedream 4.5", "Seedream 4.0"} {
+		if modelID == supported {
+			return supported, true
+		}
+	}
+	return "", false
+}
+
 func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, executors *localexecutor.Service, files *localartifact.Store) AgentImageGenerator {
 	return func(ctx context.Context, owner string, input AgentImageGenerationInput) ([]string, int, error) {
-		if strings.EqualFold(strings.TrimSpace(input.ModelID), agentLocalDoubaoImageModelID) {
+		localModel, local := agentLocalDoubaoImageModel(input)
+		if strings.EqualFold(strings.TrimSpace(input.Provider), "doubao_local_executor") && !local {
+			return nil, http.StatusUnprocessableEntity, fmt.Errorf("所选豆包图片模型不可用")
+		}
+		if local {
 			results := make([]string, 0, input.Count)
 			for index := 0; index < input.Count; index++ {
-				result, status, err := generateAgentLocalDoubaoImage(ctx, executors, files, owner, input)
+				result, status, err := generateAgentLocalDoubaoImage(ctx, executors, files, owner, localModel, input)
 				if err != nil {
 					return nil, status, err
 				}
@@ -40,7 +61,7 @@ func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetch
 	}
 }
 
-func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor.Service, files *localartifact.Store, owner string, input AgentImageGenerationInput) (string, int, error) {
+func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor.Service, files *localartifact.Store, owner, model string, input AgentImageGenerationInput) (string, int, error) {
 	if executors == nil || files == nil {
 		return "", http.StatusServiceUnavailable, fmt.Errorf("豆包本地执行器未配置")
 	}
@@ -58,7 +79,7 @@ func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor
 	if !online {
 		return "", http.StatusServiceUnavailable, fmt.Errorf("没有在线的豆包本地执行器")
 	}
-	mediaType, storageRef, err := waitForLocalExecutorImageWithSettings(ctx, executors, files, owner, "Seedream 4.5", input)
+	mediaType, storageRef, err := waitForLocalExecutorImageWithSettings(ctx, executors, files, owner, model, input)
 	if err != nil {
 		return "", http.StatusBadGateway, err
 	}

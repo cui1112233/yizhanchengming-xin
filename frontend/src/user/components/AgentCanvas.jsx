@@ -26,8 +26,7 @@ import {
 import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences } from '../pages/agent-canvas-connections';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentImageGeneration, createAgentTextGeneration, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels } from '../../shared/api/modelCatalog';
-import { nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
-import { imageGenerationRequestSettings } from '../pages/agent-canvas-image-settings';
+import { buildNodeGenerationRequest } from '../pages/agent-canvas-node-generation';
 import { normalizeNodeConfig, patchNodeConfig } from '../pages/agent-node-config';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
@@ -556,17 +555,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     const requestedTaskId = taskId;
     const node = nodesRef.current.find(item => item.id === nodeID);
     if (!requestedTaskId || node?.data?.type !== 'text') return;
-    const config = node.data?.config || {};
     const attempt = Number(nodeGenerationByNode[nodeID]?.attempt) || 0;
     setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
     try {
-      const result = await createAgentTextGeneration(requestedTaskId, {
-        nodeId: nodeID,
-        nodeVersion: node.data.version,
-        modelId: selectedModel,
-        prompt: String(config.prompt || '').trim(),
-        idempotencyKey: nodeGenerationIdempotencyKey({ taskId: requestedTaskId, nodeId: nodeID, nodeVersion: node.data.version, kind: 'text', attempt })
-      });
+      const result = await createAgentTextGeneration(requestedTaskId, buildNodeGenerationRequest(node, {
+        taskId: requestedTaskId, attempt, modelId: selectedModel
+      }));
       if (requestedTaskId !== taskIdRef.current) return;
       applyGeneratedCanvas(result.canvas);
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: '', attempt } }));
@@ -580,20 +574,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     const requestedTaskId = taskId;
     const node = nodesRef.current.find(item => item.id === nodeID);
     if (!requestedTaskId || node?.data?.type !== 'image') return;
-    const config = node.data?.config || {};
     const attempt = Number(nodeGenerationByNode[nodeID]?.attempt) || 0;
-    const imageSettings = imageGenerationRequestSettings(config);
     setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
     try {
-      const result = await createAgentImageGeneration(requestedTaskId, {
-        nodeId: nodeID,
-        nodeVersion: node.data.version,
-        modelId: selectedModel,
-        prompt: String(config.prompt || '').trim(),
-        ...imageSettings,
-        referenceAssetIds: (config.referenceAssets || []).filter(asset => asset?.kind === 'image').map(asset => asset.id),
-        idempotencyKey: nodeGenerationIdempotencyKey({ taskId: requestedTaskId, nodeId: nodeID, nodeVersion: node.data.version, kind: 'image', attempt })
-      });
+      const result = await createAgentImageGeneration(requestedTaskId, buildNodeGenerationRequest(node, {
+        taskId: requestedTaskId, attempt, modelId: selectedModel
+      }));
       if (requestedTaskId !== taskIdRef.current) return;
       applyGeneratedCanvas(result.canvas);
       setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: '', attempt } }));
@@ -604,16 +590,11 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
   }
 
   function videoRequestPayloadForNode(node, ignoreReferences = false) {
-    const config = node?.data?.config || {};
     return {
-      nodeId: node.id,
+      ...buildNodeGenerationRequest(node, { taskId }),
       idempotencyKey: makeVideoJobIdempotencyKey(),
-      prompt: config.prompt || node.data?.summary || '',
-      modelKey: config.model || '',
-      aspectRatio: config.ratio || '',
-      resolution: config.resolution || '',
-      duration: config.durationSeconds || 10,
-      referenceAssetIds: videoReferenceAssetIDs(config),
+      prompt: node?.data?.config?.prompt || node?.data?.summary || '',
+      referenceAssetIds: videoReferenceAssetIDs(node?.data?.config || {}),
       ignoreReferences
     };
   }
@@ -629,7 +610,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
       return;
     }
     const payload = videoRequestPayloadForNode(node, ignoreReferences);
-    if (selectedModel) payload.modelKey = selectedModel;
+    if (selectedModel) payload.modelId = selectedModel;
     if (!canSubmitVideoFromConfig({ prompt: payload.prompt })) return;
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
     setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));

@@ -12,16 +12,17 @@ import (
 const localScriptVideoTaskPrefix = "go-local:"
 
 type scriptVideoLocalInput struct {
-	SourceTaskID string   `json:"-"`
-	ModelKey     string   `json:"modelKey"`
-	Prompt       string   `json:"prompt"`
-	BookID       string   `json:"bookId"`
-	VideoID      string   `json:"videoId"`
-	Model        string   `json:"model"`
-	Duration     any      `json:"duration"`
-	AspectRatio  string   `json:"aspectRatio"`
-	Resolution   string   `json:"resolution"`
-	ImageURLs    []string `json:"imageUrls"`
+	SourceTaskID  string   `json:"-"`
+	ModelKey      string   `json:"modelKey"`
+	Prompt        string   `json:"prompt"`
+	BookID        string   `json:"bookId"`
+	VideoID       string   `json:"videoId"`
+	Model         string   `json:"model"`
+	Duration      any      `json:"duration"`
+	AspectRatio   string   `json:"aspectRatio"`
+	Resolution    string   `json:"resolution"`
+	ImageURLs     []string `json:"imageUrls"`
+	GenerateAudio bool     `json:"generateAudio"`
 }
 
 func validateLocalScriptVideoInput(input scriptVideoLocalInput) error {
@@ -66,7 +67,7 @@ func RegisterLocalScriptVideoRoutes(root *http.ServeMux, auth BridgeAuth, servic
 				Payload: map[string]any{
 					"bookId": input.BookID, "videoId": input.VideoID, "model": model,
 					"prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio,
-					"resolution": input.Resolution, "imageUrls": input.ImageURLs,
+					"resolution": input.Resolution, "imageUrls": input.ImageURLs, "generateAudio": input.GenerateAudio,
 				},
 			})
 			if err != nil {
