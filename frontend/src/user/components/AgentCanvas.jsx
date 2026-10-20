@@ -15,7 +15,7 @@ import {
 } from '../pages/agent-canvas-commands';
 import { createCanvasHistory } from '../pages/agent-canvas-history';
 import {
-  appearanceCssVariables, canvasEdgeColorOptions, canvasEdgeWidthOptions,
+  appearanceCssVariables, applyCanvasEdgeAppearance, canvasEdgeColorOptions, canvasEdgeWidthOptions,
   edgeStyleForAppearance, normalizeCanvasAppearance
 } from '../pages/agent-canvas-appearance';
 import {
@@ -162,13 +162,13 @@ function toFlowNode(node) {
 
 function toFlowEdge(edge, appearance) {
   const style = edgeStyleForAppearance(appearance);
-  return {
+  return applyCanvasEdgeAppearance({
     ...edge,
     type: 'canvas',
     hidden: !appearance.edgesVisible,
     markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
-    data: { relation: edge.relation || edge.data?.relation || 'reference', appearance }
-  };
+    data: { ...(edge.data || {}), relation: edge.relation || edge.data?.relation || 'reference', appearance }
+  }, appearance);
 }
 
 function toCanvas(nodes, edges, revision, viewport, appearance) {
@@ -932,7 +932,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   function applyHistory(direction) {
     const snapshot = direction === 'undo' ? historyRef.current.undo() : historyRef.current.redo();
-    commit(snapshot.nodes, snapshot.edges, { record: false });
+    const restoredEdges = snapshot.edges.map(edge => toFlowEdge(edge, appearanceRef.current));
+    commit(snapshot.nodes, restoredEdges, { record: false });
   }
 
   function keyboardPastePosition() {

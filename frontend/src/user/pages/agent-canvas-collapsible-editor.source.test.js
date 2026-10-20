@@ -57,6 +57,8 @@ test('edge visibility changes rendering without deleting serialized edges', () =
   assert.match(canvasSource, /appearance\.edgesVisible \? '隐藏连线' : '显示连线'/);
   assert.match(canvasSource, /updateAppearance\(\{ edgesVisible: !appearance\.edgesVisible \}\)/);
   assert.match(canvasSource, /appearance\.edgesVisible \? <EyeOff size=\{17\} \/> : <Eye size=\{17\} \/>/);
+  assert.match(canvasSource, /const restoredEdges = snapshot\.edges\.map\(edge => toFlowEdge\(edge, appearanceRef\.current\)\)/);
+  assert.match(canvasSource, /commit\(snapshot\.nodes, restoredEdges, \{ record: false \}\)/);
   assert.doesNotMatch(canvasSource, /appearance\.edgesVisible \? edges : \[\]/);
 });
 

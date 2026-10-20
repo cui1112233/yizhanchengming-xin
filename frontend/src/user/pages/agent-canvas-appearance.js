@@ -46,6 +46,15 @@ export function edgeStyleForAppearance(value) {
   };
 }
 
+export function applyCanvasEdgeAppearance(edge, value) {
+  const appearance = normalizeCanvasAppearance(value);
+  return {
+    ...edge,
+    hidden: !appearance.edgesVisible,
+    data: { ...(edge?.data || {}), appearance }
+  };
+}
+
 export function appearanceCssVariables(value) {
   const appearance = normalizeCanvasAppearance(value);
   return {
