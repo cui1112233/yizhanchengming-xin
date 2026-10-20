@@ -522,7 +522,7 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if id == "minimax-h3-video" && credential == "" {
 		return nil, errors.New("保存 H3 配置前必须填写 API Key")
 	}
-	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "credential": credential, "workflowId": workflowID, "enabled": input["enabled"] == true}
+	model := map[string]any{"id": id, "kind": kind, "displayName": strings.TrimSpace(fmt.Sprint(input["displayName"])), "modelId": strings.TrimSpace(fmt.Sprint(input["modelId"])), "baseUrl": strings.TrimSpace(fmt.Sprint(input["baseUrl"])), "endpoint": strings.TrimSpace(fmt.Sprint(input["endpoint"])), "provider": strings.TrimSpace(fmt.Sprint(input["provider"])), "requestTemplate": strings.TrimSpace(fmt.Sprint(input["requestTemplate"])), "responseMapping": strings.TrimSpace(fmt.Sprint(input["responseMapping"])), "credential": credential, "workflowId": workflowID, "enabled": input["enabled"] == true}
 	if model["displayName"] == "<nil>" || model["displayName"] == "" {
 		model["displayName"] = id
 	}
@@ -532,7 +532,7 @@ func normalizeManagedModel(input map[string]any) (map[string]any, error) {
 	if model["baseUrl"] == "<nil>" {
 		model["baseUrl"] = ""
 	}
-	for _, key := range []string{"endpoint", "requestTemplate", "responseMapping"} {
+	for _, key := range []string{"endpoint", "provider", "requestTemplate", "responseMapping"} {
 		if model[key] == "<nil>" {
 			model[key] = ""
 		}
@@ -548,5 +548,6 @@ func publicManagedModel(model map[string]any) map[string]any {
 		}
 	}
 	result["hasCredential"] = strings.TrimSpace(fmt.Sprint(model["credential"])) != "" && fmt.Sprint(model["credential"]) != "<nil>"
+	result["capabilities"] = publicModelCapabilities(model)
 	return result
 }
