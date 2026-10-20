@@ -19,10 +19,15 @@ const classSpecificity = selector => (selector.match(/\.[a-z0-9_-]+/gi) || []).l
 test('media nodes render one temporary inline editor controlled by preview activation', () => {
   assert.match(canvasSource, /const \[activeEditorNodeID, setActiveEditorNodeID\] = useState\(''\)/);
   assert.match(canvasSource, /isEditorOpen=\{activeEditorNodeID === props\.id\}/);
-  assert.match(canvasSource, /onOpenEditor=\{setActiveEditorNodeID\}/);
+  assert.match(canvasSource, /onOpenEditor=\{nodeID => \{ setAssetPanel\(null\); setActiveEditorNodeID\(nodeID\); \}\}/);
   assert.match(canvasSource, /const generationPanel = isEditorOpen/);
   assert.match(canvasSource, /\{generationPanel\}/);
   assert.match(canvasSource, /setActiveEditorNodeID\(''\)/);
+});
+
+test('leaving a media editor also closes its anchored asset library', () => {
+  assert.match(canvasSource, /if \(event\.key === 'Escape'\) \{[\s\S]*?setActiveEditorNodeID\(''\);[\s\S]*?setAssetPanel\(null\);[\s\S]*?return;/);
+  assert.match(canvasSource, /onPaneClick=\{\(\) => \{[^}]*setActiveEditorNodeID\(''\);[^}]*setAssetPanel\(null\);[^}]*\}\}/);
 });
 
 test('image preview opens editing while a named editor action opens the asset picker', () => {

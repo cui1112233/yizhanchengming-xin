@@ -304,7 +304,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       return <CanvasNode
         {...props}
         isEditorOpen={activeEditorNodeID === props.id}
-        onOpenEditor={setActiveEditorNodeID}
+        onOpenEditor={nodeID => { setAssetPanel(null); setActiveEditorNodeID(nodeID); }}
         onManualEdit={handleNodeContentDoubleClick}
         onPickImageAsset={openImageAssetPicker}
         onPickReferenceAsset={openReferenceAssetPanel}
@@ -439,6 +439,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   function handleNodeClick(event, node) {
     setContextMenu(null);
+    setAssetPanel(null);
     if (normalizeCanvasNodeType(node.data?.type) === 'text') setActiveEditorNodeID('');
     const next = selectCanvasNodes(
       nodesRef.current,
@@ -976,6 +977,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       setContextMenu(null);
       setConnectionDropMenu(null);
       setActiveEditorNodeID('');
+      setAssetPanel(null);
       return;
     }
     const command = canvasKeyboardCommand({
@@ -1046,7 +1048,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         onSelectionChange={handleSelectionChange}
         onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
-        onPaneClick={() => { setContextMenu(null); setConnectionDropMenu(null); setActiveEditorNodeID(''); }}
+        onPaneClick={() => { setContextMenu(null); setConnectionDropMenu(null); setActiveEditorNodeID(''); setAssetPanel(null); }}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
         onConnect={handleConnect}
