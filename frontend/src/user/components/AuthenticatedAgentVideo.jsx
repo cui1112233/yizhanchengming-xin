@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react';
 import { createAuthenticatedMediaSession } from '../pages/agent-canvas-media.js';
 
 export function AuthenticatedAgentVideo({ source, className = '', ...videoProps }) {
-  const [state, setState] = useState({ url: '', loading: Boolean(source), error: '' });
+  const [state, setState] = useState({ url: '', loading: Boolean(source), error: '', reportPlaybackError: null });
 
   useEffect(() => {
-    const session = createAuthenticatedMediaSession(source, { onState: setState });
+    let session;
+    const reportPlaybackError = () => session?.reportPlaybackError();
+    session = createAuthenticatedMediaSession(source, {
+      onState: mediaState => setState({ ...mediaState, reportPlaybackError })
+    });
     return () => session.dispose();
   }, [source]);
 
@@ -14,7 +18,7 @@ export function AuthenticatedAgentVideo({ source, className = '', ...videoProps 
   if (state.error) return <span className={`${stateClassName} is-error`} role="alert">视频读取失败：{state.error}</span>;
   if (!state.url) return null;
   return <video {...videoProps} className={className} src={state.url} onError={event => {
+    state.reportPlaybackError?.();
     videoProps.onError?.(event);
-    setState(current => ({ ...current, error: '视频源无法播放' }));
   }} />;
 }

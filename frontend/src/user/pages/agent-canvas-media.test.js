@@ -11,6 +11,10 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+function flushPromises() {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
 test('Agent asset video is fetched through the authenticated API client', async t => {
   const originalLocalStorage = globalThis.localStorage;
   const originalFetch = globalThis.fetch;
@@ -147,4 +151,101 @@ test('authenticated media session reports errors and ignores late results after 
   await Promise.resolve();
   assert.equal(releases, 1);
   assert.deepEqual(lateStates, [{ url: '', loading: true, error: '' }]);
+});
+
+test('authenticated media session releases once and clears its URL after playback error', async () => {
+  const states = [];
+  let releases = 0;
+  const session = createAuthenticatedMediaSession('/private/playback-failure', {
+    store: {
+      acquire: () => ({
+        promise: Promise.resolve('blob:playback-failure'),
+        release: () => { releases += 1; }
+      })
+    },
+    onState: state => states.push(state)
+  });
+
+  await flushPromises();
+  assert.deepEqual(states.at(-1), { url: 'blob:playback-failure', loading: false, error: '' });
+
+  session.reportPlaybackError();
+  assert.deepEqual(states.at(-1), { url: '', loading: false, error: '视频源无法播放' });
+  assert.equal(releases, 1);
+
+  session.reportPlaybackError();
+  session.dispose();
+  assert.equal(releases, 1);
+});
+
+test('playback failure keeps a shared object URL until the remaining consumer releases it', async () => {
+  const revoked = [];
+  const store = createAuthenticatedMediaStore({
+    loadBlob: async () => new Blob(['shared-video']),
+    createObjectUrl: () => 'blob:shared-playback',
+    revokeObjectUrl: url => revoked.push(url)
+  });
+  const failedStates = [];
+  const remainingStates = [];
+  const failed = createAuthenticatedMediaSession('/private/shared-playback', {
+    store,
+    onState: state => failedStates.push(state)
+  });
+  const remaining = createAuthenticatedMediaSession('/private/shared-playback', {
+    store,
+    onState: state => remainingStates.push(state)
+  });
+
+  await flushPromises();
+  assert.equal(failedStates.at(-1).url, 'blob:shared-playback');
+  assert.equal(remainingStates.at(-1).url, 'blob:shared-playback');
+
+  failed.reportPlaybackError();
+  failed.dispose();
+  assert.deepEqual(revoked, []);
+
+  remaining.dispose();
+  assert.deepEqual(revoked, ['blob:shared-playback']);
+});
+
+test('retry and source change create fresh sessions after playback failure', async () => {
+  const loads = [];
+  const revoked = [];
+  let nextObjectUrl = 0;
+  const store = createAuthenticatedMediaStore({
+    loadBlob: async source => { loads.push(source); return new Blob([source]); },
+    createObjectUrl: () => `blob:fresh-${nextObjectUrl += 1}`,
+    revokeObjectUrl: url => revoked.push(url)
+  });
+
+  const failedStates = [];
+  const failed = createAuthenticatedMediaSession('/private/retry', {
+    store,
+    onState: state => failedStates.push(state)
+  });
+  await flushPromises();
+  assert.equal(failedStates.at(-1).url, 'blob:fresh-1');
+  failed.reportPlaybackError();
+
+  const retryStates = [];
+  const retry = createAuthenticatedMediaSession('/private/retry', {
+    store,
+    onState: state => retryStates.push(state)
+  });
+  await flushPromises();
+  assert.equal(retryStates.at(-1).url, 'blob:fresh-2');
+  retry.dispose();
+
+  const replacementStates = [];
+  const replacement = createAuthenticatedMediaSession('/private/replacement', {
+    store,
+    onState: state => replacementStates.push(state)
+  });
+  await flushPromises();
+  assert.equal(replacementStates.at(-1).url, 'blob:fresh-3');
+
+  failed.dispose();
+  replacement.dispose();
+  assert.deepEqual(loads, ['/private/retry', '/private/retry', '/private/replacement']);
+  assert.deepEqual(revoked, ['blob:fresh-1', 'blob:fresh-2', 'blob:fresh-3']);
 });

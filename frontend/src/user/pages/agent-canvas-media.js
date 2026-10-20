@@ -62,11 +62,17 @@ export const agentCanvasMediaStore = createAuthenticatedMediaStore();
 export function createAuthenticatedMediaSession(source, { store = agentCanvasMediaStore, onState } = {}) {
   if (!source) {
     onState?.({ url: '', loading: false, error: '' });
-    return { dispose() {} };
+    return { reportPlaybackError() {}, dispose() {} };
   }
 
   let active = true;
   const lease = store.acquire(source);
+  const release = () => {
+    if (!active) return false;
+    active = false;
+    lease.release();
+    return true;
+  };
   onState?.({ url: '', loading: true, error: '' });
   lease.promise
     .then(url => {
@@ -77,10 +83,12 @@ export function createAuthenticatedMediaSession(source, { store = agentCanvasMed
     });
 
   return {
+    reportPlaybackError(message = '视频源无法播放') {
+      if (!release()) return;
+      onState?.({ url: '', loading: false, error: String(message || '').trim() || '视频源无法播放' });
+    },
     dispose() {
-      if (!active) return;
-      active = false;
-      lease.release();
+      release();
     }
   };
 }
