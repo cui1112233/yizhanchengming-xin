@@ -56,12 +56,12 @@ test('视频确认回读只把服务端 revision 同步给发起请求时的任�
 });
 
 test('A 方案画布工具使用固定尺寸且不会因禁用状态位移', () => {
-  for (const selector of ['.agent-page .agent-canvas-toolrail', '.agent-page .agent-canvas-editbar', '.agent-page .agent-canvas-zoombar']) {
+  for (const selector of ['.agent-page .agent-canvas-toolrail', '.agent-page .agent-canvas-editbar', '.agent-page .agent-canvas-zoom-controls']) {
     const block = cssBlock(selector);
     assert.match(block, /position:\s*absolute/);
     assert.match(block, /z-index:\s*1[0-9]/);
   }
-  const buttons = cssBlock('.agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar) .ant-btn');
+  const buttons = cssBlock('.agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn');
   assert.match(buttons, /width:\s*36px/);
   assert.match(buttons, /height:\s*36px/);
   assert.match(buttons, /border-radius:\s*[0-8]px/);
@@ -69,8 +69,8 @@ test('A 方案画布工具使用固定尺寸且不会因禁用状态位移', () 
 
 test('窄屏编辑工具可横向滚动且缩放栏保持有界', () => {
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-editbar\s*\{[^}]*max-width:\s*calc\(100% - 72px\)[^}]*overflow-x:\s*auto/);
-  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-zoombar\s*\{[^}]*max-width:\s*calc\(100% - 24px\)/);
-  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-canvas-workspace:not\(\.is-conversation-collapsed\) \.agent-canvas-zoombar\s*\{[^}]*bottom:\s*calc\(min\(72dvh,\s*620px\) \+ 12px\)/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-zoom-controls\s*\{[^}]*max-width:\s*calc\(100% - 24px\)/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-canvas-workspace:not\(\.is-conversation-collapsed\) \.agent-canvas-zoom-controls\s*\{[^}]*bottom:\s*calc\(min\(72dvh,\s*620px\) \+ 12px\)/);
 });
 
 test('节点点击明确支持 Ctrl Shift 和 Command 多选', () => {

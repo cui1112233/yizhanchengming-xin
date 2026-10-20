@@ -2,6 +2,21 @@ function nodeWidth(node) {
   return Number(node.measured?.width ?? node.width ?? 168);
 }
 
+export const CANVAS_SHORTCUTS = Object.freeze([
+  { command: 'undo', keys: 'Ctrl/⌘ + Z', label: '撤销' },
+  { command: 'redo', keys: 'Ctrl/⌘ + Shift + Z', label: '重做' },
+  { command: 'copy', keys: 'Ctrl/⌘ + C', label: '复制节点' },
+  { command: 'paste', keys: 'Ctrl/⌘ + V', label: '粘贴节点' },
+  { command: 'duplicate', keys: 'Ctrl/⌘ + D', label: '创建副本' },
+  { command: 'delete', keys: 'Delete', label: '删除选中' },
+  { command: 'group', keys: 'Ctrl/⌘ + G', label: '编组' },
+  { command: 'ungroup', keys: 'Ctrl/⌘ + Shift + G', label: '解组' },
+  { command: 'fit_canvas', keys: 'Shift + 1', label: '适合屏幕' },
+  { command: 'focus_selection', keys: 'Shift + 2', label: '聚焦选中' },
+  { command: 'zoom_in', keys: 'Ctrl/⌘ + +', label: '放大' },
+  { command: 'zoom_out', keys: 'Ctrl/⌘ + -', label: '缩小' }
+]);
+
 function nodeHeight(node) {
   return Number(node.measured?.height ?? node.height ?? 88);
 }
@@ -138,8 +153,20 @@ export function canvasGroupBounds(nodes, groupId, padding = 16) {
 export function canvasKeyboardCommand(event) {
   const tag = String(event?.targetTagName || '').toLowerCase();
   if (event?.isContentEditable || ['input', 'textarea', 'select'].includes(tag)) return null;
-  if (!event?.ctrlKey && !event?.metaKey) return null;
   const key = String(event?.key || '').toLowerCase();
+  const modifier = Boolean(event?.ctrlKey || event?.metaKey);
+  if (key === 'delete' || key === 'backspace') return 'delete';
+  if (event?.shiftKey && key === '1') return 'fit_canvas';
+  if (event?.shiftKey && key === '2') return 'focus_selection';
+  if (!modifier) return null;
+  if (key === 'a') return 'select_all';
+  if (key === 'c') return 'copy';
+  if (key === 'v') return 'paste';
+  if (key === 'd') return 'duplicate';
+  if (key === 'g' && event?.shiftKey) return 'ungroup';
+  if (key === 'g') return 'group';
+  if (key === '+' || key === '=') return 'zoom_in';
+  if (key === '-') return 'zoom_out';
   if (key === 'z' && event?.shiftKey) return 'redo';
   if (key === 'z') return 'undo';
   if (key === 'y') return 'redo';

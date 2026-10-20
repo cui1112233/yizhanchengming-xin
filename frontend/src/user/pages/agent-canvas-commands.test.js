@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CANVAS_SHORTCUTS,
   alignCanvasNodes,
   canvasKeyboardCommand,
   canvasGroupBounds,
@@ -122,12 +123,31 @@ test('command availability explains selection requirements', () => {
   assert.equal(three.canDistribute, true);
 });
 
-test('keyboard command recognizes undo and redo outside editable controls', () => {
+test('keyboard command recognizes every supported canvas shortcut outside editable controls', () => {
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'a', targetTagName: 'div' }), 'select_all');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'c', targetTagName: 'div' }), 'copy');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'v', targetTagName: 'div' }), 'paste');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'd', targetTagName: 'div' }), 'duplicate');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'g', targetTagName: 'div' }), 'group');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, shiftKey: true, key: 'g', targetTagName: 'div' }), 'ungroup');
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'z', targetTagName: 'div' }), 'undo');
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, shiftKey: true, key: 'z', targetTagName: 'div' }), 'redo');
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'y', targetTagName: 'div' }), 'redo');
+  assert.equal(canvasKeyboardCommand({ key: 'Delete', targetTagName: 'div' }), 'delete');
+  assert.equal(canvasKeyboardCommand({ shiftKey: true, key: '1', targetTagName: 'div' }), 'fit_canvas');
+  assert.equal(canvasKeyboardCommand({ shiftKey: true, key: '2', targetTagName: 'div' }), 'focus_selection');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: '+', targetTagName: 'div' }), 'zoom_in');
+  assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: '-', targetTagName: 'div' }), 'zoom_out');
   assert.equal(canvasKeyboardCommand({ metaKey: true, key: 'z', targetTagName: 'textarea' }), null);
   assert.equal(canvasKeyboardCommand({ ctrlKey: true, key: 'z', isContentEditable: true }), null);
+});
+
+test('快捷键帮助只展示键盘处理器已经支持的命令', () => {
+  const documented = new Set(CANVAS_SHORTCUTS.map(item => item.command));
+  for (const command of ['undo', 'redo', 'copy', 'paste', 'duplicate', 'delete', 'group', 'ungroup', 'fit_canvas', 'focus_selection', 'zoom_in', 'zoom_out']) {
+    assert.equal(documented.has(command), true, command);
+  }
+  assert.equal(documented.has('auto_layout'), false);
 });
 
 test('new canvas node has stable persistent defaults at requested position', () => {

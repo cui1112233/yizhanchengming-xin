@@ -1,11 +1,11 @@
-import { Background, BaseEdge, Handle, MarkerType, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath, useUpdateNodeInternals } from '@xyflow/react';
+import { Background, BaseEdge, Handle, MarkerType, MiniMap, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath, useUpdateNodeInternals } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button, Dropdown, Input, Modal, Popover, Segmented, Select, Switch, Tooltip, message } from 'antd';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
-  AlignVerticalDistributeCenter, Eye, EyeOff, Focus, GitBranch, Group, Hand, Maximize2,
-  ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
+  AlignVerticalDistributeCenter, Eye, EyeOff, GitBranch, Group, Hand,
+  ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup
 } from 'lucide-react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,6 +14,7 @@ import {
   moveCanvasGroup, selectCanvasNodes, ungroupCanvasNodes
 } from '../pages/agent-canvas-commands';
 import { createCanvasHistory } from '../pages/agent-canvas-history';
+import { layoutCanvas } from '../pages/agent-canvas-layout';
 import {
   appearanceCssVariables, applyCanvasEdgeAppearance, canvasEdgeColorOptions, canvasEdgeWidthOptions,
   edgeStyleForAppearance, normalizeCanvasAppearance
@@ -29,6 +30,7 @@ import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJ
 import { normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
+import { AgentCanvasControls } from './AgentCanvasControls';
 import AgentNodeComposer from './AgentNodeComposer';
 
 function CanvasNode({
@@ -177,8 +179,9 @@ function IconTool({ label, disabled = false, active = false, onClick, children }
   );
 }
 
-export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onServerCanvasChange }, ref) {
+export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, workspaceView: workspaceViewState, onWorkspaceViewChange, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onServerCanvasChange }, ref) {
   const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
+  const workspaceView = workspaceViewState || { snapToGrid: false, showMinimap: true, showConnections: true };
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -308,6 +311,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, onC
     () => contextMenu ? commandAvailability(nodes, contextMenu.nodeIds) : null,
     [contextMenu, nodes]
   );
+  const visibleEdges = useMemo(() => workspaceView.showConnections ? edges : edges.map(edge => ({ ...edge, hidden: true })), [edges, workspaceView.showConnections]);
 
   function updateRefs(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
     nodesRef.current = nextNodes;
@@ -1150,7 +1154,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, onC
     >
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={visibleEdges}
         nodeTypes={canvasNodeTypes}
         edgeTypes={canvasEdgeTypes}
         onInit={setFlowInstance}
@@ -1183,11 +1187,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, onC
         nodesDraggable={interactionMode !== 'pan'}
         elementsSelectable={interactionMode !== 'pan'}
         selectionOnDrag={interactionMode === 'select'}
-        snapToGrid={appearance.alignmentGuides}
+        snapToGrid={workspaceView.snapToGrid}
         snapGrid={[20, 20]}
         multiSelectionKeyCode="Shift"
       >
         {appearance.backgroundDots ? <Background variant="dots" gap={20} size={1} /> : null}
+        {workspaceView.showMinimap ? <MiniMap className="agent-canvas-minimap" pannable zoomable /> : null}
         <ViewportPortal>
           {groups.map(({ groupId, bounds }) => (
             <section className="agent-canvas-group" key={groupId} style={{ left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }}>
@@ -1339,13 +1344,17 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, onC
         <IconTool label={availability.canDistribute ? '垂直等距' : availability.distributeReason} disabled={!availability.canDistribute} onClick={() => runNodeCommand(current => distributeCanvasNodes(current, selectedIds, 'vertical'))}><AlignVerticalDistributeCenter size={17} /></IconTool>
       </nav>
 
-      <nav className="agent-canvas-zoombar" aria-label="画布缩放工具">
-        <IconTool label="缩小" onClick={() => flowInstance?.zoomOut()}><ZoomOut size={17} /></IconTool>
-        <span className="agent-canvas-zoom-value">{Math.round((viewport.zoom || 1) * 100)}%</span>
-        <IconTool label="放大" onClick={() => flowInstance?.zoomIn()}><ZoomIn size={17} /></IconTool>
-        <IconTool label="适合屏幕" onClick={() => flowInstance?.fitView({ padding: 0.18 })}><Maximize2 size={17} /></IconTool>
-        <IconTool label={selectedIds.length ? '聚焦选中' : '请先选择节点'} disabled={!selectedIds.length} onClick={() => flowInstance?.fitView({ nodes: nodesRef.current.filter(node => selectedIds.includes(node.id)), padding: 0.3 })}><Focus size={17} /></IconTool>
-      </nav>
+      <AgentCanvasControls
+        workspaceView={workspaceView}
+        zoom={Math.round((viewport.zoom || 1) * 100)}
+        hasSelection={selectedIds.length > 0}
+        onWorkspaceViewChange={onWorkspaceViewChange}
+        onAutoLayout={direction => commit(layoutCanvas(nodesRef.current, edgesRef.current, direction), edgesRef.current)}
+        onZoomOut={() => flowInstance?.zoomOut()}
+        onZoomIn={() => flowInstance?.zoomIn()}
+        onFitView={() => flowInstance?.fitView({ padding: 0.18 })}
+        onFocusSelection={() => flowInstance?.fitView({ nodes: nodesRef.current.filter(node => selectedIds.includes(node.id)), padding: 0.3 })}
+      />
     </div>
   );
 });

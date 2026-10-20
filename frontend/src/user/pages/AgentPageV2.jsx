@@ -630,6 +630,8 @@ export function AgentPageV2({ theme }) {
             key={activeTaskId}
             taskId={activeTaskId}
             canvas={canvas}
+            workspaceView={viewState}
+            onWorkspaceViewChange={updateWorkspaceView}
             onSelectionChange={setSelectedCanvasNodes}
             onViewportChange={setCanvasViewport}
             onChange={nextCanvas => {
