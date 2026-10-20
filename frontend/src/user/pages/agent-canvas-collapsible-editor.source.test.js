@@ -10,6 +10,9 @@ const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentC
 const workspaceStyles = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-workspace.css'), 'utf8');
 const packageLock = JSON.parse(fs.readFileSync(path.resolve(frontendRoot, 'package-lock.json'), 'utf8'));
 const reactFlowSource = fs.readFileSync(path.resolve(frontendRoot, 'node_modules/@xyflow/react/dist/esm/index.js'), 'utf8');
+const reactFlowStyles = fs.readFileSync(path.resolve(frontendRoot, 'node_modules/@xyflow/react/dist/style.css'), 'utf8');
+
+const classSpecificity = selector => (selector.match(/\.[a-z0-9_-]+/gi) || []).length;
 
 test('media nodes render one temporary inline editor controlled by preview activation', () => {
   assert.match(canvasSource, /const \[activeEditorNodeID, setActiveEditorNodeID\] = useState\(''\)/);
@@ -50,6 +53,24 @@ test('connection handles belong to the visible preview shell and stay hidden unt
   assert.match(reactFlowSource, /connectingto:\s*connectingTo/);
   assert.match(workspaceStyles, /\.agent-canvas-node-target\.connectingto\.valid/);
   assert.doesNotMatch(workspaceStyles, /\.agent-canvas-node-target\.connecting\.valid/);
+});
+
+test('hidden handle rules outrank React Flow pointer events and interaction states restore them', () => {
+  const dependencyRule = reactFlowStyles.match(/(\.react-flow__handle\.connectionindicator)\s*\{([^}]*)\}/);
+  const hiddenTargetRule = workspaceStyles.match(/(\.agent-page \.react-flow__handle\.agent-canvas-node-target)\s*\{([^}]*)\}/);
+  const hiddenSourceRule = workspaceStyles.match(/(\.agent-page \.react-flow__handle\.agent-canvas-node-quick-add)\s*\{([^}]*)\}/);
+  const visibleTargetRule = workspaceStyles.match(/\.agent-page \.agent-canvas\.is-connecting \.agent-canvas-node-target\s*\{([^}]*)\}/);
+  const visibleSourceRule = workspaceStyles.match(/\.agent-page \.agent-canvas-node-preview-shell:hover \.agent-canvas-node-quick-add,[\s\S]*?\.agent-page \.agent-canvas-node-preview-shell:focus-within \.agent-canvas-node-quick-add,[\s\S]*?\.agent-page \.agent-canvas-node-quick-add:focus-visible\s*\{([^}]*)\}/);
+
+  assert.ok(dependencyRule, 'React Flow pointer rule should be present');
+  assert.match(dependencyRule[2], /pointer-events:\s*all/);
+  for (const rule of [hiddenTargetRule, hiddenSourceRule]) {
+    assert.ok(rule, 'hidden handle rule should include the React Flow handle class');
+    assert.ok(classSpecificity(rule[1]) > classSpecificity(dependencyRule[1]));
+    assert.match(rule[2], /pointer-events:\s*none/);
+  }
+  assert.match(visibleTargetRule?.[1] || '', /pointer-events:\s*auto/);
+  assert.match(visibleSourceRule?.[1] || '', /pointer-events:\s*auto/);
 });
 
 test('edge visibility changes rendering without deleting serialized edges', () => {
