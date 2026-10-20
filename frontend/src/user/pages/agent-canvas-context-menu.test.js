@@ -320,9 +320,15 @@ test('expanded video editor exposes create cancel retry confirm and per-node err
 
 test('expanded video editor previews the pending result and reports provider failures', () => {
   assert.match(canvasSource, /videoResultPreview\(videoJob\)/);
-  assert.match(canvasSource, /<video[^>]+src=\{videoResult\.url\}/);
+  assert.match(canvasSource, /<AuthenticatedAgentVideo source=\{videoResult\.url\}/);
   assert.match(canvasSource, /videoJob\?\.errorMessage/);
   assert.match(canvasSource, /\{videoJob\.errorMessage\}/);
+});
+
+test('formal and pending Agent videos use the authenticated media component', () => {
+  assert.match(canvasSource, /import \{ AuthenticatedAgentVideo \}/);
+  assert.equal((canvasSource.match(/<AuthenticatedAgentVideo/g) || []).length, 2);
+  assert.doesNotMatch(canvasSource, /<video className="agent-canvas-(?:node-media|generation-result)"/);
 });
 
 test('canvas keeps middle mouse panning and advertises only implemented undo redo keys', () => {

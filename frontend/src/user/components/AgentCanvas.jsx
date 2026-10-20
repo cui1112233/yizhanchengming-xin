@@ -26,6 +26,7 @@ import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgen
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from '../pages/agent-canvas-video-jobs';
 import { isMediaCanvasNodeType, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
+import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 
 const LOCAL_DOUBAO_VIDEO_MODEL_OPTION = { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' };
 
@@ -68,7 +69,7 @@ function CanvasNode({
       <button type="button" className="agent-canvas-generation-add-reference" aria-label="添加参考素材" onClick={event => { stopCanvasEvent(event); onPickReferenceAsset?.(id, event); }}><Plus size={22} /></button>
       <span className="agent-canvas-generation-reference-count">{referenceAssets.length}/10<br />参考图</span>
     </div> : null}
-    {data.type === 'video' && videoResult ? <video className="agent-canvas-generation-result" src={videoResult.url} preload="metadata" muted controls /> : null}
+    {data.type === 'video' && videoResult ? <AuthenticatedAgentVideo source={videoResult.url} className="agent-canvas-generation-result" aria-label="待确认视频结果" preload="metadata" muted controls /> : null}
     <Input.TextArea aria-label={inputLabel} className="agent-canvas-generation-prompt" value={config.prompt || ''} maxLength={data.type === 'audio' ? 8000 : 4000} autoSize={{ minRows: 3, maxRows: 7 }} placeholder={data.type === 'audio' ? '输入要合成的文案。' : data.type === 'video' ? '输入提示词或@参考图，描述你想要生成的视频。' : '输入提示词或@参考图，描述你想要生成的图片。'} onChange={event => updateConfig({ prompt: event.target.value })} />
     <div className="agent-canvas-generation-toolbar">
       {data.type === 'image' ? <>
@@ -111,7 +112,7 @@ function CanvasNode({
         {data.type === 'image' ? <button type="button" className="agent-canvas-node-image-select" aria-label="展开图片编辑" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
           {data.assetRef?.url ? <img className="agent-canvas-node-media" src={data.assetRef.url} alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
         </button> : null}
-        {data.type === 'video' && data.assetRef?.url ? <video className="agent-canvas-node-media" src={data.assetRef.url} preload="metadata" muted controls onClick={openEditor} /> : null}
+        {data.type === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
         {data.type === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
         {data.type === 'text' ? <p>{data.summary || '等待 Agent 写入结果'}</p> : null}
         {generationPanel}

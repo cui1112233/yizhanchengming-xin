@@ -1,4 +1,12 @@
-import { apiRequest } from './client';
+import { apiRequest } from './client.js';
+
+const AGENT_ASSET_CONTENT_PATTERN = /^\/api\/agent\/tasks\/[^/?#]+\/assets\/[^/?#]+\/content$/;
+
+export function getAgentAssetBlob(assetUrl) {
+  const path = String(assetUrl || '').trim();
+  if (!AGENT_ASSET_CONTENT_PATTERN.test(path)) return Promise.reject(new Error('Agent asset URL is not a local protected asset'));
+  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+}
 
 export function listAgentTasks() {
   return apiRequest('/api/agent/tasks');
