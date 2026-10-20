@@ -16,6 +16,7 @@ import {
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
+const composerSource = fs.readFileSync(path.resolve(dirname, '../components/AgentNodeComposer.jsx'), 'utf8');
 const canvasStyles = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-workspace.css'), 'utf8');
 
 const imageNode = {
@@ -242,39 +243,37 @@ test('successful connections are remembered so the empty-drop menu does not also
   assert.match(canvasSource, /setConnectingSourceID\(''\)/);
 });
 
-test('image and audio generation controls disclose that their executors are not connected', () => {
-  assert.match(canvasSource, /暂未接入生成执行器/);
-  assert.match(canvasSource, /const generationAvailable = data\.type === 'video'/);
-  assert.match(canvasSource, /disabled=\{!generationAvailable \|\| !String\(config\.prompt \|\| ''\)\.trim\(\)\}/);
+test('text image and video generation controls use the shared composer', () => {
+  assert.match(canvasSource, /<AgentNodeComposer/);
+  assert.match(composerSource, /\['text', 'image', 'video'\]\.includes\(kind\)/);
+  assert.doesNotMatch(composerSource, /暂未接入生成执行器/);
 });
 
 test('opened media editors expose direct prompt, reference, and setting controls below their preview', () => {
-  assert.match(canvasSource, /const generationPanel = isEditorOpen/);
-  assert.match(canvasSource, /\{generationPanel\}/);
-  assert.match(canvasSource, /agent-canvas-generation-panel/);
-  assert.match(canvasSource, /aria-label="添加参考素材"/);
-  assert.match(canvasSource, /onPickReferenceAsset/);
-  assert.match(canvasSource, /图片提示词/);
-  assert.match(canvasSource, /视频提示词/);
+  assert.match(canvasSource, /const composer = isEditorOpen/);
+  assert.match(canvasSource, /\{composer\}/);
+  assert.match(composerSource, /agent-node-composer/);
+  assert.match(composerSource, /aria-label="添加参考素材"/);
+  assert.match(composerSource, /onPickReferenceAsset/);
+  assert.match(composerSource, /图片提示词/);
+  assert.match(composerSource, /视频提示词/);
   assert.match(canvasSource, /onNodeConfigChange/);
-  assert.match(canvasStyles, /\.agent-page \.agent-canvas-generation-panel/);
+  assert.match(canvasStyles, /\.agent-page \.agent-node-composer/);
 });
 
 test('opened media editors use the wide reference-style panel instead of compact form controls', () => {
-  assert.match(canvasSource, /const generationPanel = isEditorOpen/);
-  assert.match(canvasSource, /agent-canvas-generation-panel/);
-  assert.match(canvasSource, /agent-canvas-generation-reference-strip/);
-  assert.match(canvasSource, /agent-canvas-generation-prompt/);
-  assert.match(canvasSource, /agent-canvas-generation-toolbar/);
-  assert.match(canvasSource, /agent-canvas-generation-submit/);
-  assert.match(canvasStyles, /\.agent-page \.agent-canvas-generation-panel/);
-  assert.match(canvasStyles, /\.agent-page \.agent-canvas-generation-reference-strip/);
+  assert.match(composerSource, /agent-node-composer__references/);
+  assert.match(composerSource, /agent-node-composer__prompt/);
+  assert.match(composerSource, /agent-node-composer__toolbar/);
+  assert.match(composerSource, /agent-node-composer__submit/);
+  assert.match(canvasStyles, /\.agent-page \.agent-node-composer/);
+  assert.match(canvasStyles, /\.agent-page \.agent-node-composer__references/);
 });
 
 test('generation panel uses the workspace palette with restrained spacing instead of the copied green treatment', () => {
-  const panelRule = canvasStyles.match(/\.agent-page \.agent-canvas-generation-panel \{([\s\S]*?)\n\}/);
+  const panelRule = canvasStyles.match(/\.agent-page \.agent-node-composer \{([\s\S]*?)\n\}/);
   assert.ok(panelRule, 'generation panel rule should exist');
-  assert.match(panelRule[1], /background:\s*var\(--agent-panel\)/);
+  assert.match(panelRule[1], /background:[^;]*var\(--agent-panel\)/);
   assert.match(panelRule[1], /border-radius:\s*8px/);
   assert.doesNotMatch(panelRule[1], /#193727|#315b43/);
   assert.match(canvasStyles, /color:\s*var\(--agent-accent\)/);
@@ -299,15 +298,15 @@ test('canvas opens the manual editor on text double click and saves node content
 });
 
 test('opened media editor saves generation settings directly by node type', () => {
-  assert.match(canvasSource, /node\.data\?\.config \|\| \{\}/);
-  assert.match(canvasSource, /图片提示词/);
-  assert.match(canvasSource, /视频时长（秒）/);
-  assert.match(canvasSource, /音色/);
+  assert.match(composerSource, /node\.data\?\.config \|\| \{\}/);
+  assert.match(composerSource, /图片提示词/);
+  assert.match(composerSource, /视频时长（秒）/);
+  assert.match(composerSource, /文字生成要求/);
   assert.match(canvasSource, /onNodeConfigChange/);
 });
 
 test('canvas keeps media asset actions in the opened editor instead of the manual modal', () => {
-  assert.match(canvasSource, /aria-label=\{data\.assetRef\?\.url \? '更换图片素材' : '添加图片素材'\}/);
+  assert.match(composerSource, /node\.data\?\.assetRef\?\.url \? '更换当前图片' : '从收藏添加图片'/);
   assert.match(canvasSource, /assetPanel\.mode === 'image-source'/);
   assert.doesNotMatch(canvasSource, /manualNode\?\.data\?\.type === 'image'/);
   assert.doesNotMatch(canvasSource, /manualNode\?\.data\?\.type === 'video'/);
@@ -320,31 +319,29 @@ test('expanded video editor exposes create cancel retry confirm and per-node err
   assert.match(canvasSource, /videoState=\{videoNodeViewState\(videoJob\)\}/);
   assert.match(canvasSource, /videoBusy=\{videoJobsLoadedTaskID !== taskId \|\| Boolean\(videoBusyByNode\[props\.id\]\)\}/);
   assert.match(canvasSource, /videoActionError=\{videoActionErrors\[props\.id\] \|\| \(videoJobsLoadedTaskID !== taskId \? videoJobsLoadError : ''\)\}/);
-  for (const action of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
-    assert.match(canvasSource, new RegExp(`aria-label="${action}"`));
-  }
-  assert.match(canvasSource, /onCancelVideo\?\.\(id\)/);
-  assert.match(canvasSource, /onRetryVideo\?\.\(id\)/);
-  assert.match(canvasSource, /onConfirmVideo\?\.\(id\)/);
+  assert.match(composerSource, /aria-label=\{`生成\$\{kind/);
+  assert.match(composerSource, /onCancelVideo\?\.\(node\.id\)/);
+  assert.match(composerSource, /onRetryVideo\?\.\(node\.id\)/);
+  assert.match(composerSource, /onConfirmVideo\?\.\(node\.id\)/);
   assert.doesNotMatch(canvasSource, /const activeVideoJob = manualNode/);
 });
 
 test('expanded video editor previews the pending result and reports provider failures', () => {
-  assert.match(canvasSource, /videoResultPreview\(videoJob\)/);
-  assert.match(canvasSource, /<AuthenticatedAgentVideo source=\{videoResult\.url\}/);
-  assert.match(canvasSource, /videoJob\?\.errorMessage/);
-  assert.match(canvasSource, /\{videoJob\.errorMessage\}/);
+  assert.match(composerSource, /videoResultPreview\(videoJob\)/);
+  assert.match(composerSource, /<AuthenticatedAgentVideo source=\{videoResult\.url\}/);
+  assert.match(composerSource, /videoJob\?\.errorMessage/);
 });
 
 test('formal and pending Agent videos use the authenticated media component', () => {
   assert.match(canvasSource, /import \{ AuthenticatedAgentVideo \}/);
-  assert.ok((canvasSource.match(/<AuthenticatedAgentVideo/g) || []).length >= 2);
+  assert.match(composerSource, /<AuthenticatedAgentVideo/);
   assert.doesNotMatch(canvasSource, /<video className="agent-canvas-(?:node-media|generation-result)"/);
 });
 
 test('node images, reference thumbnails, and material thumbnails use authenticated media', () => {
   assert.match(canvasSource, /import \{ AuthenticatedAgentImage \}/);
-  assert.ok((canvasSource.match(/<AuthenticatedAgentImage/g) || []).length >= 3);
+  assert.match(composerSource, /<AuthenticatedAgentImage/);
+  assert.ok((canvasSource.match(/<AuthenticatedAgentImage/g) || []).length >= 2);
   assert.doesNotMatch(canvasSource, /<img\s+src=\{(?:data\.assetRef|asset)\.url\}/);
 });
 
@@ -359,9 +356,9 @@ test('canvas keeps middle mouse panning and advertises only implemented undo red
   assert.doesNotMatch(canvasSource, /case 'focus_selection':/);
 });
 
-test('canvas reads image and video models from the shared API configuration instead of hard-coding its own catalog', () => {
-  assert.match(canvasSource, /listAvailableModels\('image'\)/);
-  assert.match(canvasSource, /listAvailableModels\('video'\)/);
+test('canvas reads text image and video models from the shared API configuration instead of hard-coding its own catalog', () => {
+  assert.match(canvasSource, /\['text', 'image', 'video'\]\.map\(kind => listAvailableModels\(kind\)\)/);
+  assert.match(canvasSource, /configuredTextModelOptions/);
   assert.match(canvasSource, /configuredImageModelOptions/);
   assert.match(canvasSource, /configuredVideoModelOptions/);
   assert.doesNotMatch(canvasSource, /value=\{imageConfig\.model \|\| 'seedream-5-flash-local'\}/);

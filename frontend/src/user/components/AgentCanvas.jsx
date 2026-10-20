@@ -5,7 +5,7 @@ import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, Eye, EyeOff, Focus, GitBranch, Group, Hand, Maximize2,
-  ArrowUp, ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
+  ImagePlus, MousePointer2, Plus, Redo2, SlidersHorizontal, Undo2, Ungroup, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -22,19 +22,21 @@ import {
   appendReferenceAsset, attachImageAsset, copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes,
   readableAssetRequestError, shouldOpenConnectionDrop, syncNodeReferencesFromEdges
 } from '../pages/agent-canvas-context-menu';
-import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
+import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentImageGeneration, createAgentTextGeneration, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError, videoResultPreview } from '../pages/agent-canvas-video-jobs';
-import { isMediaCanvasNodeType, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
+import { nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
+import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
+import { normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
+import AgentNodeComposer from './AgentNodeComposer';
 
 const LOCAL_DOUBAO_VIDEO_MODEL_OPTION = { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' };
 
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
-  onNodeConfigChange, onSubmitVideo, onCancelVideo, onRetryVideo, onConfirmVideo,
-  videoJob, videoState, videoBusy, videoActionError, imageModelOptions, videoModelOptions, modelLoadError,
+  onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onCancelVideo, onRetryVideo, onConfirmVideo,
+  videoJob, videoState, videoBusy, videoActionError, generationState, modelOptions, modelLoadError,
   selected, isEditorOpen, onOpenEditor
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
@@ -51,61 +53,25 @@ function CanvasNode({
   useLayoutEffect(() => {
     updateNodeInternals(id);
   }, [id, isEditorOpen, updateNodeInternals]);
-  const config = data.config || {};
   const nodeType = normalizeCanvasNodeType(data.type);
-  const referenceAssets = Array.isArray(config.referenceAssets) ? config.referenceAssets : [];
-  const updateConfig = patch => onNodeConfigChange?.(id, patch);
-  const inputLabel = data.type === 'image' ? '图片提示词' : data.type === 'video' ? '视频提示词' : '音频文案';
-  const supportsReferences = data.type === 'image' || data.type === 'video';
-  const generationAvailable = data.type === 'video';
-  const videoResult = videoResultPreview(videoJob);
-  const generationPanel = isEditorOpen && isMediaCanvasNodeType(data.type) ? <section className="agent-canvas-generation-panel nodrag nopan" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent}>
-    {data.type === 'image' ? <button type="button" className="agent-canvas-generation-image-picker" aria-label={data.assetRef?.url ? '更换图片素材' : '添加图片素材'} onClick={event => { stopCanvasEvent(event); onPickImageAsset?.(id, event); }}>
-      {data.assetRef?.url ? '更换图片素材' : '添加图片素材'}
-    </button> : null}
-    {supportsReferences ? <div className="agent-canvas-generation-reference-strip" aria-label="参考素材">
-      {referenceAssets.map(asset => <span className="agent-canvas-node-reference" key={asset.id} title={asset.name || asset.id}>
-        {asset.url ? asset.kind === 'video'
-          ? <AuthenticatedAgentVideo source={asset.url} aria-label="视频参考素材" preload="metadata" muted />
-          : <AuthenticatedAgentImage source={asset.url} alt="" />
-          : <ImagePlus size={14} />}
-        <button type="button" aria-label="移除参考素材" onClick={event => { stopCanvasEvent(event); onRemoveReference?.(id, asset.id); }}>×</button>
-      </span>)}
-      <button type="button" className="agent-canvas-generation-add-reference" aria-label="添加参考素材" onClick={event => { stopCanvasEvent(event); onPickReferenceAsset?.(id, event); }}><Plus size={22} /></button>
-      <span className="agent-canvas-generation-reference-count">{referenceAssets.length}/10<br />参考图</span>
-    </div> : null}
-    {data.type === 'video' && videoResult ? <AuthenticatedAgentVideo source={videoResult.url} className="agent-canvas-generation-result" aria-label="待确认视频结果" preload="metadata" muted controls /> : null}
-    <Input.TextArea aria-label={inputLabel} className="agent-canvas-generation-prompt" value={config.prompt || ''} maxLength={data.type === 'audio' ? 8000 : 4000} autoSize={{ minRows: 3, maxRows: 7 }} placeholder={data.type === 'audio' ? '输入要合成的文案。' : data.type === 'video' ? '输入提示词或@参考图，描述你想要生成的视频。' : '输入提示词或@参考图，描述你想要生成的图片。'} onChange={event => updateConfig({ prompt: event.target.value })} />
-    <div className="agent-canvas-generation-toolbar">
-      {data.type === 'image' ? <>
-        <Select aria-label="图片模型" variant="borderless" size="small" value={config.model || undefined} placeholder={modelLoadError || '选择模型'} options={imageModelOptions} onChange={model => updateConfig({ model })} />
-        <Select aria-label="图片比例" variant="borderless" size="small" value={config.ratio || '16:9'} options={['16:9', '9:16', '1:1'].map(value => ({ value, label: value }))} onChange={ratio => updateConfig({ ratio })} />
-      </> : null}
-      {data.type === 'video' ? <>
-        <Select aria-label="视频模型" variant="borderless" size="small" value={config.model || undefined} placeholder={modelLoadError || '选择模型'} options={videoModelOptions} onChange={model => updateConfig({ model })} />
-        <Select aria-label="视频比例" variant="borderless" size="small" value={config.ratio || undefined} placeholder="比例" options={[{ value: '16:9', label: '16:9 · 横屏' }, { value: '9:16', label: '9:16 · 竖屏' }]} onChange={ratio => updateConfig({ ratio })} />
-        <Select aria-label="视频时长（秒）" variant="borderless" size="small" value={config.durationSeconds || 10} options={[5, 10, 15].map(value => ({ value, label: `${value}s` }))} onChange={durationSeconds => updateConfig({ durationSeconds })} />
-        <Select aria-label="视频自动设置" variant="borderless" size="small" value={config.resolution || 'auto'} options={[{ value: 'auto', label: '自动设置' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} onChange={resolution => updateConfig({ resolution })} />
-      </> : null}
-      {data.type === 'audio' ? <>
-        <Input aria-label="音色" variant="borderless" size="small" value={config.voice || ''} placeholder="音色" maxLength={191} onChange={event => updateConfig({ voice: event.target.value })} />
-        <Input aria-label="语速" variant="borderless" size="small" type="number" min={0.5} max={2} step={0.1} value={config.speed ?? 1} onChange={event => updateConfig({ speed: event.target.value === '' ? 1 : Number(event.target.value) })} />
-      </> : null}
-      {!generationAvailable ? <>
-        <span className="agent-canvas-generation-unavailable">暂未接入生成执行器</span>
-        <button type="button" className="agent-canvas-generation-submit" aria-label="暂未接入生成执行器" title="暂未接入生成执行器" disabled={!generationAvailable || !String(config.prompt || '').trim()}><ArrowUp size={19} /></button>
-      </> : null}
-      {data.type === 'video' ? <>
-        <span className="agent-canvas-generation-state" aria-live="polite">{videoJob ? videoState.state : '尚未生成'}</span>
-        {videoJob?.errorMessage ? <span className="agent-canvas-generation-error" role="alert">{videoJob.errorMessage}</span> : null}
-        {videoActionError ? <span className="agent-canvas-generation-error" role="alert">{videoActionError}</span> : null}
-        {videoState.canCancel ? <button type="button" aria-label="取消视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onCancelVideo?.(id); }}>取消生成</button> : null}
-        {videoState.canRetry ? <button type="button" aria-label="重试视频任务" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onRetryVideo?.(id); }}>重试生成</button> : null}
-        {videoState.canConfirm ? <button type="button" aria-label="确认视频结果" disabled={videoBusy} onClick={event => { stopCanvasEvent(event); onConfirmVideo?.(id); }}>确认回填</button> : null}
-        <button type="button" className="agent-canvas-generation-submit agent-canvas-generation-submit--video" aria-label="生成视频" title="生成视频" disabled={videoBusy || !videoState.canGenerate || !String(config.prompt || '').trim()} onClick={event => { stopCanvasEvent(event); onSubmitVideo?.(id); }}><ArrowUp size={17} /><span>生成视频</span></button>
-      </> : null}
-    </div>
-  </section> : null;
+  const composer = isEditorOpen ? <AgentNodeComposer
+    node={{ id, data }}
+    modelOptions={modelOptions}
+    modelLoadError={modelLoadError}
+    generationState={generationState}
+    onConfigChange={onNodeConfigChange}
+    onPickImageAsset={onPickImageAsset}
+    onPickReferenceAsset={onPickReferenceAsset}
+    onRemoveReference={onRemoveReference}
+    onSubmit={nodeType === 'text' ? onSubmitText : nodeType === 'image' ? onSubmitImage : (nodeID, modelID) => onSubmitVideo?.(nodeID, false, modelID)}
+    videoJob={videoJob}
+    videoState={videoState}
+    videoBusy={videoBusy}
+    videoActionError={videoActionError}
+    onCancelVideo={onCancelVideo}
+    onRetryVideo={onRetryVideo}
+    onConfirmVideo={onConfirmVideo}
+  /> : null;
   return (
     <article
       className={`agent-canvas-node agent-canvas-node--${nodeType} agent-canvas-node--${data.status}${selected ? ' is-selected' : ''}`}
@@ -121,12 +87,12 @@ function CanvasNode({
           {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
           {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
           {nodeType === 'audio' ? <button type="button" className="agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>音频设置</button> : null}
-          {nodeType === 'text' ? <p>{data.summary || '等待 Agent 写入结果'}</p> : null}
+          {nodeType === 'text' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.summary || '等待 Agent 写入结果'}</button> : null}
           <footer><span>v{data.version}</span><span>{data.status}</span></footer>
         </div>
         <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" />
       </div>
-      {generationPanel}
+      {composer}
     </article>
   );
 }
@@ -238,6 +204,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const [videoJobsLoadError, setVideoJobsLoadError] = useState('');
   const [videoBusyByNode, setVideoBusyByNode] = useState({});
   const [videoActionErrors, setVideoActionErrors] = useState({});
+  const [nodeGenerationByNode, setNodeGenerationByNode] = useState({});
+  const [configuredTextModels, setConfiguredTextModels] = useState([]);
   const [configuredImageModels, setConfiguredImageModels] = useState([]);
   const [configuredVideoModels, setConfiguredVideoModels] = useState([]);
   const [modelLoadError, setModelLoadError] = useState('');
@@ -258,6 +226,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const taskIdRef = useRef(taskId);
   taskIdRef.current = taskId;
 
+  const configuredTextModelOptions = useMemo(() => modelSelectOptions(configuredTextModels, 'text'), [configuredTextModels]);
   const configuredImageModelOptions = useMemo(() => modelSelectOptions(configuredImageModels, 'image'), [configuredImageModels]);
   const configuredVideoModelOptions = useMemo(() => {
     const options = modelSelectOptions(configuredVideoModels, 'video');
@@ -268,21 +237,30 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   useEffect(() => {
     let active = true;
-    Promise.all([listAvailableModels('image'), listAvailableModels('video')])
-      .then(([imageModels, videoModels]) => {
+    Promise.all(['text', 'image', 'video'].map(kind => listAvailableModels(kind)))
+      .then(([textModels, imageModels, videoModels]) => {
         if (!active) return;
+        setConfiguredTextModels(textModels);
         setConfiguredImageModels(imageModels);
         setConfiguredVideoModels(videoModels);
         setModelLoadError('');
       })
       .catch(error => {
         if (!active) return;
+        setConfiguredTextModels([]);
         setConfiguredImageModels([]);
         setConfiguredVideoModels([]);
         setModelLoadError(error?.message || '模型列表加载失败');
       });
     return () => { active = false; };
   }, []);
+
+  function closeNodeComposer() {
+    setContextMenu(null);
+    setConnectionDropMenu(null);
+    setActiveEditorNodeID('');
+    setAssetPanel(null);
+  }
 
   const openManualNode = useCallback(node => {
     if (!node) return;
@@ -301,6 +279,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const canvasNodeTypes = useMemo(() => ({
     agent: props => {
       const videoJob = videoJobs[props.id]?.projectId === taskId ? videoJobs[props.id] : null;
+      const kind = normalizeCanvasNodeType(props.data?.type);
+      const modelOptions = kind === 'text' ? configuredTextModelOptions : kind === 'image' ? configuredImageModelOptions : configuredVideoModelOptions;
       return <CanvasNode
         {...props}
         isEditorOpen={activeEditorNodeID === props.id}
@@ -310,6 +290,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         onPickReferenceAsset={openReferenceAssetPanel}
         onRemoveReference={removeReference}
         onNodeConfigChange={handleNodeConfigChange}
+        onSubmitText={submitTextForNode}
+        onSubmitImage={submitImageForNode}
         onSubmitVideo={submitVideoForNode}
         onCancelVideo={cancelVideo}
         onRetryVideo={retryVideo}
@@ -318,12 +300,12 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         videoState={videoNodeViewState(videoJob)}
         videoBusy={videoJobsLoadedTaskID !== taskId || Boolean(videoBusyByNode[props.id])}
         videoActionError={videoActionErrors[props.id] || (videoJobsLoadedTaskID !== taskId ? videoJobsLoadError : '')}
-        imageModelOptions={configuredImageModelOptions}
-        videoModelOptions={configuredVideoModelOptions}
+        generationState={nodeGenerationByNode[props.id] || {}}
+        modelOptions={modelOptions}
         modelLoadError={modelLoadError}
       />;
     }
-  }), [activeEditorNodeID, configuredImageModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+  }), [activeEditorNodeID, configuredImageModelOptions, configuredTextModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -352,6 +334,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     setSelectedIds([]);
     setContextMenu(null);
     setActiveEditorNodeID('');
+    setAssetPanel(null);
     setViewport(nextViewport);
     setAppearance(nextAppearance);
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
@@ -367,6 +350,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     setVideoJobsLoadError('');
     setVideoBusyByNode({});
     setVideoActionErrors({});
+    setNodeGenerationByNode({});
+    closeNodeComposer();
     if (!requestedTaskId) return () => { active = false; };
     listAgentVideoJobs(requestedTaskId)
       .then(result => {
@@ -440,7 +425,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   function handleNodeClick(event, node) {
     setContextMenu(null);
     setAssetPanel(null);
-    if (normalizeCanvasNodeType(node.data?.type) === 'text') setActiveEditorNodeID('');
+    if (activeEditorNodeID && activeEditorNodeID !== node.id) setActiveEditorNodeID('');
     const next = selectCanvasNodes(
       nodesRef.current,
       node.id,
@@ -548,6 +533,73 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     commit(next, edgesRef.current);
   }
 
+  function applyGeneratedCanvas(serverCanvas) {
+    if (!serverCanvas) return;
+    const nextAppearance = normalizeCanvasAppearance(serverCanvas.appearance || appearanceRef.current);
+    const nextNodes = (serverCanvas.nodes || []).map(toFlowNode);
+    const nextEdges = (serverCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
+    const nextViewport = serverCanvas.viewport || viewportRef.current;
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    setAppearance(nextAppearance);
+    setViewport(nextViewport);
+    updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
+    historyRef.current.push({ nodes: nextNodes, edges: nextEdges });
+    setHistoryVersion(value => value + 1);
+    onServerCanvasChange?.(serverCanvas);
+  }
+
+  async function submitTextForNode(nodeID, selectedModel) {
+    const requestedTaskId = taskId;
+    const node = nodesRef.current.find(item => item.id === nodeID);
+    if (!requestedTaskId || node?.data?.type !== 'text') return;
+    const config = node.data?.config || {};
+    const attempt = Number(nodeGenerationByNode[nodeID]?.attempt) || 0;
+    setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
+    try {
+      const result = await createAgentTextGeneration(requestedTaskId, {
+        nodeId: nodeID,
+        nodeVersion: node.data.version,
+        modelId: selectedModel,
+        prompt: String(config.prompt || '').trim(),
+        idempotencyKey: nodeGenerationIdempotencyKey({ taskId: requestedTaskId, nodeId: nodeID, nodeVersion: node.data.version, kind: 'text', attempt })
+      });
+      if (requestedTaskId !== taskIdRef.current) return;
+      applyGeneratedCanvas(result.canvas);
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: '', attempt } }));
+    } catch (error) {
+      if (requestedTaskId !== taskIdRef.current) return;
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: error?.message || '文字生成失败', attempt: attempt + 1 } }));
+    }
+  }
+
+  async function submitImageForNode(nodeID, selectedModel) {
+    const requestedTaskId = taskId;
+    const node = nodesRef.current.find(item => item.id === nodeID);
+    if (!requestedTaskId || node?.data?.type !== 'image') return;
+    const config = node.data?.config || {};
+    const attempt = Number(nodeGenerationByNode[nodeID]?.attempt) || 0;
+    const sizes = { '1:1': '1024x1024', '16:9': '1536x1024', '9:16': '1024x1536' };
+    setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
+    try {
+      const result = await createAgentImageGeneration(requestedTaskId, {
+        nodeId: nodeID,
+        nodeVersion: node.data.version,
+        modelId: selectedModel,
+        prompt: String(config.prompt || '').trim(),
+        size: sizes[config.ratio] || sizes['16:9'],
+        referenceAssetIds: (config.referenceAssets || []).filter(asset => asset?.kind === 'image').map(asset => asset.id),
+        idempotencyKey: nodeGenerationIdempotencyKey({ taskId: requestedTaskId, nodeId: nodeID, nodeVersion: node.data.version, kind: 'image', attempt })
+      });
+      if (requestedTaskId !== taskIdRef.current) return;
+      applyGeneratedCanvas(result.canvas);
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: '', attempt } }));
+    } catch (error) {
+      if (requestedTaskId !== taskIdRef.current) return;
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: { busy: false, error: error?.message || '图片生成失败', attempt: attempt + 1 } }));
+    }
+  }
+
   function videoRequestPayloadForNode(node, ignoreReferences = false) {
     const config = node?.data?.config || {};
     return {
@@ -563,7 +615,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     };
   }
 
-  async function submitVideoForNode(nodeID, ignoreReferences = false) {
+  async function submitVideoForNode(nodeID, ignoreReferences = false, selectedModel = '') {
     const requestedTaskId = taskId;
     if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId) return;
     const node = nodesRef.current.find(item => item.id === nodeID);
@@ -574,6 +626,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       return;
     }
     const payload = videoRequestPayloadForNode(node, ignoreReferences);
+    if (selectedModel) payload.modelKey = selectedModel;
     if (!canSubmitVideoFromConfig({ prompt: payload.prompt })) return;
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
     setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
@@ -910,6 +963,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
 
   function deleteCanvasNodes(ids = selectedIds) {
     if (!ids.length) return false;
+    if (ids.includes(activeEditorNodeID)) closeNodeComposer();
     const result = removeCanvasNodes({ nodes: nodesRef.current, edges: edgesRef.current, ids });
     setSelectedIds([]);
     onSelectionChange?.([]);
@@ -974,10 +1028,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   function handleKeyDown(event) {
     if (event.key === 'Escape') {
       event.preventDefault();
-      setContextMenu(null);
-      setConnectionDropMenu(null);
-      setActiveEditorNodeID('');
-      setAssetPanel(null);
+      closeNodeComposer();
       return;
     }
     const command = canvasKeyboardCommand({
@@ -1048,7 +1099,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         onSelectionChange={handleSelectionChange}
         onNodeClick={handleNodeClick}
         onNodeDoubleClick={handleNodeDoubleClick}
-        onPaneClick={() => { setContextMenu(null); setConnectionDropMenu(null); setActiveEditorNodeID(''); setAssetPanel(null); }}
+        onPaneClick={closeNodeComposer}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
         onConnect={handleConnect}

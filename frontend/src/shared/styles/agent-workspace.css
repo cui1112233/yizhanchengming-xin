@@ -435,36 +435,35 @@
 .agent-page .agent-canvas-node-image-placeholder { display: grid; width: 100%; min-height: 168px; margin-top: 8px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-accent); }
 .agent-page .agent-canvas-node-video-placeholder { display: grid; width: 100%; min-height: 168px; margin-top: 8px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-muted); font-size: 11px; }
 .agent-page .agent-canvas-node-audio-placeholder { display: grid; width: 100%; min-height: 76px; margin-top: 8px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-muted); font-size: 11px; }
-.agent-page .agent-canvas-generation-panel { position: relative; left: 50%; display: grid; box-sizing: border-box; width: 800px; max-width: calc(100vw - 96px); min-height: 134px; gap: 10px; margin-top: 12px; border: 1px solid var(--agent-border); border-radius: 8px; padding: 12px 14px; background: var(--agent-panel); box-shadow: none; transform: translateX(-50%); }
-.agent-page .agent-canvas-generation-reference-strip { display: flex; min-height: 42px; flex-wrap: wrap; align-items: center; gap: 6px; }
 .agent-page .agent-canvas-node-reference { position: relative; display: grid; width: 32px; height: 32px; place-items: center; overflow: hidden; border: 1px solid var(--agent-border-strong); border-radius: 5px; background: var(--agent-elevated); color: var(--agent-muted); }
-.agent-page .agent-canvas-generation-reference-strip .agent-canvas-node-reference { width: 42px; height: 42px; border-radius: 6px; }
 .agent-page .agent-canvas-node-reference img, .agent-page .agent-canvas-node-reference video { width: 100%; height: 100%; object-fit: cover; }
 .agent-page .agent-canvas-node-reference button { position: absolute; top: -2px; right: -2px; display: grid; width: 14px; height: 14px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 50%; padding: 0; background: var(--agent-panel); color: var(--agent-text); cursor: pointer; font-size: 12px; line-height: 1; }
-.agent-page .agent-canvas-generation-add-reference { display: grid; width: 42px; height: 42px; place-items: center; border: 1px dashed var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-accent); cursor: pointer; }
-.agent-page .agent-canvas-generation-add-reference:hover { border-color: var(--agent-accent); background: var(--agent-accent-soft); color: var(--agent-accent); }
-.agent-page .agent-canvas-generation-reference-count { color: var(--agent-muted); font-size: 10px; line-height: 1.3; }
-.agent-page .agent-canvas-generation-result { width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--agent-border); border-radius: 6px; background: #000; object-fit: contain; }
 .agent-page .agent-canvas-auth-media-state { display: grid; place-items: center; padding: 12px; color: var(--agent-muted); font-size: 11px; text-align: center; }
 .agent-page .agent-canvas-node-media.agent-canvas-auth-media-state { min-height: 168px; }
 .agent-page .agent-canvas-auth-media-state.is-error { color: #dc2626; }
-.agent-page .agent-canvas-generation-prompt { width: 100%; border: 0; resize: vertical; background: transparent !important; color: var(--agent-text) !important; font-size: 12px; line-height: 1.5; }
-.agent-page .agent-canvas-generation-prompt::placeholder { color: var(--agent-muted); }
-.agent-page .agent-canvas-generation-prompt.ant-input-outlined:focus,
-.agent-page .agent-canvas-generation-prompt.ant-input-outlined:focus-within { box-shadow: none; }
-.agent-page .agent-canvas-generation-toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
-.agent-page .agent-canvas-generation-toolbar .ant-select { min-width: 88px; max-width: 140px; flex: 0 1 auto; }
-.agent-page .agent-canvas-generation-toolbar .ant-select:first-child { min-width: 240px; max-width: 320px; flex: 1 1 260px; }
-.agent-page .agent-canvas-generation-toolbar .ant-select-selector,
-.agent-page .agent-canvas-generation-toolbar .ant-input { padding-inline: 0 !important; color: var(--agent-text) !important; font-size: 11px; }
-.agent-page .agent-canvas-generation-toolbar .ant-select-arrow { color: var(--agent-muted); }
-.agent-page .agent-canvas-generation-state { flex: 0 0 auto; color: var(--agent-muted); font-size: 10px; }
-.agent-page .agent-canvas-generation-error { min-width: 0; overflow-wrap: anywhere; color: #dc2626; font-size: 10px; line-height: 1.35; }
-.agent-page .agent-canvas-generation-unavailable { margin-left: auto; color: var(--agent-muted); font-size: 10px; white-space: nowrap; }
-.agent-page .agent-canvas-generation-submit { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; margin-left: auto; border: 0; border-radius: 50%; background: var(--agent-accent); color: #fff; cursor: pointer; }
-.agent-page .agent-canvas-generation-submit--video { display: inline-flex; width: auto; min-width: 88px; align-items: center; justify-content: center; gap: 5px; border-radius: 6px; padding: 0 10px; }
-.agent-page .agent-canvas-generation-unavailable + .agent-canvas-generation-submit { margin-left: 0; }
-.agent-page .agent-canvas-generation-submit:disabled { background: var(--agent-elevated); color: var(--agent-muted); cursor: not-allowed; }
+.agent-page .agent-node-composer { position: relative; left: 50%; display: grid; box-sizing: border-box; width: min(680px, calc(100vw - 96px)); gap: 8px; margin-top: 10px; border: 1px solid var(--agent-border-strong); border-radius: 8px; padding: 10px 12px; background: color-mix(in srgb, var(--agent-panel) 98%, #000); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2); transform: translateX(-50%); }
+.agent-page .agent-node-composer__source { display: inline-flex; width: fit-content; align-items: center; gap: 6px; border: 0; padding: 0; background: transparent; color: var(--agent-accent); cursor: pointer; font-size: 11px; }
+.agent-page .agent-node-composer__references { display: flex; min-height: 38px; align-items: center; gap: 6px; overflow-x: auto; }
+.agent-page .agent-node-composer__references .agent-canvas-node-reference { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 6px; }
+.agent-page .agent-node-composer__references .agent-canvas-node-reference i { position: absolute; bottom: 1px; left: 2px; min-width: 12px; border-radius: 3px; background: rgba(0, 0, 0, 0.68); color: #fff; font-size: 9px; font-style: normal; line-height: 12px; text-align: center; }
+.agent-page .agent-node-composer__add-reference { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 1px dashed var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-accent); cursor: pointer; }
+.agent-page .agent-node-composer__add-reference:hover { border-color: var(--agent-accent); background: var(--agent-accent-soft); }
+.agent-page .agent-node-composer__reference-count { flex: 0 0 auto; color: var(--agent-muted); font-size: 10px; }
+.agent-page .agent-node-composer__result { width: 100%; max-height: 260px; border: 1px solid var(--agent-border); border-radius: 6px; background: #000; object-fit: contain; }
+.agent-page .agent-node-composer__prompt { width: 100%; min-height: 54px !important; border: 0 !important; padding: 4px 0 !important; resize: none; background: transparent !important; color: var(--agent-text) !important; font-size: 12px; line-height: 1.55; box-shadow: none !important; }
+.agent-page .agent-node-composer__prompt::placeholder { color: var(--agent-muted); }
+.agent-page .agent-node-composer__toolbar { display: flex; min-width: 0; flex-wrap: nowrap; align-items: center; gap: 6px; overflow: visible; }
+.agent-page .agent-node-composer__toolbar .ant-select { width: auto; min-width: 76px; max-width: 116px; flex: 0 1 auto; }
+.agent-page .agent-node-composer__model { min-width: 220px !important; max-width: 280px !important; flex: 1 1 240px !important; }
+.agent-page .agent-node-composer__toolbar .ant-select-selector { padding-inline: 4px !important; color: var(--agent-text) !important; font-size: 11px; }
+.agent-page .agent-node-composer__toolbar .ant-select-selection-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-node-composer__toolbar .ant-select-arrow { color: var(--agent-muted); }
+.agent-page .agent-node-composer__state { min-width: 0; flex: 1 1 auto; overflow: hidden; color: var(--agent-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-node-composer__state.is-error { color: #e98080; }
+.agent-page .agent-node-composer__toolbar > button:not(.agent-node-composer__submit) { min-height: 26px; flex: 0 0 auto; border: 1px solid var(--agent-border); border-radius: 5px; padding: 0 7px; background: var(--agent-elevated); color: var(--agent-secondary); cursor: pointer; font-size: 10px; }
+.agent-page .agent-node-composer__submit { display: inline-flex; min-width: 64px; height: 30px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 5px; border: 0; border-radius: 6px; padding: 0 10px; background: var(--agent-accent); color: #fff; cursor: pointer; }
+.agent-page .agent-node-composer__submit:disabled { background: var(--agent-elevated); color: var(--agent-muted); cursor: not-allowed; }
+.agent-page .agent-canvas-node-text-preview { display: block; width: 100%; min-height: 36px; margin: 8px 0; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--agent-secondary); cursor: text; font: inherit; font-size: 11px; line-height: 1.5; text-align: left; }
 
 .agent-page .agent-canvas-toolrail {
   position: absolute;
