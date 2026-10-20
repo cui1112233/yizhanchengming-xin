@@ -47,14 +47,15 @@ test('generation editor expands horizontally while the prompt stays compact', ()
   const primarySelectRule = workspaceStyles.match(/\.agent-page \.agent-canvas-generation-toolbar \.ant-select:first-child\s*\{([^}]*)\}/);
   assert.match(canvasSource, /autoSize=\{\{ minRows: 3, maxRows: 7 \}\}/);
   assert.ok(generationPanelRule, 'the expanded editor should have its own layout rule');
-  assert.match(generationPanelRule[1], /width:\s*520px/);
+  assert.match(generationPanelRule[1], /width:\s*800px/);
   assert.match(generationPanelRule[1], /max-width:\s*calc\(100vw - 96px\)/);
   assert.ok(promptRule, 'the prompt should have its own layout rule');
   assert.doesNotMatch(promptRule[1], /min-height:\s*96px/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-toolbar\s*\{[^}]*flex-wrap:\s*wrap/);
   assert.ok(primarySelectRule, 'the primary model selector should have its own layout rule');
-  assert.match(primarySelectRule[1], /flex-basis:\s*100%/);
-  assert.match(primarySelectRule[1], /max-width:\s*none/);
+  assert.match(primarySelectRule[1], /min-width:\s*240px/);
+  assert.match(primarySelectRule[1], /max-width:\s*320px/);
+  assert.match(primarySelectRule[1], /flex:\s*1 1 260px/);
 });
 
 test('connection handles belong to the visible preview shell and stay hidden until relevant', () => {
@@ -63,7 +64,7 @@ test('connection handles belong to the visible preview shell and stay hidden unt
   assert.match(canvasSource, /useLayoutEffect\(\(\) => \{\s*updateNodeInternals\(id\);\s*\}, \[id, isEditorOpen, updateNodeInternals\]\)/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-preview-shell\s*\{[^}]*position:\s*relative/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node--image,[\s\S]*?\.agent-canvas-node--audio\s*\{[^}]*width:\s*340px/);
-  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-panel\s*\{[^}]*width:\s*520px/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-panel\s*\{[^}]*width:\s*800px/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-quick-add\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
   assert.match(workspaceStyles, /\.react-flow__node\.selected[\s\S]*?\.agent-canvas-node-quick-add/);
   assert.match(workspaceStyles, /\.agent-canvas\.is-connecting[\s\S]*?\.agent-canvas-node-target/);
