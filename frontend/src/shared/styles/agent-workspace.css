@@ -312,17 +312,29 @@
 }
 
 .agent-page .agent-canvas-toolbar {
-  display: flex;
+  display: grid;
   min-width: 0;
   height: 44px;
   grid-column: 1 / -1;
+  grid-template-columns: minmax(160px, 1fr) auto minmax(160px, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 12px;
+  padding: 0 10px;
   border-bottom: 1px solid var(--agent-border);
   background: var(--agent-panel);
   color: var(--agent-secondary);
 }
+
+.agent-page .agent-canvas-toolbar__project,
+.agent-page .agent-canvas-toolbar__status,
+.agent-page .agent-canvas-toolbar__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.agent-page .agent-canvas-toolbar__status,
+.agent-page .agent-canvas-toolbar__actions { justify-content: flex-end; }
 
 .agent-page .agent-canvas-toolbar-button,
 .agent-page .agent-canvas-project-title {
@@ -339,16 +351,22 @@
   font: inherit;
   font-size: 12px;
 }
+.agent-page .agent-canvas-toolbar-button { width: 30px; height: 30px; flex: 0 0 30px; justify-content: center; padding: 0; }
+.agent-page .agent-canvas-toolbar-button.is-active { background: var(--agent-hover); color: var(--agent-accent); }
 .agent-page .agent-canvas-toolbar-button:hover,
 .agent-page .agent-canvas-project-title:hover { background: var(--agent-hover); }
-.agent-page .agent-canvas-project-title { max-width: 36%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.agent-page .agent-canvas-project-title { max-width: min(280px, 28vw); overflow: hidden; white-space: nowrap; font-weight: 650; }
+.agent-page .agent-canvas-project-title span { overflow: hidden; text-overflow: ellipsis; }
+.agent-page .agent-canvas-view-switch { padding: 2px; background: var(--agent-elevated); }
+.agent-page .agent-canvas-view-switch .ant-segmented-item { min-width: 66px; color: var(--agent-secondary); font-size: 12px; }
+.agent-page .agent-canvas-view-switch .ant-segmented-item-selected { background: var(--agent-panel); color: var(--agent-text); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18); }
 .agent-page .agent-canvas-save-status,
-.agent-page .agent-canvas-view-info { overflow: hidden; color: var(--agent-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-canvas-view-info,
+.agent-page .agent-canvas-workspace-counts { overflow: hidden; color: var(--agent-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .agent-page .agent-canvas-save-status.is-error,
 .agent-page .agent-canvas-save-status.is-conflict { color: #d84b4b; }
 .agent-page .agent-canvas-save-status.is-dirty,
 .agent-page .agent-canvas-save-status.is-saving { color: #c88a2d; }
-.agent-page .agent-canvas-toolbar-button:last-child { margin-left: auto; }
 
 .agent-page .agent-project-drawer {
   position: absolute;
@@ -666,6 +684,8 @@
 @media (max-width: 860px) {
   .agent-page .agent-canvas-workspace,
   .agent-page .agent-canvas-workspace.is-conversation-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .agent-page .agent-canvas-toolbar { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .agent-page .agent-canvas-toolbar__status { display: none; }
   .agent-page .agent-conversation-panel { position: absolute; z-index: 15; top: 44px; right: 0; bottom: 0; width: min(380px, 100vw); grid-column: 1; box-shadow: -14px 0 26px rgba(0, 0, 0, 0.28); transform: translateX(0); transition: transform 180ms ease, opacity 180ms ease; }
   .agent-page .agent-canvas-workspace.is-conversation-collapsed .agent-conversation-panel { opacity: 0; pointer-events: none; transform: translateX(100%); }
   .agent-page .agent-canvas-view-info { display: none; }
@@ -673,6 +693,7 @@
 
 @media (max-width: 560px) {
   .legacy-shell:has(.agent-page.agent-workspace-v3) > .cm-penguin-shell { display: none; }
+  .agent-page .agent-canvas-toolbar { gap: 6px; padding-inline: 6px; }
   .agent-page .agent-conversation-panel { top: auto; height: min(72dvh, 620px); width: 100%; border-top: 1px solid var(--agent-border); border-left: 0; box-shadow: 0 -14px 26px rgba(0, 0, 0, 0.28); }
   .agent-page .agent-canvas-save-status { display: none; }
   .agent-page .agent-canvas-project-title { max-width: none; flex: 1; }
@@ -691,6 +712,11 @@
   .agent-page .agent-context-chip { justify-content: center; flex: 1 1 calc(50% - 4px); }
   .agent-page .agent-composer-actions > .ant-btn { width: 100%; }
   .agent-page .agent-recent-projects { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 420px) {
+  .agent-page .agent-canvas-project-title { display: none; }
+  .agent-page .agent-canvas-view-switch .ant-segmented-item { min-width: 56px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

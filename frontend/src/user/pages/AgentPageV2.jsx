@@ -1,11 +1,13 @@
 import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
-import { ChevronDown, ChevronUp, Clock3, FilePenLine, MessageCircle, MessageSquarePlus, MoreHorizontal, Pencil, Pin, RotateCcw, Save, SearchCheck, Send, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock3, FilePenLine, MessageCircle, MessageSquarePlus, MoreHorizontal, Pin, RotateCcw, SearchCheck, Send, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { askAgent, clearAgentTask, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentExecutions, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, updateMyAgentSkill } from '../../shared/api/agent';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
 import { AgentCanvas } from '../components/AgentCanvas';
+import { AgentWorkspaceHeader } from '../components/AgentWorkspaceHeader';
 import { buildSelectedNodeContext, canvasSaveAction, canvasSaveStatusText, createCanvasSaveQueue, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask } from './agent-canvas-state';
+import { normalizeWorkspaceView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -57,8 +59,9 @@ export function AgentPageV2({ theme }) {
   const [selectedExpert, setSelectedExpert] = useState('CM 创作顾问');
   const [attachedFile, setAttachedFile] = useState(null);
   const [problemSearchMode, setProblemSearchMode] = useState(false);
-  const [taskDrawerOpen, setTaskDrawerOpen] = useState(false);
-  const [conversationPanelOpen, setConversationPanelOpen] = useState(true);
+  const [viewState, setViewState] = useState(() => normalizeWorkspaceView({
+    activeView: workspaceViewQuery(new URLSearchParams(window.location.search).get('view'))
+  }));
   const [loading, setLoading] = useState(true);
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [canvas, setCanvas] = useState({ version: 1, revision: 0, nodes: [], edges: [] });
@@ -86,14 +89,44 @@ export function AgentPageV2({ theme }) {
   const taskDetailLoadingRef = useRef(false);
   const composerTriggerRef = useRef(null);
   const canvasSaveQueueRef = useRef(null);
+  const viewStateRef = useRef(viewState);
   const composerMenuId = 'agent-composer-menu';
 
   function syncTaskUrl(taskId, historyMode = 'replace') {
-    const nextUrl = taskId ? `/agent/canvas?taskId=${encodeURIComponent(taskId)}` : '/agent';
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.delete('task');
+    if (taskId) {
+      searchParams.set('taskId', taskId);
+      searchParams.set('view', viewStateRef.current.activeView);
+    } else {
+      searchParams.delete('taskId');
+      searchParams.delete('view');
+    }
+    const query = searchParams.toString();
+    const nextUrl = `${taskId ? '/agent/canvas' : '/agent'}${query ? `?${query}` : ''}`;
     if (historyMode === 'none' || `${window.location.pathname}${window.location.search}` === nextUrl) return;
     if (historyMode === 'push') window.history.pushState({}, '', nextUrl);
     else window.history.replaceState({}, '', nextUrl);
     window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+
+  function syncWorkspaceViewUrl(view) {
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.set('view', view);
+    const nextUrl = `${window.location.pathname}?${searchParams.toString()}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextUrl) window.history.replaceState({}, '', nextUrl);
+  }
+
+  function updateWorkspaceView(patch) {
+    const nextViewState = workspaceViewPatch(viewStateRef.current, patch);
+    viewStateRef.current = nextViewState;
+    setViewState(nextViewState);
+    if (Object.prototype.hasOwnProperty.call(patch || {}, 'activeView')) syncWorkspaceViewUrl(nextViewState.activeView);
+    setCanvas(currentCanvas => {
+      const nextCanvas = { ...currentCanvas, viewState: nextViewState };
+      canvasSaveQueueRef.current?.enqueue(nextCanvas);
+      return nextCanvas;
+    });
   }
 
   function activateTask(task, { historyMode = 'replace' } = {}) {
@@ -197,7 +230,10 @@ export function AgentPageV2({ theme }) {
           return undefined;
         }
         if (legacyTaskId) {
-          const nextUrl = `/agent/canvas?taskId=${encodeURIComponent(legacyTaskId)}`;
+          params.delete('task');
+          params.set('taskId', legacyTaskId);
+          params.set('view', viewStateRef.current.activeView);
+          const nextUrl = `/agent/canvas?${params.toString()}`;
           window.history.replaceState({}, '', nextUrl);
           setIsCanvasWorkspace(true);
           return undefined;
@@ -221,8 +257,17 @@ export function AgentPageV2({ theme }) {
     function selectHistoryTask() {
       if (!mountedRef.current) return;
       const nextIsCanvasWorkspace = window.location.pathname === '/agent/canvas';
+      const searchParams = new URLSearchParams(window.location.search);
+      if (nextIsCanvasWorkspace) {
+        const nextViewState = workspaceViewPatch(viewStateRef.current, {
+          activeView: workspaceViewQuery(searchParams.get('view'))
+        });
+        viewStateRef.current = nextViewState;
+        setViewState(nextViewState);
+        setCanvas(currentCanvas => ({ ...currentCanvas, viewState: nextViewState }));
+      }
       setIsCanvasWorkspace(nextIsCanvasWorkspace);
-      const requestedTaskId = nextIsCanvasWorkspace ? new URLSearchParams(window.location.search).get('taskId') : null;
+      const requestedTaskId = nextIsCanvasWorkspace ? searchParams.get('taskId') : null;
       const requestedTask = tasksRef.current.find(task => task.id === requestedTaskId);
       if (requestedTask) {
         setInvalidCanvasTask(false);
@@ -281,7 +326,15 @@ export function AgentPageV2({ theme }) {
       .then(([canvasResult, executionResult]) => {
         if (cancelled) return;
         const loadedCanvas = canvasResult.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
-        setCanvas(loadedCanvas);
+        const loadedViewState = normalizeWorkspaceView(loadedCanvas.viewState);
+        const queryView = new URLSearchParams(window.location.search).get('view');
+        const nextViewState = queryView
+          ? workspaceViewPatch(loadedViewState, { activeView: workspaceViewQuery(queryView) })
+          : loadedViewState;
+        viewStateRef.current = nextViewState;
+        setViewState(nextViewState);
+        syncWorkspaceViewUrl(nextViewState.activeView);
+        setCanvas({ ...loadedCanvas, viewState: nextViewState });
         setCanvasViewport(loadedCanvas.viewport || { x: 0, y: 0, zoom: 1 });
         setCanvasSaveStatus('idle');
         saveQueue = createCanvasSaveQueue({
@@ -516,24 +569,34 @@ export function AgentPageV2({ theme }) {
   }
 
   return (
-    <div className={`agent-page utility-workbench agent-workspace-v3${isCanvasWorkspace && !taskDrawerOpen ? ' agent-task-drawer-collapsed' : ''}`}>
-      {isCanvasWorkspace ? <div className={conversationPanelOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}>
-        <header className="agent-canvas-toolbar">
-          <button className="agent-canvas-toolbar-button" type="button" aria-expanded={taskDrawerOpen} aria-controls="agent-project-drawer" onClick={() => setTaskDrawerOpen(open => !open)}>项目</button>
-          <button className="agent-canvas-project-title" type="button" onClick={openRenameTask}>{activeTask?.title || '未选择项目'}<Pencil size={14} /></button>
-          <span className={`agent-canvas-save-status is-${canvasSaveStatus}`}>{asking ? '正在执行…' : canvasSaveStatusText[canvasSaveStatus]} · {canvas.nodes.length} 个节点</span>
-          <Tooltip title={saveAction.label}><span><button className="agent-canvas-toolbar-button" type="button" aria-label={saveAction.label} disabled={saveAction.disabled} onClick={saveCanvasNow}><Save size={14} />{saveAction.label}</button></span></Tooltip>
-          <span className="agent-canvas-view-info">缩放 {Math.round((canvasViewport.zoom || 1) * 100)}%</span>
-          <button className="agent-canvas-toolbar-button" type="button" aria-pressed={conversationPanelOpen} onClick={() => setConversationPanelOpen(open => !open)}>{conversationPanelOpen ? '收起对话' : '打开对话'}</button>
-        </header>
+    <div className={`agent-page utility-workbench agent-workspace-v3${isCanvasWorkspace && !viewState.drawerOpen ? ' agent-task-drawer-collapsed' : ''}`}>
+      {isCanvasWorkspace ? <div className={viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}>
+        <AgentWorkspaceHeader
+          projectTitle={activeTask?.title}
+          activeView={viewState.activeView}
+          drawerOpen={viewState.drawerOpen}
+          conversationOpen={viewState.conversationOpen}
+          saveStatus={canvasSaveStatus}
+          saveLabel={asking ? '正在执行…' : (canvasSaveStatusText[canvasSaveStatus] || saveAction.label)}
+          saveDisabled={saveAction.disabled}
+          nodeCount={canvas.nodes.length}
+          materialCount={0}
+          zoom={Math.round((canvasViewport.zoom || 1) * 100)}
+          isRunning={asking}
+          onRename={openRenameTask}
+          onViewChange={activeView => updateWorkspaceView({ activeView })}
+          onToggleDrawer={() => updateWorkspaceView({ drawerOpen: !viewStateRef.current.drawerOpen })}
+          onToggleConversation={() => updateWorkspaceView({ conversationOpen: !viewStateRef.current.conversationOpen })}
+          onSave={saveCanvasNow}
+        />
 
-        <aside id="agent-project-drawer" className={`agent-project-drawer${taskDrawerOpen ? ' is-open' : ''}`} aria-hidden={!taskDrawerOpen}>
-          <header><strong>项目</strong><Button className="agent-task-new" icon={<MessageSquarePlus size={15} />} onClick={() => { setTaskDrawerOpen(false); createTask(); }}>新建项目</Button></header>
+        <aside id="agent-project-drawer" className={`agent-project-drawer${viewState.drawerOpen ? ' is-open' : ''}`} aria-hidden={!viewState.drawerOpen}>
+          <header><strong>项目</strong><Button className="agent-task-new" icon={<MessageSquarePlus size={15} />} onClick={() => { updateWorkspaceView({ drawerOpen: false }); createTask(); }}>新建项目</Button></header>
           <div className="agent-task-list" aria-live="polite">
             {loading ? <div className="agent-task-loading" role="status">正在读取项目...</div> : null}
             {!loading && tasks.length === 0 ? <div className="agent-task-empty">还没有项目<br />从一段新对话开始。</div> : null}
             {Object.entries(taskGroups).map(([group, groupTasks]) => groupTasks.length ? <section className="agent-task-group" key={group}><h4>{group}</h4>{groupTasks.map(task => (
-              <button className={`agent-task-row${task.id === activeTaskId ? ' active' : ''}`} type="button" key={task.id} onClick={() => { selectTask(task.id, { historyMode: 'push' }); setTaskDrawerOpen(false); }}>
+              <button className={`agent-task-row${task.id === activeTaskId ? ' active' : ''}`} type="button" key={task.id} onClick={() => { selectTask(task.id, { historyMode: 'push' }); updateWorkspaceView({ drawerOpen: false }); }}>
                 <strong>{task.title}</strong><span>{task.preview || '尚未开始对话'}</span>
               </button>
             ))}</section> : null)}
