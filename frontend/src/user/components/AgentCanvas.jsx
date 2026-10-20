@@ -21,11 +21,13 @@ import {
 } from '../pages/agent-canvas-appearance';
 import {
   appendReferenceAsset, attachImageAsset, copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes,
-  readableAssetRequestError, shouldOpenConnectionDrop, syncNodeReferencesFromEdges
+  readableAssetRequestError, shouldOpenConnectionDrop
 } from '../pages/agent-canvas-context-menu';
+import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences } from '../pages/agent-canvas-connections';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentImageGeneration, createAgentTextGeneration, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
 import { agentCanvasModelOptions, nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
+import { imageGenerationRequestSettings } from '../pages/agent-canvas-image-settings';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
@@ -325,7 +327,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     const mappedNodes = (currentCanvas.nodes || []).map(toFlowNode);
     const nextAppearance = normalizeCanvasAppearance(currentCanvas.appearance);
     const nextEdges = (currentCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
-    const nextNodes = syncNodeReferencesFromEdges({ nodes: mappedNodes, edges: nextEdges });
+    const nextNodes = syncCanvasEffectiveReferences(mappedNodes, nextEdges);
     const nextViewport = currentCanvas.viewport || { x: 0, y: 0, zoom: 1 };
     if (canvasSignature(nextNodes, nextEdges, nextViewport, nextAppearance) === signatureRef.current) return;
     setNodes(nextNodes);
@@ -411,7 +413,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     edgesRef.current = next;
     setEdges(next);
     if (changes.some(change => change.type === 'remove' || change.type === 'add')) {
-      commit(syncNodeReferencesFromEdges({ nodes: nodesRef.current, edges: next }), next);
+      commit(syncCanvasEffectiveReferences(nodesRef.current, next), next);
     }
   }
 
@@ -537,7 +539,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     const nextAppearance = normalizeCanvasAppearance(serverCanvas.appearance || appearanceRef.current);
     const mappedNodes = (serverCanvas.nodes || []).map(toFlowNode);
     const nextEdges = (serverCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
-    const nextNodes = syncNodeReferencesFromEdges({ nodes: mappedNodes, edges: nextEdges });
+    const nextNodes = syncCanvasEffectiveReferences(mappedNodes, nextEdges);
     const nextViewport = serverCanvas.viewport || viewportRef.current;
     setNodes(nextNodes);
     setEdges(nextEdges);
@@ -580,7 +582,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     if (!requestedTaskId || node?.data?.type !== 'image') return;
     const config = node.data?.config || {};
     const attempt = Number(nodeGenerationByNode[nodeID]?.attempt) || 0;
-    const sizes = { '1:1': '1024x1024', '16:9': '1536x1024', '9:16': '1024x1536' };
+    const imageSettings = imageGenerationRequestSettings(config);
     setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
     try {
       const result = await createAgentImageGeneration(requestedTaskId, {
@@ -588,7 +590,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
         nodeVersion: node.data.version,
         modelId: selectedModel,
         prompt: String(config.prompt || '').trim(),
-        size: sizes[config.ratio] || sizes['16:9'],
+        ...imageSettings,
         referenceAssetIds: (config.referenceAssets || []).filter(asset => asset?.kind === 'image').map(asset => asset.id),
         idempotencyKey: nodeGenerationIdempotencyKey({ taskId: requestedTaskId, nodeId: nodeID, nodeVersion: node.data.version, kind: 'image', attempt })
       });
@@ -706,9 +708,11 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
 
   function handleConnect(connection) {
     connectionCompletedRef.current = true;
-    const next = connectCanvasNodes(edgesRef.current, connection);
+    const typedEdge = createTypedCanvasEdge(connection, nodesRef.current);
+    if (!typedEdge) return;
+    const next = connectCanvasNodes(edgesRef.current, typedEdge);
     if (next === edgesRef.current) return;
-    const nextNodes = syncNodeReferencesFromEdges({ nodes: nodesRef.current, edges: next });
+    const nextNodes = syncCanvasEffectiveReferences(nodesRef.current, next);
     commit(nextNodes, next.map(edge => toFlowEdge(edge, appearanceRef.current)));
   }
 
@@ -741,16 +745,18 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
   }
 
   function isValidCanvasConnection(connection) {
-    return connectCanvasNodes(edgesRef.current, connection) !== edgesRef.current;
+    const typedEdge = createTypedCanvasEdge(connection, nodesRef.current);
+    return Boolean(typedEdge) && connectCanvasNodes(edgesRef.current, typedEdge) !== edgesRef.current;
   }
 
   function handleConnectionDropCreate(kind) {
     if (!connectionDropMenu) return;
     const nextNode = createNodeAt({ id: nextCanvasID(kind), kind, position: connectionDropMenu.position });
     const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
-    const nextEdges = connectCanvasNodes(edgesRef.current, { source: connectionDropMenu.sourceID, target: nextNode.id });
+    const typedEdge = createTypedCanvasEdge({ source: connectionDropMenu.sourceID, target: nextNode.id }, nextNodes);
+    const nextEdges = typedEdge ? connectCanvasNodes(edgesRef.current, typedEdge) : edgesRef.current;
     if (nextEdges === edgesRef.current) return;
-    const syncedNodes = syncNodeReferencesFromEdges({ nodes: nextNodes, edges: nextEdges });
+    const syncedNodes = syncCanvasEffectiveReferences(nextNodes, nextEdges);
     setSelectedIds([nextNode.id]);
     onSelectionChange?.([nextNode.id]);
     commit(syncedNodes, nextEdges.map(edge => toFlowEdge(edge, appearanceRef.current)));
@@ -864,7 +870,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
       const next = nodesRef.current.map(node => node.id === assetPanel.nodeID
         ? appendReferenceAsset({ node, asset })
         : node);
-      commit(syncNodeReferencesFromEdges({ nodes: next, edges: edgesRef.current }), edgesRef.current);
+      commit(syncCanvasEffectiveReferences(next, edgesRef.current), edgesRef.current);
       const updatedNode = next.find(node => node.id === assetPanel.nodeID);
       if (updatedNode && manualNode?.id === updatedNode.id) {
         setManualNode(updatedNode);
@@ -874,7 +880,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
       const next = nodesRef.current.map(node => node.id === assetPanel.nodeID
         ? attachImageAsset({ node, asset })
         : node);
-      commit(syncNodeReferencesFromEdges({ nodes: next, edges: edgesRef.current }), edgesRef.current);
+      commit(syncCanvasEffectiveReferences(next, edgesRef.current), edgesRef.current);
       const updatedNode = next.find(node => node.id === assetPanel.nodeID);
       if (updatedNode && manualNode?.id === updatedNode.id) {
         setManualNode(updatedNode);
@@ -983,7 +989,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     const ids = new Set(contextMenu.nodeIds);
     const nextEdges = edgesRef.current.filter(edge => !ids.has(edge.source) && !ids.has(edge.target));
     if (nextEdges.length !== edgesRef.current.length) {
-      commit(syncNodeReferencesFromEdges({ nodes: nodesRef.current, edges: nextEdges }), nextEdges);
+      commit(syncCanvasEffectiveReferences(nodesRef.current, nextEdges), nextEdges);
     }
     setContextMenu(null);
   }
@@ -1212,8 +1218,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
       {connectionDropMenu ? <section className="agent-canvas-connection-drop-menu" aria-label="添加参考节点" style={{ left: connectionDropMenu.left, top: connectionDropMenu.top }}>
         <strong>添加参考节点</strong>
         <div>
-          <button type="button" onClick={() => handleConnectionDropCreate('text')}>文本</button>
-          <button type="button" onClick={() => handleConnectionDropCreate('image')}>图片</button>
+          {connectionDropChoices(nodes.find(sourceNode => sourceNode.id === connectionDropMenu.sourceID)).map(choice => (
+            <button type="button" key={choice.kind} onClick={() => handleConnectionDropCreate(choice.kind)}>{choice.label}</button>
+          ))}
         </div>
       </section> : null}
 

@@ -1,9 +1,10 @@
-import { Input, Select } from 'antd';
-import { ArrowUp, ImagePlus, Plus } from 'lucide-react';
+import { Input, Popover, Select } from 'antd';
+import { ArrowUp, ImagePlus, Plus, SlidersHorizontal } from 'lucide-react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { videoResultPreview } from '../pages/agent-canvas-video-jobs';
 import { submitNodeGeneration } from '../pages/agent-canvas-node-generation';
+import { imageNodeSettingsSummary, normalizeImageNodeSettings } from '../pages/agent-canvas-image-settings';
 
 const PROMPT_LABELS = { text: '文字生成要求', image: '图片提示词', video: '视频提示词' };
 const PROMPT_PLACEHOLDERS = {
@@ -26,6 +27,7 @@ export default function AgentNodeComposer({
     ? config.model
     : (modelOptions[0]?.value || '');
   const prompt = String(config.prompt || '');
+  const imageSettings = normalizeImageNodeSettings(config);
   const busy = kind === 'video' ? videoBusy : Boolean(generationState.busy);
   const error = kind === 'video'
     ? (videoJob?.errorMessage || videoActionError)
@@ -70,7 +72,20 @@ export default function AgentNodeComposer({
       {kind === 'image' ? <Select aria-label="图片模型" className="agent-node-composer__model" variant="borderless" size="small" value={selectedModel || undefined} placeholder={modelLoadError || '选择图片模型'} options={modelOptions} onChange={model => update({ model })} /> : null}
       {kind === 'video' ? <Select aria-label="视频模型" className="agent-node-composer__model" variant="borderless" size="small" value={selectedModel || undefined} placeholder={modelLoadError || '选择视频模型'} options={modelOptions} onChange={model => update({ model })} /> : null}
 
-      {kind === 'image' ? <Select aria-label="图片比例" variant="borderless" size="small" value={config.ratio || '16:9'} options={['16:9', '9:16', '1:1'].map(value => ({ value, label: value }))} onChange={ratio => update({ ratio })} /> : null}
+      {kind === 'image' ? <Popover
+        placement="bottom"
+        trigger="click"
+        content={<div className="agent-node-image-settings" onMouseDown={stop}>
+          <label><span>比例</span><Select aria-label="图片比例" value={imageSettings.ratio} options={['16:9', '9:16', '1:1'].map(value => ({ value, label: value }))} onChange={ratio => update({ ratio })} /></label>
+          <label><span>画质</span><Select aria-label="图片画质" value={imageSettings.quality} options={[{ value: 'standard', label: '标准画质' }, { value: 'high', label: '高清画质' }]} onChange={quality => update({ quality })} /></label>
+          <label><span>清晰度</span><Select aria-label="图片清晰度" value={imageSettings.resolution} options={['1K', '2K', '4K'].map(value => ({ value, label: value }))} onChange={resolution => update({ resolution })} /></label>
+          <label><span>数量</span><Select aria-label="图片数量" value={imageSettings.count} options={[1, 2, 3, 4].map(value => ({ value, label: `${value}张` }))} onChange={count => update({ count })} /></label>
+        </div>}
+      >
+        <button type="button" className="agent-node-composer__image-settings" aria-label="图片设置" title="设置比例、画质、清晰度和数量" onClick={stop}>
+          <SlidersHorizontal size={14} /><span>{imageNodeSettingsSummary(imageSettings)}</span>
+        </button>
+      </Popover> : null}
       {kind === 'video' ? <>
         <Select aria-label="视频比例" variant="borderless" size="small" value={config.ratio || '16:9'} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} onChange={ratio => update({ ratio })} />
         <Select aria-label="视频时长（秒）" variant="borderless" size="small" value={config.durationSeconds || 10} options={[5, 10, 15].map(value => ({ value, label: `${value}s` }))} onChange={durationSeconds => update({ durationSeconds })} />

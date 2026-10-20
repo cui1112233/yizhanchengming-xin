@@ -16,7 +16,17 @@ import (
 )
 
 type AgentTextModelResolver func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error)
-type AgentImageGenerator func(context.Context, string, string, string, string) (string, int, error)
+type AgentImageGenerationInput struct {
+	ModelID     string
+	Prompt      string
+	Size        string
+	AspectRatio string
+	Quality     string
+	Resolution  string
+	Count       int
+}
+
+type AgentImageGenerator func(context.Context, string, AgentImageGenerationInput) ([]string, int, error)
 
 type AgentNodeGenerationServices struct {
 	Projects      agentworkspace.Store
@@ -70,6 +80,10 @@ type agentImageGenerationRequest struct {
 	ModelID           string   `json:"modelId"`
 	Prompt            string   `json:"prompt"`
 	Size              string   `json:"size"`
+	AspectRatio       string   `json:"aspectRatio"`
+	Quality           string   `json:"quality"`
+	Resolution        string   `json:"resolution"`
+	Count             int      `json:"count"`
 	ReferenceAssetIDs []string `json:"referenceAssetIds"`
 	IdempotencyKey    string   `json:"idempotencyKey"`
 }
@@ -167,6 +181,9 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 		input.ModelID = strings.TrimSpace(input.ModelID)
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.Size = strings.TrimSpace(input.Size)
+		input.AspectRatio = strings.TrimSpace(input.AspectRatio)
+		input.Quality = strings.TrimSpace(input.Quality)
+		input.Resolution = strings.TrimSpace(input.Resolution)
 		input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
 		if input.NodeID == "" || input.NodeVersion < 1 || input.ModelID == "" || input.Prompt == "" || input.IdempotencyKey == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请选择图片模型并填写生成要求"})
@@ -206,7 +223,12 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			writeAgentNodeGenerationError(w, err)
 			return
 		}
-		resultURL, status, err := services.ImageGenerate(req.Context(), identity.Username, input.ModelID, input.Prompt, input.Size)
+		generationInput, settingsErr := normalizeAgentImageGenerationInput(input)
+		if settingsErr != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": settingsErr.Error()})
+			return
+		}
+		resultURLs, status, err := services.ImageGenerate(req.Context(), identity.Username, generationInput)
 		if err != nil {
 			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"modelId": input.ModelID, "error": err.Error()}, services.Now().UTC())
 			if status < 400 || status > 599 {
@@ -215,25 +237,76 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
+		if len(resultURLs) == 0 {
+			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"modelId": input.ModelID, "error": "图片模型未返回图片结果"}, services.Now().UTC())
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "图片模型未返回图片结果"})
+			return
+		}
 		ingestor := newAgentMediaAssetIngestor(services.Assets, services.Objects, nil, services.Now)
-		asset, err := ingestor.SaveImageResult(req.Context(), identity.Username, projectID, newAgentID("asset"), resultURL)
-		if err != nil {
+		assets := make([]agentworkspace.Asset, 0, len(resultURLs))
+		for _, resultURL := range resultURLs {
+			asset, saveErr := ingestor.SaveImageResult(req.Context(), identity.Username, projectID, newAgentID("asset"), resultURL)
+			if saveErr != nil {
+				err = saveErr
+				break
+			}
+			assets = append(assets, asset)
+		}
+		if err != nil || len(assets) == 0 {
 			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"modelId": input.ModelID, "error": err.Error()}, services.Now().UTC())
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "图片结果保存失败：" + err.Error()})
 			return
 		}
+		asset := assets[0]
 		assetRef := map[string]any{"id": asset.ID, "assetId": asset.ID, "kind": asset.Kind, "url": asset.URL, "contentType": asset.ContentType}
 		updatedCanvas, completed, err := services.Projects.ApplyNodeExecution(req.Context(), identity.Username, projectID, agentworkspace.ApplyNodeExecutionInput{
 			ExecutionID: execution.ID, NodeID: input.NodeID, NodeVersion: input.NodeVersion, NodeType: "image", AssetRef: assetRef,
-			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID, "assetId": asset.ID}, Now: services.Now().UTC(),
+			Detail: map[string]any{"nodeId": input.NodeID, "nodeVersion": input.NodeVersion, "modelId": input.ModelID, "assetId": asset.ID, "aspectRatio": generationInput.AspectRatio, "quality": generationInput.Quality, "resolution": generationInput.Resolution, "count": generationInput.Count}, Now: services.Now().UTC(),
 		})
 		if err != nil {
 			_, _ = services.Projects.FailNodeExecution(req.Context(), identity.Username, projectID, execution.ID, map[string]any{"error": "节点版本已变化", "assetId": asset.ID}, services.Now().UTC())
 			writeAgentNodeGenerationError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(projectID, updatedCanvas), "execution": completed, "resultAsset": asset})
+		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(projectID, updatedCanvas), "execution": completed, "resultAsset": asset, "resultAssets": assets})
 	})))
+}
+
+func normalizeAgentImageGenerationInput(input agentImageGenerationRequest) (AgentImageGenerationInput, error) {
+	ratio := input.AspectRatio
+	if ratio == "" {
+		ratio = "16:9"
+	}
+	quality := input.Quality
+	if quality == "" {
+		quality = "standard"
+	}
+	resolution := strings.ToUpper(input.Resolution)
+	if resolution == "" {
+		resolution = "2K"
+	}
+	count := input.Count
+	if count == 0 {
+		count = 1
+	}
+	if ratio != "16:9" && ratio != "9:16" && ratio != "1:1" {
+		return AgentImageGenerationInput{}, fmt.Errorf("图片比例无效")
+	}
+	if quality != "standard" && quality != "high" {
+		return AgentImageGenerationInput{}, fmt.Errorf("图片画质无效")
+	}
+	if resolution != "1K" && resolution != "2K" && resolution != "4K" {
+		return AgentImageGenerationInput{}, fmt.Errorf("图片清晰度无效")
+	}
+	if count < 1 || count > 4 {
+		return AgentImageGenerationInput{}, fmt.Errorf("图片数量必须为 1 到 4 张")
+	}
+	sizes := map[string]map[string]string{
+		"1K": {"16:9": "1024x576", "9:16": "576x1024", "1:1": "1024x1024"},
+		"2K": {"16:9": "2048x1152", "9:16": "1152x2048", "1:1": "2048x2048"},
+		"4K": {"16:9": "4096x2304", "9:16": "2304x4096", "1:1": "4096x4096"},
+	}
+	return AgentImageGenerationInput{ModelID: input.ModelID, Prompt: input.Prompt, Size: sizes[resolution][ratio], AspectRatio: ratio, Quality: quality, Resolution: resolution, Count: count}, nil
 }
 
 func agentGenerationNodeMatches(canvas agentworkspace.Canvas, nodeID, nodeType string, version int64) bool {

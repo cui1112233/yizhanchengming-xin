@@ -25,7 +25,7 @@ export function createNodeAt({ id, kind, position, asset = null }) {
   const defaults = type === 'audio'
     ? { title: '新音频', config: { prompt: '', voice: '', speed: 1 } }
     : type === 'image'
-      ? { title: '新图片', config: { prompt: '', model: '', ratio: '16:9', referenceAssets: [] } }
+      ? { title: '新图片', config: { prompt: '', model: '', ratio: '16:9', quality: 'standard', resolution: '2K', count: 1, referenceAssets: [] } }
       : type === 'video'
         ? { title: '新视频', config: { prompt: '', model: '', ratio: '', durationSeconds: 0, referenceAssets: [] } }
         : { title: '新文本', config: {} };

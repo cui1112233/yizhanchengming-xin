@@ -74,9 +74,9 @@ func TestAgentImageGeneratorUsesOnlineLocalDoubaoExecutor(t *testing.T) {
 	}()
 
 	generator := newAgentImageGenerator(nil, nil, executors, files)
-	result, status, err := generator(context.Background(), "alice", agentLocalDoubaoImageModelID, "一只蓝色小鸟", "1024x1536")
-	if err != nil || status != 200 || !strings.HasPrefix(result, "data:image/png;base64,") {
-		t.Fatalf("status=%d result=%q err=%v", status, result, err)
+	results, status, err := generator(context.Background(), "alice", AgentImageGenerationInput{ModelID: agentLocalDoubaoImageModelID, Prompt: "一只蓝色小鸟", Size: "1024x1536", AspectRatio: "9:16", Quality: "standard", Resolution: "1K", Count: 1})
+	if err != nil || status != 200 || len(results) != 1 || !strings.HasPrefix(results[0], "data:image/png;base64,") {
+		t.Fatalf("status=%d results=%q err=%v", status, results, err)
 	}
 	if err := <-done; err != nil {
 		t.Fatal(err)

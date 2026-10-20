@@ -132,17 +132,17 @@ func TestAgentImageGenerationPersistsAssetBeforeApplyingNode(t *testing.T) {
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
 	assets := agentworkspace.NewMemoryAssetStore()
 	objects := &recordingAgentNodeObjectStore{}
-	imageGenerator := func(_ context.Context, owner, modelID, prompt, size string) (string, int, error) {
-		if owner != "alice" || modelID != "image-primary" || prompt != "雨夜街道" || size != "1024x1024" {
-			t.Fatalf("owner=%q model=%q prompt=%q size=%q", owner, modelID, prompt, size)
+	imageGenerator := func(_ context.Context, owner string, input AgentImageGenerationInput) ([]string, int, error) {
+		if owner != "alice" || input.ModelID != "image-primary" || input.Prompt != "雨夜街道" || input.Size != "2048x1152" || input.AspectRatio != "16:9" || input.Quality != "standard" || input.Resolution != "2K" || input.Count != 1 {
+			t.Fatalf("owner=%q input=%+v", owner, input)
 		}
-		return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB", http.StatusOK, nil
+		return []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"}, http.StatusOK, nil
 	}
 	mux := http.NewServeMux()
 	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
 		Projects: store, Assets: assets, Objects: objects, ImageGenerate: imageGenerator, Now: func() time.Time { return now },
 	})
-	body := `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"雨夜街道","size":"1024x1024","idempotencyKey":"image-request-1"}`
+	body := `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"雨夜街道","aspectRatio":"16:9","quality":"standard","resolution":"2K","count":1,"size":"2048x1152","idempotencyKey":"image-request-1"}`
 	recorder := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", body)
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"kind":"image"`) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
@@ -157,6 +157,36 @@ func TestAgentImageGenerationPersistsAssetBeforeApplyingNode(t *testing.T) {
 	}
 }
 
+func TestAgentImageGenerationPersistsEveryRequestedResult(t *testing.T) {
+	now := time.Date(2026, 10, 20, 10, 2, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
+	assets := agentworkspace.NewMemoryAssetStore()
+	objects := &recordingAgentNodeObjectStore{}
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
+		Projects: store, Assets: assets, Objects: objects,
+		ImageGenerate: func(_ context.Context, _ string, input AgentImageGenerationInput) ([]string, int, error) {
+			if input.Count != 2 || input.AspectRatio != "9:16" || input.Quality != "high" || input.Resolution != "4K" || input.Size != "2304x4096" {
+				t.Fatalf("input=%+v", input)
+			}
+			return []string{
+				"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+				"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAC",
+			}, http.StatusOK, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	body := `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"竖版海报","aspectRatio":"9:16","quality":"high","resolution":"4K","count":2,"idempotencyKey":"image-request-2"}`
+	recorder := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", body)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"resultAssets":[`) {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	items, err := assets.ListAssets(context.Background(), "alice", "project-1", "image")
+	if err != nil || len(items) != 2 {
+		t.Fatalf("assets=%+v err=%v", items, err)
+	}
+}
+
 func TestAgentImageGenerationRejectsCrossProjectReference(t *testing.T) {
 	now := time.Date(2026, 10, 20, 10, 5, 0, 0, time.UTC)
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Version: 1})
@@ -168,9 +198,9 @@ func TestAgentImageGenerationRejectsCrossProjectReference(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
 		Projects: store, Assets: assets, Objects: &recordingAgentNodeObjectStore{},
-		ImageGenerate: func(context.Context, string, string, string, string) (string, int, error) {
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
 			called = true
-			return "", http.StatusOK, nil
+			return nil, http.StatusOK, nil
 		},
 		Now: func() time.Time { return now },
 	})
@@ -187,8 +217,8 @@ func TestAgentImageGenerationProviderFailureLeavesNodeUnchanged(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
 		Projects: store, Assets: agentworkspace.NewMemoryAssetStore(), Objects: &recordingAgentNodeObjectStore{},
-		ImageGenerate: func(context.Context, string, string, string, string) (string, int, error) {
-			return "", http.StatusServiceUnavailable, errors.New("图片模型凭据未配置")
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+			return nil, http.StatusServiceUnavailable, errors.New("图片模型凭据未配置")
 		},
 		Now: func() time.Time { return now },
 	})
@@ -209,7 +239,7 @@ func TestAgentImageGenerationRejectsStaleNodeAfterProviderCompletes(t *testing.T
 	mux := http.NewServeMux()
 	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
 		Projects: store, Assets: agentworkspace.NewMemoryAssetStore(), Objects: &recordingAgentNodeObjectStore{},
-		ImageGenerate: func(ctx context.Context, owner, _, _, _ string) (string, int, error) {
+		ImageGenerate: func(ctx context.Context, owner string, _ AgentImageGenerationInput) ([]string, int, error) {
 			canvas, err := store.Canvas(ctx, owner, "project-1")
 			if err != nil {
 				t.Fatal(err)
@@ -218,7 +248,7 @@ func TestAgentImageGenerationRejectsStaleNodeAfterProviderCompletes(t *testing.T
 			if _, err := store.SaveCanvas(ctx, owner, "project-1", canvas, canvas.Revision, now.Add(time.Second)); err != nil {
 				t.Fatal(err)
 			}
-			return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB", http.StatusOK, nil
+			return []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"}, http.StatusOK, nil
 		},
 		Now: func() time.Time { return now },
 	})

@@ -46,6 +46,20 @@ func registerConfiguredImageGenerationRoute(mux *http.ServeMux, store batchfacto
 }
 
 func configuredBatchImage(ctx context.Context, store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, owner, prompt, imageModelID, size string) (map[string]any, int, error) {
+	results, status, err := configuredBatchImages(ctx, store, catalogStore, owner, AgentImageGenerationInput{
+		ModelID: imageModelID, Prompt: prompt, Size: size,
+	})
+	if err != nil {
+		return nil, status, err
+	}
+	if len(results) == 0 {
+		return nil, http.StatusBadGateway, fmt.Errorf("图片模型未返回图片结果")
+	}
+	return map[string]any{"ok": true, "imageUrl": results[0]}, http.StatusOK, nil
+}
+
+func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, owner string, input AgentImageGenerationInput) ([]string, int, error) {
+	prompt := strings.TrimSpace(input.Prompt)
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
 		return nil, http.StatusBadRequest, fmt.Errorf("图片生成提示词不能为空")
@@ -59,7 +73,7 @@ func configuredBatchImage(ctx context.Context, store batchfactoryv11.Store, cata
 		if !strings.EqualFold(modelString(candidate, "kind"), "image") {
 			continue
 		}
-		if imageModelID != "" && modelString(candidate, "id") != imageModelID && modelString(candidate, "modelId") != imageModelID {
+		if input.ModelID != "" && modelString(candidate, "id") != input.ModelID && modelString(candidate, "modelId") != input.ModelID {
 			continue
 		}
 		if enabled, exists := candidate["enabled"].(bool); exists && !enabled {
@@ -84,8 +98,14 @@ func configuredBatchImage(ctx context.Context, store batchfactoryv11.Store, cata
 		return nil, http.StatusServiceUnavailable, fmt.Errorf("图片模型凭据未配置")
 	}
 	payload := map[string]any{"model": modelString(model, "modelId"), "prompt": prompt}
-	if strings.TrimSpace(size) != "" {
-		payload["size"] = strings.TrimSpace(size)
+	if input.Count > 0 {
+		payload["n"] = input.Count
+	}
+	if strings.TrimSpace(input.Quality) != "" {
+		payload["quality"] = input.Quality
+	}
+	if strings.TrimSpace(input.Size) != "" {
+		payload["size"] = strings.TrimSpace(input.Size)
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -116,21 +136,32 @@ func configuredBatchImage(ctx context.Context, store batchfactoryv11.Store, cata
 	if err := json.Unmarshal(raw, &decoded); err != nil || len(decoded.Data) == 0 {
 		return nil, http.StatusBadGateway, fmt.Errorf("图片模型返回了无法识别的响应")
 	}
-	item := decoded.Data[0]
-	imageURL := strings.TrimSpace(item.URL)
-	if imageURL == "" {
-		imageURL = strings.TrimSpace(item.Image)
-	}
-	if imageURL == "" && strings.TrimSpace(item.B64JSON) != "" {
-		encoded := strings.TrimSpace(item.B64JSON)
-		decodedBytes, decodeErr := base64.StdEncoding.DecodeString(encoded)
-		if decodeErr != nil || len(decodedBytes) == 0 {
-			return nil, http.StatusBadGateway, fmt.Errorf("图片模型返回了无效图片数据")
+	imageURLs := make([]string, 0, len(decoded.Data))
+	for _, item := range decoded.Data {
+		imageURL := strings.TrimSpace(item.URL)
+		if imageURL == "" {
+			imageURL = strings.TrimSpace(item.Image)
 		}
-		imageURL = "data:" + detectedShuihuoImageMediaType(decodedBytes) + ";base64," + encoded
+		if imageURL == "" && strings.TrimSpace(item.B64JSON) != "" {
+			encoded := strings.TrimSpace(item.B64JSON)
+			decodedBytes, decodeErr := base64.StdEncoding.DecodeString(encoded)
+			if decodeErr != nil || len(decodedBytes) == 0 {
+				return nil, http.StatusBadGateway, fmt.Errorf("图片模型返回了无效图片数据")
+			}
+			imageURL = "data:" + detectedShuihuoImageMediaType(decodedBytes) + ";base64," + encoded
+		}
+		if imageURL != "" {
+			imageURLs = append(imageURLs, imageURL)
+		}
 	}
-	if imageURL == "" {
+	if len(imageURLs) == 0 {
 		return nil, http.StatusBadGateway, fmt.Errorf("图片模型未返回图片结果")
 	}
-	return map[string]any{"ok": true, "modelId": modelString(model, "id"), "imageUrl": imageURL}, http.StatusOK, nil
+	if input.Count > 0 && len(imageURLs) < input.Count {
+		return nil, http.StatusBadGateway, fmt.Errorf("图片模型只返回了 %d 张图片，少于请求的 %d 张", len(imageURLs), input.Count)
+	}
+	if input.Count > 0 && len(imageURLs) > input.Count {
+		imageURLs = imageURLs[:input.Count]
+	}
+	return imageURLs, http.StatusOK, nil
 }

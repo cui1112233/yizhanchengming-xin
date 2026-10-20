@@ -73,11 +73,13 @@ test('creating a media node keeps only a serializable asset reference', () => {
   assert.equal(node.data.status, 'draft');
 });
 
-test('creating a blank image node keeps the prompt, model, and ratio fields ready for generation', () => {
+test('creating a blank image node keeps the complete generation settings ready', () => {
   const node = createNodeAt({ id: 'image-blank', kind: 'image', position: { x: 12, y: 18 } });
   assert.equal(node.data.type, 'image');
   assert.equal(node.data.assetRef, null);
-  assert.deepEqual(node.data.config, { prompt: '', model: '', ratio: '16:9', referenceAssets: [] });
+  assert.deepEqual(node.data.config, {
+    prompt: '', model: '', ratio: '16:9', quality: 'standard', resolution: '2K', count: 1, referenceAssets: []
+  });
 });
 
 test('adding image references keeps image assets only, deduplicates them, and caps the set at ten', () => {
@@ -225,8 +227,8 @@ test('empty connection drops offer text and image nodes instead of silently crea
   assert.match(canvasSource, /onConnectStart=\{handleConnectStart\}/);
   assert.match(canvasSource, /onConnectEnd=\{handleConnectEnd\}/);
   assert.match(canvasSource, /添加参考节点/);
-  assert.match(canvasSource, /handleConnectionDropCreate\('text'\)/);
-  assert.match(canvasSource, /handleConnectionDropCreate\('image'\)/);
+  assert.match(canvasSource, /connectionDropChoices\(nodes\.find\(sourceNode => sourceNode\.id === connectionDropMenu\.sourceID\)\)/);
+  assert.match(canvasSource, /handleConnectionDropCreate\(choice\.kind\)/);
 });
 
 test('canvas exposes preview-bound target ports only while connecting and keeps a forgiving hit area', () => {
@@ -280,14 +282,15 @@ test('generation panel uses the workspace palette with restrained spacing instea
 });
 
 test('connecting edges synchronizes upstream media into node reference panels before saving', () => {
-  assert.match(canvasSource, /syncNodeReferencesFromEdges/);
-  assert.match(canvasSource, /const nextNodes = syncNodeReferencesFromEdges\(\{ nodes: nodesRef\.current, edges: next \}\)/);
+  assert.match(canvasSource, /createTypedCanvasEdge/);
+  assert.match(canvasSource, /syncCanvasEffectiveReferences/);
+  assert.match(canvasSource, /const typedEdge = createTypedCanvasEdge\(connection, nodesRef\.current\)/);
 });
 
 test('generated media refreshes connected downstream references before rendering the returned canvas', () => {
   assert.match(
     canvasSource,
-    /const mappedNodes = \(serverCanvas\.nodes \|\| \[\]\)\.map\(toFlowNode\);[\s\S]*?const nextNodes = syncNodeReferencesFromEdges\(\{ nodes: mappedNodes, edges: nextEdges \}\);/
+    /const mappedNodes = \(serverCanvas\.nodes \|\| \[\]\)\.map\(toFlowNode\);[\s\S]*?const nextNodes = syncCanvasEffectiveReferences\(mappedNodes, nextEdges\);/
   );
   assert.match(
     canvasSource,
@@ -298,7 +301,7 @@ test('generated media refreshes connected downstream references before rendering
 test('loading a saved canvas restores references from its existing edges', () => {
   assert.match(
     canvasSource,
-    /const mappedNodes = \(currentCanvas\.nodes \|\| \[\]\)\.map\(toFlowNode\);[\s\S]*?const nextNodes = syncNodeReferencesFromEdges\(\{ nodes: mappedNodes, edges: nextEdges \}\);/
+    /const mappedNodes = \(currentCanvas\.nodes \|\| \[\]\)\.map\(toFlowNode\);[\s\S]*?const nextNodes = syncCanvasEffectiveReferences\(mappedNodes, nextEdges\);/
   );
 });
 

@@ -39,3 +39,11 @@ test('adaptive composer is wide rather than tall and keeps controls on one line'
   assert.match(styles, /agent-node-composer__toolbar[^}]*flex-wrap:\s*nowrap/);
   assert.match(styles, /agent-node-composer__model[^}]*min-width:\s*220px/);
 });
+
+test('image composer shows the complete compact settings summary and opens all four settings', () => {
+  assert.match(composerSource, /imageNodeSettingsSummary/);
+  assert.match(composerSource, /aria-label="图片设置"/);
+  assert.match(composerSource, /aria-label="图片画质"/);
+  assert.match(composerSource, /aria-label="图片清晰度"/);
+  assert.match(composerSource, /aria-label="图片数量"/);
+});

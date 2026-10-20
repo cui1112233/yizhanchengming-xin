@@ -520,6 +520,11 @@
 .agent-page .agent-node-composer__state { min-width: 0; flex: 1 1 auto; overflow: hidden; color: var(--agent-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .agent-page .agent-node-composer__state.is-error { color: #e98080; }
 .agent-page .agent-node-composer__toolbar > button:not(.agent-node-composer__submit) { min-height: 26px; flex: 0 0 auto; border: 1px solid var(--agent-border); border-radius: 5px; padding: 0 7px; background: var(--agent-elevated); color: var(--agent-secondary); cursor: pointer; font-size: 10px; }
+.agent-page .agent-node-composer__image-settings { display: inline-flex; max-width: 220px; align-items: center; gap: 5px; white-space: nowrap; }
+.agent-page .agent-node-composer__image-settings span { overflow: hidden; text-overflow: ellipsis; }
+.agent-node-image-settings { display: grid; width: 280px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.agent-node-image-settings label { display: grid; gap: 5px; color: var(--agent-secondary, #475569); font-size: 11px; }
+.agent-node-image-settings .ant-select { width: 100%; }
 .agent-page .agent-node-composer__submit { display: inline-flex; min-width: 64px; height: 30px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 5px; border: 0; border-radius: 6px; padding: 0 10px; background: var(--agent-accent); color: #fff; cursor: pointer; }
 .agent-page .agent-node-composer__submit:disabled { background: var(--agent-elevated); color: var(--agent-muted); cursor: not-allowed; }
 .agent-page .agent-canvas-node-text-preview { display: block; width: 100%; min-height: 36px; margin: 8px 0; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--agent-secondary); cursor: text; font: inherit; font-size: 11px; line-height: 1.5; text-align: left; }
