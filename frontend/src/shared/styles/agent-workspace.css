@@ -448,13 +448,13 @@
 .agent-page .agent-canvas-auth-media-state { display: grid; place-items: center; padding: 12px; color: var(--agent-muted); font-size: 11px; text-align: center; }
 .agent-page .agent-canvas-node-media.agent-canvas-auth-media-state { min-height: 168px; }
 .agent-page .agent-canvas-auth-media-state.is-error { color: #dc2626; }
-.agent-page .agent-canvas-generation-prompt { width: 100%; border: 0; background: transparent; color: var(--agent-text); font-size: 12px; line-height: 1.5; }
-.agent-page .agent-canvas-generation-prompt textarea { min-height: 42px; resize: vertical; background: transparent !important; color: var(--agent-text) !important; }
-.agent-page .agent-canvas-generation-prompt textarea::placeholder { color: var(--agent-muted); }
+.agent-page .agent-canvas-generation-prompt { width: 100%; min-height: 96px !important; border: 0; resize: vertical; background: transparent !important; color: var(--agent-text) !important; font-size: 12px; line-height: 1.5; }
+.agent-page .agent-canvas-generation-prompt::placeholder { color: var(--agent-muted); }
 .agent-page .agent-canvas-generation-prompt.ant-input-outlined:focus,
 .agent-page .agent-canvas-generation-prompt.ant-input-outlined:focus-within { box-shadow: none; }
-.agent-page .agent-canvas-generation-toolbar { display: flex; min-width: 0; align-items: center; gap: 10px; }
-.agent-page .agent-canvas-generation-toolbar .ant-select { min-width: 0; max-width: 164px; }
+.agent-page .agent-canvas-generation-toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.agent-page .agent-canvas-generation-toolbar .ant-select { min-width: 88px; max-width: none; flex: 1 1 88px; }
+.agent-page .agent-canvas-generation-toolbar .ant-select:first-child { width: 100%; max-width: none; flex-basis: 100%; }
 .agent-page .agent-canvas-generation-toolbar .ant-select-selector,
 .agent-page .agent-canvas-generation-toolbar .ant-input { padding-inline: 0 !important; color: var(--agent-text) !important; font-size: 11px; }
 .agent-page .agent-canvas-generation-toolbar .ant-select-arrow { color: var(--agent-muted); }

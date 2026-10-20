@@ -41,6 +41,16 @@ test('loaded and serialized nodes both use the canonical type', () => {
   assert.ok(workspaceStyles.includes('.agent-page .agent-canvas-generation-panel'));
 });
 
+test('generation editor keeps the prompt readable and gives the model selector a full row', () => {
+  const primarySelectRule = workspaceStyles.match(/\.agent-page \.agent-canvas-generation-toolbar \.ant-select:first-child\s*\{([^}]*)\}/);
+  assert.match(canvasSource, /autoSize=\{\{ minRows: 5, maxRows: 10 \}\}/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-prompt\s*\{[^}]*min-height:\s*96px/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-generation-toolbar\s*\{[^}]*flex-wrap:\s*wrap/);
+  assert.ok(primarySelectRule, 'the primary model selector should have its own layout rule');
+  assert.match(primarySelectRule[1], /flex-basis:\s*100%/);
+  assert.match(primarySelectRule[1], /max-width:\s*none/);
+});
+
 test('connection handles belong to the visible preview shell and stay hidden until relevant', () => {
   assert.match(canvasSource, /className="agent-canvas-node-preview-shell"[\s\S]*?<Handle type="target"[\s\S]*?<Handle type="source"/);
   assert.match(canvasSource, /selected,\s*isEditorOpen/);

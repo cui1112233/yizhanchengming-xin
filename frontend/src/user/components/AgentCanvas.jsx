@@ -75,7 +75,7 @@ function CanvasNode({
       <span className="agent-canvas-generation-reference-count">{referenceAssets.length}/10<br />参考图</span>
     </div> : null}
     {data.type === 'video' && videoResult ? <AuthenticatedAgentVideo source={videoResult.url} className="agent-canvas-generation-result" aria-label="待确认视频结果" preload="metadata" muted controls /> : null}
-    <Input.TextArea aria-label={inputLabel} className="agent-canvas-generation-prompt" value={config.prompt || ''} maxLength={data.type === 'audio' ? 8000 : 4000} autoSize={{ minRows: 3, maxRows: 7 }} placeholder={data.type === 'audio' ? '输入要合成的文案。' : data.type === 'video' ? '输入提示词或@参考图，描述你想要生成的视频。' : '输入提示词或@参考图，描述你想要生成的图片。'} onChange={event => updateConfig({ prompt: event.target.value })} />
+    <Input.TextArea aria-label={inputLabel} className="agent-canvas-generation-prompt" value={config.prompt || ''} maxLength={data.type === 'audio' ? 8000 : 4000} autoSize={{ minRows: 5, maxRows: 10 }} placeholder={data.type === 'audio' ? '输入要合成的文案。' : data.type === 'video' ? '输入提示词或@参考图，描述你想要生成的视频。' : '输入提示词或@参考图，描述你想要生成的图片。'} onChange={event => updateConfig({ prompt: event.target.value })} />
     <div className="agent-canvas-generation-toolbar">
       {data.type === 'image' ? <>
         <Select aria-label="图片模型" variant="borderless" size="small" value={config.model || undefined} placeholder={modelLoadError || '选择模型'} options={imageModelOptions} onChange={model => updateConfig({ model })} />
