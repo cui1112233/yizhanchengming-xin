@@ -41,3 +41,8 @@ test('provider options include enabled catalog providers such as FanKe video', (
   const options = providerOptionsForModels(catalog);
   assert.ok(options.some(item => item.value === 'yfai_seedance' && item.label === '梵客视频'));
 });
+
+test('text and audio channels do not offer image or video-only executors', () => {
+  assert.deepEqual(providerOptionsForModels(catalog, 'text').map(item => item.value), ['personal_api']);
+  assert.deepEqual(modelOptionsForProvider(catalog, 'text', 'doubao_local_executor'), []);
+});

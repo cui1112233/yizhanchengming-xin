@@ -249,9 +249,9 @@ test('successful connections are remembered so the empty-drop menu does not also
   assert.match(canvasSource, /setConnectingSourceID\(''\)/);
 });
 
-test('text image and video generation controls use the shared composer', () => {
+test('text image video and audio generation controls use the shared composer', () => {
   assert.match(canvasSource, /<AgentNodeComposer/);
-  assert.match(composerSource, /\['text', 'image', 'video'\]\.includes\(kind\)/);
+  assert.match(composerSource, /\['text', 'image', 'video', 'audio'\]\.includes\(kind\)/);
   assert.doesNotMatch(composerSource, /暂未接入生成执行器/);
 });
 
@@ -325,7 +325,8 @@ test('canvas opens the manual editor on text double click and saves node content
 test('opened media editor saves generation settings directly by node type', () => {
   assert.match(composerSource, /node\.data\?\.config \|\| \{\}/);
   assert.match(composerSource, /图片提示词/);
-  assert.match(composerSource, /视频时长（秒）/);
+  assert.match(composerSource, /AgentNodeParameterPopover/);
+  assert.match(composerSource, /AgentNodeSettingsPanel/);
   assert.match(composerSource, /文字生成要求/);
   assert.match(canvasSource, /onNodeConfigChange/);
 });
@@ -383,7 +384,7 @@ test('canvas keeps middle mouse panning and advertises only implemented undo red
 });
 
 test('canvas reads text image and video models from the shared API configuration instead of hard-coding its own catalog', () => {
-  assert.match(canvasSource, /\['text', 'image', 'video'\]\.map\(kind => listAvailableModels\(kind\)\)/);
+  assert.match(canvasSource, /\['text', 'image', 'video', 'audio'\]\.map\(kind => listAvailableModels\(kind\)\)/);
   assert.match(canvasSource, /configuredTextModels/);
   assert.match(canvasSource, /configuredImageModels/);
   assert.match(canvasSource, /configuredVideoModels/);

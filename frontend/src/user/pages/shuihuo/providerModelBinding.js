@@ -45,7 +45,9 @@ export function providerForCatalogModel(model, fallback = 'personal_api') {
 }
 
 export function providerOptionsForModels(models, kind = '') {
-  const providers = ['personal_api', 'doubao_local_executor', 'autodl_comfyui'];
+  const providers = kind === 'image' || kind === 'video'
+    ? ['personal_api', 'doubao_local_executor', 'autodl_comfyui']
+    : ['personal_api'];
   for (const model of Array.isArray(models) ? models : []) {
     if (kind && model?.kind !== kind) continue;
     const provider = providerForCatalogModel(model, 'personal_api');
@@ -55,11 +57,15 @@ export function providerOptionsForModels(models, kind = '') {
 }
 
 function localOptions(kind) {
-  return kind === 'video' ? LOCAL_DOUBAO_VIDEO_MODEL_OPTIONS : LOCAL_DOUBAO_IMAGE_MODEL_OPTIONS;
+  if (kind === 'video') return LOCAL_DOUBAO_VIDEO_MODEL_OPTIONS;
+  if (kind === 'image') return LOCAL_DOUBAO_IMAGE_MODEL_OPTIONS;
+  return [];
 }
 
 function defaultLocalModel(kind) {
-  return kind === 'video' ? 'Seedance 2.0 Fast' : 'Seedream 4.5';
+  if (kind === 'video') return 'Seedance 2.0 Fast';
+  if (kind === 'image') return 'Seedream 4.5';
+  return '';
 }
 
 export function modelOptionsForProvider(models, kind, provider) {

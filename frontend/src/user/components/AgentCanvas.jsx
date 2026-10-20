@@ -66,7 +66,7 @@ function CanvasNode({
     onPickImageAsset={onPickImageAsset}
     onPickReferenceAsset={onPickReferenceAsset}
     onRemoveReference={onRemoveReference}
-    onSubmit={nodeType === 'text' ? onSubmitText : nodeType === 'image' ? onSubmitImage : (nodeID, modelID) => onSubmitVideo?.(nodeID, false, modelID)}
+    onSubmit={nodeType === 'text' ? onSubmitText : nodeType === 'image' ? onSubmitImage : nodeType === 'video' ? (nodeID, modelID) => onSubmitVideo?.(nodeID, false, modelID) : undefined}
     videoJob={videoJob}
     videoState={videoState}
     videoBusy={videoBusy}
@@ -213,6 +213,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
   const [configuredTextModels, setConfiguredTextModels] = useState([]);
   const [configuredImageModels, setConfiguredImageModels] = useState([]);
   const [configuredVideoModels, setConfiguredVideoModels] = useState([]);
+  const [configuredAudioModels, setConfiguredAudioModels] = useState([]);
   const [modelLoadError, setModelLoadError] = useState('');
   const [, setHistoryVersion] = useState(0);
   const rootRef = useRef(null);
@@ -233,12 +234,13 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
 
   useEffect(() => {
     let active = true;
-    Promise.all(['text', 'image', 'video'].map(kind => listAvailableModels(kind)))
-      .then(([textModels, imageModels, videoModels]) => {
+    Promise.all(['text', 'image', 'video', 'audio'].map(kind => listAvailableModels(kind)))
+      .then(([textModels, imageModels, videoModels, audioModels]) => {
         if (!active) return;
         setConfiguredTextModels(textModels);
         setConfiguredImageModels(imageModels);
         setConfiguredVideoModels(videoModels);
+        setConfiguredAudioModels(audioModels);
         setModelLoadError('');
       })
       .catch(error => {
@@ -246,6 +248,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
         setConfiguredTextModels([]);
         setConfiguredImageModels([]);
         setConfiguredVideoModels([]);
+        setConfiguredAudioModels([]);
         setModelLoadError(error?.message || '模型列表加载失败');
       });
     return () => { active = false; };
@@ -276,7 +279,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     agent: props => {
       const videoJob = videoJobs[props.id]?.projectId === taskId ? videoJobs[props.id] : null;
       const kind = normalizeCanvasNodeType(props.data?.type);
-      const models = kind === 'text' ? configuredTextModels : kind === 'image' ? configuredImageModels : configuredVideoModels;
+      const models = kind === 'text' ? configuredTextModels : kind === 'image' ? configuredImageModels : kind === 'video' ? configuredVideoModels : configuredAudioModels;
       return <CanvasNode
         {...props}
         isEditorOpen={activeEditorNodeID === props.id}
@@ -301,7 +304,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
         modelLoadError={modelLoadError}
       />;
     }
-  }), [activeEditorNodeID, configuredImageModels, configuredTextModels, configuredVideoModels, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+  }), [activeEditorNodeID, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
