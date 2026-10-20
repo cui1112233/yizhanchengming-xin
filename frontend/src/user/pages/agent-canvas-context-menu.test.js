@@ -284,6 +284,17 @@ test('connecting edges synchronizes upstream media into node reference panels be
   assert.match(canvasSource, /const nextNodes = syncNodeReferencesFromEdges\(\{ nodes: nodesRef\.current, edges: next \}\)/);
 });
 
+test('generated media refreshes connected downstream references before rendering the returned canvas', () => {
+  assert.match(
+    canvasSource,
+    /const mappedNodes = \(serverCanvas\.nodes \|\| \[\]\)\.map\(toFlowNode\);[\s\S]*?const nextNodes = syncNodeReferencesFromEdges\(\{ nodes: mappedNodes, edges: nextEdges \}\);/
+  );
+  assert.match(
+    canvasSource,
+    /onChange\?\.\(toCanvas\(nextNodes, nextEdges, serverCanvas\.revision, nextViewport, nextAppearance\)\);/
+  );
+});
+
 test('context-menu submenus are allowed to extend beyond the parent menu', () => {
   const rule = canvasStyles.match(/\.agent-page \.agent-canvas-context-menu \{([\s\S]*?)\n\}/);
   assert.ok(rule, 'context menu CSS rule should exist');

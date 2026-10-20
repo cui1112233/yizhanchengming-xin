@@ -529,8 +529,9 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   function applyGeneratedCanvas(serverCanvas) {
     if (!serverCanvas) return;
     const nextAppearance = normalizeCanvasAppearance(serverCanvas.appearance || appearanceRef.current);
-    const nextNodes = (serverCanvas.nodes || []).map(toFlowNode);
+    const mappedNodes = (serverCanvas.nodes || []).map(toFlowNode);
     const nextEdges = (serverCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
+    const nextNodes = syncNodeReferencesFromEdges({ nodes: mappedNodes, edges: nextEdges });
     const nextViewport = serverCanvas.viewport || viewportRef.current;
     setNodes(nextNodes);
     setEdges(nextEdges);
@@ -539,6 +540,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
     historyRef.current.push({ nodes: nextNodes, edges: nextEdges });
     setHistoryVersion(value => value + 1);
+    onChange?.(toCanvas(nextNodes, nextEdges, serverCanvas.revision, nextViewport, nextAppearance));
     onServerCanvasChange?.(serverCanvas);
   }
 
