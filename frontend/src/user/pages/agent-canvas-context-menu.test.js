@@ -295,6 +295,13 @@ test('generated media refreshes connected downstream references before rendering
   );
 });
 
+test('loading a saved canvas restores references from its existing edges', () => {
+  assert.match(
+    canvasSource,
+    /const mappedNodes = \(currentCanvas\.nodes \|\| \[\]\)\.map\(toFlowNode\);[\s\S]*?const nextNodes = syncNodeReferencesFromEdges\(\{ nodes: mappedNodes, edges: nextEdges \}\);/
+  );
+});
+
 test('context-menu submenus are allowed to extend beyond the parent menu', () => {
   const rule = canvasStyles.match(/\.agent-page \.agent-canvas-context-menu \{([\s\S]*?)\n\}/);
   assert.ok(rule, 'context menu CSS rule should exist');

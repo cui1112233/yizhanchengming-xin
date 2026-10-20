@@ -317,9 +317,10 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   }
 
   useEffect(() => {
-    const nextNodes = (currentCanvas.nodes || []).map(toFlowNode);
+    const mappedNodes = (currentCanvas.nodes || []).map(toFlowNode);
     const nextAppearance = normalizeCanvasAppearance(currentCanvas.appearance);
     const nextEdges = (currentCanvas.edges || []).map(edge => toFlowEdge(edge, nextAppearance));
+    const nextNodes = syncNodeReferencesFromEdges({ nodes: mappedNodes, edges: nextEdges });
     const nextViewport = currentCanvas.viewport || { x: 0, y: 0, zoom: 1 };
     if (canvasSignature(nextNodes, nextEdges, nextViewport, nextAppearance) === signatureRef.current) return;
     setNodes(nextNodes);
