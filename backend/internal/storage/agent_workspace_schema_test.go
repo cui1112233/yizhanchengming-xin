@@ -37,11 +37,11 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 
 func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800004 {
-		t.Fatalf("last migration=%v, want 8800004", migrations[len(migrations)-1].Version)
+	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800006 {
+		t.Fatalf("last migration=%v, want 8800006", migrations[len(migrations)-1].Version)
 	}
 	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800004 {
+		if migration.Version >= 8800006 {
 			t.Fatalf("agent migration must be greater than existing version %d", migration.Version)
 		}
 	}
@@ -49,8 +49,8 @@ func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 
 func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	if len(migrations) != 4 {
-		t.Fatalf("AgentWorkspaceMigrations length=%d, want 4", len(migrations))
+	if len(migrations) != 6 {
+		t.Fatalf("AgentWorkspaceMigrations length=%d, want 6", len(migrations))
 	}
 	if migrations[0].Version != 8800001 || migrations[0].CallbackChecksum != "v88-agent-workspace-foundation-v1" {
 		t.Fatalf("historical migration changed: %+v", migrations[0])
@@ -76,5 +76,22 @@ func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	assetSchema := strings.ToLower(strings.Join(assets.SQL, "\n"))
 	if !strings.Contains(assetSchema, "create table if not exists agent_assets") || !strings.Contains(assetSchema, "idx_agent_assets_owner_project_created") {
 		t.Fatalf("missing project asset table or owner index: %v", assets.SQL)
+	}
+	config := migrations[4]
+	if config.Version != 8800005 || config.CallbackChecksum != "v88-agent-canvas-node-config-v1" {
+		t.Fatalf("node config migration=%+v", config)
+	}
+	if !strings.Contains(strings.ToLower(strings.Join(config.SQL, "\n")), "add column config_json json") {
+		t.Fatalf("missing config_json migration: %v", config.SQL)
+	}
+	jobs := migrations[5]
+	if jobs.Version != 8800006 || jobs.CallbackChecksum != "v88-agent-video-jobs-v1" {
+		t.Fatalf("video jobs migration=%+v", jobs)
+	}
+	jobSchema := strings.ToLower(strings.Join(jobs.SQL, "\n"))
+	for _, clause := range []string{"create table if not exists agent_video_jobs", "uq_agent_video_jobs_owner_idempotency", "idx_agent_video_jobs_project_node_updated"} {
+		if !strings.Contains(jobSchema, clause) {
+			t.Fatalf("missing video job schema clause %q: %v", clause, jobs.SQL)
+		}
 	}
 }

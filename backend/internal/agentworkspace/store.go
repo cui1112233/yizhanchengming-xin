@@ -26,4 +26,5 @@ type Store interface {
 	ImportProject(context.Context, string, Project) error
 	LegacyImport(context.Context, string, string) (LegacyImport, bool, error)
 	RecordLegacyImport(context.Context, LegacyImport) error
+	VideoJobStore
 }

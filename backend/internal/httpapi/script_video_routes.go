@@ -92,7 +92,7 @@ func (r *scriptVideoRoutes) download(w http.ResponseWriter, req *http.Request, o
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
 		return
 	}
-	modelKey := map[string]string{batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
+	modelKey := map[string]string{batchfactoryv11.VideoProviderPersonalAPI: "yd2-mini-video", batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
 	cfg, err := r.resolver(req.Context(), owner, modelKey)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -121,7 +121,7 @@ func (r *scriptVideoRoutes) download(w http.ResponseWriter, req *http.Request, o
 }
 
 func scriptVideoProvider(taskID string) (string, string) {
-	for _, item := range []struct{ prefix, provider string }{{"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
+	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
 		if strings.HasPrefix(taskID, item.prefix) {
 			return item.prefix, item.provider
 		}
@@ -217,7 +217,7 @@ func (r *scriptVideoRoutes) poll(w http.ResponseWriter, req *http.Request, owner
 		writeJSON(w, http.StatusOK, result)
 		return
 	}
-	for _, item := range []struct{ prefix, provider string }{{"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
+	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
 		if strings.HasPrefix(taskID, item.prefix) {
 			prefix, provider = item.prefix, item.provider
 			break
@@ -227,7 +227,7 @@ func (r *scriptVideoRoutes) poll(w http.ResponseWriter, req *http.Request, owner
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported video task"})
 		return
 	}
-	modelKey := map[string]string{batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
+	modelKey := map[string]string{batchfactoryv11.VideoProviderPersonalAPI: "yd2-mini-video", batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
 	if r.resolver == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
 		return

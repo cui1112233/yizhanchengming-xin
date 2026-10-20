@@ -50,6 +50,34 @@ export function uploadAgentAsset(taskId, file) {
   return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/assets`, { method: 'POST', body });
 }
 
+export function createAgentVideoJob(taskId, payload) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function getAgentVideoJob(taskId, jobId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs/${encodeURIComponent(jobId)}`, { suppressGlobalError: true });
+}
+
+export function confirmAgentVideoJob(taskId, jobId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs/${encodeURIComponent(jobId)}/confirm`, {
+    method: 'POST', suppressGlobalError: true
+  });
+}
+
+export function cancelAgentVideoJob(taskId, jobId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST', suppressGlobalError: true
+  });
+}
+
+export function retryAgentVideoJob(taskId, jobId, idempotencyKey) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs/${encodeURIComponent(jobId)}/retry`, {
+    method: 'POST', body: JSON.stringify({ idempotencyKey }), suppressGlobalError: true
+  });
+}
+
 export function listAgentSkills() {
   return apiRequest('/api/agent/skills');
 }

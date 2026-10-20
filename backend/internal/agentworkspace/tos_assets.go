@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,10 +21,11 @@ type AssetTOSConfig struct {
 }
 
 type TOSAssetObjectStore struct {
-	Bucket string
-	put    func(context.Context, Asset, io.Reader) error
-	open   func(context.Context, Asset) (io.ReadCloser, error)
-	delete func(context.Context, Asset) error
+	Bucket       string
+	put          func(context.Context, Asset, io.Reader) error
+	open         func(context.Context, Asset) (io.ReadCloser, error)
+	delete       func(context.Context, Asset) error
+	referenceURL func(context.Context, Asset, time.Duration) (string, error)
 }
 
 func NewTOSAssetObjectStore(config AssetTOSConfig) (*TOSAssetObjectStore, error) {
@@ -55,6 +58,20 @@ func NewTOSAssetObjectStore(config AssetTOSConfig) (*TOSAssetObjectStore, error)
 			_, err := client.DeleteObjectV2(ctx, &tos.DeleteObjectV2Input{Bucket: config.Bucket, Key: asset.ObjectKey})
 			return err
 		},
+		referenceURL: func(_ context.Context, asset Asset, ttl time.Duration) (string, error) {
+			if ttl <= 0 || ttl > 7*24*time.Hour {
+				return "", ErrReferenceURLUnavailable
+			}
+			result, err := client.PreSignedURL(&tos.PreSignedURLInput{HTTPMethod: http.MethodGet, Bucket: config.Bucket, Key: asset.ObjectKey, Expires: int64(ttl / time.Second)})
+			if err != nil {
+				return "", err
+			}
+			parsed, err := url.Parse(result.SignedUrl)
+			if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+				return "", ErrReferenceURLUnavailable
+			}
+			return result.SignedUrl, nil
+		},
 	}, nil
 }
 
@@ -77,4 +94,11 @@ func (s *TOSAssetObjectStore) Delete(ctx context.Context, asset Asset) error {
 		return fmt.Errorf("agent asset object store is not configured")
 	}
 	return s.delete(ctx, asset)
+}
+
+func (s *TOSAssetObjectStore) ReferenceURL(ctx context.Context, asset Asset, ttl time.Duration) (string, error) {
+	if s == nil || s.referenceURL == nil || strings.TrimSpace(s.Bucket) == "" || strings.TrimSpace(asset.ObjectKey) == "" {
+		return "", ErrReferenceURLUnavailable
+	}
+	return s.referenceURL(ctx, asset, ttl)
 }

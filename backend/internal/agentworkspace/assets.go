@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrAssetNotFound = errors.New("agent asset not found")
-	ErrAssetExists   = errors.New("agent asset already exists")
-	ErrInvalidAsset  = errors.New("invalid agent asset")
+	ErrAssetNotFound           = errors.New("agent asset not found")
+	ErrAssetExists             = errors.New("agent asset already exists")
+	ErrInvalidAsset            = errors.New("invalid agent asset")
+	ErrReferenceURLUnavailable = errors.New("agent reference URL unavailable")
 )
 
 var assetSafeID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$`)
@@ -42,6 +43,12 @@ type AssetObjectStore interface {
 	Put(context.Context, Asset, io.Reader) error
 	Open(context.Context, Asset) (io.ReadCloser, error)
 	Delete(context.Context, Asset) error
+}
+
+// ReferenceURLProvider exposes a short-lived read URL only to a server-side
+// model submission. It must never expose object-storage credentials to users.
+type ReferenceURLProvider interface {
+	ReferenceURL(context.Context, Asset, time.Duration) (string, error)
 }
 
 func ValidAssetKind(kind string) bool {

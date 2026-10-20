@@ -342,6 +342,25 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.UserConfigStore != nil {
 		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
 		RegisterAgentAssetRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
+		if options.NovelFetchStore != nil && options.AgentWorkspace != nil && options.AgentAssets != nil {
+			var references agentworkspace.ReferenceURLProvider
+			if options.AgentAssetObjects != nil {
+				references, _ = options.AgentAssetObjects.(agentworkspace.ReferenceURLProvider)
+			}
+			videoResolver := func(ctx context.Context, owner, modelKey string) (batchfactoryv11.VideoProviderConfig, error) {
+				config, err := loadShuihuoOwnerConfig(ctx, options.Store, owner, options.NovelFetchStore)
+				if err != nil {
+					return batchfactoryv11.VideoProviderConfig{}, err
+				}
+				return scriptVideoModelConfig(ctx, options.Store, owner, config, modelKey)
+			}
+			RegisterAgentVideoJobRoutes(root, auth, &agentVideoCoordinator{
+				projects: options.AgentWorkspace, assets: options.AgentAssets, references: references,
+				videos:   &scriptVideoService{resolver: videoResolver, localExecutor: options.LocalExecutors},
+				ingestor: newAgentVideoAssetIngestor(options.AgentAssets, options.AgentAssetObjects, nil, options.Now),
+				executor: options.LocalExecutors, artifacts: options.LocalArtifacts, now: options.Now,
+			})
+		}
 		systemDir := ""
 		if options.MemberProfileStore != nil {
 			systemDir = options.MemberProfileStore.SystemDir

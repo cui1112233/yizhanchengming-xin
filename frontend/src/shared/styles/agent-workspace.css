@@ -382,8 +382,13 @@
 .agent-page .agent-canvas-main .agent-canvas,
 .agent-page .agent-canvas-main .react-flow { width: 100%; height: 100%; min-height: 0; background: var(--agent-elevated); }
 .agent-page .agent-canvas-main .agent-canvas { position: relative; overflow: hidden; outline: none; }
-.agent-page .agent-canvas-node { width: 176px; border: 1px solid var(--agent-border); border-radius: 8px; padding: 10px; background: color-mix(in srgb, var(--agent-panel) 97%, #000); color: var(--agent-text); box-shadow: 0 7px 16px rgba(0, 0, 0, 0.16); }
+.agent-page .agent-canvas-node { position: relative; width: 270px; border: 0; padding: 0; background: transparent; color: var(--agent-text); box-shadow: none; }
 .agent-page .agent-canvas-node--image { border-color: color-mix(in srgb, var(--agent-accent) 58%, var(--agent-border)); }
+.agent-page .agent-canvas-node--image,
+.agent-page .agent-canvas-node--video { width: 470px; }
+.agent-page .agent-canvas-node--video { border-color: color-mix(in srgb, var(--agent-edge-color) 54%, var(--agent-border)); }
+.agent-page .agent-canvas-node--audio { width: 470px; }
+.agent-page .agent-canvas-node--text { width: 176px; border: 1px solid var(--agent-border); border-radius: 8px; padding: 10px; background: color-mix(in srgb, var(--agent-panel) 97%, #000); box-shadow: 0 7px 16px rgba(0, 0, 0, 0.16); }
 .agent-page .agent-canvas-node--failed { border-color: #d84b4b; }
 .agent-page .react-flow__node.selected .agent-canvas-node { border-color: var(--agent-accent); box-shadow: 0 0 0 2px var(--agent-accent-soft), 0 10px 22px rgba(0, 0, 0, 0.2); }
 .agent-page .agent-canvas-node header { display: grid; gap: 3px; }
@@ -391,7 +396,48 @@
 .agent-page .agent-canvas-node footer { color: var(--agent-muted); font-size: 10px; }
 .agent-page .agent-canvas-node header strong { font-size: 12px; }
 .agent-page .agent-canvas-node p { min-height: 36px; margin: 8px 0; color: var(--agent-secondary); font-size: 11px; line-height: 1.5; }
-.agent-page .agent-canvas-node footer { display: flex; justify-content: space-between; }
+.agent-page .agent-canvas-node footer { display: none; justify-content: space-between; }
+.agent-page .agent-canvas-node--text footer { display: flex; }
+.agent-page .agent-canvas-node-media { display: block; width: min(100%, 330px); max-height: 190px; margin-top: 8px; border: 1px solid color-mix(in srgb, var(--agent-accent) 76%, var(--agent-border)); border-radius: 7px; background: #10151a; object-fit: cover; }
+.agent-page .agent-canvas-node-image-select { display: block; width: min(100%, 330px); margin: 8px 0 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+.agent-page .agent-canvas-node-image-select .agent-canvas-node-media,
+.agent-page .agent-canvas-node-image-select .agent-canvas-node-image-placeholder { margin-top: 0; }
+.agent-page .agent-canvas-node-image-select:hover .agent-canvas-node-media,
+.agent-page .agent-canvas-node-image-select:hover .agent-canvas-node-image-placeholder,
+.agent-page .agent-canvas-node-image-select:focus-visible .agent-canvas-node-media,
+.agent-page .agent-canvas-node-image-select:focus-visible .agent-canvas-node-image-placeholder { border-color: var(--agent-accent); box-shadow: 0 0 0 2px var(--agent-accent-soft); }
+.agent-page .agent-canvas-node-image-select:focus-visible { outline: none; }
+.agent-page .agent-canvas-node-target { left: -7px; width: 14px; height: 14px; border: 2px solid var(--agent-panel); background: var(--agent-border-strong); opacity: 0.55; transform: translateY(-50%); transition: opacity 140ms ease, transform 140ms ease, background 140ms ease, box-shadow 140ms ease; }
+.agent-page .agent-canvas.is-connecting .agent-canvas-node-target { background: var(--agent-accent); box-shadow: 0 0 0 4px var(--agent-accent-soft), 0 0 15px color-mix(in srgb, var(--agent-accent) 55%, transparent); opacity: 1; transform: translateY(-50%) scale(1.15); }
+.agent-page .agent-canvas-node-quick-add { position: absolute; z-index: 2; top: 50%; right: -12px; display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--agent-accent); border-radius: 50%; padding: 0; background: var(--agent-panel); color: var(--agent-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent-canvas) 88%, transparent); cursor: crosshair; transform: translateY(-50%); transition: box-shadow 140ms ease, transform 140ms ease, background 140ms ease; }
+.agent-page .agent-canvas-node-quick-add::before { content: '+'; font-size: 18px; font-weight: 500; line-height: 1; }
+.agent-page .agent-canvas-node-quick-add:hover,
+.agent-page .agent-canvas-node-quick-add:focus-visible { background: var(--agent-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent-canvas) 88%, transparent), 0 0 18px color-mix(in srgb, var(--agent-accent) 68%, transparent); color: #fff; outline: none; transform: translateY(-50%) scale(1.08); }
+.agent-page .agent-canvas-node-image-placeholder { display: grid; width: 300px; min-height: 168px; margin-top: 8px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-accent); }
+.agent-page .agent-canvas-node-video-placeholder { display: grid; width: 300px; min-height: 168px; margin-top: 8px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-muted); font-size: 11px; }
+.agent-page .agent-canvas-generation-panel { display: grid; min-height: 134px; gap: 10px; margin-top: 12px; border: 1px solid var(--agent-border); border-radius: 10px; padding: 12px 14px; background: var(--agent-panel); box-shadow: none; }
+.agent-page .agent-canvas-generation-reference-strip { display: flex; min-height: 42px; flex-wrap: wrap; align-items: center; gap: 6px; }
+.agent-page .agent-canvas-node-reference { position: relative; display: grid; width: 32px; height: 32px; place-items: center; overflow: hidden; border: 1px solid var(--agent-border-strong); border-radius: 5px; background: var(--agent-elevated); color: var(--agent-muted); }
+.agent-page .agent-canvas-generation-reference-strip .agent-canvas-node-reference { width: 42px; height: 42px; border-radius: 6px; }
+.agent-page .agent-canvas-node-reference img { width: 100%; height: 100%; object-fit: cover; }
+.agent-page .agent-canvas-node-reference button { position: absolute; top: -2px; right: -2px; display: grid; width: 14px; height: 14px; place-items: center; border: 1px solid var(--agent-border-strong); border-radius: 50%; padding: 0; background: var(--agent-panel); color: var(--agent-text); cursor: pointer; font-size: 12px; line-height: 1; }
+.agent-page .agent-canvas-generation-add-reference { display: grid; width: 42px; height: 42px; place-items: center; border: 1px dashed var(--agent-border-strong); border-radius: 6px; background: var(--agent-elevated); color: var(--agent-accent); cursor: pointer; }
+.agent-page .agent-canvas-generation-add-reference:hover { border-color: var(--agent-accent); background: var(--agent-accent-soft); color: var(--agent-accent); }
+.agent-page .agent-canvas-generation-reference-count { color: var(--agent-muted); font-size: 10px; line-height: 1.3; }
+.agent-page .agent-canvas-generation-prompt { width: 100%; border: 0; background: transparent; color: var(--agent-text); font-size: 12px; line-height: 1.5; }
+.agent-page .agent-canvas-generation-prompt textarea { min-height: 42px; resize: vertical; background: transparent !important; color: var(--agent-text) !important; }
+.agent-page .agent-canvas-generation-prompt textarea::placeholder { color: var(--agent-muted); }
+.agent-page .agent-canvas-generation-prompt.ant-input-outlined:focus,
+.agent-page .agent-canvas-generation-prompt.ant-input-outlined:focus-within { box-shadow: none; }
+.agent-page .agent-canvas-generation-toolbar { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.agent-page .agent-canvas-generation-toolbar .ant-select { min-width: 0; max-width: 164px; }
+.agent-page .agent-canvas-generation-toolbar .ant-select-selector,
+.agent-page .agent-canvas-generation-toolbar .ant-input { padding-inline: 0 !important; color: var(--agent-text) !important; font-size: 11px; }
+.agent-page .agent-canvas-generation-toolbar .ant-select-arrow { color: var(--agent-muted); }
+.agent-page .agent-canvas-generation-unavailable { margin-left: auto; color: var(--agent-muted); font-size: 10px; white-space: nowrap; }
+.agent-page .agent-canvas-generation-submit { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; margin-left: auto; border: 0; border-radius: 50%; background: var(--agent-accent); color: #fff; cursor: pointer; }
+.agent-page .agent-canvas-generation-unavailable + .agent-canvas-generation-submit { margin-left: 0; }
+.agent-page .agent-canvas-generation-submit:disabled { background: var(--agent-elevated); color: var(--agent-muted); cursor: not-allowed; }
 
 .agent-page .agent-canvas-toolrail {
   position: absolute;
@@ -470,7 +516,7 @@
   display: grid;
   min-width: 184px;
   max-width: calc(100% - 16px);
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--agent-border-strong);
   border-radius: 8px;
   padding: 5px;
@@ -480,21 +526,42 @@
 }
 .agent-page .agent-canvas-context-menu-title { margin: 3px 7px 5px; color: var(--agent-muted); font-size: 11px; }
 .agent-page .agent-canvas-context-menu button { width: 100%; min-height: 30px; border: 0; border-radius: 5px; padding: 0 8px; background: transparent; color: var(--agent-text); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+.agent-page .agent-canvas-context-menu button.agent-canvas-context-menu-parent { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .agent-page .agent-canvas-context-menu button:hover:not(:disabled) { background: var(--agent-hover); }
 .agent-page .agent-canvas-context-menu button:disabled { color: var(--agent-muted); cursor: not-allowed; opacity: 0.48; }
 .agent-page .agent-canvas-context-menu button.is-danger { color: #e98080; }
 .agent-page .agent-canvas-context-menu-divider { height: 1px; margin: 4px 3px; background: var(--agent-border); }
+.agent-page .agent-canvas-context-submenu { position: absolute; z-index: 1; top: -1px; left: calc(100% + 6px); display: grid; min-width: 150px; overflow: hidden; border: 1px solid var(--agent-border-strong); border-radius: 8px; padding: 5px; background: color-mix(in srgb, var(--agent-panel) 97%, #000); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28); backdrop-filter: blur(16px); }
+.agent-page .agent-canvas-context-submenu button { white-space: nowrap; }
+.agent-page .agent-canvas-connection-drop-menu { position: absolute; z-index: 32; display: grid; gap: 7px; width: 142px; border: 1px solid var(--agent-border-strong); border-radius: 8px; padding: 8px; background: color-mix(in srgb, var(--agent-panel) 97%, #000); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28); backdrop-filter: blur(16px); }
+.agent-page .agent-canvas-connection-drop-menu strong { color: var(--agent-secondary); font-size: 11px; }
+.agent-page .agent-canvas-connection-drop-menu div { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.agent-page .agent-canvas-connection-drop-menu button { min-height: 28px; border: 1px solid var(--agent-border); border-radius: 5px; background: var(--agent-elevated); color: var(--agent-text); cursor: pointer; font: inherit; font-size: 11px; }
+.agent-page .agent-canvas-connection-drop-menu button:hover { border-color: var(--agent-accent); background: var(--agent-hover); }
 .agent-page .agent-canvas-asset-panel { position: absolute; z-index: 31; top: 12px; right: 12px; display: grid; width: min(280px, calc(100% - 24px)); gap: 8px; border: 1px solid var(--agent-border-strong); border-radius: 8px; padding: 10px; background: var(--agent-panel); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28); }
+.agent-page .agent-canvas-asset-panel.is-node-picker { right: auto; width: 288px; max-width: calc(100% - 16px); background: color-mix(in srgb, var(--agent-panel) 97%, #000); backdrop-filter: blur(16px); }
 .agent-page .agent-canvas-asset-panel header { display: flex; align-items: center; justify-content: space-between; color: var(--agent-text); font-size: 12px; }
 .agent-page .agent-canvas-asset-panel header button { border: 0; background: transparent; color: var(--agent-secondary); cursor: pointer; font-size: 18px; }
+.agent-page .agent-canvas-asset-section-title { margin: 0; color: var(--agent-muted); font-size: 10px; }
 .agent-page .agent-canvas-upload-input { display: none; }
 .agent-page .agent-canvas-asset-list { display: grid; max-height: 260px; gap: 5px; overflow: auto; }
-.agent-page .agent-canvas-asset-list button { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--agent-border); border-radius: 6px; padding: 8px; background: var(--agent-elevated); color: var(--agent-text); cursor: pointer; font: inherit; font-size: 11px; text-align: left; }
+.agent-page .agent-canvas-asset-list button { display: grid; min-width: 0; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--agent-border); border-radius: 6px; padding: 7px; background: var(--agent-elevated); color: var(--agent-text); cursor: pointer; font: inherit; font-size: 11px; text-align: left; }
 .agent-page .agent-canvas-asset-list button:hover { border-color: var(--agent-accent); background: var(--agent-hover); }
+.agent-page .agent-canvas-asset-list img { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; }
 .agent-page .agent-canvas-asset-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-page .agent-canvas-asset-list span, .agent-page .agent-canvas-asset-empty, .agent-page .agent-canvas-asset-error { margin: 0; color: var(--agent-muted); font-size: 11px; }
 .agent-page .agent-canvas-asset-error { color: #e98080; }
 .agent-page .agent-canvas-manual-field { display: grid; gap: 6px; margin-bottom: 12px; color: var(--text-secondary); font-size: 12px; }
+.agent-page .agent-canvas-manual-assets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 12px; color: var(--agent-muted); font-size: 12px; }
+.agent-page .agent-canvas-manual-hint { margin: -4px 0 12px; color: var(--agent-muted); font-size: 12px; line-height: 1.5; }
+.agent-page .agent-canvas-shortcut-help { display: grid; gap: 2px; }
+.agent-page .agent-canvas-shortcut-help p { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1fr); gap: 12px; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--agent-border); color: var(--agent-secondary); font-size: 13px; }
+.agent-page .agent-canvas-shortcut-help p:last-child { border-bottom: 0; }
+.agent-page .agent-canvas-shortcut-help kbd { width: fit-content; border: 1px solid var(--agent-border-strong); border-radius: 4px; padding: 2px 6px; background: var(--agent-elevated); color: var(--agent-text); font: inherit; }
+.agent-page .agent-canvas-video-job { display: grid; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--agent-border); }
+.agent-page .agent-canvas-video-job strong { color: var(--agent-text); font-size: 12px; }
+.agent-page .agent-canvas-video-job video { width: 100%; max-height: 220px; border-radius: 6px; background: #10151a; }
+.agent-page .agent-canvas-video-job > div { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .agent-page .agent-canvas-edge-flow {
   fill: none;

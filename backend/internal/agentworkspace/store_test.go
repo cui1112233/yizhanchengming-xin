@@ -75,6 +75,30 @@ func TestMemoryStoreCanvasRevisionPreventsLostUpdates(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreCanvasPreservesBusinessNodeConfiguration(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 19, 2, 3, 4, 0, time.UTC)
+	if err := store.CreateProject(ctx, "alice", Project{ID: "project-config", Title: "项目", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	input := Canvas{Nodes: []Node{{
+		ID: "video-1", Type: "video", Title: "分镜视频", Position: Position{X: 12, Y: 24}, Version: 1, Status: "draft",
+		Config: map[string]any{"prompt": "雨夜追逐", "model": "seedance-2.0", "ratio": "9:16", "durationSeconds": float64(5)},
+	}}, Edges: []Edge{}}
+	if _, err := store.SaveCanvas(ctx, "alice", "project-config", input, 0, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.Canvas(ctx, "alice", "project-config")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.Nodes[0].Config; got["prompt"] != "雨夜追逐" || got["model"] != "seedance-2.0" || got["ratio"] != "9:16" || got["durationSeconds"] != float64(5) {
+		t.Fatalf("node config=%#v", got)
+	}
+}
+
 func TestEmptyCanvasUsesPersistentAppearanceDefaults(t *testing.T) {
 	appearance := EmptyCanvas().Appearance
 	if appearance.EdgeColor != "coral" || !appearance.EdgeAnimated || appearance.EdgeWidth != "default" || !appearance.BackgroundDots || !appearance.AlignmentGuides {

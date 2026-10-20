@@ -11,7 +11,7 @@ type scriptVideoModel struct {
 func scriptVideoModelSpec(modelKey string) (scriptVideoModel, bool) {
 	switch modelKey {
 	case "yd2-mini-video":
-		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderPersonalAPI, AcceptsReferenceImages: true}, true
+		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderPersonalAPI, AcceptsReferenceImages: true, PublicTaskPrefix: "yd2:"}, true
 	case "minimax-h3-video":
 		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderAutoDLH3, AcceptsReferenceImages: true, PublicTaskPrefix: "h3:"}, true
 	case "seedance-2-0-official":

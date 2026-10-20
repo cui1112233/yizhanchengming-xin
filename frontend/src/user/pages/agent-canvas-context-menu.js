@@ -7,9 +7,20 @@ function copiedTitle(title) {
   return value.endsWith('副本') ? value : `${value}副本`;
 }
 
+export function shouldOpenConnectionDrop({ sourceID, connectionCompleted, droppedOnHandle }) {
+  return Boolean(String(sourceID || '').trim()) && !connectionCompleted && !droppedOnHandle;
+}
+
 export function createNodeAt({ id, kind, position, asset = null }) {
-  const type = ['text', 'image', 'video'].includes(kind) ? kind : 'text';
+  const type = ['text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text';
   const media = type === 'image' || type === 'video';
+  const defaults = type === 'audio'
+    ? { title: '新音频', config: { prompt: '', voice: '', speed: 1 } }
+    : type === 'image'
+      ? { title: '新图片', config: { prompt: '', model: '', ratio: '16:9', referenceAssets: [] } }
+      : type === 'video'
+        ? { title: '新视频', config: { prompt: '', model: '', ratio: '', durationSeconds: 0, referenceAssets: [] } }
+        : { title: '新文本', config: {} };
   return {
     id,
     type: 'agent',
@@ -17,12 +28,115 @@ export function createNodeAt({ id, kind, position, asset = null }) {
     selected: true,
     data: {
       type,
-      title: media ? String(asset?.name || `新${type === 'image' ? '图片' : '视频'}`) : '新文本',
+      title: media ? String(asset?.name || defaults.title) : defaults.title,
       summary: '',
       version: 1,
       sourceNodeIds: [],
       status: 'draft',
-      assetRef: media && asset ? clone(asset) : null
+      assetRef: media && asset ? clone(asset) : null,
+      config: defaults.config
+    }
+  };
+}
+
+export function appendReferenceAsset({ node, asset, limit = 10 }) {
+  const allowedKinds = node?.data?.type === 'image'
+    ? ['image']
+    : node?.data?.type === 'video'
+      ? ['image', 'video']
+      : [];
+  if (!allowedKinds.includes(asset?.kind) || !String(asset?.id || '').trim()) return node;
+  const existing = Array.isArray(node.data?.config?.referenceAssets)
+    ? node.data.config.referenceAssets.filter(item => allowedKinds.includes(item?.kind) && String(item?.id || '').trim())
+    : [];
+  if (existing.some(item => item.id === asset.id) || existing.length >= limit) return node;
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      config: {
+        ...(node.data?.config || {}),
+        referenceAssets: [...existing, clone(asset)]
+      }
+    }
+  };
+}
+
+function referenceKindsForNode(type) {
+  if (type === 'image') return ['image'];
+  if (type === 'video') return ['image', 'video'];
+  return [];
+}
+
+function uniqueAssets(assets, limit = 10) {
+  const seen = new Set();
+  return assets.filter(asset => {
+    const id = String(asset?.id || '').trim();
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  }).slice(0, limit);
+}
+
+export function syncNodeReferencesFromEdges({ nodes = [], edges = [] }) {
+  const nodeByID = new Map(nodes.map(node => [node.id, node]));
+  return nodes.map(node => {
+    const supportedKinds = referenceKindsForNode(node?.data?.type);
+    if (!supportedKinds.length) return node;
+
+    const config = node.data?.config || {};
+    const existing = Array.isArray(config.referenceAssets) ? config.referenceAssets : [];
+    const previousAutoIDs = new Set(Array.isArray(config.autoReferenceAssetIDs) ? config.autoReferenceAssetIDs : []);
+    const manualAssets = existing.filter(asset => !previousAutoIDs.has(asset?.id));
+    const automaticAssets = edges
+      .filter(edge => edge?.target === node.id)
+      .map(edge => nodeByID.get(edge.source)?.data?.assetRef)
+      .filter(asset => supportedKinds.includes(asset?.kind));
+    const referenceAssets = uniqueAssets([...manualAssets, ...automaticAssets]);
+    const autoReferenceAssetIDs = referenceAssets
+      .filter(asset => automaticAssets.some(candidate => candidate?.id === asset.id))
+      .map(asset => asset.id);
+    const existingIDs = existing.map(asset => asset?.id || '');
+    const changed = existingIDs.join('|') !== referenceAssets.map(asset => asset.id).join('|') ||
+      (Array.isArray(config.autoReferenceAssetIDs) ? config.autoReferenceAssetIDs : []).join('|') !== autoReferenceAssetIDs.join('|');
+    if (!changed) return node;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        config: { ...config, referenceAssets: referenceAssets.map(clone), autoReferenceAssetIDs }
+      }
+    };
+  });
+}
+
+export function attachImageAsset({ node, asset }) {
+  if (node?.data?.type !== 'image' || asset?.kind !== 'image' || !String(asset?.id || '').trim()) return node;
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      title: String(asset.name || node.data.title || '图片'),
+      assetRef: clone(asset)
+    }
+  };
+}
+
+export function createLinkedNode({ source, id, kind }) {
+  if (!source?.id) throw new Error('source node is required');
+  const position = {
+    x: (Number(source.position?.x) || 0) + 256,
+    y: Number(source.position?.y) || 0
+  };
+  const node = createNodeAt({ id, kind, position });
+  node.data.sourceNodeIds = [source.id];
+  return {
+    node,
+    edge: {
+      id: `edge-${source.id}-${node.id}-reference`,
+      source: source.id,
+      target: node.id,
+      data: { relation: 'reference' }
     }
   };
 }

@@ -252,7 +252,7 @@ func (s *MySQLStore) Canvas(ctx context.Context, owner, id string) (Canvas, erro
 	}
 	canvas.Appearance = normalizeCanvasAppearance(canvas.Appearance, canvas.appearanceConfigured)
 	canvas.appearanceConfigured = true
-	rows, err := s.db.QueryContext(ctx, `SELECT id, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, group_id
+	rows, err := s.db.QueryContext(ctx, `SELECT id, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id
 FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? ORDER BY created_at, id`, id, owner)
 	if err != nil {
 		return Canvas{}, err
@@ -260,9 +260,9 @@ FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? ORDER BY cre
 	canvas.Nodes = make([]Node, 0)
 	for rows.Next() {
 		var node Node
-		var sourceJSON, assetJSON []byte
+		var sourceJSON, assetJSON, configJSON []byte
 		var groupID sql.NullString
-		if err := rows.Scan(&node.ID, &node.Type, &node.Title, &node.Summary, &node.Position.X, &node.Position.Y, &node.Version, &node.Status, &sourceJSON, &assetJSON, &groupID); err != nil {
+		if err := rows.Scan(&node.ID, &node.Type, &node.Title, &node.Summary, &node.Position.X, &node.Position.Y, &node.Version, &node.Status, &sourceJSON, &assetJSON, &configJSON, &groupID); err != nil {
 			rows.Close()
 			return Canvas{}, err
 		}
@@ -274,6 +274,9 @@ FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? ORDER BY cre
 		}
 		if len(assetJSON) > 0 {
 			_ = json.Unmarshal(assetJSON, &node.AssetRef)
+		}
+		if len(configJSON) > 0 {
+			_ = json.Unmarshal(configJSON, &node.Config)
 		}
 		canvas.Nodes = append(canvas.Nodes, node)
 	}
@@ -360,8 +363,12 @@ func insertCanvasItems(ctx context.Context, tx *sql.Tx, owner, id string, canvas
 		if err != nil {
 			return err
 		}
+		configJSON, err := nullableJSON(node.Config)
+		if err != nil {
+			return err
+		}
 		groupID := sql.NullString{String: node.GroupID, Valid: node.GroupID != ""}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvas_nodes (id, project_id, owner_username, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, node.ID, id, owner, node.Type, node.Title, node.Summary, node.Position.X, node.Position.Y, node.Version, node.Status, sourceJSON, assetJSON, groupID, now, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvas_nodes (id, project_id, owner_username, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, node.ID, id, owner, node.Type, node.Title, node.Summary, node.Position.X, node.Position.Y, node.Version, node.Status, sourceJSON, assetJSON, configJSON, groupID, now, now); err != nil {
 			return err
 		}
 		contentJSON, err := json.Marshal(node)

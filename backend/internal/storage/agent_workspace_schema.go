@@ -135,5 +135,37 @@ func AgentWorkspaceMigrations() []Migration {
 			},
 			CallbackChecksum: "v88-agent-project-assets-v1",
 		},
+		{
+			Version: 8800005,
+			SQL: []string{
+				`ALTER TABLE agent_canvas_nodes ADD COLUMN config_json JSON NULL AFTER asset_ref_json`,
+			},
+			CallbackChecksum: "v88-agent-canvas-node-config-v1",
+		},
+		{
+			Version: 8800006,
+			SQL: []string{
+				`CREATE TABLE IF NOT EXISTS agent_video_jobs (
+  id VARCHAR(96) NOT NULL PRIMARY KEY,
+  project_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  node_id VARCHAR(96) NOT NULL,
+  node_version BIGINT NOT NULL,
+  state VARCHAR(32) NOT NULL,
+  model_key VARCHAR(96) NOT NULL,
+  provider_task_id VARCHAR(191) NULL,
+  settings_json JSON NOT NULL,
+  reference_asset_ids_json JSON NOT NULL,
+  result_asset_id VARCHAR(96) NULL,
+  error_message TEXT NULL,
+  idempotency_key VARCHAR(191) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_agent_video_jobs_owner_idempotency (owner_username, idempotency_key),
+  KEY idx_agent_video_jobs_project_node_updated (owner_username, project_id, node_id, updated_at)
+) ENGINE=InnoDB`,
+			},
+			CallbackChecksum: "v88-agent-video-jobs-v1",
+		},
 	}
 }

@@ -52,6 +52,7 @@ type Node struct {
 	Status        string         `json:"status"`
 	Summary       string         `json:"summary"`
 	AssetRef      map[string]any `json:"assetRef,omitempty"`
+	Config        map[string]any `json:"config,omitempty"`
 	GroupID       string         `json:"groupId,omitempty"`
 }
 

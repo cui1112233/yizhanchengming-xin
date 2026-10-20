@@ -10,17 +10,21 @@ import (
 )
 
 type MemoryStore struct {
-	mu       sync.Mutex
-	projects map[string]Project
-	imports  map[string]LegacyImport
+	mu               sync.Mutex
+	projects         map[string]Project
+	imports          map[string]LegacyImport
+	videoJobs        map[string]VideoJob
+	videoIdempotency map[string]string
 }
 
 func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{projects: make(map[string]Project), imports: make(map[string]LegacyImport)}
+	return &MemoryStore{projects: make(map[string]Project), imports: make(map[string]LegacyImport), videoJobs: make(map[string]VideoJob), videoIdempotency: make(map[string]string)}
 }
 
-func projectKey(owner, id string) string  { return owner + "\x00" + id }
-func importKey(owner, path string) string { return owner + "\x00" + path }
+func projectKey(owner, id string) string                   { return owner + "\x00" + id }
+func importKey(owner, path string) string                  { return owner + "\x00" + path }
+func videoJobKey(owner, id string) string                  { return owner + "\x00" + id }
+func videoIdempotencyKey(owner, idempotency string) string { return owner + "\x00" + idempotency }
 
 func cloneProject(project Project) Project {
 	raw, _ := json.Marshal(project)
