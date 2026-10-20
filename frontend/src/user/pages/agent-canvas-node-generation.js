@@ -1,0 +1,39 @@
+const KIND_LABELS = Object.freeze({ text: '文字', image: '图片', video: '视频' });
+
+export function composerModelSelection(kind, config = {}, models = []) {
+  const options = (Array.isArray(models) ? models : [])
+    .filter(model => model?.kind === kind && model?.enabled !== false && String(model?.id || '').trim())
+    .map(model => ({
+      value: String(model.id).trim(),
+      label: String(model.displayName || model.name || model.modelId || model.id).trim()
+    }));
+  const requested = String(config?.modelId || '').trim();
+  const modelId = options.some(option => option.value === requested) ? requested : (options[0]?.value || '');
+  return {
+    modelId,
+    options,
+    disabled: !modelId,
+    message: modelId ? '' : `尚未配置可用的${KIND_LABELS[kind] || ''}模型`
+  };
+}
+
+export function nodeGenerationViewState({ kind, busy = false, error = '', execution = null } = {}) {
+  if (busy || execution?.status === 'running') {
+    return { busy: true, disabled: true, tone: 'running', message: `正在生成${KIND_LABELS[kind] || '内容'}…` };
+  }
+  const message = String(error?.message || error || '').trim();
+  if (message) return { busy: false, disabled: false, tone: 'error', message };
+  if (execution?.status === 'completed') return { busy: false, disabled: false, tone: 'success', message: '生成完成' };
+  return { busy: false, disabled: false, tone: 'idle', message: '' };
+}
+
+export function nodeGenerationIdempotencyKey({ taskId, nodeId, nodeVersion, kind, attempt = 0 } = {}) {
+  return ['agent-node', taskId, nodeId, kind, Number(nodeVersion) || 0, Number(attempt) || 0]
+    .map(value => encodeURIComponent(String(value || '')))
+    .join(':');
+}
+
+export function composerShouldClose(eventState = {}) {
+  if (eventState.insideComposer || eventState.insidePortal) return false;
+  return Boolean(eventState.paneClick || eventState.escape || eventState.switchedNode || eventState.nodeDeleted || eventState.projectChanged);
+}

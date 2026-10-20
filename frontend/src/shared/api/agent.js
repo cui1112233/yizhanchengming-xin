@@ -58,6 +58,18 @@ export function uploadAgentAsset(taskId, file) {
   return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/assets`, { method: 'POST', body });
 }
 
+export function createAgentTextGeneration(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/text-generations`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function createAgentImageGeneration(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/image-generations`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
 export function createAgentVideoJob(taskId, payload) {
   return requestAgentVideoJob(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs`, {
     method: 'POST', body: JSON.stringify(payload)
