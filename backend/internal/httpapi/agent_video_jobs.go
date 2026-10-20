@@ -61,10 +61,22 @@ func RegisterAgentVideoJobRoutes(root *http.ServeMux, middleware BridgeAuth, coo
 		}
 		job, err := coordinator.submit(req.Context(), owner, req.PathValue("id"), input)
 		if err != nil {
-			writeAgentVideoJobError(w, err)
+			writeAgentVideoJobSubmissionError(w, req.Context(), coordinator, owner, job, err)
 			return
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"job": coordinator.viewJob(req.Context(), owner, job)})
+	})
+	handle("GET /api/agent/tasks/{id}/video-jobs", func(w http.ResponseWriter, req *http.Request, owner string) {
+		jobs, err := coordinator.projects.ListVideoJobs(req.Context(), owner, req.PathValue("id"))
+		if err != nil {
+			writeAgentVideoJobError(w, err)
+			return
+		}
+		result := make([]map[string]any, 0, len(jobs))
+		for _, job := range jobs {
+			result = append(result, coordinator.viewJob(req.Context(), owner, job))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"jobs": result})
 	})
 	handle("GET /api/agent/tasks/{id}/video-jobs/{jobID}", func(w http.ResponseWriter, req *http.Request, owner string) {
 		job, err := coordinator.projects.VideoJob(req.Context(), owner, req.PathValue("id"), req.PathValue("jobID"))
@@ -115,7 +127,7 @@ func RegisterAgentVideoJobRoutes(root *http.ServeMux, middleware BridgeAuth, coo
 		request := requestFromJob(current, input.IdempotencyKey)
 		job, err := coordinator.submit(req.Context(), owner, current.ProjectID, request)
 		if err != nil {
-			writeAgentVideoJobError(w, err)
+			writeAgentVideoJobSubmissionError(w, req.Context(), coordinator, owner, job, err)
 			return
 		}
 		writeJSON(w, http.StatusAccepted, map[string]any{"job": coordinator.viewJob(req.Context(), owner, job)})
@@ -157,8 +169,11 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 	submission, err := s.videos.Submit(ctx, owner, scriptVideoLocalInput{ModelKey: job.ModelKey, Prompt: valueString(settings["prompt"]), Duration: settings["duration"], AspectRatio: valueString(settings["aspectRatio"]), Resolution: valueString(settings["resolution"]), ImageURLs: references})
 	if err != nil {
 		job.State, job.ErrorMessage = agentworkspace.VideoJobFailed, err.Error()
-		_, _ = s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
-		return agentworkspace.VideoJob{}, err
+		failedJob, updateErr := s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
+		if updateErr != nil {
+			return agentworkspace.VideoJob{}, updateErr
+		}
+		return failedJob, err
 	}
 	job.State, job.ProviderTaskID, job.ErrorMessage = agentworkspace.VideoJobQueued, submission.TaskID, ""
 	return s.projects.UpdateVideoJob(ctx, owner, job, s.now().UTC())
@@ -306,4 +321,15 @@ func writeAgentVideoJobError(w http.ResponseWriter, err error) {
 	default:
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 	}
+}
+
+func writeAgentVideoJobSubmissionError(w http.ResponseWriter, ctx context.Context, coordinator *agentVideoCoordinator, owner string, job agentworkspace.VideoJob, err error) {
+	if strings.TrimSpace(job.ID) == "" {
+		writeAgentVideoJobError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusBadGateway, map[string]any{
+		"error": err.Error(),
+		"job":   coordinator.viewJob(ctx, owner, job),
+	})
 }

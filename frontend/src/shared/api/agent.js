@@ -59,9 +59,13 @@ export function uploadAgentAsset(taskId, file) {
 }
 
 export function createAgentVideoJob(taskId, payload) {
-  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs`, {
-    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  return requestAgentVideoJob(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs`, {
+    method: 'POST', body: JSON.stringify(payload)
   });
+}
+
+export function listAgentVideoJobs(taskId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs`, { suppressGlobalError: true });
 }
 
 export function getAgentVideoJob(taskId, jobId) {
@@ -81,10 +85,20 @@ export function cancelAgentVideoJob(taskId, jobId) {
 }
 
 export function retryAgentVideoJob(taskId, jobId, idempotencyKey) {
-  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs/${encodeURIComponent(jobId)}/retry`, {
-    method: 'POST', body: JSON.stringify({ idempotencyKey }), suppressGlobalError: true
+  return requestAgentVideoJob(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-jobs/${encodeURIComponent(jobId)}/retry`, {
+    method: 'POST', body: JSON.stringify({ idempotencyKey })
   });
 }
+
+async function requestAgentVideoJob(path, options) {
+  const result = await apiRequest(path, { ...options, allowStatuses: [httpBadGateway], suppressGlobalError: true });
+  if (result?.job) return result;
+  const error = new Error(result?.error || '视频任务提交失败');
+  error.status = httpBadGateway;
+  throw error;
+}
+
+const httpBadGateway = 502;
 
 export function listAgentSkills() {
   return apiRequest('/api/agent/skills');

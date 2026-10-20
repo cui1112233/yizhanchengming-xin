@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from './agent-canvas-video-jobs.js';
+import * as videoJobs from './agent-canvas-video-jobs.js';
+
+const { canSubmitVideoFromConfig, collectVideoReferences, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } = videoJobs;
 
 test('video creation requires a non-empty prompt from the inline node settings', () => {
   assert.equal(canSubmitVideoFromConfig({ prompt: '' }), false);
@@ -54,4 +56,39 @@ test('videoResultPreview exposes only a playable public video reference', () => 
   });
   assert.equal(videoResultPreview({ resultAsset: { id: 'result-1', kind: 'video' } }), null);
   assert.equal(videoResultPreview({ resultAsset: { id: 'result-1', kind: 'image', url: '/image' } }), null);
+});
+
+test('restored video jobs keep only the newest job for each node in the active project', () => {
+  assert.equal(typeof videoJobs.mergeLatestVideoJobsByNode, 'function');
+  if (typeof videoJobs.mergeLatestVideoJobsByNode !== 'function') return;
+  const restored = videoJobs.mergeLatestVideoJobsByNode({}, [
+    { id: 'new-confirm', projectId: 'project-1', nodeId: 'video-1', state: 'awaiting_confirmation', updatedAt: '2026-10-20T02:05:00Z' },
+    { id: 'old-failed', projectId: 'project-1', nodeId: 'video-1', state: 'failed', updatedAt: '2026-10-20T02:00:00Z' },
+    { id: 'retryable', projectId: 'project-1', nodeId: 'video-2', state: 'failed', errorMessage: 'provider failed', updatedAt: '2026-10-20T02:03:00Z' },
+    { id: 'foreign', projectId: 'project-2', nodeId: 'video-3', state: 'running', updatedAt: '2026-10-20T02:06:00Z' }
+  ], 'project-1');
+  assert.deepEqual(Object.fromEntries(Object.entries(restored).map(([nodeID, job]) => [nodeID, job.id])), {
+    'video-1': 'new-confirm',
+    'video-2': 'retryable'
+  });
+  assert.equal(videoNodeViewState(restored['video-1']).canConfirm, true);
+  assert.equal(videoNodeViewState(restored['video-2']).canRetry, true);
+});
+
+test('stale list and poll responses cannot overwrite a newer local job or another project', () => {
+  assert.equal(typeof videoJobs.mergeLatestVideoJobsByNode, 'function');
+  assert.equal(typeof videoJobs.shouldAcceptVideoJobResponse, 'function');
+  if (typeof videoJobs.mergeLatestVideoJobsByNode !== 'function' || typeof videoJobs.shouldAcceptVideoJobResponse !== 'function') return;
+  const current = { 'video-1': { id: 'local-new', projectId: 'project-1', nodeId: 'video-1', state: 'queued', updatedAt: '2026-10-20T02:10:00Z' } };
+  const merged = videoJobs.mergeLatestVideoJobsByNode(current, [
+    { id: 'stale-list', projectId: 'project-1', nodeId: 'video-1', state: 'failed', updatedAt: '2026-10-20T02:05:00Z' }
+  ], 'project-1');
+  assert.equal(merged['video-1'].id, 'local-new');
+  const progressed = videoJobs.mergeLatestVideoJobsByNode(current, [
+    { id: 'local-new', projectId: 'project-1', nodeId: 'video-1', state: 'awaiting_confirmation', updatedAt: '2026-10-20T02:10:00Z' }
+  ], 'project-1');
+  assert.equal(progressed['video-1'].state, 'awaiting_confirmation');
+  assert.equal(videoJobs.shouldAcceptVideoJobResponse({ requestedTaskId: 'project-1', currentTaskId: 'project-2', active: true }), false);
+  assert.equal(videoJobs.shouldAcceptVideoJobResponse({ requestedTaskId: 'project-1', currentTaskId: 'project-1', active: false }), false);
+  assert.equal(videoJobs.shouldAcceptVideoJobResponse({ requestedTaskId: 'project-1', currentTaskId: 'project-1', active: true }), true);
 });

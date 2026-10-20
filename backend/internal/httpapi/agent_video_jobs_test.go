@@ -191,6 +191,102 @@ func TestAgentVideoJobRoutesSaveResultBeforeConfirmingCanvasNode(t *testing.T) {
 	}
 }
 
+func TestAgentVideoJobListRouteIsOwnerProjectScoped(t *testing.T) {
+	now := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
+	projects := agentworkspace.NewMemoryStore()
+	for _, item := range []struct{ owner, id string }{{"alice", "agent-1"}, {"alice", "agent-2"}, {"bob", "agent-1"}} {
+		if err := projects.CreateProject(context.Background(), item.owner, agentworkspace.Project{ID: item.id, Title: "项目", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, input := range []struct{ owner, id, projectID, nodeID, key string }{
+		{"alice", "alice-current", "agent-1", "video-1", "alice-current-key"},
+		{"alice", "alice-other-project", "agent-2", "video-2", "alice-other-key"},
+		{"bob", "bob-current", "agent-1", "video-3", "bob-current-key"},
+	} {
+		if _, err := projects.CreateVideoJob(context.Background(), input.owner, agentworkspace.CreateVideoJobInput{
+			ID: input.id, ProjectID: input.projectID, NodeID: input.nodeID, NodeVersion: 1,
+			ModelKey: "minimax-h3-video", IdempotencyKey: input.key, Now: now,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assets := agentworkspace.NewMemoryAssetStore()
+	coordinator := &agentVideoCoordinator{projects: projects, assets: assets, videos: &scriptVideoService{}, ingestor: &agentVideoAssetIngestor{}, now: func() time.Time { return now }}
+	mux := http.NewServeMux()
+	RegisterAgentVideoJobRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, coordinator)
+
+	request := agentVideoJSONRequest(t, now, http.MethodGet, "/api/agent/tasks/agent-1/video-jobs", "")
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("list=%d %s", recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Jobs []agentworkspace.VideoJob `json:"jobs"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Jobs) != 1 || payload.Jobs[0].ID != "alice-current" {
+		t.Fatalf("jobs=%+v", payload.Jobs)
+	}
+}
+
+func TestAgentVideoJobImmediateProviderFailureReturnsPersistedFailedJob(t *testing.T) {
+	now := time.Date(2026, 10, 20, 2, 30, 0, 0, time.UTC)
+	projects := agentworkspace.NewMemoryStore()
+	if err := projects.CreateProject(context.Background(), "alice", agentworkspace.Project{
+		ID: "agent-1", Title: "项目", CreatedAt: now, UpdatedAt: now,
+		Canvas: agentworkspace.Canvas{Version: 1, Nodes: []agentworkspace.Node{{ID: "video-1", Type: "video", Title: "镜头", Version: 1, Status: "draft"}}, Edges: []agentworkspace.Edge{}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "provider unavailable", http.StatusServiceUnavailable)
+	}))
+	defer provider.Close()
+	client := provider.Client()
+	transport := client.Transport
+	client.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		copyReq := req.Clone(req.Context())
+		parsed, err := url.Parse(provider.URL + req.URL.Path)
+		if err != nil {
+			return nil, err
+		}
+		copyReq.URL = parsed
+		return transport.RoundTrip(copyReq)
+	})
+	resolver := func(context.Context, string, string) (batchfactoryv11.VideoProviderConfig, error) {
+		return batchfactoryv11.VideoProviderConfig{Provider: batchfactoryv11.VideoProviderAutoDLH3, APIKey: "secret", Model: batchfactoryv11.AutoDLH3Model, CreateURL: "https://autodl.art/api/v1/comfyui/comfyui_workflow/{workflow}", TasksURL: "https://autodl.art/api/v1/comfyui/comfyui_workflow/result/{id}", WorkflowID: batchfactoryv11.AutoDLH3NoImageWorkflow}, nil
+	}
+	assets := agentworkspace.NewMemoryAssetStore()
+	coordinator := &agentVideoCoordinator{projects: projects, assets: assets, videos: &scriptVideoService{resolver: resolver, client: client}, ingestor: &agentVideoAssetIngestor{}, now: func() time.Time { return now }}
+	mux := http.NewServeMux()
+	RegisterAgentVideoJobRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, coordinator)
+
+	request := agentVideoJSONRequest(t, now, http.MethodPost, "/api/agent/tasks/agent-1/video-jobs", `{"nodeId":"video-1","idempotencyKey":"immediate-failure","prompt":"雨夜追逐","modelKey":"minimax-h3-video","duration":10}`)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("create=%d %s", recorder.Code, recorder.Body.String())
+	}
+	var payload struct {
+		Job   agentworkspace.VideoJob `json:"job"`
+		Error string                  `json:"error"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Job.ID == "" || payload.Job.State != agentworkspace.VideoJobFailed || payload.Job.ErrorMessage == "" || payload.Error == "" {
+		t.Fatalf("payload=%+v", payload)
+	}
+	stored, err := projects.VideoJob(context.Background(), "alice", "agent-1", payload.Job.ID)
+	if err != nil || stored.State != agentworkspace.VideoJobFailed {
+		t.Fatalf("stored=%+v err=%v", stored, err)
+	}
+}
+
 func agentVideoJSONRequest(t *testing.T, now time.Time, method, target, body string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, target, strings.NewReader(body))

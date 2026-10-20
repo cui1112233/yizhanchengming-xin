@@ -22,9 +22,9 @@ import {
   appendReferenceAsset, attachImageAsset, copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes,
   shouldOpenConnectionDrop, syncNodeReferencesFromEdges
 } from '../pages/agent-canvas-context-menu';
-import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
+import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from '../pages/agent-canvas-video-jobs';
+import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoResultPreview } from '../pages/agent-canvas-video-jobs';
 import { isMediaCanvasNodeType, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 
@@ -225,6 +225,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const [manualNode, setManualNode] = useState(null);
   const [manualNodeDraft, setManualNodeDraft] = useState({ title: '', summary: '', status: 'draft', config: {} });
   const [videoJobs, setVideoJobs] = useState({});
+  const [videoJobsLoadedTaskID, setVideoJobsLoadedTaskID] = useState('');
+  const [videoJobsLoadError, setVideoJobsLoadError] = useState('');
   const [videoBusyByNode, setVideoBusyByNode] = useState({});
   const [videoActionErrors, setVideoActionErrors] = useState({});
   const [configuredImageModels, setConfiguredImageModels] = useState([]);
@@ -244,6 +246,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   const connectionSourceRef = useRef('');
   const connectionCompletedRef = useRef(false);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
+  const taskIdRef = useRef(taskId);
+  taskIdRef.current = taskId;
 
   const configuredImageModelOptions = useMemo(() => modelSelectOptions(configuredImageModels, 'image'), [configuredImageModels]);
   const configuredVideoModelOptions = useMemo(() => {
@@ -286,28 +290,31 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     openManualNode(nodesRef.current.find(node => node.id === nodeID));
   }, [openManualNode]);
   const canvasNodeTypes = useMemo(() => ({
-    agent: props => <CanvasNode
-      {...props}
-      isEditorOpen={activeEditorNodeID === props.id}
-      onOpenEditor={setActiveEditorNodeID}
-      onManualEdit={handleNodeContentDoubleClick}
-      onPickImageAsset={openImageAssetPicker}
-      onPickReferenceAsset={openReferenceAssetPanel}
-      onRemoveReference={removeReference}
-      onNodeConfigChange={handleNodeConfigChange}
-      onSubmitVideo={submitVideoForNode}
-      onCancelVideo={cancelVideo}
-      onRetryVideo={retryVideo}
-      onConfirmVideo={confirmVideo}
-      videoJob={videoJobs[props.id] || null}
-      videoState={videoNodeViewState(videoJobs[props.id])}
-      videoBusy={Boolean(videoBusyByNode[props.id])}
-      videoActionError={videoActionErrors[props.id] || ''}
-      imageModelOptions={configuredImageModelOptions}
-      videoModelOptions={configuredVideoModelOptions}
-      modelLoadError={modelLoadError}
-    />
-  }), [activeEditorNodeID, configuredImageModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError, videoActionErrors, videoBusyByNode, videoJobs]);
+    agent: props => {
+      const videoJob = videoJobs[props.id]?.projectId === taskId ? videoJobs[props.id] : null;
+      return <CanvasNode
+        {...props}
+        isEditorOpen={activeEditorNodeID === props.id}
+        onOpenEditor={setActiveEditorNodeID}
+        onManualEdit={handleNodeContentDoubleClick}
+        onPickImageAsset={openImageAssetPicker}
+        onPickReferenceAsset={openReferenceAssetPanel}
+        onRemoveReference={removeReference}
+        onNodeConfigChange={handleNodeConfigChange}
+        onSubmitVideo={submitVideoForNode}
+        onCancelVideo={cancelVideo}
+        onRetryVideo={retryVideo}
+        onConfirmVideo={confirmVideo}
+        videoJob={videoJob}
+        videoState={videoNodeViewState(videoJob)}
+        videoBusy={videoJobsLoadedTaskID !== taskId || Boolean(videoBusyByNode[props.id])}
+        videoActionError={videoActionErrors[props.id] || (videoJobsLoadedTaskID !== taskId ? videoJobsLoadError : '')}
+        imageModelOptions={configuredImageModelOptions}
+        videoModelOptions={configuredVideoModelOptions}
+        modelLoadError={modelLoadError}
+      />;
+    }
+  }), [activeEditorNodeID, configuredImageModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -344,21 +351,43 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   }, [canvas]);
 
   useEffect(() => {
+    const requestedTaskId = taskId;
+    let active = true;
+    setVideoJobs({});
+    setVideoJobsLoadedTaskID('');
+    setVideoJobsLoadError('');
+    setVideoBusyByNode({});
+    setVideoActionErrors({});
+    if (!requestedTaskId) return () => { active = false; };
+    listAgentVideoJobs(requestedTaskId)
+      .then(result => {
+        if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current, active })) return;
+        setVideoJobs(current => mergeLatestVideoJobsByNode(current, result?.jobs, requestedTaskId));
+        setVideoJobsLoadedTaskID(requestedTaskId);
+      })
+      .catch(error => {
+        if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current, active })) return;
+        setVideoJobsLoadError(error?.message || '视频任务状态加载失败，请刷新重试');
+      });
+    return () => { active = false; };
+  }, [taskId]);
+
+  useEffect(() => {
     if (!taskId) return undefined;
+    if (videoJobsLoadedTaskID !== taskId) return undefined;
+    const requestedTaskId = taskId;
+    let active = true;
     const pending = Object.values(videoJobs).filter(job => videoNodeViewState(job).polling);
     if (!pending.length) return undefined;
     const timer = window.setTimeout(async () => {
       const updates = await Promise.all(pending.map(async job => {
-        try { return (await getAgentVideoJob(taskId, job.id)).job; } catch (_) { return null; }
+        try { return (await getAgentVideoJob(requestedTaskId, job.id)).job; } catch (_) { return null; }
       }));
-      setVideoJobs(current => {
-        const next = { ...current };
-        updates.filter(Boolean).forEach(job => { next[job.nodeId] = job; });
-        return next;
-      });
+      if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current, active })) return;
+      setVideoJobs(current => mergeLatestVideoJobsByNode(current, updates.filter(Boolean), requestedTaskId));
     }, 2500);
-    return () => window.clearTimeout(timer);
-  }, [taskId, videoJobs]);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [taskId, videoJobs, videoJobsLoadedTaskID]);
 
   function emitChange(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
@@ -525,7 +554,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   }
 
   async function submitVideoForNode(nodeID, ignoreReferences = false) {
-    if (!taskId) return;
+    const requestedTaskId = taskId;
+    if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId) return;
     const node = nodesRef.current.find(item => item.id === nodeID);
     if (!node || node.data?.type !== 'video') return;
     const payload = videoRequestPayloadForNode(node, ignoreReferences);
@@ -533,9 +563,11 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
     setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
-      const result = await createAgentVideoJob(taskId, payload);
-      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
+      const result = await createAgentVideoJob(requestedTaskId, payload);
+      if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) return;
+      setVideoJobs(current => mergeLatestVideoJobsByNode(current, [result.job], requestedTaskId));
     } catch (error) {
+      if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) return;
       if (!ignoreReferences && String(error?.responseText || '').includes('UNSUPPORTED_REFERENCE_IMAGES')) {
         Modal.confirm({
           title: '当前模型不支持参考图',
@@ -547,53 +579,59 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '视频任务创建失败' }));
       }
     } finally {
-      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
   }
 
   async function cancelVideo(nodeID) {
+    const requestedTaskId = taskId;
     const job = videoJobs[nodeID];
-    if (!taskId || !job) return;
+    if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId || !job) return;
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
     setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
-      const result = await cancelAgentVideoJob(taskId, job.id);
-      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
+      const result = await cancelAgentVideoJob(requestedTaskId, job.id);
+      if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) return;
+      setVideoJobs(current => mergeLatestVideoJobsByNode(current, [result.job], requestedTaskId));
     } catch (error) {
-      setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '取消视频任务失败' }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '取消视频任务失败' }));
     } finally {
-      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
   }
 
   async function retryVideo(nodeID) {
+    const requestedTaskId = taskId;
     const job = videoJobs[nodeID];
-    if (!taskId || !job) return;
+    if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId || !job) return;
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
     setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
-      const result = await retryAgentVideoJob(taskId, job.id, makeVideoJobIdempotencyKey());
-      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
+      const result = await retryAgentVideoJob(requestedTaskId, job.id, makeVideoJobIdempotencyKey());
+      if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) return;
+      setVideoJobs(current => mergeLatestVideoJobsByNode(current, [result.job], requestedTaskId));
     } catch (error) {
-      setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '重试视频任务失败' }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '重试视频任务失败' }));
     } finally {
-      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
   }
 
   async function confirmVideo(nodeID) {
+    const requestedTaskId = taskId;
     const job = videoJobs[nodeID];
-    if (!taskId || !job) return;
+    if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId || !job) return;
     setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
     setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
     try {
-      const result = await confirmAgentVideoJob(taskId, job.id);
-      setVideoJobs(current => ({ ...current, [nodeID]: result.job }));
+      const result = await confirmAgentVideoJob(requestedTaskId, job.id);
+      if (!shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) return;
+      setVideoJobs(current => mergeLatestVideoJobsByNode(current, [result.job], requestedTaskId));
       await onServerCanvasChange?.();
     } catch (error) {
-      setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '确认回填失败' }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoActionErrors(current => ({ ...current, [nodeID]: error?.message || '确认回填失败' }));
     } finally {
-      setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+      if (shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId: taskIdRef.current })) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
     }
   }
 

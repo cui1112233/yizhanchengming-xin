@@ -32,3 +32,20 @@ test('loaded and serialized nodes both use the canonical type', () => {
   assert.match(canvasSource, /type:\s*normalizeCanvasNodeType\(node\.data\.type\)/);
   assert.ok(workspaceStyles.includes('.agent-page .agent-canvas-generation-panel'));
 });
+
+test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
+  for (const label of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
+    assert.match(canvasSource, new RegExp(`aria-label="${label}"`));
+  }
+  assert.match(canvasSource, /onSubmitVideo\?\.\(id\)/);
+  assert.match(canvasSource, /onCancelVideo\?\.\(id\)/);
+  assert.match(canvasSource, /onRetryVideo\?\.\(id\)/);
+  assert.match(canvasSource, /onConfirmVideo\?\.\(id\)/);
+  assert.match(canvasSource, /videoState=\{videoNodeViewState\(/);
+});
+
+test('canvas restores project video jobs and rejects stale project responses', () => {
+  assert.match(canvasSource, /listAgentVideoJobs\(requestedTaskId\)/);
+  assert.match(canvasSource, /shouldAcceptVideoJobResponse\(\{[\s\S]*?requestedTaskId[\s\S]*?currentTaskId:/);
+  assert.match(canvasSource, /mergeLatestVideoJobsByNode\(current,/);
+});

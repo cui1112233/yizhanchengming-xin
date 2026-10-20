@@ -305,10 +305,11 @@ test('canvas keeps media asset actions in the opened editor instead of the manua
 });
 
 test('expanded video editor exposes create cancel retry confirm and per-node errors', () => {
-  assert.match(canvasSource, /videoJob=\{videoJobs\[props\.id\]\s*\|\|\s*null\}/);
-  assert.match(canvasSource, /videoState=\{videoNodeViewState\(videoJobs\[props\.id\]\)\}/);
-  assert.match(canvasSource, /videoBusy=\{Boolean\(videoBusyByNode\[props\.id\]\)\}/);
-  assert.match(canvasSource, /videoActionError=\{videoActionErrors\[props\.id\]\s*\|\|\s*''\}/);
+  assert.match(canvasSource, /const videoJob = videoJobs\[props\.id\]\?\.projectId === taskId/);
+  assert.match(canvasSource, /videoJob=\{videoJob\}/);
+  assert.match(canvasSource, /videoState=\{videoNodeViewState\(videoJob\)\}/);
+  assert.match(canvasSource, /videoBusy=\{videoJobsLoadedTaskID !== taskId \|\| Boolean\(videoBusyByNode\[props\.id\]\)\}/);
+  assert.match(canvasSource, /videoActionError=\{videoActionErrors\[props\.id\] \|\| \(videoJobsLoadedTaskID !== taskId \? videoJobsLoadError : ''\)\}/);
   for (const action of ['生成视频', '取消视频任务', '重试视频任务', '确认视频结果']) {
     assert.match(canvasSource, new RegExp(`aria-label="${action}"`));
   }

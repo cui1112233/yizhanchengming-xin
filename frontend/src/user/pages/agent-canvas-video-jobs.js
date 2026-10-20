@@ -49,6 +49,51 @@ export function videoNodeViewState(job) {
   };
 }
 
+function videoJobUpdatedAt(job) {
+  const timestamp = Date.parse(String(job?.updatedAt || ''));
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function videoJobStateRank(job) {
+  return {
+    preparing: 0,
+    queued: 1,
+    running: 2,
+    result_ready: 3,
+    awaiting_confirmation: 4,
+    failed: 5,
+    canceled: 5,
+    abandoned: 5,
+    applied: 6
+  }[String(job?.state || '')] ?? -1;
+}
+
+export function mergeLatestVideoJobsByNode(current = {}, jobs = [], projectId = '') {
+  const activeProjectId = String(projectId || '').trim();
+  const next = {};
+  const candidates = [
+    ...Object.values(current && typeof current === 'object' ? current : {}),
+    ...(Array.isArray(jobs) ? jobs : [])
+  ];
+  for (const job of candidates) {
+    const nodeId = String(job?.nodeId || '').trim();
+    if (!nodeId || String(job?.projectId || '').trim() !== activeProjectId) continue;
+    const existing = next[nodeId];
+    const incomingTime = videoJobUpdatedAt(job);
+    const existingTime = videoJobUpdatedAt(existing);
+    const sameJobProgressed = existing?.id === job?.id
+      && incomingTime === existingTime
+      && videoJobStateRank(job) >= videoJobStateRank(existing);
+    if (!existing || incomingTime > existingTime || sameJobProgressed) next[nodeId] = job;
+  }
+  return next;
+}
+
+export function shouldAcceptVideoJobResponse({ requestedTaskId, currentTaskId, active = true } = {}) {
+  const requested = String(requestedTaskId || '').trim();
+  return Boolean(active && requested && requested === String(currentTaskId || '').trim());
+}
+
 export function makeVideoJobIdempotencyKey() {
   const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `agent-video-${random}`;
