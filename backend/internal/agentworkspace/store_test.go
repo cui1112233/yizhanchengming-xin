@@ -2,6 +2,7 @@ package agentworkspace
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -103,6 +104,10 @@ func TestEmptyCanvasUsesPersistentAppearanceDefaults(t *testing.T) {
 	appearance := EmptyCanvas().Appearance
 	if appearance.EdgeColor != "coral" || !appearance.EdgeAnimated || appearance.EdgeWidth != "default" || !appearance.BackgroundDots || !appearance.AlignmentGuides {
 		t.Fatalf("appearance=%+v", appearance)
+	}
+	appearanceJSON, err := json.Marshal(appearance)
+	if err != nil || string(appearanceJSON) != `{"edgeColor":"coral","edgeAnimated":true,"edgeWidth":"default","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}` {
+		t.Fatalf("appearance JSON=%s err=%v", appearanceJSON, err)
 	}
 }
 

@@ -69,6 +69,7 @@ type Appearance struct {
 	EdgeWidth       string `json:"edgeWidth"`
 	BackgroundDots  bool   `json:"backgroundDots"`
 	AlignmentGuides bool   `json:"alignmentGuides"`
+	EdgesVisible    bool   `json:"edgesVisible"`
 }
 
 func DefaultAppearance() Appearance {
@@ -78,7 +79,18 @@ func DefaultAppearance() Appearance {
 		EdgeWidth:       "default",
 		BackgroundDots:  true,
 		AlignmentGuides: true,
+		EdgesVisible:    true,
 	}
+}
+
+func (appearance *Appearance) UnmarshalJSON(data []byte) error {
+	type appearanceAlias Appearance
+	decoded := appearanceAlias(DefaultAppearance())
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*appearance = Appearance(decoded)
+	return nil
 }
 
 func normalizeCanvasAppearance(input Appearance, configured bool) Appearance {
@@ -95,6 +107,7 @@ func normalizeCanvasAppearance(input Appearance, configured bool) Appearance {
 	appearance.EdgeAnimated = input.EdgeAnimated
 	appearance.BackgroundDots = input.BackgroundDots
 	appearance.AlignmentGuides = input.AlignmentGuides
+	appearance.EdgesVisible = input.EdgesVisible
 	return appearance
 }
 
