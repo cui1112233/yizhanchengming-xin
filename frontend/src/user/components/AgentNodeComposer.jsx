@@ -5,6 +5,8 @@ import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { videoResultPreview } from '../pages/agent-canvas-video-jobs';
 import { submitNodeGeneration } from '../pages/agent-canvas-node-generation';
 import { imageNodeSettingsSummary, normalizeImageNodeSettings } from '../pages/agent-canvas-image-settings';
+import { reconcileNodeModel } from '../pages/agent-model-capabilities';
+import { AgentModelPicker } from './AgentModelPicker';
 
 const PROMPT_LABELS = { text: '文字生成要求', image: '图片提示词', video: '视频提示词' };
 const PROMPT_PLACEHOLDERS = {
@@ -14,7 +16,7 @@ const PROMPT_PLACEHOLDERS = {
 };
 
 export default function AgentNodeComposer({
-  node, modelOptions = [], modelLoadError = '', generationState = {},
+  node, models = [], modelLoadError = '', generationState = {},
   onConfigChange, onPickImageAsset, onPickReferenceAsset, onRemoveReference, onSubmit,
   videoJob, videoState = {}, videoBusy = false, videoActionError = '',
   onCancelVideo, onRetryVideo, onConfirmVideo
@@ -23,9 +25,8 @@ export default function AgentNodeComposer({
   if (!['text', 'image', 'video'].includes(kind)) return null;
   const config = node.data?.config || {};
   const references = Array.isArray(config.referenceAssets) ? config.referenceAssets : [];
-  const selectedModel = modelOptions.some(option => option.value === config.model)
-    ? config.model
-    : (modelOptions[0]?.value || '');
+  const modelState = reconcileNodeModel(config, models, kind);
+  const selectedModel = modelState.modelId;
   const prompt = String(config.prompt || '');
   const imageSettings = normalizeImageNodeSettings(config);
   const busy = kind === 'video' ? videoBusy : Boolean(generationState.busy);
@@ -33,7 +34,7 @@ export default function AgentNodeComposer({
     ? (videoJob?.errorMessage || videoActionError)
     : String(generationState.error?.message || generationState.error || '');
   const videoResult = kind === 'video' ? videoResultPreview(videoJob) : null;
-  const submitDisabled = busy || !prompt.trim() || !selectedModel || (kind === 'video' && !videoState.canGenerate);
+  const submitDisabled = busy || !prompt.trim() || !selectedModel || !modelState.available || (kind === 'video' && !videoState.canGenerate);
   const update = patch => onConfigChange?.(node.id, patch);
   const stop = event => event.stopPropagation();
 
@@ -68,9 +69,7 @@ export default function AgentNodeComposer({
     />
 
     <div className="agent-node-composer__toolbar">
-      {kind === 'text' ? <Select aria-label="文字模型" className="agent-node-composer__model" variant="borderless" size="small" value={selectedModel || undefined} placeholder={modelLoadError || '选择文字模型'} options={modelOptions} onChange={model => update({ model })} /> : null}
-      {kind === 'image' ? <Select aria-label="图片模型" className="agent-node-composer__model" variant="borderless" size="small" value={selectedModel || undefined} placeholder={modelLoadError || '选择图片模型'} options={modelOptions} onChange={model => update({ model })} /> : null}
-      {kind === 'video' ? <Select aria-label="视频模型" className="agent-node-composer__model" variant="borderless" size="small" value={selectedModel || undefined} placeholder={modelLoadError || '选择视频模型'} options={modelOptions} onChange={model => update({ model })} /> : null}
+      <AgentModelPicker kind={kind} config={config} models={models} disabled={busy} onChange={update} />
 
       {kind === 'image' ? <Popover
         placement="bottom"
@@ -98,7 +97,7 @@ export default function AgentNodeComposer({
       {kind === 'video' && videoState.canCancel ? <button type="button" onClick={() => onCancelVideo?.(node.id)} disabled={busy}>取消</button> : null}
       {kind === 'video' && videoState.canRetry ? <button type="button" onClick={() => onRetryVideo?.(node.id)} disabled={busy}>重试</button> : null}
       {kind === 'video' && videoState.canConfirm ? <button type="button" onClick={() => onConfirmVideo?.(node.id)} disabled={busy}>确认</button> : null}
-      <button type="button" className="agent-node-composer__submit" aria-label={`生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : '视频'}`} title={selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型'} disabled={submitDisabled} onPointerDown={stop} onClick={event => submitNodeGeneration({ event, onSubmit, nodeID: node.id, modelID: selectedModel })}>
+      <button type="button" className="agent-node-composer__submit" aria-label={`生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : '视频'}`} title={modelLoadError || modelState.reason || (selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型')} disabled={submitDisabled} onPointerDown={stop} onClick={event => submitNodeGeneration({ event, onSubmit, nodeID: node.id, modelID: selectedModel })}>
         <ArrowUp size={17} /><span>生成</span>
       </button>
     </div>

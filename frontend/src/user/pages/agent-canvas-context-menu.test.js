@@ -384,8 +384,9 @@ test('canvas keeps middle mouse panning and advertises only implemented undo red
 
 test('canvas reads text image and video models from the shared API configuration instead of hard-coding its own catalog', () => {
   assert.match(canvasSource, /\['text', 'image', 'video'\]\.map\(kind => listAvailableModels\(kind\)\)/);
-  assert.match(canvasSource, /configuredTextModelOptions/);
-  assert.match(canvasSource, /configuredImageModelOptions/);
-  assert.match(canvasSource, /configuredVideoModelOptions/);
+  assert.match(canvasSource, /configuredTextModels/);
+  assert.match(canvasSource, /configuredImageModels/);
+  assert.match(canvasSource, /configuredVideoModels/);
+  assert.match(canvasSource, /models=\{models\}/);
   assert.doesNotMatch(canvasSource, /value=\{imageConfig\.model \|\| 'seedream-5-flash-local'\}/);
 });

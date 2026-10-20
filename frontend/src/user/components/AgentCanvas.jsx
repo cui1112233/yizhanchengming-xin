@@ -25,8 +25,8 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences } from '../pages/agent-canvas-connections';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentImageGeneration, createAgentTextGeneration, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
-import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { agentCanvasModelOptions, nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
+import { listAvailableModels } from '../../shared/api/modelCatalog';
+import { nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
 import { imageGenerationRequestSettings } from '../pages/agent-canvas-image-settings';
 import { normalizeNodeConfig, patchNodeConfig } from '../pages/agent-node-config';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
@@ -39,7 +39,7 @@ import AgentNodeComposer from './AgentNodeComposer';
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
   onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onCancelVideo, onRetryVideo, onConfirmVideo,
-  videoJob, videoState, videoBusy, videoActionError, generationState, modelOptions, modelLoadError,
+  videoJob, videoState, videoBusy, videoActionError, generationState, models, modelLoadError,
   selected, isEditorOpen, onOpenEditor
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
@@ -59,7 +59,7 @@ function CanvasNode({
   const nodeType = normalizeCanvasNodeType(data.type);
   const composer = isEditorOpen ? <AgentNodeComposer
     node={{ id, data }}
-    modelOptions={modelOptions}
+    models={models}
     modelLoadError={modelLoadError}
     generationState={generationState}
     onConfigChange={onNodeConfigChange}
@@ -231,10 +231,6 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
   const taskIdRef = useRef(taskId);
   taskIdRef.current = taskId;
 
-  const configuredTextModelOptions = useMemo(() => modelSelectOptions(configuredTextModels, 'text'), [configuredTextModels]);
-  const configuredImageModelOptions = useMemo(() => agentCanvasModelOptions(modelSelectOptions(configuredImageModels, 'image'), 'image'), [configuredImageModels]);
-  const configuredVideoModelOptions = useMemo(() => agentCanvasModelOptions(modelSelectOptions(configuredVideoModels, 'video'), 'video'), [configuredVideoModels]);
-
   useEffect(() => {
     let active = true;
     Promise.all(['text', 'image', 'video'].map(kind => listAvailableModels(kind)))
@@ -280,7 +276,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
     agent: props => {
       const videoJob = videoJobs[props.id]?.projectId === taskId ? videoJobs[props.id] : null;
       const kind = normalizeCanvasNodeType(props.data?.type);
-      const modelOptions = kind === 'text' ? configuredTextModelOptions : kind === 'image' ? configuredImageModelOptions : configuredVideoModelOptions;
+      const models = kind === 'text' ? configuredTextModels : kind === 'image' ? configuredImageModels : configuredVideoModels;
       return <CanvasNode
         {...props}
         isEditorOpen={activeEditorNodeID === props.id}
@@ -301,11 +297,11 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
         videoBusy={videoJobsLoadedTaskID !== taskId || Boolean(videoBusyByNode[props.id])}
         videoActionError={videoActionErrors[props.id] || (videoJobsLoadedTaskID !== taskId ? videoJobsLoadError : '')}
         generationState={nodeGenerationByNode[props.id] || {}}
-        modelOptions={modelOptions}
+        models={models}
         modelLoadError={modelLoadError}
       />;
     }
-  }), [activeEditorNodeID, configuredImageModelOptions, configuredTextModelOptions, configuredVideoModelOptions, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+  }), [activeEditorNodeID, configuredImageModels, configuredTextModels, configuredVideoModels, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))

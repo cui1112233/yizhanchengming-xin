@@ -13,9 +13,8 @@ test('canvas renders one adaptive composer for text image and video nodes', () =
   assert.match(canvasSource, /import AgentNodeComposer from '\.\/AgentNodeComposer'/);
   assert.match(canvasSource, /<AgentNodeComposer/);
   assert.match(composerSource, /\['text', 'image', 'video'\]\.includes\(kind\)/);
-  assert.match(composerSource, /aria-label="文字模型"/);
-  assert.match(composerSource, /aria-label="图片模型"/);
-  assert.match(composerSource, /aria-label="视频模型"/);
+  assert.match(composerSource, /<AgentModelPicker kind=\{kind\}/);
+  assert.match(composerSource, /reconcileNodeModel\(config, models, kind\)/);
 });
 
 test('canvas loads all configured model kinds and calls real text and image APIs', () => {
