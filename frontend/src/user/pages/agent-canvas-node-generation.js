@@ -1,4 +1,15 @@
 const KIND_LABELS = Object.freeze({ text: '文字', image: '图片', video: '视频' });
+const LOCAL_EXECUTOR_MODELS = Object.freeze({
+  image: { value: 'local-doubao-executor-image', label: '豆包本地执行器（图片）' },
+  video: { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' }
+});
+
+export function agentCanvasModelOptions(options = [], kind = '') {
+  const local = LOCAL_EXECUTOR_MODELS[kind];
+  const normalized = Array.isArray(options) ? options.filter(option => option?.value) : [];
+  if (!local) return normalized;
+  return [local, ...normalized.filter(option => option.value !== local.value)];
+}
 
 export function composerModelSelection(kind, config = {}, models = []) {
   const options = (Array.isArray(models) ? models : [])

@@ -24,14 +24,12 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentImageGeneration, createAgentTextGeneration, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
-import { nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
+import { agentCanvasModelOptions, nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import AgentNodeComposer from './AgentNodeComposer';
-
-const LOCAL_DOUBAO_VIDEO_MODEL_OPTION = { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' };
 
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
@@ -227,13 +225,8 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
   taskIdRef.current = taskId;
 
   const configuredTextModelOptions = useMemo(() => modelSelectOptions(configuredTextModels, 'text'), [configuredTextModels]);
-  const configuredImageModelOptions = useMemo(() => modelSelectOptions(configuredImageModels, 'image'), [configuredImageModels]);
-  const configuredVideoModelOptions = useMemo(() => {
-    const options = modelSelectOptions(configuredVideoModels, 'video');
-    return options.some(option => option.value === LOCAL_DOUBAO_VIDEO_MODEL_OPTION.value)
-      ? options
-      : [...options, LOCAL_DOUBAO_VIDEO_MODEL_OPTION];
-  }, [configuredVideoModels]);
+  const configuredImageModelOptions = useMemo(() => agentCanvasModelOptions(modelSelectOptions(configuredImageModels, 'image'), 'image'), [configuredImageModels]);
+  const configuredVideoModelOptions = useMemo(() => agentCanvasModelOptions(modelSelectOptions(configuredVideoModels, 'video'), 'video'), [configuredVideoModels]);
 
   useEffect(() => {
     let active = true;

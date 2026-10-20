@@ -3,11 +3,25 @@ import assert from 'node:assert/strict';
 
 import { createAgentImageGeneration, createAgentTextGeneration } from '../../shared/api/agent.js';
 import {
+  agentCanvasModelOptions,
   composerModelSelection,
   composerShouldClose,
   nodeGenerationIdempotencyKey,
   nodeGenerationViewState
 } from './agent-canvas-node-generation.js';
+
+test('Agent canvas keeps local Doubao image and video models available first', () => {
+  assert.deepEqual(agentCanvasModelOptions([], 'image'), [
+    { value: 'local-doubao-executor-image', label: '豆包本地执行器（图片）' }
+  ]);
+  assert.deepEqual(agentCanvasModelOptions([
+    { value: 'minimax-h3-video', label: 'MiniMax H3 多图生视频' },
+    { value: 'local-doubao-executor-video', label: '重复项' }
+  ], 'video'), [
+    { value: 'local-doubao-executor-video', label: '豆包本地执行器（视频）' },
+    { value: 'minimax-h3-video', label: 'MiniMax H3 多图生视频' }
+  ]);
+});
 
 test('text and image generation clients use Agent project routes', async () => {
   const calls = [];

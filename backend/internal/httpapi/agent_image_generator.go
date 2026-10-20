@@ -1,0 +1,72 @@
+package httpapi
+
+import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
+	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/localexecutor"
+	"qiantie/backend/internal/novelfetchworkshop"
+)
+
+const agentLocalDoubaoImageModelID = "local-doubao-executor-image"
+
+func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetchworkshop.Store, executors *localexecutor.Service, files *localartifact.Store) AgentImageGenerator {
+	return func(ctx context.Context, owner, modelID, prompt, size string) (string, int, error) {
+		if strings.EqualFold(strings.TrimSpace(modelID), agentLocalDoubaoImageModelID) {
+			return generateAgentLocalDoubaoImage(ctx, executors, files, owner, prompt, size)
+		}
+		if store == nil || catalogStore == nil {
+			return "", http.StatusServiceUnavailable, fmt.Errorf("图片模型执行器未配置")
+		}
+		result, status, err := configuredBatchImage(ctx, store, catalogStore, owner, prompt, modelID, size)
+		if err != nil {
+			return "", status, err
+		}
+		imageURL, _ := result["imageUrl"].(string)
+		if strings.TrimSpace(imageURL) == "" {
+			return "", http.StatusBadGateway, fmt.Errorf("图片模型未返回图片结果")
+		}
+		return imageURL, status, nil
+	}
+}
+
+func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor.Service, files *localartifact.Store, owner, prompt, size string) (string, int, error) {
+	if executors == nil || files == nil {
+		return "", http.StatusServiceUnavailable, fmt.Errorf("豆包本地执行器未配置")
+	}
+	items, err := executors.List(ctx, owner)
+	if err != nil {
+		return "", http.StatusServiceUnavailable, fmt.Errorf("读取豆包本地执行器状态失败: %w", err)
+	}
+	online := false
+	for _, item := range items {
+		if item.Online {
+			online = true
+			break
+		}
+	}
+	if !online {
+		return "", http.StatusServiceUnavailable, fmt.Errorf("没有在线的豆包本地执行器")
+	}
+	mediaType, storageRef, err := waitForLocalExecutorImage(ctx, executors, files, owner, "Seedream 4.5", prompt, size)
+	if err != nil {
+		return "", http.StatusBadGateway, err
+	}
+	file, err := files.Open(storageRef)
+	if err != nil {
+		return "", http.StatusBadGateway, fmt.Errorf("读取豆包图片结果失败: %w", err)
+	}
+	defer file.Close()
+	const maxAgentImageBytes = 32 << 20
+	raw, err := io.ReadAll(io.LimitReader(file, maxAgentImageBytes+1))
+	if err != nil || len(raw) == 0 || len(raw) > maxAgentImageBytes {
+		return "", http.StatusBadGateway, fmt.Errorf("豆包图片结果无效或过大")
+	}
+	return "data:" + mediaType + ";base64," + base64.StdEncoding.EncodeToString(raw), http.StatusOK, nil
+}
