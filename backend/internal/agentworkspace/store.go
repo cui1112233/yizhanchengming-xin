@@ -7,9 +7,13 @@ import (
 )
 
 var (
-	ErrProjectNotFound  = errors.New("agent project not found")
-	ErrProjectExists    = errors.New("agent project already exists")
-	ErrRevisionConflict = errors.New("agent canvas revision conflict")
+	ErrProjectNotFound      = errors.New("agent project not found")
+	ErrProjectExists        = errors.New("agent project already exists")
+	ErrRevisionConflict     = errors.New("agent canvas revision conflict")
+	ErrExecutionExists      = errors.New("agent execution already exists")
+	ErrExecutionNotFound    = errors.New("agent execution not found")
+	ErrExecutionState       = errors.New("invalid agent execution state")
+	ErrExecutionNodeChanged = errors.New("agent execution node changed")
 )
 
 type Store interface {
@@ -23,6 +27,8 @@ type Store interface {
 	Canvas(context.Context, string, string) (Canvas, error)
 	SaveCanvas(context.Context, string, string, Canvas, int64, time.Time) (Canvas, error)
 	Executions(context.Context, string, string) ([]Execution, error)
+	BeginNodeExecution(context.Context, string, string, Execution) (Execution, error)
+	ApplyNodeExecution(context.Context, string, string, ApplyNodeExecutionInput) (Canvas, Execution, error)
 	ImportProject(context.Context, string, Project) error
 	LegacyImport(context.Context, string, string) (LegacyImport, bool, error)
 	RecordLegacyImport(context.Context, LegacyImport) error

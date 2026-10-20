@@ -199,6 +199,64 @@ func TestMySQLStoreSaveCanvasWritesNodeGroupAndConfiguration(t *testing.T) {
 	}
 }
 
+func TestMySQLStoreBeginsAndAppliesTextExecutionAtomically(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLStore(db)
+	now := time.Date(2026, 10, 20, 8, 20, 0, 0, time.UTC)
+	execution := Execution{ID: "execution-1", ToolName: "text-generation", Status: "running", IdempotencyKey: "text-1-v1", CreatedAt: now, UpdatedAt: now}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id FROM agent_projects WHERE id = ? AND owner_username = ? AND deleted_at IS NULL FOR UPDATE`)).
+		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("project-1"))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_executions (id, project_id, owner_username, tool_name, status, detail_json, idempotency_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)).
+		WithArgs("execution-1", "project-1", "alice", "text-generation", "running", nil, "text-1-v1", now, now).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	if _, err := store.BeginNodeExecution(context.Background(), "alice", "project-1", execution); err != nil {
+		t.Fatal(err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT status FROM agent_executions WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("execution-1", "project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"status"}).AddRow("running"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT node_type, current_version FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id = ? FOR UPDATE`)).
+		WithArgs("project-1", "alice", "text-1").WillReturnRows(sqlmock.NewRows([]string{"node_type", "current_version"}).AddRow("text", int64(1)))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(int64(3)))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_canvas_nodes SET summary = ?, current_version = current_version + 1, status = ?, updated_at = ? WHERE project_id = ? AND owner_username = ? AND id = ?`)).
+		WithArgs("生成后的正文", "confirmed", now.Add(time.Second), "project-1", "alice", "text-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_canvases SET revision = revision + 1, updated_at = ? WHERE project_id = ? AND owner_username = ?`)).
+		WithArgs(now.Add(time.Second), "project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`)).
+		WithArgs(now.Add(time.Second), "project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_executions SET status = ?, detail_json = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`)).
+		WithArgs("completed", `{"modelId":"text-primary"}`, now.Add(time.Second), "execution-1", "project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT canvas_version, revision, viewport_json, appearance_json FROM agent_canvases WHERE project_id = ? AND owner_username = ?`)).
+		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"canvas_version", "revision", "viewport_json", "appearance_json"}).AddRow(1, int64(4), nil, nil))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id
+FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? ORDER BY created_at, id`)).
+		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"id", "node_type", "title", "summary", "position_x", "position_y", "current_version", "status", "source_node_ids_json", "asset_ref_json", "config_json", "group_id"}).
+		AddRow("text-1", "text", "文字", "生成后的正文", 0.0, 0.0, int64(2), "confirmed", nil, nil, nil, nil))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, source_node_id, target_node_id, relation_type FROM agent_canvas_edges WHERE project_id = ? AND owner_username = ? ORDER BY created_at, id`)).
+		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"id", "source_node_id", "target_node_id", "relation_type"}))
+
+	canvas, completed, err := store.ApplyNodeExecution(context.Background(), "alice", "project-1", ApplyNodeExecutionInput{
+		ExecutionID: "execution-1", NodeID: "text-1", NodeVersion: 1, NodeType: "text", Summary: "生成后的正文",
+		Detail: map[string]any{"modelId": "text-primary"}, Now: now.Add(time.Second),
+	})
+	if err != nil || canvas.Revision != 4 || completed.Status != "completed" {
+		t.Fatalf("canvas=%+v execution=%+v err=%v", canvas, completed, err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMySQLStoreConfirmVideoJobReturnsNodeQueryError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

@@ -209,6 +209,113 @@ func (s *MemoryStore) Executions(_ context.Context, owner, id string) ([]Executi
 	return project.Executions, nil
 }
 
+func (s *MemoryStore) BeginNodeExecution(_ context.Context, owner, projectID string, execution Execution) (Execution, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := projectKey(strings.TrimSpace(owner), strings.TrimSpace(projectID))
+	project, ok := s.projects[key]
+	if !ok || project.DeletedAt != nil {
+		return Execution{}, ErrProjectNotFound
+	}
+	execution.ID = strings.TrimSpace(execution.ID)
+	execution.ToolName = strings.TrimSpace(execution.ToolName)
+	execution.IdempotencyKey = strings.TrimSpace(execution.IdempotencyKey)
+	if execution.ID == "" || execution.ToolName == "" || execution.IdempotencyKey == "" {
+		return Execution{}, ErrExecutionState
+	}
+	for existingKey, existingProject := range s.projects {
+		if !strings.HasPrefix(existingKey, strings.TrimSpace(owner)+"\x00") {
+			continue
+		}
+		for _, existing := range existingProject.Executions {
+			if existing.ID == execution.ID || existing.IdempotencyKey == execution.IdempotencyKey {
+				return Execution{}, ErrExecutionExists
+			}
+		}
+	}
+	execution.Status = "running"
+	project.Executions = append(project.Executions, execution)
+	s.projects[key] = project
+	return execution, nil
+}
+
+func (s *MemoryStore) ApplyNodeExecution(_ context.Context, owner, projectID string, input ApplyNodeExecutionInput) (Canvas, Execution, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := projectKey(strings.TrimSpace(owner), strings.TrimSpace(projectID))
+	project, ok := s.projects[key]
+	if !ok || project.DeletedAt != nil {
+		return Canvas{}, Execution{}, ErrProjectNotFound
+	}
+	executionIndex := -1
+	for index := range project.Executions {
+		if project.Executions[index].ID == strings.TrimSpace(input.ExecutionID) {
+			executionIndex = index
+			break
+		}
+	}
+	if executionIndex < 0 {
+		return Canvas{}, Execution{}, ErrExecutionNotFound
+	}
+	if project.Executions[executionIndex].Status != "running" {
+		return Canvas{}, Execution{}, ErrExecutionState
+	}
+	nodeIndex := -1
+	for index := range project.Canvas.Nodes {
+		node := project.Canvas.Nodes[index]
+		if node.ID == input.NodeID {
+			nodeIndex = index
+			if node.Type != input.NodeType || node.Version != input.NodeVersion {
+				return Canvas{}, Execution{}, ErrExecutionNodeChanged
+			}
+			break
+		}
+	}
+	if nodeIndex < 0 {
+		return Canvas{}, Execution{}, ErrExecutionNodeChanged
+	}
+	node := &project.Canvas.Nodes[nodeIndex]
+	switch input.NodeType {
+	case "text":
+		if strings.TrimSpace(input.Summary) == "" {
+			return Canvas{}, Execution{}, ErrExecutionState
+		}
+		node.Summary = strings.TrimSpace(input.Summary)
+	case "image":
+		if strings.TrimSpace(stringValue(input.AssetRef["id"])) == "" || stringValue(input.AssetRef["kind"]) != "image" {
+			return Canvas{}, Execution{}, ErrExecutionState
+		}
+		node.AssetRef = cloneMap(input.AssetRef)
+	default:
+		return Canvas{}, Execution{}, ErrExecutionState
+	}
+	node.Version++
+	node.Status = "confirmed"
+	project.Canvas.Revision++
+	project.UpdatedAt = input.Now.UTC()
+	execution := &project.Executions[executionIndex]
+	execution.Status = "completed"
+	execution.Detail = cloneMap(input.Detail)
+	execution.UpdatedAt = input.Now.UTC()
+	s.projects[key] = project
+	return cloneProject(project).Canvas, cloneProject(project).Executions[executionIndex], nil
+}
+
+func stringValue(value any) string {
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
+}
+
+func cloneMap(input map[string]any) map[string]any {
+	if input == nil {
+		return nil
+	}
+	raw, _ := json.Marshal(input)
+	var output map[string]any
+	_ = json.Unmarshal(raw, &output)
+	return output
+}
+
 func (s *MemoryStore) ImportProject(ctx context.Context, owner string, project Project) error {
 	err := s.CreateProject(ctx, owner, project)
 	if err == ErrProjectExists {

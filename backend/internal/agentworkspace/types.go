@@ -159,6 +159,17 @@ type Execution struct {
 	UpdatedAt      time.Time      `json:"updatedAt"`
 }
 
+type ApplyNodeExecutionInput struct {
+	ExecutionID string
+	NodeID      string
+	NodeVersion int64
+	NodeType    string
+	Summary     string
+	AssetRef    map[string]any
+	Detail      map[string]any
+	Now         time.Time
+}
+
 type LegacyImport struct {
 	OwnerUsername    string
 	SourcePath       string

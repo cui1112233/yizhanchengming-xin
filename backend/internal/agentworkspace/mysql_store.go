@@ -411,6 +411,120 @@ WHERE project_id = ? AND owner_username = ? ORDER BY updated_at DESC`, id, owner
 	return out, rows.Err()
 }
 
+func (s *MySQLStore) BeginNodeExecution(ctx context.Context, owner, projectID string, execution Execution) (Execution, error) {
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	execution.ID = strings.TrimSpace(execution.ID)
+	execution.ToolName = strings.TrimSpace(execution.ToolName)
+	execution.IdempotencyKey = strings.TrimSpace(execution.IdempotencyKey)
+	if owner == "" || projectID == "" || execution.ID == "" || execution.ToolName == "" || execution.IdempotencyKey == "" {
+		return Execution{}, ErrExecutionState
+	}
+	execution.Status = "running"
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Execution{}, err
+	}
+	defer tx.Rollback()
+	var activeProjectID string
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM agent_projects WHERE id = ? AND owner_username = ? AND deleted_at IS NULL FOR UPDATE`, projectID, owner).Scan(&activeProjectID); errors.Is(err, sql.ErrNoRows) {
+		return Execution{}, ErrProjectNotFound
+	} else if err != nil {
+		return Execution{}, err
+	}
+	detailJSON, err := nullableJSON(execution.Detail)
+	if err != nil {
+		return Execution{}, err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO agent_executions (id, project_id, owner_username, tool_name, status, detail_json, idempotency_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, execution.ID, projectID, owner, execution.ToolName, execution.Status, detailJSON, execution.IdempotencyKey, execution.CreatedAt, execution.UpdatedAt)
+	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return Execution{}, ErrExecutionExists
+		}
+		return Execution{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Execution{}, err
+	}
+	return execution, nil
+}
+
+func (s *MySQLStore) ApplyNodeExecution(ctx context.Context, owner, projectID string, input ApplyNodeExecutionInput) (Canvas, Execution, error) {
+	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	defer tx.Rollback()
+	var executionStatus string
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM agent_executions WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`, input.ExecutionID, projectID, owner).Scan(&executionStatus); errors.Is(err, sql.ErrNoRows) {
+		return Canvas{}, Execution{}, ErrExecutionNotFound
+	} else if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	if executionStatus != "running" {
+		return Canvas{}, Execution{}, ErrExecutionState
+	}
+	var nodeType string
+	var nodeVersion int64
+	if err := tx.QueryRowContext(ctx, `SELECT node_type, current_version FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id = ? FOR UPDATE`, projectID, owner, input.NodeID).Scan(&nodeType, &nodeVersion); errors.Is(err, sql.ErrNoRows) {
+		return Canvas{}, Execution{}, ErrExecutionNodeChanged
+	} else if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	if nodeType != input.NodeType || nodeVersion != input.NodeVersion {
+		return Canvas{}, Execution{}, ErrExecutionNodeChanged
+	}
+	var revision int64
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`, projectID, owner).Scan(&revision); errors.Is(err, sql.ErrNoRows) {
+		return Canvas{}, Execution{}, ErrProjectNotFound
+	} else if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	assetJSON, err := nullableJSON(input.AssetRef)
+	if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	switch input.NodeType {
+	case "text":
+		if strings.TrimSpace(input.Summary) == "" {
+			return Canvas{}, Execution{}, ErrExecutionState
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE agent_canvas_nodes SET summary = ?, current_version = current_version + 1, status = ?, updated_at = ? WHERE project_id = ? AND owner_username = ? AND id = ?`, strings.TrimSpace(input.Summary), "confirmed", input.Now, projectID, owner, input.NodeID)
+	case "image":
+		if strings.TrimSpace(stringValue(input.AssetRef["id"])) == "" || stringValue(input.AssetRef["kind"]) != "image" {
+			return Canvas{}, Execution{}, ErrExecutionState
+		}
+		_, err = tx.ExecContext(ctx, `UPDATE agent_canvas_nodes SET asset_ref_json = ?, current_version = current_version + 1, status = ?, updated_at = ? WHERE project_id = ? AND owner_username = ? AND id = ?`, assetJSON, "confirmed", input.Now, projectID, owner, input.NodeID)
+	default:
+		return Canvas{}, Execution{}, ErrExecutionState
+	}
+	if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_canvases SET revision = revision + 1, updated_at = ? WHERE project_id = ? AND owner_username = ?`, input.Now, projectID, owner); err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, input.Now, projectID, owner); err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	detailJSON, err := nullableJSON(input.Detail)
+	if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_executions SET status = ?, detail_json = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`, "completed", detailJSON, input.Now, input.ExecutionID, projectID, owner); err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	canvas, err := s.Canvas(ctx, owner, projectID)
+	if err != nil {
+		return Canvas{}, Execution{}, err
+	}
+	return canvas, Execution{ID: input.ExecutionID, Status: "completed", Detail: cloneMap(input.Detail), UpdatedAt: input.Now}, nil
+}
+
 func (s *MySQLStore) ImportProject(ctx context.Context, owner string, project Project) error {
 	return s.CreateProject(ctx, owner, project)
 }
