@@ -25,6 +25,7 @@ type Config struct {
 	AgentAssetTOSBucket           string
 	AgentAssetTOSAccessKey        string
 	AgentAssetTOSSecretKey        string
+	AgentAssetLocalDir            string
 	Slice                         int
 	DirectorEndpoint              string
 	DirectorAPIKey                string
@@ -103,6 +104,7 @@ func FromEnv() (Config, error) {
 	cfg.AgentAssetTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_BUCKET"))
 	cfg.AgentAssetTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_ACCESS_KEY"))
 	cfg.AgentAssetTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_SECRET_KEY"))
+	cfg.AgentAssetLocalDir = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_LOCAL_DIR"))
 	if cfg.NovelFetchTOSEndpoint == "" {
 		cfg.NovelFetchTOSEndpoint = cfg.MergeTOSEndpoint
 	}

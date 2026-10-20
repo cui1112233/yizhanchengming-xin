@@ -30,6 +30,12 @@ test('leaving a media editor also closes its anchored asset library', () => {
   assert.match(canvasSource, /onPaneClick=\{\(\) => \{[^}]*setActiveEditorNodeID\(''\);[^}]*setAssetPanel\(null\);[^}]*\}\}/);
 });
 
+test('asset picker does not present an empty library while reporting a request failure', () => {
+  assert.match(canvasSource, /!assetLoading && !assetError && !assets\.length/);
+  assert.match(canvasSource, /readableAssetRequestError\(error, 'upload'\)/);
+  assert.match(canvasSource, /readableAssetRequestError\(error, 'load'\)/);
+});
+
 test('image preview opens editing while a named editor action opens the asset picker', () => {
   assert.match(canvasSource, /aria-label="展开图片编辑"/);
   assert.match(canvasSource, /aria-label=\{data\.assetRef\?\.url \? '更换图片素材' : '添加图片素材'\}/);

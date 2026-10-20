@@ -1,8 +1,11 @@
 package agentworkspace
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -37,5 +40,42 @@ func TestAgentAssetObjectKeyUsesSafeProjectAndAssetIDs(t *testing.T) {
 	}
 	if _, err := AgentAssetObjectKey("alice", "../agent", "asset-1", "png"); !errors.Is(err, ErrInvalidAsset) {
 		t.Fatalf("unsafe project err=%v", err)
+	}
+}
+
+func TestLocalAssetObjectStorePersistsAndDeletesAssetBytes(t *testing.T) {
+	root := t.TempDir()
+	store := NewLocalAssetObjectStore(root)
+	asset := Asset{ObjectKey: "agent-assets/owner/project/asset-1.png"}
+	want := []byte("local-agent-image")
+
+	if err := store.Put(context.Background(), asset, bytes.NewReader(want)); err != nil {
+		t.Fatal(err)
+	}
+	body, err := store.Open(context.Background(), asset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(body)
+	_ = body.Close()
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("got=%q err=%v", got, err)
+	}
+	if err := store.Delete(context.Background(), asset); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Open(context.Background(), asset); !errors.Is(err, ErrAssetNotFound) {
+		t.Fatalf("open after delete err=%v", err)
+	}
+	if _, err := filepath.Abs(root); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLocalAssetObjectStoreRejectsEscapingObjectKeys(t *testing.T) {
+	store := NewLocalAssetObjectStore(t.TempDir())
+	asset := Asset{ObjectKey: "../outside.png"}
+	if err := store.Put(context.Background(), asset, bytes.NewReader([]byte("bad"))); !errors.Is(err, ErrInvalidAsset) {
+		t.Fatalf("put err=%v", err)
 	}
 }

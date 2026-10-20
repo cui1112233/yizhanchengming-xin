@@ -20,7 +20,7 @@ import {
 } from '../pages/agent-canvas-appearance';
 import {
   appendReferenceAsset, attachImageAsset, copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes,
-  shouldOpenConnectionDrop, syncNodeReferencesFromEdges
+  readableAssetRequestError, shouldOpenConnectionDrop, syncNodeReferencesFromEdges
 } from '../pages/agent-canvas-context-menu';
 import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentVideoJob, getAgentVideoJob, listAgentAssets, listAgentVideoJobs, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
@@ -493,7 +493,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       .then(result => setAssets(result.assets || []))
       .catch(error => {
         setAssets([]);
-        setAssetError(error?.message || '素材库读取失败');
+        setAssetError(readableAssetRequestError(error, 'load'));
       })
       .finally(() => setAssetLoading(false));
   }
@@ -519,7 +519,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       .then(result => setAssets(result.assets || []))
       .catch(error => {
         setAssets([]);
-        setAssetError(error?.message || '素材库读取失败');
+        setAssetError(readableAssetRequestError(error, 'load'));
       })
       .finally(() => setAssetLoading(false));
   }
@@ -787,7 +787,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       setAssets(result.assets || []);
     } catch (error) {
       setAssets([]);
-      setAssetError(error?.message || '素材库读取失败');
+      setAssetError(readableAssetRequestError(error, 'load'));
     } finally {
       setAssetLoading(false);
     }
@@ -855,7 +855,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
       const result = await uploadAgentAsset(taskId, file);
       commitAsset(result.asset);
     } catch (error) {
-      setAssetError(error?.message || '素材上传失败');
+      setAssetError(readableAssetRequestError(error, 'upload'));
     } finally {
       setAssetLoading(false);
     }
@@ -1175,7 +1175,7 @@ export function AgentCanvas({ taskId, canvas, onChange, onAppearanceChange, onSe
         <Button size="small" onClick={startAssetUpload} disabled={assetLoading}>上传{assetPanel.assetKind === 'image' ? '图片' : '视频'}</Button>
         {assetError ? <p className="agent-canvas-asset-error">{assetError}</p> : null}
         {assetLoading ? <p className="agent-canvas-asset-empty">正在读取素材...</p> : null}
-        {!assetLoading && !assets.length ? <p className="agent-canvas-asset-empty">还没有可用素材</p> : null}
+        {!assetLoading && !assetError && !assets.length ? <p className="agent-canvas-asset-empty">还没有可用素材</p> : null}
         <div className="agent-canvas-asset-list">{assets.map(asset => <button type="button" key={asset.id} onClick={() => commitAsset(asset)}>{asset.url ? asset.kind === 'video'
           ? <AuthenticatedAgentVideo source={asset.url} aria-label="视频素材缩略图" preload="metadata" muted />
           : <AuthenticatedAgentImage source={asset.url} alt="" />

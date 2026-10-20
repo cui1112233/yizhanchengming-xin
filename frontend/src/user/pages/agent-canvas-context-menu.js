@@ -7,6 +7,14 @@ function copiedTitle(title) {
   return value.endsWith('副本') ? value : `${value}副本`;
 }
 
+export function readableAssetRequestError(error, action = 'load') {
+  const message = String(error?.message || '').trim();
+  if (/^(failed to fetch|network request failed|networkerror)/i.test(message)) {
+    return action === 'upload' ? '图片上传连接中断，请重试' : '素材读取连接中断，请重试';
+  }
+  return message || (action === 'upload' ? '素材上传失败' : '素材库读取失败');
+}
+
 export function shouldOpenConnectionDrop({ sourceID, connectionCompleted, droppedOnHandle }) {
   return Boolean(String(sourceID || '').trim()) && !connectionCompleted && !droppedOnHandle;
 }

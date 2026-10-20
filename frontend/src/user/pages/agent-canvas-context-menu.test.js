@@ -7,6 +7,7 @@ import {
   appendReferenceAsset, attachImageAsset, copyCanvasSelection,
   createLinkedNode,
   createNodeAt,
+  readableAssetRequestError,
   pasteCanvasSelection,
   removeCanvasNodes,
   shouldOpenConnectionDrop,
@@ -37,6 +38,12 @@ test('connection drop menu opens only for a genuine empty-canvas drop', () => {
   assert.equal(shouldOpenConnectionDrop({ sourceID: 'image-1', connectionCompleted: true, droppedOnHandle: false }), false);
   assert.equal(shouldOpenConnectionDrop({ sourceID: 'image-1', connectionCompleted: false, droppedOnHandle: true }), false);
   assert.equal(shouldOpenConnectionDrop({ sourceID: 'image-1', connectionCompleted: false, droppedOnHandle: false }), true);
+});
+
+test('asset request failures use clear Chinese actions instead of browser network text', () => {
+  assert.equal(readableAssetRequestError(new Error('Failed to fetch'), 'upload'), '图片上传连接中断，请重试');
+  assert.equal(readableAssetRequestError(new Error('Network request failed'), 'load'), '素材读取连接中断，请重试');
+  assert.equal(readableAssetRequestError(new Error('素材存储尚未配置'), 'upload'), '素材存储尚未配置');
 });
 
 test('pasting a copied pair recreates only its internal edge at the click position', () => {
@@ -179,6 +186,7 @@ test('canvas loads or uploads a project asset before committing a media node', (
   assert.match(canvasSource, /listAgentAssets\(taskId, assetKind\)/);
   assert.match(canvasSource, /uploadAgentAsset\(taskId, file\)/);
   assert.match(canvasSource, /createNodeAt\(\{[\s\S]*asset/);
+  assert.match(canvasSource, /!assetLoading && !assetError && !assets\.length/);
 });
 
 test('canvas exposes a standalone video node action alongside asset video import', () => {

@@ -105,6 +105,9 @@ try {
   if (-not $env:QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR) {
     $env:QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR = Join-Path $localData 'local-executor-artifacts'
   }
+  if (-not $env:QIANTIE_AGENT_ASSET_LOCAL_DIR) {
+    $env:QIANTIE_AGENT_ASSET_LOCAL_DIR = Join-Path $localData 'agent-assets'
+  }
   if (-not $env:QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR) {
     $env:QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR = Join-Path $localData 'downloads'
   }
