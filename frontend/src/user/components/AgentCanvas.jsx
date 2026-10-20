@@ -28,6 +28,7 @@ import { cancelAgentVideoJob, confirmAgentVideoJob, createAgentImageGeneration, 
 import { listAvailableModels, modelSelectOptions } from '../../shared/api/modelCatalog';
 import { agentCanvasModelOptions, nodeGenerationIdempotencyKey } from '../pages/agent-canvas-node-generation';
 import { imageGenerationRequestSettings } from '../pages/agent-canvas-image-settings';
+import { normalizeNodeConfig, patchNodeConfig } from '../pages/agent-node-config';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
@@ -126,7 +127,7 @@ function toFlowNode(node) {
       sourceNodeIds: node.sourceNodeIds,
       status: node.status,
       assetRef: node.assetRef || null,
-      config: node.config || {},
+      config: normalizeNodeConfig(normalizeCanvasNodeType(node.type), node.config || {}),
       ...(node.groupId ? { groupId: node.groupId } : {})
     }
   };
@@ -529,7 +530,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, wor
 
   function handleNodeConfigChange(nodeID, patch) {
     const next = nodesRef.current.map(node => node.id === nodeID
-      ? { ...node, data: { ...node.data, config: { ...(node.data?.config || {}), ...patch } } }
+      ? { ...node, data: { ...node.data, config: patchNodeConfig(normalizeCanvasNodeType(node.data?.type), node.data?.config || {}, patch) } }
       : node);
     commit(next, edgesRef.current);
   }

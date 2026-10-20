@@ -77,9 +77,10 @@ test('creating a blank image node keeps the complete generation settings ready',
   const node = createNodeAt({ id: 'image-blank', kind: 'image', position: { x: 12, y: 18 } });
   assert.equal(node.data.type, 'image');
   assert.equal(node.data.assetRef, null);
-  assert.deepEqual(node.data.config, {
-    prompt: '', model: '', ratio: '16:9', quality: 'standard', resolution: '2K', count: 1, referenceAssets: []
-  });
+  assert.equal(node.data.config.prompt, '');
+  assert.equal(node.data.config.modelId, '');
+  assert.deepEqual(node.data.config.parameters, { ratio: '16:9', quality: 'standard', resolution: '2K', count: 1 });
+  assert.deepEqual(node.data.config.referenceAssets, []);
 });
 
 test('adding image references keeps image assets only, deduplicates them, and caps the set at ten', () => {
@@ -167,7 +168,8 @@ test('creating an audio node keeps generation-ready business defaults', () => {
   const node = createNodeAt({ id: 'audio-1', kind: 'audio', position: { x: 12, y: 18 } });
   assert.equal(node.data.type, 'audio');
   assert.equal(node.data.title, '新音频');
-  assert.deepEqual(node.data.config, { prompt: '', voice: '', speed: 1 });
+  assert.equal(node.data.config.voice, '');
+  assert.deepEqual(node.data.config.parameters, { operation: 'speech', speed: 1, pitch: 0, emotion: 'neutral', format: 'mp3' });
 });
 
 test('creating a video node is allowed before any video asset exists', () => {
@@ -175,7 +177,9 @@ test('creating a video node is allowed before any video asset exists', () => {
   assert.equal(node.data.type, 'video');
   assert.equal(node.data.title, '新视频');
   assert.equal(node.data.assetRef, null);
-  assert.deepEqual(node.data.config, { prompt: '', model: '', ratio: '', durationSeconds: 0, referenceAssets: [] });
+  assert.equal(node.data.config.modelId, '');
+  assert.deepEqual(node.data.config.parameters, { ratio: '16:9', resolution: '720P', durationSeconds: 5, count: 1, generateAudio: false });
+  assert.deepEqual(node.data.config.referenceAssets, []);
 });
 
 test('canvas registers pane and node context-menu handlers', () => {

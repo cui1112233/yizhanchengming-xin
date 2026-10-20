@@ -1,3 +1,5 @@
+import { normalizeNodeConfig } from './agent-node-config.js';
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -42,7 +44,7 @@ export function createNodeAt({ id, kind, position, asset = null }) {
       sourceNodeIds: [],
       status: 'draft',
       assetRef: media && asset ? clone(asset) : null,
-      config: defaults.config
+      config: normalizeNodeConfig(type, defaults.config)
     }
   };
 }
