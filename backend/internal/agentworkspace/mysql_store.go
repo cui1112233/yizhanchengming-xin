@@ -525,6 +525,25 @@ func (s *MySQLStore) ApplyNodeExecution(ctx context.Context, owner, projectID st
 	return canvas, Execution{ID: input.ExecutionID, Status: "completed", Detail: cloneMap(input.Detail), UpdatedAt: input.Now}, nil
 }
 
+func (s *MySQLStore) FailNodeExecution(ctx context.Context, owner, projectID, executionID string, detail map[string]any, now time.Time) (Execution, error) {
+	detailJSON, err := nullableJSON(detail)
+	if err != nil {
+		return Execution{}, err
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE agent_executions SET status = ?, detail_json = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ? AND status = ?`, "failed", detailJSON, now, strings.TrimSpace(executionID), strings.TrimSpace(projectID), strings.TrimSpace(owner), "running")
+	if err != nil {
+		return Execution{}, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return Execution{}, err
+	}
+	if affected == 0 {
+		return Execution{}, ErrExecutionNotFound
+	}
+	return Execution{ID: strings.TrimSpace(executionID), Status: "failed", Detail: cloneMap(detail), UpdatedAt: now}, nil
+}
+
 func (s *MySQLStore) ImportProject(ctx context.Context, owner string, project Project) error {
 	return s.CreateProject(ctx, owner, project)
 }

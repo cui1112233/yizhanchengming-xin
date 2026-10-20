@@ -78,6 +78,7 @@ type RouterOptions struct {
 	UserDataDir                     string
 	UserConfigStore                 *UserConfigStore
 	TextProvider                    batchfactoryv11.DirectorProvider
+	AgentTextModelResolver          AgentTextModelResolver
 	AgentWorkspace                  agentworkspace.Store
 	AgentAssets                     agentworkspace.AssetStore
 	AgentAssetObjects               agentworkspace.AssetObjectStore
@@ -342,6 +343,13 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.UserConfigStore != nil {
 		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
 		RegisterAgentAssetRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
+		textModels := options.AgentTextModelResolver
+		if textModels == nil && options.NovelFetchStore != nil {
+			textModels = func(ctx context.Context, owner, modelID string) (batchfactoryv11.DirectorProvider, error) {
+				return resolveAgentTextModel(ctx, options.NovelFetchStore, owner, modelID)
+			}
+		}
+		RegisterAgentNodeGenerationRoutes(root, auth, AgentNodeGenerationServices{Projects: options.AgentWorkspace, TextModels: textModels, Now: options.Now})
 		if options.NovelFetchStore != nil && options.AgentWorkspace != nil && options.AgentAssets != nil {
 			var references agentworkspace.ReferenceURLProvider
 			if options.AgentAssetObjects != nil {

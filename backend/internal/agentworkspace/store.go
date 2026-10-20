@@ -29,6 +29,7 @@ type Store interface {
 	Executions(context.Context, string, string) ([]Execution, error)
 	BeginNodeExecution(context.Context, string, string, Execution) (Execution, error)
 	ApplyNodeExecution(context.Context, string, string, ApplyNodeExecutionInput) (Canvas, Execution, error)
+	FailNodeExecution(context.Context, string, string, string, map[string]any, time.Time) (Execution, error)
 	ImportProject(context.Context, string, Project) error
 	LegacyImport(context.Context, string, string) (LegacyImport, bool, error)
 	RecordLegacyImport(context.Context, LegacyImport) error

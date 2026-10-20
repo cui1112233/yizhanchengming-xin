@@ -301,6 +301,32 @@ func (s *MemoryStore) ApplyNodeExecution(_ context.Context, owner, projectID str
 	return cloneProject(project).Canvas, cloneProject(project).Executions[executionIndex], nil
 }
 
+func (s *MemoryStore) FailNodeExecution(_ context.Context, owner, projectID, executionID string, detail map[string]any, now time.Time) (Execution, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := projectKey(strings.TrimSpace(owner), strings.TrimSpace(projectID))
+	project, ok := s.projects[key]
+	if !ok || project.DeletedAt != nil {
+		return Execution{}, ErrProjectNotFound
+	}
+	for index := range project.Executions {
+		execution := &project.Executions[index]
+		if execution.ID != strings.TrimSpace(executionID) {
+			continue
+		}
+		if execution.Status != "running" {
+			return Execution{}, ErrExecutionState
+		}
+		execution.Status = "failed"
+		execution.Detail = cloneMap(detail)
+		execution.UpdatedAt = now.UTC()
+		project.UpdatedAt = now.UTC()
+		s.projects[key] = project
+		return cloneProject(project).Executions[index], nil
+	}
+	return Execution{}, ErrExecutionNotFound
+}
+
 func stringValue(value any) string {
 	text, _ := value.(string)
 	return strings.TrimSpace(text)
