@@ -37,6 +37,98 @@ type BatchFactoryAudioReader interface {
 	BatchFactoryAudioRecord(context.Context, string, string, string, string) (BatchFactoryAudioRecord, bool, error)
 }
 
+// DurationResolution records how a Batch Factory video duration was chosen.
+// A connected audio track is a default, never a silent overwrite of a manual
+// choice made by the user.
+type DurationResolution struct {
+	RequestedSeconds   float64
+	Adjusted           bool
+	HasMismatchWarning bool
+}
+
+// ResolveVideoDuration chooses the nearest duration accepted by a model when
+// audio supplies the default target. A positive override remains authoritative
+// and is surfaced as a warning when it no longer matches the audio.
+func ResolveVideoDuration(audioSeconds float64, allowedSeconds []float64, overrideSeconds float64) DurationResolution {
+	allowed := make([]float64, 0, len(allowedSeconds))
+	for _, value := range allowedSeconds {
+		if value > 0 {
+			allowed = append(allowed, value)
+		}
+	}
+	sort.Float64s(allowed)
+	if overrideSeconds > 0 {
+		return DurationResolution{RequestedSeconds: overrideSeconds, HasMismatchWarning: audioSeconds > 0 && absDurationDelta(overrideSeconds, audioSeconds) > 0.01}
+	}
+	if audioSeconds <= 0 || len(allowed) == 0 {
+		return DurationResolution{RequestedSeconds: audioSeconds}
+	}
+	// Choosing the first supported duration that can contain the audio avoids
+	// silently cutting a connected narration short. If every option is shorter,
+	// retain the largest available duration as the closest viable request.
+	requested := allowed[len(allowed)-1]
+	for _, candidate := range allowed {
+		if candidate >= audioSeconds {
+			requested = candidate
+			break
+		}
+	}
+	return DurationResolution{RequestedSeconds: requested, Adjusted: absDurationDelta(requested, audioSeconds) > 0.01}
+}
+
+func absDurationDelta(left, right float64) float64 {
+	if left < right {
+		return right - left
+	}
+	return left - right
+}
+
+// NormalizedMappedNodeState keeps the Agent canvas truthful without exposing
+// provider-specific status values or unsafe diagnostic payloads.
+type NormalizedMappedNodeState struct {
+	Status       string
+	ErrorMessage string
+	CanRetry     bool
+}
+
+func NormalizeMappedNodeState(status, errorMessage string) NormalizedMappedNodeState {
+	normalized := strings.ToLower(strings.TrimSpace(status))
+	switch normalized {
+	case "succeeded", "success", "completed", "confirmed", "applied":
+		normalized = "succeeded"
+	case "failed", "error", "abandoned":
+		normalized = "failed"
+	case "cancelled", "canceled":
+		normalized = "cancelled"
+	case "running", "processing", "submitting", "preparing", "ingesting", "result_ready", "awaiting_confirmation":
+		normalized = "running"
+	default:
+		normalized = "queued"
+	}
+	state := NormalizedMappedNodeState{Status: normalized, CanRetry: normalized == "failed" || normalized == "cancelled"}
+	if normalized == "failed" {
+		state.ErrorMessage = safeMappedNodeError(errorMessage)
+	}
+	return state
+}
+
+func safeMappedNodeError(value string) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if value == "" {
+		return "批量工厂任务失败，请重试"
+	}
+	lower := strings.ToLower(value)
+	for _, sensitive := range []string{"authorization", "bearer ", "token", "secret", "password", "http://", "https://"} {
+		if strings.Contains(lower, sensitive) {
+			return "批量工厂任务失败，请重试"
+		}
+	}
+	if len(value) > 200 {
+		return value[:200] + "..."
+	}
+	return value
+}
+
 type BatchFactoryProjectionStore interface {
 	Store
 	SaveBatchFactoryProjection(context.Context, string, BatchFactoryBinding, string, Canvas, int64, []BatchFactoryNodeOrigin, time.Time) (Canvas, error)
@@ -161,9 +253,11 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		return node.ID
 	}
 
+	scriptConfig := projectionConfig(binding.BatchID, book.ID, "book_script", book.ID)
+	applyMappedNodeState(scriptConfig, "confirmed", "")
 	add("book_script", book.ID, projectionFingerprint(book.Revision, book.Title, book.SourceText), Node{
-		Type: "script", Title: projectionTitle(book.Title, "剧本"), Summary: book.SourceText, Status: "confirmed",
-		Position: Position{X: 40, Y: 80}, Config: projectionConfig(binding.BatchID, book.ID, "book_script", book.ID),
+		Type: "script", Title: projectionTitle(book.Title, "剧本"), Summary: book.SourceText, Status: "succeeded",
+		Position: Position{X: 40, Y: 80}, Config: scriptConfig,
 	})
 	sort.SliceStable(assets, func(i, j int) bool { return assets[i].ID < assets[j].ID })
 	for index, asset := range assets {
@@ -185,8 +279,13 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		if asset.ImageAspectRatio != "" {
 			config["ratio"] = asset.ImageAspectRatio
 		}
+		imageStatus := "queued"
+		if primary.ID != "" {
+			imageStatus = "succeeded"
+		}
+		applyMappedNodeState(config, imageStatus, "")
 		nodeID := add("book_asset", asset.ID, projectionFingerprint(asset.Revision, primary.ID, primary.Revision, primary.URL), Node{
-			Type: "image", Title: projectionTitle(asset.Name, "图片素材"), Summary: asset.Prompt, Status: projectionMediaStatus(primary.ID != ""),
+			Type: "image", Title: projectionTitle(asset.Name, "图片素材"), Summary: asset.Prompt, Status: imageStatus,
 			Position: Position{X: 360, Y: 80 + float64(index*180)}, AssetRef: assetRef, Config: config,
 		})
 		for _, image := range images {
@@ -212,6 +311,8 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		if video.DurationSeconds > 0 {
 			config["durationSeconds"] = video.DurationSeconds
 		}
+		applyMappedNodeState(config, status, task.ErrorMessage)
+		status = NormalizeMappedNodeState(status, task.ErrorMessage).Status
 		nodeID := add("video", video.ID, versionID, Node{
 			Type: "video", Title: projectionTitle(video.Label, fmt.Sprintf("VIDEO %02d", index+1)), Summary: video.VideoPrompt, Status: status,
 			Position: Position{X: 700, Y: 80 + float64(index*200)}, AssetRef: assetRef, Config: config,
@@ -243,16 +344,19 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 				if versionID == "" {
 					versionID = projectionFingerprint(record.ID, record.Status, record.MediaURL, record.DurationSeconds)
 				}
+				applyMappedNodeState(config, record.Status, "")
 				audioNodeID = add("audio", audioID, versionID, Node{
-					Type: "audio", Title: "配音", Summary: merge.AudioSource, Status: projectionTitle(record.Status, "draft"), Position: Position{X: 360, Y: 120 + float64(len(assets)*180)},
+					Type: "audio", Title: "配音", Summary: merge.AudioSource, Status: NormalizeMappedNodeState(record.Status, "").Status, Position: Position{X: 360, Y: 120 + float64(len(assets)*180)},
 					AssetRef: assetRef, Config: config,
 				})
 			}
 		}
 		assetRef := map[string]any{"id": merge.ID, "kind": "video"}
+		mergeConfig := projectionConfig(binding.BatchID, book.ID, "merge", merge.ID)
+		applyMappedNodeState(mergeConfig, string(merge.Status), merge.ErrorMessage)
 		mergeNodeID := add("merge", merge.ID, projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources), Node{
-			Type: "video", Title: "最终合成视频", Status: string(merge.Status), Position: Position{X: 1040, Y: 80},
-			AssetRef: assetRef, Config: projectionConfig(binding.BatchID, book.ID, "merge", merge.ID),
+			Type: "video", Title: "最终合成视频", Status: NormalizeMappedNodeState(string(merge.Status), merge.ErrorMessage).Status, Position: Position{X: 1040, Y: 80},
+			AssetRef: assetRef, Config: mergeConfig,
 		})
 		for _, source := range merge.Sources {
 			if sourceID := nodeIDByResource[projectionResourceKey("video", source.VideoID)]; sourceID != "" {
@@ -437,6 +541,17 @@ func projectionMediaStatus(hasMedia bool) string {
 		return "confirmed"
 	}
 	return "draft"
+}
+
+func applyMappedNodeState(config map[string]any, status, errorMessage string) {
+	state := NormalizeMappedNodeState(status, errorMessage)
+	config["mappedState"] = state.Status
+	config["canRetry"] = state.CanRetry
+	if state.ErrorMessage != "" {
+		config["errorMessage"] = state.ErrorMessage
+	} else {
+		delete(config, "errorMessage")
+	}
 }
 
 func projectionJSONText(raw json.RawMessage) string {

@@ -79,3 +79,44 @@ export function batchFactoryGroupLabel(groupId) {
   const bookId = bookIdFromGroupId(groupId);
   return bookId ? `书籍分组 ${bookId}` : String(groupId || '').trim();
 }
+
+export function videoNodeTiming({ audioSeconds, selectedSeconds, allowedSeconds } = {}) {
+  const audio = Number(audioSeconds) || 0;
+  const selected = Number(selectedSeconds) || 0;
+  const allowed = [...new Set((Array.isArray(allowedSeconds) ? allowedSeconds : []).map(Number).filter(value => value > 0))].sort((left, right) => left - right);
+  if (selected > 0) {
+    const mismatch = audio > 0 && Math.abs(selected - audio) > 0.01;
+    return {
+      requestedSeconds: selected,
+      adjusted: false,
+      warning: mismatch ? `所选视频时长 ${selected} 秒与已连接音频时长不一致（${audio} 秒）` : ''
+    };
+  }
+  if (audio <= 0 || !allowed.length) return { requestedSeconds: audio, adjusted: false, warning: '' };
+  const requestedSeconds = allowed.find(value => value >= audio) || allowed[allowed.length - 1];
+  return { requestedSeconds, adjusted: Math.abs(requestedSeconds - audio) > 0.01, warning: '' };
+}
+
+export function mappedNodeStatePresentation(node) {
+  if (!isBatchFactoryNode(node)) return null;
+  const config = node?.config || node?.data?.config || {};
+  const state = ['queued', 'running', 'succeeded', 'failed', 'cancelled'].includes(String(config.mappedState || node?.status || '').trim())
+    ? String(config.mappedState || node?.status).trim()
+    : 'queued';
+  return { state, errorMessage: String(config.errorMessage || '').trim(), canRetry: config.canRetry === true };
+}
+
+export function batchFactoryMappedAction(node) {
+  if (!isBatchFactoryNode(node)) return null;
+  const config = node?.config || node?.data?.config || {};
+  const batchId = String(config.batchId || '').trim();
+  const bookId = String(config.bookId || '').trim();
+  const resourceType = String(config.resourceType || '').trim();
+  const resourceId = String(config.resourceId || '').trim();
+  if (!batchId || !bookId || !resourceType) return null;
+  if (resourceType === 'book_asset' && resourceId) return { type: 'image', batchId, bookId, resourceId };
+  if (resourceType === 'video') return { type: 'video', batchId, bookId, resourceId };
+  if (resourceType === 'merge') return { type: 'merge', batchId, bookId, resourceId };
+  if (resourceType === 'audio' && resourceId) return { type: 'audio', batchId, bookId, resourceId };
+  return { type: 'sync', batchId, bookId, resourceId };
+}

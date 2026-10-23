@@ -113,22 +113,12 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			writeAgentStoreError(w, err)
 			return
 		}
-		binding, batch, err := agentBatchFactoryBindingForProject(req.Context(), projects, batches, owner, projectID)
+		response, err := syncAgentBatchFactoryBookProjection(req.Context(), projects, batches, projection, owner, projectID, req.PathValue("bookId"))
 		if err != nil {
 			writeAgentBatchFactoryError(w, err)
 			return
 		}
-		bookID := strings.TrimSpace(req.PathValue("bookId"))
-		if !batchFactoryBookExists(batch, bookID) {
-			writeAgentBatchFactoryError(w, batchfactoryv11.ErrNotFound)
-			return
-		}
-		canvas, err := projection.SyncBatchFactoryBook(req.Context(), owner, binding, bookID)
-		if err != nil {
-			writeAgentBatchFactoryError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, bindingResponse(binding, bookID, canvas.Revision, "synchronized"))
+		writeJSON(w, http.StatusOK, response)
 	})
 
 	handle("DELETE /api/agent/tasks/{id}/batch-factory/nodes/{nodeId}", func(w http.ResponseWriter, req *http.Request, owner string) {
@@ -175,6 +165,25 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 		}
 		writeJSON(w, http.StatusOK, bindingResponse(binding, bookID, saved.Revision, "canvas_reference_deleted"))
 	})
+}
+
+// syncAgentBatchFactoryBookProjection is the only Agent-side projection write.
+// Media-producing actions remain on Batch Factory endpoints; after they finish
+// the canvas receives the authoritative records through this one path.
+func syncAgentBatchFactoryBookProjection(ctx context.Context, projects agentworkspace.Store, batches agentBatchFactoryBridgeStore, projection *agentworkspace.BatchFactoryProjectionService, owner, projectID, bookID string) (agentBatchFactoryBindingResponse, error) {
+	binding, batch, err := agentBatchFactoryBindingForProject(ctx, projects, batches, owner, projectID)
+	if err != nil {
+		return agentBatchFactoryBindingResponse{}, err
+	}
+	bookID = strings.TrimSpace(bookID)
+	if !batchFactoryBookExists(batch, bookID) {
+		return agentBatchFactoryBindingResponse{}, batchfactoryv11.ErrNotFound
+	}
+	canvas, err := projection.SyncBatchFactoryBook(ctx, owner, binding, bookID)
+	if err != nil {
+		return agentBatchFactoryBindingResponse{}, err
+	}
+	return bindingResponse(binding, bookID, canvas.Revision, "synchronized"), nil
 }
 
 func bindingResponse(binding agentworkspace.BatchFactoryBinding, bookID string, version int64, state string) agentBatchFactoryBindingResponse {

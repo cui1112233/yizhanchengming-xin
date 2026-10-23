@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentCanvasURL, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, projectedNodePresentation, removeBatchFactoryCanvasNodes, syncBookThenLoadCanvas } from './agent-canvas-batch-factory.js';
+import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, projectedNodePresentation, removeBatchFactoryCanvasNodes, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
 
 test('opens the bound project at the requested book group', () => {
   assert.equal(
@@ -87,4 +87,17 @@ test('stops before later mapped deletes when an earlier delete changes the activ
     isCurrent: () => current
   });
   assert.deepEqual(calls, ['remove:node-1']);
+});
+
+test('shows a timing mismatch after manual override', () => {
+  const timing = videoNodeTiming({ audioSeconds: 7.4, selectedSeconds: 15, allowedSeconds: [5, 10, 15] });
+  assert.match(timing.warning, /与已连接音频时长不一致/);
+  assert.equal(timing.requestedSeconds, 15);
+});
+
+test('routes mapped image actions back to the batch factory record', () => {
+  assert.deepEqual(batchFactoryMappedAction({
+    groupId: 'book:book-1',
+    config: { batchId: 'batch-1', bookId: 'book-1', resourceType: 'book_asset', resourceId: 'asset-1' }
+  }), { type: 'image', batchId: 'batch-1', bookId: 'book-1', resourceId: 'asset-1' });
 });

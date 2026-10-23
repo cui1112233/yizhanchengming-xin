@@ -205,16 +205,16 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	}
 
 	imageNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
-	if imageNode.Config["prompt"] != asset.Prompt || imageNode.AssetRef["id"] != image.ID || imageNode.AssetRef["url"] != image.URL {
+	if imageNode.Config["prompt"] != asset.Prompt || imageNode.AssetRef["id"] != image.ID || imageNode.AssetRef["url"] != nil {
 		t.Fatalf("image node=%+v", imageNode)
 	}
 	videoNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "video", book.Videos[0].ID)
-	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != production.Tasks[0].MediaURL {
+	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != nil {
 		t.Fatalf("video node=%+v", videoNode)
 	}
 	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", merge.AudioArtifactID)
 	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", merge.ID)
-	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != merge.OutputURL {
+	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != nil {
 		t.Fatalf("merge node=%+v", mergeNode)
 	}
 	assertProjectionEdge(t, canvas.Edges, imageNode.ID, videoNode.ID)
@@ -481,4 +481,38 @@ func hasEdge(edges []Edge, source, target, relation string) bool {
 		}
 	}
 	return false
+}
+
+func TestResolveVideoDurationUsesNearestAllowedAudioDuration(t *testing.T) {
+	got := ResolveVideoDuration(7.4, []float64{5, 10, 15}, 0)
+	if got.RequestedSeconds != 10 {
+		t.Fatalf("requested=%v, want 10", got.RequestedSeconds)
+	}
+	if !got.Adjusted {
+		t.Fatalf("resolution=%+v, want adjusted", got)
+	}
+}
+
+func TestResolveVideoDurationPreservesManualOverride(t *testing.T) {
+	got := ResolveVideoDuration(7.4, []float64{5, 10, 15}, 15)
+	if got.RequestedSeconds != 15 {
+		t.Fatalf("requested=%v, want 15", got.RequestedSeconds)
+	}
+	if !got.HasMismatchWarning {
+		t.Fatalf("resolution=%+v, want mismatch warning", got)
+	}
+}
+
+func TestNormalizeMappedNodeStateUsesOnlyCanvasStatesAndSafeErrors(t *testing.T) {
+	failed := NormalizeMappedNodeState("error", "Authorization Bearer secret-token")
+	if failed.Status != "failed" || !failed.CanRetry || failed.ErrorMessage != "批量工厂任务失败，请重试" {
+		t.Fatalf("failed=%+v", failed)
+	}
+	running := NormalizeMappedNodeState("awaiting_confirmation", "")
+	if running.Status != "running" || running.CanRetry || running.ErrorMessage != "" {
+		t.Fatalf("running=%+v", running)
+	}
+	if cancelled := NormalizeMappedNodeState("canceled", ""); cancelled.Status != "cancelled" || !cancelled.CanRetry {
+		t.Fatalf("cancelled=%+v", cancelled)
+	}
 }

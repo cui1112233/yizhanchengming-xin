@@ -25,6 +25,7 @@ export default function AgentNodeComposer({
   node, models = [], modelLoadError = '', generationState = {},
   modelsByKind = {}, scriptState = {}, onSourceTextChange, onSplitScript, onBatchShots,
   onConfigChange, onPickImageAsset, onPickReferenceAsset, onRemoveReference, onSubmit,
+  timingWarning = '',
   videoJob, videoState = {}, videoBusy = false, videoActionError = '',
   onSelectImageCandidate, onConfirmImage,
   onSelectAudioCandidate, onConfirmAudio,

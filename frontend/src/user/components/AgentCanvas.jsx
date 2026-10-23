@@ -24,7 +24,8 @@ import {
   readableAssetRequestError, shouldOpenConnectionDrop
 } from '../pages/agent-canvas-context-menu';
 import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences } from '../pages/agent-canvas-connections';
-import { cancelAgentGeneration, cancelAgentVideoJob, confirmAgentGeneration, confirmAgentImageGeneration, confirmAgentVideoJob, createAgentAudioGeneration, createAgentImageGeneration, createAgentScriptSplit, createAgentShotBatchNodes, createAgentTextGeneration, createAgentVideoJob, getAgentGeneration, getAgentVideoJob, listAgentAssets, listAgentGenerations, listAgentScriptShots, listAgentVideoJobs, previewAgentCanvasInputs, removeAgentBatchFactoryNode, retryAgentGeneration, retryAgentVideoJob, uploadAgentAsset } from '../../shared/api/agent';
+import { cancelAgentGeneration, cancelAgentVideoJob, confirmAgentGeneration, confirmAgentImageGeneration, confirmAgentVideoJob, createAgentAudioGeneration, createAgentImageGeneration, createAgentScriptSplit, createAgentShotBatchNodes, createAgentTextGeneration, createAgentVideoJob, getAgentGeneration, getAgentVideoJob, listAgentAssets, listAgentGenerations, listAgentScriptShots, listAgentVideoJobs, previewAgentCanvasInputs, removeAgentBatchFactoryNode, retryAgentGeneration, retryAgentVideoJob, syncAgentBatchFactoryBook, uploadAgentAsset } from '../../shared/api/agent';
+import { generateBookAssetImages, setPrimaryBookAssetImage, submitBookMerge, submitBookProduction } from '../../shared/api/batchFactoryV11';
 import { listAvailableModels } from '../../shared/api/modelCatalog';
 import { buildNodeGenerationRequest, nextNodeGenerationAttempt, nodeExecutionReview } from '../pages/agent-canvas-node-generation';
 import { audioJobRequestForNode, canSubmitAudioNode } from '../pages/agent-canvas-audio-jobs';
@@ -35,7 +36,7 @@ import { modelInputCapabilityError } from '../pages/agent-model-capabilities';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { retainCanvasAssetPanel, retainCanvasEditorNodeID, viewportHasChanged } from '../pages/agent-canvas-state';
-import { batchFactoryGroupLabel, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, projectedNodePresentation, removeBatchFactoryCanvasNodes } from '../pages/agent-canvas-batch-factory';
+import { batchFactoryGroupLabel, batchFactoryMappedAction, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, videoNodeTiming } from '../pages/agent-canvas-batch-factory';
 import { invalidateScriptSplitForSource, normalizeScriptShots, normalizeScriptShotsForConfig, runAfterDurableCanvasSave, scriptShotsByNode as groupScriptShotsByNode, scriptSourceMarker, scriptSplitReady } from '../pages/agent-script-shots';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
@@ -189,7 +190,8 @@ function CanvasNodeRenderer(props) {
     : effectiveScriptState;
   const mergedGeneration = mergeGenerationTask({ id: props.id, data: props.data }, generationTask, localGeneration.selectedAssetId);
   const presentation = mergedGeneration.task ? generationPresentation(mergedGeneration.task) : null;
-  const taskPresentation = presentation || (kind === 'video' && videoJob ? videoJobGenerationPresentation(videoJob) : null);
+  const mappedPresentation = mappedNodeStatePresentation(props.data);
+  const taskPresentation = mappedPresentation || presentation || (kind === 'video' && videoJob ? videoJobGenerationPresentation(videoJob) : null);
   const taskCandidates = mergedGeneration.task?.state === 'awaiting_confirmation'
     ? mergedGeneration.resultOptions.map(result => ({ ...result.asset, ...result, id: result.assetId, resultId: result.id }))
     : [];
@@ -220,6 +222,11 @@ function CanvasNodeRenderer(props) {
     onNodeConfigChange={handleNodeConfigChange}
     inputPreview={canvasInputPreviewByNode[props.id]}
     onPreviewInputs={previewInputsForNode}
+    timingWarning={kind === 'video' ? videoNodeTiming({
+      audioSeconds: Number(props.data?.config?.connectedAudioDurationSeconds || 0),
+      selectedSeconds: Number(props.data?.config?.durationSeconds || 0),
+      allowedSeconds: props.data?.config?.allowedDurationSeconds
+    }).warning : ''}
     onSubmitText={submitTextForNode}
     onSubmitImage={submitImageForNode}
     onSubmitVideo={submitVideoForNode}
@@ -965,6 +972,48 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     }
   }
 
+  function mappedActionRequestID(action) {
+    const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return `agent-batch-factory-${action.type}-${action.resourceId || 'book'}-${random}`;
+  }
+
+  async function runMappedBatchFactoryAction(node, selectedModel = '') {
+    const action = batchFactoryMappedAction(node);
+    if (!action) return false;
+    const requestedTaskId = taskIdRef.current;
+    if (!requestedTaskId) return true;
+    const requestId = mappedActionRequestID(action);
+    try {
+      switch (action.type) {
+        case 'image':
+          await generateBookAssetImages(action.batchId, action.bookId, { assetIds: [action.resourceId], ...(selectedModel ? { modelId: selectedModel } : {}) });
+          break;
+        case 'video':
+          await submitBookProduction(action.batchId, action.bookId, requestId);
+          break;
+        case 'merge':
+          await submitBookMerge(action.batchId, action.bookId, { requestId });
+          break;
+        case 'audio':
+          await submitBookMerge(action.batchId, action.bookId, { requestId, audioArtifactId: action.resourceId });
+          break;
+        default:
+          break;
+      }
+      if (requestedTaskId !== taskIdRef.current) return true;
+      await syncAgentBatchFactoryBook(requestedTaskId, action.bookId);
+      if (requestedTaskId !== taskIdRef.current) return true;
+      await onServerCanvasChange?.();
+    } catch (error) {
+      if (requestedTaskId === taskIdRef.current) {
+        const messageText = error?.message || '批量工厂操作失败';
+        setNodeGenerationByNode(current => ({ ...current, [node.id]: { ...current[node.id], busy: false, error: messageText } }));
+        setVideoActionErrors(current => ({ ...current, [node.id]: messageText }));
+      }
+    }
+    return true;
+  }
+
   async function submitTextForNode(nodeID, selectedModel, draftPrompt) {
     const requestedTaskId = taskId;
     const node = persistGenerationDraftPrompt(nodeID, draftPrompt);
@@ -999,6 +1048,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   async function submitImageForNode(nodeID, selectedModel, draftPrompt) {
     const requestedTaskId = taskId;
+    const mappedNode = nodesRef.current.find(item => item.id === nodeID);
+    if (isBatchFactoryNode(mappedNode?.data)) {
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
+      await runMappedBatchFactoryAction(mappedNode, selectedModel);
+      return;
+    }
     const node = persistGenerationDraftPrompt(nodeID, draftPrompt);
     if (!requestedTaskId || node?.data?.type !== 'image') return;
     const capabilityError = nodeModelInputCapabilityError(node, selectedModel, configuredImageModels);
@@ -1058,6 +1113,20 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   async function confirmImage(nodeID, assetID) {
     const requestedTaskId = taskId;
+    const mappedNode = nodesRef.current.find(item => item.id === nodeID);
+    const mappedAction = batchFactoryMappedAction(mappedNode);
+    if (mappedAction?.type === 'image' && assetID) {
+      try {
+        await setPrimaryBookAssetImage(mappedAction.batchId, mappedAction.bookId, mappedAction.resourceId, assetID);
+        if (requestedTaskId === taskIdRef.current) {
+          await syncAgentBatchFactoryBook(requestedTaskId, mappedAction.bookId);
+          await onServerCanvasChange?.();
+        }
+      } catch (error) {
+        if (requestedTaskId === taskIdRef.current) setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, error: error?.message || '设置批量工厂主版本失败' } }));
+      }
+      return;
+    }
     const local = nodeGenerationByNode[nodeID] || {};
     const restored = nodeExecutionReview(executions, nodeID) || {};
     const executionID = local.executionId || restored.executionId;
@@ -1083,6 +1152,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   async function submitAudioForNode(nodeID, selectedModel, draftPrompt) {
     const requestedTaskId = taskId;
+    const mappedNode = nodesRef.current.find(item => item.id === nodeID);
+    if (isBatchFactoryNode(mappedNode?.data)) {
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '' } }));
+      await runMappedBatchFactoryAction(mappedNode, selectedModel);
+      return;
+    }
     const node = persistGenerationDraftPrompt(nodeID, draftPrompt);
     if (!requestedTaskId || node?.data?.type !== 'audio' || !canSubmitAudioNode(node, selectedModel)) return;
     const capabilityError = nodeModelInputCapabilityError(node, selectedModel, configuredAudioModels);
@@ -1195,6 +1270,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   async function submitVideoForNode(nodeID, ignoreReferences = false, selectedModel = '', draftPrompt) {
     const requestedTaskId = taskId;
+    const mappedNode = nodesRef.current.find(item => item.id === nodeID);
+    if (isBatchFactoryNode(mappedNode?.data)) {
+      setVideoBusyByNode(current => ({ ...current, [nodeID]: true }));
+      setVideoActionErrors(current => ({ ...current, [nodeID]: '' }));
+      await runMappedBatchFactoryAction(mappedNode, selectedModel);
+      if (requestedTaskId === taskIdRef.current) setVideoBusyByNode(current => ({ ...current, [nodeID]: false }));
+      return;
+    }
     if (!requestedTaskId || videoJobsLoadedTaskID !== requestedTaskId) return;
     const node = persistGenerationDraftPrompt(nodeID, draftPrompt);
     if (!node || node.data?.type !== 'video') return;
