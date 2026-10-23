@@ -52,7 +52,7 @@ type ReferenceURLProvider interface {
 }
 
 func ValidAssetKind(kind string) bool {
-	return kind == "image" || kind == "video"
+	return kind == "image" || kind == "video" || kind == "audio"
 }
 
 func ValidateAsset(asset Asset) error {
@@ -63,7 +63,9 @@ func ValidateAsset(asset Asset) error {
 		return ErrInvalidAsset
 	}
 	contentType := strings.ToLower(strings.TrimSpace(asset.ContentType))
-	if (asset.Kind == "image" && !strings.HasPrefix(contentType, "image/")) || (asset.Kind == "video" && !strings.HasPrefix(contentType, "video/")) {
+	if (asset.Kind == "image" && !strings.HasPrefix(contentType, "image/")) ||
+		(asset.Kind == "video" && !strings.HasPrefix(contentType, "video/")) ||
+		(asset.Kind == "audio" && !strings.HasPrefix(contentType, "audio/")) {
 		return ErrInvalidAsset
 	}
 	return nil

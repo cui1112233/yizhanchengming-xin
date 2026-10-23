@@ -10,15 +10,27 @@ import (
 )
 
 type MemoryStore struct {
-	mu               sync.Mutex
-	projects         map[string]Project
-	imports          map[string]LegacyImport
-	videoJobs        map[string]VideoJob
-	videoIdempotency map[string]string
+	mu                      sync.Mutex
+	projects                map[string]Project
+	imports                 map[string]LegacyImport
+	videoJobs               map[string]VideoJob
+	videoIdempotency        map[string]string
+	generationTasks         map[string]GenerationTask
+	generationIdempotency   map[string]string
+	scriptShots             map[string]ScriptShot
+	shotGenerationLinks     map[string]ShotGenerationLink
+	batchFactoryBindings    map[string]BatchFactoryBinding
+	batchFactoryProjects    map[string]string
+	batchFactoryNodeOrigins map[string]BatchFactoryNodeOrigin
 }
 
 func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{projects: make(map[string]Project), imports: make(map[string]LegacyImport), videoJobs: make(map[string]VideoJob), videoIdempotency: make(map[string]string)}
+	return &MemoryStore{
+		projects: make(map[string]Project), imports: make(map[string]LegacyImport), videoJobs: make(map[string]VideoJob), videoIdempotency: make(map[string]string),
+		generationTasks: make(map[string]GenerationTask), generationIdempotency: make(map[string]string),
+		scriptShots: make(map[string]ScriptShot), shotGenerationLinks: make(map[string]ShotGenerationLink),
+		batchFactoryBindings: make(map[string]BatchFactoryBinding), batchFactoryProjects: make(map[string]string), batchFactoryNodeOrigins: make(map[string]BatchFactoryNodeOrigin),
+	}
 }
 
 func projectKey(owner, id string) string                   { return owner + "\x00" + id }
@@ -239,6 +251,32 @@ func (s *MemoryStore) BeginNodeExecution(_ context.Context, owner, projectID str
 	return execution, nil
 }
 
+func (s *MemoryStore) SetNodeExecutionAwaitingConfirmation(_ context.Context, owner, projectID, executionID string, detail map[string]any, now time.Time) (Execution, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := projectKey(strings.TrimSpace(owner), strings.TrimSpace(projectID))
+	project, ok := s.projects[key]
+	if !ok || project.DeletedAt != nil {
+		return Execution{}, ErrProjectNotFound
+	}
+	for index := range project.Executions {
+		execution := &project.Executions[index]
+		if execution.ID != strings.TrimSpace(executionID) {
+			continue
+		}
+		if execution.Status != "running" {
+			return Execution{}, ErrExecutionState
+		}
+		execution.Status = "awaiting_confirmation"
+		execution.Detail = cloneMap(detail)
+		execution.UpdatedAt = now.UTC()
+		project.UpdatedAt = now.UTC()
+		s.projects[key] = project
+		return cloneProject(project).Executions[index], nil
+	}
+	return Execution{}, ErrExecutionNotFound
+}
+
 func (s *MemoryStore) ApplyNodeExecution(_ context.Context, owner, projectID string, input ApplyNodeExecutionInput) (Canvas, Execution, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -257,7 +295,8 @@ func (s *MemoryStore) ApplyNodeExecution(_ context.Context, owner, projectID str
 	if executionIndex < 0 {
 		return Canvas{}, Execution{}, ErrExecutionNotFound
 	}
-	if project.Executions[executionIndex].Status != "running" {
+	executionStatus := project.Executions[executionIndex].Status
+	if executionStatus != "running" && !(input.NodeType == "image" && executionStatus == "awaiting_confirmation") {
 		return Canvas{}, Execution{}, ErrExecutionState
 	}
 	nodeIndex := -1

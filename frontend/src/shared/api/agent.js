@@ -43,6 +43,13 @@ export function saveAgentCanvas(taskId, canvas, revision) {
   });
 }
 
+export function approveAgentDirectorPlan(taskId, planId, revision) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/director/plans/${encodeURIComponent(planId)}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ revision })
+  });
+}
+
 export function listAgentExecutions(taskId) {
   return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/executions`);
 }
@@ -67,6 +74,90 @@ export function createAgentTextGeneration(taskId, payload, request = apiRequest)
 export function createAgentImageGeneration(taskId, payload, request = apiRequest) {
   return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/image-generations`, {
     method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function previewAgentCanvasInputs(taskId, nodeId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/canvas-inputs/preview`, {
+    method: 'POST', body: JSON.stringify({ nodeId }), suppressGlobalError: true
+  });
+}
+
+export function createAgentScriptSplit(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/script-splits`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function listAgentScriptShots(taskId, nodeId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/script-nodes/${encodeURIComponent(nodeId)}/shots`, {
+    suppressGlobalError: true
+  });
+}
+
+export function updateAgentScriptShot(taskId, shotId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/shots/${encodeURIComponent(shotId)}`, {
+    method: 'PATCH', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function createAgentShotBatchNodes(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/shots/batch-nodes`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function createAgentAudioGeneration(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/audio-generations`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function confirmAgentImageGeneration(taskId, executionId, assetId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/image-generations/${encodeURIComponent(executionId)}/confirm`, {
+    method: 'POST', body: JSON.stringify({ assetId }), suppressGlobalError: true
+  });
+}
+
+export function createAgentGeneration(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function listAgentGenerations(taskId, request = apiRequest) {
+	return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations`, { suppressGlobalError: true });
+}
+
+export function getAgentGenerationSummary(taskId, request = apiRequest) {
+	return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generation-summary`, { suppressGlobalError: true });
+}
+
+export function getAgentGeneration(taskId, generationId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations/${encodeURIComponent(generationId)}`, { suppressGlobalError: true });
+}
+
+export function confirmAgentGeneration(taskId, generationId, resultId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations/${encodeURIComponent(generationId)}/confirm`, {
+    method: 'POST', body: JSON.stringify({ resultId }), suppressGlobalError: true
+  });
+}
+
+export function activateAgentGenerationResult(taskId, generationId, resultId, expectedNodeVersion, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations/${encodeURIComponent(generationId)}/activate`, {
+    method: 'POST', body: JSON.stringify({ resultId, expectedNodeVersion }), suppressGlobalError: true
+  });
+}
+
+export function cancelAgentGeneration(taskId, generationId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations/${encodeURIComponent(generationId)}/cancel`, {
+    method: 'POST', suppressGlobalError: true
+  });
+}
+
+export function retryAgentGeneration(taskId, generationId, idempotencyKey, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generations/${encodeURIComponent(generationId)}/retry`, {
+    method: 'POST', body: JSON.stringify({ idempotencyKey }), suppressGlobalError: true
   });
 }
 

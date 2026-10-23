@@ -54,6 +54,23 @@ export function filterWorkspaceAssets(assets = [], filters = {}) {
   ));
 }
 
+export function workspaceExecutionKind(execution = {}) {
+  const value = String(execution?.kind || execution?.mediaKind || execution?.toolName || execution?.tool || '').toLocaleLowerCase();
+  if (value.includes('image')) return 'image';
+  if (value.includes('video')) return 'video';
+  if (value.includes('audio')) return 'audio';
+  if (value.includes('text')) return 'text';
+  return 'other';
+}
+
+export function filterWorkspaceExecutions(executions = [], filters = {}) {
+  const kinds = selected(filters.kinds);
+  return (Array.isArray(executions) ? executions : []).filter(execution => (
+    includesText([execution?.name, execution?.toolName, execution?.tool, execution?.status, execution?.state], filters.query)
+    && (!kinds.length || kinds.includes(workspaceExecutionKind(execution)))
+  ));
+}
+
 export function workspaceDrawerWidth(value) {
   const width = Number(value);
   if (!Number.isFinite(width)) return 288;

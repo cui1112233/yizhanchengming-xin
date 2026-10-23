@@ -46,7 +46,7 @@ func RegisterAgentAssetRoutes(root *http.ServeMux, middleware BridgeAuth, projec
 		}
 		kind := strings.TrimSpace(req.URL.Query().Get("kind"))
 		if kind != "" && !agentworkspace.ValidAssetKind(kind) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "素材类型仅支持图片或视频"})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "素材类型仅支持图片、视频或音频"})
 			return
 		}
 		items, err := assets.ListAssets(req.Context(), owner, req.PathValue("id"), kind)
@@ -85,7 +85,7 @@ func RegisterAgentAssetRoutes(root *http.ServeMux, middleware BridgeAuth, projec
 		}
 		contentType, kind := detectedAgentAssetType(header.Header.Get("Content-Type"), header.Filename, contents)
 		if kind == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "仅支持图片或视频素材"})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "仅支持图片、视频或音频素材"})
 			return
 		}
 		assetID := newAgentID("asset")
@@ -143,6 +143,9 @@ func detectedAgentAssetType(requestType, filename string, contents []byte) (stri
 		}
 		if strings.HasPrefix(contentType, "video/") {
 			return contentType, "video"
+		}
+		if strings.HasPrefix(contentType, "audio/") {
+			return contentType, "audio"
 		}
 	}
 	return "", ""

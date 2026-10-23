@@ -8,6 +8,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const css = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-workspace.css'), 'utf8');
 const pageSource = fs.readFileSync(path.resolve(dirname, './AgentPageV2.jsx'), 'utf8');
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
+const controlsSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvasControls.jsx'), 'utf8');
 
 function cssBlock(selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -41,11 +42,66 @@ test('Agent 窄屏画布隐藏会遮挡输入按钮的桌面宠物', () => {
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.legacy-shell:has\(\.agent-page\.agent-workspace-v3\)\s*>\s*\.cm-penguin-shell\s*\{[^}]*display:\s*none/);
 });
 
+test('项目对话空状态提供只填入输入框的创作引导', () => {
+  assert.match(pageSource, /function handleConversationStarter\(prompt\)/);
+  assert.match(pageSource, /questionInputRef\.current\?\.focus\?\.\(\)/);
+  assert.match(pageSource, /agent-conversation-starters/);
+  for (const label of ['从画布开始创作', '从素材预设开始脚本原创', '上传故事来改编', '批量优化提示词']) {
+    assert.match(pageSource, new RegExp(label));
+  }
+  assert.match(css, /\.agent-page \.agent-conversation-starters\s*\{/);
+  assert.match(css, /\.agent-page \.agent-conversation-starter\s*\{/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*agent-conversation-starters/);
+});
+
+test('项目对话输入区将能力收为紧凑图标工具条', () => {
+  assert.match(pageSource, /agent-composer-tools/);
+  assert.match(pageSource, /全能创作/);
+  assert.match(pageSource, /aria-label="添加附件"/);
+  assert.match(pageSource, /aria-label="选择技能"/);
+  assert.match(pageSource, /aria-label="选择专家"/);
+  assert.match(pageSource, /aria-label="发送消息"/);
+  assert.match(pageSource, /找问题/);
+  assert.match(css, /\.agent-page \.agent-conversation-panel \.agent-composer-tools\s*\{/);
+  assert.match(css, /\.agent-page \.agent-conversation-panel \.agent-composer-send\s*\{/);
+});
+
+test('项目对话把输入内容与工具条收在同一个输入框内', () => {
+  const composer = cssBlock('.agent-page .agent-conversation-panel .agent-workbench-composer');
+  assert.match(composer, /border:\s*1px solid var\(--agent-border-strong\)/);
+  assert.match(composer, /border-radius:\s*8px/);
+  assert.match(composer, /background:\s*var\(--agent-elevated\)/);
+  const actions = cssBlock('.agent-page .agent-conversation-panel .agent-composer-actions');
+  assert.match(actions, /border-top:\s*1px solid var\(--agent-border\)/);
+  assert.match(actions, /padding-top:\s*7px/);
+});
+
 test('进入画布页后会重新读取当前项目画布', () => {
   const canvasLoadEffect = pageSource.match(/Promise\.all\(\[getAgentCanvas\(activeTaskId\)[\s\S]*?\n\s*}, \[([^\]]+)\]\);/);
   assert.ok(canvasLoadEffect, 'missing canvas load effect');
   assert.match(canvasLoadEffect[1], /activeTaskId/);
   assert.match(canvasLoadEffect[1], /isCanvasWorkspace/);
+});
+
+test('画布节点列表在已经处于工作流时也会重新触发定位', () => {
+  assert.match(pageSource, /const \[workflowFocusRequest, setWorkflowFocusRequest\] = useState\(0\);/);
+  assert.match(pageSource, /function openNodeInWorkflow\(nodeId\) \{[\s\S]*?setWorkflowFocusRequest\(current => current \+ 1\);[\s\S]*?updateWorkspaceView\(\{ activeView: 'workflow' \}\);/);
+  const focusEffect = pageSource.match(/useEffect\(\(\) => \{[\s\S]*?canvasRef\.current\?\.locateNode\(nodeId\);[\s\S]*?}, \[([^\]]+)\]\);/);
+  assert.ok(focusEffect, 'missing workflow node focus effect');
+  assert.match(focusEffect[1], /workflowFocusRequest/);
+});
+
+test('画布保持稳定的节点渲染器定义，输入时不会重置 React Flow 节点类型', () => {
+  assert.match(canvasSource, /const canvasNodeTypes = \{\s*agent: CanvasNodeRenderer\s*\};/);
+  assert.doesNotMatch(canvasSource, /const canvasNodeTypes = useMemo\(\(\) => \(\{\s*agent: props =>/);
+});
+
+test('节点列表定位会居中目标节点而不把单个节点强制放大到最大缩放', () => {
+  const locateNode = canvasSource.match(/function locateNode\(nodeID\) \{[\s\S]*?\n  \}/);
+  assert.ok(locateNode, 'missing locateNode');
+  assert.match(locateNode[0], /flowInstance\?\.getInternalNode\?\.\(nodeID\)/);
+  assert.match(locateNode[0], /flowInstance\?\.setCenter\?/);
+  assert.doesNotMatch(locateNode[0], /fitView\(\{ nodes:/);
 });
 
 test('视频确认回读只把服务端 revision 同步给发起请求时的任务和保存队列', () => {
@@ -55,28 +111,42 @@ test('视频确认回读只把服务端 revision 同步给发起请求时的任�
   assert.match(pageSource, /await requestedQueue\.acceptServerCanvas\(nextCanvas\)/);
 });
 
-test('A 方案画布工具使用固定尺寸且不会因禁用状态位移', () => {
-  for (const selector of ['.agent-page .agent-canvas-toolrail', '.agent-page .agent-canvas-editbar', '.agent-page .agent-canvas-zoom-controls']) {
+test('画布把全局工具与选中节点操作分层，常用控制收进底部工具组', () => {
+  for (const selector of ['.agent-page .agent-canvas-toolrail', '.agent-page .agent-canvas-editbar', '.agent-page .agent-canvas-bottom-dock']) {
     const block = cssBlock(selector);
     assert.match(block, /position:\s*absolute/);
-    assert.match(block, /z-index:\s*1[0-9]/);
+    assert.match(block, /z-index:\s*\d+/);
   }
+  assert.match(canvasSource, /\{selectedIds\.length > 0 \? <nav className="agent-canvas-editbar"/);
+  assert.match(controlsSource, /<div className="agent-canvas-bottom-dock">/);
   const buttons = cssBlock('.agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn');
   assert.match(buttons, /width:\s*36px/);
   assert.match(buttons, /height:\s*36px/);
   assert.match(buttons, /border-radius:\s*[0-8]px/);
 });
 
+test('文本节点预览保持可读尺寸，不与媒体节点共用过窄卡片', () => {
+  assert.match(css, /\.agent-page \.agent-canvas-node--text\s*\{[^}]*width:\s*280px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*min-height:\s*64px/);
+});
+
+test('项目抽屉打开后不会盖住左侧全局画布工具', () => {
+  const drawer = cssBlock('.agent-page .agent-project-drawer');
+  const toolrail = cssBlock('.agent-page .agent-canvas-toolrail');
+  assert.match(drawer, /z-index:\s*20/);
+  assert.match(toolrail, /z-index:\s*2[1-9]/);
+});
+
 test('窄屏编辑工具可横向滚动且缩放栏保持有界', () => {
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-editbar\s*\{[^}]*max-width:\s*calc\(100% - 72px\)[^}]*overflow-x:\s*auto/);
-  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-zoom-controls\s*\{[^}]*max-width:\s*calc\(100% - 24px\)/);
-  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-canvas-workspace:not\(\.is-conversation-collapsed\) \.agent-canvas-zoom-controls\s*\{[^}]*bottom:\s*calc\(min\(72dvh,\s*620px\) \+ 12px\)/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-bottom-dock\s*\{[^}]*max-width:\s*calc\(100% - 24px\)[^}]*overflow-x:\s*auto/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-canvas-workspace:not\(\.is-conversation-collapsed\) \.agent-canvas-bottom-dock\s*\{[^}]*bottom:\s*calc\(min\(72dvh,\s*620px\) \+ 12px\)/);
 });
 
 test('节点点击明确支持 Ctrl Shift 和 Command 多选', () => {
   assert.match(canvasSource, /onNodeClick=\{handleNodeClick\}/);
-  assert.match(canvasSource, /event\.ctrlKey\s*\|\|\s*event\.metaKey\s*\|\|\s*event\.shiftKey/);
-  assert.match(canvasSource, /selectCanvasNodes\([\s\S]*?nodesRef\.current,[\s\S]*?node\.id,[\s\S]*?selectedIds/);
+  assert.match(canvasSource, /const isMultiSelection = isCanvasMultiSelectionEvent\(event\);/);
+  assert.match(canvasSource, /selectCanvasNodes\([\s\S]*?nodesRef\.current,[\s\S]*?node\.id,[\s\S]*?isMultiSelection,[\s\S]*?selectedIds/);
 });
 
 test('画布提供持久外观设置和按方向流动的连线', () => {

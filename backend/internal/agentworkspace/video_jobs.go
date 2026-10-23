@@ -19,6 +19,7 @@ type VideoJobState string
 
 const (
 	VideoJobPreparing            VideoJobState = "preparing"
+	VideoJobSubmitting           VideoJobState = "submitting"
 	VideoJobQueued               VideoJobState = "queued"
 	VideoJobRunning              VideoJobState = "running"
 	VideoJobResultReady          VideoJobState = "result_ready"
@@ -71,14 +72,24 @@ type VideoJobStore interface {
 	CreateVideoJob(context.Context, string, CreateVideoJobInput) (VideoJob, error)
 	VideoJob(context.Context, string, string, string) (VideoJob, error)
 	ListVideoJobs(context.Context, string, string) ([]VideoJob, error)
+	ListPollableVideoJobs(context.Context, int) ([]VideoJob, error)
 	UpdateVideoJob(context.Context, string, VideoJob, time.Time) (VideoJob, error)
 	ConfirmVideoJob(context.Context, string, string, string, time.Time) (VideoJob, error)
 	RetryVideoJob(context.Context, string, string, string, RetryVideoJobInput) (VideoJob, error)
 }
 
+func isPollableVideoJob(state VideoJobState) bool {
+	switch state {
+	case VideoJobSubmitting, VideoJobQueued, VideoJobRunning, VideoJobResultReady, VideoJobIngesting:
+		return true
+	default:
+		return false
+	}
+}
+
 func validVideoJobState(state VideoJobState) bool {
 	switch state {
-	case VideoJobPreparing, VideoJobQueued, VideoJobRunning, VideoJobResultReady, VideoJobIngesting, VideoJobCanceling,
+	case VideoJobPreparing, VideoJobSubmitting, VideoJobQueued, VideoJobRunning, VideoJobResultReady, VideoJobIngesting, VideoJobCanceling,
 		VideoJobAwaitingConfirmation, VideoJobApplied, VideoJobFailed, VideoJobCanceled, VideoJobAbandoned:
 		return true
 	default:
@@ -130,7 +141,9 @@ func isRetryableVideoJob(state VideoJobState) bool {
 func validVideoJobTransition(from, to VideoJobState) bool {
 	switch from {
 	case VideoJobPreparing:
-		return to == VideoJobQueued || to == VideoJobCanceling || to == VideoJobFailed || to == VideoJobCanceled || to == VideoJobAbandoned
+		return to == VideoJobSubmitting || to == VideoJobQueued || to == VideoJobCanceling || to == VideoJobFailed || to == VideoJobCanceled || to == VideoJobAbandoned
+	case VideoJobSubmitting:
+		return to == VideoJobQueued || to == VideoJobFailed || to == VideoJobAbandoned
 	case VideoJobQueued:
 		return to == VideoJobRunning || to == VideoJobResultReady || to == VideoJobCanceling || to == VideoJobFailed || to == VideoJobCanceled || to == VideoJobAbandoned
 	case VideoJobRunning:

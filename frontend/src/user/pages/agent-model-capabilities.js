@@ -19,7 +19,7 @@ function localDoubaoModels(kind) {
     provider: 'doubao_local_executor',
     enabled: true,
     capabilities: kind === 'image'
-      ? { ratios: ['16:9', '9:16', '1:1'], resolutions: ['1K', '2K', '4K'], qualityLevels: ['standard', 'high'], maxOutputCount: 4, referenceKinds: ['image'] }
+      ? { ratios: ['16:9', '9:16', '1:1'], qualityLevels: ['low', 'standard', 'high'], maxOutputCount: 4, referenceKinds: ['image'], resolutionManagedByModel: true }
       : { ratios: ['16:9', '9:16'], resolutions: ['720P', '1080P'], duration: { min: 5, max: 15, default: 5 }, maxOutputCount: 1, referenceKinds: ['image'] }
   }));
 }

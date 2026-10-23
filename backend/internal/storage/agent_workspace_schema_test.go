@@ -37,20 +37,20 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 
 func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800007 {
-		t.Fatalf("last migration=%v, want 8800007", migrations[len(migrations)-1].Version)
+	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800012 {
+		t.Fatalf("last migration=%v, want 8800012", migrations[len(migrations)-1].Version)
 	}
 	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800007 {
-			t.Fatalf("agent migration must be greater than existing version %d", migration.Version)
+		if migration.Version >= 8800012 {
+			t.Fatalf("agent migration must be less than new version %d", migration.Version)
 		}
 	}
 }
 
 func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	if len(migrations) != 7 {
-		t.Fatalf("AgentWorkspaceMigrations length=%d, want 7", len(migrations))
+	if len(migrations) != 12 {
+		t.Fatalf("AgentWorkspaceMigrations length=%d, want 12", len(migrations))
 	}
 	if migrations[0].Version != 8800001 || migrations[0].CallbackChecksum != "v88-agent-workspace-foundation-v1" {
 		t.Fatalf("historical migration changed: %+v", migrations[0])
@@ -100,5 +100,102 @@ func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(strings.Join(viewState.SQL, "\n")), "add column view_state_json json") {
 		t.Fatalf("missing view_state_json migration: %v", viewState.SQL)
+	}
+	generation := migrations[7]
+	if generation.Version != 8800008 || generation.CallbackChecksum != "v88-agent-generation-tasks-v1" {
+		t.Fatalf("generation task migration=%+v", generation)
+	}
+	generationSchema := strings.ToLower(strings.Join(generation.SQL, "\n"))
+	for _, clause := range []string{
+		"create table if not exists agent_generation_tasks",
+		"create table if not exists agent_generation_results",
+		"uq_agent_generation_tasks_owner_project_idempotency",
+		"idx_agent_generation_tasks_owner_project_updated",
+		"idx_agent_generation_results_task",
+	} {
+		if !strings.Contains(generationSchema, clause) {
+			t.Fatalf("missing generation schema clause %q: %v", clause, generation.SQL)
+		}
+	}
+	snapshot := migrations[8]
+	if snapshot.Version != 8800009 || snapshot.CallbackChecksum != "v88-agent-canvas-json-snapshot-v1" {
+		t.Fatalf("canvas snapshot migration=%+v", snapshot)
+	}
+	if !strings.Contains(strings.ToLower(strings.Join(snapshot.SQL, "\n")), "add column canvas_json json") {
+		t.Fatalf("missing canvas_json migration: %v", snapshot.SQL)
+	}
+	backfill := migrations[9]
+	if backfill.Version != 8800010 || backfill.CallbackChecksum != "v88-agent-canvas-json-backfill-v1" {
+		t.Fatalf("canvas backfill migration=%+v", backfill)
+	}
+	backfillSQL := strings.ToLower(strings.Join(backfill.SQL, "\n"))
+	for _, clause := range []string{"update agent_canvases", "json_arrayagg", "agent_canvas_nodes", "agent_canvas_edges", "where c.canvas_json is null"} {
+		if !strings.Contains(backfillSQL, clause) {
+			t.Fatalf("missing canvas snapshot backfill clause %q: %v", clause, backfill.SQL)
+		}
+	}
+	shots := migrations[10]
+	if shots.Version != 8800011 || shots.CallbackChecksum != "v88-agent-script-shots-v1" {
+		t.Fatalf("script shots migration=%+v", shots)
+	}
+	shotSchema := strings.ToLower(strings.Join(shots.SQL, "\n"))
+	for _, clause := range []string{
+		"create table if not exists agent_script_shots",
+		"primary key (project_id, id)",
+		"unique key uq_agent_script_shots_sequence (project_id, script_node_id, sequence)",
+		"create table if not exists agent_shot_generation_links",
+		"unique key uq_agent_shot_generation_links (project_id, shot_id, node_id, generation_id)",
+		"owner_username",
+	} {
+		if !strings.Contains(shotSchema, clause) {
+			t.Fatalf("missing script shot schema clause %q: %v", clause, shots.SQL)
+		}
+	}
+}
+
+func TestAgentWorkspaceSchemaIncludesScriptShots(t *testing.T) {
+	migrations := AgentWorkspaceMigrations()
+	shots := migrations[10]
+	if shots.Version != 8800011 || shots.CallbackChecksum != "v88-agent-script-shots-v1" {
+		t.Fatalf("script shots migration=%+v", shots)
+	}
+	schema := strings.ToLower(strings.Join(shots.SQL, "\n"))
+	for _, clause := range []string{
+		"create table if not exists agent_script_shots",
+		"primary key (project_id, id)",
+		"unique key uq_agent_script_shots_sequence (project_id, script_node_id, sequence)",
+		"create table if not exists agent_shot_generation_links",
+		"unique key uq_agent_shot_generation_links (project_id, shot_id, node_id, generation_id)",
+		"owner_username",
+	} {
+		if !strings.Contains(schema, clause) {
+			t.Fatalf("missing script shot schema clause %q: %v", clause, shots.SQL)
+		}
+	}
+}
+
+func TestAgentWorkspaceBatchFactoryBindingMigrationIsAppendOnlyAndSafe(t *testing.T) {
+	migrations := AgentWorkspaceMigrations()
+	binding := migrations[len(migrations)-1]
+	if binding.Version != 8800012 || binding.CallbackChecksum != "v88-agent-batch-factory-bindings-v1" {
+		t.Fatalf("batch factory binding migration=%+v", binding)
+	}
+	schema := strings.ToLower(strings.Join(binding.SQL, "\n"))
+	for _, clause := range []string{
+		"create table if not exists agent_batch_factory_bindings",
+		"unique key uq_agent_batch_factory_bindings_owner_batch (owner_username, batch_id)",
+		"unique key uq_agent_batch_factory_bindings_owner_project (owner_username, project_id)",
+		"create table if not exists agent_batch_factory_node_origins",
+		"primary key (project_id, node_id)",
+		"idx_agent_batch_factory_node_origins_owner_book",
+	} {
+		if !strings.Contains(schema, clause) {
+			t.Fatalf("missing batch factory binding schema clause %q: %v", clause, binding.SQL)
+		}
+	}
+	for _, forbidden := range []string{"media_bytes", "object_key", "provider_credential"} {
+		if strings.Contains(schema, forbidden) {
+			t.Fatalf("batch factory binding schema contains forbidden column %q", forbidden)
+		}
 	}
 }

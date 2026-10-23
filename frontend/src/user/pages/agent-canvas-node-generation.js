@@ -36,8 +36,26 @@ export function nodeGenerationViewState({ kind, busy = false, error = '', execut
   }
   const message = String(error?.message || error || '').trim();
   if (message) return { busy: false, disabled: false, tone: 'error', message };
-  if (execution?.status === 'completed') return { busy: false, disabled: false, tone: 'success', message: '生成完成' };
+  if (execution?.status === 'awaiting_confirmation') return { busy: false, disabled: false, tone: 'review', message: '等待选择' };
+  if (execution?.status === 'completed') return { busy: false, disabled: false, tone: 'success', message: '已完成' };
   return { busy: false, disabled: false, tone: 'idle', message: '' };
+}
+
+export function nodeExecutionReview(executions = [], nodeID = '') {
+  const targetID = String(nodeID || '').trim();
+  const pending = (Array.isArray(executions) ? executions : [])
+    .filter(execution => execution?.toolName === 'image-generation'
+      && execution?.status === 'awaiting_confirmation'
+      && String(execution?.detail?.nodeId || '').trim() === targetID)
+    .sort((left, right) => Date.parse(String(right?.updatedAt || '')) - Date.parse(String(left?.updatedAt || '')))[0];
+  if (!pending) return null;
+  const candidates = (Array.isArray(pending?.detail?.resultAssets) ? pending.detail.resultAssets : []).flatMap(asset => {
+    const id = String(asset?.id || asset?.assetId || '').trim();
+    if (!id || asset?.kind !== 'image') return [];
+    return [{ ...asset, id, assetId: id }];
+  });
+  if (!candidates.length) return null;
+  return { executionId: String(pending.id || '').trim(), status: 'awaiting_confirmation', candidates };
 }
 
 export function nodeGenerationIdempotencyKey({ taskId, nodeId, nodeVersion, kind, attempt = 0 } = {}) {
@@ -46,9 +64,27 @@ export function nodeGenerationIdempotencyKey({ taskId, nodeId, nodeVersion, kind
     .join(':');
 }
 
+export function nextNodeGenerationAttempt({ localAttempt = 0, task = null, nodeId = '', kind = '' } = {}) {
+  const local = Math.max(0, Number(localAttempt) || 0);
+  const isMatchingFailedTask = (task?.state === 'failed' || task?.state === 'cancelled')
+    && String(task?.nodeId || '').trim() === String(nodeId || '').trim()
+    && String(task?.kind || '').trim() === String(kind || '').trim();
+  if (!isMatchingFailedTask) return local;
+  const parts = String(task?.idempotencyKey || '').split(':');
+  const previousAttempt = Number(parts.at(-1));
+  return Number.isFinite(previousAttempt) && previousAttempt >= 0
+    ? Math.max(local, previousAttempt + 1)
+    : local;
+}
+
 export function buildNodeGenerationRequest(node, { taskId = '', attempt = 0, modelId = '' } = {}) {
   const kind = String(node?.data?.type || '').trim();
   const config = normalizeNodeConfig(kind, node?.data?.config || {});
+  const upstreamPrompt = (Array.isArray(config.edgePromptSources) ? config.edgePromptSources : [])
+    .map(source => String(source?.text || '').trim())
+    .filter(Boolean)
+    .join('\n');
+  const prompt = [upstreamPrompt, String(config.prompt || '').trim()].filter(Boolean).join('\n');
   const referenceAssetIds = (config.referenceAssets || [])
     .filter(asset => kind === 'image' ? asset?.kind === 'image' : true)
     .map(asset => String(asset?.id || asset?.assetId || '').trim())
@@ -59,7 +95,7 @@ export function buildNodeGenerationRequest(node, { taskId = '', attempt = 0, mod
     provider: config.provider,
     modelId: String(modelId || config.modelId).trim(),
     mode: config.mode,
-    prompt: String(config.prompt || '').trim(),
+    prompt,
     parameters: { ...config.parameters },
     advanced: { ...config.advanced },
     referenceAssetIds: [...new Set(referenceAssetIds)],
@@ -73,9 +109,9 @@ export function buildNodeGenerationRequest(node, { taskId = '', attempt = 0, mod
   };
 }
 
-export function submitNodeGeneration({ event, onSubmit, nodeID, modelID } = {}) {
+export function submitNodeGeneration({ event, onSubmit, nodeID, modelID, prompt } = {}) {
   event?.stopPropagation?.();
-  onSubmit?.(nodeID, modelID);
+  onSubmit?.(nodeID, modelID, prompt);
 }
 
 export function composerShouldClose(eventState = {}) {

@@ -6,10 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 )
@@ -30,6 +33,11 @@ func TestAgentImageGeneratorUsesOnlineLocalDoubaoExecutor(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	assets := agentworkspace.NewMemoryAssetStore()
+	reference := agentworkspace.Asset{ID: "reference-1", ProjectID: "agent-1", Kind: "image", Name: "reference.png", ContentType: "image/png", ObjectKey: "agent-assets/alice/agent-1/reference-1.png", ByteSize: 4, CreatedAt: now}
+	if err := assets.CreateAsset(context.Background(), "alice", reference); err != nil {
+		t.Fatal(err)
+	}
 	pngBytes, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII=")
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +50,18 @@ func TestAgentImageGeneratorUsesOnlineLocalDoubaoExecutor(t *testing.T) {
 			done <- claimErr
 			return
 		}
+		var payload map[string]any
+		if decodeErr := json.Unmarshal(claim.Job.Payload, &payload); decodeErr != nil {
+			done <- decodeErr
+			return
+		}
 		lease := localexecutor.LeaseCredential{Token: claim.LeaseToken, Generation: claim.LeaseGeneration}
+		urls, _ := payload["referenceImages"].([]any)
+		if len(urls) != 1 || urls[0] != agentExecutorReferenceAssetURL("agent-1", "reference-1") {
+			_ = executors.FailJob(context.Background(), paired.Token, claim.Job.ID, lease, localexecutor.FailureInput{Code: "assertion", Message: "referenceImages missing"})
+			done <- fmt.Errorf("referenceImages=%v", payload["referenceImages"])
+			return
+		}
 		for _, state := range []localexecutor.JobState{localexecutor.JobPreparing, localexecutor.JobSubmitting} {
 			if progressErr := executors.RecordProgress(context.Background(), paired.Token, claim.Job.ID, lease, state); progressErr != nil {
 				done <- progressErr
@@ -73,8 +92,8 @@ func TestAgentImageGeneratorUsesOnlineLocalDoubaoExecutor(t *testing.T) {
 		done <- executors.CompleteJob(context.Background(), paired.Token, claim.Job.ID, lease, localexecutor.ResultInput{ArtifactID: artifact.ID})
 	}()
 
-	generator := newAgentImageGenerator(nil, nil, executors, files)
-	results, status, err := generator(context.Background(), "alice", AgentImageGenerationInput{ModelID: agentLocalDoubaoImageModelID, Prompt: "一只蓝色小鸟", Size: "1024x1536", AspectRatio: "9:16", Quality: "standard", Resolution: "1K", Count: 1})
+	generator := newAgentImageGenerator(nil, nil, executors, files, assets, nil)
+	results, status, err := generator(context.Background(), "alice", AgentImageGenerationInput{ModelID: agentLocalDoubaoImageModelID, Prompt: "一只蓝色小鸟", Size: "1024x1536", AspectRatio: "9:16", Quality: "standard", Resolution: "1K", Count: 1, ProjectID: "agent-1", ReferenceAssetIDs: []string{"reference-1"}})
 	if err != nil || status != 200 || len(results) != 1 || !strings.HasPrefix(results[0], "data:image/png;base64,") {
 		t.Fatalf("status=%d results=%q err=%v", status, results, err)
 	}

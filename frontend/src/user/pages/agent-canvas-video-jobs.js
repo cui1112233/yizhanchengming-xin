@@ -1,4 +1,4 @@
-const runningStates = new Set(['preparing', 'queued', 'running', 'result_ready', 'ingesting', 'canceling']);
+const runningStates = new Set(['preparing', 'submitting', 'queued', 'running', 'result_ready', 'ingesting', 'canceling']);
 
 export function canSubmitVideoFromConfig(config = {}) {
   return Boolean(String(config?.prompt || '').trim());
@@ -28,9 +28,13 @@ export function videoReferenceAssetIDs(config = {}) {
 }
 
 export function videoReferenceCapabilityError(config = {}) {
-  const unsupported = (Array.isArray(config?.referenceAssets) ? config.referenceAssets : [])
+  const references = Array.isArray(config?.referenceAssets) ? config.referenceAssets : [];
+  const unsupportedVideo = references
     .find(asset => asset?.kind === 'video' && String(asset?.id || '').trim());
-  return unsupported ? '当前视频生成暂不支持视频参考素材，请移除视频参考后再生成。' : '';
+  if (unsupportedVideo) return '当前视频生成暂不支持视频参考素材，请移除视频参考后再生成。';
+  const unsupportedAudio = references
+    .find(asset => asset?.kind === 'audio' && String(asset?.id || '').trim());
+  return unsupportedAudio ? '当前视频生成暂不支持音频参考素材，请移除音频参考后再生成。' : '';
 }
 
 export function videoResultPreview(job) {
@@ -44,8 +48,23 @@ export function videoResultPreview(job) {
 
 export function videoNodeViewState(job) {
   const state = String(job?.state || 'draft');
+  const label = {
+    draft: '准备生成',
+    preparing: '正在准备',
+    submitting: '正在提交',
+    queued: '正在排队',
+    running: '正在生成视频…',
+    result_ready: '正在保存结果',
+    ingesting: '正在保存结果',
+    canceling: '正在取消',
+    awaiting_confirmation: '等待确认',
+    failed: '生成失败',
+    canceled: '已取消',
+    abandoned: '需处理',
+    applied: '已完成'
+  }[state] || '准备生成';
   return {
-    state,
+    state, label,
     polling: runningStates.has(state),
     canGenerate: !job || ['failed', 'canceled', 'abandoned', 'applied'].includes(state),
     canCancel: ['preparing', 'queued', 'running'].includes(state),
@@ -63,16 +82,17 @@ function videoJobUpdatedAt(job) {
 function videoJobStateRank(job) {
   return {
     preparing: 0,
-    queued: 1,
-    running: 2,
-    result_ready: 3,
-    ingesting: 4,
-    canceling: 4,
-    awaiting_confirmation: 5,
-    failed: 6,
-    canceled: 6,
-    abandoned: 6,
-    applied: 7
+    submitting: 1,
+    queued: 2,
+    running: 3,
+    result_ready: 4,
+    ingesting: 5,
+    canceling: 5,
+    awaiting_confirmation: 6,
+    failed: 7,
+    canceled: 7,
+    abandoned: 7,
+    applied: 8
   }[String(job?.state || '')] ?? -1;
 }
 

@@ -14,3 +14,11 @@ test('画布控制区提供持久显示开关、自动布局和快捷键帮助',
   assert.match(canvas, /snapToGrid=\{workspaceView\.snapToGrid\}/);
   assert.match(canvas, /layoutCanvas/);
 });
+
+test('项目对话开关位于画布底部控制区，并保留原有开关状态', () => {
+  assert.match(controls, /agent-canvas-conversation-toggle/);
+  assert.match(controls, /conversationOpen \? '收起项目对话' : '打开项目对话'/);
+  assert.match(controls, /onToggleConversation/);
+  assert.match(canvas, /conversationOpen=\{conversationOpen\}/);
+  assert.match(canvas, /onToggleConversation=\{onToggleConversation\}/);
+});

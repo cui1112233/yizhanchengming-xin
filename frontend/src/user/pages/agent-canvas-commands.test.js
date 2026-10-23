@@ -10,7 +10,10 @@ import {
   createCanvasNode,
   distributeCanvasNodes,
   groupCanvasNodes,
+  isCanvasMultiSelectionEvent,
   moveCanvasGroup,
+  removeCanvasEdges,
+  sameCanvasSelection,
   selectCanvasNodes,
   ungroupCanvasNodes
 } from './agent-canvas-commands.js';
@@ -36,6 +39,18 @@ test('valid connection creates one stable reference edge without mutating input'
   assert.deepEqual(edges, []);
 });
 
+test('removing a selected connection preserves every other connection', () => {
+  const edges = [
+    { id: 'edge-image-video', source: 'image-1', target: 'video-1', data: { relation: 'first_frame' } },
+    { id: 'edge-text-image', source: 'text-1', target: 'image-1', data: { relation: 'script_source' } }
+  ];
+
+  const remaining = removeCanvasEdges(edges, ['edge-image-video']);
+
+  assert.deepEqual(remaining, [edges[1]]);
+  assert.deepEqual(edges.map(edge => edge.id), ['edge-image-video', 'edge-text-image']);
+});
+
 test('modified node clicks add and remove nodes from the current selection', () => {
   const selectedA = selectCanvasNodes(nodes, 'a', false);
   assert.deepEqual(selectedA.filter(node => node.selected).map(node => node.id), ['a']);
@@ -46,6 +61,19 @@ test('modified node clicks add and remove nodes from the current selection', () 
   const selectedB = selectCanvasNodes(selectedAB, 'a', true);
   assert.deepEqual(selectedB.filter(node => node.selected).map(node => node.id), ['b']);
   assert.equal(nodes.some(node => node.selected), false);
+});
+
+test('modifier click on node content is reserved for multi-selection', () => {
+  assert.equal(isCanvasMultiSelectionEvent({ shiftKey: true }), true);
+  assert.equal(isCanvasMultiSelectionEvent({ ctrlKey: true }), true);
+  assert.equal(isCanvasMultiSelectionEvent({ metaKey: true }), true);
+  assert.equal(isCanvasMultiSelectionEvent({}), false);
+});
+
+test('identical React Flow selections do not trigger another state update', () => {
+  assert.equal(sameCanvasSelection(['image-1', 'video-1'], ['image-1', 'video-1']), true);
+  assert.equal(sameCanvasSelection(['image-1', 'video-1'], ['video-1', 'image-1']), false);
+  assert.equal(sameCanvasSelection(['image-1'], []), false);
 });
 
 test('alignment supports all six bounds and leaves unselected nodes unchanged', () => {

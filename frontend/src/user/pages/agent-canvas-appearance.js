@@ -50,7 +50,6 @@ export function applyCanvasEdgeAppearance(edge, value) {
   const appearance = normalizeCanvasAppearance(value);
   return {
     ...edge,
-    hidden: !appearance.edgesVisible,
     data: { ...(edge?.data || {}), appearance }
   };
 }

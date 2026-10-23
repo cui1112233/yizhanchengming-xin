@@ -64,6 +64,37 @@ test('removing a node also removes every attached edge', () => {
   assert.deepEqual(result.edges, []);
 });
 
+test('removing an upstream node clears only its automatic downstream reference', () => {
+  const source = createNodeAt({
+    id: 'source-image',
+    kind: 'image',
+    position: { x: 0, y: 0 },
+    asset: { id: 'auto-image', kind: 'image', name: '连线图片.png' }
+  });
+  const target = createNodeAt({ id: 'target-video', kind: 'video', position: { x: 300, y: 0 } });
+  target.data.config = {
+    ...target.data.config,
+    referenceAssets: [
+      { id: 'manual-image', kind: 'image', name: '手工图片.png' },
+      { id: 'auto-image', kind: 'image', name: '连线图片.png' }
+    ],
+    manualReferences: [{ id: 'manual-image', kind: 'image', name: '手工图片.png' }],
+    autoReferenceAssetIDs: ['auto-image'],
+    edgeReferences: [{ assetId: 'auto-image', sourceNodeId: 'source-image', relation: 'first_frame' }]
+  };
+
+  const result = removeCanvasNodes({
+    nodes: [source, target],
+    edges: [{ id: 'edge-source-target', source: 'source-image', target: 'target-video', data: { relation: 'first_frame' } }],
+    ids: ['source-image']
+  });
+
+  assert.deepEqual(result.nodes.map(node => node.id), ['target-video']);
+  assert.deepEqual(result.edges, []);
+  assert.deepEqual(result.nodes[0].data.config.referenceAssets.map(asset => asset.id), ['manual-image']);
+  assert.deepEqual(result.nodes[0].data.config.autoReferenceAssetIDs, []);
+});
+
 test('creating a media node keeps only a serializable asset reference', () => {
   const node = createNodeAt({ id: 'node-1', kind: 'image', position: { x: 12, y: 18 }, asset: { id: 'asset-1', name: '封面.png', kind: 'image', url: '/api/agent/assets/asset-1/content' } });
   assert.deepEqual(node.position, { x: 12, y: 18 });
@@ -71,6 +102,27 @@ test('creating a media node keeps only a serializable asset reference', () => {
   assert.equal(node.data.title, '封面.png');
   assert.equal(node.data.assetRef.id, 'asset-1');
   assert.equal(node.data.status, 'draft');
+});
+
+test('creating an audio asset node keeps the source for playback and processing', () => {
+  const node = createNodeAt({ id: 'audio-node', kind: 'audio', position: { x: 12, y: 18 }, asset: { id: 'audio-1', name: '旁白.mp3', kind: 'audio', url: '/api/agent/assets/audio-1/content' } });
+  assert.equal(node.data.type, 'audio');
+  assert.equal(node.data.title, '旁白.mp3');
+  assert.equal(node.data.assetRef.id, 'audio-1');
+});
+
+test('audio processing references accept audio only and follow audio connections', () => {
+  const sourceAudio = createNodeAt({ id: 'source-audio', kind: 'audio', position: { x: 0, y: 0 }, asset: { id: 'asset-audio', kind: 'audio', name: '旁白.mp3' } });
+  const targetAudio = createNodeAt({ id: 'target-audio', kind: 'audio', position: { x: 0, y: 0 } });
+  const withAudio = appendReferenceAsset({ node: targetAudio, asset: sourceAudio.data.assetRef });
+  const withImage = appendReferenceAsset({ node: withAudio, asset: { id: 'asset-image', kind: 'image', name: '封面.png' } });
+  assert.deepEqual(withImage.data.config.referenceAssets.map(asset => asset.id), ['asset-audio']);
+
+  const synced = syncNodeReferencesFromEdges({
+    nodes: [sourceAudio, targetAudio],
+    edges: [{ id: 'edge-audio-audio', source: 'source-audio', target: 'target-audio' }]
+  });
+  assert.deepEqual(synced.find(node => node.id === 'target-audio').data.config.referenceAssets.map(asset => asset.id), ['asset-audio']);
 });
 
 test('creating a blank image node keeps the complete generation settings ready', () => {
@@ -81,6 +133,13 @@ test('creating a blank image node keeps the complete generation settings ready',
   assert.equal(node.data.config.modelId, '');
   assert.deepEqual(node.data.config.parameters, { ratio: '16:9', quality: 'standard', resolution: '2K', count: 1 });
   assert.deepEqual(node.data.config.referenceAssets, []);
+});
+
+test('creating a script node keeps the workflow starting state instead of falling back to text', () => {
+  const node = createNodeAt({ id: 'script-1', kind: 'script', position: { x: 12, y: 18 } });
+  assert.equal(node.data.type, 'script');
+  assert.equal(node.data.title, '新剧本');
+  assert.deepEqual(node.data.config, { sourceText: '', splitModelId: '', splitState: { state: 'idle', errorMessage: '' } });
 });
 
 test('adding image references keeps image assets only, deduplicates them, and caps the set at ten', () => {
@@ -212,6 +271,13 @@ test('canvas groups new node choices before paste and history actions', () => {
   assert.match(canvasSource, /contextMenuSubmenu/);
 });
 
+test('toolrail add starts a script workflow rather than silently adding generic text', () => {
+  assert.match(canvasSource, /function addNode\(kind = 'script'\)/);
+  assert.match(canvasSource, /const nextNode = createNodeAt\(\{ id: nextCanvasID\(kind\), kind, position, config: inheritedModelSelection\(nodesRef\.current, kind\) \}\)/);
+  assert.match(canvasSource, /<IconTool label="添加节点" onClick=\{\(\) => addNode\('script'\)\}/);
+  assert.doesNotMatch(canvasSource, /const nextNode = createCanvasNode\(`node-\$\{Date\.now\(\)\}-\$\{nodeSequenceRef\.current\}`/);
+});
+
 test('clicking a context-menu parent keeps its child choices open', () => {
   assert.match(canvasSource, /onClick=\{\(\) => setContextMenuSubmenu\('create'\)\}/);
   assert.match(canvasSource, /onClick=\{\(\) => setContextMenuSubmenu\('assets'\)\}/);
@@ -227,10 +293,10 @@ test('node plus control is a real source handle for dragging a connection', () =
   assert.match(canvasStyles, /\.agent-page \.agent-canvas-node-quick-add\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
 });
 
-test('empty connection drops offer text and image nodes instead of silently creating a default node', () => {
+test('empty connection drops describe creation of a following node instead of a reference picker', () => {
   assert.match(canvasSource, /onConnectStart=\{handleConnectStart\}/);
   assert.match(canvasSource, /onConnectEnd=\{handleConnectEnd\}/);
-  assert.match(canvasSource, /添加参考节点/);
+  assert.match(canvasSource, /新建后续节点/);
   assert.match(canvasSource, /connectionDropChoices\(nodes\.find\(sourceNode => sourceNode\.id === connectionDropMenu\.sourceID\)\)/);
   assert.match(canvasSource, /handleConnectionDropCreate\(choice\.kind\)/);
 });
@@ -372,14 +438,14 @@ test('node images, reference thumbnails, and material thumbnails use authenticat
   assert.doesNotMatch(canvasSource, /<img\s+src=\{(?:data\.assetRef|asset)\.url\}/);
 });
 
-test('canvas keeps middle mouse panning and advertises only implemented undo redo keys', () => {
+test('canvas keeps middle mouse panning and implements selected-item deletion', () => {
   assert.match(canvasSource, /panOnDrag=\{interactionMode === 'pan' \? \[0, 1\] : \[1\]\}/);
   assert.match(canvasSource, /case 'undo':\s*case 'redo':/);
   assert.doesNotMatch(canvasSource, /aria-label="快捷键"/);
   assert.doesNotMatch(canvasSource, /title="快捷键操作"/);
   assert.doesNotMatch(canvasSource, /case 'select_all':/);
   assert.doesNotMatch(canvasSource, /case 'copy':/);
-  assert.doesNotMatch(canvasSource, /case 'delete':/);
+  assert.match(canvasSource, /case 'delete':[\s\S]*?deleteCanvasEdges\(\)/);
   assert.doesNotMatch(canvasSource, /case 'focus_selection':/);
 });
 

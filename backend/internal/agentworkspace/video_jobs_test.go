@@ -74,6 +74,75 @@ func TestMemoryListVideoJobsStaysInsideOwnerProjectAndReturnsNewestFirst(t *test
 	}
 }
 
+func TestMemoryListPollableVideoJobsFindsOnlyUnfinishedJobsAcrossProjects(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
+	for _, project := range []struct{ owner, id string }{
+		{"alice", "project-1"}, {"alice", "project-2"}, {"bob", "project-1"},
+	} {
+		if err := store.CreateProject(ctx, project.owner, Project{ID: project.id, Title: "项目", CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, input := range []struct {
+		owner, projectID, id string
+		state                VideoJobState
+	}{
+		{"alice", "project-1", "submitting", VideoJobSubmitting},
+		{"alice", "project-1", "queued", VideoJobQueued},
+		{"alice", "project-2", "running", VideoJobRunning},
+		{"bob", "project-1", "ingesting", VideoJobIngesting},
+		{"alice", "project-1", "complete", VideoJobAwaitingConfirmation},
+		{"bob", "project-1", "failed", VideoJobFailed},
+	} {
+		job, err := store.CreateVideoJob(ctx, input.owner, CreateVideoJobInput{
+			ID: input.id, ProjectID: input.projectID, NodeID: "video-" + input.id, NodeVersion: 1,
+			ModelKey: "seedance", IdempotencyKey: "request-" + input.id, Now: now,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		states := []VideoJobState{VideoJobSubmitting, VideoJobQueued, VideoJobRunning, VideoJobResultReady, VideoJobIngesting, VideoJobAwaitingConfirmation}
+		if input.state == VideoJobFailed {
+			states = []VideoJobState{VideoJobFailed}
+		}
+		for _, state := range states {
+			if state == VideoJobAwaitingConfirmation {
+				job.ResultAssetID = "asset-" + input.id
+			}
+			job.State = state
+			job, err = store.UpdateVideoJob(ctx, input.owner, job, now.Add(time.Second))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if state == input.state {
+				break
+			}
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	jobs, err := store.ListPollableVideoJobs(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 4 {
+		t.Fatalf("pollable jobs=%+v, want submitting/queued/running/ingesting only", jobs)
+	}
+	got := map[string]bool{}
+	for _, job := range jobs {
+		got[job.ID] = true
+	}
+	for _, id := range []string{"submitting", "queued", "running", "ingesting"} {
+		if !got[id] {
+			t.Fatalf("pollable jobs missing %q: %+v", id, jobs)
+		}
+	}
+}
+
 func TestMemoryVideoJobConfirmRejectsNodeVersionConflict(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

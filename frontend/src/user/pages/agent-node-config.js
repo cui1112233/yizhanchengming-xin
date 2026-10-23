@@ -8,12 +8,12 @@ const PARAMETER_KEYS = {
   image: Object.keys(IMAGE_DEFAULTS),
   video: Object.keys(VIDEO_DEFAULTS),
   text: Object.keys(TEXT_DEFAULTS),
-  audio: Object.keys(AUDIO_DEFAULTS)
+  audio: [...Object.keys(AUDIO_DEFAULTS), 'startMs', 'endMs', 'segmentSeconds', 'ranges']
 };
 
 const LABELS = {
   quality: { low: '快速画质', standard: '标准画质', high: '高清画质' },
-  operation: { generate: '生成', rewrite: '改写', continue: '续写', speech: '语音', music: '音乐', effect: '音效' },
+  operation: { generate: '生成', rewrite: '改写', continue: '续写', speech: '语音', music: '音乐', effect: '音效', sound_effect: '音效', trim: '裁剪', speed: '变速', smart_split: '智能分段', custom_split: '自定义分段' },
   length: { short: '精简', standard: '标准长度', long: '长篇' },
   creativity: { precise: '严谨', balanced: '均衡', creative: '创意' }
 };

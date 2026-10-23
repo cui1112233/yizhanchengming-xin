@@ -108,6 +108,26 @@ func (s *MySQLStore) ListVideoJobs(ctx context.Context, owner, projectID string)
 	return out, rows.Err()
 }
 
+func (s *MySQLStore) ListPollableVideoJobs(ctx context.Context, limit int) ([]VideoJob, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+videoJobColumns+` FROM agent_video_jobs WHERE state IN ('submitting', 'queued', 'running', 'result_ready', 'ingesting') ORDER BY updated_at ASC, id ASC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]VideoJob, 0)
+	for rows.Next() {
+		job, scanErr := scanVideoJob(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		out = append(out, job)
+	}
+	return out, rows.Err()
+}
+
 func (s *MySQLStore) UpdateVideoJob(ctx context.Context, owner string, input VideoJob, now time.Time) (VideoJob, error) {
 	owner = strings.TrimSpace(owner)
 	if owner == "" || strings.TrimSpace(input.ID) == "" || strings.TrimSpace(input.ProjectID) == "" || !validVideoJobState(input.State) || now.IsZero() || input.UpdatedAt.IsZero() {
@@ -225,7 +245,11 @@ func (s *MySQLStore) ConfirmVideoJob(ctx context.Context, owner, projectID, id s
 	if _, err := tx.ExecContext(ctx, `INSERT INTO agent_node_versions (project_id, node_id, owner_username, version, content_json, source_execution_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, job.ProjectID, node.ID, owner, node.Version, string(contentJSON), job.ID, now.UTC()); err != nil {
 		return VideoJob{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE agent_canvases SET revision = revision + 1, updated_at = ? WHERE project_id = ? AND owner_username = ?`, now.UTC(), job.ProjectID, owner); err != nil {
+	if err := updateCanvasSnapshotNode(ctx, tx, owner, job.ProjectID, node.ID, now.UTC(), func(snapshotNode *Node) {
+		snapshotNode.AssetRef = cloneMap(node.AssetRef)
+		snapshotNode.Status = node.Status
+		snapshotNode.Version = node.Version
+	}); err != nil {
 		return VideoJob{}, err
 	}
 	job.State = VideoJobApplied
@@ -276,6 +300,8 @@ func (s *MySQLStore) RetryVideoJob(ctx context.Context, owner, projectID, id str
 	if err != nil || owner == "" {
 		return VideoJob{}, ErrVideoJobInvalid
 	}
+	create.Settings = cloneMap(create.Settings)
+	create.Settings["retryOfVideoJobId"] = current.ID
 	settingsJSON, err := json.Marshal(create.Settings)
 	if err != nil {
 		return VideoJob{}, ErrVideoJobInvalid

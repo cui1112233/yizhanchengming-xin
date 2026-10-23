@@ -1,83 +1,60 @@
-import { Segmented, Tooltip } from 'antd';
-import { MessageSquare, PanelLeft, Pencil, Save } from 'lucide-react';
+import { Dropdown } from 'antd';
+import { PanelsTopLeft, Pencil, Workflow } from 'lucide-react';
+import { BrandLogo } from '../../shared/components/BrandLogo';
 
 export function AgentWorkspaceHeader({
   projectTitle,
   activeView,
-  drawerOpen,
-  conversationOpen,
   saveStatus,
-  saveLabel,
-  saveDisabled,
   nodeCount = 0,
   materialCount = 0,
   zoom = 100,
   isRunning = false,
   onRename,
+  onBackHome,
+  onShowProjects,
+  onCreateProject,
+  onDeleteProject,
   onViewChange,
-  onToggleDrawer,
-  onToggleConversation,
-  onSave
+  onRetrySync
 }) {
+  const projectMenu = {
+    items: [
+      { key: 'home', label: '回到主页', onClick: onBackHome },
+      { key: 'projects', label: '全部项目', onClick: onShowProjects },
+      { type: 'divider' },
+      { key: 'new', label: '创建新项目', onClick: onCreateProject },
+      { key: 'delete', label: '删除项目', danger: true, disabled: !projectTitle, onClick: onDeleteProject }
+    ]
+  };
+
   return (
     <header className="agent-canvas-toolbar">
       <div className="agent-canvas-toolbar__project">
-        <Tooltip title={drawerOpen ? '收起项目栏' : '打开项目栏'}>
-          <button
-            className={`agent-canvas-toolbar-button${drawerOpen ? ' is-active' : ''}`}
-            type="button"
-            aria-label={drawerOpen ? '收起项目栏' : '打开项目栏'}
-            aria-expanded={drawerOpen}
-            aria-controls="agent-project-drawer"
-            onClick={onToggleDrawer}
-          >
-            <PanelLeft size={16} />
+        <Dropdown menu={projectMenu} trigger={['click']} placement="bottomLeft">
+          <button className="agent-canvas-brand-menu" type="button" aria-label="项目菜单">
+            <BrandLogo />
           </button>
-        </Tooltip>
+        </Dropdown>
         <button className="agent-canvas-project-title" type="button" onClick={onRename}>
           <span>{projectTitle || '未选择项目'}</span>
           <Pencil size={13} />
         </button>
+        <div className="agent-canvas-view-switch" role="group" aria-label="项目视图">
+          <button type="button" title="工作流" aria-label="工作流" aria-pressed={activeView === 'workflow'} className={activeView === 'workflow' ? 'is-active' : ''} onClick={() => onViewChange('workflow')}>
+            <Workflow size={15} />
+          </button>
+          <button type="button" title="故事板" aria-label="故事板" aria-pressed={activeView === 'storyboard'} className={activeView === 'storyboard' ? 'is-active' : ''} onClick={() => onViewChange('storyboard')}>
+            <PanelsTopLeft size={15} />
+          </button>
+        </div>
       </div>
-
-      <Segmented
-        className="agent-canvas-view-switch"
-        aria-label="项目视图"
-        value={activeView}
-        options={[
-          { label: '工作流', value: 'workflow' },
-          { label: '故事板', value: 'storyboard' }
-        ]}
-        onChange={onViewChange}
-      />
 
       <div className="agent-canvas-toolbar__status">
-        <span className={`agent-canvas-save-status is-${saveStatus}`}>
-          {isRunning ? '正在执行…' : saveLabel}
-        </span>
+        {isRunning ? <span className="agent-canvas-save-status is-running">正在执行…</span> : null}
+        {!isRunning && saveStatus === 'error' ? <button className="agent-canvas-save-status is-error" type="button" onClick={onRetrySync}>内容已暂存在本机，重试同步</button> : null}
         <span className="agent-canvas-workspace-counts">{nodeCount} 个节点 · {materialCount} 项素材</span>
         <span className="agent-canvas-view-info">{zoom}%</span>
-      </div>
-
-      <div className="agent-canvas-toolbar__actions">
-        <Tooltip title={saveLabel}>
-          <span>
-            <button className="agent-canvas-toolbar-button" type="button" aria-label={saveLabel} disabled={saveDisabled} onClick={onSave}>
-              <Save size={16} />
-            </button>
-          </span>
-        </Tooltip>
-        <Tooltip title={conversationOpen ? '收起项目对话' : '打开项目对话'}>
-          <button
-            className={`agent-canvas-toolbar-button${conversationOpen ? ' is-active' : ''}`}
-            type="button"
-            aria-label={conversationOpen ? '收起项目对话' : '打开项目对话'}
-            aria-pressed={conversationOpen}
-            onClick={onToggleConversation}
-          >
-            <MessageSquare size={16} />
-          </button>
-        </Tooltip>
       </div>
     </header>
   );

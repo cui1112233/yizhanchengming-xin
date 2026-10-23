@@ -21,10 +21,12 @@ export function shouldOpenConnectionDrop({ sourceID, connectionCompleted, droppe
   return Boolean(String(sourceID || '').trim()) && !connectionCompleted && !droppedOnHandle;
 }
 
-export function createNodeAt({ id, kind, position, asset = null }) {
-  const type = ['text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text';
-  const media = type === 'image' || type === 'video';
-  const defaults = type === 'audio'
+export function createNodeAt({ id, kind, position, asset = null, config = {} }) {
+  const type = ['script', 'text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text';
+  const media = type === 'image' || type === 'video' || type === 'audio';
+  const defaults = type === 'script'
+    ? { title: '新剧本', config: { sourceText: '', splitModelId: '', splitState: { state: 'idle', errorMessage: '' } } }
+    : type === 'audio'
     ? { title: '新音频', config: { prompt: '', voice: '', speed: 1 } }
     : type === 'image'
       ? { title: '新图片', config: { prompt: '', model: '', ratio: '16:9', quality: 'standard', resolution: '2K', count: 1, referenceAssets: [] } }
@@ -44,7 +46,7 @@ export function createNodeAt({ id, kind, position, asset = null }) {
       sourceNodeIds: [],
       status: 'draft',
       assetRef: media && asset ? clone(asset) : null,
-      config: normalizeNodeConfig(type, defaults.config)
+      config: type === 'script' ? { ...defaults.config } : normalizeNodeConfig(type, { ...defaults.config, ...config })
     }
   };
 }
@@ -54,19 +56,50 @@ export function appendReferenceAsset({ node, asset, limit = 10 }) {
     ? ['image']
     : node?.data?.type === 'video'
       ? ['image', 'video']
-      : [];
+      : node?.data?.type === 'audio'
+        ? ['audio']
+        : [];
   if (!allowedKinds.includes(asset?.kind) || !String(asset?.id || '').trim()) return node;
-  const existing = Array.isArray(node.data?.config?.referenceAssets)
-    ? node.data.config.referenceAssets.filter(item => allowedKinds.includes(item?.kind) && String(item?.id || '').trim())
+  const config = node.data?.config || {};
+  const existing = Array.isArray(config.referenceAssets)
+    ? config.referenceAssets.filter(item => allowedKinds.includes(item?.kind) && String(item?.id || '').trim())
     : [];
+  const automaticIDs = new Set([
+    ...(Array.isArray(config.autoReferenceAssetIDs) ? config.autoReferenceAssetIDs : []),
+    ...(Array.isArray(config.edgeReferences) ? config.edgeReferences.map(item => item?.assetId) : [])
+  ]);
+  const manualReferences = (Array.isArray(config.manualReferences)
+    ? config.manualReferences
+    : existing.filter(item => !automaticIDs.has(item?.id)))
+    .filter(item => allowedKinds.includes(item?.kind) && String(item?.id || '').trim());
   if (existing.some(item => item.id === asset.id) || existing.length >= limit) return node;
   return {
     ...node,
     data: {
       ...node.data,
       config: {
-        ...(node.data?.config || {}),
+        ...config,
+        manualReferences: [...manualReferences, clone(asset)],
         referenceAssets: [...existing, clone(asset)]
+      }
+    }
+  };
+}
+
+export function removeReferenceAsset({ node, assetID }) {
+  const id = String(assetID || '').trim();
+  if (!node?.data || !id) return node;
+  const config = node.data.config || {};
+  const withoutAsset = assets => Array.isArray(assets) ? assets.filter(asset => asset?.id !== id) : [];
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      config: {
+        ...config,
+        manualReferences: withoutAsset(config.manualReferences),
+        referenceAssets: withoutAsset(config.referenceAssets),
+        autoReferenceAssetIDs: (config.autoReferenceAssetIDs || []).filter(currentID => currentID !== id)
       }
     }
   };
@@ -75,6 +108,7 @@ export function appendReferenceAsset({ node, asset, limit = 10 }) {
 function referenceKindsForNode(type) {
   if (type === 'image') return ['image'];
   if (type === 'video') return ['image', 'video'];
+  if (type === 'audio') return ['audio'];
   return [];
 }
 
@@ -196,8 +230,10 @@ export function pasteCanvasSelection({ clipboard, position, nextID }) {
 
 export function removeCanvasNodes({ nodes = [], edges = [], ids = [] }) {
   const removed = new Set(ids);
+  const remainingNodes = nodes.filter(node => !removed.has(node.id));
+  const remainingEdges = edges.filter(edge => !removed.has(edge.source) && !removed.has(edge.target));
   return {
-    nodes: nodes.filter(node => !removed.has(node.id)),
-    edges: edges.filter(edge => !removed.has(edge.source) && !removed.has(edge.target))
+    nodes: syncNodeReferencesFromEdges({ nodes: remainingNodes, edges: remainingEdges }),
+    edges: remainingEdges
   };
 }

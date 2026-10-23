@@ -17,10 +17,13 @@ export function AgentModelPicker({ kind, config = {}, models = [], onChange, dis
     variant="borderless"
     size="small"
     showSearch
+    popupMatchSelectWidth={false}
+    popupClassName="agent-model-picker__dropdown"
     allowClear={false}
     disabled={disabled}
     value={state.modelId || undefined}
     placeholder={state.reason || '选择模型'}
+    notFoundContent="当前通道没有可用模型，请在设置中切换生成通道或到 API 配置添加模型"
     optionFilterProp="label"
     options={options}
     optionRender={option => {

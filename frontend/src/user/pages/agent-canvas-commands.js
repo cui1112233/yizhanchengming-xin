@@ -26,6 +26,14 @@ function selectedNodes(nodes, selectedIds) {
   return nodes.filter(node => selected.has(node.id));
 }
 
+export function sameCanvasSelection(current = [], next = []) {
+  return current.length === next.length && current.every((id, index) => id === next[index]);
+}
+
+export function isCanvasMultiSelectionEvent(event) {
+  return Boolean(event?.shiftKey || event?.ctrlKey || event?.metaKey);
+}
+
 function selectionBounds(nodes) {
   if (!nodes.length) return null;
   const left = Math.min(...nodes.map(node => node.position.x));
@@ -68,6 +76,12 @@ export function connectCanvasNodes(edges, connection) {
   if (!source || !target || source === target) return edges;
   if (edges.some(edge => edge.source === source && edge.target === target && (edge.data?.relation || 'reference') === relation)) return edges;
   return [...edges, { id: `edge-${source}-${target}-${relation}`, source, target, data: { relation } }];
+}
+
+export function removeCanvasEdges(edges, edgeIds) {
+  const removed = new Set(edgeIds || []);
+  if (!removed.size) return edges;
+  return edges.filter(edge => !removed.has(edge.id));
 }
 
 export function groupCanvasNodes(nodes, selectedIds, groupId) {

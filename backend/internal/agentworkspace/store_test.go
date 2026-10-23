@@ -141,6 +141,70 @@ func TestMemoryStoreAppliesTextExecutionOnlyToExpectedNodeVersion(t *testing.T) 
 	}
 }
 
+func TestMemoryStoreMarksNodeExecutionAwaitingConfirmationWithoutChangingCanvas(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 21, 8, 0, 0, 0, time.UTC)
+	project := Project{ID: "project-review", Title: "项目", CreatedAt: now, UpdatedAt: now, Canvas: Canvas{
+		Version: 1, Appearance: DefaultAppearance(), Nodes: []Node{{ID: "image-1", Type: "image", Version: 1, Status: "draft"}}, Edges: []Edge{},
+	}}
+	if err := store.CreateProject(ctx, "alice", project); err != nil {
+		t.Fatal(err)
+	}
+	execution, err := store.BeginNodeExecution(ctx, "alice", project.ID, Execution{
+		ID: "execution-review", ToolName: "image-generation", IdempotencyKey: "image-1-v1", CreatedAt: now, UpdatedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := store.Canvas(ctx, "alice", project.ID)
+	pending, err := store.SetNodeExecutionAwaitingConfirmation(ctx, "alice", project.ID, execution.ID, map[string]any{
+		"nodeId": "image-1", "nodeVersion": int64(1), "resultAssetIds": []string{"asset-1", "asset-2"},
+	}, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, _ := store.Canvas(ctx, "alice", project.ID)
+	if pending.Status != "awaiting_confirmation" || pending.Detail["nodeId"] != "image-1" {
+		t.Fatalf("pending=%+v", pending)
+	}
+	if after.Revision != before.Revision || after.Nodes[0].Version != 1 || len(after.Nodes[0].AssetRef) != 0 {
+		t.Fatalf("canvas changed before=%+v after=%+v", before, after)
+	}
+}
+
+func TestMemoryStoreAppliesSelectedImageFromAwaitingConfirmation(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 21, 8, 10, 0, 0, time.UTC)
+	project := Project{ID: "project-review-apply", Title: "项目", CreatedAt: now, UpdatedAt: now, Canvas: Canvas{
+		Version: 1, Appearance: DefaultAppearance(), Nodes: []Node{{ID: "image-1", Type: "image", Version: 1, Status: "draft"}}, Edges: []Edge{},
+	}}
+	if err := store.CreateProject(ctx, "alice", project); err != nil {
+		t.Fatal(err)
+	}
+	execution, err := store.BeginNodeExecution(ctx, "alice", project.ID, Execution{ID: "execution-review-apply", ToolName: "image-generation", IdempotencyKey: "image-1-v1", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetNodeExecutionAwaitingConfirmation(ctx, "alice", project.ID, execution.ID, map[string]any{
+		"nodeId": "image-1", "nodeVersion": int64(1), "resultAssetIds": []string{"asset-1", "asset-2"},
+	}, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	canvas, completed, err := store.ApplyNodeExecution(ctx, "alice", project.ID, ApplyNodeExecutionInput{
+		ExecutionID: execution.ID, NodeID: "image-1", NodeVersion: 1, NodeType: "image",
+		AssetRef: map[string]any{"id": "asset-2", "assetId": "asset-2", "kind": "image", "url": "/asset-2"},
+		Detail:   map[string]any{"nodeId": "image-1", "nodeVersion": int64(1), "assetId": "asset-2"}, Now: now.Add(2 * time.Second),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Status != "completed" || canvas.Nodes[0].AssetRef["id"] != "asset-2" || canvas.Nodes[0].Version != 2 || canvas.Revision != 1 {
+		t.Fatalf("canvas=%+v completed=%+v", canvas, completed)
+	}
+}
+
 func TestMemoryStoreRejectsGeneratedResultWhenNodeChanged(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

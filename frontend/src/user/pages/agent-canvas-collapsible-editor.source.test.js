@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(dirname, '../../..');
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
+const controlsSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvasControls.jsx'), 'utf8');
 const composerSource = fs.readFileSync(path.resolve(dirname, '../components/AgentNodeComposer.jsx'), 'utf8');
 const authenticatedImagePath = path.resolve(dirname, '../components/AuthenticatedAgentImage.jsx');
 const authenticatedImageSource = fs.existsSync(authenticatedImagePath) ? fs.readFileSync(authenticatedImagePath, 'utf8') : '';
@@ -20,16 +21,31 @@ const classSpecificity = selector => (selector.match(/\.[a-z0-9_-]+/gi) || []).l
 test('media nodes render one temporary inline editor controlled by preview activation', () => {
   assert.match(canvasSource, /const \[activeEditorNodeID, setActiveEditorNodeID\] = useState\(''\)/);
   assert.match(canvasSource, /isEditorOpen=\{activeEditorNodeID === props\.id\}/);
-  assert.match(canvasSource, /onOpenEditor=\{nodeID => \{ setAssetPanel\(null\); setActiveEditorNodeID\(nodeID\); \}\}/);
+  assert.match(canvasSource, /onOpenEditor=\{openNodeComposer\}/);
   assert.match(canvasSource, /const composer = isEditorOpen \? <AgentNodeComposer/);
   assert.match(canvasSource, /\{composer\}/);
+  assert.match(canvasSource, /isEditorOpen \? ' is-editor-open' : ''/);
+  assert.match(workspaceStyles, /\.react-flow__node:has\(\.agent-canvas-node\.is-editor-open\)[^{]*\{[^}]*z-index:/);
   assert.match(canvasSource, /setActiveEditorNodeID\(''\)/);
 });
 
+test('opening a node editor leaves the viewport still so its prompt can retain keyboard focus', () => {
+  assert.doesNotMatch(canvasSource, /flowInstance\.fitView\(\{ nodes: \[\{ id: nodeID \}\]/);
+  assert.doesNotMatch(canvasSource, /canvasEditorFocusOptions\(viewportRef\.current\?\.zoom\)/);
+});
+
 test('leaving a media editor also closes its anchored asset library', () => {
-  assert.match(canvasSource, /function closeNodeComposer\(\) \{[\s\S]*?setActiveEditorNodeID\(''\);[\s\S]*?setAssetPanel\(null\);[\s\S]*?\}/);
+  assert.match(canvasSource, /function closeNodeComposer\([^)]*\) \{[\s\S]*?setActiveEditorNodeID\(''\);[\s\S]*?setAssetPanel\(null\);[\s\S]*?\}/);
   assert.match(canvasSource, /if \(event\.key === 'Escape'\) \{[\s\S]*?closeNodeComposer\(\);/);
   assert.match(canvasSource, /onPaneClick=\{closeNodeComposer\}/);
+});
+
+test('Escape can dismiss an open editor or connection-drop menu without a pane click event', () => {
+  assert.match(canvasSource, /function closeNodeComposer\(event\) \{[\s\S]*?if \(event && !event\.target\?\.classList\?\.contains\('react-flow__pane'\)\) return;/);
+});
+
+test('Escape is captured by the canvas before a focused node input can swallow it', () => {
+  assert.match(canvasSource, /className=\{`agent-canvas\$\{connectingSourceID \? ' is-connecting' : ''\}`\}[\s\S]*?onKeyDownCapture=\{handleKeyDown\}/);
 });
 
 test('asset picker does not present an empty library while reporting a request failure', () => {
@@ -43,6 +59,12 @@ test('image preview opens editing while a named editor action opens the asset pi
   assert.match(composerSource, /node\.data\?\.assetRef\?\.url \? '更换当前图片' : '从收藏添加图片'/);
   assert.match(composerSource, /onPickImageAsset\?\.\(node\.id, event\)/);
   assert.doesNotMatch(canvasSource, /aria-label="选择图片素材"[\s\S]*?onClick=\{event => \{ stopCanvasEvent\(event\); onPickImageAsset/);
+});
+
+test('reference add button keeps its asset picker open after the canvas click settles', () => {
+  const referencePicker = canvasSource.match(/function openReferenceAssetPanel\(nodeID, event\) \{([\s\S]*?)\n  \}/);
+  assert.ok(referencePicker, 'reference asset picker should exist');
+  assert.match(referencePicker[1], /window\.requestAnimationFrame\(\(\) => setAssetPanel\(panel\)\)/);
 });
 
 test('only text nodes use the manual double-click editor', () => {
@@ -74,6 +96,24 @@ test('generation editor expands horizontally while the prompt stays compact', ()
   assert.match(primarySelectRule[1], /flex:\s*1 1 240px/);
 });
 
+test('prompt typing stays local until focus leaves, then saves without per-keystroke canvas writes', () => {
+  assert.match(composerSource, /const \[draftPrompt, setDraftPrompt\] = useState\(prompt\)/);
+  assert.match(composerSource, /useEffect\(\(\) => \{\s*setDraftPrompt\(prompt\);\s*\}, \[node\?\.id, prompt\]\)/);
+  assert.match(composerSource, /value=\{draftPrompt\}/);
+  assert.match(composerSource, /onChange=\{event => setDraftPrompt\(event\.target\.value\)\}/);
+  assert.match(composerSource, /const persistPrompt = \(\) => \{/);
+  assert.match(composerSource, /onBlur=\{persistPrompt\}/);
+  assert.match(composerSource, /onPointerDown=\{stop\}/);
+  assert.match(composerSource, /prompt: draftPrompt/);
+});
+
+test('panning only updates the local viewport and does not enqueue a canvas save', () => {
+  const moveEnd = canvasSource.match(/function handleMoveEnd\(_event, nextViewport\) \{([\s\S]*?)\n  \}/);
+  assert.ok(moveEnd, 'canvas move-end handler should exist');
+  assert.match(moveEnd[1], /onViewportChange\?\.\(nextViewport\)/);
+  assert.doesNotMatch(moveEnd[1], /emitChange\(/);
+});
+
 test('connection handles belong to the visible preview shell and stay hidden until relevant', () => {
   assert.match(canvasSource, /className="agent-canvas-node-preview-shell"[\s\S]*?<Handle type="target"[\s\S]*?<Handle type="source"/);
   assert.match(canvasSource, /selected,\s*isEditorOpen/);
@@ -99,23 +139,22 @@ test('hidden handle rules outrank React Flow pointer events and interaction stat
 
   assert.ok(dependencyRule, 'React Flow pointer rule should be present');
   assert.match(dependencyRule[2], /pointer-events:\s*all/);
-  for (const rule of [hiddenTargetRule, hiddenSourceRule]) {
-    assert.ok(rule, 'hidden handle rule should include the React Flow handle class');
-    assert.ok(classSpecificity(rule[1]) > classSpecificity(dependencyRule[1]));
-    assert.match(rule[2], /pointer-events:\s*none/);
-  }
+  assert.ok(hiddenTargetRule, 'target handle rule should include the React Flow handle class');
+  assert.ok(classSpecificity(hiddenTargetRule[1]) > classSpecificity(dependencyRule[1]));
+  assert.match(hiddenTargetRule[2], /pointer-events:\s*auto/);
+  assert.ok(hiddenSourceRule, 'source handle rule should include the React Flow handle class');
+  assert.ok(classSpecificity(hiddenSourceRule[1]) > classSpecificity(dependencyRule[1]));
+  assert.match(hiddenSourceRule[2], /pointer-events:\s*none/);
   assert.match(visibleTargetRule?.[1] || '', /pointer-events:\s*auto/);
   assert.match(visibleSourceRule?.[1] || '', /pointer-events:\s*auto/);
 });
 
-test('edge visibility changes rendering without deleting serialized edges', () => {
-  assert.match(canvasSource, /hidden:\s*!appearance\.edgesVisible/);
-  assert.match(canvasSource, /appearance\.edgesVisible \? '隐藏连线' : '显示连线'/);
-  assert.match(canvasSource, /updateAppearance\(\{ edgesVisible: !appearance\.edgesVisible \}\)/);
-  assert.match(canvasSource, /appearance\.edgesVisible \? <EyeOff size=\{17\} \/> : <Eye size=\{17\} \/>/);
+test('edge visibility stays in the bottom display control without duplicating the left toolrail', () => {
+  assert.match(controlsSource, /<ControlButton label=\{workspaceView\.showConnections \? '隐藏连线' : '显示连线'\}/);
+  assert.doesNotMatch(canvasSource, /<IconTool label=\{workspaceView\.showConnections \? '隐藏连线' : '显示连线'\}/);
   assert.match(canvasSource, /const restoredEdges = snapshot\.edges\.map\(edge => toFlowEdge\(edge, appearanceRef\.current\)\)/);
   assert.match(canvasSource, /commit\(snapshot\.nodes, restoredEdges, \{ record: false \}\)/);
-  assert.doesNotMatch(canvasSource, /appearance\.edgesVisible \? edges : \[\]/);
+  assert.doesNotMatch(canvasSource, /hidden:\s*!appearance\.edgesVisible/);
 });
 
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
@@ -128,6 +167,29 @@ test('expanded video editor retains reachable create cancel retry and confirm ac
   assert.match(composerSource, /onRetryVideo\?\.\(node\.id\)/);
   assert.match(composerSource, /onConfirmVideo\?\.\(node\.id\)/);
   assert.match(canvasSource, /videoState=\{videoState\}/);
+  assert.match(composerSource, /videoState\.label/);
+});
+
+test('expanded image editor shows persisted candidates and requires explicit confirmation', () => {
+  assert.match(composerSource, /agent-node-composer__candidates/);
+  assert.match(composerSource, /aria-label=\{`选择候选图片/);
+  assert.match(composerSource, />使用这张</);
+  assert.match(composerSource, />重新生成</);
+  assert.match(canvasSource, /confirmAgentImageGeneration/);
+  assert.match(canvasSource, /nodeExecutionReview/);
+  assert.match(canvasSource, /canvas, executions = \[\]/);
+});
+
+test('image generation keeps a visible node-level status from submission through failure or review', () => {
+  const submitImage = canvasSource.match(/async function submitImageForNode\(nodeID, selectedModel, draftPrompt\) \{([\s\S]*?)\n  \}/);
+  assert.ok(submitImage, 'image generation entry should exist');
+  assert.match(composerSource, /agent-node-composer__generation-status/);
+  assert.match(composerSource, /正在提交生成请求/);
+  assert.match(composerSource, /正在生成图片/);
+  assert.match(composerSource, /等待选择图片/);
+  assert.match(submitImage[1], /phase: '正在提交生成请求'/);
+  assert.match(submitImage[1], /void refreshGenerationTasks\(requestedTaskId\)/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-node-composer__generation-status\s*\{/);
 });
 
 test('every private Agent image surface uses an authenticated Blob session', () => {

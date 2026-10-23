@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyCanvasEdgeAppearance,
   appearanceCssVariables,
   defaultCanvasAppearance,
   edgeStyleForAppearance,
@@ -48,4 +49,9 @@ test('canvas appearance exposes safe edge styles and background variables', () =
     '--agent-edge-width': '1px',
     '--agent-dot-opacity': '0'
   });
+});
+
+test('edge visual preferences do not override the workspace connection visibility', () => {
+  const edge = { id: 'edge-image-video', source: 'image-1', target: 'video-1', hidden: false };
+  assert.equal(applyCanvasEdgeAppearance(edge, { edgesVisible: false }).hidden, false);
 });

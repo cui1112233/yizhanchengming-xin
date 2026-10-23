@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/localexecutor"
 )
 
 type agentAssetObjectTestStore struct{ files map[string][]byte }
@@ -22,6 +23,39 @@ func (s *agentAssetObjectTestStore) Put(_ context.Context, asset agentworkspace.
 		s.files[asset.ObjectKey] = contents
 	}
 	return err
+}
+
+func TestAgentExecutorReferenceAssetRouteRequiresPairedOwner(t *testing.T) {
+	now := time.Date(2026, 10, 22, 4, 0, 0, 0, time.UTC)
+	assets := agentworkspace.NewMemoryAssetStore()
+	asset := agentworkspace.Asset{ID: "image-1", ProjectID: "agent-1", Kind: "image", Name: "cover.png", ContentType: "image/png", ObjectKey: "agent-assets/alice/agent-1/image-1.png", ByteSize: 4, CreatedAt: now}
+	if err := assets.CreateAsset(context.Background(), "alice", asset); err != nil {
+		t.Fatal(err)
+	}
+	objects := &agentAssetObjectTestStore{files: map[string][]byte{asset.ObjectKey: {137, 80, 78, 71}}}
+	service := localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return now })
+	pairing, err := service.CreatePairing(context.Background(), "alice", localexecutor.PlatformDoubao)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paired, err := service.Pair(context.Background(), localexecutor.PairInput{Code: pairing.Code, Platform: localexecutor.PlatformDoubao, DeviceName: "test", OS: "windows", Version: "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterAgentExecutorReferenceAssetRoutes(mux, service, assets, objects)
+	req := httptest.NewRequest(http.MethodGet, agentExecutorReferenceAssetURL("agent-1", "image-1"), nil)
+	req.Header.Set("Authorization", "Bearer "+paired.Token)
+	result := httptest.NewRecorder()
+	mux.ServeHTTP(result, req)
+	if result.Code != http.StatusOK || result.Header().Get("Content-Type") != "image/png" || result.Body.String() != "\x89PNG" {
+		t.Fatalf("response=%d headers=%v body=%q", result.Code, result.Header(), result.Body.String())
+	}
+	denied := httptest.NewRecorder()
+	mux.ServeHTTP(denied, httptest.NewRequest(http.MethodGet, agentExecutorReferenceAssetURL("agent-1", "image-1"), nil))
+	if denied.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous response=%d body=%s", denied.Code, denied.Body.String())
+	}
 }
 
 func (s *agentAssetObjectTestStore) Open(_ context.Context, asset agentworkspace.Asset) (io.ReadCloser, error) {

@@ -83,6 +83,30 @@ func (s *MemoryStore) ListVideoJobs(_ context.Context, owner, projectID string) 
 	return out, nil
 }
 
+func (s *MemoryStore) ListPollableVideoJobs(_ context.Context, limit int) ([]VideoJob, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if limit <= 0 {
+		limit = 100
+	}
+	out := make([]VideoJob, 0)
+	for _, job := range s.videoJobs {
+		if isPollableVideoJob(job.State) {
+			out = append(out, cloneVideoJob(job))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UpdatedAt.Equal(out[j].UpdatedAt) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].UpdatedAt.Before(out[j].UpdatedAt)
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (s *MemoryStore) UpdateVideoJob(_ context.Context, owner string, input VideoJob, now time.Time) (VideoJob, error) {
 	owner = strings.TrimSpace(owner)
 	key := videoJobKey(owner, strings.TrimSpace(input.ID))
@@ -186,6 +210,8 @@ func (s *MemoryStore) RetryVideoJob(ctx context.Context, owner, projectID, id st
 	if !nodeValid {
 		return VideoJob{}, ErrVideoJobNodeChanged
 	}
+	create.Settings = cloneMap(create.Settings)
+	create.Settings["retryOfVideoJobId"] = current.ID
 	if _, exists := s.videoJobs[videoJobKey(owner, create.ID)]; exists {
 		return VideoJob{}, ErrVideoJobExists
 	}

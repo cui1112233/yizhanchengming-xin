@@ -111,6 +111,13 @@ func (s *MySQLStore) CreateProject(ctx context.Context, owner string, project Pr
 }
 
 func insertProject(ctx context.Context, tx *sql.Tx, owner string, project Project) error {
+	project.Canvas.Version = 1
+	project.Canvas.Appearance = normalizeCanvasAppearance(project.Canvas.Appearance, project.Canvas.appearanceConfigured)
+	project.Canvas.appearanceConfigured = true
+	canvasJSON, err := nullableJSON(project.Canvas)
+	if err != nil {
+		return err
+	}
 	viewportJSON, err := nullableJSON(project.Canvas.Viewport)
 	if err != nil {
 		return err
@@ -127,8 +134,8 @@ func insertProject(ctx context.Context, tx *sql.Tx, owner string, project Projec
 		project.ID, owner, project.Title, project.TitleMode, project.Preview, project.CreatedAt, project.UpdatedAt); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvases (project_id, owner_username, canvas_version, revision, viewport_json, appearance_json, view_state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		project.ID, owner, project.Canvas.Version, project.Canvas.Revision, viewportJSON, appearanceJSON, viewStateJSON, project.CreatedAt, project.UpdatedAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvases (project_id, owner_username, canvas_version, revision, canvas_json, viewport_json, appearance_json, view_state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		project.ID, owner, project.Canvas.Version, project.Canvas.Revision, canvasJSON, viewportJSON, appearanceJSON, viewStateJSON, project.CreatedAt, project.UpdatedAt); err != nil {
 		return err
 	}
 	for _, message := range project.Messages {
@@ -238,14 +245,31 @@ func (s *MySQLStore) AppendExchange(ctx context.Context, owner, id string, user,
 
 func (s *MySQLStore) Canvas(ctx context.Context, owner, id string) (Canvas, error) {
 	var canvas Canvas
-	var viewportJSON, appearanceJSON, viewStateJSON []byte
-	err := s.db.QueryRowContext(ctx, `SELECT canvas_version, revision, viewport_json, appearance_json, view_state_json FROM agent_canvases WHERE project_id = ? AND owner_username = ?`, id, owner).
-		Scan(&canvas.Version, &canvas.Revision, &viewportJSON, &appearanceJSON, &viewStateJSON)
+	var canvasJSON, viewportJSON, appearanceJSON, viewStateJSON []byte
+	err := s.db.QueryRowContext(ctx, `SELECT canvas_version, revision, canvas_json, viewport_json, appearance_json, view_state_json FROM agent_canvases WHERE project_id = ? AND owner_username = ?`, id, owner).
+		Scan(&canvas.Version, &canvas.Revision, &canvasJSON, &viewportJSON, &appearanceJSON, &viewStateJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Canvas{}, ErrProjectNotFound
 	}
 	if err != nil {
 		return Canvas{}, err
+	}
+	if len(canvasJSON) > 0 && string(canvasJSON) != "null" {
+		var snapshot Canvas
+		if err := json.Unmarshal(canvasJSON, &snapshot); err != nil {
+			return Canvas{}, errors.New("invalid agent canvas snapshot")
+		}
+		snapshot.Version = canvas.Version
+		snapshot.Revision = canvas.Revision
+		snapshot.Appearance = normalizeCanvasAppearance(snapshot.Appearance, snapshot.appearanceConfigured)
+		snapshot.appearanceConfigured = true
+		if snapshot.Nodes == nil {
+			snapshot.Nodes = []Node{}
+		}
+		if snapshot.Edges == nil {
+			snapshot.Edges = []Edge{}
+		}
+		return snapshot, nil
 	}
 	if len(viewportJSON) > 0 && json.Unmarshal(viewportJSON, &canvas.Viewport) != nil {
 		return Canvas{}, errors.New("invalid agent canvas viewport")
@@ -327,6 +351,10 @@ func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Ca
 	canvas.Revision = revision + 1
 	canvas.Appearance = normalizeCanvasAppearance(canvas.Appearance, canvas.appearanceConfigured)
 	canvas.appearanceConfigured = true
+	canvasJSON, err := nullableJSON(canvas)
+	if err != nil {
+		return Canvas{}, err
+	}
 	viewportJSON, err := nullableJSON(canvas.Viewport)
 	if err != nil {
 		return Canvas{}, err
@@ -339,10 +367,10 @@ func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Ca
 	if err != nil {
 		return Canvas{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE agent_canvases SET canvas_version = ?, revision = ?, viewport_json = ?, appearance_json = ?, view_state_json = ?, updated_at = ? WHERE project_id = ? AND owner_username = ?`, canvas.Version, canvas.Revision, viewportJSON, appearanceJSON, viewStateJSON, now, id, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_canvases SET canvas_version = ?, revision = ?, canvas_json = ?, viewport_json = ?, appearance_json = ?, view_state_json = ?, updated_at = ? WHERE project_id = ? AND owner_username = ?`, canvas.Version, canvas.Revision, canvasJSON, viewportJSON, appearanceJSON, viewStateJSON, now, id, owner); err != nil {
 		return Canvas{}, err
 	}
-	if err := replaceCanvasItems(ctx, tx, owner, id, canvas, now); err != nil {
+	if err := syncCanvasNodeIndex(ctx, tx, owner, id, canvas, now); err != nil {
 		return Canvas{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, now, id, owner); err != nil {
@@ -354,14 +382,66 @@ func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Ca
 	return canvas, nil
 }
 
-func replaceCanvasItems(ctx context.Context, tx *sql.Tx, owner, id string, canvas Canvas, now time.Time) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM agent_canvas_edges WHERE project_id = ? AND owner_username = ?`, id, owner); err != nil {
+// Nodes remain a small compatibility index for generation workers. Canvas JSON is the source of truth.
+func syncCanvasNodeIndex(ctx context.Context, tx *sql.Tx, owner, id string, canvas Canvas, now time.Time) error {
+	for _, node := range canvas.Nodes {
+		sourceJSON, err := nullableJSON(node.SourceNodeIDs)
+		if err != nil {
+			return err
+		}
+		assetJSON, err := nullableJSON(node.AssetRef)
+		if err != nil {
+			return err
+		}
+		configJSON, err := nullableJSON(node.Config)
+		if err != nil {
+			return err
+		}
+		groupID := sql.NullString{String: node.GroupID, Valid: node.GroupID != ""}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvas_nodes (id, project_id, owner_username, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE node_type = VALUES(node_type), title = VALUES(title), summary = VALUES(summary), position_x = VALUES(position_x), position_y = VALUES(position_y), current_version = VALUES(current_version), status = VALUES(status), source_node_ids_json = VALUES(source_node_ids_json), asset_ref_json = VALUES(asset_ref_json), config_json = VALUES(config_json), group_id = VALUES(group_id), updated_at = VALUES(updated_at)`, node.ID, id, owner, node.Type, node.Title, node.Summary, node.Position.X, node.Position.Y, node.Version, node.Status, sourceJSON, assetJSON, configJSON, groupID, now, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateCanvasSnapshotNode(ctx context.Context, tx *sql.Tx, owner, projectID string, nodeID string, now time.Time, mutate func(*Node)) error {
+	var revision int64
+	var snapshotJSON []byte
+	if err := tx.QueryRowContext(ctx, `SELECT revision, canvas_json FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`, projectID, owner).Scan(&revision, &snapshotJSON); errors.Is(err, sql.ErrNoRows) {
+		return ErrProjectNotFound
+	} else if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ?`, id, owner); err != nil {
+	if len(snapshotJSON) == 0 || string(snapshotJSON) == "null" {
+		_, err := tx.ExecContext(ctx, `UPDATE agent_canvases SET revision = revision + 1, updated_at = ? WHERE project_id = ? AND owner_username = ?`, now, projectID, owner)
 		return err
 	}
-	return insertCanvasItems(ctx, tx, owner, id, canvas, now)
+	var canvas Canvas
+	if err := json.Unmarshal(snapshotJSON, &canvas); err != nil {
+		return errors.New("invalid agent canvas snapshot")
+	}
+	found := false
+	for index := range canvas.Nodes {
+		if canvas.Nodes[index].ID == nodeID {
+			mutate(&canvas.Nodes[index])
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrExecutionNodeChanged
+	}
+	canvas.Version = 1
+	canvas.Revision = revision + 1
+	canvas.Appearance = normalizeCanvasAppearance(canvas.Appearance, canvas.appearanceConfigured)
+	canvas.appearanceConfigured = true
+	updatedJSON, err := nullableJSON(canvas)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE agent_canvases SET revision = ?, canvas_json = ?, updated_at = ? WHERE project_id = ? AND owner_username = ?`, canvas.Revision, updatedJSON, now, projectID, owner)
+	return err
 }
 
 func insertCanvasItems(ctx context.Context, tx *sql.Tx, owner, id string, canvas Canvas, now time.Time) error {
@@ -460,6 +540,38 @@ func (s *MySQLStore) BeginNodeExecution(ctx context.Context, owner, projectID st
 	return execution, nil
 }
 
+func (s *MySQLStore) SetNodeExecutionAwaitingConfirmation(ctx context.Context, owner, projectID, executionID string, detail map[string]any, now time.Time) (Execution, error) {
+	owner, projectID, executionID = strings.TrimSpace(owner), strings.TrimSpace(projectID), strings.TrimSpace(executionID)
+	detailJSON, err := nullableJSON(detail)
+	if err != nil {
+		return Execution{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Execution{}, err
+	}
+	defer tx.Rollback()
+	var status string
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM agent_executions WHERE id = ? AND project_id = ? AND owner_username = ? FOR UPDATE`, executionID, projectID, owner).Scan(&status); errors.Is(err, sql.ErrNoRows) {
+		return Execution{}, ErrExecutionNotFound
+	} else if err != nil {
+		return Execution{}, err
+	}
+	if status != "running" {
+		return Execution{}, ErrExecutionState
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_executions SET status = ?, detail_json = ?, updated_at = ? WHERE id = ? AND project_id = ? AND owner_username = ?`, "awaiting_confirmation", detailJSON, now.UTC(), executionID, projectID, owner); err != nil {
+		return Execution{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, now.UTC(), projectID, owner); err != nil {
+		return Execution{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Execution{}, err
+	}
+	return Execution{ID: executionID, Status: "awaiting_confirmation", Detail: cloneMap(detail), UpdatedAt: now.UTC()}, nil
+}
+
 func (s *MySQLStore) ApplyNodeExecution(ctx context.Context, owner, projectID string, input ApplyNodeExecutionInput) (Canvas, Execution, error) {
 	owner, projectID = strings.TrimSpace(owner), strings.TrimSpace(projectID)
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -473,7 +585,7 @@ func (s *MySQLStore) ApplyNodeExecution(ctx context.Context, owner, projectID st
 	} else if err != nil {
 		return Canvas{}, Execution{}, err
 	}
-	if executionStatus != "running" {
+	if executionStatus != "running" && !(input.NodeType == "image" && executionStatus == "awaiting_confirmation") {
 		return Canvas{}, Execution{}, ErrExecutionState
 	}
 	var nodeType string
@@ -485,12 +597,6 @@ func (s *MySQLStore) ApplyNodeExecution(ctx context.Context, owner, projectID st
 	}
 	if nodeType != input.NodeType || nodeVersion != input.NodeVersion {
 		return Canvas{}, Execution{}, ErrExecutionNodeChanged
-	}
-	var revision int64
-	if err := tx.QueryRowContext(ctx, `SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`, projectID, owner).Scan(&revision); errors.Is(err, sql.ErrNoRows) {
-		return Canvas{}, Execution{}, ErrProjectNotFound
-	} else if err != nil {
-		return Canvas{}, Execution{}, err
 	}
 	assetJSON, err := nullableJSON(input.AssetRef)
 	if err != nil {
@@ -513,7 +619,15 @@ func (s *MySQLStore) ApplyNodeExecution(ctx context.Context, owner, projectID st
 	if err != nil {
 		return Canvas{}, Execution{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE agent_canvases SET revision = revision + 1, updated_at = ? WHERE project_id = ? AND owner_username = ?`, input.Now, projectID, owner); err != nil {
+	if err := updateCanvasSnapshotNode(ctx, tx, owner, projectID, input.NodeID, input.Now, func(node *Node) {
+		node.Status = "confirmed"
+		node.Version++
+		if input.NodeType == "text" {
+			node.Summary = strings.TrimSpace(input.Summary)
+		} else {
+			node.AssetRef = cloneMap(input.AssetRef)
+		}
+	}); err != nil {
 		return Canvas{}, Execution{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, input.Now, projectID, owner); err != nil {

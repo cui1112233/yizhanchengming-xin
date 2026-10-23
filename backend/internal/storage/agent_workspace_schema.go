@@ -174,5 +174,143 @@ func AgentWorkspaceMigrations() []Migration {
 			},
 			CallbackChecksum: "v88-agent-workspace-view-state-v1",
 		},
+		{
+			Version: 8800008,
+			SQL: []string{
+				`CREATE TABLE IF NOT EXISTS agent_generation_tasks (
+  id VARCHAR(96) NOT NULL PRIMARY KEY,
+  project_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  node_id VARCHAR(96) NOT NULL,
+  node_version BIGINT NOT NULL,
+  kind VARCHAR(32) NOT NULL,
+  provider VARCHAR(96) NOT NULL,
+  model_id VARCHAR(191) NOT NULL,
+  mode VARCHAR(64) NULL,
+  state VARCHAR(32) NOT NULL,
+  settings_json JSON NOT NULL,
+  reference_asset_ids_json JSON NOT NULL,
+  selected_result_id VARCHAR(96) NULL,
+  idempotency_key VARCHAR(191) NOT NULL,
+  retry_of_task_id VARCHAR(96) NULL,
+  error_message TEXT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_agent_generation_tasks_owner_project_idempotency (owner_username, project_id, idempotency_key),
+  KEY idx_agent_generation_tasks_owner_project_updated (owner_username, project_id, updated_at, id)
+) ENGINE=InnoDB`,
+				`CREATE TABLE IF NOT EXISTS agent_generation_results (
+  id VARCHAR(96) NOT NULL PRIMARY KEY,
+  task_id VARCHAR(96) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  asset_id VARCHAR(96) NOT NULL,
+  kind VARCHAR(32) NOT NULL,
+  asset_json JSON NULL,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_agent_generation_results_task (owner_username, project_id, task_id, created_at, id)
+) ENGINE=InnoDB`,
+			},
+			CallbackChecksum: "v88-agent-generation-tasks-v1",
+		},
+		{
+			Version: 8800009,
+			SQL: []string{
+				`ALTER TABLE agent_canvases ADD COLUMN canvas_json JSON NULL AFTER revision`,
+			},
+			CallbackChecksum: "v88-agent-canvas-json-snapshot-v1",
+		},
+		{
+			Version: 8800010,
+			SQL: []string{
+				`UPDATE agent_canvases c
+SET canvas_json = JSON_OBJECT(
+  'version', c.canvas_version,
+  'revision', c.revision,
+  'viewport', COALESCE(c.viewport_json, JSON_OBJECT()),
+  'viewState', COALESCE(c.view_state_json, JSON_OBJECT()),
+  'appearance', COALESCE(c.appearance_json, JSON_OBJECT()),
+  'nodes', COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT(
+    'id', n.id, 'type', n.node_type,
+    'position', JSON_OBJECT('x', n.position_x, 'y', n.position_y),
+    'title', n.title, 'version', n.current_version, 'status', n.status,
+    'summary', n.summary, 'sourceNodeIds', COALESCE(n.source_node_ids_json, JSON_ARRAY()),
+    'assetRef', n.asset_ref_json, 'config', n.config_json, 'groupId', n.group_id
+  )) FROM agent_canvas_nodes n WHERE n.project_id = c.project_id AND n.owner_username = c.owner_username), JSON_ARRAY()),
+  'edges', COALESCE((SELECT JSON_ARRAYAGG(JSON_OBJECT(
+    'id', e.id, 'source', e.source_node_id, 'target', e.target_node_id, 'relation', e.relation_type
+  )) FROM agent_canvas_edges e WHERE e.project_id = c.project_id AND e.owner_username = c.owner_username), JSON_ARRAY())
+)
+WHERE c.canvas_json IS NULL`,
+			},
+			CallbackChecksum: "v88-agent-canvas-json-backfill-v1",
+		},
+		{
+			Version: 8800011,
+			SQL: []string{
+				`CREATE TABLE IF NOT EXISTS agent_script_shots (
+  id VARCHAR(96) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  script_node_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  sequence INT NOT NULL,
+  scene TEXT NOT NULL,
+  characters TEXT NOT NULL,
+  dialogue TEXT NOT NULL,
+  narration TEXT NOT NULL,
+  image_prompt TEXT NOT NULL,
+  video_prompt TEXT NOT NULL,
+  tts_text TEXT NOT NULL,
+  revision BIGINT NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (project_id, id),
+  UNIQUE KEY uq_agent_script_shots_sequence (project_id, script_node_id, sequence),
+  KEY idx_agent_script_shots_owner_script_sequence (owner_username, project_id, script_node_id, sequence)
+) ENGINE=InnoDB`,
+				`CREATE TABLE IF NOT EXISTS agent_shot_generation_links (
+  project_id VARCHAR(96) NOT NULL,
+  script_node_id VARCHAR(96) NOT NULL,
+  shot_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  node_id VARCHAR(96) NOT NULL,
+  generation_id VARCHAR(96) NOT NULL,
+  attempt INT NOT NULL,
+  active BOOLEAN NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_agent_shot_generation_links (project_id, shot_id, node_id, generation_id),
+  KEY idx_agent_shot_generation_links_owner_shot (owner_username, project_id, shot_id, attempt)
+) ENGINE=InnoDB`,
+			},
+			CallbackChecksum: "v88-agent-script-shots-v1",
+		},
+		{
+			Version: 8800012,
+			SQL: []string{
+				`CREATE TABLE IF NOT EXISTS agent_batch_factory_bindings (
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(96) NOT NULL,
+  project_id VARCHAR(96) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_agent_batch_factory_bindings_owner_batch (owner_username, batch_id),
+  UNIQUE KEY uq_agent_batch_factory_bindings_owner_project (owner_username, project_id)
+) ENGINE=InnoDB`,
+				`CREATE TABLE IF NOT EXISTS agent_batch_factory_node_origins (
+  project_id VARCHAR(96) NOT NULL,
+  node_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(96) NOT NULL,
+  book_id VARCHAR(96) NOT NULL,
+  resource_type VARCHAR(32) NOT NULL,
+  resource_id VARCHAR(191) NOT NULL,
+  version_id VARCHAR(191) NULL,
+  PRIMARY KEY (project_id, node_id),
+  KEY idx_agent_batch_factory_node_origins_owner_book (owner_username, book_id, project_id)
+) ENGINE=InnoDB`,
+			},
+			CallbackChecksum: "v88-agent-batch-factory-bindings-v1",
+		},
 	}
 }

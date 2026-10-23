@@ -9,10 +9,11 @@ export function AgentNodeSettingsPanel({ kind, config = {}, models = [], onChang
   const stop = event => event.stopPropagation();
   const advanced = config.advanced || {};
   const patchAdvanced = patch => onChange?.({ advanced: patch });
-  const content = <section className={`agent-node-settings-panel agent-node-settings-panel--${kind}`} aria-label={`${channelLabels[kind]}设置`} onMouseDown={stop}>
+  const content = <section className={`agent-node-settings-panel agent-node-settings-panel--${kind}`} aria-label={`${channelLabels[kind]}设置`} onMouseDown={stop} onClick={stop}>
     <label><span>{channelLabels[kind]}</span><Select
       value={config.provider || 'personal_api'}
       options={providerOptions}
+      getPopupContainer={trigger => trigger.parentElement}
       onChange={provider => {
         const next = reconcileProviderModel({ models, kind, provider, modelId: config.modelId || config.model });
         onChange?.({ provider: next.provider, modelId: next.modelId, model: next.modelId });
@@ -25,7 +26,7 @@ export function AgentNodeSettingsPanel({ kind, config = {}, models = [], onChang
     </> : null}
     {kind === 'video' ? <>
       <label className="is-inline"><span>自动连接结果</span><Switch checked={advanced.autolink !== false} onChange={autolink => patchAdvanced({ autolink })} /></label>
-      <label><span>镜头运动</span><Select allowClear value={advanced.cameraMotion || undefined} options={['自动', '推进', '拉远', '环绕', '平移'].map(value => ({ value, label: value }))} onChange={cameraMotion => patchAdvanced({ cameraMotion })} /></label>
+      <label><span>镜头运动</span><Select allowClear value={advanced.cameraMotion || undefined} options={['自动', '推进', '拉远', '环绕', '平移'].map(value => ({ value, label: value }))} getPopupContainer={trigger => trigger.parentElement} onChange={cameraMotion => patchAdvanced({ cameraMotion })} /></label>
     </> : null}
     {kind === 'text' ? <label><span>结构要求</span><Input value={advanced.structure || ''} onChange={event => patchAdvanced({ structure: event.target.value })} /></label> : null}
     {kind === 'audio' ? <>

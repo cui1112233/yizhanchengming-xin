@@ -139,6 +139,32 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(req.PathValue("id"), canvas)})
 	})
+	handle("POST /api/agent/tasks/{id}/director/plans/{planId}/approve", func(w http.ResponseWriter, req *http.Request, owner string) {
+		var body struct {
+			Revision int64 `json:"revision"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&body) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "导演方案确认数据无效"})
+			return
+		}
+		projectID := req.PathValue("id")
+		project, err := store.Project(req.Context(), owner, projectID)
+		if err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
+		plan, ok := savedDirectorPlan(project.Messages, req.PathValue("planId"))
+		if !ok {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "导演方案不存在或已失效"})
+			return
+		}
+		canvas, err := agentworkspace.ApplyDirectorPlan(req.Context(), store, owner, projectID, body.Revision, plan, clock().UTC())
+		if err != nil {
+			writeDirectorPlanError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"canvas": agentCanvasForResponse(projectID, canvas), "planId": plan.ID})
+	})
 	handle("GET /api/agent/tasks/{id}/executions", func(w http.ResponseWriter, req *http.Request, owner string) {
 		executions, err := store.Executions(req.Context(), owner, req.PathValue("id"))
 		if err != nil {
@@ -159,16 +185,22 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入消息"})
 				return
 			}
-			if _, err := store.Project(req.Context(), owner, body.TaskID); err != nil {
+			project, err := store.Project(req.Context(), owner, body.TaskID)
+			if err != nil {
 				writeAgentStoreError(w, err)
 				return
 			}
 			cleanContext := sanitizeAgentContext(body.Context)
 			contextJSON, _ := json.Marshal(cleanContext)
+			directorRequest := agentDirectorRequested(cleanContext)
+			systemPrompt := promptcatalog.AgentWorkspaceSystemPrompt
+			if directorRequest {
+				systemPrompt = promptcatalog.AgentDirectorPlanSystemPrompt
+			}
 			completion, err := provider.Complete(req.Context(), batchfactoryv11.TextCompletionRequest{
-				SystemPrompt: promptcatalog.AgentWorkspaceSystemPrompt,
+				SystemPrompt: systemPrompt,
 				UserPrompt:   strings.TrimSpace(body.Prompt) + "\n\n页面上下文：\n" + string(contextJSON),
-				MaxTokens:    2048, Temperature: 0.7, DisableJSONResponse: true,
+				MaxTokens:    2048, Temperature: 0.7, DisableJSONResponse: !directorRequest,
 			})
 			if err != nil {
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "文本模型请求失败"})
@@ -177,13 +209,138 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 			now := clock().UTC()
 			userMessage := agentworkspace.Message{Role: "user", Content: strings.TrimSpace(body.Prompt), Context: cleanContext, CreatedAt: now}
 			assistantMessage := agentworkspace.Message{Role: "assistant", Content: strings.TrimSpace(completion), CreatedAt: now}
-			project, err := store.AppendExchange(req.Context(), owner, body.TaskID, userMessage, assistantMessage)
+			var automaticallyAppliedCanvas *agentworkspace.Canvas
+			if directorRequest {
+				assistantMessage = directorAssistantMessage(project, strings.TrimSpace(completion), now)
+				if agentDirectorAutomaticRequested(cleanContext) {
+					if plan, ok := directorPlanFromMessage(assistantMessage); ok {
+						canvas, applyErr := agentworkspace.ApplyDirectorPlan(req.Context(), store, owner, body.TaskID, project.Canvas.Revision, plan, now)
+						if applyErr == nil {
+							plan.Status = "applied"
+							assistantMessage.Context["directorPlan"] = plan
+							assistantMessage.Content = strings.TrimSpace(assistantMessage.Content) + "\n\n已按你的自动执行要求应用到画布。"
+							automaticallyAppliedCanvas = &canvas
+						} else if errors.Is(applyErr, agentworkspace.ErrDirectorCommandNeedsExecution) || errors.Is(applyErr, agentworkspace.ErrDirectorMissingConfiguration) {
+							assistantMessage.Content = strings.TrimSpace(assistantMessage.Content) + "\n\n这一步需要真实生成或补齐模型配置，已暂停等待你处理。"
+						}
+					}
+				}
+			}
+			updatedProject, err := store.AppendExchange(req.Context(), owner, body.TaskID, userMessage, assistantMessage)
 			if err != nil {
 				writeAgentStoreError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"task": project, "user": userMessage, "assistant": assistantMessage})
+			response := map[string]any{"task": updatedProject, "user": userMessage, "assistant": assistantMessage}
+			if automaticallyAppliedCanvas != nil {
+				response["canvas"] = agentCanvasForResponse(body.TaskID, *automaticallyAppliedCanvas)
+			}
+			writeJSON(w, http.StatusOK, response)
 		})
+	}
+}
+
+func agentDirectorRequested(context map[string]any) bool {
+	director, ok := context["director"].(map[string]any)
+	if !ok {
+		return false
+	}
+	enabled, _ := director["enabled"].(bool)
+	return enabled
+}
+
+func agentDirectorAutomaticRequested(context map[string]any) bool {
+	director, ok := context["director"].(map[string]any)
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(stringValue(director["mode"])), "automatic")
+}
+
+func directorPlanFromMessage(message agentworkspace.Message) (agentworkspace.DirectorPlan, bool) {
+	if message.Context == nil {
+		return agentworkspace.DirectorPlan{}, false
+	}
+	rawPlan, exists := message.Context["directorPlan"]
+	if !exists {
+		return agentworkspace.DirectorPlan{}, false
+	}
+	rawJSON, err := json.Marshal(rawPlan)
+	if err != nil {
+		return agentworkspace.DirectorPlan{}, false
+	}
+	var plan agentworkspace.DirectorPlan
+	if err := json.Unmarshal(rawJSON, &plan); err != nil {
+		return agentworkspace.DirectorPlan{}, false
+	}
+	return plan, true
+}
+
+func directorAssistantMessage(project agentworkspace.Project, completion string, now time.Time) agentworkspace.Message {
+	message := agentworkspace.Message{Role: "assistant", Content: completion, CreatedAt: now}
+	var response struct {
+		Reply string                       `json:"reply"`
+		Plan  *agentworkspace.DirectorPlan `json:"plan"`
+	}
+	if json.Unmarshal([]byte(completion), &response) != nil {
+		message.Content = "导演没有生成可确认的方案。请补充你想修改的内容后再试。"
+		return message
+	}
+	if strings.TrimSpace(response.Reply) != "" {
+		message.Content = strings.TrimSpace(response.Reply)
+	}
+	if response.Plan == nil {
+		return message
+	}
+	if strings.TrimSpace(response.Plan.ID) == "" {
+		response.Plan.ID = newAgentID("director-plan")
+	}
+	if err := agentworkspace.ValidateDirectorPlan(project, *response.Plan); err != nil {
+		message.Content = strings.TrimSpace(message.Content) + "\n\n这份方案未通过画布校验，请补充或调整需求。"
+		return message
+	}
+	message.Context = map[string]any{"directorPlan": response.Plan}
+	return message
+}
+
+func savedDirectorPlan(messages []agentworkspace.Message, planID string) (agentworkspace.DirectorPlan, bool) {
+	planID = strings.TrimSpace(planID)
+	if planID == "" {
+		return agentworkspace.DirectorPlan{}, false
+	}
+	for index := len(messages) - 1; index >= 0; index-- {
+		message := messages[index]
+		if message.Role != "assistant" || message.Context == nil {
+			continue
+		}
+		rawPlan, exists := message.Context["directorPlan"]
+		if !exists {
+			continue
+		}
+		rawJSON, err := json.Marshal(rawPlan)
+		if err != nil {
+			continue
+		}
+		var plan agentworkspace.DirectorPlan
+		if json.Unmarshal(rawJSON, &plan) == nil && plan.ID == planID {
+			return plan, true
+		}
+	}
+	return agentworkspace.DirectorPlan{}, false
+}
+
+func writeDirectorPlanError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, agentworkspace.ErrDirectorCommandNeedsExecution):
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "该方案包含生成或应用结果，请先通过对应任务入口执行"})
+	case errors.Is(err, agentworkspace.ErrDirectorMissingConfiguration):
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "方案中的节点缺少可用模型或通道配置"})
+	case errors.Is(err, agentworkspace.ErrDirectorCommandForbidden):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "导演不能删除项目素材"})
+	case errors.Is(err, agentworkspace.ErrDirectorCommandInvalid), errors.Is(err, agentworkspace.ErrDirectorCommandUnknown):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "导演方案无效或已过期"})
+	default:
+		writeAgentStoreError(w, err)
 	}
 }
 
@@ -203,12 +360,22 @@ func agentCanvasForResponse(projectID string, canvas agentworkspace.Canvas) agen
 		}
 		assetID, _ := publicRef["id"].(string)
 		kind, _ := publicRef["kind"].(string)
-		if strings.TrimSpace(assetID) != "" && (kind == "image" || kind == "video") {
+		if strings.TrimSpace(assetID) != "" && (kind == "image" || kind == "video" || kind == "audio") {
 			publicRef["url"] = agentAssetContentURL(projectID, strings.TrimSpace(assetID))
 		}
 		canvas.Nodes[index].AssetRef = publicRef
 	}
 	return canvas
+}
+
+func agentCanvasNodeByID(canvas agentworkspace.Canvas, nodeID string) (agentworkspace.Node, bool) {
+	nodeID = strings.TrimSpace(nodeID)
+	for _, node := range canvas.Nodes {
+		if node.ID == nodeID {
+			return node, true
+		}
+	}
+	return agentworkspace.Node{}, false
 }
 
 func newAgentID(prefix string) string {

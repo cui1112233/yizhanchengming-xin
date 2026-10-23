@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -101,6 +102,10 @@ func TestAgentTextGenerationUsesRequestedOwnerModelAndAppliesResult(t *testing.T
 	if err != nil || canvas.Nodes[0].Summary != "生成后的正文" || canvas.Nodes[0].Version != 2 {
 		t.Fatalf("canvas=%+v err=%v", canvas, err)
 	}
+	generations, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	if err != nil || len(generations) != 1 || generations[0].State != agentworkspace.GenerationCompleted || generations[0].Kind != "text" {
+		t.Fatalf("generations=%+v err=%v", generations, err)
+	}
 }
 
 func TestNormalizeAgentImageGenerationInputUsesNestedNodeSettings(t *testing.T) {
@@ -165,7 +170,7 @@ func TestAgentTextGenerationFailureDoesNotChangeNode(t *testing.T) {
 	}
 }
 
-func TestAgentImageGenerationPersistsAssetBeforeApplyingNode(t *testing.T) {
+func TestAgentImageGenerationPersistsAssetBeforeAwaitingConfirmation(t *testing.T) {
 	now := time.Date(2026, 10, 20, 10, 0, 0, 0, time.UTC)
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
 	assets := agentworkspace.NewMemoryAssetStore()
@@ -190,8 +195,16 @@ func TestAgentImageGenerationPersistsAssetBeforeApplyingNode(t *testing.T) {
 		t.Fatalf("assets=%+v bytes=%d err=%v", items, len(objects.putContents), err)
 	}
 	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
-	if err != nil || canvas.Nodes[0].Version != 2 || canvas.Nodes[0].AssetRef["id"] != items[0].ID {
+	if err != nil || canvas.Nodes[0].Version != 1 || len(canvas.Nodes[0].AssetRef) != 0 {
 		t.Fatalf("canvas=%+v err=%v", canvas, err)
+	}
+	executions, err := store.Executions(context.Background(), "alice", "project-1")
+	if err != nil || len(executions) != 1 || executions[0].Status != "awaiting_confirmation" {
+		t.Fatalf("executions=%+v err=%v", executions, err)
+	}
+	generations, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	if err != nil || len(generations) != 1 || generations[0].State != agentworkspace.GenerationAwaitingConfirmation || len(generations[0].Results) != 1 {
+		t.Fatalf("generations=%+v err=%v", generations, err)
 	}
 }
 
@@ -222,6 +235,97 @@ func TestAgentImageGenerationPersistsEveryRequestedResult(t *testing.T) {
 	items, err := assets.ListAssets(context.Background(), "alice", "project-1", "image")
 	if err != nil || len(items) != 2 {
 		t.Fatalf("assets=%+v err=%v", items, err)
+	}
+	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil || canvas.Nodes[0].Version != 1 || len(canvas.Nodes[0].AssetRef) != 0 {
+		t.Fatalf("canvas=%+v err=%v", canvas, err)
+	}
+	executions, err := store.Executions(context.Background(), "alice", "project-1")
+	if err != nil || len(executions) != 1 || executions[0].Status != "awaiting_confirmation" {
+		t.Fatalf("executions=%+v err=%v", executions, err)
+	}
+	ids, ok := executions[0].Detail["resultAssetIds"].([]any)
+	assetIDSet := map[string]bool{}
+	for _, item := range items {
+		assetIDSet[item.ID] = true
+	}
+	if !ok || len(ids) != 2 || !assetIDSet[ids[0].(string)] || !assetIDSet[ids[1].(string)] {
+		t.Fatalf("resultAssetIds=%#v assets=%+v", executions[0].Detail["resultAssetIds"], items)
+	}
+}
+
+func TestConfirmAgentImageGenerationAppliesTheSelectedCandidate(t *testing.T) {
+	now := time.Date(2026, 10, 21, 10, 20, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
+	assets := agentworkspace.NewMemoryAssetStore()
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
+		Projects: store, Assets: assets, Objects: &recordingAgentNodeObjectStore{},
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+			return []string{
+				"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+				"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAC",
+			}, http.StatusOK, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	generated := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"两个候选","parameters":{"count":2},"idempotencyKey":"image-confirm-1"}`)
+	if generated.Code != http.StatusOK {
+		t.Fatalf("generate status=%d body=%s", generated.Code, generated.Body.String())
+	}
+	var response struct {
+		Execution struct {
+			ID string `json:"id"`
+		} `json:"execution"`
+		ResultAssets []agentworkspace.Asset `json:"resultAssets"`
+	}
+	if err := json.Unmarshal(generated.Body.Bytes(), &response); err != nil || response.Execution.ID == "" || len(response.ResultAssets) != 2 {
+		t.Fatalf("response=%+v err=%v body=%s", response, err, generated.Body.String())
+	}
+	selected := response.ResultAssets[1]
+	confirmed := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations/"+response.Execution.ID+"/confirm", `{"assetId":"`+selected.ID+`"}`)
+	if confirmed.Code != http.StatusOK || !strings.Contains(confirmed.Body.String(), `"status":"completed"`) {
+		t.Fatalf("confirm status=%d body=%s", confirmed.Code, confirmed.Body.String())
+	}
+	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil || canvas.Nodes[0].Version != 2 || canvas.Nodes[0].AssetRef["id"] != selected.ID {
+		t.Fatalf("canvas=%+v selected=%+v err=%v", canvas, selected, err)
+	}
+	generations, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	if err != nil || len(generations) != 1 || generations[0].State != agentworkspace.GenerationCompleted || generations[0].SelectedResultID == "" {
+		t.Fatalf("generations=%+v err=%v", generations, err)
+	}
+}
+
+func TestConfirmAgentImageGenerationRejectsAssetOutsideExecution(t *testing.T) {
+	now := time.Date(2026, 10, 21, 10, 30, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
+	assets := agentworkspace.NewMemoryAssetStore()
+	if err := assets.CreateAsset(context.Background(), "alice", agentworkspace.Asset{ID: "other-asset", ProjectID: "project-1", Kind: "image", Name: "other.png", ContentType: "image/png", ObjectKey: "agent-assets/other.png", ByteSize: 1, CreatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
+		Projects: store, Assets: assets, Objects: &recordingAgentNodeObjectStore{},
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+			return []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"}, http.StatusOK, nil
+		},
+		Now: func() time.Time { return now },
+	})
+	generated := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"一个候选","idempotencyKey":"image-confirm-reject"}`)
+	var response struct {
+		Execution struct {
+			ID string `json:"id"`
+		} `json:"execution"`
+	}
+	_ = json.Unmarshal(generated.Body.Bytes(), &response)
+	rejected := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations/"+response.Execution.ID+"/confirm", `{"assetId":"other-asset"}`)
+	if rejected.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", rejected.Code, rejected.Body.String())
+	}
+	canvas, _ := store.Canvas(context.Background(), "alice", "project-1")
+	if canvas.Nodes[0].Version != 1 || len(canvas.Nodes[0].AssetRef) != 0 {
+		t.Fatalf("canvas=%+v", canvas)
 	}
 }
 
@@ -271,7 +375,7 @@ func TestAgentImageGenerationProviderFailureLeavesNodeUnchanged(t *testing.T) {
 	}
 }
 
-func TestAgentImageGenerationRejectsStaleNodeAfterProviderCompletes(t *testing.T) {
+func TestAgentImageGenerationRejectsStaleNodeWhenCandidateIsConfirmed(t *testing.T) {
 	now := time.Date(2026, 10, 20, 10, 15, 0, 0, time.UTC)
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Version: 1, Status: "draft"})
 	mux := http.NewServeMux()
@@ -292,7 +396,20 @@ func TestAgentImageGenerationRejectsStaleNodeAfterProviderCompletes(t *testing.T
 	})
 	body := `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"雨夜街道","idempotencyKey":"image-request-stale"}`
 	recorder := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", body)
-	if recorder.Code != http.StatusConflict || !strings.Contains(recorder.Body.String(), "节点已变化") {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("generate status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Execution struct {
+			ID string `json:"id"`
+		} `json:"execution"`
+		ResultAssets []agentworkspace.Asset `json:"resultAssets"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.Execution.ID == "" || len(response.ResultAssets) != 1 {
+		t.Fatalf("response=%+v err=%v", response, err)
+	}
+	confirmed := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations/"+response.Execution.ID+"/confirm", `{"assetId":"`+response.ResultAssets[0].ID+`"}`)
+	if confirmed.Code != http.StatusConflict || !strings.Contains(confirmed.Body.String(), "节点已变化") {
+		t.Fatalf("confirm status=%d body=%s", confirmed.Code, confirmed.Body.String())
 	}
 }

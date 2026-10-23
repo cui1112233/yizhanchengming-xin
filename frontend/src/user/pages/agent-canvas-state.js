@@ -44,12 +44,29 @@ export function shouldPersistFlowChanges(changes) {
   return Array.isArray(changes) && changes.some(change => change?.type !== 'select' && change?.type !== 'dimensions');
 }
 
+export function viewportHasChanged(current, next) {
+  return Number(current?.x) !== Number(next?.x)
+    || Number(current?.y) !== Number(next?.y)
+    || Number(current?.zoom) !== Number(next?.zoom);
+}
+
 export function shouldKeepPendingCreatedTask({ requestedTaskId, activeTaskId, knownTaskIds }) {
   return Boolean(requestedTaskId && requestedTaskId === activeTaskId && !new Set(knownTaskIds || []).has(requestedTaskId));
 }
 
 export function shouldAcceptCanvasRefresh({ requestedTaskId, currentTaskId, requestedQueue, currentQueue, mounted = true }) {
   return Boolean(mounted && requestedTaskId && requestedTaskId === currentTaskId && requestedQueue === currentQueue);
+}
+
+export function retainCanvasEditorNodeID(nodeID, nodes = []) {
+  const current = String(nodeID || '');
+  return current && nodes.some(node => node?.id === current) ? current : '';
+}
+
+export function retainCanvasAssetPanel(panel, nodes = []) {
+  if (!panel) return null;
+  const nodeID = String(panel.nodeID || panel.replaceNodeId || '');
+  return nodeID && nodes.some(node => node?.id === nodeID) ? panel : null;
 }
 
 export function mergePendingCanvas(serverCanvas, localCanvas) {
@@ -72,13 +89,15 @@ export function mergePendingCanvas(serverCanvas, localCanvas) {
   };
 }
 
-export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload, onCanvas, onStatus }) {
+export function createCanvasSaveQueue({ revision = 0, delay = 1200, save, reload, onCanvas, onStatus, onSynced }) {
   let currentRevision = Number(revision) || 0;
   let pending = null;
   let failed = null;
   let active = null;
   let disposed = false;
   let timer = null;
+  let conflictRecoveryAttempted = false;
+  let lastSaveError = null;
 
   function setStatus(status) {
     if (!disposed) onStatus?.(status);
@@ -96,7 +115,6 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
     if (disposed) return;
     if (active) {
       await active;
-      if (pending) return savePending();
       return;
     }
     if (!pending) return;
@@ -108,27 +126,56 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
         const result = await save({ ...canvas, revision: currentRevision }, currentRevision);
         if (disposed) return;
         failed = null;
+        lastSaveError = null;
+        conflictRecoveryAttempted = false;
         const savedCanvas = result?.canvas || { ...canvas, revision: currentRevision + 1 };
         currentRevision = Number(savedCanvas.revision) || currentRevision + 1;
         if (!pending) {
           onCanvas?.(savedCanvas);
+          onSynced?.(savedCanvas);
           setStatus('saved');
         }
       } catch (error) {
         if (disposed) return;
+        lastSaveError = error;
         if (error?.status === 409) {
-          pending = null;
           failed = null;
+          if (conflictRecoveryAttempted) {
+            pending = null;
+            try {
+              const result = await reload();
+              if (disposed) return;
+              const fresh = result?.canvas;
+              if (fresh) {
+                currentRevision = Number(fresh.revision) || currentRevision;
+                onCanvas?.(fresh);
+              }
+              setStatus('conflict');
+            } catch (reloadError) {
+              lastSaveError = reloadError;
+              failed = canvas;
+              setStatus('error');
+            }
+            return;
+          }
+          conflictRecoveryAttempted = true;
           try {
             const result = await reload();
             if (disposed) return;
             const fresh = result?.canvas;
             if (fresh) {
               currentRevision = Number(fresh.revision) || 0;
-              onCanvas?.(fresh);
+              pending = mergePendingCanvas(fresh, canvas);
+              onCanvas?.(pending);
+              setStatus('dirty');
+              return;
             }
+          } catch (reloadError) {
+            lastSaveError = reloadError;
+            failed = canvas;
+            setStatus('error');
           } finally {
-            setStatus('conflict');
+            if (!pending && !failed) setStatus('conflict');
           }
         } else {
           failed = pending || canvas;
@@ -139,7 +186,7 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
     })();
     await active;
     active = null;
-    if (pending) return savePending();
+    if (pending) schedule();
   }
 
   function clearTimer() {
@@ -152,20 +199,40 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
       if (disposed) return;
       pending = canvas;
       failed = null;
+      lastSaveError = null;
+      conflictRecoveryAttempted = false;
       setStatus('dirty');
+      clearTimer();
       schedule();
     },
-    flush() {
+    async flush() {
+      clearTimer();
+      if (active) await active;
       clearTimer();
       return savePending();
+    },
+    async flushRequired() {
+      if (disposed) throw new Error('画布保存队列已关闭');
+      clearTimer();
+      while (active || pending) {
+        await savePending();
+        clearTimer();
+      }
+      if (failed || lastSaveError) throw lastSaveError || new Error('画布保存失败');
+      return { revision: currentRevision };
     },
     retry() {
       if (disposed || !failed) return Promise.resolve();
       pending = failed;
       failed = null;
+      lastSaveError = null;
+      conflictRecoveryAttempted = false;
       setStatus('dirty');
       clearTimer();
       return savePending();
+    },
+    currentRevision() {
+      return currentRevision;
     },
     async acceptServerCanvas(canvas) {
       if (disposed || !canvas) return false;
@@ -176,6 +243,7 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
       clearTimer();
       currentRevision = incomingRevision;
       failed = null;
+      lastSaveError = null;
       if (pending) {
         pending = mergePendingCanvas(canvas, pending);
         onCanvas?.(pending);
@@ -191,6 +259,7 @@ export function createCanvasSaveQueue({ revision = 0, delay = 220, save, reload,
       disposed = true;
       pending = null;
       failed = null;
+      lastSaveError = null;
       clearTimer();
     }
   };

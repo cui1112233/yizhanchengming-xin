@@ -15,8 +15,27 @@ test('共享头部提供工作流和故事板视图', () => {
   assert.match(header, /工作流/);
   assert.match(header, /故事板/);
   assert.match(header, /onViewChange/);
-  assert.match(header, /onToggleDrawer/);
-  assert.match(header, /onToggleConversation/);
+  assert.doesNotMatch(header, /项目对话/);
+});
+
+test('共享头部使用品牌 Logo 菜单和图标化视图切换', () => {
+  const header = read('../components/AgentWorkspaceHeader.jsx');
+  for (const label of ['回到主页', '全部项目', '创建新项目', '删除项目']) {
+    assert.match(header, new RegExp(label));
+  }
+  assert.match(header, /<BrandLogo/);
+  assert.match(header, /<Workflow/);
+  assert.match(header, /<PanelsTopLeft/);
+  assert.doesNotMatch(header, /<Segmented/);
+});
+
+test('画布头部复用已有项目导航、创建和删除能力', () => {
+  const page = read('./AgentPageV2.jsx');
+  assert.match(page, /onBackHome=/);
+  assert.match(page, /onShowProjects=/);
+  assert.match(page, /onCreateProject=/);
+  assert.match(page, /onDeleteProject=/);
+  assert.match(page, /Modal\.confirm/);
 });
 
 test('切换视图保留任务编号和其他地址参数', () => {

@@ -57,6 +57,11 @@ function uniqueAssets(assets, limit = 10) {
   }).slice(0, limit);
 }
 
+function nodePromptSource(node) {
+  const text = String(node?.data?.summary || node?.data?.config?.prompt || '').trim();
+  return text ? { nodeId: node.id, text } : null;
+}
+
 export function syncEffectiveReferences(node, edges = [], nodes = []) {
   const supportedKinds = allowedReferenceKinds(nodeKind(node));
   if (!supportedKinds.length) return node;
@@ -72,6 +77,13 @@ export function syncEffectiveReferences(node, edges = [], nodes = []) {
       .map(clone)
   );
   const nodeByID = new Map(nodes.map(item => [item.id, item]));
+  const edgePromptSources = edges.flatMap(edge => {
+    if (edge?.target !== node.id) return [];
+    const sourceNode = nodeByID.get(edge.source);
+    if (nodeKind(sourceNode) !== 'text') return [];
+    const source = nodePromptSource(sourceNode);
+    return source ? [source] : [];
+  });
   const edgeReferences = edges.flatMap(edge => {
     if (edge?.target !== node.id) return [];
     const sourceNode = nodeByID.get(edge.source);
@@ -88,6 +100,7 @@ export function syncEffectiveReferences(node, edges = [], nodes = []) {
       config: {
         ...config,
         manualReferences,
+        edgePromptSources,
         edgeReferences: dedupedEdgeReferences,
         referenceAssets,
         autoReferenceAssetIDs: dedupedEdgeReferences.map(item => item.assetId)

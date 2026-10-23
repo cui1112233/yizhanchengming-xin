@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   buildWorkspaceGroupTree,
   filterWorkspaceAssets,
+  filterWorkspaceExecutions,
   filterWorkspaceNodes,
+  workspaceExecutionKind,
   workspaceDrawerWidth
 } from './agent-workspace-navigation.js';
 
@@ -38,4 +40,16 @@ test('素材搜索支持名称类型且侧栏宽度限制在可用范围', () =>
   assert.equal(workspaceDrawerWidth(120), 240);
   assert.equal(workspaceDrawerWidth(620), 460);
   assert.equal(workspaceDrawerWidth(336.4), 336);
+});
+
+test('生成历史按真实任务媒介与关键字筛选', () => {
+  const executions = [
+    { id: 'e-text', toolName: 'text-generation', name: '第一版文案', status: 'completed' },
+    { id: 'e-image', tool: 'image-generation', name: '角色图', status: 'completed' },
+    { id: 'e-video', toolName: 'video-generation', name: '片头镜头', status: 'running' },
+    { id: 'e-audio', tool: 'audio-generation', name: '旁白', status: 'failed' }
+  ];
+  assert.equal(workspaceExecutionKind(executions[2]), 'video');
+  assert.deepEqual(filterWorkspaceExecutions(executions, { kinds: ['image', 'video'] }).map(item => item.id), ['e-image', 'e-video']);
+  assert.deepEqual(filterWorkspaceExecutions(executions, { query: '旁白', kinds: [] }).map(item => item.id), ['e-audio']);
 });

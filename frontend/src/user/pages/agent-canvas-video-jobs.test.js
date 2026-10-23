@@ -42,6 +42,9 @@ test('video references disclose the unsupported video-to-video capability before
   assert.match(videoReferenceCapabilityError({ referenceAssets: [
     { id: 'video-asset', kind: 'video', name: '上游成片.mp4' }
   ] }), /暂不支持视频参考素材/);
+  assert.match(videoReferenceCapabilityError({ referenceAssets: [
+    { id: 'audio-asset', kind: 'audio', name: '旁白.mp3' }
+  ] }), /暂不支持音频参考素材/);
 });
 
 test('videoNodeViewState exposes confirmation instead of auto-applying result', () => {
@@ -49,6 +52,30 @@ test('videoNodeViewState exposes confirmation instead of auto-applying result', 
   assert.equal(state.canConfirm, true);
   assert.equal(state.canGenerate, false);
   assert.equal(state.polling, false);
+  assert.equal(state.label, '等待确认');
+});
+
+test('videoNodeViewState translates provider lifecycle into readable canvas states', () => {
+	const submitting = videoNodeViewState({ state: 'submitting' });
+	assert.equal(submitting.label, '正在提交');
+	assert.equal(submitting.polling, true);
+	assert.equal(submitting.canGenerate, false);
+	assert.equal(submitting.canConfirm, false);
+	assert.equal(submitting.canCancel, false);
+	assert.equal(videoNodeViewState({ state: 'queued' }).label, '正在排队');
+  assert.equal(videoNodeViewState({ state: 'running' }).label, '正在生成视频…');
+  assert.equal(videoNodeViewState({ state: 'failed' }).label, '生成失败');
+  assert.equal(videoNodeViewState({ state: 'applied' }).label, '已完成');
+});
+
+test('submitting ranks after preparation and before a queued job at the same timestamp', () => {
+  const at = '2026-10-21T20:30:00Z';
+  const merged = videoJobs.mergeLatestVideoJobsByNode({
+    video: { id: 'same', projectId: 'project-1', nodeId: 'video', state: 'preparing', updatedAt: at }
+  }, [{ id: 'same', projectId: 'project-1', nodeId: 'video', state: 'submitting', updatedAt: at }], 'project-1');
+  assert.equal(merged.video.state, 'submitting');
+  const queued = videoJobs.mergeLatestVideoJobsByNode(merged, [{ id: 'same', projectId: 'project-1', nodeId: 'video', state: 'queued', updatedAt: at }], 'project-1');
+  assert.equal(queued.video.state, 'queued');
 });
 
 test('video result ingestion remains visible as an active polling state', () => {

@@ -24,3 +24,10 @@ test('豆包执行器模型按节点类型进入同一模型列表', () => {
   assert.ok(local.some(item => item.id === 'Seedream 4.5' && item.provider === 'doubao_local_executor'));
   assert.equal(local.some(item => item.kind !== 'image'), false);
 });
+
+test('豆包图片执行器只公布实际可执行的参数', () => {
+  const model = compatibleModels(models, { kind: 'image', provider: 'doubao_local_executor' })[0];
+  assert.deepEqual(model.capabilities.qualityLevels, ['low', 'standard', 'high']);
+  assert.equal(model.capabilities.resolutionManagedByModel, true);
+  assert.equal(model.capabilities.maxOutputCount, 4);
+});
