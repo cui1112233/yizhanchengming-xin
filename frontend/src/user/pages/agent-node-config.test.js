@@ -24,6 +24,13 @@ test('旧版平铺设置会升级为每个节点独立的参数但仍保留引�
   assert.equal(formatNodeParameterSummary('video', config), '9:16 · 1080P · 10s · 1个');
 });
 
+test('旧版豆包本地图片模型会迁移到当前执行器和模型标识', () => {
+  const config = normalizeNodeConfig('image', { modelId: 'seedream-5-flash-local', prompt: '雨夜霓虹街道' });
+  assert.equal(config.provider, 'doubao_local_executor');
+  assert.equal(config.modelId, 'Seedream 5.0 Flash');
+  assert.equal(config.model, 'Seedream 5.0 Flash');
+});
+
 test('文字和音频节点不会获得图片或视频引擎字段', () => {
   const text = normalizeNodeConfig('text', { provider: 'personal_api' });
   const audio = normalizeNodeConfig('audio', {});

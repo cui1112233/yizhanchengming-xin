@@ -18,6 +18,12 @@ const LABELS = {
   creativity: { precise: '严谨', balanced: '均衡', creative: '创意' }
 };
 
+function migrateLegacyLocalDoubaoImageModel(modelId) {
+  return String(modelId || '').trim().toLowerCase() === 'seedream-5-flash-local'
+    ? 'Seedream 5.0 Flash'
+    : '';
+}
+
 function kindOf(kind) {
   return Object.hasOwn(DEFAULTS, kind) ? kind : 'text';
 }
@@ -56,10 +62,12 @@ function normalizedParameters(kind, value = {}) {
 export function normalizeNodeConfig(kind, value = {}) {
   const type = kindOf(kind);
   const parameters = normalizedParameters(type, value);
-  const modelId = String(value.modelId || value.model || '').trim();
+  const savedModelId = String(value.modelId || value.model || '').trim();
+  const migratedLocalModelId = type === 'image' ? migrateLegacyLocalDoubaoImageModel(savedModelId) : '';
+  const modelId = migratedLocalModelId || savedModelId;
   const config = {
     ...value,
-    provider: String(value.provider || '').trim(),
+    provider: migratedLocalModelId ? 'doubao_local_executor' : String(value.provider || '').trim(),
     modelId,
     model: modelId,
     mode: String(value.mode || parameters.operation || '').trim(),
