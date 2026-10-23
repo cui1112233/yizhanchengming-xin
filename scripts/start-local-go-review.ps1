@@ -1,7 +1,9 @@
 param(
   [string]$EnvFile = '',
   [string]$ListenAddr = ':4001',
-  [switch]$UseYcmMysql
+  [Alias('UseYcmMysql')]
+  [switch]$UseLocalMysql,
+  [switch]$UseReviewMysql
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,20 +34,29 @@ if ([string]::IsNullOrWhiteSpace($password) -or [string]::IsNullOrWhiteSpace($br
 }
 Write-Output "Review credentials loaded (password length $($password.Length), bridge length $($bridgeSecret.Length))"
 
-$mysqlHost = (& docker inspect qiantie-v88-review-mysql-1 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>$null).Trim()
-$mysqlUser = 'qiantie'
-$mysqlDatabase = 'qiantie_v88'
-$mysqlPassword = $password
-if ($UseYcmMysql) {
-  $mysqlHost = '127.0.0.1'
-  $mysqlUser = 'root'
-  $mysqlDatabase = 'qiantie_go_local'
-  $mysqlPassword = (& docker inspect ycm-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' 2>$null | Where-Object { $_ -match '^MYSQL_ROOT_PASSWORD=' } | Select-Object -First 1) -replace '^MYSQL_ROOT_PASSWORD=', ''
-  if ([string]::IsNullOrWhiteSpace($mysqlPassword)) { throw '无法读取 ycm-mysql 的数据库密码' }
+$mysqlHost = '127.0.0.1'
+$mysqlPort = 3306
+$mysqlUser = 'root'
+$mysqlDatabase = 'qiantie_go_local'
+$mysqlPassword = (& docker inspect ycm-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' 2>$null | Where-Object { $_ -match '^MYSQL_ROOT_PASSWORD=' } | Select-Object -First 1) -replace '^MYSQL_ROOT_PASSWORD=', ''
+if ([string]::IsNullOrWhiteSpace($mysqlPassword)) { throw '无法读取 ycm-mysql 的数据库密码' }
+Write-Output 'Defaulting local runtime to the persisted YCM MySQL data store.'
+
+if ($UseReviewMysql) {
+  $mysqlHost = (& docker inspect qiantie-v88-review-mysql-1 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>$null).Trim()
+  $mysqlPort = 3306
+  $mysqlUser = 'qiantie'
+  $mysqlDatabase = 'qiantie_v88'
+  $mysqlPassword = $password
+  if (Test-NetConnection -ComputerName '127.0.0.1' -Port 3307 -InformationLevel Quiet) {
+    $mysqlHost = '127.0.0.1'
+    $mysqlPort = 3307
+  }
+  if ([string]::IsNullOrWhiteSpace($mysqlHost)) { $mysqlHost = '127.0.0.1' }
+  Write-Output 'Using explicitly requested isolated review MySQL data store.'
 }
-if ([string]::IsNullOrWhiteSpace($mysqlHost)) { $mysqlHost = '127.0.0.1' }
-Write-Output "Using MySQL $mysqlUser@$mysqlHost/$mysqlDatabase"
-$env:QIANTIE_MYSQL_DSN = "${mysqlUser}:$mysqlPassword@tcp(${mysqlHost}:3306)/${mysqlDatabase}?parseTime=true&multiStatements=true"
+Write-Output "Using MySQL $mysqlUser@$mysqlHost`:$mysqlPort/$mysqlDatabase"
+$env:QIANTIE_MYSQL_DSN = "${mysqlUser}:$mysqlPassword@tcp(${mysqlHost}:$mysqlPort)/${mysqlDatabase}?parseTime=true&multiStatements=true"
 $env:QIANTIE_BRIDGE_SECRET = $bridgeSecret
 $env:QIANTIE_GO_LISTEN_ADDR = $ListenAddr
 # Review compose files may use a higher production slice. The local Go
