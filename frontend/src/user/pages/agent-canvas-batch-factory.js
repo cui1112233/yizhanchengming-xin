@@ -102,6 +102,16 @@ export function videoNodeTiming({ audioSeconds, selectedSeconds, allowedSeconds 
 export function mappedNodeStatePresentation(node) {
   if (!isBatchFactoryNode(node)) return null;
   const config = node?.config || node?.data?.config || {};
+  if (String(config.resourceType || '').trim() === 'merge' && String(config.mergeState || '').trim()) {
+    const ready = String(config.mergeState).trim() === 'ready';
+    return {
+      state: ready ? 'ready' : 'blocked',
+      errorMessage: '',
+      canRetry: false,
+      busy: false,
+      message: ready ? '所有分镜已就绪，可以合成最终视频' : String(config.mergeReason || '等待所有分镜视频生成完成')
+    };
+  }
   const state = ['queued', 'running', 'succeeded', 'failed', 'cancelled'].includes(String(config.mappedState || node?.status || '').trim())
     ? String(config.mappedState || node?.status).trim()
     : 'queued';
@@ -110,6 +120,23 @@ export function mappedNodeStatePresentation(node) {
     queued: '正在排队', running: '正在执行中…', succeeded: '已完成', failed: '批量工厂任务失败，请重试', cancelled: '已取消'
   }[state] || '正在排队');
   return { state, errorMessage, canRetry: config.canRetry === true, busy: state === 'queued' || state === 'running', message };
+}
+
+// Mapped production remains owned by Batch Factory. The canvas only polls a
+// book while one of its projected nodes is still in a non-terminal state.
+export function mappedBatchFactoryBooksNeedingRefresh(nodes) {
+  const books = new Map();
+  for (const node of Array.isArray(nodes) ? nodes : []) {
+    const config = node?.data?.config || node?.config || {};
+    if (String(config.source || '').trim() !== 'batch_factory') continue;
+    const state = String(config.mappedState || node?.data?.status || node?.status || '').trim().toLowerCase();
+    if (state !== 'queued' && state !== 'running') continue;
+    const batchId = String(config.batchId || '').trim();
+    const bookId = String(config.bookId || '').trim();
+    if (!batchId || !bookId) continue;
+    books.set(`${batchId}\u0000${bookId}`, { batchId, bookId });
+  }
+  return [...books.values()];
 }
 
 export function batchFactoryMappedAction(node) {
@@ -138,16 +165,33 @@ export function batchFactoryMappedAction(node) {
       ...(Number(config.resourceRevision) > 0 ? { expectedRevision: Number(config.resourceRevision) } : {})
     };
   }
-  if (resourceType === 'merge') return { type: 'merge', batchId, bookId, resourceId };
+  if (resourceType === 'merge') return {
+    type: 'merge', batchId, bookId, resourceId,
+    canMerge: config.canMerge === true,
+    canPublish: config.canPublish === true,
+    mergeState: String(config.mergeState || '').trim(),
+    mergeReason: String(config.mergeReason || '').trim()
+  };
   if (resourceType === 'audio' && resourceId) return { type: 'audio', batchId, bookId, resourceId };
   return { type: 'sync', batchId, bookId, resourceId };
 }
 
-export async function runMappedBatchFactoryScriptStage({ action, stage, requestId, runStage }) {
+// Settings and metadata save responses differ, but both carry the next
+// book revision needed by any following save.
+export function latestBookRevision(result, fallback = 0) {
+  const direct = Number(result?.revision);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const bookRevision = Number(result?.book?.revision);
+  if (Number.isFinite(bookRevision) && bookRevision > 0) return bookRevision;
+  return Number(fallback) || 0;
+}
+
+export async function runMappedBatchFactoryScriptStage({ action, stage, requestId, options = {}, runStage }) {
   if (action?.type !== 'script' || !action.batchId || !action.bookId || !['assets', 'director'].includes(stage) || typeof runStage !== 'function') {
     throw new Error('映射剧本生产参数无效');
   }
-  return runStage(action.batchId, action.bookId, stage, { mode: 'missing', requestId });
+  const contentRangeLines = Math.min(500, Math.max(1, Number(options.contentRangeLines) || 5));
+  return runStage(action.batchId, action.bookId, stage, { mode: 'missing', requestId, contentRangeLines });
 }
 
 export async function runMappedBatchFactoryVideoProduction({ action, requestId, runStage }) {

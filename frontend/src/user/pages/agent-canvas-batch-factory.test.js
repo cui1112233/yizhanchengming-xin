@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
+import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, latestBookRevision, mappedBatchFactoryBooksNeedingRefresh, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
 
 test('opens the bound project at the requested book group', () => {
   assert.equal(
@@ -148,15 +148,50 @@ test('routes mapped image actions back to the batch factory record', () => {
   }), { type: 'image', batchId: 'batch-1', bookId: 'book-1', resourceId: 'asset-1' });
 });
 
-test('runs mapped script stages against the same Batch Factory book', async () => {
+test('keeps the final merge card actionable before its first merge job exists', () => {
+  const node = {
+    groupId: 'book:book-1',
+    status: 'queued',
+    config: {
+      batchId: 'batch-1', bookId: 'book-1', resourceType: 'merge', resourceId: 'book-1',
+      canMerge: true, canPublish: false, mergeState: 'ready'
+    }
+  };
+  assert.deepEqual(batchFactoryMappedAction(node), {
+    type: 'merge', batchId: 'batch-1', bookId: 'book-1', resourceId: 'book-1',
+    canMerge: true, canPublish: false, mergeState: 'ready', mergeReason: ''
+  });
+  assert.deepEqual(mappedNodeStatePresentation(node), {
+    state: 'ready', errorMessage: '', canRetry: false, busy: false, message: '所有分镜已就绪，可以合成最终视频'
+  });
+});
+
+test('runs mapped script stages with the selected production line count', async () => {
   const calls = [];
   await runMappedBatchFactoryScriptStage({
     action: { type: 'script', batchId: 'batch-1', bookId: 'book-1' },
     stage: 'assets',
     requestId: 'canvas-assets-1',
+    options: { contentRangeLines: 12 },
     runStage: async (...args) => calls.push(args)
   });
   assert.deepEqual(calls, [[
-    'batch-1', 'book-1', 'assets', { mode: 'missing', requestId: 'canvas-assets-1' }
+    'batch-1', 'book-1', 'assets', { mode: 'missing', requestId: 'canvas-assets-1', contentRangeLines: 12 }
   ]]);
+});
+
+test('uses the newest book revision returned by each save endpoint', () => {
+  assert.equal(latestBookRevision({ revision: 14 }, 9), 14);
+  assert.equal(latestBookRevision({ book: { revision: 15 } }, 9), 15);
+  assert.equal(latestBookRevision({}, 9), 9);
+});
+
+test('refreshes each mapped book once while it has queued or running production', () => {
+  assert.deepEqual(mappedBatchFactoryBooksNeedingRefresh([
+    { id: 'script', data: { config: { source: 'batch_factory', batchId: 'batch-1', bookId: 'book-1', mappedState: 'succeeded' } } },
+    { id: 'video-1', data: { config: { source: 'batch_factory', batchId: 'batch-1', bookId: 'book-1', mappedState: 'running' } } },
+    { id: 'video-2', data: { config: { source: 'batch_factory', batchId: 'batch-1', bookId: 'book-1', mappedState: 'queued' } } },
+    { id: 'video-3', data: { config: { source: 'batch_factory', batchId: 'batch-1', bookId: 'book-2', mappedState: 'failed' } } },
+    { id: 'manual', data: { config: { source: 'manual', batchId: 'batch-1', bookId: 'book-3', mappedState: 'running' } } }
+  ]), [{ batchId: 'batch-1', bookId: 'book-1' }]);
 });

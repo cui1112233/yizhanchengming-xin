@@ -389,7 +389,7 @@ func agentBatchFactoryProjectionMediaURL(ctx context.Context, batches agentBatch
 			return "", err
 		}
 		for _, job := range jobs {
-			if job.BookID == bookID && job.ID == origin.ResourceID && job.ID == mediaID && strings.TrimSpace(job.OutputURL) != "" {
+			if job.BookID == bookID && job.ID == mediaID && strings.TrimSpace(job.OutputURL) != "" {
 				return strings.TrimSpace(job.OutputURL), nil
 			}
 		}

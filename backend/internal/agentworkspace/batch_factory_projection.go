@@ -25,6 +25,13 @@ type BatchFactoryProjectionReader interface {
 	ListMergeJobs(context.Context, string, string) ([]batchfactoryv11.MergeJob, error)
 }
 
+// BatchFactoryMergeStatusReader refreshes in-flight merge jobs before a
+// projection is rendered. Batch Factory owns this polling behavior so the
+// canvas and workbench always show the same job state.
+type BatchFactoryMergeStatusReader interface {
+	GetBatchStatus(context.Context, string, string) ([]batchfactoryv11.MergeJob, error)
+}
+
 type BatchFactoryAudioRecord struct {
 	ID              string
 	VersionID       string
@@ -133,6 +140,7 @@ type BatchFactoryProjectionStore interface {
 type BatchFactoryProjectionService struct {
 	CanvasStore  BatchFactoryProjectionStore
 	BatchFactory BatchFactoryProjectionReader
+	MergeStatus  BatchFactoryMergeStatusReader
 	AudioRecords BatchFactoryAudioReader
 	Now          func() time.Time
 }
@@ -174,7 +182,12 @@ func (s *BatchFactoryProjectionService) SyncBatchFactoryBook(ctx context.Context
 	if err != nil {
 		return Canvas{}, err
 	}
-	mergeJobs, err := s.BatchFactory.ListMergeJobs(ctx, owner, binding.BatchID)
+	var mergeJobs []batchfactoryv11.MergeJob
+	if s.MergeStatus != nil {
+		mergeJobs, err = s.MergeStatus.GetBatchStatus(ctx, owner, binding.BatchID)
+	} else {
+		mergeJobs, err = s.BatchFactory.ListMergeJobs(ctx, owner, binding.BatchID)
+	}
 	if err != nil {
 		return Canvas{}, err
 	}
@@ -200,7 +213,38 @@ func (s *BatchFactoryProjectionService) SyncBatchFactoryBook(ctx context.Context
 	for _, item := range items {
 		desiredOrigins = append(desiredOrigins, item.origin)
 	}
+	// Status polling asks Batch Factory for the latest task state. If that
+	// read did not change this book's projection, keep the existing canvas
+	// revision so an active canvas is not continuously saved or conflicted.
+	if sameBatchFactoryProjectionCanvas(canvas, next) && sameBatchFactoryProjectionOrigins(origins, desiredOrigins) {
+		return canvas, nil
+	}
 	return s.CanvasStore.SaveBatchFactoryProjection(ctx, owner, binding, book.ID, next, canvas.Revision, desiredOrigins, now)
+}
+
+func sameBatchFactoryProjectionCanvas(left, right Canvas) bool {
+	// Projection config values can carry equivalent numeric values with
+	// different Go representations after a store round trip. JSON is the
+	// persisted canvas format and gives us the durable comparison here.
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	return leftErr == nil && rightErr == nil && string(leftJSON) == string(rightJSON)
+}
+
+func sameBatchFactoryProjectionOrigins(left, right []BatchFactoryNodeOrigin) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	byNodeID := make(map[string]BatchFactoryNodeOrigin, len(left))
+	for _, origin := range left {
+		byNodeID[origin.NodeID] = origin
+	}
+	for _, origin := range right {
+		if current, found := byNodeID[origin.NodeID]; !found || current != origin {
+			return false
+		}
+	}
+	return true
 }
 
 func projectionBook(batch batchfactoryv11.Batch, bookID string) (batchfactoryv11.Book, bool) {
@@ -271,6 +315,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 
 	scriptConfig := projectionConfig(binding.BatchID, book.ID, "book_script", book.ID)
 	scriptConfig["sourceText"] = book.SourceText
+	scriptConfig["contentRangeLines"] = projectionContentRangeLines(book.SourceMetadata)
 	scriptConfig["resourceRevision"] = book.Revision
 	effectiveScriptSettings := append([]batchfactoryv11.SettingsPatch(nil), batchSettings...)
 	effectiveScriptSettings = append(effectiveScriptSettings, book.SettingsState.Patch)
@@ -384,8 +429,11 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		nodeIDByResource[projectionResourceKey("video", video.ID)] = nodeID
 	}
 
+	// The final video is a stable book-level node. It must be available before
+	// the first merge so the canvas can finish the same chain as Batch Factory.
+	mergeReady, mergeReason := projectionMergeReadiness(book.Videos, tasksByVideo)
+	var audioNodeID string
 	if hasMerge {
-		var audioNodeID string
 		if audioID := strings.TrimSpace(merge.AudioArtifactID); audioID != "" && hasAudioRecord {
 			record := audioRecord
 			assetRef := map[string]any{"id": audioID, "kind": "audio", "source": "batch_factory"}
@@ -403,23 +451,56 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 				AssetRef: assetRef, Config: config,
 			})
 		}
-		assetRef := map[string]any{"id": merge.ID, "kind": "video", "source": "batch_factory"}
-		mergeConfig := projectionConfig(binding.BatchID, book.ID, "merge", merge.ID)
+	}
+	mergeConfig := projectionConfig(binding.BatchID, book.ID, "merge", book.ID)
+	publishSettings := projectionJSONMap(batchfactoryv11.ResolveSettings(append(append([]batchfactoryv11.SettingsPatch{}, batchSettings...), book.SettingsState.Patch)...)["publishSettings"])
+	mergeConfig["canMerge"] = mergeReady
+	mergeConfig["publishStatus"] = projectionMetadataText(book.SourceMetadata, "websiteSubmitStatus", "publishStatus")
+	if progress, ok := book.SourceMetadata["websiteSubmitProgress"].(map[string]any); ok {
+		mergeConfig["publishProgress"] = progress
+	}
+	if organization := projectionMetadataText(publishSettings, "organization"); organization != "" {
+		mergeConfig["publishOrganization"] = organization
+	}
+	assetRef := map[string]any{"kind": "video", "source": "batch_factory"}
+	mergeStatus, mergeVersion, mergeSummary := "queued", projectionFingerprint(book.Revision, "merge-pending", mergeReady, mergeReason), mergeReason
+	if hasMerge {
+		assetRef["id"] = merge.ID
+		mergeConfig["mergeJobId"] = merge.ID
+		mergeConfig["canPublish"] = merge.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(merge.OutputURL) != ""
 		applyMappedNodeState(mergeConfig, string(merge.Status), merge.ErrorMessage)
-		mergeNodeID := add("merge", merge.ID, projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources), Node{
-			Type: "video", Title: "最终合成视频", Status: NormalizeMappedNodeState(string(merge.Status), merge.ErrorMessage).Status, Position: Position{X: 1040, Y: 80},
-			AssetRef: assetRef, Config: mergeConfig,
-		})
+		mergeStatus = NormalizeMappedNodeState(string(merge.Status), merge.ErrorMessage).Status
+		mergeVersion = projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources)
+		mergeSummary = ""
+	} else {
+		mergeConfig["canPublish"] = false
+		mergeConfig["mergeState"] = map[bool]string{true: "ready", false: "blocked"}[mergeReady]
+		if mergeReason != "" {
+			mergeConfig["mergeReason"] = mergeReason
+		}
+		applyMappedNodeState(mergeConfig, "queued", "")
+	}
+	mergeNodeID := add("merge", book.ID, mergeVersion, Node{
+		Type: "video", Title: "最终合成视频", Summary: mergeSummary, Status: mergeStatus, Position: Position{X: 1040, Y: 80},
+		AssetRef: assetRef, Config: mergeConfig,
+	})
+	if hasMerge {
 		for _, source := range merge.Sources {
 			if sourceID := nodeIDByResource[projectionResourceKey("video", source.VideoID)]; sourceID != "" {
 				items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, sourceID)
 			}
 		}
-		if audioNodeID != "" {
-			items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, audioNodeID)
+	} else {
+		for _, video := range book.Videos {
+			if sourceID := nodeIDByResource[projectionResourceKey("video", video.ID)]; sourceID != "" {
+				items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, sourceID)
+			}
 		}
-		nodeIDByResource[projectionResourceKey("merge", merge.ID)] = mergeNodeID
 	}
+	if audioNodeID != "" {
+		items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, audioNodeID)
+	}
+	nodeIDByResource[projectionResourceKey("merge", book.ID)] = mergeNodeID
 
 	edges := projectionEdges(binding.ProjectID, book.ID, items)
 	return items, edges, nil
@@ -497,6 +578,10 @@ func reconcileBatchFactoryCanvas(canvas Canvas, origins []BatchFactoryNodeOrigin
 	for _, item := range items {
 		desired[item.node.ID] = struct{}{}
 	}
+	authoritativeEdgePairs := make(map[string]struct{}, len(projectedEdges))
+	for _, edge := range projectedEdges {
+		authoritativeEdgePairs[edge.Source+"\x00"+edge.Target] = struct{}{}
+	}
 	nodes := make([]Node, 0, len(canvas.Nodes)+len(items))
 	for _, node := range canvas.Nodes {
 		if _, projected := oldProjected[node.ID]; projected {
@@ -531,6 +616,12 @@ func reconcileBatchFactoryCanvas(canvas Canvas, origins []BatchFactoryNodeOrigin
 		_, sourceDesired := desired[edge.Source]
 		_, targetDesired := desired[edge.Target]
 		if edge.Relation == batchFactoryProjectionRelation && (sourceProjected || targetProjected || sourceDesired || targetDesired) {
+			continue
+		}
+		if _, authoritative := authoritativeEdgePairs[edge.Source+"\x00"+edge.Target]; authoritative &&
+			(sourceProjected || targetProjected || sourceDesired || targetDesired) {
+			// Batch Factory owns this exact source/target relationship. Keeping an
+			// older manual relation here renders the same visual line twice.
 			continue
 		}
 		edges = append(edges, edge)
@@ -598,6 +689,22 @@ func projectionCurrentTask(video batchfactoryv11.Video, tasks []batchfactoryv11.
 	return batchfactoryv11.ProductionTask{}, false
 }
 
+func projectionMergeReadiness(videos []batchfactoryv11.Video, tasksByVideo map[string][]batchfactoryv11.ProductionTask) (bool, string) {
+	if len(videos) == 0 {
+		return false, "请先生成至少一个视频分镜"
+	}
+	for _, video := range videos {
+		task, found := projectionCurrentTask(video, tasksByVideo[video.ID])
+		if !found || task.Status != batchfactoryv11.ProductionSucceeded || strings.TrimSpace(task.MediaURL) == "" {
+			if task.Status == batchfactoryv11.ProductionFailed {
+				return false, "有分镜视频生成失败，请重试后再合成"
+			}
+			return false, "等待所有分镜视频生成完成"
+		}
+	}
+	return true, ""
+}
+
 func projectionLatestMerge(bookID string, jobs []batchfactoryv11.MergeJob) (batchfactoryv11.MergeJob, bool) {
 	var latest batchfactoryv11.MergeJob
 	found := false
@@ -623,6 +730,29 @@ func projectionPrimaryImage(images []batchfactoryv11.BookAssetImage) batchfactor
 
 func projectionConfig(batchID, bookID, resourceType, resourceID string) map[string]any {
 	return map[string]any{"source": "batch_factory", "batchId": batchID, "bookId": bookID, "resourceType": resourceType, "resourceId": resourceID}
+}
+
+func projectionContentRangeLines(metadata map[string]any) int {
+	value := 5
+	switch raw := metadata["contentRangeLines"].(type) {
+	case int:
+		value = raw
+	case int64:
+		value = int(raw)
+	case float64:
+		value = int(raw)
+	case json.Number:
+		if parsed, err := raw.Int64(); err == nil {
+			value = int(parsed)
+		}
+	}
+	if value < 1 {
+		return 1
+	}
+	if value > 500 {
+		return 500
+	}
+	return value
 }
 
 func projectionTitle(value, fallback string) string {
@@ -656,6 +786,26 @@ func projectionJSONText(raw json.RawMessage) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+func projectionJSONMap(raw json.RawMessage) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	var value map[string]any
+	if json.Unmarshal(raw, &value) != nil || value == nil {
+		return map[string]any{}
+	}
+	return value
+}
+
+func projectionMetadataText(metadata map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(fmt.Sprint(metadata[key])); value != "" && value != "<nil>" {
+			return value
+		}
+	}
+	return ""
 }
 
 func projectionJSONNumber(raw json.RawMessage) float64 {

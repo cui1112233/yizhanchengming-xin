@@ -18,7 +18,7 @@ func TestSyncBatchFactoryBookDoesNotExposeMergeFailureDetails(t *testing.T) {
 	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
 	secretDetail := "provider failure: Authorization Bearer secret-token"
 	failureTime := merge.UpdatedAt.Add(time.Minute)
-	failed, err := source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{
+	_, err := source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{
 		Owner: "alice", BatchID: binding.BatchID, BookID: book.ID, RequestID: "merge-failed",
 		Status: batchfactoryv11.MergeFailed, ErrorMessage: secretDetail,
 		Sources:   []batchfactoryv11.MergeMedia{{ProductionJobID: production.ID, VideoID: book.Videos[0].ID, MediaURL: production.Tasks[0].MediaURL}},
@@ -31,7 +31,7 @@ func TestSyncBatchFactoryBookDoesNotExposeMergeFailureDetails(t *testing.T) {
 	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
 		t.Fatal(err)
 	}
-	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", failed.ID)
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
 	visible, err := json.Marshal(struct {
 		Summary  string         `json:"summary"`
 		Config   map[string]any `json:"config"`
@@ -42,6 +42,47 @@ func TestSyncBatchFactoryBookDoesNotExposeMergeFailureDetails(t *testing.T) {
 	}
 	if strings.Contains(string(visible), secretDetail) {
 		t.Fatalf("merge failure detail leaked into canvas node: %s", visible)
+	}
+}
+
+func TestSyncBatchFactoryBookRefreshesMergeStateThroughBatchFactoryStatusReader(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, merge := newProjectionFixture(t, ctx)
+	refreshed := merge
+	refreshed.Status = batchfactoryv11.MergeRunning
+	refreshed.ProgressPhase = "merging"
+	refreshed.ProgressCurrent = 1
+	refreshed.ProgressTotal = 1
+	refreshed.OutputURL = ""
+	reader := &projectionMergeStatusReader{jobs: []batchfactoryv11.MergeJob{refreshed}}
+	service.MergeStatus = reader
+
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	if reader.calls != 1 {
+		t.Fatalf("merge status reader calls = %d, want 1", reader.calls)
+	}
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
+	if mergeNode.Config["mappedState"] != "running" {
+		t.Fatalf("canvas retained stale merge state instead of refreshed state: %+v", mergeNode.Config)
+	}
+}
+
+func TestSyncBatchFactoryBookDoesNotRewriteUnchangedCanvas(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixture(t, ctx)
+
+	first, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Revision != first.Revision {
+		t.Fatalf("an unchanged projection must retain its revision, first=%d second=%d", first.Revision, second.Revision)
 	}
 }
 
@@ -223,14 +264,18 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 		t.Fatalf("video timing config=%+v", videoNode.Config)
 	}
 	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", merge.AudioArtifactID)
-	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", merge.ID)
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
 	scriptNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_script", book.ID)
 	_, scriptRevisionOK := projectionConfigPositiveNumber(scriptNode.Config["resourceRevision"])
-	if scriptNode.Config["sourceText"] != book.SourceText || !scriptRevisionOK || scriptNode.Config["modelId"] != "text-model-1" {
+	productionLines, productionLinesOK := projectionConfigPositiveNumber(scriptNode.Config["contentRangeLines"])
+	if scriptNode.Config["sourceText"] != book.SourceText || !scriptRevisionOK || scriptNode.Config["modelId"] != "text-model-1" || !productionLinesOK || productionLines != 12 {
 		t.Fatalf("script editing config=%+v", scriptNode.Config)
 	}
 	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != nil {
 		t.Fatalf("merge node=%+v", mergeNode)
+	}
+	if mergeNode.Config["publishStatus"] != "uploaded" || mergeNode.Config["publishOrganization"] != "org-1" {
+		t.Fatalf("merge publish config=%+v", mergeNode.Config)
 	}
 	assertProjectionEdge(t, canvas.Edges, scriptNode.ID, imageNode.ID)
 	assertProjectionEdge(t, canvas.Edges, imageNode.ID, videoNode.ID)
@@ -426,7 +471,39 @@ func TestSyncBatchFactoryBookRecoversAllMissingOriginsWithoutDuplicateEdges(t *t
 	}
 }
 
+func TestReconcileBatchFactoryCanvasReplacesLegacyDuplicateOfProjectedEdge(t *testing.T) {
+	script := Node{ID: "bf-script", Type: "script"}
+	image := Node{ID: "bf-image", Type: "image", SourceNodeIDs: []string{script.ID}}
+	origins := []BatchFactoryNodeOrigin{
+		{NodeID: script.ID, ResourceType: "book_script", ResourceID: "book-1"},
+		{NodeID: image.ID, ResourceType: "book_asset", ResourceID: "asset-1"},
+	}
+	items := []batchFactoryProjectionItem{
+		{node: script, origin: origins[0]},
+		{node: image, origin: origins[1]},
+	}
+	projected := []Edge{{ID: "projected", Source: script.ID, Target: image.ID, Relation: batchFactoryProjectionRelation}}
+	canvas := EmptyCanvas()
+	canvas.Nodes = []Node{script, image}
+	canvas.Edges = []Edge{{ID: "legacy-manual", Source: script.ID, Target: image.ID, Relation: "reference"}}
+
+	reconciled := reconcileBatchFactoryCanvas(canvas, origins, items, projected)
+	matching := make([]Edge, 0, 1)
+	for _, edge := range reconciled.Edges {
+		if edge.Source == script.ID && edge.Target == image.ID {
+			matching = append(matching, edge)
+		}
+	}
+	if len(matching) != 1 || matching[0].ID != "projected" || matching[0].Relation != batchFactoryProjectionRelation {
+		t.Fatalf("expected exactly the authoritative projected edge, got %+v", matching)
+	}
+}
+
 func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProjectionService, BatchFactoryBinding, batchfactoryv11.Book, batchfactoryv11.BookAsset, batchfactoryv11.BookAssetImage, batchfactoryv11.ProductionJob, batchfactoryv11.MergeJob) {
+	return newProjectionFixtureWithMerge(t, ctx, true)
+}
+
+func newProjectionFixtureWithMerge(t *testing.T, ctx context.Context, includeMerge bool) (*BatchFactoryProjectionService, BatchFactoryBinding, batchfactoryv11.Book, batchfactoryv11.BookAsset, batchfactoryv11.BookAssetImage, batchfactoryv11.ProductionJob, batchfactoryv11.MergeJob) {
 	t.Helper()
 	now := time.Date(2026, 10, 23, 10, 0, 0, 0, time.UTC)
 	canvasStore := NewMemoryStore()
@@ -437,11 +514,12 @@ func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProje
 	batch, err := source.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
 		Title: "作品",
 		InitialBatchSettings: batchfactoryv11.SettingsPatch{
-			"videoProvider": json.RawMessage(`"doubao_local_executor"`),
-			"videoModelId":  json.RawMessage(`"local-doubao-executor-video"`),
-			"textModelId":   json.RawMessage(`"text-model-1"`),
+			"videoProvider":   json.RawMessage(`"doubao_local_executor"`),
+			"videoModelId":    json.RawMessage(`"local-doubao-executor-video"`),
+			"textModelId":     json.RawMessage(`"text-model-1"`),
+			"publishSettings": json.RawMessage(`{"organization":"org-1"}`),
 		},
-		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本书", SourceText: "第一章，雨夜。", Videos: []batchfactoryv11.CreateVideoInput{{Label: "VIDEO 01", VideoPrompt: "雨夜追逐", DurationSeconds: 5}}}},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本书", SourceText: "第一章，雨夜。", SourceMetadata: map[string]any{"contentRangeLines": 12, "websiteSubmitStatus": "uploaded", "websiteSubmitProgress": map[string]any{"message": "视频管理系统已接收并回读确认"}}, Videos: []batchfactoryv11.CreateVideoInput{{Label: "VIDEO 01", VideoPrompt: "雨夜追逐", DurationSeconds: 5}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -463,9 +541,12 @@ func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProje
 	if err != nil {
 		t.Fatal(err)
 	}
-	merge, err := source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "merge-1", AudioSource: "tts", AudioArtifactID: "audio-1", Status: batchfactoryv11.MergeSucceeded, Sources: []batchfactoryv11.MergeMedia{{ProductionJobID: production.ID, VideoID: book.Videos[0].ID, MediaURL: production.Tasks[0].MediaURL, Order: 0}}, OutputURL: "https://cdn.example.com/final.mp4", CreatedAt: now, UpdatedAt: now})
-	if err != nil {
-		t.Fatal(err)
+	var merge batchfactoryv11.MergeJob
+	if includeMerge {
+		merge, err = source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "merge-1", AudioSource: "tts", AudioArtifactID: "audio-1", Status: batchfactoryv11.MergeSucceeded, Sources: []batchfactoryv11.MergeMedia{{ProductionJobID: production.ID, VideoID: book.Videos[0].ID, MediaURL: production.Tasks[0].MediaURL, Order: 0}}, OutputURL: "https://cdn.example.com/final.mp4", CreatedAt: now, UpdatedAt: now})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	service := &BatchFactoryProjectionService{
 		CanvasStore: canvasStore, BatchFactory: source, Now: func() time.Time { return now },
@@ -475,6 +556,16 @@ func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProje
 }
 
 type batchFactoryAudioRecords map[string]BatchFactoryAudioRecord
+
+type projectionMergeStatusReader struct {
+	calls int
+	jobs  []batchfactoryv11.MergeJob
+}
+
+func (r *projectionMergeStatusReader) GetBatchStatus(context.Context, string, string) ([]batchfactoryv11.MergeJob, error) {
+	r.calls++
+	return append([]batchfactoryv11.MergeJob(nil), r.jobs...), nil
+}
 
 type failingProjectionStore struct {
 	*MemoryStore
@@ -516,6 +607,104 @@ func projectedNode(t *testing.T, store Store, ctx context.Context, binding Batch
 	}
 	t.Fatalf("missing projected node %s/%s", resourceType, resourceID)
 	return Node{}
+}
+
+func TestProjectBookIncludesReadyMergeNodeBeforeFirstMerge(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixture(t, ctx)
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+	assets, err := source.ListBookAssets(ctx, "alice", binding.BatchID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	productionJobs, err := source.ListProductionJobs(ctx, "alice", binding.BatchID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	items, edges, err := service.projectBook(ctx, "alice", binding, book, assets, productionJobs, nil, EmptyCanvas(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mergeNode, videoNode Node
+	for _, item := range items {
+		switch item.origin.ResourceType {
+		case "merge":
+			if item.origin.ResourceID == book.ID {
+				mergeNode = item.node
+			}
+		case "video":
+			if item.origin.ResourceID == book.Videos[0].ID {
+				videoNode = item.node
+			}
+		}
+	}
+	if mergeNode.ID == "" || mergeNode.Type != "video" || mergeNode.Config["canMerge"] != true {
+		t.Fatalf("expected a ready final merge node before the first merge, got %+v", mergeNode)
+	}
+	if mergeNode.Config["canPublish"] == true {
+		t.Fatalf("a merge that does not exist cannot be publishable: %+v", mergeNode.Config)
+	}
+	if videoNode.ID == "" {
+		t.Fatal("projected video node is missing")
+	}
+	if !projectionHasEdge(edges, videoNode.ID, mergeNode.ID) {
+		t.Fatalf("expected final merge node to reference completed video %q, edges=%+v", videoNode.ID, edges)
+	}
+}
+
+func TestSyncBatchFactoryBookKeepsFinalNodeStableAfterFirstMerge(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, production, _ := newProjectionFixtureWithMerge(t, ctx, false)
+	first, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
+	if before.Config["canMerge"] != true || before.Config["canPublish"] == true {
+		t.Fatalf("initial final node is not ready for its first merge: %+v", before)
+	}
+
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+	merge, err := source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{
+		Owner: "alice", BatchID: binding.BatchID, BookID: book.ID, RequestID: "merge-first",
+		Status: batchfactoryv11.MergeSucceeded, OutputURL: "https://cdn.example.com/final-first.mp4",
+		Sources:   []batchfactoryv11.MergeMedia{{ProductionJobID: production.ID, VideoID: book.Videos[0].ID, MediaURL: production.Tasks[0].MediaURL, Order: 0}},
+		CreatedAt: time.Date(2026, 10, 23, 10, 1, 0, 0, time.UTC), UpdatedAt: time.Date(2026, 10, 23, 10, 1, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
+	if after.ID != before.ID || after.Position != before.Position || after.Version <= before.Version {
+		t.Fatalf("final node must be updated in place, before=%+v after=%+v", before, after)
+	}
+	if after.AssetRef["id"] != merge.ID || after.Config["mergeJobId"] != merge.ID || after.Config["canPublish"] != true {
+		t.Fatalf("final node did not receive first merge state: %+v", after)
+	}
+	count := 0
+	for _, node := range second.Nodes {
+		if node.ID == before.ID {
+			count++
+		}
+	}
+	if count != 1 || len(second.Nodes) != len(first.Nodes) {
+		t.Fatalf("first merge duplicated final node: before=%d after=%d matching=%d", len(first.Nodes), len(second.Nodes), count)
+	}
+}
+
+func projectionHasEdge(edges []Edge, source, target string) bool {
+	for _, edge := range edges {
+		if edge.Source == source && edge.Target == target {
+			return true
+		}
+	}
+	return false
 }
 
 func assertProjectionEdge(t *testing.T, edges []Edge, source, target string) {

@@ -5,7 +5,7 @@ import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, GitBranch, Group, Hand,
-  ImagePlus, MousePointer2, Music2, Plus, SlidersHorizontal, Ungroup
+  History, ImagePlus, LibraryBig, MousePointer2, Music2, Plus, SlidersHorizontal, Ungroup
 } from 'lucide-react';
 import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,24 +24,27 @@ import {
   readableAssetRequestError, shouldOpenConnectionDrop
 } from '../pages/agent-canvas-context-menu';
 import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences } from '../pages/agent-canvas-connections';
-import { cancelAgentGeneration, cancelAgentVideoJob, confirmAgentGeneration, confirmAgentImageGeneration, confirmAgentVideoJob, createAgentAudioGeneration, createAgentImageGeneration, createAgentScriptSplit, createAgentShotBatchNodes, createAgentTextGeneration, createAgentVideoJob, getAgentGeneration, getAgentVideoJob, listAgentAssets, listAgentGenerations, listAgentScriptShots, listAgentVideoJobs, previewAgentCanvasInputs, removeAgentBatchFactoryNode, retryAgentGeneration, retryAgentVideoJob, syncAgentBatchFactoryBook, uploadAgentAsset } from '../../shared/api/agent';
-import { generateBookAssetImages, runBookStage, saveBookOverride, saveVideoOverride, setPrimaryBookAssetImage, submitBookMerge, updateBookAsset, updateBookSource } from '../../shared/api/batchFactoryV11';
+import { cancelAgentGeneration, cancelAgentVideoJob, confirmAgentGeneration, confirmAgentImageGeneration, confirmAgentVideoJob, createAgentAudioGeneration, createAgentImageGeneration, createAgentImageTool, createAgentScriptSplit, createAgentShotBatchNodes, createAgentTextGeneration, createAgentVideoJob, createAgentVideoTool, getAgentGeneration, getAgentGenerationSummary, getAgentVideoJob, listAgentAssets, listAgentGenerations, listAgentScriptShots, listAgentVideoJobs, previewAgentCanvasInputs, removeAgentBatchFactoryNode, retryAgentGeneration, retryAgentVideoJob, syncAgentBatchFactoryBook, uploadAgentAsset } from '../../shared/api/agent';
+import { generateBookAssetImages, rewriteWorkingFront, runBookStage, saveBookOverride, saveVideoOverride, setPrimaryBookAssetImage, submitBookMerge, submitBookTo121, updateBookAsset, updateBookMetadata, updateBookSource } from '../../shared/api/batchFactoryV11';
 import { listAvailableModels } from '../../shared/api/modelCatalog';
 import { buildNodeGenerationRequest, nextNodeGenerationAttempt, nodeExecutionReview } from '../pages/agent-canvas-node-generation';
 import { audioJobRequestForNode, canSubmitAudioNode } from '../pages/agent-canvas-audio-jobs';
-import { activeGenerationTaskForNode, generationPresentation, latestGenerationTaskForNode, mergeGenerationTask, mergeLatestGenerationTasksByNode, shouldAcceptGenerationResponse, shouldPollGeneration } from '../pages/agent-generation-state';
+import { activeGenerationTaskForNode, generationPresentation, generationSummaryText, latestGenerationTaskForNode, mergeGenerationTask, mergeLatestGenerationTasksByNode, shouldAcceptGenerationResponse, shouldPollGeneration } from '../pages/agent-generation-state';
 import { normalizeNodeConfig, patchNodeConfig } from '../pages/agent-node-config';
 import { inheritedModelSelection, shareModelSelection } from '../pages/agent-canvas-model-selection';
 import { modelInputCapabilityError } from '../pages/agent-model-capabilities';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { retainCanvasAssetPanel, retainCanvasEditorNodeID, viewportHasChanged } from '../pages/agent-canvas-state';
-import { batchFactoryGroupLabel, batchFactoryMappedAction, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, videoNodeTiming } from '../pages/agent-canvas-batch-factory';
+import { batchFactoryGroupLabel, batchFactoryMappedAction, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, latestBookRevision, mappedBatchFactoryBooksNeedingRefresh, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, videoNodeTiming } from '../pages/agent-canvas-batch-factory';
 import { invalidateScriptSplitForSource, normalizeScriptShots, normalizeScriptShotsForConfig, runAfterDurableCanvasSave, scriptShotsByNode as groupScriptShotsByNode, scriptSourceMarker, scriptSplitReady } from '../pages/agent-script-shots';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { AuthenticatedAgentAudio } from './AuthenticatedAgentAudio';
 import { AgentCanvasControls } from './AgentCanvasControls';
+import { AgentGenerationHistoryDrawer } from './AgentGenerationHistoryDrawer';
+import { AgentMaterialLibraryDrawer } from './AgentMaterialLibraryDrawer';
+import { AgentDirectorDeskNode } from './AgentDirectorDeskNode';
 import AgentNodeComposer from './AgentNodeComposer';
 
 function nodeModelInputCapabilityError(node, selectedModel, models) {
@@ -71,11 +74,11 @@ function videoJobGenerationPresentation(job) {
 
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
-  onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onSubmitAudio, onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo,
-  onSelectImageCandidate, onConfirmImage, onSelectAudioCandidate, onConfirmAudio,
+  onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onSubmitAudio, onImageTool, onVideoTool, onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo,
+  onSelectImageCandidate, onConfirmImage, onSelectAudioCandidate, onConfirmAudio, onPublishBatchFactory,
   onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots, scriptState, modelsByKind,
   videoJob, videoState, videoBusy, videoActionError, generationState, models, modelLoadError, inputPreview, onPreviewInputs, timingWarning, taskPresentation,
-  selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas
+  selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas, onSaveDirectorDeskScreenshot
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
   const stopCanvasEvent = event => {
@@ -116,10 +119,13 @@ function CanvasNode({
     onPickReferenceAsset={onPickReferenceAsset}
     onRemoveReference={onRemoveReference}
     onSubmit={nodeType === 'text' ? onSubmitText : nodeType === 'image' ? onSubmitImage : nodeType === 'video' ? (nodeID, modelID, prompt) => onSubmitVideo?.(nodeID, false, modelID, prompt) : onSubmitAudio}
+    onImageTool={onImageTool}
+    onVideoTool={onVideoTool}
     onSelectImageCandidate={onSelectImageCandidate}
     onConfirmImage={onConfirmImage}
     onSelectAudioCandidate={onSelectAudioCandidate}
     onConfirmAudio={onConfirmAudio}
+    onPublishBatchFactory={onPublishBatchFactory}
     onCancelGeneration={onCancelGeneration}
     onRetryGeneration={onRetryGeneration}
     videoJob={videoJob}
@@ -138,7 +144,18 @@ function CanvasNode({
       <div className="agent-canvas-node-preview-shell">
         <Handle type="target" position={Position.Left} className="agent-canvas-node-target" aria-label="连接到此节点" />
         <div className="agent-canvas-node-card">
-          <header><span>{canvasNodeTypeLabel(nodeType)}</span><strong>{data.title}</strong>{sourcePresentation?.sourceLabel ? <Tag color="blue">{sourcePresentation.sourceLabel}</Tag> : null}</header>
+          <header
+            className="agent-canvas-node-card-header"
+            role="button"
+            tabIndex={0}
+            aria-label={`编辑${canvasNodeTypeLabel(nodeType)}节点`}
+            onMouseDown={stopCanvasEvent}
+            onClick={openEditor}
+            onKeyDown={event => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              openEditor(event);
+            }}
+          ><span>{canvasNodeTypeLabel(nodeType)}</span><strong>{data.title}</strong>{sourcePresentation?.sourceLabel ? <Tag color="blue">{sourcePresentation.sourceLabel}</Tag> : null}</header>
           {nodeType === 'image' ? <button type="button" className="agent-canvas-node-image-select nodrag nopan" aria-label="展开图片编辑" onPointerDown={event => { event.preventDefault(); stopCanvasEvent(event); }} onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
             {data.assetRef?.url ? <AuthenticatedAgentImage source={data.assetRef.url} className="agent-canvas-node-media" alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
           </button> : null}
@@ -149,6 +166,13 @@ function CanvasNode({
             <button type="button" onClick={openEditor}>编辑音频</button>
           </div> : null}
           {nodeType === 'audio' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成或添加音频</button> : null}
+          {nodeType === 'director' ? <AgentDirectorDeskNode
+            node={{ id, data }}
+            onConfigChange={onNodeConfigChange}
+            onPickReferenceAsset={onPickReferenceAsset}
+            onRemoveReference={onRemoveReference}
+            onSaveScreenshot={onSaveDirectorDeskScreenshot}
+          /> : null}
           {nodeType === 'text' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.summary || '等待 Agent 写入结果'}</button> : null}
           {nodeType === 'script' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.config?.sourceText || '等待填写剧本正文'}</button> : null}
           <footer><span>v{data.version}</span><span className={`agent-canvas-node-task-state is-${taskPresentation?.state || data.status}`}>{taskPresentation?.errorMessage || taskPresentation?.message || canvasNodeStatusLabel(data.status)}</span>{sourcePresentation?.sourceLabel ? <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onRemoveFromCanvas?.(id); }}>从画布移除</button> : null}</footer>
@@ -170,10 +194,10 @@ function CanvasNodeRenderer(props) {
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
-    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange,
-    submitTextForNode, submitImageForNode, submitVideoForNode, submitAudioForNode,
+    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot,
+    submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
-    changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, canvasInputPreviewByNode, previewInputsForNode, removeBatchFactoryNode
+    changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, canvasInputPreviewByNode, previewInputsForNode, removeBatchFactoryNode
   } = bindings;
   const videoJob = videoJobs[props.id]?.projectId === taskId ? videoJobs[props.id] : null;
   const kind = normalizeCanvasNodeType(props.data?.type);
@@ -207,6 +231,7 @@ function CanvasNodeRenderer(props) {
     ...(mergedGeneration.task ? {
       generationId: mergedGeneration.task.id,
       status: mergedGeneration.task.state,
+      mode: mergedGeneration.task.mode,
       presentation,
       selectedAssetId: mergedGeneration.previewAssetId
     } : {}),
@@ -224,6 +249,7 @@ function CanvasNodeRenderer(props) {
     onPickImageAsset={openImageAssetPicker}
     onPickReferenceAsset={openReferenceAssetPanel}
     onRemoveReference={removeReference}
+    onSaveDirectorDeskScreenshot={saveDirectorDeskScreenshot}
     onNodeConfigChange={handleNodeConfigChange}
     inputPreview={canvasInputPreviewByNode[props.id]}
     onPreviewInputs={previewInputsForNode}
@@ -234,12 +260,15 @@ function CanvasNodeRenderer(props) {
     }).warning : ''}
     onSubmitText={submitTextForNode}
     onSubmitImage={submitImageForNode}
+    onImageTool={submitImageTool}
+    onVideoTool={submitVideoTool}
     onSubmitVideo={submitVideoForNode}
     onSubmitAudio={submitAudioForNode}
     onSelectImageCandidate={selectImageCandidate}
     onConfirmImage={confirmImage}
     onSelectAudioCandidate={selectAudioCandidate}
     onConfirmAudio={confirmAudio}
+    onPublishBatchFactory={publishBatchFactoryMerge}
     onSourceTextChange={changeScriptSource}
     onCommitScriptSource={commitScriptSource}
     onRunBatchFactoryStage={runBatchFactoryScriptStageForNode}
@@ -383,6 +412,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const [generationTasksByNode, setGenerationTasksByNode] = useState({});
   const [generationTasksLoadedTaskID, setGenerationTasksLoadedTaskID] = useState('');
   const [generationTasksLoadError, setGenerationTasksLoadError] = useState('');
+  const [generationSummary, setGenerationSummary] = useState(null);
+  const [generationHistoryOpen, setGenerationHistoryOpen] = useState(false);
+  const [materialLibraryOpen, setMaterialLibraryOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
   const [scriptShotsByNode, setScriptShotsByNode] = useState({});
   const sharedScriptShotsByNode = useMemo(() => groupScriptShotsByNode(scriptShots), [scriptShots]);
@@ -408,7 +440,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const taskIdRef = useRef(taskId);
   const focusedBookGroupRef = useRef('');
   const scriptSourceSaveByNodeRef = useRef({});
+  const batchFactoryStatusPollingRef = useRef(false);
+  const onServerCanvasChangeRef = useRef(onServerCanvasChange);
   taskIdRef.current = taskId;
+  onServerCanvasChangeRef.current = onServerCanvasChange;
+  const pendingMappedBooks = useMemo(() => mappedBatchFactoryBooksNeedingRefresh(nodes), [nodes]);
+  const pendingMappedBookKey = useMemo(() => pendingMappedBooks.map(({ batchId, bookId }) => `${batchId}\u0000${bookId}`).join('\u0001'), [pendingMappedBooks]);
 
   useEffect(() => {
     let active = true;
@@ -529,16 +566,42 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       throw error;
     }
   }
+
+  async function publishBatchFactoryMerge(nodeID) {
+    const requestedTaskId = taskIdRef.current;
+    const node = nodesRef.current.find(item => item.id === nodeID);
+    const action = batchFactoryMappedAction(node);
+    const config = node?.data?.config || {};
+    if (!requestedTaskId || action?.type !== 'merge') return;
+    setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, actionBusy: true, error: '' } }));
+    try {
+      await submitBookTo121(action.batchId, action.bookId, {
+        ...(String(config.publishOrganization || '').trim() ? { organization: String(config.publishOrganization).trim() } : {})
+      });
+      if (requestedTaskId !== taskIdRef.current) return;
+      await syncAgentBatchFactoryBook(requestedTaskId, action.bookId);
+      if (requestedTaskId === taskIdRef.current) await onServerCanvasChange?.();
+    } catch (error) {
+      if (requestedTaskId === taskIdRef.current) {
+        setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], error: error?.message || '上传到视频管理系统失败' } }));
+      }
+    } finally {
+      if (requestedTaskId === taskIdRef.current) {
+        setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: false, actionBusy: false } }));
+      }
+    }
+  }
+
   const canvasNodeContextValue = useMemo(() => ({
     activeEditorNodeID, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels,
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, canvasInputPreviewByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
-    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange,
-    submitTextForNode, submitImageForNode, submitVideoForNode, submitAudioForNode,
+    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot,
+    submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
-    changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, previewInputsForNode, removeBatchFactoryNode
-  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, modelLoadError, nodeGenerationByNode, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitTextForNode, submitVideoForNode, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+    changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, previewInputsForNode, removeBatchFactoryNode
+  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, modelLoadError, nodeGenerationByNode, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -626,6 +689,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     setGenerationTasksByNode({});
     setGenerationTasksLoadedTaskID('');
     setGenerationTasksLoadError('');
+    setGenerationSummary(null);
     setScriptShotsByNode({});
     closeNodeComposer();
     if (!requestedTaskId) return () => { active = false; };
@@ -649,6 +713,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         if (!shouldAcceptGenerationResponse({ requestedTaskId, currentTaskId: taskIdRef.current, active })) return;
         setGenerationTasksLoadError(error?.message || '生成任务状态加载失败，请刷新重试');
       });
+    void refreshGenerationSummary(requestedTaskId, active);
     return () => { active = false; };
   }, [taskId]);
 
@@ -681,9 +746,29 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       }));
       if (!shouldAcceptGenerationResponse({ requestedTaskId, currentTaskId: taskIdRef.current, active })) return;
       setGenerationTasksByNode(current => mergeLatestGenerationTasksByNode(current, updates.filter(Boolean), requestedTaskId));
+      void refreshGenerationSummary(requestedTaskId, active);
     }, 2500);
     return () => { active = false; window.clearTimeout(timer); };
   }, [generationTasksByNode, generationTasksLoadedTaskID, taskId]);
+
+  useEffect(() => {
+    if (!taskId || !pendingMappedBooks.length) return undefined;
+    const requestedTaskId = taskId;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      if (batchFactoryStatusPollingRef.current) return;
+      batchFactoryStatusPollingRef.current = true;
+      try {
+        await Promise.all(pendingMappedBooks.map(({ bookId }) => syncAgentBatchFactoryBook(requestedTaskId, bookId)));
+        if (active && requestedTaskId === taskIdRef.current) await onServerCanvasChangeRef.current?.();
+      } catch (_) {
+        // Keep the existing truthful running state and retry on the next poll.
+      } finally {
+        batchFactoryStatusPollingRef.current = false;
+      }
+    }, 2500);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [pendingMappedBookKey, taskId]);
 
   function emitChange(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
     updateRefs(nextNodes, nextEdges, nextViewport, nextAppearance);
@@ -829,10 +914,10 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   function openReferenceAssetPanel(nodeID, event) {
     const node = nodesRef.current.find(item => item.id === nodeID);
-    if (!taskId || !['image', 'video', 'audio'].includes(node?.data?.type)) return;
+    if (!taskId || !['image', 'video', 'audio', 'director'].includes(node?.data?.type)) return;
     event?.preventDefault();
     event?.stopPropagation();
-    const assetKind = node.data.type === 'image' ? 'image' : node.data.type === 'audio' ? 'audio' : '';
+    const assetKind = node.data.type === 'image' || node.data.type === 'director' ? 'image' : node.data.type === 'audio' ? 'audio' : '';
     const panel = { assetKind, mode: 'node-reference', nodeID, position: { x: 0, y: 0 }, anchor: imageAssetPanelAnchor(event) };
     window.requestAnimationFrame(() => setAssetPanel(panel));
     setAssetLoading(true);
@@ -886,7 +971,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     if (scriptSourceSaveByNodeRef.current[nodeID]) return scriptSourceSaveByNodeRef.current[nodeID];
     const save = (async () => {
       try {
-        await updateBookSource(config.batchId, config.bookId, {
+        const saved = await updateBookSource(config.batchId, config.bookId, {
           sourceText: String(sourceText || '').trim(),
           replaceSource: true,
           expectedRevision: Number(config.resourceRevision || 0)
@@ -894,6 +979,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         if (requestedTaskId !== taskIdRef.current) return;
         await syncAgentBatchFactoryBook(requestedTaskId, config.bookId);
         if (requestedTaskId === taskIdRef.current) await onServerCanvasChange?.();
+        return saved?.book || saved;
       } catch (error) {
         if (requestedTaskId === taskIdRef.current) {
           setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], error: error?.message || '剧本正文保存失败' } }));
@@ -909,9 +995,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     }
   }
 
-  async function runBatchFactoryScriptStageForNode(nodeID, stage, textModelID = '') {
+  async function runBatchFactoryScriptStageForNode(nodeID, stage, textModelID = '', options = {}) {
     const requestedTaskId = taskIdRef.current;
-    await scriptSourceSaveByNodeRef.current[nodeID];
+    const savedSource = await scriptSourceSaveByNodeRef.current[nodeID];
     const node = nodesRef.current.find(item => item.id === nodeID && item.data?.type === 'script');
     const action = batchFactoryMappedAction(node);
     const config = node?.data?.config || {};
@@ -919,16 +1005,41 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, actionBusy: true, error: '' } }));
     try {
       const selectedModelID = String(textModelID || config.modelId || config.textModelId || '').trim();
+      let currentRevision = latestBookRevision(savedSource, config.resourceRevision);
+      const contentRangeLines = Math.min(500, Math.max(1, Number(options.contentRangeLines) || Number(config.contentRangeLines) || 5));
       if (selectedModelID) {
-        await saveBookOverride(action.batchId, action.bookId, {
+        const savedSettings = await saveBookOverride(action.batchId, action.bookId, {
           patch: { textModelId: selectedModelID },
-          expectedRevision: Number(config.resourceRevision || 0)
+          expectedRevision: currentRevision
         });
+        currentRevision = latestBookRevision(savedSettings, currentRevision);
+      }
+      if (stage === 'settings' || contentRangeLines !== Number(config.contentRangeLines || 5)) {
+        const savedMetadata = await updateBookMetadata(action.batchId, action.bookId, {
+          metadataPatch: { contentRangeLines },
+          expectedRevision: currentRevision
+        });
+        currentRevision = latestBookRevision(savedMetadata, currentRevision);
+      }
+      if (stage === 'viral') {
+        const result = await rewriteWorkingFront(action.batchId, action.bookId, String(options.sourceText || config.sourceText || ''), {
+          textModelId: selectedModelID
+        });
+        if (requestedTaskId !== taskIdRef.current) return null;
+        await syncAgentBatchFactoryBook(requestedTaskId, action.bookId);
+        if (requestedTaskId === taskIdRef.current) await onServerCanvasChange?.();
+        return { candidate: String(result?.candidate || '').trim() };
+      }
+      if (stage === 'settings') {
+        await syncAgentBatchFactoryBook(requestedTaskId, action.bookId);
+        if (requestedTaskId === taskIdRef.current) await onServerCanvasChange?.();
+        return true;
       }
       await runMappedBatchFactoryScriptStage({
         action,
         stage,
         requestId: mappedActionRequestID(action),
+        options: { contentRangeLines },
         runStage: runBookStage
       });
       if (requestedTaskId !== taskIdRef.current) return true;
@@ -1033,6 +1144,17 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   function mergeGenerationForProject(projectID, generation) {
     if (!generation || !shouldAcceptGenerationResponse({ requestedTaskId: projectID, currentTaskId: taskIdRef.current })) return;
     setGenerationTasksByNode(current => mergeLatestGenerationTasksByNode(current, [generation], projectID));
+    void refreshGenerationSummary(projectID);
+  }
+
+  async function refreshGenerationSummary(projectID, active = true) {
+    try {
+      const result = await getAgentGenerationSummary(projectID);
+      if (!shouldAcceptGenerationResponse({ requestedTaskId: projectID, currentTaskId: taskIdRef.current, active })) return;
+      setGenerationSummary(result?.summary || null);
+    } catch (_) {
+      // The per-node list remains usable when the optional compact summary is unavailable.
+    }
   }
 
   async function refreshGenerationTasks(projectID) {
@@ -1042,6 +1164,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       setGenerationTasksByNode(current => mergeLatestGenerationTasksByNode(current, result?.tasks, projectID));
       setGenerationTasksLoadedTaskID(projectID);
       setGenerationTasksLoadError('');
+	  void refreshGenerationSummary(projectID);
 	  return result?.tasks || [];
     } catch (error) {
       if (shouldAcceptGenerationResponse({ requestedTaskId: projectID, currentTaskId: taskIdRef.current })) {
@@ -1118,6 +1241,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
           });
           break;
         case 'merge':
+          if (!action.canMerge) throw new Error(action.mergeReason || '等待所有分镜视频生成完成');
           await submitBookMerge(action.batchId, action.bookId, { requestId });
           break;
         case 'audio':
@@ -1233,6 +1357,76 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
           ? { ...current[nodeID], busy: false, error: '', phase: '', attempt: attempt + 1, generationId: latestTask.id, status: latestTask.state }
           : { ...current[nodeID], busy: false, error: error?.message || '图片生成失败', phase: '', attempt: attempt + 1 }
       }));
+    }
+  }
+
+  async function submitImageTool(nodeID, input) {
+    const requestedTaskId = taskId;
+    const node = nodesRef.current.find(item => item.id === nodeID);
+    if (!requestedTaskId || node?.data?.type !== 'image' || !input?.sourceAssetId) return;
+    const latestTasks = await refreshGenerationTasks(requestedTaskId);
+    if (requestedTaskId !== taskIdRef.current) return;
+    const latestTask = latestGenerationTaskForNode(latestTasks, nodeID, 'image');
+    const attempt = nextNodeGenerationAttempt({ localAttempt: nodeGenerationByNode[nodeID]?.attempt, task: latestTask || generationTasksByNode[nodeID], nodeId: nodeID, kind: 'image' });
+    setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], busy: true, error: '', phase: '正在提交图片编辑任务' } }));
+    try {
+      const task = await createAgentImageTool(requestedTaskId, {
+        ...input,
+        nodeId: nodeID,
+        nodeVersion: Number(node.data.version) || 0,
+        idempotencyKey: `agent-image-tool:${requestedTaskId}:${nodeID}:${Number(node.data.version) || 0}:${input.operation}:${Date.now()}:${attempt}`
+      });
+      if (requestedTaskId !== taskIdRef.current) return;
+      mergeGenerationForProject(requestedTaskId, task.task);
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: {
+        ...current[nodeID], busy: false, error: '', phase: '', attempt, generationId: task.task?.id || '', status: task.task?.state || 'queued', candidates: [], selectedAssetId: ''
+      } }));
+    } catch (error) {
+      if (requestedTaskId !== taskIdRef.current) return;
+      const tasks = await refreshGenerationTasks(requestedTaskId);
+      const activeTask = activeGenerationTaskForNode(tasks, nodeID, 'image');
+      setNodeGenerationByNode(current => ({ ...current, [nodeID]: activeTask
+        ? { ...current[nodeID], busy: false, error: '', phase: '', attempt, generationId: activeTask.id, status: activeTask.state }
+        : { ...current[nodeID], busy: false, error: error?.message || '图片编辑提交失败', phase: '', attempt: attempt + 1 }
+      }));
+    }
+  }
+
+  async function submitVideoTool(nodeID, input) {
+    const requestedTaskId = taskId;
+    const source = nodesRef.current.find(item => item.id === nodeID && item.data?.type === 'video');
+    const sourceAssetId = String(input?.sourceAssetId || '').trim();
+    const targetKind = input?.operation === 'extract_frames' ? 'image' : input?.operation === 'separate_audio' ? 'audio' : 'video';
+    if (!requestedTaskId || !source || !sourceAssetId) return;
+    const labels = { trim: '视频剪辑结果', crop: '视频裁剪结果', extract_frames: '视频抽帧结果', separate_audio: '视频原声音频' };
+    const target = createNodeAt({
+      id: nextCanvasID(targetKind), kind: targetKind,
+      position: { x: (Number(source.position?.x) || 0) + 390, y: Number(source.position?.y) || 0 },
+      config: inheritedModelSelection(nodesRef.current, targetKind)
+    });
+    target.data.title = labels[input.operation] || '视频处理结果';
+    target.data.sourceNodeIds = [source.id];
+    const edge = toFlowEdge({ id: `edge-${source.id}-${target.id}-processing`, source: source.id, target: target.id, relation: 'reference' }, appearanceRef.current);
+    const nextEdges = edgesRef.current.concat(edge);
+    const nextNodes = syncCanvasEffectiveReferences(nodesRef.current.map(node => ({ ...node, selected: false })).concat(target), nextEdges);
+    setSelectedIds([target.id]);
+    onSelectionChange?.([target.id]);
+    commit(nextNodes, nextEdges);
+    setNodeGenerationByNode(current => ({ ...current, [target.id]: { busy: true, error: '', phase: '正在保存视频处理任务' } }));
+    try {
+      const result = await runAfterDurableCanvasSave(onFlushCanvas, () => createAgentVideoTool(requestedTaskId, {
+        ...input,
+        nodeId: target.id,
+        nodeVersion: Number(target.data.version) || 1,
+        idempotencyKey: `agent-video-tool:${requestedTaskId}:${target.id}:${input.operation}:${Date.now()}`
+      }));
+      if (requestedTaskId !== taskIdRef.current) return;
+      mergeGenerationForProject(requestedTaskId, result.task);
+      setNodeGenerationByNode(current => ({ ...current, [target.id]: { busy: false, error: '', phase: '', generationId: result.task?.id || '', status: result.task?.state || 'queued', candidates: [], selectedAssetId: '' } }));
+      setActiveEditorNodeID(target.id);
+    } catch (error) {
+      if (requestedTaskId !== taskIdRef.current) return;
+      setNodeGenerationByNode(current => ({ ...current, [target.id]: { ...current[target.id], busy: false, error: error?.message || '视频处理任务提交失败', phase: '' } }));
     }
   }
 
@@ -1356,7 +1550,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   async function cancelGeneration(nodeID) {
     const requestedTaskId = taskId;
     const task = generationTasksByNode[nodeID];
-    if (!requestedTaskId || !task || task.kind === 'video') return;
+    if (!requestedTaskId || !task || (task.kind === 'video' && !String(task.mode || '').startsWith('video_'))) return;
     setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], actionBusy: true, error: '' } }));
     try {
       const result = await cancelAgentGeneration(requestedTaskId, task.id);
@@ -1379,7 +1573,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       return;
     }
     const task = generationTasksByNode[nodeID];
-    if (!requestedTaskId || !task || task.kind === 'video') return;
+    if (!requestedTaskId || !task || (task.kind === 'video' && !String(task.mode || '').startsWith('video_'))) return;
     setNodeGenerationByNode(current => ({ ...current, [nodeID]: { ...current[nodeID], actionBusy: true, error: '' } }));
     try {
       const result = await retryAgentGeneration(requestedTaskId, task.id, makeGenerationRetryIdempotencyKey());
@@ -1960,6 +2154,35 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     commit(nextNodes, edgesRef.current);
   }
 
+  async function saveDirectorDeskScreenshot(nodeID, file) {
+    const requestedTaskId = taskIdRef.current;
+    const source = nodesRef.current.find(node => node.id === nodeID && node.data?.type === 'director');
+    if (!requestedTaskId || !source || !(file instanceof File)) throw new Error('导演台预演图无法保存');
+    try {
+      const result = await uploadAgentAsset(requestedTaskId, file);
+      if (requestedTaskId !== taskIdRef.current) return;
+      const asset = result?.asset;
+      if (!asset?.id || asset.kind !== 'image') throw new Error('预演图保存失败');
+      const imageNode = createNodeAt({
+        id: nextCanvasID('image'),
+        kind: 'image',
+        asset,
+        position: { x: (Number(source.position?.x) || 0) + 374, y: Number(source.position?.y) || 0 },
+        config: inheritedModelSelection(nodesRef.current, 'image')
+      });
+      const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(imageNode);
+      const edge = createTypedCanvasEdge({ source: source.id, target: imageNode.id }, nextNodes);
+      const nextEdges = edge ? connectCanvasNodes(edgesRef.current, edge) : edgesRef.current;
+      setSelectedIds([imageNode.id]);
+      onSelectionChange?.([imageNode.id]);
+      commit(syncCanvasEffectiveReferences(nextNodes, nextEdges), nextEdges);
+      message.success('预演图已加入项目素材和画布');
+    } catch (error) {
+      message.error(error?.message || '预演图保存失败');
+      throw error;
+    }
+  }
+
   function canvasCenterPosition() {
     const bounds = rootRef.current?.getBoundingClientRect();
     if (!bounds || !flowInstance?.screenToFlowPosition) return { x: 80, y: 80 };
@@ -2100,6 +2323,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       </CanvasNodeContext.Provider>
 
       {generationTasksLoadError ? <p className="agent-canvas-global-error" role="alert">{generationTasksLoadError}</p> : null}
+      {generationSummary ? <p className="agent-canvas-generation-summary" role="status" aria-live="polite">{generationSummaryText(generationSummary)}</p> : null}
 
       {connectionDropMenu ? <section className="agent-canvas-connection-drop-menu" aria-label="新建后续节点" style={{ left: connectionDropMenu.left, top: connectionDropMenu.top }}>
         <strong>新建后续节点</strong>
@@ -2147,12 +2371,13 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
           <button type="button" role="menuitem" disabled={!historyRef.current.canUndo()} onClick={() => { applyHistory('undo'); setContextMenu(null); }}>撤销</button>
           <button type="button" role="menuitem" disabled={!historyRef.current.canRedo()} onClick={() => { applyHistory('redo'); setContextMenu(null); }}>重做</button>
           {contextMenuSubmenu ? <section className="agent-canvas-context-submenu" role="menu" aria-label="画布右键子菜单">
-            {contextMenuSubmenu === 'create' ? <>
+          {contextMenuSubmenu === 'create' ? <>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('script')}>新建剧本</button>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('text')}>新建文本</button>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('image')}>新建图片</button>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('video')}>新建视频</button>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('audio')}>新建音频</button>
+              <button type="button" role="menuitem" onClick={() => handleContextCreate('director')}>新建导演台</button>
             </> : null}
             {contextMenuSubmenu === 'assets' ? <>
               <button type="button" role="menuitem" onClick={() => openAssetPanel('image')}>图片</button>
@@ -2218,10 +2443,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         <IconTool label="拖动画布" active={interactionMode === 'pan'} onClick={() => setInteractionMode('pan')}><Hand size={17} /></IconTool>
         <IconTool label="连接节点" active={interactionMode === 'connect'} onClick={() => setInteractionMode('connect')}><GitBranch size={17} /></IconTool>
         <Dropdown trigger={['click']} menu={{ items: [
-          { key: 'script', label: '新建剧本' }, { key: 'text', label: '新建文本' }, { key: 'image', label: '新建图片' }, { key: 'video', label: '新建视频' }, { key: 'audio', label: '新建音频' }
+          { key: 'script', label: '新建剧本' }, { key: 'text', label: '新建文本' }, { key: 'image', label: '新建图片' }, { key: 'video', label: '新建视频' }, { key: 'audio', label: '新建音频' }, { key: 'director', label: '新建导演台' }
         ], onClick: ({ key }) => addNode(key) }}>
           <span><IconTool label="添加节点"><Plus size={17} /></IconTool></span>
         </Dropdown>
+        <span data-agent-generation-history-entry><IconTool label="打开生成历史" onClick={() => setGenerationHistoryOpen(true)}><History size={17} /></IconTool></span>
+        <span data-agent-material-library-entry><IconTool label="打开素材库" onClick={() => setMaterialLibraryOpen(true)}><LibraryBig size={17} /></IconTool></span>
         <Popover trigger="click" placement="rightTop" overlayClassName="agent-canvas-appearance-popover" content={<section className="agent-canvas-appearance-panel" aria-label="画布外观设置">
           <div className="agent-canvas-appearance-row"><span>连线颜色</span><div className="agent-canvas-color-options">{canvasEdgeColorOptions.map(option => <button key={option.value} type="button" className={`agent-canvas-color-swatch is-${option.value}${appearance.edgeColor === option.value ? ' is-active' : ''}`} aria-label={option.label} aria-pressed={appearance.edgeColor === option.value} onClick={() => updateAppearance({ edgeColor: option.value })} />)}</div></div>
           <div className="agent-canvas-appearance-row"><span>连线动效</span><Switch size="small" checked={appearance.edgeAnimated} onChange={edgeAnimated => updateAppearance({ edgeAnimated })} /></div>
@@ -2232,6 +2459,25 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
           <span><IconTool label="画布外观"><SlidersHorizontal size={17} /></IconTool></span>
         </Popover>
       </nav>
+
+      <AgentGenerationHistoryDrawer
+        open={generationHistoryOpen}
+        onClose={() => setGenerationHistoryOpen(false)}
+        currentProjectId={taskId}
+        onInserted={() => {
+          setGenerationHistoryOpen(false);
+          void onServerCanvasChange?.();
+        }}
+      />
+      <AgentMaterialLibraryDrawer
+        open={materialLibraryOpen}
+        onClose={() => setMaterialLibraryOpen(false)}
+        currentProjectId={taskId}
+        onInserted={() => {
+          setMaterialLibraryOpen(false);
+          void onServerCanvasChange?.();
+        }}
+      />
 
       {selectedIds.length > 0 ? <nav className="agent-canvas-editbar" aria-label="节点编辑工具">
         <IconTool label={availability.canGroup ? '分组' : availability.groupReason} disabled={!availability.canGroup} onClick={() => runNodeCommand(current => groupCanvasNodes(current, selectedIds, `group-${Date.now()}`))}><Group size={17} /></IconTool>

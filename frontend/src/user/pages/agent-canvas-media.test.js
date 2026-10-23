@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getAgentAssetBlob } from '../../shared/api/agent.js';
-import { createAuthenticatedMediaSession, createAuthenticatedMediaStore } from './agent-canvas-media.js';
+import { createAuthenticatedMediaSession, createAuthenticatedMediaStore, nextAuthenticatedMediaRetryAttempt } from './agent-canvas-media.js';
 
 function deferred() {
   let resolve;
@@ -14,6 +14,13 @@ function deferred() {
 function flushPromises() {
   return new Promise(resolve => setImmediate(resolve));
 }
+
+test('protected media retries a bounded number of times when a just-created artifact is not readable yet', () => {
+  assert.equal(nextAuthenticatedMediaRetryAttempt('/api/agent/tasks/p/batch-factory/nodes/n/media', 0), 1);
+  assert.equal(nextAuthenticatedMediaRetryAttempt('/api/agent/tasks/p/batch-factory/nodes/n/media', 1), 2);
+  assert.equal(nextAuthenticatedMediaRetryAttempt('/api/agent/tasks/p/batch-factory/nodes/n/media', 2), null);
+  assert.equal(nextAuthenticatedMediaRetryAttempt('', 0), null);
+});
 
 test('Agent asset video is fetched through the authenticated API client', async t => {
   const originalLocalStorage = globalThis.localStorage;

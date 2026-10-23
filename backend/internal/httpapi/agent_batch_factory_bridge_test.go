@@ -385,6 +385,31 @@ func TestBatchFactoryProjectionMediaReadUsesCanonicalBookID(t *testing.T) {
 	}
 }
 
+func TestBatchFactoryProjectionMediaReadsMergeByCurrentMergeVersion(t *testing.T) {
+	ctx := context.Background()
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	const mediaURL = "https://media.example/final.mp4"
+	merge, err := batches.CreateMergeJob(ctx, batchfactoryv11.MergeJob{
+		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "merge", Status: batchfactoryv11.MergeSucceeded, OutputURL: mediaURL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	media, err := agentBatchFactoryProjectionMediaURL(ctx, batches, "alice", batch.ID, book.ID,
+		agentworkspace.BatchFactoryNodeOrigin{ResourceType: "merge", ResourceID: book.ID},
+		agentworkspace.Node{AssetRef: map[string]any{"id": merge.ID}},
+	)
+	if err != nil || media != mediaURL {
+		t.Fatalf("media=%q err=%v, want current merge output %q", media, err, mediaURL)
+	}
+}
+
 func TestBatchFactoryProjectionMediaReadsLocalExecutorImageArtifact(t *testing.T) {
 	now := time.Date(2026, 10, 23, 21, 55, 0, 0, time.UTC)
 	batches := batchfactoryv11.NewMemoryStore()

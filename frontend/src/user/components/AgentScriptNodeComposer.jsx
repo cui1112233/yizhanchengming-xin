@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input, Segmented } from 'antd';
+import { Button, Checkbox, Input, InputNumber, Segmented } from 'antd';
 import { AudioLines, Image, Scissors, Video } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { buildShotBatchPayload, scriptSplitReady, selectedShotIDs } from '../pages/agent-script-shots';
@@ -53,7 +53,11 @@ export default function AgentScriptNodeComposer({
   const [batchBusyKind, setBatchBusyKind] = useState('');
   const [batchFactoryStage, setBatchFactoryStage] = useState('');
   const [batchFactoryError, setBatchFactoryError] = useState('');
+  const [batchFactoryRangeLines, setBatchFactoryRangeLines] = useState(() => Math.min(500, Math.max(1, Number(config.contentRangeLines) || 5)));
+  const [viralCandidate, setViralCandidate] = useState('');
   useEffect(() => setDraftSource(sourceText), [node?.id, sourceText]);
+  useEffect(() => setBatchFactoryRangeLines(Math.min(500, Math.max(1, Number(config.contentRangeLines) || 5))), [node?.id, config.contentRangeLines]);
+  useEffect(() => setViralCandidate(''), [node?.id, sourceText]);
 
   const shots = Array.isArray(scriptState.shots) ? scriptState.shots : emptyShots;
   useEffect(() => {
@@ -111,9 +115,30 @@ export default function AgentScriptNodeComposer({
     setBatchFactoryError('');
     setBatchFactoryStage(stage);
     try {
-      await onRunBatchFactoryStage?.(node.id, stage, splitModel.modelId);
+      const result = await onRunBatchFactoryStage?.(node.id, stage, splitModel.modelId, {
+        contentRangeLines: batchFactoryRangeLines,
+        sourceText: draftSource
+      });
+      if (stage === 'viral') setViralCandidate(String(result?.candidate || '').trim());
     } catch (error) {
       setBatchFactoryError(error?.message || '批量工厂步骤提交失败');
+    } finally {
+      setBatchFactoryStage('');
+    }
+  }
+
+  async function adoptViralCandidate() {
+    const nextSource = viralCandidate.trim();
+    if (!nextSource || batchFactoryStage) return;
+    setBatchFactoryError('');
+    setBatchFactoryStage('adopt-viral');
+    try {
+      setDraftSource(nextSource);
+      onSourceTextChange?.(node.id, nextSource);
+      await onCommitSource?.(node.id, nextSource);
+      setViralCandidate('');
+    } catch (error) {
+      setBatchFactoryError(error?.message || '采用爆款候选失败');
     } finally {
       setBatchFactoryStage('');
     }
@@ -164,7 +189,25 @@ export default function AgentScriptNodeComposer({
         <h4><span>批</span>批量工厂</h4>
         <span>结果会同步到本书的图片和视频卡</span>
       </div>
-      <div className="agent-script-step__generate-controls">
+      <div className="agent-script-step__generate-controls agent-script-step__batch-factory-controls">
+        <label>
+          <span>生产正文行数</span>
+          <InputNumber
+            aria-label="生产正文行数"
+            min={1}
+            max={500}
+            precision={0}
+            value={batchFactoryRangeLines}
+            disabled={Boolean(batchFactoryStage)}
+            onChange={value => setBatchFactoryRangeLines(Math.min(500, Math.max(1, Number(value) || 5)))}
+          />
+        </label>
+        <Button
+          size="small"
+          loading={batchFactoryStage === 'settings'}
+          disabled={Boolean(batchFactoryStage) || !draftSource.trim()}
+          onClick={() => runBatchFactoryStage('settings')}
+        >保存行数</Button>
         <Button
           type="primary"
           size="small"
@@ -178,7 +221,17 @@ export default function AgentScriptNodeComposer({
           disabled={Boolean(batchFactoryStage) || !draftSource.trim()}
           onClick={() => runBatchFactoryStage('director')}
         >生成视频分镜</Button>
+        <Button
+          size="small"
+          loading={batchFactoryStage === 'viral'}
+          disabled={Boolean(batchFactoryStage) || !draftSource.trim()}
+          onClick={() => runBatchFactoryStage('viral')}
+        >生成爆款候选</Button>
       </div>
+      {viralCandidate ? <div className="agent-script-step__candidate">
+        <Input.TextArea aria-label="爆款候选正文" value={viralCandidate} readOnly autoSize={{ minRows: 3, maxRows: 8 }} />
+        <Button size="small" type="primary" loading={batchFactoryStage === 'adopt-viral'} disabled={Boolean(batchFactoryStage)} onClick={adoptViralCandidate}>采用候选</Button>
+      </div> : null}
       {batchFactoryError ? <span className="agent-node-composer__state is-error" role="alert">{batchFactoryError}</span> : null}
     </section> : null}
 

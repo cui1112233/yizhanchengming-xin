@@ -1,5 +1,13 @@
 import { getAgentAssetBlob } from '../../shared/api/agent.js';
 
+export const AUTHENTICATED_MEDIA_AUTO_RETRY_LIMIT = 2;
+
+export function nextAuthenticatedMediaRetryAttempt(source, currentAttempt) {
+  if (!String(source || '').trim()) return null;
+  const attempt = Number.isInteger(currentAttempt) && currentAttempt >= 0 ? currentAttempt : 0;
+  return attempt < AUTHENTICATED_MEDIA_AUTO_RETRY_LIMIT ? attempt + 1 : null;
+}
+
 export function createAuthenticatedMediaStore({
   loadBlob = getAgentAssetBlob,
   createObjectUrl = blob => URL.createObjectURL(blob),
