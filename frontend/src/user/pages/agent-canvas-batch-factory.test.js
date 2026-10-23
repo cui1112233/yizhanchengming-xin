@@ -75,3 +75,16 @@ test('does not remove or refresh after the active task changes during flush', as
   });
   assert.deepEqual(calls, ['flush']);
 });
+
+test('stops before later mapped deletes when an earlier delete changes the active task', async () => {
+  const calls = [];
+  let current = true;
+  await removeBatchFactoryCanvasNodes({
+    taskId: 'agent-1',
+    nodeIds: ['node-1', 'node-2'],
+    remove: async (_taskId, nodeId) => { calls.push(`remove:${nodeId}`); current = false; },
+    refresh: async () => calls.push('refresh'),
+    isCurrent: () => current
+  });
+  assert.deepEqual(calls, ['remove:node-1']);
+});

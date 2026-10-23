@@ -50,7 +50,10 @@ export async function removeBatchFactoryCanvasNodes({ taskId, nodeIds, flush, re
   if (!taskId || !ids.length) return;
   await flush?.();
   if (!isCurrent()) return;
-  await Promise.all(ids.map(nodeId => remove(taskId, nodeId)));
+  for (const nodeId of ids) {
+    if (!isCurrent()) return;
+    await remove(taskId, nodeId);
+  }
   if (!isCurrent()) return;
   await refresh?.();
 }
