@@ -6,6 +6,7 @@ const BASE = '/api/batch-factory/v12';
 const LOCAL_EXECUTOR_ARTIFACT_PREFIX = '/api/shuihuo-production/local-executor-artifacts/';
 const LOCAL_MERGE_MEDIA_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/merge-media\/[^/]+$/;
 const LOCAL_MERGE_COVER_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/merge-cover\/[^/]+$/;
+const BOOK_ASSET_IMAGE_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/books\/[^/]+\/assets\/[^/]+\/images\/[^/]+\/content$/;
 
 function id(value) {
   return encodeURIComponent(String(value ?? ''));
@@ -23,6 +24,12 @@ function query(params = {}) {
   }
   const suffix = search.toString();
   return suffix ? `?${suffix}` : '';
+}
+
+async function productionRetentionDays() {
+  const config = await apiRequest('/api/config');
+  const days = Number(config?.productionRetentionDays);
+  return [3, 7, 14, 30].includes(days) ? days : 3;
 }
 
 function localExecutorArtifactRequestPath(value) {
@@ -70,6 +77,27 @@ function mergeCoverRequestPath(value) {
   }
 }
 
+function bookAssetImageRequestPath(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('/')) {
+    try {
+      const parsed = new URL(raw, 'http://qiantie.local');
+      return BOOK_ASSET_IMAGE_PATTERN.test(parsed.pathname) ? `${parsed.pathname}${parsed.search}` : '';
+    } catch (_) {
+      return '';
+    }
+  }
+  if (typeof window === 'undefined' || !window.location?.origin) return '';
+  try {
+    const parsed = new URL(raw, window.location.origin);
+    if (parsed.origin !== window.location.origin || !BOOK_ASSET_IMAGE_PATTERN.test(parsed.pathname)) return '';
+    return `${parsed.pathname}${parsed.search}`;
+  } catch (_) {
+    return '';
+  }
+}
+
 export function isProtectedProductionMediaURL(value) {
   return Boolean(localExecutorArtifactRequestPath(value));
 }
@@ -90,6 +118,12 @@ export function isBatchFactoryMergeCoverURL(value) {
 export function getBatchFactoryMergeCoverBlob(coverUrl) {
   const path = mergeCoverRequestPath(coverUrl);
   if (!path) return Promise.reject(new Error('Merge cover URL is not a local Batch Factory cover artifact'));
+  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+}
+
+export function getBookAssetImageBlob(imageUrl) {
+  const path = bookAssetImageRequestPath(imageUrl);
+  if (!path) return Promise.reject(new Error('Book asset image URL is not a local Batch Factory asset image'));
   return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
 }
 
@@ -185,12 +219,18 @@ export function getBatch(batchId) {
   return apiRequest(bf11Path(`batches/${id(batchId)}`));
 }
 
-export function deleteBatchFactoryBook(batchId, bookId) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}`), { method: 'DELETE' });
+export function bindBatchFactoryAgentProject(batchId) {
+  return apiRequest(`/api/batch-factory/v11/batches/${id(batchId)}/agent-project`, { method: 'POST' });
 }
 
-export function deleteBatchFactoryProject(batchId) {
-  return apiRequest(bf11Path(`batches/${id(batchId)}`), { method: 'DELETE' });
+export async function deleteBatchFactoryBook(batchId, bookId) {
+  const retentionDays = await productionRetentionDays();
+  return apiRequest(`${bf11Path(`batches/${id(batchId)}/books/${id(bookId)}`)}${query({ retentionDays })}`, { method: 'DELETE' });
+}
+
+export async function deleteBatchFactoryProject(batchId) {
+  const retentionDays = await productionRetentionDays();
+  return apiRequest(`${bf11Path(`batches/${id(batchId)}`)}${query({ retentionDays })}`, { method: 'DELETE' });
 }
 
 export function updateBookSource(batchId, bookId, input) {
@@ -342,6 +382,35 @@ export function approveHook(batchId, bookId, hookId) {
 
 export function runDirector(batchId, bookId) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/director`), { method: 'POST', body: body({}) });
+}
+
+function directorPromptCandidatePath(batchId, bookId) {
+  return `/api/batch-factory/v11/batches/${id(batchId)}/books/${id(bookId)}/director-prompt-candidate`;
+}
+
+export function createDirectorPromptCandidate(batchId, bookId, expectedRevision) {
+  return apiRequest(directorPromptCandidatePath(batchId, bookId), {
+    method: 'POST',
+    body: body({ expectedRevision: Number(expectedRevision || 0) })
+  });
+}
+
+export function getDirectorPromptCandidate(batchId, bookId) {
+  return apiRequest(directorPromptCandidatePath(batchId, bookId), { silent: true, suppressGlobalError: true });
+}
+
+export function acceptDirectorPromptCandidate(batchId, bookId, videoId, candidateId, expectedRevision) {
+  return apiRequest(`/api/batch-factory/v11/batches/${id(batchId)}/books/${id(bookId)}/videos/${id(videoId)}/director-prompt-candidate/accept`, {
+    method: 'POST',
+    body: body({ candidateId, expectedRevision: Number(expectedRevision || 0) })
+  });
+}
+
+export function cancelDirectorPromptCandidate(batchId, bookId, expectedRevision) {
+  return apiRequest(directorPromptCandidatePath(batchId, bookId), {
+    method: 'DELETE',
+    body: body({ expectedRevision: Number(expectedRevision || 0) })
+  });
 }
 
 export function runH3Director(batchId, bookId, payload) {
@@ -565,6 +634,7 @@ export function getPublishAudits(provider, intentId) {
 
 export default {
   getCapabilities,
+  getBookAssetImageBlob,
   generateConfiguredImage,
   createNovelFetchIntake,
   getIntake,
@@ -576,6 +646,7 @@ export default {
   fetchBookOriginal,
   backfillBatch121Metadata,
   getBatch,
+  bindBatchFactoryAgentProject,
   updateBookSource,
   saveBatchSettings,
   saveBookOverride,

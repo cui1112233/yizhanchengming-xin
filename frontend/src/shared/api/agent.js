@@ -36,6 +36,22 @@ export function getAgentCanvas(taskId) {
   return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/canvas`);
 }
 
+export function getAgentBatchFactoryBinding(taskId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/batch-factory`);
+}
+
+export function syncAgentBatchFactoryBook(taskId, bookId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/batch-factory/books/${encodeURIComponent(bookId)}/sync`, {
+    method: 'POST'
+  });
+}
+
+export function removeAgentBatchFactoryNode(taskId, nodeId) {
+  return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/batch-factory/nodes/${encodeURIComponent(nodeId)}`, {
+    method: 'DELETE'
+  });
+}
+
 export function saveAgentCanvas(taskId, canvas, revision) {
   return apiRequest(`/api/agent/tasks/${encodeURIComponent(taskId)}/canvas`, {
     method: 'PATCH',
@@ -77,9 +93,14 @@ export function createAgentImageGeneration(taskId, payload, request = apiRequest
   });
 }
 
-export function previewAgentCanvasInputs(taskId, nodeId, request = apiRequest) {
+export function previewAgentCanvasInputs(taskId, input, request = apiRequest) {
+  const payload = typeof input === 'string' ? { nodeId: input } : {
+    nodeId: String(input?.nodeId || '').trim(),
+    provider: String(input?.provider || '').trim(),
+    modelId: String(input?.modelId || '').trim()
+  };
   return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/canvas-inputs/preview`, {
-    method: 'POST', body: JSON.stringify({ nodeId }), suppressGlobalError: true
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
   });
 }
 

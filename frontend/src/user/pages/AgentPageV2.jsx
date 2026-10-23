@@ -1,7 +1,7 @@
 import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { ArrowRight, ArrowUp, Bot, ChevronDown, ChevronUp, Clock3, FilePenLine, FileText, Film, Image as ImageIcon, MessageCircle, MoreHorizontal, Music, Paperclip, Pin, RotateCcw, SearchCheck, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
+import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
@@ -22,6 +22,7 @@ import { createNodeAt } from './agent-canvas-context-menu';
 import { appendUniqueAssetID, classifyComposerAttachment } from './agent-composer-attachments';
 import { findNodeMentionCandidates, insertNodeMention } from './agent-node-mentions';
 import { normalizeWorkspaceView, workspaceViewForActiveView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
+import { batchFactoryGroupLabel } from './agent-canvas-batch-factory';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -61,6 +62,7 @@ export function AgentPageV2({ theme }) {
   const [activeTask, setActiveTask] = useState(null);
   const [invalidCanvasTask, setInvalidCanvasTask] = useState(false);
   const [isCanvasWorkspace, setIsCanvasWorkspace] = useState(() => window.location.pathname === '/agent/canvas');
+  const [requestedBatchBookId, setRequestedBatchBookId] = useState(() => new URLSearchParams(window.location.search).get('bookId') || '');
   const [skills, setSkills] = useState([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState([]);
   const [source, setSource] = useState('all');
@@ -483,6 +485,7 @@ export function AgentPageV2({ theme }) {
         replaceCanvas({ ...canvasStateRef.current, viewState: nextViewState });
       }
       setIsCanvasWorkspace(nextIsCanvasWorkspace);
+      setRequestedBatchBookId(nextIsCanvasWorkspace ? searchParams.get('bookId') || '' : '');
       const requestedTaskId = nextIsCanvasWorkspace ? searchParams.get('taskId') : null;
       const requestedTask = tasksRef.current.find(task => task.id === requestedTaskId);
       if (requestedTask) {
@@ -540,7 +543,11 @@ export function AgentPageV2({ theme }) {
       setSelectedCanvasNodes([]);
       return undefined;
     }
-    Promise.all([getAgentCanvas(activeTaskId), listAgentExecutions(activeTaskId)])
+    const requestedBookId = String(requestedBatchBookId || '').trim();
+    const canvasRequest = requestedBookId
+      ? syncAgentBatchFactoryBook(activeTaskId, requestedBookId).then(() => getAgentCanvas(activeTaskId))
+      : getAgentCanvas(activeTaskId);
+    Promise.all([canvasRequest, listAgentExecutions(activeTaskId)])
       .then(([canvasResult, executionResult]) => {
         if (cancelled) return;
         const loadedCanvas = canvasResult.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
@@ -587,7 +594,7 @@ export function AgentPageV2({ theme }) {
       saveQueue?.dispose();
       if (canvasSaveQueueRef.current === saveQueue) canvasSaveQueueRef.current = null;
     };
-  }, [activeTaskId, isCanvasWorkspace]);
+  }, [activeTaskId, isCanvasWorkspace, requestedBatchBookId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -710,7 +717,7 @@ export function AgentPageV2({ theme }) {
     return plan && typeof plan === 'object' && !dismissedDirectorPlanIDs.includes(String(plan.id || '')) ? [plan] : [];
   }), [dismissedDirectorPlanIDs, messages]);
   const canvasGroups = useMemo(() => [...new Set((canvas.nodes || []).map(node => node.groupId).filter(Boolean))]
-    .map(groupId => ({ id: groupId, title: groupId })), [canvas.nodes]);
+    .map(groupId => ({ id: groupId, title: batchFactoryGroupLabel(groupId) })), [canvas.nodes]);
   function toggleSkill(id) {
     setSelectedSkillIds(current => current.includes(id) ? current.filter(value => value !== id) : current.length >= 3 ? current : [...current, id]);
   }
@@ -1044,6 +1051,7 @@ export function AgentPageV2({ theme }) {
             ref={canvasRef}
             key={activeTaskId}
             taskId={activeTaskId}
+            requestedBookId={requestedBatchBookId}
             canvas={canvas}
             executions={executions}
             scriptShots={storyboardShots}
