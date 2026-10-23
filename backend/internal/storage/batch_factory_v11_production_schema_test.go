@@ -28,6 +28,15 @@ func TestV11MigrationsRegisterProductionAfterDirector(t *testing.T) {
 	}
 }
 
+func TestV11MergeProgressMigrationReconcilesRecordedPartialSchemas(t *testing.T) {
+	for _, migration := range V11Migrations() {
+		if migration.Version == 1100020 {
+			if migration.Reconcile == nil { t.Fatal("merge progress migration must reconcile a historically recorded partial schema") }
+			return
+		}
+	}
+	t.Fatal("merge progress migration is missing")
+}
 func TestV11BookStageRunsMigrationIsAdditiveAndDurable(t *testing.T) {
 	migrations := V11Migrations()
 	if len(migrations) < 16 || migrations[14].Version != 1100015 || migrations[14].CallbackChecksum != "batch-factory-v11-book-stage-runs-v1" {

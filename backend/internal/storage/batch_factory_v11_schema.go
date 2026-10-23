@@ -549,6 +549,28 @@ func adoptV11MergeProgressLedger(ctx context.Context, tx *sql.Tx) (bool, error) 
 	return v11ColumnsExist(ctx, tx, "batch_factory_v11_merge_jobs", "timing_mode", "speed", "progress_phase", "progress_current", "progress_total")
 }
 
+// reconcileV11MergeProgressLedger repairs a historical ledger row that was
+// recorded before all of its additive columns reached the database. It runs
+// only for an already-recorded migration, so a healthy schema is unchanged.
+func reconcileV11MergeProgressLedger(ctx context.Context, tx *sql.Tx) error {
+	for _, column := range []struct {
+		name string
+		sql  string
+	}{
+		{"timing_mode", `ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN timing_mode VARCHAR(32) NULL AFTER request_id`},
+		{"speed", `ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN speed DECIMAL(8,3) NOT NULL DEFAULT 1 AFTER timing_mode`},
+		{"progress_phase", `ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN progress_phase VARCHAR(32) NULL AFTER status`},
+		{"progress_current", `ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN progress_current INT NOT NULL DEFAULT 0 AFTER progress_phase`},
+		{"progress_total", `ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN progress_total INT NOT NULL DEFAULT 0 AFTER progress_current`},
+	} {
+		exists, err := v11ColumnExists(ctx, tx, "batch_factory_v11_merge_jobs", column.name)
+		if err != nil { return err }
+		if !exists {
+			if _, err := tx.ExecContext(ctx, column.sql); err != nil { return err }
+		}
+	}
+	return nil
+}
 func adoptV11OpeningVariantLedger(ctx context.Context, tx *sql.Tx) (bool, error) {
 	for _, column := range []struct {
 		table string
@@ -729,7 +751,7 @@ func V11Migrations() []Migration {
 		{Version: 1100017, SQL: V11ProductionDurationStatements(), CallbackChecksum: "batch-factory-v11-production-durations-v1"},
 		{Version: 1100018, SQL: V11MergeSourceDurationStatements(), CallbackChecksum: "batch-factory-v11-merge-source-durations-v1"},
 		{Version: 1100019, SQL: V11ProductionLibraryStatements(), CallbackChecksum: "batch-factory-v11-production-library-v1"},
-		{Version: 1100020, SQL: V11MergeProgressStatements(), CallbackChecksum: "batch-factory-v11-merge-progress-v1", Adopt: adoptV11MergeProgressLedger},
+		{Version: 1100020, SQL: V11MergeProgressStatements(), CallbackChecksum: "batch-factory-v11-merge-progress-v1", Reconcile: reconcileV11MergeProgressLedger, Adopt: adoptV11MergeProgressLedger},
 		{Version: 1100021, SQL: V11OpeningVariantStatements(), CallbackChecksum: "batch-factory-v11-opening-variant-v1", Adopt: adoptV11OpeningVariantLedger},
 		{Version: 1100022, SQL: V11LocalArtifactPurgeStatements(), CallbackChecksum: "batch-factory-v11-local-artifact-purge-v1"},
 		// The first public Go deployment recorded this additive table migration
