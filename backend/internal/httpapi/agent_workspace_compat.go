@@ -346,7 +346,7 @@ func writeDirectorPlanError(w http.ResponseWriter, err error) {
 
 func agentCanvasForResponse(projectID string, canvas agentworkspace.Canvas) agentworkspace.Canvas {
 	canvas.Nodes = append([]agentworkspace.Node(nil), canvas.Nodes...)
-	publicFields := []string{"id", "assetId", "projectId", "kind", "mediaType", "name", "contentType", "byteSize", "width", "height", "duration"}
+	publicFields := []string{"id", "assetId", "projectId", "kind", "mediaType", "name", "contentType", "byteSize", "width", "height", "duration", "source"}
 	for index := range canvas.Nodes {
 		ref := canvas.Nodes[index].AssetRef
 		if len(ref) == 0 {
@@ -360,7 +360,7 @@ func agentCanvasForResponse(projectID string, canvas agentworkspace.Canvas) agen
 		}
 		assetID, _ := publicRef["id"].(string)
 		kind, _ := publicRef["kind"].(string)
-		if strings.TrimSpace(assetID) != "" && (kind == "image" || kind == "video" || kind == "audio") {
+		if strings.TrimSpace(assetID) != "" && publicRef["source"] != "batch_factory" && (kind == "image" || kind == "video" || kind == "audio") {
 			publicRef["url"] = agentAssetContentURL(projectID, strings.TrimSpace(assetID))
 		}
 		canvas.Nodes[index].AssetRef = publicRef

@@ -342,6 +342,9 @@ func NewRouter(options RouterOptions) http.Handler {
 	publish121OrganizationsHandler(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
 	if options.UserConfigStore != nil {
 		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
+		if batchFactoryBridgeStore, ok := options.Store.(agentBatchFactoryBridgeStore); ok {
+			RegisterAgentBatchFactoryBridge(root, auth, options.AgentWorkspace, batchFactoryBridgeStore, nil, options.Now)
+		}
 		RegisterAgentAssetRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
 		textModels := options.AgentTextModelResolver
 		if textModels == nil && options.NovelFetchStore != nil {
