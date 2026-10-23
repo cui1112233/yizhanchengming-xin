@@ -1,0 +1,304 @@
+package agentworkspace
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
+)
+
+func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, asset, image, production, merge := newProjectionFixture(t, ctx)
+
+	canvas, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantTypes := map[string]int{"script": 1, "image": 1, "audio": 1, "video": 2}
+	gotTypes := map[string]int{}
+	for _, node := range canvas.Nodes {
+		gotTypes[node.Type]++
+		if node.GroupID != "book:"+book.ID {
+			t.Fatalf("node %s group=%q", node.ID, node.GroupID)
+		}
+		if node.Type == "asset" {
+			t.Fatalf("invented asset node: %+v", node)
+		}
+	}
+	if len(gotTypes) != len(wantTypes) {
+		t.Fatalf("node types=%v, want %v", gotTypes, wantTypes)
+	}
+	for nodeType, count := range wantTypes {
+		if gotTypes[nodeType] != count {
+			t.Fatalf("node type %q count=%d, want %d", nodeType, gotTypes[nodeType], count)
+		}
+	}
+
+	imageNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
+	if imageNode.Config["prompt"] != asset.Prompt || imageNode.AssetRef["id"] != image.ID || imageNode.AssetRef["url"] != image.URL {
+		t.Fatalf("image node=%+v", imageNode)
+	}
+	videoNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "video", book.Videos[0].ID)
+	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != production.Tasks[0].MediaURL {
+		t.Fatalf("video node=%+v", videoNode)
+	}
+	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", merge.AudioArtifactID)
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", merge.ID)
+	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != merge.OutputURL {
+		t.Fatalf("merge node=%+v", mergeNode)
+	}
+	assertProjectionEdge(t, canvas.Edges, imageNode.ID, videoNode.ID)
+	assertProjectionEdge(t, canvas.Edges, videoNode.ID, mergeNode.ID)
+	assertProjectionEdge(t, canvas.Edges, audioNode.ID, mergeNode.ID)
+}
+
+func TestSyncBatchFactoryBookKeepsStableNodesPositionsAndManualContent(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, asset, _, _, _ := newProjectionFixture(t, ctx)
+	first, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imageNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
+	for index := range first.Nodes {
+		if first.Nodes[index].ID == imageNode.ID {
+			first.Nodes[index].Position = Position{X: 777, Y: 333}
+		}
+	}
+	manual := Node{ID: "manual-note", Type: "text", Title: "我的备注", Summary: "不要覆盖", Version: 4, Status: "draft", Position: Position{X: 9, Y: 11}}
+	first.Nodes = append(first.Nodes, manual)
+	manualEdge := Edge{ID: "manual-edge", Source: manual.ID, Target: imageNode.ID, Relation: "manual_reference"}
+	first.Edges = append(first.Edges, manualEdge)
+	if _, err := service.CanvasStore.SaveCanvas(ctx, "alice", binding.ProjectID, first, first.Revision, time.Date(2026, 10, 23, 10, 1, 0, 0, time.UTC)); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Nodes) != len(first.Nodes) {
+		t.Fatalf("node count after repeat=%d, want %d", len(second.Nodes), len(first.Nodes))
+	}
+	seen := map[string]int{}
+	for _, node := range second.Nodes {
+		seen[node.ID]++
+		if node.ID == imageNode.ID && node.Position != (Position{X: 777, Y: 333}) {
+			t.Fatalf("image position=%+v", node.Position)
+		}
+		if node.ID == manual.ID && (node.Summary != manual.Summary || node.Version != manual.Version || node.GroupID != "") {
+			t.Fatalf("manual node changed: %+v", node)
+		}
+	}
+	for id, count := range seen {
+		if count != 1 {
+			t.Fatalf("node %s appears %d times", id, count)
+		}
+	}
+	if !hasEdge(second.Edges, manualEdge.Source, manualEdge.Target, manualEdge.Relation) {
+		t.Fatalf("manual edge was removed: %+v", second.Edges)
+	}
+	projectionEdges := map[string]int{}
+	for _, edge := range second.Edges {
+		if edge.Relation == batchFactoryProjectionRelation {
+			projectionEdges[edge.ID]++
+		}
+	}
+	for id, count := range projectionEdges {
+		if count != 1 {
+			t.Fatalf("projection edge %s appears %d times", id, count)
+		}
+	}
+}
+
+func TestSyncBatchFactoryBookRecoversMissingOriginWithoutDuplicateNode(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, asset, _, _, _ := newProjectionFixture(t, ctx)
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	imageNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
+	if err := service.CanvasStore.RemoveBatchFactoryNodeBinding(ctx, "alice", binding.ProjectID, imageNode.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	canvas, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, node := range canvas.Nodes {
+		if node.ID == imageNode.ID {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("stable image node %s appears %d times", imageNode.ID, count)
+	}
+}
+
+func TestSyncBatchFactoryBookDoesNotProjectMissingAudioRecord(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, merge := newProjectionFixture(t, ctx)
+	service.AudioRecords = batchFactoryAudioRecords{}
+
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	origins, err := service.CanvasStore.BatchFactoryNodeOrigins(ctx, "alice", binding.ProjectID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, origin := range origins {
+		if origin.ResourceType == "audio" || origin.ResourceID == merge.AudioArtifactID && origin.ResourceType != "merge" {
+			t.Fatalf("missing audio record was projected: %+v", origin)
+		}
+	}
+}
+
+func TestSyncBatchFactoryBookBumpsVersionWhenPrimaryImageChanges(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, asset, _, _, _ := newProjectionFixture(t, ctx)
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	first := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+	secondImage, err := source.CreateBookAssetImage(ctx, "alice", binding.BatchID, book.ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{URL: "https://cdn.example.com/lin-wan-2.png", MediaType: "image/png", Source: "provider"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.SetPrimaryBookAssetImage(ctx, "alice", binding.BatchID, book.ID, asset.ID, secondImage.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	second := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
+	if second.AssetRef["id"] != secondImage.ID || second.Version != first.Version+1 {
+		t.Fatalf("first=%+v second=%+v", first, second)
+	}
+}
+
+func TestSyncBatchFactoryBookRecoversAllMissingOriginsWithoutDuplicateEdges(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixture(t, ctx)
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	origins, err := service.CanvasStore.BatchFactoryNodeOrigins(ctx, "alice", binding.ProjectID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, origin := range origins {
+		if err := service.CanvasStore.RemoveBatchFactoryNodeBinding(ctx, "alice", binding.ProjectID, origin.NodeID); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	canvas, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]int{}
+	for _, edge := range canvas.Edges {
+		if edge.Relation == batchFactoryProjectionRelation {
+			seen[edge.ID]++
+		}
+	}
+	for id, count := range seen {
+		if count != 1 {
+			t.Fatalf("projection edge %s appears %d times", id, count)
+		}
+	}
+}
+
+func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProjectionService, BatchFactoryBinding, batchfactoryv11.Book, batchfactoryv11.BookAsset, batchfactoryv11.BookAssetImage, batchfactoryv11.ProductionJob, batchfactoryv11.MergeJob) {
+	t.Helper()
+	now := time.Date(2026, 10, 23, 10, 0, 0, 0, time.UTC)
+	canvasStore := NewMemoryStore()
+	if err := canvasStore.CreateProject(ctx, "alice", Project{ID: "project-1", Title: "作品", CreatedAt: now, UpdatedAt: now, Canvas: EmptyCanvas()}); err != nil {
+		t.Fatal(err)
+	}
+	source := batchfactoryv11.NewMemoryStore()
+	batch, err := source.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "作品", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本书", SourceText: "第一章，雨夜。", Videos: []batchfactoryv11.CreateVideoInput{{Label: "VIDEO 01", VideoPrompt: "雨夜追逐", DurationSeconds: 5}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	binding, err := canvasStore.BindBatchFactoryProject(ctx, BatchFactoryBinding{Owner: "alice", BatchID: batch.ID, ProjectID: "project-1", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset, err := source.CreateBookAsset(ctx, "alice", batch.ID, book.ID, batchfactoryv11.CreateBookAssetInput{Kind: "character", Name: "林晚", Prompt: "黑发女性，红色风衣", ImageAspectRatio: "9:16"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	image, err := source.CreateBookAssetImage(ctx, "alice", batch.ID, book.ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{URL: "https://cdn.example.com/lin-wan.png", MediaType: "image/png", Source: "provider"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	production, err := source.CreateProductionJob(ctx, batchfactoryv11.ProductionJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "production-1", Status: batchfactoryv11.ProductionSucceeded, Tasks: []batchfactoryv11.ProductionTask{{VideoID: book.Videos[0].ID, Status: batchfactoryv11.ProductionSucceeded, Attempt: 1, ReferenceImageURLs: []string{image.URL}, MediaURL: "https://cdn.example.com/video-1.mp4", CreatedAt: now, UpdatedAt: now}}, CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	merge, err := source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "merge-1", AudioSource: "tts", AudioArtifactID: "audio-1", Status: batchfactoryv11.MergeSucceeded, Sources: []batchfactoryv11.MergeMedia{{ProductionJobID: production.ID, VideoID: book.Videos[0].ID, MediaURL: production.Tasks[0].MediaURL, Order: 0}}, OutputURL: "https://cdn.example.com/final.mp4", CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &BatchFactoryProjectionService{
+		CanvasStore: canvasStore, BatchFactory: source, Now: func() time.Time { return now },
+		AudioRecords: batchFactoryAudioRecords{merge.AudioArtifactID: {ID: merge.AudioArtifactID, VersionID: "audio-version-1", Status: "succeeded", DurationSeconds: 7.4, MediaURL: "/api/audio/audio-1"}},
+	}
+	return service, binding, book, asset, image, production, merge
+}
+
+type batchFactoryAudioRecords map[string]BatchFactoryAudioRecord
+
+func (records batchFactoryAudioRecords) BatchFactoryAudioRecord(_ context.Context, _, _, _, audioID string) (BatchFactoryAudioRecord, bool, error) {
+	record, found := records[audioID]
+	return record, found, nil
+}
+
+func projectedNode(t *testing.T, store Store, ctx context.Context, binding BatchFactoryBinding, bookID, resourceType, resourceID string) Node {
+	t.Helper()
+	origins, err := store.BatchFactoryNodeOrigins(ctx, binding.Owner, binding.ProjectID, bookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canvas, err := store.Canvas(ctx, binding.Owner, binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, origin := range origins {
+		if origin.ResourceType != resourceType || origin.ResourceID != resourceID {
+			continue
+		}
+		for _, node := range canvas.Nodes {
+			if node.ID == origin.NodeID {
+				return node
+			}
+		}
+	}
+	t.Fatalf("missing projected node %s/%s", resourceType, resourceID)
+	return Node{}
+}
+
+func assertProjectionEdge(t *testing.T, edges []Edge, source, target string) {
+	t.Helper()
+	if !hasEdge(edges, source, target, batchFactoryProjectionRelation) {
+		t.Fatalf("missing projection edge %s -> %s in %+v", source, target, edges)
+	}
+}
+
+func hasEdge(edges []Edge, source, target, relation string) bool {
+	for _, edge := range edges {
+		if edge.Source == source && edge.Target == target && edge.Relation == relation {
+			return true
+		}
+	}
+	return false
+}

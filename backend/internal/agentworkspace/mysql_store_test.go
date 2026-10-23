@@ -186,7 +186,7 @@ FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? ORDER BY cre
 	}
 }
 
-func TestMySQLStoreSaveCanvasWritesWholeCanvasSnapshotWithoutReplacingTables(t *testing.T) {
+func TestMySQLStoreSaveCanvasWritesSnapshotAndReconcilesIndexes(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -201,8 +201,14 @@ func TestMySQLStoreSaveCanvasWritesWholeCanvasSnapshotWithoutReplacingTables(t *
 		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(int64(0)))
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_canvases SET canvas_version = ?, revision = ?, canvas_json = ?, viewport_json = ?, appearance_json = ?, view_state_json = ?, updated_at = ? WHERE project_id = ? AND owner_username = ?`)).
 		WithArgs(1, int64(1), sqlmock.AnyArg(), nil, appearanceJSON, `{"activeView":"storyboard","drawerWidth":340}`, now, "project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM agent_canvas_edges WHERE project_id = ? AND owner_username = ?`)).
+		WithArgs("project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id NOT IN (?)`)).
+		WithArgs("project-1", "alice", "node-1").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_canvas_nodes (id, project_id, owner_username, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE node_type = VALUES(node_type), title = VALUES(title), summary = VALUES(summary), position_x = VALUES(position_x), position_y = VALUES(position_y), current_version = VALUES(current_version), status = VALUES(status), source_node_ids_json = VALUES(source_node_ids_json), asset_ref_json = VALUES(asset_ref_json), config_json = VALUES(config_json), group_id = VALUES(group_id), updated_at = VALUES(updated_at)`)).
 		WithArgs("node-1", "project-1", "alice", "video", "节点", "内容", 12.0, 24.0, int64(1), "ready", nil, nil, `{"prompt":"雨夜追逐","ratio":"9:16"}`, sql.NullString{String: "group-1", Valid: true}, now, now).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_canvas_edges (id, project_id, owner_username, source_node_id, target_node_id, relation_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)).
+		WithArgs("edge-1", "project-1", "alice", "node-1", "node-1", "reference", now, now).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`)).
 		WithArgs(now, "project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -211,6 +217,7 @@ func TestMySQLStoreSaveCanvasWritesWholeCanvasSnapshotWithoutReplacingTables(t *
 	canvas.Appearance.EdgesVisible = false
 	canvas.ViewState = map[string]any{"activeView": "storyboard", "drawerWidth": 340}
 	canvas.Nodes = []Node{{ID: "node-1", Type: "video", Title: "节点", Summary: "内容", Position: Position{X: 12, Y: 24}, Version: 1, Status: "ready", Config: map[string]any{"prompt": "雨夜追逐", "ratio": "9:16"}, GroupID: "group-1"}}
+	canvas.Edges = []Edge{{ID: "edge-1", Source: "node-1", Target: "node-1", Relation: "reference"}}
 	if _, err := store.SaveCanvas(context.Background(), "alice", "project-1", canvas, 0, now); err != nil {
 		t.Fatal(err)
 	}

@@ -390,6 +390,24 @@ func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Ca
 
 // Nodes remain a small compatibility index for generation workers. Canvas JSON is the source of truth.
 func syncCanvasNodeIndex(ctx context.Context, tx *sql.Tx, owner, id string, canvas Canvas, now time.Time) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM agent_canvas_edges WHERE project_id = ? AND owner_username = ?`, id, owner); err != nil {
+		return err
+	}
+	if len(canvas.Nodes) == 0 {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ?`, id, owner); err != nil {
+			return err
+		}
+	} else {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(canvas.Nodes)), ",")
+		args := make([]any, 0, len(canvas.Nodes)+2)
+		args = append(args, id, owner)
+		for _, node := range canvas.Nodes {
+			args = append(args, node.ID)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? AND id NOT IN (`+placeholders+`)`, args...); err != nil {
+			return err
+		}
+	}
 	for _, node := range canvas.Nodes {
 		sourceJSON, err := nullableJSON(node.SourceNodeIDs)
 		if err != nil {
@@ -405,6 +423,11 @@ func syncCanvasNodeIndex(ctx context.Context, tx *sql.Tx, owner, id string, canv
 		}
 		groupID := sql.NullString{String: node.GroupID, Valid: node.GroupID != ""}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvas_nodes (id, project_id, owner_username, node_type, title, summary, position_x, position_y, current_version, status, source_node_ids_json, asset_ref_json, config_json, group_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE node_type = VALUES(node_type), title = VALUES(title), summary = VALUES(summary), position_x = VALUES(position_x), position_y = VALUES(position_y), current_version = VALUES(current_version), status = VALUES(status), source_node_ids_json = VALUES(source_node_ids_json), asset_ref_json = VALUES(asset_ref_json), config_json = VALUES(config_json), group_id = VALUES(group_id), updated_at = VALUES(updated_at)`, node.ID, id, owner, node.Type, node.Title, node.Summary, node.Position.X, node.Position.Y, node.Version, node.Status, sourceJSON, assetJSON, configJSON, groupID, now, now); err != nil {
+			return err
+		}
+	}
+	for _, edge := range canvas.Edges {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvas_edges (id, project_id, owner_username, source_node_id, target_node_id, relation_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, edge.ID, id, owner, edge.Source, edge.Target, edge.Relation, now, now); err != nil {
 			return err
 		}
 	}
