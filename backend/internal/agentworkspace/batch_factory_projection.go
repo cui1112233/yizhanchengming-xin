@@ -174,7 +174,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		primary := projectionPrimaryImage(images)
 		assetRef := map[string]any{"assetId": asset.ID, "kind": "image"}
 		if primary.ID != "" {
-			assetRef["id"], assetRef["url"] = primary.ID, primary.URL
+			assetRef["id"] = primary.ID
 			assetRef["mediaType"], assetRef["source"] = primary.MediaType, primary.Source
 		}
 		config := projectionConfig(binding.BatchID, book.ID, "book_asset", asset.ID)
@@ -204,9 +204,6 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		status := "draft"
 		if hasTask {
 			assetRef["id"] = task.ID
-			if task.MediaURL != "" {
-				assetRef["url"] = task.MediaURL
-			}
 			versionID = projectionFingerprint(video.Revision, task.ID, task.Status, task.MediaURL, task.UpdatedAt, task.ReferenceImageURLs)
 			status = string(task.Status)
 		}
@@ -238,9 +235,6 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 			}
 			if found && strings.TrimSpace(record.ID) == audioID {
 				assetRef := map[string]any{"id": audioID, "kind": "audio"}
-				if record.MediaURL != "" {
-					assetRef["url"] = record.MediaURL
-				}
 				config := projectionConfig(binding.BatchID, book.ID, "audio", audioID)
 				if record.DurationSeconds > 0 {
 					config["durationSeconds"] = record.DurationSeconds
@@ -256,9 +250,6 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 			}
 		}
 		assetRef := map[string]any{"id": merge.ID, "kind": "video"}
-		if merge.OutputURL != "" {
-			assetRef["url"] = merge.OutputURL
-		}
 		mergeNodeID := add("merge", merge.ID, projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources), Node{
 			Type: "video", Title: "最终合成视频", Status: string(merge.Status), Position: Position{X: 1040, Y: 80},
 			AssetRef: assetRef, Config: projectionConfig(binding.BatchID, book.ID, "merge", merge.ID),

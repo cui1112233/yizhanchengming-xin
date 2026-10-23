@@ -80,6 +80,13 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			}
 			binding, err = projects.BindBatchFactoryProject(req.Context(), agentworkspace.BatchFactoryBinding{Owner: owner, BatchID: batch.ID, ProjectID: projectID, CreatedAt: now, UpdatedAt: now})
 		}
+		if errors.Is(err, agentworkspace.ErrBatchFactoryBindingConflict) {
+			// The MySQL unique key can win a concurrent insert after the first
+			// lookup. The deterministic project ID makes an exact readback safe.
+			if existing, readErr := projects.BatchFactoryBinding(req.Context(), owner, batch.ID); readErr == nil && existing.ProjectID == agentBatchFactoryProjectID(owner, batch.ID) {
+				binding, err = existing, nil
+			}
+		}
 		if err != nil {
 			writeAgentBatchFactoryError(w, err)
 			return
@@ -126,6 +133,11 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 
 	handle("DELETE /api/agent/tasks/{id}/batch-factory/nodes/{nodeId}", func(w http.ResponseWriter, req *http.Request, owner string) {
 		projectID := req.PathValue("id")
+		nodeID := strings.TrimSpace(req.PathValue("nodeId"))
+		if nodeID == "" {
+			writeAgentBatchFactoryError(w, agentworkspace.ErrBatchFactoryNodeOriginInvalid)
+			return
+		}
 		if _, err := projects.Project(req.Context(), owner, projectID); err != nil {
 			writeAgentStoreError(w, err)
 			return
@@ -135,7 +147,7 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			writeAgentBatchFactoryError(w, err)
 			return
 		}
-		bookID, origins, found, err := agentBatchFactoryNodeOrigins(req.Context(), projects, owner, binding, batch, req.PathValue("nodeId"))
+		bookID, origins, found, err := agentBatchFactoryNodeOrigins(req.Context(), projects, owner, binding, batch, nodeID)
 		if err != nil {
 			writeAgentBatchFactoryError(w, err)
 			return
@@ -149,10 +161,10 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			writeAgentStoreError(w, err)
 			return
 		}
-		next := removeAgentBatchFactoryCanvasNode(canvas, req.PathValue("nodeId"))
+		next := removeAgentBatchFactoryCanvasNode(canvas, nodeID)
 		remaining := make([]agentworkspace.BatchFactoryNodeOrigin, 0, len(origins)-1)
 		for _, origin := range origins {
-			if origin.NodeID != req.PathValue("nodeId") {
+			if origin.NodeID != nodeID {
 				remaining = append(remaining, origin)
 			}
 		}

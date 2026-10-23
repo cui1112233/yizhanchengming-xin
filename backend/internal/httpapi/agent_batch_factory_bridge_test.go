@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +17,19 @@ import (
 type batchFactoryDeleteGuard struct {
 	*batchfactoryv11.MemoryStore
 	deleteBookAssetCalls int
+}
+
+type duplicateBindingRaceStore struct {
+	*agentworkspace.MemoryStore
+}
+
+func (s *duplicateBindingRaceStore) BindBatchFactoryProject(ctx context.Context, binding agentworkspace.BatchFactoryBinding) (agentworkspace.BatchFactoryBinding, error) {
+	if _, err := s.MemoryStore.BindBatchFactoryProject(ctx, binding); err != nil {
+		return agentworkspace.BatchFactoryBinding{}, err
+	}
+	// Match the MySQL unique-key race: another request has already persisted
+	// the deterministic binding, while this insert reports a duplicate.
+	return agentworkspace.BatchFactoryBinding{}, agentworkspace.ErrBatchFactoryBindingConflict
 }
 
 func (s *batchFactoryDeleteGuard) DeleteBookAsset(ctx context.Context, owner, batchID, bookID, assetID string) error {
@@ -56,6 +71,47 @@ func TestBindBatchFactoryReturnsSameProjectForSameOwner(t *testing.T) {
 	}
 	if strings.Contains(first.Body.String(), "private batch title") || strings.Contains(first.Body.String(), "private book title") || strings.Contains(first.Body.String(), "private source text") {
 		t.Fatalf("binding leaked private Batch Factory fields: %s", first.Body.String())
+	}
+}
+
+func TestBindBatchFactoryRecoversConcurrentDuplicateBinding(t *testing.T) {
+	now := time.Date(2026, 10, 23, 12, 1, 0, 0, time.UTC)
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := &duplicateBindingRaceStore{MemoryStore: agentworkspace.NewMemoryStore()}
+	mux := http.NewServeMux()
+	RegisterAgentBatchFactoryBridge(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, projects, batches, nil, func() time.Time { return now })
+
+	path := "/api/batch-factory/v11/batches/" + batch.ID + "/agent-project"
+	start := make(chan struct{})
+	responses := make(chan *httptest.ResponseRecorder, 2)
+	var group sync.WaitGroup
+	for range 2 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-start
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			SignBridgeRequest(req, "alice", true, now, "secret")
+			recorder := httptest.NewRecorder()
+			mux.ServeHTTP(recorder, req)
+			responses <- recorder
+		}()
+	}
+	close(start)
+	group.Wait()
+	close(responses)
+	for response := range responses {
+		if response.Code != http.StatusOK {
+			t.Fatalf("concurrent bind status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+	projectsList, err := projects.ListProjects(context.Background(), "alice")
+	if err != nil || len(projectsList) != 1 {
+		t.Fatalf("projects=%+v err=%v", projectsList, err)
 	}
 }
 
@@ -102,6 +158,54 @@ func TestSyncBookRejectsAnotherOwnersBatch(t *testing.T) {
 	}
 	if strings.Contains(response.Body.String(), "bob private batch") || strings.Contains(response.Body.String(), "bob private book") || strings.Contains(response.Body.String(), "bob private source") {
 		t.Fatalf("cross-owner response leaked Batch Factory fields: %s", response.Body.String())
+	}
+}
+
+func TestSyncBookDoesNotPersistSignedMediaURL(t *testing.T) {
+	now := time.Date(2026, 10, 23, 12, 7, 0, 0, time.UTC)
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	asset, err := batches.CreateBookAsset(context.Background(), "alice", batch.ID, book.ID, batchfactoryv11.CreateBookAssetInput{Kind: "character", Name: "hero", Prompt: "portrait"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const signedURL = "https://media.example/image.png?X-Amz-Signature=private-signature&token=private-token"
+	if _, err := batches.CreateBookAssetImage(context.Background(), "alice", batch.ID, book.ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{URL: signedURL, MediaType: "image/png"}); err != nil {
+		t.Fatal(err)
+	}
+	projects := agentworkspace.NewMemoryStore()
+	mux := http.NewServeMux()
+	auth := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}
+	RegisterAgentWorkspaceCompat(mux, auth, projects, "", nil, func() time.Time { return now })
+	RegisterAgentBatchFactoryBridge(mux, auth, projects, batches, nil, func() time.Time { return now })
+
+	bound := agentRequest(t, mux, now, http.MethodPost, "/api/batch-factory/v11/batches/"+batch.ID+"/agent-project", "")
+	if bound.Code != http.StatusOK {
+		t.Fatalf("bind status=%d body=%s", bound.Code, bound.Body.String())
+	}
+	var binding agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(bound.Body.Bytes(), &binding); err != nil {
+		t.Fatal(err)
+	}
+	synced := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/books/"+book.ID+"/sync", "")
+	if synced.Code != http.StatusOK {
+		t.Fatalf("sync status=%d body=%s", synced.Code, synced.Body.String())
+	}
+	stored, err := projects.Project(context.Background(), "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	storedJSON, _ := json.Marshal(stored)
+	if strings.Contains(string(storedJSON), "private-signature") || strings.Contains(string(storedJSON), "private-token") {
+		t.Fatalf("signed media URL persisted in canvas: %s", storedJSON)
+	}
+	read := agentRequest(t, mux, now, http.MethodGet, "/api/agent/tasks/"+binding.ProjectID, "")
+	if read.Code != http.StatusOK || strings.Contains(read.Body.String(), "private-signature") || strings.Contains(read.Body.String(), "private-token") {
+		t.Fatalf("task response leaked signed media URL: status=%d body=%s", read.Code, read.Body.String())
 	}
 }
 
@@ -169,7 +273,7 @@ func TestDeleteBoundNodeOnlyRemovesCanvasReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	deleted := agentRequest(t, mux, now, http.MethodDelete, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/nodes/"+nodeID, "")
+	deleted := agentRequest(t, mux, now, http.MethodDelete, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/nodes/"+nodeID+"%20", "")
 	if deleted.Code != http.StatusOK {
 		t.Fatalf("delete status=%d body=%s", deleted.Code, deleted.Body.String())
 	}
