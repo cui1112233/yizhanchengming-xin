@@ -187,7 +187,7 @@ func (s *BatchFactoryProjectionService) SyncBatchFactoryBook(ctx context.Context
 		return Canvas{}, err
 	}
 
-	items, edges, err := s.projectBook(ctx, owner, binding, book, assets, productionJobs, mergeJobs, canvas, origins)
+	items, edges, err := s.projectBook(ctx, owner, binding, book, assets, productionJobs, mergeJobs, canvas, origins, batch.SettingsState.Patch)
 	if err != nil {
 		return Canvas{}, err
 	}
@@ -212,7 +212,7 @@ func projectionBook(batch batchfactoryv11.Batch, bookID string) (batchfactoryv11
 	return batchfactoryv11.Book{}, false
 }
 
-func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner string, binding BatchFactoryBinding, book batchfactoryv11.Book, assets []batchfactoryv11.BookAsset, productionJobs []batchfactoryv11.ProductionJob, mergeJobs []batchfactoryv11.MergeJob, canvas Canvas, origins []BatchFactoryNodeOrigin) ([]batchFactoryProjectionItem, []Edge, error) {
+func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner string, binding BatchFactoryBinding, book batchfactoryv11.Book, assets []batchfactoryv11.BookAsset, productionJobs []batchfactoryv11.ProductionJob, mergeJobs []batchfactoryv11.MergeJob, canvas Canvas, origins []BatchFactoryNodeOrigin, batchSettings ...batchfactoryv11.SettingsPatch) ([]batchFactoryProjectionItem, []Edge, error) {
 	groupID := "book:" + book.ID
 	existingNodes := make(map[string]Node, len(canvas.Nodes))
 	for _, node := range canvas.Nodes {
@@ -323,6 +323,17 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		}
 		config := projectionConfig(binding.BatchID, book.ID, "video", video.ID)
 		config["prompt"], config["visualPrompt"] = video.VideoPrompt, video.VisualPrompt
+		layers := append([]batchfactoryv11.SettingsPatch(nil), batchSettings...)
+		layers = append(layers, book.SettingsState.Patch, video.SettingsState.Patch)
+		effective := batchfactoryv11.ResolveSettings(layers...)
+		modelID := projectionJSONText(effective["videoModelId"])
+		provider := batchfactoryv11.VideoProviderForModel(modelID, projectionJSONText(effective["videoProvider"]))
+		if modelID != "" {
+			config["videoModelId"] = modelID
+		}
+		if provider != "" {
+			config["videoProvider"] = provider
+		}
 		config["resourceRevision"] = video.Revision
 		allowedDurations := []float64{5, 10, 15}
 		config["allowedDurationSeconds"] = allowedDurations

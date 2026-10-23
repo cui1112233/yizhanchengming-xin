@@ -73,3 +73,30 @@ func TestMemoryBatchFactoryBindingsAreOwnerScopedAndAppendOnly(t *testing.T) {
 		t.Fatalf("origins after remove=%+v err=%v", origins, err)
 	}
 }
+
+func TestMemoryBatchFactoryRebindRequiresOwnerAndLiveReplacementProject(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 23, 9, 30, 0, 0, time.UTC)
+	for _, projectID := range []string{"project-deleted", "project-replacement"} {
+		if err := store.CreateProject(ctx, "alice", Project{ID: projectID, Title: "Agent", Canvas: EmptyCanvas(), CreatedAt: now, UpdatedAt: now}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.BindBatchFactoryProject(ctx, BatchFactoryBinding{Owner: "alice", BatchID: "batch-1", ProjectID: "project-deleted", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteProject(ctx, "alice", "project-deleted", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RebindBatchFactoryProject(ctx, "bob", "batch-1", "project-deleted", "project-replacement", now.Add(2*time.Minute)); !errors.Is(err, ErrBatchFactoryBindingNotFound) {
+		t.Fatalf("cross-owner rebind err=%v", err)
+	}
+	rebound, err := store.RebindBatchFactoryProject(ctx, "alice", "batch-1", "project-deleted", "project-replacement", now.Add(2*time.Minute))
+	if err != nil || rebound.ProjectID != "project-replacement" || rebound.Owner != "alice" {
+		t.Fatalf("rebound=%+v err=%v", rebound, err)
+	}
+	if _, err := store.RebindBatchFactoryProject(ctx, "alice", "batch-1", "project-replacement", "project-deleted", now.Add(3*time.Minute)); !errors.Is(err, ErrProjectNotFound) {
+		t.Fatalf("rebind to deleted project err=%v, want project not found", err)
+	}
+}

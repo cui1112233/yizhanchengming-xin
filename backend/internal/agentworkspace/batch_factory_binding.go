@@ -34,6 +34,7 @@ type BatchFactoryNodeOrigin struct {
 
 type BatchFactoryBindingStore interface {
 	BindBatchFactoryProject(context.Context, BatchFactoryBinding) (BatchFactoryBinding, error)
+	RebindBatchFactoryProject(context.Context, string, string, string, string, time.Time) (BatchFactoryBinding, error)
 	BatchFactoryBinding(context.Context, string, string) (BatchFactoryBinding, error)
 	BindBatchFactoryNode(context.Context, string, BatchFactoryNodeOrigin) error
 	BatchFactoryNodeOrigins(context.Context, string, string, string) ([]BatchFactoryNodeOrigin, error)

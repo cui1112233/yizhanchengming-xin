@@ -212,6 +212,9 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != nil {
 		t.Fatalf("video node=%+v", videoNode)
 	}
+	if videoNode.Config["videoProvider"] != batchfactoryv11.VideoProviderDoubaoLocal || videoNode.Config["videoModelId"] != "local-doubao-executor-video" {
+		t.Fatalf("video execution settings=%+v", videoNode.Config)
+	}
 	audioSeconds, audioOK := projectionConfigPositiveNumber(videoNode.Config["connectedAudioDurationSeconds"])
 	resolvedSeconds, resolvedOK := projectionConfigPositiveNumber(videoNode.Config["resolvedDurationSeconds"])
 	resourceRevision, revisionOK := projectionConfigPositiveNumber(videoNode.Config["resourceRevision"])
@@ -410,7 +413,14 @@ func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProje
 		t.Fatal(err)
 	}
 	source := batchfactoryv11.NewMemoryStore()
-	batch, err := source.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "作品", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本书", SourceText: "第一章，雨夜。", Videos: []batchfactoryv11.CreateVideoInput{{Label: "VIDEO 01", VideoPrompt: "雨夜追逐", DurationSeconds: 5}}}}})
+	batch, err := source.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "作品",
+		InitialBatchSettings: batchfactoryv11.SettingsPatch{
+			"videoProvider": json.RawMessage(`"doubao_local_executor"`),
+			"videoModelId":  json.RawMessage(`"local-doubao-executor-video"`),
+		},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本书", SourceText: "第一章，雨夜。", Videos: []batchfactoryv11.CreateVideoInput{{Label: "VIDEO 01", VideoPrompt: "雨夜追逐", DurationSeconds: 5}}}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

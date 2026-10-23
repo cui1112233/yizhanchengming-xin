@@ -48,6 +48,54 @@ func (s *MySQLStore) BatchFactoryBinding(ctx context.Context, owner, batchID str
 	return binding, err
 }
 
+func (s *MySQLStore) RebindBatchFactoryProject(ctx context.Context, owner, batchID, previousProjectID, projectID string, now time.Time) (BatchFactoryBinding, error) {
+	owner, batchID = strings.TrimSpace(owner), strings.TrimSpace(batchID)
+	previousProjectID, projectID = strings.TrimSpace(previousProjectID), strings.TrimSpace(projectID)
+	if owner == "" || batchID == "" || previousProjectID == "" || projectID == "" {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingInvalid
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return BatchFactoryBinding{}, err
+	}
+	defer tx.Rollback()
+	var binding BatchFactoryBinding
+	err = tx.QueryRowContext(ctx, `SELECT `+batchFactoryBindingColumns+` FROM agent_batch_factory_bindings WHERE owner_username = ? AND batch_id = ? FOR UPDATE`, owner, batchID).
+		Scan(&binding.Owner, &binding.BatchID, &binding.ProjectID, &binding.CreatedAt, &binding.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingNotFound
+	}
+	if err != nil {
+		return BatchFactoryBinding{}, err
+	}
+	if binding.ProjectID == projectID {
+		return binding, nil
+	}
+	if binding.ProjectID != previousProjectID {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingConflict
+	}
+	var exists int
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM agent_projects WHERE owner_username = ? AND id = ? AND deleted_at IS NULL FOR UPDATE`, owner, projectID).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return BatchFactoryBinding{}, ErrProjectNotFound
+	}
+	if err != nil {
+		return BatchFactoryBinding{}, err
+	}
+	now = now.UTC().Truncate(time.Microsecond)
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_batch_factory_bindings SET project_id = ?, updated_at = ? WHERE owner_username = ? AND batch_id = ? AND project_id = ?`, projectID, now, owner, batchID, previousProjectID); err != nil {
+		if isBatchFactoryBindingDuplicate(err) {
+			return BatchFactoryBinding{}, ErrBatchFactoryBindingConflict
+		}
+		return BatchFactoryBinding{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return BatchFactoryBinding{}, err
+	}
+	binding.ProjectID, binding.UpdatedAt = projectID, now
+	return binding, nil
+}
+
 func (s *MySQLStore) BindBatchFactoryNode(ctx context.Context, owner string, origin BatchFactoryNodeOrigin) error {
 	origin, err := normalizeBatchFactoryNodeOrigin(owner, origin)
 	if err != nil {

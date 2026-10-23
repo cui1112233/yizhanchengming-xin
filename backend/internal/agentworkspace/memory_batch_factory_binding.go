@@ -49,6 +49,40 @@ func (s *MemoryStore) BatchFactoryBinding(_ context.Context, owner, batchID stri
 	return binding, nil
 }
 
+func (s *MemoryStore) RebindBatchFactoryProject(_ context.Context, owner, batchID, previousProjectID, projectID string, now time.Time) (BatchFactoryBinding, error) {
+	owner, batchID = strings.TrimSpace(owner), strings.TrimSpace(batchID)
+	previousProjectID, projectID = strings.TrimSpace(previousProjectID), strings.TrimSpace(projectID)
+	if owner == "" || batchID == "" || previousProjectID == "" || projectID == "" {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingInvalid
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bindingKey := batchFactoryBindingKey(owner, batchID)
+	binding, found := s.batchFactoryBindings[bindingKey]
+	if !found {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingNotFound
+	}
+	if binding.ProjectID == projectID {
+		return binding, nil
+	}
+	if binding.ProjectID != previousProjectID {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingConflict
+	}
+	replacement, found := s.projects[projectKey(owner, projectID)]
+	if !found || replacement.DeletedAt != nil {
+		return BatchFactoryBinding{}, ErrProjectNotFound
+	}
+	if existingBatchID, exists := s.batchFactoryProjects[batchFactoryProjectKey(owner, projectID)]; exists && existingBatchID != batchID {
+		return BatchFactoryBinding{}, ErrBatchFactoryBindingConflict
+	}
+	delete(s.batchFactoryProjects, batchFactoryProjectKey(owner, previousProjectID))
+	binding.ProjectID = projectID
+	binding.UpdatedAt = now.UTC().Truncate(time.Microsecond)
+	s.batchFactoryBindings[bindingKey] = binding
+	s.batchFactoryProjects[batchFactoryProjectKey(owner, projectID)] = batchID
+	return binding, nil
+}
+
 func (s *MemoryStore) BindBatchFactoryNode(_ context.Context, owner string, origin BatchFactoryNodeOrigin) error {
 	origin, err := normalizeBatchFactoryNodeOrigin(owner, origin)
 	if err != nil {

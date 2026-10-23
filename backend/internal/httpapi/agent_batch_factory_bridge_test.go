@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
 )
 
 type batchFactoryDeleteGuard struct {
@@ -72,6 +74,114 @@ func TestBindBatchFactoryReturnsSameProjectForSameOwner(t *testing.T) {
 	if strings.Contains(first.Body.String(), "private batch title") || strings.Contains(first.Body.String(), "private book title") || strings.Contains(first.Body.String(), "private source text") {
 		t.Fatalf("binding leaked private Batch Factory fields: %s", first.Body.String())
 	}
+}
+
+func TestBindBatchFactoryRecreatesDeletedBoundProject(t *testing.T) {
+	now := time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := agentworkspace.NewMemoryStore()
+	mux := http.NewServeMux()
+	RegisterAgentBatchFactoryBridge(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, projects, batches, nil, func() time.Time { return now })
+
+	path := "/api/batch-factory/v11/batches/" + batch.ID + "/agent-project"
+	first := agentRequest(t, mux, now, http.MethodPost, path, "")
+	if first.Code != http.StatusOK {
+		t.Fatalf("first bind status=%d body=%s", first.Code, first.Body.String())
+	}
+	var original agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(first.Body.Bytes(), &original); err != nil {
+		t.Fatal(err)
+	}
+	if err := projects.DeleteProject(context.Background(), "alice", original.ProjectID, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	second := agentRequest(t, mux, now.Add(2*time.Minute), http.MethodPost, path, "")
+	if second.Code != http.StatusOK {
+		t.Fatalf("rebind status=%d body=%s", second.Code, second.Body.String())
+	}
+	var recreated agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(second.Body.Bytes(), &recreated); err != nil {
+		t.Fatal(err)
+	}
+	if recreated.ProjectID == "" || recreated.ProjectID == original.ProjectID {
+		t.Fatalf("deleted project was returned again: original=%q recreated=%q", original.ProjectID, recreated.ProjectID)
+	}
+	if _, err := projects.Project(context.Background(), "alice", recreated.ProjectID); err != nil {
+		t.Fatalf("recreated project is not alive: %v", err)
+	}
+	binding, err := projects.BatchFactoryBinding(context.Background(), "alice", batch.ID)
+	if err != nil || binding.ProjectID != recreated.ProjectID {
+		t.Fatalf("binding=%+v err=%v, want recreated project", binding, err)
+	}
+	third := agentRequest(t, mux, now.Add(3*time.Minute), http.MethodPost, path, "")
+	var idempotent agentBatchFactoryBindingResponse
+	if third.Code != http.StatusOK || json.Unmarshal(third.Body.Bytes(), &idempotent) != nil || idempotent.ProjectID != recreated.ProjectID {
+		t.Fatalf("third bind status=%d body=%s recreated=%+v", third.Code, third.Body.String(), recreated)
+	}
+}
+
+func TestRouterProjectsPersistedBatchFactoryAudioForOwner(t *testing.T) {
+	now := time.Date(2026, 10, 23, 12, 3, 0, 0, time.UTC)
+	ctx := context.Background()
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	const audioID = "tts-owner-audio"
+	if _, err := batches.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: batch.ID, BookID: book.ID}, batchfactoryv11.SettingsUpdate{
+		Patch: batchfactoryv11.SettingsPatch{
+			"ttsAudioArtifactId":   json.RawMessage(`"` + audioID + `"`),
+			"audioDurationSeconds": json.RawMessage(`7.4`),
+		},
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := batches.CreateMergeJob(ctx, batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "merge-audio", AudioSource: "tts", AudioArtifactID: audioID, Status: batchfactoryv11.MergeSucceeded, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	files := localartifact.NewStore(t.TempDir(), 1024)
+	if _, err := files.SaveMedia(audioID, "audio/mpeg", "mp3", bytes.NewBufferString("persisted-audio")); err != nil {
+		t.Fatal(err)
+	}
+	projects := agentworkspace.NewMemoryStore()
+	api := NewRouter(RouterOptions{
+		BridgeSecret: "secret", Now: func() time.Time { return now }, Store: batches, AgentWorkspace: projects,
+		UserConfigStore: NewUserConfigStore(t.TempDir()), LocalArtifacts: files,
+	})
+	bound := agentRequest(t, api, now, http.MethodPost, "/api/batch-factory/v11/batches/"+batch.ID+"/agent-project", "")
+	if bound.Code != http.StatusOK {
+		t.Fatalf("bind status=%d body=%s", bound.Code, bound.Body.String())
+	}
+	var binding agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(bound.Body.Bytes(), &binding); err != nil {
+		t.Fatal(err)
+	}
+	synced := agentRequest(t, api, now, http.MethodPost, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/books/"+book.ID+"/sync", "")
+	if synced.Code != http.StatusOK {
+		t.Fatalf("sync status=%d body=%s", synced.Code, synced.Body.String())
+	}
+	canvas, err := projects.Canvas(ctx, "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range canvas.Nodes {
+		if node.Type != "audio" {
+			continue
+		}
+		if node.AssetRef["id"] != audioID || node.Config["durationSeconds"] != 7.4 || node.AssetRef["url"] != nil {
+			t.Fatalf("audio node leaked or lost persisted metadata: %+v", node)
+		}
+		return
+	}
+	t.Fatalf("persisted owner-scoped audio was not projected: %+v", canvas.Nodes)
 }
 
 func TestBindBatchFactoryRecoversConcurrentDuplicateBinding(t *testing.T) {

@@ -343,7 +343,13 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.UserConfigStore != nil {
 		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
 		if batchFactoryBridgeStore, ok := options.Store.(agentBatchFactoryBridgeStore); ok {
-			RegisterAgentBatchFactoryBridge(root, auth, options.AgentWorkspace, batchFactoryBridgeStore, nil, options.Now)
+			if projectionStore, projectionOK := options.AgentWorkspace.(agentworkspace.BatchFactoryProjectionStore); projectionOK {
+				projection := &agentworkspace.BatchFactoryProjectionService{
+					CanvasStore: projectionStore, BatchFactory: batchFactoryBridgeStore,
+					AudioRecords: newBatchFactoryProductionAudioReader(batchFactoryBridgeStore, options.LocalArtifacts), Now: options.Now,
+				}
+				RegisterAgentBatchFactoryBridge(root, auth, options.AgentWorkspace, batchFactoryBridgeStore, projection, options.Now)
+			}
 		}
 		RegisterAgentAssetRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
 		textModels := options.AgentTextModelResolver

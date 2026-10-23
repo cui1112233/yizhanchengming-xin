@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
+import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
 
 test('opens the bound project at the requested book group', () => {
   assert.equal(
@@ -111,6 +111,24 @@ test('maps projected audio timing into the Batch Factory video action', () => {
   }), {
     type: 'video', batchId: 'batch-1', bookId: 'book-1', resourceId: 'video-1', durationSeconds: 10, expectedRevision: 7
   });
+});
+
+test('submits and retries only the selected mapped video through its effective executor', async () => {
+  for (const [canRetry, mode] of [[false, 'missing'], [true, 'force']]) {
+    const calls = [];
+    await runMappedBatchFactoryVideoProduction({
+      action: {
+        type: 'video', batchId: 'batch-1', bookId: 'book-1', resourceId: 'video-selected',
+        provider: 'doubao_local_executor', modelId: 'local-doubao-executor-video', canRetry
+      },
+      requestId: `request-${mode}`,
+      runStage: async (...args) => { calls.push(args); return { state: 'queued' }; }
+    });
+    assert.deepEqual(calls, [[
+      'batch-1', 'book-1', 'video',
+      { mode, requestId: `request-${mode}`, videoId: 'video-selected', provider: 'doubao_local_executor' }
+    ]]);
+  }
 });
 
 test('presents mapped failures with the safe error and retry state', () => {

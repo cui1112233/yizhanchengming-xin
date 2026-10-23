@@ -130,6 +130,9 @@ export function batchFactoryMappedAction(node) {
     const resolvedSeconds = Number(config.resolvedDurationSeconds) || timing.requestedSeconds;
     return {
       type: 'video', batchId, bookId, resourceId,
+      ...(String(config.videoProvider || '').trim() ? { provider: String(config.videoProvider).trim() } : {}),
+      ...(String(config.videoModelId || '').trim() ? { modelId: String(config.videoModelId).trim() } : {}),
+      ...(config.canRetry === true ? { canRetry: true } : {}),
       ...(resolvedSeconds > 0 ? { durationSeconds: resolvedSeconds } : {}),
       ...(Number(config.resourceRevision) > 0 ? { expectedRevision: Number(config.resourceRevision) } : {})
     };
@@ -137,4 +140,16 @@ export function batchFactoryMappedAction(node) {
   if (resourceType === 'merge') return { type: 'merge', batchId, bookId, resourceId };
   if (resourceType === 'audio' && resourceId) return { type: 'audio', batchId, bookId, resourceId };
   return { type: 'sync', batchId, bookId, resourceId };
+}
+
+export async function runMappedBatchFactoryVideoProduction({ action, requestId, runStage }) {
+  if (action?.type !== 'video' || !action.batchId || !action.bookId || !action.resourceId || typeof runStage !== 'function') {
+    throw new Error('映射视频生产参数无效');
+  }
+  return runStage(action.batchId, action.bookId, 'video', {
+    mode: action.canRetry ? 'force' : 'missing',
+    requestId,
+    videoId: action.resourceId,
+    ...(action.provider ? { provider: action.provider } : {})
+  });
 }

@@ -72,6 +72,9 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			return
 		}
 		binding, err := projects.BatchFactoryBinding(req.Context(), owner, batch.ID)
+		if err == nil {
+			binding, err = ensureLiveAgentBatchFactoryProject(req.Context(), projects, binding, clock)
+		}
 		if errors.Is(err, agentworkspace.ErrBatchFactoryBindingNotFound) {
 			now := clock().UTC()
 			projectID := agentBatchFactoryProjectID(owner, batch.ID)
@@ -216,6 +219,47 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 	})
 }
 
+func ensureLiveAgentBatchFactoryProject(ctx context.Context, projects agentworkspace.Store, binding agentworkspace.BatchFactoryBinding, clock func() time.Time) (agentworkspace.BatchFactoryBinding, error) {
+	if _, err := projects.Project(ctx, binding.Owner, binding.ProjectID); err == nil {
+		return binding, nil
+	} else if !errors.Is(err, agentworkspace.ErrProjectNotFound) {
+		return agentworkspace.BatchFactoryBinding{}, err
+	}
+	current := binding
+	for range 16 {
+		projectID := agentBatchFactoryReplacementProjectID(current.Owner, current.BatchID, current.ProjectID)
+		now := clock().UTC()
+		project := agentworkspace.Project{ID: projectID, Title: "批量工厂项目", TitleMode: "automatic", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
+		createErr := projects.CreateProject(ctx, current.Owner, project)
+		if errors.Is(createErr, agentworkspace.ErrProjectExists) {
+			if _, liveErr := projects.Project(ctx, current.Owner, projectID); errors.Is(liveErr, agentworkspace.ErrProjectNotFound) {
+				current.ProjectID = projectID
+				continue
+			} else if liveErr != nil {
+				return agentworkspace.BatchFactoryBinding{}, liveErr
+			}
+		} else if createErr != nil {
+			return agentworkspace.BatchFactoryBinding{}, createErr
+		}
+		rebound, rebindErr := projects.RebindBatchFactoryProject(ctx, current.Owner, current.BatchID, binding.ProjectID, projectID, now)
+		if rebindErr == nil {
+			return rebound, nil
+		}
+		if !errors.Is(rebindErr, agentworkspace.ErrBatchFactoryBindingConflict) {
+			return agentworkspace.BatchFactoryBinding{}, rebindErr
+		}
+		latest, readErr := projects.BatchFactoryBinding(ctx, current.Owner, current.BatchID)
+		if readErr != nil {
+			return agentworkspace.BatchFactoryBinding{}, readErr
+		}
+		if _, liveErr := projects.Project(ctx, current.Owner, latest.ProjectID); liveErr == nil {
+			return latest, nil
+		}
+		binding, current = latest, latest
+	}
+	return agentworkspace.BatchFactoryBinding{}, agentworkspace.ErrBatchFactoryBindingConflict
+}
+
 // syncAgentBatchFactoryBookProjection is the only Agent-side projection write.
 // Media-producing actions remain on Batch Factory endpoints; after they finish
 // the canvas receives the authoritative records through this one path.
@@ -242,6 +286,11 @@ func bindingResponse(binding agentworkspace.BatchFactoryBinding, bookID string, 
 func agentBatchFactoryProjectID(owner, batchID string) string {
 	digest := sha256.Sum256([]byte(strings.TrimSpace(owner) + "\x00" + strings.TrimSpace(batchID)))
 	return "agent-bf-" + hex.EncodeToString(digest[:12])
+}
+
+func agentBatchFactoryReplacementProjectID(owner, batchID, previousProjectID string) string {
+	digest := sha256.Sum256([]byte(strings.TrimSpace(owner) + "\x00" + strings.TrimSpace(batchID) + "\x00" + strings.TrimSpace(previousProjectID)))
+	return agentBatchFactoryProjectID(owner, batchID) + "-" + hex.EncodeToString(digest[:6])
 }
 
 func agentBatchFactoryBindingForProject(ctx context.Context, projects agentworkspace.Store, batches agentBatchFactoryBridgeStore, owner, projectID string) (agentworkspace.BatchFactoryBinding, batchfactoryv11.Batch, error) {
