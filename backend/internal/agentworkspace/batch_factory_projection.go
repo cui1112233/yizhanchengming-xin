@@ -222,6 +222,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	items := make([]batchFactoryProjectionItem, 0, 1+len(assets)+len(book.Videos)+2)
 	nodeIDByResource := map[string]string{}
 	imageNodeByURL := map[string]string{}
+	imageNodeByAssetID := map[string]string{}
 	merge, hasMerge := projectionLatestMerge(book.ID, mergeJobs)
 	audioSeconds := projectionJSONNumber(book.SettingsState.Patch["audioDurationSeconds"])
 	var audioRecord BatchFactoryAudioRecord
@@ -270,7 +271,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 
 	scriptConfig := projectionConfig(binding.BatchID, book.ID, "book_script", book.ID)
 	applyMappedNodeState(scriptConfig, "confirmed", "")
-	add("book_script", book.ID, projectionFingerprint(book.Revision, book.Title, book.SourceText), Node{
+	scriptNodeID := add("book_script", book.ID, projectionFingerprint(book.Revision, book.Title, book.SourceText), Node{
 		Type: "script", Title: projectionTitle(book.Title, "剧本"), Summary: book.SourceText, Status: "succeeded",
 		Position: Position{X: 40, Y: 80}, Config: scriptConfig,
 	})
@@ -301,8 +302,9 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		applyMappedNodeState(config, imageStatus, "")
 		nodeID := add("book_asset", asset.ID, projectionFingerprint(asset.Revision, primary.ID, primary.Revision, primary.URL), Node{
 			Type: "image", Title: projectionTitle(asset.Name, "图片素材"), Summary: asset.Prompt, Status: imageStatus,
-			Position: Position{X: 360, Y: 80 + float64(index*180)}, AssetRef: assetRef, Config: config,
+			Position: Position{X: 360, Y: 80 + float64(index*180)}, AssetRef: assetRef, Config: config, SourceNodeIDs: []string{scriptNodeID},
 		})
+		imageNodeByAssetID[asset.ID] = nodeID
 		for _, image := range images {
 			if url := strings.TrimSpace(image.URL); url != "" {
 				imageNodeByURL[url] = nodeID
@@ -364,6 +366,11 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 				}
 			}
 		}
+		for _, assetID := range projectionVideoAssetIDs(video, assets) {
+			if sourceID := imageNodeByAssetID[assetID]; sourceID != "" {
+				items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, sourceID)
+			}
+		}
 		nodeIDByResource[projectionResourceKey("video", video.ID)] = nodeID
 	}
 
@@ -406,6 +413,50 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 
 	edges := projectionEdges(binding.ProjectID, book.ID, items)
 	return items, edges, nil
+}
+
+// projectionVideoAssetIDs mirrors Batch Factory's selection rule for the
+// canvas only. A saved selection is authoritative; without one, Batch
+// Factory's production compiler falls back to every available book asset.
+// Keeping that fallback here makes the visible lines truthful before a video
+// is first submitted, instead of showing unrelated isolated nodes.
+func projectionVideoAssetIDs(video batchfactoryv11.Video, assets []batchfactoryv11.BookAsset) []string {
+	type selection struct {
+		AutoAssetIDs     []string `json:"autoAssetIds"`
+		AddedAssetIDs    []string `json:"addedAssetIds"`
+		ExcludedAssetIDs []string `json:"excludedAssetIds"`
+	}
+
+	raw, hasSelection := video.SettingsState.Patch["assetSelection"]
+	if hasSelection && len(raw) > 0 {
+		var saved selection
+		if json.Unmarshal(raw, &saved) == nil {
+			selected := map[string]bool{}
+			for _, id := range append(saved.AutoAssetIDs, saved.AddedAssetIDs...) {
+				if id = strings.TrimSpace(id); id != "" {
+					selected[id] = true
+				}
+			}
+			for _, id := range saved.ExcludedAssetIDs {
+				delete(selected, strings.TrimSpace(id))
+			}
+			ids := make([]string, 0, len(selected))
+			for _, asset := range assets {
+				if selected[asset.ID] {
+					ids = append(ids, asset.ID)
+				}
+			}
+			return ids
+		}
+	}
+
+	ids := make([]string, 0, len(assets))
+	for _, asset := range assets {
+		if id := strings.TrimSpace(asset.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func projectionOriginsByResource(origins []BatchFactoryNodeOrigin, nodes map[string]Node) map[string]BatchFactoryNodeOrigin {

@@ -223,12 +223,28 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	}
 	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", merge.AudioArtifactID)
 	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", merge.ID)
+	scriptNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_script", book.ID)
 	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != nil {
 		t.Fatalf("merge node=%+v", mergeNode)
 	}
+	assertProjectionEdge(t, canvas.Edges, scriptNode.ID, imageNode.ID)
 	assertProjectionEdge(t, canvas.Edges, imageNode.ID, videoNode.ID)
 	assertProjectionEdge(t, canvas.Edges, videoNode.ID, mergeNode.ID)
 	assertProjectionEdge(t, canvas.Edges, audioNode.ID, mergeNode.ID)
+}
+
+func TestProjectionVideoAssetIDsUsesSavedSelectionOrBatchFactoryDefault(t *testing.T) {
+	assets := []batchfactoryv11.BookAsset{{ID: "asset-1"}, {ID: "asset-2"}}
+	video := batchfactoryv11.Video{}
+	if got := projectionVideoAssetIDs(video, assets); !reflect.DeepEqual(got, []string{"asset-1", "asset-2"}) {
+		t.Fatalf("default asset ids=%v", got)
+	}
+	video.SettingsState.Patch = batchfactoryv11.SettingsPatch{
+		"assetSelection": json.RawMessage(`{"autoAssetIds":["asset-2"],"addedAssetIds":["asset-missing"],"excludedAssetIds":["asset-1"]}`),
+	}
+	if got := projectionVideoAssetIDs(video, assets); !reflect.DeepEqual(got, []string{"asset-2"}) {
+		t.Fatalf("selected asset ids=%v", got)
+	}
 }
 
 func projectionConfigPositiveNumber(value any) (float64, bool) {
