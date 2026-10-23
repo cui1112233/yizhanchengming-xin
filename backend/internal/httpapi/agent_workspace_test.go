@@ -140,7 +140,7 @@ func TestAgentWorkspaceCanvasReadAddsSafeAssetContentURL(t *testing.T) {
 	project := agentworkspace.Project{ID: "agent-1", Title: "视频项目", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
 	project.Canvas.Nodes = []agentworkspace.Node{{
 		ID: "video-1", Type: "video", Title: "成片", Version: 2, Status: "confirmed",
-		AssetRef: map[string]any{"id": "asset-1", "kind": "video", "name": "成片.mp4", "objectKey": "private/alice/agent-1/asset-1.mp4"},
+		AssetRef: map[string]any{"id": "asset-1", "kind": "video", "name": "成片.mp4"},
 	}}
 	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
 		t.Fatal(err)
@@ -174,7 +174,7 @@ func TestAgentWorkspaceCanvasReadAddsSafeAudioContentURL(t *testing.T) {
 	project := agentworkspace.Project{ID: "agent-audio-1", Title: "音频项目", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
 	project.Canvas.Nodes = []agentworkspace.Node{{
 		ID: "audio-1", Type: "audio", Title: "配音", Version: 2, Status: "confirmed",
-		AssetRef: map[string]any{"id": "asset-audio-1", "kind": "audio", "name": "speech.mp3", "objectKey": "private/alice/agent-audio-1/asset-audio-1.mp3"},
+		AssetRef: map[string]any{"id": "asset-audio-1", "kind": "audio", "name": "speech.mp3"},
 	}}
 	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
 		t.Fatal(err)

@@ -106,6 +106,9 @@ func normalizeProject(project Project) Project {
 }
 
 func (s *MemoryStore) CreateProject(_ context.Context, owner string, project Project) error {
+	if err := ValidateCanvasForStorage(project.Canvas); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := projectKey(owner, project.ID)

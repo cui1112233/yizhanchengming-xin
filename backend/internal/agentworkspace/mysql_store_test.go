@@ -41,6 +41,30 @@ func TestMySQLStoreCreatesProjectAndEmptyCanvasAtomically(t *testing.T) {
 	}
 }
 
+func TestMySQLStoreCreateProjectRejectsUnsafeCanvasBeforeWrites(t *testing.T) {
+	now := time.Date(2026, 10, 23, 16, 30, 0, 0, time.UTC)
+	for name, canvas := range map[string]Canvas{
+		"forbidden node type": {Nodes: []Node{{ID: "asset-1", Type: "asset"}}},
+		"private object key":  {Nodes: []Node{{ID: "image-1", Type: "image", AssetRef: map[string]any{"objectKey": "private/alice/image.png"}}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			store := NewMySQLStore(db)
+			project := Project{ID: "unsafe-project", Title: "不安全项目", CreatedAt: now, UpdatedAt: now, Canvas: canvas}
+			if err := store.CreateProject(context.Background(), "alice", project); !errors.Is(err, ErrCanvasInvalid) {
+				t.Fatalf("err=%v", err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatalf("unexpected database write: %v", err)
+			}
+		})
+	}
+}
+
 func TestMySQLStoreRejectsStaleCanvasRevisionBeforeWrites(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

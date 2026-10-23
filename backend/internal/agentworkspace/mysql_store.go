@@ -94,6 +94,9 @@ WHERE project_id = ? AND owner_username = ? ORDER BY created_at, id`, id, owner)
 }
 
 func (s *MySQLStore) CreateProject(ctx context.Context, owner string, project Project) error {
+	if err := ValidateCanvasForStorage(project.Canvas); err != nil {
+		return err
+	}
 	project = normalizeProject(project)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

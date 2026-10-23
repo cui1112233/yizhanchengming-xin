@@ -43,6 +43,32 @@ func TestMemoryStoreProjectMessagesAndOwnerIsolation(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreCreateProjectRejectsUnsafeCanvasWithoutPersisting(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 10, 23, 16, 30, 0, 0, time.UTC)
+	for name, canvas := range map[string]Canvas{
+		"forbidden node type": {Nodes: []Node{{ID: "asset-1", Type: "asset"}}},
+		"private object key":  {Nodes: []Node{{ID: "image-1", Type: "image", AssetRef: map[string]any{"objectKey": "private/alice/image.png"}}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := NewMemoryStore()
+			project := Project{ID: "unsafe-project", Title: "不安全项目", CreatedAt: now, UpdatedAt: now, Canvas: canvas}
+			if err := store.CreateProject(ctx, "alice", project); !errors.Is(err, ErrCanvasInvalid) {
+				t.Fatalf("err=%v", err)
+			}
+			if len(store.projects) != 0 {
+				t.Fatalf("unsafe project persisted: %+v", store.projects)
+			}
+			if _, err := store.Project(ctx, "alice", project.ID); !errors.Is(err, ErrProjectNotFound) {
+				t.Fatalf("project err=%v", err)
+			}
+			if _, err := store.Canvas(ctx, "alice", project.ID); !errors.Is(err, ErrProjectNotFound) {
+				t.Fatalf("canvas err=%v", err)
+			}
+		})
+	}
+}
+
 func TestMemoryStoreCanvasRevisionPreventsLostUpdates(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()
