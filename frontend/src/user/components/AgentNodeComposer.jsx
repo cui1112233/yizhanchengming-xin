@@ -65,6 +65,7 @@ export default function AgentNodeComposer({
   const selectedAudioID = String(generationState.selectedAssetId || audioCandidates[0]?.id || '');
   const audioNeedsModel = kind === 'audio' && audioOperationNeedsModel(config.parameters?.operation || config.operation);
   const audioReady = kind === 'audio' && canSubmitAudioNode(node, selectedModel);
+  const isBatchFactoryNode = config.source === 'batch_factory';
   const imageGenerationStatus = kind !== 'image' ? null : (() => {
     if (error) return { tone: 'error', label: '图片生成失败', detail: error };
     if (busy) {
@@ -77,8 +78,8 @@ export default function AgentNodeComposer({
     return null;
   })();
   const submitDisabled = typeof onSubmit !== 'function' || busy || (kind === 'audio'
-    ? !audioReady
-    : (!draftPrompt.trim() || !selectedModel || !modelState.available || (kind === 'video' && !videoState.canGenerate)));
+    ? (!isBatchFactoryNode && !audioReady)
+    : (!draftPrompt.trim() || (!isBatchFactoryNode && (!selectedModel || !modelState.available || (kind === 'video' && !videoState.canGenerate)))));
   const update = patch => onConfigChange?.(node.id, patch);
   const stop = event => event.stopPropagation();
   const persistPrompt = () => {

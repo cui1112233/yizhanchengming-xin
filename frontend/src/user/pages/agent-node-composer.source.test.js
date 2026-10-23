@@ -38,6 +38,12 @@ test('canvas loads all configured model kinds and calls real text and image APIs
   assert.doesNotMatch(composerSource, /暂未接入生成执行器/);
 });
 
+test('mapped Batch Factory cards submit through their mapped stage even when this page has no matching model', () => {
+  assert.match(composerSource, /const isBatchFactoryNode = config\.source === 'batch_factory';/);
+  assert.match(composerSource, /\(!isBatchFactoryNode && \(!selectedModel \|\| !modelState\.available/);
+  assert.match(composerSource, /\? \(!isBatchFactoryNode && !audioReady\)/);
+});
+
 test('canvas close lifecycle clears the composer and its material panel together', () => {
   assert.match(canvasSource, /function closeNodeComposer\(event\) \{\s*\/\/ React Flow can report nested controls as pane clicks\. Only its blank pane closes the editor\.\s*if \(event && !event\.target\?\.classList\?\.contains\('react-flow__pane'\)\) return;/);
   assert.match(canvasSource, /setActiveEditorNodeID\(''\)/);
