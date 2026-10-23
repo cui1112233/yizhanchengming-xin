@@ -22,7 +22,7 @@ import { createNodeAt } from './agent-canvas-context-menu';
 import { appendUniqueAssetID, classifyComposerAttachment } from './agent-composer-attachments';
 import { findNodeMentionCandidates, insertNodeMention } from './agent-node-mentions';
 import { normalizeWorkspaceView, workspaceViewForActiveView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
-import { batchFactoryGroupLabel } from './agent-canvas-batch-factory';
+import { batchFactoryGroupLabel, syncBookThenLoadCanvas } from './agent-canvas-batch-factory';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -544,12 +544,16 @@ export function AgentPageV2({ theme }) {
       return undefined;
     }
     const requestedBookId = String(requestedBatchBookId || '').trim();
-    const canvasRequest = requestedBookId
-      ? syncAgentBatchFactoryBook(activeTaskId, requestedBookId).then(() => getAgentCanvas(activeTaskId))
-      : getAgentCanvas(activeTaskId);
+    const canvasRequest = syncBookThenLoadCanvas({
+      taskId: activeTaskId,
+      bookId: requestedBookId,
+      sync: syncAgentBatchFactoryBook,
+      getCanvas: getAgentCanvas
+    });
     Promise.all([canvasRequest, listAgentExecutions(activeTaskId)])
-      .then(([canvasResult, executionResult]) => {
+      .then(([canvasLoad, executionResult]) => {
         if (cancelled) return;
+        const canvasResult = canvasLoad.result;
         const loadedCanvas = canvasResult.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
         const loadedViewState = normalizeWorkspaceView(loadedCanvas.viewState);
         const queryView = new URLSearchParams(window.location.search).get('view');

@@ -19,6 +19,40 @@ export function agentCanvasURL({ projectId, batchId, bookId } = {}) {
   return `/agent/canvas?${query.toString()}`;
 }
 
+export async function bindBatchFactoryBookAndNavigate({ batchId, bookId, bind, navigate }) {
+  const binding = await bind(batchId);
+  const projectId = String(binding?.projectId || '').trim();
+  if (!projectId) throw new Error('Agent 项目绑定失败');
+  const url = agentCanvasURL({ projectId, batchId, bookId });
+  navigate(url);
+  return binding;
+}
+
+export async function syncBookThenLoadCanvas({ taskId, bookId, sync, getCanvas, createSaveQueue }) {
+  const requestedBookId = String(bookId || '').trim();
+  if (requestedBookId) await sync(taskId, requestedBookId);
+  const result = await getCanvas(taskId);
+  return {
+    result,
+    saveQueue: createSaveQueue?.(result?.canvas || { version: 1, revision: 0, nodes: [], edges: [] })
+  };
+}
+
+export function focusRequestedBookGroup({ bookId, nodes, focus }) {
+  const groupId = bookGroupId(bookId);
+  const groupNodes = (Array.isArray(nodes) ? nodes : []).filter(node => String((node?.groupId ?? node?.data?.groupId) || '') === groupId);
+  if (groupNodes.length) focus?.(groupNodes);
+  return groupNodes;
+}
+
+export async function removeBatchFactoryCanvasNodes({ taskId, nodeIds, flush, remove, refresh }) {
+  const ids = [...new Set((nodeIds || []).map(value => String(value || '').trim()).filter(Boolean))];
+  if (!taskId || !ids.length) return;
+  await flush?.();
+  await Promise.all(ids.map(nodeId => remove(taskId, nodeId)));
+  await refresh?.();
+}
+
 export function isBatchFactoryNode(node) {
   return Boolean(bookIdFromGroupId(node?.groupId ?? node?.data?.groupId));
 }

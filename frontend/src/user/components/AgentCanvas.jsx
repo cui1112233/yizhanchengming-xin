@@ -35,7 +35,7 @@ import { modelInputCapabilityError } from '../pages/agent-model-capabilities';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
 import { retainCanvasAssetPanel, retainCanvasEditorNodeID, viewportHasChanged } from '../pages/agent-canvas-state';
-import { batchFactoryGroupLabel, bookGroupId, isBatchFactoryNode, projectedNodePresentation } from '../pages/agent-canvas-batch-factory';
+import { batchFactoryGroupLabel, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, projectedNodePresentation, removeBatchFactoryCanvasNodes } from '../pages/agent-canvas-batch-factory';
 import { invalidateScriptSplitForSource, normalizeScriptShots, normalizeScriptShotsForConfig, runAfterDurableCanvasSave, scriptShotsByNode as groupScriptShotsByNode, scriptSourceMarker, scriptSplitReady } from '../pages/agent-script-shots';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
@@ -560,9 +560,12 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   useEffect(() => {
     const groupId = bookGroupId(requestedBookId);
     if (!groupId || focusedBookGroupRef.current === groupId) return;
-    if (!nodes.some(node => node.data?.groupId === groupId)) return;
-    focusedBookGroupRef.current = groupId;
-    locateGroup(groupId);
+    const focusedNodes = focusRequestedBookGroup({
+      bookId: requestedBookId,
+      nodes,
+      focus: groupNodes => locateGroup(groupNodes[0]?.data?.groupId)
+    });
+    if (focusedNodes.length) focusedBookGroupRef.current = groupId;
   }, [nodes, requestedBookId]);
 
   function updateRefs(nextNodes, nextEdges, nextViewport = viewportRef.current, nextAppearance = appearanceRef.current) {
@@ -1585,11 +1588,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     const uniqueIDs = [...new Set((nodeIDs || []).map(value => String(value || '').trim()).filter(Boolean))];
     if (!requestedTaskId || !uniqueIDs.length) return;
     try {
-      await onFlushCanvas?.();
+      await removeBatchFactoryCanvasNodes({
+        taskId: requestedTaskId,
+        nodeIds: uniqueIDs,
+        flush: onFlushCanvas,
+        remove: removeAgentBatchFactoryNode,
+        refresh: onServerCanvasChange
+      });
       if (requestedTaskId !== taskIdRef.current) return;
-      await Promise.all(uniqueIDs.map(nodeID => removeAgentBatchFactoryNode(requestedTaskId, nodeID)));
-      if (requestedTaskId !== taskIdRef.current) return;
-      await onServerCanvasChange?.();
       message.success(uniqueIDs.length === 1 ? '已从画布移除书籍节点' : '已从画布移除书籍节点');
     } catch (error) {
       if (requestedTaskId === taskIdRef.current) message.error(error?.message || '从画布移除失败');

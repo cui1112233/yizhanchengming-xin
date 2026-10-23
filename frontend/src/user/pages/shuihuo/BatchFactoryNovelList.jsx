@@ -119,7 +119,7 @@ import { videoProviderForModel } from './videoProviderBinding';
 import { modelOptionsForProvider } from './providerModelBinding';
 import { stripBaseSetupSection } from '../scriptFinalSegment';
 import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
-import { agentCanvasURL } from '../agent-canvas-batch-factory.js';
+import { bindBatchFactoryBookAndNavigate } from '../agent-canvas-batch-factory.js';
 
 
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
@@ -3137,10 +3137,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (!batch?.id || !book?.id || actionBusy) return;
     setActionBusy(`agent-${book.id}`);
     try {
-      const binding = await bindBatchFactoryAgentProject(batch.id);
-      const projectId = String(binding?.projectId || '').trim();
-      if (!projectId) throw new Error('Agent 项目绑定失败');
-      window.location.assign(agentCanvasURL({ projectId, batchId: batch.id, bookId: book.id }));
+      await bindBatchFactoryBookAndNavigate({
+        batchId: batch.id,
+        bookId: book.id,
+        bind: bindBatchFactoryAgentProject,
+        navigate: url => window.location.assign(url)
+      });
     } catch (error) {
       message.error(error?.message || '打开 Agent 画布失败');
       setActionBusy('');
