@@ -342,8 +342,81 @@ func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Ca
 		return Canvas{}, err
 	}
 	defer tx.Rollback()
+	canvas, err = saveCanvasInTx(ctx, tx, owner, id, canvas, expected, now)
+	if err != nil {
+		return Canvas{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, now, id, owner); err != nil {
+		return Canvas{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Canvas{}, err
+	}
+	return canvas, nil
+}
+
+func (s *MySQLStore) SaveBatchFactoryProjection(ctx context.Context, owner string, binding BatchFactoryBinding, bookID string, canvas Canvas, expected int64, origins []BatchFactoryNodeOrigin, now time.Time) (Canvas, error) {
+	owner, bookID = strings.TrimSpace(owner), strings.TrimSpace(bookID)
+	binding.Owner = strings.TrimSpace(binding.Owner)
+	binding.BatchID = strings.TrimSpace(binding.BatchID)
+	binding.ProjectID = strings.TrimSpace(binding.ProjectID)
+	if owner == "" || bookID == "" || ValidateBatchFactoryBinding(binding) != nil || binding.Owner != owner {
+		return Canvas{}, ErrBatchFactoryBindingInvalid
+	}
+	if err := ValidateCanvasForStorage(canvas); err != nil {
+		return Canvas{}, err
+	}
+	normalizedOrigins := make([]BatchFactoryNodeOrigin, len(origins))
+	seenNodes := make(map[string]struct{}, len(origins))
+	for index, origin := range origins {
+		normalized, err := normalizeBatchFactoryNodeOrigin(owner, origin)
+		if err != nil || normalized.ProjectID != binding.ProjectID || normalized.BatchID != binding.BatchID || normalized.BookID != bookID {
+			return Canvas{}, ErrBatchFactoryNodeOriginInvalid
+		}
+		if _, duplicate := seenNodes[normalized.NodeID]; duplicate {
+			return Canvas{}, ErrBatchFactoryNodeOriginInvalid
+		}
+		seenNodes[normalized.NodeID] = struct{}{}
+		normalizedOrigins[index] = normalized
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Canvas{}, err
+	}
+	defer tx.Rollback()
+	canvas, err = saveCanvasInTx(ctx, tx, owner, binding.ProjectID, canvas, expected, now)
+	if err != nil {
+		return Canvas{}, err
+	}
+	var bindingExists int
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM agent_batch_factory_bindings WHERE owner_username = ? AND batch_id = ? AND project_id = ?`, owner, binding.BatchID, binding.ProjectID).Scan(&bindingExists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Canvas{}, ErrBatchFactoryBindingNotFound
+	}
+	if err != nil {
+		return Canvas{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM agent_batch_factory_node_origins WHERE owner_username = ? AND project_id = ? AND book_id = ?`, owner, binding.ProjectID, bookID); err != nil {
+		return Canvas{}, err
+	}
+	for _, origin := range normalizedOrigins {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_batch_factory_node_origins (project_id, node_id, owner_username, batch_id, book_id, resource_type, resource_id, version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, origin.ProjectID, origin.NodeID, owner, origin.BatchID, origin.BookID, origin.ResourceType, origin.ResourceID, nullableBatchFactoryVersionID(origin.VersionID)); err != nil {
+			return Canvas{}, err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, now, binding.ProjectID, owner); err != nil {
+		return Canvas{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Canvas{}, err
+	}
+	return canvas, nil
+}
+
+func saveCanvasInTx(ctx context.Context, tx *sql.Tx, owner, id string, canvas Canvas, expected int64, now time.Time) (Canvas, error) {
 	var revision int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`, id, owner).Scan(&revision)
+	err := tx.QueryRowContext(ctx, `SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`, id, owner).Scan(&revision)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Canvas{}, ErrProjectNotFound
 	}
@@ -377,12 +450,6 @@ func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Ca
 		return Canvas{}, err
 	}
 	if err := syncCanvasNodeIndex(ctx, tx, owner, id, canvas, now); err != nil {
-		return Canvas{}, err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE agent_projects SET updated_at = ? WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, now, id, owner); err != nil {
-		return Canvas{}, err
-	}
-	if err := tx.Commit(); err != nil {
 		return Canvas{}, err
 	}
 	return canvas, nil

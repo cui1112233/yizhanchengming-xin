@@ -2,11 +2,178 @@ package agentworkspace
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
+
+func TestSyncBatchFactoryBookDoesNotExposeMergeFailureDetails(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, production, merge := newProjectionFixture(t, ctx)
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+	secretDetail := "provider failure: Authorization Bearer secret-token"
+	failureTime := merge.UpdatedAt.Add(time.Minute)
+	failed, err := source.CreateMergeJob(ctx, batchfactoryv11.MergeJob{
+		Owner: "alice", BatchID: binding.BatchID, BookID: book.ID, RequestID: "merge-failed",
+		Status: batchfactoryv11.MergeFailed, ErrorMessage: secretDetail,
+		Sources:   []batchfactoryv11.MergeMedia{{ProductionJobID: production.ID, VideoID: book.Videos[0].ID, MediaURL: production.Tasks[0].MediaURL}},
+		CreatedAt: failureTime, UpdatedAt: failureTime,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", failed.ID)
+	visible, err := json.Marshal(struct {
+		Summary  string         `json:"summary"`
+		Config   map[string]any `json:"config"`
+		AssetRef map[string]any `json:"assetRef"`
+	}{Summary: mergeNode.Summary, Config: mergeNode.Config, AssetRef: mergeNode.AssetRef})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(visible), secretDetail) {
+		t.Fatalf("merge failure detail leaked into canvas node: %s", visible)
+	}
+}
+
+func TestProjectBookFingerprintsIgnoreUpstreamErrorDetails(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixture(t, ctx)
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+	batch, err := source.GetBatch(ctx, "alice", binding.BatchID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, found := projectionBook(batch, book.ID)
+	if !found {
+		t.Fatal("fixture book missing")
+	}
+	assets, err := source.ListBookAssets(ctx, "alice", binding.BatchID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	productionJobs, err := source.ListProductionJobs(ctx, "alice", binding.BatchID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mergeJobs, err := source.ListMergeJobs(ctx, "alice", binding.BatchID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, _, err := service.projectBook(ctx, "alice", binding, book, assets, productionJobs, mergeJobs, EmptyCanvas(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changedProduction := append([]batchfactoryv11.ProductionJob(nil), productionJobs...)
+	changedProduction[0].Tasks = append([]batchfactoryv11.ProductionTask(nil), productionJobs[0].Tasks...)
+	changedProduction[0].Tasks[0].ErrorMessage = "executor secret detail"
+	changedMerges := append([]batchfactoryv11.MergeJob(nil), mergeJobs...)
+	changedMerges[0].ErrorMessage = "provider secret detail"
+	changed, _, err := service.projectBook(ctx, "alice", binding, book, assets, changedProduction, changedMerges, EmptyCanvas(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	baseVersions := make(map[string]string, len(base))
+	for _, item := range base {
+		baseVersions[projectionResourceKey(item.origin.ResourceType, item.origin.ResourceID)] = item.origin.VersionID
+	}
+	for _, item := range changed {
+		key := projectionResourceKey(item.origin.ResourceType, item.origin.ResourceID)
+		if item.origin.VersionID != baseVersions[key] {
+			t.Fatalf("error detail changed %s fingerprint: base=%s changed=%s", key, baseVersions[key], item.origin.VersionID)
+		}
+	}
+}
+
+func TestSyncBatchFactoryBookLeavesCanvasAndOriginsUnchangedWhenProjectionSaveFails(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixture(t, ctx)
+	store := service.CanvasStore.(*MemoryStore)
+	beforeCanvas, err := store.Canvas(ctx, "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeOrigins, err := store.BatchFactoryNodeOrigins(ctx, "alice", binding.ProjectID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("origin reconciliation failed")
+	service.CanvasStore = &failingProjectionStore{MemoryStore: store, err: wantErr}
+
+	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); !errors.Is(err, wantErr) {
+		t.Fatalf("err=%v, want %v", err, wantErr)
+	}
+	afterCanvas, err := store.Canvas(ctx, "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterOrigins, err := store.BatchFactoryNodeOrigins(ctx, "alice", binding.ProjectID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(afterCanvas, beforeCanvas) || !reflect.DeepEqual(afterOrigins, beforeOrigins) {
+		t.Fatalf("projection failure changed stored state: canvas before=%+v after=%+v origins before=%+v after=%+v", beforeCanvas, afterCanvas, beforeOrigins, afterOrigins)
+	}
+}
+
+func TestMemoryStoreSaveBatchFactoryProjectionRejectsInvalidOriginWithoutMutation(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 23, 11, 0, 0, 0, time.UTC)
+	project := Project{ID: "project-1", Title: "作品", Canvas: EmptyCanvas(), CreatedAt: now, UpdatedAt: now}
+	if err := store.CreateProject(ctx, "alice", project); err != nil {
+		t.Fatal(err)
+	}
+	binding, err := store.BindBatchFactoryProject(ctx, BatchFactoryBinding{Owner: "alice", BatchID: "batch-1", ProjectID: project.ID, CreatedAt: now, UpdatedAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	existing := BatchFactoryNodeOrigin{ProjectID: project.ID, NodeID: "node-old", BatchID: binding.BatchID, BookID: "book-1", ResourceType: "book_script", ResourceID: "book-1", VersionID: "v1"}
+	if err := store.BindBatchFactoryNode(ctx, "alice", existing); err != nil {
+		t.Fatal(err)
+	}
+	beforeCanvas, err := store.Canvas(ctx, "alice", project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeOrigins, err := store.BatchFactoryNodeOrigins(ctx, "alice", project.ID, "book-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := beforeCanvas
+	next.Nodes = append(next.Nodes, Node{ID: "node-new", Type: "script", Title: "新剧本", Version: 1})
+	desired := []BatchFactoryNodeOrigin{
+		{ProjectID: project.ID, NodeID: "node-new", BatchID: binding.BatchID, BookID: "book-1", ResourceType: "book_script", ResourceID: "book-1", VersionID: "v2"},
+		{ProjectID: project.ID, NodeID: "node-invalid", BatchID: binding.BatchID, BookID: "book-1", ResourceType: "book_asset"},
+	}
+
+	_, err = store.SaveBatchFactoryProjection(ctx, "alice", binding, "book-1", next, beforeCanvas.Revision, desired, now.Add(time.Minute))
+	if !errors.Is(err, ErrBatchFactoryNodeOriginInvalid) {
+		t.Fatalf("err=%v, want %v", err, ErrBatchFactoryNodeOriginInvalid)
+	}
+	afterCanvas, err := store.Canvas(ctx, "alice", project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterOrigins, err := store.BatchFactoryNodeOrigins(ctx, "alice", project.ID, "book-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(afterCanvas, beforeCanvas) || !reflect.DeepEqual(afterOrigins, beforeOrigins) {
+		t.Fatalf("invalid origin changed stored state: canvas before=%+v after=%+v origins before=%+v after=%+v", beforeCanvas, afterCanvas, beforeOrigins, afterOrigins)
+	}
+}
 
 func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	ctx := context.Background()
@@ -257,6 +424,19 @@ func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProje
 }
 
 type batchFactoryAudioRecords map[string]BatchFactoryAudioRecord
+
+type failingProjectionStore struct {
+	*MemoryStore
+	err error
+}
+
+func (s *failingProjectionStore) SaveBatchFactoryProjection(context.Context, string, BatchFactoryBinding, string, Canvas, int64, []BatchFactoryNodeOrigin, time.Time) (Canvas, error) {
+	return Canvas{}, s.err
+}
+
+func (s *failingProjectionStore) BindBatchFactoryNode(context.Context, string, BatchFactoryNodeOrigin) error {
+	return s.err
+}
 
 func (records batchFactoryAudioRecords) BatchFactoryAudioRecord(_ context.Context, _, _, _, audioID string) (BatchFactoryAudioRecord, bool, error) {
 	record, found := records[audioID]

@@ -203,6 +203,76 @@ func (s *MemoryStore) SaveCanvas(_ context.Context, owner, id string, canvas Can
 	if project.Canvas.Revision != expected {
 		return Canvas{}, ErrRevisionConflict
 	}
+	canvas = normalizeSavedCanvas(canvas, expected)
+	project.Canvas = canvas
+	project.UpdatedAt = now
+	s.projects[key] = project
+	return cloneProject(project).Canvas, nil
+}
+
+func (s *MemoryStore) SaveBatchFactoryProjection(_ context.Context, owner string, binding BatchFactoryBinding, bookID string, canvas Canvas, expected int64, origins []BatchFactoryNodeOrigin, now time.Time) (Canvas, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	owner, bookID = strings.TrimSpace(owner), strings.TrimSpace(bookID)
+	binding.Owner = strings.TrimSpace(binding.Owner)
+	binding.BatchID = strings.TrimSpace(binding.BatchID)
+	binding.ProjectID = strings.TrimSpace(binding.ProjectID)
+	if owner == "" || bookID == "" || ValidateBatchFactoryBinding(binding) != nil || binding.Owner != owner {
+		return Canvas{}, ErrBatchFactoryBindingInvalid
+	}
+	if err := ValidateCanvasForStorage(canvas); err != nil {
+		return Canvas{}, err
+	}
+	normalizedOrigins := make([]BatchFactoryNodeOrigin, len(origins))
+	seenNodes := make(map[string]struct{}, len(origins))
+	for index, origin := range origins {
+		normalized, err := normalizeBatchFactoryNodeOrigin(owner, origin)
+		if err != nil || normalized.ProjectID != binding.ProjectID || normalized.BatchID != binding.BatchID || normalized.BookID != bookID {
+			return Canvas{}, ErrBatchFactoryNodeOriginInvalid
+		}
+		if _, duplicate := seenNodes[normalized.NodeID]; duplicate {
+			return Canvas{}, ErrBatchFactoryNodeOriginInvalid
+		}
+		seenNodes[normalized.NodeID] = struct{}{}
+		normalizedOrigins[index] = normalized
+	}
+	persistedBinding, found := s.batchFactoryBindings[batchFactoryBindingKey(owner, binding.BatchID)]
+	if !found {
+		return Canvas{}, ErrBatchFactoryBindingNotFound
+	}
+	if persistedBinding.ProjectID != binding.ProjectID || s.batchFactoryProjects[batchFactoryProjectKey(owner, binding.ProjectID)] != binding.BatchID {
+		return Canvas{}, ErrBatchFactoryBindingConflict
+	}
+	key := projectKey(owner, binding.ProjectID)
+	project, found := s.projects[key]
+	if !found || project.DeletedAt != nil {
+		return Canvas{}, ErrProjectNotFound
+	}
+	if project.Canvas.Revision != expected {
+		return Canvas{}, ErrRevisionConflict
+	}
+
+	canvas = normalizeSavedCanvas(canvas, expected)
+	nextOrigins := make(map[string]BatchFactoryNodeOrigin, len(s.batchFactoryNodeOrigins)+len(normalizedOrigins))
+	prefix := owner + "\x00" + binding.ProjectID + "\x00"
+	for originKey, origin := range s.batchFactoryNodeOrigins {
+		if strings.HasPrefix(originKey, prefix) && origin.BookID == bookID {
+			continue
+		}
+		nextOrigins[originKey] = origin
+	}
+	for _, origin := range normalizedOrigins {
+		nextOrigins[batchFactoryNodeOriginKey(owner, binding.ProjectID, origin.NodeID)] = origin
+	}
+	project.Canvas = canvas
+	project.UpdatedAt = now
+	s.projects[key] = project
+	s.batchFactoryNodeOrigins = nextOrigins
+	return cloneProject(project).Canvas, nil
+}
+
+func normalizeSavedCanvas(canvas Canvas, expected int64) Canvas {
 	canvas.Version = 1
 	canvas.Revision = expected + 1
 	canvas.Appearance = normalizeCanvasAppearance(canvas.Appearance, canvas.appearanceConfigured)
@@ -213,10 +283,7 @@ func (s *MemoryStore) SaveCanvas(_ context.Context, owner, id string, canvas Can
 	if canvas.Edges == nil {
 		canvas.Edges = []Edge{}
 	}
-	project.Canvas = canvas
-	project.UpdatedAt = now
-	s.projects[key] = project
-	return cloneProject(project).Canvas, nil
+	return canvas
 }
 
 func (s *MemoryStore) Executions(_ context.Context, owner, id string) ([]Execution, error) {

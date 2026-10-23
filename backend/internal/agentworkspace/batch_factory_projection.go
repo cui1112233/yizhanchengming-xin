@@ -37,8 +37,13 @@ type BatchFactoryAudioReader interface {
 	BatchFactoryAudioRecord(context.Context, string, string, string, string) (BatchFactoryAudioRecord, bool, error)
 }
 
+type BatchFactoryProjectionStore interface {
+	Store
+	SaveBatchFactoryProjection(context.Context, string, BatchFactoryBinding, string, Canvas, int64, []BatchFactoryNodeOrigin, time.Time) (Canvas, error)
+}
+
 type BatchFactoryProjectionService struct {
-	CanvasStore  Store
+	CanvasStore  BatchFactoryProjectionStore
 	BatchFactory BatchFactoryProjectionReader
 	AudioRecords BatchFactoryAudioReader
 	Now          func() time.Time
@@ -103,27 +108,11 @@ func (s *BatchFactoryProjectionService) SyncBatchFactoryBook(ctx context.Context
 	if s.Now != nil {
 		now = s.Now().UTC()
 	}
-	saved, err := s.CanvasStore.SaveCanvas(ctx, owner, binding.ProjectID, next, canvas.Revision, now)
-	if err != nil {
-		return Canvas{}, err
-	}
-
-	desiredNodes := make(map[string]struct{}, len(items))
+	desiredOrigins := make([]BatchFactoryNodeOrigin, 0, len(items))
 	for _, item := range items {
-		desiredNodes[item.node.ID] = struct{}{}
-		if err := s.CanvasStore.BindBatchFactoryNode(ctx, owner, item.origin); err != nil {
-			return Canvas{}, err
-		}
+		desiredOrigins = append(desiredOrigins, item.origin)
 	}
-	for _, origin := range origins {
-		if _, keep := desiredNodes[origin.NodeID]; keep {
-			continue
-		}
-		if err := s.CanvasStore.RemoveBatchFactoryNodeBinding(ctx, owner, binding.ProjectID, origin.NodeID); err != nil {
-			return Canvas{}, err
-		}
-	}
-	return saved, nil
+	return s.CanvasStore.SaveBatchFactoryProjection(ctx, owner, binding, book.ID, next, canvas.Revision, desiredOrigins, now)
 }
 
 func projectionBook(batch batchfactoryv11.Batch, bookID string) (batchfactoryv11.Book, bool) {
@@ -218,7 +207,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 			if task.MediaURL != "" {
 				assetRef["url"] = task.MediaURL
 			}
-			versionID = projectionFingerprint(video.Revision, task.ID, task.Status, task.MediaURL, task.ErrorMessage, task.UpdatedAt, task.ReferenceImageURLs)
+			versionID = projectionFingerprint(video.Revision, task.ID, task.Status, task.MediaURL, task.UpdatedAt, task.ReferenceImageURLs)
 			status = string(task.Status)
 		}
 		config := projectionConfig(binding.BatchID, book.ID, "video", video.ID)
@@ -270,8 +259,8 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		if merge.OutputURL != "" {
 			assetRef["url"] = merge.OutputURL
 		}
-		mergeNodeID := add("merge", merge.ID, projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.ErrorMessage, merge.UpdatedAt, merge.Sources), Node{
-			Type: "video", Title: "最终合成视频", Summary: merge.ErrorMessage, Status: string(merge.Status), Position: Position{X: 1040, Y: 80},
+		mergeNodeID := add("merge", merge.ID, projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources), Node{
+			Type: "video", Title: "最终合成视频", Status: string(merge.Status), Position: Position{X: 1040, Y: 80},
 			AssetRef: assetRef, Config: projectionConfig(binding.BatchID, book.ID, "merge", merge.ID),
 		})
 		for _, source := range merge.Sources {
@@ -498,4 +487,6 @@ func appendUniqueString(values []string, value string) []string {
 var (
 	_ BatchFactoryProjectionReader = (*batchfactoryv11.MemoryStore)(nil)
 	_ BatchFactoryProjectionReader = (*batchfactoryv11.MySQLStore)(nil)
+	_ BatchFactoryProjectionStore  = (*MemoryStore)(nil)
+	_ BatchFactoryProjectionStore  = (*MySQLStore)(nil)
 )

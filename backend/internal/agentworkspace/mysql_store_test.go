@@ -226,6 +226,45 @@ func TestMySQLStoreSaveCanvasWritesSnapshotAndReconcilesIndexes(t *testing.T) {
 	}
 }
 
+func TestMySQLStoreSaveBatchFactoryProjectionRollsBackCanvasWhenOriginInsertFails(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLStore(db)
+	now := time.Date(2026, 10, 23, 11, 30, 0, 0, time.UTC)
+	appearanceJSON := `{"edgeColor":"coral","edgeAnimated":true,"edgeWidth":"default","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}`
+	binding := BatchFactoryBinding{Owner: "alice", BatchID: "batch-1", ProjectID: "project-1"}
+	origin := BatchFactoryNodeOrigin{ProjectID: binding.ProjectID, NodeID: "node-1", BatchID: binding.BatchID, BookID: "book-1", ResourceType: "book_script", ResourceID: "book-1", VersionID: "v1"}
+	wantErr := errors.New("origin insert failed")
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`)).
+		WithArgs("project-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(int64(0)))
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE agent_canvases SET canvas_version = ?, revision = ?, canvas_json = ?, viewport_json = ?, appearance_json = ?, view_state_json = ?, updated_at = ? WHERE project_id = ? AND owner_username = ?`)).
+		WithArgs(1, int64(1), sqlmock.AnyArg(), nil, appearanceJSON, nil, now, "project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM agent_canvas_edges WHERE project_id = ? AND owner_username = ?`)).
+		WithArgs("project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ?`)).
+		WithArgs("project-1", "alice").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT 1 FROM agent_batch_factory_bindings WHERE owner_username = ? AND batch_id = ? AND project_id = ?`)).
+		WithArgs("alice", "batch-1", "project-1").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(1))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM agent_batch_factory_node_origins WHERE owner_username = ? AND project_id = ? AND book_id = ?`)).
+		WithArgs("alice", "project-1", "book-1").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_batch_factory_node_origins (project_id, node_id, owner_username, batch_id, book_id, resource_type, resource_id, version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)).
+		WithArgs("project-1", "node-1", "alice", "batch-1", "book-1", "book_script", "book-1", "v1").WillReturnError(wantErr)
+	mock.ExpectRollback()
+
+	_, err = store.SaveBatchFactoryProjection(context.Background(), "alice", binding, "book-1", EmptyCanvas(), 0, []BatchFactoryNodeOrigin{origin}, now)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("err=%v, want %v", err, wantErr)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMySQLStoreBeginsAndAppliesTextExecutionAtomically(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
