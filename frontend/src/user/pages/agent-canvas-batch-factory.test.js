@@ -61,3 +61,17 @@ test('removes mapped nodes only after flushing and refreshes the projected canva
   });
   assert.deepEqual(calls, ['flush', 'remove:agent-1:node-1', 'refresh']);
 });
+
+test('does not remove or refresh after the active task changes during flush', async () => {
+  const calls = [];
+  let current = true;
+  await removeBatchFactoryCanvasNodes({
+    taskId: 'agent-1',
+    nodeIds: ['node-1'],
+    flush: async () => { calls.push('flush'); current = false; },
+    remove: async () => calls.push('remove'),
+    refresh: async () => calls.push('refresh'),
+    isCurrent: () => current
+  });
+  assert.deepEqual(calls, ['flush']);
+});

@@ -45,11 +45,13 @@ export function focusRequestedBookGroup({ bookId, nodes, focus }) {
   return groupNodes;
 }
 
-export async function removeBatchFactoryCanvasNodes({ taskId, nodeIds, flush, remove, refresh }) {
+export async function removeBatchFactoryCanvasNodes({ taskId, nodeIds, flush, remove, refresh, isCurrent = () => true }) {
   const ids = [...new Set((nodeIds || []).map(value => String(value || '').trim()).filter(Boolean))];
   if (!taskId || !ids.length) return;
   await flush?.();
+  if (!isCurrent()) return;
   await Promise.all(ids.map(nodeId => remove(taskId, nodeId)));
+  if (!isCurrent()) return;
   await refresh?.();
 }
 

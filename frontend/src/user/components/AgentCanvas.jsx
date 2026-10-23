@@ -1593,7 +1593,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         nodeIds: uniqueIDs,
         flush: onFlushCanvas,
         remove: removeAgentBatchFactoryNode,
-        refresh: onServerCanvasChange
+        refresh: onServerCanvasChange,
+        isCurrent: () => requestedTaskId === taskIdRef.current
       });
       if (requestedTaskId !== taskIdRef.current) return;
       message.success(uniqueIDs.length === 1 ? '已从画布移除书籍节点' : '已从画布移除书籍节点');
