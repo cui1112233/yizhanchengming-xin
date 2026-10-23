@@ -5,7 +5,7 @@ import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, GitBranch, Group, Hand,
-  History, ImagePlus, LibraryBig, MousePointer2, Music2, Plus, SlidersHorizontal, Ungroup
+  ImagePlus, MousePointer2, Music2, Plus, SlidersHorizontal, Ungroup
 } from 'lucide-react';
 import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -42,8 +42,6 @@ import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { AuthenticatedAgentAudio } from './AuthenticatedAgentAudio';
 import { AgentCanvasControls } from './AgentCanvasControls';
-import { AgentGenerationHistoryDrawer } from './AgentGenerationHistoryDrawer';
-import { AgentMaterialLibraryDrawer } from './AgentMaterialLibraryDrawer';
 import { AgentDirectorDeskNode } from './AgentDirectorDeskNode';
 import AgentNodeComposer from './AgentNodeComposer';
 
@@ -413,8 +411,6 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const [generationTasksLoadedTaskID, setGenerationTasksLoadedTaskID] = useState('');
   const [generationTasksLoadError, setGenerationTasksLoadError] = useState('');
   const [generationSummary, setGenerationSummary] = useState(null);
-  const [generationHistoryOpen, setGenerationHistoryOpen] = useState(false);
-  const [materialLibraryOpen, setMaterialLibraryOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(() => new Set());
   const [scriptShotsByNode, setScriptShotsByNode] = useState({});
   const sharedScriptShotsByNode = useMemo(() => groupScriptShotsByNode(scriptShots), [scriptShots]);
@@ -2447,8 +2443,6 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         ], onClick: ({ key }) => addNode(key) }}>
           <span><IconTool label="添加节点"><Plus size={17} /></IconTool></span>
         </Dropdown>
-        <span data-agent-generation-history-entry><IconTool label="打开生成历史" onClick={() => setGenerationHistoryOpen(true)}><History size={17} /></IconTool></span>
-        <span data-agent-material-library-entry><IconTool label="打开素材库" onClick={() => setMaterialLibraryOpen(true)}><LibraryBig size={17} /></IconTool></span>
         <Popover trigger="click" placement="rightTop" overlayClassName="agent-canvas-appearance-popover" content={<section className="agent-canvas-appearance-panel" aria-label="画布外观设置">
           <div className="agent-canvas-appearance-row"><span>连线颜色</span><div className="agent-canvas-color-options">{canvasEdgeColorOptions.map(option => <button key={option.value} type="button" className={`agent-canvas-color-swatch is-${option.value}${appearance.edgeColor === option.value ? ' is-active' : ''}`} aria-label={option.label} aria-pressed={appearance.edgeColor === option.value} onClick={() => updateAppearance({ edgeColor: option.value })} />)}</div></div>
           <div className="agent-canvas-appearance-row"><span>连线动效</span><Switch size="small" checked={appearance.edgeAnimated} onChange={edgeAnimated => updateAppearance({ edgeAnimated })} /></div>
@@ -2459,25 +2453,6 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
           <span><IconTool label="画布外观"><SlidersHorizontal size={17} /></IconTool></span>
         </Popover>
       </nav>
-
-      <AgentGenerationHistoryDrawer
-        open={generationHistoryOpen}
-        onClose={() => setGenerationHistoryOpen(false)}
-        currentProjectId={taskId}
-        onInserted={() => {
-          setGenerationHistoryOpen(false);
-          void onServerCanvasChange?.();
-        }}
-      />
-      <AgentMaterialLibraryDrawer
-        open={materialLibraryOpen}
-        onClose={() => setMaterialLibraryOpen(false)}
-        currentProjectId={taskId}
-        onInserted={() => {
-          setMaterialLibraryOpen(false);
-          void onServerCanvasChange?.();
-        }}
-      />
 
       {selectedIds.length > 0 ? <nav className="agent-canvas-editbar" aria-label="节点编辑工具">
         <IconTool label={availability.canGroup ? '分组' : availability.groupReason} disabled={!availability.canGroup} onClick={() => runNodeCommand(current => groupCanvasNodes(current, selectedIds, `group-${Date.now()}`))}><Group size={17} /></IconTool>
