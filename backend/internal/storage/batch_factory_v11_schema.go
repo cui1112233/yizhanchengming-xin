@@ -597,6 +597,13 @@ func adoptV11OpeningVariantLedger(ctx context.Context, tx *sql.Tx) (bool, error)
 	return v11ColumnsExist(ctx, tx, "batch_factory_v11_merge_jobs", "opening_variant_index")
 }
 
+// reconcileV11OpeningVariantLedger completes a migration that was recorded
+// before the additive opening-variant columns reached the database.
+func reconcileV11OpeningVariantLedger(ctx context.Context, tx *sql.Tx) error {
+	_, err := adoptV11OpeningVariantLedger(ctx, tx)
+	return err
+}
+
 func V11BookAssetImagesStatements() []string {
 	return []string{
 		`CREATE TABLE IF NOT EXISTS batch_factory_v11_book_asset_images (
@@ -752,7 +759,7 @@ func V11Migrations() []Migration {
 		{Version: 1100018, SQL: V11MergeSourceDurationStatements(), CallbackChecksum: "batch-factory-v11-merge-source-durations-v1"},
 		{Version: 1100019, SQL: V11ProductionLibraryStatements(), CallbackChecksum: "batch-factory-v11-production-library-v1"},
 		{Version: 1100020, SQL: V11MergeProgressStatements(), CallbackChecksum: "batch-factory-v11-merge-progress-v1", Reconcile: reconcileV11MergeProgressLedger, Adopt: adoptV11MergeProgressLedger},
-		{Version: 1100021, SQL: V11OpeningVariantStatements(), CallbackChecksum: "batch-factory-v11-opening-variant-v1", Adopt: adoptV11OpeningVariantLedger},
+		{Version: 1100021, SQL: V11OpeningVariantStatements(), CallbackChecksum: "batch-factory-v11-opening-variant-v1", Reconcile: reconcileV11OpeningVariantLedger, Adopt: adoptV11OpeningVariantLedger},
 		{Version: 1100022, SQL: V11LocalArtifactPurgeStatements(), CallbackChecksum: "batch-factory-v11-local-artifact-purge-v1"},
 		// The first public Go deployment recorded this additive table migration
 		// with the SQL-era checksum below. Accept that exact ledger value so the
