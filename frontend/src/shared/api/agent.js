@@ -94,6 +94,18 @@ export function createAgentImageGeneration(taskId, payload, request = apiRequest
   });
 }
 
+export function createAgentImageTool(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/image-tools`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
+export function createAgentVideoTool(taskId, payload, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/video-tools`, {
+    method: 'POST', body: JSON.stringify(payload), suppressGlobalError: true
+  });
+}
+
 export function previewAgentCanvasInputs(taskId, input, request = apiRequest) {
   const payload = typeof input === 'string' ? { nodeId: input } : {
     nodeId: String(input?.nodeId || '').trim(),
@@ -135,6 +147,13 @@ export function createAgentAudioGeneration(taskId, payload, request = apiRequest
   });
 }
 
+export function getAgentAudioWaveform(taskId, assetId, request = apiRequest) {
+  return request(
+    `/api/agent/tasks/${encodeURIComponent(taskId)}/audio-assets/${encodeURIComponent(assetId)}/waveform`,
+    { suppressGlobalError: true }
+  );
+}
+
 export function confirmAgentImageGeneration(taskId, executionId, assetId, request = apiRequest) {
   return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/image-generations/${encodeURIComponent(executionId)}/confirm`, {
     method: 'POST', body: JSON.stringify({ assetId }), suppressGlobalError: true
@@ -153,6 +172,53 @@ export function listAgentGenerations(taskId, request = apiRequest) {
 
 export function getAgentGenerationSummary(taskId, request = apiRequest) {
 	return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generation-summary`, { suppressGlobalError: true });
+}
+
+export function listAgentGenerationHistory(filters = {}, request = apiRequest) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries({
+    kind: filters?.kind,
+    state: filters?.state,
+    modelId: filters?.modelId,
+    q: filters?.query
+  })) {
+    const text = String(value || '').trim();
+    if (text) query.set(key, text);
+  }
+  const suffix = query.size ? `?${query.toString()}` : '';
+  return request(`/api/agent/generation-history${suffix}`, { suppressGlobalError: true });
+}
+
+export function insertAgentGenerationHistoryResult(taskId, sourceTaskId, resultId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/generation-history/${encodeURIComponent(sourceTaskId)}/results/${encodeURIComponent(resultId)}/insert`, {
+    method: 'POST', suppressGlobalError: true
+  });
+}
+
+export function listAgentMaterialLibraryFolders(request = apiRequest) {
+  return request('/api/agent/material-library/folders', { suppressGlobalError: true });
+}
+
+export function createAgentMaterialLibraryFolder(name, request = apiRequest) {
+  return request('/api/agent/material-library/folders', { method: 'POST', body: JSON.stringify({ name }), suppressGlobalError: true });
+}
+
+export function listAgentMaterialLibraryItems(folderId, filters = {}, request = apiRequest) {
+  const query = new URLSearchParams();
+  const kind = String(filters?.kind || '').trim();
+  const text = String(filters?.query || '').trim();
+  if (kind) query.set('kind', kind);
+  if (text) query.set('q', text);
+  const suffix = query.size ? `?${query.toString()}` : '';
+  return request(`/api/agent/material-library/folders/${encodeURIComponent(folderId)}/items${suffix}`, { suppressGlobalError: true });
+}
+
+export function saveAgentMaterialLibraryItem(folderId, input, request = apiRequest) {
+  return request(`/api/agent/material-library/folders/${encodeURIComponent(folderId)}/items`, { method: 'POST', body: JSON.stringify(input), suppressGlobalError: true });
+}
+
+export function insertAgentMaterialLibraryItem(taskId, itemId, request = apiRequest) {
+  return request(`/api/agent/tasks/${encodeURIComponent(taskId)}/material-library/items/${encodeURIComponent(itemId)}/insert`, { method: 'POST', suppressGlobalError: true });
 }
 
 export function getAgentGeneration(taskId, generationId, request = apiRequest) {

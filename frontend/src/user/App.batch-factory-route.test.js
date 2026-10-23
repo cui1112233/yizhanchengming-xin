@@ -7,12 +7,14 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(here, 'App.jsx'), 'utf8');
 
-test('routes the Shuihuo entry to the canonical Batch Factory while retaining the creative library', () => {
+test('keeps Batch Factory on its durable workbench route', () => {
   assert.match(app, /const loadBatchFactoryWorkbenchPage = \(\) => import\('\.\/pages\/BatchFactoryWorkbenchPage'\)/);
   assert.match(app, /const BatchFactoryWorkbenchPage = lazy\(loadBatchFactoryWorkbenchPage\)/);
   assert.match(app, /'\/batch-factory': BatchFactoryWorkbenchPage/);
   assert.match(app, /function CanonicalBatchFactoryRedirect\(\)/);
   assert.match(app, /'\/shuihuo-production': CanonicalBatchFactoryRedirect/);
   assert.match(app, /'\/shuihuo-production\/creative': ShuihuoProductionPage/);
-  assert.doesNotMatch(app, /BatchFactoryFromShuihuoPage/);
+  for (const requiredFile of ['pages/BatchFactoryWorkbenchPage.jsx', 'pages/BatchFactoryWorkbenchPage.css']) {
+    assert.equal(fs.existsSync(path.join(here, requiredFile)), true, `${requiredFile} must remain available`);
+  }
 });

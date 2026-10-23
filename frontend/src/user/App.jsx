@@ -2,13 +2,16 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { UserLayout } from '../shared/layouts/UserLayout';
 import { HomeRoute } from './pages/HomeRoute';
 import GiantMaterialTestPage from './pages/GiantMaterialTestPage';
+import { preloadRoute as preloadWorkbenchRoute } from './workbenchPreload.js';
 
-const loadNovelPanelPage = () => import('./pages/NovelPanelPage');
+export function preloadRoute(href) {
+  return preloadWorkbenchRoute(href);
+}
+
 const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
 const loadBatchFactoryWorkbenchPage = () => import('./pages/BatchFactoryWorkbenchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
-const NovelPanelPage = lazy(loadNovelPanelPage);
 const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ default: module.AgentPageV2 })));
 const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
@@ -36,24 +39,6 @@ function CanonicalBatchFactoryRedirect() {
   return <div className="route-loading" role="status">正在打开批量工厂</div>;
 }
 
-export async function preloadWorkbenchPages(loaders = {
-  novelFetch: loadNovelFetchPage,
-  novelPanel: loadNovelPanelPage,
-  batchFactory: loadBatchFactoryWorkbenchPage
-}) {
-  await Promise.allSettled(Object.values(loaders).map(load => load()));
-}
-
-function scheduleWorkbenchPreload() {
-  const preload = () => { void preloadWorkbenchPages(); };
-  if (typeof window.requestIdleCallback === 'function') {
-    const idleId = window.requestIdleCallback(preload, { timeout: 1500 });
-    return () => window.cancelIdleCallback?.(idleId);
-  }
-  const timerId = window.setTimeout(preload, 200);
-  return () => window.clearTimeout(timerId);
-}
-
 function usePathname() {
   const canonicalPathname = () => {
     const pathname = window.location.pathname;
@@ -79,12 +64,10 @@ function getPage(pathname) {
     '/novel-fetch-react': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchPage,
     '/batch-factory': BatchFactoryWorkbenchPage,
-    '/novel-panel': NovelPanelPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
-    // Keep the old URL as a hard compatibility redirect so there is only one
-    // production workspace. The legacy comic-work library remains available
-    // from the explicit creative entry.
+    // Keep the production-workspace address compatible while retaining the
+    // separate creative library entry.
     '/shuihuo-production': CanonicalBatchFactoryRedirect,
     '/shuihuo-production/creative': ShuihuoProductionPage,
     '/tts': TtsPage,
@@ -108,8 +91,6 @@ function getPage(pathname) {
 }
 
 export function UserApp() {
-  useEffect(() => scheduleWorkbenchPreload(), []);
-
   useEffect(() => {
     const recoverChunk = event => {
       const message = String(event?.reason?.message || event?.error?.message || event?.message || '');
