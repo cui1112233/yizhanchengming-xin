@@ -36,9 +36,10 @@ function shotReadiness(shot) {
 
 export default function AgentScriptNodeComposer({
   node, modelsByKind = {}, modelLoadError = '', scriptState = {},
-  onConfigChange, onSourceTextChange, onSplitScript, onBatchShots
+  onConfigChange, onSourceTextChange, onCommitSource, onRunBatchFactoryStage, onSplitScript, onBatchShots
 }) {
   const config = node?.data?.config || {};
+  const isBatchFactoryScript = config.source === 'batch_factory' && config.resourceType === 'book_script';
   const sourceText = String(config.sourceText || '');
   const [draftSource, setDraftSource] = useState(sourceText);
   const [selection, setSelection] = useState({});
@@ -50,6 +51,8 @@ export default function AgentScriptNodeComposer({
   });
   const [batchError, setBatchError] = useState('');
   const [batchBusyKind, setBatchBusyKind] = useState('');
+  const [batchFactoryStage, setBatchFactoryStage] = useState('');
+  const [batchFactoryError, setBatchFactoryError] = useState('');
   useEffect(() => setDraftSource(sourceText), [node?.id, sourceText]);
 
   const shots = Array.isArray(scriptState.shots) ? scriptState.shots : emptyShots;
@@ -63,7 +66,8 @@ export default function AgentScriptNodeComposer({
   const stateName = String(currentSplitState.state || 'idle').toLowerCase();
   const splitBusy = ['pending', 'queued', 'running', 'processing'].includes(stateName);
   const textModels = modelsByKind.text || [];
-  const splitModel = reconcileNodeModel({ ...config, modelId: config.splitModelId || '' }, textModels, 'text');
+  const selectedTextModelID = config.splitModelId || (isBatchFactoryScript ? config.textModelId || config.modelId || '' : '');
+  const splitModel = reconcileNodeModel({ ...config, modelId: selectedTextModelID }, textModels, 'text');
   const splitReady = scriptSplitReady(config);
   const activeBatchKind = batchKinds.find(item => item.kind === activeKind) || batchKinds[0];
   const activeModel = batchModels[activeBatchKind.kind] || {};
@@ -77,7 +81,7 @@ export default function AgentScriptNodeComposer({
 
   async function splitScript() {
     const preparedSource = draftSource.trim();
-    const modelId = String(config.splitModelId || '').trim();
+    const modelId = String(selectedTextModelID || '').trim();
     if (!preparedSource || !modelId || splitBusy) return;
     setBatchError('');
     await onSplitScript?.(node.id, { nodeId: node.id, nodeVersion: node.data?.version || 1, modelId, sourceText: draftSource });
@@ -102,6 +106,19 @@ export default function AgentScriptNodeComposer({
     }
   }
 
+  async function runBatchFactoryStage(stage) {
+    if (!isBatchFactoryScript || !draftSource.trim() || batchFactoryStage) return;
+    setBatchFactoryError('');
+    setBatchFactoryStage(stage);
+    try {
+      await onRunBatchFactoryStage?.(node.id, stage, splitModel.modelId);
+    } catch (error) {
+      setBatchFactoryError(error?.message || '批量工厂步骤提交失败');
+    } finally {
+      setBatchFactoryStage('');
+    }
+  }
+
   return <section className="agent-node-composer agent-script-node-composer nodrag nopan" aria-label="剧本工作流" onMouseDown={stop} onDoubleClick={stop}>
     <section className="agent-script-step" aria-labelledby="agent-script-step-source">
       <h4 id="agent-script-step-source"><span>1</span>剧本</h4>
@@ -113,30 +130,59 @@ export default function AgentScriptNodeComposer({
         autoSize={{ minRows: 4, maxRows: 8 }}
         placeholder="粘贴剧本正文"
         onChange={changeSource}
+        onBlur={() => {
+          const save = onCommitSource?.(node.id, draftSource);
+          if (save?.catch) void save.catch(() => {});
+        }}
       />
       <div className="agent-script-step__controls">
         <AgentModelPicker
           kind="text"
-          config={{ ...config, modelId: config.splitModelId || '' }}
+          config={{ ...config, modelId: selectedTextModelID }}
           models={textModels}
           disabled={splitBusy}
-          onChange={patch => update({ splitModelId: patch.modelId })}
+          onChange={patch => update(isBatchFactoryScript
+            ? { modelId: patch.modelId, textModelId: patch.modelId }
+            : { splitModelId: patch.modelId })}
         />
         <span className={`agent-node-composer__state${stateName === 'failed' ? ' is-error' : ''}`} aria-live="polite">
           {currentSplitState.errorMessage || scriptState.errorMessage || modelLoadError || splitStateLabels[stateName] || '等待拆分'}
         </span>
-        <Button
+        {!isBatchFactoryScript ? <Button
           type="primary"
           size="small"
           icon={<Scissors size={14} />}
           loading={splitBusy}
           disabled={!draftSource.trim() || !splitModel.modelId || !splitModel.available}
           onClick={splitScript}
-        >拆分镜头</Button>
+        >拆分镜头</Button> : null}
       </div>
     </section>
 
-    <section className="agent-script-step" aria-labelledby="agent-script-step-shots">
+    {isBatchFactoryScript ? <section className="agent-script-step" aria-label="批量工厂生产">
+      <div className="agent-script-step__heading">
+        <h4><span>批</span>批量工厂</h4>
+        <span>结果会同步到本书的图片和视频卡</span>
+      </div>
+      <div className="agent-script-step__generate-controls">
+        <Button
+          type="primary"
+          size="small"
+          loading={batchFactoryStage === 'assets'}
+          disabled={Boolean(batchFactoryStage) || !draftSource.trim() || !splitModel.modelId || !splitModel.available}
+          onClick={() => runBatchFactoryStage('assets')}
+        >提取图片资产</Button>
+        <Button
+          size="small"
+          loading={batchFactoryStage === 'director'}
+          disabled={Boolean(batchFactoryStage) || !draftSource.trim() || !splitModel.modelId || !splitModel.available}
+          onClick={() => runBatchFactoryStage('director')}
+        >生成视频分镜</Button>
+      </div>
+      {batchFactoryError ? <span className="agent-node-composer__state is-error" role="alert">{batchFactoryError}</span> : null}
+    </section> : null}
+
+    {!isBatchFactoryScript ? <section className="agent-script-step" aria-labelledby="agent-script-step-shots">
       <div className="agent-script-step__heading">
         <h4 id="agent-script-step-shots"><span>2</span>镜头</h4>
         <span>{splitReady ? `${shots.length} 个镜头 · 已选 ${selectedIDs.length}` : splitStateLabels[stateName] || '等待拆分'}</span>
@@ -164,9 +210,9 @@ export default function AgentScriptNodeComposer({
           </article>)}
         </div>
       </> : <p className="agent-script-step__empty">{splitBusy ? '镜头拆分完成后会显示在这里' : '先完成第 1 步，拆分出镜头'}</p>}
-    </section>
+    </section> : null}
 
-    <section className="agent-script-step" aria-labelledby="agent-script-step-generate">
+    {!isBatchFactoryScript ? <section className="agent-script-step" aria-labelledby="agent-script-step-generate">
       <div className="agent-script-step__heading">
         <h4 id="agent-script-step-generate"><span>3</span>生成</h4>
         <span>{selectedIDs.length ? `将处理 ${selectedIDs.length} 个镜头` : '先勾选要处理的镜头'}</span>
@@ -196,6 +242,6 @@ export default function AgentScriptNodeComposer({
         >{activeBatchKind.action} {selectedIDs.length ? `(${selectedIDs.length})` : ''}</Button>
       </div>
       {batchError ? <span className="agent-node-composer__state is-error" role="alert">{batchError}</span> : null}
-    </section>
+    </section> : null}
   </section>;
 }

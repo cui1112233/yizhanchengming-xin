@@ -205,14 +205,15 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	}
 
 	imageNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_asset", asset.ID)
-	if imageNode.Config["prompt"] != asset.Prompt || imageNode.AssetRef["id"] != image.ID || imageNode.AssetRef["url"] != nil {
+	_, imageRevisionOK := projectionConfigPositiveNumber(imageNode.Config["resourceRevision"])
+	if imageNode.Config["prompt"] != asset.Prompt || imageNode.Config["assetName"] != asset.Name || !imageRevisionOK || imageNode.AssetRef["id"] != image.ID || imageNode.AssetRef["url"] != nil {
 		t.Fatalf("image node=%+v", imageNode)
 	}
 	videoNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "video", book.Videos[0].ID)
 	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != nil {
 		t.Fatalf("video node=%+v", videoNode)
 	}
-	if videoNode.Config["videoProvider"] != batchfactoryv11.VideoProviderDoubaoLocal || videoNode.Config["videoModelId"] != "local-doubao-executor-video" {
+	if videoNode.Config["videoProvider"] != batchfactoryv11.VideoProviderDoubaoLocal || videoNode.Config["videoModelId"] != "local-doubao-executor-video" || videoNode.Config["modelId"] != "local-doubao-executor-video" {
 		t.Fatalf("video execution settings=%+v", videoNode.Config)
 	}
 	audioSeconds, audioOK := projectionConfigPositiveNumber(videoNode.Config["connectedAudioDurationSeconds"])
@@ -224,6 +225,10 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", merge.AudioArtifactID)
 	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", merge.ID)
 	scriptNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "book_script", book.ID)
+	_, scriptRevisionOK := projectionConfigPositiveNumber(scriptNode.Config["resourceRevision"])
+	if scriptNode.Config["sourceText"] != book.SourceText || !scriptRevisionOK || scriptNode.Config["modelId"] != "text-model-1" {
+		t.Fatalf("script editing config=%+v", scriptNode.Config)
+	}
 	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != nil {
 		t.Fatalf("merge node=%+v", mergeNode)
 	}
@@ -434,6 +439,7 @@ func newProjectionFixture(t *testing.T, ctx context.Context) (*BatchFactoryProje
 		InitialBatchSettings: batchfactoryv11.SettingsPatch{
 			"videoProvider": json.RawMessage(`"doubao_local_executor"`),
 			"videoModelId":  json.RawMessage(`"local-doubao-executor-video"`),
+			"textModelId":   json.RawMessage(`"text-model-1"`),
 		},
 		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本书", SourceText: "第一章，雨夜。", Videos: []batchfactoryv11.CreateVideoInput{{Label: "VIDEO 01", VideoPrompt: "雨夜追逐", DurationSeconds: 5}}}},
 	})

@@ -23,7 +23,7 @@ const PROMPT_PLACEHOLDERS = {
 
 export default function AgentNodeComposer({
   node, models = [], modelLoadError = '', generationState = {},
-  modelsByKind = {}, scriptState = {}, onSourceTextChange, onSplitScript, onBatchShots,
+  modelsByKind = {}, scriptState = {}, onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots,
   onConfigChange, onPickImageAsset, onPickReferenceAsset, onRemoveReference, onSubmit,
   timingWarning = '',
   videoJob, videoState = {}, videoBusy = false, videoActionError = '',
@@ -44,6 +44,8 @@ export default function AgentNodeComposer({
     scriptState={scriptState}
     onConfigChange={onConfigChange}
     onSourceTextChange={onSourceTextChange}
+    onCommitSource={onCommitScriptSource}
+    onRunBatchFactoryStage={onRunBatchFactoryStage}
     onSplitScript={onSplitScript}
     onBatchShots={onBatchShots}
   />;

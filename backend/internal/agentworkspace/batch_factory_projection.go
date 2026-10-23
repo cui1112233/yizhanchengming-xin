@@ -270,6 +270,13 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	}
 
 	scriptConfig := projectionConfig(binding.BatchID, book.ID, "book_script", book.ID)
+	scriptConfig["sourceText"] = book.SourceText
+	scriptConfig["resourceRevision"] = book.Revision
+	effectiveScriptSettings := append([]batchfactoryv11.SettingsPatch(nil), batchSettings...)
+	effectiveScriptSettings = append(effectiveScriptSettings, book.SettingsState.Patch)
+	if textModelID := projectionJSONText(batchfactoryv11.ResolveSettings(effectiveScriptSettings...)["textModelId"]); textModelID != "" {
+		scriptConfig["modelId"], scriptConfig["textModelId"] = textModelID, textModelID
+	}
 	applyMappedNodeState(scriptConfig, "confirmed", "")
 	scriptNodeID := add("book_script", book.ID, projectionFingerprint(book.Revision, book.Title, book.SourceText), Node{
 		Type: "script", Title: projectionTitle(book.Title, "剧本"), Summary: book.SourceText, Status: "succeeded",
@@ -289,11 +296,14 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		}
 		config := projectionConfig(binding.BatchID, book.ID, "book_asset", asset.ID)
 		config["prompt"], config["assetKind"] = asset.Prompt, asset.Kind
+		config["assetName"], config["formalName"] = asset.Name, asset.FormalName
+		config["facts"], config["appearance"], config["relationships"] = asset.Facts, asset.Appearance, asset.Relationships
+		config["resourceRevision"] = asset.Revision
 		if asset.ImageModelID != "" {
-			config["modelId"] = asset.ImageModelID
+			config["modelId"], config["imageModelId"] = asset.ImageModelID, asset.ImageModelID
 		}
 		if asset.ImageAspectRatio != "" {
-			config["ratio"] = asset.ImageAspectRatio
+			config["ratio"], config["imageAspectRatio"] = asset.ImageAspectRatio, asset.ImageAspectRatio
 		}
 		imageStatus := "queued"
 		if primary.ID != "" {
@@ -331,7 +341,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		modelID := projectionJSONText(effective["videoModelId"])
 		provider := batchfactoryv11.VideoProviderForModel(modelID, projectionJSONText(effective["videoProvider"]))
 		if modelID != "" {
-			config["videoModelId"] = modelID
+			config["modelId"], config["videoModelId"] = modelID, modelID
 		}
 		if provider != "" {
 			config["videoProvider"] = provider

@@ -120,6 +120,7 @@ export function batchFactoryMappedAction(node) {
   const resourceType = String(config.resourceType || '').trim();
   const resourceId = String(config.resourceId || '').trim();
   if (!batchId || !bookId || !resourceType) return null;
+  if (resourceType === 'book_script') return { type: 'script', batchId, bookId, resourceId };
   if (resourceType === 'book_asset' && resourceId) return { type: 'image', batchId, bookId, resourceId };
   if (resourceType === 'video') {
     const timing = videoNodeTiming({
@@ -142,6 +143,13 @@ export function batchFactoryMappedAction(node) {
   return { type: 'sync', batchId, bookId, resourceId };
 }
 
+export async function runMappedBatchFactoryScriptStage({ action, stage, requestId, runStage }) {
+  if (action?.type !== 'script' || !action.batchId || !action.bookId || !['assets', 'director'].includes(stage) || typeof runStage !== 'function') {
+    throw new Error('映射剧本生产参数无效');
+  }
+  return runStage(action.batchId, action.bookId, stage, { mode: 'missing', requestId });
+}
+
 export async function runMappedBatchFactoryVideoProduction({ action, requestId, runStage }) {
   if (action?.type !== 'video' || !action.batchId || !action.bookId || !action.resourceId || typeof runStage !== 'function') {
     throw new Error('映射视频生产参数无效');
@@ -150,6 +158,7 @@ export async function runMappedBatchFactoryVideoProduction({ action, requestId, 
     mode: action.canRetry ? 'force' : 'missing',
     requestId,
     videoId: action.resourceId,
-    ...(action.provider ? { provider: action.provider } : {})
+    ...(action.provider ? { provider: action.provider } : {}),
+    ...(action.modelId ? { videoModelId: action.modelId } : {})
   });
 }

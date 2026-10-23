@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
+import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
 
 test('opens the bound project at the requested book group', () => {
   assert.equal(
@@ -126,7 +126,7 @@ test('submits and retries only the selected mapped video through its effective e
     });
     assert.deepEqual(calls, [[
       'batch-1', 'book-1', 'video',
-      { mode, requestId: `request-${mode}`, videoId: 'video-selected', provider: 'doubao_local_executor' }
+      { mode, requestId: `request-${mode}`, videoId: 'video-selected', provider: 'doubao_local_executor', videoModelId: 'local-doubao-executor-video' }
     ]]);
   }
 });
@@ -146,4 +146,17 @@ test('routes mapped image actions back to the batch factory record', () => {
     groupId: 'book:book-1',
     config: { batchId: 'batch-1', bookId: 'book-1', resourceType: 'book_asset', resourceId: 'asset-1' }
   }), { type: 'image', batchId: 'batch-1', bookId: 'book-1', resourceId: 'asset-1' });
+});
+
+test('runs mapped script stages against the same Batch Factory book', async () => {
+  const calls = [];
+  await runMappedBatchFactoryScriptStage({
+    action: { type: 'script', batchId: 'batch-1', bookId: 'book-1' },
+    stage: 'assets',
+    requestId: 'canvas-assets-1',
+    runStage: async (...args) => calls.push(args)
+  });
+  assert.deepEqual(calls, [[
+    'batch-1', 'book-1', 'assets', { mode: 'missing', requestId: 'canvas-assets-1' }
+  ]]);
 });
