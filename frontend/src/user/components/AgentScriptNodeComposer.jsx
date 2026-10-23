@@ -169,13 +169,13 @@ export default function AgentScriptNodeComposer({
           type="primary"
           size="small"
           loading={batchFactoryStage === 'assets'}
-          disabled={Boolean(batchFactoryStage) || !draftSource.trim() || !splitModel.modelId || !splitModel.available}
+          disabled={Boolean(batchFactoryStage) || !draftSource.trim()}
           onClick={() => runBatchFactoryStage('assets')}
         >提取图片资产</Button>
         <Button
           size="small"
           loading={batchFactoryStage === 'director'}
-          disabled={Boolean(batchFactoryStage) || !draftSource.trim() || !splitModel.modelId || !splitModel.available}
+          disabled={Boolean(batchFactoryStage) || !draftSource.trim()}
           onClick={() => runBatchFactoryStage('director')}
         >生成视频分镜</Button>
       </div>
