@@ -93,7 +93,9 @@ export function videoNodeTiming({ audioSeconds, selectedSeconds, allowedSeconds 
     };
   }
   if (audio <= 0 || !allowed.length) return { requestedSeconds: audio, adjusted: false, warning: '' };
-  const requestedSeconds = allowed.find(value => value >= audio) || allowed[allowed.length - 1];
+  const requestedSeconds = allowed.reduce((nearest, value) => (
+    Math.abs(value - audio) < Math.abs(nearest - audio) ? value : nearest
+  ), allowed[0]);
   return { requestedSeconds, adjusted: Math.abs(requestedSeconds - audio) > 0.01, warning: '' };
 }
 
@@ -103,7 +105,11 @@ export function mappedNodeStatePresentation(node) {
   const state = ['queued', 'running', 'succeeded', 'failed', 'cancelled'].includes(String(config.mappedState || node?.status || '').trim())
     ? String(config.mappedState || node?.status).trim()
     : 'queued';
-  return { state, errorMessage: String(config.errorMessage || '').trim(), canRetry: config.canRetry === true };
+  const errorMessage = String(config.errorMessage || '').trim();
+  const message = errorMessage || ({
+    queued: '正在排队', running: '正在执行中…', succeeded: '已完成', failed: '批量工厂任务失败，请重试', cancelled: '已取消'
+  }[state] || '正在排队');
+  return { state, errorMessage, canRetry: config.canRetry === true, busy: state === 'queued' || state === 'running', message };
 }
 
 export function batchFactoryMappedAction(node) {
@@ -115,7 +121,19 @@ export function batchFactoryMappedAction(node) {
   const resourceId = String(config.resourceId || '').trim();
   if (!batchId || !bookId || !resourceType) return null;
   if (resourceType === 'book_asset' && resourceId) return { type: 'image', batchId, bookId, resourceId };
-  if (resourceType === 'video') return { type: 'video', batchId, bookId, resourceId };
+  if (resourceType === 'video') {
+    const timing = videoNodeTiming({
+      audioSeconds: config.connectedAudioDurationSeconds,
+      selectedSeconds: config.durationOverrideSeconds,
+      allowedSeconds: config.allowedDurationSeconds
+    });
+    const resolvedSeconds = Number(config.resolvedDurationSeconds) || timing.requestedSeconds;
+    return {
+      type: 'video', batchId, bookId, resourceId,
+      ...(resolvedSeconds > 0 ? { durationSeconds: resolvedSeconds } : {}),
+      ...(Number(config.resourceRevision) > 0 ? { expectedRevision: Number(config.resourceRevision) } : {})
+    };
+  }
   if (resourceType === 'merge') return { type: 'merge', batchId, bookId, resourceId };
   if (resourceType === 'audio' && resourceId) return { type: 'audio', batchId, bookId, resourceId };
   return { type: 'sync', batchId, bookId, resourceId };

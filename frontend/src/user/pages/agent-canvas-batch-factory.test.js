@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, projectedNodePresentation, removeBatchFactoryCanvasNodes, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
+import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
 
 test('opens the bound project at the requested book group', () => {
   assert.equal(
@@ -93,6 +93,34 @@ test('shows a timing mismatch after manual override', () => {
   const timing = videoNodeTiming({ audioSeconds: 7.4, selectedSeconds: 15, allowedSeconds: [5, 10, 15] });
   assert.match(timing.warning, /与已连接音频时长不一致/);
   assert.equal(timing.requestedSeconds, 15);
+});
+
+test('chooses the absolute nearest supported duration for linked audio', () => {
+  const timing = videoNodeTiming({ audioSeconds: 11, allowedSeconds: [5, 10, 15] });
+  assert.equal(timing.requestedSeconds, 10);
+  assert.equal(timing.adjusted, true);
+});
+
+test('maps projected audio timing into the Batch Factory video action', () => {
+  assert.deepEqual(batchFactoryMappedAction({
+    groupId: 'book:book-1',
+    config: {
+      batchId: 'batch-1', bookId: 'book-1', resourceType: 'video', resourceId: 'video-1', resourceRevision: 7,
+      connectedAudioDurationSeconds: 11, allowedDurationSeconds: [5, 10, 15]
+    }
+  }), {
+    type: 'video', batchId: 'batch-1', bookId: 'book-1', resourceId: 'video-1', durationSeconds: 10, expectedRevision: 7
+  });
+});
+
+test('presents mapped failures with the safe error and retry state', () => {
+  assert.deepEqual(mappedNodeStatePresentation({
+    groupId: 'book:book-1',
+    status: 'failed',
+    config: { mappedState: 'failed', errorMessage: '批量工厂任务失败，请重试', canRetry: true }
+  }), {
+    state: 'failed', errorMessage: '批量工厂任务失败，请重试', canRetry: true, busy: false, message: '批量工厂任务失败，请重试'
+  });
 });
 
 test('routes mapped image actions back to the batch factory record', () => {

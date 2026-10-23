@@ -63,14 +63,10 @@ func ResolveVideoDuration(audioSeconds float64, allowedSeconds []float64, overri
 	if audioSeconds <= 0 || len(allowed) == 0 {
 		return DurationResolution{RequestedSeconds: audioSeconds}
 	}
-	// Choosing the first supported duration that can contain the audio avoids
-	// silently cutting a connected narration short. If every option is shorter,
-	// retain the largest available duration as the closest viable request.
-	requested := allowed[len(allowed)-1]
-	for _, candidate := range allowed {
-		if candidate >= audioSeconds {
+	requested := allowed[0]
+	for _, candidate := range allowed[1:] {
+		if absDurationDelta(candidate, audioSeconds) < absDurationDelta(requested, audioSeconds) {
 			requested = candidate
-			break
 		}
 	}
 	return DurationResolution{RequestedSeconds: requested, Adjusted: absDurationDelta(requested, audioSeconds) > 0.01}
@@ -226,6 +222,25 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	items := make([]batchFactoryProjectionItem, 0, 1+len(assets)+len(book.Videos)+2)
 	nodeIDByResource := map[string]string{}
 	imageNodeByURL := map[string]string{}
+	merge, hasMerge := projectionLatestMerge(book.ID, mergeJobs)
+	audioSeconds := projectionJSONNumber(book.SettingsState.Patch["audioDurationSeconds"])
+	var audioRecord BatchFactoryAudioRecord
+	hasAudioRecord := false
+	if hasMerge && s.AudioRecords != nil {
+		audioID := strings.TrimSpace(merge.AudioArtifactID)
+		if audioID != "" {
+			record, found, err := s.AudioRecords.BatchFactoryAudioRecord(ctx, owner, binding.BatchID, book.ID, audioID)
+			if err != nil {
+				return nil, nil, err
+			}
+			if found && strings.TrimSpace(record.ID) == audioID {
+				audioRecord, hasAudioRecord = record, true
+				if record.DurationSeconds > 0 {
+					audioSeconds = record.DurationSeconds
+				}
+			}
+		}
+	}
 
 	add := func(resourceType, resourceID, versionID string, node Node) string {
 		key := projectionResourceKey(resourceType, resourceID)
@@ -308,6 +323,20 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		}
 		config := projectionConfig(binding.BatchID, book.ID, "video", video.ID)
 		config["prompt"], config["visualPrompt"] = video.VideoPrompt, video.VisualPrompt
+		config["resourceRevision"] = video.Revision
+		allowedDurations := []float64{5, 10, 15}
+		config["allowedDurationSeconds"] = allowedDurations
+		if audioSeconds > 0 {
+			config["connectedAudioDurationSeconds"] = audioSeconds
+		}
+		manualDuration := projectionJSONNumber(video.SettingsState.Patch["duration"])
+		if manualDuration > 0 {
+			config["durationOverrideSeconds"] = manualDuration
+		}
+		resolution := ResolveVideoDuration(audioSeconds, allowedDurations, manualDuration)
+		if resolution.RequestedSeconds > 0 {
+			config["resolvedDurationSeconds"] = resolution.RequestedSeconds
+		}
 		if video.DurationSeconds > 0 {
 			config["durationSeconds"] = video.DurationSeconds
 		}
@@ -327,29 +356,24 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		nodeIDByResource[projectionResourceKey("video", video.ID)] = nodeID
 	}
 
-	if merge, ok := projectionLatestMerge(book.ID, mergeJobs); ok {
+	if hasMerge {
 		var audioNodeID string
-		if audioID := strings.TrimSpace(merge.AudioArtifactID); audioID != "" && s.AudioRecords != nil {
-			record, found, err := s.AudioRecords.BatchFactoryAudioRecord(ctx, owner, binding.BatchID, book.ID, audioID)
-			if err != nil {
-				return nil, nil, err
+		if audioID := strings.TrimSpace(merge.AudioArtifactID); audioID != "" && hasAudioRecord {
+			record := audioRecord
+			assetRef := map[string]any{"id": audioID, "kind": "audio"}
+			config := projectionConfig(binding.BatchID, book.ID, "audio", audioID)
+			if record.DurationSeconds > 0 {
+				config["durationSeconds"] = record.DurationSeconds
 			}
-			if found && strings.TrimSpace(record.ID) == audioID {
-				assetRef := map[string]any{"id": audioID, "kind": "audio"}
-				config := projectionConfig(binding.BatchID, book.ID, "audio", audioID)
-				if record.DurationSeconds > 0 {
-					config["durationSeconds"] = record.DurationSeconds
-				}
-				versionID := strings.TrimSpace(record.VersionID)
-				if versionID == "" {
-					versionID = projectionFingerprint(record.ID, record.Status, record.MediaURL, record.DurationSeconds)
-				}
-				applyMappedNodeState(config, record.Status, "")
-				audioNodeID = add("audio", audioID, versionID, Node{
-					Type: "audio", Title: "配音", Summary: merge.AudioSource, Status: NormalizeMappedNodeState(record.Status, "").Status, Position: Position{X: 360, Y: 120 + float64(len(assets)*180)},
-					AssetRef: assetRef, Config: config,
-				})
+			versionID := strings.TrimSpace(record.VersionID)
+			if versionID == "" {
+				versionID = projectionFingerprint(record.ID, record.Status, record.MediaURL, record.DurationSeconds)
 			}
+			applyMappedNodeState(config, record.Status, "")
+			audioNodeID = add("audio", audioID, versionID, Node{
+				Type: "audio", Title: "配音", Summary: merge.AudioSource, Status: NormalizeMappedNodeState(record.Status, "").Status, Position: Position{X: 360, Y: 120 + float64(len(assets)*180)},
+				AssetRef: assetRef, Config: config,
+			})
 		}
 		assetRef := map[string]any{"id": merge.ID, "kind": "video"}
 		mergeConfig := projectionConfig(binding.BatchID, book.ID, "merge", merge.ID)
@@ -560,6 +584,14 @@ func projectionJSONText(raw json.RawMessage) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
+}
+
+func projectionJSONNumber(raw json.RawMessage) float64 {
+	var value float64
+	if len(raw) == 0 || json.Unmarshal(raw, &value) != nil || value <= 0 {
+		return 0
+	}
+	return value
 }
 
 func projectionResourceKey(resourceType, resourceID string) string {

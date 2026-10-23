@@ -212,6 +212,12 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != nil {
 		t.Fatalf("video node=%+v", videoNode)
 	}
+	audioSeconds, audioOK := projectionConfigPositiveNumber(videoNode.Config["connectedAudioDurationSeconds"])
+	resolvedSeconds, resolvedOK := projectionConfigPositiveNumber(videoNode.Config["resolvedDurationSeconds"])
+	resourceRevision, revisionOK := projectionConfigPositiveNumber(videoNode.Config["resourceRevision"])
+	if !audioOK || absDurationDelta(audioSeconds, 7.4) > 0.001 || !resolvedOK || absDurationDelta(resolvedSeconds, 5) > 0.001 || !revisionOK || resourceRevision < 1 {
+		t.Fatalf("video timing config=%+v", videoNode.Config)
+	}
 	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", merge.AudioArtifactID)
 	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", merge.ID)
 	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != nil {
@@ -220,6 +226,19 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	assertProjectionEdge(t, canvas.Edges, imageNode.ID, videoNode.ID)
 	assertProjectionEdge(t, canvas.Edges, videoNode.ID, mergeNode.ID)
 	assertProjectionEdge(t, canvas.Edges, audioNode.ID, mergeNode.ID)
+}
+
+func projectionConfigPositiveNumber(value any) (float64, bool) {
+	switch number := value.(type) {
+	case float64:
+		return number, number > 0
+	case int64:
+		return float64(number), number > 0
+	case int:
+		return float64(number), number > 0
+	default:
+		return 0, false
+	}
 }
 
 func TestSyncBatchFactoryBookKeepsStableNodesPositionsAndManualContent(t *testing.T) {
@@ -485,11 +504,18 @@ func hasEdge(edges []Edge, source, target, relation string) bool {
 
 func TestResolveVideoDurationUsesNearestAllowedAudioDuration(t *testing.T) {
 	got := ResolveVideoDuration(7.4, []float64{5, 10, 15}, 0)
-	if got.RequestedSeconds != 10 {
-		t.Fatalf("requested=%v, want 10", got.RequestedSeconds)
+	if got.RequestedSeconds != 5 {
+		t.Fatalf("requested=%v, want 5", got.RequestedSeconds)
 	}
 	if !got.Adjusted {
 		t.Fatalf("resolution=%+v, want adjusted", got)
+	}
+}
+
+func TestResolveVideoDurationUsesAbsoluteNearestAllowedValue(t *testing.T) {
+	got := ResolveVideoDuration(11, []float64{5, 10, 15}, 0)
+	if got.RequestedSeconds != 10 {
+		t.Fatalf("requested=%v, want 10", got.RequestedSeconds)
 	}
 }
 
