@@ -15,6 +15,9 @@ func applyVideoPromptOverrides(video *Video) {
 	if value, ok := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); ok {
 		video.VideoPrompt = value
 	}
+	if value, ok := optionalPromptValue(video.SettingsState.Patch, "aiOriginalVideoPrompt"); ok {
+		video.AIOriginalVideoPrompt = value
+	}
 	if value, ok := optionalPromptValue(video.SettingsState.Patch, "visualPrompt"); ok {
 		video.VisualPrompt = value
 	}
@@ -33,4 +36,29 @@ func optionalPromptValue(patch SettingsPatch, key string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSpace(value), true
+}
+
+// initializeAIOriginalVideoPrompt freezes the effective prompt that existed
+// before a user first edits a legacy VIDEO. Later edits keep that stored
+// original intact while changing only videoPrompt.
+func initializeAIOriginalVideoPrompt(update SettingsUpdate, current SettingsPatch, preEditPrompt string) SettingsUpdate {
+	if _, editingPrompt := update.Patch["videoPrompt"]; !editingPrompt {
+		return update
+	}
+	if _, suppliedOriginal := update.Patch["aiOriginalVideoPrompt"]; suppliedOriginal {
+		return update
+	}
+	if _, existingOriginal := current["aiOriginalVideoPrompt"]; existingOriginal {
+		return update
+	}
+	if existingPrompt, overridden := optionalPromptValue(current, "videoPrompt"); overridden {
+		preEditPrompt = existingPrompt
+	}
+	encoded, err := json.Marshal(preEditPrompt)
+	if err != nil {
+		return update
+	}
+	update.Patch = clonePatch(update.Patch)
+	update.Patch["aiOriginalVideoPrompt"] = encoded
+	return update
 }

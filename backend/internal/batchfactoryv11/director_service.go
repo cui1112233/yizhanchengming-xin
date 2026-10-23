@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 )
 
 type DirectorService struct {
@@ -24,6 +25,10 @@ func retryableModelOutputError(err error) error {
 		return nil
 	}
 	return fmt.Errorf("%w: 文本模型输出不符合当前格式要求，可重试：%v", ErrUnavailable, err)
+}
+
+func isTruncatedDirectorOutput(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "director provider output truncated (finish_reason=length)")
 }
 
 func sourceDigest(source string) string {
@@ -376,42 +381,9 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 	if err != nil {
 		return DirectorRevision{}, err
 	}
-	completion, err := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens, DisableJSONResponse: contract.SDTextProtocol})
+	result, err := s.completeDirectorContract(ctx, contract)
 	if err != nil {
 		return DirectorRevision{}, err
-	}
-	var result DirectorResult
-	if contract.SDTextProtocol {
-		result, err = parseSDDirectorText(completion, contract.Normalization.MaxVideoDuration)
-		if err != nil {
-			return DirectorRevision{}, retryableModelOutputError(err)
-		}
-	} else {
-		raw, err := ParseDirectorJSON(completion)
-		if err != nil {
-			// Some OpenAI-compatible gateways accept JSON mode but still return
-			// explanatory text on the first attempt. Give the same frozen
-			// contract one repair attempt without response_format before marking
-			// the stage failed; this keeps a transient formatting issue retryable
-			// without weakening the final validator.
-			retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{
-				SystemPrompt:        contract.SystemPrompt + "\n上一轮输出无法解析。现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
-				UserPrompt:          contract.UserPrompt,
-				Temperature:         0.2,
-				MaxTokens:           contract.MaxTokens,
-				DisableJSONResponse: true,
-			})
-			if retryErr == nil {
-				raw, err = ParseDirectorJSON(retryCompletion)
-			}
-			if err != nil {
-				return DirectorRevision{}, retryableModelOutputError(err)
-			}
-		}
-		result, err = NormalizeDirectorOutput(raw, contract.Normalization)
-		if err != nil {
-			return DirectorRevision{}, retryableModelOutputError(err)
-		}
 	}
 	if smartUnifiedAnalysis != nil {
 		result.SmartUnifiedStyle = smartUnifiedAnalysis.Prompt
@@ -421,6 +393,188 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 		result.SmartUnifiedAnalysis = smartUnifiedAnalysis
 	}
 	return s.Store.PersistDirectorRevision(ctx, owner, book, snapshot, sourceDigest(book.SourceText), hook.ID, result)
+}
+
+// CreateDirectorPromptCandidate regenerates prompts for the existing VIDEO
+// rows without creating a director revision or replacing any accepted prompt.
+func (s *DirectorService) CreateDirectorPromptCandidate(ctx context.Context, owner, batchID, bookID string, expectedBookRevision int64) (DirectorPromptCandidate, error) {
+	if err := s.validate(); err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	batch, err := s.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	book, err := bookFromBatch(batch, bookID)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	if book.Revision != expectedBookRevision {
+		return DirectorPromptCandidate{}, ErrConflict
+	}
+	book, err = s.productionBook(ctx, owner, batchID, book)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	if strings.TrimSpace(book.SourceText) == "" {
+		return DirectorPromptCandidate{}, fmt.Errorf("%w: source text is required", ErrInvalid)
+	}
+	snapshot, err := snapshotForBook(batch, book)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	hook := HookRevision{}
+	if snapshot.Mode == "viral" {
+		hook, err = s.Store.LatestHookRevision(ctx, owner, batchID, bookID)
+		if err != nil || hook.Status != "approved" {
+			return DirectorPromptCandidate{}, fmt.Errorf("%w: viral mode requires approved Hook", ErrConflict)
+		}
+	}
+	contract, err := BuildDirectorContract(book, hook, snapshot)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	result, err := s.completeDirectorContract(ctx, contract)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	if len(result.Storyboard) != len(book.Videos) {
+		return DirectorPromptCandidate{}, fmt.Errorf("%w: regenerated storyboard count does not match existing videos", ErrConflict)
+	}
+	latest, err := s.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	latestBook, err := bookFromBatch(latest, bookID)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	if latestBook.Revision != expectedBookRevision {
+		return DirectorPromptCandidate{}, ErrConflict
+	}
+	now := time.Now().UTC()
+	candidate := DirectorPromptCandidate{
+		ID:                 "director-prompt-candidate-" + sourceDigest(fmt.Sprintf("%s:%s:%d", batchID, bookID, now.UnixNano()))[:16],
+		SourceBookRevision: latestBook.Revision,
+		CreatedAt:          now,
+		VideoPrompts:       make(map[string]string, len(latestBook.Videos)),
+	}
+	for index, video := range latestBook.Videos {
+		candidate.VideoPrompts[video.ID] = storyboardVideoPrompt(result.Storyboard[index])
+	}
+	encoded, err := json.Marshal(candidate)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	if _, err := s.Store.SaveSettings(ctx, owner, ScopeRef{Kind: ScopeBook, BatchID: batchID, BookID: bookID}, SettingsUpdate{
+		Patch: SettingsPatch{"directorPromptCandidate": encoded}, ExpectedRevision: latestBook.Revision,
+	}); err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	return candidate, nil
+}
+
+func (s *DirectorService) DirectorPromptCandidate(ctx context.Context, owner, batchID, bookID string) (DirectorPromptCandidate, error) {
+	if s == nil || s.Store == nil {
+		return DirectorPromptCandidate{}, ErrUnavailable
+	}
+	batch, err := s.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	book, err := bookFromBatch(batch, bookID)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
+	return directorPromptCandidateFromBook(book)
+}
+
+func (s *DirectorService) AcceptDirectorPromptCandidate(ctx context.Context, owner, batchID, bookID, videoID, candidateID string, expectedVideoRevision int64) (Video, error) {
+	if s == nil || s.Store == nil {
+		return Video{}, ErrUnavailable
+	}
+	if err := s.Store.AcceptDirectorPromptCandidate(ctx, owner, batchID, bookID, videoID, candidateID, expectedVideoRevision); err != nil {
+		return Video{}, err
+	}
+	latest, err := s.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return Video{}, err
+	}
+	latestBook, err := bookFromBatch(latest, bookID)
+	if err != nil {
+		return Video{}, err
+	}
+	for _, video := range latestBook.Videos {
+		if video.ID == videoID {
+			return video, nil
+		}
+	}
+	return Video{}, ErrNotFound
+}
+
+func (s *DirectorService) CancelDirectorPromptCandidate(ctx context.Context, owner, batchID, bookID string, expectedBookRevision int64) error {
+	if s == nil || s.Store == nil {
+		return ErrUnavailable
+	}
+	if _, err := s.DirectorPromptCandidate(ctx, owner, batchID, bookID); err != nil {
+		return err
+	}
+	_, err := s.Store.SaveSettings(ctx, owner, ScopeRef{Kind: ScopeBook, BatchID: batchID, BookID: bookID}, SettingsUpdate{
+		RestoreKeys: []string{"directorPromptCandidate"}, ExpectedRevision: expectedBookRevision,
+	})
+	return err
+}
+
+func directorPromptCandidateFromBook(book Book) (DirectorPromptCandidate, error) {
+	return directorPromptCandidateFromPatch(book.SettingsState.Patch)
+}
+
+func directorPromptCandidateFromPatch(patch SettingsPatch) (DirectorPromptCandidate, error) {
+	raw, exists := patch["directorPromptCandidate"]
+	if !exists {
+		return DirectorPromptCandidate{}, ErrNotFound
+	}
+	var candidate DirectorPromptCandidate
+	if err := json.Unmarshal(raw, &candidate); err != nil || strings.TrimSpace(candidate.ID) == "" || len(candidate.VideoPrompts) == 0 {
+		return DirectorPromptCandidate{}, fmt.Errorf("%w: malformed director prompt candidate", ErrInvalid)
+	}
+	return candidate, nil
+}
+
+func (s *DirectorService) completeDirectorContract(ctx context.Context, contract PromptContract) (DirectorResult, error) {
+	completion, err := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens, DisableJSONResponse: contract.SDTextProtocol})
+	if err != nil {
+		return DirectorResult{}, err
+	}
+	if contract.SDTextProtocol {
+		result, err := parseSDDirectorText(completion, contract.Normalization.MaxVideoDuration)
+		if err == nil {
+			return result, nil
+		}
+		retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt + "\n上一轮输出无法解析。现在仅输出完整有效的 SD 分镜文本，不要解释，不要 Markdown。", UserPrompt: contract.UserPrompt, Temperature: 0.2, MaxTokens: contract.MaxTokens, DisableJSONResponse: true})
+		if retryErr == nil {
+			result, err = parseSDDirectorText(retryCompletion, contract.Normalization.MaxVideoDuration)
+		}
+		if err != nil {
+			return DirectorResult{}, retryableModelOutputError(err)
+		}
+		return result, nil
+	}
+	raw, err := ParseDirectorJSON(completion)
+	if err != nil {
+		retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt + "\n上一轮输出无法解析。现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。", UserPrompt: contract.UserPrompt, Temperature: 0.2, MaxTokens: contract.MaxTokens, DisableJSONResponse: true})
+		if retryErr == nil {
+			raw, err = ParseDirectorJSON(retryCompletion)
+		}
+		if err != nil {
+			return DirectorResult{}, retryableModelOutputError(err)
+		}
+	}
+	result, err := NormalizeDirectorOutput(raw, contract.Normalization)
+	if err != nil {
+		return DirectorResult{}, retryableModelOutputError(err)
+	}
+	return result, nil
 }
 
 // RunAssetExtraction runs the compact asset-only request. Existing director
@@ -490,23 +644,34 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 		return nil, err
 	}
 	completion, err := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens})
-	if err != nil {
+	if err != nil && !isTruncatedDirectorOutput(err) {
 		return nil, err
 	}
-	raw, err := ParseDirectorJSON(completion)
-	if err != nil {
+	raw, parseErr := ParseDirectorJSON(completion)
+	if err != nil || parseErr != nil {
+		retryPrompt := "\n上一轮输出无法解析。现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。"
+		if isTruncatedDirectorOutput(err) {
+			retryPrompt = "\n上一轮输出因长度截断。请保留必要的角色、场景和道具，使用更紧凑的短语并减少输出量；现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。"
+		}
 		retryCompletion, retryErr := s.Provider.Complete(ctx, TextCompletionRequest{
-			SystemPrompt:        contract.SystemPrompt + "\n上一轮输出无法解析。现在只输出一个完整、合法的 JSON 对象，不要解释，不要 Markdown。",
+			SystemPrompt:        contract.SystemPrompt + retryPrompt,
 			UserPrompt:          contract.UserPrompt,
 			Temperature:         0.2,
 			MaxTokens:           contract.MaxTokens,
 			DisableJSONResponse: true,
 		})
-		if retryErr == nil {
-			raw, err = ParseDirectorJSON(retryCompletion)
+		if retryErr != nil {
+			if isTruncatedDirectorOutput(retryErr) {
+				return nil, retryErr
+			}
+			if parseErr != nil {
+				return nil, retryableModelOutputError(parseErr)
+			}
+			return nil, retryErr
 		}
-		if err != nil {
-			return nil, retryableModelOutputError(err)
+		raw, parseErr = ParseDirectorJSON(retryCompletion)
+		if parseErr != nil {
+			return nil, retryableModelOutputError(parseErr)
 		}
 	}
 	assets, err := NormalizeAssetExtractionOutput(raw)
