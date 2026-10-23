@@ -688,7 +688,8 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 }
 
 func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
-	if input.ExpectedRevision < 1 || strings.TrimSpace(input.SourceText) == "" {
+	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
+	if input.ExpectedRevision < 1 || !validSourceText {
 		return Book{}, ErrInvalid
 	}
 	s.mu.Lock()
@@ -706,7 +707,7 @@ func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookI
 		if book.Revision != input.ExpectedRevision || (strings.TrimSpace(book.SourceText) != "" && !input.ReplaceSource) {
 			return Book{}, ErrConflict
 		}
-		book.SourceText = strings.TrimSpace(input.SourceText)
+		book.SourceText = sourceText
 		book.TxtText = book.SourceText
 		if shouldReplaceGeneratedBookTitle(book.Title, book.BookID, input.SourceTitle) {
 			book.Title = strings.TrimSpace(input.SourceTitle)
@@ -838,6 +839,7 @@ func (s *MemoryStore) SaveSettings(_ context.Context, owner string, ref ScopeRef
 	}
 	b := owned.Value
 	var rev *int64
+	var selectedVideo *Video
 	switch ref.Kind {
 	case ScopeBatch:
 		rev = &b.Revision
@@ -856,6 +858,7 @@ func (s *MemoryStore) SaveSettings(_ context.Context, owner string, ref ScopeRef
 			for j := range b.Books[i].Videos {
 				if b.Books[i].Videos[j].ID == ref.VideoID {
 					rev = &b.Books[i].Videos[j].Revision
+					selectedVideo = &b.Books[i].Videos[j]
 					break
 				}
 			}
@@ -866,6 +869,9 @@ func (s *MemoryStore) SaveSettings(_ context.Context, owner string, ref ScopeRef
 	}
 	if update.ExpectedRevision != *rev {
 		return SettingsResult{}, ErrConflict
+	}
+	if selectedVideo != nil {
+		update = initializeAIOriginalVideoPrompt(update, s.patches[scopeKey(ref)], selectedVideo.VideoPrompt)
 	}
 	versionID, selectsVersion, err := configVersionIDFromUpdate(ref, update)
 	if err != nil {
@@ -896,6 +902,76 @@ func (s *MemoryStore) SaveSettings(_ context.Context, owner string, ref ScopeRef
 	}
 	snap := ConfigSnapshot{ID: s.id("snapshot"), BatchID: b.ID, BookID: ref.BookID, VideoID: ref.VideoID, Effective: effective, CreatedAt: time.Now().UTC()}
 	return SettingsResult{Scope: ref, Patch: clonePatch(patch), Revision: *rev, Snapshot: &snap}, nil
+}
+
+func (s *MemoryStore) AcceptDirectorPromptCandidate(_ context.Context, owner, batchID, bookID, videoID, candidateID string, expectedVideoRevision int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	owned, ok := s.batches[batchID]
+	if !ok || owned.Owner != owner {
+		return ErrNotFound
+	}
+	batch := owned.Value
+	bookIndex, videoIndex := -1, -1
+	for i := range batch.Books {
+		if batch.Books[i].ID != bookID {
+			continue
+		}
+		bookIndex = i
+		for j := range batch.Books[i].Videos {
+			if batch.Books[i].Videos[j].ID == videoID {
+				videoIndex = j
+				break
+			}
+		}
+		break
+	}
+	if bookIndex < 0 || videoIndex < 0 {
+		return ErrNotFound
+	}
+	bookRef := ScopeRef{Kind: ScopeBook, BatchID: batchID, BookID: bookID}
+	videoRef := ScopeRef{Kind: ScopeVideo, BatchID: batchID, BookID: bookID, VideoID: videoID}
+	bookPatch := clonePatch(s.patches[scopeKey(bookRef)])
+	candidate, err := directorPromptCandidateFromPatch(bookPatch)
+	if err != nil {
+		return err
+	}
+	if candidate.ID != strings.TrimSpace(candidateID) {
+		return fmt.Errorf("%w: candidate no longer matches", ErrConflict)
+	}
+	prompt, exists := candidate.VideoPrompts[videoID]
+	if !exists || strings.TrimSpace(prompt) == "" {
+		return ErrNotFound
+	}
+	video := &batch.Books[bookIndex].Videos[videoIndex]
+	if video.Revision != expectedVideoRevision {
+		return ErrConflict
+	}
+	encodedPrompt, err := json.Marshal(prompt)
+	if err != nil {
+		return err
+	}
+	videoPatch := ApplySparseUpdate(s.patches[scopeKey(videoRef)], SettingsUpdate{Patch: SettingsPatch{
+		"aiOriginalVideoPrompt": encodedPrompt,
+		"videoPrompt":           encodedPrompt,
+	}})
+	delete(candidate.VideoPrompts, videoID)
+	if len(candidate.VideoPrompts) == 0 {
+		delete(bookPatch, "directorPromptCandidate")
+	} else {
+		encodedCandidate, err := json.Marshal(candidate)
+		if err != nil {
+			return err
+		}
+		bookPatch["directorPromptCandidate"] = encodedCandidate
+	}
+	video.Revision++
+	batch.Books[bookIndex].Revision++
+	batch.UpdatedAt = time.Now().UTC()
+	s.patches[scopeKey(videoRef)] = videoPatch
+	s.patches[scopeKey(bookRef)] = bookPatch
+	s.batches[batchID] = memoryOwned[Batch]{Owner: owner, Value: batch}
+	return nil
 }
 func (s *MemoryStore) ConfigVersions(_ context.Context, owner string) ([]ConfigVersion, error) {
 	s.mu.Lock()
@@ -1008,6 +1084,15 @@ func validBookAssetKind(kind string) bool {
 	}
 }
 
+func validBookAssetImageAspectRatio(ratio string) bool {
+	switch ratio {
+	case "", "16:9", "9:16", "1:1":
+		return true
+	default:
+		return false
+	}
+}
+
 func normalizeBookAssetInput(input CreateBookAssetInput) (CreateBookAssetInput, error) {
 	input.Kind = strings.TrimSpace(input.Kind)
 	input.Name = strings.TrimSpace(input.Name)
@@ -1016,7 +1101,8 @@ func normalizeBookAssetInput(input CreateBookAssetInput) (CreateBookAssetInput, 
 	input.Appearance = strings.TrimSpace(input.Appearance)
 	input.Relationships = strings.TrimSpace(input.Relationships)
 	input.Prompt = strings.TrimSpace(input.Prompt)
-	if !validBookAssetKind(input.Kind) || input.Name == "" || input.Prompt == "" || len(input.Name) > 255 {
+	input.ImageModelID = strings.TrimSpace(input.ImageModelID)
+	if !validBookAssetKind(input.Kind) || input.Name == "" || input.Prompt == "" || len(input.Name) > 255 || !validBookAssetImageAspectRatio(input.ImageAspectRatio) {
 		return CreateBookAssetInput{}, ErrInvalid
 	}
 	return input, nil
@@ -1055,7 +1141,7 @@ func (s *MemoryStore) CreateBookAsset(_ context.Context, owner, batchID, bookID 
 		return BookAsset{}, ErrNotFound
 	}
 	now := time.Now().UTC()
-	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, Source: "manual", Revision: 1, CreatedAt: now, UpdatedAt: now}
+	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, Source: "manual", Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.bookAssets[asset.ID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	return asset, nil
 }
@@ -1067,7 +1153,8 @@ func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID,
 	input.Appearance = strings.TrimSpace(input.Appearance)
 	input.Relationships = strings.TrimSpace(input.Relationships)
 	input.Prompt = strings.TrimSpace(input.Prompt)
-	if input.Name == "" || input.Prompt == "" || len(input.Name) > 255 {
+	input.ImageModelID = strings.TrimSpace(input.ImageModelID)
+	if input.Name == "" || input.Prompt == "" || len(input.Name) > 255 || !validBookAssetImageAspectRatio(input.ImageAspectRatio) {
 		return BookAsset{}, ErrInvalid
 	}
 	s.mu.Lock()
@@ -1083,7 +1170,7 @@ func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID,
 	if input.ExpectedRevision != asset.Revision {
 		return BookAsset{}, ErrConflict
 	}
-	asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, asset.Source, asset.Revision, asset.UpdatedAt = input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, "manual", asset.Revision+1, time.Now().UTC()
+	asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, asset.ImageModelID, asset.ImageAspectRatio, asset.Source, asset.Revision, asset.UpdatedAt = input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, input.ImageModelID, input.ImageAspectRatio, "manual", asset.Revision+1, time.Now().UTC()
 	s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	return asset, nil
 }
@@ -1115,7 +1202,7 @@ func validBookAssetImageInput(input CreateBookAssetImageInput) (CreateBookAssetI
 	if input.MediaType == "" {
 		input.MediaType = "image/png"
 	}
-	if input.Source != "provider" && input.Source != "upload" {
+	if input.Source != "provider" && input.Source != "upload" && input.Source != VideoProviderDoubaoLocal {
 		return CreateBookAssetImageInput{}, ErrInvalid
 	}
 	if input.MediaType == "" || (input.URL == "" && input.StorageRef == "") || (input.URL != "" && input.StorageRef != "") {

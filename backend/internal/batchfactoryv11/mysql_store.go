@@ -370,7 +370,8 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 }
 
 func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
-	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || strings.TrimSpace(input.SourceText) == "" {
+	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || !validSourceText {
 		return Book{}, ErrInvalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -412,7 +413,6 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	if err != nil {
 		return Book{}, ErrInvalid
 	}
-	sourceText := strings.TrimSpace(input.SourceText)
 	nextTitle := currentTitle.String
 	if shouldReplaceGeneratedBookTitle(nextTitle, sourceBookID.String, input.SourceTitle) {
 		nextTitle = strings.TrimSpace(input.SourceTitle)
@@ -566,29 +566,69 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	// A project card needs at most one already-generated cover. Reading that
 	// choice here in one bulk query prevents the browser from polling full
 	// production and merge histories for every old project after each reload.
-	coverRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,j.id FROM batch_factory_v11_merge_jobs j LEFT JOIN batch_factory_v11_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`, owner)
+	coverRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,j.output_url FROM batch_factory_v11_merge_jobs j LEFT JOIN batch_factory_v11_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
 	defer coverRows.Close()
 	seenCover := map[string]bool{}
 	for coverRows.Next() {
-		var batchID, jobID string
-		if err := coverRows.Scan(&batchID, &jobID); err != nil {
+		var batchID, outputURL string
+		if err := coverRows.Scan(&batchID, &outputURL); err != nil {
 			return nil, err
+		}
+		artifactID := projectCoverArtifactID(batchID, outputURL)
+		if artifactID == "" {
+			continue
 		}
 		if seenCover[batchID] {
 			continue
 		}
 		seenCover[batchID] = true
 		if index, ok := batchIndexByID[batchID]; ok {
-			batches[index].ProjectCoverJobID = jobID
+			batches[index].ProjectCoverArtifactID = artifactID
 		}
 	}
 	if err := coverRows.Err(); err != nil {
 		return nil, err
 	}
+
+	// Not every batch has been merged into a final video yet. Reuse the first
+	// completed storyboard video as its project-card cover so the library can
+	// show real work without issuing one production-status request per card.
+	shotRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,t.media_url FROM batch_factory_v11_production_tasks t JOIN batch_factory_v11_production_jobs j ON j.id=t.job_id AND j.owner_username=t.owner_username LEFT JOIN batch_factory_v11_books b ON b.id=j.book_id AND b.owner_username=j.owner_username LEFT JOIN batch_factory_v11_videos v ON v.id=t.video_id AND v.owner_username=t.owner_username WHERE t.owner_username=? AND t.status='succeeded' AND COALESCE(t.media_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),COALESCE(v.ordinal,2147483647),t.updated_at DESC,t.id DESC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer shotRows.Close()
+	seenShot := map[string]bool{}
+	for shotRows.Next() {
+		var batchID, mediaURL string
+		if err := shotRows.Scan(&batchID, &mediaURL); err != nil {
+			return nil, err
+		}
+		if seenShot[batchID] {
+			continue
+		}
+		seenShot[batchID] = true
+		if index, ok := batchIndexByID[batchID]; ok {
+			batches[index].ProjectCoverMediaURL = mediaURL
+		}
+	}
+	if err := shotRows.Err(); err != nil {
+		return nil, err
+	}
 	return batches, nil
+}
+
+func projectCoverArtifactID(batchID, outputURL string) string {
+	for _, version := range []string{"v11", "v12"} {
+		prefix := "/api/batch-factory/" + version + "/batches/" + batchID + "/merge-media/"
+		if artifactID, ok := strings.CutPrefix(strings.TrimSpace(outputURL), prefix); ok && localMergedArtifactID.MatchString(artifactID) {
+			return artifactID
+		}
+	}
+	return ""
 }
 
 func (s *MySQLStore) GetBatch(ctx context.Context, owner, id string) (Batch, error) {
@@ -970,6 +1010,16 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 	if err != nil {
 		return SettingsResult{}, err
 	}
+	if ref.Kind == ScopeVideo {
+		var preEditPrompt string
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(video_prompt,'') FROM batch_factory_v11_video_records WHERE video_id=?`, ref.VideoID).Scan(&preEditPrompt); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return SettingsResult{}, ErrNotFound
+			}
+			return SettingsResult{}, err
+		}
+		update = initializeAIOriginalVideoPrompt(update, patch, preEditPrompt)
+	}
 	patch = ApplySparseUpdate(patch, update)
 	next := current + 1
 	if err := updateScopeRevision(ctx, tx, owner, ref, next); err != nil {
@@ -1004,6 +1054,88 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 	}
 	snap := ConfigSnapshot{ID: snapshotID, BatchID: ref.BatchID, BookID: ref.BookID, VideoID: ref.VideoID, Effective: effective, CreatedAt: now}
 	return SettingsResult{Scope: ref, Patch: patch, Revision: next, Snapshot: &snap}, nil
+}
+
+// AcceptDirectorPromptCandidate updates a selected VIDEO and removes that
+// candidate entry while holding both scopes in one MySQL transaction.
+func (s *MySQLStore) AcceptDirectorPromptCandidate(ctx context.Context, owner, batchID, bookID, videoID, candidateID string, expectedVideoRevision int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	bookRef := ScopeRef{Kind: ScopeBook, BatchID: batchID, BookID: bookID}
+	videoRef := ScopeRef{Kind: ScopeVideo, BatchID: batchID, BookID: bookID, VideoID: videoID}
+	bookRevision, err := lockScopeRevision(ctx, tx, owner, bookRef)
+	if err != nil {
+		return err
+	}
+	videoRevision, err := lockScopeRevision(ctx, tx, owner, videoRef)
+	if err != nil {
+		return err
+	}
+	if videoRevision != expectedVideoRevision {
+		return ErrConflict
+	}
+	bookPatch, err := loadPatch(ctx, tx, owner, bookRef)
+	if err != nil {
+		return err
+	}
+	candidate, err := directorPromptCandidateFromPatch(bookPatch)
+	if err != nil {
+		return err
+	}
+	if candidate.ID != strings.TrimSpace(candidateID) {
+		return fmt.Errorf("%w: candidate no longer matches", ErrConflict)
+	}
+	prompt, exists := candidate.VideoPrompts[videoID]
+	if !exists || strings.TrimSpace(prompt) == "" {
+		return ErrNotFound
+	}
+	videoPatch, err := loadPatch(ctx, tx, owner, videoRef)
+	if err != nil {
+		return err
+	}
+	encodedPrompt, err := json.Marshal(prompt)
+	if err != nil {
+		return err
+	}
+	videoPatch = ApplySparseUpdate(videoPatch, SettingsUpdate{Patch: SettingsPatch{
+		"aiOriginalVideoPrompt": encodedPrompt,
+		"videoPrompt":           encodedPrompt,
+	}})
+	delete(candidate.VideoPrompts, videoID)
+	if len(candidate.VideoPrompts) == 0 {
+		delete(bookPatch, "directorPromptCandidate")
+	} else {
+		encodedCandidate, err := json.Marshal(candidate)
+		if err != nil {
+			return err
+		}
+		bookPatch["directorPromptCandidate"] = encodedCandidate
+	}
+	if err := updateScopeRevision(ctx, tx, owner, videoRef, videoRevision+1); err != nil {
+		return err
+	}
+	if err := updateScopeRevision(ctx, tx, owner, bookRef, bookRevision+1); err != nil {
+		return err
+	}
+	if err := upsertSettingsPatch(ctx, tx, owner, videoRef, videoPatch, videoRevision+1); err != nil {
+		return err
+	}
+	if err := upsertSettingsPatch(ctx, tx, owner, bookRef, bookPatch, bookRevision+1); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func upsertSettingsPatch(ctx context.Context, tx *sql.Tx, owner string, ref ScopeRef, patch SettingsPatch, revision int64) error {
+	encoded, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(encoded), revision)
+	return err
 }
 
 func scopeID(ref ScopeRef) string {

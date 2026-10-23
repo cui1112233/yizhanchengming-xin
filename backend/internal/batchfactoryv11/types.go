@@ -60,13 +60,14 @@ type Video struct {
 	// VideoPrompt is the Director/video-motion instruction compiled for the
 	// video model. VisualPrompt is deliberately separate and only drives the
 	// optional still-image generation chain.
-	VideoPrompt        string        `json:"videoPrompt,omitempty"`
-	VisualPrompt       string        `json:"visualPrompt,omitempty"`
-	ComicPrompt        string        `json:"comicPrompt,omitempty"`
-	DurationSeconds    float64       `json:"durationSeconds,omitempty"`
-	CompatibilityState string        `json:"compatibilityState"`
-	Revision           int64         `json:"revision"`
-	SettingsState      SettingsState `json:"settingsState"`
+	VideoPrompt           string        `json:"videoPrompt,omitempty"`
+	AIOriginalVideoPrompt string        `json:"aiOriginalVideoPrompt,omitempty"`
+	VisualPrompt          string        `json:"visualPrompt,omitempty"`
+	ComicPrompt           string        `json:"comicPrompt,omitempty"`
+	DurationSeconds       float64       `json:"durationSeconds,omitempty"`
+	CompatibilityState    string        `json:"compatibilityState"`
+	Revision              int64         `json:"revision"`
+	SettingsState         SettingsState `json:"settingsState"`
 }
 type Book struct {
 	ID                  string            `json:"id"`
@@ -90,15 +91,16 @@ type Book struct {
 	Videos              []Video           `json:"videos"`
 }
 type Batch struct {
-	ID                string        `json:"id"`
-	Title             string        `json:"title"`
-	SourceIntakeID    string        `json:"sourceIntakeId,omitempty"`
-	ProjectCoverJobID string        `json:"projectCoverJobId,omitempty"`
-	Revision          int64         `json:"revision"`
-	SettingsState     SettingsState `json:"settingsState"`
-	Books             []Book        `json:"books"`
-	CreatedAt         time.Time     `json:"createdAt,omitempty"`
-	UpdatedAt         time.Time     `json:"updatedAt,omitempty"`
+	ID                     string        `json:"id"`
+	Title                  string        `json:"title"`
+	SourceIntakeID         string        `json:"sourceIntakeId,omitempty"`
+	ProjectCoverArtifactID string        `json:"projectCoverArtifactId,omitempty"`
+	ProjectCoverMediaURL   string        `json:"projectCoverMediaUrl,omitempty"`
+	Revision               int64         `json:"revision"`
+	SettingsState          SettingsState `json:"settingsState"`
+	Books                  []Book        `json:"books"`
+	CreatedAt              time.Time     `json:"createdAt,omitempty"`
+	UpdatedAt              time.Time     `json:"updatedAt,omitempty"`
 }
 type CreateVideoInput struct {
 	Label           string  `json:"label"`
@@ -215,6 +217,8 @@ type BookAsset struct {
 	Appearance              string    `json:"appearance,omitempty"`
 	Relationships           string    `json:"relationships,omitempty"`
 	Prompt                  string    `json:"prompt"`
+	ImageModelID            string    `json:"imageModelId"`
+	ImageAspectRatio        string    `json:"imageAspectRatio"`
 	Source                  string    `json:"source"`
 	ExtractionPresetID      string    `json:"extractionPresetId,omitempty"`
 	ExtractionPresetVersion int64     `json:"extractionPresetVersion,omitempty"`
@@ -224,13 +228,15 @@ type BookAsset struct {
 }
 
 type CreateBookAssetInput struct {
-	Kind          string `json:"kind"`
-	Name          string `json:"name"`
-	FormalName    string `json:"formalName,omitempty"`
-	Facts         string `json:"facts,omitempty"`
-	Appearance    string `json:"appearance,omitempty"`
-	Relationships string `json:"relationships,omitempty"`
-	Prompt        string `json:"prompt"`
+	Kind             string `json:"kind"`
+	Name             string `json:"name"`
+	FormalName       string `json:"formalName,omitempty"`
+	Facts            string `json:"facts,omitempty"`
+	Appearance       string `json:"appearance,omitempty"`
+	Relationships    string `json:"relationships,omitempty"`
+	Prompt           string `json:"prompt"`
+	ImageModelID     string `json:"imageModelId,omitempty"`
+	ImageAspectRatio string `json:"imageAspectRatio,omitempty"`
 }
 
 type UpdateBookAssetInput struct {
@@ -240,6 +246,8 @@ type UpdateBookAssetInput struct {
 	Appearance       string `json:"appearance,omitempty"`
 	Relationships    string `json:"relationships,omitempty"`
 	Prompt           string `json:"prompt"`
+	ImageModelID     string `json:"imageModelId,omitempty"`
+	ImageAspectRatio string `json:"imageAspectRatio,omitempty"`
 	ExpectedRevision int64  `json:"expectedRevision"`
 }
 
@@ -293,6 +301,16 @@ type DirectorRunInput struct {
 	BookID  string `json:"bookId"`
 }
 
+// DirectorPromptCandidate is a temporary, book-scoped regeneration result.
+// Its prompts are keyed by the already-persisted VIDEO IDs so accepting one
+// candidate never changes the formal director revision or VIDEO inventory.
+type DirectorPromptCandidate struct {
+	ID                 string            `json:"id"`
+	SourceBookRevision int64             `json:"sourceBookRevision"`
+	CreatedAt          time.Time         `json:"createdAt"`
+	VideoPrompts       map[string]string `json:"videoPrompts"`
+}
+
 type DirectorSnapshot struct {
 	Effective            SettingsPatch `json:"effective"`
 	Mode                 string        `json:"mode"`
@@ -339,6 +357,7 @@ type Store interface {
 	UpdateBookMetadata(context.Context, string, string, string, UpdateBookMetadataInput) (Book, error)
 	CaptureBookSource(context.Context, string, string, string, CaptureBookSourceInput) (Book, error)
 	SaveSettings(context.Context, string, ScopeRef, SettingsUpdate) (SettingsResult, error)
+	AcceptDirectorPromptCandidate(context.Context, string, string, string, string, string, int64) error
 	ConfigVersions(context.Context, string) ([]ConfigVersion, error)
 	CreateConfigVersion(context.Context, string, ConfigVersion) (ConfigVersion, error)
 	RenameConfigVersion(context.Context, string, string, string) (ConfigVersion, error)

@@ -479,6 +479,15 @@ func V11BookAssetDetailsStatements() []string {
 	}
 }
 
+// V11BookAssetImageOverridesStatements adds nullable per-asset image settings.
+// Empty values preserve inherited batch or book configuration for existing rows.
+func V11BookAssetImageOverridesStatements() []string {
+	return []string{
+		`ALTER TABLE batch_factory_v11_book_assets ADD COLUMN image_model_id VARCHAR(255) NULL AFTER prompt`,
+		`ALTER TABLE batch_factory_v11_book_assets ADD COLUMN image_aspect_ratio VARCHAR(16) NULL AFTER image_model_id`,
+	}
+}
+
 // reconcileV11SeparateVideoPromptLedger repairs the matching historical
 // ledger/schema split for the prompt separation migration. When the column is
 // absent, run the original one-time copy before clearing visual_prompt; once
@@ -513,6 +522,12 @@ func v11ColumnsExist(ctx context.Context, tx *sql.Tx, table string, columns ...s
 		}
 	}
 	return true, nil
+}
+
+func v11IndexExists(ctx context.Context, tx *sql.Tx, table, index string) (bool, error) {
+	var count int
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`, table, index).Scan(&count)
+	return count > 0, err
 }
 
 func adoptV11BookMergeLedger(ctx context.Context, tx *sql.Tx) (bool, error) {
@@ -564,13 +579,59 @@ func reconcileV11MergeProgressLedger(ctx context.Context, tx *sql.Tx) error {
 		{"progress_total", `ALTER TABLE batch_factory_v11_merge_jobs ADD COLUMN progress_total INT NOT NULL DEFAULT 0 AFTER progress_current`},
 	} {
 		exists, err := v11ColumnExists(ctx, tx, "batch_factory_v11_merge_jobs", column.name)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if !exists {
-			if _, err := tx.ExecContext(ctx, column.sql); err != nil { return err }
+			if _, err := tx.ExecContext(ctx, column.sql); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
+
+func ensureV11ProductionTaskAttemptIndex(ctx context.Context, tx *sql.Tx) error {
+	var columns string
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(GROUP_CONCAT(column_name ORDER BY seq_in_index), '') FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'batch_factory_v11_production_tasks' AND index_name = 'uq_bfv11_production_task_attempt'`).Scan(&columns); err != nil {
+		return err
+	}
+	if columns == "job_id,video_id,opening_variant_index,attempt" {
+		return nil
+	}
+	if columns != "" {
+		jobIndexExists, err := v11IndexExists(ctx, tx, "batch_factory_v11_production_tasks", "idx_bfv11_production_tasks_job_id")
+		if err != nil {
+			return err
+		}
+		if !jobIndexExists {
+			if _, err := tx.ExecContext(ctx, `ALTER TABLE batch_factory_v11_production_tasks ADD KEY idx_bfv11_production_tasks_job_id (job_id)`); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE batch_factory_v11_production_tasks DROP INDEX uq_bfv11_production_task_attempt`); err != nil {
+			return err
+		}
+	}
+	_, err := tx.ExecContext(ctx, `ALTER TABLE batch_factory_v11_production_tasks ADD UNIQUE KEY uq_bfv11_production_task_attempt (job_id, video_id, opening_variant_index, attempt)`)
+	return err
+}
+
+func reconcileV11ProductionTaskAttemptIndex(ctx context.Context, tx *sql.Tx) error {
+	return ensureV11ProductionTaskAttemptIndex(ctx, tx)
+}
+
+func adoptV11ProductionTaskAttemptIndex(ctx context.Context, tx *sql.Tx) (bool, error) {
+	exists, err := v11ColumnsExist(ctx, tx, "batch_factory_v11_production_tasks", "opening_variant_index")
+	if err != nil || !exists {
+		return false, err
+	}
+	if err := ensureV11ProductionTaskAttemptIndex(ctx, tx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func adoptV11OpeningVariantLedger(ctx context.Context, tx *sql.Tx) (bool, error) {
 	for _, column := range []struct {
 		table string
@@ -767,6 +828,8 @@ func V11Migrations() []Migration {
 		{Version: 1100023, SQL: V11ShuihuoConfigStatements(), CallbackChecksum: "batch-factory-v11-shuihuo-config-v1", LegacyChecksums: []string{"27ba1a709f19049ce933a5be670e703c6bef140999611daa0757d64952fc5b20"}},
 		{Version: 1100024, SQL: V11BookAssetDetailsStatements(), CallbackChecksum: "batch-factory-v11-book-asset-details-v1"},
 		{Version: 1100025, SQL: V11MergeAudioStatements(), CallbackChecksum: "batch-factory-v11-merge-audio-v1"},
+		{Version: 1100026, SQL: nil, CallbackChecksum: "batch-factory-v11-production-task-attempt-index-v1", Reconcile: reconcileV11ProductionTaskAttemptIndex, Adopt: adoptV11ProductionTaskAttemptIndex},
+		{Version: 1100027, SQL: V11BookAssetImageOverridesStatements(), CallbackChecksum: "batch-factory-v11-book-asset-image-overrides-v1"},
 	}
 }
 
