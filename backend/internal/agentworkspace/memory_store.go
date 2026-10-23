@@ -187,6 +187,9 @@ func (s *MemoryStore) Canvas(_ context.Context, owner, id string) (Canvas, error
 }
 
 func (s *MemoryStore) SaveCanvas(_ context.Context, owner, id string, canvas Canvas, expected int64, now time.Time) (Canvas, error) {
+	if err := ValidateCanvasForStorage(canvas); err != nil {
+		return Canvas{}, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := projectKey(owner, id)

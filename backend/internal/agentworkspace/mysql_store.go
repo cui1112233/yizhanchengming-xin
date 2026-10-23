@@ -331,6 +331,9 @@ FROM agent_canvas_nodes WHERE project_id = ? AND owner_username = ? ORDER BY cre
 }
 
 func (s *MySQLStore) SaveCanvas(ctx context.Context, owner, id string, canvas Canvas, expected int64, now time.Time) (Canvas, error) {
+	if err := ValidateCanvasForStorage(canvas); err != nil {
+		return Canvas{}, err
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Canvas{}, err

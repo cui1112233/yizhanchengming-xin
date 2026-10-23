@@ -53,7 +53,7 @@ func TestMemoryStoreCanvasRevisionPreventsLostUpdates(t *testing.T) {
 
 	input := Canvas{
 		Version:   1,
-		Nodes:     []Node{{ID: "node-1", Type: "input", Title: "小说原文", Summary: "第一章", Position: Position{X: 120, Y: 80}, Version: 1, Status: "confirmed", GroupID: "group-1"}},
+		Nodes:     []Node{{ID: "node-1", Type: "script", Title: "小说原文", Summary: "第一章", Position: Position{X: 120, Y: 80}, Version: 1, Status: "confirmed", GroupID: "group-1"}},
 		Edges:     []Edge{},
 		Viewport:  map[string]any{"x": float64(10), "y": float64(20), "zoom": float64(1)},
 		ViewState: map[string]any{"activeView": "storyboard", "drawerWidth": float64(340)},

@@ -14,6 +14,7 @@ var (
 	ErrExecutionNotFound    = errors.New("agent execution not found")
 	ErrExecutionState       = errors.New("invalid agent execution state")
 	ErrExecutionNodeChanged = errors.New("agent execution node changed")
+	ErrCanvasInvalid        = errors.New("invalid agent canvas")
 )
 
 type Store interface {

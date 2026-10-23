@@ -435,6 +435,8 @@ func writeAgentStoreError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "项目不存在"})
 	case errors.Is(err, agentworkspace.ErrRevisionConflict):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "画布已在其他位置更新，请重新加载"})
+	case errors.Is(err, agentworkspace.ErrCanvasInvalid):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "画布节点或来源数据无效"})
 	case errors.Is(err, agentworkspace.ErrProjectExists):
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "项目已存在"})
 	default:

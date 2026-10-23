@@ -75,7 +75,7 @@ func TestAgentWorkspaceImportsLegacyAndUsesStoreForCanvasAndChat(t *testing.T) {
 		t.Fatalf("create body=%s err=%v", created.Body.String(), err)
 	}
 
-	canvasBody := `{"canvas":{"version":1,"revision":0,"appearance":{"edgeColor":"cyan","edgeAnimated":false,"edgeWidth":"thick","backgroundDots":false,"alignmentGuides":true,"edgesVisible":false},"nodes":[{"id":"node-1","type":"input","position":{"x":12,"y":24},"title":"小说原文","version":1,"sourceNodeIds":[],"status":"confirmed","summary":"第一章"}],"edges":[]},"revision":0}`
+	canvasBody := `{"canvas":{"version":1,"revision":0,"appearance":{"edgeColor":"cyan","edgeAnimated":false,"edgeWidth":"thick","backgroundDots":false,"alignmentGuides":true,"edgesVisible":false},"nodes":[{"id":"node-1","type":"script","position":{"x":12,"y":24},"title":"小说原文","version":1,"sourceNodeIds":[],"status":"confirmed","summary":"第一章"}],"edges":[]},"revision":0}`
 	canvasPath := "/api/agent/tasks/" + createBody.Task.ID + "/canvas"
 	saved := agentRequest(t, mux, now, http.MethodPatch, canvasPath, canvasBody)
 	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), `"revision":1`) || !strings.Contains(saved.Body.String(), `"edgeColor":"cyan"`) || !strings.Contains(saved.Body.String(), `"edgesVisible":false`) {
@@ -105,22 +105,44 @@ func TestAgentWorkspaceImportsLegacyAndUsesStoreForCanvasAndChat(t *testing.T) {
 	}
 }
 
+func TestAgentWorkspaceCanvasPatchRejectsUnsafeNodesWithoutPersisting(t *testing.T) {
+	now := time.Date(2026, 10, 23, 11, 0, 0, 0, time.UTC)
+	for name, body := range map[string]string{
+		"forbidden node type": `{"canvas":{"nodes":[{"id":"asset-1","type":"asset"}],"edges":[]},"revision":0}`,
+		"media bytes":         `{"canvas":{"nodes":[{"id":"image-1","type":"image","assetRef":{"id":"asset-1","mediaBytes":"AA=="}}],"edges":[]},"revision":0}`,
+		"nested object key":   `{"canvas":{"nodes":[{"id":"image-1","type":"image","config":{"source":{"objectKey":"private/image.png"}}}],"edges":[]},"revision":0}`,
+		"nested credential":   `{"canvas":{"nodes":[{"id":"video-1","type":"video","config":{"provider":{"apiKey":"secret"}}}],"edges":[]},"revision":0}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := agentworkspace.NewMemoryStore()
+			project := agentworkspace.Project{ID: "canvas-validation", Title: "画布校验", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
+			if err := store.CreateProject(context.Background(), "alice", project); err != nil {
+				t.Fatal(err)
+			}
+			mux := http.NewServeMux()
+			RegisterAgentWorkspaceCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, store, "", nil, func() time.Time { return now })
+			path := "/api/agent/tasks/" + project.ID + "/canvas"
+			response := agentRequest(t, mux, now, http.MethodPatch, path, body)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			canvas, err := store.Canvas(context.Background(), "alice", project.ID)
+			if err != nil || canvas.Revision != 0 || len(canvas.Nodes) != 0 {
+				t.Fatalf("unsafe PATCH persisted canvas=%+v err=%v", canvas, err)
+			}
+		})
+	}
+}
+
 func TestAgentWorkspaceCanvasReadAddsSafeAssetContentURL(t *testing.T) {
 	now := time.Date(2026, 10, 20, 4, 0, 0, 0, time.UTC)
 	store := agentworkspace.NewMemoryStore()
 	project := agentworkspace.Project{ID: "agent-1", Title: "视频项目", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
-	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
-		t.Fatal(err)
-	}
-	canvas := agentworkspace.EmptyCanvas()
-	canvas.Nodes = []agentworkspace.Node{{
+	project.Canvas.Nodes = []agentworkspace.Node{{
 		ID: "video-1", Type: "video", Title: "成片", Version: 2, Status: "confirmed",
-		AssetRef: map[string]any{
-			"id": "asset-1", "kind": "video", "name": "成片.mp4",
-			"objectKey": "private/alice/agent-1/asset-1.mp4",
-		},
+		AssetRef: map[string]any{"id": "asset-1", "kind": "video", "name": "成片.mp4", "objectKey": "private/alice/agent-1/asset-1.mp4"},
 	}}
-	if _, err := store.SaveCanvas(context.Background(), "alice", project.ID, canvas, 0, now); err != nil {
+	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
 		t.Fatal(err)
 	}
 
@@ -150,18 +172,11 @@ func TestAgentWorkspaceCanvasReadAddsSafeAudioContentURL(t *testing.T) {
 	now := time.Date(2026, 10, 21, 4, 0, 0, 0, time.UTC)
 	store := agentworkspace.NewMemoryStore()
 	project := agentworkspace.Project{ID: "agent-audio-1", Title: "音频项目", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
-	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
-		t.Fatal(err)
-	}
-	canvas := agentworkspace.EmptyCanvas()
-	canvas.Nodes = []agentworkspace.Node{{
+	project.Canvas.Nodes = []agentworkspace.Node{{
 		ID: "audio-1", Type: "audio", Title: "配音", Version: 2, Status: "confirmed",
-		AssetRef: map[string]any{
-			"id": "asset-audio-1", "kind": "audio", "name": "speech.mp3",
-			"objectKey": "private/alice/agent-audio-1/asset-audio-1.mp3",
-		},
+		AssetRef: map[string]any{"id": "asset-audio-1", "kind": "audio", "name": "speech.mp3", "objectKey": "private/alice/agent-audio-1/asset-audio-1.mp3"},
 	}}
-	if _, err := store.SaveCanvas(context.Background(), "alice", project.ID, canvas, 0, now); err != nil {
+	if err := store.CreateProject(context.Background(), "alice", project); err != nil {
 		t.Fatal(err)
 	}
 
