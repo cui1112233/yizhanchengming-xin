@@ -281,10 +281,10 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 			return nil, nil, err
 		}
 		primary := projectionPrimaryImage(images)
-		assetRef := map[string]any{"assetId": asset.ID, "kind": "image"}
+		assetRef := map[string]any{"assetId": asset.ID, "kind": "image", "source": "batch_factory"}
 		if primary.ID != "" {
 			assetRef["id"] = primary.ID
-			assetRef["mediaType"], assetRef["source"] = primary.MediaType, primary.Source
+			assetRef["mediaType"], assetRef["providerSource"] = primary.MediaType, primary.Source
 		}
 		config := projectionConfig(binding.BatchID, book.ID, "book_asset", asset.ID)
 		config["prompt"], config["assetKind"] = asset.Prompt, asset.Kind
@@ -313,7 +313,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	tasksByVideo := projectionTasksByVideo(book, productionJobs)
 	for index, video := range book.Videos {
 		task, hasTask := projectionCurrentTask(video, tasksByVideo[video.ID])
-		assetRef := map[string]any{"videoId": video.ID, "kind": "video"}
+		assetRef := map[string]any{"videoId": video.ID, "kind": "video", "source": "batch_factory"}
 		versionID := projectionFingerprint(video.Revision, video.Label, video.VideoPrompt, video.VisualPrompt, video.DurationSeconds)
 		status := "draft"
 		if hasTask {
@@ -360,7 +360,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		var audioNodeID string
 		if audioID := strings.TrimSpace(merge.AudioArtifactID); audioID != "" && hasAudioRecord {
 			record := audioRecord
-			assetRef := map[string]any{"id": audioID, "kind": "audio"}
+			assetRef := map[string]any{"id": audioID, "kind": "audio", "source": "batch_factory"}
 			config := projectionConfig(binding.BatchID, book.ID, "audio", audioID)
 			if record.DurationSeconds > 0 {
 				config["durationSeconds"] = record.DurationSeconds
@@ -375,7 +375,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 				AssetRef: assetRef, Config: config,
 			})
 		}
-		assetRef := map[string]any{"id": merge.ID, "kind": "video"}
+		assetRef := map[string]any{"id": merge.ID, "kind": "video", "source": "batch_factory"}
 		mergeConfig := projectionConfig(binding.BatchID, book.ID, "merge", merge.ID)
 		applyMappedNodeState(mergeConfig, string(merge.Status), merge.ErrorMessage)
 		mergeNodeID := add("merge", merge.ID, projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources), Node{

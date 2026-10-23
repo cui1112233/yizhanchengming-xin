@@ -121,6 +121,53 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 		writeJSON(w, http.StatusOK, response)
 	})
 
+	handle("GET /api/agent/tasks/{id}/batch-factory/nodes/{nodeId}/media", func(w http.ResponseWriter, req *http.Request, owner string) {
+		projectID, nodeID := strings.TrimSpace(req.PathValue("id")), strings.TrimSpace(req.PathValue("nodeId"))
+		if nodeID == "" {
+			writeAgentBatchFactoryError(w, agentworkspace.ErrBatchFactoryNodeOriginInvalid)
+			return
+		}
+		if _, err := projects.Project(req.Context(), owner, projectID); err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
+		binding, batch, err := agentBatchFactoryBindingForProject(req.Context(), projects, batches, owner, projectID)
+		if err != nil {
+			writeAgentBatchFactoryError(w, err)
+			return
+		}
+		bookID, origins, found, err := agentBatchFactoryNodeOrigins(req.Context(), projects, owner, binding, batch, nodeID)
+		if err != nil {
+			writeAgentBatchFactoryError(w, err)
+			return
+		}
+		if !found {
+			writeAgentBatchFactoryError(w, agentworkspace.ErrBatchFactoryBindingNotFound)
+			return
+		}
+		canvas, err := projects.Canvas(req.Context(), owner, projectID)
+		if err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
+		node, found := agentCanvasNodeByID(canvas, nodeID)
+		if !found {
+			writeAgentBatchFactoryError(w, batchfactoryv11.ErrNotFound)
+			return
+		}
+		origin, found := agentBatchFactoryNodeOrigin(origins, nodeID)
+		if !found || origin.BookID != bookID || origin.BatchID != binding.BatchID {
+			writeAgentBatchFactoryError(w, agentworkspace.ErrBatchFactoryBindingNotFound)
+			return
+		}
+		mediaURL, err := agentBatchFactoryProjectionMediaURL(req.Context(), batches, owner, binding.BatchID, bookID, origin, node)
+		if err != nil {
+			writeAgentBatchFactoryError(w, err)
+			return
+		}
+		http.Redirect(w, req, mediaURL, http.StatusFound)
+	})
+
 	handle("DELETE /api/agent/tasks/{id}/batch-factory/nodes/{nodeId}", func(w http.ResponseWriter, req *http.Request, owner string) {
 		projectID := req.PathValue("id")
 		nodeID := strings.TrimSpace(req.PathValue("nodeId"))
@@ -240,6 +287,62 @@ func agentBatchFactoryNodeOrigins(ctx context.Context, projects agentworkspace.S
 		}
 	}
 	return "", nil, false, nil
+}
+
+func agentBatchFactoryNodeOrigin(origins []agentworkspace.BatchFactoryNodeOrigin, nodeID string) (agentworkspace.BatchFactoryNodeOrigin, bool) {
+	for _, origin := range origins {
+		if origin.NodeID == nodeID {
+			return origin, true
+		}
+	}
+	return agentworkspace.BatchFactoryNodeOrigin{}, false
+}
+
+func agentBatchFactoryProjectionMediaURL(ctx context.Context, batches agentBatchFactoryBridgeStore, owner, batchID, bookID string, origin agentworkspace.BatchFactoryNodeOrigin, node agentworkspace.Node) (string, error) {
+	mediaID := strings.TrimSpace(agentNodeAssetRefID(node.AssetRef))
+	switch origin.ResourceType {
+	case "book_asset":
+		images, err := batches.ListBookAssetImages(ctx, owner, batchID, bookID, origin.ResourceID)
+		if err != nil {
+			return "", err
+		}
+		for _, image := range images {
+			if image.ID == mediaID && strings.TrimSpace(image.URL) != "" {
+				return strings.TrimSpace(image.URL), nil
+			}
+		}
+	case "video":
+		jobs, err := batches.ListProductionJobs(ctx, owner, batchID)
+		if err != nil {
+			return "", err
+		}
+		for _, job := range jobs {
+			if job.BookID != bookID {
+				continue
+			}
+			for _, task := range job.Tasks {
+				if task.VideoID == origin.ResourceID && task.ID == mediaID && strings.TrimSpace(task.MediaURL) != "" {
+					return strings.TrimSpace(task.MediaURL), nil
+				}
+			}
+		}
+	case "merge":
+		jobs, err := batches.ListMergeJobs(ctx, owner, batchID)
+		if err != nil {
+			return "", err
+		}
+		for _, job := range jobs {
+			if job.BookID == bookID && job.ID == origin.ResourceID && job.ID == mediaID && strings.TrimSpace(job.OutputURL) != "" {
+				return strings.TrimSpace(job.OutputURL), nil
+			}
+		}
+	}
+	return "", batchfactoryv11.ErrNotFound
+}
+
+func agentNodeAssetRefID(ref map[string]any) string {
+	value, _ := ref["id"].(string)
+	return value
 }
 
 func removeAgentBatchFactoryCanvasNode(canvas agentworkspace.Canvas, nodeID string) agentworkspace.Canvas {

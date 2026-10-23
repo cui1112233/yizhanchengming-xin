@@ -360,12 +360,20 @@ func agentCanvasForResponse(projectID string, canvas agentworkspace.Canvas) agen
 		}
 		assetID, _ := publicRef["id"].(string)
 		kind, _ := publicRef["kind"].(string)
-		if strings.TrimSpace(assetID) != "" && publicRef["source"] != "batch_factory" && (kind == "image" || kind == "video" || kind == "audio") {
-			publicRef["url"] = agentAssetContentURL(projectID, strings.TrimSpace(assetID))
+		if strings.TrimSpace(assetID) != "" && (kind == "image" || kind == "video" || kind == "audio") {
+			if publicRef["source"] == "batch_factory" {
+				publicRef["url"] = agentBatchFactoryNodeMediaURL(projectID, canvas.Nodes[index].ID)
+			} else {
+				publicRef["url"] = agentAssetContentURL(projectID, strings.TrimSpace(assetID))
+			}
 		}
 		canvas.Nodes[index].AssetRef = publicRef
 	}
 	return canvas
+}
+
+func agentBatchFactoryNodeMediaURL(projectID, nodeID string) string {
+	return "/api/agent/tasks/" + projectID + "/batch-factory/nodes/" + nodeID + "/media"
 }
 
 func agentCanvasNodeByID(canvas agentworkspace.Canvas, nodeID string) (agentworkspace.Node, bool) {

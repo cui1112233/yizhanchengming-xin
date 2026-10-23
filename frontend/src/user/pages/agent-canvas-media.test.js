@@ -45,6 +45,36 @@ test('Agent asset video is fetched through the authenticated API client', async 
   assert.equal(calls[0].headers.get('authorization'), 'Bearer agent-media-token');
 });
 
+test('Batch Factory projection media is fetched through the authenticated API client', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = {
+    getItem(key) { return key === 'auth_token' ? 'agent-media-token' : ''; },
+    setItem() {},
+    removeItem() {}
+  };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, headers: new Headers(options.headers || {}) });
+    return new Response(new Blob(['image'], { type: 'image/png' }), {
+      status: 200,
+      headers: { 'content-type': 'image/png' }
+    });
+  };
+  t.after(() => {
+    globalThis.localStorage = originalLocalStorage;
+    globalThis.fetch = originalFetch;
+  });
+
+  const path = '/api/agent/tasks/project-1/batch-factory/nodes/node-1/media';
+  const blob = await getAgentAssetBlob(path);
+
+  assert.equal(blob.type, 'image/png');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].path, path);
+  assert.equal(calls[0].headers.get('authorization'), 'Bearer agent-media-token');
+});
+
 test('Agent asset blob helper refuses external URLs before sending authentication', async () => {
   await assert.rejects(() => getAgentAssetBlob('https://media.example/private.mp4'), /Agent asset/i);
 });

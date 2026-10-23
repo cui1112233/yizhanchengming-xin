@@ -209,6 +209,72 @@ func TestSyncBookDoesNotPersistSignedMediaURL(t *testing.T) {
 	}
 }
 
+func TestBatchFactoryProjectionMediaReadUsesCanonicalBookID(t *testing.T) {
+	now := time.Date(2026, 10, 23, 19, 50, 0, 0, time.UTC)
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		BookID: "2091926811672429633", Title: "legacy source book",
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	if book.ID == book.BookID || book.BookID != "2091926811672429633" {
+		t.Fatalf("fixture must keep distinct canonical and legacy book IDs: %+v", book)
+	}
+	asset, err := batches.CreateBookAsset(context.Background(), "alice", batch.ID, book.ID, batchfactoryv11.CreateBookAssetInput{Kind: "character", Name: "hero", Prompt: "portrait"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const mediaURL = "https://media.example/hero.png"
+	image, err := batches.CreateBookAssetImage(context.Background(), "alice", batch.ID, book.ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{URL: mediaURL, MediaType: "image/png", Source: "provider"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := agentworkspace.NewMemoryStore()
+	mux := http.NewServeMux()
+	auth := BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}
+	RegisterAgentWorkspaceCompat(mux, auth, projects, "", nil, func() time.Time { return now })
+	RegisterAgentBatchFactoryBridge(mux, auth, projects, batches, nil, func() time.Time { return now })
+
+	bound := agentRequest(t, mux, now, http.MethodPost, "/api/batch-factory/v11/batches/"+batch.ID+"/agent-project", "")
+	if bound.Code != http.StatusOK {
+		t.Fatalf("bind status=%d body=%s", bound.Code, bound.Body.String())
+	}
+	var binding agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(bound.Body.Bytes(), &binding); err != nil {
+		t.Fatal(err)
+	}
+	synced := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/books/"+book.ID+"/sync", "")
+	if synced.Code != http.StatusOK {
+		t.Fatalf("sync status=%d body=%s", synced.Code, synced.Body.String())
+	}
+	canvas, err := projects.Canvas(context.Background(), "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nodeID string
+	for _, node := range canvas.Nodes {
+		if node.Config["resourceType"] == "book_asset" && node.Config["resourceId"] == asset.ID && node.AssetRef["id"] == image.ID {
+			nodeID = node.ID
+			break
+		}
+	}
+	if nodeID == "" {
+		t.Fatalf("missing projected image node: %+v", canvas.Nodes)
+	}
+	canvasResponse := agentRequest(t, mux, now, http.MethodGet, "/api/agent/tasks/"+binding.ProjectID+"/canvas", "")
+	wantMediaPath := "/api/agent/tasks/" + binding.ProjectID + "/batch-factory/nodes/" + nodeID + "/media"
+	if canvasResponse.Code != http.StatusOK || !strings.Contains(canvasResponse.Body.String(), wantMediaPath) || strings.Contains(canvasResponse.Body.String(), "/assets/"+image.ID+"/content") {
+		t.Fatalf("canvas response must expose the mapped media reader only: status=%d body=%s", canvasResponse.Code, canvasResponse.Body.String())
+	}
+
+	media := agentRequest(t, mux, now, http.MethodGet, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/nodes/"+nodeID+"/media", "")
+	if media.Code != http.StatusFound || media.Header().Get("Location") != mediaURL {
+		t.Fatalf("media status=%d location=%q body=%s", media.Code, media.Header().Get("Location"), media.Body.String())
+	}
+}
+
 func TestBatchFactorySyncUsesMappedStateWithoutAgentGenerationTask(t *testing.T) {
 	now := time.Date(2026, 10, 23, 12, 8, 0, 0, time.UTC)
 	batches := batchfactoryv11.NewMemoryStore()
