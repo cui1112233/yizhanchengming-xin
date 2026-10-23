@@ -16,6 +16,11 @@ version IDs do not exist in `agent_assets`, so the browser received `素材不�
 The canonical Batch Factory book ID and the legacy source book ID are distinct;
 projection reads must use the canonical ID recorded by the node origin.
 
+The remaining image was a valid primary local-executor record: it stores a
+`storage_ref` instead of a provider URL. The previous bridge only redirected
+to non-empty URLs, so it incorrectly reported that the existing local image
+did not exist.
+
 ## Repair And Evidence
 
 - Mapped nodes now identify `batch_factory` as their source.
@@ -27,6 +32,9 @@ projection reads must use the canonical ID recorded by the node origin.
   verifies the protected endpoint redirects only to the matching media record.
 - The focused frontend regression verifies this protected URL still uses the
   authenticated media client.
+- Local-executor image records now redirect through the existing owner-scoped
+  artifact reader. The storage reference stays private, and no image is copied
+  or mutated.
 - Focused tests passed before local restart:
   - `go test ./internal/httpapi -run 'Test(BatchFactoryProjectionMediaReadUsesCanonicalBookID|SyncBookDoesNotPersistSignedMediaURL|BatchFactorySyncUsesMappedStateWithoutAgentGenerationTask|DeleteBoundNodeOnlyRemovesCanvasReference)' -count=1`
   - `go test ./internal/agentworkspace -run 'TestSyncBatchFactoryBook|TestResolveVideoDuration' -count=1`
@@ -42,5 +50,10 @@ projection reads must use the canonical ID recorded by the node origin.
 
 ## Runtime Status
 
-The rebuilt embedded binary is ready. Browser recheck of the supplied local
-project is pending the localhost restart.
+The local Go runtime was rebuilt and restarted at SHA `3c4d8625`.
+
+Authenticated browser acceptance on the supplied project confirmed that:
+
+- `豆包资产图测试` loaded as a `2048 x 2048` image from the protected local
+  artifact path, with no media error.
+- Both mapped video nodes loaded without a `素材不存在` error.

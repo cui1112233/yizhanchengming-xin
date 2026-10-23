@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -307,8 +309,14 @@ func agentBatchFactoryProjectionMediaURL(ctx context.Context, batches agentBatch
 			return "", err
 		}
 		for _, image := range images {
-			if image.ID == mediaID && strings.TrimSpace(image.URL) != "" {
-				return strings.TrimSpace(image.URL), nil
+			if image.ID != mediaID {
+				continue
+			}
+			if mediaURL := strings.TrimSpace(image.URL); mediaURL != "" {
+				return mediaURL, nil
+			}
+			if mediaURL, ok := agentBatchFactoryLocalImageArtifactURL(image); ok {
+				return mediaURL, nil
 			}
 		}
 	case "video":
@@ -338,6 +346,24 @@ func agentBatchFactoryProjectionMediaURL(ctx context.Context, batches agentBatch
 		}
 	}
 	return "", batchfactoryv11.ErrNotFound
+}
+
+// agentBatchFactoryLocalImageArtifactURL keeps locally generated Batch Factory
+// images behind the established owner-scoped artifact reader. The canvas never
+// exposes the storage reference itself, and the target reader rechecks owner.
+func agentBatchFactoryLocalImageArtifactURL(image batchfactoryv11.BookAssetImage) (string, bool) {
+	if image.Source != batchfactoryv11.VideoProviderDoubaoLocal {
+		return "", false
+	}
+	storageRef := strings.TrimSpace(image.StorageRef)
+	if storageRef == "" || filepath.Base(storageRef) != storageRef {
+		return "", false
+	}
+	artifactID := strings.TrimSuffix(storageRef, filepath.Ext(storageRef))
+	if artifactID == "" {
+		return "", false
+	}
+	return "/api/shuihuo-production/local-executor-artifacts/" + url.PathEscape(artifactID), true
 }
 
 func agentNodeAssetRefID(ref map[string]any) string {
