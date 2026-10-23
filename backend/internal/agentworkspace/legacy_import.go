@@ -64,6 +64,11 @@ func ImportLegacyFile(ctx context.Context, store Store, owner, path string, now 
 
 func normalizeLegacyProject(project Project, now time.Time, index int) Project {
 	project = normalizeProject(project)
+	for nodeIndex := range project.Canvas.Nodes {
+		if project.Canvas.Nodes[nodeIndex].Type == "input" {
+			project.Canvas.Nodes[nodeIndex].Type = "script"
+		}
+	}
 	if project.ID == "" {
 		project.ID = fmt.Sprintf("agent-import-%d-%d", now.UnixNano(), index)
 	}

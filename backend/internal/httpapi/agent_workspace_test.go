@@ -109,6 +109,7 @@ func TestAgentWorkspaceCanvasPatchRejectsUnsafeNodesWithoutPersisting(t *testing
 	now := time.Date(2026, 10, 23, 11, 0, 0, 0, time.UTC)
 	for name, body := range map[string]string{
 		"forbidden node type": `{"canvas":{"nodes":[{"id":"asset-1","type":"asset"}],"edges":[]},"revision":0}`,
+		"legacy input type":   `{"canvas":{"nodes":[{"id":"input-1","type":"input"}],"edges":[]},"revision":0}`,
 		"media bytes":         `{"canvas":{"nodes":[{"id":"image-1","type":"image","assetRef":{"id":"asset-1","mediaBytes":"AA=="}}],"edges":[]},"revision":0}`,
 		"nested object key":   `{"canvas":{"nodes":[{"id":"image-1","type":"image","config":{"source":{"objectKey":"private/image.png"}}}],"edges":[]},"revision":0}`,
 		"nested credential":   `{"canvas":{"nodes":[{"id":"video-1","type":"video","config":{"provider":{"apiKey":"secret"}}}],"edges":[]},"revision":0}`,

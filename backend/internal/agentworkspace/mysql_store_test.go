@@ -45,6 +45,7 @@ func TestMySQLStoreCreateProjectRejectsUnsafeCanvasBeforeWrites(t *testing.T) {
 	now := time.Date(2026, 10, 23, 16, 30, 0, 0, time.UTC)
 	for name, canvas := range map[string]Canvas{
 		"forbidden node type": {Nodes: []Node{{ID: "asset-1", Type: "asset"}}},
+		"legacy input type":   {Nodes: []Node{{ID: "input-1", Type: "input"}}},
 		"private object key":  {Nodes: []Node{{ID: "image-1", Type: "image", AssetRef: map[string]any{"objectKey": "private/alice/image.png"}}}},
 	} {
 		t.Run(name, func(t *testing.T) {

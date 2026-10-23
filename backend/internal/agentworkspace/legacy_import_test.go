@@ -14,7 +14,7 @@ func TestImportLegacyFilePreservesAndImportsWholeProjectOnce(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()
 	path := filepath.Join(t.TempDir(), "agent-tasks.json")
-	raw := []byte(`{"version":1,"tasks":[{"id":"legacy-1","title":"旧项目","titleMode":"manual","preview":"已分析","createdAt":"2026-10-17T01:00:00Z","updatedAt":"2026-10-17T01:02:00Z","messages":[{"role":"user","content":"做这本书","createdAt":"2026-10-17T01:01:00Z"},{"role":"assistant","content":"已分析","createdAt":"2026-10-17T01:02:00Z"}],"canvas":{"version":1,"revision":3,"viewport":{"x":12,"y":18,"zoom":0.8},"nodes":[{"id":"n1","type":"script","position":{"x":20,"y":30},"title":"小说原文","version":1,"sourceNodeIds":[],"status":"confirmed","summary":"第一章"}],"edges":[]},"executions":[{"id":"e1","toolName":"分析小说","status":"succeeded","createdAt":"2026-10-17T01:01:30Z","updatedAt":"2026-10-17T01:01:40Z"}]}]}`)
+	raw := []byte(`{"version":1,"tasks":[{"id":"legacy-1","title":"旧项目","titleMode":"manual","preview":"已分析","createdAt":"2026-10-17T01:00:00Z","updatedAt":"2026-10-17T01:02:00Z","messages":[{"role":"user","content":"做这本书","createdAt":"2026-10-17T01:01:00Z"},{"role":"assistant","content":"已分析","createdAt":"2026-10-17T01:02:00Z"}],"canvas":{"version":1,"revision":3,"viewport":{"x":12,"y":18,"zoom":0.8},"nodes":[{"id":"n1","type":"input","position":{"x":20,"y":30},"title":"小说原文","version":1,"sourceNodeIds":[],"status":"confirmed","summary":"第一章"}],"edges":[]},"executions":[{"id":"e1","toolName":"分析小说","status":"succeeded","createdAt":"2026-10-17T01:01:30Z","updatedAt":"2026-10-17T01:01:40Z"}]}]}`)
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestImportLegacyFilePreservesAndImportsWholeProjectOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(project.Messages) != 2 || project.Canvas.Revision != 3 || len(project.Canvas.Nodes) != 1 || len(project.Executions) != 1 {
+	if len(project.Messages) != 2 || project.Canvas.Revision != 3 || len(project.Canvas.Nodes) != 1 || project.Canvas.Nodes[0].Type != "script" || len(project.Executions) != 1 {
 		t.Fatalf("project=%+v", project)
 	}
 	after, err := os.ReadFile(path)
