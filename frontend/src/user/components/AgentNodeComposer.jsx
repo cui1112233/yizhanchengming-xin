@@ -29,6 +29,7 @@ const PROMPT_PLACEHOLDERS = {
 
 export default function AgentNodeComposer({
   compact = false,
+  canvasZoom = 1,
   node, models = [], modelLoadError = '', generationState = {},
   modelsByKind = {}, scriptState = {}, onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots,
   onConfigChange, onPickImageAsset, onPickReferenceAsset, onRemoveReference, onSubmit,
@@ -173,7 +174,7 @@ export default function AgentNodeComposer({
     return { direct, more };
   }, [actionPlan.primary.join('|'), actionPlan.more.join('|'), busy, taskActionBusy, references, config, onBatchFactoryPromptSaved, onPickReferenceAsset, onRemoveReference, node.id, onPreviewInputs, selectedModel, kind, isVideoToolTask, isBatchFactoryMerge, onRetryVideo, onRetryGeneration, onConfirmImage, selectedImageID, onConfirmAudio, selectedAudioID, publishStatus, onPublishBatchFactory, onPickImageAsset, node.data?.assetRef?.url, canCancelGeneration, onCancelGeneration, videoState.canCancel, videoState.canConfirm, onCancelVideo, onConfirmVideo, publishOrganization, publishOrganizationsLoading, publishOrganizations, onPublishOrganizationChange, toolsOpen]);
 
-  return <section className="agent-node-composer nodrag nopan" aria-label={`${PROMPT_LABELS[kind]}输入框`} onMouseDown={stop} onDoubleClick={stop}>
+  return <section className="agent-node-composer nodrag nopan" style={{ '--agent-canvas-zoom': canvasZoom }} aria-label={`${PROMPT_LABELS[kind]}输入框`} onMouseDown={stop} onDoubleClick={stop}>
     <AgentNodeComposerTopActions primaryActions={topActions.direct} moreActions={topActions.more} />
 
     <div className="agent-node-composer__body">

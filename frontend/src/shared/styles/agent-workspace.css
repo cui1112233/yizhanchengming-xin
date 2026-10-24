@@ -579,7 +579,7 @@
 .agent-page .agent-canvas-auth-media-state { display: grid; place-items: center; padding: 12px; color: var(--agent-muted); font-size: 11px; text-align: center; }
 .agent-page .agent-canvas-node-media.agent-canvas-auth-media-state { min-height: 168px; }
 .agent-page .agent-canvas-auth-media-state.is-error { color: #dc2626; }
-.agent-page .agent-node-composer { position: relative; left: 50%; display: grid; box-sizing: border-box; width: min(680px, calc(100vw - 96px)); gap: 8px; margin-top: 10px; border: 1px solid var(--agent-border-strong); border-radius: 9px; padding: 9px 10px; background: #202020; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2); transform: translateX(-50%); }
+.agent-page .agent-node-composer { position: relative; left: 50%; display: grid; box-sizing: border-box; width: min(680px, calc((100vw - 96px) / max(var(--agent-canvas-zoom, 1), 0.25))); gap: 8px; margin-top: 10px; border: 1px solid var(--agent-border-strong); border-radius: 9px; padding: 9px 10px; background: #202020; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2); transform: translateX(-50%); }
 .agent-page .agent-canvas-node-pinned-composer { position: relative; width: min(360px, calc(100vw - 72px)); overflow: visible; border: 1px solid var(--agent-border-strong); border-radius: 8px; background: color-mix(in srgb, var(--agent-panel) 97%, #000); box-shadow: 0 7px 16px rgba(0, 0, 0, 0.16); }
 .agent-page .agent-canvas-node-pinned-header { grid-template-columns: 20px 24px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--agent-border); }
 .agent-page .agent-canvas-node-pinned-header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

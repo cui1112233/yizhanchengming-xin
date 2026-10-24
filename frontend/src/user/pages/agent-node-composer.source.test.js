@@ -155,6 +155,12 @@ test('composer errors stay compact instead of expanding the prompt panel', () =>
   assert.match(styles, /agent-node-composer__prompt[^}]*height:\s*auto !important/);
 });
 
+test('composer width follows the current canvas zoom budget', () => {
+  assert.match(composerSource, /canvasZoom = 1/);
+  assert.match(composerSource, /--agent-canvas-zoom': canvasZoom/);
+  assert.match(styles, /agent-node-composer[^}]*agent-canvas-zoom/);
+});
+
 test('actual input preview stays visible in the compact card after it is requested', () => {
   assert.match(composerSource, /const previewInputs = inputPreview\?\.inputs \|\| null/);
   assert.match(composerSource, /agent-node-composer__input-preview/);
