@@ -8,12 +8,20 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const canvas = fs.readFileSync(path.join(here, 'AgentCanvas.jsx'), 'utf8');
 const styles = fs.readFileSync(path.resolve(here, '../../shared/styles/agent-workspace.css'), 'utf8');
 
-test('画布节点任意空白区域都可以移动，编辑入口不再占用拖动区域', () => {
+test('画布节点主体可直接拖动，只有真实交互控件阻止拖动', () => {
   assert.doesNotMatch(canvas, /dragHandle:\s*'\.agent-canvas-node-drag-handle'/);
   assert.match(canvas, /className=\{`agent-canvas-node agent-canvas-node--\$\{nodeType\}/);
   assert.match(canvas, /className="nodrag nopan agent-canvas-node-card-header-action"[\s\S]*?onClick=\{openEditor\}/);
-  assert.match(canvas, /className="nodrag nopan agent-canvas-node-text-preview"/);
+  assert.match(canvas, /className="agent-canvas-node-image-select agent-canvas-node-drag-surface"/);
+  assert.match(canvas, /AuthenticatedAgentImage[\s\S]*?draggable=\{false\}/);
+  assert.match(canvas, /AuthenticatedAgentVideo[\s\S]*?className="agent-canvas-node-media agent-canvas-node-drag-surface"[\s\S]*?draggable=\{false\}/);
+  assert.match(canvas, /className="agent-canvas-node-audio-preview agent-canvas-node-drag-surface"/);
+  assert.match(canvas, /AuthenticatedAgentAudio[\s\S]*?className="nodrag nopan"/);
+  assert.match(canvas, /className="agent-canvas-node-text-preview agent-canvas-node-drag-surface"/);
+  assert.doesNotMatch(canvas, /agent-canvas-node-(?:image-select|video-placeholder|audio-placeholder|text-preview)[^"\n]*nodrag/);
+  assert.doesNotMatch(canvas, /closest\?\.\('\.agent-node-composer,[^']*agent-canvas-node-(?:image-select|video-placeholder|audio-placeholder|text-preview)/);
   assert.match(styles, /agent-canvas-node-drag-handle[^}]*cursor:\s*grab/);
+  assert.match(styles, /agent-canvas-node-drag-surface[^}]*cursor:\s*grab/);
 });
 
 test('画布连线把手始终可见，不能依赖悬停才能开始连线', () => {

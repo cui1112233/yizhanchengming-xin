@@ -509,6 +509,8 @@
 .agent-page .agent-canvas-node-drag-handle { display: grid; width: 16px; height: 22px; place-items: center; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--agent-muted); cursor: grab; }
 .agent-page .agent-canvas-node-drag-handle:hover { background: var(--agent-hover); color: var(--agent-secondary); }
 .agent-page .agent-canvas-node-drag-handle:active { cursor: grabbing; }
+.agent-page .agent-canvas-node-drag-surface { cursor: grab; user-select: none; }
+.agent-page .react-flow__node.dragging .agent-canvas-node-drag-surface { cursor: grabbing; }
 .agent-page .agent-canvas-node-type-icon { display: grid; width: 18px; height: 18px; place-items: center; border-radius: 4px; background: transparent; color: var(--agent-muted); }
 .agent-page .agent-canvas-node-type-icon.is-image { background: rgba(58, 156, 117, 0.13); color: #4eaa82; }
 .agent-page .agent-canvas-node-type-icon.is-video { background: rgba(72, 130, 190, 0.14); color: #5c92c7; }
@@ -526,7 +528,7 @@
 .agent-page .agent-canvas-node footer { display: none; justify-content: space-between; }
 .agent-page .agent-canvas-node--text footer { display: flex; }
 .agent-page .agent-canvas-node-media { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: none; margin-top: 0; border: 1px solid var(--agent-border); border-radius: 6px; background: #10151a; object-fit: cover; }
-.agent-page .agent-canvas-node-image-select { display: block; width: 100%; margin: 8px 0 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; }
+.agent-page .agent-canvas-node-image-select { display: block; width: 100%; margin: 8px 0 0; border: 0; padding: 0; background: transparent; color: inherit; }
 .agent-page .agent-canvas-node-image-select .agent-canvas-node-media,
 .agent-page .agent-canvas-node-image-select .agent-canvas-node-image-placeholder { margin-top: 0; }
 .agent-page .agent-canvas-node-image-select:hover .agent-canvas-node-media,
@@ -676,7 +678,7 @@
   .agent-page .agent-node-composer__bottom-bar { padding-bottom: 1px; }
   .agent-page .agent-node-composer__state { min-width: 92px; }
 }
-.agent-page .agent-canvas-node-text-preview { display: block; width: 100%; min-height: 36px; margin: 8px 0; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--agent-secondary); cursor: text; font: inherit; font-size: 11px; line-height: 1.5; text-align: left; }
+.agent-page .agent-canvas-node-text-preview { display: block; width: 100%; min-height: 36px; margin: 8px 0; overflow: hidden; border: 0; padding: 0; background: transparent; color: var(--agent-secondary); font: inherit; font-size: 11px; line-height: 1.5; text-align: left; }
 
 .agent-page .agent-canvas-toolrail {
   position: absolute;

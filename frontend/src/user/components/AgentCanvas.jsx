@@ -119,7 +119,11 @@ function CanvasNode({
   const handleNodeDoubleClick = event => {
     event.preventDefault();
     event.stopPropagation();
-    if (normalizeCanvasNodeType(data.type) === 'text') onManualEdit?.(id);
+    if (normalizeCanvasNodeType(data.type) === 'text') {
+      onManualEdit?.(id);
+      return;
+    }
+    onOpenEditor?.(id);
   };
   const openEditor = event => {
     if (isCanvasMultiSelectionEvent(event)) return;
@@ -205,16 +209,16 @@ function CanvasNode({
             ><strong>{data.title}</strong><span>{canvasNodeTypeLabel(nodeType)}</span></button>
             {sourcePresentation?.sourceLabel ? <Tag color="blue" className="nodrag nopan" onMouseDown={stopCanvasEvent}>{sourcePresentation.sourceLabel}</Tag> : null}
           </header>
-          {nodeType === 'image' ? <button type="button" className="agent-canvas-node-image-select nodrag nopan" aria-label="展开图片编辑" onPointerDown={event => { event.preventDefault(); stopCanvasEvent(event); }} onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
-            {data.assetRef?.url ? <AuthenticatedAgentImage source={data.assetRef.url} className="agent-canvas-node-media" alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
-          </button> : null}
-          {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="nodrag nopan agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
-          {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="nodrag nopan agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
-          {nodeType === 'audio' && data.assetRef?.url ? <div className="nodrag nopan agent-canvas-node-audio-preview" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent}>
-            <AuthenticatedAgentAudio source={data.assetRef.url} aria-label="音频节点预览" preload="metadata" controls waveform waveformSourceLabel={data.title || '音频节点'} />
-            <button type="button" onClick={openEditor}>编辑音频</button>
+          {nodeType === 'image' ? <div className="agent-canvas-node-image-select agent-canvas-node-drag-surface" aria-label="图片节点预览">
+            {data.assetRef?.url ? <AuthenticatedAgentImage source={data.assetRef.url} className="agent-canvas-node-media" alt="" draggable={false} /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
           </div> : null}
-          {nodeType === 'audio' && !data.assetRef?.url ? <button type="button" className="nodrag nopan agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成或添加音频</button> : null}
+          {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media agent-canvas-node-drag-surface" aria-label="视频节点预览" preload="metadata" muted controls draggable={false} onDoubleClick={stopCanvasEvent} /> : null}
+          {nodeType === 'video' && !data.assetRef?.url ? <div className="agent-canvas-node-video-placeholder agent-canvas-node-drag-surface">等待生成视频</div> : null}
+          {nodeType === 'audio' && data.assetRef?.url ? <div className="agent-canvas-node-audio-preview agent-canvas-node-drag-surface">
+            <AuthenticatedAgentAudio source={data.assetRef.url} className="nodrag nopan" aria-label="音频节点预览" preload="metadata" controls waveform waveformSourceLabel={data.title || '音频节点'} onDoubleClick={stopCanvasEvent} />
+            <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={openEditor}>编辑音频</button>
+          </div> : null}
+          {nodeType === 'audio' && !data.assetRef?.url ? <div className="agent-canvas-node-audio-placeholder agent-canvas-node-drag-surface">等待生成或添加音频</div> : null}
           {nodeType === 'director' ? <AgentDirectorDeskNode
             node={{ id, data }}
             onOpen={onOpenDirectorDesk}
@@ -223,8 +227,8 @@ function CanvasNode({
             onRemoveReference={onRemoveReference}
             onSaveScreenshot={onSaveDirectorDeskScreenshot}
           /> : null}
-          {nodeType === 'text' ? <button type="button" className="nodrag nopan agent-canvas-node-text-preview" onClick={openEditor}>{data.summary || '等待 Agent 写入结果'}</button> : null}
-          {nodeType === 'script' ? <button type="button" className="nodrag nopan agent-canvas-node-text-preview" onClick={openEditor}>{data.config?.sourceText || '等待填写剧本正文'}</button> : null}
+          {nodeType === 'text' ? <div className="agent-canvas-node-text-preview agent-canvas-node-drag-surface">{data.summary || '等待 Agent 写入结果'}</div> : null}
+          {nodeType === 'script' ? <div className="agent-canvas-node-text-preview agent-canvas-node-drag-surface">{data.config?.sourceText || '等待填写剧本正文'}</div> : null}
           <footer><span>v{data.version}</span><span className={`agent-canvas-node-task-state is-${taskPresentation?.state || data.status}`}>{taskPresentation?.errorMessage || taskPresentation?.message || canvasNodeStatusLabel(data.status)}</span>{sourcePresentation?.sourceLabel ? <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onRemoveFromCanvas?.(id); }}>从画布移除</button> : null}</footer>
         </div>}
         {!isPinnedBatchFactoryComposer ? <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" /> : null}
@@ -914,7 +918,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   function handleNodeClick(event, node) {
     // Controls inside a node can opt out of the canvas-level click cleanup.
     const isMultiSelection = isCanvasMultiSelectionEvent(event);
-    if (event.defaultPrevented || (!isMultiSelection && event.target?.closest?.('.agent-node-composer, .agent-canvas-node-image-select, .agent-canvas-node-video-placeholder, .agent-canvas-node-audio-placeholder, .agent-canvas-node-text-preview'))) return;
+    if (event.defaultPrevented || (!isMultiSelection && event.target?.closest?.('.agent-node-composer'))) return;
     focusCanvasAfterSelection();
     setContextMenu(null);
     setAssetPanel(null);

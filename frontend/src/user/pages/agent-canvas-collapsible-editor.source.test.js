@@ -85,8 +85,9 @@ test('asset picker does not present an empty library while reporting a request f
   assert.match(canvasSource, /readableAssetRequestError\(error, 'load'\)/);
 });
 
-test('image preview opens editing while a named editor action opens the asset picker', () => {
-  assert.match(canvasSource, /aria-label="展开图片编辑"/);
+test('image preview stays draggable while double click opens editing and the named action opens the asset picker', () => {
+  assert.match(canvasSource, /className="agent-canvas-node-image-select agent-canvas-node-drag-surface"/);
+  assert.match(canvasSource, /const handleNodeDoubleClick = event => \{[\s\S]*?onOpenEditor\?\.\(id\);/);
   assert.match(composerSource, /node\.data\?\.assetRef\?\.url \? '更换当前图片' : '从收藏添加图片'/);
   assert.match(composerSource, /onPickImageAsset\?\.\(node\.id, event\)/);
   assert.doesNotMatch(canvasSource, /aria-label="选择图片素材"[\s\S]*?onClick=\{event => \{ stopCanvasEvent\(event\); onPickImageAsset/);

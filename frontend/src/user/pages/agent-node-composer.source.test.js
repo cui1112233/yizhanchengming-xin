@@ -19,20 +19,23 @@ test('canvas renders one adaptive composer for text image video and audio nodes'
   assert.match(composerSource, /reconcileNodeModel\(config, models, kind\)/);
 });
 
-test('image node preview is a React Flow non-drag control so its editor click is delivered', () => {
-  assert.match(canvasSource, /className="agent-canvas-node-image-select nodrag nopan" aria-label="展开图片编辑"/);
+test('image node preview is a React Flow drag surface and disables native image dragging', () => {
+  assert.match(canvasSource, /className="agent-canvas-node-image-select agent-canvas-node-drag-surface"/);
+  assert.match(canvasSource, /AuthenticatedAgentImage[\s\S]*?draggable=\{false\}/);
 });
 
-test('opening a media editor prevents the canvas selection handler from immediately closing it', () => {
+test('named media edit actions stop canvas cleanup while passive previews keep selecting and dragging', () => {
   const opener = canvasSource.match(/const openEditor = event => \{([\s\S]*?)\n  \};/);
   assert.ok(opener, 'media editor opener should exist');
   assert.match(opener[1], /event\.preventDefault\(\);/);
   assert.match(opener[1], /stopCanvasEvent\(event\);/);
-  assert.match(canvasSource, /event\.target\?\.closest\?\.\('\.agent-node-composer, \.agent-canvas-node-card-header, \.agent-canvas-node-image-select/);
+  assert.match(canvasSource, /event\.target\?\.closest\?\.\('\.agent-node-composer'\)/);
+  assert.doesNotMatch(canvasSource, /closest\?\.\('[^']*agent-canvas-node-image-select/);
 });
 
-test('script card header is protected from the canvas selection handler so production controls can open', () => {
-  assert.match(canvasSource, /\.agent-node-composer, \.agent-canvas-node-card-header, \.agent-canvas-node-image-select/);
+test('script card named edit action remains protected without making the complete header non-draggable', () => {
+  assert.match(canvasSource, /className="nodrag nopan agent-canvas-node-card-header-action"/);
+  assert.doesNotMatch(canvasSource, /closest\?\.\('[^']*agent-canvas-node-card-header/);
 });
 
 test('a linked book waits for the canvas instance before it marks its group as focused', () => {
@@ -66,9 +69,9 @@ test('canvas close lifecycle clears the composer and its material panel together
 });
 
 test('the image material button is protected from the canvas node-click cleanup', () => {
-  assert.match(composerSource, /className="agent-node-composer__source" onPointerDown=\{stop\} onClick=\{event => \{ event\.preventDefault\(\); stop\(event\); onPickImageAsset\?\.\(node\.id, event\); \}\}/);
+  assert.match(composerSource, /if \(kind === 'image'\) more\.push\(action\('source-image',[\s\S]*?event => onPickImageAsset\?\.\(node\.id, event\)/);
   assert.match(canvasSource, /const isMultiSelection = isCanvasMultiSelectionEvent\(event\);/);
-  assert.match(canvasSource, /event\.defaultPrevented \|\| \(!isMultiSelection && event\.target\?\.closest\?\.\('\.agent-node-composer, \.agent-canvas-node-card-header, \.agent-canvas-node-image-select, \.agent-canvas-node-video-placeholder, \.agent-canvas-node-audio-placeholder, \.agent-canvas-node-text-preview'\)\)/);
+  assert.match(canvasSource, /event\.defaultPrevented \|\| \(!isMultiSelection && event\.target\?\.closest\?\.\('\.agent-node-composer'\)\)/);
   assert.match(canvasSource, /const panel = \{ assetKind: 'image', mode, nodeID, position: \{ x: 0, y: 0 \}, anchor: imageAssetPanelAnchor\(event\) \};\s*\/\/ React Flow completes its node click after this nested control; open after that cleanup\.\s*window\.requestAnimationFrame\(\(\) => setAssetPanel\(panel\)\);/);
 });
 
