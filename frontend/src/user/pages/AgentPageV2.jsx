@@ -578,6 +578,17 @@ export function AgentPageV2({ theme }) {
   }, [composerMenuOpen, composerPanel]);
 
   useEffect(() => {
+    if (!composerMenuOpen && !composerPanel) return undefined;
+    function closeComposerOnOutsidePointer(event) {
+      if (event.target?.closest?.('.agent-workbench-composer')) return;
+      setComposerMenuOpen(false);
+      setComposerPanel(null);
+    }
+    window.addEventListener('pointerdown', closeComposerOnOutsidePointer);
+    return () => window.removeEventListener('pointerdown', closeComposerOnOutsidePointer);
+  }, [composerMenuOpen, composerPanel]);
+
+  useEffect(() => {
     historyRef.current?.scrollTo({ top: historyRef.current.scrollHeight, behavior: 'smooth' });
   }, [activeTask?.id, activeTask?.messages?.length]);
 
@@ -1362,7 +1373,7 @@ export function AgentPageV2({ theme }) {
                   </div>
                 ) : null}
               </div>
-              <button className="agent-composer-mode" type="button" onClick={() => openComposerTool('mode')}>全能创作<ChevronDown size={13} /></button>
+              <button className="agent-composer-mode" type="button" onClick={() => openComposerTool('mode')}>{selectedMode}<ChevronDown size={13} /></button>
               <button className="agent-composer-tool" type="button" aria-label="添加附件" title="添加附件" onClick={() => openComposerTool('file')}><Paperclip size={16} /></button>
               {viewState.activeView !== 'storyboard' ? <><button className="agent-composer-tool" type="button" aria-label="选择技能" title="选择技能" onClick={() => openComposerTool('skill')}><Sparkles size={16} /></button>
               <button className="agent-composer-tool" type="button" aria-label="选择专家" title="选择专家" onClick={() => openComposerTool('expert')}><Bot size={16} /></button></> : null}

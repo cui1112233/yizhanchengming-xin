@@ -24,6 +24,9 @@ test('生成框浮层由单一 composerPanel 状态控制', () => {
   assert.match(source, /composerPanel === 'expert'/);
   assert.match(source, /composerPanel === 'skill'/);
   assert.match(source, /setComposerPanel\(current => current === tool \? null : tool\)/);
+  assert.match(source, /closeComposerOnOutsidePointer/);
+  assert.match(source, /event\.target\?\.closest\?\.\('\.agent-workbench-composer'\)/);
+  assert.match(source, /\{selectedMode\}<ChevronDown/);
 });
 
 test('附件和素材引用继续走真实校验与移除逻辑', () => {
