@@ -1,7 +1,7 @@
 import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { ArrowRight, ArrowUp, Bot, ChevronDown, ChevronUp, Clock3, FilePenLine, FileText, Film, Image as ImageIcon, MessageCircle, MoreHorizontal, Music, Paperclip, Pin, RotateCcw, SearchCheck, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
+import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentGenerationSummary, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
@@ -12,17 +12,18 @@ import { AgentWorkspaceDrawer } from '../components/AgentWorkspaceDrawer';
 import { AgentWorkspaceHeader } from '../components/AgentWorkspaceHeader';
 import { AuthenticatedAgentImage } from '../components/AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from '../components/AuthenticatedAgentVideo';
-import { buildSelectedNodeContext, createCanvasSaveQueue, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask } from './agent-canvas-state';
+import { buildSelectedNodeContext, createCanvasSaveQueue, mergePendingCanvas, shouldAcceptCanvasRefresh, shouldKeepPendingCreatedTask } from './agent-canvas-state';
 import { clearCanvasDraft, isDraftAtLeastAsFresh, loadCanvasDraft, saveCanvasDraft } from './agent-canvas-draft-storage';
 import { detectDirectorMode } from './agent-director-mode';
 import { buildStoryboardAssetContext, patchStoryboardNodeConfig } from './agent-storyboard-model';
 import { hasStoryboardAssetDrop, readStoryboardAssetDrop } from './agent-storyboard-conversation-drag';
+import { STORYBOARD_SPLIT_DEFAULTS, storyboardSplitRatio, storyboardSplitRatioFromPointer } from './agent-storyboard-split';
 import { patchStoryboardState } from './agent-storyboard-state';
 import { createNodeAt } from './agent-canvas-context-menu';
 import { appendUniqueAssetID, classifyComposerAttachment } from './agent-composer-attachments';
 import { findNodeMentionCandidates, insertNodeMention } from './agent-node-mentions';
 import { normalizeWorkspaceView, workspaceViewForActiveView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
-import { batchFactoryGroupLabel, syncBookThenLoadCanvas } from './agent-canvas-batch-factory';
+import { batchFactoryGroupLabel, refreshBatchFactoryBookCanvas, syncBookThenLoadCanvas } from './agent-canvas-batch-factory';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -77,6 +78,7 @@ export function AgentPageV2({ theme }) {
     activeView: workspaceViewQuery(new URLSearchParams(window.location.search).get('view'))
   }));
   const [workflowFocusRequest, setWorkflowFocusRequest] = useState(0);
+  const [storyboardDirectorResizing, setStoryboardDirectorResizing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [taskDetailLoading, setTaskDetailLoading] = useState(false);
   const [canvas, setCanvas] = useState({ version: 1, revision: 0, nodes: [], edges: [] });
@@ -87,6 +89,7 @@ export function AgentPageV2({ theme }) {
   const [workspaceAssetsError, setWorkspaceAssetsError] = useState('');
   const [executions, setExecutions] = useState([]);
   const [generations, setGenerations] = useState([]);
+  const [generationSummary, setGenerationSummary] = useState(null);
   const [storyboardShots, setStoryboardShots] = useState([]);
   const [storyboardShotsLoading, setStoryboardShotsLoading] = useState(false);
   const [storyboardShotsError, setStoryboardShotsError] = useState('');
@@ -119,6 +122,7 @@ export function AgentPageV2({ theme }) {
   const canvasRef = useRef(null);
   const pendingWorkflowNodeRef = useRef('');
   const viewStateRef = useRef(viewState);
+  const storyboardDirectorResizeRef = useRef(null);
   const composerMenuId = 'agent-composer-menu';
 
   function replaceCanvas(nextCanvas) {
@@ -227,12 +231,14 @@ export function AgentPageV2({ theme }) {
       if (accepted === false || !isCurrentRequest()) return { ...result, ignored: true };
       setCanvasViewport(result.canvas.viewport || { x: 0, y: 0, zoom: 1 });
     }
-    const [generationResult, executionResult] = await Promise.all([
+    const [generationResult, executionResult, summaryResult] = await Promise.all([
       listAgentGenerations(requestedTaskId),
-      listAgentExecutions(requestedTaskId)
+      listAgentExecutions(requestedTaskId),
+      getAgentGenerationSummary(requestedTaskId)
     ]);
     if (!isCurrentRequest()) return { ...result, ignored: true };
     setGenerations(Array.isArray(generationResult.tasks) ? generationResult.tasks : []);
+    setGenerationSummary(summaryResult?.summary || null);
     setExecutions(Array.isArray(executionResult.executions) ? executionResult.executions : []);
     return result;
   }, []);
@@ -267,6 +273,52 @@ export function AgentPageV2({ theme }) {
     const nextStoryboard = patchStoryboardState(viewStateRef.current.storyboard, patch);
     updateWorkspaceView({ storyboard: nextStoryboard });
   }, []);
+
+  function startStoryboardDirectorResize(event) {
+    const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+    if (event.button !== 0 || !bounds || storyboardDirectorResizeRef.current) return;
+    storyboardDirectorResizeRef.current = { pointerId: event.pointerId, bounds };
+    setStoryboardDirectorResizing(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  useEffect(() => {
+    if (!storyboardDirectorResizing) return undefined;
+    function moveStoryboardDirectorResize(event) {
+      const resize = storyboardDirectorResizeRef.current;
+      if (!resize || resize.pointerId !== event.pointerId) return;
+      const director = storyboardSplitRatioFromPointer(event.clientX, resize.bounds, 'x', 18, STORYBOARD_SPLIT_DEFAULTS.director);
+      handleStoryboardStateChange({ layout: { director } });
+      event.preventDefault();
+    }
+    function finishStoryboardDirectorResize(event) {
+      const resize = storyboardDirectorResizeRef.current;
+      if (!resize || resize.pointerId !== event.pointerId) return;
+      storyboardDirectorResizeRef.current = null;
+      setStoryboardDirectorResizing(false);
+    }
+    window.addEventListener('pointermove', moveStoryboardDirectorResize);
+    window.addEventListener('pointerup', finishStoryboardDirectorResize);
+    window.addEventListener('pointercancel', finishStoryboardDirectorResize);
+    return () => {
+      window.removeEventListener('pointermove', moveStoryboardDirectorResize);
+      window.removeEventListener('pointerup', finishStoryboardDirectorResize);
+      window.removeEventListener('pointercancel', finishStoryboardDirectorResize);
+    };
+  }, [handleStoryboardStateChange, storyboardDirectorResizing]);
+
+  function resetStoryboardDirectorSplit() {
+    handleStoryboardStateChange({ layout: { director: STORYBOARD_SPLIT_DEFAULTS.director } });
+  }
+
+  function adjustStoryboardDirectorSplit(event) {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowLeft' ? -2 : 2;
+    const director = storyboardSplitRatio(viewStateRef.current.storyboard.layout.director + direction, 18, STORYBOARD_SPLIT_DEFAULTS.director);
+    handleStoryboardStateChange({ layout: { director } });
+  }
 
   const addStoryboardAssetToWorkflow = useCallback(asset => {
     const kind = String(asset?.kind || '').trim();
@@ -477,9 +529,10 @@ export function AgentPageV2({ theme }) {
       const nextIsCanvasWorkspace = window.location.pathname === '/agent/canvas';
       const searchParams = new URLSearchParams(window.location.search);
       if (nextIsCanvasWorkspace) {
-        const nextViewState = workspaceViewPatch(viewStateRef.current, {
-          activeView: workspaceViewQuery(searchParams.get('view'))
-        });
+        const requestedView = searchParams.get('view');
+        const nextViewState = requestedView
+          ? workspaceViewForActiveView(viewStateRef.current, workspaceViewQuery(requestedView))
+          : workspaceViewPatch(viewStateRef.current, { activeView: workspaceViewQuery(requestedView) });
         viewStateRef.current = nextViewState;
         setViewState(nextViewState);
         replaceCanvas({ ...canvasStateRef.current, viewState: nextViewState });
@@ -539,6 +592,7 @@ export function AgentPageV2({ theme }) {
       setCanvasViewport({ x: 0, y: 0, zoom: 1 });
       setExecutions([]);
       setGenerations([]);
+      setGenerationSummary(null);
       setStoryboardShots([]);
       setSelectedCanvasNodes([]);
       return undefined;
@@ -579,16 +633,20 @@ export function AgentPageV2({ theme }) {
         canvasSaveQueueRef.current = saveQueue;
         const serverCanvas = { ...loadedCanvas, viewState: nextViewState };
         const draft = loadCanvasDraft(window.localStorage, getCurrentUsername(), activeTaskId);
-        const initialCanvas = draft && isDraftAtLeastAsFresh(draft, loadedCanvas)
-          ? { ...draft.canvas, viewState: nextViewState }
+        const draftIsCurrent = draft && isDraftAtLeastAsFresh(draft, loadedCanvas);
+        // A Batch Factory book can gain projected nodes while this browser is
+        // closed. An old empty local draft must never hide or overwrite them.
+        const staleEmptyBatchDraft = Boolean(draftIsCurrent && requestedBookId && serverCanvas.nodes?.length && !draft.canvas?.nodes?.length);
+        const initialCanvas = draftIsCurrent && !staleEmptyBatchDraft
+          ? { ...mergePendingCanvas(serverCanvas, draft.canvas), viewState: nextViewState }
           : serverCanvas;
-        if (draft && !isDraftAtLeastAsFresh(draft, loadedCanvas)) {
+        if (draft && (!draftIsCurrent || staleEmptyBatchDraft)) {
           clearCanvasDraft(window.localStorage, getCurrentUsername(), activeTaskId);
         }
         replaceCanvas(initialCanvas);
         setCanvasViewport(initialCanvas.viewport || { x: 0, y: 0, zoom: 1 });
-        setCanvasSaveStatus(draft && isDraftAtLeastAsFresh(draft, loadedCanvas) ? 'dirty' : 'idle');
-        if (draft && isDraftAtLeastAsFresh(draft, loadedCanvas)) saveQueue.enqueue(initialCanvas);
+        setCanvasSaveStatus(draftIsCurrent && !staleEmptyBatchDraft ? 'dirty' : 'idle');
+        if (draftIsCurrent && !staleEmptyBatchDraft) saveQueue.enqueue(initialCanvas);
         setExecutions(Array.isArray(executionResult.executions) ? executionResult.executions : []);
       })
       .catch(error => { if (!cancelled) message.error(error.message || '读取创作画布失败'); });
@@ -607,9 +665,11 @@ export function AgentPageV2({ theme }) {
       setGenerations([]);
       return undefined;
     }
-    const refresh = () => listAgentGenerations(activeTaskId)
-      .then(result => {
-        if (!cancelled) setGenerations(Array.isArray(result.tasks) ? result.tasks : []);
+    const refresh = () => Promise.all([listAgentGenerations(activeTaskId), getAgentGenerationSummary(activeTaskId)])
+      .then(([generationResult, summaryResult]) => {
+        if (cancelled) return;
+        setGenerations(Array.isArray(generationResult.tasks) ? generationResult.tasks : []);
+        setGenerationSummary(summaryResult?.summary || null);
       })
       .catch(() => {});
     void refresh();
@@ -674,6 +734,57 @@ export function AgentPageV2({ theme }) {
   }, [activeTaskId, isCanvasWorkspace]);
 
   useEffect(() => {
+    const requestedBookId = String(requestedBatchBookId || '').trim();
+    if (!isCanvasWorkspace || !activeTaskId || !requestedBookId) return undefined;
+    let cancelled = false;
+    let refreshing = false;
+    const refreshMappedBook = async () => {
+      if (cancelled || refreshing || document.visibilityState !== 'visible') return;
+      const requestedTaskId = activeTaskId;
+      const requestedQueue = canvasSaveQueueRef.current;
+      if (!requestedQueue) return;
+      const isCurrentRefresh = () => shouldAcceptCanvasRefresh({
+        requestedTaskId,
+        currentTaskId: activeTaskIdRef.current,
+        requestedQueue,
+        currentQueue: canvasSaveQueueRef.current,
+        mounted: mountedRef.current
+      });
+      refreshing = true;
+      try {
+        const result = await refreshBatchFactoryBookCanvas({
+          taskId: requestedTaskId,
+          bookId: requestedBookId,
+          queue: requestedQueue,
+          sync: syncAgentBatchFactoryBook,
+          getCanvas: getAgentCanvas,
+          isCurrent: isCurrentRefresh
+        });
+        if (result?.ignored || !isCurrentRefresh()) return;
+        const nextCanvas = result?.canvas || { version: 1, revision: 0, nodes: [], edges: [] };
+        const accepted = await requestedQueue.acceptServerCanvas(nextCanvas);
+        if (accepted === false || !isCurrentRefresh()) return;
+        setCanvasViewport(nextCanvas.viewport || { x: 0, y: 0, zoom: 1 });
+      } catch {
+        // A background refresh should not interrupt active editing. The next
+        // return to this tab or an explicit refresh can try again.
+      } finally {
+        refreshing = false;
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshMappedBook();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [activeTaskId, isCanvasWorkspace, requestedBatchBookId]);
+
+  useEffect(() => {
     let cancelled = false;
     if (!isCanvasWorkspace || !activeTaskId) {
       setWorkspaceAssets([]);
@@ -721,7 +832,7 @@ export function AgentPageV2({ theme }) {
     return plan && typeof plan === 'object' && !dismissedDirectorPlanIDs.includes(String(plan.id || '')) ? [plan] : [];
   }), [dismissedDirectorPlanIDs, messages]);
   const canvasGroups = useMemo(() => [...new Set((canvas.nodes || []).map(node => node.groupId).filter(Boolean))]
-    .map(groupId => ({ id: groupId, title: batchFactoryGroupLabel(groupId) })), [canvas.nodes]);
+    .map(groupId => ({ id: groupId, title: batchFactoryGroupLabel(groupId, canvas.nodes) })), [canvas.nodes]);
   function toggleSkill(id) {
     setSelectedSkillIds(current => current.includes(id) ? current.filter(value => value !== id) : current.length >= 3 ? current : [...current, id]);
   }
@@ -1004,7 +1115,10 @@ export function AgentPageV2({ theme }) {
 
   return (
     <div className={`agent-page utility-workbench agent-workspace-v3${isCanvasWorkspace && !viewState.drawerOpen ? ' agent-task-drawer-collapsed' : ''}`}>
-      {isCanvasWorkspace ? <div className={`${viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}${viewState.activeView === 'storyboard' ? ' is-storyboard' : ' is-workflow'}`}>
+      {isCanvasWorkspace ? <div
+        className={`${viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}${viewState.activeView === 'storyboard' ? ' is-storyboard' : ' is-workflow'}${storyboardDirectorResizing ? ' is-resizing-director' : ''}`}
+        style={viewState.activeView === 'storyboard' ? { '--storyboard-director-split': `${viewState.storyboard.layout.director}%` } : undefined}
+      >
         <AgentWorkspaceHeader
           projectTitle={activeTask?.title}
           activeView={viewState.activeView}
@@ -1035,6 +1149,7 @@ export function AgentPageV2({ theme }) {
           executions={executions}
           shots={storyboardShots}
           generations={generations}
+          generationSummary={generationSummary}
           assetsLoading={workspaceAssetsLoading}
           assetsError={workspaceAssetsError}
           tasks={tasks}
@@ -1042,6 +1157,7 @@ export function AgentPageV2({ theme }) {
           onTabChange={drawerTab => updateWorkspaceView({ drawerTab })}
           onWidthChange={drawerWidth => updateWorkspaceView({ drawerWidth })}
           onLocateNode={openNodeInWorkflow}
+          onOpenDirectorDesk={nodeId => canvasRef.current?.openDirectorDesk(nodeId)}
           onActivateGenerationResult={handleGenerationResultActivate}
           onCreateFromAsset={asset => canvasRef.current?.createFromAsset(asset)}
           onSelectTask={taskId => selectTask(taskId, { historyMode: 'push' })}
@@ -1110,6 +1226,7 @@ export function AgentPageV2({ theme }) {
           assets={workspaceAssets}
           shots={storyboardShots}
           generations={generations}
+          generationSummary={generationSummary}
           loading={workspaceAssetsLoading}
           error={workspaceAssetsError}
           shotsLoading={storyboardShotsLoading}
@@ -1163,6 +1280,35 @@ export function AgentPageV2({ theme }) {
           onDragLeave={handleConversationAssetDragLeave}
           onDrop={handleConversationAssetDrop}
         >
+          <div className="agent-composer-overlay" aria-live="polite">
+            {composerPanel === 'mode' ? (
+              <div className="agent-composer-context"><strong>模式</strong>{['创作助手', '分析拆解', '修改润色'].map(value => <button type="button" key={value} className={selectedMode === value ? 'active' : ''} onClick={() => { setSelectedMode(value); setComposerPanel(null); }}>{value}</button>)}</div>
+            ) : null}
+            {composerPanel === 'expert' ? (
+              <div className="agent-composer-context"><strong>专家</strong>{['CM 创作顾问', '前贴片广告策划', '短剧编剧'].map(value => <button type="button" key={value} className={selectedExpert === value ? 'active' : ''} onClick={() => { setSelectedExpert(value); setComposerPanel(null); }}>{value}</button>)}</div>
+            ) : null}
+            {composerPanel === 'skill' ? (
+              <div className="agent-skill-panel">
+                <header><div><strong>技能</strong><span>最多选择 3 项</span></div><Button size="small" icon={<FilePenLine size={14} />} onClick={openCreateSkill}>新建我的技能</Button></header>
+                <Segmented value={source} onChange={setSource} options={[{ label: '全部', value: 'all' }, { label: '平台自带', value: 'system' }, { label: '我的技能', value: 'user' }]} />
+                <div className="agent-skill-list">
+                  {visibleSkills.map(skill => (
+                    <article className={`agent-skill-card${selectedSkillIds.includes(skill.id) ? ' selected' : ''}`} key={skill.id}>
+                      <div><strong>{skill.name}</strong><Tag>{skill.source === 'system' ? '平台自带' : '我的技能'}</Tag></div>
+                      <p>{skill.description || '未填写说明'}</p>
+                      <Space size="small" wrap>
+                        <Button size="small" type={selectedSkillIds.includes(skill.id) ? 'primary' : 'default'} onClick={() => toggleSkill(skill.id)}>{selectedSkillIds.includes(skill.id) ? '已选用' : '选用'}</Button>
+                        {skill.inputTemplate ? <Button size="small" onClick={() => useTemplate(skill)}>填入模板</Button> : null}
+                        {skill.source === 'user' ? <Button size="small" onClick={() => openEditSkill(skill.id)}>编辑</Button> : null}
+                        {skill.source === 'user' ? <Popconfirm title="删除这项我的技能？" onConfirm={() => removeSkill(skill.id)}><Button size="small" danger>删除</Button></Popconfirm> : null}
+                      </Space>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="agent-composer-body">
           <input ref={attachmentInputRef} className="agent-attachment-input" type="file" accept=".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json,image/*,video/*,audio/*" onChange={readAttachment} />
           {selectedConversationAssets.length ? <div className="agent-composer-asset-attachments" aria-label="已加入对话的素材">
             {selectedConversationAssets.map(asset => <div className="agent-composer-asset-attachment" key={asset.id} title={asset.name}>
@@ -1234,34 +1380,18 @@ export function AgentPageV2({ theme }) {
             />
           </div>
 
-          {composerPanel === 'mode' ? (
-            <div className="agent-composer-context"><strong>模式</strong>{['创作助手', '分析拆解', '修改润色'].map(value => <button type="button" key={value} className={selectedMode === value ? 'active' : ''} onClick={() => { setSelectedMode(value); setComposerPanel(null); }}>{value}</button>)}</div>
-          ) : null}
-          {composerPanel === 'expert' ? (
-            <div className="agent-composer-context"><strong>专家</strong>{['CM 创作顾问', '前贴片广告策划', '短剧编剧'].map(value => <button type="button" key={value} className={selectedExpert === value ? 'active' : ''} onClick={() => { setSelectedExpert(value); setComposerPanel(null); }}>{value}</button>)}</div>
-          ) : null}
-          {composerPanel === 'skill' ? (
-            <div className="agent-skill-panel">
-              <header><div><strong>技能</strong><span>最多选择 3 项</span></div><Button size="small" icon={<FilePenLine size={14} />} onClick={openCreateSkill}>新建我的技能</Button></header>
-              <Segmented value={source} onChange={setSource} options={[{ label: '全部', value: 'all' }, { label: '平台自带', value: 'system' }, { label: '我的技能', value: 'user' }]} />
-              <div className="agent-skill-list">
-                {visibleSkills.map(skill => (
-                  <article className={`agent-skill-card${selectedSkillIds.includes(skill.id) ? ' selected' : ''}`} key={skill.id}>
-                    <div><strong>{skill.name}</strong><Tag>{skill.source === 'system' ? '平台自带' : '我的技能'}</Tag></div>
-                    <p>{skill.description || '未填写说明'}</p>
-                    <Space size="small" wrap>
-                      <Button size="small" type={selectedSkillIds.includes(skill.id) ? 'primary' : 'default'} onClick={() => toggleSkill(skill.id)}>{selectedSkillIds.includes(skill.id) ? '已选用' : '选用'}</Button>
-                      {skill.inputTemplate ? <Button size="small" onClick={() => useTemplate(skill)}>填入模板</Button> : null}
-                      {skill.source === 'user' ? <Button size="small" onClick={() => openEditSkill(skill.id)}>编辑</Button> : null}
-                      {skill.source === 'user' ? <Popconfirm title="删除这项我的技能？" onConfirm={() => removeSkill(skill.id)}><Button size="small" danger>删除</Button></Popconfirm> : null}
-                    </Space>
-                  </article>
-                ))}
-              </div>
-            </div>
-          ) : null}
+          </div>
         </div>
         </aside>
+        {viewState.activeView === 'storyboard' && viewState.conversationOpen ? <button
+          type="button"
+          className="agent-storyboard-workspace-splitter"
+          aria-label="调整 AI 助手面板宽度"
+          title="拖动调整宽度，双击恢复默认"
+          onPointerDown={startStoryboardDirectorResize}
+          onDoubleClick={resetStoryboardDirectorSplit}
+          onKeyDown={adjustStoryboardDirectorSplit}
+        /> : null}
       </div>
 
       : <section className="agent-creation-home" aria-labelledby="agent-creation-home-title">
