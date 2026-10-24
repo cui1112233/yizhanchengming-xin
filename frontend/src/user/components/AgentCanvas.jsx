@@ -6,7 +6,7 @@ import {
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, GitBranch, Group, Hand,
   Clapperboard, FileText, Film, GripHorizontal, Image as ImageIcon,
-  Download, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, Scissors, SlidersHorizontal, Sparkles, Ungroup
+  Download, Folder, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, Scissors, SlidersHorizontal, Sparkles, Ungroup
 } from 'lucide-react';
 import { createContext, forwardRef, lazy, Suspense, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -2417,9 +2417,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
                 onPointerMove={moveGroupDrag}
                 onPointerUp={endGroupDrag}
                 onPointerCancel={endGroupDrag}
-              >{batchFactoryGroupLabel(groupId)}</button>
-              <Button size="small" onClick={() => toggleGroup(groupId)}>{collapsedGroups.has(groupId) ? '展开' : '收起'}</Button>
-              <Button size="small" onClick={() => locateGroup(groupId)}>定位</Button>
+              ><Folder size={12} />{batchFactoryGroupLabel(groupId)}</button>
+              <Button size="small" aria-label={collapsedGroups.has(groupId) ? '展开分组' : '收起分组'} onClick={() => toggleGroup(groupId)}>{collapsedGroups.has(groupId) ? '展开' : '收起'}</Button>
+              <Button size="small" aria-label="定位分组" onClick={() => locateGroup(groupId)}>定位</Button>
             </section>
           ))}
         </ViewportPortal>

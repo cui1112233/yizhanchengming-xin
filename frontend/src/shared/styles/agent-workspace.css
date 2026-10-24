@@ -1128,6 +1128,9 @@
   top: -28px;
   left: 0;
   height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--agent-border);
   border-radius: 6px;
   padding: 0 8px;
@@ -1139,6 +1142,7 @@
   pointer-events: auto;
   touch-action: none;
 }
+.agent-page .agent-canvas-group-handle svg { color: var(--agent-accent); }
 .agent-page .agent-canvas-group-handle:active { cursor: grabbing; }
 
 .agent-page .agent-conversation-panel { position: absolute; z-index: 15; bottom: 124px; left: 50%; display: flex; width: min(960px, calc(100% - 32px)); height: min(520px, calc(100% - 184px)); min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--agent-border); border-radius: 8px; background: var(--agent-panel); box-shadow: 0 -14px 26px rgba(0, 0, 0, 0.22); transform: translateX(-50%); transition: transform 180ms ease, opacity 160ms ease; }
