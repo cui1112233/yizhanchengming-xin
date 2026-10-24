@@ -1,5 +1,5 @@
 import { Button, Empty, Input, Segmented, Select, Spin, Tag, Tooltip, message } from 'antd';
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, FileText, Film, GripVertical, Image as ImageIcon, ListChecks, LocateFixed, MessageSquarePlus, Music, Plus, Save, Search, Sparkles, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, FileText, Film, Folder, FolderOpen, GripVertical, Image as ImageIcon, ListChecks, LocateFixed, MessageSquarePlus, Music, Plus, Save, Search, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { updateAgentScriptShot, uploadAgentAsset } from '../../shared/api/agent';
 import { listAvailableModels } from '../../shared/api/modelCatalog';
@@ -11,6 +11,7 @@ import { STORYBOARD_SPLIT_DEFAULTS, storyboardSplitRatioFromPointer } from '../p
 import { filterStoryboardLibrary, moveStoryboardMaterial, normalizeStoryboardState, reorderStoryboardMaterial, storyboardBatchAssets, storyboardBatchCategoryPatch, storyboardCategoryOptions, storyboardItemCategory, storyboardPointerDropTarget, toggleStoryboardBatchSelection } from '../pages/agent-storyboard-state';
 import { audioOperationNeedsModel } from '../pages/agent-canvas-audio-jobs';
 import { reconcileNodeModel } from '../pages/agent-model-capabilities';
+import { generationSummaryText } from '../pages/agent-generation-state';
 import { AgentBatchModelPicker } from './AgentBatchModelPicker';
 import { AgentModelPicker } from './AgentModelPicker';
 import { AgentNodeParameterPopover } from './AgentNodeParameterPopover';
@@ -34,7 +35,7 @@ function StoryboardThumbnail({ item, large = false }) {
 }
 
 export function AgentStoryboardWorkspace({
-  taskId = '', nodes = [], assets = [], shots = [], generations = [], loading = false, error = '', shotsLoading = false, shotsError = '', conversationAssetIds = [], storyboardState = {}, onStoryboardStateChange,
+  taskId = '', nodes = [], assets = [], shots = [], generations = [], generationSummary = null, loading = false, error = '', shotsLoading = false, shotsError = '', conversationAssetIds = [], storyboardState = {}, onStoryboardStateChange,
   onOpenNodeInWorkflow, onSelectionChange, onNodeConfigChange, onShotUpdated, onCreateShotBatch, onAddToConversation, onAddToWorkflow, onAssetsCreated
 }) {
   const [query, setQuery] = useState('');
@@ -49,8 +50,9 @@ export function AgentStoryboardWorkspace({
   const [dragTargetKey, setDragTargetKey] = useState('');
   const [draggingKey, setDraggingKey] = useState('');
   const [conversationDraggingKey, setConversationDraggingKey] = useState('');
-  const [gridSplit, setGridSplit] = useState(() => ({ ...STORYBOARD_SPLIT_DEFAULTS }));
   const [gridResizeAxis, setGridResizeAxis] = useState('');
+  const [sectionDraggingKind, setSectionDraggingKind] = useState('');
+  const [sectionDragTargetKind, setSectionDragTargetKind] = useState('');
   const [shotDraft, setShotDraft] = useState(null);
   const [shotSaving, setShotSaving] = useState(false);
   const [shotActionError, setShotActionError] = useState('');
@@ -65,12 +67,18 @@ export function AgentStoryboardWorkspace({
   const assetInputRef = useRef(null);
   const itemDragRef = useRef(null);
   const gridResizeRef = useRef(null);
+  const sectionDragRef = useRef(null);
+  const sectionClickSuppressionRef = useRef(false);
   const selectedKey = storyboard.selectedKey;
   const conversationAssetIDSet = useMemo(() => new Set(conversationAssetIds.map(value => String(value))), [conversationAssetIds]);
   const library = useMemo(() => buildStoryboardLibrary(nodes, assets, shots), [nodes, assets, shots]);
   const visibleLibrary = useMemo(() => filterStoryboardLibrary(library, storyboard, query), [library, query, storyboard]);
   const shotSection = useMemo(() => visibleLibrary.find(section => section.kind === 'shot') || { kind: 'shot', label: '镜头', items: [] }, [visibleLibrary]);
   const materialLibrary = useMemo(() => visibleLibrary.filter(section => section.kind !== 'shot'), [visibleLibrary]);
+  const orderedMaterialLibrary = useMemo(() => {
+    const sections = new Map(materialLibrary.map(section => [section.kind, section]));
+    return storyboard.layout.sectionOrder.map(kind => sections.get(kind)).filter(Boolean);
+  }, [materialLibrary, storyboard.layout.sectionOrder]);
   const visibleItems = useMemo(() => materialLibrary.flatMap(section => section.items || []), [materialLibrary]);
   const resultGroups = useMemo(() => groupResultLibrary({ shots, nodes, generations, assets }), [assets, generations, nodes, shots]);
   const selectedBatchItems = useMemo(() => {
@@ -286,10 +294,11 @@ export function AgentStoryboardWorkspace({
 
   function startGridResize(event, eventType = 'pointer') {
     const axis = event.currentTarget.dataset.axis;
+    const split = event.currentTarget.dataset.split;
     const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
-    if (gridResizeRef.current || event.button !== 0 || !bounds || (axis !== 'x' && axis !== 'y')) return;
-    gridResizeRef.current = { axis, eventType, pointerId: eventType === 'pointer' ? event.pointerId : null, bounds };
-    setGridResizeAxis(axis);
+    if (gridResizeRef.current || event.button !== 0 || !bounds || (axis !== 'x' && axis !== 'y') || !Object.hasOwn(STORYBOARD_SPLIT_DEFAULTS, split)) return;
+    gridResizeRef.current = { axis, split, eventType, pointerId: eventType === 'pointer' ? event.pointerId : null, bounds };
+    setGridResizeAxis(split);
     if (eventType === 'pointer') event.currentTarget.setPointerCapture?.(event.pointerId);
     event.preventDefault();
   }
@@ -300,10 +309,18 @@ export function AgentStoryboardWorkspace({
     const ratio = storyboardSplitRatioFromPointer(
       resize.axis === 'x' ? event.clientX : event.clientY,
       resize.bounds,
-      resize.axis
+      resize.axis,
+      18,
+      STORYBOARD_SPLIT_DEFAULTS[resize.split]
     );
-    setGridSplit(current => resize.axis === 'x' ? { ...current, column: ratio } : { ...current, row: ratio });
+    onStoryboardStateChange?.({ layout: { [resize.split]: ratio } });
     event.preventDefault();
+  }
+
+  function resetGridSplit(event) {
+    const split = event.currentTarget.dataset.split;
+    if (!Object.hasOwn(STORYBOARD_SPLIT_DEFAULTS, split)) return;
+    onStoryboardStateChange?.({ layout: { [split]: STORYBOARD_SPLIT_DEFAULTS[split] } });
   }
 
   function finishGridResize(event) {
@@ -328,18 +345,147 @@ export function AgentStoryboardWorkspace({
     };
   }, [gridResizeAxis]);
 
+  function startSectionDrag(event, kind) {
+    if (event.button !== 0) return;
+    sectionDragRef.current = {
+      pointerId: event.pointerId,
+      sourceKind: kind,
+      targetKind: '',
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function moveSectionDrag(event) {
+    const drag = sectionDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 5) return;
+    drag.moved = true;
+    const targetKind = document.elementsFromPoint(event.clientX, event.clientY)
+      .map(element => element.closest?.('[data-section-kind]')?.dataset?.sectionKind || '')
+      .find(kind => kind && kind !== drag.sourceKind) || '';
+    drag.targetKind = targetKind;
+    setSectionDraggingKind(drag.sourceKind);
+    setSectionDragTargetKind(targetKind);
+    event.preventDefault();
+  }
+
+  function finishSectionDrag(event, cancelled = false) {
+    const drag = sectionDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    sectionDragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setSectionDraggingKind('');
+    setSectionDragTargetKind('');
+    if (!drag.moved) return;
+    sectionClickSuppressionRef.current = true;
+    if (cancelled || !drag.targetKind) return;
+    const sectionOrder = [...storyboard.layout.sectionOrder];
+    const sourceIndex = sectionOrder.indexOf(drag.sourceKind);
+    const targetIndex = sectionOrder.indexOf(drag.targetKind);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    [sectionOrder[sourceIndex], sectionOrder[targetIndex]] = [sectionOrder[targetIndex], sectionOrder[sourceIndex]];
+    onStoryboardStateChange?.({ layout: { sectionOrder } });
+  }
+
+  function handleSectionTitleClick(kind) {
+    if (sectionClickSuppressionRef.current) {
+      sectionClickSuppressionRef.current = false;
+      return;
+    }
+    toggleSection(kind);
+  }
+
   function startConversationAssetDrag(event, item) {
     if (batchMode || !writeStoryboardAssetDrag(event.dataTransfer, item.asset)) return;
     setConversationDraggingKey(item.key);
   }
 
   const total = library.reduce((sum, section) => sum + section.items.length, 0);
+  const showShotSection = shotsLoading || Boolean(shotsError) || shotSection.items.length > 0;
   const selectedModels = selected ? (modelsByKind[selected.kind] || []) : [];
   const selectedModel = selected ? reconcileNodeModel(selected.config, selectedModels, selected.kind).model : null;
   const selectedAudioNeedsModel = selected?.kind === 'audio' && audioOperationNeedsModel(selected.config?.parameters?.operation || selected.config?.operation);
   const updateSelectedConfig = patch => {
     if (selected?.nodeId) onNodeConfigChange?.(selected.nodeId, patch);
   };
+  function renderMaterialSection(section) {
+    if (!section) return null;
+    const collapsed = collapsedKinds.includes(section.kind);
+    const selectedKeys = new Set(batchSelectedKeys);
+    return <section
+      className={`agent-storyboard-section is-${section.kind}${collapsed ? ' is-collapsed' : ''}${sectionDraggingKind === section.kind ? ' is-section-dragging' : ''}${sectionDragTargetKind === section.kind ? ' is-section-drop-target' : ''}`}
+      key={section.kind}
+      data-section-kind={section.kind}
+    >
+      <button
+        type="button"
+        className="agent-storyboard-section__title"
+        aria-expanded={!collapsed}
+        aria-label={`拖动调整位置，点击${collapsed ? '展开' : '收起'}${section.label}`}
+        onPointerDown={event => startSectionDrag(event, section.kind)}
+        onPointerMove={moveSectionDrag}
+        onPointerUp={event => finishSectionDrag(event)}
+        onPointerCancel={event => finishSectionDrag(event, true)}
+        onClick={() => handleSectionTitleClick(section.kind)}
+      >
+        <span><GripVertical size={12} /><span className="agent-storyboard-section__folder" aria-hidden="true">{collapsed ? <Folder size={13} /> : <FolderOpen size={13} />}</span><KindIcon kind={section.kind} /><strong>{section.label}</strong><i>{section.items.length}</i></span>{collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+      </button>
+      {!collapsed ? <>
+        <Segmented
+          className="agent-storyboard-section__filters"
+          aria-label={`${section.label}分类`}
+          size="small"
+          value={storyboard.filters[section.kind]}
+          options={storyboardCategoryOptions(section.kind)}
+          onChange={category => onStoryboardStateChange?.({ filters: { [section.kind]: category } })}
+        />
+        <div className="agent-storyboard-section__items">
+          {section.items.map(item => {
+            const conversationAssetID = String(item.asset?.id || item.asset?.assetId || '');
+            const addedToConversation = conversationAssetIDSet.has(conversationAssetID);
+            const batchSelected = selectedKeys.has(item.key);
+            return <article
+              key={item.key}
+              data-storyboard-key={item.key}
+              data-storyboard-kind={item.kind}
+              title={conversationAssetID ? '拖到右侧对话框即可引用素材' : undefined}
+              className={`agent-storyboard-item${selectedKey === item.key && !batchMode ? ' is-selected' : ''}${batchSelected ? ' is-batch-selected' : ''}${draggingKey === item.key ? ' is-dragging' : ''}${conversationDraggingKey === item.key ? ' is-conversation-dragging' : ''}${dragTargetKey === item.key ? ' is-drop-target' : ''}`}
+              draggable={!batchMode && Boolean(conversationAssetID)}
+              onDragStart={event => startConversationAssetDrag(event, item)}
+              onDragEnd={() => setConversationDraggingKey('')}
+            >
+              {!batchMode ? <button
+                type="button"
+                className="agent-storyboard-item__drag"
+                aria-label={`拖动排序 ${item.title}`}
+                onClick={event => event.stopPropagation()}
+                onPointerDown={event => startItemDrag(event, item, section.items)}
+                onPointerMove={moveItemDrag}
+                onPointerUp={event => finishItemDrag(event)}
+                onPointerCancel={event => finishItemDrag(event, true)}
+                onDragStart={event => event.preventDefault()}
+              ><GripVertical size={13} /></button> : null}
+              <button type="button" className="agent-storyboard-item__select" aria-pressed={batchMode ? batchSelected : selectedKey === item.key} onClick={() => selectItem(item)}>
+                <StoryboardThumbnail item={item} />
+                <span><strong>{item.title}</strong><small>{storyboardItemMetaLabel(item) || item.summary || statusLabels[item.status] || '暂无内容'}</small></span>
+              </button>
+              {batchMode ? <span className="agent-storyboard-item__check" aria-hidden="true">{batchSelected ? <Check size={13} /> : null}</span> : null}
+              {!batchMode && conversationAssetID ? <Tooltip title={addedToConversation ? '已加入对话' : '加入对话'}><button
+                type="button"
+                className={`agent-storyboard-item__conversation${addedToConversation ? ' is-added' : ''}`}
+                aria-label={`${addedToConversation ? '已加入对话' : '加入对话'} ${item.title}`}
+                onClick={() => onAddToConversation?.(item.asset)}
+              ><MessageSquarePlus size={13} /></button></Tooltip> : null}
+            </article>;
+          })}
+          {!section.items.length ? <p>当前分类暂无{section.label}</p> : null}
+        </div>
+      </> : null}
+    </section>;
+  }
   return <section
     className={`agent-storyboard-workspace${selected ? ' has-selection' : ''}`}
     aria-label="故事板工作区"
@@ -350,6 +496,7 @@ export function AgentStoryboardWorkspace({
           <Button size="small" icon={<Plus size={13} />} loading={assetUploading} disabled={!taskId} onClick={() => assetInputRef.current?.click()}>添加素材</Button>
           <Button size="small" type={batchMode ? 'primary' : 'default'} icon={<ListChecks size={13} />} onClick={toggleBatchMode}>批量操作</Button>
         </div></div>
+        {generationSummary ? <span className="agent-storyboard-generation-summary" role="status" aria-live="polite">{generationSummaryText(generationSummary)}</span> : null}
         <Input allowClear prefix={<Search size={14} />} placeholder="搜索名称" value={query} onChange={event => setQuery(event.target.value)} />
         <input ref={assetInputRef} className="agent-storyboard-upload-input" type="file" accept="image/*,video/*,audio/*" onChange={uploadProjectAsset} />
         {assetUploadError ? <span className="agent-storyboard-upload-error">{assetUploadError}</span> : null}
@@ -368,104 +515,67 @@ export function AgentStoryboardWorkspace({
         <Button size="small" icon={<MessageSquarePlus size={13} />} disabled={!selectedBatchAssets.length} onClick={batchAddToConversation}>批量加入对话</Button>
         <Tooltip title="完成批量操作"><Button size="small" type="text" aria-label="完成批量操作" icon={<X size={14} />} onClick={toggleBatchMode} /></Tooltip>
       </div> : null}
-      <section className="agent-storyboard-shots" aria-label="故事板镜头">
+      {showShotSection ? <section className="agent-storyboard-shots" aria-label="故事板镜头">
         <header><span><FileText size={14} /><strong>镜头</strong><i>{shotSection.items.length}</i></span></header>
         {shotsLoading ? <span className="agent-storyboard-shots__state"><Spin size="small" />正在读取镜头</span> : null}
         {shotsError ? <span className="agent-storyboard-shots__state is-error">{shotsError}</span> : null}
-        {!shotsLoading && !shotsError && !shotSection.items.length ? <span className="agent-storyboard-shots__state">当前剧本还没有镜头</span> : null}
         <div className="agent-storyboard-shots__list">
           {shotSection.items.map(item => <button type="button" className={selectedKey === item.key ? 'is-selected' : ''} key={item.key} disabled={batchMode} onClick={() => selectItem(item)}>
             <strong>{item.title}</strong><small>{item.summary || '待补充镜头内容'}</small>
           </button>)}
         </div>
-      </section>
+      </section> : null}
       <div
         className={`agent-storyboard-library__body${gridResizeAxis ? ' is-resizing-grid' : ''}`}
-        style={{ '--storyboard-column-split': `${gridSplit.column}%`, '--storyboard-row-split': `${gridSplit.row}%` }}
+        style={{
+          '--storyboard-column-split': `${storyboard.layout.column}%`,
+          '--storyboard-left-row-split': `${storyboard.layout.leftRow}%`,
+          '--storyboard-right-row-split': `${storyboard.layout.rightRow}%`
+        }}
       >
         {loading ? <div className="agent-storyboard-state"><Spin size="small" />正在读取项目素材</div> : null}
         {error ? <div className="agent-storyboard-state is-error">{error}</div> : null}
         {!loading && !error && !total ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前项目还没有内容" /> : null}
-        {materialLibrary.map(section => {
-          const collapsed = collapsedKinds.includes(section.kind);
-          const selectedKeys = new Set(batchSelectedKeys);
-          return <section
-            className={`agent-storyboard-section is-${section.kind}${collapsed ? ' is-collapsed' : ''}`}
-            key={section.kind}
-          >
-            <button type="button" className="agent-storyboard-section__title" aria-expanded={!collapsed} onClick={() => toggleSection(section.kind)}>
-              <span><KindIcon kind={section.kind} /><strong>{section.label}</strong><i>{section.items.length}</i></span>{collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-            </button>
-            {!collapsed ? <>
-              <Segmented
-                className="agent-storyboard-section__filters"
-                aria-label={`${section.label}分类`}
-                size="small"
-                value={storyboard.filters[section.kind]}
-                options={storyboardCategoryOptions(section.kind)}
-                onChange={category => onStoryboardStateChange?.({ filters: { [section.kind]: category } })}
-              />
-              <div className="agent-storyboard-section__items">
-                {section.items.map(item => {
-                  const conversationAssetID = String(item.asset?.id || item.asset?.assetId || '');
-                  const addedToConversation = conversationAssetIDSet.has(conversationAssetID);
-                  const batchSelected = selectedKeys.has(item.key);
-                  return <article
-                    key={item.key}
-                    data-storyboard-key={item.key}
-                    data-storyboard-kind={item.kind}
-                    title={conversationAssetID ? '拖到右侧对话框即可引用素材' : undefined}
-                    className={`agent-storyboard-item${selectedKey === item.key && !batchMode ? ' is-selected' : ''}${batchSelected ? ' is-batch-selected' : ''}${draggingKey === item.key ? ' is-dragging' : ''}${conversationDraggingKey === item.key ? ' is-conversation-dragging' : ''}${dragTargetKey === item.key ? ' is-drop-target' : ''}`}
-                    draggable={!batchMode && Boolean(conversationAssetID)}
-                    onDragStart={event => startConversationAssetDrag(event, item)}
-                    onDragEnd={() => setConversationDraggingKey('')}
-                  >
-                    {!batchMode ? <button
-                      type="button"
-                      className="agent-storyboard-item__drag"
-                      aria-label={`拖动排序 ${item.title}`}
-                      onClick={event => event.stopPropagation()}
-                      onPointerDown={event => startItemDrag(event, item, section.items)}
-                      onPointerMove={moveItemDrag}
-                      onPointerUp={event => finishItemDrag(event)}
-                      onPointerCancel={event => finishItemDrag(event, true)}
-                      onDragStart={event => event.preventDefault()}
-                    ><GripVertical size={13} /></button> : null}
-                    <button type="button" className="agent-storyboard-item__select" aria-pressed={batchMode ? batchSelected : selectedKey === item.key} onClick={() => selectItem(item)}>
-                      <StoryboardThumbnail item={item} />
-                      <span><strong>{item.title}</strong><small>{storyboardItemMetaLabel(item) || item.summary || statusLabels[item.status] || '暂无内容'}</small></span>
-                    </button>
-                    {batchMode ? <span className="agent-storyboard-item__check" aria-hidden="true">{batchSelected ? <Check size={13} /> : null}</span> : null}
-                    {!batchMode && conversationAssetID ? <Tooltip title={addedToConversation ? '已加入对话' : '加入对话'}><button
-                      type="button"
-                      className={`agent-storyboard-item__conversation${addedToConversation ? ' is-added' : ''}`}
-                      aria-label={`${addedToConversation ? '已加入对话' : '加入对话'} ${item.title}`}
-                      onClick={() => onAddToConversation?.(item.asset)}
-                    ><MessageSquarePlus size={13} /></button></Tooltip> : null}
-                  </article>;
-                })}
-                {!section.items.length ? <p>当前分类暂无{section.label}</p> : null}
-              </div>
-            </> : null}
-          </section>;
-        })}
+        <div className="agent-storyboard-material-column agent-storyboard-material-column--left">
+          {renderMaterialSection(orderedMaterialLibrary[0])}
+          {renderMaterialSection(orderedMaterialLibrary[1])}
+          <button
+            type="button"
+            className="agent-storyboard-grid-splitter agent-storyboard-grid-splitter--left-row"
+            data-axis="y"
+            data-split="leftRow"
+            aria-label="拖动调整左列高度，双击恢复默认"
+            onPointerDown={event => startGridResize(event, 'pointer')}
+            onMouseDown={event => startGridResize(event, 'mouse')}
+            onPointerCancel={finishGridResize}
+            onDoubleClick={resetGridSplit}
+          />
+        </div>
+        <div className="agent-storyboard-material-column agent-storyboard-material-column--right">
+          {renderMaterialSection(orderedMaterialLibrary[2])}
+          {renderMaterialSection(orderedMaterialLibrary[3])}
+          <button
+            type="button"
+            className="agent-storyboard-grid-splitter agent-storyboard-grid-splitter--right-row"
+            data-axis="y"
+            data-split="rightRow"
+            aria-label="拖动调整右列高度，双击恢复默认"
+            onPointerDown={event => startGridResize(event, 'pointer')}
+            onMouseDown={event => startGridResize(event, 'mouse')}
+            onPointerCancel={finishGridResize}
+            onDoubleClick={resetGridSplit}
+          />
+        </div>
         <button
           type="button"
           className="agent-storyboard-grid-splitter agent-storyboard-grid-splitter--column"
           data-axis="x"
-          aria-label="调整素材列宽"
+          data-split="column"
+          aria-label="拖动调整素材列宽，双击恢复默认"
           onPointerDown={event => startGridResize(event, 'pointer')}
           onMouseDown={event => startGridResize(event, 'mouse')}
           onPointerCancel={finishGridResize}
-        />
-        <button
-          type="button"
-          className="agent-storyboard-grid-splitter agent-storyboard-grid-splitter--row"
-          data-axis="y"
-          aria-label="调整素材行高"
-          onPointerDown={event => startGridResize(event, 'pointer')}
-          onMouseDown={event => startGridResize(event, 'mouse')}
-          onPointerCancel={finishGridResize}
+          onDoubleClick={resetGridSplit}
         />
       </div>
     </aside>

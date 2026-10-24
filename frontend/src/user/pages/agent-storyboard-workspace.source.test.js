@@ -47,6 +47,19 @@ test('工作流和故事板读取同一份镜头集合，不各自维护镜头�
   assert.match(model, /currentStoryboardShots/);
 });
 
+test('故事板和工作流共享服务端持久任务的项目汇总', () => {
+  const storyboardWorkspace = page.slice(
+    page.indexOf('<AgentStoryboardWorkspace'),
+    page.indexOf('<aside className="agent-conversation-panel"')
+  );
+  assert.match(page, /getAgentGenerationSummary/);
+  assert.match(page, /const \[generationSummary, setGenerationSummary\]/);
+  assert.match(storyboardWorkspace, /generationSummary=\{generationSummary\}/);
+  assert.match(workspace, /generationSummary = null/);
+  assert.match(workspace, /generationSummaryText\(generationSummary\)/);
+  assert.match(workspace, /agent-storyboard-generation-summary/);
+});
+
 test('镜头批量响应只交给提交时的项目和保存队列', () => {
   const handler = page.match(/const handleStoryboardBatchCreate = useCallback\(async payload => \{([\s\S]*?)\n  \}, \[\]\);/);
   assert.ok(handler, 'page should own the scoped storyboard batch request');
@@ -65,7 +78,8 @@ test('故事板只在用户选择素材后打开详情并允许明确关闭', ()
   assert.match(workspace, /aria-label="关闭素材详情"/);
   assert.match(workspace, /selectedKey: ''/);
   assert.match(styles, /agent-storyboard-workspace:not\(\.has-selection\)/);
-  assert.match(styles, /grid-template-areas:\s*"text image"\s*"audio video"/);
+  assert.match(styles, /agent-storyboard-material-column--left/);
+  assert.match(styles, /agent-storyboard-material-column--right/);
 });
 
 test('故事板详情直接复用工作流节点的模型参数和设置控件', () => {
@@ -85,26 +99,57 @@ test('故事板音频编辑与工作流一致地按操作决定是否需要模�
   assert.match(workspace, /本地音频处理/);
 });
 
-test('故事板使用大导演区加右侧四分区素材墙并在窄屏降为可用单栏', () => {
+test('故事板使用紧凑导演区加右侧独立素材列并在窄屏降为可用单栏', () => {
   assert.match(styles, /agent-canvas-workspace\.is-storyboard/);
   assert.match(styles, /agent-storyboard-workspace/);
   assert.match(styles, /agent-storyboard-library/);
   assert.match(styles, /agent-storyboard-inspector/);
-  assert.match(styles, /agent-canvas-workspace\.is-storyboard[^}]*grid-template-columns:\s*minmax\(520px,\s*1\.62fr\)\s+minmax\(360px,\s*1fr\)/);
-  assert.match(styles, /grid-template-areas:\s*"text image"\s*"audio video"/);
+  assert.match(styles, /agent-canvas-workspace\.is-storyboard[^}]*grid-template-columns:\s*minmax\(320px,\s*var\(--storyboard-director-split,\s*31%\)\)\s+minmax\(0,\s*1fr\)/);
+  assert.match(styles, /agent-storyboard-material-column--left/);
+  assert.match(styles, /agent-storyboard-material-column--right/);
   assert.match(styles, /agent-storyboard-inspector[^}]*position:\s*absolute/);
   assert.match(styles, /@media \(max-width: 1000px\)/);
 });
 
-test('故事板素材四分区支持拖动调整列宽和行高', () => {
+test('故事板素材四分区支持三条分隔线独立调整并双击复位', () => {
   assert.match(workspace, /storyboardSplitRatioFromPointer/);
   assert.match(workspace, /agent-storyboard-grid-splitter--column/);
-  assert.match(workspace, /agent-storyboard-grid-splitter--row/);
+  assert.match(workspace, /agent-storyboard-grid-splitter--left-row/);
+  assert.match(workspace, /agent-storyboard-grid-splitter--right-row/);
   assert.match(workspace, /onPointerDown=\{event => startGridResize\(event, 'pointer'\)\}/);
+  assert.match(workspace, /onDoubleClick=\{resetGridSplit\}/);
   assert.match(styles, /--storyboard-column-split/);
-  assert.match(styles, /--storyboard-row-split/);
+  assert.match(styles, /--storyboard-left-row-split/);
+  assert.match(styles, /--storyboard-right-row-split/);
+  assert.match(styles, /agent-storyboard-material-column--left/);
+  assert.match(styles, /agent-storyboard-material-column--right/);
   assert.match(styles, /cursor:\s*col-resize/);
   assert.match(styles, /cursor:\s*row-resize/);
+});
+
+test('故事板素材分区使用文件夹图标表达可收起的分组', () => {
+  assert.match(workspace, /FolderOpen/);
+  assert.match(workspace, /Folder size=\{13\}/);
+  assert.match(workspace, /agent-storyboard-section__folder/);
+  assert.match(styles, /agent-storyboard-section__folder[^}]*color: var\(--agent-accent\)/);
+});
+
+test('没有镜头时不占用素材区高度，读取和错误状态仍可见', () => {
+  assert.match(workspace, /const showShotSection = shotsLoading \|\| Boolean\(shotsError\) \|\| shotSection\.items\.length > 0/);
+  assert.match(workspace, /\{showShotSection \? <section className="agent-storyboard-shots"/);
+  assert.doesNotMatch(workspace, /当前剧本还没有镜头/);
+});
+
+test('素材分区标题支持指针拖动重排并避免拖动后误触收起', () => {
+  assert.match(workspace, /sectionDragRef/);
+  assert.match(workspace, /sectionClickSuppressionRef/);
+  assert.match(workspace, /data-section-kind=\{section\.kind\}/);
+  assert.match(workspace, /onPointerDown=\{event => startSectionDrag\(event, section\.kind\)\}/);
+  assert.match(workspace, /onPointerMove=\{moveSectionDrag\}/);
+  assert.match(workspace, /onPointerUp=\{event => finishSectionDrag\(event\)\}/);
+  assert.match(workspace, /document\.elementsFromPoint\(event\.clientX, event\.clientY\)/);
+  assert.match(workspace, /sectionClickSuppressionRef\.current = true/);
+  assert.match(workspace, /onStoryboardStateChange\?\.\(\{ layout: \{ sectionOrder \} \}\)/);
 });
 
 test('故事板素材支持同分区直接拖拽排序并保留按钮操作', () => {

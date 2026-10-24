@@ -937,6 +937,7 @@
 .agent-page .agent-storyboard-section__title { display: flex; width: 100%; min-height: 36px; align-items: center; justify-content: space-between; border: 0; padding: 0 11px; background: transparent; color: var(--agent-secondary); cursor: grab; }
 .agent-page .agent-storyboard-section__title:active { cursor: grabbing; }
 .agent-page .agent-storyboard-section__title > span { display: flex; min-width: 0; align-items: center; gap: 6px; }
+.agent-page .agent-storyboard-section__folder { display: inline-flex; flex: 0 0 auto; align-items: center; color: var(--agent-accent); }
 .agent-page .agent-storyboard-section__title i { color: var(--agent-muted); font-size: 10px; font-style: normal; }
 .agent-page .agent-storyboard-section__filters { max-width: calc(100% - 20px); margin: 0 10px 7px; padding: 2px; background: color-mix(in srgb, var(--agent-elevated) 86%, transparent); }
 .agent-page .agent-storyboard-section__filters .ant-segmented-item { min-width: 0; color: var(--agent-muted); font-size: 10px; }
