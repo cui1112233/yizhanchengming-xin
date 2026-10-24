@@ -29,6 +29,11 @@ test('画布连线把手始终可见，不能依赖悬停才能开始连线', ()
   assert.match(styles, /react-flow__handle\.agent-canvas-node-quick-add[^}]*pointer-events:\s*auto/);
 });
 
+test('分组外框不拦截画布操作，但收起和定位按钮仍可点击', () => {
+  assert.match(styles, /agent-canvas-group[^}]*pointer-events:\s*none/);
+  assert.match(styles, /agent-canvas-group\s+\.ant-btn[^}]*pointer-events:\s*auto/);
+});
+
 test('节点和生成框使用稳定的 Liblib 对标内容层级', () => {
   assert.match(canvas, /AuthenticatedAgentAudio[\s\S]*waveform/);
   assert.match(canvas, /agent-canvas-node-audio-preview/);
