@@ -23,6 +23,26 @@ test('页面读取项目素材并把定位与创建动作交给真实画布', ()
   assert.match(page, /canvasRef\.current\?\.createFromAsset/);
 });
 
+test('导演台在节点列表中提供不依赖画布定位的直接打开入口', () => {
+  const drawer = read('../components/AgentWorkspaceDrawer.jsx');
+  const page = read('./AgentPageV2.jsx');
+  const canvas = read('../components/AgentCanvas.jsx');
+  assert.match(drawer, /onOpenDirectorDesk/);
+  assert.match(drawer, /打开 3D 导演台/);
+  assert.match(page, /canvasRef\.current\?\.openDirectorDesk/);
+  assert.match(canvas, /openDirectorDesk\(nodeID\)/);
+  assert.match(canvas, /useImperativeHandle\(ref, \(\) => \(\{[\s\S]*?openDirectorDesk/);
+});
+
+test('回到批量工厂作品画布时会重新同步真实生产状态', () => {
+  const page = read('./AgentPageV2.jsx');
+  assert.match(page, /refreshBatchFactoryBookCanvas/);
+  assert.match(page, /sync:\s*syncAgentBatchFactoryBook/);
+  assert.match(page, /document\.addEventListener\('visibilitychange', refreshWhenVisible\)/);
+  assert.match(page, /window\.addEventListener\('focus', refreshWhenVisible\)/);
+  assert.match(page, /requestedQueue\.acceptServerCanvas\(nextCanvas\)/);
+});
+
 test('抽屉和显示开关只更新本地工作区状态，不触发画布保存', () => {
   const page = read('./AgentPageV2.jsx');
   const workspaceUpdate = page.match(/function updateWorkspaceView\(patch\) \{([\s\S]*?)\n  \}/);
@@ -31,12 +51,14 @@ test('抽屉和显示开关只更新本地工作区状态，不触发画布保�
   assert.doesNotMatch(workspaceUpdate[1], /canvasSaveQueueRef\.current\?\.enqueue/);
 });
 
-test('项目抽屉提供真实生成历史并复用当前项目执行记录', () => {
+test('项目抽屉提供真实生成历史并以统一生成任务状态为主', () => {
   const drawer = read('../components/AgentWorkspaceDrawer.jsx');
   const canvas = read('../components/AgentCanvas.jsx');
   const page = read('./AgentPageV2.jsx');
   assert.match(drawer, /生成历史/);
   assert.match(drawer, /executions = \[\]/);
+  assert.match(drawer, /const historyEntries = useMemo/);
+  assert.match(drawer, /generations\.map/);
   assert.match(drawer, /execution\.status/);
   assert.doesNotMatch(canvas, /label="生成历史"/);
   assert.doesNotMatch(canvas, /onOpenHistory/);
@@ -81,6 +103,40 @@ test('项目素材抽屉为图片和视频显示真实缩略图，其他媒介�
   assert.match(drawer, /AuthenticatedAgentVideo/);
   assert.match(drawer, /agent-workspace-assets__preview/);
   assert.match(css, /agent-workspace-assets__preview/);
+});
+
+test('项目素材使用可独立收起的书籍文件夹和固定媒体预览框', () => {
+  const drawer = read('../components/AgentWorkspaceDrawer.jsx');
+  const css = read('../../shared/styles/agent-workspace.css');
+  assert.match(drawer, /collapsedAssetGroups/);
+  assert.match(drawer, /aria-expanded=\{!collapsed\}/);
+  assert.match(drawer, /agent-workspace-assets__group-header/);
+  assert.match(css, /\.agent-page \.agent-workspace-assets__preview\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;/);
+  assert.match(css, /agent-workspace-assets__preview\s+(?:img|video)/);
+  assert.match(css, /object-fit:\s*cover/);
+});
+
+test('工作流节点使用可收起的文件夹分组并保留定位入口', () => {
+  const drawer = read('../components/AgentWorkspaceDrawer.jsx');
+  const css = read('../../shared/styles/agent-workspace.css');
+  assert.match(drawer, /collapsedNodeGroups/);
+  assert.match(drawer, /agent-workspace-tree__group-header/);
+  assert.match(drawer, /aria-expanded=\{!collapsed\}/);
+  assert.match(drawer, /<Folder size=\{14\}/);
+  assert.match(drawer, /onLocateNode\?\.\(node\.id\)/);
+  assert.match(css, /agent-workspace-tree__group-header/);
+});
+
+test('生成历史每条记录都有独立的内容层级和状态样式', () => {
+  const drawer = read('../components/AgentWorkspaceDrawer.jsx');
+  const css = read('../../shared/styles/agent-workspace.css');
+  assert.match(drawer, /agent-workspace-history__item/);
+  assert.match(drawer, /agent-workspace-history__content/);
+  assert.match(drawer, /agent-workspace-history__status/);
+  assert.match(css, /\.agent-page \.agent-workspace-history\s*\{/);
+  assert.match(css, /\.agent-page \.agent-workspace-history__item\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(css, /\.agent-page \.agent-workspace-history__content\s*\{[\s\S]*?min-width:\s*0/);
+  assert.match(css, /\.agent-page \.agent-workspace-history__status\.is-failed/);
 });
 
 test('工作流画布优先，节点抽屉默认收起并从项目菜单打开', () => {

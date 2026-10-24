@@ -1,8 +1,9 @@
 import { Button, Empty, Input, Select, Spin, Tabs, Tooltip } from 'antd';
-import { CircleAlert, Clock3, FileText, Film, History, Image, LocateFixed, Music, Plus, Search, X } from 'lucide-react';
+import { Camera, ChevronDown, ChevronRight, CircleAlert, Clock3, FileText, Film, Folder, History, Image, LocateFixed, Music, Plus, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildWorkspaceGroupTree,
+  buildWorkspaceAssetGroupTree,
   filterWorkspaceAssets,
   filterWorkspaceExecutions,
   filterWorkspaceNodes,
@@ -35,6 +36,19 @@ function executionTime(execution) {
   if (!value) return '暂无时间';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function generationHistoryEntry(task) {
+  const kind = String(task?.kind || 'text').trim();
+  const model = String(task?.modelId || '').trim();
+  return {
+    ...task,
+    id: `generation-${task?.id || ''}`,
+    name: `${kindLabels[kind] || kind}生成${model ? ` · ${model}` : ''}`,
+    toolName: `${kind}-generation`,
+    status: task?.state || 'draft',
+    error: task?.errorMessage || ''
+  };
 }
 
 function nodeValue(node, key) {
@@ -71,6 +85,7 @@ export function AgentWorkspaceDrawer({
   onTabChange,
   onWidthChange,
   onLocateNode,
+  onOpenDirectorDesk,
   onActivateGenerationResult,
   onCreateFromAsset,
   onSelectTask,
@@ -82,6 +97,8 @@ export function AgentWorkspaceDrawer({
   const [kinds, setKinds] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [historyKinds, setHistoryKinds] = useState([]);
+  const [collapsedNodeGroups, setCollapsedNodeGroups] = useState(() => new Set());
+  const [collapsedAssetGroups, setCollapsedAssetGroups] = useState(() => new Set());
   const [localWidth, setLocalWidth] = useState(() => workspaceDrawerWidth(width));
   const resizeRef = useRef(null);
 
@@ -93,7 +110,11 @@ export function AgentWorkspaceDrawer({
   );
   const nodeTree = useMemo(() => buildWorkspaceGroupTree(filteredNodes, groups), [filteredNodes, groups]);
   const filteredAssets = useMemo(() => filterWorkspaceAssets(assets, { query, kinds }), [assets, query, kinds]);
-  const filteredExecutions = useMemo(() => filterWorkspaceExecutions(executions, { query, kinds: historyKinds }), [executions, query, historyKinds]);
+  const assetGroups = useMemo(() => buildWorkspaceAssetGroupTree(filteredAssets, groups, nodes), [filteredAssets, groups, nodes]);
+  const historyEntries = useMemo(() => (
+    generations.length ? generations.map(generationHistoryEntry) : executions
+  ), [executions, generations]);
+  const filteredExecutions = useMemo(() => filterWorkspaceExecutions(historyEntries, { query, kinds: historyKinds }), [historyEntries, query, historyKinds]);
   const resultGroups = useMemo(() => {
     const needle = String(query || '').trim().toLocaleLowerCase();
     const allowedKinds = new Set(historyKinds.map(String));
@@ -152,14 +173,26 @@ export function AgentWorkspaceDrawer({
   const nodeContent = <div className="agent-workspace-drawer__body">
     {filters}
     <div className="agent-workspace-tree">
-      {!nodeTree.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有符合条件的节点" /> : nodeTree.map(group => <section key={group.id} className="agent-workspace-tree__group">
-        <header><strong>{group.title}</strong><span>{group.children.length}</span></header>
-        {group.children.map(node => <button type="button" className="agent-workspace-tree__row" key={node.id} onClick={() => onLocateNode?.(node.id)}>
-          <KindIcon kind={nodeValue(node, 'type')} />
-          <span><strong>{nodeValue(node, 'title') || '未命名节点'}</strong><small>{nodeValue(node, 'summary') || statusLabels[nodeValue(node, 'status')] || '暂无内容'}</small></span>
-          <Tooltip title="在画布中定位"><LocateFixed size={14} /></Tooltip>
-        </button>)}
-      </section>)}
+      {!nodeTree.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有符合条件的节点" /> : nodeTree.map(group => {
+        const collapsed = collapsedNodeGroups.has(group.id);
+        return <section key={group.id} className={`agent-workspace-tree__group${collapsed ? ' is-collapsed' : ''}`}>
+        <button type="button" className="agent-workspace-tree__group-header" aria-expanded={!collapsed} onClick={() => setCollapsedNodeGroups(current => {
+          const next = new Set(current);
+          if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+          return next;
+        })}>
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}<Folder size={14} /><strong>{group.title}</strong><span>{group.children.length}</span>
+        </button>
+        {!collapsed ? group.children.map(node => <div className="agent-workspace-tree__item" key={node.id}>
+          <button type="button" className="agent-workspace-tree__row" onClick={() => onLocateNode?.(node.id)}>
+            <KindIcon kind={nodeValue(node, 'type')} />
+            <span><strong>{nodeValue(node, 'title') || '未命名节点'}</strong><small>{nodeValue(node, 'summary') || statusLabels[nodeValue(node, 'status')] || '暂无内容'}</small></span>
+            <Tooltip title="在画布中定位"><LocateFixed size={14} /></Tooltip>
+          </button>
+          {nodeValue(node, 'type') === 'director' ? <Button className="agent-workspace-tree__director-open" size="small" icon={<Camera size={13} />} onClick={() => onOpenDirectorDesk?.(node.id)}>打开 3D 导演台</Button> : null}
+        </div>) : null}
+      </section>;
+      })}
     </div>
   </div>;
 
@@ -169,7 +202,19 @@ export function AgentWorkspaceDrawer({
     {assetsError ? <div className="agent-workspace-drawer__error">{assetsError}</div> : null}
     {!assetsLoading && !assetsError && !filteredAssets.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前项目还没有素材" /> : null}
     <div className="agent-workspace-assets">
-      {filteredAssets.map(asset => <button
+      {assetGroups.map(group => {
+        const collapsed = collapsedAssetGroups.has(group.id);
+        return <section className="agent-workspace-assets__group" key={group.id}>
+          <button type="button" className="agent-workspace-assets__group-header" aria-expanded={!collapsed} onClick={() => setCollapsedAssetGroups(current => {
+            const next = new Set(current);
+            if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+            return next;
+          })}>
+            {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            <strong>{group.title}</strong>
+            <span>{group.children.length}</span>
+          </button>
+          {!collapsed ? group.children.map(asset => <button
         type="button"
         className="agent-workspace-assets__row"
         key={asset.id}
@@ -183,7 +228,9 @@ export function AgentWorkspaceDrawer({
         <span className={`agent-workspace-assets__preview is-${asset.kind || 'file'}`}><AssetPreview asset={asset} /></span>
         <span><strong>{asset.name || asset.title || '未命名素材'}</strong><small>{kindLabels[asset.kind] || asset.kind || '素材'}</small></span>
         <Plus size={14} />
-      </button>)}
+          </button>) : null}
+        </section>;
+      })}
     </div>
   </div>;
 
@@ -220,7 +267,7 @@ export function AgentWorkspaceDrawer({
         })}
       </section>)}
     </div> : null}
-    {!executions.length && !resultGroups.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前项目还没有生成记录" /> : executions.length && !filteredExecutions.length && !resultGroups.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有符合条件的生成记录" /> : <div className="agent-workspace-history">
+    {!historyEntries.length && !resultGroups.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前项目还没有生成记录" /> : historyEntries.length && !filteredExecutions.length && !resultGroups.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有符合条件的生成记录" /> : <div className="agent-workspace-history">
       {filteredExecutions.map((execution, index) => {
         const status = execution.status || execution.state || 'pending';
         const error = execution?.errorMessage || execution?.error || '';
@@ -256,7 +303,7 @@ export function AgentWorkspaceDrawer({
       items={[
         { key: 'nodes', label: `画布节点 ${nodes.length}`, children: nodeContent },
         { key: 'assets', label: `项目素材 ${assets.length}`, children: assetContent },
-        { key: 'history', label: `生成历史 ${executions.length}`, children: historyContent }
+        { key: 'history', label: `生成历史 ${historyEntries.length}`, children: historyContent }
       ]}
     />
     {footer ? <footer className="agent-workspace-drawer__footer">{footer}</footer> : null}

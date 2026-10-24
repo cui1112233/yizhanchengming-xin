@@ -420,9 +420,14 @@
 .agent-page .agent-workspace-drawer__filters > :first-child { grid-column: 1 / -1; }
 .agent-page .agent-workspace-tree,
 .agent-page .agent-workspace-assets { min-height: 0; flex: 1; overflow-y: auto; padding: 8px; }
-.agent-page .agent-workspace-tree__group + .agent-workspace-tree__group { margin-top: 12px; }
-.agent-page .agent-workspace-tree__group > header { display: flex; align-items: center; justify-content: space-between; padding: 4px 7px; color: var(--agent-muted); font-size: 10px; }
-.agent-page .agent-workspace-tree__group > header strong { color: var(--agent-secondary); font-size: 11px; }
+.agent-page .agent-workspace-tree__group + .agent-workspace-tree__group { margin-top: 8px; }
+.agent-page .agent-workspace-tree__group-header { display: grid; width: 100%; grid-template-columns: 14px 16px minmax(0, 1fr) auto; align-items: center; gap: 5px; border: 0; border-radius: 5px; padding: 6px 7px; background: transparent; color: var(--agent-secondary); cursor: pointer; text-align: left; }
+.agent-page .agent-workspace-tree__group-header:hover,
+.agent-page .agent-workspace-tree__group-header:focus-visible { background: var(--agent-hover); color: var(--agent-text); outline: none; }
+.agent-page .agent-workspace-tree__group-header strong { overflow: hidden; color: inherit; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-workspace-tree__group-header > svg:first-child { color: var(--agent-muted); }
+.agent-page .agent-workspace-tree__group-header > svg:nth-child(2) { color: var(--agent-accent); }
+.agent-page .agent-workspace-tree__group-header span { color: var(--agent-muted); font-size: 10px; }
 .agent-page .agent-workspace-tree__item { display: grid; gap: 3px; }
 .agent-page .agent-workspace-tree__row,
 .agent-page .agent-workspace-assets__row { display: grid; width: 100%; min-width: 0; grid-template-columns: 20px minmax(0, 1fr) 18px; align-items: center; gap: 7px; border: 0; border-radius: 6px; padding: 8px 7px; background: transparent; color: var(--agent-secondary); cursor: pointer; text-align: left; }
@@ -717,12 +722,12 @@
   left: 50%;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   border: 1px solid var(--agent-border);
-  border-radius: 8px;
-  padding: 4px;
-  background: color-mix(in srgb, var(--agent-panel) 94%, transparent);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  border-radius: 14px;
+  padding: 5px 6px;
+  background: color-mix(in srgb, var(--agent-panel) 96%, transparent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(14px);
   transform: translateX(-50%);
 }
@@ -740,10 +745,10 @@
 }
 
 .agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn {
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
-  border-radius: 6px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 9px;
   padding: 0;
   color: var(--agent-secondary);
 }
@@ -752,7 +757,7 @@
 .agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn.is-active { background: var(--agent-hover); color: var(--agent-text); }
 .agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn.is-active { box-shadow: inset 0 0 0 1px var(--agent-border-strong); }
 .agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn:disabled { background: transparent; color: var(--agent-muted); opacity: 0.44; }
-.agent-page .agent-canvas-tool-divider { width: 1px; height: 24px; flex: 0 0 auto; margin: 0 3px; background: var(--agent-border); }
+.agent-page .agent-canvas-tool-divider { width: 1px; height: 20px; flex: 0 0 auto; margin: 0 3px; background: var(--agent-border); }
 .agent-page .agent-canvas-zoom-value,
 .agent-page .agent-canvas-zoom-controls > span { min-width: 48px; color: var(--agent-secondary); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
 .agent-page .agent-canvas-display-controls .is-vertical { transform: rotate(90deg); }
