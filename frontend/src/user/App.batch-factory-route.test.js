@@ -6,15 +6,15 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(here, 'App.jsx'), 'utf8');
+const preload = fs.readFileSync(path.join(here, 'workbenchPreload.js'), 'utf8');
 
-test('keeps Batch Factory on its durable workbench route', () => {
-  assert.match(app, /const loadBatchFactoryWorkbenchPage = \(\) => import\('\.\/pages\/BatchFactoryWorkbenchPage'\)/);
-  assert.match(app, /const BatchFactoryWorkbenchPage = lazy\(loadBatchFactoryWorkbenchPage\)/);
-  assert.match(app, /'\/batch-factory': BatchFactoryWorkbenchPage/);
+test('keeps Batch Factory on the single cover-library route', () => {
+  assert.match(app, /const ShuihuoProductionPage = lazy\(\(\) => import\('\.\/pages\/ShuihuoProductionPage'\)\)/);
+  assert.match(app, /'\/batch-factory': ShuihuoProductionPage/);
   assert.match(app, /function CanonicalBatchFactoryRedirect\(\)/);
   assert.match(app, /'\/shuihuo-production': CanonicalBatchFactoryRedirect/);
-  assert.match(app, /'\/shuihuo-production\/creative': ShuihuoProductionPage/);
-  for (const requiredFile of ['pages/BatchFactoryWorkbenchPage.jsx', 'pages/BatchFactoryWorkbenchPage.css']) {
-    assert.equal(fs.existsSync(path.join(here, requiredFile)), true, `${requiredFile} must remain available`);
-  }
+  assert.match(app, /'\/shuihuo-production\/creative': CanonicalBatchFactoryRedirect/);
+  assert.doesNotMatch(app, /BatchFactoryWorkbenchPage/);
+  assert.match(preload, /'\/batch-factory': \(\) => import\('\.\/pages\/ShuihuoProductionPage'\)/);
+  assert.doesNotMatch(preload, /BatchFactoryWorkbenchPage/);
 });

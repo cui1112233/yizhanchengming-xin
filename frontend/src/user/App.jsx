@@ -9,14 +9,12 @@ export function preloadRoute(href) {
 }
 
 const loadNovelFetchPage = () => import('./pages/NovelFetchPage');
-const loadBatchFactoryWorkbenchPage = () => import('./pages/BatchFactoryWorkbenchPage');
 
 const ScriptPage = lazy(() => import('./pages/ScriptPage'));
 const AgentPage = lazy(() => import('./pages/AgentPageV2').then(module => ({ default: module.AgentPageV2 })));
 const ShuihuoProductionPage = lazy(() => import('./pages/ShuihuoProductionPage'));
 const TtsPage = lazy(() => import('./pages/TtsPage'));
 const NovelFetchPage = lazy(loadNovelFetchPage);
-const BatchFactoryWorkbenchPage = lazy(loadBatchFactoryWorkbenchPage);
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const MemberCenterPage = lazy(() => import('./pages/MemberCenterPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
@@ -63,13 +61,14 @@ function getPage(pathname) {
     // 迁移调试地址保留同一份 React 页面，避免出现第二套实现。
     '/novel-fetch-react': NovelFetchPage,
     '/novel-fetch-workshop': NovelFetchPage,
-    '/batch-factory': BatchFactoryWorkbenchPage,
+    // The cover-based project library is the only Batch Factory entry.
+    '/batch-factory': ShuihuoProductionPage,
     '/agent': AgentPage,
     '/agent/canvas': AgentPage,
-    // Keep the production-workspace address compatible while retaining the
-    // separate creative library entry.
+    // Keep historical addresses as redirects so they cannot open a second
+    // Batch Factory implementation.
     '/shuihuo-production': CanonicalBatchFactoryRedirect,
-    '/shuihuo-production/creative': ShuihuoProductionPage,
+    '/shuihuo-production/creative': CanonicalBatchFactoryRedirect,
     '/tts': TtsPage,
     '/settings': SettingsPage,
     '/api-config': ApiConfigPage,
