@@ -129,7 +129,7 @@ export default function AgentNodeComposer({
       if (actionID === 'reference-assets') direct.push(referenceAssets);
       if (actionID === 'prompt-templates') direct.push({
         id: actionID,
-        content: <AgentBatchFactoryPromptSelector config={config} disabled={busy} onSaved={onBatchFactoryPromptSaved} display="popover" />
+        content: <AgentBatchFactoryPromptSelector config={config} disabled={busy} onSaved={onBatchFactoryPromptSaved} display="popover-compact" />
       });
       if (actionID === 'publish-organization') direct.push({
         id: actionID,
@@ -203,7 +203,7 @@ export default function AgentNodeComposer({
           <div className="agent-node-composer__video-list">{videoToolCandidates.map((asset, index) => <article key={asset.id} className={asset.id === selectedVideoToolID ? 'is-selected' : ''}><AuthenticatedAgentVideo source={asset.url} aria-label={`视频处理结果 ${index + 1}`} preload="metadata" muted controls /><button type="button" aria-pressed={asset.id === selectedVideoToolID} onClick={() => onSelectImageCandidate?.(node.id, asset.id)}>选择第 {index + 1} 个</button></article>)}</div>
           <div className="agent-node-composer__candidate-actions"><button type="button" className="is-primary" disabled={busy || !selectedVideoToolID} onClick={() => onConfirmImage?.(node.id, selectedVideoToolID)}>使用这个结果</button></div>
         </div> : null}
-        <Input.TextArea aria-label={PROMPT_LABELS[kind]} className="agent-node-composer__prompt" value={draftPrompt} maxLength={kind === 'text' ? 8000 : 4000} autoSize={{ minRows: 2, maxRows: 6 }} placeholder={PROMPT_PLACEHOLDERS[kind]} onChange={event => setDraftPrompt(event.target.value)} onBlur={persistPrompt} />
+        <Input.TextArea aria-label={PROMPT_LABELS[kind]} className="agent-node-composer__prompt" value={draftPrompt} maxLength={kind === 'text' ? 8000 : 4000} autoSize={{ minRows: 2, maxRows: kind === 'text' ? 6 : 3 }} placeholder={PROMPT_PLACEHOLDERS[kind]} onChange={event => setDraftPrompt(event.target.value)} onBlur={persistPrompt} />
         {inputPreview?.error ? <small className="is-error" role="alert">{inputPreview.error}</small> : null}
         {previewInputs ? <div className="agent-node-composer__input-preview" aria-live="polite">
           <span title={previewPrompt}>最终文字：{previewPrompt || '未提供'}</span>

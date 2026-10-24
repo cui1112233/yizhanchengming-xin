@@ -124,7 +124,8 @@ test('compact composer exposes real top controls without an arrow menu label', (
   assert.match(topActionsSource, /aria-label="更多功能"/);
   assert.match(composerSource, /onPickReferenceAsset\?\.\(node\.id, event\)/);
   assert.match(composerSource, /onRemoveReference\?\.\(node\.id, asset\.id\)/);
-  assert.match(composerSource, /display="popover"/);
+  assert.match(composerSource, /display="popover-compact"/);
+  assert.match(composerSource, /maxRows: kind === 'text' \? 6 : 3/);
 });
 
 test('mapped media cards use the compact top body and bottom zones without replacing real callbacks', () => {
