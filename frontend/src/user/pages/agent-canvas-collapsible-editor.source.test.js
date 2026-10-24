@@ -56,7 +56,6 @@ test('asset picker does not present an empty library while reporting a request f
 
 test('image preview opens editing while a named editor action opens the asset picker', () => {
   assert.match(canvasSource, /aria-label="展开图片编辑"/);
-  assert.match(canvasSource, /aria-label="展开图片编辑" onPointerDown=\{event => \{ event\.preventDefault\(\); stopCanvasEvent\(event\); \}\}/);
   assert.match(composerSource, /node\.data\?\.assetRef\?\.url \? '更换当前图片' : '从收藏添加图片'/);
   assert.match(composerSource, /onPickImageAsset\?\.\(node\.id, event\)/);
   assert.doesNotMatch(canvasSource, /aria-label="选择图片素材"[\s\S]*?onClick=\{event => \{ stopCanvasEvent\(event\); onPickImageAsset/);
@@ -66,15 +65,6 @@ test('reference add button keeps its asset picker open after the canvas click se
   const referencePicker = canvasSource.match(/function openReferenceAssetPanel\(nodeID, event\) \{([\s\S]*?)\n  \}/);
   assert.ok(referencePicker, 'reference asset picker should exist');
   assert.match(referencePicker[1], /window\.requestAnimationFrame\(\(\) => setAssetPanel\(panel\)\)/);
-});
-
-test('reference thumbnails expose a clear removal control without starting a canvas drag', () => {
-  assert.match(composerSource, /aria-label=\{`移除第 \$\{index \+ 1\} 个参考素材`\}/);
-  assert.match(composerSource, /aria-label=\{`移除第 \$\{index \+ 1\} 个参考素材`\}[\s\S]*?onPointerDown=\{event => \{ event\.preventDefault\(\); stop\(event\); \}\}/);
-  const removeControlRule = workspaceStyles.match(/\.agent-page \.agent-node-composer__references \.agent-canvas-node-reference button\s*\{([^}]*)\}/);
-  assert.ok(removeControlRule, 'the reference strip should style its own removal control');
-  assert.match(removeControlRule[1], /width:\s*20px/);
-  assert.match(removeControlRule[1], /height:\s*20px/);
 });
 
 test('only text nodes use the manual double-click editor', () => {
@@ -87,15 +77,16 @@ test('loaded and serialized nodes both use the canonical type', () => {
   assert.ok(workspaceStyles.includes('.agent-page .agent-node-composer'));
 });
 
-test('generation editor stays embedded under the preview while the prompt stays compact', () => {
+test('generation editor expands horizontally while the prompt stays compact', () => {
   const generationPanelRule = workspaceStyles.match(/\.agent-page \.agent-node-composer\s*\{([^}]*)\}/);
   const promptRule = workspaceStyles.match(/\.agent-page \.agent-node-composer__prompt\s*\{([^}]*)\}/);
   const primarySelectRule = workspaceStyles.match(/\.agent-page \.agent-node-composer__model\s*\{([^}]*)\}/);
   assert.match(composerSource, /autoSize=\{\{ minRows: 2, maxRows: 6 \}\}/);
   assert.ok(generationPanelRule, 'the expanded editor should have its own layout rule');
-  assert.match(generationPanelRule[1], /width:\s*100%/);
-  assert.match(generationPanelRule[1], /margin-top:\s*0/);
-  assert.match(generationPanelRule[1], /transform:\s*none/);
+  assert.match(generationPanelRule[1], /position:\s*relative/);
+  assert.match(generationPanelRule[1], /left:\s*50%/);
+  assert.match(generationPanelRule[1], /width:\s*min\(680px, calc\(100vw - 96px\)\)/);
+  assert.match(generationPanelRule[1], /transform:\s*translateX\(-50%\)/);
   assert.ok(promptRule, 'the prompt should have its own layout rule');
   assert.doesNotMatch(promptRule[1], /min-height:\s*96px/);
   assert.match(workspaceStyles, /\.agent-page \.agent-node-composer__toolbar\s*\{[^}]*flex-wrap:\s*nowrap/);
@@ -124,12 +115,12 @@ test('panning only updates the local viewport and does not enqueue a canvas save
 });
 
 test('connection handles belong to the visible preview shell and stay hidden until relevant', () => {
-  assert.match(canvasSource, /className="agent-canvas-node-preview-anchor"[\s\S]*?<Handle type="target"[\s\S]*?<Handle type="source"/);
+  assert.match(canvasSource, /className="agent-canvas-node-preview-shell"[\s\S]*?<Handle type="target"[\s\S]*?<Handle type="source"/);
   assert.match(canvasSource, /selected,\s*isEditorOpen/);
   assert.match(canvasSource, /useLayoutEffect\(\(\) => \{\s*updateNodeInternals\(id\);\s*\}, \[id, isEditorOpen, updateNodeInternals\]\)/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-preview-shell\s*\{[^}]*position:\s*relative/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node--image,[\s\S]*?\.agent-canvas-node--audio\s*\{[^}]*width:\s*340px/);
-  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-card\s*> \.agent-node-composer\s*\{/);
+  assert.match(workspaceStyles, /\.agent-page \.agent-node-composer\s*\{[^}]*width:\s*min\(680px, calc\(100vw - 96px\)\)/);
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-quick-add\s*\{[^}]*opacity:\s*0[^}]*pointer-events:\s*none/);
   assert.match(workspaceStyles, /\.react-flow__node\.selected[\s\S]*?\.agent-canvas-node-quick-add/);
   assert.match(workspaceStyles, /\.agent-canvas\.is-connecting[\s\S]*?\.agent-canvas-node-target/);
@@ -150,7 +141,7 @@ test('hidden handle rules outrank React Flow pointer events and interaction stat
   assert.match(dependencyRule[2], /pointer-events:\s*all/);
   assert.ok(hiddenTargetRule, 'target handle rule should include the React Flow handle class');
   assert.ok(classSpecificity(hiddenTargetRule[1]) > classSpecificity(dependencyRule[1]));
-  assert.match(hiddenTargetRule[2], /pointer-events:\s*none/);
+  assert.match(hiddenTargetRule[2], /pointer-events:\s*auto/);
   assert.ok(hiddenSourceRule, 'source handle rule should include the React Flow handle class');
   assert.ok(classSpecificity(hiddenSourceRule[1]) > classSpecificity(dependencyRule[1]));
   assert.match(hiddenSourceRule[2], /pointer-events:\s*none/);
@@ -167,7 +158,7 @@ test('edge visibility stays in the bottom display control without duplicating th
 });
 
 test('expanded video editor retains reachable create cancel retry and confirm actions', () => {
-  assert.match(composerSource, /aria-label=\{isBatchFactoryMerge \? '合成最终视频' : `生成\$\{/);
+  assert.match(composerSource, /aria-label=\{`生成\$\{/);
   assert.match(composerSource, /kind === 'video' \? '视频'/);
   for (const label of ['取消', '重试', '确认']) assert.match(composerSource, new RegExp(`>${label}<`));
   assert.match(composerSource, /onPointerDown=\{stop\}/);
