@@ -1,13 +1,14 @@
-import { Background, BaseEdge, Handle, MarkerType, MiniMap, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath, useUpdateNodeInternals } from '@xyflow/react';
+import { Background, BaseEdge, Handle, MiniMap, Position, ReactFlow, ViewportPortal, applyEdgeChanges, applyNodeChanges, getBezierPath, useUpdateNodeInternals } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button, Dropdown, Input, Modal, Popover, Segmented, Select, Switch, Tag, Tooltip, message } from 'antd';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical,
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, GitBranch, Group, Hand,
-  ImagePlus, MousePointer2, Music2, Plus, SlidersHorizontal, Ungroup
+  Clapperboard, FileText, Film, GripHorizontal, Image as ImageIcon,
+  Download, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, Scissors, SlidersHorizontal, Sparkles, Ungroup
 } from 'lucide-react';
-import { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, forwardRef, lazy, Suspense, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   alignCanvasNodes, canvasGroupBounds, canvasKeyboardCommand, commandAvailability,
   connectCanvasNodes, distributeCanvasNodes, groupCanvasNodes,
@@ -34,8 +35,9 @@ import { normalizeNodeConfig, patchNodeConfig } from '../pages/agent-node-config
 import { inheritedModelSelection, shareModelSelection } from '../pages/agent-canvas-model-selection';
 import { modelInputCapabilityError } from '../pages/agent-model-capabilities';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
-import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType } from '../pages/agent-canvas-node-presentation';
+import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType, usesPinnedBatchFactoryComposer } from '../pages/agent-canvas-node-presentation';
 import { retainCanvasAssetPanel, retainCanvasEditorNodeID, viewportHasChanged } from '../pages/agent-canvas-state';
+import { shouldRecoverCanvasViewport } from '../pages/agent-canvas-viewport';
 import { batchFactoryGroupLabel, batchFactoryMappedAction, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, latestBookRevision, mappedBatchFactoryBooksNeedingRefresh, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, videoNodeTiming } from '../pages/agent-canvas-batch-factory';
 import { invalidateScriptSplitForSource, normalizeScriptShots, normalizeScriptShotsForConfig, runAfterDurableCanvasSave, scriptShotsByNode as groupScriptShotsByNode, scriptSourceMarker, scriptSplitReady } from '../pages/agent-script-shots';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
@@ -43,7 +45,12 @@ import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { AuthenticatedAgentAudio } from './AuthenticatedAgentAudio';
 import { AgentCanvasControls } from './AgentCanvasControls';
 import { AgentDirectorDeskNode } from './AgentDirectorDeskNode';
+import { createDirectorDeskHostAdapter } from './director-desk/DirectorDeskHostAdapter';
+import { insertDirectorCapture as insertDirectorCaptureState } from './director-desk/director-capture';
 import AgentNodeComposer from './AgentNodeComposer';
+
+const DirectorDeskApp = lazy(() => import('./director-desk/DirectorDeskApp'));
+export { insertDirectorCapture } from './director-desk/director-capture';
 
 function nodeModelInputCapabilityError(node, selectedModel, models) {
   const kind = normalizeCanvasNodeType(node?.data?.type);
@@ -70,13 +77,40 @@ function videoJobGenerationPresentation(job) {
   return generationPresentation({ state, errorMessage: job?.errorMessage });
 }
 
+function CanvasNodeTypeIcon({ type }) {
+  const icons = {
+    text: FileText,
+    script: Clapperboard,
+    image: ImageIcon,
+    video: Film,
+    audio: Music2,
+    director: Clapperboard
+  };
+  const Icon = icons[normalizeCanvasNodeType(type)] || FileText;
+  return <span className={`agent-canvas-node-type-icon is-${normalizeCanvasNodeType(type)}`} aria-hidden="true"><Icon size={14} strokeWidth={1.8} /></span>;
+}
+
+function AgentAudioQuickTools({ source, onOperation, onMore }) {
+  const actions = [
+    { operation: 'trim', label: '截取', icon: <Scissors size={14} /> },
+    { operation: 'custom_split', label: '自定义切分', icon: <SlidersHorizontal size={14} /> },
+    { operation: 'smart_split', label: '智能切分', icon: <Sparkles size={14} /> },
+    { operation: 'speed', label: '变速', icon: <span className="agent-audio-quick-tools__speed">◔</span> }
+  ];
+  return <div className="agent-audio-quick-tools nodrag nopan" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+    {actions.map(action => <button type="button" key={action.operation} title={action.label} onClick={() => onOperation?.(action.operation)}>{action.icon}<span>{action.label}</span></button>)}
+    <button type="button" title="更多音频操作" aria-label="更多音频操作" onClick={onMore}><MoreHorizontal size={15} /><span>更多</span></button>
+    {source ? <a href={source} download title="下载音频" aria-label="下载音频"><Download size={15} /></a> : null}
+  </div>;
+}
+
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
   onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onSubmitAudio, onImageTool, onVideoTool, onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo,
   onSelectImageCandidate, onConfirmImage, onSelectAudioCandidate, onConfirmAudio, onPublishBatchFactory,
   onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots, scriptState, modelsByKind,
   videoJob, videoState, videoBusy, videoActionError, generationState, models, modelLoadError, inputPreview, onPreviewInputs, timingWarning, taskPresentation,
-  selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas, onSaveDirectorDeskScreenshot
+  selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas, onSaveDirectorDeskScreenshot, onOpenDirectorDesk
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
   const stopCanvasEvent = event => {
@@ -93,11 +127,18 @@ function CanvasNode({
     stopCanvasEvent(event);
     onOpenEditor?.(id);
   };
+  const nodeType = normalizeCanvasNodeType(data.type);
+  const isPinnedBatchFactoryComposer = usesPinnedBatchFactoryComposer(data);
+  const applyAudioOperation = operation => {
+    if (nodeType !== 'audio') return;
+    onNodeConfigChange?.(id, { parameters: { ...(data.config?.parameters || {}), operation } });
+    onOpenEditor?.(id);
+  };
   useLayoutEffect(() => {
     updateNodeInternals(id);
-  }, [id, isEditorOpen, updateNodeInternals]);
-  const nodeType = normalizeCanvasNodeType(data.type);
-  const composer = isEditorOpen ? <AgentNodeComposer
+  }, [id, isEditorOpen, isPinnedBatchFactoryComposer, updateNodeInternals]);
+  const composer = (isEditorOpen || isPinnedBatchFactoryComposer) ? <AgentNodeComposer
+    compact={isPinnedBatchFactoryComposer}
     node={{ id, data }}
     models={models}
     modelLoadError={modelLoadError}
@@ -141,31 +182,41 @@ function CanvasNode({
     >
       <div className="agent-canvas-node-preview-shell">
         <Handle type="target" position={Position.Left} className="agent-canvas-node-target" aria-label="连接到此节点" />
-        <div className="agent-canvas-node-card">
-          <header
-            className="agent-canvas-node-card-header"
-            role="button"
-            tabIndex={0}
-            aria-label={`编辑${canvasNodeTypeLabel(nodeType)}节点`}
-            onMouseDown={stopCanvasEvent}
-            onClick={openEditor}
-            onKeyDown={event => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              openEditor(event);
-            }}
-          ><span>{canvasNodeTypeLabel(nodeType)}</span><strong>{data.title}</strong>{sourcePresentation?.sourceLabel ? <Tag color="blue">{sourcePresentation.sourceLabel}</Tag> : null}</header>
+        {isPinnedBatchFactoryComposer ? <div className="agent-canvas-node-pinned-composer">
+          <header className="agent-canvas-node-card-header agent-canvas-node-pinned-header">
+            <span className="agent-canvas-node-drag-handle" aria-label="拖动节点"><GripHorizontal size={14} /></span>
+            <CanvasNodeTypeIcon type={nodeType} /><strong>{data.title}</strong><Tag color="blue" className="nodrag nopan" onMouseDown={stopCanvasEvent}>批量工厂</Tag>
+          </header>
+          <div className="agent-canvas-node-pinned-composer__body">{composer}</div>
+          <footer className="agent-canvas-node-pinned-footer"><span>v{data.version}</span><span className={`agent-canvas-node-task-state is-${taskPresentation?.state || data.status}`}>{taskPresentation?.errorMessage || taskPresentation?.message || canvasNodeStatusLabel(data.status)}</span><button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onRemoveFromCanvas?.(id); }}>从画布移除</button></footer>
+          <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" />
+        </div> : <div className="agent-canvas-node-card">
+          {nodeType === 'audio' && data.assetRef?.url && selected ? <AgentAudioQuickTools source={data.assetRef.url} onOperation={applyAudioOperation} onMore={openEditor} /> : null}
+          <header className="agent-canvas-node-card-header">
+            <span className="agent-canvas-node-drag-handle" aria-label="拖动节点"><GripHorizontal size={14} /></span>
+            <CanvasNodeTypeIcon type={nodeType} />
+            <button
+              type="button"
+              className="agent-canvas-node-card-header-action"
+              aria-label={`编辑${canvasNodeTypeLabel(nodeType)}节点`}
+              onMouseDown={stopCanvasEvent}
+              onClick={openEditor}
+            ><strong>{data.title}</strong><span>{canvasNodeTypeLabel(nodeType)}</span></button>
+            {sourcePresentation?.sourceLabel ? <Tag color="blue" className="nodrag nopan" onMouseDown={stopCanvasEvent}>{sourcePresentation.sourceLabel}</Tag> : null}
+          </header>
           {nodeType === 'image' ? <button type="button" className="agent-canvas-node-image-select nodrag nopan" aria-label="展开图片编辑" onPointerDown={event => { event.preventDefault(); stopCanvasEvent(event); }} onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
             {data.assetRef?.url ? <AuthenticatedAgentImage source={data.assetRef.url} className="agent-canvas-node-media" alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
           </button> : null}
           {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
           {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
           {nodeType === 'audio' && data.assetRef?.url ? <div className="agent-canvas-node-audio-preview" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent}>
-            <AuthenticatedAgentAudio source={data.assetRef.url} aria-label="音频节点预览" preload="metadata" controls />
+            <AuthenticatedAgentAudio source={data.assetRef.url} aria-label="音频节点预览" preload="metadata" controls waveform waveformSourceLabel={data.title || '音频节点'} />
             <button type="button" onClick={openEditor}>编辑音频</button>
           </div> : null}
           {nodeType === 'audio' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成或添加音频</button> : null}
           {nodeType === 'director' ? <AgentDirectorDeskNode
             node={{ id, data }}
+            onOpen={onOpenDirectorDesk}
             onConfigChange={onNodeConfigChange}
             onPickReferenceAsset={onPickReferenceAsset}
             onRemoveReference={onRemoveReference}
@@ -174,10 +225,10 @@ function CanvasNode({
           {nodeType === 'text' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.summary || '等待 Agent 写入结果'}</button> : null}
           {nodeType === 'script' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.config?.sourceText || '等待填写剧本正文'}</button> : null}
           <footer><span>v{data.version}</span><span className={`agent-canvas-node-task-state is-${taskPresentation?.state || data.status}`}>{taskPresentation?.errorMessage || taskPresentation?.message || canvasNodeStatusLabel(data.status)}</span>{sourcePresentation?.sourceLabel ? <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onRemoveFromCanvas?.(id); }}>从画布移除</button> : null}</footer>
-        </div>
-        <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" />
+        </div>}
+        {!isPinnedBatchFactoryComposer ? <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" /> : null}
       </div>
-      {composer}
+      {!isPinnedBatchFactoryComposer ? composer : null}
     </article>
   );
 }
@@ -192,7 +243,7 @@ function CanvasNodeRenderer(props) {
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
-    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot,
+    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot, openDirectorDesk,
     submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
     changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, canvasInputPreviewByNode, previewInputsForNode, removeBatchFactoryNode
@@ -248,6 +299,7 @@ function CanvasNodeRenderer(props) {
     onPickReferenceAsset={openReferenceAssetPanel}
     onRemoveReference={removeReference}
     onSaveDirectorDeskScreenshot={saveDirectorDeskScreenshot}
+    onOpenDirectorDesk={openDirectorDesk}
     onNodeConfigChange={handleNodeConfigChange}
     inputPreview={canvasInputPreviewByNode[props.id]}
     onPreviewInputs={previewInputsForNode}
@@ -296,13 +348,13 @@ function CanvasNodeRenderer(props) {
 
 const canvasNodeTypes = { agent: CanvasNodeRenderer };
 
-function CanvasEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, data, markerEnd }) {
+function CanvasEdge({ id, sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, data }) {
   const appearance = normalizeCanvasAppearance(data?.appearance);
   const [edgePath] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   const style = edgeStyleForAppearance(appearance);
   const energyStyle = { ...style, strokeWidth: Number(style.strokeWidth) + 1 };
   return <>
-    <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} />
+    <BaseEdge id={id} path={edgePath} style={style} />
     {appearance.edgeAnimated ? <path d={edgePath} className="agent-canvas-edge-flow" style={energyStyle} /> : null}
   </>;
 }
@@ -313,6 +365,7 @@ function toFlowNode(node) {
   return {
     id: node.id,
     type: 'agent',
+    dragHandle: '.agent-canvas-node-drag-handle',
     position: node.position,
     selected: false,
     data: {
@@ -330,11 +383,9 @@ function toFlowNode(node) {
 }
 
 function toFlowEdge(edge, appearance) {
-  const style = edgeStyleForAppearance(appearance);
   return applyCanvasEdgeAppearance({
     ...edge,
     type: 'canvas',
-    markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
     data: { ...(edge.data || {}), relation: edge.relation || edge.data?.relation || 'reference', appearance }
   }, appearance);
 }
@@ -394,6 +445,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const [connectionDropMenu, setConnectionDropMenu] = useState(null);
   const [connectingSourceID, setConnectingSourceID] = useState('');
   const [activeEditorNodeID, setActiveEditorNodeID] = useState('');
+  const [directorDeskNodeID, setDirectorDeskNodeID] = useState('');
   const [assetPanel, setAssetPanel] = useState(null);
   const [assets, setAssets] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
@@ -435,6 +487,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
   const taskIdRef = useRef(taskId);
   const focusedBookGroupRef = useRef('');
+  const viewportRecoveryKeyRef = useRef('');
+  const viewportRecoveryTimerRef = useRef(null);
+  const suppressViewportCommitRef = useRef(false);
   const scriptSourceSaveByNodeRef = useRef({});
   const batchFactoryStatusPollingRef = useRef(false);
   const onServerCanvasChangeRef = useRef(onServerCanvasChange);
@@ -593,11 +648,11 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, canvasInputPreviewByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
-    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot,
+    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot, openDirectorDesk,
     submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
     changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, previewInputsForNode, removeBatchFactoryNode
-  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, modelLoadError, nodeGenerationByNode, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, modelLoadError, nodeGenerationByNode, openDirectorDesk, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -672,6 +727,27 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     historyRef.current.reset({ nodes: nextNodes, edges: nextEdges });
     setHistoryVersion(value => value + 1);
   }, [canvas]);
+
+  useEffect(() => {
+    if (!flowInstance || !currentCanvas.viewport || !nodes.length) return undefined;
+    const recoveryKey = `${taskId}\u0000${nodes.map(node => node.id).sort().join('\u0001')}`;
+    if (viewportRecoveryKeyRef.current === recoveryKey) return undefined;
+    viewportRecoveryKeyRef.current = recoveryKey;
+    const frame = window.requestAnimationFrame(() => {
+      const recoverableNodes = (flowInstance.getNodes?.() || nodesRef.current).filter(node => !node.hidden);
+      const bounds = rootRef.current?.getBoundingClientRect();
+      if (!bounds || !shouldRecoverCanvasViewport(recoverableNodes, viewportRef.current, bounds)) return;
+      suppressViewportCommitRef.current = true;
+      window.clearTimeout(viewportRecoveryTimerRef.current);
+      flowInstance.fitView({ nodes: recoverableNodes, padding: 0.18, duration: 260 });
+      viewportRecoveryTimerRef.current = window.setTimeout(() => {
+        suppressViewportCommitRef.current = false;
+      }, 800);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentCanvas.viewport, flowInstance, nodes, taskId]);
+
+  useEffect(() => () => window.clearTimeout(viewportRecoveryTimerRef.current), []);
 
   useEffect(() => {
     const requestedTaskId = taskId;
@@ -2105,10 +2181,15 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   }
 
   function handleMoveEnd(_event, nextViewport) {
+    const suppressViewportCommit = suppressViewportCommitRef.current;
+    if (suppressViewportCommit) {
+      suppressViewportCommitRef.current = false;
+      window.clearTimeout(viewportRecoveryTimerRef.current);
+    }
     setViewport(nextViewport);
     viewportRef.current = nextViewport;
     onViewportChange?.(nextViewport);
-    onViewportCommit?.(nextViewport);
+    if (!suppressViewportCommit) onViewportCommit?.(nextViewport);
   }
 
   function updateAppearance(nextValue) {
@@ -2150,29 +2231,35 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     commit(nextNodes, edgesRef.current);
   }
 
+  function openDirectorDesk(nodeID) {
+    const director = nodesRef.current.find(node => node.id === nodeID && node.data?.type === 'director');
+    if (director) setDirectorDeskNodeID(nodeID);
+  }
+
+  function commitDirectorCapture(nodeID, asset) {
+    const next = insertDirectorCaptureState({
+      nodes: nodesRef.current,
+      edges: edgesRef.current,
+      directorNodeID: nodeID,
+      asset
+    });
+    setSelectedIds([next.imageNode.id]);
+    onSelectionChange?.([next.imageNode.id]);
+    commit(next.nodes, next.edges);
+    message.success('3D 构图已加入项目素材和画布');
+    return asset;
+  }
+
   async function saveDirectorDeskScreenshot(nodeID, file) {
     const requestedTaskId = taskIdRef.current;
     const source = nodesRef.current.find(node => node.id === nodeID && node.data?.type === 'director');
     if (!requestedTaskId || !source || !(file instanceof File)) throw new Error('导演台预演图无法保存');
     try {
       const result = await uploadAgentAsset(requestedTaskId, file);
-      if (requestedTaskId !== taskIdRef.current) return;
+      if (requestedTaskId !== taskIdRef.current) throw new Error('项目已切换，未将构图加入当前画布');
       const asset = result?.asset;
       if (!asset?.id || asset.kind !== 'image') throw new Error('预演图保存失败');
-      const imageNode = createNodeAt({
-        id: nextCanvasID('image'),
-        kind: 'image',
-        asset,
-        position: { x: (Number(source.position?.x) || 0) + 374, y: Number(source.position?.y) || 0 },
-        config: inheritedModelSelection(nodesRef.current, 'image')
-      });
-      const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(imageNode);
-      const edge = createTypedCanvasEdge({ source: source.id, target: imageNode.id }, nextNodes);
-      const nextEdges = edge ? connectCanvasNodes(edgesRef.current, edge) : edgesRef.current;
-      setSelectedIds([imageNode.id]);
-      onSelectionChange?.([imageNode.id]);
-      commit(syncCanvasEffectiveReferences(nextNodes, nextEdges), nextEdges);
-      message.success('预演图已加入项目素材和画布');
+      return commitDirectorCapture(nodeID, asset);
     } catch (error) {
       message.error(error?.message || '预演图保存失败');
       throw error;
@@ -2226,10 +2313,28 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   useImperativeHandle(ref, () => ({
     locateNode,
+    openDirectorDesk,
     createFromAsset(asset) {
       addAssetNode(asset, canvasCenterPosition());
     }
   }));
+
+  const directorDeskAdapter = useMemo(() => {
+    if (!directorDeskNodeID) return null;
+    return createDirectorDeskHostAdapter({
+      nodeID: directorDeskNodeID,
+      getNode: nodeID => nodesRef.current.find(node => node.id === nodeID),
+      saveProject: async (nodeID, project) => handleNodeConfigChange(nodeID, { directorDesk: project }),
+      listImages: () => listAgentAssets(taskIdRef.current, 'image'),
+      uploadCapture: async file => {
+        const requestedTaskId = taskIdRef.current;
+        const result = await uploadAgentAsset(requestedTaskId, file);
+        if (requestedTaskId !== taskIdRef.current) throw new Error('项目已切换，无法保存 3D 构图');
+        return result?.asset;
+      },
+      onClose: () => setDirectorDeskNodeID('')
+    });
+  }, [directorDeskNodeID]);
 
   const alignItems = [
     { key: 'left', label: '左对齐', icon: <AlignStartVertical size={15} /> },
@@ -2298,7 +2403,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         deleteKeyCode={null}
       >
         {appearance.backgroundDots ? <Background variant="dots" gap={20} size={1} /> : null}
-        {workspaceView.showMinimap ? <MiniMap className="agent-canvas-minimap" pannable zoomable /> : null}
+        {workspaceView.showMinimap ? <MiniMap className="agent-canvas-minimap" nodeColor="#526277" maskColor="rgba(7, 13, 21, 0.72)" pannable zoomable /> : null}
         <ViewportPortal>
           {groups.map(({ groupId, bounds }) => (
             <section className="agent-canvas-group" key={groupId} style={{ left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height }}>
@@ -2317,6 +2422,13 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         </ViewportPortal>
       </ReactFlow>
       </CanvasNodeContext.Provider>
+
+      {directorDeskAdapter ? <Suspense fallback={<div className="agent-director-desk-loading">正在加载 3D导演台…</div>}>
+        <DirectorDeskApp
+          adapter={directorDeskAdapter}
+          onCapture={asset => commitDirectorCapture(directorDeskNodeID, asset)}
+        />
+      </Suspense> : null}
 
       {generationTasksLoadError ? <p className="agent-canvas-global-error" role="alert">{generationTasksLoadError}</p> : null}
       {generationSummary ? <p className="agent-canvas-generation-summary" role="status" aria-live="polite">{generationSummaryText(generationSummary)}</p> : null}

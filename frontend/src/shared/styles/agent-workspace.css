@@ -560,6 +560,14 @@
 .agent-page .agent-canvas-node-audio-preview > button { justify-self: start; border: 1px solid var(--agent-border); border-radius: 5px; padding: 4px 8px; background: var(--agent-panel); color: var(--agent-secondary); cursor: pointer; font-size: 10px; }
 .agent-page .agent-canvas-node-audio-preview > button:hover,
 .agent-page .agent-canvas-node-audio-preview > button:focus-visible { border-color: var(--agent-border-strong); background: var(--agent-hover); color: var(--agent-text); outline: none; }
+.agent-page .agent-audio-quick-tools { display: flex; min-width: 0; align-items: center; gap: 3px; width: fit-content; max-width: 100%; margin: 0 0 7px; border-radius: 7px; padding: 4px 6px; background: #202020; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24); }
+.agent-page .agent-audio-quick-tools button,
+.agent-page .agent-audio-quick-tools a { display: inline-flex; min-height: 26px; align-items: center; gap: 5px; border: 0; border-radius: 4px; padding: 0 7px; background: transparent; color: var(--agent-text); cursor: pointer; font: inherit; font-size: 11px; text-decoration: none; white-space: nowrap; }
+.agent-page .agent-audio-quick-tools button:hover,
+.agent-page .agent-audio-quick-tools button:focus-visible,
+.agent-page .agent-audio-quick-tools a:hover,
+.agent-page .agent-audio-quick-tools a:focus-visible { background: var(--agent-hover); outline: none; }
+.agent-page .agent-audio-quick-tools__speed { display: inline-grid; width: 14px; height: 14px; place-items: center; font-size: 15px; line-height: 1; }
 .agent-page .agent-audio-waveform { display: grid; min-width: 0; gap: 5px; }
 .agent-page .agent-audio-waveform__bars { display: flex; height: 42px; align-items: center; gap: 2px; overflow: hidden; border-radius: 5px; padding: 0 5px; background: #242424; }
 .agent-page .agent-audio-waveform__bar { display: block; min-width: 2px; flex: 1 1 0; max-width: 4px; border-radius: 2px; background: #858585; opacity: .82; }
