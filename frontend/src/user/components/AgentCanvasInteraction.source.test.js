@@ -8,10 +8,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const canvas = fs.readFileSync(path.join(here, 'AgentCanvas.jsx'), 'utf8');
 const styles = fs.readFileSync(path.resolve(here, '../../shared/styles/agent-workspace.css'), 'utf8');
 
-test('画布节点只从明确的拖动把手开始移动，编辑入口不再占用拖动区域', () => {
-  assert.match(canvas, /dragHandle:\s*'\.agent-canvas-node-drag-handle'/);
-  assert.match(canvas, /className="agent-canvas-node-drag-handle" aria-label="拖动节点"/);
-  assert.match(canvas, /className="agent-canvas-node-card-header-action"[\s\S]*?onClick=\{openEditor\}/);
+test('画布节点任意空白区域都可以移动，编辑入口不再占用拖动区域', () => {
+  assert.doesNotMatch(canvas, /dragHandle:\s*'\.agent-canvas-node-drag-handle'/);
+  assert.match(canvas, /className=\{`agent-canvas-node agent-canvas-node--\$\{nodeType\}/);
+  assert.match(canvas, /className="nodrag nopan agent-canvas-node-card-header-action"[\s\S]*?onClick=\{openEditor\}/);
+  assert.match(canvas, /className="nodrag nopan agent-canvas-node-text-preview"/);
   assert.match(styles, /agent-canvas-node-drag-handle[^}]*cursor:\s*grab/);
 });
 

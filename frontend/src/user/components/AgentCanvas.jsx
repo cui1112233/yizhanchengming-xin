@@ -198,7 +198,7 @@ function CanvasNode({
             <CanvasNodeTypeIcon type={nodeType} />
             <button
               type="button"
-              className="agent-canvas-node-card-header-action"
+              className="nodrag nopan agent-canvas-node-card-header-action"
               aria-label={`编辑${canvasNodeTypeLabel(nodeType)}节点`}
               onMouseDown={stopCanvasEvent}
               onClick={openEditor}
@@ -208,13 +208,13 @@ function CanvasNode({
           {nodeType === 'image' ? <button type="button" className="agent-canvas-node-image-select nodrag nopan" aria-label="展开图片编辑" onPointerDown={event => { event.preventDefault(); stopCanvasEvent(event); }} onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>
             {data.assetRef?.url ? <AuthenticatedAgentImage source={data.assetRef.url} className="agent-canvas-node-media" alt="" /> : <span className="agent-canvas-node-image-placeholder" aria-label="待生成图片"><ImagePlus size={27} /></span>}
           </button> : null}
-          {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
-          {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
-          {nodeType === 'audio' && data.assetRef?.url ? <div className="agent-canvas-node-audio-preview" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent}>
+          {nodeType === 'video' && data.assetRef?.url ? <AuthenticatedAgentVideo source={data.assetRef.url} className="nodrag nopan agent-canvas-node-media" aria-label="视频节点预览" preload="metadata" muted controls onClick={openEditor} /> : null}
+          {nodeType === 'video' && !data.assetRef?.url ? <button type="button" className="nodrag nopan agent-canvas-node-video-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成视频</button> : null}
+          {nodeType === 'audio' && data.assetRef?.url ? <div className="nodrag nopan agent-canvas-node-audio-preview" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent}>
             <AuthenticatedAgentAudio source={data.assetRef.url} aria-label="音频节点预览" preload="metadata" controls waveform waveformSourceLabel={data.title || '音频节点'} />
             <button type="button" onClick={openEditor}>编辑音频</button>
           </div> : null}
-          {nodeType === 'audio' && !data.assetRef?.url ? <button type="button" className="agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成或添加音频</button> : null}
+          {nodeType === 'audio' && !data.assetRef?.url ? <button type="button" className="nodrag nopan agent-canvas-node-audio-placeholder" onMouseDown={stopCanvasEvent} onDoubleClick={stopCanvasEvent} onClick={openEditor}>等待生成或添加音频</button> : null}
           {nodeType === 'director' ? <AgentDirectorDeskNode
             node={{ id, data }}
             onOpen={onOpenDirectorDesk}
@@ -223,8 +223,8 @@ function CanvasNode({
             onRemoveReference={onRemoveReference}
             onSaveScreenshot={onSaveDirectorDeskScreenshot}
           /> : null}
-          {nodeType === 'text' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.summary || '等待 Agent 写入结果'}</button> : null}
-          {nodeType === 'script' ? <button type="button" className="agent-canvas-node-text-preview" onClick={openEditor}>{data.config?.sourceText || '等待填写剧本正文'}</button> : null}
+          {nodeType === 'text' ? <button type="button" className="nodrag nopan agent-canvas-node-text-preview" onClick={openEditor}>{data.summary || '等待 Agent 写入结果'}</button> : null}
+          {nodeType === 'script' ? <button type="button" className="nodrag nopan agent-canvas-node-text-preview" onClick={openEditor}>{data.config?.sourceText || '等待填写剧本正文'}</button> : null}
           <footer><span>v{data.version}</span><span className={`agent-canvas-node-task-state is-${taskPresentation?.state || data.status}`}>{taskPresentation?.errorMessage || taskPresentation?.message || canvasNodeStatusLabel(data.status)}</span>{sourcePresentation?.sourceLabel ? <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onRemoveFromCanvas?.(id); }}>从画布移除</button> : null}</footer>
         </div>}
         {!isPinnedBatchFactoryComposer ? <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" /> : null}
@@ -367,7 +367,6 @@ function toFlowNode(node) {
   return {
     id: node.id,
     type: 'agent',
-    dragHandle: '.agent-canvas-node-drag-handle',
     position: node.position,
     selected: false,
     data: {
