@@ -147,6 +147,13 @@ test('media processing tools stay collapsed until the compact tools action is op
   assert.match(composerSource, /!isBatchFactoryMerge && toolsOpen \? <AgentVideoTools/);
 });
 
+test('composer errors stay compact instead of expanding the prompt panel', () => {
+  assert.match(styles, /agent-node-composer__generation-status[^}]*max-height:\s*30px/);
+  assert.match(styles, /agent-node-composer__generation-status strong[^}]*font-size:\s*11px/);
+  assert.match(styles, /agent-node-composer__top-actions[^}]*padding-bottom:\s*1px/);
+  assert.match(styles, /agent-node-composer__prompt[^}]*height:\s*auto !important/);
+});
+
 test('actual input preview stays visible in the compact card after it is requested', () => {
   assert.match(composerSource, /const previewInputs = inputPreview\?\.inputs \|\| null/);
   assert.match(composerSource, /agent-node-composer__input-preview/);
