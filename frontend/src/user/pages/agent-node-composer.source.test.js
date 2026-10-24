@@ -28,7 +28,20 @@ test('opening a media editor prevents the canvas selection handler from immediat
   assert.ok(opener, 'media editor opener should exist');
   assert.match(opener[1], /event\.preventDefault\(\);/);
   assert.match(opener[1], /stopCanvasEvent\(event\);/);
-  assert.match(canvasSource, /event\.target\?\.closest\?\.\('\.agent-node-composer, \.agent-canvas-node-image-select/);
+  assert.match(canvasSource, /event\.target\?\.closest\?\.\('\.agent-node-composer, \.agent-canvas-node-card-header, \.agent-canvas-node-image-select/);
+});
+
+test('script card header is protected from the canvas selection handler so production controls can open', () => {
+  assert.match(canvasSource, /\.agent-node-composer, \.agent-canvas-node-card-header, \.agent-canvas-node-image-select/);
+});
+
+test('a linked book waits for the canvas instance before it marks its group as focused', () => {
+  assert.match(canvasSource, /if \(!flowInstance\) return;/);
+  assert.match(canvasSource, /for \(let attempt = 0; attempt < 4; attempt \+= 1\)/);
+  assert.match(canvasSource, /const bounds = getNodesBounds\(renderedNodes\);/);
+  assert.match(canvasSource, /const fitted = await flowInstance\.fitBounds\(bounds, \{ padding: 0\.22/);
+  assert.match(canvasSource, /if \(active && fitted\) focusedBookGroupRef\.current = groupId;/);
+  assert.match(canvasSource, /\}, \[flowInstance, nodes, requestedBookId\]\);/);
 });
 
 test('canvas loads all configured model kinds and calls real text and image APIs', () => {
@@ -55,7 +68,7 @@ test('canvas close lifecycle clears the composer and its material panel together
 test('the image material button is protected from the canvas node-click cleanup', () => {
   assert.match(composerSource, /className="agent-node-composer__source" onPointerDown=\{stop\} onClick=\{event => \{ event\.preventDefault\(\); stop\(event\); onPickImageAsset\?\.\(node\.id, event\); \}\}/);
   assert.match(canvasSource, /const isMultiSelection = isCanvasMultiSelectionEvent\(event\);/);
-  assert.match(canvasSource, /event\.defaultPrevented \|\| \(!isMultiSelection && event\.target\?\.closest\?\.\('\.agent-node-composer, \.agent-canvas-node-image-select, \.agent-canvas-node-video-placeholder, \.agent-canvas-node-audio-placeholder, \.agent-canvas-node-text-preview'\)\)/);
+  assert.match(canvasSource, /event\.defaultPrevented \|\| \(!isMultiSelection && event\.target\?\.closest\?\.\('\.agent-node-composer, \.agent-canvas-node-card-header, \.agent-canvas-node-image-select, \.agent-canvas-node-video-placeholder, \.agent-canvas-node-audio-placeholder, \.agent-canvas-node-text-preview'\)\)/);
   assert.match(canvasSource, /const panel = \{ assetKind: 'image', mode, nodeID, position: \{ x: 0, y: 0 \}, anchor: imageAssetPanelAnchor\(event\) \};\s*\/\/ React Flow completes its node click after this nested control; open after that cleanup\.\s*window\.requestAnimationFrame\(\(\) => setAssetPanel\(panel\)\);/);
 });
 
@@ -102,4 +115,52 @@ test('settings panel keeps select menus inside its popover interaction boundary'
 
 test('settings panel stops click bubbling before it reaches the canvas node', () => {
   assert.match(settingsSource, /aria-label=\{`\$\{channelLabels\[kind\]\}设置`\} onMouseDown=\{stop\} onClick=\{stop\}/);
+});
+
+test('compact composer exposes real top controls without an arrow menu label', () => {
+  assert.match(composerSource, /AgentNodeComposerTopActions/);
+  assert.match(composerSource, /AgentNodeComposerReferenceAssets/);
+  const topActionsSource = fs.readFileSync(path.resolve(dirname, '../components/AgentNodeComposerTopActions.jsx'), 'utf8');
+  assert.match(topActionsSource, /aria-label="更多功能"/);
+  assert.match(composerSource, /onPickReferenceAsset\?\.\(node\.id, event\)/);
+  assert.match(composerSource, /onRemoveReference\?\.\(node\.id, asset\.id\)/);
+  assert.match(composerSource, /display="popover"/);
+});
+
+test('mapped media cards use the compact top body and bottom zones without replacing real callbacks', () => {
+  const topActionsSource = fs.readFileSync(path.resolve(dirname, '../components/AgentNodeComposerTopActions.jsx'), 'utf8');
+  assert.match(topActionsSource, /agent-node-composer__top-actions/);
+  assert.match(composerSource, /agent-node-composer__body/);
+  assert.match(composerSource, /agent-node-composer__bottom-bar/);
+  assert.match(composerSource, /compactComposerActionPlan/);
+  assert.match(composerSource, /onPreviewInputs\?\.\(node\.id, selectedModel\)/);
+  assert.match(composerSource, /onRetryVideo\?\.\(node\.id\)/);
+  assert.match(composerSource, /onConfirmImage\?\.\(node\.id, selectedImageID\)/);
+  assert.match(composerSource, /onConfirmAudio\?\.\(node\.id, selectedAudioID\)/);
+});
+
+test('media processing tools stay collapsed until the compact tools action is opened', () => {
+  assert.match(composerSource, /const \[toolsOpen, setToolsOpen\] = useState\(false\)/);
+  assert.match(composerSource, /id: 'media-tools'/);
+  assert.match(composerSource, /toolsOpen \? '收起工具' : '工具'/);
+  assert.match(composerSource, /kind === 'image' && toolsOpen \? <AgentImageTools/);
+  assert.match(composerSource, /!isBatchFactoryMerge && toolsOpen \? <AgentVideoTools/);
+});
+
+test('actual input preview stays visible in the compact card after it is requested', () => {
+  assert.match(composerSource, /const previewInputs = inputPreview\?\.inputs \|\| null/);
+  assert.match(composerSource, /agent-node-composer__input-preview/);
+  assert.match(composerSource, /最终文字：/);
+  assert.match(composerSource, /参考素材：图片/);
+});
+
+test('mapped script card uses the same compact controls and keeps production actions', () => {
+  const scriptComposerSource = fs.readFileSync(path.resolve(dirname, '../components/AgentScriptNodeComposer.jsx'), 'utf8');
+  assert.match(scriptComposerSource, /AgentNodeComposerTopActions/);
+  assert.match(scriptComposerSource, /contentRangeLines/);
+  assert.match(scriptComposerSource, /runBatchFactoryStage\('assets'\)/);
+  assert.match(scriptComposerSource, /runBatchFactoryStage\('director'\)/);
+  assert.match(scriptComposerSource, /runBatchFactoryStage\('viral'\)/);
+  assert.match(scriptComposerSource, /adoptViralCandidate/);
+  assert.match(scriptComposerSource, /AgentBatchFactoryPromptSelector[\s\S]*display="popover"/);
 });
