@@ -1,10 +1,15 @@
 import { Input, InputNumber, Popover, Select, Switch } from 'antd';
 import { Settings2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { providerOptionsForModels, reconcileProviderModel } from '../pages/shuihuo/providerModelBinding';
 
 const channelLabels = { image: '图片生成通道', video: '视频引擎', text: '文本通道', audio: '音频通道' };
 
-export function AgentNodeSettingsPanel({ kind, config = {}, models = [], onChange, disabled = false }) {
+export function AgentNodeSettingsPanel({ kind, config = {}, models = [], onChange, disabled = false, openRequest = 0 }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (openRequest > 0) setOpen(true);
+  }, [openRequest]);
   const providerOptions = providerOptionsForModels(models, kind);
   const stop = event => event.stopPropagation();
   const advanced = config.advanced || {};
@@ -35,7 +40,7 @@ export function AgentNodeSettingsPanel({ kind, config = {}, models = [], onChang
     </> : null}
   </section>;
 
-  return <Popover trigger="click" placement="bottomRight" content={content}>
+  return <Popover trigger="click" placement="bottomRight" content={content} open={open} onOpenChange={setOpen}>
     <button type="button" className="agent-node-composer__settings" aria-label="设置" title="设置" disabled={disabled} onClick={stop}><Settings2 size={15} /></button>
   </Popover>;
 }

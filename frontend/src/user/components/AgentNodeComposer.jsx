@@ -37,6 +37,7 @@ export default function AgentNodeComposer({
   timingWarning = '',
   videoJob, videoState = {}, videoBusy = false, videoActionError = '',
   videoToolsRequest = 0,
+  settingsRequest = 0,
   onSelectImageCandidate, onConfirmImage,
   onSelectAudioCandidate, onConfirmAudio,
   onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo, onPublishBatchFactory, onPublishOrganizationChange, publishOrganizations = [], publishOrganizationsLoading = false, publishOrganizationsError = '', onImageTool, onVideoTool, onBatchFactoryPromptSaved
@@ -48,7 +49,7 @@ export default function AgentNodeComposer({
   useEffect(() => setDraftPrompt(prompt), [node?.id, prompt]);
   useEffect(() => setToolsOpen(false), [node?.id]);
   useEffect(() => {
-    if (kind === 'video' && videoToolsRequest > 0) setToolsOpen(true);
+    if ((kind === 'image' || kind === 'video') && videoToolsRequest > 0) setToolsOpen(true);
   }, [kind, node?.id, videoToolsRequest]);
 
   if (kind === 'script') return <AgentScriptNodeComposer
@@ -178,7 +179,7 @@ export default function AgentNodeComposer({
     return { direct, more };
   }, [actionPlan.primary.join('|'), actionPlan.more.join('|'), busy, taskActionBusy, references, config, onBatchFactoryPromptSaved, onPickReferenceAsset, onRemoveReference, node.id, onPreviewInputs, selectedModel, kind, isVideoToolTask, isBatchFactoryMerge, onRetryVideo, onRetryGeneration, onConfirmImage, selectedImageID, onConfirmAudio, selectedAudioID, publishStatus, onPublishBatchFactory, onPickImageAsset, node.data?.assetRef?.url, canCancelGeneration, onCancelGeneration, videoState.canCancel, videoState.canConfirm, onCancelVideo, onConfirmVideo, publishOrganization, publishOrganizationsLoading, publishOrganizations, onPublishOrganizationChange, toolsOpen]);
 
-  return <section className="agent-node-composer nodrag nopan" style={{ '--agent-canvas-zoom': canvasZoom }} aria-label={`${PROMPT_LABELS[kind]}输入框`} onMouseDown={stop} onDoubleClick={stop}>
+  return <section className={`agent-node-composer agent-node-composer--${kind} nodrag nopan`} style={{ '--agent-canvas-zoom': canvasZoom }} aria-label={`${PROMPT_LABELS[kind]}输入框`} onMouseDown={stop} onDoubleClick={stop}>
     <AgentNodeComposerTopActions primaryActions={topActions.direct} moreActions={topActions.more} />
 
     <div className="agent-node-composer__body">
@@ -198,6 +199,7 @@ export default function AgentNodeComposer({
         {imageCandidates.length ? <div className="agent-node-composer__candidates" aria-label="生成图片候选">
           <div className="agent-node-composer__candidate-head"><strong>选择生成结果</strong><span>{imageCandidates.length} 张</span></div>
           <div className="agent-node-composer__candidate-list">{imageCandidates.map((asset, index) => <button type="button" key={asset.id} className={asset.id === selectedImageID ? 'is-selected' : ''} aria-label={`选择候选图片 ${index + 1}`} aria-pressed={asset.id === selectedImageID} onClick={() => onSelectImageCandidate?.(node.id, asset.id)}><AuthenticatedAgentImage source={asset.url} alt={`候选图片 ${index + 1}`} /><span>{index + 1}</span></button>)}</div>
+          <div className="agent-node-composer__candidate-actions"><button type="button" className="is-primary" disabled={busy || !selectedImageID} onClick={() => onConfirmImage?.(node.id, selectedImageID)}>使用这张</button></div>
         </div> : null}
         {audioCandidates.length ? <div className="agent-node-composer__candidates agent-node-composer__audio-candidates" aria-label="生成音频候选">
           <div className="agent-node-composer__candidate-head"><strong>选择音频结果</strong><span>{audioCandidates.length} 条</span></div>
@@ -222,7 +224,7 @@ export default function AgentNodeComposer({
     <div className="agent-node-composer__bottom-bar agent-node-composer__toolbar">
       {kind !== 'audio' || audioNeedsModel ? <AgentModelPicker kind={kind} config={config} models={models} disabled={busy} onChange={update} /> : <span className="agent-node-composer__local-processor">本地音频处理</span>}
       <AgentNodeParameterPopover kind={kind} config={config} capabilities={modelState.model?.capabilities} disabled={busy} onChange={update} />
-      <AgentNodeSettingsPanel kind={kind} config={config} models={models} disabled={busy} onChange={update} />
+      <AgentNodeSettingsPanel kind={kind} config={config} models={models} disabled={busy} openRequest={settingsRequest} onChange={update} />
       <span className={`agent-node-composer__state${error ? ' is-error' : ''}`} aria-live="polite">{kind === 'image' ? '' : error || (busy ? `正在${isVideoToolTask ? '处理视频' : `生成${kind === 'text' ? '文字' : kind === 'video' ? '视频' : '音频'}`}…` : kind === 'audio' && audioCandidates.length ? '等待选择' : kind === 'video' && isVideoToolTask ? generationState.presentation?.message || '' : kind === 'video' && videoJob ? videoState.label : generationState.presentation?.message || '')}</span>
       {timingWarning ? <small className="is-warning">{timingWarning}</small> : null}
       {isBatchFactoryMerge && publishProgress?.message ? <small className={publishStatus === 'uploaded' ? 'is-success' : 'is-warning'}>{publishProgress.message}</small> : null}

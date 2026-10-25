@@ -10,16 +10,16 @@ const composerSource = fs.readFileSync(path.resolve(dirname, 'AgentNodeComposer.
 const styles = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-workspace.css'), 'utf8');
 
 test('single-clicking a video node opens its editor', () => {
-  assert.match(canvasSource, /normalizeCanvasNodeType\(node\.data\?\.type\) === 'video'[\s\S]*?openNodeComposer\(node\.id\)/);
+  assert.match(canvasSource, /EDITABLE_NODE_TYPES\.has\(normalizeCanvasNodeType\(node\.data\?\.type\)\)[\s\S]*?openNodeComposer\(node\.id\)/);
 });
 
 test('an open video node exposes real quick tools above its preview', () => {
   assert.match(canvasSource, /function AgentVideoQuickTools/);
   assert.match(canvasSource, /operation:\s*'separate_audio'/);
-  for (const label of ['截取', '裁剪', '逐帧拉片', '分离音视频', '下载视频']) {
+  for (const label of ['截取', '裁剪', '抽取画面', '提取音频', '下载视频']) {
     assert.match(canvasSource, new RegExp(label));
   }
-  assert.match(canvasSource, /isEditorOpen && nodeType === 'video'/);
+  assert.match(canvasSource, /isEditorOpen && EDITABLE_NODE_TYPES\.has\(nodeType\)/);
 });
 
 test('the quick toolbar opens the existing functional video tools panel', () => {
@@ -33,9 +33,9 @@ test('opening the video editor does not resize the video node', () => {
   assert.match(canvasSource, /'--agent-canvas-inverse-zoom':\s*1\s*\/\s*Math\.max\(canvasZoom,\s*0\.25\)/);
 });
 
-test('video tools and composer are inverse-scaled floating surfaces', () => {
-  assert.match(canvasSource, /agent-video-floating-toolbar/);
-  assert.match(canvasSource, /agent-video-floating-composer/);
-  assert.match(styles, /agent-video-floating-toolbar[^}]*position:\s*absolute[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
-  assert.match(styles, /agent-video-floating-composer[^}]*position:\s*absolute[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
+test('video tools and composer use the shared inverse-scaled floating surfaces', () => {
+  assert.match(canvasSource, /agent-node-floating-toolbar/);
+  assert.match(canvasSource, /agent-node-floating-composer/);
+  assert.match(styles, /agent-node-floating-toolbar[^}]*position:\s*absolute[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
+  assert.match(styles, /agent-node-floating-composer[^}]*position:\s*absolute[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
 });

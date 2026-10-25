@@ -5,7 +5,7 @@ import { formatNodeParameterSummary, normalizeNodeConfig } from '../pages/agent-
 const labels = {
   image: { title: '图片参数', ratio: '比例', quality: '画质', resolution: '清晰度', count: '数量' },
   video: { title: '视频参数', mode: '类型', ratio: '比例', resolution: '清晰度', durationSeconds: '时长', count: '数量', generateAudio: '生成声音' },
-  text: { title: '文字参数', operation: '类型', length: '长度', creativity: '风格' },
+  text: { title: '文字参数', operation: '生成类型', length: '文字长度', creativity: '创作风格' },
   audio: { title: '音频参数', operation: '类型', speed: '语速 / 倍速', format: '格式' }
 };
 

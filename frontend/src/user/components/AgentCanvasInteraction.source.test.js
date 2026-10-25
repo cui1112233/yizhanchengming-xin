@@ -43,12 +43,12 @@ test('节点和生成框使用稳定的 Liblib 对标内容层级', () => {
   assert.match(styles, /agent-node-composer__bottom-bar[^}]*overflow-x:\s*auto/);
 });
 
-test('选中的音频节点显示 Liblib 风格的快捷处理条', () => {
+test('选中的音频节点使用统一快捷处理条', () => {
   assert.match(canvas, /AgentAudioQuickTools/);
   assert.match(canvas, /operation: 'trim'/);
   assert.match(canvas, /operation: 'custom_split'/);
   assert.match(canvas, /operation: 'smart_split'/);
   assert.match(canvas, /operation: 'speed'/);
-  assert.match(canvas, /download title="下载音频"/);
-  assert.match(styles, /agent-audio-quick-tools/);
+  assert.match(canvas, /downloadTitle="下载音频"/);
+  assert.match(styles, /agent-node-quick-tools/);
 });

@@ -6,7 +6,7 @@ import {
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, GitBranch, Group, Hand,
   Clapperboard, FileText, Film, GripHorizontal, Image as ImageIcon,
-  Crop, Download, Folder, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, Scissors, SlidersHorizontal, Sparkles, Ungroup, Volume2
+  Crop, Download, FlipHorizontal, Folder, Grid2X2, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, RotateCw, Scissors, SlidersHorizontal, Sparkles, Ungroup, Volume2
 } from 'lucide-react';
 import { createContext, forwardRef, lazy, Suspense, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -52,6 +52,8 @@ import AgentNodeComposer from './AgentNodeComposer';
 const DirectorDeskApp = lazy(() => import('./director-desk/DirectorDeskApp'));
 export { insertDirectorCapture } from './director-desk/director-capture';
 
+const EDITABLE_NODE_TYPES = new Set(['text', 'image', 'video', 'audio']);
+
 function nodeModelInputCapabilityError(node, selectedModel, models) {
   const kind = normalizeCanvasNodeType(node?.data?.type);
   const config = normalizeNodeConfig(kind, node?.data?.config || {});
@@ -90,42 +92,74 @@ function CanvasNodeTypeIcon({ type }) {
   return <span className={`agent-canvas-node-type-icon is-${normalizeCanvasNodeType(type)}`} aria-hidden="true"><Icon size={14} strokeWidth={1.8} /></span>;
 }
 
-function AgentAudioQuickTools({ source, onOperation, onMore }) {
-  const actions = [
-    { operation: 'trim', label: '截取', icon: <Scissors size={14} /> },
-    { operation: 'custom_split', label: '自定义切分', icon: <SlidersHorizontal size={14} /> },
-    { operation: 'smart_split', label: '智能切分', icon: <Sparkles size={14} /> },
-    { operation: 'speed', label: '变速', icon: <span className="agent-audio-quick-tools__speed">◔</span> }
-  ];
-  return <div className="agent-audio-quick-tools nodrag nopan" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-    {actions.map(action => <button type="button" key={action.operation} title={action.label} onClick={() => onOperation?.(action.operation)}>{action.icon}<span>{action.label}</span></button>)}
-    <button type="button" title="更多音频操作" aria-label="更多音频操作" onClick={onMore}><MoreHorizontal size={15} /><span>更多</span></button>
-    {source ? <a href={source} download title="下载音频" aria-label="下载音频"><Download size={15} /></a> : null}
-  </div>;
-}
-
-function AgentVideoQuickTools({ source, sourceAsset, busy = false, onApply, onOpenTools }) {
+function AgentNodeQuickTools({ kind, source, sourceAsset, busy = false, onConfigChange, onImageTool, onVideoTool, onOpenTools, onOpenSettings, downloadTitle = '' }) {
   const sourceAssetId = String(sourceAsset?.id || sourceAsset?.assetId || '').trim();
-  const canProcess = Boolean(sourceAssetId && typeof onApply === 'function' && !busy);
+  const canProcess = Boolean(sourceAssetId && !busy);
   const openTools = event => {
     event.preventDefault();
     event.stopPropagation();
     onOpenTools?.();
   };
-  const separateAudio = event => {
+  const updateOperation = operation => event => {
+    event.preventDefault();
+    event.stopPropagation();
+    onConfigChange?.({ parameters: { operation } });
+    onOpenTools?.();
+  };
+  const apply = (operation, settings = {}) => event => {
     event.preventDefault();
     event.stopPropagation();
     if (!canProcess) return;
-    onApply?.({ operation: 'separate_audio', sourceAssetId, settings: {} });
+    const input = { operation, sourceAssetId, settings };
+    if (kind === 'image') onImageTool?.(input);
+    if (kind === 'video') onVideoTool?.(input);
   };
-  return <div className="agent-video-quick-tools agent-video-floating-toolbar nodrag nopan" aria-label="视频快捷工具" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
-    <button type="button" onClick={openTools}><Scissors size={14} /><span>截取</span></button>
-    <button type="button" onClick={openTools}><Crop size={14} /><span>裁剪</span></button>
-    <button type="button" disabled={!canProcess} onClick={separateAudio}><Volume2 size={14} /><span>分离音视频</span></button>
-    <button type="button" onClick={openTools}><Film size={14} /><span>逐帧拉片</span></button>
-    <button type="button" onClick={openTools}><MoreHorizontal size={14} /><span>更多</span></button>
-    {source ? <a href={source} download title="下载视频" aria-label="下载视频"><Download size={15} /></a> : null}
+  const textActions = [
+    { operation: 'generate', label: '生成', icon: <Sparkles size={14} />, onClick: updateOperation('generate') },
+    { operation: 'rewrite', label: '改写', icon: <FileText size={14} />, onClick: updateOperation('rewrite') },
+    { operation: 'continue', label: '续写', icon: <Plus size={14} />, onClick: updateOperation('continue') },
+    { id: 'structure', label: '结构要求', icon: <SlidersHorizontal size={14} />, onClick: event => { event.preventDefault(); event.stopPropagation(); onOpenSettings?.(); } }
+  ];
+  const imageActions = [
+    { operation: 'rotate', label: '旋转', icon: <RotateCw size={14} />, onClick: apply('rotate', { degrees: 90 }), disabled: !canProcess },
+    { operation: 'mirror', label: '镜像', icon: <FlipHorizontal size={14} />, onClick: apply('mirror', { direction: 'horizontal' }), disabled: !canProcess },
+    { operation: 'grid_split', label: '2 x 2', icon: <Grid2X2 size={14} />, onClick: apply('grid_split', { columns: 2, rows: 2 }), disabled: !canProcess },
+    { operation: 'crop', label: '裁剪', icon: <Crop size={14} />, onClick: openTools, disabled: !canProcess }
+  ];
+  const videoActions = [
+    { operation: 'trim', label: '截取', icon: <Scissors size={14} />, onClick: openTools, disabled: !canProcess },
+    { operation: 'crop', label: '裁剪', icon: <Crop size={14} />, onClick: openTools, disabled: !canProcess },
+    { operation: 'separate_audio', label: '提取音频', icon: <Volume2 size={14} />, onClick: apply('separate_audio'), disabled: !canProcess },
+    { operation: 'extract_frames', label: '抽取画面', icon: <Film size={14} />, onClick: openTools, disabled: !canProcess }
+  ];
+  const audioActions = [
+    { operation: 'trim', label: '截取', icon: <Scissors size={14} />, onClick: updateOperation('trim') },
+    { operation: 'custom_split', label: '自定义切分', icon: <SlidersHorizontal size={14} />, onClick: updateOperation('custom_split') },
+    { operation: 'smart_split', label: '智能切分', icon: <Sparkles size={14} />, onClick: updateOperation('smart_split') },
+    { operation: 'speed', label: '变速', icon: <SlidersHorizontal size={14} />, onClick: updateOperation('speed') }
+  ];
+  const actions = kind === 'text' ? textActions : kind === 'image' ? imageActions : kind === 'video' ? videoActions : audioActions;
+  return <div className={`agent-node-quick-tools agent-${kind}-quick-tools agent-node-floating-toolbar nodrag nopan`} aria-label={`${canvasNodeTypeLabel(kind)}快捷工具`} onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+    {actions.map(action => <button type="button" key={action.operation || action.id} disabled={action.disabled || busy} onClick={action.onClick}>{action.icon}<span>{action.label}</span></button>)}
+    <button type="button" onClick={event => { event.preventDefault(); event.stopPropagation(); (onOpenSettings || onOpenTools)?.(); }}><MoreHorizontal size={14} /><span>更多</span></button>
+    {source && (kind === 'video' || kind === 'audio') ? <a href={source} download title={downloadTitle || `下载${canvasNodeTypeLabel(kind)}`} aria-label={downloadTitle || `下载${canvasNodeTypeLabel(kind)}`}><Download size={15} /></a> : null}
   </div>;
+}
+
+function AgentVideoQuickTools(props) {
+  return <AgentNodeQuickTools kind="video" {...props} onVideoTool={props.onApply} onOpenTools={props.onOpenTools} downloadTitle="下载视频" />;
+}
+
+function AgentAudioQuickTools({ source, busy, onOperation, onMore, onOpenSettings }) {
+  return <AgentNodeQuickTools
+    kind="audio"
+    source={source}
+    busy={busy}
+    onConfigChange={patch => onOperation?.(patch.parameters.operation)}
+    onOpenTools={onMore}
+    onOpenSettings={onOpenSettings}
+    downloadTitle="下载音频"
+  />;
 }
 
 function CanvasNode({
@@ -138,6 +172,7 @@ function CanvasNode({
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
   const [videoToolsRequest, setVideoToolsRequest] = useState(0);
+  const [settingsRequest, setSettingsRequest] = useState(0);
   const stopCanvasEvent = event => {
     if (!isCanvasMultiSelectionEvent(event)) event.stopPropagation();
   };
@@ -209,6 +244,7 @@ function CanvasNode({
     onRetryVideo={onRetryVideo}
     onConfirmVideo={onConfirmVideo}
     videoToolsRequest={videoToolsRequest}
+    settingsRequest={settingsRequest}
   /> : null;
   return (
     <article
@@ -217,13 +253,21 @@ function CanvasNode({
       onDoubleClick={handleNodeDoubleClick}
     >
       <div className="agent-canvas-node-preview-shell">
-        {isEditorOpen && nodeType === 'video' && data.assetRef?.url ? <AgentVideoQuickTools
-          source={data.assetRef.url}
-          sourceAsset={data.assetRef}
-          busy={videoBusy}
-          onApply={input => onVideoTool?.(id, input)}
-          onOpenTools={openVideoTools}
-        /> : null}
+        {isEditorOpen && EDITABLE_NODE_TYPES.has(nodeType) && !isPinnedBatchFactoryComposer
+          ? nodeType === 'video'
+            ? <AgentVideoQuickTools source={data.assetRef?.url} sourceAsset={data.assetRef} busy={videoBusy} onApply={input => onVideoTool?.(id, input)} onOpenTools={openVideoTools} onOpenSettings={() => setSettingsRequest(request => request + 1)} />
+            : nodeType === 'audio'
+              ? <AgentAudioQuickTools source={data.assetRef?.url} busy={Boolean(generationState?.busy)} onOperation={applyAudioOperation} onMore={openEditor} onOpenSettings={() => setSettingsRequest(request => request + 1)} />
+              : <AgentNodeQuickTools
+                kind={nodeType}
+                sourceAsset={data.assetRef}
+                busy={Boolean(generationState?.busy)}
+                onConfigChange={patch => onNodeConfigChange?.(id, patch)}
+                onImageTool={input => onImageTool?.(id, input)}
+                onOpenTools={openVideoTools}
+                onOpenSettings={() => setSettingsRequest(request => request + 1)}
+              />
+          : null}
         <Handle type="target" position={Position.Left} className="agent-canvas-node-target" aria-label="连接到此节点" />
         {isPinnedBatchFactoryComposer ? <div className="agent-canvas-node-pinned-composer">
           <header className="agent-canvas-node-card-header agent-canvas-node-pinned-header">
@@ -234,7 +278,6 @@ function CanvasNode({
           <footer className="agent-canvas-node-pinned-footer"><span>v{data.version}</span><span className={`agent-canvas-node-task-state is-${taskPresentation?.state || data.status}`}>{taskPresentation?.errorMessage || taskPresentation?.message || canvasNodeStatusLabel(data.status)}</span><button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onRemoveFromCanvas?.(id); }}>从画布移除</button></footer>
           <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" />
         </div> : <div className="agent-canvas-node-card">
-          {nodeType === 'audio' && data.assetRef?.url && selected ? <AgentAudioQuickTools source={data.assetRef.url} onOperation={applyAudioOperation} onMore={openEditor} /> : null}
           <header className="agent-canvas-node-card-header">
             <span className="agent-canvas-node-drag-handle" aria-label="拖动节点"><GripHorizontal size={14} /></span>
             <CanvasNodeTypeIcon type={nodeType} />
@@ -272,8 +315,8 @@ function CanvasNode({
         {!isPinnedBatchFactoryComposer ? <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" /> : null}
       </div>
       {!isPinnedBatchFactoryComposer
-        ? (nodeType === 'video' && isEditorOpen
-          ? <div className="agent-video-floating-composer nodrag nopan">{composer}</div>
+        ? (EDITABLE_NODE_TYPES.has(nodeType) && isEditorOpen
+          ? <div className="agent-node-floating-composer nodrag nopan">{composer}</div>
           : composer)
         : null}
     </article>
@@ -976,7 +1019,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     setNodes(next);
     setSelectedIds(ids);
     onSelectionChange?.(ids);
-    if (!isMultiSelection && normalizeCanvasNodeType(node.data?.type) === 'video') openNodeComposer(node.id);
+    if (!isMultiSelection && EDITABLE_NODE_TYPES.has(normalizeCanvasNodeType(node.data?.type))) openNodeComposer(node.id);
   }
 
   function handleNodeDoubleClick(event, node) {
