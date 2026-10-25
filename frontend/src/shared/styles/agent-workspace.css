@@ -1595,7 +1595,8 @@
 .agent-director-inspector__field input { box-sizing: border-box; width: 100%; min-width: 0; height: 30px; border: 1px solid var(--director-border); border-radius: 4px; padding: 4px 6px; color: var(--director-text); background: var(--director-panel-strong); font: inherit; }
 .agent-director-inspector__field input:focus-visible { outline: 2px solid var(--director-accent); outline-offset: 1px; }
 .agent-director-inspector__field input[aria-invalid='true'] { border-color: #d84e50; }
-.agent-director-inspector__field small { color: #d84e50; overflow-wrap: anywhere; }
+.agent-director-inspector__field small { color: #ff8585; overflow-wrap: anywhere; }
+[data-theme='light'] .agent-director-inspector__field small { color: #ad252c; }
 .agent-page .agent-director-desk-fullscreen .agent-director-shell .agent-director-inspector button { min-height: 32px; padding: 6px 8px; border: 1px solid var(--director-border); border-radius: 4px; }
 @media (max-width: 1180px) {
   .agent-director-shell, .agent-director-shell.is-left-collapsed, .agent-director-shell.is-right-collapsed, .agent-director-shell.is-left-collapsed.is-right-collapsed { grid-template-columns: 44px minmax(0, 1fr) 44px; }

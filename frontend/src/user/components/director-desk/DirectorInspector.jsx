@@ -25,7 +25,7 @@ function NumericField({ label, value, onCommit }) {
   </label>;
 }
 
-export default function DirectorInspector({ project, selection, onProjectChange, onSetActiveCamera, onChangeScene }) {
+export default function DirectorInspector({ project, images = [], selection, onProjectChange, onSetActiveCamera, onChangeScene }) {
   const current = normalizeDirectorProject(project);
   const object = selection?.kind === 'actor' ? current.actors.find(item => item.id === selection.id)
     : selection?.kind === 'camera' ? current.cameras.find(item => item.id === selection.id) : null;
@@ -47,7 +47,7 @@ export default function DirectorInspector({ project, selection, onProjectChange,
       return property === 'uniformScale' ? updated.scale[0] : index === undefined ? updated[property] : updated[property][Number(index)];
     }} />;
   return <section className="agent-director-inspector" aria-label={`${prefix}检查器`}>
-    <h3>{actor ? object.assetId : object.name}</h3>
+    <h3>{actor ? (images.find(image => image.id === object.assetId)?.name?.trim() || object.assetId) : object.name}</h3>
     {fields.map(([name, path]) => <fieldset key={path}><legend>{name}</legend><div className="agent-director-inspector__axes">
       {['X', 'Y', 'Z'].map((axis, index) => field(`${prefix}${name} ${axis}`, `${path}.${index}`, object[path][index]))}
     </div></fieldset>)}
