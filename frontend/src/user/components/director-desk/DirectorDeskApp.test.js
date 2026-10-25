@@ -93,6 +93,13 @@ test('底部工具栏限制在场景中列且不改变场景高度', () => {
   assert.doesNotMatch(styles.match(/\.agent-director-bottom-dock\s*\{[^}]*\}/s)[0], /100vw|position:\s*fixed/);
 });
 
+test('底部保存状态在浅色主题的深色视口上保持可见', () => {
+  const statusRule = styles.match(/\.agent-director-bottom-dock__status\s*\{[^}]*\}/s)?.[0] || '';
+  assert.doesNotMatch(statusRule, /color:\s*var\(--director-text\)/);
+  assert.match(statusRule, /background:\s*rgba\(10,\s*19,\s*28,\s*\.78\)/);
+  assert.match(statusRule, /color:\s*#f3f7f8/);
+});
+
 test('导演台外壳提供三栏和可收起面板', () => {
   const shell = read('DirectorDeskShell.jsx');
   const rail = read('DirectorToolRail.jsx');
@@ -141,6 +148,14 @@ test('全屏导演台有稳定的场景视口和窄侧栏布局', () => {
   assert.match(styles, /\.agent-page \.agent-director-desk-fullscreen__viewport\s*\{/);
   assert.match(styles, /\.agent-page \.agent-director-3d-scene\s*\{/);
   assert.match(styles, /@media \(max-width: 900px\)/);
+});
+
+test('导演台中列提供真实可用高度供竖屏画幅适配', () => {
+  const viewportRule = styles.match(/\.agent-director-shell__viewport\s*\{[^}]*\}/s)?.[0] || '';
+  assert.match(viewportRule, /container-type:\s*size/);
+  assert.match(viewportRule, /display:\s*flex/);
+  assert.match(viewportRule, /align-items:\s*center/);
+  assert.match(viewportRule, /justify-content:\s*center/);
 });
 
 test('桌面端导演台避开全站左侧导航，素材卡和场景按钮不可被遮挡', () => {

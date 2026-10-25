@@ -37,6 +37,12 @@ export function cameraForView(project, view) {
     || current.cameras.find(camera => camera.id === 'camera-main');
 }
 
+export function cameraMarkerVisible(camera, viewCamera) {
+  const marker = vector(camera?.position, [0, 0, 0]);
+  const viewer = vector(viewCamera?.position, [0, 3, 8]);
+  return Math.hypot(...marker.map((value, index) => value - viewer[index])) >= 0.75;
+}
+
 function vector(value, fallback) {
   if (Array.isArray(value)) return value.slice(0, fallback.length);
   if (value && typeof value.toArray === 'function') return value.toArray();

@@ -48,6 +48,13 @@ test('stale active camera falls back to camera-main', () => {
   assert.equal(cameraForView(project, 'camera').id, 'camera-main');
 });
 
+test('director camera does not render a camera marker around itself', () => {
+  assert.equal(typeof sceneState.cameraMarkerVisible, 'function');
+  const directorCamera = { position: [0, 3, 8] };
+  assert.equal(sceneState.cameraMarkerVisible({ position: [0, 3, 8] }, directorCamera), false);
+  assert.equal(sceneState.cameraMarkerVisible({ position: [0, 3, 7] }, directorCamera), true);
+});
+
 test('actor plane preserves non-uniform v2 scale', () => {
   assert.deepEqual(actorPlaneProps({ position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 2, 1] }).scale, [1, 2, 1]);
 });

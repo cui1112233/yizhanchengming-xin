@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import * as THREE from 'three';
 import { createAuthenticatedMediaSession } from '../../pages/agent-canvas-media.js';
 import { normalizeDirectorProject, updateDirectorActorTransform, updateDirectorCamera, updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
-import { actorPlaneProps, applyCameraFrame, aspectRatioValue, cameraForView, cameraFromControls, canTransformActor, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
+import { actorPlaneProps, applyCameraFrame, aspectRatioValue, cameraForView, cameraFromControls, cameraMarkerVisible, canTransformActor, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
 
 export { actorPlaneProps, cameraFromControls, updateCamera } from './director-scene-state.js';
 
@@ -148,7 +148,7 @@ export const DirectorScene = forwardRef(function DirectorScene({ project, images
       selected={selected?.kind === 'actor' && selected.id === actor.id}
       onSelect={() => select({ kind: 'actor', id: actor.id })}
     /></Movable>)}
-    {viewMode === 'director' ? current.cameras.map(camera => <Movable key={camera.id} position={camera.position} selected={transformMode === 'translate' && selected?.kind === 'camera' && selected.id === camera.id} onDragging={setTransformDragging} onFinish={object => onProjectChange(updateDirectorCamera(current, camera.id, { position: object.position.toArray() }))}><CameraMarker camera={camera} selected={selected?.kind === 'camera' && selected.id === camera.id} onSelect={() => select({ kind: 'camera', id: camera.id })} /></Movable>) : null}
+    {viewMode === 'director' ? current.cameras.filter(camera => cameraMarkerVisible(camera, cameraState)).map(camera => <Movable key={camera.id} position={camera.position} selected={transformMode === 'translate' && selected?.kind === 'camera' && selected.id === camera.id} onDragging={setTransformDragging} onFinish={object => onProjectChange(updateDirectorCamera(current, camera.id, { position: object.position.toArray() }))}><CameraMarker camera={camera} selected={selected?.kind === 'camera' && selected.id === camera.id} onSelect={() => select({ kind: 'camera', id: camera.id })} /></Movable>) : null}
     {viewMode === 'director' ? <OrbitControls ref={controlsRef} enabled={!transformDragging} target={current.directorCamera.target}
       onEnd={event => onProjectChange(updateCamera(current, cameraFromControls(event.target.object, event.target.target)))} /> : null}
   </Canvas></div>;
