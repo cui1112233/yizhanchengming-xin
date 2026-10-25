@@ -157,12 +157,19 @@ export function createDirectorPromptDraft(value) {
 
 export function syncDirectorPromptDraft(draft, external) {
   const prompt = String(external || '');
+  if (draft.pending && prompt === draft.pending.normalized) {
+    return draft.value === draft.pending.value ? createDirectorPromptDraft(prompt) : { value: draft.value, base: prompt, conflict: false };
+  }
   if (draft.value === draft.base || draft.value === prompt) return createDirectorPromptDraft(prompt);
   return { ...draft, conflict: prompt !== draft.base };
 }
 
 export function editDirectorPromptDraft(draft, value, external) {
-  return { value, base: String(external || ''), conflict: false };
+  return { value, base: String(external || ''), conflict: false, ...(!draft.conflict && draft.pending ? { pending: draft.pending } : {}) };
+}
+
+export function submitDirectorPromptDraft(draft, normalized) {
+  return { ...draft, pending: { value: draft.value, normalized } };
 }
 
 export function discardDirectorPromptDraft(draft, external) {

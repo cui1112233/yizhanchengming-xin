@@ -1,7 +1,7 @@
 import { Camera, ImagePlus, Move, Send, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
-import { createDirectorPromptDraft, directorDeskConfig, directorDeskSceneStyle, discardDirectorPromptDraft, editDirectorPromptDraft, mergeDirectorDeskConfig, moveDirectorDeskActor, syncDirectorPromptDraft } from '../pages/agent-director-desk';
+import { createDirectorPromptDraft, directorDeskConfig, directorDeskSceneStyle, discardDirectorPromptDraft, editDirectorPromptDraft, mergeDirectorDeskConfig, moveDirectorDeskActor, submitDirectorPromptDraft, syncDirectorPromptDraft } from '../pages/agent-director-desk';
 
 function imageForAsset(surface, assetID) {
   return [...(surface?.querySelectorAll?.('img[data-director-asset-id]') || [])]
@@ -120,15 +120,17 @@ export function AgentDirectorDeskNode({ node, onOpen, onConfigChange, onPickRefe
   useEffect(() => {
     setDraftState(previous => {
       const next = previous.nodeID === node.id ? syncDirectorPromptDraft(previous.draft, desk.scenePrompt) : createDirectorPromptDraft(desk.scenePrompt);
-      if (previous.nodeID === node.id && previous.draft.value === next.value && previous.draft.base === next.base && previous.draft.conflict === next.conflict) return previous;
+      if (previous.nodeID === node.id && previous.draft.value === next.value && previous.draft.base === next.base && previous.draft.conflict === next.conflict && previous.draft.pending === next.pending) return previous;
       return { nodeID: node.id, draft: next };
     });
   }, [node.id, desk.scenePrompt]);
   const saveDraft = event => {
     event?.preventDefault();
     event?.stopPropagation();
-    if (draft.conflict) return;
-    onConfigChange?.(node.id, { directorDesk: mergeDirectorDeskConfig(node?.data?.config?.directorDesk, { ...desk, scenePrompt: draft.value }) });
+    if (draft.conflict || !onConfigChange) return;
+    const next = mergeDirectorDeskConfig(node?.data?.config?.directorDesk, { ...desk, scenePrompt: draft.value });
+    setDraftState({ nodeID: node.id, draft: submitDirectorPromptDraft(draft, next.scene.prompt) });
+    onConfigChange(node.id, { directorDesk: next });
   };
   const stopCanvasEvent = event => event.stopPropagation();
   const hasDraft = Boolean(desk.scenePrompt || desk.sceneAsset?.id);

@@ -115,6 +115,25 @@ test('外部描述更新同步未编辑输入，冲突草稿需用户编辑或�
   assert.equal(director.syncDirectorPromptDraft(typed, '我的草稿').conflict, false);
 });
 
+test('本次保存的描述被规范化后同步，不掩盖真正的外部更新', () => {
+  const project = normalizeDirectorProject({ scene: { assetId: 's', prompt: 'old' } });
+  const draft = director.editDirectorPromptDraft(director.createDirectorPromptDraft('old'), ' new ', 'old');
+  const saved = director.mergeDirectorDeskConfig(project, { ...directorDeskConfig(project), scenePrompt: draft.value });
+  assert.equal(saved.scene.prompt, 'new');
+  const pending = director.submitDirectorPromptDraft(draft, saved.scene.prompt);
+  const confirmed = director.syncDirectorPromptDraft(pending, saved.scene.prompt);
+  assert.equal(confirmed.value, 'new');
+  assert.equal(confirmed.conflict, false);
+  const external = director.syncDirectorPromptDraft(pending, 'someone else');
+  assert.equal(external.value, ' new ');
+  assert.equal(external.conflict, true);
+  const editedAgain = director.editDirectorPromptDraft(pending, 'my next edit', 'old');
+  const acknowledged = director.syncDirectorPromptDraft(editedAgain, 'new');
+  assert.equal(acknowledged.value, 'my next edit');
+  assert.equal(acknowledged.base, 'new');
+  assert.equal(acknowledged.conflict, false);
+});
+
 test('紧凑编辑场景描述和演员位置保留完整三维项目', () => {
   const original = normalizeDirectorProject({ scene: { assetId: 's', prompt: 'before' },
     actors: [{ id: 'a', assetId: 'img', position: [1, 3, 2], rotation: [0.4, 0.5, 0.2], scale: [2, 3, 4] }],
