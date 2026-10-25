@@ -19,6 +19,7 @@ test('all editable node kinds use one single-click editor gate', () => {
 test('all editable nodes share inverse-scaled floating toolbar and composer shells', () => {
   assert.match(canvasSource, /agent-node-floating-toolbar/);
   assert.match(canvasSource, /agent-node-floating-composer/);
+  assert.match(styles, /react-flow__node:has\(\.agent-canvas-node\.is-editor-open\)[^}]*z-index:\s*30/);
   assert.match(styles, /agent-node-floating-toolbar[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
   assert.match(styles, /agent-node-floating-composer[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
   assert.doesNotMatch(styles, /agent-canvas-node--(?:text|image|video|audio)\.is-editor-open\s*\{[^}]*width:/);
@@ -44,6 +45,29 @@ test('the unified composer retains real model parameters settings state and subm
   assert.match(composerSource, /agent-node-composer__state/);
   assert.match(composerSource, /submitNodeGeneration/);
   for (const fake of ['积分', '角色库', '特效库', '运镜库']) assert.doesNotMatch(composerSource, new RegExp(fake));
+});
+
+test('the unified composer uses the approved compact three-part editor layout', () => {
+  assert.match(composerSource, /agent-node-composer__asset-strip/);
+  assert.match(composerSource, /agent-node-composer__prompt-wrap/);
+  assert.match(composerSource, /agent-node-composer__prompt-label/);
+  assert.match(composerSource, /agent-node-composer__prompt-count/);
+  assert.match(composerSource, /<footer className="agent-node-composer__bottom-bar agent-node-composer__toolbar">/);
+
+  assert.match(styles, /agent-node-composer__asset-strip[^}]*min-height:\s*46px/);
+  assert.match(styles, /agent-node-composer__prompt-wrap[^}]*min-height:\s*108px/);
+  assert.match(styles, /agent-node-composer__prompt[^}]*min-height:\s*92px/);
+  assert.match(styles, /agent-node-composer__bottom-bar[^}]*min-height:\s*49px/);
+  assert.match(styles, /agent-canvas-node footer\.agent-node-composer__bottom-bar[^}]*display:\s*flex/);
+  assert.doesNotMatch(styles, /agent-node-composer__bottom-bar[^}]*border-top:/);
+});
+
+test('editor actions and footer controls are compact and borderless by default', () => {
+  assert.match(styles, /agent-node-composer__top-action[^}]*border:\s*1px solid transparent/);
+  assert.match(styles, /agent-model-picker[^}]*border:\s*0/);
+  assert.match(styles, /agent-node-composer__parameters[^}]*border:\s*0/);
+  assert.match(styles, /agent-node-composer__settings[^}]*border:\s*0/);
+  assert.doesNotMatch(styles, /agent-node-composer__parameters[^}]*min-width:\s*150px/);
 });
 
 test('editor surfaces use theme variables instead of fixed dark backgrounds', () => {

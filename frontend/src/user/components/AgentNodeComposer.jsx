@@ -107,6 +107,7 @@ export default function AgentNodeComposer({
   const previewInputs = inputPreview?.inputs || null;
   const previewCount = inputKind => Array.isArray(previewInputs?.[inputKind]) ? previewInputs[inputKind].length : 0;
   const previewPrompt = String(previewInputs?.resolvedPrompt || previewInputs?.prompt || '').trim();
+  const promptLimit = kind === 'text' ? 8000 : 4000;
   const imageGenerationStatus = kind !== 'image' ? null : (() => {
     if (error) return { tone: 'error', label: '图片生成失败', detail: error };
     if (busy) {
@@ -180,7 +181,9 @@ export default function AgentNodeComposer({
   }, [actionPlan.primary.join('|'), actionPlan.more.join('|'), busy, taskActionBusy, references, config, onBatchFactoryPromptSaved, onPickReferenceAsset, onRemoveReference, node.id, onPreviewInputs, selectedModel, kind, isVideoToolTask, isBatchFactoryMerge, onRetryVideo, onRetryGeneration, onConfirmImage, selectedImageID, onConfirmAudio, selectedAudioID, publishStatus, onPublishBatchFactory, onPickImageAsset, node.data?.assetRef?.url, canCancelGeneration, onCancelGeneration, videoState.canCancel, videoState.canConfirm, onCancelVideo, onConfirmVideo, publishOrganization, publishOrganizationsLoading, publishOrganizations, onPublishOrganizationChange, toolsOpen]);
 
   return <section className={`agent-node-composer agent-node-composer--${kind} nodrag nopan`} style={{ '--agent-canvas-zoom': canvasZoom }} aria-label={`${PROMPT_LABELS[kind]}输入框`} onMouseDown={stop} onDoubleClick={stop}>
-    <AgentNodeComposerTopActions primaryActions={topActions.direct} moreActions={topActions.more} />
+    <div className="agent-node-composer__asset-strip">
+      <AgentNodeComposerTopActions primaryActions={topActions.direct} moreActions={topActions.more} />
+    </div>
 
     <div className="agent-node-composer__body">
       {kind === 'image' && toolsOpen ? <AgentImageTools sourceAsset={node.data?.assetRef} busy={busy} onApply={input => onImageTool?.(node.id, input)} /> : null}
@@ -210,7 +213,13 @@ export default function AgentNodeComposer({
           <div className="agent-node-composer__video-list">{videoToolCandidates.map((asset, index) => <article key={asset.id} className={asset.id === selectedVideoToolID ? 'is-selected' : ''}><AuthenticatedAgentVideo source={asset.url} aria-label={`视频处理结果 ${index + 1}`} preload="metadata" muted controls /><button type="button" aria-pressed={asset.id === selectedVideoToolID} onClick={() => onSelectImageCandidate?.(node.id, asset.id)}>选择第 {index + 1} 个</button></article>)}</div>
           <div className="agent-node-composer__candidate-actions"><button type="button" className="is-primary" disabled={busy || !selectedVideoToolID} onClick={() => onConfirmImage?.(node.id, selectedVideoToolID)}>使用这个结果</button></div>
         </div> : null}
-        <Input.TextArea aria-label={PROMPT_LABELS[kind]} className="agent-node-composer__prompt" value={draftPrompt} maxLength={kind === 'text' ? 8000 : 4000} autoSize={{ minRows: 2, maxRows: kind === 'text' ? 6 : 3 }} placeholder={PROMPT_PLACEHOLDERS[kind]} onChange={event => setDraftPrompt(event.target.value)} onBlur={persistPrompt} />
+        <div className="agent-node-composer__prompt-wrap">
+          <div className="agent-node-composer__prompt-label">
+            <span>{PROMPT_LABELS[kind]}</span>
+            <span className="agent-node-composer__prompt-count">{draftPrompt.length} / {promptLimit}</span>
+          </div>
+          <Input.TextArea aria-label={PROMPT_LABELS[kind]} className="agent-node-composer__prompt" value={draftPrompt} maxLength={promptLimit} autoSize={false} placeholder={PROMPT_PLACEHOLDERS[kind]} onChange={event => setDraftPrompt(event.target.value)} onBlur={persistPrompt} />
+        </div>
         {inputPreview?.error ? <small className="is-error" role="alert">{inputPreview.error}</small> : null}
         {previewInputs ? <div className="agent-node-composer__input-preview" aria-live="polite">
           <span title={previewPrompt}>最终文字：{previewPrompt || '未提供'}</span>
@@ -221,7 +230,7 @@ export default function AgentNodeComposer({
       </>}
     </div>
 
-    <div className="agent-node-composer__bottom-bar agent-node-composer__toolbar">
+    <footer className="agent-node-composer__bottom-bar agent-node-composer__toolbar">
       {kind !== 'audio' || audioNeedsModel ? <AgentModelPicker kind={kind} config={config} models={models} disabled={busy} onChange={update} /> : <span className="agent-node-composer__local-processor">本地音频处理</span>}
       <AgentNodeParameterPopover kind={kind} config={config} capabilities={modelState.model?.capabilities} disabled={busy} onChange={update} />
       <AgentNodeSettingsPanel kind={kind} config={config} models={models} disabled={busy} openRequest={settingsRequest} onChange={update} />
@@ -229,6 +238,6 @@ export default function AgentNodeComposer({
       {timingWarning ? <small className="is-warning">{timingWarning}</small> : null}
       {isBatchFactoryMerge && publishProgress?.message ? <small className={publishStatus === 'uploaded' ? 'is-success' : 'is-warning'}>{publishProgress.message}</small> : null}
       <button type="button" className="agent-node-composer__submit" aria-label={isBatchFactoryMerge ? '合成最终视频' : `生成${kind === 'text' ? '文字' : kind === 'image' ? '图片' : kind === 'video' ? '视频' : '音频'}`} title={isBatchFactoryMerge ? (mergeReady ? '按当前分镜主版本合成最终视频' : mergeReason) : (modelLoadError || modelState.reason || (selectedModel ? '开始生成' : '请先在 API 配置中添加可用模型'))} disabled={submitDisabled} onPointerDown={stop} onClick={event => submitNodeGeneration({ event, onSubmit, nodeID: node.id, modelID: selectedModel, prompt: draftPrompt })}><ArrowUp size={17} /><span>{isBatchFactoryMerge ? (config.mergeJobId ? '重新合成' : '合成最终视频') : '生成'}</span></button>
-    </div>
+    </footer>
   </section>;
 }
