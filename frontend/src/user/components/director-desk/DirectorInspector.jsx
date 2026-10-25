@@ -37,7 +37,7 @@ export default function DirectorInspector({ project, images = [], selection, onP
   const actor = selection.kind === 'actor';
   const prefix = actor ? '角色' : '机位';
   const fields = actor ? [['位置', 'position'], ['旋转', 'rotation'], ['缩放', 'scale']]
-    : [['位置', 'position'], ['旋转', 'rotation'], ['目标', 'target']];
+    : [['位置', 'position'], ['目标', 'target']];
   const field = (label, path, value) => <NumericField key={`${selection.id}-${path}`} label={label} value={value}
     onCommit={value => {
       const next = applyDirectorInspectorChange(current, selection, path, value);
@@ -52,6 +52,9 @@ export default function DirectorInspector({ project, images = [], selection, onP
       {['X', 'Y', 'Z'].map((axis, index) => field(`${prefix}${name} ${axis}`, `${path}.${index}`, object[path][index]))}
     </div></fieldset>)}
     {actor ? field('角色统一缩放', 'uniformScale', object.scale[0]) : <>
+      <fieldset><legend>镜头滚转</legend><div className="agent-director-inspector__axes">
+        {field('机位滚转', 'rotation.2', object.rotation[2])}
+      </div></fieldset>
       {field('机位 FOV', 'fov', object.fov)}
       <button type="button" onClick={() => onSetActiveCamera?.(object.id)}>设为活动机位</button>
     </>}

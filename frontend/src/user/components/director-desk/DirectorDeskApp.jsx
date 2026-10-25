@@ -12,7 +12,7 @@ import {
 } from '../../pages/agent-director-desk.js';
 import DirectorAssetPanel from './DirectorAssetPanel';
 import DirectorBottomDock from './DirectorBottomDock';
-import { queueDirectorCaptureMetadata } from './DirectorDeskHostAdapter.js';
+import { createDirectorCaptureTransaction, queueDirectorCaptureMetadata } from './DirectorDeskHostAdapter.js';
 import DirectorDeskShell from './DirectorDeskShell';
 import DirectorInspector from './DirectorInspector';
 import { DirectorScene } from './DirectorScene';
@@ -31,7 +31,7 @@ const CAMERA_PRESETS = Object.freeze([
   { id: 'dutch-angle', label: '荷兰角', position: [-3.8, 3.1, 5.4], target: [0, 1.2, 0], fov: 44, rotation: [0, 0, -0.22] }
 ]);
 
-export default function DirectorDeskApp({ adapter, onCapture }) {
+export default function DirectorDeskApp({ adapter }) {
   const [project, setProject] = useState(() => normalizeDirectorProject(adapter.readState()));
   const [images, setImages] = useState([]);
   const [activeTool, setActiveTool] = useState('scene');
@@ -49,6 +49,7 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
   const sceneRef = useRef(null);
   const projectRef = useRef(project);
   const saveQueueRef = useRef(null);
+  const captureTransactionRef = useRef(null);
 
   if (!saveQueueRef.current) {
     saveQueueRef.current = createDirectorSaveQueue(next => adapter.writeState(next), {
@@ -60,6 +61,26 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
     });
   }
   const saveQueue = saveQueueRef.current;
+  if (!captureTransactionRef.current) {
+    captureTransactionRef.current = createDirectorCaptureTransaction({
+      capture: async () => {
+        await saveQueue.flush();
+        return sceneRef.current.capture();
+      },
+      storeCapture: file => adapter.storeCapture(file),
+      persistMetadata: asset => queueDirectorCaptureMetadata({
+        saveQueue,
+        project: projectRef.current,
+        asset,
+        updateProject: next => {
+          projectRef.current = next;
+          setProject(next);
+        }
+      }),
+      insertCapture: asset => adapter.insertCapture(asset)
+    });
+  }
+  const captureTransaction = captureTransactionRef.current;
 
   useEffect(() => {
     let active = true;
@@ -117,6 +138,7 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
   });
   const close = async () => {
     try {
+      await captureTransaction.flush();
       await saveQueue.flush();
       adapter.close();
     } catch (cause) {
@@ -129,19 +151,8 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
     setBusy(true);
     setOperationError('');
     try {
-      await saveQueue.flush();
-      const file = await sceneRef.current.capture();
-      const asset = await adapter.storeCapture(file);
-      await queueDirectorCaptureMetadata({
-        saveQueue,
-        project: projectRef.current,
-        asset,
-        updateProject: next => {
-          projectRef.current = next;
-          setProject(next);
-        }
-      });
-      await onCapture?.(asset);
+      await captureTransaction.start();
+      setSaveError('');
     } catch (cause) {
       if (saveQueue.getStatus() === 'error') setSaveError(cause?.message || '导演台保存失败');
       else setOperationError(cause?.message || '3D 构图保存失败');

@@ -15,7 +15,7 @@ export function applyDirectorInspectorChange(project, selection, field, rawValue
   else {
     const match = /^(position|rotation|scale|target)\.([0-2])$/.exec(field);
     const allowed = kind === 'actor' ? ['position', 'rotation', 'scale'] : ['position', 'rotation', 'target'];
-    if (!match || !allowed.includes(match[1])) return current;
+    if (!match || !allowed.includes(match[1]) || (kind === 'camera' && match[1] === 'rotation' && match[2] !== '2')) return current;
     const vector = [...object[match[1]]];
     vector[Number(match[2])] = value;
     patch = { [match[1]]: vector };

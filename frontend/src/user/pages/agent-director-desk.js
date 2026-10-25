@@ -81,13 +81,19 @@ export function normalizeDirectorProject(input = {}) {
   const scene = normalizeAsset(source.scene || source.sceneAsset);
   const cameras = Array.isArray(source.cameras) ? source.cameras.map(normalizeCameraObject) : [];
   if (!cameras.some(camera => camera.id === 'camera-main')) cameras.unshift({ ...normalizeCameraObject(source.camera), id: 'camera-main' });
+  const actors = [];
+  for (const value of Array.isArray(source.actors) ? source.actors : []) {
+    const actor = normalizeActor(value);
+    if (!actor) continue;
+    actors.push({ ...actor, id: availableId(actor.id, [{ id: 'scene' }, ...cameras, ...actors]) });
+  }
   const directorCamera = normalizeCamera(source.directorCamera || source.camera);
   return {
     rendererVersion: '3d-v2',
     scene: scene
       ? { ...scene, prompt: text(source.scenePrompt || source.scene?.prompt, 1000) }
       : { assetId: '', url: '', name: '', prompt: text(source.scenePrompt || source.scene?.prompt, 1000) },
-    actors: Array.isArray(source.actors) ? source.actors.map(normalizeActor).filter(Boolean) : [],
+    actors,
     cameras,
     activeCameraId: cameras.some(camera => camera.id === source.activeCameraId) ? source.activeCameraId : 'camera-main',
     aspectRatio: DIRECTOR_ASPECT_RATIOS.includes(source.aspectRatio) ? source.aspectRatio : 'adaptive',

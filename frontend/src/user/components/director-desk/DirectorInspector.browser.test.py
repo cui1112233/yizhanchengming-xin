@@ -65,6 +65,16 @@ class InspectorBrowserTests(unittest.TestCase):
             }''')
             self.assertGreaterEqual(ratio, 4.5, f'{theme} contrast {ratio}')
         self.assertTrue(page.get_by_role('heading', name='角色素材').is_visible())
+        for axis in ('X', 'Y', 'Z'):
+            self.assertTrue(page.get_by_label(f'角色旋转 {axis}', exact=True).is_visible())
+        page.get_by_role('button', name='检查机位').click()
+        self.assertEqual(page.get_by_label('机位旋转 X', exact=True).count(), 0)
+        self.assertEqual(page.get_by_label('机位旋转 Y', exact=True).count(), 0)
+        roll = page.get_by_label('机位滚转', exact=True)
+        self.assertTrue(roll.is_visible())
+        roll.fill('-0.4')
+        roll.press('Enter')
+        self.assertEqual(page.get_by_test_id('camera-roll').inner_text(), '-0.4')
 
 
 if __name__ == '__main__':

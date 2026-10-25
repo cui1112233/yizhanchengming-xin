@@ -167,15 +167,11 @@ test('桌面端导演台避开全站左侧导航，素材卡和场景按钮不�
 
 test('截图只有在导演台项目保存成功后才回写画布', () => {
   const source = fs.readFileSync(path.join(dirname, 'DirectorDeskApp.jsx'), 'utf8');
-  const steps = [
-    'await saveQueue.flush()',
-    'await sceneRef.current.capture()',
-    'await adapter.storeCapture(file)',
-    'await queueDirectorCaptureMetadata',
-    'await onCapture?.(asset)'
-  ].map(step => source.indexOf(step));
-  assert.ok(steps.every(index => index >= 0));
-  assert.deepEqual(steps, [...steps].sort((left, right) => left - right));
-  const capture = source.slice(source.indexOf('const capture'), source.indexOf('let toolPanel'));
-  assert.doesNotMatch(capture, /adapter\.writeState/);
+  assert.match(source, /createDirectorCaptureTransaction/);
+  assert.match(source, /captureTransaction\.start\(\)/);
+  assert.match(source, /captureTransaction\.flush\(\)/);
+  assert.match(source, /insertCapture:\s*asset\s*=>\s*adapter\.insertCapture\(asset\)/);
+  const closeStart = source.indexOf('const close');
+  const close = source.slice(closeStart, source.indexOf('const capture', closeStart));
+  assert.ok(close.indexOf('await captureTransaction.flush()') < close.indexOf('adapter.close()'));
 });

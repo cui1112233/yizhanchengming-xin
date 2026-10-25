@@ -1,7 +1,7 @@
 import { Camera, ImagePlus, Move, Send, UserRound, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
-import { createDirectorPromptDraft, directorDeskConfig, directorDeskSceneStyle, discardDirectorPromptDraft, editDirectorPromptDraft, mergeDirectorDeskConfig, moveDirectorDeskActor, submitDirectorPromptDraft, syncDirectorPromptDraft } from '../pages/agent-director-desk';
+import { addDirectorActor, createDirectorPromptDraft, directorDeskConfig, directorDeskSceneStyle, discardDirectorPromptDraft, editDirectorPromptDraft, mergeDirectorDeskConfig, moveDirectorDeskActor, submitDirectorPromptDraft, syncDirectorPromptDraft } from '../pages/agent-director-desk';
 
 function imageForAsset(surface, assetID) {
   return [...(surface?.querySelectorAll?.('img[data-director-asset-id]') || [])]
@@ -60,7 +60,13 @@ export function AgentDirectorDeskWorkspace({ node, onConfigChange, onPickReferen
   const [savingScreenshot, setSavingScreenshot] = useState(false);
   const update = next => onConfigChange?.(node.id, { directorDesk: mergeDirectorDeskConfig(node?.data?.config?.directorDesk, next) });
   const setScene = asset => update({ ...desk, sceneAsset: asset ? { id: asset.id, url: asset.url, name: asset.name } : null });
-  const addActor = asset => update({ ...desk, actors: [...desk.actors, { id: `actor-${asset.id}`, assetId: asset.id, x: 50, y: 68, scale: 1 }] });
+  const addActor = asset => onConfigChange?.(node.id, { directorDesk: addDirectorActor(node?.data?.config?.directorDesk, {
+    id: `actor-${asset.id}`,
+    assetId: asset.id,
+    x: 50,
+    y: 68,
+    scale: 1
+  }) });
   const pointerMove = (event, actor) => {
     if (!surface.current || event.buttons !== 1) return;
     const bounds = surface.current.getBoundingClientRect();

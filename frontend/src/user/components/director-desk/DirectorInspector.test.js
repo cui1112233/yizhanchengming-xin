@@ -18,7 +18,7 @@ const { default: Inspector } = await import(`data:text/javascript;base64,${Buffe
 
 test('inspector renders actor asset name and axis controls with accessible labels', () => {
   const markup = renderToStaticMarkup(React.createElement(Inspector, { project: { actors: [{ id: 'a', assetId: 'image-a' }] }, images: [{ id: 'image-a', name: '角色图片' }], selection: { kind: 'actor', id: 'a' } }));
-  for (const label of ['角色位置 X', '角色旋转 Y', '角色缩放 Z', '角色统一缩放']) assert.ok(markup.includes(`aria-label="${label}"`));
+  for (const label of ['角色位置 X', '角色旋转 X', '角色旋转 Y', '角色旋转 Z', '角色缩放 Z', '角色统一缩放']) assert.ok(markup.includes(`aria-label="${label}"`));
   assert.match(markup, /角色图片/);
   assert.doesNotMatch(markup, /image-a/);
 });
@@ -33,5 +33,6 @@ test('inspector renders scene information and camera controls for their selectio
   const scene = renderToStaticMarkup(React.createElement(Inspector, { project, selection: { kind: 'scene', id: 'scene' } }));
   assert.match(scene, /场景图/); assert.match(scene, /16:9/); assert.match(scene, /更换场景图片/);
   const camera = renderToStaticMarkup(React.createElement(Inspector, { project, selection: { kind: 'camera', id: 'camera-main' } }));
-  assert.match(camera, /机位目标 Z/); assert.match(camera, /机位 FOV/); assert.match(camera, /设为活动机位/);
+  assert.match(camera, /机位目标 Z/); assert.match(camera, /机位滚转/); assert.match(camera, /机位 FOV/); assert.match(camera, /设为活动机位/);
+  assert.doesNotMatch(camera, /机位旋转 [XYZ]/);
 });

@@ -2499,6 +2499,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         if (requestedTaskId !== taskIdRef.current) throw new Error('项目已切换，无法上传参考图');
         return result;
       },
+      insertCapture: asset => commitDirectorCapture(directorDeskNodeID, asset),
       onClose: () => setDirectorDeskNodeID('')
     });
   }, [directorDeskNodeID]);
@@ -2596,7 +2597,6 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         <Suspense fallback={<div className="agent-director-desk-loading">正在加载 3D导演台…</div>}>
           <DirectorDeskApp
             adapter={directorDeskAdapter}
-            onCapture={asset => commitDirectorCapture(directorDeskNodeID, asset)}
           />
         </Suspense>
       </DirectorDeskLoadBoundary> : null}

@@ -27,3 +27,9 @@ test('画布节点将全屏工作区明确标识为 3D 导演台', () => {
   assert.match(desk, /3D 导演台/);
   assert.match(desk, /打开 3D 导演台/);
 });
+
+test('紧凑导演台复用唯一演员 ID helper 添加重复素材', () => {
+  assert.match(desk, /addDirectorActor/);
+  assert.match(desk, /addDirectorActor\(node\?\.data\?\.config\?\.directorDesk/);
+  assert.doesNotMatch(desk, /actors:\s*\[\.\.\.desk\.actors/);
+});

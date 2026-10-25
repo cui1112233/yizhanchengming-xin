@@ -18,8 +18,12 @@ test('camera FOV clamps and axis edits preserve the remaining values', () => {
   const base = normalizeDirectorProject();
   const wide = applyDirectorInspectorChange(base, { kind: 'camera', id: 'camera-main' }, 'fov', '120');
   const moved = applyDirectorInspectorChange(wide, { kind: 'camera', id: 'camera-main' }, 'target.1', '4');
-  assert.equal(moved.cameras[0].fov, 90);
-  assert.deepEqual(moved.cameras[0].target, [0, 4, 0]);
+  const rolled = applyDirectorInspectorChange(moved, { kind: 'camera', id: 'camera-main' }, 'rotation.2', '-0.35');
+  assert.equal(rolled.cameras[0].fov, 90);
+  assert.deepEqual(rolled.cameras[0].target, [0, 4, 0]);
+  assert.deepEqual(rolled.cameras[0].rotation, [0, 0, -0.35]);
+  assert.deepEqual(applyDirectorInspectorChange(rolled, { kind: 'camera', id: 'camera-main' }, 'rotation.0', '1'), rolled);
+  assert.deepEqual(applyDirectorInspectorChange(rolled, { kind: 'camera', id: 'camera-main' }, 'rotation.1', '1'), rolled);
 });
 
 test('invalid values, unsupported paths and missing selections cannot change the project', () => {

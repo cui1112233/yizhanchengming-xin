@@ -19,6 +19,25 @@ test('导演台截图会变成图片节点并连回导演台', () => {
   assert.equal(result.edges[0].target, result.nodes.at(-1).id);
 });
 
+test('同一截图素材重试只保留一个图片节点和一条导演台连线', () => {
+  const asset = { id: 'capture-retry', url: '/capture-retry.png', name: '重试构图', kind: 'image' };
+  const first = insertDirectorCapture({
+    nodes: [directorNode],
+    edges: [],
+    directorNodeID: directorNode.id,
+    asset
+  });
+  const retried = insertDirectorCapture({
+    nodes: first.nodes,
+    edges: first.edges,
+    directorNodeID: directorNode.id,
+    asset
+  });
+
+  assert.equal(retried.nodes.filter(node => node.id === 'image-director-capture-retry').length, 1);
+  assert.equal(retried.edges.filter(edge => edge.source === directorNode.id && edge.target === 'image-director-capture-retry').length, 1);
+});
+
 test('缺少导演台或截图不是图片时，不会产生半成品画布变更', () => {
   const nodes = [directorNode];
   const edges = [];

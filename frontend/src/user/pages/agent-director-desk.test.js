@@ -193,6 +193,32 @@ test('object helpers preserve identity, protect main camera and switch active ca
   assert.deepEqual(updateDirectorViewCamera(framed, { position: [4, 5, 6] }).directorCamera.position, [4, 5, 6]);
 });
 
+test('紧凑编辑器重复加入同一素材后可分别选择、移动和删除', () => {
+  let project = normalizeDirectorProject();
+  project = addDirectorActor(project, { id: 'actor-shared', assetId: 'shared', x: 50, y: 68, scale: 1 });
+  project = addDirectorActor(project, { id: 'actor-shared', assetId: 'shared', x: 50, y: 68, scale: 1 });
+  assert.deepEqual(project.actors.map(actor => actor.id), ['actor-shared', 'actor-shared-2']);
+  assert.deepEqual(directorSceneObjects(project).filter(object => object.kind === 'actor').map(object => object.id), ['actor-shared', 'actor-shared-2']);
+
+  const moved = updateDirectorActor(project, 'actor-shared-2', { position: [3, 2, 1] });
+  assert.deepEqual(moved.actors.find(actor => actor.id === 'actor-shared').position, [0, 0, 0.25]);
+  assert.deepEqual(moved.actors.find(actor => actor.id === 'actor-shared-2').position, [3, 2, 1]);
+  const removed = removeDirectorObject(moved, 'actor-shared');
+  assert.deepEqual(removed.actors.map(actor => actor.id), ['actor-shared-2']);
+});
+
+test('规范化历史重复演员 ID 时保留两名演员并分配唯一 ID', () => {
+  const project = normalizeDirectorProject({
+    actors: [
+      { id: 'actor-duplicate', assetId: 'image-1' },
+      { id: 'actor-duplicate', assetId: 'image-2' }
+    ]
+  });
+
+  assert.deepEqual(project.actors.map(actor => actor.id), ['actor-duplicate', 'actor-duplicate-2']);
+  assert.deepEqual(project.actors.map(actor => actor.assetId), ['image-1', 'image-2']);
+});
+
 test('演员变换和截图记录会保留稳定素材 ID', () => {
   const project = normalizeDirectorProject({
     rendererVersion: '3d-v1',
