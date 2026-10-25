@@ -44,6 +44,7 @@ test('removes a whole referenced asset from backspace or delete boundaries', () 
 
   assert.match(source, /\['Backspace', 'Delete'\]/);
   assert.match(source, /assetMentionDeletionAtCaret/);
+  assert.match(source, /assetMentionAtDOMCaret/);
   assert.match(source, /removeAssetMention\(value, boundary\.asset\)/);
   assert.match(source, /onRemoveReference\?\.\(boundary\.asset, nextValue\)/);
 });

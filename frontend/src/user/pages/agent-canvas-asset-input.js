@@ -54,6 +54,36 @@ export function assetReferenceKey(asset) {
   return String(asset?.id || asset?.assetId || '').trim();
 }
 
+function domMentionIdentity(node) {
+  const label = String(node?.dataset?.assetMentionValue || '').trim();
+  if (!label) return null;
+  return {
+    assetKey: String(node?.dataset?.assetId || '').trim(),
+    label
+  };
+}
+
+export function assetMentionAtDOMCaret(anchorNode, anchorOffset, root, direction) {
+  const offset = Math.max(0, Number(anchorOffset) || 0);
+  if (anchorNode === root) {
+    const candidate = direction === 'backspace'
+      ? root?.childNodes?.[offset - 1]
+      : direction === 'delete'
+        ? root?.childNodes?.[offset]
+        : null;
+    return domMentionIdentity(candidate);
+  }
+  if (anchorNode?.nodeType !== 3) return null;
+  const text = String(anchorNode.nodeValue || '');
+  if (direction === 'backspace' && offset > 0 && /^[^\S\r\n]+$/u.test(text.slice(0, offset))) {
+    return domMentionIdentity(anchorNode.previousSibling);
+  }
+  if (direction === 'delete' && offset < text.length && /^[^\S\r\n]+$/u.test(text.slice(offset))) {
+    return domMentionIdentity(anchorNode.nextSibling);
+  }
+  return null;
+}
+
 function isMentionBoundary(character) {
   return !character || /[\s\p{P}\p{S}]/u.test(character);
 }

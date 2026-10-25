@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  assetMentionAtDOMCaret,
   assetMentionDeletionAtCaret,
   assetReferenceKey,
   assetMentionTrigger,
@@ -81,6 +82,24 @@ test('backspace after the inserted separator targets the complete asset mention'
   assert.equal(assetMentionDeletionAtCaret('@角色A 正文', [asset], 5, 'backspace')?.asset, asset);
   assert.equal(assetMentionDeletionAtCaret('@角色A 正文', [asset], 6, 'backspace'), null);
   assert.equal(assetMentionDeletionAtCaret('正文 @角色A', [asset], 3, 'delete')?.asset, asset);
+});
+
+test('backspace recognizes a chip beside Chromium contenteditable separator text', () => {
+  const chip = {
+    nodeType: 1,
+    dataset: { assetId: 'asset-role-a', assetMentionValue: '@角色A' }
+  };
+  const separator = {
+    nodeType: 3,
+    nodeValue: ' ',
+    previousSibling: chip
+  };
+
+  assert.deepEqual(assetMentionAtDOMCaret(separator, 1, null, 'backspace'), {
+    assetKey: 'asset-role-a',
+    label: '@角色A'
+  });
+  assert.equal(assetMentionAtDOMCaret(separator, 0, null, 'backspace'), null);
 });
 
 test('canvas paste accepts the first clipboard image and leaves editable fields alone', () => {
