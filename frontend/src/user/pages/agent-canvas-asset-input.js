@@ -143,7 +143,7 @@ export function removeAssetMention(value, asset) {
     let end = range.end;
     const before = next[start - 1] || '';
     const after = next[end] || '';
-    if (/[^\S\r\n]/u.test(after) && (start === 0 || /[^\S\r\n]/u.test(before))) end += 1;
+    if (/[^\S\r\n]/u.test(after) && (start === 0 || /[^\S\r\n]/u.test(before) || !next[end + 1])) end += 1;
     else if (/[^\S\r\n]/u.test(before) && isMentionBoundary(after)) start -= 1;
     next = `${next.slice(0, start)}${next.slice(end)}`;
   }

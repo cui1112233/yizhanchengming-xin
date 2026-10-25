@@ -76,6 +76,12 @@ test('removing a selected asset deletes every exact mention and preserves simila
   assert.equal(removeAssetMention('没有引用', asset), '没有引用');
 });
 
+test('removing an asset appended to the prompt also removes its inserted trailing separator', () => {
+  const asset = { id: 'asset-role-a', kind: 'image', name: '角色A' };
+
+  assert.equal(removeAssetMention('原始提示词@角色A ', asset), '原始提示词');
+});
+
 test('backspace after the inserted separator targets the complete asset mention', () => {
   const asset = { id: 'asset-role-a', kind: 'image', name: '角色A' };
 
