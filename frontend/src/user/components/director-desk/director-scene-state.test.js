@@ -11,9 +11,14 @@ test('图片演员会投影成稳定的 3D 立面参数', () => {
   assert.deepEqual(actor.rotation, [0, 1.2, 0]);
 });
 
+test('v2 三轴缩放在视口中保留各轴数值', () => {
+  assert.deepEqual(actorPlaneProps({ scale: [1.4, 2, 0.5] }).scale, [1.4, 2, 0.5]);
+});
+
 test('镜头取景更新会保留为可持久化的相机数据', () => {
   const next = updateCamera(normalizeDirectorProject(), { position: [0, 3, 8], target: [0, 0, 0], fov: 38 });
   assert.equal(next.camera.fov, 38);
+  assert.equal(next.directorCamera.fov, 38);
   assert.deepEqual(next.camera.position, [0, 3, 8]);
 });
 

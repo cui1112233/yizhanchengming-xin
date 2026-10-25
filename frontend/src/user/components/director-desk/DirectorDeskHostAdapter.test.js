@@ -13,7 +13,9 @@ test('导演台适配器从当前导演节点读取并保存 3D 项目', async (
   });
 
   assert.equal(adapter.readState().scene.assetId, 'scene-1');
-  await adapter.writeState({ rendererVersion: '3d-v1', scene: { assetId: 'scene-2', url: '/next.png' } });
+  const saved = await adapter.writeState({ rendererVersion: '3d-v1', scene: { assetId: 'scene-2', url: '/next.png' } });
+  assert.equal(saved.rendererVersion, '3d-v2');
+  assert.equal(saves[0].project.rendererVersion, '3d-v2');
   assert.equal(saves[0].nodeID, 'director-1');
   assert.equal(saves[0].project.scene.assetId, 'scene-2');
 });
