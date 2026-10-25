@@ -1,14 +1,40 @@
 import { Camera, ImagePlus, Move3D, RotateCcw, Send, Upload } from 'lucide-react';
 import { useLayoutEffect, useRef } from 'react';
 
+function resizePrompt(input) {
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+}
+
 export default function DirectorBottomDock({ prompt, saveStatus, canCapture, transformMode, onTransformModeChange, onPromptChange, onSavePrompt, onOpenAssets, onUploadReference, onResetView, onCapture }) {
   const textarea = useRef(null);
   useLayoutEffect(() => {
     const input = textarea.current;
     if (!input) return;
-    input.style.height = 'auto';
-    input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+    resizePrompt(input);
   }, [prompt]);
+  useLayoutEffect(() => {
+    const input = textarea.current;
+    if (!input) return;
+    let width = input.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      const nextWidth = input.getBoundingClientRect().width;
+      if (nextWidth === width) return;
+      width = nextWidth;
+      resizePrompt(input);
+    });
+    observer.observe(input);
+    const fonts = document.fonts;
+    const onFontsLoaded = () => resizePrompt(input);
+    fonts?.addEventListener('loadingdone', onFontsLoaded);
+    let active = true;
+    fonts?.ready.then(() => { if (active) onFontsLoaded(); });
+    return () => {
+      active = false;
+      observer.disconnect();
+      fonts?.removeEventListener('loadingdone', onFontsLoaded);
+    };
+  }, []);
 
   const upload = event => {
     const input = event.currentTarget;

@@ -19,6 +19,21 @@ test('底部导演工具只暴露当前真实能力', () => {
   assert.match(styles, /\.agent-director-bottom-dock__composer[^}]*width:\s*min\(620px,\s*calc\(100% - 32px\)\)/s);
 });
 
+test('描述输入随宽度和字体变化重新测量并清理监听', () => {
+  const dock = read('DirectorBottomDock.jsx');
+  assert.match(dock, /ResizeObserver/);
+  assert.match(dock, /observer\.observe\(input\)/);
+  assert.match(dock, /observer\.disconnect\(\)/);
+  assert.match(dock, /document\.fonts/);
+  assert.match(dock, /removeEventListener\('loadingdone'/);
+});
+
+test('底部工具栏限制在场景中列且不改变场景高度', () => {
+  assert.match(styles, /\.agent-director-shell__bottom\s*\{[^}]*grid-column:\s*2\s*;[^}]*position:\s*relative\s*;[^}]*height:\s*0\s*;/s);
+  assert.match(styles, /\.agent-director-bottom-dock\s*\{[^}]*position:\s*absolute\s*;[^}]*width:\s*100%\s*;/s);
+  assert.doesNotMatch(styles.match(/\.agent-director-bottom-dock\s*\{[^}]*\}/s)[0], /100vw|position:\s*fixed/);
+});
+
 test('导演台外壳提供三栏和可收起面板', () => {
   const shell = read('DirectorDeskShell.jsx');
   const rail = read('DirectorToolRail.jsx');
