@@ -29,6 +29,9 @@ type MemoryStore struct {
 	drafts                map[string]Draft
 	bookAssets            map[string]memoryOwned[BookAsset]
 	bookAssetImages       map[string]memoryOwned[BookAssetImage]
+	comicPages           map[string]memoryOwned[ComicPage]
+	comicPageImages      map[string]memoryOwned[ComicPageImage]
+	comicCollections     map[string]memoryOwned[ComicCollection]
 	shuihuoConfigs        map[string]map[string]any
 	hooks                 map[string][]HookRevision
 	directors             map[string][]DirectorRevision
@@ -54,6 +57,9 @@ func NewMemoryStore() *MemoryStore {
 		drafts:                map[string]Draft{},
 		bookAssets:            map[string]memoryOwned[BookAsset]{},
 		bookAssetImages:       map[string]memoryOwned[BookAssetImage]{},
+		comicPages:            map[string]memoryOwned[ComicPage]{},
+		comicPageImages:       map[string]memoryOwned[ComicPageImage]{},
+		comicCollections:      map[string]memoryOwned[ComicCollection]{},
 		shuihuoConfigs:        map[string]map[string]any{},
 		hooks:                 map[string][]HookRevision{},
 		directors:             map[string][]DirectorRevision{},
@@ -1515,6 +1521,33 @@ func (s *MemoryStore) PersistExtractedBookAssets(_ context.Context, owner string
 			seed.ID, seed.Revision, seed.CreatedAt, seed.UpdatedAt = s.id("asset"), 1, now, now
 			s.bookAssets[seed.ID] = memoryOwned[BookAsset]{Owner: owner, Value: seed}
 		}
+	}
+	return memoryBookAssets(s.bookAssets, book.BatchID, book.ID), nil
+}
+
+// PersistComicExtractedBookAssets replaces only the automatic comic asset set.
+// Video/director and manually maintained records remain available to their own
+// production paths.
+func (s *MemoryStore) PersistComicExtractedBookAssets(_ context.Context, owner string, book Book, snapshot DirectorSnapshot, assets DirectorAssets) ([]BookAsset, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	owned, ok := s.batches[book.BatchID]
+	if !ok || owned.Owner != owner {
+		return nil, ErrNotFound
+	}
+	if _, err := bookFromBatch(owned.Value, book.ID); err != nil {
+		return nil, err
+	}
+	for assetID, ownedAsset := range s.bookAssets {
+		asset := ownedAsset.Value
+		if ownedAsset.Owner == owner && asset.BatchID == book.BatchID && asset.BookID == book.ID && asset.Source == "comic" {
+			delete(s.bookAssets, assetID)
+		}
+	}
+	now := time.Now().UTC()
+	for _, asset := range comicBookAssets(book, snapshot, assets) {
+		asset.ID, asset.Revision, asset.CreatedAt, asset.UpdatedAt = s.id("comic-asset"), 1, now, now
+		s.bookAssets[asset.ID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	}
 	return memoryBookAssets(s.bookAssets, book.BatchID, book.ID), nil
 }

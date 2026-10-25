@@ -194,6 +194,13 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	if err != nil {
 		return BookStageSummary{}, err
 	}
+	effectiveMode := normalizeProductionMode(ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
+	if stage == BookStageVideo && effectiveMode == "comic" {
+		return BookStageSummary{}, fmt.Errorf("%w: 漫画生成已开启，不能生成视频", ErrConflict)
+	}
+	if stage == BookStageComic && effectiveMode != "comic" {
+		return BookStageSummary{}, fmt.Errorf("%w: 请先打开漫画生成", ErrConflict)
+	}
 	availability := s.availability(ctx, owner, stage)
 	inputRevision := ""
 	if stage == BookStageVideo {
@@ -211,7 +218,11 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	}
 	switch stage {
 	case BookStageAssets:
-		_, err = s.Director.RunAssetExtraction(ctx, owner, batchID, bookID)
+		if effectiveMode == "comic" {
+			_, err = s.Director.RunComicAssetExtraction(ctx, owner, batchID, bookID)
+		} else {
+			_, err = s.Director.RunAssetExtraction(ctx, owner, batchID, bookID)
+		}
 	case BookStageOpening:
 		_, err = s.Director.RunOpeningVariants(ctx, owner, batchID, bookID, s.OpeningMeta)
 		if err == nil && book.DirectorRevision != nil {

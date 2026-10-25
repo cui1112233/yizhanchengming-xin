@@ -35,6 +35,7 @@ import {
   Space,
   Switch,
   Tag,
+  Tabs,
   Tooltip,
   message
 } from 'antd';
@@ -50,7 +51,13 @@ import {
   getBatch,
   bindBatchFactoryAgentProject,
   getBookAssetImageBlob,
+  getComicPageImageBlob,
   generateBookAssetImages,
+  generateComicPage,
+  listComicPages,
+  setPrimaryComicPageImage,
+  createComicCollection,
+  listComicCollections,
   listBookAssets,
   listBookAssetImages,
   getConfigVersions,
@@ -106,6 +113,8 @@ import { audioPlanningRequired, normalizeAudioSource, normalizeAudioSourceSettin
 import { BatchFactoryGiantMaterialPendingProgress } from './BatchFactoryGiantMaterialPendingProgress';
 import { batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, batchFactorySourceText, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange';
+import { assetsForProductionMode } from './batchFactoryAssetMode';
+import { comicPageGenerationPayload, comicPromptForImageAspect } from './batchFactoryComicMode';
 import { batchMediaCounts as runtimeBatchMediaCounts, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { downloadProductionContent } from './batchFactoryContentDownload.js';
 import { realVideoDurationSeconds } from './batchFactoryVideoMeta';
@@ -119,7 +128,7 @@ import { videoProviderForModel } from './videoProviderBinding';
 import { modelOptionsForProvider } from './providerModelBinding';
 import { stripBaseSetupSection } from '../scriptFinalSegment';
 import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
-import { bindBatchFactoryBookAndNavigate } from '../agent-canvas-batch-factory.js';
+import { agentCanvasURL, bindBatchFactoryBookAndNavigate } from '../agent-canvas-batch-factory.js';
 
 
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
@@ -231,13 +240,8 @@ function batchFactorySourceSummary(book = {}) {
   const productionLines = batchFactoryPreviewText(book?.sourceText || '', book).split(/\r?\n/).filter(Boolean).length;
   return { ready: true, text: `已带入 · ${source.length} 字 · 生产前 ${productionLines} 行` };
 }
-function batchFactoryWorkbenchConfigRegions(book) {
-  const base = BOOK_CONFIG_REGIONS.filter(region => !['video', 'visual'].includes(region.key));
-  const video = bookConfigRegionStatus(book, 'video');
-  const visual = bookConfigRegionStatus(book, 'visual');
-  const labels = [...new Set([video?.label, visual?.label].filter(Boolean))];
-  const tone = video?.tone === visual?.tone ? (video?.tone || 'muted') : (video?.tone || visual?.tone || 'muted');
-  return [...base, { key: 'media', label: '画面与视频', combinedStatus: { tone, label: labels.join(' / ') || '已配置' } }];
+function batchFactoryWorkbenchConfigRegions() {
+  return BOOK_CONFIG_REGIONS.filter(region => !['video', 'visual'].includes(region.key));
 }
 
 function value(metadata, key) { return String(metadata?.[key] || '').trim() || '—'; }
@@ -340,7 +344,10 @@ function savedDraftKey(type, asset) { return `asset:${type}:${asset?.id || asset
 function effectiveBookSettings(batch, book) {
   const batchPatch = batch?.settingsState?.patch || {};
   const bookPatch = book?.settingsState?.patch || {};
-  return normalizeAudioSourceSettings({ ...batchPatch, ...bookPatch, publishSettings: { ...(batchPatch.publishSettings || {}), ...(bookPatch.publishSettings || {}) } });
+  const effective = { ...batchPatch, ...bookPatch, publishSettings: { ...(batchPatch.publishSettings || {}), ...(bookPatch.publishSettings || {}) } };
+  const comic = effective?.aiPromptConfig?.comic || {};
+  if (!['comic', 'video'].includes(effective.productionMode) && comic.enabled === true && String(comic.body || '').trim()) effective.productionMode = 'comic';
+  return normalizeAudioSourceSettings(effective);
 }
 function baseSetupEnabled(settings = {}) {
   return settings?.aiPromptConfig?.constraints?.baseSetup?.enabled !== false;
@@ -411,6 +418,12 @@ function effectiveBookAssetRules(batch, book) {
   return {
     ...(batch?.settingsState?.patch?.aiPromptConfig?.assets || {}),
     ...(book?.settingsState?.patch?.aiPromptConfig?.assets || {})
+  };
+}
+function effectiveBookComicRules(batch, book) {
+  return {
+    ...(batch?.settingsState?.patch?.aiPromptConfig?.comic || {}),
+    ...(book?.settingsState?.patch?.aiPromptConfig?.comic || {})
   };
 }
 function selectedPublishProfile(settings = {}) {
@@ -619,7 +632,7 @@ function readImageAsDataURL(file) {
   });
 }
 
-function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry, onAssetPromptChange, assetRules, canGenerate, generateReason, generating, engineSettings }) {
+function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry, onAssetPromptChange, assetRules, productionMode = 'video', canGenerate, generateReason, generating, engineSettings }) {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState('');
@@ -679,27 +692,31 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
   useEffect(() => {
     let active = true;
     setAssetPromptLoading(true);
-    listSystemPresetCatalog('script').then(script => {
+    const module = productionMode === 'comic' ? 'batch-factory' : 'script';
+    const slot = productionMode === 'comic' ? 'batch.comic-assets' : 'script.asset-extraction';
+    listSystemPresetCatalog(module).then(script => {
       if (active) setAssetPromptCatalog(
-        (Array.isArray(script?.catalog) ? script.catalog : []).filter(item => item?.slot === 'script.asset-extraction')
+        (Array.isArray(script?.catalog) ? script.catalog : []).filter(item => item?.slot === slot)
       );
     }).catch(error => { if (active) message.error(error?.message || '读取资产提示词失败'); }).finally(() => { if (active) setAssetPromptLoading(false); });
     return () => { active = false; };
-  }, [book?.id]);
+  }, [book?.id, productionMode]);
   const textModelId = String(engineSettings?.textModelId || '').trim();
   const imageModelId = String(engineSettings?.imageModelId || '').trim();
   const imageProvider = String(engineSettings?.imageProvider || 'personal_api').trim();
   const imageAspectRatio = String(engineSettings?.imageAspectRatio || engineSettings?.aspectRatio || '9:16');
 	const imageModelOptions = useMemo(() => modelOptionsForProvider(imageModels, 'image', imageProvider), [imageModels, imageProvider]);
-  const currentAssetPromptId = String(assetRules?.extraction?.presetId || '').trim();
+  const activeAssetSelection = productionMode === 'comic' ? assetRules?.assets : assetRules?.extraction;
+  const currentAssetPromptId = String(activeAssetSelection?.presetId || '').trim();
   const assetPromptOptions = (currentAssetPromptId && !assetPromptCatalog.some(item => item.id === currentAssetPromptId)
-    ? [{ id: currentAssetPromptId, name: assetRules?.extraction?.presetName || '预设已失效', version: assetRules?.extraction?.presetVersion || 1, disabled: true }, ...assetPromptCatalog]
+    ? [{ id: currentAssetPromptId, name: activeAssetSelection?.presetName || '预设已失效', version: activeAssetSelection?.presetVersion || 1, disabled: true }, ...assetPromptCatalog]
     : assetPromptCatalog).map(item => ({ value: item.id, label: `${item.name || item.id} · v${item.version || 1}`, disabled: item.disabled === true }));
-  const visibleAssets = assets.filter(asset => asset.kind === kind).filter(asset => {
+  const modeAssets = assetsForProductionMode(assets, productionMode);
+  const visibleAssets = modeAssets.filter(asset => asset.kind === kind).filter(asset => {
     const query = search.trim().toLowerCase();
     return !query || `${asset.name} ${asset.prompt}`.toLowerCase().includes(query);
   });
-  const libraryImages = assets.filter(asset => asset.kind === libraryKind).flatMap(asset => (assetImages[asset.id] || []).map(image => ({ image, asset }))).filter(({ asset }) => {
+  const libraryImages = modeAssets.filter(asset => asset.kind === libraryKind).flatMap(asset => (assetImages[asset.id] || []).map(image => ({ image, asset }))).filter(({ asset }) => {
     const query = search.trim().toLowerCase();
     return !query || `${asset.name} ${asset.prompt}`.toLowerCase().includes(query);
   });
@@ -809,12 +826,12 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
     } catch (error) { message.error(error?.message || '切换主图失败'); } finally { setSavingId(''); }
   }
   return <section className="batch-factory-preset-shell">
-    <Alert type="info" showIcon message="当前小说的人物、场景与道具" description="每一项都归属当前小说并持久化保存。智能预设成功后会写入导演提取的资产；手动修改会保留为该书的人工资产。" />
+    <Alert type="info" showIcon message="当前小说的人物、场景与道具" description={productionMode === 'comic' ? '这里只显示本次漫画自动资产；重新提取会替换上一批漫画资产，不会无限叠加。旧手动和视频资产仍保留在其它模式中。' : '这里只显示视频与手动资产；漫画自动资产单独保留在漫画模式。'} />
     <div className="shuihuo-preset-toolbar batch-factory-preset-toolbar">
-      <Tooltip title="选择当前书的人物、场景与道具提取提示词；模型统一在引擎配置设置。"><Select value={currentAssetPromptId || undefined} loading={assetPromptLoading} placeholder="选择资产提示词" style={{ minWidth: 230 }} options={assetPromptOptions} onChange={chooseAssetPrompt} /></Tooltip>
-      <Tooltip title={canGenerate ? '仅在当前书没有文案时提取人物、场景、道具；已有手动资产不会被覆盖。' : generateReason}><Button type="primary" loading={generating} disabled={!canGenerate || generating} onClick={runPreset}>智能预设</Button></Tooltip>
-      <Tooltip title="基于当前书内容重新生成 AI 文案和自动资产；手动编辑的资产提示词保留。"><Button loading={generating} disabled={!canGenerate || generating || !textModelId} onClick={() => onRegenerate?.(textModelId)}>重新生成资产</Button></Tooltip>
-      <Tooltip title="只重跑当前小说最后失败的阶段。"><Button disabled={!canGenerate || generating || !textModelId} onClick={() => onRetry?.(textModelId)}>重试资产</Button></Tooltip>
+      <Tooltip title={productionMode === 'comic' ? '选择当前书的漫画资产提示词；模型统一在引擎配置设置。' : '选择当前书的人物、场景与道具提取提示词；模型统一在引擎配置设置。'}><Select value={currentAssetPromptId || undefined} loading={assetPromptLoading} placeholder={productionMode === 'comic' ? '选择漫画资产提示词' : '选择资产提示词'} style={{ minWidth: 230 }} options={assetPromptOptions} onChange={chooseAssetPrompt} /></Tooltip>
+      <Tooltip title={canGenerate ? (productionMode === 'comic' ? '提取当前书的漫画人物、场景、道具资产；不会覆盖视频或手动资产。' : '仅在当前书没有文案时提取人物、场景、道具；已有手动资产不会被覆盖。') : generateReason}><Button type="primary" loading={generating} disabled={!canGenerate || generating} onClick={runPreset}>{productionMode === 'comic' ? '提取漫画资产' : '提取资产'}</Button></Tooltip>
+      <Tooltip title={productionMode === 'comic' ? '根据当前书内容重新提取漫画资产；视频和手动资产保留。' : '基于当前书内容重新生成 AI 文案和自动资产；手动编辑的资产提示词保留。'}><Button loading={generating} disabled={!canGenerate || generating || !textModelId} onClick={() => onRegenerate?.(textModelId)}>{productionMode === 'comic' ? '重新提取漫画资产' : '重新生成资产'}</Button></Tooltip>
+      <Tooltip title="只重跑当前小说最后失败的阶段。"><Button disabled={!canGenerate || generating || !textModelId} onClick={() => onRetry?.(textModelId)}>{productionMode === 'comic' ? '重试漫画资产' : '重试资产'}</Button></Tooltip>
       <Button loading={loading} onClick={() => loadAssets()}>刷新资产</Button>
       <Tooltip title="优先使用资产单独选择的图片模型和画幅；未单独选择时使用书籍引擎配置。"><Button type="primary" loading={imageGenerating} disabled={imageGenerating || !selectedAssetIds.length} onClick={() => generateImages()}>AI生成（已选 {selectedAssetIds.length}）</Button></Tooltip>
       <Button onClick={() => setEditing({ kind, name: '', prompt: '' })}>手动添加</Button>
@@ -951,6 +968,26 @@ function AuthenticatedBookAssetImage({ imageUrl, alt = '', preview = false }) {
   return preview
     ? <Image src={display.url} alt={alt} preview={{ mask: '点击放大' }} />
     : <img src={display.url} alt={alt} />;
+}
+
+function AuthenticatedComicPageImage({ imageUrl, alt = '', preview = false }) {
+  const [display, setDisplay] = useState({ url: '', failed: false });
+  useEffect(() => {
+    let active = true;
+    let ownedUrl = '';
+    setDisplay({ url: '', failed: false });
+    getComicPageImageBlob(imageUrl).then(blob => {
+      if (!active) return;
+      ownedUrl = URL.createObjectURL(blob);
+      setDisplay({ url: ownedUrl, failed: false });
+    }).catch(() => { if (active) setDisplay({ url: '', failed: true }); });
+    return () => {
+      active = false;
+      if (ownedUrl) URL.revokeObjectURL(ownedUrl);
+    };
+  }, [imageUrl]);
+  if (!display.url) return <span className="batch-factory-comic-image-state">{display.failed ? '图片加载失败' : '正在读取图片…'}</span>;
+  return preview ? <Image src={display.url} alt={alt} preview={{ mask: '点击放大' }} /> : <img src={display.url} alt={alt} />;
 }
 
 function useAuthenticatedBookAssetThumbs(batchId, book) {
@@ -1379,7 +1416,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const selectedIndex = Math.max(0, videos.findIndex(video => video.id === selectedVideoId));
   const video = videos[selectedIndex] || null;
   const rawVideoPrompt = String(video?.videoPrompt || '');
-  const comicPrompt = String(video?.comicPrompt || '');
+  const comicPrompt = comicPromptForImageAspect(effectiveBookSettings(batch, book), video?.comicPrompt || '');
   const hasVisualPrompt = Boolean(comicPrompt.trim());
   // 分镜卡直接读取 Go 编译后的最终 Prompt，让已开启的智能统一、基础设定、
   // 画质、限制和负面规则在卡片中可见；弹窗与卡片使用同一份编译结果。
@@ -1517,13 +1554,13 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
     const firstH3Frame = resolvePrecompiledStoryboardFrame(book, initialVideoId);
     setSelectedVideoId(first?.id || firstH3Frame?.key || '');
     setVideoPrompt(first?.videoPrompt || '');
-    setComicPrompt(first?.comicPrompt || '');
+    setComicPrompt(comicPromptForImageAspect(engineSettings, first?.comicPrompt || ''));
     setPromptKind('video');
     setEditing(false);
   }, [book?.id, initialVideoId]);
   useEffect(() => {
     setVideoPrompt(selectedVideo?.videoPrompt || '');
-    setComicPrompt(selectedVideo?.comicPrompt || '');
+    setComicPrompt(comicPromptForImageAspect(engineSettings, selectedVideo?.comicPrompt || ''));
     setEditing(false);
     setAssetMentionMenu(null);
   }, [selectedVideoId, selectedVideo?.revision]);
@@ -1822,7 +1859,7 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
         {promptKind === 'video' && selectedIndex === 0 && engineSettings.openingEnabled === true ? <Button onClick={() => setOpeningVariantsOpen(true)}>查看换开头提示词</Button> : null}
         {promptKind === 'video' ? <Button onClick={() => setAiOriginalOpen(true)}>查看 AI 原始输出</Button> : null}
         <Button type="text" disabled={regenerating} onClick={() => onRetry?.(selectedVideo?.id)}>重试</Button>
-        <span className="batch-factory-prompt-primary-action">{promptKind === 'visual' ? <Button onClick={() => onGenerateVisual?.(selectedVideo?.id)}>生成图片</Button> : <Tooltip title={productionAvailable ? '为当前分镜生成视频候选版本。' : productionReason}><Button type="primary" disabled={!productionAvailable || regenerating} loading={regenerating} onClick={() => onGenerateVideo?.(selectedVideo?.id)}>生成视频</Button></Tooltip>}</span>
+        <span className="batch-factory-prompt-primary-action">{promptKind === 'visual' ? <Button type="primary" disabled={!hasVisualPrompt || regenerating} loading={regenerating} onClick={() => onGenerateVisual?.(selectedVideo?.id, comicPrompt)}>生成漫画</Button> : <Tooltip title={productionAvailable ? '为当前分镜生成视频候选版本。' : productionReason}><Button type="primary" disabled={!productionAvailable || regenerating} loading={regenerating} onClick={() => onGenerateVideo?.(selectedVideo?.id)}>生成视频</Button></Tooltip>}</span>
       </div>
     </>}
     <p className="shuihuo-modal-note">{promptKind === 'visual' ? '漫画版本从当前书的漫画资产和提示词预设中生成。' : editing ? '编辑的是当前分镜的视频描述；保存后会按已启用资产与约束重新编译最终视频提示词。' : compilingPrompt ? '正在读取已启用资产与约束编译的最终视频提示词。' : '视频版本只在当前分镜内生成和切换，不会覆盖其他分镜。'}</p>
@@ -2018,6 +2055,96 @@ function InlineMediaLibrary({ book, versionsByVideo, productionStatus, mergeJob,
     </div>
     <div className="batch-factory-cell-pager"><button type="button" disabled={selectedIndex === 0} onClick={() => move(-1)}><LeftOutlined /></button><span>{selectedIndex + 1} / {videos.length}</span><button type="button" disabled={selectedIndex >= videos.length - 1} onClick={() => move(1)}><RightOutlined /></button></div>
   </div>;
+}
+
+function InlineComicLibrary({ batchId, book, selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage }) {
+  const videos = book?.videos || [];
+  const [pages, setPages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [localSelectedVideoId, setLocalSelectedVideoId] = useState(videos[0]?.id || '');
+  const selectedVideoId = controlledSelectedVideoId || localSelectedVideoId;
+  const selectedIndex = Math.max(0, videos.findIndex(video => video.id === selectedVideoId));
+  const selectedVideo = videos[selectedIndex] || null;
+  const page = pages.find(item => item.videoId === selectedVideo?.id) || null;
+  const primary = page?.images?.find(image => image.isPrimary) || null;
+  const candidates = (page?.images || []).filter(image => image.id !== primary?.id).slice(-4).reverse();
+  const selectVideo = nextId => {
+    setLocalSelectedVideoId(nextId);
+    onSelectedVideoChange?.(nextId);
+  };
+  useEffect(() => {
+    let active = true;
+    if (!batchId || !book?.id) return () => { active = false; };
+    setLoading(true);
+    listComicPages(batchId, book.id, { silent: true, suppressGlobalError: true }).then(response => {
+      if (active) setPages(resultData(response, 'pages') || []);
+    }).catch(() => { if (active) setPages([]); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [batchId, book]);
+  useEffect(() => {
+    if (!videos.some(video => video.id === selectedVideoId) && videos[0]?.id) selectVideo(videos[0].id);
+  }, [videos.map(video => video.id).join('|'), selectedVideoId]);
+  if (!selectedVideo) return <div className="batch-factory-cell-shell batch-factory-inline-media is-empty"><div className="batch-factory-cell-empty">提取漫画提示词后显示漫画页。</div></div>;
+  return <div className="batch-factory-cell-shell batch-factory-inline-comic">
+    <header className="batch-factory-cell-head"><div><b>漫画页 {String(selectedIndex + 1).padStart(2, '0')}</b><small>{primary ? '当前主图' : page ? '等待生成图片' : '等待提取漫画提示词'}</small>{page?.configStale ? <small className="batch-factory-comic-stale">配置已变化，建议重新生成</small> : null}</div><span className={`batch-factory-cell-state${primary ? ' is-ready' : ''}`}>{primary ? '已选主图' : loading ? '读取中' : '待生成'}</span></header>
+    <button type="button" className="batch-factory-inline-comic-primary" onClick={() => onManage?.(selectedVideo.id)}>
+      {primary?.url ? <AuthenticatedComicPageImage imageUrl={primary.url} alt={`漫画页 ${selectedIndex + 1}`} /> : <><PictureOutlined /><span>{page ? '当前页暂无候选图' : '当前分镜暂无漫画页'}</span></>}
+    </button>
+    <div className="batch-factory-inline-media-versions"><span>候选</span>{candidates.map(image => <button type="button" className="batch-factory-inline-media-version" key={image.id} onClick={() => onManage?.(selectedVideo.id)}><AuthenticatedComicPageImage imageUrl={image.url} alt="漫画候选图" /></button>)}<button type="button" className="batch-factory-inline-media-version is-more" onClick={() => onManage?.(selectedVideo.id)} title="打开漫画媒体库">•••</button></div>
+    <div className="batch-factory-cell-pager"><button type="button" disabled={selectedIndex === 0} onClick={() => selectVideo(videos[selectedIndex - 1]?.id)}><LeftOutlined /></button><span>{selectedIndex + 1} / {videos.length}</span><button type="button" disabled={selectedIndex >= videos.length - 1} onClick={() => selectVideo(videos[selectedIndex + 1]?.id)}><RightOutlined /></button></div>
+  </div>;
+}
+
+function ComicMediaPanel({ batchId, book, initialVideoId = '', onSaved }) {
+  const videos = book?.videos || [];
+  const [pages, setPages] = useState([]);
+  const [collections, setCollections] = useState([]);
+  const [selectedVideoId, setSelectedVideoId] = useState(initialVideoId || videos[0]?.id || '');
+  const [busy, setBusy] = useState('');
+  const selectedIndex = Math.max(0, videos.findIndex(video => video.id === selectedVideoId));
+  const selectedVideo = videos[selectedIndex] || null;
+  const selectedPage = pages.find(page => page.videoId === selectedVideo?.id) || null;
+  const primary = selectedPage?.images?.find(image => image.isPrimary) || null;
+  async function load() {
+    const [pageResponse, collectionResponse] = await Promise.all([
+      listComicPages(batchId, book.id),
+      listComicCollections(batchId, book.id)
+    ]);
+    setPages(resultData(pageResponse, 'pages') || []);
+    setCollections(resultData(collectionResponse, 'collections') || []);
+  }
+  useEffect(() => {
+    setSelectedVideoId(initialVideoId || videos[0]?.id || '');
+    load().catch(error => message.error(error?.message || '读取漫画媒体库失败'));
+  }, [batchId, book?.id]);
+  async function choosePrimary(image) {
+    if (!selectedPage || image?.isPrimary) return;
+    setBusy(image.id);
+    try {
+      await setPrimaryComicPageImage(batchId, book.id, selectedPage.id, image.id);
+      await load();
+      await onSaved?.();
+      message.success('当前漫画页主图已切换。');
+    } catch (error) { message.error(error?.message || '切换漫画主图失败'); } finally { setBusy(''); }
+  }
+  async function makeCollection() {
+    setBusy('collection');
+    try {
+      await createComicCollection(batchId, book.id);
+      await load();
+      message.success('漫画合集已收集当前书全部主图。');
+    } catch (error) { message.error(error?.message || '生成漫画合集失败'); } finally { setBusy(''); }
+  }
+  const pageTab = <div className="batch-factory-comic-library">
+    <div className="batch-factory-comic-viewer">
+      <header><div><b>{selectedVideo ? `漫画页 ${String(selectedIndex + 1).padStart(2, '0')}` : '漫画页'}</b><small>{primary ? '当前主图' : '尚未选择主图'}</small>{selectedPage?.configStale ? <small className="batch-factory-comic-stale">配置已变化，建议重新生成</small> : null}</div><Tag color={primary ? 'success' : 'default'}>{primary ? '主图已就绪' : '待生成'}</Tag></header>
+      <div className="batch-factory-comic-viewer-frame">{primary?.url ? <AuthenticatedComicPageImage imageUrl={primary.url} alt="当前漫画主图" preview /> : <div className="batch-factory-cell-empty"><PictureOutlined /><span>当前分镜还没有漫画候选图</span></div>}</div>
+      <footer><Button disabled={selectedIndex === 0} icon={<LeftOutlined />} onClick={() => setSelectedVideoId(videos[selectedIndex - 1]?.id)} /><Select value={selectedVideoId || undefined} onChange={setSelectedVideoId} options={videos.map((video, index) => ({ value: video.id, label: `漫画页 ${String(index + 1).padStart(2, '0')}` }))} /><Button disabled={selectedIndex >= videos.length - 1} icon={<RightOutlined />} onClick={() => setSelectedVideoId(videos[selectedIndex + 1]?.id)} /></footer>
+    </div>
+    <aside className="batch-factory-comic-candidates"><h3>候选图</h3>{(selectedPage?.images || []).map((image, index) => <button type="button" className={image.isPrimary ? 'is-primary' : ''} key={image.id} disabled={busy === image.id} onClick={() => choosePrimary(image)}><AuthenticatedComicPageImage imageUrl={image.url} alt={`候选图 ${index + 1}`} /><span>{image.isPrimary ? '主图' : `候选 ${index + 1}`}</span></button>)}{!selectedPage?.images?.length ? <p>生成当前漫画页后，候选图会保留在这里。</p> : null}</aside>
+  </div>;
+  const collectionTab = <div className="batch-factory-comic-collections"><div className="batch-factory-comic-collection-actions"><div><b>漫画合集</b><small>按分镜顺序收集每页当前主图，不拼长图。</small></div><Button type="primary" loading={busy === 'collection'} onClick={makeCollection}>生成漫画合集</Button></div>{collections.slice().reverse().map(collection => <section key={collection.id}><header><b>{new Date(collection.createdAt).toLocaleString()}</b><Tag color="success">{collection.items?.length || 0} 页</Tag></header><div>{(collection.items || []).map(item => <figure key={`${collection.id}-${item.ordinal}`}><AuthenticatedComicPageImage imageUrl={item.url} alt={`第 ${item.ordinal} 页`} /><figcaption>第 {item.ordinal} 页</figcaption></figure>)}</div></section>)}{!collections.length ? <div className="batch-factory-cell-empty">所有漫画页选好主图后，可生成漫画合集。</div> : null}</div>;
+  return <Tabs defaultActiveKey="pages" items={[{ key: 'pages', label: '漫画页', children: pageTab }, { key: 'collections', label: '漫画合集', children: collectionTab }]} />;
 }
 
 function MediaVersionPanel({ book, batchId, versionsByVideo, productionStatus, mergeJob, mergeJobs = [], mergeSettings = {}, mergeSpeed, onMergeSpeedChange, onMerge, onUpload, mergeAvailable = false, mergeReason = '', merging = false, onSaved, onDeleted, onRegenerate, onRetry, regenerating, productionAvailable = false, productionReason = '', initialVideoId = '', initialTab = 'clips', onOpenDirector }) {
@@ -3133,6 +3260,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     return await onBatchChanged?.();
   }
 
+
   async function openBookInAgent(book) {
     if (!batch?.id || !book?.id || actionBusy) return;
     setActionBusy(`agent-${book.id}`);
@@ -3147,6 +3275,26 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       message.error(error?.message || '打开 Agent 画布失败');
       setActionBusy('');
     }
+  }
+
+  async function openBatchInAgent() {
+    if (!batch?.id || !books.length || actionBusy) return;
+    setActionBusy('agent-all');
+    try {
+      const binding = await bindBatchFactoryAgentProject(batch.id);
+      const projectId = String(binding?.projectId || '').trim();
+      if (!projectId) throw new Error('Agent 项目绑定失败');
+      window.location.assign(agentCanvasURL({ projectId, batchId: batch.id }));
+    } catch (error) {
+      message.error(error?.message || '打开 Agent 画布失败');
+      setActionBusy('');
+    }
+  }
+
+  async function openSelectedInAgent() {
+    if (selectedBookIds.length !== 1) return;
+    const selectedBook = books.find(book => String(book.id) === String(selectedBookIds[0]));
+    if (selectedBook) await openBookInAgent(selectedBook);
   }
 
   async function addBooksToBatch(items, platform, allowDuplicate) {
@@ -3702,7 +3850,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         if (latestBook) setPromptBook(latestBook);
       }
       await Promise.all([refreshBatch(), loadRuntimeStatus({ quiet: true })]);
-      const labels = { assets: mode === 'force' ? '已重新生成资产；分镜和 VIDEO 未改动' : '已生成资产', director: mode === 'force' ? '已重新生成文案' : '已生成文案', image: mode === 'force' ? '已重新生成图片' : '已生成图片', video: mode === 'force' ? '已创建新的视频候选版本' : '已提交视频生成' };
+      const labels = { assets: settings.productionMode === 'comic' ? (mode === 'force' ? '已重新提取漫画资产；视频和手动资产未改动' : '已提取漫画资产') : (mode === 'force' ? '已重新生成资产；分镜和 VIDEO 未改动' : '已生成资产'), director: mode === 'force' ? '已重新生成文案' : '已生成文案', image: mode === 'force' ? '已重新生成图片' : '已生成图片', video: mode === 'force' ? '已创建新的视频候选版本' : '已提交视频生成' };
       const baseLabel = labels[stage] || '当前小说阶段已提交。';
       if (stage === 'director' && stageResult?.openingVariants?.triggered) {
         const ov = stageResult.openingVariants;
@@ -3793,6 +3941,21 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       await Promise.all([refreshBatch(), loadRuntimeStatus({ quiet: true })]);
       message.success(book ? '当前小说的视频任务已提交。' : '批量视频任务已提交。');
     } catch (error) { message.error(error?.message || '提交视频任务失败'); } finally { setActionBusy(''); }
+  }
+  async function generateBookComicPage(book, videoId, prompt = '') {
+    if (!batch?.id || !book?.id || !videoId || actionBusy) return;
+    const settings = effectiveBookSettings(batch, book);
+    const payload = comicPageGenerationPayload(settings, prompt || book.videos?.find(video => video.id === videoId)?.comicPrompt);
+    if (settings.productionMode !== 'comic') { message.error('请先把当前书切换为漫画生成模式。'); return; }
+    if (!payload.imagePrompt) { message.error('当前分镜还没有漫画提示词。'); return; }
+    if (!payload.modelId) { message.error('请先在引擎配置中选择图片模型。'); return; }
+    const busyKey = `comic-image-${book.id}-${videoId}`;
+    setActionBusy(busyKey);
+    try {
+      await generateComicPage(batch.id, book.id, videoId, payload);
+      await refreshBatch();
+      message.success('当前漫画页已生成候选图；第一张已自动设为主图。');
+    } catch (error) { message.error(error?.message || '生成当前漫画页失败'); } finally { setActionBusy(''); }
   }
   async function runSelectedProduction() {
     if (!batch?.id || actionBusy) return;
@@ -4075,6 +4238,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     { key: 'production', label: '批量生成视频', disabled: !productionCapability.available, title: productionCapability.reason },
     { key: 'merge', label: '合并当前主 VIDEO', disabled: !mergeCapability.available, title: mergeCapability.reason }
   ];
+  const agentMenuItems = [
+    { key: 'all', label: `全部小说（${books.length}）`, disabled: !books.length },
+    { type: 'divider' },
+    { key: 'selected', label: `优化选择（${selectedBookIds.length}）`, disabled: selectedBookIds.length !== 1, title: '先在小说列表中勾选一本小说' }
+  ];
   const automationStartBlocked = !books.length;
   const automationRetryQueued = (automationStatus?.books || []).filter(book => book?.retryRequested === true).length;
   const automationMenuItems = [
@@ -4140,11 +4308,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
 
   return <section className="shuihuo-workbench batch-factory-workbench">
     <header className="shuihuo-workbench-header">
-      <div className="shuihuo-workbench-heading"><button className="shuihuo-back-link" type="button" title="返回个人作品" aria-label="返回个人作品" onClick={onBack}><ArrowLeftOutlined /></button><strong>批量工厂 V12 · {batch?.title || '未命名批量'}</strong><div className="shuihuo-workbench-progress" aria-label={`完成率 ${batchProgress.completionPercent}%`}><div className="shuihuo-workbench-progress-track batch-factory-completion-track">{progressSegments.map(segment => <i key={segment.key} className={`is-${segment.key}`} title={`${segment.label} ${segment.count} 本`} style={{ width: `${segment.percent}%` }} />)}</div><span>{batchProgress.completionPercent}%</span></div></div>
+      <div className="shuihuo-workbench-heading"><button className="shuihuo-back-link" type="button" title="返回批量作品列表" aria-label="返回批量作品列表" onClick={onBack}><ArrowLeftOutlined /></button><strong>批量工厂 V12 · {batch?.title || '未命名批量'}</strong><div className="shuihuo-workbench-progress" aria-label={`完成率 ${batchProgress.completionPercent}%`}><div className="shuihuo-workbench-progress-track batch-factory-completion-track">{progressSegments.map(segment => <i key={segment.key} className={`is-${segment.key}`} title={`${segment.label} ${segment.count} 本`} style={{ width: `${segment.percent}%` }} />)}</div><span>{batchProgress.completionPercent}%</span></div></div>
       <div className="shuihuo-workbench-toolbar" role="toolbar" aria-label="批量工厂工具栏">
         <Button type={novelListOpen ? 'primary' : 'text'} icon={<BarsOutlined />} onClick={() => setNovelListOpen(current => !current)}>{novelListOpen ? '返回生产表' : '小说列表'}</Button>
         <Button type="text" icon={<SettingOutlined />} onClick={() => setUnifiedSettingsOpen(true)}>统一配置</Button>
         <Dropdown menu={{ items: automationMenuItems, onClick: ({ key }) => key === 'start' ? openAutomationStart() : runAutomationAction(key) }}><Button type="text" loading={Boolean(automationBusy)} disabled={automationState === 'idle' && automationStartBlocked}>{automationLabel}</Button></Dropdown>
+        <Dropdown menu={{ items: agentMenuItems, onClick: ({ key }) => key === 'all' ? openBatchInAgent() : openSelectedInAgent() }}><Button type="text" disabled={Boolean(actionBusy)} loading={actionBusy === 'agent-all' || actionBusy?.startsWith?.('agent-')}>Agent 优化</Button></Dropdown>
         <Dropdown menu={{ items: batchMenuItems, onClick: ({ key }) => key === 'selected-production' ? runSelectedProduction() : key === 'production' ? runProduction() : runMerge() }}><Button className="shuihuo-batch-button" type="text" icon={<PictureOutlined />} loading={actionBusy === 'production' || actionBusy === 'selected-production' || actionBusy === 'merge'}>批量操作</Button></Dropdown>
 		<Tooltip title={cancelCapability.available ? '取消可取消的本地执行器任务；其它供应商保持在途状态。' : cancelCapability.reason}><Button className="shuihuo-cancel-button" type="text" loading={actionBusy === 'cancel'} disabled={!cancelCapability.available || Boolean(actionBusy)} onClick={cancelProduction}>取消操作</Button></Tooltip>
       </div>
@@ -4169,17 +4338,18 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         const sourceVersionClass = batchFactorySourceVersionClass(book);
         const sourceSummary = batchFactorySourceSummary(book);
         const videos = book.videos || [];
+		const productionMode = effectiveBookSettings(batch, book).productionMode === 'comic' ? 'comic' : 'video';
         return <article className="shuihuo-workbench-row batch-factory-book-row" key={book.id} role="row" style={columnWidths ? { gridTemplateColumns: columnWidths.map(width => `${width}px`).join(' ') } : undefined}>
           <div className="shuihuo-workbench-cell shuihuo-order-cell"><Checkbox checked={selectedBookIds.includes(book.id)} onChange={event => setSelectedBookIds(current => event.target.checked ? [...new Set([...current, book.id])] : current.filter(id => id !== book.id))} aria-label={`选择 ${book.title || `小说 ${index + 1}`}`} /><strong>{index + 1}</strong></div>
-          <div className="shuihuo-workbench-cell batch-factory-book-content" role="button" tabIndex={0} title="点击编辑当前小说所选行数的内容" onClick={() => openContentEditor(book)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openContentEditor(book); } }}><div className="batch-factory-book-title-row"><strong>{book.title || `小说 ${index + 1}`}</strong><span className={`batch-factory-production-source ${sourceSummary.ready ? 'is-ready' : 'is-missing'}`} title={`${sourceVersionLabel} · ${sourceSummary.text}`}><i className={`batch-factory-content-mode is-${sourceVersionClass}`}>{sourceVersionLabel}</i></span></div><span>bookId：{book.bookId || '—'} · 书城：{bookPlatformName(book, platformNames)} · 生产前 {rangeLines} 行</span><p>{previewText || '原文尚未获取'}</p>{!previewText ? <BatchFactoryGiantMaterialPendingProgress book={book} batchId={batch?.id} visible onContentReady={refreshBatch} /> : null}<Space wrap className="batch-factory-book-content-actions"><Button size="small" className="batch-factory-book-content-action is-edit" onClick={event => { event.stopPropagation(); openContentEditor(book); }}>编辑内容</Button><Button size="small" className="batch-factory-book-content-action" loading={actionBusy === `agent-${book.id}`} onClick={event => { event.stopPropagation(); void openBookInAgent(book); }}>Agent 优化</Button><Button size="small" className="batch-factory-book-content-action is-download" disabled={!publishText} onClick={event => { event.stopPropagation(); downloadProductionContent({ title: book.title, content: publishText }); }}>下载 TXT</Button><Popconfirm title="删除本书？" description="将删除本书及本地生产记录，不影响已提交到 121 的内容。" okText="删除" cancelText="取消" onConfirm={event => { event?.stopPropagation?.(); return deleteBook(book); }}><Button danger size="small" className="batch-factory-book-content-action is-delete" icon={<DeleteOutlined />} loading={actionBusy === `delete-${book.id}`} onClick={event => event.stopPropagation()}>删除本书</Button></Popconfirm></Space></div>
+          <div className="shuihuo-workbench-cell batch-factory-book-content" role="button" tabIndex={0} title="点击编辑当前小说所选行数的内容" onClick={() => openContentEditor(book)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openContentEditor(book); } }}><div className="batch-factory-book-title-row"><strong>{book.title || `小说 ${index + 1}`}</strong><span className={`batch-factory-production-source ${sourceSummary.ready ? 'is-ready' : 'is-missing'}`} title={`${sourceVersionLabel} · ${sourceSummary.text}`}><i className={`batch-factory-content-mode is-${sourceVersionClass}`}>{sourceVersionLabel}</i></span></div><span>bookId：{book.bookId || '—'} · 书城：{bookPlatformName(book, platformNames)} · 生产前 {rangeLines} 行</span><p>{previewText || '原文尚未获取'}</p>{!previewText ? <BatchFactoryGiantMaterialPendingProgress book={book} batchId={batch?.id} visible onContentReady={refreshBatch} /> : null}<Space wrap className="batch-factory-book-content-actions"><Button size="small" className="batch-factory-book-content-action is-edit" onClick={event => { event.stopPropagation(); openContentEditor(book); }}>编辑内容</Button><Button size="small" className="batch-factory-book-content-action is-download" disabled={!publishText} onClick={event => { event.stopPropagation(); downloadProductionContent({ title: book.title, content: publishText }); }}>下载 TXT</Button><Popconfirm title="删除本书？" description="将删除本书及本地生产记录，不影响已提交到 121 的内容。" okText="删除" cancelText="取消" onConfirm={event => { event?.stopPropagation?.(); return deleteBook(book); }}><Button danger size="small" className="batch-factory-book-content-action is-delete" icon={<DeleteOutlined />} loading={actionBusy === `delete-${book.id}`} onClick={event => event.stopPropagation()}>删除本书</Button></Popconfirm></Space></div>
           <div className="shuihuo-workbench-cell batch-factory-book-config-cell"><div className="batch-factory-book-config-regions">{batchFactoryWorkbenchConfigRegions(book).map(region => { const status = region.combinedStatus || bookConfigRegionStatus(book, region.key); const detail = region.key === 'assets' ? bookAssetSummary(book) : status.label; return <button type="button" key={region.key} className={`batch-factory-book-config-region is-${status.tone}`} onClick={() => region.key === 'assets' ? setAssetBook(book) : setConfigTarget({ book, region: region.key })}><b>{region.label}</b><small>{detail}</small></button>; })}</div></div>
 		  <InlineBookPrompts batch={batch} book={book} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setPromptVideoId(videoId || ''); setPromptBook(book); }} />
-		  <div className="shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell"><InlineMediaLibrary book={book} versionsByVideo={mediaVersionsByVideo} productionStatus={productionStatus} mergeJob={latestBookMerge(mergeStatus, book.id)} aspectRatio={effectiveBookSettings(batch, book).aspectRatio} h3CompilationMessage={h3CompilationStatus(effectiveBookSettings(batch, book))} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setMediaVideoId(videoId || ''); setMediaStartTab('clips'); setMediaBook(book); }} onOpenMerge={() => { setMediaVideoId(''); setMediaStartTab('merges'); setMediaBook(book); }} /></div>
+		  <div className="shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell">{productionMode === 'comic' ? <InlineComicLibrary batchId={batch?.id} book={book} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setMediaVideoId(videoId || ''); setMediaStartTab('comic'); setMediaBook(book); }} /> : <InlineMediaLibrary book={book} versionsByVideo={mediaVersionsByVideo} productionStatus={productionStatus} mergeJob={latestBookMerge(mergeStatus, book.id)} aspectRatio={effectiveBookSettings(batch, book).aspectRatio} h3CompilationMessage={h3CompilationStatus(effectiveBookSettings(batch, book))} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setMediaVideoId(videoId || ''); setMediaStartTab('clips'); setMediaBook(book); }} onOpenMerge={() => { setMediaVideoId(''); setMediaStartTab('merges'); setMediaBook(book); }} />}</div>
           <div className="shuihuo-workbench-cell batch-factory-actions">
             <div className="batch-factory-action-group is-utility"><span>资料与流程</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => setViewingBook(book)}>查看资料</Button>{previewText ? <Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新状态</Button> : <Button size="small" type="primary" onClick={() => fetchMissingBookSource(book)} loading={actionBusy === `source-${book.id}`} disabled={Boolean(actionBusy)}>获取正文</Button>}</div></div>
-            <div className="batch-factory-action-group is-production"><span>资产获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '提取当前书的人物、场景、道具提示词；手动资产保留。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'assets', 'force')} loading={actionBusy === stageActionKey('assets', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="打开资产图选择与生成面板；选择资产和图片模型后生成。"><Button size="small" onClick={() => setAssetBook(book)} disabled={Boolean(actionBusy)}>生成图片</Button></Tooltip></div></div>
+            <div className="batch-factory-action-group is-production"><span>{productionMode === 'comic' ? '漫画资产' : '资产获取'}</span><div className="batch-factory-action-button-grid">{productionMode === 'comic' ? <Tooltip title="在资产设置中选择漫画资产提示词，并执行提取漫画资产。"><Button size="small" onClick={() => setAssetBook(book)} disabled={Boolean(actionBusy)}>资产设置</Button></Tooltip> : <Tooltip title={runCapability.available ? '提取当前书的人物、场景、道具提示词；手动资产保留。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'assets', 'force')} loading={actionBusy === stageActionKey('assets', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取资产</Button></Tooltip>}<Tooltip title="打开资产图选择与生成面板；选择资产和图片模型后生成。"><Button size="small" onClick={() => setAssetBook(book)} disabled={Boolean(actionBusy)}>生成图片</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-production"><span>视频获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? (h3DirectorCards(book).length && usesH3VideoPrompt(effectiveBookSettings(batch, book)) ? '复用已有统一导演卡，按当前规则编译最终 VIDEO Prompt。' : '按统一流程生成导演分镜：选中的视频提示词决定 SD 或 H3 的输出协议。') : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'director', 'compile')} loading={actionBusy === stageActionKey('director', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title={productionCapability.available ? '按当前书最终编译视频提示词、可用参考图和画幅创建 VIDEO 任务。' : productionCapability.reason}><Button size="small" className="batch-factory-action-video" onClick={() => runBookStageAction(book, 'video')} loading={actionBusy === stageActionKey('video', book.id)} disabled={!productionCapability.available || Boolean(actionBusy)}>生成视频</Button></Tooltip></div></div>
-            <div className="batch-factory-action-group is-production"><span>漫画获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '根据当前小说、漫画资产和漫画提示词预设，生成每张完整漫画页提示词。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'comic', 'force')} loading={actionBusy === stageActionKey('comic', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title="漫画图片生成服务尚未配置；可先在漫画提示词中查看或编辑完整页面提示词。"><Button size="small" disabled>生成图片</Button></Tooltip></div></div>
+            <div className="batch-factory-action-group is-production"><span>漫画获取</span><div className="batch-factory-action-button-grid"><Tooltip title={runCapability.available ? '根据当前小说、漫画资产和漫画提示词预设，生成每张完整漫画页提示词。' : runCapability.reason}><Button size="small" onClick={() => runBookStageAction(book, 'comic', 'force')} loading={actionBusy === stageActionKey('comic', book.id)} disabled={!runCapability.available || Boolean(actionBusy)}>提取</Button></Tooltip><Tooltip title={productionMode === 'comic' ? '只生成当前选中的漫画页候选图。' : '请先切换为漫画生成模式。'}><Button size="small" type="primary" loading={String(actionBusy).startsWith(`comic-image-${book.id}-`)} disabled={productionMode !== 'comic' || Boolean(actionBusy)} onClick={() => { const videoId = rowStoryboardSelection[book.id] || videos[0]?.id; const video = videos.find(item => item.id === videoId); generateBookComicPage(book, videoId, video?.comicPrompt); }}>生成漫画</Button></Tooltip></div></div>
             <div className="batch-factory-action-group is-recovery"><span>异常处理</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新</Button><Button size="small" danger onClick={() => retryLastFailedStage(book)} loading={actionBusy === stageActionKey('retry', book.id)} disabled={Boolean(actionBusy) && actionBusy !== stageActionKey('retry', book.id)}>重试失败步骤</Button></div></div>
           </div>
         </article>;
@@ -4197,10 +4367,10 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       </Space>
     </Modal>
     <BatchFactoryBookSettingsModal open={Boolean(configTarget)} batch={batch} book={configTarget?.book} activeRegion={configTarget?.region} onClose={() => setConfigTarget(null)} onSaved={refreshAfterBookSettingsSaved} onOpenBookAssets={book => setAssetBook(book)} />
-    <Modal title={assetBook ? `人物场景预设 · ${assetBook.title}` : '人物场景预设'} open={Boolean(assetBook)} onCancel={() => setAssetBook(null)} footer={null} width="min(1440px, calc(100vw - 48px))" className="batch-factory-assets-modal">{assetBook ? <AssetEditor book={assetBook} batchId={batch?.id} onSaved={refreshBatch} onGenerate={async textModelId => { await refreshAssetPresetSnapshot(assetBook); await runBookStageAction(assetBook, 'assets', 'missing', '', textModelId); }} onRegenerate={async textModelId => { await refreshAssetPresetSnapshot(assetBook); await runBookStageAction(assetBook, 'assets', 'force', '', textModelId); }} onRetry={textModelId => retryLastFailedStage(assetBook, '', textModelId)} assetRules={effectiveBookAssetRules(batch, assetBook)} onAssetPromptChange={async selection => { const bookPromptConfig = assetBook?.settingsState?.patch?.aiPromptConfig || {}; const assetRules = effectiveBookAssetRules(batch, assetBook); await saveBookOverrideWithRetry(batch.id, assetBook.id, assetBook.revision, { patch: { aiPromptConfig: { ...bookPromptConfig, assets: { ...assetRules, extraction: selection, scope: 'custom', bookIds: [assetBook.id] } } } }); await refreshBatch(); }} canGenerate={runCapability.available} generateReason={runCapability.reason} generating={actionBusy === stageActionKey('assets', assetBook.id)} engineSettings={effectiveBookSettings(batch, assetBook)} /> : null}</Modal>
-	<Modal title={promptBook ? `分镜卡（视频与漫画提示词） · ${promptBook.title}` : '分镜卡（视频与漫画提示词）'} open={Boolean(promptBook)} onCancel={() => { setPromptBook(null); setPromptVideoId(''); }} footer={null} width={900} className="batch-factory-prompt-modal">{promptBook ? <PromptPanel key={`${promptBook.id}:${promptBook.revision || 0}:${promptBook.directorRevision?.id || ''}`} book={promptBook} batch={batch} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} initialVideoId={promptVideoId} onSaved={async () => { const latestBatch = await refreshBatch(); const latestBook = latestBatch?.books?.find(item => item.id === promptBook?.id); if (latestBook) setPromptBook(latestBook); return latestBook; }} onCompile={() => runBookStageAction(promptBook, 'director', 'compile')} onRegenerateVisual={() => runBookStageAction(promptBook, 'comic', 'force')} onRetry={videoId => retryLastFailedStage(promptBook, videoId)} onGenerateVideo={videoId => runBookStageAction(promptBook, 'video', 'missing', videoId)} onGenerateVisual={() => setAssetBook(promptBook)} regenerating={actionBusy === stageActionKey('director', promptBook.id) || actionBusy === stageActionKey('video', promptBook.id) || actionBusy === stageActionKey('comic', promptBook.id) || actionBusy === stageActionKey('retry', promptBook.id)} productionAvailable={productionCapability.available} productionReason={productionCapability.reason} /> : null}</Modal>
+    <Modal title={assetBook ? `人物场景预设 · ${assetBook.title}` : '人物场景预设'} open={Boolean(assetBook)} onCancel={() => setAssetBook(null)} footer={null} width="min(1440px, calc(100vw - 48px))" className="batch-factory-assets-modal">{assetBook ? (() => { const settings = effectiveBookSettings(batch, assetBook); const productionMode = settings.productionMode === 'comic' ? 'comic' : 'video'; const comicRules = effectiveBookComicRules(batch, assetBook); return <AssetEditor book={assetBook} batchId={batch?.id} onSaved={refreshBatch} onGenerate={async textModelId => { await refreshAssetPresetSnapshot(assetBook); await runBookStageAction(assetBook, 'assets', 'missing', '', textModelId); }} onRegenerate={async textModelId => { await refreshAssetPresetSnapshot(assetBook); await runBookStageAction(assetBook, 'assets', 'force', '', textModelId); }} onRetry={textModelId => retryLastFailedStage(assetBook, '', textModelId)} productionMode={productionMode} assetRules={productionMode === 'comic' ? comicRules : effectiveBookAssetRules(batch, assetBook)} onAssetPromptChange={async selection => { const bookPromptConfig = assetBook?.settingsState?.patch?.aiPromptConfig || {}; const assetRules = effectiveBookAssetRules(batch, assetBook); await saveBookOverrideWithRetry(batch.id, assetBook.id, assetBook.revision, { patch: { aiPromptConfig: productionMode === 'comic' ? { ...bookPromptConfig, comic: { ...comicRules, assets: selection, enabled: true, scope: 'custom', bookIds: [assetBook.id] } } : { ...bookPromptConfig, assets: { ...assetRules, extraction: selection, scope: 'custom', bookIds: [assetBook.id] } } } }); await refreshBatch(); }} canGenerate={runCapability.available} generateReason={runCapability.reason} generating={actionBusy === stageActionKey('assets', assetBook.id)} engineSettings={settings} />; })() : null}</Modal>
+	<Modal title={promptBook ? `分镜卡（视频与漫画提示词） · ${promptBook.title}` : '分镜卡（视频与漫画提示词）'} open={Boolean(promptBook)} onCancel={() => { setPromptBook(null); setPromptVideoId(''); }} footer={null} width={900} className="batch-factory-prompt-modal">{promptBook ? <PromptPanel key={`${promptBook.id}:${promptBook.revision || 0}:${promptBook.directorRevision?.id || ''}`} book={promptBook} batch={batch} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} initialVideoId={promptVideoId} onSaved={async () => { const latestBatch = await refreshBatch(); const latestBook = latestBatch?.books?.find(item => item.id === promptBook?.id); if (latestBook) setPromptBook(latestBook); return latestBook; }} onCompile={() => runBookStageAction(promptBook, 'director', 'compile')} onRegenerateVisual={() => runBookStageAction(promptBook, 'comic', 'force')} onRetry={videoId => retryLastFailedStage(promptBook, videoId)} onGenerateVideo={videoId => runBookStageAction(promptBook, 'video', 'missing', videoId)} onGenerateVisual={(videoId, prompt) => generateBookComicPage(promptBook, videoId, prompt)} regenerating={actionBusy === stageActionKey('director', promptBook.id) || actionBusy === stageActionKey('video', promptBook.id) || actionBusy === stageActionKey('comic', promptBook.id) || actionBusy === stageActionKey('retry', promptBook.id) || String(actionBusy).startsWith(`comic-image-${promptBook.id}-`)} productionAvailable={productionCapability.available} productionReason={productionCapability.reason} /> : null}</Modal>
 	<Modal
-      title={mediaBook ? `片段库 · ${mediaBook.title}` : '片段库'}
+      title={mediaBook ? `媒体库 · ${mediaBook.title}` : '媒体库'}
       open={Boolean(mediaBook)}
       onCancel={() => { setMediaBook(null); setMediaVideoId(''); setMediaStartTab('clips'); }}
       footer={null}
@@ -4208,7 +4378,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       className="batch-factory-media-library-modal"
       destroyOnClose
     >
-      {mediaBook ? <MediaVersionPanel
+      {mediaBook ? (effectiveBookSettings(batch, mediaBook).productionMode === 'comic' ? <ComicMediaPanel batchId={batch?.id} book={mediaBook} initialVideoId={mediaVideoId} onSaved={refreshBatch} /> : <MediaVersionPanel
         book={mediaBook}
         batchId={batch?.id}
         versionsByVideo={mediaVersionsByVideo}
@@ -4233,7 +4403,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         initialVideoId={mediaVideoId}
         initialTab={mediaStartTab}
         onOpenDirector={frameKey => { setPendingMediaPrompt({ bookId: mediaBook.id, frameKey: frameKey || '' }); setMediaBook(null); }}
-      /> : null}
+      />) : null}
     </Modal>
 
     <BatchFactoryUnifiedSettingsModal open={unifiedSettingsOpen} batch={batch} onClose={() => setUnifiedSettingsOpen(false)} onSaved={saveSettings} />

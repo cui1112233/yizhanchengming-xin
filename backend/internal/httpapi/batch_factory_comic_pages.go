@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
@@ -33,6 +35,14 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		if err != nil {
 			writeStoreError(w, err)
 			return
+		}
+		batch, batchErr := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
+		if batchErr != nil {
+			writeStoreError(w, batchErr)
+			return
+		}
+		for index := range result {
+			result[index].ConfigStale = comicPageConfigStale(r.Context(), store, owner, batch, r.PathValue("bookId"), result[index])
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"pages": comicPageResponses(result)})
 	})
@@ -84,16 +94,19 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			return
 		}
 		effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, selectedBook.SettingsState.Patch)
-		referenceImageURLs := append([]string(nil), input.ReferenceImageURLs...)
-		if batchfactoryv11.ComicImageStyleConfigured(effective) {
-			contract, compileErr := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposePage, input.ImagePrompt, nil, input.ReferenceImageURLs)
-			if compileErr != nil {
-				writeStoreError(w, compileErr)
-				return
-			}
-			input.ImagePrompt = contract.Prompt
-			referenceImageURLs = contract.ReferenceImageURLs
+		assetImageURLs, assetErr := comicPageAssetReferenceURLs(r.Context(), store, owner, batch.ID, selectedBook.ID, input.ImagePrompt)
+		if assetErr != nil {
+			writeStoreError(w, assetErr)
+			return
 		}
+		contract, compileErr := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposePage, input.ImagePrompt, assetImageURLs, input.ReferenceImageURLs)
+		if compileErr != nil {
+			writeStoreError(w, compileErr)
+			return
+		}
+		input.ImagePrompt = contract.Prompt
+		input.SnapshotHash = contract.SnapshotHash
+		referenceImageURLs := contract.ReferenceImageURLs
 		createdPage, err := comicStore.UpsertComicPage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input)
 		if err != nil {
 			writeStoreError(w, err)
@@ -271,6 +284,71 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"collections": result})
 	})
+}
+
+func comicPageAssetReferenceURLs(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID, promptText string) ([]string, error) {
+	assets, err := store.ListBookAssets(ctx, owner, batchID, bookID)
+	if err != nil {
+		return nil, err
+	}
+	promptText = strings.TrimSpace(promptText)
+	references := make([]string, 0)
+	for _, asset := range assets {
+		if !comicPromptMentionsAsset(promptText, asset) {
+			continue
+		}
+		images, listErr := store.ListBookAssetImages(ctx, owner, batchID, bookID, asset.ID)
+		if listErr != nil {
+			return nil, listErr
+		}
+		for _, image := range images {
+			if !image.IsPrimary {
+				continue
+			}
+			if remote := strings.TrimSpace(image.URL); remote != "" {
+				parsed, parseErr := url.Parse(remote)
+				if parseErr == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != "" {
+					references = append(references, remote)
+				}
+			} else if strings.TrimSpace(image.StorageRef) != "" {
+				references = append(references, "/api/local-executor/v1/batch-book-asset-images/"+url.PathEscape(batchID)+"/"+url.PathEscape(bookID)+"/"+url.PathEscape(asset.ID)+"/"+url.PathEscape(image.ID))
+			}
+			break
+		}
+	}
+	return references, nil
+}
+
+func comicPromptMentionsAsset(promptText string, asset batchfactoryv11.BookAsset) bool {
+	for _, name := range []string{asset.Name, asset.FormalName} {
+		if name = strings.TrimSpace(name); name != "" && strings.Contains(promptText, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func comicPageConfigStale(ctx context.Context, store batchfactoryv11.Store, owner string, batch batchfactoryv11.Batch, bookID string, page batchfactoryv11.ComicPage) bool {
+	if strings.TrimSpace(page.SnapshotHash) == "" || len(page.Images) == 0 {
+		return false
+	}
+	var book *batchfactoryv11.Book
+	for index := range batch.Books {
+		if batch.Books[index].ID == bookID {
+			book = &batch.Books[index]
+			break
+		}
+	}
+	if book == nil {
+		return false
+	}
+	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	assets, err := comicPageAssetReferenceURLs(ctx, store, owner, batch.ID, bookID, page.ComicPrompt)
+	if err != nil {
+		return false
+	}
+	contract, err := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposePage, page.ComicPrompt, assets, nil)
+	return err != nil || contract.SnapshotHash != page.SnapshotHash
 }
 
 func comicPageImageResponse(image batchfactoryv11.ComicPageImage) batchfactoryv11.ComicPageImage {

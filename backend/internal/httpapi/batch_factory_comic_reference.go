@@ -104,6 +104,39 @@ func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, sto
 		w.Header().Set("Cache-Control", "private, max-age=86400")
 		_, _ = w.Write(payload)
 	})
+	root.HandleFunc("GET /api/local-executor/v1/batch-book-asset-images/{batchId}/{bookId}/{assetId}/{imageId}", func(w http.ResponseWriter, r *http.Request) {
+		token, ok := executorBearerToken(r)
+		if !ok {
+			writeExecutorError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		owner, err := executors.OwnerForToken(r.Context(), token)
+		if err != nil {
+			writeLocalJobError(w, err)
+			return
+		}
+		images, err := store.ListBookAssetImages(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("assetId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		for _, candidate := range images {
+			if candidate.ID != r.PathValue("imageId") || strings.TrimSpace(candidate.StorageRef) == "" {
+				continue
+			}
+			file, openErr := files.Open(candidate.StorageRef)
+			if openErr != nil {
+				writeExecutorError(w, http.StatusNotFound, "asset image not found")
+				return
+			}
+			defer file.Close()
+			w.Header().Set("Content-Type", candidate.MediaType)
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			_, _ = io.Copy(w, file)
+			return
+		}
+		writeExecutorError(w, http.StatusNotFound, "asset image not found")
+	})
 }
 
 func serveBatchComicReference(w http.ResponseWriter, r *http.Request, store batchfactoryv11.Store, files *localartifact.Store, owner, batchID, assetID string) {

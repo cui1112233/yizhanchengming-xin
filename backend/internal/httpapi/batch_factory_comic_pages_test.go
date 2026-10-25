@@ -268,4 +268,68 @@ func TestComicPageGenerateUsesPagePromptAndStoresCandidateOutsideAssets(t *testi
 	if len(assets) != 0 {
 		t.Fatalf("generated comic page leaked into assets: %+v", assets)
 	}
+	current, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(context.Background(), "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{
+		"productionMode": comicTestRaw(t, "comic"),
+		"aiPromptConfig": comicTestRaw(t, map[string]any{"comic": map[string]any{
+			"enabled": true,
+			"style":   map[string]any{"presetId": "batch-comic-style-15", "body": "新的厚涂漫画画风"},
+		}}),
+	}, ExpectedRevision: current.SettingsState.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	listed := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/books/"+book.ID+"/comic-pages", nil)
+	if listed.Code != http.StatusOK {
+		t.Fatalf("list after config change status=%d body=%s", listed.Code, listed.Body.String())
+	}
+	pages := decodeBody[struct {
+		Pages []batchfactoryv11.ComicPage `json:"pages"`
+	}](t, listed).Pages
+	if len(pages) != 1 || !pages[0].ConfigStale || len(pages[0].Images) != 1 {
+		t.Fatalf("stale page should preserve its candidate: %+v", pages)
+	}
+}
+
+func TestComicPageAssetReferenceURLsUseOnlyMentionedPrimaryImages(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	hero, err := store.CreateBookAsset(ctx, "alice", batch.ID, book.ID, batchfactoryv11.CreateBookAssetInput{Kind: "character", Name: "阿月", Prompt: "青衣女子"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unused, err := store.CreateBookAsset(ctx, "alice", batch.ID, book.ID, batchfactoryv11.CreateBookAssetInput{Kind: "scene", Name: "后院", Prompt: "古宅后院"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := store.CreateBookAssetImage(ctx, "alice", batch.ID, book.ID, hero.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: "hero-first.png", MediaType: "image/png", Source: batchfactoryv11.VideoProviderDoubaoLocal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.CreateBookAssetImage(ctx, "alice", batch.ID, book.ID, hero.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: "hero-primary.png", MediaType: "image/png", Source: batchfactoryv11.VideoProviderDoubaoLocal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetPrimaryBookAssetImage(ctx, "alice", batch.ID, book.ID, hero.ID, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateBookAssetImage(ctx, "alice", batch.ID, book.ID, unused.ID, batchfactoryv11.CreateBookAssetImageInput{URL: "https://images.example/unused.png", MediaType: "image/png", Source: "provider"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := comicPageAssetReferenceURLs(ctx, store, "alice", batch.ID, book.ID, "阿月在正堂抬头")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "/api/local-executor/v1/batch-book-asset-images/" + batch.ID + "/" + book.ID + "/" + hero.ID + "/" + second.ID
+	if len(got) != 1 || got[0] != want || strings.Contains(got[0], first.ID) {
+		t.Fatalf("references=%v want=%q", got, want)
+	}
 }

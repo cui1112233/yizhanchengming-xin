@@ -136,6 +136,55 @@ func (s *MySQLStore) PersistExtractedBookAssets(ctx context.Context, owner strin
 	return result, nil
 }
 
+// PersistComicExtractedBookAssets uses the same durable asset ledger as video
+// assets, while keeping the comic source isolated so a refresh cannot replace
+// the other medium or a user's manual records.
+func (s *MySQLStore) PersistComicExtractedBookAssets(ctx context.Context, owner string, book Book, snapshot DirectorSnapshot, assets DirectorAssets) ([]BookAsset, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if err := ensureBookOwnership(ctx, tx, owner, book.BatchID, book.ID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND source='comic'`, owner, book.BatchID, book.ID); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	for _, asset := range comicBookAssets(book, snapshot, assets) {
+		id, err := newID("comic-asset")
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,extraction_preset_id,extraction_preset_version,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'comic',?,?,1,?,?)`,
+			id, owner, book.BatchID, book.ID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nil, nil, nullableString(asset.ExtractionPresetID), nullableInt64(asset.ExtractionPresetVersion), now, now); err != nil {
+			return nil, err
+		}
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, book.BatchID, book.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []BookAsset{}
+	for rows.Next() {
+		var asset BookAsset
+		if err := rows.Scan(&asset.ID, &asset.Kind, &asset.Name, &asset.FormalName, &asset.Facts, &asset.Appearance, &asset.Relationships, &asset.Prompt, &asset.ImageModelID, &asset.ImageAspectRatio, &asset.Source, &asset.ExtractionPresetID, &asset.ExtractionPresetVersion, &asset.Revision, &asset.CreatedAt, &asset.UpdatedAt); err != nil {
+			return nil, err
+		}
+		asset.BatchID, asset.BookID = book.BatchID, book.ID
+		result = append(result, asset)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *MySQLStore) UpdateBookAsset(ctx context.Context, owner, batchID, bookID, assetID string, input UpdateBookAssetInput) (BookAsset, error) {
 	input.Name, input.Prompt = strings.TrimSpace(input.Name), strings.TrimSpace(input.Prompt)
 	input.FormalName, input.Facts, input.Appearance, input.Relationships, input.ImageModelID = strings.TrimSpace(input.FormalName), strings.TrimSpace(input.Facts), strings.TrimSpace(input.Appearance), strings.TrimSpace(input.Relationships), strings.TrimSpace(input.ImageModelID)

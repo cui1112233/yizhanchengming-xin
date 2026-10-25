@@ -790,6 +790,74 @@ func V11ShuihuoConfigStatements() []string {
 ) ENGINE=InnoDB`}
 }
 
+func V11ComicPageStatements() []string {
+	return []string{
+		`CREATE TABLE IF NOT EXISTS batch_factory_v11_comic_pages (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(64) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  video_id VARCHAR(64) NOT NULL,
+  comic_prompt MEDIUMTEXT NOT NULL,
+  image_prompt MEDIUMTEXT NOT NULL,
+  model_id VARCHAR(191) NULL,
+  aspect_ratio VARCHAR(32) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  revision BIGINT NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  UNIQUE KEY uq_bfv11_comic_page_video (owner_username,batch_id,book_id,video_id),
+  KEY idx_bfv11_comic_page_book (owner_username,batch_id,book_id),
+  FOREIGN KEY (batch_id) REFERENCES batch_factory_v11_batches(id) ON DELETE CASCADE,
+  FOREIGN KEY (book_id) REFERENCES batch_factory_v11_books(id) ON DELETE CASCADE,
+  FOREIGN KEY (video_id) REFERENCES batch_factory_v11_video_records(video_id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v11_comic_page_images (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  comic_page_id VARCHAR(64) NOT NULL,
+  url TEXT NULL,
+  storage_ref VARCHAR(128) NULL,
+  media_type VARCHAR(128) NOT NULL,
+  source VARCHAR(64) NOT NULL,
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  revision BIGINT NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_bfv11_comic_image_page (owner_username,comic_page_id,created_at),
+  FOREIGN KEY (comic_page_id) REFERENCES batch_factory_v11_comic_pages(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v11_comic_collections (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(64) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_bfv11_comic_collection_book (owner_username,batch_id,book_id,created_at),
+  FOREIGN KEY (batch_id) REFERENCES batch_factory_v11_batches(id) ON DELETE CASCADE,
+  FOREIGN KEY (book_id) REFERENCES batch_factory_v11_books(id) ON DELETE CASCADE
+) ENGINE=InnoDB`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v11_comic_collection_items (
+  collection_id VARCHAR(64) NOT NULL,
+  ordinal_no INT NOT NULL,
+  video_id VARCHAR(64) NOT NULL,
+  comic_page_id VARCHAR(64) NOT NULL,
+  image_id VARCHAR(64) NOT NULL,
+  storage_ref VARCHAR(128) NULL,
+  media_type VARCHAR(128) NOT NULL,
+  PRIMARY KEY (collection_id,ordinal_no),
+  FOREIGN KEY (collection_id) REFERENCES batch_factory_v11_comic_collections(id) ON DELETE CASCADE,
+  FOREIGN KEY (video_id) REFERENCES batch_factory_v11_video_records(video_id) ON DELETE RESTRICT,
+  FOREIGN KEY (comic_page_id) REFERENCES batch_factory_v11_comic_pages(id) ON DELETE RESTRICT,
+  FOREIGN KEY (image_id) REFERENCES batch_factory_v11_comic_page_images(id) ON DELETE RESTRICT
+) ENGINE=InnoDB`,
+	}
+}
+
+func V11ComicPageSnapshotStatements() []string {
+	return []string{`ALTER TABLE batch_factory_v11_comic_pages ADD COLUMN snapshot_hash VARCHAR(64) NULL AFTER status`}
+}
+
 func V11Migrations() []Migration {
 	return []Migration{
 		{Version: 1100001, SQL: V11FoundationStatements(), CallbackChecksum: "batch-factory-v11-foundation-v1"},
@@ -830,6 +898,13 @@ func V11Migrations() []Migration {
 		{Version: 1100025, SQL: V11MergeAudioStatements(), CallbackChecksum: "batch-factory-v11-merge-audio-v1"},
 		{Version: 1100026, SQL: nil, CallbackChecksum: "batch-factory-v11-production-task-attempt-index-v1", Reconcile: reconcileV11ProductionTaskAttemptIndex, Adopt: adoptV11ProductionTaskAttemptIndex},
 		{Version: 1100027, SQL: V11BookAssetImageOverridesStatements(), CallbackChecksum: "batch-factory-v11-book-asset-image-overrides-v1"},
+		// One persisted local V88 database already reserved 1100028 under the
+		// verified ledger checksum below before the comic tables were added.
+		// Accept only that exact historical value, then let 1100029 idempotently
+		// create any missing comic tables.
+		{Version: 1100028, SQL: V11ComicPageStatements(), CallbackChecksum: "batch-factory-v11-comic-pages-v1", LegacyChecksums: []string{"402a7b76a317be5a5a753a64e179f6bee5d426b2382ba6b1fd8ad3f605e904c2"}},
+		{Version: 1100029, SQL: V11ComicPageStatements(), CallbackChecksum: "batch-factory-v11-comic-pages-repair-v1"},
+		{Version: 1100030, SQL: V11ComicPageSnapshotStatements(), CallbackChecksum: "batch-factory-v11-comic-page-snapshot-v1"},
 	}
 }
 

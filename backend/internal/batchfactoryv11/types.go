@@ -271,19 +271,21 @@ type CreateBookAssetImageInput struct {
 }
 
 type ComicPage struct {
-	ID          string           `json:"id"`
-	BatchID     string           `json:"batchId"`
-	BookID      string           `json:"bookId"`
-	VideoID     string           `json:"videoId"`
-	ComicPrompt string           `json:"comicPrompt"`
-	ImagePrompt string           `json:"imagePrompt"`
-	ModelID     string           `json:"modelId,omitempty"`
-	AspectRatio string           `json:"aspectRatio"`
-	Status      string           `json:"status"`
-	Revision    int64            `json:"revision"`
-	Images      []ComicPageImage `json:"images"`
-	CreatedAt   time.Time        `json:"createdAt"`
-	UpdatedAt   time.Time        `json:"updatedAt"`
+	ID           string           `json:"id"`
+	BatchID      string           `json:"batchId"`
+	BookID       string           `json:"bookId"`
+	VideoID      string           `json:"videoId"`
+	ComicPrompt  string           `json:"comicPrompt"`
+	ImagePrompt  string           `json:"imagePrompt"`
+	ModelID      string           `json:"modelId,omitempty"`
+	AspectRatio  string           `json:"aspectRatio"`
+	Status       string           `json:"status"`
+	SnapshotHash string           `json:"snapshotHash,omitempty"`
+	ConfigStale  bool             `json:"configStale,omitempty"`
+	Revision     int64            `json:"revision"`
+	Images       []ComicPageImage `json:"images"`
+	CreatedAt    time.Time        `json:"createdAt"`
+	UpdatedAt    time.Time        `json:"updatedAt"`
 }
 
 type UpsertComicPageInput struct {
@@ -294,6 +296,7 @@ type UpsertComicPageInput struct {
 	ModelID            string   `json:"modelId,omitempty"`
 	AspectRatio        string   `json:"aspectRatio"`
 	Status             string   `json:"status,omitempty"`
+	SnapshotHash       string   `json:"-"`
 }
 
 type ComicPageImage struct {
