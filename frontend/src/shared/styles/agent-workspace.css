@@ -1584,6 +1584,19 @@
 .agent-director-assets__item strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .agent-director-assets__item > div { display: flex; grid-column: 1 / -1; gap: 4px; }
 .agent-director-assets__item > div button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 5px 2px; border: 1px solid var(--director-border); font-size: 11px; }
+.agent-director-inspector { min-width: 0; padding: 12px; color: var(--director-text); }
+.agent-director-inspector h3 { margin: 0 0 12px; overflow-wrap: anywhere; font-size: 13px; }
+.agent-director-inspector p { color: var(--director-muted); font-size: 12px; overflow-wrap: anywhere; }
+.agent-director-inspector fieldset { min-width: 0; margin: 0 0 12px; border: 0; padding: 0; }
+.agent-director-inspector legend { margin-bottom: 6px; color: var(--director-muted); font-size: 12px; }
+.agent-director-inspector__axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.agent-director-inspector__field { display: grid; min-width: 0; gap: 4px; margin-bottom: 8px; font-size: 11px; }
+.agent-director-inspector__field span { overflow-wrap: anywhere; color: var(--director-muted); }
+.agent-director-inspector__field input { box-sizing: border-box; width: 100%; min-width: 0; height: 30px; border: 1px solid var(--director-border); border-radius: 4px; padding: 4px 6px; color: var(--director-text); background: var(--director-panel-strong); font: inherit; }
+.agent-director-inspector__field input:focus-visible { outline: 2px solid var(--director-accent); outline-offset: 1px; }
+.agent-director-inspector__field input[aria-invalid='true'] { border-color: #d84e50; }
+.agent-director-inspector__field small { color: #d84e50; overflow-wrap: anywhere; }
+.agent-page .agent-director-desk-fullscreen .agent-director-shell .agent-director-inspector button { min-height: 32px; padding: 6px 8px; border: 1px solid var(--director-border); border-radius: 4px; }
 @media (max-width: 1180px) {
   .agent-director-shell, .agent-director-shell.is-left-collapsed, .agent-director-shell.is-right-collapsed, .agent-director-shell.is-left-collapsed.is-right-collapsed { grid-template-columns: 44px minmax(0, 1fr) 44px; }
   .agent-director-shell__left, .agent-director-shell__right { position: relative; overflow: visible; }
