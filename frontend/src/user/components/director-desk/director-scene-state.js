@@ -2,6 +2,15 @@ import { normalizeDirectorProject, updateDirectorViewCamera } from '../../pages/
 
 const RATIOS = Object.freeze({ '21:9': 21 / 9, '16:9': 16 / 9, '4:3': 4 / 3, '1:1': 1, '3:4': 3 / 4, '9:16': 9 / 16 });
 
+export function applyCameraFrame(camera, state) {
+  camera.position.fromArray(state.position);
+  camera.fov = state.fov;
+  camera.updateProjectionMatrix();
+  camera.lookAt(...state.target);
+  const roll = Number(state.rotation?.[2]);
+  if (Number.isFinite(roll)) camera.rotateZ(roll);
+}
+
 export function resolveSceneSelection(selection, localSelection) {
   return selection === undefined ? localSelection : selection;
 }

@@ -4,17 +4,14 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import * as THREE from 'three';
 import { createAuthenticatedMediaSession } from '../../pages/agent-canvas-media.js';
 import { normalizeDirectorProject, updateDirectorActorTransform, updateDirectorCamera, updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
-import { actorPlaneProps, aspectRatioValue, cameraForView, cameraFromControls, canTransformActor, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
+import { actorPlaneProps, applyCameraFrame, aspectRatioValue, cameraForView, cameraFromControls, canTransformActor, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
 
 export { actorPlaneProps, cameraFromControls, updateCamera } from './director-scene-state.js';
 
 function CameraFrame({ cameraState }) {
   const { camera } = useThree();
   useEffect(() => {
-    camera.position.fromArray(cameraState.position);
-    camera.fov = cameraState.fov;
-    camera.updateProjectionMatrix();
-    camera.lookAt(...cameraState.target);
+    applyCameraFrame(camera, cameraState);
   }, [camera, cameraState]);
   return null;
 }

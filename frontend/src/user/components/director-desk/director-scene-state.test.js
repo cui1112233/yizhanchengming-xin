@@ -4,6 +4,26 @@ import assert from 'node:assert/strict';
 import { actorPlaneProps, aspectRatioValue, cameraForView, cameraFromControls, captureViewportSize, updateCamera } from './director-scene-state.js';
 import { normalizeDirectorProject } from '../../pages/agent-director-desk.js';
 import * as sceneState from './director-scene-state.js';
+import * as THREE from 'three';
+
+test('camera roll tilts the image around the target direction without accumulating', () => {
+  assert.equal(typeof sceneState.applyCameraFrame, 'function');
+  const camera = new THREE.PerspectiveCamera();
+  const state = { position: [0, 0, 5], target: [0, 0, 0], fov: 44, rotation: [0, 0, -0.22] };
+  sceneState.applyCameraFrame(camera, state);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  assert.ok(Math.abs(up.x - Math.sin(0.22)) < 1e-10);
+  assert.ok(Math.abs(up.y - Math.cos(0.22)) < 1e-10);
+  assert.deepEqual(camera.position.toArray(), [0, 0, 5]);
+  assert.equal(camera.fov, 44);
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  assert.ok(direction.distanceTo(new THREE.Vector3(0, 0, -1)) < 1e-10);
+  const first = camera.quaternion.clone();
+  sceneState.applyCameraFrame(camera, state);
+  assert.ok(first.angleTo(camera.quaternion) < 1e-7);
+  sceneState.applyCameraFrame(camera, { ...state, rotation: [0, 0, 0] });
+  assert.ok(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).distanceTo(new THREE.Vector3(0, 1, 0)) < 1e-10);
+});
 
 test('controlled null selection clears the previous local selection', () => {
   assert.equal(typeof sceneState.resolveSceneSelection, 'function');
