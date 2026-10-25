@@ -28,8 +28,14 @@ test('the quick toolbar opens the existing functional video tools panel', () => 
   assert.match(composerSource, /setToolsOpen\(true\)/);
 });
 
-test('the selected video, toolbar, and lower editor share one adaptive width', () => {
-  assert.match(styles, /agent-canvas-node--video\.is-editor-open[^}]*width:\s*min\(680px,/);
-  assert.match(styles, /agent-video-quick-tools[^}]*min-height:\s*40px/);
-  assert.match(styles, /agent-canvas-node--video\.is-editor-open \.agent-node-composer[^}]*width:\s*100%/);
+test('opening the video editor does not resize the video node', () => {
+  assert.doesNotMatch(styles, /agent-canvas-node--video\.is-editor-open\s*\{[^}]*width:/);
+  assert.match(canvasSource, /'--agent-canvas-inverse-zoom':\s*1\s*\/\s*Math\.max\(canvasZoom,\s*0\.25\)/);
+});
+
+test('video tools and composer are inverse-scaled floating surfaces', () => {
+  assert.match(canvasSource, /agent-video-floating-toolbar/);
+  assert.match(canvasSource, /agent-video-floating-composer/);
+  assert.match(styles, /agent-video-floating-toolbar[^}]*position:\s*absolute[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
+  assert.match(styles, /agent-video-floating-composer[^}]*position:\s*absolute[^}]*scale\(var\(--agent-canvas-inverse-zoom\)\)/);
 });

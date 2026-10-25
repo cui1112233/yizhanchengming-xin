@@ -118,7 +118,7 @@ function AgentVideoQuickTools({ source, sourceAsset, busy = false, onApply, onOp
     if (!canProcess) return;
     onApply?.({ operation: 'separate_audio', sourceAssetId, settings: {} });
   };
-  return <div className="agent-video-quick-tools nodrag nopan" aria-label="视频快捷工具" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+  return <div className="agent-video-quick-tools agent-video-floating-toolbar nodrag nopan" aria-label="视频快捷工具" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
     <button type="button" onClick={openTools}><Scissors size={14} /><span>截取</span></button>
     <button type="button" onClick={openTools}><Crop size={14} /><span>裁剪</span></button>
     <button type="button" disabled={!canProcess} onClick={separateAudio}><Volume2 size={14} /><span>分离音视频</span></button>
@@ -213,6 +213,7 @@ function CanvasNode({
   return (
     <article
       className={`agent-canvas-node agent-canvas-node--${nodeType} agent-canvas-node--${data.status}${selected ? ' is-selected' : ''}${isEditorOpen ? ' is-editor-open' : ''}${taskPresentation ? ' has-task-status' : ''}`}
+      style={{ '--agent-canvas-zoom': canvasZoom, '--agent-canvas-inverse-zoom': 1 / Math.max(canvasZoom, 0.25) }}
       onDoubleClick={handleNodeDoubleClick}
     >
       <div className="agent-canvas-node-preview-shell">
@@ -270,7 +271,11 @@ function CanvasNode({
         </div>}
         {!isPinnedBatchFactoryComposer ? <Handle type="source" position={Position.Right} className="agent-canvas-node-quick-add" aria-label="拖出连接" /> : null}
       </div>
-      {!isPinnedBatchFactoryComposer ? composer : null}
+      {!isPinnedBatchFactoryComposer
+        ? (nodeType === 'video' && isEditorOpen
+          ? <div className="agent-video-floating-composer nodrag nopan">{composer}</div>
+          : composer)
+        : null}
     </article>
   );
 }
