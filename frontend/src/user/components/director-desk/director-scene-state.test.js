@@ -5,6 +5,24 @@ import { actorPlaneProps, aspectRatioValue, cameraForView, cameraFromControls, c
 import { normalizeDirectorProject } from '../../pages/agent-director-desk.js';
 import * as sceneState from './director-scene-state.js';
 
+test('controlled null selection clears the previous local selection', () => {
+  assert.equal(typeof sceneState.resolveSceneSelection, 'function');
+  const previous = { kind: 'actor', id: 'actor-1' };
+  assert.equal(sceneState.resolveSceneSelection(null, previous), null);
+  assert.deepEqual(sceneState.resolveSceneSelection(undefined, previous), previous);
+  assert.deepEqual(sceneState.resolveSceneSelection({ kind: 'camera', id: 'camera-main' }, previous), { kind: 'camera', id: 'camera-main' });
+});
+
+test('selected actor can be moved in both director and camera view', () => {
+  assert.equal(typeof sceneState.canTransformActor, 'function');
+  const selected = { kind: 'actor', id: 'actor-1' };
+  assert.equal(sceneState.canTransformActor(selected, 'actor-1', 'translate', 'director'), true);
+  assert.equal(sceneState.canTransformActor(selected, 'actor-1', 'translate', 'camera'), true);
+  assert.equal(sceneState.canTransformActor(selected, 'actor-2', 'translate', 'camera'), false);
+  assert.equal(sceneState.canTransformActor(null, 'actor-1', 'translate', 'camera'), false);
+  assert.equal(sceneState.canTransformActor(selected, 'actor-1', 'none', 'camera'), false);
+});
+
 test('stale active camera falls back to camera-main', () => {
   const project = normalizeDirectorProject({ activeCameraId: 'missing' });
   assert.equal(cameraForView(project, 'camera').id, 'camera-main');

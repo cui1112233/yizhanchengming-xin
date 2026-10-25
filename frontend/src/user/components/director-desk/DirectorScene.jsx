@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import * as THREE from 'three';
 import { createAuthenticatedMediaSession } from '../../pages/agent-canvas-media.js';
 import { normalizeDirectorProject, updateDirectorActorTransform, updateDirectorCamera, updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
-import { actorPlaneProps, aspectRatioValue, cameraForView, cameraFromControls, focusDirectorObject, updateCamera } from './director-scene-state.js';
+import { actorPlaneProps, aspectRatioValue, cameraForView, cameraFromControls, canTransformActor, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
 
 export { actorPlaneProps, cameraFromControls, updateCamera } from './director-scene-state.js';
 
@@ -107,7 +107,7 @@ export const DirectorScene = forwardRef(function DirectorScene({ project, images
   onReadyChangeRef.current = onReadyChange;
   const [localSelection, setLocalSelection] = useState(null);
   const [transformDragging, setTransformDragging] = useState(false);
-  const selected = selection ?? localSelection;
+  const selected = resolveSceneSelection(selection, localSelection);
   const current = normalizeDirectorProject(project);
   const cameraState = cameraForView(current, viewMode);
   const ratio = aspectRatioValue(current.aspectRatio);
@@ -145,7 +145,7 @@ export const DirectorScene = forwardRef(function DirectorScene({ project, images
     <directionalLight position={[4, 8, 5]} intensity={1.8} />
     <SceneBackground scene={current.scene} />
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}><planeGeometry args={[30, 30]} /><meshStandardMaterial color="#17212b" roughness={1} /></mesh>
-    {current.actors.map(actor => <Movable key={actor.id} {...actorPlaneProps(actor)} selected={viewMode === 'director' && transformMode === 'translate' && selected?.kind === 'actor' && selected.id === actor.id} onDragging={setTransformDragging} onFinish={object => onProjectChange(updateDirectorActorTransform(current, actor.id, { position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.toArray() }))}><ImageActorPlane
+    {current.actors.map(actor => <Movable key={actor.id} {...actorPlaneProps(actor)} selected={canTransformActor(selected, actor.id, transformMode, viewMode)} onDragging={setTransformDragging} onFinish={object => onProjectChange(updateDirectorActorTransform(current, actor.id, { position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.toArray() }))}><ImageActorPlane
       actor={{ ...actor, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
       asset={(images || []).find(image => image.id === actor.assetId)}
       selected={selected?.kind === 'actor' && selected.id === actor.id}

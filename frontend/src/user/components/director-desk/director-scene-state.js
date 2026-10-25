@@ -2,6 +2,14 @@ import { normalizeDirectorProject, updateDirectorViewCamera } from '../../pages/
 
 const RATIOS = Object.freeze({ '21:9': 21 / 9, '16:9': 16 / 9, '4:3': 4 / 3, '1:1': 1, '3:4': 3 / 4, '9:16': 9 / 16 });
 
+export function resolveSceneSelection(selection, localSelection) {
+  return selection === undefined ? localSelection : selection;
+}
+
+export function canTransformActor(selection, actorId, transformMode, viewMode) {
+  return (viewMode === 'director' || viewMode === 'camera') && transformMode === 'translate' && selection?.kind === 'actor' && selection.id === actorId;
+}
+
 export function aspectRatioValue(value) {
   return Object.hasOwn(RATIOS, value) ? RATIOS[value] : null;
 }
