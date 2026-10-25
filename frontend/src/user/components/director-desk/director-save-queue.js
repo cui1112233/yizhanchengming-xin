@@ -3,9 +3,11 @@ export function createDirectorSaveQueue(write, { onStatus = () => {} } = {}) {
   let inFlight = null;
   let status = 'saved';
   let lastError = null;
+  let scheduleVersion = 0;
 
   function drain() {
     if (inFlight) return inFlight;
+    let failedAtVersion = null;
     inFlight = Promise.resolve().then(async () => {
       while (pending !== null) {
         const value = pending;
@@ -21,16 +23,23 @@ export function createDirectorSaveQueue(write, { onStatus = () => {} } = {}) {
           if (pending === null) pending = value;
           status = 'error';
           lastError = error;
+          failedAtVersion = scheduleVersion;
           onStatus(status, error);
           throw error;
         }
       }
-    }).finally(() => { inFlight = null; });
+    }).finally(() => {
+      inFlight = null;
+      if (failedAtVersion !== null && scheduleVersion > failedAtVersion) {
+        queueMicrotask(() => { void drain().catch(() => {}); });
+      }
+    });
     return inFlight;
   }
 
   return {
     schedule(value) {
+      scheduleVersion += 1;
       pending = value;
       status = 'dirty';
       onStatus(status);

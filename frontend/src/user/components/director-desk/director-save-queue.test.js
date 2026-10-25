@@ -69,3 +69,30 @@ test('旧写入失败不能覆盖较新的待保存状态，flush 可重试最�
   assert.deepEqual(writes, [1, 2]);
   assert.equal(queue.getStatus(), 'saved');
 });
+
+test('错误状态回调中安排的新内容会自动写入，旧失败内容不会自动重试', async () => {
+  const writes = [];
+  let queue;
+  queue = createDirectorSaveQueue(async value => {
+    writes.push(value.revision);
+    if (value.revision === 1) throw new Error('保存失败');
+  }, { onStatus: status => {
+    if (status === 'error') queue.schedule({ revision: 2 });
+  } });
+  queue.schedule({ revision: 1 });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(writes, [1, 2]);
+  assert.equal(queue.getStatus(), 'saved');
+});
+
+test('没有新内容时失败不会自动重复写入', async () => {
+  let attempts = 0;
+  const queue = createDirectorSaveQueue(async () => {
+    attempts += 1;
+    throw new Error('保存失败');
+  });
+  queue.schedule({ revision: 1 });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(attempts, 1);
+  assert.equal(queue.getStatus(), 'error');
+});
