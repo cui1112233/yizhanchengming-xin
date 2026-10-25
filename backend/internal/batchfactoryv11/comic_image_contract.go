@@ -22,6 +22,10 @@ type ComicImageContract struct {
 	SnapshotHash       string   `json:"snapshotHash"`
 }
 
+func ComicImageStyleConfigured(settings SettingsPatch) bool {
+	return normalizeProductionMode(settings) == "comic" && strings.TrimSpace(aiReasoningPromptConfig(settings).Comic.Style.Body) != ""
+}
+
 func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, content string, assetImageURLs, pageReferenceURLs []string) (ComicImageContract, error) {
 	if normalizeProductionMode(settings) != "comic" {
 		return ComicImageContract{}, fmt.Errorf("%w: 当前书不是漫画生成模式", ErrConflict)

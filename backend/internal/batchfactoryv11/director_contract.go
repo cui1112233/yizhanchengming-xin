@@ -108,9 +108,14 @@ type AIReasoningComicModule struct {
 type ComicGlobalReferenceImage struct {
 	AssetID       string `json:"assetId"`
 	URL           string `json:"url"`
+	PreviewURL    string `json:"previewUrl,omitempty"`
 	Enabled       bool   `json:"enabled"`
 	ApplyToAssets bool   `json:"applyToAssets"`
 	ApplyToPages  bool   `json:"applyToPages"`
+}
+
+func ComicGlobalReference(settings SettingsPatch) ComicGlobalReferenceImage {
+	return aiReasoningPromptConfig(settings).Comic.GlobalReferenceImage
 }
 
 func (m AIReasoningComicModule) body() string {

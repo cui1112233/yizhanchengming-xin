@@ -270,6 +270,81 @@ type CreateBookAssetImageInput struct {
 	Source     string `json:"source"`
 }
 
+type ComicPage struct {
+	ID          string           `json:"id"`
+	BatchID     string           `json:"batchId"`
+	BookID      string           `json:"bookId"`
+	VideoID     string           `json:"videoId"`
+	ComicPrompt string           `json:"comicPrompt"`
+	ImagePrompt string           `json:"imagePrompt"`
+	ModelID     string           `json:"modelId,omitempty"`
+	AspectRatio string           `json:"aspectRatio"`
+	Status      string           `json:"status"`
+	Revision    int64            `json:"revision"`
+	Images      []ComicPageImage `json:"images"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
+}
+
+type UpsertComicPageInput struct {
+	ComicPrompt        string   `json:"comicPrompt"`
+	ImagePrompt        string   `json:"imagePrompt"`
+	ReferenceImageURLs []string `json:"referenceImageUrls,omitempty"`
+	Provider           string   `json:"provider,omitempty"`
+	ModelID            string   `json:"modelId,omitempty"`
+	AspectRatio        string   `json:"aspectRatio"`
+	Status             string   `json:"status,omitempty"`
+}
+
+type ComicPageImage struct {
+	ID          string    `json:"id"`
+	BatchID     string    `json:"-"`
+	BookID      string    `json:"-"`
+	ComicPageID string    `json:"comicPageId"`
+	URL         string    `json:"url,omitempty"`
+	StorageRef  string    `json:"-"`
+	MediaType   string    `json:"mediaType"`
+	Source      string    `json:"source"`
+	IsPrimary   bool      `json:"isPrimary"`
+	Revision    int64     `json:"revision"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+type CreateComicPageImageInput struct {
+	URL        string `json:"url,omitempty"`
+	StorageRef string `json:"-"`
+	MediaType  string `json:"mediaType,omitempty"`
+	Source     string `json:"source"`
+}
+
+type ComicCollectionItem struct {
+	Ordinal     int    `json:"ordinal"`
+	VideoID     string `json:"videoId"`
+	ComicPageID string `json:"comicPageId"`
+	ImageID     string `json:"imageId"`
+	URL         string `json:"url,omitempty"`
+	StorageRef  string `json:"-"`
+	MediaType   string `json:"mediaType"`
+}
+
+type ComicCollection struct {
+	ID        string                `json:"id"`
+	BatchID   string                `json:"batchId"`
+	BookID    string                `json:"bookId"`
+	Status    string                `json:"status"`
+	Items     []ComicCollectionItem `json:"items"`
+	CreatedAt time.Time             `json:"createdAt"`
+}
+
+type ComicPageStore interface {
+	UpsertComicPage(context.Context, string, string, string, string, UpsertComicPageInput) (ComicPage, error)
+	ListComicPages(context.Context, string, string, string) ([]ComicPage, error)
+	CreateComicPageImage(context.Context, string, string, string, string, CreateComicPageImageInput) (ComicPageImage, error)
+	SetPrimaryComicPageImage(context.Context, string, string, string, string, string) (ComicPageImage, error)
+	CreateComicCollection(context.Context, string, string, string) (ComicCollection, []string, error)
+	ListComicCollections(context.Context, string, string, string) ([]ComicCollection, error)
+}
+
 type OrphanedOverride struct {
 	VideoID string        `json:"videoId"`
 	Patch   SettingsPatch `json:"patch"`
@@ -374,6 +449,7 @@ type Store interface {
 	CreateBookAssetImage(context.Context, string, string, string, string, CreateBookAssetImageInput) (BookAssetImage, error)
 	SetPrimaryBookAssetImage(context.Context, string, string, string, string, string) (BookAssetImage, error)
 	PersistExtractedBookAssets(context.Context, string, Book, DirectorSnapshot, DirectorAssets) ([]BookAsset, error)
+	PersistComicExtractedBookAssets(context.Context, string, Book, DirectorSnapshot, DirectorAssets) ([]BookAsset, error)
 	CreateHookRevision(context.Context, string, string, string, string, string) (HookRevision, error)
 	ApproveHookRevision(context.Context, string, string, string, string) (HookRevision, error)
 	LatestHookRevision(context.Context, string, string, string) (HookRevision, error)

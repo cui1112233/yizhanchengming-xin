@@ -42,6 +42,10 @@ func readRuntimeManifest(path string) runtimeManifest {
 }
 
 type RouterOptions struct {
+	AgentVideoWorkerContext         context.Context
+	AgentScriptSplitWorkerContext   context.Context
+	AgentImageWorkerContext         context.Context
+	AgentAudioWorkerContext         context.Context
 	BridgeSecret                    string
 	ReleaseSHA                      string
 	RuntimeManifestPath             string
@@ -118,10 +122,12 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
-	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, options.External != nil && options.External.Enabled[external.Provider121], options.External != nil && options.External.Enabled[external.ProviderYadi]))
+	publish121Available := options.VideoManagementConnector != nil || (options.External != nil && options.External.Enabled[external.Provider121])
+	publishYadiAvailable := options.External != nil && options.External.Enabled[external.ProviderYadi]
+	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, publish121Available, publishYadiAvailable))
 	// V12 is the public workbench namespace. Keep its capability contract on
 	// Go even while a few legacy V12 adapters still bridge to Node.
-	v12.HandleFunc("GET /api/batch-factory/v12/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, options.External != nil && options.External.Enabled[external.Provider121], options.External != nil && options.External.Enabled[external.ProviderYadi]))
+	v12.HandleFunc("GET /api/batch-factory/v12/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, publish121Available, publishYadiAvailable))
 	if options.Store != nil && options.Slice >= 1 {
 		registerSliceOneRoutes(v11, options.Store, options.PresetCatalog)
 		registerV12IntakeRoutes(v12, options.Store)
@@ -132,7 +138,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerConfiguredImageGenerationRoute(v11, options.Store, options.NovelFetchStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, options.NovelFetchStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
-		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.NovelFetchStore)
+		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore)
+		registerComicPageRoutes(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore)
 	}
 	if options.NovelFetchFetcher != nil {
 		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher, batchFetchClassification{
@@ -170,7 +177,7 @@ func NewRouter(options RouterOptions) http.Handler {
 				for _, asset := range book.AssetRecords {
 					assetIDs = append(assetIDs, asset.ID)
 				}
-				_, err = generateShuihuoAssetImages(ctx, options.Store, options.LocalArtifacts, owner, batch, assetIDs, "", "9:16", options.NovelFetchStore)
+				_, err = generateShuihuoAssetImages(ctx, options.Store, options.LocalArtifacts, owner, batch, assetIDs, "", "9:16", "", options.LocalExecutors, options.NovelFetchStore)
 				return err
 			}
 		}
@@ -211,7 +218,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	// Completed local merge artifacts must remain readable in the ordinary
 	// review runtime. This only exposes owner-scoped GET routes; merge writes
 	// remain gated by the production slice below.
-	if mergeStatus != nil && options.LocalArtifacts != nil {
+	if mergeStatus != nil {
 		var mergeReader mergeworker.ObjectReader
 		if candidate, ok := options.MergeOutput.(mergeworker.ObjectReader); ok {
 			mergeReader = candidate
@@ -320,19 +327,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterAccountPasskeyCompat(root, auth, options.MemberProfileStore, options.AuthStore)
 		RegisterAccountPurgeCompat(root, auth, options.AuthStore, options.MemberProfileStore, options.MemberAvatarDir)
 	}
-	RegisterNovelPanelDiagnosticsCompat(root, auth, options.UserDataDir)
-	RegisterNovelPanelSettingsCompat(root, auth, options.UserConfigStore, options.TextProvider, options.NovelFetchStore)
-	RegisterNovelPanelAssetCompat(root, auth, options.UserDataDir)
-	RegisterNovelPanelCharacterCompat(root, auth)
-	RegisterNovelPanelLeaseCompat(root, auth)
-	RegisterNovelPanelCharacterTraceCompat(root, auth, options.UserDataDir)
-	RegisterNovelPanelCharacterAICompat(root, auth, options.TextProvider)
-	RegisterNovelPanelAnalysisCompat(root, auth, options.TextProvider, options.PresetCatalog)
-	RegisterNovelPanelTextOpsCompat(root, auth, options.TextProvider)
-	RegisterNovelPanelOutlineCompat(root, auth, options.TextProvider, options.PresetCatalog)
-	RegisterNovelPanelAssetDescribeCompat(root, auth, options.TextProvider)
-	RegisterNovelPanelImageGenerateCompat(root, auth, options.UserConfigStore, options.NovelFetchStore)
-	RegisterNovelPanelClipboardCompat(root, auth)
+	RegisterReferenceAssetRoutes(root, auth, options.UserDataDir)
+	registerReferenceAssetImageGenerateRoute(root, auth, options.UserConfigStore, options.NovelFetchStore, options.LocalExecutors)
 	registerUserConfigRoutes(root, auth, options.UserConfigStore, options.AuthStore, options.NovelFetchStore, options.MemberProfileStore)
 	RegisterStorageRoutes(root, auth, options.UserConfigStore, options.ScriptHistoryStore)
 	RegisterPlatformProjectsRoute(root, auth, options.ScriptHistoryStore, options.Store)
@@ -340,26 +336,66 @@ func NewRouter(options RouterOptions) http.Handler {
 	RegisterNovelFetchUploadBatchCompat(root, novelCompatAuth, options.UserDataDir, options.NovelFetchStore, options.VideoManagementConnector)
 	RegisterWebSubmitTargetCheckCompat(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
 	publish121OrganizationsHandler(root, novelCompatAuth, options.UserDataDir, options.VideoManagementConnector)
+	if options.AgentWorkspace != nil {
+		RegisterAgentGenerationHistoryRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.Now)
+		RegisterAgentMaterialLibraryRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.Now)
+	}
 	if options.UserConfigStore != nil {
 		RegisterAgentWorkspaceCompat(root, auth, options.AgentWorkspace, options.UserConfigStore.BaseDir, options.TextProvider, options.Now)
 		if batchFactoryBridgeStore, ok := options.Store.(agentBatchFactoryBridgeStore); ok {
 			if projectionStore, projectionOK := options.AgentWorkspace.(agentworkspace.BatchFactoryProjectionStore); projectionOK {
+				var mergeMedia mergeworker.ObjectReader
+				if candidate, ok := options.MergeOutput.(mergeworker.ObjectReader); ok {
+					mergeMedia = candidate
+				}
 				projection := &agentworkspace.BatchFactoryProjectionService{
 					CanvasStore: projectionStore, BatchFactory: batchFactoryBridgeStore,
+					MergeStatus:  mergeStatus,
 					AudioRecords: newBatchFactoryProductionAudioReader(batchFactoryBridgeStore, options.LocalArtifacts), Now: options.Now,
 				}
-				RegisterAgentBatchFactoryBridge(root, auth, options.AgentWorkspace, batchFactoryBridgeStore, projection, options.Now)
+				RegisterAgentBatchFactoryBridge(root, auth, options.AgentWorkspace, batchFactoryBridgeStore, projection, options.Now, agentBatchFactoryBridgeMedia{Local: options.LocalArtifacts, Remote: mergeMedia})
 			}
 		}
 		RegisterAgentAssetRoutes(root, auth, options.AgentWorkspace, options.AgentAssets, options.AgentAssetObjects, options.Now)
+		RegisterAgentExecutorReferenceAssetRoutes(root, options.LocalExecutors, options.AgentAssets, options.AgentAssetObjects)
+		RegisterAgentGenerationTaskRoutes(root, auth, options.AgentWorkspace, options.Now)
+		if options.AgentAssets != nil && options.AgentAssetObjects != nil {
+			audioServices := AgentAudioServices{
+				Projects: options.AgentWorkspace, Assets: options.AgentAssets, Objects: options.AgentAssetObjects,
+				Catalog:   options.NovelFetchStore,
+				Generator: &configuredAgentAudioGenerator{catalog: options.NovelFetchStore}, Processor: &FFmpegAgentAudioProcessor{}, Waveform: &FFmpegAgentAudioWaveform{}, QueueAudio: true, Now: options.Now,
+			}
+			RegisterAgentAudioJobRoutes(root, auth, audioServices)
+			if options.AgentAudioWorkerContext != nil {
+				go newAgentAudioCoordinator(audioServices).Run(options.AgentAudioWorkerContext)
+			}
+			videoToolServices := AgentVideoToolServices{
+				Projects: options.AgentWorkspace, Assets: options.AgentAssets, Objects: options.AgentAssetObjects,
+				Processor: &FFmpegAgentVideoProcessor{}, Now: options.Now,
+			}
+			RegisterAgentVideoToolRoutes(root, auth, videoToolServices)
+			if options.AgentVideoWorkerContext != nil {
+				go newAgentVideoToolCoordinator(videoToolServices).Run(options.AgentVideoWorkerContext)
+			}
+		}
 		textModels := options.AgentTextModelResolver
 		if textModels == nil && options.NovelFetchStore != nil {
 			textModels = func(ctx context.Context, owner, modelID string) (batchfactoryv11.DirectorProvider, error) {
 				return resolveAgentTextModel(ctx, options.NovelFetchStore, owner, modelID)
 			}
 		}
-		imageGenerate := newAgentImageGenerator(options.Store, options.NovelFetchStore, options.LocalExecutors, options.LocalArtifacts)
-		RegisterAgentNodeGenerationRoutes(root, auth, AgentNodeGenerationServices{Projects: options.AgentWorkspace, TextModels: textModels, Assets: options.AgentAssets, Objects: options.AgentAssetObjects, ImageGenerate: imageGenerate, Now: options.Now})
+		var imageReferences agentworkspace.ReferenceURLProvider
+		if options.AgentAssetObjects != nil {
+			imageReferences, _ = options.AgentAssetObjects.(agentworkspace.ReferenceURLProvider)
+		}
+		imageGenerate := newAgentImageGenerator(options.Store, options.NovelFetchStore, options.LocalExecutors, options.LocalArtifacts, options.AgentAssets, imageReferences)
+		textComplete := newAgentTextCompletionExecutor(textModels)
+		imageServices := AgentNodeGenerationServices{Projects: options.AgentWorkspace, Catalog: options.NovelFetchStore, TextModels: textModels, TextComplete: textComplete, Assets: options.AgentAssets, Objects: options.AgentAssetObjects, ImageGenerate: imageGenerate, ImageProcess: NewAgentImageProcessor(), QueueImages: true, Now: options.Now}
+		RegisterAgentNodeGenerationRoutes(root, auth, imageServices)
+		if options.AgentImageWorkerContext != nil {
+			go newAgentImageCoordinator(imageServices).Run(options.AgentImageWorkerContext)
+		}
+		var videoCoordinator *agentVideoCoordinator
 		if options.NovelFetchStore != nil && options.AgentWorkspace != nil && options.AgentAssets != nil {
 			var references agentworkspace.ReferenceURLProvider
 			if options.AgentAssetObjects != nil {
@@ -372,12 +408,21 @@ func NewRouter(options RouterOptions) http.Handler {
 				}
 				return scriptVideoModelConfig(ctx, options.Store, owner, config, modelKey)
 			}
-			RegisterAgentVideoJobRoutes(root, auth, &agentVideoCoordinator{
-				projects: options.AgentWorkspace, assets: options.AgentAssets, references: references,
+			videoCoordinator = &agentVideoCoordinator{
+				projects: options.AgentWorkspace, catalog: options.NovelFetchStore, assets: options.AgentAssets, references: references,
 				videos:   &scriptVideoService{resolver: videoResolver, localExecutor: options.LocalExecutors},
 				ingestor: newAgentVideoAssetIngestor(options.AgentAssets, options.AgentAssetObjects, nil, options.Now),
 				executor: options.LocalExecutors, artifacts: options.LocalArtifacts, now: options.Now,
-			})
+			}
+			RegisterAgentVideoJobRoutes(root, auth, videoCoordinator)
+			if options.AgentVideoWorkerContext != nil {
+				go videoCoordinator.Run(options.AgentVideoWorkerContext)
+			}
+		}
+		scriptShotServices := AgentScriptShotServices{Projects: options.AgentWorkspace, TextModels: textModels, TextComplete: textComplete, Models: agentConfiguredModelResolver(options.NovelFetchStore), Dispatch: newAgentShotGenerationDispatcher(root, auth, options.Now, videoCoordinator), Now: options.Now}
+		RegisterAgentScriptShotRoutes(root, auth, scriptShotServices)
+		if options.AgentScriptSplitWorkerContext != nil {
+			go newAgentScriptSplitCoordinator(scriptShotServices).Run(options.AgentScriptSplitWorkerContext)
 		}
 		systemDir := ""
 		if options.MemberProfileStore != nil {
@@ -397,7 +442,8 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}
-	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore, options.PresetCatalog, options.RedisURL)
+	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore, options.PresetCatalog, options.RedisURL, options.LocalExecutors)
+	RegisterBatchComicReferenceRoutes(root, auth, options.Store, options.LocalArtifacts, options.LocalExecutors)
 	registerTTSRoute(root, auth, options.NovelFetchStore)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)
@@ -620,6 +666,11 @@ func shuihuoVideoReadyChecker(store batchfactoryv11.Store, catalogStore novelfet
 	return func(ctx context.Context, owner string) (bool, string) {
 		if production == nil || !production.Enabled {
 			return false, "视频生成服务未启用"
+		}
+		if production.LocalExecutor != nil {
+			if err := production.LocalExecutor.EnsureAvailable(ctx, owner); err == nil {
+				return true, ""
+			}
 		}
 		config, err := loadShuihuoOwnerConfig(ctx, store, owner, catalogStore)
 		if err != nil {

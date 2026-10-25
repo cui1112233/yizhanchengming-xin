@@ -132,7 +132,7 @@ func shuihuoRedisHealth(ctx context.Context, rawURL string) (bool, string) {
 	return false, "Redis 未返回 PONG"
 }
 
-func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, redisURL string) {
+func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, director *batchfactoryv11.DirectorService, textProvider batchfactoryv11.DirectorProvider, production *batchfactoryv11.ProductionService, catalogStore novelfetchworkshop.Store, presetCatalog *prompt.Catalog, redisURL string, localExecutors *localexecutor.Service) {
 	if store == nil {
 		return
 	}
@@ -816,6 +816,9 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 			projects := make([]map[string]any, 0, len(batches))
 			for _, batch := range batches {
+				if !isShuihuoProjectBatch(batch) {
+					continue
+				}
 				projects = append(projects, shuihuoProject(batch))
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"projects": projects})
@@ -1355,7 +1358,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if !decodeJSON(w, r, &input) {
 				return
 			}
-			images, generationErr := generateShuihuoAssetImages(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio, catalogStore)
+			images, generationErr := generateShuihuoAssetImages(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio, "", localExecutors, catalogStore)
 			if generationErr != nil {
 				writeStoreError(w, generationErr)
 				return
@@ -1365,14 +1368,16 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 		}
 		if len(parts) == 2 && parts[1] == "assets" && r.Method == http.MethodPost {
 			var input struct {
-				Category      string `json:"category"`
-				Kind          string `json:"kind"`
-				Name          string `json:"name"`
-				FormalName    string `json:"formalName"`
-				Facts         string `json:"facts"`
-				Appearance    string `json:"appearance"`
-				Relationships string `json:"relationships"`
-				Prompt        string `json:"prompt"`
+				Category         string `json:"category"`
+				Kind             string `json:"kind"`
+				Name             string `json:"name"`
+				FormalName       string `json:"formalName"`
+				Facts            string `json:"facts"`
+				Appearance       string `json:"appearance"`
+				Relationships    string `json:"relationships"`
+				Prompt           string `json:"prompt"`
+				ImageModelID     string `json:"imageModelId"`
+				ImageAspectRatio string `json:"imageAspectRatio"`
 			}
 			if !decodeJSON(w, r, &input) {
 				return
@@ -1388,7 +1393,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if kind == "" {
 				kind = "character"
 			}
-			if _, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: strings.TrimSpace(input.Prompt)}); err != nil {
+			if _, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: strings.TrimSpace(input.Prompt), ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio}); err != nil {
 				writeStoreError(w, err)
 				return
 			}
@@ -1406,15 +1411,17 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				return
 			}
 			var input struct {
-				Category      string `json:"category"`
-				Kind          string `json:"kind"`
-				Name          string `json:"name"`
-				FormalName    string `json:"formalName"`
-				Facts         string `json:"facts"`
-				Appearance    string `json:"appearance"`
-				Relationships string `json:"relationships"`
-				Prompt        string `json:"prompt"`
-				DataURL       string `json:"dataUrl"`
+				Category         string `json:"category"`
+				Kind             string `json:"kind"`
+				Name             string `json:"name"`
+				FormalName       string `json:"formalName"`
+				Facts            string `json:"facts"`
+				Appearance       string `json:"appearance"`
+				Relationships    string `json:"relationships"`
+				Prompt           string `json:"prompt"`
+				ImageModelID     string `json:"imageModelId"`
+				ImageAspectRatio string `json:"imageAspectRatio"`
+				DataURL          string `json:"dataUrl"`
 			}
 			if !decodeJSON(w, r, &input) {
 				return
@@ -1431,7 +1438,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if kind == "" {
 				kind = "character"
 			}
-			asset, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: strings.TrimSpace(input.Prompt)})
+			asset, err := store.CreateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: kind, Name: strings.TrimSpace(input.Name), FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: strings.TrimSpace(input.Prompt), ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio})
 			if err != nil {
 				writeStoreError(w, err)
 				return
@@ -1927,6 +1934,8 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 					Appearance       string `json:"appearance"`
 					Relationships    string `json:"relationships"`
 					Prompt           string `json:"prompt"`
+					ImageModelID     string `json:"imageModelId"`
+					ImageAspectRatio string `json:"imageAspectRatio"`
 					ExpectedRevision int64  `json:"expectedRevision"`
 				}
 				if !decodeJSON(w, r, &input) {
@@ -1935,7 +1944,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 				if input.ExpectedRevision == 0 {
 					input.ExpectedRevision = asset.Revision
 				}
-				updated, updateErr := store.UpdateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, batchfactoryv11.UpdateBookAssetInput{Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ExpectedRevision: input.ExpectedRevision})
+				updated, updateErr := store.UpdateBookAsset(r.Context(), owner, batch.ID, batch.Books[0].ID, assetID, batchfactoryv11.UpdateBookAssetInput{Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, ExpectedRevision: input.ExpectedRevision})
 				if updateErr != nil {
 					writeStoreError(w, updateErr)
 					return
@@ -2255,6 +2264,7 @@ func shuihuoAssets(batch batchfactoryv11.Batch) []map[string]any {
 	for _, asset := range batch.Books[0].AssetRecords {
 		assets = append(assets, map[string]any{
 			"id": asset.ID, "category": asset.Kind, "kind": asset.Kind, "name": asset.Name, "prompt": asset.Prompt,
+			"imageModelId": asset.ImageModelID, "imageAspectRatio": asset.ImageAspectRatio,
 			"source": asset.Source, "revision": asset.Revision, "createdAt": asset.CreatedAt, "updatedAt": asset.UpdatedAt,
 		})
 	}
@@ -2781,7 +2791,7 @@ func generateShuihuoPromptCandidates(ctx context.Context, provider batchfactoryv
 	return items, "text_model", nil
 }
 
-func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio string, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
+func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -2798,34 +2808,8 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 	if err != nil {
 		return nil, err
 	}
-	var model map[string]any
-	for _, candidate := range shuihuoCollection(config, "modelCatalog", nil) {
-		if !strings.EqualFold(modelString(candidate, "kind"), "image") || (modelID != "" && modelString(candidate, "modelId") != strings.TrimSpace(modelID)) {
-			continue
-		}
-		enabled, hasEnabled := candidate["enabled"].(bool)
-		if hasEnabled && !enabled {
-			continue
-		}
-		model = candidate
-		break
-	}
-	if model == nil {
-		return nil, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
-	}
-	endpointRaw := modelString(model, "endpoint")
-	if endpointRaw == "" {
-		endpointRaw = modelString(model, "baseUrl")
-	}
-	endpoint, err := shuihuoImageGenerationEndpoint(endpointRaw)
-	if err != nil {
-		return nil, fmt.Errorf("%w: image model endpoint is invalid", batchfactoryv11.ErrInvalid)
-	}
-	apiKey := shuihuoModelCredential(model)
-	if apiKey == "" {
-		return nil, fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
-	}
-	client := &http.Client{Timeout: 120 * time.Second}
+	catalog := shuihuoCollection(config, "modelCatalog", nil)
+	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, batch.Books[0].SettingsState.Patch)
 	generated := make([]batchfactoryv11.BookAssetImage, 0, len(wanted))
 	for _, asset := range batch.Books[0].AssetRecords {
 		if !wanted[asset.ID] {
@@ -2835,47 +2819,26 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 		if prompt == "" {
 			return nil, fmt.Errorf("%w: asset %s has no prompt", batchfactoryv11.ErrInvalid, asset.ID)
 		}
-		payload := map[string]any{"model": modelString(model, "modelId"), "prompt": prompt, "n": 1, "size": shuihuoImageSize(aspectRatio), "response_format": "b64_json"}
-		body, _ := json.Marshal(payload)
-		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-		if requestErr != nil {
-			return nil, fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+		target, targetErr := resolveShuihuoAssetImageTarget(asset, modelID, aspectRatio, provider, catalog)
+		if targetErr != nil {
+			return nil, targetErr
 		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-		response, requestErr := client.Do(req)
-		if requestErr != nil {
-			return nil, fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, requestErr)
+		referenceImageURLs := []string(nil)
+		if asset.Source == "comic" && batchfactoryv11.ComicImageStyleConfigured(effective) {
+			contract, compileErr := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposeAsset, prompt, nil, nil)
+			if compileErr != nil {
+				return nil, compileErr
+			}
+			prompt = contract.Prompt
+			referenceImageURLs = contract.ReferenceImageURLs
 		}
-		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
-		response.Body.Close()
-		if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-			return nil, fmt.Errorf("%w: image provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+		mediaType, storageRef, source, generateErr := generateShuihuoImageArtifact(ctx, files, owner, target, prompt, referenceImageURLs, localExecutors)
+		if generateErr != nil {
+			return nil, generateErr
 		}
-		var result struct {
-			Data []struct {
-				B64JSON string `json:"b64_json"`
-				URL     string `json:"url"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
-			return nil, fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
-		}
-		mediaType, imageBytes, decodeErr := decodeShuihuoGeneratedImage(ctx, client, result.Data[0].B64JSON, result.Data[0].URL)
-		if decodeErr != nil {
-			return nil, fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, decodeErr)
-		}
-		artifactID, idErr := localexecutor.NewArtifactID()
-		if idErr != nil {
-			return nil, idErr
-		}
-		saved, saveErr := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
-		if saveErr != nil {
-			return nil, saveErr
-		}
-		image, createErr := store.CreateBookAssetImage(ctx, owner, batch.ID, batch.Books[0].ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: saved.StorageRef, MediaType: mediaType, Source: "provider"})
+		image, createErr := store.CreateBookAssetImage(ctx, owner, batch.ID, batch.Books[0].ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: storageRef, MediaType: mediaType, Source: source})
 		if createErr != nil {
-			_ = files.Remove(saved.StorageRef)
+			_ = files.Remove(storageRef)
 			return nil, createErr
 		}
 		generated = append(generated, image)
@@ -2884,6 +2847,193 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 		return nil, fmt.Errorf("%w: selected asset not found", batchfactoryv11.ErrNotFound)
 	}
 	return generated, nil
+}
+
+func generateShuihuoImageArtifact(ctx context.Context, files *localartifact.Store, owner string, target shuihuoAssetImageTarget, prompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (string, string, string, error) {
+	if files == nil {
+		return "", "", "", fmt.Errorf("%w: image storage is unavailable", batchfactoryv11.ErrUnavailable)
+	}
+	if target.Provider == batchfactoryv11.VideoProviderDoubaoLocal {
+		if localExecutors == nil {
+			return "", "", "", fmt.Errorf("%w: 豆包本地执行器未配置", batchfactoryv11.ErrUnavailable)
+		}
+		mediaType, storageRef, err := waitForLocalExecutorImage(ctx, localExecutors, files, owner, target.ModelID, prompt, shuihuoImageSize(target.AspectRatio), map[string]any{"referenceImages": referenceImageURLs, "imageUrls": referenceImageURLs})
+		return mediaType, storageRef, "doubao_local_executor", err
+	}
+	if len(referenceImageURLs) > 0 {
+		return "", "", "", fmt.Errorf("%w: 当前图片接口不支持参考图，请改用支持参考图的豆包执行器", batchfactoryv11.ErrConflict)
+	}
+	model := target.CatalogModel
+	endpointRaw := modelString(model, "endpoint")
+	if endpointRaw == "" {
+		endpointRaw = modelString(model, "baseUrl")
+	}
+	endpoint, err := shuihuoImageGenerationEndpoint(endpointRaw)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: image model endpoint is invalid", batchfactoryv11.ErrInvalid)
+	}
+	credential := shuihuoModelCredential(model)
+	if credential == "" {
+		return "", "", "", fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
+	}
+	payload := map[string]any{"model": target.ModelID, "prompt": prompt, "n": 1, "size": shuihuoImageSize(target.AspectRatio), "response_format": "b64_json"}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+credential)
+	client := &http.Client{Timeout: 120 * time.Second}
+	response, err := client.Do(req)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	response.Body.Close()
+	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		return "", "", "", fmt.Errorf("%w: image provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+	}
+	var result struct {
+		Data []struct {
+			B64JSON string `json:"b64_json"`
+			URL     string `json:"url"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
+		return "", "", "", fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
+	}
+	mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, client, result.Data[0].B64JSON, result.Data[0].URL)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	artifactID, err := localexecutor.NewArtifactID()
+	if err != nil {
+		return "", "", "", err
+	}
+	saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
+	if err != nil {
+		return "", "", "", err
+	}
+	return mediaType, saved.StorageRef, "provider", nil
+}
+
+type shuihuoAssetImageTarget struct {
+	Provider     string
+	ModelID      string
+	AspectRatio  string
+	CatalogModel map[string]any
+}
+
+func resolveShuihuoAssetImageTarget(asset batchfactoryv11.BookAsset, fallbackModelID, fallbackAspectRatio, fallbackProvider string, catalog []map[string]any) (shuihuoAssetImageTarget, error) {
+	selectedModelID, resolvedAspectRatio := resolveShuihuoAssetImageSettings(asset, fallbackModelID, fallbackAspectRatio)
+	provider := batchfactoryv11.NormalizeVideoProviderForHTTP(fallbackProvider)
+	if provider == batchfactoryv11.VideoProviderDoubaoLocal && selectedModelID != "" {
+		return shuihuoAssetImageTarget{Provider: provider, ModelID: selectedModelID, AspectRatio: resolvedAspectRatio}, nil
+	}
+	for _, candidate := range catalog {
+		if !strings.EqualFold(modelString(candidate, "kind"), "image") {
+			continue
+		}
+		if selectedModelID != "" && !strings.EqualFold(modelString(candidate, "id"), selectedModelID) && !strings.EqualFold(modelString(candidate, "modelId"), selectedModelID) {
+			continue
+		}
+		if enabled, exists := candidate["enabled"].(bool); exists && !enabled {
+			continue
+		}
+		candidateProvider := modelString(candidate, "provider")
+		if candidateProvider == "" && strings.EqualFold(selectedModelID, strings.TrimSpace(fallbackModelID)) {
+			candidateProvider = fallbackProvider
+		}
+		providerModelID := modelString(candidate, "modelId")
+		if providerModelID == "" {
+			providerModelID = modelString(candidate, "id")
+		}
+		return shuihuoAssetImageTarget{
+			Provider:     batchfactoryv11.NormalizeVideoProviderForHTTP(candidateProvider),
+			ModelID:      providerModelID,
+			AspectRatio:  resolvedAspectRatio,
+			CatalogModel: candidate,
+		}, nil
+	}
+	return shuihuoAssetImageTarget{}, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
+}
+
+func resolveShuihuoAssetImageSettings(asset batchfactoryv11.BookAsset, fallbackModelID, fallbackAspectRatio string) (modelID, aspectRatio string) {
+	modelID = strings.TrimSpace(asset.ImageModelID)
+	if modelID == "" {
+		modelID = strings.TrimSpace(fallbackModelID)
+	}
+	aspectRatio = strings.TrimSpace(asset.ImageAspectRatio)
+	if aspectRatio == "" {
+		aspectRatio = strings.TrimSpace(fallbackAspectRatio)
+	}
+	return modelID, aspectRatio
+}
+
+func waitForLocalExecutorImage(ctx context.Context, service *localexecutor.Service, files *localartifact.Store, owner, model, prompt, size string, extra ...map[string]any) (string, string, error) {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = "Seedream 4.5"
+	}
+	payload := map[string]any{"type": "image", "model": model, "prompt": prompt, "size": size}
+	if len(extra) > 0 {
+		for key, value := range extra[0] {
+			payload[key] = value
+		}
+	}
+	job, err := service.CreateJob(ctx, owner, localexecutor.CreateJobInput{
+		SourceTaskID: "batch-factory:image:" + time.Now().UTC().Format("20060102150405.000000000"),
+		Platform:     localexecutor.PlatformDoubao,
+		Payload:      payload,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("%w: 创建豆包图片任务失败: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	deadline := time.NewTimer(180 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		current, getErr := service.GetJob(ctx, owner, job.ID)
+		if getErr != nil {
+			return "", "", fmt.Errorf("%w: 读取豆包图片任务失败: %v", batchfactoryv11.ErrUpstream, getErr)
+		}
+		switch current.State {
+		case localexecutor.JobSucceeded:
+			if current.ArtifactID == "" {
+				return "", "", fmt.Errorf("%w: 豆包图片任务没有返回图片", batchfactoryv11.ErrUpstream)
+			}
+			artifact, artifactErr := service.GetArtifact(ctx, owner, current.ArtifactID)
+			if artifactErr != nil {
+				return "", "", fmt.Errorf("%w: 读取豆包图片结果失败: %v", batchfactoryv11.ErrUpstream, artifactErr)
+			}
+			if files == nil || artifact.StorageRef == "" {
+				return "", "", fmt.Errorf("%w: 豆包图片结果文件不存在", batchfactoryv11.ErrUpstream)
+			}
+			return artifact.MediaType, artifact.StorageRef, nil
+		case localexecutor.JobFailed, localexecutor.JobCancelled:
+			return "", "", fmt.Errorf("%w: 豆包图片任务失败: %s", batchfactoryv11.ErrUpstream, artifactErrorMessage(current.ErrorMessage))
+		}
+		select {
+		case <-ctx.Done():
+			return "", "", ctx.Err()
+		case <-deadline.C:
+			return "", "", fmt.Errorf("%w: 豆包图片任务超时", batchfactoryv11.ErrUpstream)
+		case <-ticker.C:
+		}
+	}
+}
+
+func artifactErrorMessage(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "未提供错误信息"
+	}
+	if len(value) > 300 {
+		return value[:300]
+	}
+	return value
 }
 
 func generateShuihuoSegmentAudio(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, segmentID string, catalogStores ...novelfetchworkshop.Store) (map[string]any, error) {
@@ -3075,6 +3225,8 @@ func shuihuoImageSize(aspectRatio string) string {
 	switch strings.TrimSpace(aspectRatio) {
 	case "9:16":
 		return "1024x1792"
+	case "3:4":
+		return "1536x2048"
 	case "1:1":
 		return "1024x1024"
 	default:

@@ -7,6 +7,9 @@ const LOCAL_EXECUTOR_ARTIFACT_PREFIX = '/api/shuihuo-production/local-executor-a
 const LOCAL_MERGE_MEDIA_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/merge-media\/[^/]+$/;
 const LOCAL_MERGE_COVER_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/merge-cover\/[^/]+$/;
 const BOOK_ASSET_IMAGE_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/books\/[^/]+\/assets\/[^/]+\/images\/[^/]+\/content$/;
+const COMIC_PAGE_IMAGE_PATTERN = /^\/api\/batch-factory\/v12\/batches\/[^/]+\/books\/[^/]+\/comic-pages\/[^/]+\/images\/[^/]+\/content$/;
+const COMIC_STYLE_PREVIEW_PATTERN = /^\/api\/presets\/comic-style\/[^/]+\/preview$/;
+const COMIC_GLOBAL_REFERENCE_PATTERN = /^\/api\/batch-factory\/v12\/batches\/[^/]+\/comic-references\/[^/]+\/content$/;
 
 function id(value) {
   return encodeURIComponent(String(value ?? ''));
@@ -98,6 +101,18 @@ function bookAssetImageRequestPath(value) {
   }
 }
 
+function comicPageImageRequestPath(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw, typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'http://qiantie.local');
+    if (!raw.startsWith('/') && typeof window !== 'undefined' && window.location?.origin && parsed.origin !== window.location.origin) return '';
+    return COMIC_PAGE_IMAGE_PATTERN.test(parsed.pathname) ? `${parsed.pathname}${parsed.search}` : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 export function isProtectedProductionMediaURL(value) {
   return Boolean(localExecutorArtifactRequestPath(value));
 }
@@ -124,6 +139,20 @@ export function getBatchFactoryMergeCoverBlob(coverUrl) {
 export function getBookAssetImageBlob(imageUrl) {
   const path = bookAssetImageRequestPath(imageUrl);
   if (!path) return Promise.reject(new Error('Book asset image URL is not a local Batch Factory asset image'));
+  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+}
+
+export function getComicPageImageBlob(imageUrl) {
+  const path = comicPageImageRequestPath(imageUrl);
+  if (!path) return Promise.reject(new Error('Comic page image URL is not a local Batch Factory comic image'));
+  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+}
+
+export function getComicReferencePreviewBlob(imageUrl) {
+  const path = String(imageUrl || '').trim();
+  if (!COMIC_STYLE_PREVIEW_PATTERN.test(path) && !COMIC_GLOBAL_REFERENCE_PATTERN.test(path)) {
+    return Promise.reject(new Error('Comic reference preview URL is not a protected Batch Factory image'));
+  }
   return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
 }
 
@@ -384,6 +413,39 @@ export function runDirector(batchId, bookId) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/director`), { method: 'POST', body: body({}) });
 }
 
+export function uploadComicGlobalReference(batchId, dataUrl) {
+  return apiRequest(bf11Path(`batches/${id(batchId)}/comic-reference/upload`), { method: 'POST', body: body({ dataUrl }) });
+}
+
+function comicPagesPath(batchId, bookId, suffix = '') {
+  const base = bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/comic-pages`);
+  return suffix ? `${base}/${suffix}` : base;
+}
+
+function comicCollectionsPath(batchId, bookId) {
+  return bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/comic-collections`);
+}
+
+export function listComicPages(batchId, bookId, options = {}) {
+  return apiRequest(comicPagesPath(batchId, bookId), options);
+}
+
+export function generateComicPage(batchId, bookId, videoId, payload) {
+  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/generate`), { method: 'POST', body: body(payload) });
+}
+
+export function setPrimaryComicPageImage(batchId, bookId, pageId, imageId) {
+  return apiRequest(comicPagesPath(batchId, bookId, `${id(pageId)}/images/${id(imageId)}/primary`), { method: 'PUT', body: body({}) });
+}
+
+export function createComicCollection(batchId, bookId) {
+  return apiRequest(comicCollectionsPath(batchId, bookId), { method: 'POST', body: body({}) });
+}
+
+export function listComicCollections(batchId, bookId, options = {}) {
+  return apiRequest(comicCollectionsPath(batchId, bookId), options);
+}
+
 function directorPromptCandidatePath(batchId, bookId) {
   return `/api/batch-factory/v11/batches/${id(batchId)}/books/${id(bookId)}/director-prompt-candidate`;
 }
@@ -438,6 +500,10 @@ export function getBookStageSummary(batchId, bookId) {
 
 export function runBookStage(batchId, bookId, stage, payload = {}) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/stages/${id(stage)}`), { method: 'POST', body: body(payload) });
+}
+
+export function createBookAudioPlan(batchId, bookId, payload = {}) {
+  return apiRequest(bf11Path(`batches/${id(batchId)}/books/${id(bookId)}/audio-plan`), { method: 'POST', body: body(payload) });
 }
 
 export function retryBookStage(batchId, bookId, payload = {}) {
@@ -635,6 +701,8 @@ export function getPublishAudits(provider, intentId) {
 export default {
   getCapabilities,
   getBookAssetImageBlob,
+  getComicPageImageBlob,
+  getComicReferencePreviewBlob,
   generateConfiguredImage,
   createNovelFetchIntake,
   getIntake,
@@ -658,7 +726,13 @@ export default {
   listBookAssetImages,
   createBookAssetImage,
   uploadBookAssetImage,
+  uploadComicGlobalReference,
   setPrimaryBookAssetImage,
+  listComicPages,
+  generateComicPage,
+  setPrimaryComicPageImage,
+  createComicCollection,
+  listComicCollections,
   getConfigVersions,
   createConfigVersion,
   renameConfigVersion,

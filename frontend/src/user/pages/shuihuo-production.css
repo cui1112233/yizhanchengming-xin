@@ -488,15 +488,12 @@ body.shuihuo-reference-shell .legacy-content { padding: 0; overflow: auto; }
 .shuihuo-theme-active .shuihuo-image-empty,
 .shuihuo-theme-active .shuihuo-image-empty p { color: var(--sh-muted); }
 
-.batch-factory-workbench .shuihuo-workbench-header { grid-template-columns: minmax(285px, .9fr) minmax(630px, 1.9fr) auto; }
 /* Keep the production table flush with its container while each column grows
-   from a controlled base. This fills a wide screen without letting prompt or
-   clip-library cells absorb all remaining width. */
+ from a controlled base. This fills a wide screen without letting prompt or
+ clip-library cells absorb all remaining width. */
 .batch-factory-workbench-table .shuihuo-workbench-head,
 .batch-factory-book-row {
   width: 100%;
-  min-width: 1665px;
-  grid-template-columns: 56px minmax(300px, 1.05fr) minmax(176px, .70fr) minmax(205px, .75fr) minmax(330px, 1fr) minmax(330px, 1fr) minmax(268px, .80fr);
 }
 .batch-factory-book-row { display: grid; }
 .batch-factory-workbench-table .shuihuo-workbench-head > div { position: relative; }
@@ -508,6 +505,25 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-book-row .shuihuo-workbench-cell { min-height: 206px; }
 .batch-factory-book-content strong { color: var(--sh-text); font-size: 14px; }
 .batch-factory-book-content > span, .batch-factory-placeholder > span, .batch-factory-actions > span { color: var(--sh-muted); line-height: 1.55; font-size: 12px; }
+.batch-factory-book-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.batch-factory-book-title-row > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-factory-book-title-row .batch-factory-production-source { flex: none; }
+.batch-factory-production-source { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 0; line-height: 1.3; }
+.batch-factory-production-source .batch-factory-content-mode { display: inline-flex; align-items: center; min-height: 20px; padding: 1px 7px; border: 1px solid color-mix(in srgb, var(--sh-accent) 58%, var(--sh-line)); border-radius: 999px; color: var(--sh-text); font-size: 11px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.batch-factory-production-source .batch-factory-content-mode.is-sensitive { color: #a8f1d2; border-color: #4bbf95; background: color-mix(in srgb, #2f9e75 25%, var(--sh-panel)); }
+.batch-factory-production-source .batch-factory-content-mode.is-original { color: #cfe5ff; border-color: #5e91c5; background: color-mix(in srgb, #3976b5 24%, var(--sh-panel)); }
+.batch-factory-production-source .batch-factory-content-mode.is-ai1,
+.batch-factory-production-source .batch-factory-content-mode.is-ai2,
+.batch-factory-production-source .batch-factory-content-mode.is-ai3,
+.batch-factory-production-source .batch-factory-content-mode.is-ai4,
+.batch-factory-production-source .batch-factory-content-mode.is-ai5 { color: #ffe4a3; border-color: #c5943e; background: color-mix(in srgb, #9b6d20 25%, var(--sh-panel)); }
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-sensitive { color: #075e55; border-color: #62c7b4; background: #e5f8f2; }
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-original { color: #22547d; border-color: #89b5db; background: #edf5fc; }
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-ai1,
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-ai2,
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-ai3,
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-ai4,
+[data-theme='light'] .batch-factory-production-source .batch-factory-content-mode.is-ai5 { color: #875d0a; border-color: #d5ad59; background: #fff6dc; }
 .batch-factory-book-content p { margin-bottom: 0; color: var(--sh-muted); font-size: 12px; font-weight: 400; line-height: 1.65; white-space: pre-wrap; }
 .batch-factory-book-content-actions {
   gap: 8px !important;
@@ -876,6 +892,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-prompt-editor-label .ant-input { min-height: 290px; background: #0d1726; }
 .batch-factory-prompt-editor-label .ant-input[readonly] { cursor: default; color: #d9e6f8; }
 .batch-factory-prompt-modal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.batch-factory-prompt-primary-action { margin-left: auto; display: inline-flex; }
 @media (max-width: 720px) { .batch-factory-prompt-modal-head { align-items: flex-start; flex-direction: column; } .batch-factory-prompt-modal-tabs { align-self: stretch; justify-content: flex-end; } }
 
 /* 编辑资产弹窗：左字段右图的两栏布局（对齐剧本生成） */
@@ -885,6 +902,19 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-image-upload input { display: none; }
 .batch-factory-asset-editor-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; }
 .batch-factory-asset-editor-fields { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.batch-factory-asset-editor-config-row { display: grid; grid-template-columns: 108px minmax(0, 1fr) 120px; align-items: end; gap: 8px; padding: 10px; border: 1px solid rgba(139, 169, 207, .18); border-radius: 8px; background: linear-gradient(115deg, rgba(18, 34, 52, .9), rgba(10, 18, 30, .76)); }
+.batch-factory-asset-editor-config-field { display: grid; min-width: 0; gap: 5px; }
+.batch-factory-asset-editor-config-field > span { color: #8fa8c4; font-size: 11px; }
+.batch-factory-asset-editor-config-field .ant-select-selector { min-height: 32px !important; border-color: rgba(139, 169, 207, .24) !important; border-radius: 6px !important; background: rgba(6, 15, 26, .72) !important; box-shadow: none !important; }
+.batch-factory-asset-editor-config-field .ant-select-selection-placeholder { color: #6e849f !important; }
+.batch-factory-asset-editor-config-field.is-model .ant-select-selector { border-color: rgba(92, 165, 232, .38) !important; background: rgba(14, 43, 67, .56) !important; }
+.batch-factory-asset-editor-config-field.is-model .ant-select-selection-placeholder { color: #9fbddd !important; }
+.batch-factory-asset-editor-config-field .ant-select-selection-item { line-height: 30px !important; }
+.batch-factory-asset-editor-character-section { display: grid; gap: 8px; padding: 2px 0; }
+.batch-factory-asset-editor-section-title { color: #a9c2df; font-size: 12px; font-weight: 600; }
+.batch-factory-asset-editor-character-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.batch-factory-asset-editor-character-fields .shuihuo-form-label { margin: 0; }
+.batch-factory-asset-editor-character-appearance { grid-column: 1 / -1; }
 .batch-factory-asset-editor-hint { margin: 2px 0 0; color: var(--sh-muted); font-size: 12px; line-height: 1.7; }
 .batch-factory-asset-editor-panel { display: grid; align-content: start; gap: 0; min-width: 0; }
 .batch-factory-asset-editor-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -903,7 +933,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-asset-editor-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .batch-factory-asset-editor-thumb-tag { position: absolute; left: 0; bottom: 0; padding: 1px 6px; border-radius: 0 6px 0 6px; background: rgba(45, 122, 227, .92); color: #fff; font-size: 11px; line-height: 1.6; }
 .batch-factory-asset-editor-thumbs-empty { grid-column: 1 / -1; color: var(--sh-muted); font-size: 12px; }
-@media (max-width: 760px) { .batch-factory-asset-editor-body { grid-template-columns: minmax(0, 1fr); } .batch-factory-asset-editor-main { height: 300px; } }
+@media (max-width: 760px) { .batch-factory-asset-editor-body { grid-template-columns: minmax(0, 1fr); } .batch-factory-asset-editor-config-row { grid-template-columns: 1fr; } .batch-factory-asset-editor-character-fields { grid-template-columns: 1fr; } .batch-factory-asset-editor-character-appearance { grid-column: auto; } .batch-factory-asset-editor-main { height: 300px; } }
 
 /* Prompt type is a compact stacked label in the upper-left corner. */
 .batch-factory-prompt-entry-head { min-height:42px; padding:8px 9px 0; }
@@ -1033,10 +1063,12 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   background: var(--sh-panel-strong);
 }
 .batch-factory-book-content {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 8px;
 }
 .batch-factory-book-content p {
+  min-height: 0;
   max-height: 208px;
   overflow: auto;
   padding-right: 4px;
@@ -2986,11 +3018,6 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 /* BF_ENGINE_FINAL_V1_END */
 
 /* BF_WORKBENCH_PIPELINE_V1_START */
-.batch-factory-workbench-table .shuihuo-workbench-head,
-.batch-factory-book-row{
-  grid-template-columns:56px minmax(300px,1.02fr) minmax(176px,.63fr) minmax(215px,.78fr) minmax(330px,1.15fr) minmax(300px,1fr) minmax(220px,.76fr);
-  min-width:1597px;
-}
 .batch-factory-book-row .shuihuo-workbench-cell{min-height:276px}
 .batch-factory-book-preset-cell,.batch-factory-book-prompt-cell,.batch-factory-book-library-cell{min-height:276px!important;padding:0!important;overflow:hidden}
 
@@ -3114,21 +3141,9 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   transform:scale(.96);
   box-shadow:inset 0 2px 5px color-mix(in srgb,#061418 42%,transparent),inset 0 6px 12px color-mix(in srgb,#061418 18%,transparent)
 }
-@media(max-width:900px){
-  .batch-factory-workbench-table .shuihuo-workbench-head,.batch-factory-book-row{min-width:1510px}
-}
 /* BF_WORKBENCH_PIPELINE_V1_END */
 
-/* BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_BEGIN */
-/* The visible table has six columns. Keep the header and every book row on
-   exactly the same tracks after the storyboard-asset rail was folded into the
-   prompt column. */
-.batch-factory-workbench-table .shuihuo-workbench-head,
-.batch-factory-book-row {
-  grid-template-columns: 56px minmax(300px,1.04fr) minmax(170px,.60fr) minmax(330px,1.16fr) minmax(300px,1.02fr) minmax(210px,.72fr) !important;
-  min-width: 1366px !important;
-}
-/* BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_END */
+/* The single workbench layout contract is defined at the end of this file. */
 
 /* BF_AUDIO_PLANNING_V13_1_START */
 .batch-factory-help-button{
@@ -3189,18 +3204,14 @@ html[data-theme='light'] body.shuihuo-theme-active .batch-factory-action-group.i
 body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-production .batch-factory-action-video { color: #0f6b54; border-color: #7cc3b2; background: #d9efe9; }
 
 /* Workbench density: one book should not acquire a large empty floor. */
-.batch-factory-workbench-table .shuihuo-workbench-head,
-.batch-factory-book-row{
-  grid-template-columns:64px minmax(300px,1.04fr) minmax(170px,.60fr) minmax(220px,.78fr) minmax(330px,1.16fr) minmax(300px,1.02fr) minmax(210px,.72fr)!important;
-  min-width:1594px!important
-}
+.batch-factory-book-content .batch-factory-production-source { min-width: 0; align-self: start; }
 .batch-factory-book-row{height:250px!important;min-height:250px!important}
 .batch-factory-book-row .shuihuo-workbench-cell{height:250px!important;min-height:0!important;box-sizing:border-box;overflow:hidden}
 .batch-factory-book-content p{max-height:none!important;overflow:auto}
 .batch-factory-book-config-cell,.batch-factory-actions{overflow:auto!important}
 .shuihuo-order-cell{display:flex!important;align-items:center!important;justify-content:center!important;gap:6px!important}
 .shuihuo-workbench-head>div:first-child{display:flex;align-items:center;justify-content:center;gap:6px}
-.batch-factory-book-config-regions{grid-template-rows:repeat(4,minmax(0,1fr))!important;gap:5px!important}
+.batch-factory-book-config-regions{grid-template-rows:repeat(3,minmax(48px,1fr))!important;gap:5px!important}
 .batch-factory-book-config-region{padding:5px 7px!important}
 .batch-factory-book-preset-cell,.batch-factory-book-prompt-cell,.batch-factory-book-library-cell{height:250px!important;min-height:0!important;padding:0!important;overflow:hidden!important}
 .batch-factory-cell-shell{height:100%!important;min-height:0!important;grid-template-rows:36px minmax(0,1fr) 32px!important}
@@ -3221,6 +3232,11 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-inline-merge-status.is-failed{color:var(--sh-danger)}
 
 /* Compact novel list: selection + publish essentials only. */
+.batch-factory-novel-list-view{min-width:0;padding:20px 24px 32px}
+.batch-factory-novel-list-view-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.batch-factory-novel-list-view-header>div{display:grid;gap:3px;min-width:0}
+.batch-factory-novel-list-view-header strong{color:var(--sh-text);font-size:18px}
+.batch-factory-novel-list-view-header span{color:var(--sh-muted);font-size:12px}
 .batch-factory-novel-list-toolbar{display:flex;align-items:center;justify-content:flex-start;padding:0 12px 8px;margin-bottom:-1px}
 .batch-factory-novel-selected-count{font-size:12px;color:var(--sh-muted)}
 .batch-factory-novel-list-v13{min-width:780px!important;width:100%}
@@ -3251,6 +3267,14 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-content-mode{display:inline-flex;padding:2px 7px;border:1px solid var(--sh-line);border-radius:999px;color:var(--sh-muted);background:var(--sh-panel-strong);font-size:10px;font-style:normal}
 .batch-factory-content-mode.is-viral{color:#f3c968;border-color:color-mix(in srgb,#f3c968 45%,var(--sh-line))}
 .batch-factory-content-mode.is-custom{color:#8ec5ff;border-color:color-mix(in srgb,#8ec5ff 40%,var(--sh-line))}
+.batch-factory-content-version{display:grid;gap:3px;min-width:0;line-height:1.25}
+.batch-factory-content-version .batch-factory-content-mode{width:max-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-factory-content-version small,.batch-factory-content-version em{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-muted);font-size:10px;font-style:normal}
+.batch-factory-content-version.is-ready small{color:#72d9a0}
+.batch-factory-content-version.is-missing small{color:#ff9b9b}
+.batch-factory-content-version em{color:#f3c968}
+.batch-factory-content-mode.is-sensitive{color:#72d9a0;border-color:color-mix(in srgb,#72d9a0 45%,var(--sh-line))}
+.batch-factory-content-mode.is-ai1,.batch-factory-content-mode.is-ai2,.batch-factory-content-mode.is-ai3,.batch-factory-content-mode.is-ai4,.batch-factory-content-mode.is-ai5{color:#bca7ff;border-color:color-mix(in srgb,#bca7ff 45%,var(--sh-line))}
 
 /* 巨量素材占位书：正文位置的通知读取进度条 */
 .batch-factory-giant-pending{display:flex;flex-direction:column;gap:2px;margin-top:6px}
@@ -3299,8 +3323,9 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-media-bottom-sheet-actions .batch-factory-upload-network-button:disabled{opacity:.38}
 
 @media(max-width:900px){
+  .batch-factory-novel-list-view{padding:14px 12px 24px}
+  .batch-factory-novel-list-view-header{align-items:flex-start;flex-direction:column}
   .batch-factory-audio-options-v13{grid-template-columns:1fr}
-  .batch-factory-workbench-table .shuihuo-workbench-head,.batch-factory-book-row{min-width:1500px!important}
   .batch-factory-novel-list-v13{min-width:700px!important}
   .batch-factory-novel-list-v13 .batch-factory-novel-list-head,.batch-factory-novel-list-v13 .batch-factory-novel-list-row{grid-template-columns:52px minmax(170px,240px) 1.3fr 1fr 1fr 1fr 68px!important;min-width:700px!important}
   .batch-factory-follow-audio-control{justify-content:flex-start}.batch-factory-follow-audio-control small{text-align:left}
@@ -3482,23 +3507,6 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 }
 
 /* BF_COMPACT_STORYBOARD_ASSET_COLUMN_BEGIN */
-
-/*
- * 缩小“分镜资产”列：
- * 资产列固定 156px，把空间让给提示词和分镜视频。
- * 用户仍然可以拖动表头分隔线调整宽度。
- */
-.batch-factory-workbench-table .shuihuo-workbench-head,
-.batch-factory-book-row {
-  grid-template-columns:
-    56px
-    minmax(300px, 1.05fr)
-    minmax(176px, .70fr)
-    156px
-    minmax(350px, 1.10fr)
-    minmax(350px, 1.10fr)
-    minmax(268px, .80fr);
-}
 
 /* 分镜资产格本身也做紧凑处理 */
 .batch-factory-book-preset-cell {
@@ -3991,11 +3999,265 @@ body.shuihuo-reference-shell
 }
 /* BF_BOOK_ROW_BOUNDARY_END */
 
-/* The storyboard asset rail is now represented by @asset mentions in the
-   storyboard prompt. Keep the workbench grid aligned to its six visible
-   columns after removing that rail. */
+/* BF_WORKBENCH_LAYOUT_CONTRACT_BEGIN */
+/*
+ * The batch workbench has exactly one owner for each axis:
+ * - the table scrolls both directions;
+ * - the workbench clips its children;
+ * - the page itself never becomes a second table scroller.
+ * Keep the header and every row on the same six tracks.
+ */
+.shuihuo-production.is-workbench {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.batch-factory-workbench {
+  --bf-workbench-columns: 56px minmax(300px, 1.04fr) minmax(176px, .60fr) minmax(330px, 1.16fr) minmax(300px, 1.02fr) minmax(220px, .72fr);
+  --bf-workbench-min-width: 1382px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.batch-factory-workbench > .shuihuo-workbench-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px 10px;
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  box-shadow: 0 8px 14px color-mix(in srgb, var(--sh-bg) 78%, transparent);
+}
+
+.batch-factory-workbench .shuihuo-workbench-heading {
+  min-width: 0;
+}
+
+.batch-factory-workbench .shuihuo-workbench-export {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.batch-factory-workbench .shuihuo-workbench-toolbar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-gutter: stable;
+}
+
+.batch-factory-workbench .shuihuo-workbench-toolbar > * {
+  flex: 0 0 auto;
+}
+
+.batch-factory-workbench-table {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .batch-factory-workbench-table .shuihuo-workbench-head,
 .batch-factory-book-row {
-  grid-template-columns: 64px minmax(300px, 1.04fr) minmax(170px, .60fr) minmax(330px, 1.16fr) minmax(300px, 1.02fr) minmax(210px, .72fr) !important;
-  min-width: 1374px !important;
+  grid-template-columns: var(--bf-workbench-columns);
+  min-width: var(--bf-workbench-min-width);
+}
+/* BF_WORKBENCH_LAYOUT_CONTRACT_END */
+
+.batch-factory-inline-comic{display:grid;grid-template-rows:auto minmax(0,1fr) 42px 28px;min-height:256px;gap:6px;padding:10px}
+.batch-factory-inline-comic-primary{display:grid;min-height:0;overflow:hidden;place-items:center;color:var(--sh-muted);border:1px solid var(--sh-line);border-radius:6px;background:var(--sh-panel-strong);cursor:pointer}
+.batch-factory-inline-comic-primary img{width:100%;height:100%;object-fit:contain}
+.batch-factory-inline-comic-primary .anticon{font-size:22px}
+.batch-factory-inline-comic-primary>span{font-size:11px}
+.batch-factory-inline-comic .batch-factory-inline-media-version img{width:100%;height:100%;object-fit:cover}
+.batch-factory-comic-image-state{display:grid;min-height:70px;place-items:center;color:var(--sh-muted);font-size:11px}
+.batch-factory-comic-library{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;min-height:620px}
+.batch-factory-comic-viewer{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;gap:12px}
+.batch-factory-comic-viewer>header,.batch-factory-comic-collection-actions,.batch-factory-comic-collections section>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.batch-factory-comic-viewer>header>div,.batch-factory-comic-collection-actions>div{display:grid;gap:3px}.batch-factory-comic-viewer small,.batch-factory-comic-collection-actions small{color:var(--sh-muted);font-size:11px}
+.batch-factory-comic-viewer-frame{display:grid;min-height:480px;place-items:center;overflow:hidden;border:1px solid var(--sh-line);border-radius:6px;background:#101418}
+.batch-factory-comic-viewer-frame .ant-image,.batch-factory-comic-viewer-frame img{max-width:100%;max-height:68vh;object-fit:contain}
+.batch-factory-comic-viewer>footer{display:grid;grid-template-columns:32px minmax(180px,320px) 32px;justify-content:center;gap:8px}
+.batch-factory-comic-candidates{display:flex;min-width:0;max-height:680px;flex-direction:column;gap:8px;overflow-y:auto}.batch-factory-comic-candidates h3{margin:0;font-size:13px}.batch-factory-comic-candidates>button{position:relative;display:grid;min-height:150px;overflow:hidden;padding:0;border:1px solid var(--sh-line);border-radius:6px;background:var(--sh-panel-strong);cursor:pointer}.batch-factory-comic-candidates>button.is-primary{border-color:#2f9e6f}.batch-factory-comic-candidates img{width:100%;height:150px;object-fit:contain}.batch-factory-comic-candidates button>span{position:absolute;right:6px;bottom:6px;padding:3px 6px;border-radius:4px;background:rgba(0,0,0,.72);color:#fff;font-size:10px}
+.batch-factory-comic-collections{display:grid;gap:16px}.batch-factory-comic-collections section{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--sh-line)}.batch-factory-comic-collections section>div{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}.batch-factory-comic-collections figure{display:grid;gap:5px;margin:0}.batch-factory-comic-collections figure img{width:100%;aspect-ratio:3/4;object-fit:contain;border:1px solid var(--sh-line);border-radius:6px;background:#101418}.batch-factory-comic-collections figcaption{color:var(--sh-muted);font-size:11px;text-align:center}
+@media (max-width:800px){.batch-factory-comic-library{grid-template-columns:1fr;min-height:0}.batch-factory-comic-candidates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:none}.batch-factory-comic-candidates h3,.batch-factory-comic-candidates>p{grid-column:1/-1}.batch-factory-comic-viewer-frame{min-height:360px}}
+.batch-factory-comic-style-picker {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  min-width: 0;
+}
+
+.batch-factory-comic-style-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batch-factory-comic-style-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-factory-comic-style-heading span {
+  color: #1677ff;
+  font-size: 12px;
+}
+
+.batch-factory-comic-style-heading small,
+.batch-factory-comic-style-copy small,
+.batch-factory-comic-reference-title small {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.batch-factory-comic-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: 10px;
+  max-height: 430px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.batch-factory-comic-style-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.batch-factory-comic-style-card.is-selected {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.14);
+}
+
+.batch-factory-comic-style-card > button[role='radio'] {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.batch-factory-comic-style-card > button[role='radio']:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: -2px;
+}
+
+.batch-factory-comic-style-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.batch-factory-comic-style-image img,
+.batch-factory-comic-reference-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.batch-factory-comic-preview-loading {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #8c8c8c;
+}
+
+.batch-factory-comic-style-copy {
+  display: grid;
+  gap: 2px;
+  min-height: 54px;
+  padding: 8px;
+}
+
+.batch-factory-comic-style-copy b,
+.batch-factory-comic-style-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-factory-comic-reference-panel {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.batch-factory-comic-reference-preview {
+  display: grid;
+  place-items: center;
+  width: 108px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px dashed #d9d9d9;
+  border-radius: 4px;
+  background: #fafafa;
+  color: #8c8c8c;
+}
+
+.batch-factory-comic-reference-controls,
+.batch-factory-comic-reference-title,
+.batch-factory-comic-reference-switches {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.batch-factory-comic-reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.batch-factory-comic-reference-switches label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batch-factory-comic-prompt-affixes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.batch-factory-comic-prompt-affixes label {
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .batch-factory-comic-style-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .batch-factory-comic-reference-panel,
+  .batch-factory-comic-prompt-affixes {
+    grid-template-columns: 1fr;
+  }
 }
