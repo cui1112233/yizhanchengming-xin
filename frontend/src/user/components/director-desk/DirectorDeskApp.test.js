@@ -8,6 +8,46 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const styles = fs.readFileSync(path.resolve(dirname, '../../../shared/styles/agent-workspace.css'), 'utf8');
 const read = name => fs.readFileSync(path.join(dirname, name), 'utf8');
 
+test('导演台组合真实对象树、视口、检查器和底部工具', () => {
+  const source = read('DirectorDeskApp.jsx');
+  for (const component of ['DirectorDeskShell', 'DirectorToolRail', 'DirectorSceneTree', 'DirectorAssetPanel', 'DirectorScene', 'DirectorInspector', 'DirectorBottomDock']) {
+    assert.match(source, new RegExp(component));
+  }
+  assert.match(source, /createDirectorSaveQueue/);
+  assert.match(source, /viewMode/);
+  assert.match(source, /selectedObject/);
+});
+
+test('关闭导演台前刷新最后一次保存', () => {
+  const source = read('DirectorDeskApp.jsx');
+  assert.match(source, /await saveQueue\.flush\(\)/);
+  assert.match(source, /adapter\.close\(\)/);
+});
+
+test('导演台把选择、视图、变换和变更回调交给真实场景', () => {
+  const source = read('DirectorDeskApp.jsx');
+  for (const prop of ['selection={selectedObject}', 'viewMode={viewMode}', 'transformMode={transformMode}', 'onSelectionChange={setSelectedObject}', 'onProjectChange={applyProject}', 'onReadyChange={setSceneReady}']) {
+    assert.match(source, new RegExp(prop.replace(/[{}]/g, '\\$&')));
+  }
+  assert.match(source, /<DirectorInspector[\s\S]*?images={images}/);
+  assert.match(source, /sceneRef\.current\?\.focusObject\(selection\)/);
+  assert.match(source, /sceneRef\.current\?\.resetDirectorView\(\)/);
+});
+
+test('连续收起左右面板使用函数式状态更新', () => {
+  const source = read('DirectorDeskApp.jsx');
+  assert.match(source, /setLeftCollapsed\(current => !current\)/);
+  assert.match(source, /setRightCollapsed\(current => !current\)/);
+});
+
+test('上传参考图只复用素材上传并刷新图片列表', () => {
+  const source = read('DirectorDeskApp.jsx');
+  assert.match(source, /await adapter\.uploadProjectImage\(file\)/);
+  assert.match(source, /await adapter\.listProjectImages\(\)/);
+  assert.match(source, /setActiveTool\('assets'\)/);
+  assert.doesNotMatch(source, /createAgent|confirmAgent|generate/i);
+});
+
 test('底部导演工具只暴露当前真实能力', () => {
   const dock = read('DirectorBottomDock.jsx');
   for (const label of ['移动', '重置视角', '截图到画布', '项目图片', '上传参考图', '保存场景描述']) assert.match(dock, new RegExp(label));
@@ -56,8 +96,9 @@ test('场景树及素材面板使用实际对象和操作回调', () => {
 
 test('全屏 3D 导演台拥有独立场景、素材选择和关闭入口', () => {
   const source = fs.readFileSync(path.join(dirname, 'DirectorDeskApp.jsx'), 'utf8');
+  const shell = fs.readFileSync(path.join(dirname, 'DirectorDeskShell.jsx'), 'utf8');
   assert.match(source, /3D导演台/);
-  assert.match(source, /关闭导演台/);
+  assert.match(`${source}\n${shell}`, /关闭导演台/);
   assert.match(source, /导演视角/);
   assert.match(source, /listProjectImages/);
   assert.match(source, /DirectorScene/);
@@ -92,6 +133,13 @@ test('桌面端导演台避开全站左侧导航，素材卡和场景按钮不�
 
 test('截图只有在导演台项目保存成功后才回写画布', () => {
   const source = fs.readFileSync(path.join(dirname, 'DirectorDeskApp.jsx'), 'utf8');
-  assert.match(source, /const saved = await saveProject\(next\);/);
-  assert.match(source, /if \(!saved\) throw new Error\('3D 构图状态保存失败'\);/);
+  const steps = [
+    'await saveQueue.flush()',
+    'await sceneRef.current.capture()',
+    'await adapter.storeCapture(file)',
+    'await adapter.writeState(next)',
+    'await onCapture?.(asset)'
+  ].map(step => source.indexOf(step));
+  assert.ok(steps.every(index => index >= 0));
+  assert.deepEqual(steps, [...steps].sort((left, right) => left - right));
 });

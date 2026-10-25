@@ -12,7 +12,7 @@ function imageAsset(value) {
   return asset;
 }
 
-export function createDirectorDeskHostAdapter({ nodeID, getNode, saveProject, listImages, uploadCapture, onClose } = {}) {
+export function createDirectorDeskHostAdapter({ nodeID, getNode, saveProject, listImages, uploadCapture, uploadImage, onClose } = {}) {
   const id = String(nodeID || '').trim();
   if (!id) throw new Error('缺少导演台节点');
 
@@ -38,6 +38,11 @@ export function createDirectorDeskHostAdapter({ nodeID, getNode, saveProject, li
       requireDirectorNode(id, getNode);
       if (typeof uploadCapture !== 'function') throw new Error('导演台截图上传服务不可用');
       return imageAsset(await uploadCapture(file));
+    },
+    async uploadProjectImage(file) {
+      requireDirectorNode(id, getNode);
+      if (typeof uploadImage !== 'function') throw new Error('导演台图片上传服务不可用');
+      return imageAsset(await uploadImage(file));
     },
     close() {
       onClose?.(id);

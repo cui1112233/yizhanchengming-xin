@@ -1,15 +1,64 @@
-import { Camera, ImagePlus, UserRound, X } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { directorProjectCaptureMetadata, normalizeDirectorProject, setDirectorSceneAsset } from '../../pages/agent-director-desk.js';
+import {
+  DIRECTOR_ASPECT_RATIOS,
+  addDirectorActor,
+  addDirectorCamera,
+  directorProjectCaptureMetadata,
+  normalizeDirectorProject,
+  removeDirectorObject,
+  setDirectorActiveCamera,
+  setDirectorAspectRatio,
+  setDirectorSceneAsset
+} from '../../pages/agent-director-desk.js';
+import DirectorAssetPanel from './DirectorAssetPanel';
+import DirectorBottomDock from './DirectorBottomDock';
+import DirectorDeskShell from './DirectorDeskShell';
+import DirectorInspector from './DirectorInspector';
 import { DirectorScene } from './DirectorScene';
-import { updateCamera } from './director-scene-state.js';
+import DirectorSceneTree from './DirectorSceneTree';
+import DirectorToolRail from './DirectorToolRail';
+import { createDirectorSaveQueue } from './director-save-queue.js';
+
+const CAMERA_PRESETS = Object.freeze([
+  { id: 'current', label: '当前视角' },
+  { id: 'front-medium', label: '正面中景', position: [0, 2.2, 7], target: [0, 1.4, 0], fov: 42 },
+  { id: 'front-close', label: '正面特写', position: [0, 2, 4.2], target: [0, 1.6, 0], fov: 34 },
+  { id: 'side-follow', label: '侧面跟拍', position: [6.5, 2.1, 1.5], target: [0, 1.3, 0], fov: 46 },
+  { id: 'overhead', label: '俯拍', position: [0, 8.5, 1.5], target: [0, 0, 0], fov: 48 },
+  { id: 'low-angle', label: '低角度', position: [0, 0.65, 5.2], target: [0, 1.8, 0], fov: 40 },
+  { id: 'over-shoulder', label: '过肩', position: [3.2, 2.1, 4.6], target: [-0.4, 1.35, 0], fov: 38 },
+  { id: 'dutch-angle', label: '荷兰角', position: [-3.8, 3.1, 5.4], target: [0, 1.2, 0], fov: 44, rotation: [0, 0, -0.22] }
+]);
 
 export default function DirectorDeskApp({ adapter, onCapture }) {
   const [project, setProject] = useState(() => normalizeDirectorProject(adapter.readState()));
   const [images, setImages] = useState([]);
+  const [activeTool, setActiveTool] = useState('scene');
+  const [selectedObject, setSelectedObject] = useState({ kind: 'scene', id: 'scene' });
+  const [viewMode, setViewMode] = useState('director');
+  const [transformMode, setTransformMode] = useState('translate');
+  const [promptDraft, setPromptDraft] = useState(project.scene.prompt);
+  const [saveStatus, setSaveStatus] = useState('saved');
   const [error, setError] = useState('');
+  const [sceneReady, setSceneReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
   const sceneRef = useRef(null);
+  const projectRef = useRef(project);
+  const saveQueueRef = useRef(null);
+
+  if (!saveQueueRef.current) {
+    saveQueueRef.current = createDirectorSaveQueue(next => adapter.writeState(next), {
+      onStatus: (status, cause) => {
+        setSaveStatus(status);
+        if (status === 'error') setError(cause?.message || '导演台保存失败');
+        if (status === 'saved') setError('');
+      }
+    });
+  }
+  const saveQueue = saveQueueRef.current;
 
   useEffect(() => {
     let active = true;
@@ -19,33 +68,72 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
     return () => { active = false; };
   }, [adapter]);
 
-  const saveProject = async next => {
+  const applyProject = next => {
     const normalized = normalizeDirectorProject(next);
+    projectRef.current = normalized;
     setProject(normalized);
-    setError('');
-    try {
-      await adapter.writeState(normalized);
-      return true;
-    } catch (cause) {
-      setError(cause?.message || '导演台保存失败');
-      return false;
+    saveQueue.schedule(normalized);
+    return normalized;
+  };
+
+  const selectScene = asset => {
+    applyProject(setDirectorSceneAsset(projectRef.current, asset));
+    setSelectedObject({ kind: 'scene', id: 'scene' });
+  };
+  const addActor = asset => {
+    const next = applyProject(addDirectorActor(projectRef.current, { assetId: asset.id }));
+    const actor = next.actors.at(-1);
+    if (actor) setSelectedObject({ kind: 'actor', id: actor.id });
+  };
+  const addCamera = preset => {
+    const camera = preset.id === 'current' ? projectRef.current.directorCamera : preset;
+    const next = applyProject(addDirectorCamera(projectRef.current, { ...camera, id: '', name: preset.label }));
+    const added = next.cameras.at(-1);
+    if (added) setSelectedObject({ kind: 'camera', id: added.id });
+  };
+  const removeObject = selection => {
+    applyProject(removeDirectorObject(projectRef.current, selection.id));
+    if (selectedObject?.kind === selection.kind && selectedObject?.id === selection.id) {
+      setSelectedObject({ kind: 'scene', id: 'scene' });
     }
   };
-  const addActor = asset => saveProject({
-    ...project,
-    actors: [...project.actors, { id: `actor-${asset.id}-${Date.now()}`, assetId: asset.id, position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 }]
-  });
-  const capture = async () => {
-    if (busy) return;
+  const uploadReference = async file => {
     setBusy(true);
-    setError('');
     try {
-      const file = await sceneRef.current?.capture();
-      if (!file) throw new Error('3D 构图尚未准备完成');
+      await adapter.uploadProjectImage(file);
+      setImages(await adapter.listProjectImages());
+      setActiveTool('assets');
+      setError('');
+    } catch (cause) {
+      setError(cause?.message || '参考图上传失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const savePrompt = () => applyProject({
+    ...projectRef.current,
+    scene: { ...projectRef.current.scene, prompt: promptDraft }
+  });
+  const close = async () => {
+    try {
+      await saveQueue.flush();
+      adapter.close();
+    } catch (cause) {
+      setError(cause?.message || '导演台保存失败');
+      setSaveStatus('error');
+    }
+  };
+  const capture = async () => {
+    if (!sceneReady || busy) return;
+    setBusy(true);
+    try {
+      await saveQueue.flush();
+      const file = await sceneRef.current.capture();
       const asset = await adapter.storeCapture(file);
-      const next = directorProjectCaptureMetadata(project, asset);
-      const saved = await saveProject(next);
-      if (!saved) throw new Error('3D 构图状态保存失败');
+      const next = directorProjectCaptureMetadata(projectRef.current, asset);
+      await adapter.writeState(next);
+      projectRef.current = next;
+      setProject(next);
       await onCapture?.(asset);
     } catch (cause) {
       setError(cause?.message || '3D 构图保存失败');
@@ -53,31 +141,88 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
       setBusy(false);
     }
   };
-  const directorView = () => saveProject(updateCamera(project, { position: [5.5, 3.5, 8], target: [0, 1.4, 0], fov: 38 }));
 
-  return <section className="agent-director-desk-fullscreen" data-director-desk-open onPointerDown={event => event.stopPropagation()} onWheel={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
-    <header className="agent-director-desk-fullscreen__header">
-      <span><Camera size={18} /><strong>3D导演台</strong></span>
-      <div><button type="button" onClick={directorView}>导演视角</button><button type="button" aria-label="关闭导演台" onClick={() => adapter.close()}><X size={16} />关闭</button></div>
-    </header>
-    <main className="agent-director-desk-fullscreen__body">
-      <aside className="agent-director-desk-fullscreen__assets" aria-label="项目图片素材">
-        <header><ImagePlus size={15} />项目图片</header>
-        {!images.length ? <p>项目中还没有图片素材</p> : images.map(asset => <article key={asset.id}>
-          {asset.url ? <img src={asset.url} alt="" /> : null}
-          <strong>{asset.name || '未命名图片'}</strong>
-          <div><button type="button" onClick={() => saveProject(setDirectorSceneAsset(project, asset))}>设为场景</button><button type="button" onClick={() => addActor(asset)}><UserRound size={13} />加入角色</button></div>
-        </article>)}
-      </aside>
-      <section className="agent-director-desk-fullscreen__viewport" aria-label="3D 场景">
-        <DirectorScene ref={sceneRef} project={project} images={images} onProjectChange={saveProject} />
-        {error ? <p className="agent-director-desk-fullscreen__error" role="alert">{error}</p> : null}
-      </section>
-      <aside className="agent-director-desk-fullscreen__actions">
-        <strong>{project.scene.name || '未选择场景图'}</strong>
-        <span>{project.actors.length} 个角色立面</span>
-        <button type="button" disabled={busy} onClick={capture}><Camera size={15} />{busy ? '正在保存构图' : '截取到画布'}</button>
-      </aside>
-    </main>
+  let toolPanel = <DirectorSceneTree
+    project={project}
+    selectedObject={selectedObject}
+    onSelect={setSelectedObject}
+    onLocate={selection => sceneRef.current?.focusObject(selection)}
+    onRemove={removeObject}
+  />;
+  if (activeTool === 'assets' || activeTool === 'actors') {
+    toolPanel = <div className={`agent-director-tool-panel${activeTool === 'actors' ? ' is-actors' : ''}`}><DirectorAssetPanel
+      images={images}
+      onSetScene={selectScene}
+      onAddActor={addActor}
+    /></div>;
+  } else if (activeTool === 'cameras') {
+    toolPanel = <section className="agent-director-choice-panel" aria-label="添加机位"><h2>添加机位</h2>{CAMERA_PRESETS.map(preset => <button
+      key={preset.id} type="button" onClick={() => addCamera(preset)}>{preset.label}</button>)}</section>;
+  } else if (activeTool === 'ratio') {
+    toolPanel = <section className="agent-director-choice-panel" aria-label="画幅比例"><h2>画幅比例</h2>{DIRECTOR_ASPECT_RATIOS.map(ratio => <button
+      key={ratio} type="button" aria-pressed={project.aspectRatio === ratio}
+      onClick={() => applyProject(setDirectorAspectRatio(projectRef.current, ratio))}>{ratio === 'adaptive' ? '自适应' : ratio}</button>)}</section>;
+  }
+
+  const top = <div className="agent-director-shell__top-content">
+    <span className="agent-director-shell__title"><Camera size={17} /><strong>3D导演台</strong></span>
+    <div className="agent-director-shell__view-switch" aria-label="查看视角">
+      <button type="button" aria-pressed={viewMode === 'director'} onClick={() => setViewMode('director')}>导演视角</button>
+      <button type="button" aria-pressed={viewMode === 'camera'} onClick={() => setViewMode('camera')}>机位视角</button>
+    </div>
+  </div>;
+  const viewport = <>
+    <DirectorScene
+      ref={sceneRef}
+      project={project}
+      images={images}
+      selection={selectedObject}
+      viewMode={viewMode}
+      transformMode={transformMode}
+      onSelectionChange={setSelectedObject}
+      onProjectChange={applyProject}
+      onReadyChange={setSceneReady}
+    />
+    {error ? <p className="agent-director-desk-fullscreen__error" role="alert">{error}</p> : null}
+  </>;
+  const inspector = <DirectorInspector
+    project={project}
+    images={images}
+    selection={selectedObject}
+    onProjectChange={applyProject}
+    onSetActiveCamera={cameraID => {
+      applyProject(setDirectorActiveCamera(projectRef.current, cameraID));
+      setViewMode('camera');
+    }}
+    onChangeScene={() => setActiveTool('assets')}
+  />;
+  const bottom = <DirectorBottomDock
+    prompt={promptDraft}
+    saveStatus={saveStatus}
+    canCapture={sceneReady && !busy}
+    transformMode={transformMode}
+    onTransformModeChange={setTransformMode}
+    onPromptChange={setPromptDraft}
+    onSavePrompt={savePrompt}
+    onOpenAssets={() => setActiveTool('assets')}
+    onUploadReference={uploadReference}
+    onResetView={() => sceneRef.current?.resetDirectorView()}
+    onCapture={capture}
+  />;
+
+  return <section className="agent-director-desk-fullscreen" data-director-desk-open
+    onPointerDown={event => event.stopPropagation()} onWheel={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
+    <DirectorDeskShell
+      left={<><DirectorToolRail activeTool={activeTool} onToolChange={setActiveTool} />{toolPanel}</>}
+      viewport={viewport}
+      right={inspector}
+      top={top}
+      bottom={bottom}
+      leftCollapsed={leftCollapsed}
+      rightCollapsed={rightCollapsed}
+      onToggleLeft={() => setLeftCollapsed(current => !current)}
+      onToggleRight={() => setRightCollapsed(current => !current)}
+      onClose={close}
+    />
   </section>;
 }

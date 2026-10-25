@@ -32,6 +32,29 @@ test('导演台适配器只列出图片并拒绝非图片截图结果', async ()
   await assert.rejects(() => adapter.storeCapture(new Blob(['capture'], { type: 'image/png' })), /图片/);
 });
 
+test('导演台适配器上传项目图片并拒绝非图片结果', async () => {
+  const files = [];
+  const adapter = createDirectorDeskHostAdapter({
+    nodeID: 'director-1',
+    getNode: () => ({ id: 'director-1', data: { type: 'director', config: {} } }),
+    uploadImage: async file => {
+      files.push(file);
+      return { asset: { id: 'image-1', kind: 'image', name: '参考图' } };
+    }
+  });
+  const file = new Blob(['image'], { type: 'image/png' });
+
+  assert.deepEqual(await adapter.uploadProjectImage(file), { id: 'image-1', kind: 'image', name: '参考图' });
+  assert.deepEqual(files, [file]);
+
+  const invalid = createDirectorDeskHostAdapter({
+    nodeID: 'director-1',
+    getNode: () => ({ id: 'director-1', data: { type: 'director', config: {} } }),
+    uploadImage: async () => ({ asset: { id: 'video-1', kind: 'video' } })
+  });
+  await assert.rejects(() => invalid.uploadProjectImage(file), /图片/);
+});
+
 test('导演台适配器将关闭通知交回画布', () => {
   let closed = '';
   const adapter = createDirectorDeskHostAdapter({

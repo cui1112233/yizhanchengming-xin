@@ -2486,6 +2486,13 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         if (requestedTaskId !== taskIdRef.current) throw new Error('项目已切换，无法保存 3D 构图');
         return result?.asset;
       },
+      uploadImage: async file => {
+        const requestedTaskId = taskIdRef.current;
+        if (!requestedTaskId) throw new Error('当前项目不可用，无法上传参考图');
+        const result = await uploadAgentAsset(requestedTaskId, file);
+        if (requestedTaskId !== taskIdRef.current) throw new Error('项目已切换，无法上传参考图');
+        return result;
+      },
       onClose: () => setDirectorDeskNodeID('')
     });
   }, [directorDeskNodeID]);
