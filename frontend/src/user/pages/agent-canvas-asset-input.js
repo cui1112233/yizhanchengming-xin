@@ -50,6 +50,63 @@ export function insertAssetMention(value, trigger, asset) {
   return { value: next, caret: start + label.length + suffix.length, label };
 }
 
+export function assetReferenceKey(asset) {
+  return String(asset?.id || asset?.assetId || '').trim();
+}
+
+function isMentionBoundary(character) {
+  return !character || /[\s\p{P}\p{S}]/u.test(character);
+}
+
+export function promptMentionRanges(value, references) {
+  const text = String(value || '');
+  const seen = new Set();
+  const candidates = [];
+  for (const asset of Array.isArray(references) ? references : []) {
+    const key = assetReferenceKey(asset) || `name:${String(asset?.name || '').trim()}`;
+    const name = String(asset?.name || '').trim();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ asset, label: `@${name}` });
+  }
+  candidates.sort((left, right) => right.label.length - left.label.length);
+
+  const ranges = [];
+  for (let cursor = 0; cursor < text.length;) {
+    if (text[cursor] !== '@') {
+      cursor += 1;
+      continue;
+    }
+    const match = candidates.find(candidate => (
+      text.startsWith(candidate.label, cursor)
+      && isMentionBoundary(text[cursor + candidate.label.length])
+    ));
+    if (!match) {
+      cursor += 1;
+      continue;
+    }
+    ranges.push({ start: cursor, end: cursor + match.label.length, label: match.label, asset: match.asset });
+    cursor += match.label.length;
+  }
+  return ranges;
+}
+
+export function removeAssetMention(value, asset) {
+  const text = String(value || '');
+  const ranges = promptMentionRanges(text, [asset]);
+  let next = text;
+  for (const range of ranges.reverse()) {
+    let start = range.start;
+    let end = range.end;
+    const before = next[start - 1] || '';
+    const after = next[end] || '';
+    if (/[^\S\r\n]/u.test(after) && (start === 0 || /[^\S\r\n]/u.test(before))) end += 1;
+    else if (/[^\S\r\n]/u.test(before) && isMentionBoundary(after)) start -= 1;
+    next = `${next.slice(0, start)}${next.slice(end)}`;
+  }
+  return next;
+}
+
 export function firstClipboardImage(items) {
   for (const item of Array.from(items || [])) {
     if (item?.kind !== 'file' || !String(item.type || '').toLowerCase().startsWith('image/')) continue;

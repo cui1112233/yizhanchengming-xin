@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  assetReferenceKey,
   assetMentionTrigger,
   filterMentionAssets,
   firstClipboardImage,
   insertAssetMention,
   persistClipboardImage,
+  promptMentionRanges,
   referenceKindsForPromptNode,
+  removeAssetMention,
   shouldCloseCanvasEditorOnEscape,
   shouldHandleCanvasImagePaste
 } from './agent-canvas-asset-input.js';
@@ -40,6 +43,35 @@ test('selecting an asset replaces the active at query and returns the next caret
     insertAssetMention('参考 @夜', { start: 3, end: 5, query: '夜' }, { name: '夜景.png' }),
     { value: '参考 @夜景.png ', caret: 11, label: '@夜景.png' }
   );
+});
+
+test('selected references map to exact inline mention ranges without converting ordinary at text', () => {
+  const references = [
+    { id: 'asset-role-a', kind: 'image', name: '角色A' },
+    { assetId: 'asset-role-a', kind: 'image', name: '角色A副本' },
+    { id: 'asset-rain', kind: 'audio', name: '雨声.mp3' }
+  ];
+
+  assert.equal(assetReferenceKey(references[0]), 'asset-role-a');
+  assert.equal(assetReferenceKey(references[1]), 'asset-role-a');
+  assert.deepEqual(
+    promptMentionRanges('让 @角色A 入场，播放 @雨声.mp3，并保留 @普通文字。', references),
+    [
+      { start: 2, end: 6, label: '@角色A', asset: references[0] },
+      { start: 13, end: 20, label: '@雨声.mp3', asset: references[2] }
+    ]
+  );
+});
+
+test('removing a selected asset deletes every exact mention and preserves similar names', () => {
+  const asset = { id: 'asset-role-a', kind: 'image', name: '角色A' };
+
+  assert.equal(
+    removeAssetMention('让 @角色A 入场，再看 @角色A副本，最后 @角色A。', asset),
+    '让 入场，再看 @角色A副本，最后。'
+  );
+  assert.equal(removeAssetMention('@角色A 走进房间', asset), '走进房间');
+  assert.equal(removeAssetMention('没有引用', asset), '没有引用');
 });
 
 test('canvas paste accepts the first clipboard image and leaves editable fields alone', () => {
