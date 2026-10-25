@@ -645,6 +645,16 @@
 .agent-page .agent-node-composer__reference-item video { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; }
 .agent-page .agent-node-composer__reference-item > span { overflow: hidden; color: var(--agent-secondary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .agent-page .agent-node-composer__reference-item > button { display: grid; width: 24px; height: 24px; place-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--agent-muted); cursor: pointer; }
+.agent-page .agent-node-composer__selected-references { display: flex; min-width: 0; gap: 6px; overflow-x: auto; padding: 1px 16px 5px; scrollbar-width: thin; }
+.agent-page .agent-node-composer__selected-reference { display: grid; min-width: 124px; max-width: 190px; height: 42px; flex: 0 0 auto; grid-template-columns: 34px minmax(0, 1fr) 22px; align-items: center; gap: 6px; border: 1px solid var(--agent-editor-border); border-radius: 6px; padding: 3px 4px; background: var(--agent-editor-action); color: var(--agent-editor-text); }
+.agent-page .agent-node-composer__selected-reference > img,
+.agent-page .agent-node-composer__selected-reference > video,
+.agent-page .agent-node-composer__selected-reference > .agent-node-composer__reference-fallback { width: 34px; height: 34px; border-radius: 4px; object-fit: cover; }
+.agent-page .agent-node-composer__selected-reference > span:not(.agent-node-composer__reference-fallback) { overflow: hidden; font-size: 10px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-node-composer__selected-reference > button { display: grid; width: 22px; height: 22px; place-items: center; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--agent-editor-muted); cursor: pointer; }
+.agent-page .agent-node-composer__selected-reference > button:hover:not(:disabled),
+.agent-page .agent-node-composer__selected-reference > button:focus-visible { background: var(--agent-editor-action-hover); color: var(--agent-editor-text); outline: none; }
+.agent-page .agent-node-composer__reference-fallback { display: grid; place-items: center; background: var(--agent-accent-soft); color: var(--agent-accent); }
 .agent-page .agent-node-composer__body { display: grid; min-width: 0; gap: 8px; }
 .agent-page .agent-node-composer__generation-status { display: flex; min-width: 0; min-height: 0; max-height: 30px; align-items: center; gap: 6px; overflow: hidden; color: var(--agent-secondary); font-size: 11px; line-height: 1.35; }
 .agent-page .agent-node-composer__generation-status strong { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
