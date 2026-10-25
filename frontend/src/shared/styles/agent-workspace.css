@@ -1525,6 +1525,66 @@
 }
 .agent-page .agent-director-desk-load-error button:focus-visible { outline: 2px solid var(--director-accent, var(--legacy-accent)); outline-offset: 2px; }
 
+.agent-page .agent-director-desk-fullscreen {
+  --director-bg: var(--legacy-bg);
+  --director-panel: var(--legacy-card);
+  --director-panel-strong: var(--legacy-input);
+  --director-border: var(--legacy-border);
+  --director-text: var(--legacy-text);
+  --director-muted: var(--legacy-muted);
+  --director-accent: var(--legacy-accent);
+  color: var(--director-text);
+  background: var(--director-bg);
+}
+[data-theme='light'] .agent-page .agent-director-desk-fullscreen {
+  --director-bg: var(--surface-base);
+  --director-panel: var(--surface-panel);
+  --director-panel-strong: var(--surface-input);
+  --director-border: var(--border-default);
+  --director-text: var(--text-primary);
+  --director-muted: var(--text-secondary);
+  --director-accent: var(--text-link);
+}
+.agent-director-shell {
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr) 288px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%; height: 100%; min-width: 0; min-height: 0;
+  color: var(--director-text); background: var(--director-bg);
+}
+.agent-director-shell.is-left-collapsed { grid-template-columns: 44px minmax(0, 1fr) 288px; }
+.agent-director-shell.is-right-collapsed { grid-template-columns: 272px minmax(0, 1fr) 44px; }
+.agent-director-shell.is-left-collapsed.is-right-collapsed { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+.agent-director-shell__top, .agent-director-shell__bottom { grid-column: 1 / -1; min-width: 0; background: var(--director-panel); }
+.agent-director-shell__top { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--director-border); }
+.agent-director-shell__bottom { border-top: 1px solid var(--director-border); }
+.agent-director-shell__left, .agent-director-shell__right { min-width: 0; min-height: 0; overflow: auto; background: var(--director-panel); }
+.agent-director-shell__left { border-right: 1px solid var(--director-border); }
+.agent-director-shell__right { border-left: 1px solid var(--director-border); }
+.agent-director-shell__viewport { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.agent-director-shell button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.agent-director-shell button:focus-visible { outline: 2px solid var(--director-accent); outline-offset: -2px; }
+.agent-director-shell__toggle, .agent-director-shell__top > button { display: grid; width: 44px; height: 40px; place-items: center; }
+.agent-director-tool-rail { display: flex; flex: 0 0 44px; width: 44px; flex-direction: column; align-items: center; border-right: 1px solid var(--director-border); }
+.agent-director-tool-rail button { display: grid; width: 44px; height: 44px; place-items: center; color: var(--director-muted); }
+.agent-director-tool-rail button[aria-pressed='true'] { color: var(--director-accent); background: var(--director-panel-strong); }
+.agent-director-scene-tree, .agent-director-assets { min-width: 0; padding: 12px; }
+.agent-director-scene-tree h2, .agent-director-assets h2 { margin: 0 0 12px; font-size: 13px; }
+.agent-director-scene-tree__item { display: flex; align-items: center; min-width: 0; }
+.agent-director-scene-tree__item > button { flex: 0 0 30px; min-height: 32px; }
+.agent-director-scene-tree__item .agent-director-scene-tree__select { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.agent-director-scene-tree__select[aria-pressed='true'] { color: var(--director-accent); background: var(--director-panel-strong); }
+.agent-director-assets > p { color: var(--director-muted); font-size: 12px; }
+.agent-director-assets__item { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; border: 1px solid var(--director-border); padding: 6px; background: var(--director-panel-strong); }
+.agent-director-assets__item img { width: 42px; height: 42px; object-fit: cover; }
+.agent-director-assets__item strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.agent-director-assets__item > div { display: flex; grid-column: 1 / -1; gap: 4px; }
+.agent-director-assets__item > div button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 5px 2px; border: 1px solid var(--director-border); font-size: 11px; }
+@media (max-width: 1180px) {
+  .agent-director-shell { grid-template-columns: 272px minmax(0, 1fr) 288px; }
+  .agent-director-shell__left.is-collapsed, .agent-director-shell__right.is-collapsed { width: 44px; }
+}
+
 /* Compact canvas entry point for the full-screen director desk. Keep every
  * native control scoped here so React Flow nodes never fall back to white UI. */
 .agent-page .agent-director-desk-node {

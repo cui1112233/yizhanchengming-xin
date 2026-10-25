@@ -6,6 +6,27 @@ import { fileURLToPath } from 'node:url';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const styles = fs.readFileSync(path.resolve(dirname, '../../../shared/styles/agent-workspace.css'), 'utf8');
+const read = name => fs.readFileSync(path.join(dirname, name), 'utf8');
+
+test('导演台外壳提供三栏和可收起面板', () => {
+  const shell = read('DirectorDeskShell.jsx');
+  const rail = read('DirectorToolRail.jsx');
+  for (const slot of ['left', 'viewport', 'right']) assert.match(shell, new RegExp(`agent-director-shell__${slot}`));
+  for (const label of ['场景对象', '项目图片', '添加角色', '添加机位', '画幅比例']) assert.match(rail, new RegExp(label));
+  assert.doesNotMatch(rail, /姿势|动画时间轴/);
+  assert.match(shell, /onToggleLeft/);
+  assert.match(shell, /onToggleRight/);
+  assert.match(shell, /onClose/);
+});
+
+test('场景树及素材面板使用实际对象和操作回调', () => {
+  const tree = read('DirectorSceneTree.jsx');
+  const assets = read('DirectorAssetPanel.jsx');
+  assert.match(tree, /directorSceneObjects\(project\)/);
+  for (const callback of ['onSelect', 'onLocate', 'onRemove']) assert.match(tree, new RegExp(`${callback}\\(`));
+  for (const callback of ['onSetScene', 'onAddActor']) assert.match(assets, new RegExp(`${callback}\\(asset\\)`));
+  assert.doesNotMatch(assets, /shared\/api|fetch\(/);
+});
 
 test('全屏 3D 导演台拥有独立场景、素材选择和关闭入口', () => {
   const source = fs.readFileSync(path.join(dirname, 'DirectorDeskApp.jsx'), 'utf8');
