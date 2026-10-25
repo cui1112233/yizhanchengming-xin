@@ -14,10 +14,11 @@ export function assetMentionTrigger(value, caret) {
   const end = Math.max(0, Math.min(Number.isFinite(caret) ? caret : text.length, text.length));
   const start = text.lastIndexOf('@', end - 1);
   if (start < 0) return null;
-  const before = start > 0 ? text[start - 1] : '';
-  if (before && !/[\s([{"'，。！？、:：]/u.test(before)) return null;
   const query = text.slice(start + 1, end);
   if (/[\r\n]/u.test(query) || query.length > 80) return null;
+  const emailLocalPart = text.slice(0, start).match(/[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/u)?.[0] || '';
+  const completeEmailDomain = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u.test(query);
+  if (emailLocalPart && completeEmailDomain) return null;
   return { start, end, query };
 }
 

@@ -12,9 +12,10 @@ import {
   shouldHandleCanvasImagePaste
 } from './agent-canvas-asset-input.js';
 
-test('asset mention opens only for a standalone at query at the caret', () => {
+test('asset mention opens at the caret after prompt text while ignoring a completed email', () => {
   assert.deepEqual(assetMentionTrigger('让 @夜景 更明亮', 5), { start: 2, end: 5, query: '夜景' });
   assert.deepEqual(assetMentionTrigger('@', 1), { start: 0, end: 1, query: '' });
+  assert.deepEqual(assetMentionTrigger('高细节@', 4), { start: 3, end: 4, query: '' });
   assert.equal(assetMentionTrigger('mail@example.com', 16), null);
   assert.equal(assetMentionTrigger('上一行 @夜景\n下一行', 11), null);
 });
