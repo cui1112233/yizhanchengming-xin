@@ -21,6 +21,7 @@ function selectionRect(root) {
 
 function setSelectionOffset(root, wantedOffset) {
   if (!root || typeof document === 'undefined') return;
+  root.focus({ preventScroll: true });
   let remaining = Math.max(0, wantedOffset);
   for (const node of [...root.childNodes]) {
     const mentionValue = node.nodeType === Node.ELEMENT_NODE ? node.dataset?.assetMentionValue : '';

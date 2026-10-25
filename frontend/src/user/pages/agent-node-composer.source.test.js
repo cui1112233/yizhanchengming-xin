@@ -126,9 +126,20 @@ test('compact composer exposes real top controls without an arrow menu label', (
   const topActionsSource = fs.readFileSync(path.resolve(dirname, '../components/AgentNodeComposerTopActions.jsx'), 'utf8');
   assert.match(topActionsSource, /aria-label="更多功能"/);
   assert.match(composerSource, /onPickReferenceAsset\?\.\(node\.id, event\)/);
-  assert.match(composerSource, /onRemoveReference\?\.\(node\.id, asset\.id\)/);
+  assert.match(composerSource, /removeMentionReference/);
   assert.match(composerSource, /display="popover-compact"/);
   assert.match(composerSource, /maxRows: kind === 'text' \? 6 : 3/);
+});
+
+test('asset mentions render as synchronized inline chips and a visible reference strip', () => {
+  assert.match(composerSource, /import AgentAssetMentionEditor from '\.\/AgentAssetMentionEditor'/);
+  assert.match(composerSource, /AgentNodeComposerReferenceStrip/);
+  assert.match(composerSource, /<AgentAssetMentionEditor/);
+  assert.doesNotMatch(composerSource, /<Input\.TextArea/);
+  assert.match(composerSource, /removeAssetMention\(draftPrompt, asset\)/);
+  assert.match(composerSource, /update\(\{ prompt: nextValue \}\)/);
+  assert.match(composerSource, /onRemoveReference\?\.\(node\.id, asset\.id \|\| asset\.assetId\)/);
+  assert.match(composerSource, /onRemoveReference=\{removeMentionReference\}/);
 });
 
 test('mapped media cards use the compact top body and bottom zones without replacing real callbacks', () => {
