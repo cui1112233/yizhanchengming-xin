@@ -8,6 +8,17 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const styles = fs.readFileSync(path.resolve(dirname, '../../../shared/styles/agent-workspace.css'), 'utf8');
 const read = name => fs.readFileSync(path.join(dirname, name), 'utf8');
 
+test('底部导演工具只暴露当前真实能力', () => {
+  const dock = read('DirectorBottomDock.jsx');
+  for (const label of ['移动', '重置视角', '截图到画布', '项目图片', '上传参考图', '保存场景描述']) assert.match(dock, new RegExp(label));
+  assert.doesNotMatch(dock, /生成场景|动画时间轴|姿势/);
+  assert.match(dock, /onSavePrompt/);
+  assert.match(dock, /onCapture/);
+  assert.match(dock, /input\.value = ''/);
+  assert.match(dock, /Math\.min\(.*scrollHeight/s);
+  assert.match(styles, /\.agent-director-bottom-dock__composer[^}]*width:\s*min\(620px,\s*calc\(100% - 32px\)\)/s);
+});
+
 test('导演台外壳提供三栏和可收起面板', () => {
   const shell = read('DirectorDeskShell.jsx');
   const rail = read('DirectorToolRail.jsx');
