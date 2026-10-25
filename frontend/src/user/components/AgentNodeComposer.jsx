@@ -36,6 +36,7 @@ export default function AgentNodeComposer({
   inputPreview, onPreviewInputs,
   timingWarning = '',
   videoJob, videoState = {}, videoBusy = false, videoActionError = '',
+  videoToolsRequest = 0,
   onSelectImageCandidate, onConfirmImage,
   onSelectAudioCandidate, onConfirmAudio,
   onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo, onPublishBatchFactory, onPublishOrganizationChange, publishOrganizations = [], publishOrganizationsLoading = false, publishOrganizationsError = '', onImageTool, onVideoTool, onBatchFactoryPromptSaved
@@ -46,6 +47,9 @@ export default function AgentNodeComposer({
   const [toolsOpen, setToolsOpen] = useState(false);
   useEffect(() => setDraftPrompt(prompt), [node?.id, prompt]);
   useEffect(() => setToolsOpen(false), [node?.id]);
+  useEffect(() => {
+    if (kind === 'video' && videoToolsRequest > 0) setToolsOpen(true);
+  }, [kind, node?.id, videoToolsRequest]);
 
   if (kind === 'script') return <AgentScriptNodeComposer
     compact={compact}

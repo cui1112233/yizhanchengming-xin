@@ -6,7 +6,7 @@ import {
   AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
   AlignVerticalDistributeCenter, GitBranch, Group, Hand,
   Clapperboard, FileText, Film, GripHorizontal, Image as ImageIcon,
-  Download, Folder, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, Scissors, SlidersHorizontal, Sparkles, Ungroup
+  Crop, Download, Folder, ImagePlus, MoreHorizontal, MousePointer2, Music2, Plus, Scissors, SlidersHorizontal, Sparkles, Ungroup, Volume2
 } from 'lucide-react';
 import { createContext, forwardRef, lazy, Suspense, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -104,6 +104,30 @@ function AgentAudioQuickTools({ source, onOperation, onMore }) {
   </div>;
 }
 
+function AgentVideoQuickTools({ source, sourceAsset, busy = false, onApply, onOpenTools }) {
+  const sourceAssetId = String(sourceAsset?.id || sourceAsset?.assetId || '').trim();
+  const canProcess = Boolean(sourceAssetId && typeof onApply === 'function' && !busy);
+  const openTools = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    onOpenTools?.();
+  };
+  const separateAudio = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canProcess) return;
+    onApply?.({ operation: 'separate_audio', sourceAssetId, settings: {} });
+  };
+  return <div className="agent-video-quick-tools nodrag nopan" aria-label="视频快捷工具" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+    <button type="button" onClick={openTools}><Scissors size={14} /><span>截取</span></button>
+    <button type="button" onClick={openTools}><Crop size={14} /><span>裁剪</span></button>
+    <button type="button" disabled={!canProcess} onClick={separateAudio}><Volume2 size={14} /><span>分离音视频</span></button>
+    <button type="button" onClick={openTools}><Film size={14} /><span>逐帧拉片</span></button>
+    <button type="button" onClick={openTools}><MoreHorizontal size={14} /><span>更多</span></button>
+    {source ? <a href={source} download title="下载视频" aria-label="下载视频"><Download size={15} /></a> : null}
+  </div>;
+}
+
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
   onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onSubmitAudio, onImageTool, onVideoTool, onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo,
@@ -113,6 +137,7 @@ function CanvasNode({
   selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas, onSaveDirectorDeskScreenshot, onOpenDirectorDesk, canvasZoom = 1
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
+  const [videoToolsRequest, setVideoToolsRequest] = useState(0);
   const stopCanvasEvent = event => {
     if (!isCanvasMultiSelectionEvent(event)) event.stopPropagation();
   };
@@ -133,6 +158,10 @@ function CanvasNode({
   };
   const nodeType = normalizeCanvasNodeType(data.type);
   const isPinnedBatchFactoryComposer = usesPinnedBatchFactoryComposer(data);
+  const openVideoTools = () => {
+    setVideoToolsRequest(request => request + 1);
+    onOpenEditor?.(id);
+  };
   const applyAudioOperation = operation => {
     if (nodeType !== 'audio') return;
     onNodeConfigChange?.(id, { parameters: { ...(data.config?.parameters || {}), operation } });
@@ -179,6 +208,7 @@ function CanvasNode({
     onCancelVideo={onCancelVideo}
     onRetryVideo={onRetryVideo}
     onConfirmVideo={onConfirmVideo}
+    videoToolsRequest={videoToolsRequest}
   /> : null;
   return (
     <article
@@ -186,6 +216,13 @@ function CanvasNode({
       onDoubleClick={handleNodeDoubleClick}
     >
       <div className="agent-canvas-node-preview-shell">
+        {isEditorOpen && nodeType === 'video' && data.assetRef?.url ? <AgentVideoQuickTools
+          source={data.assetRef.url}
+          sourceAsset={data.assetRef}
+          busy={videoBusy}
+          onApply={input => onVideoTool?.(id, input)}
+          onOpenTools={openVideoTools}
+        /> : null}
         <Handle type="target" position={Position.Left} className="agent-canvas-node-target" aria-label="连接到此节点" />
         {isPinnedBatchFactoryComposer ? <div className="agent-canvas-node-pinned-composer">
           <header className="agent-canvas-node-card-header agent-canvas-node-pinned-header">
@@ -934,6 +971,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     setNodes(next);
     setSelectedIds(ids);
     onSelectionChange?.(ids);
+    if (!isMultiSelection && normalizeCanvasNodeType(node.data?.type) === 'video') openNodeComposer(node.id);
   }
 
   function handleNodeDoubleClick(event, node) {
