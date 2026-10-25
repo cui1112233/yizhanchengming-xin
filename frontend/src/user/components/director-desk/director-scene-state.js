@@ -1,4 +1,24 @@
-import { updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
+import { normalizeDirectorProject, updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
+
+const RATIOS = Object.freeze({ '21:9': 21 / 9, '16:9': 16 / 9, '4:3': 4 / 3, '1:1': 1, '3:4': 3 / 4, '9:16': 9 / 16 });
+
+export function aspectRatioValue(value) {
+  return Object.hasOwn(RATIOS, value) ? RATIOS[value] : null;
+}
+
+export function captureViewportSize(value, longEdge = 1280) {
+  const ratio = aspectRatioValue(value) || 16 / 9;
+  return ratio >= 1
+    ? { width: longEdge, height: Math.round(longEdge / ratio) }
+    : { width: Math.round(longEdge * ratio), height: longEdge };
+}
+
+export function cameraForView(project, view) {
+  const current = normalizeDirectorProject(project);
+  if (view === 'director') return { ...current.directorCamera, kind: 'director' };
+  return current.cameras.find(camera => camera.id === current.activeCameraId)
+    || current.cameras.find(camera => camera.id === 'camera-main');
+}
 
 function vector(value, fallback) {
   if (Array.isArray(value)) return value.slice(0, fallback.length);
