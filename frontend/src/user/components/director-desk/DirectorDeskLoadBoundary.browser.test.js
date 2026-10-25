@@ -16,25 +16,30 @@ const browser = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 ].find(candidate => candidate && fs.existsSync(candidate));
 
-test('加载出错后显示提示，点击重新加载调用重试回调', { skip: browser ? false : 'Chrome or Edge is not available' }, async () => {
+test('异步加载失败后显示提示，默认重试重新加载本地页面', { skip: browser ? false : 'Chrome or Edge is not available' }, async () => {
   const bundle = await build({
     stdin: {
       resolveDir: dirname,
       loader: 'jsx',
       contents: `
-        import React from 'react';
+        import React, { Suspense, lazy } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { flushSync } from 'react-dom';
         import { DirectorDeskLoadBoundary } from './DirectorDeskLoadBoundary.jsx';
-        function Broken() { throw new Error('simulated module load failure'); }
-        let retries = 0;
-        const root = createRoot(document.getElementById('root'));
-        flushSync(() => root.render(<DirectorDeskLoadBoundary onRetry={() => retries++}><Broken /></DirectorDeskLoadBoundary>));
-        const alert = document.querySelector('[role="alert"]');
-        const button = alert?.querySelector('button');
-        const valid = alert?.textContent.includes('导演台资源加载失败') && button?.textContent === '重新加载页面';
-        button?.click();
-        document.body.dataset.testResult = valid && retries === 1 ? 'passed' : 'failed';
+        if (sessionStorage.getItem('director-reloaded') === 'yes') {
+          document.body.dataset.testResult = 'passed';
+        } else {
+          const Broken = lazy(() => Promise.reject(new Error('simulated module load failure')));
+          const root = createRoot(document.getElementById('root'));
+          root.render(<DirectorDeskLoadBoundary><Suspense fallback={<span>loading</span>}><Broken /></Suspense></DirectorDeskLoadBoundary>);
+          setTimeout(() => {
+            const alert = document.querySelector('[role="alert"]');
+            const button = alert?.querySelector('button');
+            const valid = alert?.textContent.includes('导演台资源加载失败') && button?.textContent === '重新加载页面';
+            if (!valid) { document.body.dataset.testResult = 'failed'; return; }
+            sessionStorage.setItem('director-reloaded', 'yes');
+            button.click();
+          }, 100);
+        }
       `
     },
     bundle: true,
@@ -50,7 +55,7 @@ test('加载出错后显示提示，点击重新加载调用重试回调', { ski
     fs.writeFileSync(html, '<meta charset="utf-8"><div id="root"></div><script src="test.js"></script>');
     const output = execFileSync(browser, [
       '--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-      '--disable-background-networking', '--host-resolver-rules=MAP * ~NOTFOUND',
+      '--disable-background-networking', '--host-resolver-rules=MAP * ~NOTFOUND', '--virtual-time-budget=3000',
       `--user-data-dir=${path.join(tempDir, 'profile')}`, '--dump-dom', pathToFileURL(html).href
     ], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });
     assert.match(output, /data-test-result="passed"/);
