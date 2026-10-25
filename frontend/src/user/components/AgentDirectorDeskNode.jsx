@@ -1,7 +1,7 @@
 import { Camera, ImagePlus, Move, Send, UserRound, X } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
-import { directorDeskConfig, directorDeskSceneStyle, mergeDirectorDeskConfig, moveDirectorDeskActor } from '../pages/agent-director-desk';
+import { createDirectorPromptDraft, directorDeskConfig, directorDeskSceneStyle, discardDirectorPromptDraft, editDirectorPromptDraft, mergeDirectorDeskConfig, moveDirectorDeskActor, syncDirectorPromptDraft } from '../pages/agent-director-desk';
 
 function imageForAsset(surface, assetID) {
   return [...(surface?.querySelectorAll?.('img[data-director-asset-id]') || [])]
@@ -115,11 +115,20 @@ export function AgentDirectorDeskWorkspace({ node, onConfigChange, onPickReferen
 export function AgentDirectorDeskNode({ node, onOpen, onConfigChange, onPickReferenceAsset }) {
   const desk = directorDeskConfig(node?.data?.config?.directorDesk);
   const actorCount = desk.actors.length;
-  const [scenePrompt, setScenePrompt] = useState(desk.scenePrompt);
+  const [draftState, setDraftState] = useState(() => ({ nodeID: node.id, draft: createDirectorPromptDraft(desk.scenePrompt) }));
+  const draft = draftState.nodeID === node.id ? syncDirectorPromptDraft(draftState.draft, desk.scenePrompt) : createDirectorPromptDraft(desk.scenePrompt);
+  useEffect(() => {
+    setDraftState(previous => {
+      const next = previous.nodeID === node.id ? syncDirectorPromptDraft(previous.draft, desk.scenePrompt) : createDirectorPromptDraft(desk.scenePrompt);
+      if (previous.nodeID === node.id && previous.draft.value === next.value && previous.draft.base === next.base && previous.draft.conflict === next.conflict) return previous;
+      return { nodeID: node.id, draft: next };
+    });
+  }, [node.id, desk.scenePrompt]);
   const saveDraft = event => {
     event?.preventDefault();
     event?.stopPropagation();
-    onConfigChange?.(node.id, { directorDesk: mergeDirectorDeskConfig(node?.data?.config?.directorDesk, { ...desk, scenePrompt }) });
+    if (draft.conflict) return;
+    onConfigChange?.(node.id, { directorDesk: mergeDirectorDeskConfig(node?.data?.config?.directorDesk, { ...desk, scenePrompt: draft.value }) });
   };
   const stopCanvasEvent = event => event.stopPropagation();
   const hasDraft = Boolean(desk.scenePrompt || desk.sceneAsset?.id);
@@ -135,16 +144,17 @@ export function AgentDirectorDeskNode({ node, onOpen, onConfigChange, onPickRefe
     <div className="agent-director-desk-node__composer nodrag nopan" onMouseDown={stopCanvasEvent}>
       <textarea
         aria-label="导演台场景描述"
-        value={scenePrompt}
+        value={draft.value}
         maxLength={1000}
         placeholder="描述想要搭建的场景，支持通过参考图创建"
-        onChange={event => setScenePrompt(event.target.value)}
+        onChange={event => setDraftState({ nodeID: node.id, draft: editDirectorPromptDraft(draft, event.target.value, desk.scenePrompt) })}
         onPointerDown={stopCanvasEvent}
         onKeyDown={stopCanvasEvent}
       />
+      {draft.conflict ? <div role="alert">场景描述已在其他位置更新。继续编辑草稿或放弃草稿后再保存。<button type="button" onClick={() => setDraftState({ nodeID: node.id, draft: discardDirectorPromptDraft(draft, desk.scenePrompt) })}>放弃草稿</button></div> : null}
       <div>
         <button type="button" onClick={event => { stopCanvasEvent(event); onPickReferenceAsset?.(node.id, event); }}><ImagePlus size={13} />上传图片</button>
-        <button type="button" disabled={!scenePrompt.trim() && !desk.sceneAsset?.id} onClick={saveDraft}><Send size={13} />保存构图</button>
+        <button type="button" disabled={draft.conflict || (!draft.value.trim() && !desk.sceneAsset?.id)} onClick={saveDraft}><Send size={13} />保存构图</button>
       </div>
     </div>
     <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onOpen?.(node.id); }}><Camera size={13} />打开 3D 导演台</button>

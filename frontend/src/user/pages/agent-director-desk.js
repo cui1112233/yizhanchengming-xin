@@ -145,6 +145,30 @@ export function setDirectorAspectRatio(project, ratio) {
   return { ...current, aspectRatio: DIRECTOR_ASPECT_RATIOS.includes(ratio) ? ratio : 'adaptive' };
 }
 
+export function setDirectorSceneAsset(project, asset) {
+  const current = normalizeDirectorProject(project);
+  return normalizeDirectorProject({ ...current, scene: { ...current.scene, assetId: asset?.id, url: asset?.url, name: asset?.name } });
+}
+
+export function createDirectorPromptDraft(value) {
+  const prompt = String(value || '');
+  return { value: prompt, base: prompt, conflict: false };
+}
+
+export function syncDirectorPromptDraft(draft, external) {
+  const prompt = String(external || '');
+  if (draft.value === draft.base || draft.value === prompt) return createDirectorPromptDraft(prompt);
+  return { ...draft, conflict: prompt !== draft.base };
+}
+
+export function editDirectorPromptDraft(draft, value, external) {
+  return { value, base: String(external || ''), conflict: false };
+}
+
+export function discardDirectorPromptDraft(draft, external) {
+  return createDirectorPromptDraft(external);
+}
+
 export function removeDirectorObject(project, objectID) {
   const current = normalizeDirectorProject(project);
   if (objectID === 'scene' || objectID === 'camera-main') return current;

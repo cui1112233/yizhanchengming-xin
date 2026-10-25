@@ -1,12 +1,8 @@
 import { Camera, ImagePlus, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { directorProjectCaptureMetadata, normalizeDirectorProject } from '../../pages/agent-director-desk.js';
+import { directorProjectCaptureMetadata, normalizeDirectorProject, setDirectorSceneAsset } from '../../pages/agent-director-desk.js';
 import { DirectorScene } from './DirectorScene';
 import { updateCamera } from './director-scene-state.js';
-
-function assetForScene(asset) {
-  return { assetId: asset.id, url: asset.url || '', name: asset.name || '', prompt: '' };
-}
 
 export default function DirectorDeskApp({ adapter, onCapture }) {
   const [project, setProject] = useState(() => normalizeDirectorProject(adapter.readState()));
@@ -70,7 +66,7 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
         {!images.length ? <p>项目中还没有图片素材</p> : images.map(asset => <article key={asset.id}>
           {asset.url ? <img src={asset.url} alt="" /> : null}
           <strong>{asset.name || '未命名图片'}</strong>
-          <div><button type="button" onClick={() => saveProject({ ...project, scene: assetForScene(asset) })}>设为场景</button><button type="button" onClick={() => addActor(asset)}><UserRound size={13} />加入角色</button></div>
+          <div><button type="button" onClick={() => saveProject(setDirectorSceneAsset(project, asset))}>设为场景</button><button type="button" onClick={() => addActor(asset)}><UserRound size={13} />加入角色</button></div>
         </article>)}
       </aside>
       <section className="agent-director-desk-fullscreen__viewport" aria-label="3D 场景">

@@ -89,6 +89,32 @@ test('缺少主机位时从旧镜头创建固定主机位并保持有效选择',
   assert.deepEqual(project.cameras[0].position, [1, 2, 3]);
 });
 
+test('更换场景图片保留当前描述和其他项目数据', () => {
+  const project = normalizeDirectorProject({ scene: { assetId: 'old', prompt: '雨夜' }, captures: [{ assetId: 'capture' }] });
+  const next = director.setDirectorSceneAsset(project, { id: 'new', name: '街道', url: '/new' });
+  assert.equal(next.scene.assetId, 'new');
+  assert.equal(next.scene.prompt, '雨夜');
+  assert.deepEqual(next.captures, project.captures);
+});
+
+test('外部描述更新同步未编辑输入，冲突草稿需用户编辑或放弃', () => {
+  const initial = director.createDirectorPromptDraft('旧描述');
+  const clean = director.syncDirectorPromptDraft(initial, '外部更新');
+  assert.equal(clean.value, '外部更新');
+  assert.equal(clean.conflict, false);
+  const typed = director.editDirectorPromptDraft(clean, '我的草稿', '外部更新');
+  const conflict = director.syncDirectorPromptDraft(typed, '新的外部更新');
+  assert.equal(conflict.value, '我的草稿');
+  assert.equal(conflict.conflict, true);
+  const resolved = director.editDirectorPromptDraft(conflict, '确认我的草稿', '新的外部更新');
+  assert.equal(resolved.conflict, false);
+  assert.equal(resolved.value, '确认我的草稿');
+  const discarded = director.discardDirectorPromptDraft(conflict, '新的外部更新');
+  assert.equal(discarded.value, '新的外部更新');
+  assert.equal(discarded.conflict, false);
+  assert.equal(director.syncDirectorPromptDraft(typed, '我的草稿').conflict, false);
+});
+
 test('紧凑编辑场景描述和演员位置保留完整三维项目', () => {
   const original = normalizeDirectorProject({ scene: { assetId: 's', prompt: 'before' },
     actors: [{ id: 'a', assetId: 'img', position: [1, 3, 2], rotation: [0.4, 0.5, 0.2], scale: [2, 3, 4] }],
