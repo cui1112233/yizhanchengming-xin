@@ -1,7 +1,7 @@
-import { Camera, ImagePlus, Move, UserRound, X } from 'lucide-react';
+import { Camera, ImagePlus, Move, Send, UserRound, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
-import { directorDeskConfig, directorDeskSceneStyle, moveDirectorDeskActor } from '../pages/agent-director-desk';
+import { directorDeskConfig, directorDeskSceneStyle, mergeDirectorDeskConfig, moveDirectorDeskActor } from '../pages/agent-director-desk';
 
 function imageForAsset(surface, assetID) {
   return [...(surface?.querySelectorAll?.('img[data-director-asset-id]') || [])]
@@ -52,13 +52,13 @@ export async function captureDirectorDeskScreenshot(surface, config) {
   return new File([blob], `director-desk-${Date.now()}.png`, { type: 'image/png' });
 }
 
-export function AgentDirectorDeskNode({ node, onConfigChange, onPickReferenceAsset, onRemoveReference, onSaveScreenshot }) {
+export function AgentDirectorDeskWorkspace({ node, onConfigChange, onPickReferenceAsset, onRemoveReference, onSaveScreenshot }) {
   const desk = directorDeskConfig(node?.data?.config?.directorDesk);
   const references = Array.isArray(node?.data?.config?.referenceAssets) ? node.data.config.referenceAssets.filter(asset => asset?.kind === 'image') : [];
   const referenceByID = useMemo(() => new Map(references.map(asset => [asset.id, asset])), [references]);
   const surface = useRef(null);
   const [savingScreenshot, setSavingScreenshot] = useState(false);
-  const update = next => onConfigChange?.(node.id, { directorDesk: next });
+  const update = next => onConfigChange?.(node.id, { directorDesk: mergeDirectorDeskConfig(node?.data?.config?.directorDesk, next) });
   const setScene = asset => update({ ...desk, sceneAsset: asset ? { id: asset.id, url: asset.url, name: asset.name } : null });
   const addActor = asset => update({ ...desk, actors: [...desk.actors, { id: `actor-${asset.id}`, assetId: asset.id, x: 50, y: 68, scale: 1 }] });
   const pointerMove = (event, actor) => {
@@ -78,9 +78,15 @@ export function AgentDirectorDeskNode({ node, onConfigChange, onPickReferenceAss
       setSavingScreenshot(false);
     }
   };
-  return <section className="agent-director-desk nodrag nopan" aria-label="3D 导演台预演参考" onMouseDown={event => event.stopPropagation()}>
+  return <section className="agent-director-desk" aria-label="导演台预演参考">
     <header><span><Camera size={14} />导演台</span><small>预演参考</small></header>
     <div ref={surface} className="agent-director-desk__stage" style={desk.sceneAsset?.url ? { backgroundImage: `url("${desk.sceneAsset.url}")` } : undefined}>
+      {desk.sceneAsset?.url ? <AuthenticatedAgentImage
+        source={desk.sceneAsset.url}
+        data-director-asset-id={desk.sceneAsset.id}
+        className="agent-director-desk__scene-source"
+        alt=""
+      /> : null}
       <div className="agent-director-desk__camera" style={directorDeskSceneStyle(desk)}>
         {desk.actors.map(actor => {
           const asset = referenceByID.get(actor.assetId);
@@ -101,5 +107,46 @@ export function AgentDirectorDeskNode({ node, onConfigChange, onPickReferenceAss
       <button type="button" title={`添加角色：${asset.name}`} onClick={() => addActor(asset)}><UserRound size={12} /></button>
       <button type="button" title={`移除素材：${asset.name}`} onClick={() => onRemoveReference?.(node.id, asset.id)}><X size={12} /></button>
     </span>)}</div> : null}
+  </section>;
+}
+
+// The canvas only needs a compact, draggable entry point. Composition belongs
+// in the dedicated workspace above so controls never fight React Flow dragging.
+export function AgentDirectorDeskNode({ node, onOpen, onConfigChange, onPickReferenceAsset }) {
+  const desk = directorDeskConfig(node?.data?.config?.directorDesk);
+  const actorCount = desk.actors.length;
+  const [scenePrompt, setScenePrompt] = useState(desk.scenePrompt);
+  const saveDraft = event => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    onConfigChange?.(node.id, { directorDesk: mergeDirectorDeskConfig(node?.data?.config?.directorDesk, { ...desk, scenePrompt }) });
+  };
+  const stopCanvasEvent = event => event.stopPropagation();
+  const hasDraft = Boolean(desk.scenePrompt || desk.sceneAsset?.id);
+  return <section className="agent-director-desk-node" aria-label="导演台节点">
+    <div className="agent-director-desk-node__preview" style={desk.sceneAsset?.url ? { backgroundImage: `url("${desk.sceneAsset.url}")` } : undefined}>
+      {desk.sceneAsset?.url ? <AuthenticatedAgentImage source={desk.sceneAsset.url} className="agent-director-desk-node__source" alt="" /> : <Camera size={24} />}
+      {actorCount ? <span>{actorCount} 位角色</span> : null}
+    </div>
+    <div className="agent-director-desk-node__summary">
+      <strong>{desk.sceneAsset?.name || '未设置场景'}</strong>
+      <small>{actorCount ? `${actorCount} 位角色 · 3D 导演台` : hasDraft ? '构图草稿已保存，可进入 3D 导演台继续搭建' : '填写场景并添加参考图后开始预演'}</small>
+    </div>
+    <div className="agent-director-desk-node__composer nodrag nopan" onMouseDown={stopCanvasEvent}>
+      <textarea
+        aria-label="导演台场景描述"
+        value={scenePrompt}
+        maxLength={1000}
+        placeholder="描述想要搭建的场景，支持通过参考图创建"
+        onChange={event => setScenePrompt(event.target.value)}
+        onPointerDown={stopCanvasEvent}
+        onKeyDown={stopCanvasEvent}
+      />
+      <div>
+        <button type="button" onClick={event => { stopCanvasEvent(event); onPickReferenceAsset?.(node.id, event); }}><ImagePlus size={13} />上传图片</button>
+        <button type="button" disabled={!scenePrompt.trim() && !desk.sceneAsset?.id} onClick={saveDraft}><Send size={13} />保存构图</button>
+      </div>
+    </div>
+    <button type="button" className="nodrag nopan" onMouseDown={stopCanvasEvent} onClick={event => { stopCanvasEvent(event); onOpen?.(node.id); }}><Camera size={13} />打开 3D 导演台</button>
   </section>;
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as director from './agent-director-desk.js';
 
 import {
   addDirectorActor, addDirectorCamera, updateDirectorActor, updateDirectorCamera,
@@ -79,6 +80,43 @@ test('旧画布镜头参数迁移后仍能用于紧凑画布', () => {
   const compact = directorDeskConfig(normalizeDirectorProject(project));
   assert.equal(compact.scenePrompt, '雨天');
   assert.deepEqual(compact.camera, { zoom: 1.2, x: 4, y: -3 });
+});
+
+test('缺少主机位时从旧镜头创建固定主机位并保持有效选择', () => {
+  const project = normalizeDirectorProject({ camera: { id: 'old-camera', position: [1, 2, 3] }, cameras: [{ id: 'side' }] });
+  assert.equal(project.cameras[0].id, 'camera-main');
+  assert.equal(project.activeCameraId, 'camera-main');
+  assert.deepEqual(project.cameras[0].position, [1, 2, 3]);
+});
+
+test('紧凑编辑场景描述和演员位置保留完整三维项目', () => {
+  const original = normalizeDirectorProject({ scene: { assetId: 's', prompt: 'before' },
+    actors: [{ id: 'a', assetId: 'img', position: [1, 3, 2], rotation: [0.4, 0.5, 0.2], scale: [2, 3, 4] }],
+    cameras: [{ id: 'camera-main' }, { id: 'side' }], activeCameraId: 'side', aspectRatio: '9:16',
+    directorCamera: { position: [4, 5, 6] }, captures: [{ assetId: 'capture' }] });
+  const compact = directorDeskConfig(original);
+  const prompt = director.mergeDirectorDeskConfig(original, { ...compact, scenePrompt: 'after' });
+  assert.equal(prompt.scene.prompt, 'after');
+  assert.deepEqual(prompt.actors, original.actors);
+  assert.deepEqual(prompt.cameras, original.cameras);
+  assert.equal(prompt.activeCameraId, 'side');
+  assert.equal(prompt.aspectRatio, '9:16');
+  assert.deepEqual(prompt.directorCamera, original.directorCamera);
+  assert.deepEqual(prompt.captures, original.captures);
+  const moved = director.mergeDirectorDeskConfig(original, moveDirectorDeskActor(compact, 'a', { x: 80, y: 89 }));
+  assert.deepEqual(moved.actors[0].position, [2.5, 3, 2]);
+  assert.deepEqual(moved.actors[0].rotation, [0.4, 0.5, 0.2]);
+  assert.deepEqual(moved.actors[0].scale, [2, 3, 4]);
+  assert.deepEqual(moved.cameras, original.cameras);
+  assert.deepEqual(moved.captures, original.captures);
+  const scene = director.mergeDirectorDeskConfig(original, { ...compact, sceneAsset: { id: 'new-scene', url: '/new', name: 'New' }, camera: { ...compact.camera, zoom: 1.5 } });
+  assert.equal(scene.scene.assetId, 'new-scene');
+  assert.equal(scene.camera.zoom, 1.5);
+  assert.deepEqual(scene.actors, original.actors);
+  assert.deepEqual(scene.captures, original.captures);
+  const added = director.mergeDirectorDeskConfig(original, { ...compact, actors: [...compact.actors, { id: 'b', assetId: 'img-2', x: 50, y: 68, scale: 1 }] });
+  assert.equal(added.actors[1].assetId, 'img-2');
+  assert.deepEqual(added.actors[0], original.actors[0]);
 });
 
 test('object helpers preserve identity, protect main camera and switch active camera on removal', () => {

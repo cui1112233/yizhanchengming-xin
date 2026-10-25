@@ -80,7 +80,7 @@ export function normalizeDirectorProject(input = {}) {
   const source = input && typeof input === 'object' ? input : {};
   const scene = normalizeAsset(source.scene || source.sceneAsset);
   const cameras = Array.isArray(source.cameras) ? source.cameras.map(normalizeCameraObject) : [];
-  if (!cameras.some(camera => camera.id === 'camera-main')) cameras.unshift(normalizeCameraObject(source.camera));
+  if (!cameras.some(camera => camera.id === 'camera-main')) cameras.unshift({ ...normalizeCameraObject(source.camera), id: 'camera-main' });
   const directorCamera = normalizeCamera(source.directorCamera || source.camera);
   return {
     rendererVersion: '3d-v2',
@@ -210,6 +210,28 @@ export function directorDeskConfig(input = {}) {
       y: clamp(sourceCamera.y, -30, 30, DEFAULT_CAMERA.y)
     }
   };
+}
+
+export function mergeDirectorDeskConfig(project, edited) {
+  const current = normalizeDirectorProject(project);
+  const before = directorDeskConfig(current);
+  const next = directorDeskConfig(edited);
+  const actors = next.actors.map(actor => {
+    const existing = current.actors.find(item => item.id === actor.id);
+    const previous = before.actors.find(item => item.id === actor.id);
+    if (!existing || !previous) return normalizeActor(actor);
+    return {
+      ...existing,
+      position: [actor.x === previous.x ? existing.position[0] : (actor.x - 50) / 12,
+        existing.position[1], actor.y === previous.y ? existing.position[2] : (actor.y - 65) / 12],
+      rotation: [existing.rotation[0], existing.rotation[1], actor.rotation === previous.rotation ? existing.rotation[2] : actor.rotation * Math.PI / 180],
+      scale: actor.scale === previous.scale ? existing.scale : [actor.scale, actor.scale, actor.scale]
+    };
+  });
+  return normalizeDirectorProject({ ...current,
+    scene: { ...(next.sceneAsset ? { assetId: next.sceneAsset.id, url: next.sceneAsset.url, name: next.sceneAsset.name } : {}), prompt: next.scenePrompt },
+    actors, camera: { ...current.camera, ...next.camera }
+  });
 }
 
 export function moveDirectorDeskActor(config, actorID, position) {
