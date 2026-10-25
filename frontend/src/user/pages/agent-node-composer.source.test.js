@@ -146,7 +146,7 @@ test('mapped media cards use the compact top body and bottom zones without repla
 test('media processing tools stay collapsed until the compact tools action is opened', () => {
   assert.match(composerSource, /const \[toolsOpen, setToolsOpen\] = useState\(false\)/);
   assert.match(composerSource, /id: 'media-tools'/);
-  assert.match(composerSource, /toolsOpen \? '收起工具' : '工具'/);
+  assert.match(composerSource, /kind === 'image' \? \(toolsOpen \? '收起图片处理' : '图片处理'\)/);
   assert.match(composerSource, /kind === 'image' && toolsOpen \? <AgentImageTools/);
   assert.match(composerSource, /!isBatchFactoryMerge && toolsOpen \? <AgentVideoTools/);
 });

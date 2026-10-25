@@ -243,7 +243,7 @@ export default function AgentNodeComposer({
     if (kind === 'video' && videoState.canConfirm) more.push(action('confirm-video', '确认', () => onConfirmVideo?.(node.id), <Check size={14} />));
     if (kind === 'image' || (kind === 'video' && !isVideoToolTask && !isBatchFactoryMerge)) direct.push({
       id: 'media-tools',
-      label: toolsOpen ? '收起工具' : '工具',
+      label: kind === 'image' ? (toolsOpen ? '收起图片处理' : '图片处理') : (toolsOpen ? '收起视频处理' : '视频处理'),
       icon: <SlidersHorizontal size={14} />,
       disabled: busy || taskActionBusy,
       onClick: () => setToolsOpen(open => !open)
