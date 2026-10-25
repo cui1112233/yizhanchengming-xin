@@ -9,9 +9,21 @@ import (
 )
 
 const (
-	comicAssetsSlot = "batch.comic-assets"
-	comicPageSlot   = "batch.comic-page"
+	comicAssetsSlot          = "batch.comic-assets"
+	comicPageSlot            = "batch.comic-page"
+	comicImageDerivationSlot = "batch.comic-image-derivation"
+	comicStyleSlot           = "batch.comic-style"
 )
+
+func normalizeBatchFactoryProductionMode(value string) (string, error) {
+	mode := strings.TrimSpace(value)
+	switch mode {
+	case "", "video", "comic", "original", "viral", "original_direct", "viral_hook":
+		return mode, nil
+	default:
+		return "", fmt.Errorf("生产模式无效")
+	}
+}
 
 // hydrateBatchFactoryPromptConfig turns the compact preset IDs saved by the
 // browser into an immutable backend snapshot. This keeps prompt text owned by
@@ -31,9 +43,19 @@ func hydrateBatchFactoryPromptConfig(catalog *prompt.Catalog, raw json.RawMessag
 	if err := freezePromptSelection(catalog, comic, "batch-factory", comicPageSlot, ""); err != nil {
 		return nil, fmt.Errorf("漫画提示词：%w", err)
 	}
+	if derivation, ok := comic["imageDerivation"].(map[string]any); ok && derivation != nil {
+		if err := freezePromptSelection(catalog, derivation, "batch-factory", comicImageDerivationSlot, ""); err != nil {
+			return nil, fmt.Errorf("图片描述词推导：%w", err)
+		}
+	}
 	if assets, ok := comic["assets"].(map[string]any); ok && assets != nil {
 		if err := freezePromptSelection(catalog, assets, "batch-factory", comicAssetsSlot, ""); err != nil {
 			return nil, fmt.Errorf("漫画资产提示词：%w", err)
+		}
+	}
+	if style, ok := comic["style"].(map[string]any); ok && style != nil {
+		if err := freezePromptSelection(catalog, style, "batch-factory", comicStyleSlot, ""); err != nil {
+			return nil, fmt.Errorf("漫画画风：%w", err)
 		}
 	}
 	if values, ok := comic["constraints"].([]any); ok {

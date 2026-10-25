@@ -87,17 +87,30 @@ type AIReasoningPromptModule struct {
 // AIReasoningComicModule keeps the comic selections beside the existing
 // video/visual selections without changing either production path.
 type AIReasoningComicModule struct {
-	Enabled             bool             `json:"enabled"`
-	Scope               string           `json:"scope"`
-	BookIDs             []string         `json:"bookIds"`
-	ID                  string           `json:"presetId"`
-	Name                string           `json:"presetName"`
-	Slot                string           `json:"presetSlot"`
-	Version             int              `json:"presetVersion"`
-	Key                 string           `json:"presetKey"`
-	Body                string           `json:"body"`
-	Assets      PresetSnapshot   `json:"assets"`
-	Constraints []PresetSnapshot `json:"constraints"`
+	Enabled              bool                      `json:"enabled"`
+	Scope                string                    `json:"scope"`
+	BookIDs              []string                  `json:"bookIds"`
+	ID                   string                    `json:"presetId"`
+	Name                 string                    `json:"presetName"`
+	Slot                 string                    `json:"presetSlot"`
+	Version              int                       `json:"presetVersion"`
+	Key                  string                    `json:"presetKey"`
+	Body                 string                    `json:"body"`
+	Assets               PresetSnapshot            `json:"assets"`
+	ImageDerivation      PresetSnapshot            `json:"imageDerivation"`
+	Style                PresetSnapshot            `json:"style"`
+	Constraints          []PresetSnapshot          `json:"constraints"`
+	ImagePromptPrefix    string                    `json:"imagePromptPrefix"`
+	ImagePromptSuffix    string                    `json:"imagePromptSuffix"`
+	GlobalReferenceImage ComicGlobalReferenceImage `json:"globalReferenceImage"`
+}
+
+type ComicGlobalReferenceImage struct {
+	AssetID       string `json:"assetId"`
+	URL           string `json:"url"`
+	Enabled       bool   `json:"enabled"`
+	ApplyToAssets bool   `json:"applyToAssets"`
+	ApplyToPages  bool   `json:"applyToPages"`
 }
 
 func (m AIReasoningComicModule) body() string {
@@ -178,6 +191,22 @@ func aiReasoningPromptConfig(patch SettingsPatch) AIReasoningPromptConfig {
 	// remain on the combined extraction contract.
 	config.Assets.Prop = PresetSnapshot{}
 	return config
+}
+
+// normalizeProductionMode keeps historical books on the existing video path
+// until a user explicitly switches the book to comic production.
+func normalizeProductionMode(patch SettingsPatch) string {
+	if mode := rawString(patch, "productionMode", ""); mode == "comic" || mode == "video" {
+		return mode
+	}
+	// Earlier single-book screens persisted the selected comic module but could
+	// omit productionMode. Treat that durable intent as comic mode during the
+	// migration so the asset action and its server-side stage cannot silently
+	// fall back to video extraction.
+	if config := aiReasoningPromptConfig(patch); config.Comic.Enabled && strings.TrimSpace(config.Comic.body()) != "" {
+		return "comic"
+	}
+	return "video"
 }
 
 func (m AIReasoningScope) appliesTo(book Book) bool {
