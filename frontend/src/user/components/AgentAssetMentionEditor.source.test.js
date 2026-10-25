@@ -24,6 +24,21 @@ test('keeps editing compatible with IME, plain-text paste, and caret restoration
   assert.match(source, /setSelectionOffset/);
 });
 
+test('serializes canonical prompt text without layout-generated chip newlines', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+
+  assert.match(source, /plainTextFromEditor/);
+  assert.match(source, /before\.cloneContents\(\)/);
+  assert.doesNotMatch(source, /root\.innerText/);
+});
+
+test('preserves the live caret when reference updates redraw the same prompt', () => {
+  const source = fs.readFileSync(sourcePath, 'utf8');
+
+  assert.match(source, /const activeOffset = root\.contains\(window\.getSelection\(\)\?\.anchorNode\)/);
+  assert.match(source, /activeOffset/);
+});
+
 test('removes a whole referenced asset from backspace or delete boundaries', () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
 

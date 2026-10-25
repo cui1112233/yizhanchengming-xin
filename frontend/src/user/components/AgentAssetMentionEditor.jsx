@@ -1,6 +1,24 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { promptMentionRanges, removeAssetMention } from '../pages/agent-canvas-asset-input';
 
+function plainTextFromNode(node) {
+  if (!node) return '';
+  if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || '';
+  if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.assetMentionValue) return node.dataset.assetMentionValue;
+  if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') return '\n';
+  return [...node.childNodes].map(plainTextFromNode).join('');
+}
+
+function plainTextFromEditor(root) {
+  let text = '';
+  for (const node of [...(root?.childNodes || [])]) {
+    const block = node.nodeType === Node.ELEMENT_NODE && /^(DIV|P|LI)$/u.test(node.tagName);
+    if (block && text && !text.endsWith('\n')) text += '\n';
+    text += plainTextFromNode(node);
+  }
+  return text.replace(/\r/g, '');
+}
+
 function selectionOffset(root) {
   const selection = window.getSelection();
   if (!root || !selection?.rangeCount || !root.contains(selection.anchorNode)) return 0;
@@ -8,7 +26,7 @@ function selectionOffset(root) {
   const before = range.cloneRange();
   before.selectNodeContents(root);
   before.setEnd(range.startContainer, range.startOffset);
-  return before.toString().length;
+  return plainTextFromEditor(before.cloneContents()).length;
 }
 
 function selectionRect(root) {
@@ -40,6 +58,12 @@ function setSelectionOffset(root, wantedOffset) {
     }
     remaining -= size;
   }
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function mentionAtBoundary(ranges, cursor, direction) {
@@ -114,8 +138,10 @@ export default function AgentAssetMentionEditor({
   useLayoutEffect(() => {
     const root = editorRef.current;
     if (!root) return;
-    renderEditor(root, value, ranges);
+    const activeOffset = root.contains(window.getSelection()?.anchorNode) ? selectionOffset(root) : null;
     if (Number.isInteger(initialSelectionOffset)) restoreOffsetRef.current = initialSelectionOffset;
+    else if (restoreOffsetRef.current === null && activeOffset !== null) restoreOffsetRef.current = activeOffset;
+    renderEditor(root, value, ranges);
     if (restoreOffsetRef.current === null) return;
     setSelectionOffset(root, restoreOffsetRef.current);
     restoreOffsetRef.current = null;
@@ -124,13 +150,13 @@ export default function AgentAssetMentionEditor({
   const emitQuery = useCallback(() => {
     const root = editorRef.current;
     if (!root) return;
-    onQueryChange?.({ text: root.innerText.replace(/\r/g, ''), cursor: selectionOffset(root), rect: selectionRect(root) });
+    onQueryChange?.({ text: plainTextFromEditor(root), cursor: selectionOffset(root), rect: selectionRect(root) });
   }, [onQueryChange]);
 
   const emitTextChange = useCallback(() => {
     const root = editorRef.current;
     if (!root) return;
-    const rawText = root.innerText.replace(/\r/g, '');
+    const rawText = plainTextFromEditor(root);
     const text = rawText.slice(0, maxLength);
     const cursor = Math.min(selectionOffset(root), text.length);
     restoreOffsetRef.current = cursor;
