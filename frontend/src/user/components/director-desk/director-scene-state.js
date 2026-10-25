@@ -40,6 +40,17 @@ export function updateCamera(project, camera) {
   return updateDirectorViewCamera(project, camera || {});
 }
 
+export function focusDirectorObject(project, selection) {
+  const current = normalizeDirectorProject(project);
+  const object = selection?.kind === 'actor'
+    ? current.actors.find(actor => actor.id === selection.id)
+    : selection?.kind === 'camera' ? current.cameras.find(camera => camera.id === selection.id) : null;
+  if (selection?.kind !== 'scene' && !object) return current;
+  const target = object ? object.position : [0, 0, 0];
+  const offset = current.directorCamera.position.map((value, index) => value - current.directorCamera.target[index]);
+  return updateDirectorViewCamera(current, { target, position: target.map((value, index) => value + offset[index]) });
+}
+
 export function cameraFromControls(camera, target) {
   return {
     position: vector(camera?.position, [0, 3, 8]),

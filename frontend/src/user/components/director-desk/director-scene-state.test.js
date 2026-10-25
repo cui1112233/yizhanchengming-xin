@@ -3,6 +3,26 @@ import assert from 'node:assert/strict';
 
 import { actorPlaneProps, aspectRatioValue, cameraForView, cameraFromControls, captureViewportSize, updateCamera } from './director-scene-state.js';
 import { normalizeDirectorProject } from '../../pages/agent-director-desk.js';
+import * as sceneState from './director-scene-state.js';
+
+test('stale active camera falls back to camera-main', () => {
+  const project = normalizeDirectorProject({ activeCameraId: 'missing' });
+  assert.equal(cameraForView(project, 'camera').id, 'camera-main');
+});
+
+test('actor plane preserves non-uniform v2 scale', () => {
+  assert.deepEqual(actorPlaneProps({ position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 2, 1] }).scale, [1, 2, 1]);
+});
+
+test('focus targets selected objects without changing production camera', () => {
+  assert.equal(typeof sceneState.focusDirectorObject, 'function');
+  const project = normalizeDirectorProject({ actors: [{ id: 'a', position: [2, 3, 4] }] });
+  const focused = sceneState.focusDirectorObject(project, { kind: 'actor', id: 'a' });
+  assert.deepEqual(focused.directorCamera.target, [2, 3, 4]);
+  assert.deepEqual(focused.cameras, project.cameras);
+  assert.deepEqual(sceneState.focusDirectorObject(project, { kind: 'camera', id: 'camera-main' }).directorCamera.target, project.cameras[0].position);
+  assert.deepEqual(sceneState.focusDirectorObject(focused, { kind: 'scene', id: 'scene' }).directorCamera.target, [0, 0, 0]);
+});
 
 test('图片演员会投影成稳定的 3D 立面参数', () => {
   const actor = actorPlaneProps({ id: 'actor-1', assetId: 'image-1', position: [2, 0, -1], rotation: [0, 1.2, 0], scale: 1.2 });
