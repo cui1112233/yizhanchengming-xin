@@ -15,12 +15,12 @@ export default function DirectorDeskShell({ left, viewport, right, top, bottom, 
   const leftOpen = !leftCollapsed && !(narrow && !rightCollapsed && preferredSide === 'right');
   const rightOpen = !rightCollapsed && !(narrow && !leftCollapsed && preferredSide === 'left');
   const toggleLeft = () => {
-    if (narrow && !leftOpen && !rightCollapsed) onToggleRight();
+    if (narrow && !rightCollapsed) onToggleRight();
     if (leftOpen || leftCollapsed) onToggleLeft();
     setPreferredSide('left');
   };
   const toggleRight = () => {
-    if (narrow && !rightOpen && !leftCollapsed) onToggleLeft();
+    if (narrow && !leftCollapsed) onToggleLeft();
     if (rightOpen || rightCollapsed) onToggleRight();
     setPreferredSide('right');
   };

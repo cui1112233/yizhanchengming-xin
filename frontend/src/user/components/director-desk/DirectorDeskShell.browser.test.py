@@ -100,6 +100,23 @@ class ShellBrowserTests(unittest.TestCase):
         page.get_by_role('button', name='右侧操作').click()
         self.assertEqual(page.locator('.agent-director-shell__left-content').count(), 0)
 
+    def test_closing_initial_panel_hides_both_and_is_symmetric(self):
+        page = self.browser.new_page(viewport={'width': 390, 'height': 800})
+        self.addCleanup(page.close)
+        page.goto(URL)
+        page.get_by_role('button', name='收起左侧面板').click()
+        self.assertEqual(page.locator('.agent-director-shell__left-content').count(), 0)
+        self.assertEqual(page.locator('.agent-director-shell__right-content').count(), 0)
+        page.set_viewport_size({'width': 1440, 'height': 800})
+        page.get_by_role('button', name='展开左侧面板').click()
+        page.get_by_role('button', name='展开右侧面板').click()
+        page.set_viewport_size({'width': 390, 'height': 800})
+        page.get_by_role('button', name='收起右侧面板').wait_for()
+        self.assertEqual(page.locator('.agent-director-shell__left-content').count(), 0)
+        page.get_by_role('button', name='收起右侧面板').click()
+        self.assertEqual(page.locator('.agent-director-shell__left-content').count(), 0)
+        self.assertEqual(page.locator('.agent-director-shell__right-content').count(), 0)
+
 
 if __name__ == '__main__':
     unittest.main()
