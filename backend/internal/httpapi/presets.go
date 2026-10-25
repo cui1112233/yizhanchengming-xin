@@ -28,7 +28,26 @@ func registerPresetRoutes(root *http.ServeMux, auth BridgeAuth, catalog *prompt.
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
 			return
 		}
-		switch strings.TrimPrefix(r.URL.Path, prefix) {
+		presetPath := strings.TrimPrefix(r.URL.Path, prefix)
+		if strings.HasPrefix(presetPath, "comic-style/") && strings.HasSuffix(presetPath, "/preview") {
+			if r.Method != http.MethodGet {
+				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+				return
+			}
+			presetID := strings.TrimSuffix(strings.TrimPrefix(presetPath, "comic-style/"), "/preview")
+			data, contentType, found := prompt.OpenComicStylePreview(presetID)
+			if !found {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+			return
+		}
+		switch presetPath {
 		case "constraint-text":
 			if r.Method != http.MethodGet {
 				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})

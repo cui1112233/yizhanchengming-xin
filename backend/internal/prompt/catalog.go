@@ -26,6 +26,7 @@ type presetRecord struct {
 	Revision          int      `json:"revision"`
 	Status            string   `json:"status"`
 	Body              string   `json:"body"`
+	Categories        []string `json:"categories,omitempty"`
 	ProtocolLock      struct {
 		Format    string `json:"format"`
 		Slot      string `json:"slot"`
@@ -48,6 +49,8 @@ type PublicPreset struct {
 	ConstraintCategory string   `json:"constraintCategory,omitempty"`
 	ExtractionPreset   bool     `json:"extractionPreset,omitempty"`
 	ProcessOperation   string   `json:"processOperation,omitempty"`
+	Categories         []string `json:"categories,omitempty"`
+	PreviewURL         string   `json:"previewUrl,omitempty"`
 }
 
 // PublishedPresetBody is the server-side snapshot used when a workbench saves
@@ -98,7 +101,10 @@ func publicPreset(record presetRecord) PublicPreset {
 		value := record.ProtocolLock.Slot
 		slot = &value
 	}
-	result := PublicPreset{ID: record.ID, Module: record.Module, Name: record.Name, Kind: record.Kind, Description: record.Description, CompatibleBaseIDs: append([]string(nil), record.CompatibleBaseIDs...), Version: record.Version, Revision: revision, Status: record.Status, Slot: slot}
+	result := PublicPreset{ID: record.ID, Module: record.Module, Name: record.Name, Kind: record.Kind, Description: record.Description, CompatibleBaseIDs: append([]string(nil), record.CompatibleBaseIDs...), Version: record.Version, Revision: revision, Status: record.Status, Slot: slot, Categories: append([]string(nil), record.Categories...)}
+	if record.ProtocolLock.Slot == "batch.comic-style" {
+		result.PreviewURL = "/api/presets/comic-style/" + record.ID + "/preview"
+	}
 	switch record.ProtocolLock.Format {
 	case "constraint":
 		result.ConstraintCategory = record.ProtocolLock.Category

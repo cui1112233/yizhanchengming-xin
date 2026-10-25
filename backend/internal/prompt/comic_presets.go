@@ -1,15 +1,22 @@
 package prompt
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed defaults/comic_presets.json
 var comicPresetDefaults []byte
+
+//go:embed defaults/comic_styles.json
+var comicStyleDefaults []byte
+
+//go:embed defaults/comic_style_previews/*.jpg
+var comicStylePreviews embed.FS
 
 // EnsureComicPresets adds only missing built-in comic presets to the durable
 // system catalog. Existing system-preset versions remain fully editable and
@@ -28,6 +35,11 @@ func EnsureComicPresets(path string) error {
 	if err := json.Unmarshal(comicPresetDefaults, &defaults); err != nil {
 		return fmt.Errorf("read built-in comic presets: %w", err)
 	}
+	var styles []map[string]any
+	if err := json.Unmarshal(comicStyleDefaults, &styles); err != nil {
+		return fmt.Errorf("read built-in comic styles: %w", err)
+	}
+	defaults = append(defaults, styles...)
 	existing := make(map[string]bool, len(records))
 	for _, record := range records {
 		if id := stringValue(record["id"]); id != "" {
@@ -63,4 +75,20 @@ func EnsureComicPresets(path string) error {
 		return fmt.Errorf("replace system prompt catalog: %w", err)
 	}
 	return nil
+}
+
+// OpenComicStylePreview returns only the display image paired with a built-in
+// style preset. Selecting a style never adds this image to generation inputs.
+func OpenComicStylePreview(presetID string) ([]byte, string, bool) {
+	presetID = strings.TrimSpace(presetID)
+	const prefix = "batch-comic-style-"
+	if !strings.HasPrefix(presetID, prefix) || len(presetID) != len(prefix)+2 {
+		return nil, "", false
+	}
+	name := strings.TrimPrefix(presetID, prefix) + ".jpg"
+	data, err := comicStylePreviews.ReadFile("defaults/comic_style_previews/" + name)
+	if err != nil {
+		return nil, "", false
+	}
+	return data, "image/jpeg", true
 }
