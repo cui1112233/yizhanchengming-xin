@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  assetMentionDeletionAtCaret,
   assetReferenceKey,
   assetMentionTrigger,
   filterMentionAssets,
@@ -72,6 +73,14 @@ test('removing a selected asset deletes every exact mention and preserves simila
   );
   assert.equal(removeAssetMention('@角色A 走进房间', asset), '走进房间');
   assert.equal(removeAssetMention('没有引用', asset), '没有引用');
+});
+
+test('backspace after the inserted separator targets the complete asset mention', () => {
+  const asset = { id: 'asset-role-a', kind: 'image', name: '角色A' };
+
+  assert.equal(assetMentionDeletionAtCaret('@角色A 正文', [asset], 5, 'backspace')?.asset, asset);
+  assert.equal(assetMentionDeletionAtCaret('@角色A 正文', [asset], 6, 'backspace'), null);
+  assert.equal(assetMentionDeletionAtCaret('正文 @角色A', [asset], 3, 'delete')?.asset, asset);
 });
 
 test('canvas paste accepts the first clipboard image and leaves editable fields alone', () => {

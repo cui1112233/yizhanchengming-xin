@@ -43,7 +43,7 @@ test('removes a whole referenced asset from backspace or delete boundaries', () 
   const source = fs.readFileSync(sourcePath, 'utf8');
 
   assert.match(source, /\['Backspace', 'Delete'\]/);
-  assert.match(source, /mentionAtBoundary/);
+  assert.match(source, /assetMentionDeletionAtCaret/);
   assert.match(source, /removeAssetMention\(value, boundary\.asset\)/);
   assert.match(source, /onRemoveReference\?\.\(boundary\.asset, nextValue\)/);
 });

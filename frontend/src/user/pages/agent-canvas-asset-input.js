@@ -91,6 +91,19 @@ export function promptMentionRanges(value, references) {
   return ranges;
 }
 
+export function assetMentionDeletionAtCaret(value, references, caret, direction) {
+  const text = String(value || '');
+  const cursor = Math.max(0, Math.min(Number.isFinite(caret) ? caret : 0, text.length));
+  return promptMentionRanges(text, references).find(range => {
+    if (direction === 'delete') return cursor === range.start;
+    if (direction !== 'backspace') return false;
+    return cursor === range.end || (
+      cursor === range.end + 1
+      && /[^\S\r\n]/u.test(text[range.end] || '')
+    );
+  }) || null;
+}
+
 export function removeAssetMention(value, asset) {
   const text = String(value || '');
   const ranges = promptMentionRanges(text, [asset]);

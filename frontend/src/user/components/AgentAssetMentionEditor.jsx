@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { promptMentionRanges, removeAssetMention } from '../pages/agent-canvas-asset-input';
+import { assetMentionDeletionAtCaret, promptMentionRanges, removeAssetMention } from '../pages/agent-canvas-asset-input';
 
 function plainTextFromNode(node) {
   if (!node) return '';
@@ -64,13 +64,6 @@ function setSelectionOffset(root, wantedOffset) {
   const selection = window.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
-}
-
-function mentionAtBoundary(ranges, cursor, direction) {
-  return ranges.find(range => (
-    (direction === 'backspace' && cursor === range.end)
-    || (direction === 'delete' && cursor === range.start)
-  )) || null;
 }
 
 function appendAssetChip(fragment, range) {
@@ -184,14 +177,14 @@ export default function AgentAssetMentionEditor({
     onEditorKeyDown?.(event);
     if (event.defaultPrevented || disabled || !['Backspace', 'Delete'].includes(event.key)) return;
     const cursor = selectionOffset(editorRef.current);
-    const boundary = mentionAtBoundary(ranges, cursor, event.key === 'Backspace' ? 'backspace' : 'delete');
+    const boundary = assetMentionDeletionAtCaret(value, references, cursor, event.key === 'Backspace' ? 'backspace' : 'delete');
     if (!boundary) return;
     event.preventDefault();
     const nextValue = removeAssetMention(value, boundary.asset);
     restoreOffsetRef.current = Math.min(boundary.start, nextValue.length);
     if (onRemoveReference) onRemoveReference?.(boundary.asset, nextValue);
     else onChange?.(nextValue, restoreOffsetRef.current);
-  }, [disabled, onChange, onEditorKeyDown, onRemoveReference, ranges, value]);
+  }, [disabled, onChange, onEditorKeyDown, onRemoveReference, references, value]);
 
   return <div
     ref={editorRef}
