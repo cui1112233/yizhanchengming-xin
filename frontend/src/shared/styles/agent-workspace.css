@@ -1499,6 +1499,31 @@
 .agent-page .agent-director-desk-fullscreen__actions span { color: #9aaab4; font-size: 12px; }
 .agent-page .agent-director-desk-fullscreen__actions button { margin-top: 8px; border-color: #5ba58e; background: #1f4b43; }
 .agent-page .agent-director-desk-loading { position: fixed; z-index: 1200; inset: 0; display: grid; place-items: center; background: #10151b; color: #eef3f5; }
+.agent-page .agent-director-desk-load-error {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: var(--director-bg, var(--legacy-bg));
+  color: var(--director-text, var(--legacy-text));
+  text-align: center;
+}
+.agent-page .agent-director-desk-load-error span { color: var(--director-muted, var(--legacy-muted)); }
+.agent-page .agent-director-desk-load-error button {
+  border: 1px solid var(--director-border, var(--legacy-border));
+  border-radius: 5px;
+  padding: 8px 14px;
+  background: var(--director-panel-strong, var(--legacy-input));
+  color: var(--director-text, var(--legacy-text));
+  font: inherit;
+  cursor: pointer;
+}
+.agent-page .agent-director-desk-load-error button:focus-visible { outline: 2px solid var(--director-accent, var(--legacy-accent)); outline-offset: 2px; }
 
 /* Compact canvas entry point for the full-screen director desk. Keep every
  * native control scoped here so React Flow nodes never fall back to white UI. */

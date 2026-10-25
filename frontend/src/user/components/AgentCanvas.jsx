@@ -46,6 +46,7 @@ import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { AuthenticatedAgentAudio } from './AuthenticatedAgentAudio';
 import { AgentCanvasControls } from './AgentCanvasControls';
 import { AgentDirectorDeskNode } from './AgentDirectorDeskNode';
+import { DirectorDeskLoadBoundary } from './director-desk/DirectorDeskLoadBoundary';
 import { createDirectorDeskHostAdapter } from './director-desk/DirectorDeskHostAdapter';
 import { insertDirectorCapture as insertDirectorCaptureState } from './director-desk/director-capture';
 import AgentNodeComposer from './AgentNodeComposer';
@@ -2578,12 +2579,14 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       </ReactFlow>
       </CanvasNodeContext.Provider>
 
-      {directorDeskAdapter ? <Suspense fallback={<div className="agent-director-desk-loading">正在加载 3D导演台…</div>}>
-        <DirectorDeskApp
-          adapter={directorDeskAdapter}
-          onCapture={asset => commitDirectorCapture(directorDeskNodeID, asset)}
-        />
-      </Suspense> : null}
+      {directorDeskAdapter ? <DirectorDeskLoadBoundary onRetry={() => window.location.reload()}>
+        <Suspense fallback={<div className="agent-director-desk-loading">正在加载 3D导演台…</div>}>
+          <DirectorDeskApp
+            adapter={directorDeskAdapter}
+            onCapture={asset => commitDirectorCapture(directorDeskNodeID, asset)}
+          />
+        </Suspense>
+      </DirectorDeskLoadBoundary> : null}
 
       {generationTasksLoadError ? <p className="agent-canvas-global-error" role="alert">{generationTasksLoadError}</p> : null}
       {generationSummary ? <p className="agent-canvas-generation-summary" role="status" aria-live="polite">{generationSummaryText(generationSummary)}</p> : null}
