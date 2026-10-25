@@ -241,6 +241,15 @@ test('creating a video node is allowed before any video asset exists', () => {
   assert.deepEqual(node.data.config.referenceAssets, []);
 });
 
+test('text nodes can bind project assets selected from an at mention', () => {
+  const node = createNodeAt({ id: 'text-mention', kind: 'text', position: { x: 12, y: 18 } });
+  const image = { id: 'image-mention', kind: 'image', name: 'night.png' };
+  const withMention = appendReferenceAsset({ node, asset: image });
+  const repeated = appendReferenceAsset({ node: withMention, asset: image });
+
+  assert.deepEqual(repeated.data.config.referenceAssets.map(asset => asset.id), ['image-mention']);
+});
+
 test('canvas registers pane and node context-menu handlers', () => {
   assert.match(canvasSource, /onPaneContextMenu=\{handlePaneContextMenu\}/);
   assert.match(canvasSource, /onNodeContextMenu=\{handleNodeContextMenu\}/);

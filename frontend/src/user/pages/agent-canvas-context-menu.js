@@ -54,6 +54,8 @@ export function createNodeAt({ id, kind, position, asset = null, config = {} }) 
 export function appendReferenceAsset({ node, asset, limit = 10 }) {
   const allowedKinds = node?.data?.type === 'image'
     ? ['image']
+    : node?.data?.type === 'text'
+      ? ['image', 'video', 'audio']
     : node?.data?.type === 'video'
       ? ['image', 'video']
       : node?.data?.type === 'audio'
@@ -107,6 +109,7 @@ export function removeReferenceAsset({ node, assetID }) {
 
 function referenceKindsForNode(type) {
   if (type === 'image') return ['image'];
+  if (type === 'text') return ['image', 'video', 'audio'];
   if (type === 'video') return ['image', 'video'];
   if (type === 'audio') return ['audio'];
   return [];

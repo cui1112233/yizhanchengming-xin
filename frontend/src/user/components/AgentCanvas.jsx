@@ -38,6 +38,7 @@ import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJ
 import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType, usesPinnedBatchFactoryComposer } from '../pages/agent-canvas-node-presentation';
 import { retainCanvasAssetPanel, retainCanvasEditorNodeID, viewportHasChanged } from '../pages/agent-canvas-state';
 import { shouldRecoverCanvasViewport } from '../pages/agent-canvas-viewport';
+import { firstClipboardImage, persistClipboardImage, referenceKindsForPromptNode, shouldCloseCanvasEditorOnEscape, shouldHandleCanvasImagePaste } from '../pages/agent-canvas-asset-input';
 import { batchFactoryGroupLabel, batchFactoryMappedAction, bookGroupId, focusRequestedBookGroup, isBatchFactoryNode, latestBookRevision, mappedBatchFactoryBooksNeedingRefresh, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, videoNodeTiming } from '../pages/agent-canvas-batch-factory';
 import { invalidateScriptSplitForSource, normalizeScriptShots, normalizeScriptShotsForConfig, runAfterDurableCanvasSave, scriptShotsByNode as groupScriptShotsByNode, scriptSourceMarker, scriptSplitReady } from '../pages/agent-script-shots';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
@@ -164,6 +165,7 @@ function AgentAudioQuickTools({ source, busy, onOperation, onMore, onOpenSetting
 
 function CanvasNode({
   data, id, onManualEdit, onPickImageAsset, onPickReferenceAsset, onRemoveReference,
+  onListMentionAssets, onMentionAsset,
   onNodeConfigChange, onSubmitText, onSubmitImage, onSubmitVideo, onSubmitAudio, onImageTool, onVideoTool, onCancelGeneration, onRetryGeneration, onCancelVideo, onRetryVideo, onConfirmVideo,
   onSelectImageCandidate, onConfirmImage, onSelectAudioCandidate, onConfirmAudio, onPublishBatchFactory,
   onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots, scriptState, modelsByKind,
@@ -226,6 +228,8 @@ function CanvasNode({
     onPickImageAsset={onPickImageAsset}
     onPickReferenceAsset={onPickReferenceAsset}
     onRemoveReference={onRemoveReference}
+    onListMentionAssets={onListMentionAssets}
+    onMentionAsset={onMentionAsset}
     onSubmit={nodeType === 'text' ? onSubmitText : nodeType === 'image' ? onSubmitImage : nodeType === 'video' ? (nodeID, modelID, prompt) => onSubmitVideo?.(nodeID, false, modelID, prompt) : onSubmitAudio}
     onImageTool={onImageTool}
     onVideoTool={onVideoTool}
@@ -333,7 +337,7 @@ function CanvasNodeRenderer(props) {
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
-    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot, openDirectorDesk,
+    openImageAssetPicker, openReferenceAssetPanel, removeReference, listMentionAssets, mentionAsset, handleNodeConfigChange, saveDirectorDeskScreenshot, openDirectorDesk,
     submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
     changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, canvasInputPreviewByNode, previewInputsForNode, removeBatchFactoryNode
@@ -388,6 +392,8 @@ function CanvasNodeRenderer(props) {
     onPickImageAsset={openImageAssetPicker}
     onPickReferenceAsset={openReferenceAssetPanel}
     onRemoveReference={removeReference}
+    onListMentionAssets={listMentionAssets}
+    onMentionAsset={mentionAsset}
     onSaveDirectorDeskScreenshot={saveDirectorDeskScreenshot}
     onOpenDirectorDesk={openDirectorDesk}
     onNodeConfigChange={handleNodeConfigChange}
@@ -572,6 +578,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const nodeSequenceRef = useRef(0);
   const clipboardRef = useRef(null);
   const uploadInputRef = useRef(null);
+  const lastCanvasPointerRef = useRef(null);
   const connectionSourceRef = useRef('');
   const connectionCompletedRef = useRef(false);
   const historyRef = useRef(createCanvasHistory({ nodes: [], edges: [] }));
@@ -739,11 +746,11 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, canvasInputPreviewByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
-    openImageAssetPicker, openReferenceAssetPanel, removeReference, handleNodeConfigChange, saveDirectorDeskScreenshot, openDirectorDesk,
+    openImageAssetPicker, openReferenceAssetPanel, removeReference, listMentionAssets, mentionAsset, handleNodeConfigChange, saveDirectorDeskScreenshot, openDirectorDesk,
     submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
     changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, previewInputsForNode, removeBatchFactoryNode
-  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, canvasZoom, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, modelLoadError, nodeGenerationByNode, openDirectorDesk, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, canvasZoom, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, listMentionAssets, mentionAsset, modelLoadError, nodeGenerationByNode, openDirectorDesk, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -1100,6 +1107,24 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       ? removeReferenceAsset({ node, assetID })
       : node);
     commit(next, edgesRef.current);
+  }
+
+  async function listMentionAssets(nodeID) {
+    const node = nodesRef.current.find(item => item.id === nodeID);
+    const allowedKinds = referenceKindsForPromptNode(node?.data?.type);
+    if (!taskIdRef.current || !allowedKinds.length) return [];
+    const result = await listAgentAssets(taskIdRef.current);
+    return (result.assets || []).filter(asset => allowedKinds.includes(asset.kind));
+  }
+
+  function mentionAsset(nodeID, asset, prompt) {
+    const next = nodesRef.current.map(node => {
+      if (node.id !== nodeID) return node;
+      const kind = normalizeCanvasNodeType(node.data?.type);
+      const withPrompt = { ...node, data: { ...node.data, config: patchNodeConfig(kind, node.data?.config || {}, { prompt }) } };
+      return appendReferenceAsset({ node: withPrompt, asset });
+    });
+    commit(syncCanvasEffectiveReferences(next, edgesRef.current), edgesRef.current);
   }
 
   function handleNodeConfigChange(nodeID, patch) {
@@ -2259,6 +2284,9 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   function handleKeyDown(event) {
     if (event.key === 'Escape') {
+      const composer = event.target?.closest?.('.agent-node-composer');
+      const mentionOpen = event.target?.getAttribute?.('aria-expanded') === 'true';
+      if (!shouldCloseCanvasEditorOnEscape({ insideComposer: Boolean(composer), mentionOpen })) return;
       event.preventDefault();
       closeNodeComposer();
       return;
@@ -2403,6 +2431,39 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     }
   }
 
+  async function handleCanvasPaste(event) {
+    const file = firstClipboardImage(event.clipboardData?.items);
+    if (!shouldHandleCanvasImagePaste({
+      hasImage: Boolean(file),
+      targetTagName: event.target?.tagName,
+      isContentEditable: event.target?.isContentEditable
+    })) return;
+    const requestedTaskId = taskIdRef.current;
+    if (!requestedTaskId) return;
+    event.preventDefault();
+    const screenPosition = lastCanvasPointerRef.current;
+    const position = screenPosition && flowInstance?.screenToFlowPosition
+      ? flowInstance.screenToFlowPosition(screenPosition)
+      : canvasCenterPosition();
+    const messageKey = `agent-canvas-paste-${requestedTaskId}`;
+    message.loading({ content: '正在粘贴截图...', key: messageKey, duration: 0 });
+    try {
+      await persistClipboardImage({
+        file,
+        taskId: requestedTaskId,
+        position,
+        upload: uploadAgentAsset,
+        add: (asset, targetPosition) => {
+          if (requestedTaskId !== taskIdRef.current) throw new Error('项目已切换，截图未加入当前画布');
+          addAssetNode(asset, targetPosition);
+        }
+      });
+      message.success({ content: '截图已加入项目素材和画布', key: messageKey });
+    } catch (error) {
+      message.error({ content: error?.message || '截图粘贴失败', key: messageKey });
+    }
+  }
+
   useImperativeHandle(ref, () => ({
     locateNode,
     openDirectorDesk,
@@ -2444,6 +2505,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       aria-label="创作画布"
       tabIndex={0}
       onKeyDownCapture={handleKeyDown}
+      onPointerMove={event => { lastCanvasPointerRef.current = { x: event.clientX, y: event.clientY }; }}
+      onPaste={handleCanvasPaste}
       onDragOver={event => {
         if (event.dataTransfer.types.includes('application/x-agent-asset')) event.preventDefault();
       }}

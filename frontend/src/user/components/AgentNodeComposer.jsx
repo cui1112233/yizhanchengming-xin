@@ -1,6 +1,6 @@
 import { Input, Select } from 'antd';
-import { ArrowUp, Check, Eye, ImagePlus, RefreshCw, SlidersHorizontal, Upload } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowUp, Check, Eye, FileText, Film, Image as ImageIcon, ImagePlus, Music2, RefreshCw, SlidersHorizontal, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { AuthenticatedAgentAudio } from './AuthenticatedAgentAudio';
@@ -18,6 +18,7 @@ import { AgentBatchFactoryPromptSelector } from './AgentBatchFactoryPromptSelect
 import { AgentNodeComposerReferenceAssets } from './AgentNodeComposerReferenceAssets';
 import { AgentNodeComposerTopActions } from './AgentNodeComposerTopActions';
 import AgentScriptNodeComposer from './AgentScriptNodeComposer';
+import { assetMentionTrigger, filterMentionAssets, insertAssetMention, referenceKindsForPromptNode } from '../pages/agent-canvas-asset-input';
 
 const PROMPT_LABELS = { text: '文字生成要求', image: '图片提示词', video: '视频提示词', audio: '音频生成要求' };
 const PROMPT_PLACEHOLDERS = {
@@ -32,7 +33,7 @@ export default function AgentNodeComposer({
   canvasZoom = 1,
   node, models = [], modelLoadError = '', generationState = {},
   modelsByKind = {}, scriptState = {}, onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots,
-  onConfigChange, onPickImageAsset, onPickReferenceAsset, onRemoveReference, onSubmit,
+  onConfigChange, onPickImageAsset, onPickReferenceAsset, onRemoveReference, onListMentionAssets, onMentionAsset, onSubmit,
   inputPreview, onPreviewInputs,
   timingWarning = '',
   videoJob, videoState = {}, videoBusy = false, videoActionError = '',
@@ -46,8 +47,18 @@ export default function AgentNodeComposer({
   const prompt = String(node?.data?.config?.prompt || '');
   const [draftPrompt, setDraftPrompt] = useState(prompt);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [mention, setMention] = useState(null);
+  const [mentionAssets, setMentionAssets] = useState([]);
+  const [mentionState, setMentionState] = useState({ loading: false, error: '', active: 0 });
+  const promptRef = useRef(null);
+  const mentionRequestRef = useRef(0);
   useEffect(() => setDraftPrompt(prompt), [node?.id, prompt]);
-  useEffect(() => setToolsOpen(false), [node?.id]);
+  useEffect(() => {
+    setToolsOpen(false);
+    setMention(null);
+    setMentionAssets([]);
+    setMentionState({ loading: false, error: '', active: 0 });
+  }, [node?.id]);
   useEffect(() => {
     if ((kind === 'image' || kind === 'video') && videoToolsRequest > 0) setToolsOpen(true);
   }, [kind, node?.id, videoToolsRequest]);
@@ -104,6 +115,66 @@ export default function AgentNodeComposer({
   const update = patch => onConfigChange?.(node.id, patch);
   const stop = event => event.stopPropagation();
   const persistPrompt = () => { if (draftPrompt !== prompt) update({ prompt: draftPrompt }); };
+  const mentionKinds = referenceKindsForPromptNode(kind);
+  const mentionCandidates = filterMentionAssets(mentionAssets, mentionKinds, mention?.query || '');
+  const openMention = async nextMention => {
+    setMention(nextMention);
+    setMentionState({ loading: true, error: '', active: 0 });
+    const requestID = mentionRequestRef.current + 1;
+    mentionRequestRef.current = requestID;
+    try {
+      const loaded = await onListMentionAssets?.(node.id);
+      if (mentionRequestRef.current !== requestID) return;
+      setMentionAssets(Array.isArray(loaded) ? loaded : []);
+      setMentionState({ loading: false, error: '', active: 0 });
+    } catch (loadError) {
+      if (mentionRequestRef.current !== requestID) return;
+      setMentionAssets([]);
+      setMentionState({ loading: false, error: loadError?.message || '资产读取失败', active: 0 });
+    }
+  };
+  const updatePrompt = event => {
+    const value = event.target.value;
+    const nextMention = assetMentionTrigger(value, event.target.selectionStart);
+    setDraftPrompt(value);
+    if (!nextMention || !mentionKinds.length) {
+      mentionRequestRef.current += 1;
+      setMention(null);
+      return;
+    }
+    if (!mention) openMention(nextMention);
+    else {
+      setMention(nextMention);
+      setMentionState(current => ({ ...current, active: 0 }));
+    }
+  };
+  const chooseMentionAsset = asset => {
+    if (!mention) return;
+    const inserted = insertAssetMention(draftPrompt, mention, asset);
+    setDraftPrompt(inserted.value);
+    setMention(null);
+    onMentionAsset?.(node.id, asset, inserted.value);
+    window.requestAnimationFrame(() => {
+      const input = promptRef.current?.resizableTextArea?.textArea || promptRef.current;
+      input?.focus?.();
+      input?.setSelectionRange?.(inserted.caret, inserted.caret);
+    });
+  };
+  const handlePromptKeyDown = event => {
+    if (!mention) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setMention(null);
+      return;
+    }
+    if (!mentionCandidates.length || !['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Enter') chooseMentionAsset(mentionCandidates[mentionState.active] || mentionCandidates[0]);
+    else setMentionState(current => ({
+      ...current,
+      active: (current.active + (event.key === 'ArrowDown' ? 1 : -1) + mentionCandidates.length) % mentionCandidates.length
+    }));
+  };
   const previewInputs = inputPreview?.inputs || null;
   const previewCount = inputKind => Array.isArray(previewInputs?.[inputKind]) ? previewInputs[inputKind].length : 0;
   const previewPrompt = String(previewInputs?.resolvedPrompt || previewInputs?.prompt || '').trim();
@@ -218,7 +289,20 @@ export default function AgentNodeComposer({
             <span>{PROMPT_LABELS[kind]}</span>
             <span className="agent-node-composer__prompt-count">{draftPrompt.length} / {promptLimit}</span>
           </div>
-          <Input.TextArea aria-label={PROMPT_LABELS[kind]} className="agent-node-composer__prompt" value={draftPrompt} maxLength={promptLimit} autoSize={false} placeholder={PROMPT_PLACEHOLDERS[kind]} onChange={event => setDraftPrompt(event.target.value)} onBlur={persistPrompt} />
+          {mention ? <div className="agent-node-composer__mention-menu" role="listbox" aria-label="选择项目资产" onMouseDown={event => event.preventDefault()}>
+            <header><strong>@ 项目资产</strong><span>{mention.query ? `搜索“${mention.query}”` : '输入名称可筛选'}</span></header>
+            {mentionState.loading ? <p>正在读取资产...</p> : null}
+            {mentionState.error ? <p className="is-error">{mentionState.error}</p> : null}
+            {!mentionState.loading && !mentionState.error && !mentionCandidates.length ? <p>没有匹配的资产</p> : null}
+            {mentionCandidates.map((asset, index) => {
+              const MentionIcon = asset.kind === 'video' ? Film : asset.kind === 'audio' ? Music2 : asset.kind === 'image' ? ImageIcon : FileText;
+              return <button type="button" role="option" aria-selected={mentionState.active === index} className={mentionState.active === index ? 'is-active' : ''} key={asset.id || asset.assetId} onMouseDown={event => event.preventDefault()} onClick={() => chooseMentionAsset(asset)}>
+                {asset.url && asset.kind === 'image' ? <AuthenticatedAgentImage source={asset.url} alt="" /> : <span><MentionIcon size={15} /></span>}
+                <span><strong>{asset.name || '未命名资产'}</strong><small>{asset.kind === 'image' ? '图片' : asset.kind === 'video' ? '视频' : asset.kind === 'audio' ? '音频' : '文本'}</small></span>
+              </button>;
+            })}
+          </div> : null}
+          <Input.TextArea ref={promptRef} aria-label={PROMPT_LABELS[kind]} aria-expanded={Boolean(mention)} className="agent-node-composer__prompt" value={draftPrompt} maxLength={promptLimit} autoSize={false} placeholder={`${PROMPT_PLACEHOLDERS[kind]} 输入 @ 可引用项目资产。`} onChange={updatePrompt} onKeyDown={handlePromptKeyDown} onBlur={persistPrompt} />
         </div>
         {inputPreview?.error ? <small className="is-error" role="alert">{inputPreview.error}</small> : null}
         {previewInputs ? <div className="agent-node-composer__input-preview" aria-live="polite">
