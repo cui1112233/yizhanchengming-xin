@@ -4,7 +4,6 @@ import {
   DIRECTOR_ASPECT_RATIOS,
   addDirectorActor,
   addDirectorCamera,
-  directorProjectCaptureMetadata,
   normalizeDirectorProject,
   removeDirectorObject,
   setDirectorActiveCamera,
@@ -13,6 +12,7 @@ import {
 } from '../../pages/agent-director-desk.js';
 import DirectorAssetPanel from './DirectorAssetPanel';
 import DirectorBottomDock from './DirectorBottomDock';
+import { queueDirectorCaptureMetadata } from './DirectorDeskHostAdapter.js';
 import DirectorDeskShell from './DirectorDeskShell';
 import DirectorInspector from './DirectorInspector';
 import { DirectorScene } from './DirectorScene';
@@ -40,7 +40,8 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
   const [transformMode, setTransformMode] = useState('translate');
   const [promptDraft, setPromptDraft] = useState(project.scene.prompt);
   const [saveStatus, setSaveStatus] = useState('saved');
-  const [error, setError] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [operationError, setOperationError] = useState('');
   const [sceneReady, setSceneReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -53,8 +54,8 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
     saveQueueRef.current = createDirectorSaveQueue(next => adapter.writeState(next), {
       onStatus: (status, cause) => {
         setSaveStatus(status);
-        if (status === 'error') setError(cause?.message || '导演台保存失败');
-        if (status === 'saved') setError('');
+        if (status === 'error') setSaveError(cause?.message || '导演台保存失败');
+        if (status === 'saved') setSaveError('');
       }
     });
   }
@@ -64,7 +65,7 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
     let active = true;
     adapter.listProjectImages()
       .then(next => { if (active) setImages(next); })
-      .catch(cause => { if (active) setError(cause?.message || '项目图片读取失败'); });
+      .catch(cause => { if (active) setOperationError(cause?.message || '项目图片读取失败'); });
     return () => { active = false; };
   }, [adapter]);
 
@@ -103,9 +104,9 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
       await adapter.uploadProjectImage(file);
       setImages(await adapter.listProjectImages());
       setActiveTool('assets');
-      setError('');
+      setOperationError('');
     } catch (cause) {
-      setError(cause?.message || '参考图上传失败');
+      setOperationError(cause?.message || '参考图上传失败');
     } finally {
       setBusy(false);
     }
@@ -119,24 +120,31 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
       await saveQueue.flush();
       adapter.close();
     } catch (cause) {
-      setError(cause?.message || '导演台保存失败');
+      setSaveError(cause?.message || '导演台保存失败');
       setSaveStatus('error');
     }
   };
   const capture = async () => {
     if (!sceneReady || busy) return;
     setBusy(true);
+    setOperationError('');
     try {
       await saveQueue.flush();
       const file = await sceneRef.current.capture();
       const asset = await adapter.storeCapture(file);
-      const next = directorProjectCaptureMetadata(projectRef.current, asset);
-      await adapter.writeState(next);
-      projectRef.current = next;
-      setProject(next);
+      await queueDirectorCaptureMetadata({
+        saveQueue,
+        project: projectRef.current,
+        asset,
+        updateProject: next => {
+          projectRef.current = next;
+          setProject(next);
+        }
+      });
       await onCapture?.(asset);
     } catch (cause) {
-      setError(cause?.message || '3D 构图保存失败');
+      if (saveQueue.getStatus() === 'error') setSaveError(cause?.message || '导演台保存失败');
+      else setOperationError(cause?.message || '3D 构图保存失败');
     } finally {
       setBusy(false);
     }
@@ -183,7 +191,7 @@ export default function DirectorDeskApp({ adapter, onCapture }) {
       onProjectChange={applyProject}
       onReadyChange={setSceneReady}
     />
-    {error ? <p className="agent-director-desk-fullscreen__error" role="alert">{error}</p> : null}
+    {saveError || operationError ? <p className="agent-director-desk-fullscreen__error" role="alert">{saveError || operationError}</p> : null}
   </>;
   const inspector = <DirectorInspector
     project={project}

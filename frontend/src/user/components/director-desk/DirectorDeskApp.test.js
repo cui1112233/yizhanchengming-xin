@@ -48,6 +48,25 @@ test('上传参考图只复用素材上传并刷新图片列表', () => {
   assert.doesNotMatch(source, /createAgent|confirmAgent|generate/i);
 });
 
+test('上传成功只清操作错误，不会清除尚未恢复的保存错误', () => {
+  const source = read('DirectorDeskApp.jsx');
+  assert.match(source, /const \[saveError, setSaveError\] = useState\(''\)/);
+  assert.match(source, /const \[operationError, setOperationError\] = useState\(''\)/);
+  const upload = source.slice(source.indexOf('const uploadReference'), source.indexOf('const savePrompt'));
+  assert.match(upload, /setOperationError\(''\)/);
+  assert.doesNotMatch(upload, /setSaveError\(''\)/);
+  assert.match(source, /saveError \|\| operationError/);
+});
+
+test('画布宿主保存导演台后继续等待外层画布持久化', () => {
+  const canvas = fs.readFileSync(path.resolve(dirname, '../AgentCanvas.jsx'), 'utf8');
+  assert.match(canvas, /const onFlushCanvasRef = useRef\(onFlushCanvas\)/);
+  assert.match(canvas, /onFlushCanvasRef\.current = onFlushCanvas/);
+  assert.match(canvas, /flushCanvas:\s*\(\) => \{/);
+  assert.match(canvas, /onFlushCanvasRef\.current/);
+  assert.match(canvas, /\}, \[directorDeskNodeID\]\)/);
+});
+
 test('底部导演工具只暴露当前真实能力', () => {
   const dock = read('DirectorBottomDock.jsx');
   for (const label of ['移动', '重置视角', '截图到画布', '项目图片', '上传参考图', '保存场景描述']) assert.match(dock, new RegExp(label));
@@ -137,9 +156,11 @@ test('截图只有在导演台项目保存成功后才回写画布', () => {
     'await saveQueue.flush()',
     'await sceneRef.current.capture()',
     'await adapter.storeCapture(file)',
-    'await adapter.writeState(next)',
+    'await queueDirectorCaptureMetadata',
     'await onCapture?.(asset)'
   ].map(step => source.indexOf(step));
   assert.ok(steps.every(index => index >= 0));
   assert.deepEqual(steps, [...steps].sort((left, right) => left - right));
+  const capture = source.slice(source.indexOf('const capture'), source.indexOf('let toolPanel'));
+  assert.doesNotMatch(capture, /adapter\.writeState/);
 });

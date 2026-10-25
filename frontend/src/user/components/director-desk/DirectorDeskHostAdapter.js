@@ -1,4 +1,4 @@
-import { normalizeDirectorProject } from '../../pages/agent-director-desk.js';
+import { directorProjectCaptureMetadata, normalizeDirectorProject } from '../../pages/agent-director-desk.js';
 
 function requireDirectorNode(nodeID, getNode) {
   const node = getNode?.(nodeID);
@@ -12,7 +12,18 @@ function imageAsset(value) {
   return asset;
 }
 
-export function createDirectorDeskHostAdapter({ nodeID, getNode, saveProject, listImages, uploadCapture, uploadImage, onClose } = {}) {
+export async function queueDirectorCaptureMetadata({ saveQueue, project, asset, updateProject } = {}) {
+  if (typeof saveQueue?.schedule !== 'function' || typeof saveQueue?.flush !== 'function') {
+    throw new Error('导演台保存队列不可用');
+  }
+  const next = directorProjectCaptureMetadata(project, asset);
+  updateProject?.(next);
+  saveQueue.schedule(next);
+  await saveQueue.flush();
+  return next;
+}
+
+export function createDirectorDeskHostAdapter({ nodeID, getNode, saveProject, flushCanvas, listImages, uploadCapture, uploadImage, onClose } = {}) {
   const id = String(nodeID || '').trim();
   if (!id) throw new Error('缺少导演台节点');
 
@@ -24,8 +35,10 @@ export function createDirectorDeskHostAdapter({ nodeID, getNode, saveProject, li
     async writeState(project) {
       requireDirectorNode(id, getNode);
       if (typeof saveProject !== 'function') throw new Error('导演台保存服务不可用');
+      if (typeof flushCanvas !== 'function') throw new Error('画布持久化服务不可用');
       const normalized = normalizeDirectorProject(project);
       await saveProject(id, normalized);
+      await flushCanvas();
       return normalized;
     },
     async listProjectImages() {

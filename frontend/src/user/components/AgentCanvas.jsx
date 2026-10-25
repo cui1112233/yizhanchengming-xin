@@ -591,8 +591,10 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   const scriptSourceSaveByNodeRef = useRef({});
   const batchFactoryStatusPollingRef = useRef(false);
   const onServerCanvasChangeRef = useRef(onServerCanvasChange);
+  const onFlushCanvasRef = useRef(onFlushCanvas);
   taskIdRef.current = taskId;
   onServerCanvasChangeRef.current = onServerCanvasChange;
+  onFlushCanvasRef.current = onFlushCanvas;
   const pendingMappedBooks = useMemo(() => mappedBatchFactoryBooksNeedingRefresh(nodes), [nodes]);
   const pendingMappedBookKey = useMemo(() => pendingMappedBooks.map(({ batchId, bookId }) => `${batchId}\u0000${bookId}`).join('\u0001'), [pendingMappedBooks]);
 
@@ -2479,6 +2481,10 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       nodeID: directorDeskNodeID,
       getNode: nodeID => nodesRef.current.find(node => node.id === nodeID),
       saveProject: async (nodeID, project) => handleNodeConfigChange(nodeID, { directorDesk: project }),
+      flushCanvas: () => {
+        if (typeof onFlushCanvasRef.current !== 'function') throw new Error('画布持久化服务不可用');
+        return onFlushCanvasRef.current();
+      },
       listImages: () => listAgentAssets(taskIdRef.current, 'image'),
       uploadCapture: async file => {
         const requestedTaskId = taskIdRef.current;
