@@ -9,7 +9,7 @@ import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.j
 import { parseGiantMaterialIds } from './batchFactoryGiantMaterialQueue.js';
 import { createGiantMaterialJob } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
-import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryEngineSettingsForm, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
+import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
 import {
   availableGiantMaterialBooks,
   buildGiantMaterialPlaceholderIntakes,
@@ -751,7 +751,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     </div>
   </Modal>
   <Modal
-    title={<Space><BatchFactoryAutomationPresetManager value={initialBatchSettings} onLoad={setInitialBatchSettings} /><span>新建批量 · 统一配置</span></Space>}
+    title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={initialBatchSettings} onLoad={setInitialBatchSettings} /><span>新建批量 · 统一配置</span><BatchFactoryProductionModeControl value={initialBatchSettings.productionMode} onChange={productionMode => setInitialBatchSettings(current => ({ ...current, productionMode }))} /></div>}
     open={initialSettingsOpen}
     onCancel={() => setInitialSettingsOpen(false)}
     onOk={() => setInitialSettingsOpen(false)}
@@ -763,7 +763,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     <Alert type="info" showIcon message="首次批量统一配置" description="配置会在创建批量时一次性保存为该批量默认值；后续仍可在工作台的“统一配置”继续修改，单书覆盖不会被清空。" />
     <Tabs items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} sections={['models', 'audio']} active={initialSettingsOpen} /> },
-      { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm value={initialBatchSettings.aiPromptConfig} onChange={aiPromptConfig => setInitialBatchSettings(current => ({ ...current, aiPromptConfig }))} /> },
+      { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm productionMode={initialBatchSettings.productionMode} value={initialBatchSettings.aiPromptConfig} onChange={aiPromptConfig => setInitialBatchSettings(current => ({ ...current, aiPromptConfig }))} /> },
       { key: 'publish', label: '发布统一', children: <BatchFactoryPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} active={initialSettingsOpen} /> }
     ]} />
   </Modal>

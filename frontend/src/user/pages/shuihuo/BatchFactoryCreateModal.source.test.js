@@ -66,6 +66,13 @@ test('lets a first-time batch owner save unified settings before creating the ba
   assert.match(source, /initialBatchSettings: clone\(initialBatchSettings\)/);
 });
 
+test('lets a first-time batch owner switch production mode beside the unified title', () => {
+  assert.match(source, /BatchFactoryProductionModeControl/);
+  assert.match(source, /<span>新建批量 · 统一配置<\/span><BatchFactoryProductionModeControl/);
+  assert.match(source, /productionMode=\{initialBatchSettings\.productionMode\}/);
+  assert.doesNotMatch(source, /key: 'media', label: '画面与视频'/);
+});
+
 test('uses the unified button treatment for the new batch toolbar', () => {
   assert.match(source, /className="shuihuo-create-project-modal"/);
   assert.match(stylesheet, /BF_CREATE_BATCH_BUTTONS_BEGIN[\s\S]*shuihuo-create-project-modal[\s\S]*box-shadow/);

@@ -66,6 +66,11 @@ function HelpTip({ title, children }) {
   return <Tooltip title={children}><button type="button" className="batch-factory-help-button" aria-label={`查看${title}说明`}>?</button></Tooltip>;
 }
 
+export function BatchFactoryProductionModeControl({ value, onChange }) {
+  const productionMode = batchFactoryProductionModeVisibility(value).mode;
+  return <Segmented className="batch-factory-production-mode-switch" size="small" value={productionMode} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} onChange={onChange} />;
+}
+
 export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['models', 'audio', 'publish'], active = true }) {
   const [models, setModels] = useState([]);
   const [modelsError, setModelsError] = useState('');
@@ -284,47 +289,6 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
   </>;
 }
 
-export function BatchFactoryMediaSettingsForm({ value, onChange, active }) {
-  const [catalog, setCatalog] = useState([]);
-  const visibility = batchFactoryProductionModeVisibility(value.productionMode);
-  const productionMode = visibility.mode;
-  const aiPromptConfig = value.aiPromptConfig && typeof value.aiPromptConfig === 'object' ? value.aiPromptConfig : {};
-  const video = requiredVideoPrompt(aiPromptConfig.video);
-  const comic = aiPromptConfig.comic || {};
-  useEffect(() => {
-    if (!active) return undefined;
-    let alive = true;
-    listSystemPresetCatalog('batch-factory')
-      .then(result => alive && setCatalog(Array.isArray(result?.catalog) ? result.catalog : []))
-      .catch(() => alive && setCatalog([]));
-    return () => { alive = false; };
-  }, [active]);
-  const bySlot = slot => catalog.filter(item => item.slot === slot);
-  const videoRules = bySlot('batch.video-meta');
-  const comicPageRules = bySlot('batch.comic-page');
-  const imageDerivationRules = bySlot('batch.comic-image-derivation');
-  const setProductionMode = mode => {
-    const nextMode = mode === 'comic' ? 'comic' : 'video';
-    const defaultComicPage = comicPageRules[0];
-    const nextComic = nextMode === 'comic'
-      ? { ...comic, ...(comic.presetId || !defaultComicPage ? {} : presetValue(defaultComicPage)), enabled: true }
-      : comic;
-    onChange({ ...value, productionMode: nextMode, aiPromptConfig: { ...aiPromptConfig, comic: nextComic } });
-  };
-  const updateComic = next => onChange({ ...value, aiPromptConfig: { ...aiPromptConfig, comic: { ...comic, ...next, enabled: true } } });
-  return <Space direction="vertical" size={16} style={{ width: '100%' }}>
-    <Alert type="info" showIcon message={<span>画面与视频 <HelpTip title="画面与视频">统一配置会作为尚未单书覆盖的默认生产模式；漫画与视频只能启用一种。</HelpTip></span>} />
-    <section className="batch-factory-engine-card"><header><b>生产模式</b></header><div className="batch-factory-engine-card-body batch-factory-media-setting-stack">
-      <div className="batch-factory-ai-module"><div className="batch-factory-ai-module-head"><div><b>视频生成</b><HelpTip title="视频生成">启用视频后，未单书覆盖的小说使用 VIDEO 生产链路。</HelpTip></div><Switch checked={productionMode === 'video'} onChange={enabled => enabled && setProductionMode('video')} /></div>
-        {visibility.video ? <div className="batch-factory-ai-module-body"><label className="batch-factory-engine-field"><span><b>视频提示词</b></span><Select value={video.presetId || undefined} options={videoRules.map(selectOption)} placeholder="请选择已发布视频提示词" onChange={presetId => onChange({ ...value, aiPromptConfig: { ...aiPromptConfig, video: { ...video, ...presetValue(catalog.find(item => item.id === presetId)), enabled: true } } })} /></label></div> : null}
-      </div>
-      <div className="batch-factory-ai-module"><div className="batch-factory-ai-module-head"><div><b>漫画生成</b><HelpTip title="漫画生成">启用漫画后，视频生成会关闭，资产设置改用漫画资产提示词。</HelpTip></div><Switch checked={productionMode === 'comic'} onChange={enabled => enabled && setProductionMode('comic')} /></div>
-        {visibility.comic ? <div className="batch-factory-ai-module-body"><label className="batch-factory-engine-field"><span><b>漫画提示词</b></span><Select value={comic.presetId || undefined} options={comicPageRules.map(selectOption)} placeholder="请选择已发布漫画提示词" onChange={presetId => updateComic(presetValue(catalog.find(item => item.id === presetId)))} /></label><label className="batch-factory-engine-field"><span><b>图片描述词推导</b></span><Select allowClear value={comic.imageDerivation?.presetId || undefined} options={imageDerivationRules.map(selectOption)} placeholder="未选择" onChange={presetId => updateComic({ imageDerivation: presetValue(catalog.find(item => item.id === presetId)) })} /></label></div> : null}
-      </div>
-    </div></section>
-  </Space>;
-}
-
 export function BatchFactoryAiReasoningForm({ value, onChange, batchId, productionMode = 'video' }) {
   const [catalog, setCatalog] = useState([]);
   const visibility = batchFactoryProductionModeVisibility(productionMode);
@@ -346,7 +310,8 @@ export function BatchFactoryAiReasoningForm({ value, onChange, batchId, producti
   const noPromptOption = { value: '__none__', label: '无' };
   const normalizePromptId = presetId => presetId === '__none__' ? '' : (presetId || '');
   const promptOptions = options => [noPromptOption, ...options];
-  const bySlot = slot => promptOptions(catalog.filter(item => item.slot === slot).map(selectOption));
+  const catalogOptionsBySlot = slot => catalog.filter(item => item.slot === slot).map(selectOption);
+  const bySlot = slot => promptOptions(catalogOptionsBySlot(slot));
   const presetFor = presetId => presetValue(catalog.find(item => item.id === presetId));
   const bySlots = slots => promptOptions(catalog.filter(item => slots.includes(item.slot)).map(selectOption));
   const selectedConstraint = category => (constraints.selections || []).find(item => item.constraintCategory === category)?.presetId || constraints[category]?.presetId || '';
@@ -356,6 +321,10 @@ export function BatchFactoryAiReasoningForm({ value, onChange, batchId, producti
     return promptOptions(catalog.filter(item => item.kind === 'addon' && values.includes(item.constraintCategory)).map(selectOption));
   };
   const comicEnabled = nextComic => Boolean(nextComic.assets?.presetId || nextComic.presetId || (nextComic.constraints || []).some(item => item.presetId));
+  const updateComic = next => {
+    const nextComic = { ...comic, ...next };
+    onChange({ ...config, comic: { ...nextComic, enabled: comicEnabled(nextComic) } });
+  };
   const updateConstraint = (category, comicCategory, presetId) => {
     const normalizedId = normalizePromptId(presetId);
     const normalRest = (constraints.selections || []).filter(item => item.constraintCategory !== category);
@@ -400,6 +369,10 @@ export function BatchFactoryAiReasoningForm({ value, onChange, batchId, producti
       <label className="batch-factory-engine-field"><span><b>负面提示词</b></span><Select allowClear value={visibility.comic ? selectedComicConstraint('comic_negative') : selectedConstraint('negative')} options={byConstraint(visibility.comic ? 'comic_negative' : 'negative')} placeholder="选择提示词或无" onChange={presetId => updateConstraint('negative', visibility.comic ? 'comic_negative' : null, presetId)} /></label>
       {visibility.video ? <Space style={{ justifyContent: 'space-between', width: '100%' }}><span>基础设定</span><Switch checked={constraints.baseSetup?.enabled !== false} onChange={enabled => onChange({ ...config, constraints: { ...constraints, baseSetup: { enabled } } })} /></Space> : null}
     </div>{visibility.comic ? <BatchFactoryComicStylePicker batchId={batchId} catalog={catalog} value={comic} onChange={nextComic => onChange({ ...config, comic: nextComic })} /> : null}</section>
+    {visibility.comic ? <section className="batch-factory-engine-card"><header><b>漫画生成</b><HelpTip title="漫画生成">漫画提示词决定整页条漫的结构，图片描述词推导用于生成每页可直接出图的描述。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+      <label className="batch-factory-engine-field"><span><b>漫画提示词</b></span><Select value={comic.presetId || undefined} options={catalogOptionsBySlot('batch.comic-page')} placeholder="请选择已发布漫画提示词" onChange={presetId => updateComic(presetFor(normalizePromptId(presetId)))} /></label>
+      <label className="batch-factory-engine-field"><span><b>图片描述词推导</b></span><Select allowClear value={comic.imageDerivation?.presetId || undefined} options={catalogOptionsBySlot('batch.comic-image-derivation')} placeholder="未选择" onChange={presetId => updateComic({ imageDerivation: presetFor(normalizePromptId(presetId)) })} /></label>
+    </div></section> : null}
     {visibility.video ? <section className="batch-factory-engine-card"><header><b>视频设置</b><HelpTip title="视频设置">视频提示词决定结构化导演分镜的输出规则与最终模板。</HelpTip></header><div className="batch-factory-engine-card-body">
       <label className="batch-factory-engine-field"><span><b>衍生开篇</b></span><Select allowClear value={derivedOpening.presetId || undefined} options={bySlots(['batch.hook-adaptation', 'batch.original-director', 'batch.viral-director'])} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, derivedOpening: { ...derivedOpening, ...presetValue(catalog.find(item => item.id === normalizedId)), enabled: Boolean(normalizedId) } }); }} /></label>
       <div className="batch-factory-engine-field"><span><b>视频提示词</b><HelpTip title="视频提示词">决定导演分镜和最终 VIDEO Prompt 的规则与格式；与上面的具体视频模型相互独立。</HelpTip></span><Select allowClear value={video.presetId || undefined} options={bySlot('batch.video-meta')} placeholder="选择提示词或无" onChange={presetId => { const normalizedId = normalizePromptId(presetId); onChange({ ...config, video: { ...video, ...presetValue(catalog.find(item => item.id === normalizedId)), enabled: Boolean(normalizedId) } }); }} /></div>
@@ -481,10 +454,9 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     try { const result = await onSaved(nextPatch); if (result !== false) onClose(); }
     finally { setSaving(false); }
   };
-  return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} onLoad={setDraftPatch} /><span>统一配置</span></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
+  return <Modal title={<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value={draftPatch} onLoad={setDraftPatch} /><span>统一配置</span><BatchFactoryProductionModeControl value={draftPatch.productionMode} onChange={productionMode => setDraftPatch(current => ({ ...current, productionMode }))} /></div>} open={open} onCancel={onClose} width={980} destroyOnClose={false} className="batch-factory-unified-settings-modal" footer={<Space><Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存统一配置</Button></Space>}>
     <Tabs items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={draftPatch} onChange={setDraftPatch} sections={['models', 'audio']} active={open} /> },
-      { key: 'media', label: '画面与视频', children: <BatchFactoryMediaSettingsForm value={draftPatch} onChange={setDraftPatch} active={open} /> },
       { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm batchId={batch?.id} productionMode={draftPatch.productionMode} value={draftPatch.aiPromptConfig} onChange={aiPromptConfig => setDraftPatch(current => ({ ...current, aiPromptConfig }))} /> },
       { key: 'publish', label: '发布统一', children: <BatchFactoryPublishSettingsForm value={draftPatch} onChange={setDraftPatch} active={open} /> }
     ]} />
