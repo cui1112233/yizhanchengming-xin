@@ -180,6 +180,33 @@ func TestNovelFetchWorkshopConfigPersistsSensitiveAIEnabledSwitch(t *testing.T) 
 	}
 }
 
+func TestNovelFetchWorkshopConfigPersistsREAAllSensitiveAIFields(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/config", map[string]any{
+		"sensitive_ai": map[string]any{
+			"enabled": true, "group_hits": false, "concurrency": 7,
+			"max_hits_per_task": 12, "context_chars": 20, "retries": 3,
+			"temperature": 0.7, "prompt": "只改写命中片段",
+		},
+	}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("save status=%d body=%s", response.Code, response.Body.String())
+	}
+	saved, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ai := mapOrEmpty(saved["sensitive_ai"])
+	for key, want := range map[string]any{"group_hits": false, "concurrency": float64(7), "max_hits_per_task": float64(12), "context_chars": float64(20), "retries": float64(3), "temperature": 0.7, "prompt": "只改写命中片段"} {
+		if ai[key] != want {
+			t.Fatalf("sensitive_ai.%s=%#v, want %#v; saved=%#v", key, ai[key], want, ai)
+		}
+	}
+}
+
 func TestNovelFetchWorkshopConfigUnwrapsMigratedSettings(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

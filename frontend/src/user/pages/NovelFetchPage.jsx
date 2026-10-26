@@ -354,7 +354,13 @@ function NovelFetchConfigPanel({ form, effectiveValues, dirty, onDirty, versionP
           <Form.Item name={['workflow', 'auto_submit_batch_size']} label="自动提交每批任务数"><InputNumber min={1} max={1000} style={{ width: '100%' }} /></Form.Item>
           <Form.Item name={['workflow', 'auto_submit_flush_seconds']} label="自动提交等待秒数"><InputNumber min={0} max={3600} style={{ width: '100%' }} /></Form.Item>
           <Form.Item name={['ai', 'force_serial_batch']} valuePropName="checked" noStyle><label><input type="checkbox" /> AI 改文批量按顺序处理</label></Form.Item>
-          <Form.Item name={['sensitive_ai', 'mode']} label="敏感词处理模式"><Select options={[{ value: 'direct', label: '直接替换' }, { value: 'per_line', label: 'AI逐条修改' }, { value: 'group', label: 'AI整组修改' }]} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'group_hits']} label="敏感词 AI 发送方式"><Select options={[{ value: true, label: '整组一次发送' }, { value: false, label: '逐条并发发送' }]} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'concurrency']} label="敏感词 AI 并发数"><InputNumber min={1} max={32} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'max_hits_per_task']} label="每本最大命中数"><InputNumber min={1} max={1000} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'context_chars']} label="命中词上下文字符数"><InputNumber min={0} max={200} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'retries']} label="敏感词 AI 重试次数"><InputNumber min={0} max={3} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'temperature']} label="敏感词 AI 温度"><InputNumber min={0} max={2} step={0.01} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name={['sensitive_ai', 'prompt']} label="敏感词 AI 提示词"><Input.TextArea rows={4} placeholder="只改写命中片段，不增加新剧情" /></Form.Item>
         </div>
       </section>
       <section hidden={section !== 'ai'}>
