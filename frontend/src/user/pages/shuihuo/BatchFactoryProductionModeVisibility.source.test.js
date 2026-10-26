@@ -21,6 +21,11 @@ test('unified media and reasoning render only the active mode details', () => {
   assert.match(unifiedSource, /visibility\.video \? <section className="batch-factory-engine-card"><header><b>视频设置<\/b>/);
 });
 
+test('unified reasoning no longer exposes the legacy visual prompt selector', () => {
+  assert.doesNotMatch(unifiedSource, /<b>画面提示词<\/b>/);
+  assert.doesNotMatch(unifiedSource, /bySlot\('batch\.visual-meta'\)/);
+});
+
 test('single-book settings use the shared production-mode visibility model', () => {
   assert.match(bookSource, /import \{ batchFactoryProductionModeVisibility \} from '\.\/batchFactoryProductionMode'/);
   assert.match(bookSource, /const visibility = batchFactoryProductionModeVisibility\(form\.productionMode\)/);
