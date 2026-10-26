@@ -1397,7 +1397,7 @@ function useCompiledVideoPrompt(batchId, book, video, settingsRevision = 0, { en
   return { displayPrompt, compiledPrompt, baseSetupPrompt, smartUnifiedPending, loading };
 }
 
-function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage }) {
+function InlineBookPrompts({ batch, book, batchId, settingsRevision, productionMode = 'video', selectedVideoId: controlledSelectedVideoId = '', onSelectedVideoChange, onManage }) {
   const videos = book?.videos || [];
 	const h3Cards = h3DirectorCards(book);
   const precompiledWorkspace = resolvePrecompiledVideoWorkspace(book);
@@ -1406,7 +1406,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   const showSmartUnified = smartUnifiedDisplayEnabled(batch, book) && smartUnifiedAnalysis;
   const h3CompilationMessage = h3CompilationStatus(effectiveBookSettings(batch, book));
   const [localSelectedVideoId, setLocalSelectedVideoId] = useState(videos[0]?.id || '');
-  const [promptKind, setPromptKind] = useState('video');
+  const promptKind = productionMode === 'comic' ? 'visual' : 'video';
   const selectedVideoId = controlledSelectedVideoId || localSelectedVideoId;
   const selectVideo = nextId => {
     const value = String(nextId || '');
@@ -1438,7 +1438,6 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
   useEffect(() => {
     const first = book?.videos?.[0]?.id || '';
     if (!controlledSelectedVideoId) setLocalSelectedVideoId(first);
-    setPromptKind('video');
   }, [book?.id]);
 
   useEffect(() => {
@@ -1489,10 +1488,7 @@ function InlineBookPrompts({ batch, book, batchId, settingsRevision, selectedVid
     <div className="batch-factory-cell-shell batch-factory-prompt-entry-card">
       <header className="batch-factory-cell-head">
         <div><b>{storyboardVideoLabel(video, selectedIndex)}</b><small>{promptKind === 'visual' ? '漫画提示词' : '最终视频提示词'}</small></div>
-        <div className="batch-factory-cell-segmented" aria-label="提示词类型">
-          <button type="button" className={promptKind === 'video' ? 'is-active' : ''} onClick={() => setPromptKind('video')}>视频</button>
-          <button type="button" className={promptKind === 'visual' ? 'is-active' : ''} disabled={!hasVisualPrompt} onClick={() => setPromptKind('visual')}>漫画</button>
-        </div>
+        <span className={`batch-factory-prompt-mode-label is-${productionMode}`}>{productionMode === 'comic' ? '漫画提示词' : '视频提示词'}</span>
       </header>
       <button type="button" className="batch-factory-cell-content batch-factory-prompt-entry-content" aria-label="打开分镜提示词编辑" onClick={() => onManage?.(video.id)}>
         <span className="batch-factory-prompt-status">{stateLabel}</span>
@@ -1515,11 +1511,11 @@ function StoryboardVideoNavigator({ videos, selectedVideoId, onSelect }) {
 	return <Space wrap className="batch-factory-storyboard-navigator"><Tooltip title="上一分镜"><Button aria-label="上一分镜" icon={<LeftOutlined />} disabled={!hasVideos || index === 0} onClick={() => onSelect(videos[index - 1]?.id)} /></Tooltip><Select value={selectedVideoId || undefined} onChange={onSelect} style={{ minWidth: 260 }} placeholder="选择分镜 / VIDEO" options={videos.map((video, videoIndex) => ({ value: video.id, label: storyboardVideoLabel(video, videoIndex) }))} /><Tooltip title="下一分镜"><Button aria-label="下一分镜" icon={<RightOutlined />} disabled={!hasVideos || index >= videos.length - 1} onClick={() => onSelect(videos[index + 1]?.id)} /></Tooltip></Space>;
 }
 
-function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = '', onSaved, onCompile, onRegenerateVisual, onRetry, onGenerateVideo, onGenerateVisual, regenerating, productionAvailable = false, productionReason = '' }) {
+function PromptPanel({ book, batch, batchId, settingsRevision, productionMode = 'video', initialVideoId = '', onSaved, onCompile, onRegenerateVisual, onRetry, onGenerateVideo, onGenerateVisual, regenerating, productionAvailable = false, productionReason = '' }) {
   const videos = book?.videos || [];
   const precompiledWorkspace = resolvePrecompiledVideoWorkspace(book);
   const [selectedVideoId, setSelectedVideoId] = useState(initialVideoId || videos[0]?.id || '');
-  const [promptKind, setPromptKind] = useState('video');
+  const promptKind = productionMode === 'comic' ? 'visual' : 'video';
   const [editing, setEditing] = useState(false);
   const [editingSnapshot, setEditingSnapshot] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -1548,14 +1544,12 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
   const smartUnifiedAnalysis = smartUnifiedAnalysisForBook(book);
   const showSmartUnified = smartUnifiedDisplayEnabled(batch, book) && smartUnifiedAnalysis;
   const hasVisualPrompt = Boolean(String(comicPrompt || '').trim());
-  const hasVideoPrompt = Boolean(String(videoPrompt || '').trim());
   useEffect(() => {
     const first = book?.videos?.find(video => video.id === initialVideoId) || book?.videos?.[0] || null;
     const firstH3Frame = resolvePrecompiledStoryboardFrame(book, initialVideoId);
     setSelectedVideoId(first?.id || firstH3Frame?.key || '');
     setVideoPrompt(first?.videoPrompt || '');
     setComicPrompt(comicPromptForImageAspect(engineSettings, first?.comicPrompt || ''));
-    setPromptKind('video');
     setEditing(false);
   }, [book?.id, initialVideoId]);
   useEffect(() => {
@@ -1833,17 +1827,14 @@ function PromptPanel({ book, batch, batchId, settingsRevision, initialVideoId = 
         <span className="batch-factory-prompt-modal-index">{videos.length ? `${selectedIndex + 1}/${videos.length}` : '0/0'}</span>
         <Tooltip title="下一分镜"><Button aria-label="下一分镜" icon={<RightOutlined />} disabled={!videos.length || selectedIndex >= videos.length - 1} onClick={() => move(1)} /></Tooltip>
       </Space>
-      <div className="batch-factory-prompt-modal-tabs" aria-label="提示词类型">
-        <button type="button" className={promptKind === 'visual' ? 'is-visual active' : 'is-visual'} disabled={!hasVisualPrompt} onClick={() => setPromptKind('visual')}>漫画提示词</button>
-        <button type="button" className={promptKind === 'video' ? 'is-video active' : 'is-video'} disabled={!hasVideoPrompt} onClick={() => setPromptKind('video')}>视频提示词</button>
-      </div>
+      <span className={`batch-factory-prompt-mode-label is-${productionMode}`}>{productionMode === 'comic' ? '漫画提示词' : '视频提示词'}</span>
     </div>
     <div className="batch-factory-prompt-meta-bar">
       <span className="batch-factory-prompt-meta-item"><b>真实/API时长：</b>{durationLabel}</span>
       <span className="batch-factory-prompt-meta-item"><b>文本模型：</b>{textModelLabel}</span>
       <span className="batch-factory-prompt-meta-item"><b>视频模型：</b>{videoModelLabel}</span>
     </div>
-    {!activeReady ? <Alert type="info" showIcon message={smartUnifiedPending && promptKind === 'video' ? '智能统一待分析' : promptKind === 'visual' ? '请生成漫画提示词再查看' : '请生成视频提示词再查看'} description={smartUnifiedPending && promptKind === 'video' ? '智能统一与资产提示词分开获取；未取得基线不会阻断资产、分镜或视频。可在资产区单独刷新。' : '当前分镜尚未有这一类提示词；切换分镜时会保持当前查看类型。'} /> : <>
+    {!activeReady ? <Alert type="info" showIcon message={smartUnifiedPending && promptKind === 'video' ? '智能统一待分析' : promptKind === 'visual' ? '请生成漫画提示词再查看' : '请生成视频提示词再查看'} description={smartUnifiedPending && promptKind === 'video' ? '智能统一与资产提示词分开获取；未取得基线不会阻断资产、分镜或视频。可在资产区单独刷新。' : `当前处于${productionMode === 'comic' ? '漫画' : '视频'}生产模式，请先生成对应提示词。`} /> : <>
       <label className="shuihuo-form-label batch-factory-prompt-editor-label">
         {activeLabel}
         {!editing && promptKind === 'video' ? <div className="batch-factory-prompt-rich-view">{renderStoryboardPromptWithAssetMentions(activeValue, book, selectedVideo, assetThumbs)}</div> : editing && promptKind === 'video' ? <div className="batch-factory-prompt-editor-rich-wrap">
@@ -4343,7 +4334,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
           <div className="shuihuo-workbench-cell shuihuo-order-cell"><Checkbox checked={selectedBookIds.includes(book.id)} onChange={event => setSelectedBookIds(current => event.target.checked ? [...new Set([...current, book.id])] : current.filter(id => id !== book.id))} aria-label={`选择 ${book.title || `小说 ${index + 1}`}`} /><strong>{index + 1}</strong></div>
           <div className="shuihuo-workbench-cell batch-factory-book-content" role="button" tabIndex={0} title="点击编辑当前小说所选行数的内容" onClick={() => openContentEditor(book)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openContentEditor(book); } }}><div className="batch-factory-book-title-row"><strong>{book.title || `小说 ${index + 1}`}</strong><span className={`batch-factory-production-source ${sourceSummary.ready ? 'is-ready' : 'is-missing'}`} title={`${sourceVersionLabel} · ${sourceSummary.text}`}><i className={`batch-factory-content-mode is-${sourceVersionClass}`}>{sourceVersionLabel}</i></span></div><span>bookId：{book.bookId || '—'} · 书城：{bookPlatformName(book, platformNames)} · 生产前 {rangeLines} 行</span><p>{previewText || '原文尚未获取'}</p>{!previewText ? <BatchFactoryGiantMaterialPendingProgress book={book} batchId={batch?.id} visible onContentReady={refreshBatch} /> : null}<Space wrap className="batch-factory-book-content-actions"><Button size="small" className="batch-factory-book-content-action is-edit" onClick={event => { event.stopPropagation(); openContentEditor(book); }}>编辑内容</Button><Button size="small" className="batch-factory-book-content-action is-download" disabled={!publishText} onClick={event => { event.stopPropagation(); downloadProductionContent({ title: book.title, content: publishText }); }}>下载 TXT</Button><Popconfirm title="删除本书？" description="将删除本书及本地生产记录，不影响已提交到 121 的内容。" okText="删除" cancelText="取消" onConfirm={event => { event?.stopPropagation?.(); return deleteBook(book); }}><Button danger size="small" className="batch-factory-book-content-action is-delete" icon={<DeleteOutlined />} loading={actionBusy === `delete-${book.id}`} onClick={event => event.stopPropagation()}>删除本书</Button></Popconfirm></Space></div>
           <div className="shuihuo-workbench-cell batch-factory-book-config-cell"><div className="batch-factory-book-config-regions">{batchFactoryWorkbenchConfigRegions(book).map(region => { const status = region.combinedStatus || bookConfigRegionStatus(book, region.key); const detail = region.key === 'assets' ? bookAssetSummary(book) : status.label; return <button type="button" key={region.key} className={`batch-factory-book-config-region is-${status.tone}`} onClick={() => region.key === 'assets' ? setAssetBook(book) : setConfigTarget({ book, region: region.key })}><b>{region.label}</b><small>{detail}</small></button>; })}</div></div>
-		  <InlineBookPrompts batch={batch} book={book} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setPromptVideoId(videoId || ''); setPromptBook(book); }} />
+		  <InlineBookPrompts batch={batch} book={book} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} productionMode={productionMode} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setPromptVideoId(videoId || ''); setPromptBook(book); }} />
 		  <div className="shuihuo-workbench-cell shuihuo-library-cell batch-factory-book-library-cell">{productionMode === 'comic' ? <InlineComicLibrary batchId={batch?.id} book={book} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setMediaVideoId(videoId || ''); setMediaStartTab('comic'); setMediaBook(book); }} /> : <InlineMediaLibrary book={book} versionsByVideo={mediaVersionsByVideo} productionStatus={productionStatus} mergeJob={latestBookMerge(mergeStatus, book.id)} aspectRatio={effectiveBookSettings(batch, book).aspectRatio} h3CompilationMessage={h3CompilationStatus(effectiveBookSettings(batch, book))} selectedVideoId={rowStoryboardSelection[book.id] || videos[0]?.id || ''} onSelectedVideoChange={videoId => setRowStoryboardSelection(current => ({ ...current, [book.id]: videoId }))} onManage={videoId => { setMediaVideoId(videoId || ''); setMediaStartTab('clips'); setMediaBook(book); }} onOpenMerge={() => { setMediaVideoId(''); setMediaStartTab('merges'); setMediaBook(book); }} />}</div>
           <div className="shuihuo-workbench-cell batch-factory-actions">
             <div className="batch-factory-action-group is-utility"><span>资料与流程</span><div className="batch-factory-action-button-grid"><Button size="small" onClick={() => setViewingBook(book)}>查看资料</Button>{previewText ? <Button size="small" onClick={() => refreshBatch()} disabled={Boolean(actionBusy)}>刷新状态</Button> : <Button size="small" type="primary" onClick={() => fetchMissingBookSource(book)} loading={actionBusy === `source-${book.id}`} disabled={Boolean(actionBusy)}>获取正文</Button>}</div></div>
@@ -4368,7 +4359,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     </Modal>
     <BatchFactoryBookSettingsModal open={Boolean(configTarget)} batch={batch} book={configTarget?.book} activeRegion={configTarget?.region} onClose={() => setConfigTarget(null)} onSaved={refreshAfterBookSettingsSaved} onOpenBookAssets={book => setAssetBook(book)} />
     <Modal title={assetBook ? `人物场景预设 · ${assetBook.title}` : '人物场景预设'} open={Boolean(assetBook)} onCancel={() => setAssetBook(null)} footer={null} width="min(1440px, calc(100vw - 48px))" className="batch-factory-assets-modal">{assetBook ? (() => { const settings = effectiveBookSettings(batch, assetBook); const productionMode = settings.productionMode === 'comic' ? 'comic' : 'video'; const comicRules = effectiveBookComicRules(batch, assetBook); return <AssetEditor book={assetBook} batchId={batch?.id} onSaved={refreshBatch} onGenerate={async textModelId => { await refreshAssetPresetSnapshot(assetBook); await runBookStageAction(assetBook, 'assets', 'missing', '', textModelId); }} onRegenerate={async textModelId => { await refreshAssetPresetSnapshot(assetBook); await runBookStageAction(assetBook, 'assets', 'force', '', textModelId); }} onRetry={textModelId => retryLastFailedStage(assetBook, '', textModelId)} productionMode={productionMode} assetRules={productionMode === 'comic' ? comicRules : effectiveBookAssetRules(batch, assetBook)} onAssetPromptChange={async selection => { const bookPromptConfig = assetBook?.settingsState?.patch?.aiPromptConfig || {}; const assetRules = effectiveBookAssetRules(batch, assetBook); await saveBookOverrideWithRetry(batch.id, assetBook.id, assetBook.revision, { patch: { aiPromptConfig: productionMode === 'comic' ? { ...bookPromptConfig, comic: { ...comicRules, assets: selection, enabled: true, scope: 'custom', bookIds: [assetBook.id] } } : { ...bookPromptConfig, assets: { ...assetRules, extraction: selection, scope: 'custom', bookIds: [assetBook.id] } } } }); await refreshBatch(); }} canGenerate={runCapability.available} generateReason={runCapability.reason} generating={actionBusy === stageActionKey('assets', assetBook.id)} engineSettings={settings} />; })() : null}</Modal>
-	<Modal title={promptBook ? `分镜卡（视频与漫画提示词） · ${promptBook.title}` : '分镜卡（视频与漫画提示词）'} open={Boolean(promptBook)} onCancel={() => { setPromptBook(null); setPromptVideoId(''); }} footer={null} width={900} className="batch-factory-prompt-modal">{promptBook ? <PromptPanel key={`${promptBook.id}:${promptBook.revision || 0}:${promptBook.directorRevision?.id || ''}`} book={promptBook} batch={batch} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} initialVideoId={promptVideoId} onSaved={async () => { const latestBatch = await refreshBatch(); const latestBook = latestBatch?.books?.find(item => item.id === promptBook?.id); if (latestBook) setPromptBook(latestBook); return latestBook; }} onCompile={() => runBookStageAction(promptBook, 'director', 'compile')} onRegenerateVisual={() => runBookStageAction(promptBook, 'comic', 'force')} onRetry={videoId => retryLastFailedStage(promptBook, videoId)} onGenerateVideo={videoId => runBookStageAction(promptBook, 'video', 'missing', videoId)} onGenerateVisual={(videoId, prompt) => generateBookComicPage(promptBook, videoId, prompt)} regenerating={actionBusy === stageActionKey('director', promptBook.id) || actionBusy === stageActionKey('video', promptBook.id) || actionBusy === stageActionKey('comic', promptBook.id) || actionBusy === stageActionKey('retry', promptBook.id) || String(actionBusy).startsWith(`comic-image-${promptBook.id}-`)} productionAvailable={productionCapability.available} productionReason={productionCapability.reason} /> : null}</Modal>
+	<Modal title={promptBook ? `分镜卡（${effectiveBookSettings(batch, promptBook).productionMode === 'comic' ? '漫画提示词' : '视频提示词'}） · ${promptBook.title}` : '分镜卡'} open={Boolean(promptBook)} onCancel={() => { setPromptBook(null); setPromptVideoId(''); }} footer={null} width={900} className="batch-factory-prompt-modal">{promptBook ? <PromptPanel key={`${promptBook.id}:${promptBook.revision || 0}:${promptBook.directorRevision?.id || ''}`} book={promptBook} batch={batch} batchId={batch?.id} settingsRevision={batch?.settingsState?.revision} productionMode={effectiveBookSettings(batch, promptBook).productionMode === 'comic' ? 'comic' : 'video'} initialVideoId={promptVideoId} onSaved={async () => { const latestBatch = await refreshBatch(); const latestBook = latestBatch?.books?.find(item => item.id === promptBook?.id); if (latestBook) setPromptBook(latestBook); return latestBook; }} onCompile={() => runBookStageAction(promptBook, 'director', 'compile')} onRegenerateVisual={() => runBookStageAction(promptBook, 'comic', 'force')} onRetry={videoId => retryLastFailedStage(promptBook, videoId)} onGenerateVideo={videoId => runBookStageAction(promptBook, 'video', 'missing', videoId)} onGenerateVisual={(videoId, prompt) => generateBookComicPage(promptBook, videoId, prompt)} regenerating={actionBusy === stageActionKey('director', promptBook.id) || actionBusy === stageActionKey('video', promptBook.id) || actionBusy === stageActionKey('comic', promptBook.id) || actionBusy === stageActionKey('retry', promptBook.id) || String(actionBusy).startsWith(`comic-image-${promptBook.id}-`)} productionAvailable={productionCapability.available} productionReason={productionCapability.reason} /> : null}</Modal>
 	<Modal
       title={mediaBook ? `媒体库 · ${mediaBook.title}` : '媒体库'}
       open={Boolean(mediaBook)}
