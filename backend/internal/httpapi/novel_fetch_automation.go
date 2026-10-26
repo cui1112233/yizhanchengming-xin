@@ -267,9 +267,10 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		return nil, nil
 	}
 	settings, err := store.GetConfig(ctx, owner)
-	if err != nil || !novelFetchAutomationEnabled(settings) {
+	if err != nil {
 		return nil, err
 	}
+	automationEnabled := novelFetchAutomationEnabled(settings)
 	documents, err := store.ListDocuments(ctx, owner)
 	if err != nil {
 		return nil, err
@@ -284,6 +285,13 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	maxTxt := 4000
 	for _, document := range documents {
 		if len(bookIDs) >= 50 {
+			continue
+		}
+		waitingFetchRetry := strings.EqualFold(firstText(document.Meta["originalStatus"], document.Meta["original_status"]), "waiting_fetch_retry")
+		// A fetch failure has already created an explicit retry deadline. It must
+		// survive a paused global automation switch and a service restart; only
+		// ordinary pending work is gated by the switch.
+		if !automationEnabled && !waitingFetchRetry {
 			continue
 		}
 		eligible := novelFetchAutomationEligible(document, now)

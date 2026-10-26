@@ -276,6 +276,33 @@ func TestNovelFetchAutomationDoesNotRedispatchBeforeRetryTime(t *testing.T) {
 	}
 }
 
+func TestNovelFetchAutomationDispatchesDueFetchRetryWhenGlobalAutomationIsPaused(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &recordingNovelFetchQueue{}
+	now := time.Date(2026, 10, 27, 1, 0, 0, 0, time.UTC)
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{
+		"novel_fetch_automation": map[string]any{"enabled": false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "due-fetch-retry",
+		Meta: map[string]any{
+			"status": "waiting_retry", "queueState": "waiting_retry", "originalStatus": "waiting_fetch_retry",
+			"originalFetchNextRetryAt": now.Add(-time.Minute).Format(time.RFC3339Nano),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	job, err := dispatchNovelFetchAutomationOwner(context.Background(), store, queue, "tester", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job == nil || len(job.BookIDs) != 1 || job.BookIDs[0] != "due-fetch-retry" {
+		t.Fatalf("due fetch retry must dispatch while automation is paused: %#v", job)
+	}
+}
+
 func TestNovelFetchAutomationDispatchesCompletedTaskWithoutSubmissionState(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	queue := &recordingNovelFetchQueue{}
