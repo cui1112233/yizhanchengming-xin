@@ -709,6 +709,31 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	task["created_at"] = createdAt
 	task["createdAt"] = createdAt
 	task["updated_at"] = firstText(task["updated_at"], task["updatedAt"], document.UpdatedAt)
+	// REA displayed the selected rewrite knowledge separately for every AI
+	// version. Keep that history in the compatibility payload instead of
+	// collapsing it into one task-level summary.
+	if raw, ok := document.Meta["rewriteEvidenceByVersion"].(map[string]any); ok {
+		history := make([]map[string]any, 0, len(raw))
+		keys := make([]string, 0, len(raw))
+		for key := range raw {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, version := range keys {
+			entry := mapOrEmpty(raw[version])
+			history = append(history, map[string]any{
+				"version": version, "ai_index": strings.TrimPrefix(version, "ai"),
+				"method": entry["method"], "strategy_name": entry["strategy_name"],
+				"template_id": entry["template_id"], "template_name": entry["template_name"],
+				"opening_phrase_name":           entry["opening_phrase_name"],
+				"high_imitation_reference_name": entry["high_imitation_reference_name"],
+				"process_line_count":            entry["process_line_count"], "anchor_line_count": entry["anchor_line_count"],
+			})
+		}
+		if len(history) > 0 {
+			task["rewrite_knowledge_history"] = history
+		}
+	}
 	if document.MaxTxt > 0 {
 		task["max_txt"] = document.MaxTxt
 	}

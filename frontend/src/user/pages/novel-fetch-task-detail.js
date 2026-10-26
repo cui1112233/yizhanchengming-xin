@@ -54,18 +54,24 @@ function sourceLabel(value) {
 
 export function novelFetchAiVersions(data = {}) {
   const versions = data.versions && typeof data.versions === 'object' ? data.versions : {};
+  const meta = data.meta && typeof data.meta === 'object' ? data.meta : {};
+  const history = first(meta.rewriteKnowledgeHistory, meta.rewrite_knowledge_history);
+  const historyByVersion = new Map((Array.isArray(history) ? history : []).map(item => [String(first(item.version, item.versionId, item.ai_index, item.aiIndex, '')).toLowerCase(), item]));
   const rows = Object.entries(versions)
     .filter(([key]) => /^ai\d+$/i.test(key))
-    .map(([key, value]) => ({
-      key: key.toLowerCase(),
-      label: `AI 版本 ${Number(key.replace(/\D/g, ''))}`,
-      content: bodyContent(value)
-    }))
+    .map(([key, value]) => {
+      const item = { key: key.toLowerCase(), label: `AI 版本 ${Number(key.replace(/\D/g, ''))}`, content: bodyContent(value) };
+      const knowledge = historyByVersion.get(key.toLowerCase()) || historyByVersion.get(`ai${key.replace(/\D/g, '')}`);
+      if (knowledge) item.knowledge = knowledge;
+      return item;
+    })
     .filter(item => item.content.trim())
     .sort((left, right) => Number(left.key.slice(2)) - Number(right.key.slice(2)));
   if (rows.length) return rows;
   const legacy = bodyContent(first(data.aiText, data.ai_text));
-  return legacy.trim() ? [{ key: 'ai1', label: 'AI 版本 1', content: legacy }] : [];
+  const legacyRow = { key: 'ai1', label: 'AI 版本 1', content: legacy };
+  if (legacy.trim() && historyByVersion.get('ai1')) legacyRow.knowledge = historyByVersion.get('ai1');
+  return legacy.trim() ? [legacyRow] : [];
 }
 
 export function novelFetchTaskSummaryItems(data = {}) {

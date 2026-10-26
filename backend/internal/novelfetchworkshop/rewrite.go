@@ -22,6 +22,8 @@ type RewriteProvider interface {
 	Complete(context.Context, RewriteRequest) (string, error)
 }
 
+type RewriteTextProcessor func(context.Context, string, string) (string, []map[string]any, []map[string]any, error)
+
 const (
 	rewriteProcessLines = 20
 	rewriteAnchorLines  = 5
@@ -50,16 +52,154 @@ func rewriteLines(text string) []string {
 	return lines
 }
 
-func buildRewritePrompt(document Document, original string, index int) (string, int, int) {
+type rewriteRuntimePlan struct {
+	ProcessLines               int
+	AnchorLines                int
+	Temperature                float64
+	MaxTokens                  int
+	Method                     string
+	TemplateID                 string
+	TemplateName               string
+	StrategyName               string
+	OpeningPhraseName          string
+	HighImitationReferenceName string
+	Instructions               []string
+}
+
+func rewriteItemText(item map[string]any) string {
+	for _, key := range []string{"prompt", "content", "instruction", "text", "body", "example"} {
+		if text := strings.TrimSpace(fmt.Sprint(item[key])); text != "" && text != "<nil>" {
+			return text
+		}
+	}
+	return ""
+}
+
+func rewriteItemName(item map[string]any) string {
+	for _, key := range []string{"name", "title", "label", "id"} {
+		if text := strings.TrimSpace(fmt.Sprint(item[key])); text != "" && text != "<nil>" {
+			return text
+		}
+	}
+	return ""
+}
+
+func firstKnowledgeText(library map[string]any, fields ...string) string {
+	for _, field := range fields {
+		for _, item := range arrayMap(library[field]) {
+			if item["enabled"] == false {
+				continue
+			}
+			if text := rewriteItemText(item); text != "" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func rewritePlan(settings map[string]any, versionID string, index int) rewriteRuntimePlan {
+	app := mapOrEmpty(settings["appConfig"])
+	rewrite := mapOrEmpty(settings["rewrite"])
+	if configured := mapOrEmpty(app["rewrite"]); len(configured) > 0 {
+		rewrite = configured
+	}
+	ai := mapOrEmpty(settings["ai"])
+	if configured := mapOrEmpty(app["ai"]); len(configured) > 0 {
+		ai = configured
+	}
+	plan := rewriteRuntimePlan{ProcessLines: ruleInt(rewrite["process_line_count"], rewriteProcessLines), AnchorLines: ruleInt(rewrite["anchor_line_count"], rewriteAnchorLines), Temperature: rewriteTemperature, MaxTokens: rewriteMaxTokens, TemplateID: strings.TrimSpace(fmt.Sprint(rewrite["default_template_id"]))}
+	if value, ok := rewrite["temperature"].(float64); ok {
+		plan.Temperature = value
+	}
+	if value, ok := ai["max_tokens"].(float64); ok && value > 0 {
+		plan.MaxTokens = int(value)
+	}
+	if slots := mapOrEmpty(rewrite["ai_slot_methods"]); strings.TrimSpace(fmt.Sprint(slots[versionID])) != "" && fmt.Sprint(slots[versionID]) != "auto" {
+		plan.Method = strings.TrimSpace(fmt.Sprint(slots[versionID]))
+	}
+	if plan.Method == "" {
+		methods := anySlice(rewrite["method_sequence"])
+		if len(methods) > 0 {
+			plan.Method = strings.TrimSpace(fmt.Sprint(methods[(index-1)%len(methods)]))
+		}
+	}
+	if plan.Method == "" {
+		plan.Method = "instruction"
+	}
+	plan.StrategyName = map[string]string{"opening_instruction": "爆款开头", "high_imitation": "高仿改写", "instruction": "普通改文"}[plan.Method]
+	if plan.StrategyName == "" {
+		plan.StrategyName = plan.Method
+	}
+	if prompt := strings.TrimSpace(fmt.Sprint(rewrite["prompt"])); prompt != "" && prompt != "<nil>" {
+		plan.Instructions = append(plan.Instructions, "账号改文要求："+prompt)
+	}
+	for _, knowledgeConfig := range []map[string]any{mapOrEmpty(settings["knowledge"]), mapOrEmpty(app["knowledge"]), mapOrEmpty(settings["knowledgeLibraries"])} {
+		if usage := strings.TrimSpace(fmt.Sprint(knowledgeConfig["usage_prompt"])); usage != "" && usage != "<nil>" {
+			plan.Instructions = append(plan.Instructions, "知识库使用要求："+usage)
+			break
+		}
+	}
+	templates := knowledgeLibrary(settings, "rewrite_templates")
+	for _, item := range append(arrayMap(templates["profiles"]), arrayMap(templates["items"])...) {
+		id := strings.TrimSpace(fmt.Sprint(item["id"]))
+		if plan.TemplateID != "" && id != plan.TemplateID {
+			continue
+		}
+		if text := rewriteItemText(item); text != "" {
+			plan.Instructions = append(plan.Instructions, "改文模板："+text)
+			plan.TemplateName = rewriteItemName(item)
+			if plan.TemplateID == "" {
+				plan.TemplateID = id
+			}
+			break
+		}
+	}
+	if temporary := firstKnowledgeText(templates, "temporary_instructions"); temporary != "" {
+		plan.Instructions = append(plan.Instructions, "临时指令："+temporary)
+	}
+	if plan.Method == "opening_instruction" {
+		openingLibrary := knowledgeLibrary(settings, "opening_phrases")
+		if opening := firstKnowledgeText(openingLibrary, "items", "phrases"); opening != "" {
+			plan.Instructions = append(plan.Instructions, "爆款开头参考（只参考结构，不得照搬）："+opening)
+			for _, item := range append(arrayMap(openingLibrary["items"]), arrayMap(openingLibrary["phrases"])...) {
+				if rewriteItemText(item) == opening {
+					plan.OpeningPhraseName = rewriteItemName(item)
+					break
+				}
+			}
+		}
+	}
+	if plan.Method == "high_imitation" {
+		highLibrary := knowledgeLibrary(settings, "high_imitation")
+		if high := firstKnowledgeText(highLibrary, "items", "prompts", "references"); high != "" {
+			plan.Instructions = append(plan.Instructions, "高仿参考（只参考结构，不得照搬）："+high)
+			for _, field := range []string{"items", "prompts", "references"} {
+				for _, item := range arrayMap(highLibrary[field]) {
+					if rewriteItemText(item) == high {
+						plan.HighImitationReferenceName = rewriteItemName(item)
+						break
+					}
+				}
+				if plan.HighImitationReferenceName != "" {
+					break
+				}
+			}
+		}
+	}
+	return plan
+}
+
+func buildRewritePrompt(document Document, original string, index int, plan rewriteRuntimePlan) (string, int, int) {
 	lines := rewriteLines(original)
 	processCount := len(lines)
-	if processCount > rewriteProcessLines {
-		processCount = rewriteProcessLines
+	if plan.ProcessLines > 0 && processCount > plan.ProcessLines {
+		processCount = plan.ProcessLines
 	}
 	if processCount == 0 {
 		processCount = 1
 	}
-	anchorEnd := processCount + rewriteAnchorLines
+	anchorEnd := processCount + plan.AnchorLines
 	if anchorEnd > len(lines) {
 		anchorEnd = len(lines)
 	}
@@ -78,6 +218,9 @@ func buildRewritePrompt(document Document, original string, index int) (string, 
 		bookName = "未命名小说"
 	}
 	prompt := fmt.Sprintf("这是第 %d 个改写版本。\n小说名：%s\n男女频：%s\n风格：%s\n\n只改写下面的待处理片段，不要扩写成摘要或续写。保持原有事件、人物关系和信息量，句子简洁，长度尽量接近原文（最多比原文增加 35%%）。每一行对应原文叙事节奏。只输出改写后的正文，不要标题、解释、序号或 Markdown。\n\n待处理片段：\n%s", index, bookName, gender, style, block)
+	if len(plan.Instructions) > 0 {
+		prompt = strings.Join(plan.Instructions, "\n") + "\n\n" + prompt
+	}
 	if anchor != "" {
 		prompt += "\n\n后续衔接参考（不要改写这部分）：\n" + anchor
 	}
@@ -135,6 +278,12 @@ func GenerateAIRewrites(ctx context.Context, store Store, owner, bookID string, 
 // 不能用“最大编号”推断数量，否则用户只选 ai3 时会额外生成 ai1、ai2，
 // 任务列表会出现用户没有要求的版本，后续提交也可能误选它们。
 func GenerateAIRewritesForVersions(ctx context.Context, store Store, owner, bookID string, versions []string, provider RewriteProvider) (Document, error) {
+	return GenerateAIRewritesForVersionsProcessed(ctx, store, owner, bookID, versions, provider, nil)
+}
+
+// GenerateAIRewritesForVersionsProcessed applies the same persisted rule
+// pipeline used for originals before each AI body becomes visible.
+func GenerateAIRewritesForVersionsProcessed(ctx context.Context, store Store, owner, bookID string, versions []string, provider RewriteProvider, processor RewriteTextProcessor) (Document, error) {
 	if provider == nil {
 		return Document{}, errors.New("AI 改文模型未配置")
 	}
@@ -150,6 +299,7 @@ func GenerateAIRewritesForVersions(ctx context.Context, store Store, owner, book
 		return Document{}, errors.New("请先抓取原文，再生成 AI 改文")
 	}
 	document = normalizeDocument(document)
+	settings, _ := store.GetConfig(ctx, owner)
 	seen := map[string]bool{}
 	requested := make([]string, 0, len(versions))
 	for _, versionID := range versions {
@@ -172,12 +322,13 @@ func GenerateAIRewritesForVersions(ctx context.Context, store Store, owner, book
 	}
 	for _, versionID := range requested {
 		index, _ := strconv.Atoi(strings.TrimPrefix(versionID, "ai"))
-		userPrompt, processCount, targetChars := buildRewritePrompt(document, original, index)
+		plan := rewritePlan(settings, versionID, index)
+		userPrompt, processCount, targetChars := buildRewritePrompt(document, original, index, plan)
 		request := RewriteRequest{
 			SystemPrompt: "你是短剧小说改文编辑。只处理用户标出的待处理片段，不得扩写、续写或解释；保持人物身份、关键因果、时间顺序和男女频风格不变。只输出改写后的正文。",
 			UserPrompt:   userPrompt,
-			Temperature:  rewriteTemperature,
-			MaxTokens:    rewriteMaxTokens,
+			Temperature:  plan.Temperature,
+			MaxTokens:    plan.MaxTokens,
 		}
 		result, callErr := provider.Complete(ctx, request)
 		result = strings.TrimSpace(result)
@@ -213,7 +364,35 @@ func GenerateAIRewritesForVersions(ctx context.Context, store Store, owner, book
 			}
 		}
 		result = mergeRewriteBlock(original, result, processCount)
+		if processor != nil {
+			processed, trace, sensitiveItems, processErr := processor(ctx, versionID, result)
+			if processErr != nil {
+				document.Meta["aiStatus"] = "failed"
+				document.Meta["aiError"] = processErr.Error()
+				_ = store.PutDocument(ctx, owner, document)
+				return document, processErr
+			}
+			result = processed
+			traceByVersion, _ := document.Meta["rulesTraceByVersion"].(map[string]any)
+			if traceByVersion == nil {
+				traceByVersion = map[string]any{}
+			}
+			traceByVersion[versionID] = trace
+			document.Meta["rulesTraceByVersion"] = traceByVersion
+			sensitiveByVersion, _ := document.Meta["sensitiveByVersion"].(map[string]any)
+			if sensitiveByVersion == nil {
+				sensitiveByVersion = map[string]any{}
+			}
+			sensitiveByVersion[versionID] = sensitiveItems
+			document.Meta["sensitiveByVersion"] = sensitiveByVersion
+		}
 		document.Versions[versionID] = result
+		evidence, _ := document.Meta["rewriteEvidenceByVersion"].(map[string]any)
+		if evidence == nil {
+			evidence = map[string]any{}
+		}
+		evidence[versionID] = map[string]any{"method": plan.Method, "strategy_name": plan.StrategyName, "template_id": plan.TemplateID, "template_name": plan.TemplateName, "opening_phrase_name": plan.OpeningPhraseName, "high_imitation_reference_name": plan.HighImitationReferenceName, "process_line_count": plan.ProcessLines, "anchor_line_count": plan.AnchorLines, "temperature": plan.Temperature, "max_tokens": plan.MaxTokens}
+		document.Meta["rewriteEvidenceByVersion"] = evidence
 		ref, bodyErr := store.PutBody(ctx, owner, BodyRecord{
 			BookID:  document.BookID,
 			BodyRef: BodyRef{VersionID: versionID, State: "ready"},
