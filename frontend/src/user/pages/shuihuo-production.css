@@ -4117,34 +4117,132 @@ body.shuihuo-reference-shell
   font-size: 12px;
 }
 
-.batch-factory-comic-style-heading small,
+.batch-factory-comic-style-heading > small {
+  color: var(--sh-muted);
+}
+
 .batch-factory-comic-style-copy small,
 .batch-factory-comic-reference-title small {
   color: rgba(0, 0, 0, 0.55);
 }
 
-.batch-factory-comic-style-grid {
+.batch-factory-comic-coverflow {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
-  grid-auto-rows: max-content;
-  align-content: start;
-  gap: 10px;
-  max-height: 430px;
-  overflow-y: auto;
-  padding: 2px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  grid-template-rows: 350px auto;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sh-line);
+  border-radius: 8px;
+  background: #0d1520;
+  isolation: isolate;
+}
+
+.batch-factory-comic-coverflow:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+
+.batch-factory-comic-coverflow-backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: -24px;
+  overflow: hidden;
+  background: #0d1520;
+  opacity: 0.16;
+  filter: blur(22px) saturate(0.7);
+  pointer-events: none;
+  transform: scale(1.1);
+  transition: opacity 320ms ease;
+}
+
+.batch-factory-comic-coverflow-backdrop img,
+.batch-factory-comic-coverflow-backdrop .batch-factory-comic-preview-loading {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.batch-factory-comic-coverflow-stage {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  grid-column: 2;
+  min-width: 0;
+  height: 350px;
+  overflow: hidden;
+  perspective: 1100px;
+  transform-style: preserve-3d;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.batch-factory-comic-coverflow-stage:active {
+  cursor: grabbing;
+}
+
+.batch-factory-comic-coverflow-nav {
+  position: relative;
+  z-index: 30;
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #3b4c62;
+  border-radius: 50%;
+  background: rgba(10, 17, 27, 0.9);
+  color: #f4f7fb;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.batch-factory-comic-coverflow-nav:hover:not(:disabled) {
+  border-color: #70a9ff;
+  background: #172538;
+  transform: scale(1.06);
+}
+
+.batch-factory-comic-coverflow-nav:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.batch-factory-comic-coverflow-nav.is-previous {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.batch-factory-comic-coverflow-nav.is-next {
+  grid-row: 1;
+  grid-column: 3;
 }
 
 .batch-factory-comic-style-card {
-  min-width: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(146px, 18vw, 178px);
   overflow: hidden;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
   background: #fff;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
+  transform: translate(-50%, -50%) translateX(var(--comic-style-translate-x)) translateZ(var(--comic-style-translate-z)) rotateY(var(--comic-style-rotation)) scale(var(--comic-style-scale));
+  transform-origin: center;
+  transform-style: preserve-3d;
+  transition: transform 520ms cubic-bezier(0.2, 0.78, 0.2, 1), opacity 420ms ease, filter 420ms ease, border-color 220ms ease, box-shadow 320ms ease;
+  filter: brightness(var(--comic-style-brightness));
+  will-change: transform, opacity;
 }
 
 .batch-factory-comic-style-card.is-selected {
   border-color: #1677ff;
-  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.14);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(22, 119, 255, 0.24);
+  filter: none;
 }
 
 .batch-factory-comic-style-card > button[role='radio'] {
@@ -4169,6 +4267,24 @@ body.shuihuo-reference-shell
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background: #f5f5f5;
+}
+
+.batch-factory-comic-style-selected {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 13px;
+  background: #1677ff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
 }
 
 .batch-factory-comic-style-image img,
@@ -4204,6 +4320,84 @@ body.shuihuo-reference-shell
   color: #1f1f1f;
   font-size: 13px;
   line-height: 1.4;
+}
+
+.batch-factory-comic-coverflow-caption {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  min-height: 66px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 15, 24, 0.9);
+}
+
+.batch-factory-comic-coverflow-caption > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.batch-factory-comic-coverflow-caption b,
+.batch-factory-comic-coverflow-caption small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-factory-comic-coverflow-caption b {
+  color: #f7f9fc;
+  font-size: 15px;
+}
+
+.batch-factory-comic-coverflow-caption small {
+  color: #91a0b3;
+  font-size: 12px;
+}
+
+.batch-factory-comic-coverflow-caption .ant-btn-link {
+  flex: 0 0 auto;
+  color: #75adff;
+}
+
+@media (max-width: 680px) {
+  .batch-factory-comic-style-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .batch-factory-comic-coverflow {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    grid-template-rows: 310px auto;
+  }
+
+  .batch-factory-comic-coverflow-stage {
+    height: 310px;
+  }
+
+  .batch-factory-comic-style-card {
+    width: 140px;
+  }
+
+  .batch-factory-comic-coverflow-caption {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batch-factory-comic-style-card,
+  .batch-factory-comic-coverflow-backdrop,
+  .batch-factory-comic-coverflow-nav {
+    transition-duration: 0.01ms;
+  }
 }
 
 .batch-factory-comic-reference-panel {

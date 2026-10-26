@@ -1,9 +1,17 @@
 import { Button, Empty, Input, Switch, Upload as AntUpload, message } from 'antd';
-import { ImagePlus, Trash2, Upload } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, ImagePlus, Trash2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getComicReferencePreviewBlob, uploadComicGlobalReference } from '../../../shared/api/batchFactoryV11';
-import { comicStylePreviewReference, comicStyleSelection, normalizeComicReference } from './batchFactoryComicStyle';
+import {
+  comicStyleCoverFlowStyle,
+  comicStyleIndexFromDrag,
+  comicStylePreviewReference,
+  comicStyleRelativeOffset,
+  comicStyleSelection,
+  normalizeComicReference,
+  wrapComicStyleIndex
+} from './batchFactoryComicStyle';
 
 function fileAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -41,10 +49,18 @@ function AuthenticatedPreview({ src, alt }) {
 export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange, inherited = false, disabled = false }) {
   const [uploading, setUploading] = useState(false);
   const [localReferencePreview, setLocalReferencePreview] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const dragStartX = useRef(null);
+  const dragged = useRef(false);
+  const wheelLocked = useRef(false);
+  const wheelTimer = useRef(null);
   const styles = useMemo(() => (Array.isArray(catalog) ? catalog : []).filter(item => item.slot === 'batch.comic-style'), [catalog]);
   const comic = value && typeof value === 'object' ? value : {};
   const reference = normalizeComicReference(comic.globalReferenceImage);
   const selectedId = String(comic.style?.presetId || '');
+  const selectedIndex = styles.findIndex(item => item.id === selectedId);
+  const selectedPreset = selectedIndex >= 0 ? styles[selectedIndex] : null;
+  const activePreset = styles[activeIndex] || selectedPreset || null;
   const patch = next => onChange?.({ ...comic, ...next, enabled: true });
   const selectStyle = preset => patch({ style: comicStyleSelection(preset) });
   const usePreview = preset => {
@@ -68,19 +84,91 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
     return false;
   };
 
+  useEffect(() => {
+    if (!styles.length) {
+      setActiveIndex(0);
+      return;
+    }
+    setActiveIndex(current => selectedIndex >= 0 ? selectedIndex : wrapComicStyleIndex(current, styles.length));
+  }, [selectedIndex, styles.length]);
+
+  useEffect(() => () => {
+    if (wheelTimer.current) window.clearTimeout(wheelTimer.current);
+  }, []);
+
+  const selectIndex = index => {
+    if (!styles.length || disabled) return;
+    const nextIndex = wrapComicStyleIndex(index, styles.length);
+    setActiveIndex(nextIndex);
+    selectStyle(styles[nextIndex]);
+  };
+  const move = direction => selectIndex(activeIndex + direction);
+  const handlePointerDown = event => {
+    if (disabled) return;
+    dragStartX.current = event.clientX;
+    dragged.current = false;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const finishDrag = event => {
+    if (dragStartX.current == null) return;
+    const deltaX = event.clientX - dragStartX.current;
+    const nextIndex = comicStyleIndexFromDrag(activeIndex, deltaX, styles.length);
+    dragged.current = nextIndex !== activeIndex;
+    dragStartX.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (nextIndex !== activeIndex) selectIndex(nextIndex);
+    window.setTimeout(() => { dragged.current = false; }, 0);
+  };
+  const cancelDrag = event => {
+    dragStartX.current = null;
+    dragged.current = false;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+  const handleWheel = event => {
+    if (disabled || wheelLocked.current || Math.abs(event.deltaX) + Math.abs(event.deltaY) < 12) return;
+    event.preventDefault();
+    wheelLocked.current = true;
+    move(event.deltaX + event.deltaY > 0 ? 1 : -1);
+    wheelTimer.current = window.setTimeout(() => { wheelLocked.current = false; }, 260);
+  };
+  const handleKeyDown = event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    move(event.key === 'ArrowRight' ? 1 : -1);
+  };
+
   return <div className="batch-factory-comic-style-picker">
-    <div className="batch-factory-comic-style-heading"><div><b>画风库</b><span>{inherited ? '继承统一配置' : '当前配置'}</span></div><small>画风提示词只在后端参与生成；预览图不会自动发给 AI。</small></div>
-    {styles.length ? <div className="batch-factory-comic-style-grid" role="radiogroup" aria-label="漫画画风库">
-      {styles.map(preset => {
-        const selected = selectedId === preset.id;
-        return <article className={`batch-factory-comic-style-card${selected ? ' is-selected' : ''}`} key={preset.id}>
-          <button type="button" role="radio" aria-checked={selected} disabled={disabled} onClick={() => selectStyle(preset)}>
-            <span className="batch-factory-comic-style-image"><AuthenticatedPreview src={preset.previewUrl} alt={`${preset.name}预览`} /></span>
-            <span className="batch-factory-comic-style-copy"><b>{preset.name}</b><small>{preset.category || '漫画画风'}</small></span>
-          </button>
-          {selected ? <Button type="link" size="small" disabled={disabled} onClick={() => usePreview(preset)}>设为漫画全局参考图</Button> : null}
-        </article>;
-      })}
+    <div className="batch-factory-comic-style-heading"><div><b>画风库</b><span>{selectedPreset ? `当前画风：${selectedPreset.name}` : (inherited ? '继承统一配置 · 尚未选择画风' : '尚未选择画风')}</span></div><small>居中的画风即为当前选择；预览图不会自动发给 AI。</small></div>
+    {styles.length ? <div
+      className="batch-factory-comic-coverflow"
+      role="radiogroup"
+      aria-label="漫画画风库"
+      tabIndex={disabled ? -1 : 0}
+      onKeyDown={handleKeyDown}
+      onWheel={handleWheel}
+    >
+      <div className="batch-factory-comic-coverflow-backdrop" aria-hidden="true">
+        {activePreset ? <AuthenticatedPreview src={activePreset.previewUrl} alt="" /> : null}
+      </div>
+      <button type="button" className="batch-factory-comic-coverflow-nav is-previous" aria-label="上一画风" disabled={disabled} onClick={() => move(-1)}><ChevronLeft size={20} /></button>
+      <div className="batch-factory-comic-coverflow-stage" onPointerDown={handlePointerDown} onPointerUp={finishDrag} onPointerCancel={cancelDrag}>
+        {styles.map((preset, index) => {
+          const selected = selectedId === preset.id;
+          const offset = comicStyleRelativeOffset(index, activeIndex, styles.length);
+          return <article className={`batch-factory-comic-style-card${selected ? ' is-selected' : ''}`} style={comicStyleCoverFlowStyle(offset)} key={preset.id}>
+            <button type="button" role="radio" aria-checked={selected} disabled={disabled} onClick={() => { if (!dragged.current) selectIndex(index); }}>
+              <span className="batch-factory-comic-style-image"><AuthenticatedPreview src={preset.previewUrl} alt={`${preset.name}预览`} /></span>
+              <span className="batch-factory-comic-style-copy"><b>{preset.name}</b><small>{preset.category || '漫画画风'}</small></span>
+            </button>
+            {selected ? <span className="batch-factory-comic-style-selected"><Check size={13} />已选择</span> : null}
+          </article>;
+        })}
+      </div>
+      <button type="button" className="batch-factory-comic-coverflow-nav is-next" aria-label="下一画风" disabled={disabled} onClick={() => move(1)}><ChevronRight size={20} /></button>
+      <div className="batch-factory-comic-coverflow-caption" aria-live="polite">
+        <div><b>{activePreset?.name || '尚未选择画风'}</b><small>{activePreset?.description || '选择一个漫画画风'}</small></div>
+        {selectedPreset ? <Button type="link" size="small" disabled={disabled} onClick={() => usePreview(selectedPreset)}>设为漫画全局参考图</Button> : null}
+      </div>
     </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无已发布画风" />}
 
     <div className="batch-factory-comic-reference-panel">
