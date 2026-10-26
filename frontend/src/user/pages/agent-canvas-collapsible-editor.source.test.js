@@ -223,6 +223,15 @@ test('expanded image editor shows persisted candidates and requires explicit con
   assert.match(canvasSource, /canvas, executions = \[\]/);
 });
 
+test('generated image candidates stay bounded instead of rendering at their natural pixel size', () => {
+  assert.match(workspaceStyles, /agent-node-composer__candidate-list[^}]*grid-auto-columns:\s*minmax\(112px, 160px\)/);
+  assert.match(workspaceStyles, /agent-node-composer__candidate-list[^}]*grid-template-rows:\s*120px/);
+  assert.match(workspaceStyles, /agent-node-composer__candidate-list[^}]*overflow-x:\s*auto/);
+  assert.match(workspaceStyles, /agent-node-composer__candidate-list\s*>\s*button[^}]*width:\s*100%/);
+  assert.match(workspaceStyles, /agent-node-composer__candidate-list\s+img[^}]*height:\s*100%/);
+  assert.match(workspaceStyles, /agent-node-composer__candidate-list\s+img[^}]*object-fit:\s*contain/);
+});
+
 test('image generation keeps a visible node-level status from submission through failure or review', () => {
   const submitImage = canvasSource.match(/async function submitImageForNode\(nodeID, selectedModel, draftPrompt\) \{([\s\S]*?)\n  \}/);
   assert.ok(submitImage, 'image generation entry should exist');

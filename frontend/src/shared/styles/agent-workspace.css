@@ -656,6 +656,17 @@
 .agent-page .agent-node-composer__selected-reference > button:focus-visible { background: var(--agent-editor-action-hover); color: var(--agent-editor-text); outline: none; }
 .agent-page .agent-node-composer__reference-fallback { display: grid; place-items: center; background: var(--agent-accent-soft); color: var(--agent-accent); }
 .agent-page .agent-node-composer__body { display: grid; min-width: 0; gap: 8px; }
+.agent-page .agent-node-composer__candidates { display: grid; min-width: 0; gap: 6px; padding: 0 16px 8px; }
+.agent-page .agent-node-composer__candidate-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--agent-editor-muted); font-size: 10px; }
+.agent-page .agent-node-composer__candidate-head strong { color: var(--agent-editor-text); font-size: 11px; }
+.agent-page .agent-node-composer__candidate-list { display: grid; min-width: 0; grid-auto-columns: minmax(112px, 160px); grid-auto-flow: column; grid-template-rows: 120px; gap: 8px; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+.agent-page .agent-node-composer__candidate-list > button { position: relative; display: block; width: 100%; height: 120px; overflow: hidden; border: 1px solid var(--agent-editor-border); border-radius: 7px; padding: 0; background: var(--agent-elevated); color: var(--agent-editor-text); cursor: pointer; }
+.agent-page .agent-node-composer__candidate-list > button.is-selected { border-color: var(--agent-accent); box-shadow: 0 0 0 1px var(--agent-accent); }
+.agent-page .agent-node-composer__candidate-list img { display: block; width: 100%; height: 100%; background: #05080d; object-fit: contain; }
+.agent-page .agent-node-composer__candidate-list > button > span { position: absolute; right: 5px; bottom: 5px; min-width: 18px; border-radius: 4px; padding: 2px 5px; background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 9px; text-align: center; }
+.agent-page .agent-node-composer__candidate-actions { display: flex; justify-content: flex-end; }
+.agent-page .agent-node-composer__candidate-actions > button { min-height: 28px; border: 1px solid var(--agent-editor-border); border-radius: 6px; padding: 0 10px; background: var(--agent-editor-action); color: var(--agent-editor-text); cursor: pointer; font-size: 10px; }
+.agent-page .agent-node-composer__candidate-actions > button.is-primary { border-color: var(--agent-accent); background: var(--agent-accent); color: #fff; }
 .agent-page .agent-node-composer__generation-status { display: flex; min-width: 0; min-height: 0; max-height: 30px; align-items: center; gap: 6px; overflow: hidden; color: var(--agent-secondary); font-size: 11px; line-height: 1.35; }
 .agent-page .agent-node-composer__generation-status strong { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .agent-page .agent-node-composer__generation-status small { display: block; overflow: hidden; color: var(--agent-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
