@@ -34,6 +34,22 @@ func doLegacyBatchRewriteRequest(t *testing.T, handler http.Handler, method, pat
 	return result
 }
 
+func TestApplyBatchRewriteDefaultsEnablesPlatformDetectionUnlessExplicitlyDisabled(t *testing.T) {
+	defaultConfig := map[string]any{}
+	applyBatchRewriteDefaults(defaultConfig)
+	defaultFetch := mapOrEmpty(defaultConfig["fetch"])
+	if defaultFetch["auto_detect_platform"] != true {
+		t.Fatalf("expected platform detection enabled by default, got %#v", defaultFetch["auto_detect_platform"])
+	}
+
+	disabledConfig := map[string]any{"fetch": map[string]any{"auto_detect_platform": false}}
+	applyBatchRewriteDefaults(disabledConfig)
+	disabledFetch := mapOrEmpty(disabledConfig["fetch"])
+	if disabledFetch["auto_detect_platform"] != false {
+		t.Fatalf("expected explicit platform detection disable to be preserved, got %#v", disabledFetch["auto_detect_platform"])
+	}
+}
+
 func TestLegacyBatchRewriteConfigPostSavesAndReturnsConfig(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
@@ -136,6 +152,31 @@ func TestNovelFetchWorkshopConfigHidesCredentialsAndPreservesOnEdit(t *testing.T
 	}, now, secret)
 	if put.Code != http.StatusOK {
 		t.Fatalf("put status=%d body=%s", put.Code, put.Body.String())
+	}
+}
+
+func TestNovelFetchWorkshopConfigPersistsSensitiveAIEnabledSwitch(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{
+		"sensitive_ai": map[string]any{"enabled": false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/config", map[string]any{
+		"sensitive_ai_enabled": true,
+	}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("save status=%d body=%s", response.Code, response.Body.String())
+	}
+	saved, err := store.GetConfig(context.Background(), "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mapOrEmpty(saved["sensitive_ai"])["enabled"] != true {
+		t.Fatalf("sensitive AI switch was not persisted canonically: %#v", saved["sensitive_ai"])
 	}
 }
 
