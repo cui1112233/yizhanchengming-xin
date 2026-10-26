@@ -68,6 +68,7 @@ export function comicStyleIndexFromDrag(activeIndex, deltaX, count, threshold = 
   if (Math.abs(deltaX) < threshold) return wrapComicStyleIndex(activeIndex, count);
   return wrapComicStyleIndex(activeIndex + (deltaX < 0 ? 1 : -1), count);
 }
+
 ```
 
 - [ ] **Step 4: Run the focused test and verify GREEN**
@@ -84,30 +85,42 @@ Expected: all tests pass.
 
 **Interfaces:**
 - Consumes: `wrapComicStyleIndex`, `comicStyleRelativeOffset`, `comicStyleIndexFromDrag`
+- Produces: `comicStyleCoverFlowStyle(offset): Record<string, string | number>`
 - Preserves: `onChange({ ...comic, style: comicStyleSelection(preset), enabled: true })`
 
-- [ ] **Step 1: Add failing source assertions for the required controls and selection text**
+- [ ] **Step 1: Extend the failing behavior tests for hidden distant cards and symmetric transforms**
 
 ```js
-const component = fs.readFileSync(new URL('./BatchFactoryComicStylePicker.jsx', import.meta.url), 'utf8');
-assert.match(component, /aria-label="上一画风"/);
-assert.match(component, /aria-label="下一画风"/);
-assert.match(component, /当前画风：/);
-assert.match(component, /已选择/);
-assert.match(component, /onPointerDown/);
-assert.match(component, /onWheel/);
-assert.match(component, /onKeyDown/);
+assert.equal(comicStyleCoverFlowStyle(-2)['--comic-style-rotation'], '42deg');
+assert.equal(comicStyleCoverFlowStyle(2)['--comic-style-rotation'], '-42deg');
+assert.equal(comicStyleCoverFlowStyle(5).pointerEvents, 'none');
+assert.equal(comicStyleCoverFlowStyle(5).opacity, 0);
 ```
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
 Run: `node --test src/user/pages/shuihuo/batchFactoryComicStyle.test.js`
 
-Expected: FAIL because the current picker is a static multi-row grid.
+Expected: FAIL because distant-card visibility and symmetric transforms are not implemented.
 
-- [ ] **Step 3: Replace the grid markup with the Cover Flow stage**
+- [ ] **Step 3: Implement the style model and replace the grid markup with the Cover Flow stage**
 
 Implementation requirements:
+
+```js
+export function comicStyleCoverFlowStyle(offset) {
+  const normalizedOffset = Number(offset) || 0;
+  const distance = Math.abs(normalizedOffset);
+  return {
+    '--comic-style-offset': normalizedOffset,
+    '--comic-style-distance': Math.min(distance, 4),
+    '--comic-style-rotation': normalizedOffset === 0 ? '0deg' : (normalizedOffset < 0 ? '42deg' : '-42deg'),
+    opacity: distance > 4 ? 0 : Math.max(0.3, 1 - distance * 0.17),
+    pointerEvents: distance > 4 ? 'none' : 'auto',
+    zIndex: 20 - distance
+  };
+}
+```
 
 ```jsx
 <div className="batch-factory-comic-coverflow" role="radiogroup" aria-label="漫画画风库" tabIndex={0} onKeyDown={handleKeyDown} onWheel={handleWheel}>
@@ -140,19 +153,17 @@ Expected: all tests pass.
 - Consumes component classes from Task 2.
 - Produces a bounded 3D stage that does not change the modal data contract.
 
-- [ ] **Step 1: Add failing CSS assertions**
+- [ ] **Step 1: Run the focused behavior tests before styling**
 
-```js
-assert.match(stylesheet, /\.batch-factory-comic-coverflow-stage\s*\{[^}]*perspective:/s);
-assert.match(stylesheet, /\.batch-factory-comic-style-card\s*\{[^}]*position:\s*absolute/s);
-assert.match(stylesheet, /@media\s*\(prefers-reduced-motion:\s*reduce\)/s);
+```powershell
+node --test src/user/pages/shuihuo/batchFactoryComicStyle.test.js
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [ ] **Step 2: Capture the pre-change browser behavior**
 
-Run: `node --test src/user/pages/shuihuo/batchFactoryComicStyle.test.js`
+Open the real single-book constraints modal and confirm it still renders a multi-row static grid. This is the visual RED condition the CSS change must replace.
 
-Expected: FAIL because Cover Flow CSS is absent.
+Expected: multiple rows with no centered 3D stage.
 
 - [ ] **Step 3: Implement bounded Cover Flow styles**
 
