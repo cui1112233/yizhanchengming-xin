@@ -69,6 +69,17 @@ export function shouldPollGeneration(task) {
   return task?.state === 'queued' || task?.state === 'running';
 }
 
+export function generationSummaryText(summary = {}) {
+  const count = key => Math.max(0, Number(summary?.[key]) || 0);
+  const parts = [
+    [count('queued'), '排队'],
+    [count('running'), '生成中'],
+    [count('awaitingConfirmation'), '待确认']
+  ].filter(([value]) => value > 0)
+    .map(([value, label]) => `${label} ${value}`);
+  return parts.length ? parts.join(' · ') : '暂无进行中任务';
+}
+
 export function mergeGenerationTask(node, task, preferredResultId = '') {
   const nodeId = String(node?.id || '').trim();
   const nodeKind = String(node?.data?.type || node?.type || '').trim();
@@ -110,7 +121,8 @@ export function mergeLatestGenerationTasksByNode(current = {}, tasks = [], proje
     // running attempt for the same node.
     const incomingTime = taskAttemptAt(task);
     const existingTime = taskAttemptAt(existing);
-    if (!existing || incomingTime > existingTime || (incomingTime === existingTime && String(task?.id || '') > String(existing?.id || ''))) {
+    const sameTaskUpdated = existing?.id === task?.id && taskUpdatedAt(task) > taskUpdatedAt(existing);
+    if (!existing || incomingTime > existingTime || sameTaskUpdated || (incomingTime === existingTime && String(task?.id || '') > String(existing?.id || ''))) {
       next[nodeId] = task;
     }
   }

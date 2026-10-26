@@ -13,12 +13,18 @@ import {
 import {
   activeGenerationTaskForNode,
   generationPresentation,
+  generationSummaryText,
   latestGenerationTaskForNode,
   mergeGenerationTask,
   mergeLatestGenerationTasksByNode,
   shouldAcceptGenerationResponse,
   shouldPollGeneration
 } from './agent-generation-state.js';
+
+test('画布任务汇总不把历史失败当成当前执行状态', () => {
+  assert.equal(generationSummaryText({ queued: 2, running: 1, awaitingConfirmation: 3, completed: 8, failed: 21, cancelled: 1 }), '排队 2 · 生成中 1 · 待确认 3');
+  assert.equal(generationSummaryText({ completed: 8, failed: 21, cancelled: 1 }), '暂无进行中任务');
+});
 
 test('重复提交时能找回同节点正在执行的任务状态', () => {
   const task = activeGenerationTaskForNode([
@@ -96,6 +102,21 @@ test('旧请求晚到的失败不会覆盖较新的运行尝试', () => {
 
   assert.equal(merged['script-1'].id, 'newer-running');
   assert.equal(merged['script-1'].state, 'running');
+});
+
+test('同一个生成任务的实时状态会从排队更新为失败', () => {
+  const merged = mergeLatestGenerationTasksByNode({
+    'image-1': {
+      id: 'generation-1', projectId: 'project-1', nodeId: 'image-1', state: 'queued',
+      createdAt: '2026-10-26T04:40:21Z', updatedAt: '2026-10-26T04:40:21Z'
+    }
+  }, [{
+    id: 'generation-1', projectId: 'project-1', nodeId: 'image-1', state: 'failed', errorMessage: '豆包图片任务失败',
+    createdAt: '2026-10-26T04:40:21Z', updatedAt: '2026-10-26T04:40:47Z'
+  }], 'project-1');
+
+  assert.equal(merged['image-1'].state, 'failed');
+  assert.equal(merged['image-1'].errorMessage, '豆包图片任务失败');
 });
 
 test('只有排队中和生成中的通用任务需要轮询', () => {
