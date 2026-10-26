@@ -68,7 +68,7 @@ function HelpTip({ title, children }) {
 
 export function BatchFactoryProductionModeControl({ value, onChange }) {
   const productionMode = batchFactoryProductionModeVisibility(value).mode;
-  return <Segmented className="batch-factory-production-mode-switch" size="small" value={productionMode} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} onChange={onChange} />;
+  return <Segmented className={`batch-factory-production-mode-switch is-${productionMode}`} size="small" value={productionMode} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} onChange={onChange} />;
 }
 
 export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['models', 'audio', 'publish'], active = true }) {

@@ -8,6 +8,7 @@ const directory = path.dirname(fileURLToPath(import.meta.url));
 const unifiedSource = fs.readFileSync(path.join(directory, 'BatchFactoryUnifiedSettingsModal.jsx'), 'utf8');
 const bookSource = fs.readFileSync(path.join(directory, 'BatchFactoryBookSettingsModal.jsx'), 'utf8');
 const createSource = fs.readFileSync(path.join(directory, 'BatchFactoryCreateModal.jsx'), 'utf8');
+const stylesheet = fs.readFileSync(path.join(directory, '..', 'shuihuo-production.css'), 'utf8');
 
 test('unified settings use the shared production-mode visibility model', () => {
   assert.match(unifiedSource, /import \{ batchFactoryProductionModeVisibility \} from '\.\/batchFactoryProductionMode'/);
@@ -33,6 +34,13 @@ test('unified settings switch production mode beside the title without a media t
   assert.doesNotMatch(unifiedSource, /key: 'media', label: '画面与视频'/);
   assert.match(createSource, /<span>新建批量 · 统一配置<\/span><BatchFactoryProductionModeControl/);
   assert.doesNotMatch(createSource, /key: 'media', label: '画面与视频'/);
+});
+
+test('production mode switch uses distinct visible colors for video and comic', () => {
+  assert.match(unifiedSource, /batch-factory-production-mode-switch is-\$\{productionMode\}/);
+  assert.match(stylesheet, /\.batch-factory-production-mode-switch\.is-video[\s\S]*#1677ff/);
+  assert.match(stylesheet, /\.batch-factory-production-mode-switch\.is-comic[\s\S]*#e85d75/);
+  assert.match(stylesheet, /\.ant-segmented-item-selected[\s\S]*color:\s*#fff/);
 });
 
 test('comic mode owns comic generation prompts inside AI reasoning', () => {

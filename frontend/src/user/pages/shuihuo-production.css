@@ -3174,7 +3174,10 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-option-title{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-width:0}
 .batch-factory-unified-settings-title{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
 .batch-factory-unified-settings-title>span{flex:none;min-width:0}
-.batch-factory-production-mode-switch{margin-left:8px;flex:none}
+.batch-factory-production-mode-switch{margin-left:8px;flex:none;border:1px solid var(--border-strong);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.batch-factory-production-mode-switch .ant-segmented-item-selected{color:#fff;font-weight:600}
+.batch-factory-production-mode-switch.is-video .ant-segmented-item-selected{background:#1677ff;box-shadow:0 2px 7px rgba(22,119,255,.32)}
+.batch-factory-production-mode-switch.is-comic .ant-segmented-item-selected{background:#e85d75;box-shadow:0 2px 7px rgba(232,93,117,.32)}
 .batch-factory-unified-settings-modal .ant-modal-title{display:flex;align-items:center;width:100%}
 .batch-factory-audio-option.is-disabled{opacity:.5}
 .batch-factory-audio-option.is-disabled .batch-factory-help-button{opacity:1}
