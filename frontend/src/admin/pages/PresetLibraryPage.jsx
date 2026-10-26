@@ -52,7 +52,32 @@ const scriptPresetSections = [
   }
 ];
 
-// 批量工厂页与剧本生成页一样按 Collapse 分区展示：资产生成 → 剧情改编 → 视频提示词。
+const comicSlots = new Set([
+  'batch.comic-assets',
+  'batch.comic.assets.character',
+  'batch.comic.assets.scene',
+  'batch.comic.assets.prop',
+  'batch.comic.character-image-template',
+  'batch.comic-page',
+  'batch.comic-image-derivation',
+  'batch.comic-style'
+]);
+
+const comicAssetSlots = new Set([
+  'batch.comic-assets',
+  'batch.comic.assets.character',
+  'batch.comic.assets.scene',
+  'batch.comic.assets.prop',
+  'batch.comic.character-image-template'
+]);
+
+const comicConstraintCategories = new Set([
+  'comic_quality',
+  'comic_restriction',
+  'comic_negative'
+]);
+
+// 批量工厂页与剧本生成页一样按 Collapse 分区展示：资产生成 → 剧情改编 → 视频提示词 → 漫画生成。
 // 顺序固定，便于管理员定位；版本管理与归属列保持不变。
 const batchFactoryPresetSections = [
   {
@@ -94,11 +119,25 @@ const batchFactoryPresetSections = [
     ].includes(preset.id) || preset.id.startsWith('batch-prefix-')
   },
   {
+    key: 'batch-comic',
+    title: '漫画生成',
+    description: '集中管理漫画资产、分镜页面、图片描述词、画风库与漫画专用约束。',
+    matches: preset => comicSlots.has(preset.protocolLock?.slot)
+      || comicConstraintCategories.has(preset.protocolLock?.category),
+    subSections: [
+      { title: '资产推导', filter: preset => comicAssetSlots.has(preset.protocolLock?.slot) },
+      { title: '漫画分镜与页面', filter: preset => preset.protocolLock?.slot === 'batch.comic-page' },
+      { title: '图片描述词', filter: preset => preset.protocolLock?.slot === 'batch.comic-image-derivation' },
+      { title: '画风库', filter: preset => preset.protocolLock?.slot === 'batch.comic-style' },
+      { title: '漫画约束', filter: preset => comicConstraintCategories.has(preset.protocolLock?.category) }
+    ]
+  },
+  {
     key: 'batch-constraints',
     title: '约束设置',
     description: '基础设定、约束规则、画面前缀词、画质约束、画面限制与负面提示词。',
     matches: preset => preset.id === 'script-constraint-wrapper'
-      || preset.protocolLock?.format === 'constraint'
+      || (preset.protocolLock?.format === 'constraint' && !comicConstraintCategories.has(preset.protocolLock?.category))
       || [
         'script-extract',
         'script-extract-assets',
