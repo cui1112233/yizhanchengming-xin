@@ -168,7 +168,8 @@ function summarizeWorkshopProgress(rows, fallbackSubmissions = []) {
   const originalDone = source.filter(row => isDone(row.originalStatus ?? row.original_status) || Number(row.originalRawChars ?? row.original_raw_chars) > 0).length;
   const aiDone = source.filter(row => isDone(row.aiStatus ?? row.ai_status) || Number(row.aiGeneratedCount ?? row.ai_generated_count) > 0 || (Array.isArray(row.aiFiles ?? row.ai_files) && (row.aiFiles ?? row.ai_files).length > 0)).length;
   const failed = source.filter(row => isFailed(row.status) || isFailed(row.originalStatus ?? row.original_status) || isFailed(row.aiStatus ?? row.ai_status) || isFailed(row.siteSubmitStatus ?? row.site_submit_status)).length;
-  const processing = source.filter(row => ['queued', 'processing', 'waiting_retry'].includes(novelFetchTaskStatus(row).status)).length;
+  const processing = source.filter(row => ['queued', 'processing'].includes(novelFetchTaskStatus(row).status)).length;
+  const waitingRetry = source.filter(row => novelFetchTaskStatus(row).status === 'waiting_retry').length;
   const submissionDone = source.filter(row => isDone(row.siteSubmitStatus ?? row.site_submit_status)).length;
   const fallbackSubmissionDone = fallbackSubmissions.filter(row => isDone(row.status)).length;
   return {
@@ -176,6 +177,7 @@ function summarizeWorkshopProgress(rows, fallbackSubmissions = []) {
     originalDone,
     aiDone,
     processing,
+    waitingRetry,
     failed,
     submissionDone: source.length ? submissionDone : fallbackSubmissionDone
   };

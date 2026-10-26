@@ -895,7 +895,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 	}
 	model := firstText(ai["model"], ai["model_id"], ai["modelId"], settings["text_model_id"], settings["textModelId"], "未指定")
 	promptTemplate := strings.TrimSpace(fmt.Sprint(ai["prompt"]))
-	if promptTemplate == "" {
+	if promptTemplate == "" || promptTemplate == "<nil>" {
 		promptTemplate = "你是内容合规改写助手。只改写下面命中敏感词的小段内容，保留原剧情、人物关系和情绪，不增加新剧情。只返回改写后的小段，不要解释。\n\n任务ID：{book_id}\n命中词：{keyword}\n\n原片段：\n{snippet}"
 	}
 	maxAttempts := toInt(ai["retries"]) + 1
@@ -905,12 +905,95 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 	if maxAttempts > 3 {
 		maxAttempts = 3
 	}
+	contextChars := toInt(ai["context_chars"])
+	if contextChars < 0 {
+		contextChars = 0
+	}
+	maxHits := toInt(ai["max_hits_per_task"])
+	if maxHits <= 0 {
+		maxHits = len(items)
+	}
+	if maxHits > len(items) {
+		maxHits = len(items)
+	}
+	groupHits, _ := ai["group_hits"].(bool)
+	temperature := 0.2
+	if value, ok := ai["temperature"].(float64); ok {
+		temperature = value
+	}
+	for index := maxHits; index < len(items); index++ {
+		items[index]["source"] = "AI鉴组处理"
+		items[index]["model"] = model
+		items[index]["status"] = "skipped_limit"
+		items[index]["error"] = fmt.Sprintf("超过本任务命中上限 %d", maxHits)
+	}
+	active := items[:maxHits]
+	if groupHits && len(active) > 1 {
+		outputs := make([]string, 0, len(active))
+		for _, item := range active {
+			item["source"] = "AI鉴组处理"
+			item["model"] = model
+			keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
+			snippet := sensitiveContextSnippet(strings.TrimSpace(fmt.Sprint(item["before"])), keyword, contextChars)
+			outputs = append(outputs, fmt.Sprintf("%d. 命中词：%s\n原片段：%s", len(outputs)+1, keyword, snippet))
+		}
+		userPrompt := strings.NewReplacer("{book_id}", bookID, "{keyword}", "多个命中词", "{snippet}", strings.Join(outputs, "\n\n")).Replace(promptTemplate)
+		userPrompt += "\n\n请严格按原顺序返回 JSON 字符串数组，每个元素对应一个片段，只返回数组。"
+		var output string
+		var lastErr error
+		attempts := 0
+		if provider == nil {
+			lastErr = errors.New("敏感词 AI 修复模型未配置")
+		} else {
+			for attempts < maxAttempts {
+				attempts++
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: "你是内容合规改写助手。只返回 JSON 字符串数组。", UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
+				output = strings.TrimSpace(output)
+				if lastErr == nil && output != "" {
+					break
+				}
+			}
+		}
+		var repaired []string
+		if lastErr == nil {
+			lastErr = json.Unmarshal([]byte(output), &repaired)
+			if lastErr == nil && len(repaired) != len(active) {
+				lastErr = fmt.Errorf("AI 整组返回数量不完整：%d/%d", len(repaired), len(active))
+			}
+		}
+		if lastErr == nil {
+			for index, repairedText := range repaired {
+				if strings.TrimSpace(repairedText) == "" || containsSensitiveKeyword(repairedText, strings.TrimSpace(fmt.Sprint(active[index]["keyword"]))) {
+					lastErr = errors.New("AI 整组结果仍包含命中敏感词")
+					break
+				}
+			}
+		}
+		if lastErr != nil {
+			for _, item := range active {
+				item["attempt"] = attempts
+				item["status"] = "failed"
+				item["error"] = lastErr.Error()
+			}
+			return text, items
+		}
+		searchCursor := 0
+		for index, item := range active {
+			item["attempt"] = attempts
+			item["status"] = "done"
+			item["error"] = ""
+			text, searchCursor = replaceSensitiveHit(text, searchCursor, item, repaired[index])
+			item["after"] = repaired[index]
+		}
+		return text, items
+	}
 	searchCursor := 0
-	for _, item := range items {
+	for _, item := range active {
 		item["source"] = "AI鉴组处理"
 		item["model"] = model
 		before := strings.TrimSpace(fmt.Sprint(item["before"]))
 		keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
+		before = sensitiveContextSnippet(before, keyword, contextChars)
 		attempts := 0
 		var output string
 		var lastErr error
@@ -920,7 +1003,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 			userPrompt := strings.NewReplacer("{book_id}", bookID, "{keyword}", keyword, "{snippet}", before).Replace(promptTemplate)
 			for attempts < maxAttempts {
 				attempts++
-				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: "你是内容合规改写助手。只返回改写后的小段内容。", UserPrompt: userPrompt, Temperature: 0.2, MaxTokens: 1200})
+				output, lastErr = provider.Complete(ctx, novelfetchworkshop.RewriteRequest{SystemPrompt: "你是内容合规改写助手。只返回改写后的小段内容。", UserPrompt: userPrompt, Temperature: temperature, MaxTokens: 1200})
 				output = strings.TrimSpace(output)
 				if lastErr == nil && output != "" {
 					break
@@ -928,34 +1011,65 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 			}
 		}
 		item["attempt"] = attempts
-		if lastErr != nil || output == "" {
+		if lastErr != nil || output == "" || containsSensitiveKeyword(output, keyword) {
 			item["status"] = "failed"
-			item["error"] = firstText(lastErr, "AI 返回为空")
+			item["error"] = firstText(lastErr, "AI 返回为空或仍包含命中敏感词")
 			continue
 		}
 		item["status"] = "done"
 		item["error"] = ""
-		// The deterministic pass stores the line in `after`; replace that exact
-		// line once so repeated identical hits do not rewrite every occurrence.
-		// Keep the exact line boundaries for matching. Searching from the prior
-		// hit prevents identical lines later in the document from being replaced
-		// at the wrong occurrence.
-		target := fmt.Sprint(item["after"])
-		if target == "" {
-			target = fmt.Sprint(item["before"])
-		}
-		index := strings.Index(text[searchCursor:], target)
-		if index >= 0 {
-			index += searchCursor
-			text = text[:index] + output + text[index+len(target):]
-			searchCursor = index + len(output)
-		} else if index := strings.Index(text, target); index >= 0 {
-			text = text[:index] + output + text[index+len(target):]
-			searchCursor = index + len(output)
-		}
+		text, searchCursor = replaceSensitiveHit(text, searchCursor, item, output)
 		item["after"] = output
 	}
 	return text, items
+}
+
+func containsSensitiveKeyword(output, keyword string) bool {
+	return strings.TrimSpace(keyword) != "" && strings.Contains(strings.ToLower(output), strings.ToLower(keyword))
+}
+
+func sensitiveContextSnippet(text, keyword string, contextChars int) string {
+	if contextChars <= 0 || len([]rune(text)) <= contextChars*2 || keyword == "" {
+		return text
+	}
+	index := strings.Index(strings.ToLower(text), strings.ToLower(keyword))
+	if index < 0 {
+		return string([]rune(text)[:sensitiveMinInt(len([]rune(text)), contextChars*2)])
+	}
+	runes := []rune(text)
+	center := len([]rune(text[:index]))
+	start := center - contextChars
+	if start < 0 {
+		start = 0
+	}
+	end := center + len([]rune(keyword)) + contextChars
+	if end > len(runes) {
+		end = len(runes)
+	}
+	return string(runes[start:end])
+}
+
+func replaceSensitiveHit(text string, cursor int, item map[string]any, output string) (string, int) {
+	target := fmt.Sprint(item["after"])
+	if target == "" {
+		target = fmt.Sprint(item["before"])
+	}
+	index := strings.Index(text[cursor:], target)
+	if index >= 0 {
+		index += cursor
+		return text[:index] + output + text[index+len(target):], index + len(output)
+	}
+	if index := strings.Index(text, target); index >= 0 {
+		return text[:index] + output + text[index+len(target):], index + len(output)
+	}
+	return text, cursor
+}
+
+func sensitiveMinInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func processWorkshopConfiguredText(ctx context.Context, store novelfetchworkshop.Store, owner, bookID, text, scope string, sensitiveAIEnabled bool, provider novelfetchworkshop.RewriteProvider) (string, []map[string]any, []map[string]any, error) {
@@ -2853,6 +2967,22 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 		result["ai_status"] = "ai_done"
 	}
 	result["site_submit_status"] = metaString("siteSubmitStatus", "site_submit_status")
+	for _, field := range []struct {
+		output string
+		keys   []string
+	}{
+		{"site_submit_pending_versions", []string{"siteSubmitPendingVersions", "site_submit_pending_versions"}},
+		{"site_submit_waiting_generate_versions", []string{"siteSubmitWaitingGenerateVersions", "site_submit_waiting_generate_versions"}},
+		{"site_submit_ready_versions", []string{"siteSubmitReadyVersions", "site_submit_ready_versions"}},
+		{"site_submit_expected_versions", []string{"siteSubmitExpectedVersions", "site_submit_expected_versions"}},
+	} {
+		for _, key := range field.keys {
+			if value, ok := meta[key]; ok {
+				result[field.output] = value
+				break
+			}
+		}
+	}
 	result["status"] = novelfetchworkshop.DeriveTaskStatus(document)
 	createdAt := metaString("createdAt", "created_at", "createdTime", "created_time")
 	if createdAt == "" {

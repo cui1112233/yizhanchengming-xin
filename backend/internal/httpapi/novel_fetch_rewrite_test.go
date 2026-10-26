@@ -3,8 +3,10 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +83,69 @@ func TestApplySensitiveAIRepairRecordsExecutionAndReplacesHit(t *testing.T) {
 	}
 }
 
+func TestApplySensitiveAIRepairReplacesRepeatedLinesInOrder(t *testing.T) {
+	outputs := []string{"第一段已改", "第二段已改"}
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		output := outputs[0]
+		outputs = outputs[1:]
+		return output, nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true}}
+	items := []map[string]any{
+		{"hit_index": 1, "keyword": "敏感", "before": "相同敏感段", "after": "相同已替换段", "status": "done"},
+		{"hit_index": 2, "keyword": "敏感", "before": "相同敏感段", "after": "相同已替换段", "status": "done"},
+	}
+	text, _ := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "相同已替换段\n相同已替换段", items)
+	if text != "第一段已改\n第二段已改" {
+		t.Fatalf("repeated hit order was not preserved: %q", text)
+	}
+}
+
+func TestApplySensitiveAIRepairHonorsGroupModeAndHitLimit(t *testing.T) {
+	var calls int
+	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
+		calls++
+		if !strings.Contains(request.UserPrompt, "1.") || !strings.Contains(request.UserPrompt, "2.") {
+			t.Fatalf("group prompt did not include both hits: %q", request.UserPrompt)
+		}
+		return `["第一段已改","第二段已改"]`, nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": true, "max_hits_per_task": 2}}
+	items := []map[string]any{
+		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段已替换"},
+		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段已替换"},
+		{"keyword": "敏感3", "before": "第三段敏感3", "after": "第三段已替换"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段已替换\n第二段已替换\n第三段已替换", items)
+	if calls != 1 {
+		t.Fatalf("group mode calls=%d, want 1", calls)
+	}
+	if text != "第一段已改\n第二段已改\n第三段已替换" {
+		t.Fatalf("group repair text=%q", text)
+	}
+	if got[2]["status"] != "skipped_limit" {
+		t.Fatalf("third hit status=%#v, want skipped_limit", got[2]["status"])
+	}
+}
+
+func TestApplySensitiveAIRepairRejectsUnsafeOrIncompleteGroupOutput(t *testing.T) {
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		return `["仍然包含敏感词"]`, nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": true}}
+	items := []map[string]any{
+		{"keyword": "敏感词", "before": "原文敏感词", "after": "替换后"},
+		{"keyword": "另一个词", "before": "原文另一个词", "after": "替换后2"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "替换后\n替换后2", items)
+	if text != "替换后\n替换后2" {
+		t.Fatalf("unsafe group changed text=%q", text)
+	}
+	if got[0]["status"] != "failed" || got[1]["status"] != "failed" {
+		t.Fatalf("unsafe/incomplete statuses=%#v", got)
+	}
+}
+
 func TestNovelFetchOriginalUsesEnabledSensitiveAIRepair(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"
@@ -143,17 +208,77 @@ func TestNovelFetchProcessStartRunsFetchAndSensitiveAIRepair(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
 		return "他说关系越界了", nil
 	})
-	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue(), NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t测试书", "sensitive_ai_enabled": true}, now, secret)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusAccepted {
 		t.Fatalf("process start status=%d body=%s", response.Code, response.Body.String())
 	}
-	document, err := store.GetDocument(context.Background(), "tester", "12345678901")
-	if err != nil {
-		t.Fatal(err)
-	}
+	document := waitForNovelFetchDocument(t, store, "12345678901", func(document novelfetchworkshop.Document) bool {
+		return document.ProcessedText == "他说关系越界了"
+	})
 	if document.ProcessedText != "他说关系越界了" {
 		t.Fatalf("process start did not execute AI repair: %q response=%s", document.ProcessedText, response.Body.String())
+	}
+}
+
+func TestNovelFetchProcessStartPersistsRawBeforeSensitiveAIFailure(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"msg":"ok","data":"他说他出轨了","bookinfo":{"category":"男频","genre":"都市"}}`))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{
+		"sensitive": map[string]any{"groups": []any{map[string]any{"rules": []any{map[string]any{"find": "出轨", "replace": "他说他关系越界了", "enabled": true}}}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+		return "", errors.New("敏感词模型暂时不可用")
+	})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue(), NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t测试书", "sensitive_ai_enabled": true}, now, secret)
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("process start status=%d body=%s", response.Code, response.Body.String())
+	}
+	document := waitForNovelFetchDocument(t, store, "12345678901", func(document novelfetchworkshop.Document) bool {
+		return document.Meta["status"] == "waiting_retry" || document.Meta["status"] == "failed"
+	})
+	if document.OriginalRaw != "他说他出轨了" {
+		t.Fatalf("raw original was lost after sensitive AI failure: raw=%q meta=%#v", document.OriginalRaw, document.Meta)
+	}
+	if document.Meta["originalStatus"] != "waiting_sensitive_ai" {
+		t.Fatalf("original status=%#v, want waiting_sensitive_ai", document.Meta["originalStatus"])
+	}
+}
+
+func TestNovelFetchProcessStartSkipsRewriteForShortOriginal(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"msg":"ok","data":"短文","bookinfo":{"category":"男频","genre":"都市"}}`))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{
+		"workflow": map[string]any{"skip_short_original": true, "min_original_chars": 10},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+		return `{"style":"现代悬疑"}`, nil
+	})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue(), NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t测试书", "selected_versions": []string{"original", "ai1"}}, now, secret)
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("process start status=%d body=%s", response.Code, response.Body.String())
+	}
+	document := waitForNovelFetchDocument(t, store, "12345678901", func(document novelfetchworkshop.Document) bool {
+		return document.Meta["originalStatus"] == "too_short"
+	})
+	if document.Original != "短文" || document.ProcessedText != "短文" || document.Meta["aiStatus"] != "skipped_short_original" {
+		t.Fatalf("short original was not preserved and skipped: %#v", document)
 	}
 }
 
@@ -165,24 +290,28 @@ func TestNovelFetchProcessStartGeneratesOnlySelectedAIVersion(t *testing.T) {
 	}))
 	defer upstream.Close()
 	store := novelfetchworkshop.NewMemoryStore()
-	calls := 0
-	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
-		calls++
+	rewriteCalls := 0
+	classificationCalls := 0
+	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
+		if strings.Contains(request.SystemPrompt, "小说分类器") {
+			classificationCalls++
+			return `{"style":"现代悬疑"}`, nil
+		}
+		rewriteCalls++
 		return "改写后的正文", nil
 	})
-	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue(), NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{
 		"inputText": "12345678901\t测试书", "selected_versions": []string{"original", "ai3"},
 	}, now, secret)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusAccepted {
 		t.Fatalf("process start status=%d body=%s", response.Code, response.Body.String())
 	}
-	document, err := store.GetDocument(context.Background(), "tester", "12345678901")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if calls != 1 || document.Versions["ai3"] != "改写后的正文" {
-		t.Fatalf("selected AI version was not generated exactly once: calls=%d versions=%#v", calls, document.Versions)
+	document := waitForNovelFetchDocument(t, store, "12345678901", func(document novelfetchworkshop.Document) bool {
+		return document.Versions["ai3"] == "改写后的正文"
+	})
+	if rewriteCalls != 1 || classificationCalls != 1 || document.Versions["ai3"] != "改写后的正文" {
+		t.Fatalf("selected AI version was not generated exactly once: rewrite=%d classification=%d versions=%#v", rewriteCalls, classificationCalls, document.Versions)
 	}
 	if _, exists := document.Versions["ai1"]; exists {
 		t.Fatalf("unselected AI version was generated: %#v", document.Versions)
@@ -193,4 +322,19 @@ type rewriteProviderFunc func(context.Context, novelfetchworkshop.RewriteRequest
 
 func (f rewriteProviderFunc) Complete(ctx context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
 	return f(ctx, request)
+}
+
+func waitForNovelFetchDocument(t *testing.T, store novelfetchworkshop.Store, bookID string, ready func(novelfetchworkshop.Document) bool) novelfetchworkshop.Document {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		document, err := store.GetDocument(context.Background(), "tester", bookID)
+		if err == nil && ready(document) {
+			return document
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	document, _ := store.GetDocument(context.Background(), "tester", bookID)
+	t.Fatalf("background novel fetch did not reach expected state: %#v", document)
+	return novelfetchworkshop.Document{}
 }
