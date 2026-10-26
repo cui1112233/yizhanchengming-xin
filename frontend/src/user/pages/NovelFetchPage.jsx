@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, Collapse, Descriptions, Drawer, Dropdown, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
-import { CalendarClock, ChevronDown, ChevronUp, Download, Eye, Factory, RefreshCw, Settings2 } from 'lucide-react';
+import { CalendarClock, ChevronDown, ChevronUp, Download, Eye, Factory, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   checkWebSubmitEnvironment, getWebSubmitConfig, getWebSubmitHistory, getWebSubmitOrganizations, previewWebSubmit,
@@ -1842,7 +1842,7 @@ export function LegacyNovelFetchPage() {
           <Button type="primary" onClick={() => changeTab('submit')}>提交选中</Button>
           <Button danger onClick={handleDeleteTasks}>删除选中</Button>
         </div> : null}
-        <Table className="novel-fetch-task-table" scroll={{ x: 1680 }} rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20, showSizeChanger: true }} columns={[
+        <Table className="novel-fetch-task-table" scroll={{ x: 1420 }} rowKey={row => row.bookId || row.book_id} loading={tasksLoading} dataSource={visibleTasks} rowSelection={{ selectedRowKeys: selectedTaskKeys, onChange: setSelectedTaskKeys }} pagination={{ pageSize: 20, showSizeChanger: true }} columns={[
           { title: '书籍 ID', width: 130, fixed: 'left', render: (_, row) => row.bookId || row.book_id },
           { title: '书名', width: 180, render: (_, row) => row.bookName || row.book_name || row.bookId || row.book_id },
           { title: '平台', width: 110, render: (_, row) => row.platformName || row.platform_name || '-' },
@@ -1854,16 +1854,20 @@ export function LegacyNovelFetchPage() {
           { title: '网站提交', width: 120, render: (_, row) => novelFetchSubmissionLabel(row) },
           { title: '创建/推送时间', width: 190, render: (_, row) => row.push_date || row.pushDate || row.createdAt || row.created_at || '-' },
           { title: '状态', width: 120, render: (_, row) => <TaskStatusTag row={row} /> },
-          { title: '操作', width: 390, fixed: 'right', render: (_, row) => {
+          { title: '操作', width: 112, fixed: 'right', render: (_, row) => {
             const bookId = row.bookId || row.book_id;
             const openDetail = async initialTab => setTaskDetail({ bookId, initialTab, data: await getWorkshopTask(bookId) });
-            return <Space wrap>
-              <Button size="small" icon={<Eye size={14} />} onClick={() => openDetail('summary')}>详情</Button>
-              <Button size="small" onClick={() => openDetail('sensitive')}>敏感日志</Button>
-              <Button size="small" onClick={() => openDetail('submit')}>提交日志</Button>
-              <Button size="small" loading={tasksLoading} onClick={() => runTaskRowAction(() => fetchWorkshopOriginal(bookId, row.maxTxt || row.max_txt), '原文已重新抓取', '重新抓取失败')}>重新抓取</Button>
-              <Button size="small" loading={tasksLoading} onClick={() => runTaskRowAction(() => generateWorkshopAi(bookId, 1), 'AI 版本已生成', '生成 AI 版本失败')}>生成 AI</Button>
-              <Button size="small" loading={tasksLoading} onClick={() => runTaskRowAction(() => restoreWorkshopOriginal(bookId), '已恢复原文', '恢复原文失败')}>恢复原文</Button>
+            const run = action => runTaskRowAction(action, '操作完成', '操作失败');
+            return <Space size={4}>
+              <Tooltip title="查看任务详情"><Button size="small" aria-label="查看任务详情" icon={<Eye size={14} />} onClick={() => openDetail('summary')} /></Tooltip>
+              <Dropdown trigger={['click']} menu={{ items: [
+                { key: 'sensitive', label: '敏感日志', onClick: () => openDetail('sensitive') },
+                { key: 'submit', label: '提交日志', onClick: () => openDetail('submit') },
+                { type: 'divider' },
+                { key: 'fetch', label: '重新抓取原文', onClick: () => run(() => fetchWorkshopOriginal(bookId, row.maxTxt || row.max_txt)) },
+                { key: 'ai', label: '生成 AI', onClick: () => run(() => generateWorkshopAi(bookId, 1)) },
+                { key: 'restore', label: '恢复原文', onClick: () => run(() => restoreWorkshopOriginal(bookId)) }
+              ] }}><Button size="small" aria-label="更多任务操作" icon={<MoreHorizontal size={14} />} /></Dropdown>
             </Space>;
           } }
         ]} />
