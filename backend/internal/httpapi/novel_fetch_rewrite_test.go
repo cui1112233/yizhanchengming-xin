@@ -78,7 +78,7 @@ func TestApplySensitiveAIRepairRecordsExecutionAndReplacesHit(t *testing.T) {
 	if text != "他说关系越界了" {
 		t.Fatalf("repaired text = %q", text)
 	}
-	if items[0]["source"] != "AI鉴组处理" || items[0]["model"] != "[anti-2]gemini-3.8-flash" || items[0]["attempt"] != 1 || items[0]["status"] != "done" {
+	if items[0]["source"] != "ai" || items[0]["model"] != "[anti-2]gemini-3.8-flash" || items[0]["attempt"] != 1 || items[0]["status"] != "done" {
 		t.Fatalf("repair audit = %#v", items[0])
 	}
 }
@@ -185,7 +185,7 @@ func TestNovelFetchOriginalUsesEnabledSensitiveAIRepair(t *testing.T) {
 		t.Fatalf("sensitive audit missing: %s", raw)
 	}
 	item, _ := items[0].(map[string]any)
-	if item["source"] != "AI鉴组处理" || item["model"] != "[anti-2]gemini-3.8-flash" {
+	if item["source"] != "ai" || item["model"] != "[anti-2]gemini-3.8-flash" {
 		t.Fatalf("AI audit mismatch: %#v", item)
 	}
 }

@@ -922,7 +922,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		temperature = value
 	}
 	for index := maxHits; index < len(items); index++ {
-		items[index]["source"] = "AI鉴组处理"
+		items[index]["source"] = "ai_group"
 		items[index]["model"] = model
 		items[index]["status"] = "skipped_limit"
 		items[index]["error"] = fmt.Sprintf("超过本任务命中上限 %d", maxHits)
@@ -931,7 +931,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 	if groupHits && len(active) > 1 {
 		outputs := make([]string, 0, len(active))
 		for _, item := range active {
-			item["source"] = "AI鉴组处理"
+			item["source"] = "ai_group"
 			item["model"] = model
 			keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
 			snippet := sensitiveContextSnippet(strings.TrimSpace(fmt.Sprint(item["before"])), keyword, contextChars)
@@ -989,7 +989,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 	}
 	searchCursor := 0
 	for _, item := range active {
-		item["source"] = "AI鉴组处理"
+		item["source"] = "ai"
 		item["model"] = model
 		before := strings.TrimSpace(fmt.Sprint(item["before"]))
 		keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
@@ -2803,7 +2803,14 @@ func setSensitiveDetails(meta map[string]any, items []map[string]any, count int)
 	hits := make([]any, 0, len(items))
 	fixed := make([]any, 0, len(items))
 	failedCount := 0
+	mode := "system_rule"
 	for _, item := range items {
+		itemSource := strings.ToLower(strings.TrimSpace(fmt.Sprint(item["source"])))
+		if itemSource == "ai_group" || itemSource == "group" {
+			mode = "ai_group"
+		} else if itemSource == "ai" || itemSource == "ai_each" {
+			mode = "ai_each"
+		}
 		hits = append(hits, map[string]any{
 			"hit_index": item["hit_index"], "keyword": item["keyword"],
 			"start": item["start"], "end": item["end"],
@@ -2818,12 +2825,12 @@ func setSensitiveDetails(meta map[string]any, items []map[string]any, count int)
 	if fixedCount < 0 {
 		fixedCount = 0
 	}
-	meta["sensitiveHits"] = map[string]any{"mode": "system_rule", "status": "done", "hit_count": count, "updated_at": updated, "hits": hits}
+	meta["sensitiveHits"] = map[string]any{"mode": mode, "status": "done", "hit_count": count, "updated_at": updated, "hits": hits}
 	status := "done"
 	if failedCount > 0 {
 		status = "failed"
 	}
-	meta["sensitiveFixed"] = map[string]any{"mode": "system_rule", "status": status, "fixed_count": fixedCount, "failed_count": failedCount, "updated_at": updated, "items": fixed}
+	meta["sensitiveFixed"] = map[string]any{"mode": mode, "status": status, "fixed_count": fixedCount, "failed_count": failedCount, "updated_at": updated, "items": fixed}
 }
 
 // novelFetchAppConfig restores the flat config contract used by the 3001

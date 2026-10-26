@@ -169,7 +169,11 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "result": result, "logs": logs})
 		default:
-			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "stages": []any{}})
+			stages := document.Meta["rulesTrace"]
+			if stages == nil {
+				stages = []any{}
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"meta": meta, "stages": stages, "by_version": mapOrEmpty(document.Meta["rulesTraceByVersion"])})
 		}
 	}))
 	root.Handle("GET /api/batch-rewrite/tasks/{id}/sensitive-log", diagnostic)
@@ -292,13 +296,10 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			}
 			connected, loginErr = targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: username, Password: password})
 			if loginErr != nil || strings.TrimSpace(connected.Cookie) == "" {
-				if loginErr == nil {
-					loginErr = fmt.Errorf("121 登录未返回会话")
-				}
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": loginErr.Error()})
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": videoManagementLoginError(loginErr, connected.Cookie)})
 				return
 			}
-			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+			if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "https://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "上传会话保存失败"})
 				return
 			}
@@ -607,6 +608,26 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	if sensitiveReplaced == 0 {
 		sensitiveReplaced = toInt(task["sensitiveReplaced"])
 	}
+	sensitiveHits := mapOrEmpty(task["sensitiveHits"])
+	sensitiveFixed := mapOrEmpty(task["sensitiveFixed"])
+	sensitiveMode := firstText(task["sensitive_mode"], task["sensitiveMode"], sensitiveFixed["mode"], sensitiveHits["mode"])
+	if sensitiveMode == "" {
+		sensitiveMode = "system_rule"
+	}
+	hitCount := toInt(sensitiveHits["hit_count"])
+	if hitCount == 0 {
+		hitCount = toInt(sensitiveHits["hitCount"])
+	}
+	if hitCount == 0 {
+		hitCount = sensitiveReplaced
+	}
+	fixedCount := toInt(sensitiveFixed["fixed_count"])
+	if fixedCount == 0 {
+		fixedCount = toInt(sensitiveFixed["fixedCount"])
+	}
+	if fixedCount == 0 && len(sensitiveFixed) == 0 {
+		fixedCount = sensitiveReplaced
+	}
 	originalStatus := firstText(task["original_status"], task["originalStatus"])
 	aiStatus := firstText(task["ai_status"], task["aiStatus"])
 	classifyStatus := firstText(task["classify_status"], task["classifyStatus"])
@@ -647,10 +668,17 @@ func legacyBatchRewriteTask(document novelfetchworkshop.Document) map[string]any
 	if task["sensitive_status"] == "" {
 		task["sensitive_status"] = "done"
 	}
-	task["sensitive_mode"] = "系统规则"
-	task["sensitive_hit_count"] = sensitiveReplaced
-	task["sensitive_fixed_count"] = sensitiveReplaced
-	task["sensitive_failed_count"] = toInt(task["sensitive_failed_count"])
+	task["sensitive_mode"] = sensitiveMode
+	task["sensitive_hit_count"] = hitCount
+	task["sensitive_fixed_count"] = fixedCount
+	failedCount := toInt(task["sensitive_failed_count"])
+	if failedCount == 0 {
+		failedCount = toInt(sensitiveFixed["failed_count"])
+	}
+	if failedCount == 0 {
+		failedCount = toInt(sensitiveFixed["failedCount"])
+	}
+	task["sensitive_failed_count"] = failedCount
 	task["ai_generated_count"] = toInt(firstText(task["ai_generated_count"], task["aiGeneratedCount"]))
 	if len(generatedVersions) > task["ai_generated_count"].(int) {
 		task["ai_generated_count"] = len(generatedVersions)
@@ -951,13 +979,13 @@ var batchRewriteColumnPresets = []any{
 func applyBatchRewriteDefaults(app map[string]any) {
 	defaults := map[string]any{
 		"workflow":   map[string]any{"auto_classify_missing": true, "auto_fetch_original": true, "auto_rewrite_after_fetch": true, "auto_submit_after_rewrite": false, "auto_submit_confirmed": false},
-		"fetch":      map[string]any{"endpoint": "https://txt.121w.com/api.php", "default_max_txt": 4000, "timeout_seconds": 30, "concurrency": 4, "retries": 1, "auto_detect_platform": false},
+		"fetch":      map[string]any{"endpoint": "https://txt.121w.com/api.php", "default_max_txt": 4000, "timeout_seconds": 30, "concurrency": 4, "retries": 1, "auto_detect_platform": true},
 		"ai":         map[string]any{"base_url": "", "api_key": "", "model": "", "timeout_seconds": 180, "max_concurrency": 6, "retry_times": 2, "max_tokens": 1200, "temperature": 0.45, "top_p": 0.9, "stream": false, "json_mode": false, "enable_thinking": false, "disable_thinking": false, "extra_body_json": ""},
 		"ai_presets": []any{}, "ai_assignments": map[string]any{"classifier": "__current__", "rewrite": "__current__", "sensitive_fix": "__current__"},
 		"rewrite":    map[string]any{"default_ai_count": 1, "max_ai_count": 5, "process_line_count": 5, "anchor_line_count": 5, "temperature": 0.45, "strategy": "instruction", "method_sequence": []any{"high_imitation", "opening_instruction", "instruction"}, "prompt": "你是短视频小说正文改写师。请只根据原文、风格类型和男女频改写开头部分，保留故事事实、人物关系、时代背景和后续衔接。输出正文，不要解释。"},
 		"storage":    map[string]any{"cleanup_enabled": true, "retention_days": 7},
 		"parser":     map[string]any{"default_parse_mode": "smart", "default_column_preset_id": "sample_input", "custom_column_order": "书籍ID,书名,推荐理由,男女频,标签,评级"},
-		"web_submit": map[string]any{"enabled": false, "username": "", "password_masked": false, "skip_submitted": true, "min_text_chars": 0, "retry_times": 1, "submit_mode": "version", "selected_profile": "", "advanced": map[string]any{}, "upload_profiles": []any{}, "profile_bindings": map[string]any{}, "style_catalog": []any{}, "target": "two.121w.com"},
+		"web_submit": map[string]any{"enabled": false, "username": "", "password_masked": false, "skip_submitted": true, "min_text_chars": 0, "retry_times": 1, "submit_mode": "version", "selected_profile": "", "advanced": map[string]any{}, "upload_profiles": []any{}, "profile_bindings": novelFetchVersionProfileBindings(nil), "version_profiles": novelFetchVersionProfileBindings(nil), "style_catalog": []any{}, "target": "two.121w.com"},
 	}
 	for key, value := range defaults {
 		if _, exists := app[key]; !exists || app[key] == nil {
@@ -1010,7 +1038,11 @@ func publicBatchAppConfig(app map[string]any) map[string]any {
 
 func publicBatchWebSubmit(value any) map[string]any {
 	cfg := mapOrEmpty(value)
-	out := map[string]any{"enabled": cfg["enabled"] == true, "username": firstText(cfg["username"]), "password": "", "password_masked": cfg["password_masked"] == true, "skip_submitted": cfg["skip_submitted"] != false, "min_text_chars": targetNumber(cfg["min_text_chars"]), "retry_times": targetNumber(cfg["retry_times"]), "submit_mode": "version", "selected_profile": firstText(cfg["selected_profile"]), "advanced": mapOrEmpty(cfg["advanced"]), "upload_profiles": arrayOrEmpty(cfg["upload_profiles"]), "profile_bindings": mapOrEmpty(cfg["profile_bindings"]), "style_catalog": arrayOrEmpty(cfg["style_catalog"]), "target": "two.121w.com"}
+	bindings := novelFetchVersionProfileBindings(mapOrEmpty(cfg["profile_bindings"]))
+	if configured := mapOrEmpty(cfg["version_profiles"]); len(configured) > 0 {
+		bindings = novelFetchVersionProfileBindings(configured)
+	}
+	out := map[string]any{"enabled": cfg["enabled"] == true, "username": firstText(cfg["username"]), "password": "", "password_masked": cfg["password_masked"] == true, "skip_submitted": cfg["skip_submitted"] != false, "min_text_chars": targetNumber(cfg["min_text_chars"]), "retry_times": targetNumber(cfg["retry_times"]), "submit_mode": "version", "selected_profile": firstText(cfg["selected_profile"]), "advanced": mapOrEmpty(cfg["advanced"]), "upload_profiles": arrayOrEmpty(cfg["upload_profiles"]), "profile_bindings": bindings, "version_profiles": bindings, "style_catalog": arrayOrEmpty(cfg["style_catalog"]), "target": "two.121w.com"}
 	if out["min_text_chars"].(float64) < 0 {
 		out["min_text_chars"] = float64(0)
 	}
@@ -1018,6 +1050,14 @@ func publicBatchWebSubmit(value any) map[string]any {
 		out["retry_times"] = float64(1)
 	}
 	return out
+}
+
+func novelFetchVersionProfileBindings(source map[string]any) map[string]any {
+	bindings := make(map[string]any, 6)
+	for _, version := range []string{"original", "ai1", "ai2", "ai3", "ai4", "ai5"} {
+		bindings[version] = firstText(source[version])
+	}
+	return bindings
 }
 
 func batchKnowledgeSummary(knowledge map[string]any, lightweight bool) map[string]any {

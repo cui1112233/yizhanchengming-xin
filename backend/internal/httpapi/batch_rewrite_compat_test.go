@@ -125,6 +125,19 @@ func TestCanonicalNovelFetchWebSubmitConfigUsesTheSharedGoHandler(t *testing.T) 
 	}
 }
 
+func TestPublicBatchWebSubmitCompletesEveryVersionProfileBinding(t *testing.T) {
+	public := publicBatchWebSubmit(map[string]any{"profile_bindings": map[string]any{"ai1": "profile-ai1"}})
+	bindings := mapOrEmpty(public["profile_bindings"])
+	for _, version := range []string{"original", "ai1", "ai2", "ai3", "ai4", "ai5"} {
+		if _, ok := bindings[version]; !ok {
+			t.Fatalf("missing %s binding: %#v", version, bindings)
+		}
+	}
+	if bindings["ai1"] != "profile-ai1" || bindings["ai2"] != "" {
+		t.Fatalf("unexpected bindings: %#v", bindings)
+	}
+}
+
 func TestLegacyNovelFetchEndpointIsNoLongerMounted(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	handler := NewRouter(RouterOptions{BridgeSecret: "test-secret", Now: func() time.Time { return now }, NovelFetchStore: novelfetchworkshop.NewMemoryStore()})
@@ -307,6 +320,41 @@ func TestBatchRewriteTaskListFlattensGoDocumentFields(t *testing.T) {
 	}
 	if got, want := task["ai_files"], []any{"ai1"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("ai_files=%#v want=%#v", got, want)
+	}
+}
+
+func TestBatchRewriteTaskListPreservesSensitiveAIProvenance(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
+		BookID: "book-ai-sensitive",
+		Meta: map[string]any{
+			"bookName": "AI 敏感测试",
+			"sensitiveHits": map[string]any{"mode": "ai_group", "hit_count": 2, "hits": []any{}},
+			"sensitiveFixed": map[string]any{"mode": "ai_group", "fixed_count": 1, "failed_count": 1, "items": []any{}},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", AuthStore: accountStore}, store, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/tasks", nil)
+	SignBridgeRequest(req, "tester", false, time.Now(), "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", res.Code, res.Body.String())
+	}
+	var payload struct{ Tasks []map[string]any `json:"tasks"` }
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Tasks) != 1 {
+		t.Fatalf("tasks=%#v", payload.Tasks)
+	}
+	task := payload.Tasks[0]
+	if task["sensitive_mode"] != "ai_group" || task["sensitive_hit_count"] != float64(2) || task["sensitive_fixed_count"] != float64(1) || task["sensitive_failed_count"] != float64(1) {
+		t.Fatalf("sensitive provenance overwritten: %#v", task)
 	}
 }
 
