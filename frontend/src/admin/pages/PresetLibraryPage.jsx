@@ -462,7 +462,9 @@ export function PresetLibraryPage() {
 
   const visibleBatchFactorySections = useMemo(() => {
     const keys = batchFactoryMode === 'comic'
-      ? new Set(['batch-comic', 'batch-constraints'])
+      // 漫画图片链路只显示漫画专用预设；通用 H3/SD 约束属于视频链路，
+      // 不能混入漫画配置，否则管理员会误以为漫画生成仍在使用视频规则。
+      ? new Set(['batch-comic'])
       : new Set(['batch-assets', 'batch-adaptation', 'batch-video', 'batch-constraints']);
     return batchFactorySections.filter(section => keys.has(section.key));
   }, [batchFactoryMode, batchFactorySections]);

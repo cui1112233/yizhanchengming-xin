@@ -39,3 +39,7 @@ test('script preset library separates comic image constraints from shared visual
   assert.match(source, /title: '漫画图片约束'/);
   assert.match(source, /只用于漫画图片生成/);
 });
+
+test('batch factory comic mode does not show video-only H3 and SD sections', () => {
+  assert.match(source, /batchFactoryMode === 'comic'[\s\S]*new Set\(\['batch-comic'\]\)/);
+});
