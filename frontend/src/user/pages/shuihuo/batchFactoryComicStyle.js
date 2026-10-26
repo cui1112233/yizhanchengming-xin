@@ -49,6 +49,14 @@ export function comicStyleIndexFromDrag(activeIndex, deltaX, count, threshold = 
   return wrapComicStyleIndex(activeIndex + (deltaX < 0 ? 1 : -1), count);
 }
 
+export function comicStyleWheelDirection(deltaX, deltaY, shiftKey = false) {
+  const horizontal = Number(deltaX) || 0;
+  const vertical = Number(deltaY) || 0;
+  const value = shiftKey ? (vertical || horizontal) : horizontal;
+  if ((!shiftKey && Math.abs(horizontal) <= Math.max(12, Math.abs(vertical))) || Math.abs(value) < 12) return 0;
+  return value > 0 ? 1 : -1;
+}
+
 export function comicStyleCoverFlowStyle(offset) {
   const normalizedOffset = Number(offset) || 0;
   const distance = Math.abs(normalizedOffset);

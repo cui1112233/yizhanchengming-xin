@@ -9,6 +9,7 @@ import {
   comicStylePreviewReference,
   comicStyleRelativeOffset,
   comicStyleSelection,
+  comicStyleWheelDirection,
   normalizeComicReference,
   wrapComicStyleIndex
 } from './batchFactoryComicStyle';
@@ -125,10 +126,11 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const handleWheel = event => {
-    if (disabled || wheelLocked.current || Math.abs(event.deltaX) + Math.abs(event.deltaY) < 12) return;
+    const direction = comicStyleWheelDirection(event.deltaX, event.deltaY, event.shiftKey);
+    if (disabled || wheelLocked.current || !direction) return;
     event.preventDefault();
     wheelLocked.current = true;
-    move(event.deltaX + event.deltaY > 0 ? 1 : -1);
+    move(direction);
     wheelTimer.current = window.setTimeout(() => { wheelLocked.current = false; }, 260);
   };
   const handleKeyDown = event => {

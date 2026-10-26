@@ -8,6 +8,7 @@ import {
   comicStyleRelativeOffset,
   comicStyleSelection,
   comicStylePreviewReference,
+  comicStyleWheelDirection,
   normalizeComicReference,
   wrapComicStyleIndex
 } from './batchFactoryComicStyle.js';
@@ -23,6 +24,13 @@ test('cover flow drag changes one style only after crossing the threshold', () =
   assert.equal(comicStyleIndexFromDrag(2, -50, 5), 3);
   assert.equal(comicStyleIndexFromDrag(2, 50, 5), 1);
   assert.equal(comicStyleIndexFromDrag(2, 20, 5), 2);
+});
+
+test('cover flow ignores vertical page scrolling and accepts horizontal wheel gestures', () => {
+  assert.equal(comicStyleWheelDirection(0, 120, false), 0);
+  assert.equal(comicStyleWheelDirection(80, 20, false), 1);
+  assert.equal(comicStyleWheelDirection(-80, 20, false), -1);
+  assert.equal(comicStyleWheelDirection(0, 120, true), 1);
 });
 
 test('cover flow gives the centered card priority and mirrors both sides', () => {
