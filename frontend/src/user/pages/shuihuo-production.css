@@ -4200,6 +4200,12 @@ body.shuihuo-reference-shell
   white-space: nowrap;
 }
 
+.batch-factory-comic-style-copy b {
+  color: #1f1f1f;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .batch-factory-comic-reference-panel {
   display: grid;
   grid-template-columns: 108px minmax(0, 1fr);

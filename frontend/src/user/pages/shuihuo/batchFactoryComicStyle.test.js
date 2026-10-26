@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -48,4 +49,15 @@ test('uploaded global reference keeps independent asset and page scope switches'
     applyToAssets: false,
     applyToPages: true
   });
+});
+
+test('comic style grid keeps every preview card at its natural 3:4 height', () => {
+  const stylesheet = fs.readFileSync(new URL('../shuihuo-production.css', import.meta.url), 'utf8');
+  assert.match(stylesheet, /\.batch-factory-comic-style-grid\s*\{[^}]*grid-auto-rows:\s*max-content/s);
+  assert.match(stylesheet, /\.batch-factory-comic-style-image\s*\{[^}]*aspect-ratio:\s*3\s*\/\s*4/s);
+});
+
+test('comic style names stay readable on the white preview cards', () => {
+  const stylesheet = fs.readFileSync(new URL('../shuihuo-production.css', import.meta.url), 'utf8');
+  assert.match(stylesheet, /\.batch-factory-comic-style-copy b\s*\{[^}]*color:\s*#1f1f1f[^}]*font-size:\s*13px/s);
 });
