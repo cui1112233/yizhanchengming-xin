@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, Collapse, Descriptions, Drawer, Dropdown, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
-import { CalendarClock, ChevronDown, ChevronUp, Download, Eye, Factory, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react';
+import { CalendarClock, ChevronDown, ChevronUp, Download, Factory, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   checkWebSubmitEnvironment, getWebSubmitConfig, getWebSubmitHistory, getWebSubmitOrganizations, previewWebSubmit,
@@ -1854,21 +1854,19 @@ export function LegacyNovelFetchPage() {
           { title: '网站提交', width: 120, render: (_, row) => novelFetchSubmissionLabel(row) },
           { title: '创建/推送时间', width: 190, render: (_, row) => row.push_date || row.pushDate || row.createdAt || row.created_at || '-' },
           { title: '状态', width: 120, render: (_, row) => <TaskStatusTag row={row} /> },
-          { title: '操作', width: 112, fixed: 'right', render: (_, row) => {
+          { title: '操作', width: 64, fixed: 'right', render: (_, row) => {
             const bookId = row.bookId || row.book_id;
             const openDetail = async initialTab => setTaskDetail({ bookId, initialTab, data: await getWorkshopTask(bookId) });
             const run = action => runTaskRowAction(action, '操作完成', '操作失败');
-            return <Space size={4}>
-              <Tooltip title="查看任务详情"><Button size="small" aria-label="查看任务详情" icon={<Eye size={14} />} onClick={() => openDetail('summary')} /></Tooltip>
-              <Dropdown trigger={['click']} menu={{ items: [
+            return <Dropdown trigger={['click']} menu={{ items: [
+                { key: 'summary', label: '查看详情', onClick: () => openDetail('summary') },
                 { key: 'sensitive', label: '敏感日志', onClick: () => openDetail('sensitive') },
                 { key: 'submit', label: '提交日志', onClick: () => openDetail('submit') },
                 { type: 'divider' },
                 { key: 'fetch', label: '重新抓取原文', onClick: () => run(() => fetchWorkshopOriginal(bookId, row.maxTxt || row.max_txt)) },
                 { key: 'ai', label: '生成 AI', onClick: () => run(() => generateWorkshopAi(bookId, 1)) },
                 { key: 'restore', label: '恢复原文', onClick: () => run(() => restoreWorkshopOriginal(bookId)) }
-              ] }}><Button size="small" aria-label="更多任务操作" icon={<MoreHorizontal size={14} />} /></Dropdown>
-            </Space>;
+              ] }}><Tooltip title="任务操作"><Button size="small" aria-label="任务操作" icon={<MoreHorizontal size={14} />} /></Tooltip></Dropdown>;
           } }
         ]} />
         <div className="novel-fetch-task-summary"><span>当前批次 <strong>{currentBatch?.id || '—'}</strong></span><span>完成 <strong>{processSummary.aiDone}</strong></span><span>执行中 <strong>{processSummary.processing}</strong></span><span>等待重试 <strong>{processSummary.waitingRetry}</strong></span><span>失败 <strong>{processSummary.failed}</strong></span><Dropdown trigger={['click']} menu={{ items: currentBatchMenuItems }}><Button className="novel-fetch-task-batch-menu">当前批次操作</Button></Dropdown></div>
