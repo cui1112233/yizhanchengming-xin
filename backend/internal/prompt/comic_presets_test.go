@@ -86,6 +86,22 @@ func TestEnsureComicPresetsUpgradesRecognizedLegacySystemSeeds(t *testing.T) {
 	assertComicPresetVersion(t, records, "vip-smart-character-derive", 2, "published", "CM·VIP 智能角色推导", "")
 }
 
+func TestEnsureComicPresetsUpgradesOriginalV1SystemSeed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	legacy := `[{
+		"id":"batch-comic-assets","module":"batch-factory","name":"漫画资产提示词","kind":"base","description":"旧版","compatibleBaseIds":[],"version":1,"revision":1,"status":"published","body":"旧漫画资产正文","protocolLock":{"format":"json","operation":"comic-assets","slot":"batch.comic-assets"},"createdBy":"system","publishedBy":"system"
+	}]`
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	records := readComicPresetRecords(t, path)
+	assertComicPresetVersion(t, records, "batch-comic-assets", 1, "archived", "漫画资产提示词", "旧漫画资产正文")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "published", "CM·漫画资产统一推导", "")
+}
+
 func TestEnsureComicPresetsPreservesAdministratorPublishedVersions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "presets.json")
 	custom := `[{

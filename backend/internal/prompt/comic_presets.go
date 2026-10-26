@@ -73,9 +73,9 @@ func EnsureComicPresets(path string) error {
 			continue
 		}
 		if latestVersion[id] > 0 {
-			legacyVersion, isCMUpgrade := cmLegacySystemVersions[id]
+			legacyMaxVersion, isCMUpgrade := cmLegacySystemMaxVersions[id]
 			index, hasPublished := publishedIndex[id]
-			if !isCMUpgrade || latestVersion[id] != legacyVersion || !hasPublished || intValue(records[index]["version"]) != legacyVersion || stringValue(records[index]["createdBy"]) != "system" {
+			if !isCMUpgrade || latestVersion[id] > legacyMaxVersion || !hasPublished || intValue(records[index]["version"]) > legacyMaxVersion || stringValue(records[index]["createdBy"]) != "system" {
 				continue
 			}
 			records[index]["status"] = "archived"
@@ -108,7 +108,7 @@ func EnsureComicPresets(path string) error {
 	return nil
 }
 
-var cmLegacySystemVersions = map[string]int{
+var cmLegacySystemMaxVersions = map[string]int{
 	"batch-comic-assets":         2,
 	"vip-smart-character-derive": 1,
 }
