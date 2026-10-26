@@ -680,7 +680,7 @@ export function LegacyNovelFetchPage() {
   const [accountScope, setAccountScope] = useState(() => getSelectedNovelFetchAccount());
   const [accountOptions, setAccountOptions] = useState([]);
   const [documentHidden, setDocumentHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
-  const pollingRef = useRef({ realtimeBusy: false, queueBusy: false, tasksBusy: false, realtimeFailures: 0, taskFailures: 0 });
+  const pollingRef = useRef({ realtimeBusy: false, queueBusy: false, tasksBusy: false, realtimeFailures: 0, taskFailures: 0, queueStatusSignature: '' });
   const taskDataSignatureRef = useRef('');
   const batchDataSignatureRef = useRef('');
   const inputFormatOption = INPUT_FORMAT_OPTIONS.find(item => item.value === inputFormat) || INPUT_FORMAT_OPTIONS[0];
@@ -777,7 +777,23 @@ export function LegacyNovelFetchPage() {
   async function loadQueueStatus() {
     try {
       const nextStatus = await getWorkshopRealtimeStatus();
-      setQueueStatus(current => mergeNovelFetchQueueStatus(current, nextStatus));
+      const meaningfulStatus = {
+        enabled: nextStatus?.enabled,
+        auto_queue_enabled: nextStatus?.auto_queue_enabled,
+        counts: nextStatus?.counts || {},
+        pending_count: nextStatus?.pending_count,
+        processing_count: nextStatus?.processing_count,
+        active_job_id: nextStatus?.active_job_id,
+        latest_job: nextStatus?.latest_job ? {
+          id: nextStatus.latest_job.id,
+          status: nextStatus.latest_job.status
+        } : null
+      };
+      const signature = JSON.stringify(meaningfulStatus);
+      if (signature !== pollingRef.current.queueStatusSignature) {
+        pollingRef.current.queueStatusSignature = signature;
+        setQueueStatus(current => mergeNovelFetchQueueStatus(current, nextStatus));
+      }
       return true;
     } catch {
       // Keep the last confirmed enabled/paused state during a transient poll failure.
