@@ -1533,7 +1533,7 @@ export function LegacyNovelFetchPage() {
       });
       const result = await createNovelFetchIntake({
         books,
-        metadata: { sourceMode: 'novel_fetch', sourceContentVersion: batchFactorySourceVersion, selectedTaskIds: transferIds }
+        metadata: { sourceMode: 'novel_fetch', sourceContentVersion: batchFactorySourceVersion || 'sensitive', selectedTaskIds: transferIds }
       });
       const intake = result?.intake || result;
       if (!intake?.id) throw new Error('批量工厂接收失败：没有返回 intake');
@@ -1567,8 +1567,15 @@ export function LegacyNovelFetchPage() {
       rewrite.method_sequence = String(rewrite.method_sequence_text || '')
         .split(',').map(item => item.trim()).filter(Boolean);
       delete rewrite.method_sequence_text;
-      await saveWorkshopConfig({ ...values, rewrite, platforms: parseCatalog(values.platforms), styles: parseCatalog(values.styles) });
-      setConfigEffective(values);
+      const saved = await saveWorkshopConfig({ ...values, rewrite, platforms: parseCatalog(values.platforms), styles: parseCatalog(values.styles) });
+      const savedSettings = saved?.settings || { ...values, rewrite };
+      const savedRewrite = { ...(savedSettings.rewrite || {}) };
+      savedRewrite.method_sequence_text = Array.isArray(savedRewrite.method_sequence)
+        ? savedRewrite.method_sequence.join(',')
+        : String(savedRewrite.method_sequence || '');
+      const effectiveValues = { ...savedSettings, rewrite: savedRewrite };
+      configForm.setFieldsValue(effectiveValues);
+      setConfigEffective(effectiveValues);
       setConfigDirty(false);
       message.success('配置已保存');
     } catch (error) { message.error(error.message || '保存配置失败'); }

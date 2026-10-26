@@ -38,3 +38,9 @@ test('sensitive AI controls bind to the persisted backend fields', () => {
     assert.match(page, new RegExp(`sensitive_ai.*${field}|${field}.*sensitive_ai`));
   }
 });
+
+test('config save hydrates the form from the server response', () => {
+  assert.match(page, /const saved = await saveWorkshopConfig/);
+  assert.match(page, /saved\?\.settings/);
+  assert.match(page, /configForm\.setFieldsValue\(effectiveValues\)/);
+});
