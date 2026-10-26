@@ -12,6 +12,9 @@ import (
 //go:embed defaults/comic_presets.json
 var comicPresetDefaults []byte
 
+//go:embed defaults/cm_asset_presets.json
+var cmAssetPresetDefaults []byte
+
 //go:embed defaults/comic_styles.json
 var comicStyleDefaults []byte
 
@@ -39,24 +42,52 @@ func EnsureComicPresets(path string) error {
 	if err := json.Unmarshal(comicStyleDefaults, &styles); err != nil {
 		return fmt.Errorf("read built-in comic styles: %w", err)
 	}
+	var cmAssets []map[string]any
+	if err := json.Unmarshal(cmAssetPresetDefaults, &cmAssets); err != nil {
+		return fmt.Errorf("read built-in CM asset presets: %w", err)
+	}
 	defaults = append(defaults, styles...)
-	existing := make(map[string]bool, len(records))
-	for _, record := range records {
-		if id := stringValue(record["id"]); id != "" {
-			existing[id] = true
+	defaults = append(defaults, cmAssets...)
+	existingVersions := make(map[string]bool, len(records))
+	latestVersion := make(map[string]int, len(records))
+	publishedIndex := make(map[string]int, len(records))
+	for index, record := range records {
+		id := stringValue(record["id"])
+		version := intValue(record["version"])
+		if id == "" {
+			continue
+		}
+		existingVersions[presetVersionKey(id, version)] = true
+		if version > latestVersion[id] {
+			latestVersion[id] = version
+		}
+		if stringValue(record["status"]) == "published" {
+			publishedIndex[id] = index
 		}
 	}
 	changed := false
 	for _, record := range defaults {
 		id := stringValue(record["id"])
-		if id == "" || existing[id] {
+		version := intValue(record["version"])
+		if id == "" || version < 1 || existingVersions[presetVersionKey(id, version)] {
 			continue
+		}
+		if latestVersion[id] > 0 {
+			legacyVersion, isCMUpgrade := cmLegacySystemVersions[id]
+			index, hasPublished := publishedIndex[id]
+			if !isCMUpgrade || latestVersion[id] != legacyVersion || !hasPublished || intValue(records[index]["version"]) != legacyVersion || stringValue(records[index]["createdBy"]) != "system" {
+				continue
+			}
+			records[index]["status"] = "archived"
+			changed = true
 		}
 		record["createdAt"] = "2026-10-18T00:00:00Z"
 		record["createdBy"] = "system"
 		record["publishedAt"] = "2026-10-18T00:00:00Z"
 		record["publishedBy"] = "system"
 		records = append(records, record)
+		existingVersions[presetVersionKey(id, version)] = true
+		latestVersion[id] = version
 		changed = true
 	}
 	if !changed {
@@ -75,6 +106,15 @@ func EnsureComicPresets(path string) error {
 		return fmt.Errorf("replace system prompt catalog: %w", err)
 	}
 	return nil
+}
+
+var cmLegacySystemVersions = map[string]int{
+	"batch-comic-assets":         2,
+	"vip-smart-character-derive": 1,
+}
+
+func presetVersionKey(id string, version int) string {
+	return fmt.Sprintf("%s\x00%d", id, version)
 }
 
 // OpenComicStylePreview returns only the display image paired with a built-in
