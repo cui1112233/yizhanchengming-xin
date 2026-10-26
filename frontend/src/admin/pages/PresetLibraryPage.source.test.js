@@ -4,6 +4,14 @@ import test from 'node:test';
 
 const source = readFileSync(new URL('./PresetLibraryPage.jsx', import.meta.url), 'utf8');
 
+test('batch factory provides video and comic generation as second-level choices', () => {
+  assert.match(source, /const batchFactoryGenerationModes = \[/);
+  assert.match(source, /label:\s*'视频生成',\s*value:\s*'video'/);
+  assert.match(source, /label:\s*'漫画生成',\s*value:\s*'comic'/);
+  assert.match(source, /const \[batchFactoryMode, setBatchFactoryMode\] = useState\('video'\)/);
+  assert.match(source, /<Segmented options=\{batchFactoryGenerationModes\} value=\{batchFactoryMode\} onChange=\{setBatchFactoryMode\} \/>/);
+});
+
 test('batch factory groups the complete comic prompt chain under manga generation', () => {
   assert.match(source, /title:\s*'漫画生成'/);
   assert.match(source, /title:\s*'资产推导'/);
@@ -24,4 +32,10 @@ test('batch factory groups the complete comic prompt chain under manga generatio
 test('generic constraints exclude the three comic-only constraint categories', () => {
   assert.match(source, /comicConstraintCategories/);
   assert.match(source, /!comicConstraintCategories\.has\(preset\.protocolLock\?\.category\)/);
+});
+
+test('script preset library separates comic image constraints from shared visual rules', () => {
+  assert.match(source, /key: 'comic-constraints'/);
+  assert.match(source, /title: '漫画图片约束'/);
+  assert.match(source, /只用于漫画图片生成/);
 });

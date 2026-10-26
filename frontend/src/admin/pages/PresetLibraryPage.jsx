@@ -4,10 +4,14 @@ import { createPresetDraft, listAdminPresetSlots, listAdminPresets, publishPrese
 
 const modules = [
   { label: '剧本生成', value: 'script' },
-  { label: '小说面板', value: 'novel-panel' },
   { label: '小说获取', value: 'novel-fetch' },
   { label: '水货生产', value: 'shuihuo-production' },
   { label: '批量工厂', value: 'batch-factory' }
+];
+
+const batchFactoryGenerationModes = [
+  { label: '视频生成', value: 'video' },
+  { label: '漫画生成', value: 'comic' }
 ];
 
 const constraintCategories = [
@@ -24,7 +28,7 @@ const scriptPresetSections = [
     key: 'base-setup',
     title: '基础设定（人物 / 场景）',
     description: '对应剧本生成输入框的「切换指令 → 提取方案」，用于提取人物与场景。',
-    matches: preset => preset.protocolLock?.format === 'extract' || ['script-extract', 'script-extract-novel-panel'].includes(preset.id)
+    matches: preset => preset.protocolLock?.format === 'extract' || preset.id === 'script-extract'
   },
   {
     key: 'card-protocol',
@@ -33,10 +37,17 @@ const scriptPresetSections = [
     matches: preset => preset.id === 'script-card-protocol'
   },
   {
+    key: 'comic-constraints',
+    title: '漫画图片约束',
+    description: '只用于漫画图片生成：线稿、分格、气泡文字、角色一致性与图片负面项。',
+    matches: preset => comicConstraintCategories.has(preset.protocolLock?.category)
+  },
+  {
     key: 'constraints',
     title: '约束设置',
     description: '按分镜写入顺序管理：画面前缀词 → 画质约束 / 画面限制 → 分镜正文 → 负面提示词。',
-    matches: preset => preset.id === 'script-constraint-wrapper' || preset.protocolLock?.format === 'constraint'
+    matches: preset => (preset.id === 'script-constraint-wrapper' || preset.protocolLock?.format === 'constraint')
+      && !comicConstraintCategories.has(preset.protocolLock?.category)
   },
   {
     key: 'formats',
@@ -141,11 +152,10 @@ const batchFactoryPresetSections = [
       || [
         'script-extract',
         'script-extract-assets',
-        'script-extract-novel-panel',
         'script-card-protocol'
       ].includes(preset.id),
     subSections: [
-      { title: '基础设定', ids: ['script-card-protocol', 'script-extract', 'script-extract-assets', 'script-extract-novel-panel'] },
+      { title: '基础设定', ids: ['script-card-protocol', 'script-extract', 'script-extract-assets'] },
       { title: '约束规则', ids: ['script-constraint-wrapper'] },
       { title: '画面前缀词', filter: preset => preset.protocolLock?.format === 'constraint' && preset.protocolLock?.category === 'prefix' },
       { title: '画质约束', filter: preset => preset.protocolLock?.format === 'constraint' && preset.protocolLock?.category === 'quality' },
@@ -159,7 +169,6 @@ const formatPriority = [
   'script-card-protocol',
   'script-extract',
   'script-extract-assets',
-  'script-extract-novel-panel',
   'script-constraint-wrapper',
   'script-constraint-prefix-smart-unified',
   'script-constraint-prefix-live-action',
@@ -216,6 +225,7 @@ function emptyDraft(module) {
 
 export function PresetLibraryPage() {
   const [module, setModule] = useState('script');
+  const [batchFactoryMode, setBatchFactoryMode] = useState('video');
   const [presets, setPresets] = useState([]);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -450,6 +460,13 @@ export function PresetLibraryPage() {
     }).filter(section => section.items.length > 0);
   }, [grouped]);
 
+  const visibleBatchFactorySections = useMemo(() => {
+    const keys = batchFactoryMode === 'comic'
+      ? new Set(['batch-comic', 'batch-constraints'])
+      : new Set(['batch-assets', 'batch-adaptation', 'batch-video', 'batch-constraints']);
+    return batchFactorySections.filter(section => keys.has(section.key));
+  }, [batchFactoryMode, batchFactorySections]);
+
   return (
     <section className="admin-preset-library">
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -472,9 +489,12 @@ export function PresetLibraryPage() {
             }))}
           />
         ) : module === 'batch-factory' ? (
-          <Collapse
-            defaultActiveKey={batchFactorySections.map(section => section.key)}
-            items={batchFactorySections.map(section => {
+          <>
+            <Segmented options={batchFactoryGenerationModes} value={batchFactoryMode} onChange={setBatchFactoryMode} />
+            <Collapse
+            key={batchFactoryMode}
+            defaultActiveKey={visibleBatchFactorySections.map(section => section.key)}
+            items={visibleBatchFactorySections.map(section => {
               let children;
               if (section.subSections) {
                 children = section.subSections.map(sub => {
@@ -500,7 +520,8 @@ export function PresetLibraryPage() {
                 children
               };
             })}
-          />
+            />
+          </>
         ) : (
           <Table
             rowKey={row => row.id}
