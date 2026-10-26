@@ -112,8 +112,8 @@ export function getWorkshopLogs() {
 }
 
 // 任务列表
-export function listWorkshopTasks() {
-  return apiRequest('/api/novel-fetch-workshop/tasks');
+export function listWorkshopTasks(options = {}) {
+  return apiRequest('/api/novel-fetch-workshop/tasks', options);
 }
 
 // 批量删除任务（ids: bookId 数组）

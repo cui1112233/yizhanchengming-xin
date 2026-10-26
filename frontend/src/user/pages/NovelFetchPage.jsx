@@ -732,7 +732,7 @@ export function LegacyNovelFetchPage() {
     if (!silent) setTasksLoading(true);
     try {
       const [taskData, jobData] = await Promise.all([
-        listWorkshopTasks(),
+        listWorkshopTasks(silent ? { silent: true, suppressGlobalError: true } : {}),
         getWorkshopJobs(10, silent ? { silent: true, suppressGlobalError: true } : {})
       ]);
       const nextTasks = taskData.tasks || [];
