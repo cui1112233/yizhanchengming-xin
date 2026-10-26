@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, Collapse, Descriptions, Drawer, Dropdown, Empty, Form, Input, InputNumber, Modal, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
-import { CalendarClock, ChevronDown, ChevronUp, Download, Factory, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react';
+import { CalendarClock, ChevronDown, ChevronUp, Factory, MoreHorizontal, RefreshCw, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   checkWebSubmitEnvironment, getWebSubmitConfig, getWebSubmitHistory, getWebSubmitOrganizations, previewWebSubmit,
@@ -277,15 +277,6 @@ function TaskStatusTag({ row }) {
   const taskStatus = novelFetchTaskStatus(row);
   return <Tag color={taskStatus.color}>{taskStatus.label}</Tag>;
 }
-function downloadText(name, content) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function NovelFetchConfigPanel({ form, effectiveValues, dirty, onDirty, versionPanel, section, onSectionChange }) {
   const watchedValues = Form.useWatch([], form) || {};
   const sectionItems = [
