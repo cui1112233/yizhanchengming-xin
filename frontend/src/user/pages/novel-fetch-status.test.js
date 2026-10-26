@@ -116,6 +116,12 @@ test('submission status stays empty until an AI version is ready to submit', () 
   assert.equal(novelFetchSubmissionLabel({ ai_status: 'ai_done', site_submit_status: 'submitted' }), '已提交');
 });
 
+test('submission status explains version-level blockers from the legacy contract', () => {
+  assert.equal(novelFetchSubmissionLabel({ site_submit_status: 'unknown', site_submit_expected_versions: ['ai1', 'ai2'], site_submit_pending_versions: ['ai2'] }), '待远端核验 · 待提交 AI2');
+  assert.equal(novelFetchSubmissionLabel({ site_submit_status: 'partial', site_submit_partial_versions: ['ai1'], site_submit_failed_versions: ['ai2'] }), '部分接收 · 失败 AI2');
+  assert.equal(novelFetchSubmissionLabel({ site_submit_status: 'waiting_generate', site_submit_waiting_generate_versions: ['ai1'] }), '待生成 AI1');
+});
+
 test('current batch marks AI1 complete only when AI1 content is actually available', () => {
   assert.equal(novelFetchVersionReady({ ai_status: 'waiting_ai_config' }, 'ai1'), false);
   assert.equal(novelFetchVersionReady({ ai_status: 'ai_done' }, 'ai1'), true);
@@ -139,6 +145,12 @@ test('legacy submitted AI task falls back to completed', () => {
 test('processing and input-ready use confirmed Chinese labels', () => {
   assert.equal(novelFetchTaskStatus({ status: 'processing' }).label, '正在执行中…');
   assert.equal(novelFetchTaskStatus({ status: 'input_ready' }).label, '分类信息已就绪');
+});
+
+test('sensitive AI wait is shown separately from active processing', () => {
+  assert.equal(novelFetchTaskStatus({ original_status: 'waiting_sensitive_ai' }).status, 'waiting_sensitive_ai');
+  assert.equal(novelFetchTaskStatus({ original_status: 'waiting_sensitive_ai' }).label, '等待敏感词 AI');
+  assert.equal(novelFetchTaskStatus({ status: 'waiting_retry' }).status, 'waiting_retry');
 });
 
 test('processed and original counts are displayed together', () => {

@@ -2971,6 +2971,10 @@ func legacyNovelFetchTask(document novelfetchworkshop.Document) map[string]any {
 		output string
 		keys   []string
 	}{
+		{"site_submit_done_versions", []string{"siteSubmitDoneVersions", "site_submit_done_versions"}},
+		{"site_submit_failed_versions", []string{"siteSubmitFailedVersions", "site_submit_failed_versions"}},
+		{"site_submit_partial_versions", []string{"siteSubmitPartialVersions", "site_submit_partial_versions"}},
+		{"site_submit_extra_done_versions", []string{"siteSubmitExtraDoneVersions", "site_submit_extra_done_versions"}},
 		{"site_submit_pending_versions", []string{"siteSubmitPendingVersions", "site_submit_pending_versions"}},
 		{"site_submit_waiting_generate_versions", []string{"siteSubmitWaitingGenerateVersions", "site_submit_waiting_generate_versions"}},
 		{"site_submit_ready_versions", []string{"siteSubmitReadyVersions", "site_submit_ready_versions"}},

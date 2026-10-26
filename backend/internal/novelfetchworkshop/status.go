@@ -6,15 +6,16 @@ import (
 )
 
 const (
-	TaskStatusInputReady    = "input_ready"
-	TaskStatusQueued        = "queued"
-	TaskStatusProcessing    = "processing"
-	TaskStatusWaitingRetry  = "waiting_retry"
-	TaskStatusWaitingConfig = "waiting_configuration"
-	TaskStatusWaitingLogin  = "waiting_login"
-	TaskStatusPendingSubmit = "pending_submit"
-	TaskStatusCompleted     = "completed"
-	TaskStatusFailed        = "failed"
+	TaskStatusInputReady         = "input_ready"
+	TaskStatusQueued             = "queued"
+	TaskStatusProcessing         = "processing"
+	TaskStatusWaitingRetry       = "waiting_retry"
+	TaskStatusWaitingSensitiveAI = "waiting_sensitive_ai"
+	TaskStatusWaitingConfig      = "waiting_configuration"
+	TaskStatusWaitingLogin       = "waiting_login"
+	TaskStatusPendingSubmit      = "pending_submit"
+	TaskStatusCompleted          = "completed"
+	TaskStatusFailed             = "failed"
 )
 
 // DeriveTaskStatus is the single task-state rule shared by the Go API and UI.
@@ -39,6 +40,15 @@ func DeriveTaskStatus(document Document) string {
 	}
 	if hasState(status, TaskStatusWaitingRetry) || hasState(original, TaskStatusWaitingRetry) || hasState(ai, TaskStatusWaitingRetry) {
 		return TaskStatusWaitingRetry
+	}
+	if hasState(original, "waiting_fetch_retry") {
+		return TaskStatusWaitingRetry
+	}
+	if hasState(original, TaskStatusWaitingSensitiveAI) || hasState(ai, "waiting_ai_service", "waiting_sensitive_ai") {
+		return TaskStatusWaitingSensitiveAI
+	}
+	if hasState(ai, "waiting_ai_config") {
+		return TaskStatusWaitingConfig
 	}
 	if hasState(status, "running", "processing") || hasState(original, "running", "processing") || hasState(ai, "running", "processing") {
 		return TaskStatusProcessing

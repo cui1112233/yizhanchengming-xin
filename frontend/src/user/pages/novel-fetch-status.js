@@ -3,6 +3,7 @@ const labels = {
   queued: '排队中',
   processing: '正在执行中…',
   waiting_retry: '等待重试',
+  waiting_sensitive_ai: '等待敏感词 AI',
   pending_submit: '处理完成，待提交',
   waiting_configuration: '等待配置',
   waiting_login: '等待登录',
@@ -16,6 +17,7 @@ const colors = {
   queued: 'gold',
   processing: 'processing',
   waiting_retry: 'orange',
+  waiting_sensitive_ai: 'orange',
   pending_submit: 'cyan',
   waiting_configuration: 'orange',
   waiting_login: 'orange',
@@ -33,6 +35,7 @@ export function novelFetchStageLabel(value) {
     done: '已完成', success: '已完成', succeeded: '已完成', completed: '已完成', complete: '已完成',
     ready: '已就绪', ai_done: '已生成', generating: '生成中…', ai_processing: '生成中…',
     queued: '排队中', processing: '正在执行中…', running: '正在执行中…', waiting_retry: '等待重试',
+    waiting_sensitive_ai: '等待敏感词 AI',
     pending_upload: '待提交', pending_submit: '待提交', submitted: '已提交', uploaded: '已上传',
     waiting_configuration: '等待配置', waiting_login: '等待登录',
     failed: '失败', error: '失败', stopped: '已停止'
@@ -57,6 +60,19 @@ export function novelFetchBatchResultSummary(result = {}) {
 
 export function novelFetchSubmissionLabel(row = {}) {
   const submitStatus = text(row.siteSubmitStatus ?? row.site_submit_status);
+  const versions = key => (Array.isArray(row[key]) ? row[key] : []).map(value => String(value || '').trim()).filter(Boolean).join('、');
+  if (submitStatus === 'unknown') {
+    const pending = versions('site_submit_pending_versions') || versions('site_submit_missing_versions');
+    return `待远端核验${pending ? ` · 待提交 ${pending.toUpperCase()}` : ''}`;
+  }
+  if (submitStatus === 'partial') {
+    const failed = versions('site_submit_failed_versions');
+    return `部分接收${failed ? ` · 失败 ${failed.toUpperCase()}` : ''}`;
+  }
+  if (submitStatus === 'waiting_generate' || submitStatus === 'pending_generate') {
+    const waiting = versions('site_submit_waiting_generate_versions');
+    return `待生成${waiting ? ` ${waiting.toUpperCase()}` : ''}`;
+  }
   if (submitStatus) return novelFetchStageLabel(submitStatus);
   const aiStatus = row.aiStatus ?? row.ai_status;
   const aiCount = Number(row.aiGeneratedCount ?? row.ai_generated_count) || 0;
@@ -205,11 +221,14 @@ export function novelFetchTaskStatus(row = {}) {
   else if (/^(done|success|succeeded|complete|completed)$/.test(raw)) status = pendingSubmit ? 'pending_submit' : 'completed';
   else if (/^(queue|queued|pending)$/.test(raw)) status = 'queued';
   else if (/^(waiting_retry|retrying)$/.test(raw)) status = 'waiting_retry';
+  else if (/^(waiting_sensitive_ai|waiting_ai_service)$/.test(raw)) status = 'waiting_sensitive_ai';
   else if (/^waiting_configuration$/.test(raw)) status = 'waiting_configuration';
   else if (/^waiting_login$/.test(raw)) status = 'waiting_login';
 
   if (!labels[status]) {
     if ([original, ai, submit].some(value => /fail|error/.test(text(value)))) status = 'failed';
+    else if ([original, ai].some(value => /waiting_sensitive_ai|waiting_ai_service/.test(text(value)))) status = 'waiting_sensitive_ai';
+    else if ([original, ai].some(value => /waiting_fetch_retry|waiting_retry|retrying/.test(text(value)))) status = 'waiting_retry';
     else if ([original, ai].some(value => /running|processing/.test(text(value)))) status = 'processing';
     else if (submitConfirmed) status = 'completed';
     else if (pendingSubmit) status = 'pending_submit';

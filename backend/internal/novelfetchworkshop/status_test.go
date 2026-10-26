@@ -63,3 +63,10 @@ func TestDeriveTaskStatusKeepsWaitingRetrySeparateFromProcessing(t *testing.T) {
 		t.Fatalf("DeriveTaskStatus() = %q, want %q", got, TaskStatusWaitingRetry)
 	}
 }
+
+func TestDeriveTaskStatusExplainsSensitiveAIWait(t *testing.T) {
+	document := Document{Meta: map[string]any{"originalStatus": "waiting_sensitive_ai"}}
+	if got := DeriveTaskStatus(document); got != TaskStatusWaitingSensitiveAI {
+		t.Fatalf("DeriveTaskStatus() = %q, want %q", got, TaskStatusWaitingSensitiveAI)
+	}
+}
