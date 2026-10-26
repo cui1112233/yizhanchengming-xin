@@ -10,6 +10,7 @@ import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFacto
 import { audioDurationFingerprint as runtimeAudioDurationFingerprint, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { batchFactoryPreviewText } from './batchFactoryContentRange';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
+import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
 
 const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings'];
@@ -397,7 +398,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   const comicPageRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-page'), [catalog.batch]);
   const comicImageDerivationRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-image-derivation'), [catalog.batch]);
   const ai = form.aiPromptConfig || {};
-  const productionMode = form.productionMode === 'comic' ? 'comic' : 'video';
+  const visibility = batchFactoryProductionModeVisibility(form.productionMode);
+  const productionMode = visibility.mode;
   const assetRules = ai.assets || {};
   const starredCharacterNames = Array.isArray(form.starredCharacterNames) ? form.starredCharacterNames : [];
   const characterOptions = [...new Map([
@@ -438,6 +440,38 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   }
   function updateConstraintRules(next) { patchAI('constraints', scoped(withDirectorConstraintSelections(next))); }
   function updateConstraintLayer(category, patch) { updateConstraintRules({ ...constraintRules, [category]: { ...constraintRules[category], ...patch } }); }
+  function selectedComicConstraint(category) {
+    return (ai.comic?.constraints || []).find(item => item.constraintCategory === category)?.presetId || undefined;
+  }
+  function comicConstraintOptions(category) {
+    return catalog.batch.filter(item => item.kind === 'addon' && item.constraintCategory === category).map(optionFor);
+  }
+  function updateComicConstraint(category, presetId) {
+    const comic = ai.comic || {};
+    const rest = (comic.constraints || []).filter(item => item.constraintCategory !== category);
+    if (!presetId) {
+      patchAI('comic', scoped({ ...comic, constraints: rest, enabled: true }));
+      return;
+    }
+    getConstraintPresetTexts([presetId]).then(result => {
+      setForm(current => {
+        const currentAI = current.aiPromptConfig || {};
+        const currentComic = currentAI.comic || {};
+        const currentRest = (currentComic.constraints || []).filter(item => item.constraintCategory !== category);
+        return {
+          ...current,
+          aiPromptConfig: {
+            ...currentAI,
+            comic: scoped({
+              ...currentComic,
+              constraints: [...currentRest, { ...selectedMeta(catalog.batch, presetId), constraintCategory: category, body: String(result?.texts?.[presetId] || '') }],
+              enabled: true
+            })
+          }
+        };
+      });
+    }).catch(() => message.error('系统预设提示词读取失败，请重试'));
+  }
 
   async function loadPersonalConstraintPrompts(category) {
     try {
@@ -561,11 +595,11 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 
   const mediaBody = <div className="batch-factory-media-setting-stack">
     <RuleModule title="视频生成" value={{ enabled: productionMode === 'video' }} onChange={next => { if (next.enabled) setProductionMode('video'); }}>
-      <PromptSelect required label="视频提示词" value={ai.video} options={Object.assign(videoRules.map(optionFor), { catalog: videoRules })} disabled={loading || productionMode !== 'video'} onChange={selection => patchAI('video', scoped({ ...ai.video, ...selection, enabled: true }))} />
+      <PromptSelect required label="视频提示词" value={ai.video} options={Object.assign(videoRules.map(optionFor), { catalog: videoRules })} disabled={loading} onChange={selection => patchAI('video', scoped({ ...ai.video, ...selection, enabled: true }))} />
     </RuleModule>
-    <RuleModule title="漫画生成" value={{ ...ai.comic, enabled: productionMode === 'comic' }} onChange={next => { if (next.enabled) setProductionMode('comic'); }} showWhenDisabled>
-      <PromptSelect required label="漫画提示词" value={ai.comic} options={Object.assign(comicPageRules.map(optionFor), { catalog: comicPageRules })} disabled={loading || productionMode !== 'comic'} onChange={selection => patchAI('comic', scoped({ ...ai.comic, ...selection, enabled: true }))} />
-      <PromptSelect label="图片描述词推导" value={ai.comic?.imageDerivation} options={Object.assign(comicImageDerivationRules.map(optionFor), { catalog: comicImageDerivationRules })} disabled={loading || productionMode !== 'comic'} onChange={selection => patchAI('comic', scoped({ ...ai.comic, imageDerivation: selection, enabled: true }))} />
+    <RuleModule title="漫画生成" value={{ ...ai.comic, enabled: productionMode === 'comic' }} onChange={next => { if (next.enabled) setProductionMode('comic'); }}>
+      <PromptSelect required label="漫画提示词" value={ai.comic} options={Object.assign(comicPageRules.map(optionFor), { catalog: comicPageRules })} disabled={loading} onChange={selection => patchAI('comic', scoped({ ...ai.comic, ...selection, enabled: true }))} />
+      <PromptSelect label="图片描述词推导" value={ai.comic?.imageDerivation} options={Object.assign(comicImageDerivationRules.map(optionFor), { catalog: comicImageDerivationRules })} disabled={loading} onChange={selection => patchAI('comic', scoped({ ...ai.comic, imageDerivation: selection, enabled: true }))} />
     </RuleModule>
   </div>;
   let body = null;
@@ -583,11 +617,10 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
         label: '模型配置',
         children: <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
           <Alert type="info" showIcon message={<span>当前书独立模型配置 <HelpTip title="当前书独立模型配置">这里只保存当前小说与批量默认值不同的参数。</HelpTip></span>} />
-          <ConfigCard title="核心视频引擎" description="视频生成、分镜时长和画幅。"><div className="batch-factory-engine-grid">
+          {visibility.video ? <ConfigCard title="核心视频引擎" description="视频生成、分镜时长和画幅。"><div className="batch-factory-engine-grid">
             <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider || 'personal_api'} inherited={inherited.videoProvider || 'personal_api'} options={videoProviderOptions} loading={false} onChange={videoProvider => patch(reconcileProviderModel({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId || inherited.videoModelId }))} />
             <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={videoModelOptions} loading={effectiveVideoProvider === 'doubao_local_executor' ? false : loading} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), effectiveVideoProvider) } : {}) })} />
             <InheritedStoryboardDurationField value={form.storyboardDurationLimit} inherited={inherited.storyboardDurationLimit} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} />
-            <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' }]} loading={false} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
             <InheritedField label="视频画幅" field="videoAspectRatio" value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} inherited={inherited.videoAspectRatio || (inherited.aspectRatio === '16:9' ? '16:9' : '9:16')} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} loading={false} onChange={videoAspectRatio => patch({ videoAspectRatio })} />
             <InheritedField label="视频分辨率" field="videoResolution" value={form.videoResolution || '720p'} inherited={inherited.videoResolution || '720p'} options={[{ value: '480p', label: '480p' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} loading={false} onChange={videoResolution => patch({ videoResolution })} />
           </div>
@@ -598,9 +631,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
               <InputNumber min={1} max={8} precision={0} disabled={form.openingEnabled !== true} value={form.openingCount ?? inherited.openingCount ?? 4} onChange={count => patch({ openingCount: count ?? 4 })} addonAfter="条（含原始）" />
             </Space>
           </Space>
-          </ConfigCard>
+          </ConfigCard> : null}
 
-          <ConfigCard title="配音与时长" description="完整配音和逐行时长固定参与时间轴；音频来源只决定最终合成使用 TTS 还是视频原声。"><section className="batch-factory-book-audio-content">
+          {visibility.video ? <ConfigCard title="配音与时长" description="完整配音和逐行时长固定参与时间轴；音频来源只决定最终合成使用 TTS 还是视频原声。"><section className="batch-factory-book-audio-content">
             <div className="batch-factory-book-audio-head"><div><b>当前正文配音</b><HelpTip title="当前正文配音">只读取小说正文当前选择范围或已保存的生产正文，不读取整本全文。</HelpTip></div><Space wrap><Button size="small" loading={audioBusy} onClick={measureBookAudio}>生成配音并读取时长</Button>{audioBlob ? <Button size="small" onClick={() => downloadAudio(audioBlob, `${book?.bookId || book?.id || 'book'}-配音.mp3`)}>下载配音</Button> : null}</Space></div>
             <div className="batch-factory-engine-grid">
               <label className="batch-factory-engine-field"><span><b>音频来源</b><HelpTip title="音频来源">默认 TTS；原声保留视频模型自带声音。</HelpTip></span><Segmented block value={normalizeAudioSource(form.audioSource)} options={[{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }]} onChange={audioSource => patch(normalizeAudioSourceSettings({ ...form, audioSource }))} /></label>
@@ -617,12 +650,13 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             </div>
             {audioDurationStale ? <Alert type="warning" showIcon message={<span>配音时长已过期 <HelpTip title="配音时长已过期">当前正文或 TTS 参数已变化，请重新生成配音并读取时长。</HelpTip></span>} /> : null}
             {audioEnabled ? <div className="batch-factory-book-audio-duration"><InheritedNumberField label="配音目标（秒）" value={form.audioDurationSeconds ?? 0} inherited={inherited.audioDurationSeconds ?? 0} min={0} max={86400} onChange={audioDurationSeconds => patch({ audioDurationSeconds })} /></div> : null}
-          </section></ConfigCard>
+          </section></ConfigCard> : null}
 
           <ConfigCard title="辅助生成" description="图片与文本模型用于资产、AI 推理和画面生成。"><div className="batch-factory-engine-grid">
             <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} onChange={imageProvider => patch(reconcileProviderModel({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
             <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : loading} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
             <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={loading} onChange={textModelId => patch({ textModelId })} />
+            <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' }]} loading={false} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
           </div></ConfigCard>
         </div>
       },
@@ -651,25 +685,31 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   } else if (region === 'assets') {
     body = <><Alert type="info" showIcon message="当前书的人物场景预设" description="人物、场景、道具的实际 Prompt 与图片在本书这一行的“添加角色 / 添加场景 / 添加道具”中维护；这里选择这本书调用的提取与推理预设。" />
       <RuleModule title="资产设置" value={assetRules} onChange={next => patchAI('assets', scoped(next))}>
-        <PromptSelect label="选择资产提示词" value={productionMode === 'comic' ? ai.comic?.assets : assetRules.extraction} options={Object.assign((productionMode === 'comic' ? comicAssetRules : scriptExtraction).map(optionFor), { catalog: productionMode === 'comic' ? comicAssetRules : scriptExtraction })} disabled={loading} onChange={selection => productionMode === 'comic' ? patchAI('comic', scoped({ ...ai.comic, assets: selection, enabled: true })) : updateAssetSelection('extraction', selection)} />
+        <PromptSelect label={visibility.comic ? '漫画资产提示词' : '人物场景道具提取提示词'} value={visibility.comic ? ai.comic?.assets : assetRules.extraction} options={Object.assign((visibility.comic ? comicAssetRules : scriptExtraction).map(optionFor), { catalog: visibility.comic ? comicAssetRules : scriptExtraction })} disabled={loading} onChange={selection => visibility.comic ? patchAI('comic', scoped({ ...ai.comic, assets: selection, enabled: true })) : updateAssetSelection('extraction', selection)} />
         <label className="batch-factory-engine-field"><span><b>星标人物聚焦</b><HelpTip title="星标人物聚焦">与公网剧本生成一致：只作为导演分镜的剧情与镜头聚焦变量，不等同于分镜资产灰显。</HelpTip></span><Select mode="multiple" allowClear value={starredCharacterNames} options={characterOptions} placeholder={characterOptions.length ? '选择已提取的人物' : '请先提取人物资产'} onChange={starredCharacterNames => patch({ starredCharacterNames })} /></label>
         <Button onClick={() => { onClose?.(); onOpenBookAssets?.(book); }}>维护当前书人物场景预设</Button>
       </RuleModule>
     </>;
   } else if (region === 'constraints') {
-    body = <><RuleModule title="智能统一" value={constraintRules} onChange={updateConstraintRules}>
+    body = <>{visibility.video ? <RuleModule title="智能统一" value={constraintRules} onChange={updateConstraintRules}>
       <ConstraintLayers value={constraintRules} records={scriptConstraints} personalPrompts={personalPrompts} loading={loading} saving={savingPersonalCategory} editingPromptId={editingPersonalPrompt.category} onChange={updateConstraintRules} onSelectSystem={selectSystemConstraint} onSelectPersonal={selectPersonalConstraint} onSaveDraft={category => savePersonalConstraint(category, null)} onSaveNamed={category => setPersonalPromptNameModal({ open: true, category, name: editingPersonalPrompt.category === category ? editingPersonalPrompt.name : '' })} onEditPersonal={(category, prompt) => { setEditingPersonalPrompt({ category, id: prompt.id, name: prompt.name || '' }); updateConstraintLayer(category, { source: 'draft', presetId: '', personalPromptId: '', body: prompt.body || '' }); }} onDeletePersonal={deletePersonalConstraint} />
-    </RuleModule>{productionMode === 'comic' ? <section className="batch-factory-engine-card"><header><b>漫画图片约束</b><HelpTip title="漫画图片约束">统一配置会自动继承到当前书；在这里改动后只覆盖当前书。</HelpTip></header><div className="batch-factory-engine-card-body"><BatchFactoryComicStylePicker batchId={batch?.id} catalog={catalog.batch} value={ai.comic} inherited={!Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')} onChange={nextComic => patchAI('comic', scoped(nextComic))} /></div></section> : null}</>;
+    </RuleModule> : null}
+    {visibility.comic ? <section className="batch-factory-engine-card"><header><b>漫画图片约束</b><HelpTip title="漫画图片约束">统一配置会自动继承到当前书；在这里改动后只覆盖当前书。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
+      <label className="batch-factory-engine-field"><span><b>画质约束</b></span><Select allowClear value={selectedComicConstraint('comic_quality')} options={comicConstraintOptions('comic_quality')} placeholder="未选择" onChange={presetId => updateComicConstraint('comic_quality', presetId)} /></label>
+      <label className="batch-factory-engine-field"><span><b>画面限制</b></span><Select allowClear value={selectedComicConstraint('comic_restriction')} options={comicConstraintOptions('comic_restriction')} placeholder="未选择" onChange={presetId => updateComicConstraint('comic_restriction', presetId)} /></label>
+      <label className="batch-factory-engine-field"><span><b>负面提示词</b></span><Select allowClear value={selectedComicConstraint('comic_negative')} options={comicConstraintOptions('comic_negative')} placeholder="未选择" onChange={presetId => updateComicConstraint('comic_negative', presetId)} /></label>
+    </div></section> : null}
+    {visibility.comic ? <BatchFactoryComicStylePicker batchId={batch?.id} catalog={catalog.batch} value={ai.comic} inherited={!Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')} onChange={nextComic => patchAI('comic', scoped(nextComic))} /> : null}</>;
   } else if (region === 'media') {
     body = mediaBody;
   } else if (region === 'video') {
-    body = <RuleModule required title="视频提示词" value={ai.video} onChange={next => patchAI('video', scoped({ ...next, enabled: true }))}>
+    body = visibility.video ? <RuleModule required title="视频提示词" value={ai.video} onChange={next => patchAI('video', scoped({ ...next, enabled: true }))}>
       <PromptSelect required label="视频提示词" value={ai.video} options={Object.assign(videoRules.map(optionFor), { catalog: videoRules })} disabled={loading} onChange={selection => patchAI('video', scoped({ ...ai.video, ...selection, enabled: true }))} />
-    </RuleModule>;
+    </RuleModule> : null;
   } else {
-    body = <RuleModule title="画面设置" value={ai.visual} onChange={next => patchAI('visual', scoped(next))}>
+    body = visibility.video ? <RuleModule title="画面设置" value={ai.visual} onChange={next => patchAI('visual', scoped(next))}>
       <PromptSelect label="画面提示词" value={ai.visual} options={Object.assign(visualRules.map(optionFor), { catalog: visualRules })} disabled={loading} onChange={selection => patchAI('visual', scoped({ ...ai.visual, ...selection }))} />
-    </RuleModule>;
+    </RuleModule> : null;
   }
 
   return <><Modal
