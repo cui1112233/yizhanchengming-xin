@@ -36,8 +36,24 @@ export function getWorkshopJob(jobId) {
 }
 
 // 查询最近后台作业
-export function getWorkshopJobs(limit = 10) {
-  return apiRequest(`/api/novel-fetch-workshop/process/jobs/latest?limit=${encodeURIComponent(limit)}`);
+export function getWorkshopJobs(limit = 10, options = {}) {
+  return apiRequest(`/api/novel-fetch-workshop/process/jobs/latest?limit=${encodeURIComponent(limit)}`, options);
+}
+
+export function workshopRealtimeStatusPath() {
+  return '/api/novel-fetch-workshop/realtime/status';
+}
+
+export function getWorkshopRealtimeStatus() {
+  return apiRequest(workshopRealtimeStatusPath());
+}
+
+export function startWorkshopAutomation() {
+  return apiRequest('/api/novel-fetch-workshop/automation/start', { method: 'POST', body: JSON.stringify({}) });
+}
+
+export function pauseWorkshopAutomation() {
+  return apiRequest('/api/novel-fetch-workshop/automation/pause', { method: 'POST', body: JSON.stringify({}) });
 }
 
 export function previewWorkshopProcess(payload) {
@@ -80,6 +96,13 @@ export function saveWorkshopSchedule(schedule) {
   });
 }
 
+export function updateWorkshopSchedule(id, schedule) {
+  return apiRequest(`/api/novel-fetch-workshop/schedules/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(schedule)
+  });
+}
+
 export function deleteWorkshopSchedule(id) {
   return apiRequest(`/api/novel-fetch-workshop/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
@@ -112,6 +135,22 @@ export function retryWorkshopTasks(ids) {
 // 任务详情（meta + 处理后原文 + 日志）
 export function getWorkshopTask(bookId) {
   return apiRequest(`/api/novel-fetch-workshop/tasks/${encodeURIComponent(bookId)}`);
+}
+
+export function workshopTaskDiagnosticPath(bookId, kind) {
+  return `/api/batch-rewrite/tasks/${encodeURIComponent(bookId)}/${kind}`;
+}
+
+export function getWorkshopTaskSensitiveLog(bookId) {
+  return apiRequest(workshopTaskDiagnosticPath(bookId, 'sensitive-log'));
+}
+
+export function getWorkshopTaskRulesTrace(bookId) {
+  return apiRequest(workshopTaskDiagnosticPath(bookId, 'rules-trace'));
+}
+
+export function getWorkshopTaskSiteSubmitLog(bookId) {
+  return apiRequest(workshopTaskDiagnosticPath(bookId, 'site-submit-log'));
 }
 
 export function saveWorkshopBody(bookId, versionId, content, state = 'ready') {
