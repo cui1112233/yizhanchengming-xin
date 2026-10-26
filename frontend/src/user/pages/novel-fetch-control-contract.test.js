@@ -29,6 +29,15 @@ test('workflow actions refresh state after mutation', () => {
   assert.match(page, /setWebSubmitResults/);
 });
 
+test('row and knowledge actions surface failures and refresh their lists', () => {
+  assert.match(page, /runTaskRowAction/);
+  assert.match(page, /runKnowledgeItemAction/);
+  assert.match(page, /rerunHistoryBatch/);
+  assert.match(page, /retryWebSubmitVersion/);
+  assert.match(page, /loading=\{tasksLoading\}/);
+  assert.match(page, /loading=\{knowledgeLoading\}/);
+});
+
 test('visible action labels do not contain the retired 121 name', () => {
   assert.doesNotMatch(page, />[^<{]*121[^<{]*</);
 });
