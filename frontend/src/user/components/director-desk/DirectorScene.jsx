@@ -3,8 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { createAuthenticatedMediaSession } from '../../pages/agent-canvas-media.js';
-import { normalizeDirectorProject, updateDirectorActorTransform, updateDirectorCamera, updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
-import { actorPlaneProps, applyCameraFrame, aspectRatioValue, cameraForView, cameraFromControls, cameraMarkerVisible, canTransformActor, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
+import { directorObjectTransform, normalizeDirectorProject, updateDirectorActorTransform, updateDirectorCamera, updateDirectorViewCamera } from '../../pages/agent-director-desk.js';
+import { actorPlaneProps, applyCameraFrame, aspectRatioValue, cameraForView, cameraFromControls, cameraMarkerVisible, canTransformActor, canTransformObject, focusDirectorObject, resolveSceneSelection, updateCamera } from './director-scene-state.js';
 
 export { actorPlaneProps, cameraFromControls, updateCamera } from './director-scene-state.js';
 
@@ -79,10 +79,10 @@ function FrameReady({ onReady }) {
   return null;
 }
 
-function Movable({ selected, onFinish, onDragging, position, rotation, scale, children }) {
+function Movable({ selected, mode = 'translate', onFinish, onDragging, position, rotation, scale, children }) {
   const control = useRef(null);
   if (!selected) return <group position={position} rotation={rotation} scale={scale}>{children}</group>;
-  return <TransformControls ref={control} mode="translate" onMouseDown={() => onDragging(true)} onMouseUp={() => {
+  return <TransformControls ref={control} mode={mode} onMouseDown={() => onDragging(true)} onMouseUp={() => {
     onDragging(false);
     const object = control.current?.object;
     if (object) onFinish(object);
@@ -142,7 +142,7 @@ export const DirectorScene = forwardRef(function DirectorScene({ project, images
     <directionalLight position={[4, 8, 5]} intensity={1.8} />
     <SceneBackground scene={current.scene} />
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}><planeGeometry args={[30, 30]} /><meshStandardMaterial color="#17212b" roughness={1} /></mesh>
-    {current.actors.map(actor => <Movable key={actor.id} {...actorPlaneProps(actor)} selected={canTransformActor(selected, actor.id, transformMode, viewMode)} onDragging={setTransformDragging} onFinish={object => onProjectChange(updateDirectorActorTransform(current, actor.id, { position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.toArray() }))}><ImageActorPlane
+    {[...current.actors, ...current.props].map(actor => <Movable key={actor.id} {...actorPlaneProps(actor)} mode={transformMode} selected={canTransformObject(selected, actor.kind, actor.id, transformMode, viewMode)} onDragging={setTransformDragging} onFinish={object => onProjectChange(actor.kind === 'prop' ? directorObjectTransform(current, actor.id, { position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.toArray() }) : updateDirectorActorTransform(current, actor.id, { position: object.position.toArray(), rotation: [object.rotation.x, object.rotation.y, object.rotation.z], scale: object.scale.toArray() }))}><ImageActorPlane
       actor={{ ...actor, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] }}
       asset={(images || []).find(image => image.id === actor.assetId)}
       selected={selected?.kind === 'actor' && selected.id === actor.id}

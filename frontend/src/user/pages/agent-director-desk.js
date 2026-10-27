@@ -51,6 +51,12 @@ function normalizeActor(actor = {}) {
   return { id, assetId, position, rotation, scale: [0, 1, 2].map(index => clamp(scale[index], 0.1, 10, 1)) };
 }
 
+function normalizeDirectorObject(value = {}, kind = 'actor') {
+  const normalized = normalizeActor(value);
+  if (!normalized) return null;
+  return { ...normalized, kind: kind === 'prop' ? 'prop' : 'actor' };
+}
+
 function normalizeCamera(camera = {}) {
   const input = camera && typeof camera === 'object' ? camera : {};
   return {
@@ -82,27 +88,100 @@ export function normalizeDirectorProject(input = {}) {
   const cameras = Array.isArray(source.cameras) ? source.cameras.map(normalizeCameraObject) : [];
   if (!cameras.some(camera => camera.id === 'camera-main')) cameras.unshift({ ...normalizeCameraObject(source.camera), id: 'camera-main' });
   const actors = [];
-  for (const value of Array.isArray(source.actors) ? source.actors : []) {
-    const actor = normalizeActor(value);
+  const props = [];
+  const sourceObjects = Array.isArray(source.objects) ? source.objects : [];
+  const legacyObjects = [
+    ...(Array.isArray(source.actors) ? source.actors.map(value => ({ ...value, kind: 'actor' })) : []),
+    ...(Array.isArray(source.props) ? source.props.map(value => ({ ...value, kind: 'prop' })) : [])
+  ];
+  const seenObjectIDs = new Set();
+  const allObjects = [...sourceObjects, ...legacyObjects];
+  for (const [objectIndex, value] of allObjects.entries()) {
+    const object = normalizeDirectorObject(value, value.kind);
+    const actor = object;
     if (!actor) continue;
-    actors.push({ ...actor, id: availableId(actor.id, [{ id: 'scene' }, ...cameras, ...actors]) });
+    if (seenObjectIDs.has(actor.id) && sourceObjects.length > 0 && objectIndex >= sourceObjects.length) {
+      const existing = [...actors, ...props].find(item => item.id === actor.id);
+      if (existing) {
+        const index = actors.indexOf(existing);
+        if (index >= 0 && actor.kind === 'actor') actors[index] = actor;
+        const propIndex = props.indexOf(existing);
+        if (propIndex >= 0 && actor.kind === 'prop') props[propIndex] = actor;
+      }
+      continue;
+    }
+    const id = availableId(actor.id, [{ id: 'scene' }, ...cameras, ...actors, ...props]);
+    seenObjectIDs.add(id);
+    const next = { ...actor, id };
+    if (actor.kind === 'prop') props.push(next);
+    else actors.push(next);
   }
   const directorCamera = normalizeCamera(source.directorCamera || source.camera);
+  const scenePrompt = text(source.scenePrompt || source.scene?.prompt, 2000);
+  const shotPrompt = text(source.shotPrompt || source.videoPrompt || source.scene?.shotPrompt, 2000);
   return {
     rendererVersion: '3d-v2',
     scene: scene
-      ? { ...scene, prompt: text(source.scenePrompt || source.scene?.prompt, 1000) }
-      : { assetId: '', url: '', name: '', prompt: text(source.scenePrompt || source.scene?.prompt, 1000) },
+      ? { ...scene, prompt: scenePrompt, scenePrompt, shotPrompt }
+      : { assetId: '', url: '', name: '', prompt: scenePrompt, scenePrompt, shotPrompt },
     actors,
+    props,
+    objects: [...actors, ...props],
     cameras,
     activeCameraId: cameras.some(camera => camera.id === source.activeCameraId) ? source.activeCameraId : 'camera-main',
     aspectRatio: DIRECTOR_ASPECT_RATIOS.includes(source.aspectRatio) ? source.aspectRatio : 'adaptive',
     directorCamera,
+    shotSize: text(source.shotSize, 40) || 'medium',
+    focalLength: clamp(source.focalLength, 14, 200, 50),
+    azimuth: clamp(source.azimuth, -180, 180, 0),
+    elevation: clamp(source.elevation, -89, 89, 0),
+    scenePrompt,
+    shotPrompt,
     camera: { ...directorCamera, ...(source.camera && typeof source.camera === 'object' && 'zoom' in source.camera ? {
       zoom: clamp(source.camera.zoom, 0.6, 2, 1), x: clamp(source.camera.x, -30, 30, 0), y: clamp(source.camera.y, -30, 30, 0)
     } : {}) },
     captures: Array.isArray(source.captures) ? source.captures.map(normalizeCapture).filter(Boolean) : []
   };
+}
+
+export function directorObjectTransform(project, selection, patch = {}) {
+  const current = normalizeDirectorProject(project);
+  const id = text(selection?.id || selection, 200);
+  if (!id) return current;
+  const nextObjects = current.objects.map(object => object.id === id
+    ? normalizeDirectorObject({ ...object, ...patch, id: object.id, assetId: object.assetId }, object.kind)
+    : object).filter(Boolean);
+  const actors = nextObjects.filter(object => object.kind === 'actor');
+  const props = nextObjects.filter(object => object.kind === 'prop');
+  return normalizeDirectorProject({ ...current, actors, props, objects: nextObjects });
+}
+
+const SHOT_SIZE_DISTANCE = Object.freeze({ extremeClose: 3.2, close: 4.2, mediumClose: 5.4, medium: 7, full: 9, wide: 12 });
+const SHOT_SIZE_FOV = Object.freeze({ extremeClose: 28, close: 34, mediumClose: 38, medium: 42, full: 48, wide: 58 });
+
+export function directorCameraSemantics(project, patch = {}) {
+  const current = normalizeDirectorProject(project);
+  const shotSize = text(patch.shotSize || current.shotSize, 40) || 'medium';
+  const focalLength = clamp(patch.focalLength ?? current.focalLength, 14, 200, 50);
+  const azimuth = clamp(patch.azimuth ?? current.azimuth, -180, 180, 0);
+  const elevation = clamp(patch.elevation ?? current.elevation, -89, 89, 0);
+  const target = numberList(patch.target || current.directorCamera.target, [0, 0, 0]);
+  const distance = clamp(patch.distance ?? SHOT_SIZE_DISTANCE[shotSize], 1, 100, 7);
+  const horizontal = distance * Math.cos(elevation * Math.PI / 180);
+  const position = [
+    target[0] + horizontal * Math.sin(azimuth * Math.PI / 180),
+    target[1] + distance * Math.sin(elevation * Math.PI / 180),
+    target[2] + horizontal * Math.cos(azimuth * Math.PI / 180)
+  ];
+  const fov = clamp(patch.fov ?? SHOT_SIZE_FOV[shotSize] ?? (50 / focalLength * 42), 20, 90, 42);
+  return normalizeDirectorProject({ ...current, shotSize, focalLength, azimuth, elevation,
+    directorCamera: { ...current.directorCamera, position, target, fov },
+    camera: { ...current.camera, position, target, fov } });
+}
+
+export function directorReferenceAssetIds(project) {
+  const current = normalizeDirectorProject(project);
+  return [...new Set([current.scene?.assetId, ...current.objects.map(object => object.assetId)])].filter(Boolean);
 }
 
 function availableId(base, objects) {
@@ -120,9 +199,19 @@ export function addDirectorActor(project, actor = {}) {
   return normalizeDirectorProject({ ...current, actors: [...current.actors, { ...actor, assetId, id: availableId(actor.id || assetId, [{ id: 'scene' }, ...current.actors, ...current.cameras]) }] });
 }
 
+export function addDirectorProp(project, prop = {}) {
+  const current = normalizeDirectorProject(project);
+  const assetId = text(prop.assetId || prop.id, 200);
+  if (!assetId) return current;
+  const id = availableId(prop.id || assetId, [{ id: 'scene' }, ...current.objects, ...current.cameras]);
+  return normalizeDirectorProject({ ...current, props: [...current.props, { ...prop, kind: 'prop', assetId, id }], objects: [...current.objects, { ...prop, kind: 'prop', assetId, id }] });
+}
+
 export function updateDirectorActor(project, actorID, patch = {}) {
   const current = normalizeDirectorProject(project);
-  return normalizeDirectorProject({ ...current, actors: current.actors.map(actor => actor.id === actorID ? { ...actor, ...patch, id: actor.id, assetId: actor.assetId } : actor) });
+  const actors = current.actors.map(actor => actor.id === actorID ? { ...actor, ...patch, id: actor.id, assetId: actor.assetId } : actor);
+  const props = current.props.slice();
+  return normalizeDirectorProject({ ...current, actors, props, objects: [...actors, ...props] });
 }
 
 export function addDirectorCamera(project, camera = {}) {
@@ -186,13 +275,16 @@ export function removeDirectorObject(project, objectID) {
   const current = normalizeDirectorProject(project);
   if (objectID === 'scene' || objectID === 'camera-main') return current;
   const cameras = current.cameras.length > 1 ? current.cameras.filter(camera => camera.id !== objectID) : current.cameras;
-  return normalizeDirectorProject({ ...current, actors: current.actors.filter(actor => actor.id !== objectID), cameras,
+  const actors = current.actors.filter(actor => actor.id !== objectID);
+  const props = current.props.filter(prop => prop.id !== objectID);
+  return normalizeDirectorProject({ ...current, actors, props, objects: [...actors, ...props], cameras,
     activeCameraId: cameras.some(camera => camera.id === current.activeCameraId) ? current.activeCameraId : cameras[0].id });
 }
 
 export function directorSceneObjects(project) {
   const current = normalizeDirectorProject(project);
   return [{ ...current.scene, id: 'scene', kind: 'scene' }, ...current.actors.map(actor => ({ ...actor, kind: 'actor' })),
+    ...current.props.map(prop => ({ ...prop, kind: 'prop' })),
     ...current.cameras.map(camera => ({ ...camera, kind: 'camera' }))];
 }
 
@@ -266,6 +358,8 @@ export function mergeDirectorDeskConfig(project, edited) {
     };
   });
   return normalizeDirectorProject({ ...current,
+    scenePrompt: next.scenePrompt,
+    shotPrompt: next.shotPrompt || current.shotPrompt,
     scene: { ...(next.sceneAsset ? { assetId: next.sceneAsset.id, url: next.sceneAsset.url, name: next.sceneAsset.name } : {}), prompt: next.scenePrompt },
     actors, camera: { ...current.camera, ...next.camera }
   });

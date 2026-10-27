@@ -24,7 +24,7 @@ import {
   appendReferenceAsset, attachImageAsset, copyCanvasSelection, createNodeAt, pasteCanvasSelection, removeCanvasNodes, removeReferenceAsset,
   readableAssetRequestError, shouldOpenConnectionDrop
 } from '../pages/agent-canvas-context-menu';
-import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences } from '../pages/agent-canvas-connections';
+import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences, syncDirectorVideoLinks } from '../pages/agent-canvas-connections';
 import { cancelAgentGeneration, cancelAgentVideoJob, confirmAgentGeneration, confirmAgentImageGeneration, confirmAgentVideoJob, createAgentAudioGeneration, createAgentImageGeneration, createAgentImageTool, createAgentScriptSplit, createAgentShotBatchNodes, createAgentTextGeneration, createAgentVideoJob, createAgentVideoTool, getAgentGeneration, getAgentGenerationSummary, getAgentVideoJob, listAgentAssets, listAgentGenerations, listAgentScriptShots, listAgentVideoJobs, previewAgentCanvasInputs, removeAgentBatchFactoryNode, retryAgentGeneration, retryAgentVideoJob, syncAgentBatchFactoryBook, uploadAgentAsset } from '../../shared/api/agent';
 import { generateBookAssetImages, rewriteWorkingFront, runBookStage, saveBookOverride, saveVideoOverride, setPrimaryBookAssetImage, submitBookMerge, submitBookTo121, updateBookAsset, updateBookMetadata, updateBookSource } from '../../shared/api/batchFactoryV11';
 import { listAvailableModels } from '../../shared/api/modelCatalog';
@@ -33,6 +33,7 @@ import { audioJobRequestForNode, canSubmitAudioNode } from '../pages/agent-canva
 import { activeGenerationTaskForNode, generationPresentation, generationSummaryText, latestGenerationTaskForNode, mergeGenerationTask, mergeLatestGenerationTasksByNode, shouldAcceptGenerationResponse, shouldPollGeneration } from '../pages/agent-generation-state';
 import { normalizeNodeConfig, patchNodeConfig } from '../pages/agent-node-config';
 import { inheritedModelSelection, shareModelSelection } from '../pages/agent-canvas-model-selection';
+import { agentProjectCapabilities } from '../pages/agent-project-type';
 import { modelInputCapabilityError } from '../pages/agent-model-capabilities';
 import { canSubmitVideoFromConfig, makeVideoJobIdempotencyKey, mergeLatestVideoJobsByNode, shouldAcceptVideoJobResponse, videoNodeViewState, videoReferenceAssetIDs, videoReferenceCapabilityError } from '../pages/agent-canvas-video-jobs';
 import { canvasNodeStatusLabel, canvasNodeTypeLabel, normalizeCanvasNodeType, usesPinnedBatchFactoryComposer } from '../pages/agent-canvas-node-presentation';
@@ -171,7 +172,7 @@ function CanvasNode({
   onSelectImageCandidate, onConfirmImage, onSelectAudioCandidate, onConfirmAudio, onPublishBatchFactory,
   onSourceTextChange, onCommitScriptSource, onRunBatchFactoryStage, onSplitScript, onBatchShots, scriptState, modelsByKind,
   videoJob, videoState, videoBusy, videoActionError, generationState, models, modelLoadError, inputPreview, onPreviewInputs, timingWarning, taskPresentation,
-  selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas, onSaveDirectorDeskScreenshot, onOpenDirectorDesk, canvasZoom = 1
+  selected, isEditorOpen, onOpenEditor, sourcePresentation, onRemoveFromCanvas, onSaveDirectorDeskScreenshot, onOpenDirectorDesk, projectCapabilities, canvasZoom = 1
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
   const [videoToolsRequest, setVideoToolsRequest] = useState(0);
@@ -208,7 +209,7 @@ function CanvasNode({
   useLayoutEffect(() => {
     updateNodeInternals(id);
   }, [id, isEditorOpen, isPinnedBatchFactoryComposer, updateNodeInternals]);
-  const composer = (isEditorOpen || isPinnedBatchFactoryComposer) ? <AgentNodeComposer
+  const composer = (isEditorOpen || isPinnedBatchFactoryComposer) && projectCapabilities?.nodeTypes?.includes(nodeType) ? <AgentNodeComposer
     compact={isPinnedBatchFactoryComposer}
     canvasZoom={canvasZoom}
     node={{ id, data }}
@@ -250,6 +251,7 @@ function CanvasNode({
     onConfirmVideo={onConfirmVideo}
     videoToolsRequest={videoToolsRequest}
     settingsRequest={settingsRequest}
+    projectCapabilities={projectCapabilities}
   /> : null;
   return (
     <article
@@ -334,7 +336,7 @@ function CanvasNodeRenderer(props) {
   const bindings = useContext(CanvasNodeContext);
   if (!bindings) return null;
   const {
-    activeEditorNodeID, canvasZoom, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels,
+    activeEditorNodeID, canvasZoom, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, projectCapabilities,
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
@@ -440,6 +442,7 @@ function CanvasNodeRenderer(props) {
     modelLoadError={modelLoadError}
     sourcePresentation={projectedNodePresentation(props.data)}
     onRemoveFromCanvas={removeBatchFactoryNode}
+    projectCapabilities={projectCapabilities}
     canvasZoom={canvasZoom}
   />;
 }
@@ -525,7 +528,8 @@ function IconTool({ label, disabled = false, active = false, onClick, children }
   );
 }
 
-export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, executions = [], scriptShots = [], onScriptShotsChange, workspaceView: workspaceViewState, onWorkspaceViewChange, conversationOpen, onToggleConversation, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onViewportCommit, onFlushCanvas, onServerCanvasChange, onExecutionChange, onAssetsCreated, requestedBookId = '' }, ref) {
+export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, projectType = 'video', projectCapabilities: providedCapabilities, executions = [], scriptShots = [], onScriptShotsChange, workspaceView: workspaceViewState, onWorkspaceViewChange, conversationOpen, onToggleConversation, onChange, onAppearanceChange, onSelectionChange, onViewportChange, onViewportCommit, onFlushCanvas, onServerCanvasChange, onExecutionChange, onAssetsCreated, requestedBookId = '' }, ref) {
+  const projectCapabilities = providedCapabilities || agentProjectCapabilities(projectType);
   const currentCanvas = canvas || { version: 1, revision: 0, nodes: [], edges: [] };
   const workspaceView = workspaceViewState || { snapToGrid: false, showMinimap: true, showConnections: true };
   const [nodes, setNodes] = useState([]);
@@ -745,7 +749,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   const canvasZoom = Number.isFinite(Number(viewport?.zoom)) ? Number(viewport.zoom) : 1;
   const canvasNodeContextValue = useMemo(() => ({
-    activeEditorNodeID, canvasZoom, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels,
+    activeEditorNodeID, canvasZoom, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, projectCapabilities,
     executions, generationTasksByNode, handleNodeContentDoubleClick, modelLoadError, nodeGenerationByNode, canvasInputPreviewByNode,
     openNodeComposer, scriptShotsByNode, sharedScriptShotsByNode, taskId, videoActionErrors, videoBusyByNode,
     videoJobs, videoJobsLoadError, videoJobsLoadedTaskID,
@@ -753,7 +757,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     submitTextForNode, submitImageForNode, submitImageTool, submitVideoTool, submitVideoForNode, submitAudioForNode,
     selectImageCandidate, confirmImage, selectAudioCandidate, confirmAudio,
     changeScriptSource, commitScriptSource, runBatchFactoryScriptStageForNode, splitScriptForNode, batchShotsForNode, cancelGeneration, retryGeneration, cancelVideo, retryVideo, confirmVideo, publishBatchFactoryMerge, previewInputsForNode, removeBatchFactoryNode
-  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, canvasZoom, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, listMentionAssets, mentionAsset, modelLoadError, nodeGenerationByNode, openDirectorDesk, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
+  }), [activeEditorNodeID, batchShotsForNode, cancelGeneration, cancelVideo, canvasInputPreviewByNode, canvasZoom, changeScriptSource, commitScriptSource, configuredAudioModels, configuredImageModels, configuredTextModels, configuredVideoModels, confirmAudio, confirmImage, confirmVideo, executions, generationTasksByNode, handleNodeContentDoubleClick, handleNodeConfigChange, listMentionAssets, mentionAsset, modelLoadError, nodeGenerationByNode, openDirectorDesk, openImageAssetPicker, openNodeComposer, openReferenceAssetPanel, projectCapabilities, publishBatchFactoryMerge, removeBatchFactoryNode, removeReference, retryGeneration, retryVideo, runBatchFactoryScriptStageForNode, saveDirectorDeskScreenshot, scriptShotsByNode, selectAudioCandidate, selectImageCandidate, sharedScriptShotsByNode, splitScriptForNode, submitAudioForNode, submitImageForNode, submitImageTool, submitTextForNode, submitVideoForNode, submitVideoTool, taskId, videoActionErrors, videoBusyByNode, videoJobs, videoJobsLoadError, videoJobsLoadedTaskID]);
   const availability = useMemo(() => commandAvailability(nodes, selectedIds), [nodes, selectedIds]);
   const groups = useMemo(() => [...new Set(nodes.map(node => node.data?.groupId).filter(Boolean))]
     .map(groupId => ({ groupId, bounds: canvasGroupBounds(nodes, groupId) }))
@@ -1950,6 +1954,10 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   function handleConnectionDropCreate(kind) {
     if (!connectionDropMenu) return;
+    if (!projectCapabilities.nodeTypes.includes(kind)) {
+      setConnectionDropMenu(null);
+      return;
+    }
     const nextNode = createNodeAt({ id: nextCanvasID(kind), kind, position: connectionDropMenu.position, config: inheritedModelSelection(nodesRef.current, kind) });
     const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
     const typedEdge = createTypedCanvasEdge({ source: connectionDropMenu.sourceID, target: nextNode.id }, nextNodes);
@@ -1968,6 +1976,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
   }
 
   function addNode(kind = 'script') {
+    if (!projectCapabilities.nodeTypes.includes(kind)) return;
     const bounds = rootRef.current?.getBoundingClientRect();
     const screenPoint = bounds ? { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 } : { x: 0, y: 0 };
     const position = flowInstance?.screenToFlowPosition(screenPoint) || { x: 0, y: 0 };
@@ -2031,6 +2040,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   function handleContextCreate(kind) {
     if (!contextMenu) return;
+    if (!projectCapabilities.nodeTypes.includes(kind)) return;
     const nextNode = createNodeAt({ id: nextCanvasID(kind), kind, position: contextMenu.position, config: inheritedModelSelection(nodesRef.current, kind) });
     const next = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
     setSelectedIds([nextNode.id]);
@@ -2042,6 +2052,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   async function openAssetPanel(assetKind, replaceNodeId = '') {
     if (!taskId) return;
+    if (assetKind === 'video' && !projectCapabilities.allowVideoGeneration) return;
+    if (assetKind === 'audio' && !projectCapabilities.allowAudio) return;
     setContextMenu(null);
     setAssetPanel({ assetKind, replaceNodeId, position: contextMenu?.position || { x: 0, y: 0 } });
     setAssetLoading(true);
@@ -2059,6 +2071,8 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   function beginLocalUpload(assetKind) {
     if (!taskId || !contextMenu) return;
+    if (assetKind === 'video' && !projectCapabilities.allowVideoGeneration) return;
+    if (assetKind === 'audio' && !projectCapabilities.allowAudio) return;
     const position = contextMenu.position;
     setContextMenu(null);
     setContextMenuSubmenu('');
@@ -2347,6 +2361,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
 
   function addAssetNode(asset, position) {
     if (!asset) return;
+    if (!projectCapabilities.nodeTypes.includes(asset.kind)) return;
     const nextNode = createNodeAt({ id: nextCanvasID(asset.kind), kind: asset.kind, position, asset, config: inheritedModelSelection(nodesRef.current, asset.kind) });
     const nextNodes = nodesRef.current.map(node => ({ ...node, selected: false })).concat(nextNode);
     setSelectedIds([nextNode.id]);
@@ -2422,6 +2437,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     event.preventDefault();
     try {
       const reference = JSON.parse(payload);
+      if (!projectCapabilities.nodeTypes.includes(reference.kind)) return;
       const result = await listAgentAssets(taskId, reference.kind || '');
       const asset = (result.assets || []).find(item => item.id === reference.id);
       if (!asset) throw new Error('素材已不存在');
@@ -2480,7 +2496,13 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
     return createDirectorDeskHostAdapter({
       nodeID: directorDeskNodeID,
       getNode: nodeID => nodesRef.current.find(node => node.id === nodeID),
-      saveProject: async (nodeID, project) => handleNodeConfigChange(nodeID, { directorDesk: project }),
+       saveProject: async (nodeID, project) => {
+         const linked = syncDirectorVideoLinks(nodesRef.current, edgesRef.current, nodeID, project);
+         const next = linked.map(node => node.id === nodeID
+           ? { ...node, data: { ...node.data, config: patchNodeConfig('director', node.data?.config || {}, { directorDesk: project }) } }
+           : node);
+         commit(next, edgesRef.current);
+       },
       flushCanvas: () => {
         if (typeof onFlushCanvasRef.current !== 'function') throw new Error('画布持久化服务不可用');
         return onFlushCanvasRef.current();
@@ -2607,7 +2629,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
       {connectionDropMenu ? <section className="agent-canvas-connection-drop-menu" aria-label="新建后续节点" style={{ left: connectionDropMenu.left, top: connectionDropMenu.top }}>
         <strong>新建后续节点</strong>
         <div>
-          {connectionDropChoices(nodes.find(sourceNode => sourceNode.id === connectionDropMenu.sourceID)).map(choice => (
+          {connectionDropChoices(nodes.find(sourceNode => sourceNode.id === connectionDropMenu.sourceID)).filter(choice => projectCapabilities.nodeTypes.includes(choice.kind)).map(choice => (
             <button type="button" key={choice.kind} onClick={() => handleConnectionDropCreate(choice.kind)}>{choice.label}</button>
           ))}
         </div>
@@ -2654,17 +2676,17 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
               <button type="button" role="menuitem" onClick={() => handleContextCreate('script')}>新建剧本</button>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('text')}>新建文本</button>
               <button type="button" role="menuitem" onClick={() => handleContextCreate('image')}>新建图片</button>
-              <button type="button" role="menuitem" onClick={() => handleContextCreate('video')}>新建视频</button>
-              <button type="button" role="menuitem" onClick={() => handleContextCreate('audio')}>新建音频</button>
-              <button type="button" role="menuitem" onClick={() => handleContextCreate('director')}>新建导演台</button>
+              {projectCapabilities.nodeTypes.includes('video') ? <button type="button" role="menuitem" onClick={() => handleContextCreate('video')}>新建视频</button> : null}
+              {projectCapabilities.nodeTypes.includes('audio') ? <button type="button" role="menuitem" onClick={() => handleContextCreate('audio')}>新建音频</button> : null}
+              {projectCapabilities.nodeTypes.includes('director') ? <button type="button" role="menuitem" onClick={() => handleContextCreate('director')}>新建导演台</button> : null}
             </> : null}
             {contextMenuSubmenu === 'assets' ? <>
               <button type="button" role="menuitem" onClick={() => openAssetPanel('image')}>图片</button>
-              <button type="button" role="menuitem" onClick={() => openAssetPanel('video')}>视频</button>
+              {projectCapabilities.allowVideoGeneration ? <button type="button" role="menuitem" onClick={() => openAssetPanel('video')}>视频</button> : null}
             </> : null}
             {contextMenuSubmenu === 'upload' ? <>
               <button type="button" role="menuitem" onClick={() => beginLocalUpload('image')}>上传图片</button>
-              <button type="button" role="menuitem" onClick={() => beginLocalUpload('video')}>上传视频</button>
+              {projectCapabilities.allowVideoGeneration ? <button type="button" role="menuitem" onClick={() => beginLocalUpload('video')}>上传视频</button> : null}
             </> : null}
           </section> : null}
         </> : contextMenu.target === 'edges' ? <>
@@ -2722,7 +2744,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, exe
         <IconTool label="拖动画布" active={interactionMode === 'pan'} onClick={() => setInteractionMode('pan')}><Hand size={17} /></IconTool>
         <IconTool label="连接节点" active={interactionMode === 'connect'} onClick={() => setInteractionMode('connect')}><GitBranch size={17} /></IconTool>
         <Dropdown trigger={['click']} menu={{ items: [
-          { key: 'script', label: '新建剧本' }, { key: 'text', label: '新建文本' }, { key: 'image', label: '新建图片' }, { key: 'video', label: '新建视频' }, { key: 'audio', label: '新建音频' }, { key: 'director', label: '新建导演台' }
+          { key: 'script', label: '新建剧本' }, { key: 'text', label: '新建文本' }, { key: 'image', label: '新建图片' }, ...(projectCapabilities.nodeTypes.includes('video') ? [{ key: 'video', label: '新建视频' }] : []), ...(projectCapabilities.nodeTypes.includes('audio') ? [{ key: 'audio', label: '新建音频' }] : []), ...(projectCapabilities.nodeTypes.includes('director') ? [{ key: 'director', label: '新建导演台' }] : [])
         ], onClick: ({ key }) => addNode(key) }}>
           <span><IconTool label="添加节点"><Plus size={17} /></IconTool></span>
         </Dropdown>

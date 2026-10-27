@@ -14,6 +14,7 @@ import {
   normalizeDirectorProject,
   updateDirectorActorTransform
 } from './agent-director-desk.js';
+import { directorObjectTransform, directorCameraSemantics, directorReferenceAssetIds } from './agent-director-desk.js';
 
 test('导演台配置保存预演场景、演员位置和镜头参数', () => {
   const config = directorDeskConfig({
@@ -233,4 +234,36 @@ test('演员变换和截图记录会保留稳定素材 ID', () => {
 
   assert.deepEqual(moved.actors[0].position, [2, 0, -1]);
   assert.equal(next.captures[0].assetId, 'capture-1');
+});
+
+test('导演台把旧角色和新道具统一为可变换对象', () => {
+  const project = normalizeDirectorProject({
+    actors: [{ id: 'hero', assetId: 'person-1', x: 50, y: 65 }],
+    props: [{ id: 'table', kind: 'prop', assetId: 'prop-1', position: [1, 0, 2] }]
+  });
+  assert.deepEqual(project.objects.map(item => item.kind), ['actor', 'prop']);
+  assert.equal(project.actors[0].assetId, 'person-1');
+  const moved = directorObjectTransform(project, { id: 'table' }, { position: [3, 0, 4], scale: [2, 2, 2] });
+  assert.deepEqual(moved.props[0].position, [3, 0, 4]);
+  assert.deepEqual(moved.props[0].scale, [2, 2, 2]);
+  assert.deepEqual(moved.actors[0].position, project.actors[0].position);
+});
+
+test('语义机位会保存景别、焦段、方位角和俯仰角', () => {
+  const next = directorCameraSemantics({}, { shotSize: 'close', focalLength: 85, azimuth: 90, elevation: 30 });
+  assert.equal(next.shotSize, 'close');
+  assert.equal(next.focalLength, 85);
+  assert.equal(next.azimuth, 90);
+  assert.equal(next.elevation, 30);
+  assert.ok(Math.abs(next.directorCamera.position[0] - 3.637) < 0.01);
+  assert.ok(next.directorCamera.position[1] > 2);
+});
+
+test('导演台分别保存场景描述和分镜视频提示词并收集去重素材', () => {
+  const project = normalizeDirectorProject({ scene: { assetId: 'scene-1' }, scenePrompt: '街道', shotPrompt: '镜头推进', objects: [
+    { id: 'hero', kind: 'actor', assetId: 'hero-1' }, { id: 'prop', kind: 'prop', assetId: 'scene-1' }
+  ] });
+  assert.equal(project.scenePrompt, '街道');
+  assert.equal(project.shotPrompt, '镜头推进');
+  assert.deepEqual(directorReferenceAssetIds(project), ['scene-1', 'hero-1']);
 });

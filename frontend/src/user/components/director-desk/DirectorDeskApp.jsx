@@ -4,6 +4,8 @@ import {
   DIRECTOR_ASPECT_RATIOS,
   addDirectorActor,
   addDirectorCamera,
+  addDirectorProp,
+  directorCameraSemantics,
   normalizeDirectorProject,
   removeDirectorObject,
   setDirectorActiveCamera,
@@ -39,6 +41,7 @@ export default function DirectorDeskApp({ adapter }) {
   const [viewMode, setViewMode] = useState('director');
   const [transformMode, setTransformMode] = useState('translate');
   const [promptDraft, setPromptDraft] = useState(project.scene.prompt);
+  const [shotPromptDraft, setShotPromptDraft] = useState(project.shotPrompt);
   const [saveStatus, setSaveStatus] = useState('saved');
   const [saveError, setSaveError] = useState('');
   const [operationError, setOperationError] = useState('');
@@ -107,6 +110,11 @@ export default function DirectorDeskApp({ adapter }) {
     const actor = next.actors.at(-1);
     if (actor) setSelectedObject({ kind: 'actor', id: actor.id });
   };
+  const addProp = asset => {
+    const next = applyProject(addDirectorProp(projectRef.current, { assetId: asset.id }));
+    const prop = next.props.at(-1);
+    if (prop) setSelectedObject({ kind: 'prop', id: prop.id });
+  };
   const addCamera = preset => {
     const camera = preset.id === 'current' ? projectRef.current.directorCamera : preset;
     const next = applyProject(addDirectorCamera(projectRef.current, { ...camera, id: '', name: preset.label }));
@@ -134,7 +142,9 @@ export default function DirectorDeskApp({ adapter }) {
   };
   const savePrompt = () => applyProject({
     ...projectRef.current,
-    scene: { ...projectRef.current.scene, prompt: promptDraft }
+    scenePrompt: promptDraft,
+    shotPrompt: shotPromptDraft,
+    scene: { ...projectRef.current.scene, prompt: promptDraft, scenePrompt: promptDraft, shotPrompt: shotPromptDraft }
   });
   const close = async () => {
     try {
@@ -171,9 +181,10 @@ export default function DirectorDeskApp({ adapter }) {
   if (activeTool === 'assets' || activeTool === 'actors') {
     toolPanel = <div className={`agent-director-tool-panel${activeTool === 'actors' ? ' is-actors' : ''}`}><DirectorAssetPanel
       images={images}
-      onSetScene={selectScene}
-      onAddActor={addActor}
-    /></div>;
+       onSetScene={selectScene}
+       onAddActor={addActor}
+       onAddProp={addProp}
+     /></div>;
   } else if (activeTool === 'cameras') {
     toolPanel = <section className="agent-director-choice-panel" aria-label="添加机位"><h2>添加机位</h2>{CAMERA_PRESETS.map(preset => <button
       key={preset.id} type="button" onClick={() => addCamera(preset)}>{preset.label}</button>)}</section>;
@@ -214,14 +225,17 @@ export default function DirectorDeskApp({ adapter }) {
       setViewMode('camera');
     }}
     onChangeScene={() => setActiveTool('assets')}
+    onSemanticCameraChange={patch => applyProject(directorCameraSemantics(projectRef.current, patch))}
   />;
   const bottom = <DirectorBottomDock
     prompt={promptDraft}
+    shotPrompt={shotPromptDraft}
     saveStatus={saveStatus}
     canCapture={sceneReady && !busy}
     transformMode={transformMode}
     onTransformModeChange={setTransformMode}
     onPromptChange={setPromptDraft}
+    onShotPromptChange={setShotPromptDraft}
     onSavePrompt={savePrompt}
     onOpenAssets={() => setActiveTool('assets')}
     onUploadReference={uploadReference}

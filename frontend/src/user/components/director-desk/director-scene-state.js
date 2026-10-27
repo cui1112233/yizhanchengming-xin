@@ -16,7 +16,12 @@ export function resolveSceneSelection(selection, localSelection) {
 }
 
 export function canTransformActor(selection, actorId, transformMode, viewMode) {
-  return (viewMode === 'director' || viewMode === 'camera') && transformMode === 'translate' && selection?.kind === 'actor' && selection.id === actorId;
+  return canTransformObject(selection, 'actor', actorId, transformMode, viewMode);
+}
+
+export function canTransformObject(selection, kind, objectId, transformMode, viewMode) {
+  return (viewMode === 'director' || viewMode === 'camera') && ['translate', 'rotate', 'scale'].includes(transformMode)
+    && selection?.kind === kind && selection.id === objectId;
 }
 
 export function aspectRatioValue(value) {
