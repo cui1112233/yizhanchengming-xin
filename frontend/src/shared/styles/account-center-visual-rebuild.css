@@ -610,7 +610,17 @@
 .api-config-page .ac-platform-preset-info small,
 .api-config-page .ac-platform-preset-credential small,
 .api-config-page .ac-platform-preset-state small { color: #a7b5c6; font-size: 11px; line-height: 1.5; }
-.api-config-page .ac-platform-preset-credential { min-width: 0; }
+.api-config-page .ac-platform-preset-credential { position: relative; min-width: 0; }
+.api-config-page .ac-platform-preset-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: not-allowed;
+}
 .api-config-page .ac-platform-preset-state { display: grid; justify-items: end; gap: 5px; }
 .api-config-page .ac-model-quota { display: grid; gap: 3px; margin-top: 7px; min-width: 0; color: #9fb0c3; font-size: 10px; line-height: 1.35; }
 .api-config-page .ac-model-quota-head { display: flex; gap: 6px; justify-content: space-between; min-width: 0; }

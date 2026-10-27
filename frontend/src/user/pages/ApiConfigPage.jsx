@@ -2,11 +2,12 @@ import { Button, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Switc
 import { KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, Video, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canManageModelCatalog, getConfig } from '../../shared/api/config';
-import { createManagedModel, deleteManagedModel, getManagedModelQuotas, listManagedModels, refreshLocalDoubaoPairingStatus, testManagedAudioModel, testManagedTextModel, updateManagedModel } from '../../shared/api/modelCatalog';
+import { createManagedModel, deleteManagedModel, getManagedModelQuotas, listManagedModels, testManagedAudioModel, testManagedTextModel, updateManagedModel } from '../../shared/api/modelCatalog';
 import { createCustomModelId } from '../../shared/modelCatalog/customModelId';
 import { isTextModelVerified, textModelVerificationKey } from '../../shared/modelCatalog/textModelVerification';
 import { getMemberCenter } from '../../shared/api/member';
 import { PageHeader, Panel, RoleBadge } from './accountCenterShared';
+import { getPresetCardState } from './api-config-preset-state';
 
 const MODEL_KINDS = [
   { key: 'text', title: '文本模型', eyebrow: 'TEXT MODELS' },
@@ -29,8 +30,7 @@ const PLATFORM_PRESETS = [
   { id: 'yd2-mini-video', displayName: 'YD2.0 Mini（图生）', description: '平台已维护视频适配器；只需填写 API Key。', credentialMode: 'apiKey' },
   { id: 'minimax-h3-video', displayName: 'MiniMax H3 多图生视频', description: '支持切换 AutoDL 工作流；填写 API Key 和工作流 ID。', credentialMode: 'apiKey' },
   { id: 'seedance-2-0-official', displayName: 'Seedance 2.0 官方', description: 'YFAI 官方直连；支持文生视频和参考图；只需填写 API Key。', credentialMode: 'apiKey' },
-  { id: 'fanke-video-api', displayName: '梵客视频 API', description: '支持多个视频模型；填写 API Key 并选择一个模型。', credentialMode: 'apiKey' },
-  { id: 'local-doubao-executor-video', displayName: '本地豆包执行器', description: '无需 API Key，完成本地执行器配对后才能启用。', credentialMode: 'executorPairing' }
+  { id: 'fanke-video-api', displayName: '梵客视频 API', description: '支持多个视频模型；填写 API Key 并选择一个模型。', credentialMode: 'apiKey' }
 ];
 
 function customModels(models, kind) {
@@ -78,7 +78,8 @@ export default function ApiConfigPage() {
   const [presetKeys, setPresetKeys] = useState({});
   const [presetWorkflowIds, setPresetWorkflowIds] = useState({});
   const [presetModelIds, setPresetModelIds] = useState({});
-  const [doubaoPaired, setDoubaoPaired] = useState(false);
+  const [presetBaseURLs, setPresetBaseURLs] = useState({});
+  const [presetSavingId, setPresetSavingId] = useState('');
   const [quotas, setQuotas] = useState([]);
   const [quotaLoading, setQuotaLoading] = useState(false);
   const canManageApi = canManageModelCatalog(config);
@@ -94,13 +95,7 @@ export default function ApiConfigPage() {
 
   const refreshModels = useCallback(async () => {
     if (!canManageApi) return;
-    const [nextModels, pairing, nextQuotas] = await Promise.all([listManagedModels(), refreshLocalDoubaoPairingStatus(), getManagedModelQuotas().catch(() => [])]);
-    const paired = pairing.executorPaired === true;
-    const doubao = nextModels.find(model => model.id === 'local-doubao-executor-video');
-    if (doubao) {
-      doubao.executorPaired = paired;
-    }
-    setDoubaoPaired(paired);
+    const [nextModels, nextQuotas] = await Promise.all([listManagedModels(), getManagedModelQuotas().catch(() => [])]);
     setModels(nextModels);
     const h3 = nextModels.find(model => model.id === 'minimax-h3-video');
     if (h3) setPresetWorkflowIds(current => ({ ...current, 'minimax-h3-video': h3.workflowId || DEFAULT_H3_WORKFLOW_ID }));
@@ -116,13 +111,7 @@ export default function ApiConfigPage() {
       setConfig(nextConfig);
       setCenter(nextCenter);
       if (canManageModelCatalog(nextConfig)) {
-        const [nextModels, pairing, nextQuotas] = await Promise.all([listManagedModels(), refreshLocalDoubaoPairingStatus(), getManagedModelQuotas().catch(() => [])]);
-        const paired = pairing.executorPaired === true;
-        const doubao = nextModels.find(model => model.id === 'local-doubao-executor-video');
-        if (doubao) {
-          doubao.executorPaired = paired;
-        }
-        setDoubaoPaired(paired);
+        const [nextModels, nextQuotas] = await Promise.all([listManagedModels(), getManagedModelQuotas().catch(() => [])]);
         setModels(nextModels);
         const h3 = nextModels.find(model => model.id === 'minimax-h3-video');
         if (h3) setPresetWorkflowIds(current => ({ ...current, 'minimax-h3-video': h3.workflowId || DEFAULT_H3_WORKFLOW_ID }));
@@ -237,36 +226,49 @@ export default function ApiConfigPage() {
     catch (error) { message.error(error.message || '模型状态更新失败'); }
   }
 
-  function isPresetConfigured(preset, model) {
-    if (preset.credentialMode === 'executorPairing') return doubaoPaired;
-    if (model?.hasCredential !== true) return false;
-    if (preset.id === 'minimax-h3-video') return Boolean(String(model.workflowId || '').trim());
-    return true;
-  }
-
-  async function savePreset(preset, enabled) {
+  async function confirmPreset(preset) {
     const existing = modelById.get(preset.id);
     const key = String(presetKeys[preset.id] || '').trim();
     const workflowId = String(presetWorkflowIds[preset.id] || '').trim();
-    if (preset.id === 'minimax-h3-video' && !key) return message.warning('保存 H3 配置必须填写 API Key；工作流 ID 会和 Key 一起保存');
-    if (preset.credentialMode === 'apiKey' && enabled && !isPresetConfigured(preset, existing)) return message.warning('请先填写配置并点击“保存配置”，再启用该模型');
-    if (preset.credentialMode === 'executorPairing' && enabled) {
-      const pairing = await refreshLocalDoubaoPairingStatus();
-      const paired = pairing.executorPaired === true;
-      setDoubaoPaired(paired);
-      if (!paired) return message.warning('请先完成本地豆包执行器配对');
-    }
-    const payload = { id: preset.id, kind: 'video', displayName: preset.displayName, enabled };
+    if (preset.id === 'minimax-h3-video' && !key && existing?.hasCredential !== true) return message.warning('请输入 API Key');
+    if (preset.credentialMode === 'apiKey' && !key && existing?.hasCredential !== true) return message.warning('请输入 API Key');
+    const payload = { id: preset.id, kind: preset.kind || 'video', displayName: preset.displayName, enabled: true };
     if (key) payload.credential = key;
+    if (preset.provider) {
+      payload.provider = preset.provider;
+      payload.baseUrl = String(presetBaseURLs[preset.id] || existing?.baseUrl || 'http://127.0.0.1:8787').trim();
+      payload.modelId = preset.modelId;
+    }
     if (preset.id === 'minimax-h3-video') payload.workflowId = workflowId || DEFAULT_H3_WORKFLOW_ID;
     if (preset.id === 'fanke-video-api') payload.modelId = presetModelIds[preset.id] || FANKE_VIDEO_MODELS[0].value;
+    setPresetSavingId(preset.id);
     try {
       if (existing) await updateManagedModel(preset.id, payload);
       else await createManagedModel(payload);
       setPresetKeys(current => ({ ...current, [preset.id]: '' }));
-      message.success(enabled ? `${preset.displayName} 已启用` : `${preset.displayName} 已保存为停用`);
       await refreshModels();
-    } catch (error) { message.error(error.message || '预设模型保存失败'); }
+      message.success('配置已保存');
+    } catch (error) {
+      message.error(error.message || '预设模型保存失败');
+    } finally {
+      setPresetSavingId('');
+    }
+  }
+
+  async function togglePreset(preset, enabled) {
+    if (enabled) return confirmPreset(preset);
+    const existing = modelById.get(preset.id);
+    if (!existing) return;
+    setPresetSavingId(preset.id);
+    try {
+      await updateManagedModel(preset.id, { enabled: false });
+      await refreshModels();
+      message.success('已关闭，可修改配置');
+    } catch (error) {
+      message.error(error.message || '模型状态更新失败');
+    } finally {
+      setPresetSavingId('');
+    }
   }
 
   if (loading) return <div className="account-center-page"><Skeleton active paragraph={{ rows: 9 }} /></div>;
@@ -282,10 +284,26 @@ export default function ApiConfigPage() {
         <p className="ac-muted-copy">只有完成所需配置并启用后，才会出现在业务的视频模型下拉框。额度状态由服务商接口返回；不支持查询的服务商会显示“额度未知”。</p>
         {PLATFORM_PRESETS.map(preset => {
           const model = modelById.get(preset.id);
+          const cardState = getPresetCardState(preset, model, presetSavingId === preset.id);
           return <div className="ac-platform-preset-grid" key={preset.id}>
             <div className="ac-platform-preset-info"><span className="ac-security-card-icon violet"><Video size={20} /></span><div><strong>{preset.displayName}</strong><small>{preset.description}</small></div></div>
-            <div className="ac-platform-preset-credential">{preset.credentialMode === 'executorPairing' ? <small>{doubaoPaired ? '执行器已配对' : '尚未完成执行器配对'}</small> : <Space direction="vertical" style={{ width: '100%' }} size={6}><Input.Password value={presetKeys[preset.id] || ''} onChange={event => setPresetKeys(current => ({ ...current, [preset.id]: event.target.value }))} prefix={<KeyRound size={15} />} placeholder={model?.hasCredential ? '留空表示不修改已保存的 Key' : '填写 API Key'} />{preset.id === 'minimax-h3-video' ? <Input value={presetWorkflowIds[preset.id] || DEFAULT_H3_WORKFLOW_ID} onChange={event => setPresetWorkflowIds(current => ({ ...current, [preset.id]: event.target.value }))} addonBefore="AutoDL 工作流 ID" placeholder={DEFAULT_H3_WORKFLOW_ID} /> : null}{preset.id === 'fanke-video-api' ? <Select value={presetModelIds[preset.id] || model?.modelId || FANKE_VIDEO_MODELS[0].value} onChange={value => setPresetModelIds(current => ({ ...current, [preset.id]: value }))} options={FANKE_VIDEO_MODELS} placeholder="选择视频模型" /> : null}</Space>}<ModelQuotaStatus quota={quotaById.get(preset.id)} /></div>
-            <div className="ac-platform-preset-state"><Space direction="vertical" size={4}><Switch checked={model?.enabled === true} disabled={!model?.enabled && !isPresetConfigured(preset, model)} onChange={enabled => savePreset(preset, enabled)} /><small>{model?.enabled ? '已启用' : '未启用'}</small>{preset.credentialMode === 'apiKey' ? <Button size="small" onClick={() => preset.id === 'minimax-h3-video' ? savePreset(preset, true) : savePreset(preset, false)}>{preset.id === 'minimax-h3-video' ? '保存配置并启用' : '保存配置'}</Button> : null}</Space></div>
+            <div className="ac-platform-preset-credential">
+              <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                {preset.provider ? <Input disabled={!cardState.editable} value={presetBaseURLs[preset.id] ?? model?.baseUrl ?? 'http://127.0.0.1:8787'} onChange={event => setPresetBaseURLs(current => ({ ...current, [preset.id]: event.target.value }))} addonBefore="Relay 地址" placeholder="http://127.0.0.1:8787" /> : null}
+                <Input.Password disabled={!cardState.editable} value={presetKeys[preset.id] || ''} onChange={event => setPresetKeys(current => ({ ...current, [preset.id]: event.target.value }))} prefix={<KeyRound size={15} />} placeholder={model?.hasCredential ? '留空表示不修改已保存的 Key' : '填写 API Key'} />
+                {preset.id === 'minimax-h3-video' ? <Input disabled={!cardState.editable} value={presetWorkflowIds[preset.id] || DEFAULT_H3_WORKFLOW_ID} onChange={event => setPresetWorkflowIds(current => ({ ...current, [preset.id]: event.target.value }))} addonBefore="AutoDL 工作流 ID" placeholder={DEFAULT_H3_WORKFLOW_ID} /> : null}
+                {preset.id === 'fanke-video-api' ? <Select disabled={!cardState.editable} value={presetModelIds[preset.id] || model?.modelId || FANKE_VIDEO_MODELS[0].value} onChange={value => setPresetModelIds(current => ({ ...current, [preset.id]: value }))} options={FANKE_VIDEO_MODELS} placeholder="选择视频模型" /> : null}
+              </Space>
+              <ModelQuotaStatus quota={quotaById.get(preset.id)} />
+              {cardState.active ? <button type="button" className="ac-platform-preset-lock" aria-label={`修改 ${preset.displayName} 配置`} title="请先关闭开关，再修改配置" onClick={() => message.info('请先关闭开关，再修改配置')} /> : null}
+            </div>
+            <div className="ac-platform-preset-state">
+              <Space direction="vertical" size={4}>
+                <Switch checked={cardState.active} disabled={presetSavingId === preset.id} onChange={enabled => togglePreset(preset, enabled)} />
+                <small>{presetSavingId === preset.id ? '保存中' : cardState.active ? '已启用' : cardState.configured ? '已关闭' : '未配置'}</small>
+                {preset.credentialMode === 'apiKey' ? <Button size="small" loading={presetSavingId === preset.id} disabled={cardState.buttonDisabled} onClick={() => confirmPreset(preset)}>{cardState.buttonText}</Button> : null}
+              </Space>
+            </div>
           </div>;
         })}
       </Panel>
