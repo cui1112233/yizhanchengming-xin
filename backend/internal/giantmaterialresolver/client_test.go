@@ -60,6 +60,26 @@ func TestResolveNormalizesChangduBookWith121PlatformID(t *testing.T) {
 	}
 }
 
+func TestResolveNormalizesYangguangBookToDianzhongPlatformID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"code":"SUCCESS","data":{"list":[{"id":"10122319","video_url":"https://material.hnqingyuwen.top/a.mp4","works":[{"cp_work_id":"2053423598178718886","cp_type":"YG","name":"测试作品"}]}]}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(&http.Client{Transport: rewriteTransport{target: server.URL}}, "https://n8.hnqingyuwen.top/select", "server-token")
+	material, err := client.Resolve(context.Background(), "7656746438941999123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(material.Books) != 1 {
+		t.Fatalf("books=%+v", material.Books)
+	}
+	book := material.Books[0]
+	if book.PlatformCode != "YG" || book.PlatformName != "点众付费" || book.PlatformID != "4" {
+		t.Fatalf("book=%+v", book)
+	}
+}
+
 func TestResolveNormalizesZhihuBookWith121PlatformID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"code":"SUCCESS","data":{"list":[{"id":"10122318","video_url":"https://material.hnqingyuwen.top/a.mp4","works":[{"cp_work_id":"2053423598178718885","cp_type":"ZH","name":"为了抢风头，她重生毒死了全班"}]}]}}`))
