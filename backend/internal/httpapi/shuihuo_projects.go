@@ -3551,6 +3551,8 @@ var shuihuoImagePromptViolenceRules = []struct {
 	from string
 	to   string
 }{
+	{"伸手抢夺失控", "情绪激动"},
+	{"餐叉尖端狠狠擦过夏夏脸颊", "餐具被放回桌面，夏夏侧身避开"},
 	{"抢刀叉", "伸手去拿餐具"},
 	{"刀叉", "餐具"},
 	{"餐叉", "餐具"},
@@ -3594,7 +3596,7 @@ var shuihuoImagePromptViolenceRules = []struct {
 	{"夺扯", "递出"},
 }
 
-const shuihuoImagePromptViolenceNote = "【内容合规约束】在严格遵守上述画风锁定和分格结构的前提下，画面不出现武器、刀具、伤口、血液、昏迷、殴打、掐颈等暴力细节；一切冲突和伤害改用表情、姿态、后退躲避、被扶住以及对话气泡来表达，剧情与台词保持完整可读，不得因此改变画风、版式或人物设定。"
+const shuihuoImagePromptViolenceNote = "【内容合规约束】请以人物表情、自然姿态、适当距离变化和对话气泡呈现情绪转折；保持原有画风、分格布局、台词含义、场景元素与人物身份连续。"
 
 // sanitizeShuihuoImagePromptViolence 是针对暴力审核的整页合规改写。它只在
 // 提示词确实命中暴力词时生效，返回空串以外的结果会作为第三次生成尝试。

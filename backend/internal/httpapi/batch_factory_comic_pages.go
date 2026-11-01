@@ -32,6 +32,9 @@ type comicPageGenerator struct {
 	catalogStore   novelfetchworkshop.Store
 	presetCatalog  *prompt.Catalog
 	generationGate *comicPageGenerationGate
+	// rewritePrompt 接统一文本模型，用于内容审核拒绝后重写该页提示词。
+	// 未配置时为 nil，退回本地暴力合规改写。
+	rewritePrompt func(context.Context, string, novelfetchworkshop.RewriteRequest) (string, error)
 }
 
 const comicPageGenerationLimit = 35
@@ -314,6 +317,47 @@ func comicReferenceImageResponses(settings batchfactoryv11.SettingsPatch, book b
 	return result
 }
 
+// shuihuoRepairedPagePrompts 缓存审核被拒后由文本模型重写过的提示词。
+// 进程内缓存即可：后续整本自动重试直接复用修复版，不再拿原提示词撞审核。
+var shuihuoRepairedPagePrompts sync.Map
+
+func comicPageRepairKey(batchID, bookID, videoID string) string {
+	return batchID + "|" + bookID + "|" + videoID
+}
+
+const comicPromptRepairSystemPrompt = "你是漫画图片提示词的合规改写器。上游图片模型审核严格，包含武器、刀具、伤害动作、血液、伤口、昏迷、殴打等描写的提示词会被拒绝。你负责在保留画风、分格、人物和台词的前提下，把提示词改写为可以稳定通过审核的版本。"
+
+// repairComicPageImagePrompt 是“审核拒绝后的额外修复步骤”。它先用统一文本
+// 模型重写整页提示词，再用本地暴力合规规则兜底，保证返回的提示词不再包含
+// 触发审核的暴力描写。文本模型不可用时直接返回本地改写结果。
+func (g comicPageGenerator) repairComicPageImagePrompt(ctx context.Context, owner, imagePrompt, rejection string) string {
+	fallback := sanitizeShuihuoImagePromptViolence(imagePrompt)
+	if g.rewritePrompt == nil {
+		return fallback
+	}
+	request := novelfetchworkshop.RewriteRequest{
+		SystemPrompt: comicPromptRepairSystemPrompt,
+		UserPrompt:   fmt.Sprintf("请重写下面的漫画图片提示词。硬性要求：\n1. 保留画风描述、分格数量与阅读顺序、人物身份和台词原文；\n2. 删除武器、刀具、利刃、伤害动作、血液、伤口、昏迷、殴打、掐颈等描写；\n3. 冲突和伤害改用表情、姿态、后退躲避、被扶住、物品掉落等安全表达；\n4. 不新增人物，不改变剧情结论；\n5. 只输出改写后的完整提示词正文，不要解释，不要加代码块。\n\n上游拒绝原因：%s\n\n【原提示词】\n%s", strings.TrimSpace(rejection), imagePrompt),
+		Temperature:  0.3,
+		MaxTokens:    2600,
+	}
+	repaired, err := g.rewritePrompt(ctx, owner, request)
+	if err != nil {
+		log.Printf("comic prompt repair failed owner=%s err=%v", owner, err)
+		return fallback
+	}
+	repaired = strings.TrimSpace(repaired)
+	repaired = strings.TrimPrefix(repaired, "```text")
+	repaired = strings.TrimPrefix(repaired, "```")
+	repaired = strings.TrimSuffix(repaired, "```")
+	repaired = strings.TrimSpace(repaired)
+	if len([]rune(repaired)) < 120 {
+		return fallback
+	}
+	// 文本模型偶尔仍会保留暴力词，再过一遍本地规则再提交。
+	return sanitizeShuihuoImagePromptViolence(repaired)
+}
+
 func comicPagePromptContent(comicPrompt, imagePrompt string) string {
 	comicPrompt = strings.TrimSpace(comicPrompt)
 	imagePrompt = strings.TrimSpace(imagePrompt)
@@ -462,7 +506,31 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	defer cancelGeneration()
 	// 单页重试不能绕过统一配置的出图并发上限。
 	generationCtx = withShuihuoImageConcurrency(generationCtx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
-	mediaType, storageRef, source, err := generateShuihuoImageArtifact(generationCtx, g.store, g.files, g.presetCatalog, owner, target, createdPage.ImagePrompt, contract.ReferenceImageURLs, g.localExecutors)
+	generationPrompt := createdPage.ImagePrompt
+	repairKey := comicPageRepairKey(batchID, bookID, videoID)
+	if cached, ok := shuihuoRepairedPagePrompts.Load(repairKey); ok {
+		if repaired, textOK := cached.(string); textOK && strings.TrimSpace(repaired) != "" {
+			generationPrompt = repaired
+			log.Printf("comic page reuse repaired prompt batch=%s book=%s video=%s", batchID, bookID, videoID)
+		}
+	}
+	mediaType, storageRef, source, err := generateShuihuoImageArtifact(generationCtx, g.store, g.files, g.presetCatalog, owner, target, generationPrompt, contract.ReferenceImageURLs, g.localExecutors)
+	if errors.Is(err, errShuihuoImageContentPolicy) {
+		// 两次降级仍被审核拒绝后，不要拿原提示词反复重试，而是先用文本模型
+		// 把整页提示词改写成合规版本，再生成一次。修复结果会缓存，后续整本
+		// 自动重试直接复用，避免“无限重试但每次都被拒”的无效循环。
+		if progress := comicGenerationProgressFromContext(ctx); progress != nil {
+			progress("comic_images", fmt.Sprintf("%s 被内容审核拒绝，正在自动改写该页提示词为合规版本", selectedPage.Label))
+		}
+		repaired := g.repairComicPageImagePrompt(generationCtx, owner, generationPrompt, err.Error())
+		if repaired != "" && repaired != generationPrompt {
+			shuihuoRepairedPagePrompts.Store(repairKey, repaired)
+			if progress := comicGenerationProgressFromContext(ctx); progress != nil {
+				progress("comic_images", fmt.Sprintf("%s 提示词已改写为合规版本，正在重新生成", selectedPage.Label))
+			}
+			mediaType, storageRef, source, err = generateShuihuoImageArtifact(generationCtx, g.store, g.files, g.presetCatalog, owner, target, repaired, contract.ReferenceImageURLs, g.localExecutors)
+		}
+	}
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}

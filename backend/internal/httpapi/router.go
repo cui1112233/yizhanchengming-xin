@@ -94,9 +94,14 @@ type RouterOptions struct {
 	LocalExecutorDownloadsDir       string
 	MergeOutput                     mergeworker.ObjectStore
 	VideoManagementConnector        videomanagementconnector.Service
+	N8ComicPublisher                *BatchFactoryN8ComicPublisher
 }
 
 func NewRouter(options RouterOptions) http.Handler {
+	if options.Director != nil && options.Director.PresetCatalog == nil {
+		options.Director.PresetCatalog = options.PresetCatalog
+	}
+	comicGenerationGate := newComicPageGenerationGate()
 	if options.Production == nil && options.Store != nil {
 		// Read-only status is safe before the production slice is enabled. Keep
 		// the service disabled for all write/submit operations.
@@ -109,16 +114,40 @@ func NewRouter(options RouterOptions) http.Handler {
 				return syncShuihuoConfiguredVideoModels(ctx, options.Store, options.Production.ProviderRegistry, owner, options.NovelFetchStore)
 			}
 		}
-		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, &batchfactoryv11.BookStageService{
+		automationStages := &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
-		}, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
+			ImageReady: shuihuoImageReadyChecker(options.Store, options.NovelFetchStore),
+			VideoReady: shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production),
+		}
+		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, automationStages, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
 		options.AutomationCoordinator.SetSourceFetcher(options.NovelFetchFetcher)
+		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: options.NovelFetchStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
+			if provider == nil {
+				return "", batchfactoryv11.ErrUnavailable
+			}
+			return provider.Complete(ctx, request)
+		}}
+		options.AutomationCoordinator.SetComicBookGenerator(comicGenerator.generateBook)
 	}
 	if options.AutomationCoordinator != nil {
+		options.AutomationCoordinator.SetSourceClassification(batchFetchClassification{
+			AIGenderJudge:         options.NovelFetchAIGenderJudge,
+			AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
+			RewriteProvider:       options.NovelFetchRewrite,
+			RewriteResolver:       options.NovelFetchRewriteResolver,
+		})
+		if options.N8ComicPublisher != nil {
+			options.AutomationCoordinator.SetComicPublisher(options.N8ComicPublisher.PublishFromSettings)
+		}
 		if err := options.AutomationCoordinator.RecoverInterruptedJobs(); err != nil {
 			log.Printf("recover interrupted batch automation jobs: %v", err)
 		}
+		if err := options.AutomationCoordinator.ResumeInterruptedJobs(context.Background()); err != nil {
+			log.Printf("resume interrupted batch automation jobs: %v", err)
+		}
+		options.AutomationCoordinator.StartScheduledDispatcher()
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
@@ -138,15 +167,16 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerConfiguredImageGenerationRoute(v11, options.Store, options.NovelFetchStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, options.NovelFetchStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
-		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore)
-		registerComicPageRoutes(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore)
+		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog, options.NovelFetchStore)
+		registerComicPageRoutes(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore, options.PresetCatalog, options.AuthStore, options.MemberProfileStore, options.Director, comicGenerationGate)
 	}
+	registerN8ComicPublishRoutes(v12, options.N8ComicPublisher)
 	if options.NovelFetchFetcher != nil {
-		registerV12FetchOriginalsRoute(v12, options.NovelFetchFetcher, batchFetchClassification{
+		registerV12FetchOriginalsRoute(v12, options.Store, options.NovelFetchStore, options.NovelFetchFetcher, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
 		})
-		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchFetcher, batchFetchClassification{
+		registerV12SingleFetchRoute(v12, options.Store, options.NovelFetchStore, options.NovelFetchFetcher, batchFetchClassification{
 			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
 			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
 		})
@@ -177,7 +207,7 @@ func NewRouter(options RouterOptions) http.Handler {
 				for _, asset := range book.AssetRecords {
 					assetIDs = append(assetIDs, asset.ID)
 				}
-				_, err = generateShuihuoAssetImages(ctx, options.Store, options.LocalArtifacts, owner, batch, assetIDs, "", "9:16", "", options.LocalExecutors, options.NovelFetchStore)
+				_, err = generateShuihuoAssetImagesWithPresetCatalog(ctx, options.Store, options.LocalArtifacts, owner, batch, assetIDs, "", "9:16", "", options.LocalExecutors, options.PresetCatalog, options.NovelFetchStore)
 				return err
 			}
 		}
@@ -185,7 +215,10 @@ func NewRouter(options RouterOptions) http.Handler {
 	} else if options.Store != nil {
 		registerBookStageSummaryRoute(v11, &batchfactoryv11.BookStageService{Store: options.Store}, "v11")
 	}
-	if options.Compiler != nil && options.Slice >= 3 {
+	if options.Compiler != nil {
+		// The compiler preview is read-only. Keep the V11 route available even
+		// before the staged V11 production slices so an already-open legacy page
+		// can refresh its final prompt instead of falling back to stale raw text.
 		registerCompilerRoutes(v11, options.Compiler)
 	}
 	// The V12 workbench uses these endpoints for read-only preview data. Keep
@@ -274,7 +307,10 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerV12SmartUnifiedRefresh(v12, auth, options.Store, options.TextProvider)
 	}
 	if options.Store != nil {
-		registerV12MetadataCompat(v12, auth, options.Store, options.NovelFetchFetcher)
+		registerV12MetadataCompat(v12, auth, options.Store, options.NovelFetchFetcher, batchFetchClassification{
+			AIGenderJudge: options.NovelFetchAIGenderJudge, AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
+			RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver,
+		})
 	}
 	if options.AutomationPresetStore != nil {
 		registerAutomationPresetRoutes(v12, auth, options.AutomationPresetStore, "v12")
@@ -302,7 +338,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	RegisterAuthRoutes(root, AuthOptions{Store: options.AuthStore, Profiles: options.MemberProfileStore, Now: options.Now, SessionResolver: options.SessionResolver, MFAFile: mfaFile, PasskeyFile: passkeyFile})
 	if options.PresetCatalog != nil {
-		registerPresetRoutes(root, auth, options.PresetCatalog)
+		registerPresetRoutes(root, auth, options.PresetCatalog, options.LocalArtifacts)
 	}
 	if options.PersonalPromptStore != nil {
 		registerPersonalPromptRoutes(root, auth, options.PersonalPromptStore)
@@ -318,7 +354,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	if options.MemberProfileStore != nil {
 		RegisterPublicTeamInviteCompat(root, options.MemberProfileStore.SystemDir, options.AuthStore, options.MemberProfileStore)
 	}
-	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore, options.PresetCatalog)
+	RegisterAdminReadCompat(root, auth, options.AuthStore, options.MemberProfileStore, options.PresetCatalog, options.LocalArtifacts)
 	RegisterAdminGovernanceCompat(root, auth, options.AuthStore, options.MemberProfileStore)
 	RegisterApplicationsCompat(root, options.AuthStore, options.MemberProfileStore, options.Now)
 	RegisterClientErrorCompat(root, auth, options.MemberProfileStore)
@@ -443,7 +479,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}
 	registerShuihuoProjectCompatRoutes(root, auth, options.Store, options.LocalArtifacts, options.Director, options.TextProvider, options.Production, options.NovelFetchStore, options.PresetCatalog, options.RedisURL, options.LocalExecutors)
-	RegisterBatchComicReferenceRoutes(root, auth, options.Store, options.LocalArtifacts, options.LocalExecutors)
+	RegisterBatchComicReferenceRoutes(root, auth, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog)
 	registerTTSRoute(root, auth, options.NovelFetchStore)
 	RegisterLocalExecutorRoutes(root, auth, options.LocalExecutors)
 	RegisterLocalExecutorJobRoutes(root, auth, options.LocalExecutors)
@@ -594,6 +630,54 @@ func NewRouter(options RouterOptions) http.Handler {
 		root.Handle("GET /api/web-submit/operations/", novelAuth.Middleware(http.HandlerFunc(legacyWebSubmitAlias)))
 		root.Handle("PATCH /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
 		root.Handle("DELETE /api/batch-rewrite/schedules/", novelAuth.Middleware(http.HandlerFunc(legacyWorkshopAlias)))
+		// V78 exposed these process/task paths directly. Keep them as real Go
+		// aliases so an older page does not render controls that fall through to
+		// a 404 while the canonical page uses the workshop namespace.
+		legacyProcessAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = strings.Replace(clone.URL.Path, "/api/process", "/api/novel-fetch-workshop/process", 1)
+			novelFetch.ServeHTTP(w, clone)
+		}
+		root.Handle("POST /api/process", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
+		root.Handle("POST /api/process/start", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
+		root.Handle("POST /api/process/stop", novelAuth.Middleware(http.HandlerFunc(legacyProcessAlias)))
+		root.Handle("POST /api/process/queue/start", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// The Go worker's automation switch is the durable replacement for the
+			// old in-memory manual queue starter.
+			clone := req.Clone(req.Context())
+			clone.URL.Path = "/api/novel-fetch-workshop/automation/start"
+			novelFetch.ServeHTTP(w, clone)
+		})))
+		root.Handle("GET /api/process/queue/status", novelAuth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			clone.URL.Path = "/api/novel-fetch-workshop/realtime/status"
+			novelFetch.ServeHTTP(w, clone)
+		})))
+		legacyTaskAlias := func(w http.ResponseWriter, req *http.Request) {
+			clone := req.Clone(req.Context())
+			path := clone.URL.Path
+			// The old detail tabs used separate summary/content/diagnostic URLs;
+			// the Go document endpoint already contains the same durable payload.
+			for _, suffix := range []string{"/summary", "/content"} {
+				if strings.HasSuffix(path, suffix) {
+					path = strings.TrimSuffix(path, suffix)
+					break
+				}
+			}
+			if strings.HasSuffix(path, "/rules-trace") || strings.HasSuffix(path, "/sensitive-log") || strings.HasSuffix(path, "/site-submit-log") {
+				clone.URL.Path = strings.Replace(path, "/api/tasks", "/api/batch-rewrite/tasks", 1)
+				root.ServeHTTP(w, clone)
+				return
+			}
+			clone.URL.Path = strings.Replace(path, "/api/tasks", "/api/novel-fetch-workshop/tasks", 1)
+			novelFetch.ServeHTTP(w, clone)
+		}
+		root.Handle("GET /api/tasks", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
+		root.Handle("GET /api/tasks/", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
+		root.Handle("POST /api/tasks/", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
+		root.Handle("PUT /api/tasks/", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
+		root.Handle("DELETE /api/tasks/", novelAuth.Middleware(http.HandlerFunc(legacyTaskAlias)))
+		root.Handle("/api/web-submit/", novelAuth.Middleware(http.HandlerFunc(legacyWebSubmitAlias)))
 		registerCanonicalNovelFetchWebSubmitAliases(root, auth)
 		registerModelCatalogRoutes(root, novelAuth, options.NovelFetchStore)
 	}
