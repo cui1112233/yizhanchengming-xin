@@ -3228,10 +3228,21 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 	if aggressive := sanitizeShuihuoImagePromptAggressive(imagePrompt); aggressive != imagePrompt {
 		attemptPrompts = append(attemptPrompts, aggressive)
 	}
+	// 暴力/血腥类拒绝靠词表降级往往无效：提示词里仍然写着“抢刀叉、鲜血
+	// 飞溅、划破脸颊”。第三次改成整页暴力合规改写，并追加合规声明，让
+	// 每一次自动重试都带着修复，而不是拿原提示词反复撞审核。
+	violenceSafePrompt := sanitizeShuihuoImagePromptViolence(imagePrompt)
+	if violenceSafePrompt != imagePrompt && violenceSafePrompt != attemptPrompts[len(attemptPrompts)-1] {
+		attemptPrompts = append(attemptPrompts, violenceSafePrompt)
+	}
 	var policyErr error
 	for attemptIndex, attemptPrompt := range attemptPrompts {
 		if attemptIndex > 0 {
-			reportShuihuoImageEvent(ctx, "comic_images", fmt.Sprintf("第 %d 次降级重试：改用更保守的图片提示词重新生成", attemptIndex+1))
+			message := fmt.Sprintf("第 %d 次降级重试：改用更保守的图片提示词重新生成", attemptIndex+1)
+			if attemptPrompt == violenceSafePrompt {
+				message = fmt.Sprintf("第 %d 次降级重试：已按暴力合规规则改写提示词后重新生成", attemptIndex+1)
+			}
+			reportShuihuoImageEvent(ctx, "comic_images", message)
 		}
 		mediaType, storageRef, attemptErr := requestShuihuoProviderImage(ctx, files, target, model, endpoint, credential, attemptPrompt, referenceImageURLs)
 		if attemptErr == nil {
@@ -3531,6 +3542,76 @@ func sanitizeShuihuoImagePromptAggressive(prompt string) string {
 		return prompt
 	}
 	return strings.TrimSpace(result) + "\n\n" + shuihuoImagePromptAggressiveNote
+}
+
+// shuihuoImagePromptViolenceRules 专门处理“暴力内容”类拒绝。上游对武器、
+// 流血、伤口、昏迷、殴打这几类最敏感，普通降敏词表覆盖不到，所以单独
+// 做一轮改写：保留分格、构图、台词和情绪，把伤害动作换成安全等价表达。
+var shuihuoImagePromptViolenceRules = []struct {
+	from string
+	to   string
+}{
+	{"抢刀叉", "伸手去拿餐具"},
+	{"刀叉", "餐具"},
+	{"餐叉", "餐具"},
+	{"叉尖", "餐具边缘"},
+	{"刀尖", "餐盘边缘"},
+	{"匕首", "餐具"},
+	{"剪刀", "文具"},
+	{"狠狠擦过", "轻轻掠过"},
+	{"狠狠", "轻轻"},
+	{"擦过", "掠过"},
+	{"划破", "掠过"},
+	{"划伤", "掠过"},
+	{"鲜血飞溅而出", "餐巾扬起"},
+	{"鲜血飞溅", "餐巾扬起"},
+	{"鲜血", "餐巾"},
+	{"血迹渗开", "纸巾褶皱"},
+	{"血迹", "餐巾"},
+	{"血污", "污渍"},
+	{"血痕", "泪痕"},
+	{"伤口", "脸颊"},
+	{"流血", "发丝凌乱"},
+	{"殷红", "淡红"},
+	{"刺入", "碰触"},
+	{"刺穿", "碰触"},
+	{"捅入", "碰触"},
+	{"砍向", "挥向"},
+	{"劈下", "落下"},
+	{"掐住", "扶住"},
+	{"掐着", "扶着"},
+	{"扇耳光", "挡在身前"},
+	{"殴打", "阻拦"},
+	{"拳打", "推挡"},
+	{"踹开", "避开"},
+	{"踢开", "避开"},
+	{"口吐白沫", "脸色苍白"},
+	{"不省人事", "神情恍惚"},
+	{"昏迷", "虚弱"},
+	{"痛苦倒下", "站立不稳"},
+	{"倒地", "坐下"},
+	{"抢夺", "伸手去接"},
+	{"夺扯", "递出"},
+}
+
+const shuihuoImagePromptViolenceNote = "【内容合规约束】在严格遵守上述画风锁定和分格结构的前提下，画面不出现武器、刀具、伤口、血液、昏迷、殴打、掐颈等暴力细节；一切冲突和伤害改用表情、姿态、后退躲避、被扶住以及对话气泡来表达，剧情与台词保持完整可读，不得因此改变画风、版式或人物设定。"
+
+// sanitizeShuihuoImagePromptViolence 是针对暴力审核的整页合规改写。它只在
+// 提示词确实命中暴力词时生效，返回空串以外的结果会作为第三次生成尝试。
+func sanitizeShuihuoImagePromptViolence(prompt string) string {
+	result := prompt
+	changed := false
+	for _, rule := range shuihuoImagePromptViolenceRules {
+		if !strings.Contains(result, rule.from) {
+			continue
+		}
+		result = strings.ReplaceAll(result, rule.from, rule.to)
+		changed = true
+	}
+	if !changed || strings.TrimSpace(result) == "" {
+		return prompt
+	}
+	return strings.TrimSpace(result) + "\n\n" + shuihuoImagePromptViolenceNote
 }
 
 type shuihuoImageEventContextKey struct{}
