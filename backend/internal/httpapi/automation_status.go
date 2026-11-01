@@ -43,18 +43,17 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	if err != nil {
 		return nil, fmt.Errorf("read automation status: %w", err)
 	}
-	var state struct {
-		Jobs map[string]json.RawMessage `json:"jobs"`
-	}
+	var state automationStateFile
 	if err := json.Unmarshal(raw, &state); err != nil {
 		return nil, fmt.Errorf("decode automation status: %w", err)
 	}
-	matched := make([]map[string]any, 0, len(state.Jobs))
-	for _, encoded := range state.Jobs {
-		var job map[string]any
-		if json.Unmarshal(encoded, &job) != nil {
-			continue
+	if normalizeAlreadyUploadedAutomationState(&state) {
+		if err := writeAutomationStateFile(r.path, state); err != nil {
+			return nil, fmt.Errorf("repair automation status: %w", err)
 		}
+	}
+	matched := make([]map[string]any, 0, len(state.Jobs))
+	for _, job := range state.Jobs {
 		if strings.TrimSpace(toString(job["owner"])) != strings.TrimSpace(owner) || strings.TrimSpace(toString(job["batchId"])) != strings.TrimSpace(batchID) {
 			continue
 		}
@@ -77,6 +76,97 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	return idle, nil
 }
 
+// normalizeAlreadyUploadedAutomationState repairs old task records written by
+// the pre-reconciliation publisher. N8 reports IMAGE_ALREADY_IN_CAROUSEL when
+// the images are already accepted by a carousel, but the old code stored that
+// response as a hard upload failure. Treating it as completed prevents a
+// second upload and makes the live log reflect the actual remote result.
+func normalizeAlreadyUploadedAutomationState(state *automationStateFile) bool {
+	if state == nil {
+		return false
+	}
+	changed := false
+	for _, job := range state.Jobs {
+		books, _ := job["books"].(map[string]any)
+		if len(books) == 0 {
+			continue
+		}
+		jobChanged := false
+		for _, raw := range books {
+			entry, _ := raw.(map[string]any)
+			if entry == nil || automationStringValue(entry["status"], "") != "failed" {
+				continue
+			}
+			errorText := automationStringValue(entry["error"], "")
+			if !n8ImagesAlreadyUploadedError(errorText) {
+				continue
+			}
+			entry["status"] = "completed"
+			entry["stage"] = "uploaded"
+			entry["message"] = "图片已上传完成，N8 已确认图片已占用；已停止重复上传"
+			entry["publishError"] = errorText
+			entry["error"] = ""
+			entry["retryRequested"] = false
+			delete(entry, "retryAt")
+			changed = true
+			jobChanged = true
+		}
+		if jobChanged {
+			normalizeAutomationJobCounts(job, books)
+		}
+	}
+	return changed
+}
+
+func n8ImagesAlreadyUploadedError(text string) bool {
+	text = strings.ToUpper(strings.TrimSpace(text))
+	return strings.Contains(text, "IMAGE_ALREADY_IN_CAROUSEL") ||
+		strings.Contains(text, "ALREADY_IN_CAROUSEL") ||
+		strings.Contains(text, "图片已被其他轮播图集占用")
+}
+
+func normalizeAutomationJobCounts(job map[string]any, books map[string]any) {
+	failed, running, ready, pending := 0, 0, 0, 0
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "completed":
+			ready++
+		case "running":
+			running++
+		case "scheduled":
+			pending++
+		case "failed", "blocked", "stopped":
+			failed++
+		}
+	}
+	job["counts"] = map[string]any{"total": len(books), "ready": ready, "running": running, "pending": pending, "failed": failed, "blocked": 0}
+	if failed > 0 {
+		job["state"] = "failed"
+	} else if running > 0 {
+		job["state"] = "running"
+	} else if pending > 0 {
+		job["state"] = "scheduled"
+	} else {
+		job["state"] = "completed"
+	}
+}
+
+func writeAutomationStateFile(path string, state automationStateFile) error {
+	raw, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".repair.tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 func automationJobTime(job map[string]any) time.Time {
 	for _, key := range []string{"updatedAt", "completedAt", "startedAt", "createdAt"} {
 		value := strings.TrimSpace(toString(job[key]))
@@ -97,11 +187,28 @@ func idleAutomationCounts() map[string]any {
 	return map[string]any{"total": 0, "ready": 0, "running": 0, "pending": 0, "failed": 0, "blocked": 0}
 }
 
+// publicAutomationBookLogs 只返回最近 limit 条日志，避免状态接口随任务时长膨胀。
+func publicAutomationBookLogs(raw any, limit int) []any {
+	logs := make([]any, 0, 8)
+	switch typed := raw.(type) {
+	case []any:
+		logs = append(logs, typed...)
+	case []map[string]any:
+		for _, item := range typed {
+			logs = append(logs, item)
+		}
+	}
+	if limit > 0 && len(logs) > limit {
+		logs = logs[len(logs)-limit:]
+	}
+	return logs
+}
+
 func publicAutomationJob(job map[string]any) map[string]any {
 	result := map[string]any{
 		"id": job["id"], "batchId": job["batchId"], "state": job["state"],
 		"stopAt": job["stopAt"], "autoPublish": job["autoPublish"],
-		"runMode": job["runMode"], "concurrency": job["concurrency"], "preset": job["preset"],
+		"runMode": job["runMode"], "scheduleMode": job["scheduleMode"], "concurrency": job["concurrency"], "preset": job["preset"],
 		"scheduledAt": job["scheduledAt"], "createdAt": job["createdAt"], "startedAt": job["startedAt"],
 		"updatedAt": job["updatedAt"], "completedAt": job["completedAt"], "lastError": job["lastError"],
 		"counts": job["counts"],
@@ -122,11 +229,19 @@ func publicAutomationJob(job map[string]any) map[string]any {
 			if !ok {
 				continue
 			}
+			status := strings.TrimSpace(toString(book["status"]))
+			retryAt := book["retryAt"]
+			// retryAt is meaningful only while this book is still running.
+			// Older failed jobs may retain the marker from their last attempt;
+			// do not expose that stale timestamp as a future automatic retry.
+			if status != "running" && !automationBoolValue(book["retryRequested"]) {
+				retryAt = nil
+			}
 			books = append(books, map[string]any{
 				"bookId": book["bookId"], "title": book["title"], "status": book["status"], "stage": book["stage"],
-				"message": book["message"], "error": book["error"], "updatedAt": book["updatedAt"],
-				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": book["retryAt"],
-				"retryRequested": book["retryRequested"],
+				"message": book["message"], "error": book["error"], "publishError": book["publishError"], "updatedAt": book["updatedAt"],
+				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": retryAt,
+				"retryRequested": book["retryRequested"], "logs": publicAutomationBookLogs(book["logs"], 50),
 			})
 		}
 	}

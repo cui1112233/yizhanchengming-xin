@@ -4,17 +4,21 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +52,107 @@ func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
 }
 
 var shuihuoProductionConfigs sync.Map
+
+// 出图并发默认 2：需要适配上游限流时可在统一配置里调整（优先）或用环境变量兜底。
+const shuihuoImageConcurrencyEnv = "QIANTIE_SHUHUO_IMAGE_CONCURRENCY"
+const shuihuoImageConcurrencyDefault = 2
+const shuihuoImageConcurrencyMax = 4
+
+func shuihuoClampImageConcurrency(value int) int {
+	if value < 1 {
+		return 1
+	}
+	if value > shuihuoImageConcurrencyMax {
+		return shuihuoImageConcurrencyMax
+	}
+	return value
+}
+
+func shuihuoImageGenerationConcurrency() int {
+	value := strings.TrimSpace(os.Getenv(shuihuoImageConcurrencyEnv))
+	if value == "" {
+		return shuihuoImageConcurrencyDefault
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return shuihuoImageConcurrencyDefault
+	}
+	return shuihuoClampImageConcurrency(parsed)
+}
+
+// shuihuoImageSemaphore 是可在运行时调整上限的信号量。统一配置改变后，
+// 后续请求立即按新上限排队，不影响已经在跑的图片请求。
+type shuihuoImageSemaphore struct {
+	mu    sync.Mutex
+	limit int
+	inUse int
+}
+
+func newShuihuoImageSemaphore(limit int) *shuihuoImageSemaphore {
+	return &shuihuoImageSemaphore{limit: shuihuoClampImageConcurrency(limit)}
+}
+
+func (s *shuihuoImageSemaphore) setLimit(limit int) {
+	limit = shuihuoClampImageConcurrency(limit)
+	s.mu.Lock()
+	s.limit = limit
+	s.mu.Unlock()
+}
+
+func (s *shuihuoImageSemaphore) acquire(ctx context.Context) (func(), error) {
+	for {
+		s.mu.Lock()
+		if s.inUse < s.limit {
+			s.inUse++
+			s.mu.Unlock()
+			var once sync.Once
+			return func() {
+				once.Do(func() {
+					s.mu.Lock()
+					s.inUse--
+					s.mu.Unlock()
+				})
+			}, nil
+		}
+		s.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
+var shuihuoImageGenerationSemaphore = newShuihuoImageSemaphore(shuihuoImageGenerationConcurrency())
+
+type shuihuoImageConcurrencyContextKey struct{}
+
+// withShuihuoImageConcurrency 把当前书生效的出图并发写进上下文，由真正的
+// 图片请求读取。未设置时使用默认并发。
+func withShuihuoImageConcurrency(ctx context.Context, concurrency int) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoImageConcurrencyContextKey{}, shuihuoClampImageConcurrency(concurrency))
+}
+
+func shuihuoImageConcurrencyFromContext(ctx context.Context) int {
+	if ctx == nil {
+		return shuihuoImageGenerationConcurrency()
+	}
+	if concurrency, ok := ctx.Value(shuihuoImageConcurrencyContextKey{}).(int); ok && concurrency > 0 {
+		return shuihuoClampImageConcurrency(concurrency)
+	}
+	return shuihuoImageGenerationConcurrency()
+}
+
+func acquireShuihuoGPTImageGenerationSlot(ctx context.Context, modelID string) (func(), error) {
+	if !shuihuoIsGPTImageModel(modelID) {
+		return func() {}, nil
+	}
+	shuihuoImageGenerationSemaphore.setLimit(shuihuoImageConcurrencyFromContext(ctx))
+	return shuihuoImageGenerationSemaphore.acquire(ctx)
+}
 
 func textProviderForShuihuo(director *batchfactoryv11.DirectorService, ownerProvider batchfactoryv11.DirectorProvider) batchfactoryv11.DirectorProvider {
 	if ownerProvider != nil {
@@ -1358,7 +1463,7 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			if !decodeJSON(w, r, &input) {
 				return
 			}
-			images, generationErr := generateShuihuoAssetImages(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio, "", localExecutors, catalogStore)
+			images, generationErr := generateShuihuoAssetImagesWithPresetCatalog(r.Context(), store, files, owner, batch, input.AssetIDs, input.ModelID, input.AspectRatio, "", localExecutors, presetCatalog, catalogStore)
 			if generationErr != nil {
 				writeStoreError(w, generationErr)
 				return
@@ -2335,7 +2440,46 @@ func loadShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, ow
 			}
 		}
 	}
+	// Older personal API settings stored the image provider in the top-level
+	// `image` object instead of modelCatalog. Keep that configuration usable by
+	// the newer batch/comic pipeline so the UI selection and the server check
+	// cannot disagree about whether image generation is configured.
+	ensureLegacyShuihuoImageModel(config)
 	return config, nil
+}
+
+func ensureLegacyShuihuoImageModel(config map[string]any) {
+	if config == nil {
+		return
+	}
+	for _, model := range shuihuoCollection(config, "modelCatalog", nil) {
+		if strings.EqualFold(modelString(model, "kind"), "image") {
+			if enabled, exists := model["enabled"].(bool); exists && !enabled {
+				continue
+			}
+			return
+		}
+	}
+	legacy, ok := config["image"].(map[string]any)
+	if !ok {
+		return
+	}
+	modelID := firstText(legacy["model"], legacy["modelId"], legacy["model_id"])
+	baseURL := firstText(legacy["endpoint"], legacy["baseUrl"], legacy["base_url"])
+	credential := firstText(legacy["apiKey"], legacy["api_key"], legacy["credential"])
+	if modelID == "" || baseURL == "" || credential == "" {
+		return
+	}
+	model := map[string]any{
+		"id":          "legacy-account-image",
+		"kind":        "image",
+		"displayName": firstText(legacy["displayName"], "个人 API 图片模型"),
+		"modelId":     modelID,
+		"baseUrl":     baseURL,
+		"credential":  credential,
+		"enabled":     true,
+	}
+	config["modelCatalog"] = append(shuihuoCollection(config, "modelCatalog", nil), model)
 }
 
 func saveShuihuoOwnerConfig(ctx context.Context, store batchfactoryv11.Store, owner string, config map[string]any) error {
@@ -2792,6 +2936,10 @@ func generateShuihuoPromptCandidates(ctx context.Context, provider batchfactoryv
 }
 
 func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
+	return generateShuihuoAssetImagesWithPresetCatalog(ctx, store, files, owner, batch, assetIDs, modelID, aspectRatio, provider, localExecutors, nil, catalogStores...)
+}
+
+func generateShuihuoAssetImagesWithPresetCatalog(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -2810,7 +2958,13 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 	}
 	catalog := shuihuoCollection(config, "modelCatalog", nil)
 	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, batch.Books[0].SettingsState.Patch)
-	generated := make([]batchfactoryv11.BookAssetImage, 0, len(wanted))
+	type assetImageWork struct {
+		asset         batchfactoryv11.BookAsset
+		target        shuihuoAssetImageTarget
+		prompt        string
+		referenceURLs []string
+	}
+	work := make([]assetImageWork, 0, len(wanted))
 	for _, asset := range batch.Books[0].AssetRecords {
 		if !wanted[asset.ID] {
 			continue
@@ -2823,45 +2977,234 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 		if targetErr != nil {
 			return nil, targetErr
 		}
-		referenceImageURLs := []string(nil)
-		if asset.Source == "comic" && batchfactoryv11.ComicImageStyleConfigured(effective) {
-			contract, compileErr := batchfactoryv11.BuildComicImageContract(effective, batchfactoryv11.ComicImagePurposeAsset, prompt, nil, nil)
-			if compileErr != nil {
-				return nil, compileErr
+		prompt, referenceImageURLs, compileErr := compileShuihuoAssetImagePrompt(asset, effective, presetCatalog)
+		if compileErr != nil {
+			return nil, compileErr
+		}
+		work = append(work, assetImageWork{asset: asset, target: target, prompt: prompt, referenceURLs: referenceImageURLs})
+	}
+	if len(work) == 0 {
+		return nil, fmt.Errorf("%w: selected asset not found", batchfactoryv11.ErrNotFound)
+	}
+	progress := comicGenerationProgressFromContext(ctx)
+	if progress != nil {
+		progress("comic_asset_images", fmt.Sprintf("准备并发生成漫画资产图（已完成 0/%d 张）", len(work)))
+	}
+	// Asset references are independent provider requests. Generate up to five
+	// at once, while keeping database writes ordered and atomic after all image
+	// files have returned. This prevents one slow asset from making the whole
+	// "立即执行" flow look frozen.
+	assetImageConcurrency := comicAssetConcurrencyFromContext(ctx)
+	// 资产图与漫画页共用统一配置的出图并发上限。
+	workCtx := withShuihuoImageConcurrency(ctx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
+	type assetImageResult struct {
+		index      int
+		mediaType  string
+		storageRef string
+		source     string
+		err        error
+	}
+	results := make([]assetImageResult, len(work))
+	sem := make(chan struct{}, assetImageConcurrency)
+	var workers sync.WaitGroup
+	var resultMu sync.Mutex
+	completed := 0
+	skippedByPolicy := 0
+	var firstErr error
+	for index, item := range work {
+		index, item := index, item
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-workCtx.Done():
+				return
 			}
-			prompt = contract.Prompt
-			referenceImageURLs = contract.ReferenceImageURLs
+			defer func() { <-sem }()
+			mediaType, storageRef, source, generateErr := generateShuihuoAssetImageArtifactWithRetry(workCtx, store, files, presetCatalog, owner, item.target, item.prompt, item.referenceURLs, localExecutors)
+			if generateErr != nil {
+				resultMu.Lock()
+				if errors.Is(generateErr, errShuihuoImageContentPolicy) {
+					// 审核拒绝的资产图直接跳过，不能让整本书的资产阶段
+					// 因此中止，其它资产仍然要生成完。
+					log.Printf("comic asset image skipped by content policy batch=%s asset=%s err=%v", batch.ID, item.asset.Name, generateErr)
+					skippedByPolicy++
+				} else if firstErr == nil {
+					firstErr = fmt.Errorf("%s 资产图生成失败: %w", item.asset.Name, generateErr)
+				}
+				results[index].err = generateErr
+				resultMu.Unlock()
+				return
+			}
+			resultMu.Lock()
+			results[index] = assetImageResult{index: index, mediaType: mediaType, storageRef: storageRef, source: source}
+			completed++
+			if progress != nil {
+				progress("comic_asset_images", fmt.Sprintf("漫画资产图 %d/%d 已完成：%s", completed, len(work), item.asset.Name))
+			}
+			resultMu.Unlock()
+		}()
+	}
+	workers.Wait()
+	resultMu.Lock()
+	generateErr := firstErr
+	resultMu.Unlock()
+	generated := make([]batchfactoryv11.BookAssetImage, 0, len(work))
+	for index, item := range work {
+		result := results[index]
+		if result.err != nil || result.storageRef == "" {
+			continue
 		}
-		mediaType, storageRef, source, generateErr := generateShuihuoImageArtifact(ctx, files, owner, target, prompt, referenceImageURLs, localExecutors)
-		if generateErr != nil {
-			return nil, generateErr
-		}
-		image, createErr := store.CreateBookAssetImage(ctx, owner, batch.ID, batch.Books[0].ID, asset.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: storageRef, MediaType: mediaType, Source: source})
+		image, createErr := store.CreateBookAssetImage(ctx, owner, batch.ID, batch.Books[0].ID, item.asset.ID, batchfactoryv11.CreateBookAssetImageInput{StorageRef: result.storageRef, MediaType: result.mediaType, Source: result.source})
 		if createErr != nil {
-			_ = files.Remove(storageRef)
-			return nil, createErr
+			if generateErr == nil {
+				generateErr = fmt.Errorf("%s 资产图写回失败: %w", item.asset.Name, createErr)
+			}
+			_ = files.Remove(result.storageRef)
+			continue
 		}
 		generated = append(generated, image)
 	}
-	if len(generated) != len(wanted) {
-		return nil, fmt.Errorf("%w: selected asset not found", batchfactoryv11.ErrNotFound)
+	if len(generated)+skippedByPolicy != len(wanted) {
+		if generateErr == nil {
+			generateErr = fmt.Errorf("%w: selected asset not found", batchfactoryv11.ErrNotFound)
+		}
 	}
-	return generated, nil
+	return generated, generateErr
 }
 
-func generateShuihuoImageArtifact(ctx context.Context, files *localartifact.Store, owner string, target shuihuoAssetImageTarget, prompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (string, string, string, error) {
+const cmCharacterThreeViewPresetID = "batch-comic-character-three-view-cm"
+
+// generateShuihuoAssetImageArtifactWithRetry protects the asset-image flow
+// from gateways that accept an image job and then reset the long-lived HTTP
+// connection before returning its result. Retrying only transport-level
+// failures keeps ordinary provider/configuration errors visible immediately.
+func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, presetCatalog *prompt.Catalog, owner string, target shuihuoAssetImageTarget, imagePrompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (string, string, string, error) {
+	// Keep the provider attempt budget consistent with the user-visible retry
+	// policy: three attempts total, then the asset is terminally failed.
+	const maxAttempts = 3
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		mediaType, storageRef, source, err := generateShuihuoImageArtifact(ctx, store, files, presetCatalog, owner, target, imagePrompt, referenceImageURLs, localExecutors)
+		if err == nil || !retryableShuihuoAssetImageTransportError(err) || attempt == maxAttempts {
+			return mediaType, storageRef, source, err
+		}
+		lastErr = err
+		log.Printf("shuihuo asset image provider connection interrupted; retrying attempt=%d/%d model=%s: %v", attempt+1, maxAttempts, target.ModelID, err)
+		select {
+		case <-ctx.Done():
+			return "", "", "", ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return "", "", "", lastErr
+}
+
+func retryableShuihuoAssetImageTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "connection was forcibly closed") ||
+		strings.Contains(message, "connection reset") ||
+		strings.Contains(message, "unexpected eof") ||
+		strings.Contains(message, "server closed idle connection") ||
+		strings.Contains(message, "temporary network")
+}
+
+func compileShuihuoAssetImagePrompt(asset batchfactoryv11.BookAsset, settings batchfactoryv11.SettingsPatch, presetCatalog *prompt.Catalog) (string, []string, error) {
+	content := strings.TrimSpace(asset.Prompt)
+	// Asset images belong to the selected comic project, not to the historical
+	// extraction source label. Older/manual assets can still be part of a comic
+	// book, and must receive the selected comic style as well.
+	if !shuihuoComicProductionMode(settings) {
+		return content, nil, nil
+	}
+	resolvedSettings, err := resolvePublishedComicStyleReference(settings, presetCatalog)
+	if err != nil {
+		return "", nil, err
+	}
+	settings = resolvedSettings
+	// Never silently send a plain character description to an image model when
+	// the book is in comic mode. That is how a selected comic style previously
+	// degraded into photorealistic asset images.
+	if !batchfactoryv11.ComicImageStyleConfigured(settings) {
+		return "", nil, fmt.Errorf("%w: 当前漫画项目未加载已选择的画风，请先保存画面配置", batchfactoryv11.ErrConflict)
+	}
+	if asset.Kind == "character" {
+		if presetCatalog == nil {
+			return "", nil, fmt.Errorf("%w: CM·角色三视图提示词库不可用", batchfactoryv11.ErrUnavailable)
+		}
+		template, found, err := presetCatalog.PublishedBody("batch-factory", cmCharacterThreeViewPresetID)
+		if err != nil {
+			return "", nil, fmt.Errorf("%w: 读取CM·角色三视图失败", batchfactoryv11.ErrUnavailable)
+		}
+		if !found || template.Slot != "batch.comic.character-image-template" || strings.TrimSpace(template.Body) == "" {
+			return "", nil, fmt.Errorf("%w: CM·角色三视图未发布", batchfactoryv11.ErrUnavailable)
+		}
+		content = strings.TrimSpace(content + "\n\n" + template.Body)
+	}
+	contract, err := batchfactoryv11.BuildComicImageContract(settings, batchfactoryv11.ComicImagePurposeAsset, asset.Kind, content, nil, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	return contract.Prompt, contract.ReferenceImageURLs, nil
+}
+
+func shuihuoComicProductionMode(settings batchfactoryv11.SettingsPatch) bool {
+	if raw, ok := settings["productionMode"]; ok && len(raw) > 0 {
+		var mode string
+		if json.Unmarshal(raw, &mode) == nil && strings.TrimSpace(mode) != "" {
+			return strings.EqualFold(strings.TrimSpace(mode), "comic")
+		}
+	}
+	var config struct {
+		Comic struct {
+			Enabled bool `json:"enabled"`
+			Style   struct {
+				Body string `json:"body"`
+			} `json:"style"`
+		} `json:"comic"`
+	}
+	if raw := settings["aiPromptConfig"]; len(raw) > 0 && json.Unmarshal(raw, &config) == nil {
+		return config.Comic.Enabled && strings.TrimSpace(config.Comic.Style.Body) != ""
+	}
+	return false
+}
+
+func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, presetCatalog *prompt.Catalog, owner string, target shuihuoAssetImageTarget, imagePrompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (string, string, string, error) {
 	if files == nil {
 		return "", "", "", fmt.Errorf("%w: image storage is unavailable", batchfactoryv11.ErrUnavailable)
 	}
+	// 图片模型会按内容审核拒掉露骨或血腥描述；先做降敏替换，
+	// 保证同一张漫画页不会因为几个词反复被拒。
+	originalImagePrompt := imagePrompt
+	imagePrompt = sanitizeShuihuoImagePrompt(imagePrompt)
+	if imagePrompt != originalImagePrompt {
+		reportShuihuoImageEvent(ctx, "comic_images", "图片提示词已自动去敏：已替换可能触发内容审核的敏感词")
+	}
 	if target.Provider == batchfactoryv11.VideoProviderDoubaoLocal {
+		if baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("QIANTIE_DOUBAO_RELAY_BASE_URL")), "/"); baseURL != "" {
+			resolvedReferences, err := resolveComicReferenceImageData(ctx, store, files, presetCatalog, owner, referenceImageURLs)
+			if err != nil {
+				return "", "", "", err
+			}
+			token := strings.TrimSpace(os.Getenv("QIANTIE_DOUBAO_RELAY_BEARER_TOKEN"))
+			// 评审环境不再把旧的单账号变量强行传给 Relay；省略账号后由 Relay
+			// 按已登录账号轮询，并由它自己的账号锁保证切换和生成不相互挤压。
+			account := strings.TrimSpace(os.Getenv("QIANTIE_DOUBAO_RELAY_FIXED_ACCOUNT"))
+			return generateShuihuoRelayImage(ctx, files, target, imagePrompt, resolvedReferences, baseURL, token, account)
+		}
 		if localExecutors == nil {
 			return "", "", "", fmt.Errorf("%w: 豆包本地执行器未配置", batchfactoryv11.ErrUnavailable)
 		}
-		mediaType, storageRef, err := waitForLocalExecutorImage(ctx, localExecutors, files, owner, target.ModelID, prompt, shuihuoImageSize(target.AspectRatio), map[string]any{"referenceImages": referenceImageURLs, "imageUrls": referenceImageURLs})
+		resolvedReferences, err := resolveComicReferenceImageData(ctx, store, files, presetCatalog, owner, referenceImageURLs)
+		if err != nil {
+			return "", "", "", err
+		}
+		mediaType, storageRef, err := waitForLocalExecutorImage(ctx, localExecutors, files, owner, target.ModelID, imagePrompt, shuihuoImageSize(target.AspectRatio), map[string]any{"referenceImages": resolvedReferences, "imageUrls": resolvedReferences})
 		return mediaType, storageRef, "doubao_local_executor", err
-	}
-	if len(referenceImageURLs) > 0 {
-		return "", "", "", fmt.Errorf("%w: 当前图片接口不支持参考图，请改用支持参考图的豆包执行器", batchfactoryv11.ErrConflict)
 	}
 	model := target.CatalogModel
 	endpointRaw := modelString(model, "endpoint")
@@ -2876,23 +3219,81 @@ func generateShuihuoImageArtifact(ctx context.Context, files *localartifact.Stor
 	if credential == "" {
 		return "", "", "", fmt.Errorf("%w: image model credential is missing", batchfactoryv11.ErrUnavailable)
 	}
-	payload := map[string]any{"model": target.ModelID, "prompt": prompt, "n": 1, "size": shuihuoImageSize(target.AspectRatio), "response_format": "b64_json"}
-	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return "", "", "", fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+	// 第一次用常规降敏提示词；如果仍被内容审核拒绝，再用更保守的降级提示词
+	// 重新生成一次。跳过一张图之前至少给用户两次机会，避免整本缺页。
+	attemptPrompts := []string{imagePrompt}
+	if aggressive := sanitizeShuihuoImagePromptAggressive(imagePrompt); aggressive != imagePrompt {
+		attemptPrompts = append(attemptPrompts, aggressive)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	var policyErr error
+	for attemptIndex, attemptPrompt := range attemptPrompts {
+		if attemptIndex > 0 {
+			reportShuihuoImageEvent(ctx, "comic_images", fmt.Sprintf("第 %d 次降级重试：改用更保守的图片提示词重新生成", attemptIndex+1))
+		}
+		mediaType, storageRef, attemptErr := requestShuihuoProviderImage(ctx, files, target, model, endpoint, credential, attemptPrompt, referenceImageURLs)
+		if attemptErr == nil {
+			if attemptIndex > 0 {
+				reportShuihuoImageEvent(ctx, "comic_images", fmt.Sprintf("第 %d 次降级重试后图片生成成功", attemptIndex+1))
+			}
+			return mediaType, storageRef, "provider", nil
+		}
+		if !errors.Is(attemptErr, errShuihuoImageContentPolicy) {
+			return "", "", "", attemptErr
+		}
+		policyErr = attemptErr
+		log.Printf("shuihuo image content policy rejected attempt=%d/%d provider=%s model=%s", attemptIndex+1, len(attemptPrompts), target.Provider, target.ModelID)
+		reportShuihuoImageEvent(ctx, "comic_images", fmt.Sprintf("第 %d 次图片提示词被内容审核拒绝", attemptIndex+1))
+	}
+	return "", "", "", policyErr
+}
+
+// requestShuihuoProviderImage 执行一次图片供应商请求（含排队、解码与落盘）。
+// 内容审核拒绝会返回 errShuihuoImageContentPolicy，由调用方决定是否降级重试。
+func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, model map[string]any, endpoint, credential, imagePrompt string, referenceImageURLs []string) (string, string, error) {
+	var req *http.Request
+	var err error
+	if len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID) {
+		req, err = newShuihuoImageEditRequest(ctx, endpoint, target.ModelID, imagePrompt, shuihuoImageSize(target.AspectRatio), referenceImageURLs)
+	} else {
+		payload := map[string]any{"model": target.ModelID, "prompt": imagePrompt, "n": 1, "size": shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)}
+		// gpt-image compatible gateways return a URL or base64 payload according
+		// to their own configuration and reject the legacy response_format field.
+		if !shuihuoIsGPTImageModel(target.ModelID) {
+			payload["response_format"] = "b64_json"
+		}
+		body, _ := json.Marshal(payload)
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+		if err != nil {
+			return "", "", fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+		}
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+	}
+	log.Printf("shuihuo image request provider=%s model=%s endpoint=%s refs=%d size=%s", target.Provider, target.ModelID, endpoint, len(referenceImageURLs), shuihuoImageSizeForModel(target.ModelID, target.AspectRatio))
 	req.Header.Set("Authorization", "Bearer "+credential)
-	client := &http.Client{Timeout: 120 * time.Second}
+	releaseImageSlot, err := acquireShuihuoGPTImageGenerationSlot(ctx, target.ModelID)
+	if err != nil {
+		return "", "", fmt.Errorf("%w: 等待图片模型请求失败: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	client := shuihuoImageGenerationHTTPClient(endpoint)
 	response, err := client.Do(req)
 	if err != nil {
-		return "", "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
+		releaseImageSlot()
+		return "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
 	}
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	response.Body.Close()
+	// Serialize only the provider generation call; a slow CDN download must not
+	// block the next GPT image request.
+	releaseImageSlot()
 	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", "", "", fmt.Errorf("%w: image provider returned HTTP %d", batchfactoryv11.ErrUpstream, response.StatusCode)
+		log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
+		if shuihuoImageResponseContentRejected(response.StatusCode, raw) {
+			return "", "", fmt.Errorf("%w: %s", errShuihuoImageContentPolicy, shuihuoImageProviderErrorDetail(raw))
+		}
+		return "", "", fmt.Errorf("%w: image provider returned HTTP %d%s", batchfactoryv11.ErrUpstream, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
 	}
 	var result struct {
 		Data []struct {
@@ -2901,11 +3302,463 @@ func generateShuihuoImageArtifact(ctx context.Context, files *localartifact.Stor
 		} `json:"data"`
 	}
 	if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
-		return "", "", "", fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
+		return "", "", fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
 	}
-	mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, client, result.Data[0].B64JSON, result.Data[0].URL)
+	mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, shuihuoImageDownloadHTTPClient(), result.Data[0].B64JSON, result.Data[0].URL, credential, endpoint)
 	if err != nil {
-		return "", "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
+		return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	artifactID, err := localexecutor.NewArtifactID()
+	if err != nil {
+		return "", "", err
+	}
+	saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
+	if err != nil {
+		return "", "", err
+	}
+	return mediaType, saved.StorageRef, nil
+}
+
+// shuihuoLongRunningImageHTTPClient uses HTTP/2 for providers that require it.
+func shuihuoLongRunningImageHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ForceAttemptHTTP2 = true
+	transport.TLSNextProto = nil
+	return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+}
+
+// Existing image gateways that reset long HTTP/2 generation streams remain on
+// HTTP/1.1; VVEAI advertises HTTP/2 and sends HTTP/2 frames when called as H1.
+func shuihuoImageGenerationHTTPClient(endpoint string) *http.Client {
+	parsed, err := url.Parse(strings.TrimSpace(endpoint))
+	if err == nil && strings.EqualFold(strings.TrimSuffix(parsed.Hostname(), "."), "api.vveai.com") {
+		return shuihuoLongRunningImageHTTPClient()
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ForceAttemptHTTP2 = false
+	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+}
+
+func shuihuoImageDownloadHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ForceAttemptHTTP2 = true
+	return &http.Client{Timeout: 120 * time.Second, Transport: transport}
+}
+
+// errShuihuoImageContentPolicy 表示图片模型按内容审核拒收了提示词。
+// 调用方必须跳过这张图并继续其它图片，不能把它当成可重试的临时故障。
+var errShuihuoImageContentPolicy = fmt.Errorf("image prompt rejected by content policy")
+
+var shuihuoImagePromptSofteningRules = []struct {
+	from string
+	to   string
+}{
+	{"鲜血淋漓", "衣襟破损"},
+	{"血泊", "地面痕迹"},
+	{"血迹", "暗色痕迹"},
+	{"鲜血", "暗红"},
+	{"血腥", "暗色"},
+	{"血流", "痕迹"},
+	{"伤口", "痕迹"},
+	{"抓伤", "痕迹"},
+	{"尸体", "倒地的人"},
+	{"残肢", "倒地的人"},
+	{"断手", "手部"},
+	{"刀刺", "逼近"},
+	{"刺入", "触及"},
+	{"砍", "挥"},
+	{"劈", "挥"},
+	{"斩", "挥"},
+	{"捅", "推"},
+	{"殴打", "冲突"},
+	{"扇耳光", "争执"},
+	{"掐住", "扣住"},
+	{"掐死", "制住"},
+	{"勒死", "制住"},
+	{"勒住", "扣住"},
+	{"掐", "扣"},
+	{"踢", "碰"},
+	{"踹", "碰"},
+	{"摔在", "跌在"},
+	{"鞭打", "斥责"},
+	{"酷刑", "威压"},
+	{"杀戮", "冲突"},
+	{"杀人", "加害"},
+	{"杀死", "制住"},
+	{"杀了", "制住"},
+	{"自尽", "绝望"},
+	{"上吊", "绝望"},
+	{"割腕", "绝望"},
+	{"坠楼", "跌落"},
+	{"囚禁", "限制"},
+	{"绑架", "带走"},
+	{"撕扯", "拉扯"},
+	{"裸露", "衣衫单薄"},
+	{"赤裸", "衣衫单薄"},
+	{"胴体", "身影"},
+	{"肉体", "身形"},
+	{"私处", "衣襟"},
+	{"大腿内侧", "腿侧"},
+	{"胸部", "肩颈"},
+	{"胸脯", "肩颈"},
+	{"臀部", "背影"},
+	{"臀", "背影"},
+	{"呻吟", "低声喘息"},
+	{"娇喘", "呼吸急促"},
+	{"情欲", "情绪"},
+	{"淫", "轻浮"},
+	{"媚肉", "衣料"},
+	{"抚摸", "轻触"},
+	{"亲吻", "靠近"},
+	{"吻", "贴近"},
+	{"床上", "榻边"},
+	{"衣不蔽体", "衣衫单薄"},
+	{"衣衫尽褪", "衣衫凌乱"},
+	{"肌肤", "肤色"},
+	{"白皙", "浅淡"},
+	{"春光", "景象"},
+	{"裸", "着衣"},
+	{"鲜血", "暗红"},
+	{"血腥", "暗色"},
+	{"尸体", "倒地的人"},
+	{"杀戮", "冲突"},
+	{"掐死", "制住"},
+	{"勒死", "制住"},
+}
+
+// sanitizeShuihuoImagePrompt 在送图前把容易触发内容审核的词换成含蓄表达。
+// 只做词语替换并追加一句画面尺度说明，不改变剧情走向和构图要求。
+func sanitizeShuihuoImagePrompt(prompt string) string {
+	result := prompt
+	changed := false
+	for _, rule := range shuihuoImagePromptSofteningRules {
+		if !strings.Contains(result, rule.from) {
+			continue
+		}
+		result = strings.ReplaceAll(result, rule.from, rule.to)
+		changed = true
+	}
+	if strings.TrimSpace(result) == "" {
+		return prompt
+	}
+	// 没有任何命中时保持原提示词不变，避免无关提示词被追加说明后改变出图效果。
+	if !changed {
+		return result
+	}
+	const note = "画面以含蓄、艺术化的方式呈现，不表现露骨情色、暴力冲突或血腥细节。"
+	if !strings.Contains(result, note) {
+		result = strings.TrimSpace(result) + "\n\n" + note
+	}
+	return result
+}
+
+// shuihuoImagePromptAggressiveRules 是第二轮降级用的更保守替换表。
+// 只在第一轮降敏后仍被内容审核拒绝时使用，尽量保留构图和情绪，去掉一切
+// 可能被判定为暴力或情色的细节描述。
+var shuihuoImagePromptAggressiveRules = []struct {
+	from string
+	to   string
+}{
+	{"衣襟破损", "衣襟整齐"},
+	{"地面痕迹", "地面"},
+	{"暗色痕迹", "地面"},
+	{"暗红", "深色"},
+	{"暗色", "昏暗"},
+	{"痕迹", "细节"},
+	{"倒地的人", "站立的人物"},
+	{"制住", "拦下"},
+	{"逼近", "靠近"},
+	{"冲突", "对峙"},
+	{"争执", "交谈"},
+	{"斥责", "劝说"},
+	{"威压", "注视"},
+	{"加害", "阻拦"},
+	{"绝望", "沉默"},
+	{"跌落", "重心不稳"},
+	{"限制", "陪同"},
+	{"带走", "离开"},
+	{"拉扯", "相扶"},
+	{"衣衫单薄", "日常衣着"},
+	{"衣衫凌乱", "衣着整齐"},
+	{"身影", "人物"},
+	{"身形", "人物"},
+	{"衣襟", "衣领"},
+	{"肩颈", "肩部"},
+	{"背影", "侧影"},
+	{"低声喘息", "呼吸"},
+	{"呼吸急促", "呼吸"},
+	{"情欲", "情绪"},
+	{"轻浮", "轻快"},
+	{"衣料", "衣物"},
+	{"轻触", "相扶"},
+	{"相邻", "并肩"},
+	{"榻边", "屋内"},
+	{"肤色", "光影"},
+	{"浅淡", "柔和"},
+	{"景象", "画面"},
+}
+
+const shuihuoImagePromptAggressiveNote = "请以完全含蓄、克制的方式表现：画面干净，人物衣着整齐；不出现任何血腥、伤口、暴力动作、情色暗示或敏感身体描写；只保留人物姿态、场景与情绪氛围。"
+
+// sanitizeShuihuoImagePromptAggressive 在常规降敏之上再做一轮更保守的替换，
+// 用于被内容审核拒绝后的二次生成尝试。
+func sanitizeShuihuoImagePromptAggressive(prompt string) string {
+	result := prompt
+	for _, rule := range shuihuoImagePromptSofteningRules {
+		if !strings.Contains(result, rule.from) {
+			continue
+		}
+		result = strings.ReplaceAll(result, rule.from, rule.to)
+	}
+	for _, rule := range shuihuoImagePromptAggressiveRules {
+		if !strings.Contains(result, rule.from) {
+			continue
+		}
+		result = strings.ReplaceAll(result, rule.from, rule.to)
+	}
+	if strings.TrimSpace(result) == "" {
+		return prompt
+	}
+	return strings.TrimSpace(result) + "\n\n" + shuihuoImagePromptAggressiveNote
+}
+
+type shuihuoImageEventContextKey struct{}
+
+// withShuihuoImageEvent 把出图过程中的去敏、审核拒绝、降级重试事件交给调用方
+// 写进任务日志。没有绑定日志时为空操作。
+func withShuihuoImageEvent(ctx context.Context, report func(stage, message string)) context.Context {
+	if report == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoImageEventContextKey{}, report)
+}
+
+func reportShuihuoImageEvent(ctx context.Context, stage, message string) {
+	if ctx == nil || strings.TrimSpace(message) == "" {
+		return
+	}
+	if report, ok := ctx.Value(shuihuoImageEventContextKey{}).(func(stage, message string)); ok && report != nil {
+		report(stage, message)
+	}
+}
+
+func shuihuoImageResponseContentRejected(statusCode int, raw []byte) bool {
+	if statusCode != http.StatusBadRequest && statusCode != http.StatusForbidden && statusCode != http.StatusUnprocessableEntity {
+		return false
+	}
+	detail := strings.ToLower(string(raw))
+	for _, keyword := range []string{"违规", "违反", "内容政策", "content policy", "content_policy", "moderation", "safety", "unsafe", "blocked"} {
+		if strings.Contains(detail, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func shuihuoImageModelSupportsEdits(model map[string]any, modelID string) bool {
+	if value, ok := model["supportsImageEdits"].(bool); ok {
+		return value
+	}
+	// Several OpenAI-compatible gateways expose gpt-image models only through
+	// /images/generations. Sending their comic asset references to /edits makes
+	// the request hang or return an unsupported-operation response. The full
+	// comic prompt still carries the visual descriptions, so generation remains
+	// useful while the model is configured without explicit edit support.
+	return !shuihuoIsGPTImageModel(modelID)
+}
+
+func shuihuoIsGPTImageModel(modelID string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(modelID)), "gpt-image")
+}
+
+func shuihuoImageProviderErrorDetail(raw []byte) string {
+	message := strings.TrimSpace(string(raw))
+	if message == "" {
+		return ""
+	}
+	var payload map[string]any
+	if json.Unmarshal(raw, &payload) == nil {
+		if nested, ok := payload["error"].(map[string]any); ok {
+			for _, key := range []string{"message", "detail", "code"} {
+				if value := strings.TrimSpace(fmt.Sprint(nested[key])); value != "" && value != "<nil>" {
+					message = value
+					break
+				}
+			}
+		} else if value, ok := payload["message"].(string); ok && strings.TrimSpace(value) != "" {
+			message = strings.TrimSpace(value)
+		}
+	}
+	message = strings.Join(strings.Fields(message), " ")
+	if len([]rune(message)) > 240 {
+		message = string([]rune(message)[:240]) + "..."
+	}
+	return ": " + message
+}
+
+func newShuihuoImageEditRequest(ctx context.Context, generationEndpoint, modelID, prompt, size string, references []string) (*http.Request, error) {
+	editEndpoint := strings.TrimSuffix(generationEndpoint, "/generations") + "/edits"
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("model", modelID)
+	_ = writer.WriteField("prompt", prompt)
+	_ = writer.WriteField("n", "1")
+	_ = writer.WriteField("size", size)
+	_ = writer.WriteField("response_format", "b64_json")
+	client := &http.Client{Timeout: 60 * time.Second}
+	for index, reference := range references {
+		payload, mediaType, err := readShuihuoReferenceImage(ctx, client, reference)
+		if err != nil {
+			_ = writer.Close()
+			return nil, err
+		}
+		part, err := writer.CreateFormFile("image[]", fmt.Sprintf("reference-%d.%s", index+1, shuihuoImageExtension(mediaType)))
+		if err != nil {
+			_ = writer.Close()
+			return nil, err
+		}
+		if _, err := part.Write(payload); err != nil {
+			_ = writer.Close()
+			return nil, err
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, editEndpoint, &body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req, nil
+}
+
+func readShuihuoReferenceImage(ctx context.Context, client *http.Client, reference string) ([]byte, string, error) {
+	value := strings.TrimSpace(reference)
+	if strings.HasPrefix(value, "data:") {
+		comma := strings.IndexByte(value, ',')
+		if comma <= len("data:") {
+			return nil, "", fmt.Errorf("invalid reference image data")
+		}
+		meta := value[len("data:"):comma]
+		parts := strings.Split(meta, ";")
+		mediaType := parts[0]
+		if len(parts) < 2 || parts[1] != "base64" || mediaType == "" {
+			return nil, "", fmt.Errorf("unsupported reference image data")
+		}
+		payload, err := base64.StdEncoding.DecodeString(value[comma+1:])
+		if err != nil || len(payload) == 0 {
+			return nil, "", fmt.Errorf("invalid reference image data")
+		}
+		return payload, mediaType, nil
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, value, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("reference image download returned HTTP %d", response.StatusCode)
+	}
+	payload, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	if err != nil || len(payload) == 0 {
+		return nil, "", fmt.Errorf("reference image download returned empty content")
+	}
+	mediaType := response.Header.Get("Content-Type")
+	if index := strings.IndexByte(mediaType, ';'); index >= 0 {
+		mediaType = mediaType[:index]
+	}
+	if mediaType == "" {
+		mediaType = detectedShuihuoImageMediaType(payload)
+	}
+	return payload, mediaType, nil
+}
+
+func shuihuoImageExtension(mediaType string) string {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "image/jpeg", "image/jpg":
+		return "jpg"
+	case "image/webp":
+		return "webp"
+	default:
+		return "png"
+	}
+}
+
+const shuihuoRelayImageRequestTimeout = 12 * time.Minute
+
+func generateShuihuoRelayImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, prompt string, references []string, baseURL, token, account string) (string, string, string, error) {
+	if token == "" {
+		return "", "", "", fmt.Errorf("%w: doubao relay bearer token is missing", batchfactoryv11.ErrUnavailable)
+	}
+	payload := map[string]any{"model": relayImageModel(target.ModelID), "prompt": prompt, "ratio": target.AspectRatio}
+	if account != "" {
+		payload["account"] = account
+	}
+	if len(references) > 0 {
+		payload["ref_image"] = references
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/v1/images/generations", bytes.NewReader(body))
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: doubao relay request failed", batchfactoryv11.ErrUpstream)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	response, err := (&http.Client{Timeout: shuihuoRelayImageRequestTimeout}).Do(req)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: doubao relay request failed: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	defer response.Body.Close()
+	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+		detail := string(raw)
+		if len(detail) > 500 {
+			detail = detail[:500]
+		}
+		return "", "", "", fmt.Errorf("%w: doubao relay returned HTTP %d: %s", batchfactoryv11.ErrUpstream, response.StatusCode, detail)
+	}
+	var result struct {
+		Data []struct {
+			URL      string `json:"url"`
+			LocalURL string `json:"local_url"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
+		return "", "", "", fmt.Errorf("%w: doubao relay response is invalid", batchfactoryv11.ErrUpstream)
+	}
+	imageURL := result.Data[0].LocalURL
+	if imageURL == "" {
+		imageURL = result.Data[0].URL
+	}
+	if imageURL == "" {
+		return "", "", "", fmt.Errorf("%w: doubao relay returned no image URL", batchfactoryv11.ErrUpstream)
+	}
+	imageReq, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: relay image URL is invalid", batchfactoryv11.ErrUpstream)
+	}
+	imageReq.Header.Set("Authorization", "Bearer "+token)
+	imageResponse, err := (&http.Client{Timeout: 60 * time.Second}).Do(imageReq)
+	if err != nil {
+		return "", "", "", fmt.Errorf("%w: relay image download failed: %v", batchfactoryv11.ErrUpstream, err)
+	}
+	defer imageResponse.Body.Close()
+	if imageResponse.StatusCode < 200 || imageResponse.StatusCode >= 300 {
+		return "", "", "", fmt.Errorf("%w: relay image download returned HTTP %d", batchfactoryv11.ErrUpstream, imageResponse.StatusCode)
+	}
+	mediaType := imageResponse.Header.Get("Content-Type")
+	if mediaType == "" {
+		mediaType = "image/png"
+	}
+	imageBytes, err := io.ReadAll(io.LimitReader(imageResponse.Body, 32<<20))
+	if err != nil || len(imageBytes) == 0 {
+		return "", "", "", fmt.Errorf("%w: relay image body is invalid", batchfactoryv11.ErrUpstream)
 	}
 	artifactID, err := localexecutor.NewArtifactID()
 	if err != nil {
@@ -2915,7 +3768,24 @@ func generateShuihuoImageArtifact(ctx context.Context, files *localartifact.Stor
 	if err != nil {
 		return "", "", "", err
 	}
-	return mediaType, saved.StorageRef, "provider", nil
+	// The relay is the HTTP transport, but it is still the local Doubao
+	// provider from the asset store's perspective. Keep the source value within
+	// the existing allow-list so generated images can be persisted and selected
+	// as the primary asset image.
+	return mediaType, saved.StorageRef, batchfactoryv11.VideoProviderDoubaoLocal, nil
+}
+
+func relayImageModel(model string) string {
+	switch strings.ToLower(strings.TrimSpace(model)) {
+	case "seedream 4.0":
+		return "doubao-image-4.0"
+	case "seedream 5.0 flash":
+		return "doubao-image-5.0-flash"
+	case "seedream 5.0 pro":
+		return "doubao-image-5.0-flash"
+	default:
+		return "doubao-image-4.5"
+	}
 }
 
 type shuihuoAssetImageTarget struct {
@@ -2927,9 +3797,15 @@ type shuihuoAssetImageTarget struct {
 
 func resolveShuihuoAssetImageTarget(asset batchfactoryv11.BookAsset, fallbackModelID, fallbackAspectRatio, fallbackProvider string, catalog []map[string]any) (shuihuoAssetImageTarget, error) {
 	selectedModelID, resolvedAspectRatio := resolveShuihuoAssetImageSettings(asset, fallbackModelID, fallbackAspectRatio)
+	return resolveShuihuoImageTarget(selectedModelID, fallbackModelID, resolvedAspectRatio, fallbackProvider, catalog)
+}
+
+func resolveShuihuoImageTarget(selectedModelID, fallbackModelID, aspectRatio, fallbackProvider string, catalog []map[string]any) (shuihuoAssetImageTarget, error) {
+	selectedModelID = strings.TrimSpace(selectedModelID)
+	aspectRatio = strings.TrimSpace(aspectRatio)
 	provider := batchfactoryv11.NormalizeVideoProviderForHTTP(fallbackProvider)
 	if provider == batchfactoryv11.VideoProviderDoubaoLocal && selectedModelID != "" {
-		return shuihuoAssetImageTarget{Provider: provider, ModelID: selectedModelID, AspectRatio: resolvedAspectRatio}, nil
+		return shuihuoAssetImageTarget{Provider: provider, ModelID: selectedModelID, AspectRatio: aspectRatio}, nil
 	}
 	for _, candidate := range catalog {
 		if !strings.EqualFold(modelString(candidate, "kind"), "image") {
@@ -2952,21 +3828,21 @@ func resolveShuihuoAssetImageTarget(asset batchfactoryv11.BookAsset, fallbackMod
 		return shuihuoAssetImageTarget{
 			Provider:     batchfactoryv11.NormalizeVideoProviderForHTTP(candidateProvider),
 			ModelID:      providerModelID,
-			AspectRatio:  resolvedAspectRatio,
+			AspectRatio:  aspectRatio,
 			CatalogModel: candidate,
 		}, nil
 	}
 	return shuihuoAssetImageTarget{}, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
 }
 
-func resolveShuihuoAssetImageSettings(asset batchfactoryv11.BookAsset, fallbackModelID, fallbackAspectRatio string) (modelID, aspectRatio string) {
+func resolveShuihuoAssetImageSettings(asset batchfactoryv11.BookAsset, fallbackModelID, _ string) (modelID, aspectRatio string) {
 	modelID = strings.TrimSpace(asset.ImageModelID)
 	if modelID == "" {
 		modelID = strings.TrimSpace(fallbackModelID)
 	}
 	aspectRatio = strings.TrimSpace(asset.ImageAspectRatio)
 	if aspectRatio == "" {
-		aspectRatio = strings.TrimSpace(fallbackAspectRatio)
+		aspectRatio = "16:9"
 	}
 	return modelID, aspectRatio
 }
@@ -2990,7 +3866,9 @@ func waitForLocalExecutorImage(ctx context.Context, service *localexecutor.Servi
 	if err != nil {
 		return "", "", fmt.Errorf("%w: 创建豆包图片任务失败: %v", batchfactoryv11.ErrUpstream, err)
 	}
-	deadline := time.NewTimer(180 * time.Second)
+	// 豆包图片任务在带参考图和长提示词时可能超过三分钟；只要执行器仍在
+	// generating，就继续等待，避免后端先判超时而丢掉即将返回的结果。
+	deadline := time.NewTimer(10 * time.Minute)
 	defer deadline.Stop()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -3180,7 +4058,7 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 	if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
 		return nil, fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
 	}
-	mediaType, imageBytes, decodeErr := decodeShuihuoGeneratedImage(ctx, &http.Client{Timeout: 120 * time.Second}, result.Data[0].B64JSON, result.Data[0].URL)
+	mediaType, imageBytes, decodeErr := decodeShuihuoGeneratedImage(ctx, shuihuoImageDownloadHTTPClient(), result.Data[0].B64JSON, result.Data[0].URL, apiKey, endpoint)
 	if decodeErr != nil {
 		return nil, fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, decodeErr)
 	}
@@ -3234,30 +4112,153 @@ func shuihuoImageSize(aspectRatio string) string {
 	}
 }
 
-func decodeShuihuoGeneratedImage(ctx context.Context, client *http.Client, b64, imageURL string) (string, []byte, error) {
-	if strings.TrimSpace(b64) != "" {
-		payload, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64))
+func shuihuoImageSizeForModel(modelID, aspectRatio string) string {
+	if !shuihuoIsGPTImageModel(modelID) {
+		return shuihuoImageSize(aspectRatio)
+	}
+	// OpenAI-compatible gpt-image endpoints commonly support 1024x1024,
+	// 1024x1536 and 1536x1024, rather than the older 1024x1792 sizes.
+	switch strings.TrimSpace(aspectRatio) {
+	case "9:16", "3:4":
+		return "1024x1536"
+	case "16:9", "4:3":
+		return "1536x1024"
+	default:
+		return "1024x1024"
+	}
+}
+
+func decodeShuihuoGeneratedImage(ctx context.Context, client *http.Client, b64, imageURL, credential, providerEndpoint string) (string, []byte, error) {
+	encoded := strings.TrimSpace(b64)
+	if encoded != "" {
+		if strings.HasPrefix(strings.ToLower(encoded), "data:") {
+			mediaType, payload, err := decodeImageDataURL(encoded)
+			if err != nil {
+				return "", nil, fmt.Errorf("image provider returned invalid data url: %v", err)
+			}
+			return mediaType, payload, nil
+		}
+		payload, err := decodeShuihuoBase64(encoded)
 		if err != nil || len(payload) == 0 {
 			return "", nil, fmt.Errorf("image provider returned invalid base64")
 		}
 		return detectedShuihuoImageMediaType(payload), payload, nil
 	}
-	if strings.TrimSpace(imageURL) == "" {
+
+	imageURL = strings.TrimSpace(imageURL)
+	if imageURL == "" {
 		return "", nil, fmt.Errorf("image provider returned no image")
 	}
-	response, err := client.Get(imageURL)
+	if strings.HasPrefix(strings.ToLower(imageURL), "data:") {
+		mediaType, payload, err := decodeImageDataURL(imageURL)
+		if err != nil {
+			return "", nil, fmt.Errorf("image provider returned invalid data url: %v", err)
+		}
+		return mediaType, payload, nil
+	}
+
+	parsedImageURL, err := url.Parse(imageURL)
+	if err != nil || parsedImageURL.Scheme == "" || parsedImageURL.Host == "" {
+		return "", nil, fmt.Errorf("image provider returned invalid image url")
+	}
+	allowCredential := sameShuihuoImageOrigin(imageURL, providerEndpoint) && strings.TrimSpace(credential) != ""
+	mediaType, payload, statusCode, downloadErr := downloadShuihuoGeneratedImageWithRetry(ctx, client, imageURL, "", false)
+	if downloadErr == nil {
+		return mediaType, payload, nil
+	}
+	if allowCredential {
+		if retryMediaType, retryPayload, retryStatus, retryErr := downloadShuihuoGeneratedImageWithRetry(ctx, client, imageURL, credential, true); retryErr == nil {
+			log.Printf("shuihuo image URL required provider authorization host=%s", parsedImageURL.Host)
+			return retryMediaType, retryPayload, nil
+		} else if retryStatus != 0 {
+			statusCode = retryStatus
+			downloadErr = retryErr
+		}
+	}
+	if downloadErr != nil && statusCode != 0 {
+		return "", nil, fmt.Errorf("image download failed with HTTP %d: %w", statusCode, downloadErr)
+	}
+	if downloadErr != nil {
+		return "", nil, fmt.Errorf("image download failed: %w", downloadErr)
+	}
+	return "", nil, fmt.Errorf("image download returned no payload")
+}
+
+func decodeShuihuoBase64(value string) ([]byte, error) {
+	value = strings.TrimSpace(value)
+	decoders := []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding}
+	for _, decoder := range decoders {
+		if payload, err := decoder.DecodeString(value); err == nil && len(payload) > 0 {
+			return payload, nil
+		}
+	}
+	return nil, errors.New("invalid base64")
+}
+
+func sameShuihuoImageOrigin(imageURL, providerEndpoint string) bool {
+	imageParsed, imageErr := url.Parse(strings.TrimSpace(imageURL))
+	providerParsed, providerErr := url.Parse(strings.TrimSpace(providerEndpoint))
+	if imageErr != nil || providerErr != nil || imageParsed == nil || providerParsed == nil {
+		return false
+	}
+	return strings.EqualFold(imageParsed.Scheme, providerParsed.Scheme) && strings.EqualFold(imageParsed.Host, providerParsed.Host)
+}
+
+func downloadShuihuoGeneratedImage(ctx context.Context, client *http.Client, imageURL, credential string, withCredential bool) (string, []byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
+	}
+	req.Header.Set("Accept", "image/*")
+	if withCredential {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(credential))
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return "", nil, 0, err
 	}
 	defer response.Body.Close()
+	payload, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+	if readErr != nil {
+		return "", nil, response.StatusCode, readErr
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", nil, fmt.Errorf("image download returned HTTP %d", response.StatusCode)
+		return "", nil, response.StatusCode, fmt.Errorf("image download returned HTTP %d", response.StatusCode)
 	}
-	payload, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
-	if err != nil || len(payload) == 0 {
-		return "", nil, fmt.Errorf("image download returned empty content")
+	if len(payload) == 0 {
+		return "", nil, response.StatusCode, fmt.Errorf("image download returned empty content")
 	}
-	return detectedShuihuoImageMediaType(payload), payload, nil
+	return detectedShuihuoImageMediaType(payload), payload, response.StatusCode, nil
+}
+
+func downloadShuihuoGeneratedImageWithRetry(ctx context.Context, client *http.Client, imageURL, credential string, withCredential bool) (string, []byte, int, error) {
+	const maxAttempts = 3
+	parsed, _ := url.Parse(imageURL)
+	host := "unknown"
+	if parsed != nil && parsed.Host != "" {
+		host = parsed.Host
+	}
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		mediaType, payload, status, err := downloadShuihuoGeneratedImage(ctx, client, imageURL, credential, withCredential)
+		if err == nil {
+			return mediaType, payload, status, nil
+		}
+
+		log.Printf("shuihuo image download failed host=%s attempt=%d/%d status=%d withCredential=%t error=%v", host, attempt, maxAttempts, status, withCredential, err)
+		if attempt == maxAttempts || (status >= 400 && status < 500) {
+			return mediaType, payload, status, err
+		}
+
+		delay := time.Duration(attempt) * time.Second
+		select {
+		case <-ctx.Done():
+			return mediaType, payload, status, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+
+	return "", nil, 0, nil
 }
 
 func detectedShuihuoImageMediaType(payload []byte) string {
