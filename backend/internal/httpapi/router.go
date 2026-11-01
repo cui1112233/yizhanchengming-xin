@@ -167,7 +167,13 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerConfiguredImageGenerationRoute(v11, options.Store, options.NovelFetchStore)
 		registerConfiguredImageGenerationRoute(v12, options.Store, options.NovelFetchStore)
 		registerBookAssetRoutes(v11, options.Store, options.LocalArtifacts)
-		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog, options.NovelFetchStore)
+		registerV12AssetGenerationRoute(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.PresetCatalog, options.NovelFetchStore, func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
+			provider := providerForBatchClassification(ctx, owner, batchFetchClassification{RewriteProvider: options.NovelFetchRewrite, RewriteResolver: options.NovelFetchRewriteResolver})
+			if provider == nil {
+				return "", batchfactoryv11.ErrUnavailable
+			}
+			return provider.Complete(ctx, request)
+		})
 		registerComicPageRoutes(v12, options.Store, options.LocalArtifacts, options.LocalExecutors, options.NovelFetchStore, options.PresetCatalog, options.AuthStore, options.MemberProfileStore, options.Director, comicGenerationGate)
 	}
 	registerN8ComicPublishRoutes(v12, options.N8ComicPublisher)

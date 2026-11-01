@@ -2939,7 +2939,13 @@ func generateShuihuoAssetImages(ctx context.Context, store batchfactoryv11.Store
 	return generateShuihuoAssetImagesWithPresetCatalog(ctx, store, files, owner, batch, assetIDs, modelID, aspectRatio, provider, localExecutors, nil, catalogStores...)
 }
 
+type comicPromptRewriter func(context.Context, string, novelfetchworkshop.RewriteRequest) (string, error)
+
 func generateShuihuoAssetImagesWithPresetCatalog(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
+	return generateShuihuoAssetImagesWithRepair(ctx, store, files, owner, batch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, nil, catalogStores...)
+}
+
+func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, owner string, batch batchfactoryv11.Batch, assetIDs []string, modelID, aspectRatio, provider string, localExecutors *localexecutor.Service, presetCatalog *prompt.Catalog, rewrite comicPromptRewriter, catalogStores ...novelfetchworkshop.Store) ([]batchfactoryv11.BookAssetImage, error) {
 	if len(batch.Books) == 0 {
 		return nil, fmt.Errorf("%w: project has no source book", batchfactoryv11.ErrInvalid)
 	}
@@ -3022,7 +3028,32 @@ func generateShuihuoAssetImagesWithPresetCatalog(ctx context.Context, store batc
 				return
 			}
 			defer func() { <-sem }()
-			mediaType, storageRef, source, generateErr := generateShuihuoAssetImageArtifactWithRetry(workCtx, store, files, presetCatalog, owner, item.target, item.prompt, item.referenceURLs, localExecutors)
+			generationPrompt := item.prompt
+			repairKey := comicAssetRepairKey(batch.ID, batch.Books[0].ID, item.asset.ID)
+			if cached, ok := shuihuoRepairedPrompts.Load(repairKey); ok {
+				if repaired, textOK := cached.(string); textOK && strings.TrimSpace(repaired) != "" {
+					generationPrompt = repaired
+					if progress != nil {
+						progress("comic_asset_images", fmt.Sprintf("资产 %s 复用已修复提示词", item.asset.Name))
+					}
+				}
+			}
+			mediaType, storageRef, source, generateErr := generateShuihuoAssetImageArtifactWithRetry(workCtx, store, files, presetCatalog, owner, item.target, generationPrompt, item.referenceURLs, localExecutors)
+			if errors.Is(generateErr, errShuihuoImageContentPolicy) && rewrite != nil {
+				if progress != nil {
+					progress("comic_asset_images", fmt.Sprintf("资产 %s 三轮尝试后被内容审核拒绝，正在自动改写提示词", item.asset.Name))
+				}
+				repaired := repairComicImagePrompt(workCtx, owner, generationPrompt, generateErr.Error(), rewrite, true)
+				if strings.TrimSpace(repaired) != "" && repaired != generationPrompt {
+					shuihuoRepairedPrompts.Store(repairKey, repaired)
+					if progress != nil {
+						progress("comic_asset_images", fmt.Sprintf("资产 %s 提示词已去敏，正在重新生成", item.asset.Name))
+					}
+					mediaType, storageRef, source, generateErr = generateShuihuoImageArtifact(workCtx, store, files, presetCatalog, owner, item.target, repaired, item.referenceURLs, localExecutors)
+				}
+			} else if errors.Is(generateErr, errShuihuoImageContentPolicy) && progress != nil {
+				progress("comic_asset_images", fmt.Sprintf("资产 %s 三轮尝试后仍被内容审核拒绝，跳过并继续其它资产", item.asset.Name))
+			}
 			if generateErr != nil {
 				resultMu.Lock()
 				if errors.Is(generateErr, errShuihuoImageContentPolicy) {
