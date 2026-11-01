@@ -67,7 +67,11 @@ func runComicPageWork(ctx context.Context, work []comicPageWorkItem, concurrency
 			}
 			if err := generate(ctx, item); err != nil {
 				resultMu.Lock()
-				if !errors.Is(err, errShuihuoImageContentPolicy) && firstErr == nil {
+				// 内容审核拒绝和“该页仍在生成中”都不属于永久失败：前者已由
+				// 调用方跳过，后者是上一轮 detached worker 还没释放页面锁。
+				// 中止整本会让这些在途任务变成下一轮的 revision conflict，
+				// 所以这里继续跑完其它页，最后再由合集校验决定是否补页。
+				if !errors.Is(err, errShuihuoImageContentPolicy) && !comicPageGenerationInFlightError(err) && firstErr == nil {
 					firstErr = err
 					stopQueue()
 				}
@@ -108,6 +112,17 @@ func detachedGenerationContext(parent context.Context, max time.Duration) (conte
 
 func comicPageGenerationContext(parent context.Context) (context.Context, context.CancelFunc) {
 	return detachedGenerationContext(parent, comicPageDetachedGenerationTimeout)
+}
+
+// comicPageGenerationInFlightError 表示同一页还有一次生成没有结束。上一次
+// 整本尝试被其它页的错误中止时，它的 detached 生成仍会继续跑，因此重试很
+// 容易撞上这个锁。它和内容审核拒绝一样不应中止整本。
+func comicPageGenerationInFlightError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "当前漫画页正在生成") || strings.Contains(message, "当前漫画页已有生成任务")
 }
 
 // The provider may finish after the browser request has gone away. Keep the
@@ -581,6 +596,13 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 				log.Printf("comic page skipped by content policy batch=%s book=%s page=%s err=%v", batchID, bookID, item.page.Label, generateErr)
 				if progress != nil {
 					progress("comic_images", fmt.Sprintf("%s 两次降级后仍被内容审核拒绝，本次跳过并继续生成其它页", item.page.Label))
+				}
+				return generateErr
+			}
+			if comicPageGenerationInFlightError(generateErr) {
+				log.Printf("comic page still generating elsewhere batch=%s book=%s page=%s err=%v", batchID, bookID, item.page.Label, generateErr)
+				if progress != nil {
+					progress("comic_images", fmt.Sprintf("%s 上一次生成仍在跑，本次跳过并继续生成其它页，稍后自动补齐", item.page.Label))
 				}
 				return generateErr
 			}

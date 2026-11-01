@@ -3561,7 +3561,9 @@ func shuihuoImageResponseContentRejected(statusCode int, raw []byte) bool {
 	for _, keyword := range []string{"违规", "违反", "内容政策", "content policy", "content_policy", "moderation", "safety", "unsafe", "blocked",
 		// 部分网关不会返回标准审核文案，而是让模型回一句“目前未能成功生成图片，
 		// 请重新发送一次生成请求”。这只是软拒绝，同样需要走降级提示词重试。
-		"未能成功生成图片", "请重新发送一次生成请求", "unable to generate", "could not generate"} {
+		// 不同网关的措辞不统一（“未能完成”“重新发送一次生成指令”也算），
+		// 所以匹配范围放宽到“重新发送/未能完成/无法完成”。
+		"未能成功生成图片", "未能完成", "无法完成", "重新发送", "unable to generate", "could not generate", "please resend"} {
 		if strings.Contains(detail, keyword) {
 			return true
 		}
