@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$OutputDir = '',
   [switch]$SkipFrontendBuild,
   [switch]$Deploy,
