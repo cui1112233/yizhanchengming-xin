@@ -3030,6 +3030,9 @@ func generateShuihuoAssetImagesWithPresetCatalog(ctx context.Context, store batc
 					// 因此中止，其它资产仍然要生成完。
 					log.Printf("comic asset image skipped by content policy batch=%s asset=%s err=%v", batch.ID, item.asset.Name, generateErr)
 					skippedByPolicy++
+					if progress != nil {
+						progress("comic_asset_images", fmt.Sprintf("%s 两次降级后仍被内容审核拒绝，本次跳过，稍后整本自动重试", item.asset.Name))
+					}
 				} else if firstErr == nil {
 					firstErr = fmt.Errorf("%s 资产图生成失败: %w", item.asset.Name, generateErr)
 				}
@@ -3460,7 +3463,14 @@ var shuihuoImagePromptAggressiveRules = []struct {
 	from string
 	to   string
 }{
+	// 纸质道具（合同、声明、信件）被“撕开/破损”的描述经常被网关软拒绝，
+	// 保留内容但改成完整的纸张，避免整张资产图被跳过。
+	{"撕成两截", "分成两份"},
+	{"撕碎", "分成碎片"},
+	{"撕裂", "分开"},
 	{"衣襟破损", "衣襟整齐"},
+	{"破损", "完整"},
+	{"残破", "完整"},
 	{"地面痕迹", "地面"},
 	{"暗色痕迹", "地面"},
 	{"暗红", "深色"},
@@ -3548,7 +3558,10 @@ func shuihuoImageResponseContentRejected(statusCode int, raw []byte) bool {
 		return false
 	}
 	detail := strings.ToLower(string(raw))
-	for _, keyword := range []string{"违规", "违反", "内容政策", "content policy", "content_policy", "moderation", "safety", "unsafe", "blocked"} {
+	for _, keyword := range []string{"违规", "违反", "内容政策", "content policy", "content_policy", "moderation", "safety", "unsafe", "blocked",
+		// 部分网关不会返回标准审核文案，而是让模型回一句“目前未能成功生成图片，
+		// 请重新发送一次生成请求”。这只是软拒绝，同样需要走降级提示词重试。
+		"未能成功生成图片", "请重新发送一次生成请求", "unable to generate", "could not generate"} {
 		if strings.Contains(detail, keyword) {
 			return true
 		}

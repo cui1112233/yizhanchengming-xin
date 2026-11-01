@@ -94,7 +94,7 @@ func comicAssetConcurrencyFromContext(ctx context.Context) int {
 }
 
 func comicGenerationFailureStage(err error) (string, string) {
-	if err != nil && strings.Contains(err.Error(), "漫画资产图生成失败") {
+	if err != nil && (strings.Contains(err.Error(), "漫画资产图生成失败") || strings.Contains(err.Error(), "漫画资产图未全部写回")) {
 		return "comic_asset_images", "漫画资产参考图生成失败"
 	}
 	return "comic_images", "整本漫画出图失败"
@@ -188,7 +188,11 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 					continue
 				}
 				if automationStringValue(entry["retryReason"], "") == "content_policy" {
-					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "comic_images", "到达重试时间，正在重新生成被内容审核拒绝的漫画页", now
+					stage := automationStringValue(entry["stage"], "")
+					if stage == "" {
+						stage = "comic_images"
+					}
+					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", stage, "到达重试时间，正在重新生成被内容审核拒绝的内容", now
 					delete(entry, "retryReason")
 				} else {
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "assets", "超时后自动重试中", now
@@ -1083,9 +1087,16 @@ func comicMissingPageError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "个漫画页缺少主图")
 }
 
+// comicMissingAssetError 表示漫画资产图阶段结束后仍有资产没有主图。审核拒绝
+// 的资产图会被跳过而不是中断整本，所以这里同样按“等待退避重试”处理，避免
+// 一次软拒绝就把整本书打成永久失败。
+func comicMissingAssetError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "漫画资产图未全部写回")
+}
+
 // scheduleComicContentPolicyRetry 把整本标记为“等待缺页重试”，由调度器在
 // 退避时间到达后重新执行。返回 false 表示重试预算已用完，调用方应转入失败。
-func (c *BatchAutomationCoordinator) scheduleComicContentPolicyRetry(entry map[string]any, persist func()) bool {
+func (c *BatchAutomationCoordinator) scheduleComicContentPolicyRetry(entry map[string]any, persist func(), stage string) bool {
 	if entry == nil || persist == nil {
 		return false
 	}
@@ -1094,14 +1105,17 @@ func (c *BatchAutomationCoordinator) scheduleComicContentPolicyRetry(entry map[s
 		return false
 	}
 	attempt++
+	if stage == "" {
+		stage = "comic_images"
+	}
 	now := c.now()
-	message := fmt.Sprintf("有漫画页两次降级后仍被内容审核拒绝，%d 分钟后自动重试缺页（%d/%d）", int(comicContentPolicyRetryDelay.Minutes()), attempt, comicContentPolicyRetryLimit)
+	message := fmt.Sprintf("有漫画资产图或漫画页两次降级后仍被内容审核拒绝，%d 分钟后自动重试（%d/%d）", int(comicContentPolicyRetryDelay.Minutes()), attempt, comicContentPolicyRetryLimit)
 	entry["contentPolicyRetryCount"] = attempt
-	entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "running", "comic_images", "", message, now
+	entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "running", stage, "", message, now
 	entry["retryRequested"] = true
 	entry["retryReason"] = "content_policy"
 	entry["retryAt"] = now.Add(comicContentPolicyRetryDelay)
-	appendAutomationBookLog(entry, now, "comic_images", message)
+	appendAutomationBookLog(entry, now, stage, message)
 	persist()
 	return true
 }
@@ -1712,13 +1726,14 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					generationCancel()
 					if generateErr != nil {
 						failureStage, failureDetail := comicGenerationFailureStage(generateErr)
-						// 被内容审核拒绝的页会被跳过，合集因此缺主图。这里不把整本
-						// 打成永久失败，而是按退避时间自动重试缺页，其它书照常继续。
-						if comicMissingPageError(generateErr) {
-							if c.scheduleComicContentPolicyRetry(entry, persist) {
+						// 被内容审核拒绝的资产图会跳过，页会被跳过，合集/资产校验
+						// 因此报缺图。这里不把整本打成永久失败，而是按退避时间自动
+						// 重试缺失内容，其它书照常继续。
+						if comicMissingPageError(generateErr) || comicMissingAssetError(generateErr) {
+							if c.scheduleComicContentPolicyRetry(entry, persist, failureStage) {
 								continue
 							}
-							fail("comic_images", generateErr, fmt.Sprintf("被内容审核拒绝的漫画页自动重试 %d 次仍未通过，请修改该页提示词后手动重试", comicContentPolicyRetryLimit))
+							fail(failureStage, generateErr, fmt.Sprintf("被内容审核拒绝的漫画资产图/漫画页自动重试 %d 次仍未通过，请调整对应提示词后手动重试", comicContentPolicyRetryLimit))
 							continue
 						}
 						fail(failureStage, generateErr, failureDetail)
