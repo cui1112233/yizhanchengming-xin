@@ -450,7 +450,16 @@ func resolveSingleFetchPlatform(inputPlatform string, book batchfactoryv11.Book)
 	if candidate := firstMetadataString(book.SourceMetadata, "platformId", "platform_id"); numericPlatformID(candidate) != "" {
 		return strings.TrimSpace(candidate)
 	}
-	return platform
+	return normalizeSingleFetchPlatformAlias(platform)
+}
+
+func normalizeSingleFetchPlatformAlias(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "yg", "阳光", "点众", "点众付费", "yg-阳光-点众付费":
+		return "4"
+	default:
+		return strings.TrimSpace(value)
+	}
 }
 
 func numericPlatformID(value string) string {

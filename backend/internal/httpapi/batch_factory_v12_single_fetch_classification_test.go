@@ -50,6 +50,8 @@ func TestResolveSingleFetchPlatform(t *testing.T) {
 		{name: "giant material name falls back to metadata platformId", book: giantBook, want: "3"},
 		{name: "platform_id key variant", book: batchfactoryv11.Book{Platform: "知乎", SourceMetadata: map[string]any{"platform_id": "15"}}, want: "15"},
 		{name: "non-numeric metadata ignored", book: batchfactoryv11.Book{Platform: "番茄", SourceMetadata: map[string]any{"platformId": "fanqie"}}, want: "番茄"},
+		{name: "legacy YG alias maps to Dianzhong", book: batchfactoryv11.Book{Platform: "YG"}, want: "4"},
+		{name: "legacy full alias maps to Dianzhong", book: batchfactoryv11.Book{Platform: "YG-阳光-点众付费"}, want: "4"},
 		{name: "empty stays empty", book: batchfactoryv11.Book{}, want: ""},
 	}
 	for _, tc := range cases {
