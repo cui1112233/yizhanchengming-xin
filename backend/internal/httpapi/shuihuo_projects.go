@@ -29,6 +29,7 @@ import (
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
+	"qiantie/backend/internal/watermark"
 )
 
 func patchShuihuoModel(current, patch map[string]any) (map[string]any, error) {
@@ -126,6 +127,27 @@ func (s *shuihuoImageSemaphore) acquire(ctx context.Context) (func(), error) {
 var shuihuoImageGenerationSemaphore = newShuihuoImageSemaphore(shuihuoImageGenerationConcurrency())
 
 type shuihuoImageConcurrencyContextKey struct{}
+
+type shuihuoEffectiveSettingsContextKey struct{}
+
+// withShuihuoEffectiveSettings 把批次生效设置注入上下文，让出图函数在保存前
+// 读取水印等配置。未设置时水印功能默认关闭。
+func withShuihuoEffectiveSettings(ctx context.Context, settings map[string]any) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoEffectiveSettingsContextKey{}, settings)
+}
+
+func shuihuoEffectiveSettingsFromContext(ctx context.Context) map[string]any {
+	if ctx == nil {
+		return nil
+	}
+	if settings, ok := ctx.Value(shuihuoEffectiveSettingsContextKey{}).(map[string]any); ok {
+		return settings
+	}
+	return nil
+}
 
 // withShuihuoImageConcurrency 把当前书生效的出图并发写进上下文，由真正的
 // 图片请求读取。未设置时使用默认并发。
@@ -3003,6 +3025,8 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 	assetImageConcurrency := comicAssetConcurrencyFromContext(ctx)
 	// 资产图与漫画页共用统一配置的出图并发上限。
 	workCtx := withShuihuoImageConcurrency(ctx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
+	// 资产图与漫画页共用统一配置，水印设置也一并注入。
+	workCtx = withShuihuoEffectiveSettings(workCtx, comicSettingsToMap(effective))
 	type assetImageResult struct {
 		index      int
 		mediaType  string
@@ -3353,6 +3377,8 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 	if err != nil {
 		return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
 	}
+	// 统一配置启用水印时，在保存前叠加白底方框文字。
+	imageBytes, mediaType = applyShuihuoImageWatermark(ctx, imageBytes, mediaType)
 	artifactID, err := localexecutor.NewArtifactID()
 	if err != nil {
 		return "", "", err
@@ -3362,6 +3388,21 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		return "", "", err
 	}
 	return mediaType, saved.StorageRef, nil
+}
+
+// applyShuihuoImageWatermark 读取统一配置中的水印设置，在生成的图片右下角
+// 叠加白底方框文字。水印开关和文字都来自批次设置，未开启时原样返回。
+func applyShuihuoImageWatermark(ctx context.Context, imageBytes []byte, mediaType string) ([]byte, string) {
+	settings := shuihuoEffectiveSettingsFromContext(ctx)
+	if settings == nil {
+		return imageBytes, mediaType
+	}
+	enabled, _ := settings["watermarkEnabled"].(bool)
+	text, _ := settings["watermarkText"].(string)
+	if !enabled || strings.TrimSpace(text) == "" {
+		return imageBytes, mediaType
+	}
+	return watermark.Apply(imageBytes, mediaType, watermark.Options{Enabled: true, Text: strings.TrimSpace(text)})
 }
 
 // shuihuoLongRunningImageHTTPClient uses HTTP/2 for providers that require it.

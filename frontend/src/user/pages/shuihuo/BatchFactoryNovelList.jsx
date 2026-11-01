@@ -74,6 +74,7 @@ import {
   listComicCollections,
 	getN8ComicPublishStatus,
 	getN8ComicPublishAudioCategories,
+  getN8ComicPublishAudios,
 	searchN8ComicWorks,
 	publishComicCollection,
 	getComicCollectionPublishRecord,
@@ -152,7 +153,7 @@ import { modelOptionsForProvider } from './providerModelBinding';
 import { stripBaseSetupSection } from '../scriptFinalSegment';
 import { formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
 import { agentCanvasURL, bindBatchFactoryBookAndNavigate } from '../agent-canvas-batch-factory.js';
-import { DEFAULT_AUDIO_CATEGORIES, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts.js';
+import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts.js';
 import { ComicReferenceChips } from './ComicReferenceChips.jsx';
 import { removablePageReferences } from './comicReferenceMaterials.js';
 
@@ -161,7 +162,8 @@ const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.
 const UNIFIED_CONFIGURATION_KEYS = [
   'textModelId', 'imageModelId', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'imageConcurrency',
   'storyboardDurationLimit', 'maxVideoDuration', 'audioPlanningEnabled',
-	'audioSource', 'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'comicPublishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount'
+	'audioSource', 'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'comicPublishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount',
+	'watermarkEnabled', 'watermarkText'
 ];
 function readBatchFactoryAudioDuration(blob) {
   return new Promise((resolve, reject) => {
@@ -2379,7 +2381,7 @@ function InlineComicLibrary({ batchId, book, selectedVideoId: controlledSelected
       if (active) setPages(resultData(pageResponse, 'pages') || []);
     }).catch(() => { if (active) setPages([]); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [batchId, book, refreshNonce]);
+  }, [batchId, book?.id, refreshNonce]);
   useEffect(() => {
     if (!videos.some(video => video.id === selectedVideoId) && videos[0]?.id) selectVideo(videos[0].id);
   }, [videos.map(video => video.id).join('|'), selectedVideoId]);
@@ -2419,7 +2421,7 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	const [producerAccountOrganizations, setProducerAccountOrganizations] = useState(cachedPublishDirectory?.producerAccountOrganizations || {});
 	const [producerAccountsWarning, setProducerAccountsWarning] = useState('');
 	const [publishedByCollection, setPublishedByCollection] = useState({});
-	const [publishForm, setPublishForm] = useState({ producerAdminName: '', organizationId: '1', audioCategoryId: null, workIdsText: '' });
+	const [publishForm, setPublishForm] = useState({ producerAdminName: '', organizationId: '1', audioCategoryId: null, specifiedAudioId: null, specifiedAudioName: '', workIdsText: '' });
 	const [workOptions, setWorkOptions] = useState([]);
 	const [workSearchLoading, setWorkSearchLoading] = useState(false);
 	const [workSearchError, setWorkSearchError] = useState('');
@@ -2626,6 +2628,8 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 			producerAdminName: savedProducer,
 			organizationId: String(comicPublishSettings.organizationId || ''),
 			audioCategoryId: Number(selectedAudioCategory?.id || 0) || null,
+			specifiedAudioId: Number(comicPublishSettings.specifiedAudioId || 0) || null,
+			specifiedAudioName: String(comicPublishSettings.specifiedAudioName || ''),
 			workIdsText: String(comicPublishSettings.workIdsText || '')
 		});
 		setWorkOptions([]);
@@ -2640,8 +2644,9 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	async function confirmComicPublish() {
 		const workIds = parsedWorkIDs();
 		const selectedAudioCategoryId = Number(publishForm.audioCategoryId || 0);
+		const selectedAudioId = Number(publishForm.specifiedAudioId || 0);
 		const audioCategoryIsEnabled = audioCategories.some(item => Number(item.id) === selectedAudioCategoryId);
-		if (!publishTarget || !String(publishForm.producerAdminName || '').trim() || !String(publishForm.organizationId || '').trim() || !audioCategoryIsEnabled || !workIds.length) {
+		if (!publishTarget || !String(publishForm.producerAdminName || '').trim() || !String(publishForm.organizationId || '').trim() || !audioCategoryIsEnabled || !selectedAudioId || !workIds.length) {
 			message.error('请填写制作者账号、组织、音频分类 ID 和作品 ID。');
 			return;
 		}
@@ -2651,6 +2656,7 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 				producerAdminName: String(publishForm.producerAdminName).trim(),
 				organizationId: String(publishForm.organizationId || '1'),
 				audioCategoryId: Number(publishForm.audioCategoryId),
+				audioId: selectedAudioId,
 				workIds
 			});
 			const published = resultData(response, 'publish');
@@ -2667,10 +2673,11 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	const selectedProducer = String(publishForm.producerAdminName || '').trim();
 	const selectedProducerOrganizations = producerAccountOrganizations?.[selectedProducer];
 	const producerMatchesOrganization = !Array.isArray(selectedProducerOrganizations) || selectedProducerOrganizations.length === 0 || selectedProducerOrganizations.includes(String(publishForm.organizationId || ''));
-	const canPublish = publishConfigured && publishPageCount >= 2 && publishPageCount <= 35 && selectedProducer && producerMatchesOrganization && String(publishForm.organizationId || '').trim() && Number(publishForm.audioCategoryId || 0) > 0 && parsedWorkIDs().length > 0;
+	const canPublish = publishConfigured && publishPageCount >= 2 && publishPageCount <= 35 && selectedProducer && producerMatchesOrganization && String(publishForm.organizationId || '').trim() && Number(publishForm.audioCategoryId || 0) > 0 && Number(publishForm.specifiedAudioId || 0) > 0 && parsedWorkIDs().length > 0;
 	const audioCategoryOptions = audioCategories.map(item => ({ value: String(item.id), label: `${item.name}（ID ${item.id}）` }));
 	const InputNumber = props => props.placeholder === '启用中的音频分类 ID' && audioCategoryOptions.length ? <Select showSearch optionFilterProp="label" value={String(props.value || '') || undefined} options={audioCategoryOptions} placeholder="请选择 N8 启用中的音频分类" placement="bottomLeft" getPopupContainer={() => document.body} onChange={value => props.onChange?.(Number(value))} style={props.style} /> : <NativeInputNumber {...props} />;
-	const workSelect = <label className="batch-factory-engine-field"><span><b>作品</b></span><Select showSearch optionFilterProp="label" filterOption={false} loading={workSearchLoading} value={parsedWorkIDs().length === 1 ? String(parsedWorkIDs()[0]) : undefined} options={workOptions.map(work => ({ value: String(work.id), label: `${work.name}（ID ${work.id}）` }))} onSearch={query => searchComicWorks(query)} onChange={value => setPublishForm(current => ({ ...current, workIdsText: String(value || '') }))} placeholder={workSearchLoading ? '正在查询作品' : '输入书名搜索作品'} notFoundContent={workSearchError || '没有找到匹配作品'} /></label>;
+	const audioSelect = <label className="batch-factory-engine-field"><span><b>指定音频</b></span><Select value={String(publishForm.specifiedAudioId || '') || undefined} options={[]} disabled placeholder="请先在统一配置中选择音频" /></label>;
+		const workSelect = <label className="batch-factory-engine-field"><span><b>作品</b></span><Select showSearch optionFilterProp="label" filterOption={false} loading={workSearchLoading} value={parsedWorkIDs().length === 1 ? String(parsedWorkIDs()[0]) : undefined} options={workOptions.map(work => ({ value: String(work.id), label: `${work.name}（ID ${work.id}）` }))} onSearch={query => searchComicWorks(query)} onChange={value => setPublishForm(current => ({ ...current, workIdsText: String(value || '') }))} placeholder={workSearchLoading ? '正在查询作品' : '输入书名搜索作品'} notFoundContent={workSearchError || '没有找到匹配作品'} /></label>;
 	const maxCollectionPage = Math.max(1, videos.length);
 	const normalizedCollectionStart = Math.min(Math.max(1, Number(collectionStart) || 1), maxCollectionPage);
 	const normalizedCollectionEnd = Math.min(Math.max(normalizedCollectionStart, Number(collectionEnd) || normalizedCollectionStart), maxCollectionPage);
@@ -3578,8 +3585,14 @@ function BatchLogs({ automationStatus, productionStatus, mergeStatus, error, boo
 		const retryQueued = isComicRetryQueued(book);
 		const record = automationBookRecord(book);
 		const timeline = record ? batchFactoryBookTimeline(record, { productionStatus, mergeStatus, productionMode }) : [];
-		const finishedSteps = timeline.filter(step => step.status === 'completed').length;
-		const percent = timeline.length ? Math.round((finishedSteps / timeline.length) * 100) : (String(book.status || '').toLowerCase() === 'completed' ? 100 : 0);
+		const published = productionMode === 'comic'
+				&& String(book.status || '').toLowerCase() === 'completed'
+				&& String(book.stage || '').toLowerCase() === 'published';
+			const displayTimeline = published
+				? timeline.map(step => ({ ...step, status: 'completed', detail: step.key === 'complete' ? '漫画合集已发布' : step.detail }))
+				: timeline;
+			const finishedSteps = displayTimeline.filter(step => step.status === 'completed').length;
+		const percent = displayTimeline.length ? Math.round((finishedSteps / displayTimeline.length) * 100) : (published ? 100 : 0);
 		const logs = Array.isArray(book.logs) ? book.logs : [];
 		const expanded = Boolean(expandedBooks[book.bookId]);
 		return <section key={`automation-${book.bookId}`}>
@@ -3852,11 +3865,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       if (!active || polling) return;
       polling = true;
       try {
-        const response = await getBatch(batch.id);
+        const response = await getBatch(batch.id, { silent: true, suppressGlobalError: true });
         const latestBatch = response?.batch || response;
         const latestBook = (latestBatch?.books || []).find(item => item?.id === promptBook.id);
-        if (active && latestBook) setPromptBook(latestBook);
-        if (active) await onBatchChanged?.();
+        if (active && latestBook) {
+          setPromptBook(current => current?.revision === latestBook.revision ? current : latestBook);
+        }
       } catch {
         // The stage request remains the source of truth; a transient poll failure
         // must not interrupt the running per-page generation.
@@ -3865,7 +3879,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
     };
     pollComicPromptBook();
-    const timer = setInterval(pollComicPromptBook, 800);
+    const timer = setInterval(pollComicPromptBook, 1500);
     return () => {
       active = false;
       clearInterval(timer);
@@ -4397,27 +4411,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     setEditingContentBook(refreshed);
     if (!String(editingContentValue || '').trim()) setEditingContentValue(runtimeResolveBookProductionText(refreshed));
   }, [batch?.id, books, editingContentBook?.id]);
-  const hasActiveProduction = (productionStatus?.jobs || []).some(job => (job?.tasks || []).some(task => ['queued', 'running'].includes(String(task?.status || '').toLowerCase())));
-  useEffect(() => {
-    if (!batch?.id || !(viewingBook || mediaBook || promptBook || hasActiveProduction)) return undefined;
-    const delay = hasActiveProduction ? 15000 : 30000;
-    const tick = () => { loadRuntimeStatus({ quiet: true }); };
-    // 同自动化轮询：切后台暂停，回前台补刷。
-    let timer = document.hidden ? null : setInterval(tick, delay);
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        if (timer) { clearInterval(timer); timer = null; }
-      } else if (timer === null) {
-        tick();
-        timer = setInterval(tick, delay);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      if (timer) clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [batch?.id, viewingBook?.id, mediaBook?.id, promptBook?.id, hasActiveProduction]);
 
   async function openContentEditor(book) {
     const currentBook = books.find(item => item?.id === book?.id) || book;
@@ -5640,7 +5633,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                     <InlineComicLibrary
                       batchId={batch?.id}
                       book={book}
-                      refreshNonce={comicPageRefreshNonce}
+                      refreshNonce={promptBook?.id === book.id || mediaBook?.id === book.id ? comicPageRefreshNonce : 0}
                       selectedVideoId={
                         rowStoryboardSelection[book.id] || videos[0]?.id || ""
                       }

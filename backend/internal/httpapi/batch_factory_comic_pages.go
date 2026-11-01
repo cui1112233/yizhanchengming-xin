@@ -509,6 +509,8 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	defer cancelGeneration()
 	// 单页重试不能绕过统一配置的出图并发上限。
 	generationCtx = withShuihuoImageConcurrency(generationCtx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
+	// 把批次生效设置注入上下文，让出图保存前读取水印配置。
+	generationCtx = withShuihuoEffectiveSettings(generationCtx, comicSettingsToMap(effective))
 	generationPrompt := createdPage.ImagePrompt
 	repairKey := comicPageRepairKey(batchID, bookID, videoID)
 	if cached, ok := shuihuoRepairedPrompts.Load(repairKey); ok {
@@ -780,6 +782,33 @@ func comicSettingInt(settings batchfactoryv11.SettingsPatch, key string, fallbac
 		return fallback
 	}
 	return value
+}
+
+func comicSettingBool(settings batchfactoryv11.SettingsPatch, key string, fallback bool) bool {
+	raw, ok := settings[key]
+	if !ok {
+		return fallback
+	}
+	var value bool
+	if json.Unmarshal(raw, &value) != nil {
+		return fallback
+	}
+	return value
+}
+
+// comicSettingsToMap 把 SettingsPatch 转成 map[string]any，供上下文传递。
+func comicSettingsToMap(settings batchfactoryv11.SettingsPatch) map[string]any {
+	if len(settings) == 0 {
+		return nil
+	}
+	result := make(map[string]any, len(settings))
+	for key, raw := range settings {
+		var value any
+		if json.Unmarshal(raw, &value) == nil {
+			result[key] = value
+		}
+	}
+	return result
 }
 
 func comicPromptPreviewDeveloper(ctx context.Context, owner string, accounts auth.Store, profiles *MemberProfileStore) bool {
