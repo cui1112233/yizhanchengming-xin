@@ -2369,6 +2369,11 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 		if status == "failed" || status == "blocked" || status == "paused" || status == "stopped" {
 			entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", "assets", "重新执行失败阶段", "", now
 			entry["retryRequested"] = true
+			// 人工重试视为重新授权一轮自动重试预算；否则 3/3 用尽后的重试
+			// 会被 scheduleComicContentPolicyRetry 直接判死，按钮等于失效。
+			delete(entry, "contentPolicyRetryCount")
+			delete(entry, "retryAt")
+			delete(entry, "retryReason")
 		}
 	}
 }
