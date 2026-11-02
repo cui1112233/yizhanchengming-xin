@@ -558,6 +558,23 @@ func comicPageAssetLookupText(page batchfactoryv11.Video, imagePrompt string) st
 	return strings.Join([]string{imagePrompt, strings.Join(roleNames, "、"), strings.Join(page.ComicRoles, "、"), strings.Join(page.ComicScenePresets, "、")}, "\n")
 }
 
+// comicPageRefillDelay 是整本出图首轮结束后、对在途锁跳过的缺页进行补图前的
+// 等待时长。独立变量便于测试收紧。
+var comicPageRefillDelay = 60 * time.Second
+
+// missingComicPageWorkItems 返回还没有主图的页面任务，用于整本生成的补图轮。
+// 页序 index 与原 generationVideos 对齐，保证进度文案与合集顺序不变。
+func missingComicPageWorkItems(generationVideos []batchfactoryv11.Video, pages []batchfactoryv11.ComicPage) []comicPageWorkItem {
+	work := make([]comicPageWorkItem, 0)
+	for pageIndex, page := range generationVideos {
+		if comicPageHasPrimary(pages, page.ID) {
+			continue
+		}
+		work = append(work, comicPageWorkItem{index: pageIndex, page: page})
+	}
+	return work
+}
+
 func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bookID string) (batchfactoryv11.ComicCollection, error) {
 	detachedCtx, cancel := comicBookGenerationContext(ctx)
 	defer cancel()
@@ -654,42 +671,44 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		progress("comic_images", fmt.Sprintf("准备并发生成漫画图片（已完成 %d/%d 张，出图并发 %d 路）", completedPages, totalPages, imageConcurrency))
 	}
 	var resultMu sync.Mutex
-	err = runComicPageWork(ctx, work, pageWorkers, func(generateCtx context.Context, item comicPageWorkItem) error {
-		if progress != nil {
+	runPages := func(work []comicPageWorkItem) error {
+		return runComicPageWork(ctx, work, pageWorkers, func(generateCtx context.Context, item comicPageWorkItem) error {
+			if progress != nil {
+				resultMu.Lock()
+				progress("comic_images", fmt.Sprintf("正在生成漫画第 %d/%d 张（已完成 %d/%d 张）", item.index+1, totalPages, completedPages, totalPages))
+				resultMu.Unlock()
+			}
+			_, _, generateErr := g.generatePage(generateCtx, owner, batchID, bookID, item.page.ID, batchfactoryv11.UpsertComicPageInput{
+				ComicPrompt: item.page.ComicPrompt, ImagePrompt: item.page.ComicImagePrompt, Provider: provider,
+				ModelID: modelID, AspectRatio: aspectRatio,
+			})
+			if generateErr != nil {
+				if errors.Is(generateErr, errShuihuoImageContentPolicy) {
+					log.Printf("comic page skipped by content policy batch=%s book=%s page=%s err=%v", batchID, bookID, item.page.Label, generateErr)
+					if progress != nil {
+						progress("comic_images", fmt.Sprintf("%s 两次降级后仍被内容审核拒绝，本次跳过并继续生成其它页", item.page.Label))
+					}
+					return generateErr
+				}
+				if comicPageGenerationInFlightError(generateErr) {
+					log.Printf("comic page still generating elsewhere batch=%s book=%s page=%s err=%v", batchID, bookID, item.page.Label, generateErr)
+					if progress != nil {
+						progress("comic_images", fmt.Sprintf("%s 上一次生成仍在跑，本次跳过并继续生成其它页，稍后自动补齐", item.page.Label))
+					}
+					return generateErr
+				}
+				return fmt.Errorf("%s 生成失败: %w", item.page.Label, generateErr)
+			}
 			resultMu.Lock()
-			progress("comic_images", fmt.Sprintf("正在生成漫画第 %d/%d 张（已完成 %d/%d 张）", item.index+1, totalPages, completedPages, totalPages))
+			completedPages++
+			if progress != nil {
+				progress("comic_images", fmt.Sprintf("漫画第 %d/%d 张已完成，继续下一批（已完成 %d/%d 张）", item.index+1, totalPages, completedPages, totalPages))
+			}
 			resultMu.Unlock()
-		}
-		_, _, generateErr := g.generatePage(generateCtx, owner, batchID, bookID, item.page.ID, batchfactoryv11.UpsertComicPageInput{
-			ComicPrompt: item.page.ComicPrompt, ImagePrompt: item.page.ComicImagePrompt, Provider: provider,
-			ModelID: modelID, AspectRatio: aspectRatio,
+			return nil
 		})
-		if generateErr != nil {
-			if errors.Is(generateErr, errShuihuoImageContentPolicy) {
-				log.Printf("comic page skipped by content policy batch=%s book=%s page=%s err=%v", batchID, bookID, item.page.Label, generateErr)
-				if progress != nil {
-					progress("comic_images", fmt.Sprintf("%s 两次降级后仍被内容审核拒绝，本次跳过并继续生成其它页", item.page.Label))
-				}
-				return generateErr
-			}
-			if comicPageGenerationInFlightError(generateErr) {
-				log.Printf("comic page still generating elsewhere batch=%s book=%s page=%s err=%v", batchID, bookID, item.page.Label, generateErr)
-				if progress != nil {
-					progress("comic_images", fmt.Sprintf("%s 上一次生成仍在跑，本次跳过并继续生成其它页，稍后自动补齐", item.page.Label))
-				}
-				return generateErr
-			}
-			return fmt.Errorf("%s 生成失败: %w", item.page.Label, generateErr)
-		}
-		resultMu.Lock()
-		completedPages++
-		if progress != nil {
-			progress("comic_images", fmt.Sprintf("漫画第 %d/%d 张已完成，继续下一批（已完成 %d/%d 张）", item.index+1, totalPages, completedPages, totalPages))
-		}
-		resultMu.Unlock()
-		return nil
-	})
-	if err != nil {
+	}
+	if err = runPages(work); err != nil {
 		return batchfactoryv11.ComicCollection{}, err
 	}
 	// Re-read after concurrent writes so collection creation sees every page
@@ -697,6 +716,27 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID)
 	if err != nil {
 		return batchfactoryv11.ComicCollection{}, err
+	}
+	// 补图轮：首轮被在途页锁跳过的页面，等待在途 worker 释放锁后只补缺页，
+	// 避免单页锁冲突直接把整本打成缺页失败。
+	if missingWork := missingComicPageWorkItems(generationVideos, existingPages); len(missingWork) > 0 {
+		if progress != nil {
+			progress("comic_images", fmt.Sprintf("有 %d 页因在途锁暂未生成，等待后自动补齐缺失页", len(missingWork)))
+		}
+		timer := time.NewTimer(comicPageRefillDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return batchfactoryv11.ComicCollection{}, ctx.Err()
+		case <-timer.C:
+		}
+		if err = runPages(missingWork); err != nil {
+			return batchfactoryv11.ComicCollection{}, err
+		}
+		existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID)
+		if err != nil {
+			return batchfactoryv11.ComicCollection{}, err
+		}
 	}
 	if progress != nil {
 		progress("comic_images", fmt.Sprintf("图片已全部生成（%d/%d），正在整理漫画合集", completedPages, totalPages))
@@ -707,7 +747,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	}
 	collection, missing, err := comicStore.CreateComicCollection(ctx, owner, batchID, bookID, requestedVideoIDs)
 	if err != nil && len(missing) > 0 {
-		return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: %d 个漫画页缺少主图", err, len(missing))
+		return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: %d 个漫画页缺少主图（%s）", err, len(missing), strings.Join(missing, ","))
 	}
 	return collection, err
 }
