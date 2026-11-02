@@ -101,6 +101,38 @@ func TestStripLegacySharedSetupSections(t *testing.T) {
 	}
 }
 
+// 新 SD 模板的“场景环境：”是场景内字段，不能被当成旧版共享设定段而吞掉
+// 后续镜头与下一个场景。
+func TestStripLegacySharedSetupSectionsKeepsSDTemplateSceneBlocks(t *testing.T) {
+	in := `段内执行约束：按场景编号依次完成。
+
+[场景 1｜对应原文第 1 行｜总时长 3.750 秒]
+
+画面故事剧本（仅作为画面内容依据，不参与计时）：
+狭窄简陋的乡村诊室外间，盛时安将钞票塞入叶蓉手中。
+
+场景环境：
+老旧砖房诊室外廊，午后阴天。
+
+[镜头 1｜出镜人物：盛时安、叶蓉｜时长 1.950 秒] 中景，半身可见。
+
+[场景 2｜对应原文第 2 行｜总时长 2.250 秒]
+
+画面故事剧本（仅作为画面内容依据，不参与计时）：
+年轻女性神色冰冷严肃地推门闯入。
+
+场景环境：
+老旧诊室门廊内侧。
+
+[镜头 1｜出镜人物：我、盛时安、叶蓉｜时长 1.150 秒] 全景。`
+	got := stripSharedPromptSections(in)
+	for _, required := range []string{"老旧砖房诊室外廊", "[镜头 1｜出镜人物：盛时安", "[场景 2｜对应原文第 2 行", "老旧诊室门廊内侧", "[镜头 1｜出镜人物：我"} {
+		if !strings.Contains(got, required) {
+			t.Fatalf("SD 模板正文被旧版剥离规则吞掉：缺少 %q\n实际结果：%q", required, got)
+		}
+	}
+}
+
 func TestStripConstraintLines(t *testing.T) {
 	cases := []struct {
 		name string

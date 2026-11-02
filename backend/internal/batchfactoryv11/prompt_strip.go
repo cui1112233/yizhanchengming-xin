@@ -21,8 +21,12 @@ var (
 	reStripStandaloneStart = regexp.MustCompile(`^(?:【|\[)?(?:人物与场景|人物卡|场景卡)(?:】|\])?(?:[：:].*)?$`)
 	reStripContentStart    = regexp.MustCompile(`^(?:【|\[)?(?:时间轴|画面内容|声音设计|氛围与画质规范)(?:】|\])?|^(?:镜头画面[：:]|(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)|\[?\d{1,2}:\d{2}\s*[-—~])`)
 
-	reStripLegacySetupStart = regexp.MustCompile(`^(?:统一风格|统一人物|场景环境)[：:]`)
-	reStripLegacyBodyStart  = regexp.MustCompile(`^(?:镜头画面[：:]|【|(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)|\[?\d{1,2}:\d{2}\s*[-—~])`)
+	// 新 SD 模板把“场景环境：”作为单个场景内的正常字段输出，它不是旧版共享
+	// 设定段的起点；只有已经进入“统一风格/统一人物”旧块时，才把它当作附属行。
+	reStripLegacySetupStart = regexp.MustCompile(`^(?:统一风格|统一人物)[：:]`)
+	// “[镜头 N｜…]”是新模板的镜头行，必须能被识别为旧块的结束边界，否则
+	// 旧块跳过会一路吞掉后续镜头和下一个场景。
+	reStripLegacyBodyStart = regexp.MustCompile(`^(?:镜头画面[：:]|【|\[\s*(?:镜头|分镜)|(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)|\[?\d{1,2}:\d{2}\s*[-—~])`)
 
 	reStripPrefixLine      = regexp.MustCompile(`(?m)(^|\n)(?:【画面前缀】|画面前缀[：:])[^\n]*\n?`)
 	reStripQualityLine     = regexp.MustCompile(`(?m)(^|\n)(?:【画质约束】|画质约束[：:])[^\n]*\n?`)
