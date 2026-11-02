@@ -6,6 +6,32 @@ import (
 	"testing"
 )
 
+// 资产设置里的“合并资产提示词”是权威文本，卡片必须优先用它，
+// 不能再用事实/外形重新拼一份。
+func TestCompiledAssetPromptPrefersSavedPrompt(t *testing.T) {
+	saved := "现代都市女性，25岁左右，清瘦鹅蛋脸，透白微带苍白病容的真实自然肤质"
+	asset := BookAsset{
+		Facts:      "现代都市女性，25岁左右，陆淮安的妻子",
+		Appearance: "身穿低饱和燕麦色针织衫",
+		Prompt:     saved,
+	}
+	if got := compiledAssetPrompt(asset); got != saved {
+		t.Fatalf("应优先使用合并资产提示词，实际得到 %q", got)
+	}
+}
+
+func TestCompiledAssetPromptFallsBackToFactsAndAppearance(t *testing.T) {
+	asset := BookAsset{
+		Facts:      "现代都市女性，25岁左右，陆淮安的妻子",
+		Appearance: "身穿低饱和燕麦色针织衫",
+	}
+	got := compiledAssetPrompt(asset)
+	want := "现代都市女性，25岁左右，身穿低饱和燕麦色针织衫"
+	if got != want {
+		t.Fatalf("合并资产提示词为空时应回退到事实+外形，want %q got %q", want, got)
+	}
+}
+
 func validDirectorJSON() string {
 	return `{
   "characters": [{"name":"林晚","prompt":"18岁中国女性，黑色长发。"}],

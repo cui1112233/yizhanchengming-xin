@@ -369,6 +369,15 @@ func mergeVisualAssetPrompt(facts, appearance, prompt, relationships string) str
 	return visualPromptWithoutRelationships(prompt, relationships)
 }
 
+// compiledAssetPrompt 在编译分镜时取资产文本：资产设置里保存的“合并资产提示词”
+// 才是权威文本，必须优先使用；只有它为空时才回退到“事实 + 外形”拼装。
+func compiledAssetPrompt(asset BookAsset) string {
+	if value := visualPromptWithoutRelationships(asset.Prompt, asset.Relationships); value != "" {
+		return value
+	}
+	return mergeVisualAssetPrompt(asset.Facts, asset.Appearance, asset.Prompt, asset.Relationships)
+}
+
 func visualPromptWithoutRelationships(prompt, relationships string) string {
 	return visualFactsWithoutRelationships(prompt, relationships)
 }

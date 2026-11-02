@@ -278,7 +278,7 @@ func recordsByKindAndName(book Book, fallback map[string][]NamedPrompt) map[stri
 		if strings.TrimSpace(asset.Name) == "" || strings.TrimSpace(asset.Kind) == "" {
 			continue
 		}
-		records[assetKey(asset.Kind, asset.Name)] = compiledAsset{ID: asset.ID, Kind: asset.Kind, Name: asset.Name, FormalName: strings.TrimSpace(asset.FormalName), Relationships: strings.TrimSpace(asset.Relationships), Prompt: mergeVisualAssetPrompt(asset.Facts, asset.Appearance, asset.Prompt, asset.Relationships)}
+		records[assetKey(asset.Kind, asset.Name)] = compiledAsset{ID: asset.ID, Kind: asset.Kind, Name: asset.Name, FormalName: strings.TrimSpace(asset.FormalName), Relationships: strings.TrimSpace(asset.Relationships), Prompt: compiledAssetPrompt(asset)}
 	}
 	for kind, values := range fallback {
 		for _, value := range values {

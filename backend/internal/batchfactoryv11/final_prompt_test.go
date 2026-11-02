@@ -100,7 +100,7 @@ func TestFinalPromptBaseSetupRemovesRelationshipTextFromStoredAssetPrompt(t *tes
 	if strings.Contains(got, "陆淮安的妻子") || strings.Contains(got, "与陆淮安共同生活") {
 		t.Fatalf("stored relationship text leaked into compiled asset prompt: %q", got)
 	}
-	if strings.Contains(got, "刚经历小产出院恢复期") == false || !strings.Contains(got, "现代都市女性") || !strings.Contains(got, "黑色长发") {
+	if !strings.Contains(got, "现代都市女性") || !strings.Contains(got, "清瘦") || !strings.Contains(got, "黑色长发") {
 		t.Fatalf("compiled asset prompt lost visual content: %q", got)
 	}
 }
