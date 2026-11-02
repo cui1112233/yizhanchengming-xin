@@ -180,8 +180,41 @@ test('treats a published comic automation book as fully complete', () => {
   };
   const timeline = batchFactoryBookTimeline(book, { productionMode: 'comic' });
   assert.equal(timeline.every(item => item.status === 'completed'), true);
-  assert.equal(timeline.find(item => item.key === 'complete')?.detail, '已整理 1 个合集');
-  assert.equal(batchFactoryBookState(book, { productionMode: 'comic' }).label, '完成');
+  assert.equal(timeline.find(item => item.key === 'complete')?.detail, '漫画合集已发布');
+  const state = batchFactoryBookState(book, { productionMode: 'comic' });
+  assert.equal(state.label, '完成');
+  assert.equal(state.published, true);
+});
+
+test('treats a manually published comic collection as published even without book status writeback', () => {
+  const book = {
+    id: 'manual-published-comic',
+    sourceText: '正文',
+    status: 'running',
+    stage: 'comic_publish',
+    settingsState: { patch: { productionMode: 'comic' } },
+    assetRecords: [{ source: 'comic', prompt: '人物' }],
+    videos: [{ id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '图片一' }]
+  };
+  const stageSummary = { runs: [], comicCollectionReady: true, comicCollectionCount: 1, comicCollectionPageCount: 1, comicPublishedCollectionCount: 1 };
+  const timeline = batchFactoryBookTimeline(book, { stageSummary, productionMode: 'comic' });
+  assert.equal(timeline.find(item => item.key === 'complete')?.detail, '漫画合集已发布');
+  const state = batchFactoryBookState(book, { stageSummary, productionMode: 'comic' });
+  assert.equal(state.label, '完成');
+  assert.equal(state.published, true);
+});
+
+test('keeps an unpublished comic collection out of the published state', () => {
+  const book = {
+    id: 'comic-collection-ready',
+    sourceText: '正文',
+    settingsState: { patch: { productionMode: 'comic' } },
+    assetRecords: [{ source: 'comic', prompt: '人物' }],
+    videos: [{ id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '图片一' }]
+  };
+  const stageSummary = { runs: [], comicCollectionReady: true, comicCollectionCount: 1, comicCollectionPageCount: 1, comicPublishedCollectionCount: 0 };
+  const state = batchFactoryBookState(book, { stageSummary, productionMode: 'comic' });
+  assert.notEqual(state.published, true);
 });
 
 test('builds a readable per-book production timeline and keeps a failed stage actionable', () => {

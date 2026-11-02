@@ -227,7 +227,7 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
         <span className={`batch-factory-content-version ${sourceSummary.ready ? 'is-ready' : 'is-missing'}`} title={`${batchFactorySourceVersionLabel(book)} · ${sourceSummary.text}`}><i className={`batch-factory-content-mode is-${batchFactorySourceVersionClass(book)}`}>{batchFactorySourceVersionLabel(book)}</i></span>
         <span>{publicationMetadataValue(metadata, 'style')}</span>
         <span>{publicationMetadataValue(metadata, 'gender')}</span>
-        <span className={`batch-factory-source-status is-${sourceStatus.tone} ${row.status === '处理中' ? 'is-scheduled' : ''}`} title={`${sourceStatus.detail}${row.state?.detail ? ` · ${row.state.detail}` : ''}`}><b>{sourceStatus.label}</b><small>{row.status}{row.state?.manual ? ' · 已手调' : ''}</small></span>
+        <span className={`batch-factory-source-status is-${sourceStatus.tone} ${row.status === '处理中' ? 'is-scheduled' : ''}`} title={`${sourceStatus.detail}${row.state?.detail ? ` · ${row.state.detail}` : ''}`}><b>{row.state?.published ? '已发布' : sourceStatus.label}</b><small>{row.state?.published ? sourceStatus.label : row.status}{row.state?.manual ? ' · 已手调' : ''}</small></span>
         <span><Button size="small" onClick={() => onViewBook(book)}>查看</Button></span>
       </div>;
     })}

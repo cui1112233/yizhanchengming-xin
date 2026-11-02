@@ -153,8 +153,11 @@ export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, 
   const mergeRunning = ['queued', 'running'].includes(mergeStatusValue);
   const uploadDetail = upload === 'running' ? '正在上传网络' : upload === 'completed' ? '上传成功' : upload === 'failed' ? (batchFactoryVisibleError(book?.sourceMetadata?.publishError) || '上传失败') : merged ? '等待上传网络' : '完成合成后可上传';
   if (comicMode) {
-    const comicPublished = String(book?.status || '').toLowerCase() === 'completed'
-      && String(book?.stage || '').toLowerCase() === 'published';
+    // 手动发布会把记录写进合集发布草稿，而不会回写 book.status/stage；
+    // 运行时汇总里的已发布合集数量同样是权威信号，二者取其一即视为已发布。
+    const comicPublished = (String(book?.status || '').toLowerCase() === 'completed'
+      && String(book?.stage || '').toLowerCase() === 'published')
+      || Number(stageSummary?.comicPublishedCollectionCount || 0) > 0;
     const comicAssetsReady = comicPublished || (book?.assetRecords || []).some(asset => asset?.source === 'comic' && String(asset?.prompt || asset?.visualPrompt || '').trim());
     const comicPromptsReady = comicPublished || ((book?.videos || []).length > 0 && (book?.videos || []).every(video => String(video?.comicPrompt || '').trim() && String(video?.comicImagePrompt || '').trim()));
       const comicImageRun = latestStageRun(stageSummary, 'image');
@@ -168,7 +171,7 @@ export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, 
       { key: 'assets', label: '漫画资产已就绪', status: comicAssetsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(assets?.errorMessage) || (comicAssetsReady ? '人物、场景、道具已准备' : '等待提取漫画资产') },
       { key: 'director', label: '漫画分页与提示词已就绪', status: comicPromptsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(director?.errorMessage) || (comicPromptsReady ? '分页与每页分镜提示词已生成' : '等待漫画分页与提示词') },
       { key: 'video', label: '漫画图片生成', status: comicImageStatus, detail: batchFactoryVisibleError(comicImageRun?.errorMessage) || (comicImageStatus === 'completed' ? `漫画页图片已生成${stageSummary?.comicImageTotalCount ? `（${stageSummary.comicImageReadyCount}/${stageSummary.comicImageTotalCount} 页）` : ''}` : comicImageStatus === 'running' ? '正在逐页生成漫画图片' : '等待生成漫画图片') },
-      { key: 'complete', label: '漫画合集', status: comicCollectionReady ? 'completed' : 'pending', detail: comicCollectionReady ? `已整理 ${comicCollectionCount || 1} 个合集${comicCollectionPageCount ? `（${comicCollectionPageCount} 页）` : ''}` : '等待全部漫画页主图生成后整理合集' }
+      { key: 'complete', label: '漫画合集', status: comicCollectionReady ? 'completed' : 'pending', detail: comicPublished ? '漫画合集已发布' : comicCollectionReady ? `已整理 ${comicCollectionCount || 1} 个合集${comicCollectionPageCount ? `（${comicCollectionPageCount} 页）` : ''}` : '等待全部漫画页主图生成后整理合集' }
     ];
   }
   return [
@@ -215,9 +218,14 @@ export function batchFactoryBookState(book, { productionStatus, mergeStatus, sta
   const comicMode = productionMode === 'comic' || book?.settingsState?.patch?.productionMode === 'comic' || book?.settingsState?.patch?.aiPromptConfig?.comic?.enabled === true || (book?.assetRecords || []).some(asset => asset?.source === 'comic') || (book?.videos || []).some(video => String(video?.comicPrompt || '').trim());
   const timeline = batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary, productionMode: comicMode ? 'comic' : productionMode });
   const completeStep = timeline.find(item => item.key === 'complete');
+  // 漫画模式下“完成”只代表合集已整理；只有发布记录落地（或状态回写）才算发布完成。
+  const published = comicMode
+    ? Number(stageSummary?.comicPublishedCollectionCount || 0) > 0
+      || (String(book?.status || '').toLowerCase() === 'completed' && String(book?.stage || '').toLowerCase() === 'published')
+    : completeStep?.status === 'completed';
   // 已经回读确认上传成功，就以“完成”收口；中间某次重试遗留的分镜失败
   // 不能把一件已经干完的活重新标红。
-  if (completeStep?.status === 'completed') return { label: '完成', detail: completeStep.detail || '本书生产与上传均已完成', tone: 'green', manual };
+  if (completeStep?.status === 'completed') return { label: '完成', detail: completeStep.detail || '本书生产与上传均已完成', tone: 'green', manual, published };
   const failedStep = timeline.find(item => item.status === 'failed');
   if (failedStep) return { label: '异常', detail: `${failedStep.label}：${failedStep.detail}`, tone: 'red', manual, failedStep };
   const activeStep = timeline.find(item => item.status === 'running');
