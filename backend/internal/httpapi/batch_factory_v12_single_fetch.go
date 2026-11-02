@@ -74,6 +74,7 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 	}
 	metadata["sensitiveReplaced"] = replacedCount
 	metadata["sensitiveHitCount"] = len(sensitiveItems)
+	setSensitiveDetails(metadata, sensitiveItems, len(sensitiveItems))
 	metadata["sourceContentVersion"] = "sensitive"
 	metadata["processingVersion"] = "novel-fetch-rules-v1"
 	if processErr != nil {
@@ -457,6 +458,24 @@ func normalizeSingleFetchPlatformAlias(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "yg", "阳光", "点众", "点众付费", "yg-阳光-点众付费":
 		return "4"
+	case "番茄付费", "番茄付费书城":
+		return "2"
+	case "番茄免费", "番茄免费书城":
+		return "7"
+	case "七猫", "七猫付费", "七猫付费书城":
+		return "3"
+	case "知乎", "知乎付费", "知乎付费书城":
+		return "15"
+	case "掌阅", "掌阅付费", "掌阅付费书城":
+		return "20"
+	case "卓越", "卓越付费", "卓越付费书城":
+		return "26"
+	case "九州", "九州书城":
+		return "29"
+	case "掌文", "掌文付费", "掌文付费书城":
+		return "31"
+	case "黑岩", "黑岩付费", "黑岩付费书城":
+		return "1"
 	default:
 		return strings.TrimSpace(value)
 	}

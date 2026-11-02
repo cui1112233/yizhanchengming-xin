@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -34,6 +35,35 @@ func TestBatchFactoryProcessingStageSummaryDoesNotCarrySensitiveDetails(t *testi
 	}
 }
 
+func TestPrepareBatchFetchedSourcePersistsSensitiveReplacementDetails(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "alice", map[string]any{
+		"knowledgeLibraries": map[string]any{"layout_rules": map[string]any{
+			"sensitive_rules": []any{map[string]any{"enabled": true, "find": "敏感词", "replace": "替换词", "apply_to_original": true}},
+		}},
+		"sensitive_ai": map[string]any{"enabled": false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result := novelfetchworkshop.FetchAndProcessResult{ProcessedText: "含敏感词正文", OriginalRaw: "含敏感词正文", OriginalRawChars: 6, ProcessedChars: 6}
+	_, metadata, err := prepareBatchFetchedSource(context.Background(), store, "alice", "book-1", result, batchFetchClassification{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed, ok := metadata["sensitiveFixed"].(map[string]any)
+	if !ok || fixed["fixed_count"] != 1 {
+		t.Fatalf("sensitiveFixed = %#v", metadata["sensitiveFixed"])
+	}
+	items, ok := fixed["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("sensitive items = %#v", fixed["items"])
+	}
+	item, ok := items[0].(map[string]any)
+	if !ok || item["keyword"] != "敏感词" || !strings.Contains(fmt.Sprint(item["after"]), "替换词") {
+		t.Fatalf("sensitive item = %#v", items[0])
+	}
+}
+
 func TestResolveSingleFetchPlatform(t *testing.T) {
 	giantBook := batchfactoryv11.Book{
 		Platform:       "七猫",
@@ -52,6 +82,8 @@ func TestResolveSingleFetchPlatform(t *testing.T) {
 		{name: "non-numeric metadata ignored", book: batchfactoryv11.Book{Platform: "番茄", SourceMetadata: map[string]any{"platformId": "fanqie"}}, want: "番茄"},
 		{name: "legacy YG alias maps to Dianzhong", book: batchfactoryv11.Book{Platform: "YG"}, want: "4"},
 		{name: "legacy full alias maps to Dianzhong", book: batchfactoryv11.Book{Platform: "YG-阳光-点众付费"}, want: "4"},
+		{name: "Zhihu alias maps to platform 15", book: batchfactoryv11.Book{Platform: "知乎"}, want: "15"},
+		{name: "Fanqie alias maps to platform 2", book: batchfactoryv11.Book{Platform: "番茄付费"}, want: "2"},
 		{name: "empty stays empty", book: batchfactoryv11.Book{}, want: ""},
 	}
 	for _, tc := range cases {

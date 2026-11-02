@@ -286,6 +286,27 @@ function bookPlatformName(book, platformNames = {}) {
   if (platform === 'YG' || platform === '阳光') return '点众付费';
   return String(metadata.platformName || metadata.platformLabel || platformNames[String(book?.platform || '')] || '').trim() || '未命名书城';
 }
+function sensitiveProcessingDetail(book = {}) {
+  const metadata = book?.sourceMetadata || {};
+  const hitData = metadata.sensitiveHits && typeof metadata.sensitiveHits === 'object' ? metadata.sensitiveHits : {};
+  const fixedData = metadata.sensitiveFixed && typeof metadata.sensitiveFixed === 'object' ? metadata.sensitiveFixed : {};
+  const items = Array.isArray(fixedData.items) ? fixedData.items : [];
+  const hitCount = Number(metadata.sensitiveHitCount ?? hitData.hit_count ?? hitData.hitCount ?? items.length ?? 0);
+  const replacedCount = Number(metadata.sensitiveReplaced ?? fixedData.fixed_count ?? 0);
+  const originalChars = Number(metadata.originalRawChars || 0);
+  const processedChars = Number(metadata.processedChars || String(book?.sourceText || '').length || 0);
+  const stages = Array.isArray(metadata.processingStages) ? metadata.processingStages : [];
+  return {
+    status: String(metadata.sensitiveStatus || fixedData.status || (hitCount ? 'done' : '')).trim(),
+    hitCount: Number.isFinite(hitCount) ? hitCount : 0,
+    replacedCount: Number.isFinite(replacedCount) ? replacedCount : 0,
+    originalChars: Number.isFinite(originalChars) ? originalChars : 0,
+    processedChars: Number.isFinite(processedChars) ? processedChars : 0,
+    stages,
+    items
+  };
+}
+
 function batchFactorySourceKind(book = {}) {
   const mode = String(book?.sourceMetadata?.sourceMode || '').trim().toLowerCase();
   if (mode === 'giant_material') return '巨量素材';
@@ -3828,6 +3849,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [novelListOpen, setNovelListOpen] = useState(false);
   const [isDeveloper, setIsDeveloper] = useState(false);
   const [viewingBook, setViewingBookRaw] = useState(null);
+  const [sensitiveDetailBook, setSensitiveDetailBook] = useState(null);
   const [rawSourceBook, setRawSourceBook] = useState(null);
   const [sourceEditorBook, setSourceEditorBook] = useState(null);
   const [sourceEditorValue, setSourceEditorValue] = useState('');
@@ -5274,7 +5296,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const automationStartBlocked = !books.length;
   const automationRetryAction = batchFactoryAutomationRetryAction(automationStatus);
   const automationMenuItems = [
-    { key: 'start', label: '开始定时', disabled: automationActive || automationStartBlocked },
+    { key: 'start', label: '启动自动生产（选择预设）', disabled: automationActive || automationStartBlocked },
     { key: 'pause', label: '暂停自动化', disabled: !automationActive },
     { key: 'resume', label: '继续已暂停自动化', disabled: !['paused', 'needs_attention', 'completed'].includes(automationState) },
     { key: 'retry', ...automationRetryAction },
@@ -6020,6 +6042,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
               ? viewingBook.sourceMetadata.websiteSubmitHistory
               : [];
             const classifyBusy = actionBusy === `classify-${viewingBook.id}`;
+            const sensitiveDetail = sensitiveProcessingDetail(viewingBook);
             const classifyFailed =
               String(
                 viewingBook?.sourceMetadata?.classifyStatus || "",
@@ -6123,7 +6146,27 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                       ? "手动书单"
                       : "小说获取"}
                   </Descriptions.Item>
+                  <Descriptions.Item label="敏感处理">
+                    {sensitiveDetail.status === 'failed' ? '处理失败' : sensitiveDetail.status ? '已完成' : '未处理'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="处理字数">
+                    {sensitiveDetail.originalChars > 0 ? `${sensitiveDetail.processedChars}/${sensitiveDetail.originalChars} 字` : (sensitiveDetail.processedChars ? `${sensitiveDetail.processedChars} 字` : '—')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="敏感命中 / 替换">
+                    {`${sensitiveDetail.hitCount} / ${sensitiveDetail.replacedCount} 处`}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="处理链路" span={2}>
+                    {sensitiveDetail.stages.length ? sensitiveDetail.stages.map(stage => `${stage.title || stage.stage}${stage.changed ? '（已处理）' : ''}`).join(' → ') : '—'}
+                  </Descriptions.Item>
                 </Descriptions>
+                {sensitiveDetail.status ? (
+                  <Alert
+                    type={sensitiveDetail.status === 'failed' ? "warning" : "success"}
+                    showIcon
+                    message={`敏感处理：命中 ${sensitiveDetail.hitCount} 处，已替换 ${sensitiveDetail.replacedCount} 处`}
+                    description={sensitiveDetail.items.length ? <Button size="small" onClick={() => setSensitiveDetailBook(viewingBook)}>查看替换明细</Button> : '未发现需替换内容。'}
+                  />
+                ) : null}
                 {!classifyBusy ? (
                   <Alert
                     type={classifyFailed ? "warning" : "info"}
@@ -6153,6 +6196,15 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
           })()
         : null}
     </Modal>;
+    <Modal title={sensitiveDetailBook ? `敏感词替换明细 · ${sensitiveDetailBook.title || sensitiveDetailBook.bookId || ''}` : '敏感词替换明细'} open={Boolean(sensitiveDetailBook)} onCancel={() => setSensitiveDetailBook(null)} footer={null} width={860} destroyOnClose>
+      {sensitiveDetailBook ? (() => {
+        const detail = sensitiveProcessingDetail(sensitiveDetailBook);
+        return <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Alert type={detail.status === 'failed' ? "warning" : "info"} showIcon message={`命中 ${detail.hitCount} 处，已替换 ${detail.replacedCount} 处`} description="仅展示命中词和替换结果，不展示原文上下文。" />
+          {detail.items.length ? <Descriptions bordered size="small" column={1} items={detail.items.map((item, index) => ({ key: `${item.hit_index || index}-${item.keyword || ''}`, label: `#${index + 1} · ${item.keyword || '敏感词'}`, children: <Space direction="vertical" size={2}><span>替换后：{item.after || item.replace || '—'}</span><small>方式：{item.source || '规则'} · 状态：{item.status || '已处理'}</small></Space> }))} /> : <Alert type="info" showIcon message="未记录到可查看的替换明细" description="较早获取的书籍只保存了汇总数据；重新获取后会记录新的替换明细。" />}
+        </Space>;
+      })() : null}
+    </Modal>
     <Modal title={rawSourceBook ? `原始正文 · ${rawSourceBook.title || rawSourceBook.bookId || ''}` : '原始正文'} open={Boolean(rawSourceBook)} onCancel={() => setRawSourceBook(null)} footer={null} width={860} destroyOnClose>
       {rawSourceBook ? <><Alert type="info" showIcon message="上游返回的原始正文" description={`原始正文 ${String(rawSourceBook.txtText || '').length} 字；生产正文 ${String(rawSourceBook.sourceText || '').length} 字。原始正文仅供查看，不会直接替代生产正文。`} /><pre className="batch-factory-book-detail-raw-source">{rawSourceBook.txtText || '暂无原始正文。'}</pre></> : null}
     </Modal>

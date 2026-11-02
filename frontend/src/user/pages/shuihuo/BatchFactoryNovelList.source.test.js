@@ -583,6 +583,10 @@ test('renders saved book-city and novel-fetch metadata without exposing internal
   assert.match(source, /<span>标签<\/span>/);
   assert.match(source, /<span>推荐理由<\/span>/);
   assert.match(source, /<span>视频<\/span>/);
+  assert.match(source, /function sensitiveProcessingDetail\(book/);
+  assert.match(source, /查看替换明细/);
+  assert.match(source, /敏感命中 \/ 替换/);
+  assert.match(source, /敏感词替换明细/);
   assert.match(source, /function bookVideoReady/);
   assert.match(source, /视频已准备好/);
   assert.match(source, /label="书城">\{bookPlatformName\(viewingBook, platformNames\)\}/);
