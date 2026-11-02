@@ -391,13 +391,13 @@ export function assetIdentitySummary(asset) {
 
 export function assetPrompt(asset) { return String(asset?.prompt || asset?.visualPrompt || asset?.description || ''); }
 
-export function visualFactsWithoutRelationships(asset) {
-  const facts = String(asset?.facts || '').trim();
-  if (!facts) return '';
-  const relationships = String(asset?.relationships || '').trim();
-  const relationshipText = relationships.replace(/[；;。.,，]/g, ' ').trim();
+// 关系是剧情元数据，不能进画面提示词；按分句剔除带关系标记的片段。
+export function stripRelationshipText(text, relationships = '') {
+  const source = String(text || '').trim();
+  if (!source) return '';
+  const relationshipText = String(relationships || '').replace(/[；;。.,，]/g, ' ').trim();
   const markers = ['妻子', '丈夫', '老公', '老婆', '配偶', '夫妻', '妻婿', '孙媳', '孙子', '孙女', '祖父', '祖母', '爷爷', '奶奶', '父亲', '母亲', '爸爸', '妈妈', '儿子', '女儿', '兄弟', '姐妹', '长辈', '晚辈', '夫家', '主仆', '旧爱', '旧相识', '恋人', '爱人', '情感牵扯', '女主角的', '男主角的'];
-  return facts
+  return source
     .split(/[，,；;。]/)
     .map(value => value.trim())
     .filter(Boolean)
@@ -408,11 +408,19 @@ export function visualFactsWithoutRelationships(asset) {
     .join('，');
 }
 
+export function visualFactsWithoutRelationships(asset) {
+  return stripRelationshipText(asset?.facts, asset?.relationships);
+}
+
+// 资产设置里保存的提示词是权威文本，卡片必须优先使用它；只有它为空时
+// 才回退到“事实 + 外形”的拼装结果。
 export function mergedAssetVisualPrompt(asset) {
+  const saved = stripRelationshipText(assetPrompt(asset), asset?.relationships);
+  if (saved) return saved;
   const structured = [visualFactsWithoutRelationships(asset), asset?.appearance]
     .map(value => String(value || '').trim())
     .filter(Boolean);
-  return (structured.length ? structured.join('，') : assetPrompt(asset)).trim();
+  return structured.join('，').trim();
 }
 
 export function savedDraftKey(type, asset) { return `asset:${type}:${asset?.id || assetName(asset)}`; }
