@@ -13,8 +13,8 @@ export function listAgentTasks() {
   return apiRequest('/api/agent/tasks');
 }
 
-export function createAgentTask() {
-  return apiRequest('/api/agent/tasks', { method: 'POST' });
+export function createAgentTask({ projectType = 'video' } = {}) {
+  return apiRequest('/api/agent/tasks', { method: 'POST', body: JSON.stringify({ projectType }) });
 }
 
 export function getAgentTask(id) {

@@ -178,6 +178,36 @@ func (s *MySQLStore) ListGenerationTasks(ctx context.Context, owner, projectID s
 	return tasks, nil
 }
 
+func (s *MySQLStore) ListOwnerGenerationTasks(ctx context.Context, owner string) ([]GenerationTask, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		return nil, ErrGenerationInvalid
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT `+generationTaskColumns+` FROM agent_generation_tasks WHERE owner_username = ? ORDER BY updated_at DESC, id DESC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tasks := make([]GenerationTask, 0)
+	for rows.Next() {
+		task, scanErr := scanGenerationTask(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for index := range tasks {
+		tasks[index].Results, err = loadGenerationResults(ctx, s.db, owner, tasks[index].ProjectID, tasks[index].ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tasks, nil
+}
+
 func (s *MySQLStore) ListRunnableGenerationTasks(ctx context.Context, mode string, limit int) ([]GenerationTask, error) {
 	return s.ListRunnableGenerationTasksByModes(ctx, []string{mode}, limit)
 }

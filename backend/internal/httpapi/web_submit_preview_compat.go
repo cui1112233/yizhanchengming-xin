@@ -49,6 +49,8 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 		groups := map[string]map[string]any{}
 		order := []string{}
 		skipped := []any{}
+		skipSubmitted := webSubmitSkipSubmitted(web)
+		minTextChars := intValue(web["min_text_chars"])
 		for _, rawID := range body.TaskIDs {
 			id := strings.TrimSpace(rawID)
 			if id == "" {
@@ -61,7 +63,7 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 			}
 			meta := doc.Meta
 			for _, version := range versions {
-				if containsVersion(meta["siteSubmitDoneVersions"], version) || containsVersion(meta["site_submit_done_versions"], version) {
+				if skipSubmitted && (containsVersion(meta["siteSubmitDoneVersions"], version) || containsVersion(meta["site_submit_done_versions"], version)) {
 					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "该版本已确认提交"})
 					continue
 				}
@@ -74,19 +76,23 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "未找到正文版本"})
 					continue
 				}
-				platform := firstText(meta["platformId"], meta["platform_id"])
+				if minTextChars > 0 && len([]rune(content.Content)) < minTextChars {
+					skipped = append(skipped, map[string]any{"id": id, "version": version, "status": "skipped", "error": "正文少于最少字数"})
+					continue
+				}
+				profile := webSubmitProfile(web, version)
+				platform := firstText(profile["platform_id"], profile["platformId"], meta["platformId"], meta["platform_id"])
 				gender, style := submissionGenderStyle(doc)
 				profileID := "default"
 				profileName := "默认配置"
-				if profiles := arrayOrEmpty(web["upload_profiles"]); len(profiles) > 0 {
-					profile := mapOrEmpty(profiles[0])
+				if len(profile) > 0 {
 					profileID = firstText(profile["id"], profileID)
 					profileName = firstText(profile["name"], profileName)
 				}
 				key := strings.Join([]string{platform, gender, style, version, profileID}, "-")
 				group, exists := groups[key]
 				if !exists {
-					group = map[string]any{"group_id": key, "group_key": key, "status": "ready", "version": version, "summary": map[string]any{"platformId": platform, "gender": gender, "style": style, "profile_id": profileID, "profile_name": profileName}, "advanced": mapOrEmpty(web["advanced"]), "items": []any{}}
+					group = map[string]any{"group_id": key, "group_key": key, "status": "ready", "version": version, "summary": map[string]any{"platformId": platform, "gender": gender, "style": style, "profile_id": profileID, "profile_name": profileName, "organization": webSubmitOrganization(web, profile)}, "advanced": webSubmitAdvanced(web, profile), "items": []any{}}
 					groups[key] = group
 					order = append(order, key)
 				}
@@ -99,7 +105,8 @@ func RegisterWebSubmitPreviewCompat(root *http.ServeMux, middleware BridgeAuth, 
 		for _, key := range order {
 			result = append(result, groups[key])
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"material_limit": 8, "groups": result, "skipped": skipped})
+		plan := map[string]any{"material_limit": 8, "groups": result, "skipped": skipped}
+		writeJSON(w, http.StatusOK, map[string]any{"material_limit": 8, "groups": result, "skipped": skipped, "plan": plan})
 	}))
 	root.Handle("POST /api/batch-rewrite/web-submit/preview", previewHandler)
 }
@@ -129,8 +136,8 @@ func cleanStrings(values []string) []string {
 }
 
 func containsVersion(value any, wanted string) bool {
-	for _, item := range arrayOrEmpty(value) {
-		if strings.TrimSpace(toString(item)) == wanted {
+	for _, item := range anyStrings(value) {
+		if strings.TrimSpace(item) == wanted {
 			return true
 		}
 	}

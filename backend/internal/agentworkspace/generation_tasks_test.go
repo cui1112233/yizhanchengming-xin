@@ -50,6 +50,9 @@ func TestMemoryStoreListsRunnableGenerationTasksByModesOldestFirst(t *testing.T)
 	if _, err = store.CancelGenerationTask(ctx, "alice", "project-1", "audio-old", now.Add(4*time.Second)); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = store.TransitionGenerationTask(ctx, "alice", "project-1", "image-new", GenerationTaskTransition{State: GenerationFailed, Now: now.Add(4*time.Second)}); err != nil {
+		t.Fatal(err)
+	}
 	// Add another queued task after cancellation, preserving both runnable states.
 	if _, err = store.CreateGenerationTask(ctx, "alice", CreateGenerationTaskInput{ID: "audio-queued", ProjectID: "project-1", NodeID: "image-1", NodeVersion: 1, Kind: "audio", Provider: "tts", ModelID: "voice", Mode: "text_to_speech", IdempotencyKey: "audio-queued", Now: now.Add(5 * time.Second)}); err != nil {
 		t.Fatal(err)
@@ -58,7 +61,7 @@ func TestMemoryStoreListsRunnableGenerationTasksByModesOldestFirst(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tasks) != 2 || tasks[0].ID != "image-new" || tasks[1].ID != "audio-queued" || tasks[0].OwnerUsername != "alice" {
+	if len(tasks) != 1 || tasks[0].ID != "audio-queued" || tasks[0].OwnerUsername != "alice" {
 		t.Fatalf("tasks=%+v", tasks)
 	}
 }

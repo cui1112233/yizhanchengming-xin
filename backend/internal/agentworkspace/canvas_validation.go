@@ -6,7 +6,7 @@ import (
 )
 
 var allowedCanvasNodeTypes = map[string]struct{}{
-	"script": {}, "text": {}, "image": {}, "video": {}, "audio": {},
+	"script": {}, "text": {}, "image": {}, "video": {}, "audio": {}, "director": {},
 }
 
 func ValidateCanvasForStorage(canvas Canvas) error {

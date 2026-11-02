@@ -72,8 +72,8 @@ func TestDeleteBookStmtsRemoveV12DependentsBeforeTheirParents(t *testing.T) {
 	compilation := requirePosition(`DELETE FROM batch_factory_v12_video_compilations WHERE owner_username=? AND batch_id=? AND book_id=?`)
 	timeline := requirePosition(`DELETE FROM batch_factory_v12_canonical_timelines WHERE owner_username=? AND batch_id=? AND book_id=?`)
 	audio := requirePosition(`DELETE FROM batch_factory_v12_audio_measurements WHERE owner_username=? AND batch_id=? AND book_id=?`)
-	director := requirePosition(`DELETE FROM batch_factory_v11_director_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`)
-	book := requirePosition(`DELETE FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=?`)
+	director := requirePosition(`DELETE FROM batch_factory_v12_director_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`)
+	book := requirePosition(`DELETE FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=?`)
 	if !(compilation < timeline && timeline < audio && audio < director && director < book) {
 		t.Fatalf("invalid V12 cleanup order: compilation=%d timeline=%d audio=%d director=%d book=%d", compilation, timeline, audio, director, book)
 	}
@@ -115,12 +115,12 @@ func TestQueueLocalMergedArtifactPurgesQueuesOnlyLocalMergeURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mock.ExpectQuery("SELECT COALESCE\\(book_id,''\\),COALESCE\\(output_url,''\\) FROM batch_factory_v11_merge_jobs").
+	mock.ExpectQuery("SELECT COALESCE\\(book_id,''\\),COALESCE\\(output_url,''\\) FROM batch_factory_v12_merge_jobs").
 		WithArgs("alice", "batch-1").
 		WillReturnRows(sqlmock.NewRows([]string{"book_id", "output_url"}).
 			AddRow("book-1", "/api/batch-factory/v12/batches/batch-1/merge-media/merge_keep123").
 			AddRow("book-2", "tos://private-bucket/batch-merged/remote.mp4"))
-	mock.ExpectExec("INSERT IGNORE INTO batch_factory_v11_local_artifact_purges").
+	mock.ExpectExec("INSERT IGNORE INTO batch_factory_v12_local_artifact_purges").
 		WithArgs("alice", "batch-1", "book-1", "merge_keep123.mp4", purgeAfter).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

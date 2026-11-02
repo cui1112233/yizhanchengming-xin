@@ -14,7 +14,8 @@ export function agentCanvasURL({ projectId, batchId, bookId } = {}) {
   const query = new URLSearchParams();
   query.set('taskId', String(projectId || '').trim());
   query.set('batchId', String(batchId || '').trim());
-  query.set('bookId', String(bookId || '').trim());
+  const requestedBookId = String(bookId || '').trim();
+  if (requestedBookId) query.set('bookId', requestedBookId);
   query.set('view', 'workflow');
   return `/agent/canvas?${query.toString()}`;
 }
@@ -36,6 +37,23 @@ export async function syncBookThenLoadCanvas({ taskId, bookId, sync, getCanvas, 
     result,
     saveQueue: createSaveQueue?.(result?.canvas || { version: 1, revision: 0, nodes: [], edges: [] })
   };
+}
+
+// A mapped book may change in Batch Factory while this tab is in the
+// background. Flush only the user's local layout edits, then reload the
+// authoritative Batch Factory projection before applying it to the canvas.
+export async function refreshBatchFactoryBookCanvas({ taskId, bookId, queue, sync, getCanvas, isCurrent = () => true }) {
+  const requestedTaskId = String(taskId || '').trim();
+  const requestedBookId = String(bookId || '').trim();
+  if (!requestedTaskId || !requestedBookId || typeof sync !== 'function' || typeof getCanvas !== 'function') {
+    throw new Error('批量工厂画布同步参数无效');
+  }
+  await queue?.flushRequired?.();
+  if (!isCurrent()) return { ignored: true };
+  await sync(requestedTaskId, requestedBookId);
+  if (!isCurrent()) return { ignored: true };
+  const result = await getCanvas(requestedTaskId);
+  return isCurrent() ? result : { ...result, ignored: true };
 }
 
 export function focusRequestedBookGroup({ bookId, nodes, focus }) {
@@ -75,9 +93,16 @@ export function projectedNodePresentation(node) {
   return { groupId, groupLabel, sourceLabel: '批量工厂' };
 }
 
-export function batchFactoryGroupLabel(groupId) {
+export function batchFactoryGroupLabel(groupId, nodes = []) {
   const bookId = bookIdFromGroupId(groupId);
-  return bookId ? `书籍分组 ${bookId}` : String(groupId || '').trim();
+  if (!bookId) return String(groupId || '').trim();
+  const scriptNode = (Array.isArray(nodes) ? nodes : []).find(node => {
+    const nodeGroupId = String(node?.groupId ?? node?.data?.groupId ?? '').trim();
+    const nodeType = String(node?.data?.type ?? node?.type ?? '').trim();
+    return nodeGroupId === groupId && nodeType === 'script';
+  });
+  const title = String(scriptNode?.title ?? scriptNode?.data?.title ?? '').trim();
+  return `书籍分组 ${title || bookId}`;
 }
 
 export function videoNodeTiming({ audioSeconds, selectedSeconds, allowedSeconds } = {}) {
@@ -111,6 +136,9 @@ export function mappedNodeStatePresentation(node) {
       busy: false,
       message: ready ? '所有分镜已就绪，可以合成最终视频' : String(config.mergeReason || '等待所有分镜视频生成完成')
     };
+  }
+  if (String(config.resourceType || '').trim() === 'audio' && config.audioPlanPending === true) {
+    return { state: 'draft', errorMessage: '', canRetry: false, busy: false, message: '待生成配音' };
   }
   const state = ['queued', 'running', 'succeeded', 'failed', 'cancelled'].includes(String(config.mappedState || node?.status || '').trim())
     ? String(config.mappedState || node?.status).trim()
@@ -205,4 +233,11 @@ export async function runMappedBatchFactoryVideoProduction({ action, requestId, 
     ...(action.provider ? { provider: action.provider } : {}),
     ...(action.modelId ? { videoModelId: action.modelId } : {})
   });
+}
+
+export async function runMappedBatchFactoryAudioPlan({ action, requestId, createAudioPlan }) {
+  if (action?.type !== 'audio' || !action.batchId || !action.bookId || typeof createAudioPlan !== 'function') {
+    throw new Error('映射音频生产参数无效');
+  }
+  return createAudioPlan(action.batchId, action.bookId, { requestId });
 }

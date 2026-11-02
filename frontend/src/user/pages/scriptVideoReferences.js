@@ -122,8 +122,8 @@ export function collectShotReferenceImages(options) {
   return collectShotReferenceDescriptors(options).map(reference => reference.url);
 }
 
-export function buildScriptVideoPayload({ prompt, modelKey, duration, resolution, aspectRatio, imageUrls } = {}) {
-  const payload = { prompt, modelKey };
+export function buildScriptVideoPayload({ prompt, modelKey, model, duration, resolution, aspectRatio, imageUrls } = {}) {
+  const payload = { prompt, modelKey, ...(model ? { model } : {}) };
   const references = Array.isArray(imageUrls) ? imageUrls.slice(0, MAX_H3_REFERENCE_IMAGES) : [];
   if (modelKey === 'seedance-2-0-official') {
     return {
@@ -134,7 +134,7 @@ export function buildScriptVideoPayload({ prompt, modelKey, duration, resolution
       ...(references.length ? { imageUrls: references } : {})
     };
   }
-  if (modelKey !== 'minimax-h3-video') {
+  if (modelKey !== 'minimax-h3-video' && modelKey !== 'local-doubao-executor-video') {
     return references.length ? { ...payload, imageUrls: references } : payload;
   }
   return {

@@ -87,10 +87,24 @@ func LocalExecutorJobStatements() []string {
 	}
 }
 
+func LocalExecutorJobSourceTaskIDStatements() []string {
+	return []string{
+		`ALTER TABLE local_executor_jobs MODIFY COLUMN source_task_id VARCHAR(255) NOT NULL`,
+	}
+}
+
+func LocalExecutorMultipleArtifactStatements() []string {
+	return []string{
+		`ALTER TABLE local_executor_artifacts DROP INDEX uq_local_executor_artifact_job, ADD KEY idx_local_executor_artifacts_job (job_id, created_at)`,
+	}
+}
+
 func LocalExecutorMigrations() []Migration {
 	return []Migration{
 		{Version: 7801001, SQL: LocalExecutorStatements(), CallbackChecksum: "v78-local-executor-control-plane-v1"},
 		{Version: 7801002, SQL: LocalExecutorJobStatements(), CallbackChecksum: "v78-local-executor-job-leasing-v1"},
+		{Version: 7801003, SQL: LocalExecutorJobSourceTaskIDStatements(), CallbackChecksum: "v78-local-executor-source-task-id-v2"},
+		{Version: 7801004, SQL: LocalExecutorMultipleArtifactStatements(), CallbackChecksum: "v88-local-executor-multiple-artifacts-v1"},
 	}
 }
 
@@ -99,6 +113,7 @@ func AppMigrations() []Migration {
 	out = append(out, V12Migrations()...)
 	out = append(out, LocalExecutorMigrations()...)
 	out = append(out, GiantMaterialExecutorMigrations()...)
+	out = append(out, AuthMigrations()...)
 	out = append(out, AgentWorkspaceMigrations()...)
 	return out
 }

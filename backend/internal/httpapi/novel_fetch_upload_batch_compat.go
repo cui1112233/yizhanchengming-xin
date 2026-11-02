@@ -210,7 +210,7 @@ func buildUploadFieldsCompat(platformID int, gender, style string, advanced, ite
 	fontStylesJSON, _ := json.Marshal(fontStyles)
 	return map[string]string{
 		"platform_id":       strconv.Itoa(platformID),
-		"organization":      "1",
+		"organization":      stringValue(item, "organization", stringValue(advanced, "organization", "1")),
 		"gender":            strconv.Itoa(genderID),
 		"style":             strconv.Itoa(styleID),
 		"tl5":               strconv.Itoa(advancedValue("tl5", 0, 0, 1)),

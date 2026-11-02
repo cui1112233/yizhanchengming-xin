@@ -65,6 +65,31 @@ func TestResolveCanvasInputsKeepsConfirmedImageReference(t *testing.T) {
 	}
 }
 
+func TestResolveCanvasInputsStopsAtConfirmedMediaBoundary(t *testing.T) {
+	canvas := Canvas{Nodes: []Node{
+		{ID: "audio-source", Type: "audio", Status: "confirmed", AssetRef: map[string]any{"id": "asset-audio-1", "kind": "audio"}},
+		{ID: "image-source", Type: "image", Status: "confirmed", AssetRef: map[string]any{"id": "asset-image-1", "kind": "image"}},
+		{ID: "video-target", Type: "video", Status: "draft", Config: map[string]any{"prompt": "小鸟转头"}},
+	}, Edges: []Edge{
+		{ID: "edge-audio-image", Source: "audio-source", Target: "image-source", Relation: "reference"},
+		{ID: "edge-image-video", Source: "image-source", Target: "video-target", Relation: "first_frame"},
+	}}
+
+	inputs, err := ResolveCanvasInputs(canvas, "video-target", CanvasInputCapability{AcceptsTextPrompt: true, AcceptsImageReferences: true})
+	if err != nil {
+		t.Fatalf("ResolveCanvasInputs() error = %v", err)
+	}
+	if got, want := inputs.Images, []ResolvedCanvasAsset{{NodeID: "image-source", AssetID: "asset-image-1", Kind: "image"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Images = %#v, want %#v", got, want)
+	}
+	if len(inputs.Audios) != 0 {
+		t.Fatalf("Audios = %#v, want media inputs to stop at the confirmed image", inputs.Audios)
+	}
+	if got, want := inputs.SourceNodeIDs, []string{"image-source", "video-target"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SourceNodeIDs = %#v, want %#v", got, want)
+	}
+}
+
 func TestResolveCanvasInputsRejectsUnsupportedOrUnconfirmedMedia(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -93,5 +118,44 @@ func TestResolveCanvasInputsRejectsUnsupportedOrUnconfirmedMedia(t *testing.T) {
 				t.Fatalf("ResolveCanvasInputs() error = %v, want errors.Is(_, %v)", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestResolveCanvasInputsIgnoresStaleIncompatibleTypedEdge(t *testing.T) {
+	canvas := Canvas{Nodes: []Node{
+		{ID: "audio-source", Type: "audio", Status: "confirmed", AssetRef: map[string]any{"id": "asset-audio-1", "kind": "audio"}},
+		{ID: "image-target", Type: "image", Status: "draft", Config: map[string]any{"prompt": "生成一只蓝色小鸟"}},
+	}, Edges: []Edge{{ID: "legacy-audio-image", Source: "audio-source", Target: "image-target", Relation: "reference"}}}
+
+	inputs, err := ResolveCanvasInputs(canvas, "image-target", CanvasInputCapability{AcceptsTextPrompt: true, AcceptsImageReferences: true})
+	if err != nil {
+		t.Fatalf("ResolveCanvasInputs() error = %v, want stale audio-to-image edge ignored", err)
+	}
+	if len(inputs.Audios) != 0 {
+		t.Fatalf("Audios = %#v, want no audio input for an image target", inputs.Audios)
+	}
+	if got, want := inputs.SourceNodeIDs, []string{"image-target"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SourceNodeIDs = %#v, want %#v", got, want)
+	}
+}
+
+func TestResolveCanvasInputsUsesAudioSourceAsTimingMetadata(t *testing.T) {
+	canvas := Canvas{Nodes: []Node{
+		{ID: "audio-source", Type: "audio", Status: "confirmed", AssetRef: map[string]any{"id": "asset-audio-1", "kind": "audio"}, Config: map[string]any{"durationSeconds": 7.4}},
+		{ID: "video-target", Type: "video", Status: "draft", Config: map[string]any{"prompt": "小鸟转头"}},
+	}, Edges: []Edge{{ID: "edge-audio", Source: "audio-source", Target: "video-target", Relation: "audio_source"}}}
+
+	inputs, err := ResolveCanvasInputs(canvas, "video-target", CanvasInputCapability{AcceptsTextPrompt: true, AcceptsImageReferences: true})
+	if err != nil {
+		t.Fatalf("ResolveCanvasInputs() error = %v", err)
+	}
+	if len(inputs.Audios) != 0 {
+		t.Fatalf("Audios = %#v, want no provider audio references", inputs.Audios)
+	}
+	if got, want := inputs.SourceNodeIDs, []string{"audio-source", "video-target"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SourceNodeIDs = %#v, want %#v", got, want)
+	}
+	if len(inputs.Warnings) != 1 || inputs.Warnings[0] != "音频连线仅用于视频时长，不会上传给当前视频模型" {
+		t.Fatalf("Warnings = %#v", inputs.Warnings)
 	}
 }

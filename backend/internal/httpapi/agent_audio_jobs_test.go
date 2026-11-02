@@ -149,6 +149,79 @@ func TestAgentAudioIdempotencyReplayDoesNotExecuteQueuedTaskAgain(t *testing.T) 
 	}
 }
 
+func TestAgentAudioGenerationStoresResolvedCanvasInputSnapshot(t *testing.T) {
+	now := time.Date(2026, 10, 23, 17, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "audio-1", Type: "audio", Title: "旁白", Version: 1, Status: "draft"})
+	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	canvas.Nodes = append([]agentworkspace.Node{{ID: "text-1", Type: "text", Title: "文案", Summary: "上游旁白文案", Version: 1, Status: "ready"}}, canvas.Nodes...)
+	canvas.Edges = []agentworkspace.Edge{{ID: "text-to-audio", Source: "text-1", Target: "audio-1"}}
+	if _, err := store.SaveCanvas(context.Background(), "alice", "project-1", canvas, 0, now); err != nil {
+		t.Fatal(err)
+	}
+	assets := agentworkspace.NewMemoryAssetStore()
+	objects := &memoryAudioObjects{contents: map[string][]byte{}}
+	mux := http.NewServeMux()
+	RegisterAgentAudioJobRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentAudioServices{Projects: store, Assets: assets, Objects: objects, QueueAudio: true, Now: func() time.Time { return now }})
+
+	response := signedJSONRequest(t, mux, now, "alice", http.MethodPost, "/api/agent/tasks/project-1/audio-generations", map[string]any{
+		"nodeId": "audio-1", "nodeVersion": 1, "operation": "speech", "prompt": "本次 TTS 指令", "modelId": "built-in-tts", "settings": map[string]any{}, "idempotencyKey": "audio-input-snapshot",
+	})
+	if response.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	tasks, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	if err != nil || len(tasks) != 1 {
+		t.Fatalf("tasks=%+v err=%v", tasks, err)
+	}
+	snapshot, ok := tasks[0].Settings["resolvedInputs"].(map[string]any)
+	if !ok || snapshot["prompt"] != "本次 TTS 指令" || snapshot["resolvedPrompt"] != "上游旁白文案" {
+		t.Fatalf("snapshot=%+v", tasks[0].Settings["resolvedInputs"])
+	}
+}
+
+func TestAgentAudioRetryKeepsOriginalResolvedCanvasInputSnapshot(t *testing.T) {
+	now := time.Date(2026, 10, 23, 17, 10, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "audio-1", Type: "audio", Title: "旁白", Version: 1, Status: "draft"})
+	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	canvas.Nodes = append([]agentworkspace.Node{{ID: "text-1", Type: "text", Title: "文案", Summary: "提交时的文案", Version: 1, Status: "ready"}}, canvas.Nodes...)
+	canvas.Edges = []agentworkspace.Edge{{ID: "text-to-audio", Source: "text-1", Target: "audio-1"}}
+	if _, err := store.SaveCanvas(context.Background(), "alice", "project-1", canvas, 0, now); err != nil {
+		t.Fatal(err)
+	}
+	original, err := store.CreateGenerationTask(context.Background(), "alice", agentworkspace.CreateGenerationTaskInput{
+		ID: "audio-original", ProjectID: "project-1", NodeID: "audio-1", NodeVersion: 1, Kind: "audio", Provider: "personal_api", ModelID: "built-in-tts", Mode: "speech",
+		Settings: map[string]any{"resolvedInputs": map[string]any{"prompt": "提交时的指令", "resolvedPrompt": "提交时的文案"}}, IdempotencyKey: "audio-original", Now: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.TransitionGenerationTask(context.Background(), "alice", "project-1", original.ID, agentworkspace.GenerationTaskTransition{State: agentworkspace.GenerationFailed, ErrorMessage: "provider failed", Now: now.Add(time.Second)}); err != nil {
+		t.Fatal(err)
+	}
+	canvas, err = store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	canvas.Nodes[0].Summary = "画布后来的文案"
+	if _, err := store.SaveCanvas(context.Background(), "alice", "project-1", canvas, int64(canvas.Version), now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	retry, err := store.RetryGenerationTask(context.Background(), "alice", "project-1", original.ID, agentworkspace.RetryGenerationTaskInput{ID: "audio-retry", IdempotencyKey: "audio-retry", Now: now.Add(3 * time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, ok := retry.Settings["resolvedInputs"].(map[string]any)
+	if !ok || snapshot["prompt"] != "提交时的指令" || snapshot["resolvedPrompt"] != "提交时的文案" {
+		t.Fatalf("retry snapshot=%+v", retry.Settings["resolvedInputs"])
+	}
+}
+
 func TestAgentAudioCoordinatorRunsQueuedTTS(t *testing.T) {
 	now := time.Date(2026, 10, 23, 16, 0, 0, 0, time.UTC)
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "audio-1", Type: "audio", Title: "旁白", Version: 1, Status: "draft"})
@@ -225,5 +298,39 @@ func TestAgentAudioTrimCreatesNewAssetWithoutChangingSource(t *testing.T) {
 	foreign := signedJSONRequest(t, mux, now, "bob", http.MethodPost, "/api/agent/tasks/project-1/audio-generations", body)
 	if foreign.Code != http.StatusNotFound {
 		t.Fatalf("foreign status=%d body=%s", foreign.Code, foreign.Body.String())
+	}
+}
+
+func TestAgentAudioWaveformReturnsBoundedSummaryAndRejectsNonAudioAsset(t *testing.T) {
+	now := time.Date(2026, 10, 24, 3, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "audio-1", Type: "audio", Title: "旁白", Version: 1, Status: "draft"})
+	assets := agentworkspace.NewMemoryAssetStore()
+	objects := &memoryAudioObjects{contents: map[string][]byte{}}
+	audio := agentworkspace.Asset{ID: "wave-audio", ProjectID: "project-1", Kind: "audio", Name: "voice.mp3", ContentType: "audio/mpeg", ObjectKey: "agent-assets/alice/project-1/wave-audio.mp3", ByteSize: 6, CreatedAt: now}
+	image := agentworkspace.Asset{ID: "wave-image", ProjectID: "project-1", Kind: "image", Name: "cover.png", ContentType: "image/png", ObjectKey: "agent-assets/alice/project-1/wave-image.png", ByteSize: 5, CreatedAt: now}
+	for _, asset := range []agentworkspace.Asset{audio, image} {
+		if err := assets.CreateAsset(context.Background(), "alice", asset); err != nil {
+			t.Fatal(err)
+		}
+	}
+	objects.contents[audio.ObjectKey] = []byte("audio!")
+	objects.contents[image.ObjectKey] = []byte("image")
+	mux := http.NewServeMux()
+	RegisterAgentAudioJobRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentAudioServices{
+		Projects: store, Assets: assets, Objects: objects, Now: func() time.Time { return now },
+		Waveform: agentAudioWaveformFunc(func(_ context.Context, _ agentworkspace.Asset, contents []byte) (AgentAudioWaveformSummary, error) {
+			if string(contents) != "audio!" {
+				t.Fatalf("contents=%q", contents)
+			}
+			return AgentAudioWaveformSummary{SampleRate: 8000, DurationMs: 1200, Peaks: []float64{0.1, 0.5, 0.2}}, nil
+		}),
+	})
+	response := signedJSONRequest(t, mux, now, "alice", http.MethodGet, "/api/agent/tasks/project-1/audio-assets/wave-audio/waveform", nil)
+	if response.Code != http.StatusOK || containsText(response.Body.String(), "audio!") || !containsText(response.Body.String(), `"durationMs":1200`) || !containsText(response.Body.String(), `"peaks":[0.1,0.5,0.2]`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	nonAudio := signedJSONRequest(t, mux, now, "alice", http.MethodGet, "/api/agent/tasks/project-1/audio-assets/wave-image/waveform", nil)
+	if nonAudio.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("non-audio status=%d body=%s", nonAudio.Code, nonAudio.Body.String())
 	}
 }

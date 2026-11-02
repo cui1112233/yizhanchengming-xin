@@ -151,9 +151,6 @@ func (s *ProductionService) resolveProvider(ctx context.Context, owner, provider
 		if s.LocalExecutor == nil || s.LocalExecutor.Client == nil {
 			return nil, FrozenVideoModel{}, fmt.Errorf("%w: Doubao local executor is offline", ErrUnavailable)
 		}
-		if strings.TrimSpace(s.LocalExecutor.PublicBaseURL) == "" {
-			return nil, FrozenVideoModel{}, fmt.Errorf("%w: local executor public artifact base URL is required for merge and publish", ErrUnavailable)
-		}
 		if err := s.LocalExecutor.EnsureAvailable(ctx, owner); err != nil {
 			return nil, FrozenVideoModel{}, err
 		}
@@ -457,14 +454,18 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		var ref ProviderTaskRef
 		var submitErr error
 		if provider == VideoProviderDoubaoLocal {
-			sourceTaskID := "bf11:" + batchID + ":" + bookID + ":" + task.VideoID
+			sourceTaskID := "bf11:" + batchID + ":" + bookID + ":" + task.VideoID + ":" + task.ID
 			if task.OpeningVariantIndex > 0 {
 				sourceTaskID = fmt.Sprintf("%s#v%d", sourceTaskID, task.OpeningVariantIndex)
+			}
+			localModel := model.ID
+			if selectedModel := rawString(prompt.EffectiveSettings.Values, "videoModelId", ""); strings.TrimSpace(selectedModel) != "" {
+				localModel = strings.TrimSpace(selectedModel)
 			}
 			ref, submitErr = s.LocalExecutor.Submit(ctx, owner, LocalVideoJobInput{
 				SourceTaskID: sourceTaskID,
 				BatchID:      batchID, BookID: bookID, VideoID: task.VideoID,
-				Model: model.ID, Prompt: prompt.CompiledPrompt,
+				Model: localModel, Prompt: prompt.CompiledPrompt,
 				Duration:           prompt.DurationSeconds,
 				AspectRatio:        EffectiveVideoAspectRatio(prompt.EffectiveSettings.Values),
 				Resolution:         EffectiveVideoResolution(prompt.EffectiveSettings.Values),

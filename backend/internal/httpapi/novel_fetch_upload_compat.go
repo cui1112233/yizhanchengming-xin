@@ -41,7 +41,7 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "loggedIn": false, "notLoggedIn": true, "status": "expired", "lastVerifiedAt": nil, "error": "目标站登录已失效，请重新登录", "code": "SESSION_EXPIRED"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "loggedIn": true, "status": "ready", "lastVerifiedAt": time.Now().UTC().Format(time.RFC3339)})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "loggedIn": true, "status": "ready", "username": strings.TrimSpace(toString(session["targetUsername"])), "lastVerifiedAt": time.Now().UTC().Format(time.RFC3339)})
 	}))
 	root.Handle("GET /api/novel-fetch-upload/upload-session", sessionHandler)
 	root.Handle("GET /api/novel-fetch-workshop/upload/session", sessionHandler)
@@ -66,10 +66,10 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 		}
 		connected, err := targets[0].Login(req.Context(), videomanagementconnector.LoginInput{Username: strings.TrimSpace(input.Username), Password: input.Password})
 		if err != nil || strings.TrimSpace(connected.Cookie) == "" {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "121 登录失败"})
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": videoManagementLoginError(err, connected.Cookie)})
 			return
 		}
-		if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "http://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
+		if err := saveUploadTargetSession(usersDir, identity.Username, map[string]any{"mode": "go_connector", "cookie": connected.Cookie, "sessionKey": connected.Cookie, "targetUsername": connected.TargetUsername, "baseUrl": "https://two.121w.com/tttadmin", "status": "ready", "loginAt": time.Now().UTC().Format(time.RFC3339)}); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "上传会话保存失败"})
 			return
 		}
@@ -77,6 +77,23 @@ func RegisterNovelFetchUploadSessionCompat(root *http.ServeMux, middleware Bridg
 	}))
 	root.Handle("POST /api/novel-fetch-upload/upload-login", loginHandler)
 	root.Handle("POST /api/novel-fetch-workshop/upload/login", loginHandler)
+}
+
+func videoManagementLoginError(err error, cookie string) string {
+	if err == nil && strings.TrimSpace(cookie) == "" {
+		return "视频管理系统未返回登录会话，请稍后重试"
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	if strings.Contains(message, "login page") && strings.Contains(message, "http 404") {
+		return "视频管理系统登录入口不可用，请检查后台地址"
+	}
+	if strings.Contains(message, "login rejected") {
+		return "视频管理系统账号或密码错误"
+	}
+	if strings.Contains(message, "connection refused") || strings.Contains(message, "connectex") || strings.Contains(message, "no such host") || strings.Contains(message, "timeout") || strings.Contains(message, "deadline exceeded") {
+		return "暂时无法连接视频管理系统，请稍后重试"
+	}
+	return "视频管理系统登录暂时不可用，请稍后重试"
 }
 
 func saveUploadTargetSession(usersDir, username string, value map[string]any) error {

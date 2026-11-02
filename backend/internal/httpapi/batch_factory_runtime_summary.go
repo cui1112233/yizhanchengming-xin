@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"qiantie/backend/internal/batchfactoryv11"
@@ -58,13 +59,75 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 			stageService = &batchfactoryv11.BookStageService{Store: store}
 		}
 		stageSummaries := result["stageSummaries"].(map[string]any)
+		comicStore, hasComicPages := store.(batchfactoryv11.ComicPageStore)
 		for _, book := range batch.Books {
 			summary, summaryErr := stageService.Summary(r.Context(), owner, batch.ID, book.ID)
 			if summaryErr != nil {
 				stageSummaries[book.ID] = map[string]any{"bookId": book.ID, "runs": []any{}, "unavailable": true, "error": summaryErr.Error()}
 				continue
 			}
-			stageSummaries[book.ID] = summary
+			// Manual comic-page generation writes durable page images but does not
+			// create an automatic stage-run row. Include the page truth in the
+			// runtime summary so the UI does not keep saying "waiting to generate"
+			// after every page already has a primary image.
+			stageSummary := map[string]any{
+				"bookId":       summary.BookID,
+				"runs":         summary.Runs,
+				"availability": summary.Availability,
+			}
+			if summary.LastFailed != nil {
+				stageSummary["lastFailed"] = summary.LastFailed
+			}
+			if hasComicPages && len(book.Videos) > 0 {
+				pages, pagesErr := comicStore.ListComicPages(r.Context(), owner, batch.ID, book.ID)
+				if pagesErr == nil {
+					ready := 0
+					for _, video := range book.Videos {
+						for _, page := range pages {
+							if page.VideoID != video.ID {
+								continue
+							}
+							for _, image := range page.Images {
+								if image.IsPrimary {
+									ready++
+									break
+								}
+							}
+							break
+						}
+					}
+					stageSummary["comicImageReadyCount"] = ready
+					stageSummary["comicImageTotalCount"] = len(book.Videos)
+					stageSummary["comicImageReady"] = ready == len(book.Videos)
+				}
+				collections, collectionsErr := comicStore.ListComicCollections(r.Context(), owner, batch.ID, book.ID)
+				if collectionsErr == nil {
+					collectionCount := 0
+					collectionPageCount := 0
+					publishedCollectionCount := 0
+					for _, collection := range collections {
+						if len(collection.Items) == 0 {
+							continue
+						}
+						collectionCount++
+						collectionPageCount += len(collection.Items)
+						if draft, draftErr := store.GetDraft(r.Context(), owner, collection.ID, n8ComicPublishDraftKind, batch.ID); draftErr == nil {
+							var publish struct {
+								Status     string `json:"status"`
+								CarouselID int64  `json:"carouselId"`
+							}
+							if json.Unmarshal([]byte(draft.Content), &publish) == nil && publish.Status == "published" && publish.CarouselID > 0 {
+								publishedCollectionCount++
+							}
+						}
+					}
+					stageSummary["comicCollectionCount"] = collectionCount
+					stageSummary["comicCollectionPageCount"] = collectionPageCount
+					stageSummary["comicPublishedCollectionCount"] = publishedCollectionCount
+					stageSummary["comicCollectionReady"] = collectionCount > 0
+				}
+			}
+			stageSummaries[book.ID] = stageSummary
 		}
 		writeJSON(w, http.StatusOK, result)
 	})))

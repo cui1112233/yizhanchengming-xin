@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+func TestCatalogUsesAdministratorPreviewAssetForComicMaterial(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	data := `[{
+		"id":"custom-comic-scene","module":"batch-factory","name":"自定义场景","kind":"base","version":1,"revision":1,"status":"published","body":"场景隐藏词","previewAssetId":"asset_custom_scene","protocolLock":{"slot":"batch.comic-reference-scene"}
+	}]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	items, err := NewCatalog(path).Published("batch-factory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].PreviewURL != "/api/presets/comic-material/custom-comic-scene/preview" || items[0].ReferenceURL != "/api/local-executor/v1/batch-comic-materials/custom-comic-scene" {
+		t.Fatalf("custom material URLs = %#v", items)
+	}
+}
+
 func TestCatalogListsPublishedPresetsAndConstraintText(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "presets.json")

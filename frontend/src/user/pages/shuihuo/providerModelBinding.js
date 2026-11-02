@@ -27,7 +27,7 @@ export const LOCAL_DOUBAO_VIDEO_MODEL_OPTIONS = [
 export function normalizeModelProvider(provider, fallback = 'personal_api') {
   const value = String(provider || '').trim().toLowerCase();
   if (!value) return fallback;
-  if (value === 'personal' || value === 'yd_video' || value === 'yadi') return 'personal_api';
+  if (value === 'personal' || value === 'yd_video' || value === 'yadi' || value === 'openai_compatible' || value === 'custom' || value === 'custom_api') return 'personal_api';
   if (value === 'doubao' || value === 'doubao_local' || value === 'local-doubao-executor-video') return 'doubao_local_executor';
   if (value === 'h3' || value === 'autodl' || value === 'minimax_h3' || value === 'minimax-h3-video') return 'autodl_comfyui';
   if (value === 'yfai' || value === 'seedance-2-0-official') return 'yfai_seedance';
@@ -85,4 +85,12 @@ export function reconcileProviderModel({ models, kind, provider, modelId }) {
     provider: normalizedProvider,
     modelId: options.some(option => option.value === selected) ? selected : (normalizedProvider === 'doubao_local_executor' ? defaultLocalModel(kind) : (options[0]?.value || ''))
   };
+}
+
+export function providerModelSettingsPatch(input = {}) {
+  const kind = input.kind === 'video' ? 'video' : 'image';
+  const reconciled = reconcileProviderModel({ ...input, kind });
+  return kind === 'video'
+    ? { videoProvider: reconciled.provider, videoModelId: reconciled.modelId }
+    : { imageProvider: reconciled.provider, imageModelId: reconciled.modelId };
 }

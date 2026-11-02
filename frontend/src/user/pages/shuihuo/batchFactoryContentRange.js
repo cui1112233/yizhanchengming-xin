@@ -8,6 +8,11 @@ export function contentCaptureCharactersForBook(book) {
   return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : 4000;
 }
 
+function comicAnalysisTargetCharactersForBook(book) {
+  const value = Number(book?.sourceMetadata?.comicAnalysisCharacters);
+  return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : 2000;
+}
+
 function normalizedSourceLine(value) {
   return String(value || '')
     .replace(/&nbsp;|\u00a0|　/g, ' ')
@@ -23,8 +28,31 @@ function isPunctuationOnlyLine(value) {
   return /^[，。！？、；：…·—～~,.!?;:()（）【】\[\]{}「」『』“”"'\-]+$/.test(value);
 }
 
+export function comicAnalysisCharactersForBook(book) {
+  const source = Array.from(batchFactoryCleanSourceText(book?.sourceText || ''));
+  const target = comicAnalysisTargetCharactersForBook(book);
+  if (source.length <= target) return source.length;
+  const isBoundary = value => '。！？!?；;\n'.includes(value);
+  let next = -1;
+  for (let index = target; index < source.length; index += 1) {
+    if (isBoundary(source[index])) { next = index; break; }
+  }
+  let previous = -1;
+  for (let index = target - 1; index >= 0; index -= 1) {
+    if (isBoundary(source[index])) { previous = index; break; }
+  }
+  if (previous >= 0 && (next < 0 || target - previous <= next - target)) return previous + 1;
+  return next >= 0 ? next + 1 : target;
+}
+
+export function batchFactorySourceText(value) {
+  if (typeof value !== 'string') return '';
+  const text = value.trim();
+  return text === '[object Object]' ? '' : text;
+}
+
 function usableSourceLines(sourceText) {
-  const lines = String(sourceText || '').split(/\r?\n/).map(normalizedSourceLine).filter(Boolean);
+  const lines = batchFactorySourceText(sourceText).split(/\r?\n/).map(normalizedSourceLine).filter(Boolean);
   let firstContent = 0;
   while (firstContent < lines.length && isLeadingPageStateLine(lines[firstContent])) firstContent += 1;
   return lines.slice(firstContent).filter(line => !isPunctuationOnlyLine(line));
@@ -43,7 +71,7 @@ export function batchFactoryPreviewText(sourceText, book) {
 }
 
 export function batchFactoryProductionText(sourceText, workingFrontContent, book) {
-  const working = String(workingFrontContent || '').trim();
+  const working = batchFactorySourceText(workingFrontContent);
   return working || batchFactoryPreviewText(sourceText, book);
 }
 
@@ -51,14 +79,15 @@ export function batchFactoryProductionText(sourceText, workingFrontContent, book
 // workbench still decides what to show from the saved source through
 // batchFactoryPreviewText and the book's selected contentRangeLines.
 export function sourceTextAfterViralAdoption(viralCandidate) {
-  return String(viralCandidate || '').trim();
+  return batchFactorySourceText(viralCandidate);
 }
 
 
 export function publishContentWithWorkingFront(sourceText, workingFrontContent, book) {
-  const sourceLines = String(sourceText || '').split(/\r?\n/);
-  const editedLines = String(workingFrontContent || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  if (!editedLines.length) return String(sourceText || '');
+  const normalizedSource = batchFactorySourceText(sourceText);
+  const sourceLines = normalizedSource.split(/\r?\n/);
+  const editedLines = batchFactorySourceText(workingFrontContent).split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  if (!editedLines.length) return normalizedSource;
   const limit = contentRangeLinesForBook(book);
   let replacement = 0;
   let seen = 0;

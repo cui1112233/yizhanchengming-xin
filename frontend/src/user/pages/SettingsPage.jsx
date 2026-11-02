@@ -1,9 +1,11 @@
 import { Button, Form, Input, List, Popconfirm, Segmented, Select, Slider, Switch, Typography, message } from 'antd';
-import { Download, FolderOpen, RefreshCw, Save, Video } from 'lucide-react';
+import { Download, FolderOpen, Image, RefreshCw, Save, Video } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig, saveConfig } from '../../shared/api/config';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { apiRequest } from '../../shared/api/client';
+import { createLocalExecutorPairing as createDoubaoExecutorPairing, getLocalExecutorReleaseManifest } from '../../shared/api/localExecutors.js';
+import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus.js';
 import {
   createGiantMaterialPairing,
   getGiantExecutorPreference,
@@ -12,6 +14,7 @@ import {
 } from '../../shared/api/giantMaterialExecutorPublic';
 import { PET_COMPANION_SETTINGS_EVENT, readCompanionSpeechState, writeCompanionSpeechState } from '../../shared/pet/companionSpeech';
 import { DEFAULT_PET_ID, dispatchPetSelection, getPetDefinition, getPetOptions, previewPetSelection } from '../../shared/pet/petCatalog';
+import { LittleCompanionSprite } from '../../shared/pet/LittleCompanionSprite';
 
 const petOptions = getPetOptions();
 
@@ -23,8 +26,6 @@ export function SettingsPage() {
   const [listing, setListing] = useState(false);
   const [restoreReport, setRestoreReport] = useState(null);
   const [fileList, setFileList] = useState(null);
-  const [localExecutors, setLocalExecutors] = useState([]);
-  const [loadingExecutors, setLoadingExecutors] = useState(false);
   const [giantMaterialExecutors, setGiantMaterialExecutors] = useState([]);
   const [loadingGiantMaterialExecutors, setLoadingGiantMaterialExecutors] = useState(false);
   const [giantLatestVersions, setGiantLatestVersions] = useState({ windows: null, macos: null });
@@ -32,27 +33,35 @@ export function SettingsPage() {
   const [giantPairingBusy, setGiantPairingBusy] = useState(false);
   const [giantPreference, setGiantPreference] = useState({ preferredOs: 'windows' });
   const [pairing, setPairing] = useState(null);
+  const [localExecutorRelease, setLocalExecutorRelease] = useState({ windows: '', macos: '', windowsUrl: '', macosUrl: '' });
+  const [executorTestBusy, setExecutorTestBusy] = useState('');
+  const [executorTestResult, setExecutorTestResult] = useState(null);
   const [companionActive, setCompanionActive] = useState(() => readCompanionSpeechState(getCurrentUsername()).active);
   const username = getCurrentUsername();
+  const { executors: localExecutors, loading: loadingExecutors, refresh: refreshLocalExecutors } = useLocalExecutorStatus({ enabled: true, intervalMs: 30000 });
   const soundEnabled = Form.useWatch('soundEnabled', form);
   const soundVolume = Form.useWatch('soundVolume', form);
   const soundVolumePercent = Number.isFinite(soundVolume) ? Math.round(soundVolume) : 60;
+
+  useEffect(() => {
+    let alive = true;
+    getLocalExecutorReleaseManifest().then(value => {
+      if (alive) setLocalExecutorRelease(value);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     setCompanionActive(readCompanionSpeechState(username).active);
   }, [username]);
 
   async function loadLocalExecutors() {
-    setLoadingExecutors(true);
     try {
-      const result = await apiRequest('/api/shuihuo-production/local-executors', { suppressGlobalError: true });
-      setLocalExecutors(Array.isArray(result.executors) ? result.executors : []);
+      await refreshLocalExecutors();
     } catch (error) {
       message.error(error.message || '读取本地执行器失败');
-    } finally { setLoadingExecutors(false); }
+    }
   }
-
-  useEffect(() => { loadLocalExecutors(); }, []);
 
   async function loadGiantMaterialExecutors() {
     setLoadingGiantMaterialExecutors(true);
@@ -97,10 +106,54 @@ export function SettingsPage() {
 
   async function createLocalExecutorPairing() {
     try {
-      const result = await apiRequest('/api/shuihuo-production/local-executors/pairings', { method: 'POST', body: JSON.stringify({ platform: 'doubao' }), suppressGlobalError: true });
+      const result = await createDoubaoExecutorPairing();
       setPairing(result);
+      await refreshLocalExecutors();
       message.success('配对码已生成，请在本地执行器中输入');
     } catch (error) { message.error(error.message || '生成配对码失败'); }
+  }
+
+  useEffect(() => () => {
+    if (executorTestResult?.previewUrl) URL.revokeObjectURL(executorTestResult.previewUrl);
+  }, [executorTestResult?.previewUrl]);
+
+  async function runLocalExecutorTest(type) {
+    setExecutorTestBusy(type);
+    if (executorTestResult?.previewUrl) URL.revokeObjectURL(executorTestResult.previewUrl);
+    setExecutorTestResult({ type, status: 'queued' });
+    try {
+      const created = await apiRequest('/api/shuihuo-production/local-executor-tests', {
+        method: 'POST',
+        body: JSON.stringify({
+          type,
+          prompt: type === 'image' ? '一只蓝色小鸟站在樱花枝上' : '一只蓝色小鸟站在樱花枝上，轻轻扇动翅膀，镜头稳定',
+          ratio: type === 'image' ? '1:1' : '16:9',
+          duration: type === 'video' ? 5 : 0
+        }),
+        suppressGlobalError: true
+      });
+      let current = created;
+      for (let attempt = 0; attempt < 450; attempt += 1) {
+        current = await apiRequest(`/api/shuihuo-production/local-executor-tests/${created.jobId}`, { suppressGlobalError: true });
+        setExecutorTestResult({ type, ...current });
+        if (current.status === 'succeeded') {
+          const blob = await apiRequest(current.resultUrl, { responseType: 'blob', suppressGlobalError: true });
+          const previewUrl = URL.createObjectURL(blob);
+          setExecutorTestResult({ type, ...current, previewUrl });
+          message.success(`${type === 'image' ? '图片' : '视频'}测试成功`);
+          return;
+        }
+        if (current.status === 'failed' || current.status === 'cancelled') throw new Error(current.error || '本地执行器测试失败');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      throw new Error('本地执行器测试等待超时');
+    } catch (error) {
+      setExecutorTestResult(current => ({ ...current, type, status: 'failed', error: error.message || '测试失败' }));
+      message.error(error.message || '本地执行器测试失败');
+    } finally {
+      setExecutorTestBusy('');
+      loadLocalExecutors();
+    }
   }
 
   const changeGiantPreference = async (value) => {
@@ -347,27 +400,51 @@ export function SettingsPage() {
 
         <section className="settings-section settings-executor-section" aria-labelledby="settings-executor-title">
           <div>
-            <h2 id="settings-executor-title">豆包本地执行器</h2>
-            <p>本机账号登录状态只保存在本地，平台仅接收任务状态和视频结果。请先下载客户端，再生成配对码完成绑定。</p>
+            <h2 id="settings-executor-title">一战晟铭执行器</h2>
+            <p>在自己的电脑上使用豆包生成图片和视频。下载安装后，用一次性配对码连接，之后会自动接收网页任务。</p>
           </div>
           <div className="settings-executor-layout">
             <div className="settings-executor-status">
               <div className="settings-executor-icon"><Video size={20} /></div>
               <div>
-                <strong>本机视频执行通道</strong>
+                <strong>本机图片与视频执行通道</strong>
                 <span>{localExecutors.length} 台已配对 · {localExecutors.filter(item => item.online).length} 台在线</span>
               </div>
             </div>
-            {pairing ? <p className="settings-executor-pairing">请在本地执行器中输入配对码：<strong>{pairing.code}</strong></p> : null}
+            {pairing ? <p className="settings-executor-pairing">请在一战晟铭执行器中输入配对码：<strong>{pairing.code}</strong>（10 分钟内有效，只能使用一次）</p> : null}
             <div className="settings-executor-actions settings-executor-actions-doubao">
               <div className="settings-executor-action-row settings-executor-action-row-top">
                 <Button icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={loadLocalExecutors} loading={loadingExecutors}>刷新状态</Button>
                 <Button type="primary" onClick={createLocalExecutorPairing}>生成配对码</Button>
               </div>
               <div className="settings-executor-action-row settings-executor-action-row-downloads">
-                <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} disabled>Mac 版暂未发布</Button>
-                <Button type="primary" icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href="/downloads/local-executor/qiantie-executor-v88-0.1.0-win-x64.exe">下载 Go Windows 执行器 0.1.0</Button>
+                <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href={localExecutorRelease.macosUrl || '/downloads/local-executor/doubao-relay_1.0.0_universal.dmg'}>下载 macOS 客户端{localExecutorRelease.macos ? ` ${localExecutorRelease.macos}` : ''}</Button>
+                <Button type="primary" icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} href={localExecutorRelease.windowsUrl || '/downloads/local-executor/一战晟铭执行器-安装版.exe'}>下载 Windows 执行器{localExecutorRelease.windows ? ` ${localExecutorRelease.windows}` : ''}</Button>
               </div>
+            </div>
+            {localExecutors.length > 0 ? (
+              <ul className="settings-local-executor-devices">
+                {localExecutors.map(item => (
+                  <li key={item.id}>
+                    <span className={`settings-device-dot ${item.online ? 'is-online' : ''}`} aria-hidden="true" />
+                    <strong>{item.name || '未命名设备'}</strong>
+                    <span>{item.os || '未知系统'} · 版本 {item.version || '未知'}</span>
+                    <span className="settings-device-seen">{item.online ? '在线' : formatLastSeen(item.lastSeenAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="settings-executor-test">
+              <div className="settings-executor-test-actions">
+                <Button icon={<Image size={16} />} loading={executorTestBusy === 'image'} disabled={Boolean(executorTestBusy) || !localExecutors.some(item => item.online)} onClick={() => runLocalExecutorTest('image')}>测试图片生成</Button>
+                <Button icon={<Video size={16} />} loading={executorTestBusy === 'video'} disabled={Boolean(executorTestBusy) || !localExecutors.some(item => item.online)} onClick={() => runLocalExecutorTest('video')}>测试视频生成</Button>
+              </div>
+              {executorTestResult ? <div className={`settings-executor-test-result is-${executorTestResult.status || 'queued'}`}>
+                <strong>{executorTestResult.status === 'succeeded' ? '测试成功' : executorTestResult.status === 'failed' ? '测试失败' : '正在通过本地执行器生成'}</strong>
+                {executorTestResult.error ? <span>{executorTestResult.error}</span> : null}
+                {executorTestResult.previewUrl && executorTestResult.mediaType?.startsWith('image/') ? <img src={executorTestResult.previewUrl} alt="本地执行器图片测试结果" /> : null}
+                {executorTestResult.previewUrl && executorTestResult.mediaType === 'video/mp4' ? <video src={executorTestResult.previewUrl} controls playsInline /> : null}
+              </div> : null}
             </div>
           </div>
         </section>
@@ -456,7 +533,9 @@ function PetPreview({ form }) {
   return (
     <div className="settings-pet-preview" aria-label={`当前前贴宠物 ${pet.displayName}`}>
       <div className="settings-pet-frame">
-        <img src={pet.spritesheetPath} alt={pet.displayName} style={{ imageRendering: pet.renderMode === 'smooth' ? 'auto' : undefined }} />
+        {pet.renderer === 'multi-sheet'
+          ? <LittleCompanionSprite state="idle" preview label={pet.displayName} />
+          : <img className="settings-pet-atlas" src={pet.spritesheetPath} alt={pet.displayName} style={{ imageRendering: pet.renderMode === 'smooth' ? 'auto' : undefined }} />}
       </div>
       <div>
         <Typography.Text strong>{pet.displayName}</Typography.Text>

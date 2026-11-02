@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $frontendDist = Join-Path $repo 'frontend/dist'
 $goDist = Join-Path $repo 'backend/web/dist'
+$binaryPath = Join-Path $repo 'backend/qiantie-local.exe'
 $petsSource = Join-Path $repo 'pets'
 $petsDist = Join-Path $goDist 'pets'
 $brandAssetsSource = Join-Path $repo 'frontend/public/assets'
@@ -53,11 +54,17 @@ Copy-Item -Path (Join-Path $petsSource '*') -Destination $petsDist -Recurse -For
 if (-not $SkipGoBuild) {
   Push-Location (Join-Path $repo 'backend')
   try {
-    go build -o qiantie-local.exe ./cmd/qiantie
+    go build -o $binaryPath ./cmd/qiantie
+    if ($LASTEXITCODE -ne 0) {
+      throw "Go API build failed with exit code $LASTEXITCODE"
+    }
     $executorDownloads = Join-Path $goDist 'downloads/local-executor'
     New-Item -ItemType Directory -Force $executorDownloads | Out-Null
     $executorFile = Join-Path $executorDownloads 'qiantie-executor-v88-0.1.0-win-x64.exe'
     go build -o $executorFile ./cmd/qiantie-executor
+    if ($LASTEXITCODE -ne 0) {
+      throw "Local executor build failed with exit code $LASTEXITCODE"
+    }
     # The API serves operator-provided downloads from data/downloads, while
     # backend/web/dist is the embedded fallback. Keep both copies in sync so
     # a freshly built Go runtime never advertises a 503 installer URL.
@@ -71,7 +78,18 @@ if (-not $SkipGoBuild) {
     $buildMetaDir = Join-Path $repo '.direct-staging'
     New-Item -ItemType Directory -Force $buildMetaDir | Out-Null
     $buildSHA = (& git -C $repo rev-parse --short HEAD).Trim()
-    Set-Content -LiteralPath (Join-Path $buildMetaDir 'qiantie-local.build-meta') -Value @("git_sha=$buildSHA", "runtime_sha=$runtimeVersion") -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $buildMetaDir 'qiantie-local.build-meta') -Value "git_sha=$buildSHA" -Encoding utf8
+
+    $indexHTML = Get-Content -LiteralPath (Join-Path $frontendDist 'index.html') -Raw
+    $entryMatch = [regex]::Match($indexHTML, '<script[^>]+type=["'']module["''][^>]+src=["'']([^"'']+\.js)["'']')
+    if (-not $entryMatch.Success) {
+      throw "Frontend module entry was not found in: $frontendDist/index.html"
+    }
+    $runtimeManifestDir = Join-Path $repo '.local-review'
+    New-Item -ItemType Directory -Force $runtimeManifestDir | Out-Null
+    @{ gitSha = $buildSHA; frontendEntry = $entryMatch.Groups[1].Value; builtAt = (Get-Date).ToUniversalTime().ToString('o'); binaryPath = $binaryPath } |
+      ConvertTo-Json -Compress |
+      Set-Content -LiteralPath (Join-Path $runtimeManifestDir 'runtime-manifest.json') -Encoding utf8
   } finally {
     Pop-Location
   }

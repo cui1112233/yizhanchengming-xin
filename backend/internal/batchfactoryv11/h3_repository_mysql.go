@@ -90,7 +90,7 @@ func (s *MySQLStore) PersistH3CanonicalTimeline(ctx context.Context, owner, batc
 		return H3CanonicalTimelineRevision{}, err
 	}
 	var owns int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM batch_factory_v11_director_revisions WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, timeline.DirectorRevisionID, owner, batchID, bookID).Scan(&owns); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM batch_factory_v12_director_revisions WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, timeline.DirectorRevisionID, owner, batchID, bookID).Scan(&owns); err != nil {
 		return H3CanonicalTimelineRevision{}, err
 	}
 	if owns != 1 {
@@ -236,7 +236,7 @@ func (s *MySQLStore) ApplyH3CompilationVideos(ctx context.Context, owner, batchI
 		return nil, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.QueryContext(ctx, `SELECT id,ordinal,revision FROM batch_factory_v11_videos WHERE owner_username=? AND batch_id=? AND book_id=? AND compatibility_state='active' ORDER BY ordinal,id FOR UPDATE`, owner, batchID, bookID)
+	rows, err := tx.QueryContext(ctx, `SELECT id,ordinal,revision FROM batch_factory_v12_videos WHERE owner_username=? AND batch_id=? AND book_id=? AND compatibility_state='active' ORDER BY ordinal,id FOR UPDATE`, owner, batchID, bookID)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func (s *MySQLStore) ApplyH3CompilationVideos(ctx context.Context, owner, batchI
 			previousSelections[value.ordinal], previousSelectionExists[value.ordinal] = selection, true
 		}
 	}
-	assetRows, err := tx.QueryContext(ctx, `SELECT id,kind,name FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, owner, batchID, bookID)
+	assetRows, err := tx.QueryContext(ctx, `SELECT id,kind,name FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, owner, batchID, bookID)
 	if err != nil {
 		return nil, err
 	}
@@ -296,16 +296,16 @@ func (s *MySQLStore) ApplyH3CompilationVideos(ctx context.Context, owner, batchI
 		for index, segment := range stored.Compilation.Segments {
 			value := existing[index]
 			label := fmt.Sprintf("VIDEO %02d", index+1)
-			if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_videos SET ordinal=?,revision=revision+1,updated_at=? WHERE id=? AND owner_username=?`, index, now, value.id, owner); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_videos SET ordinal=?,revision=revision+1,updated_at=? WHERE id=? AND owner_username=?`, index, now, value.id, owner); err != nil {
 				return nil, err
 			}
-			if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_video_records SET label=?,video_prompt=?,duration_seconds=? WHERE video_id=?`, label, segment.EditableCopy, float64(segment.CanonicalDurationMS)/1000, value.id); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_video_records SET label=?,video_prompt=?,duration_seconds=? WHERE video_id=?`, label, segment.EditableCopy, float64(segment.CanonicalDurationMS)/1000, value.id); err != nil {
 				return nil, err
 			}
 			videos[index] = Video{ID: value.id, BatchID: batchID, BookID: bookID, Label: label, VideoPrompt: segment.EditableCopy, DurationSeconds: float64(segment.CanonicalDurationMS) / 1000, CompatibilityState: "active", Revision: value.revision + 1}
 		}
 	} else {
-		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_videos SET compatibility_state='orphaned',updated_at=? WHERE owner_username=? AND batch_id=? AND book_id=? AND compatibility_state='active'`, now, owner, batchID, bookID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_videos SET compatibility_state='orphaned',updated_at=? WHERE owner_username=? AND batch_id=? AND book_id=? AND compatibility_state='active'`, now, owner, batchID, bookID); err != nil {
 			return nil, err
 		}
 		for index, segment := range stored.Compilation.Segments {
@@ -314,10 +314,10 @@ func (s *MySQLStore) ApplyH3CompilationVideos(ctx context.Context, owner, batchI
 				return nil, err
 			}
 			label := fmt.Sprintf("VIDEO %02d", index+1)
-			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_videos(id,batch_id,book_id,owner_username,ordinal,compatibility_state,revision,created_at,updated_at) VALUES(?,?,?,?,?,'active',1,?,?)`, videoID, batchID, bookID, owner, index, now, now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_videos(id,batch_id,book_id,owner_username,ordinal,compatibility_state,revision,created_at,updated_at) VALUES(?,?,?,?,?,'active',1,?,?)`, videoID, batchID, bookID, owner, index, now, now); err != nil {
 				return nil, err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,NULL,?)`, videoID, label, segment.EditableCopy, float64(segment.CanonicalDurationMS)/1000); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,NULL,?)`, videoID, label, segment.EditableCopy, float64(segment.CanonicalDurationMS)/1000); err != nil {
 				return nil, err
 			}
 			videos[index] = Video{ID: videoID, BatchID: batchID, BookID: bookID, Label: label, VideoPrompt: segment.EditableCopy, DurationSeconds: float64(segment.CanonicalDurationMS) / 1000, CompatibilityState: "active", Revision: 1}
@@ -338,11 +338,11 @@ func (s *MySQLStore) ApplyH3CompilationVideos(ctx context.Context, owner, batchI
 		if err != nil {
 			return nil, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=revision+1,updated_at=VALUES(updated_at)`, video.ID, owner, batchID, bookID, video.ID, string(encodedPatch), now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=revision+1,updated_at=VALUES(updated_at)`, video.ID, owner, batchID, bookID, video.ID, string(encodedPatch), now); err != nil {
 			return nil, err
 		}
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, now, bookID, batchID, owner)
+	result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, now, bookID, batchID, owner)
 	if err != nil {
 		return nil, err
 	}

@@ -30,7 +30,7 @@ func (s *MySQLStore) CreateBookStageRun(ctx context.Context, value BookStageRun)
 		value.UpdatedAt = value.CreatedAt
 	}
 	value.ID = id
-	_, err = s.db.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_stage_runs(id,owner_username,batch_id,book_id,stage,status,attempt,request_id,input_revision,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, value.BookID, value.Stage, value.Status, value.Attempt, nullableString(value.RequestID), nullableString(value.InputRevision), nullableString(value.ErrorMessage), value.CreatedAt, value.UpdatedAt)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_stage_runs(id,owner_username,batch_id,book_id,stage,status,attempt,request_id,input_revision,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, value.BookID, value.Stage, value.Status, value.Attempt, nullableString(value.RequestID), nullableString(value.InputRevision), nullableString(value.ErrorMessage), value.CreatedAt, value.UpdatedAt)
 	if err != nil {
 		return BookStageRun{}, err
 	}
@@ -43,7 +43,7 @@ func (s *MySQLStore) UpdateBookStageRun(ctx context.Context, owner, id string, v
 	}
 	var existing BookStageRun
 	var stage, status string
-	err := s.db.QueryRowContext(ctx, `SELECT batch_id,book_id,stage,status,attempt,COALESCE(request_id,''),COALESCE(input_revision,''),COALESCE(error_message,''),created_at FROM batch_factory_v11_book_stage_runs WHERE id=? AND owner_username=?`, id, owner).Scan(&existing.BatchID, &existing.BookID, &stage, &status, &existing.Attempt, &existing.RequestID, &existing.InputRevision, &existing.ErrorMessage, &existing.CreatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT batch_id,book_id,stage,status,attempt,COALESCE(request_id,''),COALESCE(input_revision,''),COALESCE(error_message,''),created_at FROM batch_factory_v12_book_stage_runs WHERE id=? AND owner_username=?`, id, owner).Scan(&existing.BatchID, &existing.BookID, &stage, &status, &existing.Attempt, &existing.RequestID, &existing.InputRevision, &existing.ErrorMessage, &existing.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return BookStageRun{}, ErrNotFound
 	}
@@ -65,7 +65,7 @@ func (s *MySQLStore) UpdateBookStageRun(ctx context.Context, owner, id string, v
 	if err != nil {
 		return BookStageRun{}, err
 	}
-	_, err = s.db.ExecContext(ctx, `UPDATE batch_factory_v11_book_stage_runs SET status=?,error_message=?,input_revision=?,updated_at=? WHERE id=? AND owner_username=?`, existing.Status, nullableString(existing.ErrorMessage), nullableString(existing.InputRevision), existing.UpdatedAt, id, owner)
+	_, err = s.db.ExecContext(ctx, `UPDATE batch_factory_v12_book_stage_runs SET status=?,error_message=?,input_revision=?,updated_at=? WHERE id=? AND owner_username=?`, existing.Status, nullableString(existing.ErrorMessage), nullableString(existing.InputRevision), existing.UpdatedAt, id, owner)
 	if err != nil {
 		return BookStageRun{}, err
 	}
@@ -76,7 +76,7 @@ func (s *MySQLStore) ListBookStageRuns(ctx context.Context, owner, batchID, book
 	if err := ensureBookOwnership(ctx, s.db, owner, batchID, bookID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,stage,status,attempt,COALESCE(request_id,''),COALESCE(input_revision,''),COALESCE(error_message,''),created_at,updated_at FROM batch_factory_v11_book_stage_runs WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY updated_at,id`, owner, batchID, bookID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,stage,status,attempt,COALESCE(request_id,''),COALESCE(input_revision,''),COALESCE(error_message,''),created_at,updated_at FROM batch_factory_v12_book_stage_runs WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY updated_at,id`, owner, batchID, bookID)
 	if err != nil {
 		return nil, err
 	}

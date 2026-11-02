@@ -140,6 +140,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		})
 		if options.N8ComicPublisher != nil {
 			options.AutomationCoordinator.SetComicPublisher(options.N8ComicPublisher.PublishFromSettings)
+			options.AutomationCoordinator.SetComicPublishPreflight(options.N8ComicPublisher.ValidateSettings)
 		}
 		if err := options.AutomationCoordinator.RecoverInterruptedJobs(); err != nil {
 			log.Printf("recover interrupted batch automation jobs: %v", err)

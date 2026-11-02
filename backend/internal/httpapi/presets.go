@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/prompt"
 )
 
-func registerPresetRoutes(root *http.ServeMux, auth BridgeAuth, catalog *prompt.Catalog) {
+func registerPresetRoutes(root *http.ServeMux, auth BridgeAuth, catalog *prompt.Catalog, files *localartifact.Store) {
 	handler := auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/presets" {
 			if r.Method != http.MethodGet {
@@ -45,6 +46,35 @@ func registerPresetRoutes(root *http.ServeMux, auth BridgeAuth, catalog *prompt.
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(data)
+			return
+		}
+		if strings.HasPrefix(presetPath, "comic-reference-scene/") && strings.HasSuffix(presetPath, "/preview") {
+			if r.Method != http.MethodGet {
+				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+				return
+			}
+			presetID := strings.TrimSuffix(strings.TrimPrefix(presetPath, "comic-reference-scene/"), "/preview")
+			data, contentType, found := prompt.OpenComicReferenceScene(presetID)
+			if !found {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
+				return
+			}
+			w.Header().Set("Content-Type", contentType)
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+			return
+		}
+		if strings.HasPrefix(presetPath, "comic-material/") && strings.HasSuffix(presetPath, "/preview") {
+			if r.Method != http.MethodGet {
+				writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+				return
+			}
+			presetID := strings.TrimSuffix(strings.TrimPrefix(presetPath, "comic-material/"), "/preview")
+			if !servePublishedComicMaterial(w, r, catalog, files, presetID) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
+			}
 			return
 		}
 		switch presetPath {
@@ -91,4 +121,15 @@ func registerPresetRoutes(root *http.ServeMux, auth BridgeAuth, catalog *prompt.
 	}))
 	root.Handle("/api/presets", handler)
 	root.Handle("/api/presets/", handler)
+}
+
+func servePublishedComicMaterial(w http.ResponseWriter, r *http.Request, catalog *prompt.Catalog, files *localartifact.Store, presetID string) bool {
+	if catalog == nil || files == nil {
+		return false
+	}
+	assetID, found, err := catalog.PublishedComicMaterialAsset(presetID)
+	if err != nil || !found {
+		return false
+	}
+	return serveArtifactImage(w, r, files, assetID)
 }

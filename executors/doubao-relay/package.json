@@ -1,0 +1,11 @@
+{
+  "name": "doubao-relay-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "cargo tauri dev",
+    "build": "cargo tauri build",
+    "typecheck": "pnpm --dir frontend typecheck",
+    "test": "pnpm --dir frontend test -- --run"
+  }
+}

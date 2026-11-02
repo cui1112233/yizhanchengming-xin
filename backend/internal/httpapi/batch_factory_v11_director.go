@@ -25,6 +25,82 @@ func directorForRequest(service *batchfactoryv11.DirectorService, input *textPro
 }
 
 func registerDirectorRoutes(mux *http.ServeMux, service *batchfactoryv11.DirectorService, store batchfactoryv11.Store) {
+	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/books/{bookId}/director-prompt-candidate", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		candidate, err := service.DirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"candidate": candidate})
+	})
+	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/director-prompt-candidate", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			ExpectedRevision int64              `json:"expectedRevision"`
+			TextProvider     *textProviderInput `json:"textProvider"`
+		}
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		runner, err := directorForRequest(service, input.TextProvider)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		candidate, err := runner.CreateDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.ExpectedRevision)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"candidate": candidate})
+	})
+	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/videos/{videoId}/director-prompt-candidate/accept", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			CandidateID      string `json:"candidateId"`
+			ExpectedRevision int64  `json:"expectedRevision"`
+		}
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		video, err := service.AcceptDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input.CandidateID, input.ExpectedRevision)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"video": video})
+	})
+	mux.HandleFunc("DELETE /api/batch-factory/v11/batches/{batchId}/books/{bookId}/director-prompt-candidate", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input struct {
+			ExpectedRevision int64 `json:"expectedRevision"`
+		}
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		if err := service.CancelDirectorPromptCandidate(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.ExpectedRevision); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"cancelled": true})
+	})
 	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/working-front/viral", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

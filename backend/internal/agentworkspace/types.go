@@ -10,6 +10,7 @@ type ProjectSummary struct {
 	ID           string    `json:"id"`
 	Title        string    `json:"title"`
 	TitleMode    string    `json:"titleMode"`
+	ProjectType  string    `json:"projectType"`
 	Preview      string    `json:"preview"`
 	MessageCount int       `json:"messageCount"`
 	CreatedAt    time.Time `json:"createdAt"`
@@ -17,16 +18,24 @@ type ProjectSummary struct {
 }
 
 type Project struct {
-	ID         string      `json:"id"`
-	Title      string      `json:"title"`
-	TitleMode  string      `json:"titleMode"`
-	Preview    string      `json:"preview"`
-	CreatedAt  time.Time   `json:"createdAt"`
-	UpdatedAt  time.Time   `json:"updatedAt"`
-	Messages   []Message   `json:"messages"`
-	Canvas     Canvas      `json:"canvas"`
-	Executions []Execution `json:"executions"`
-	DeletedAt  *time.Time  `json:"-"`
+	ID          string      `json:"id"`
+	Title       string      `json:"title"`
+	TitleMode   string      `json:"titleMode"`
+	ProjectType string      `json:"projectType"`
+	Preview     string      `json:"preview"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+	Messages    []Message   `json:"messages"`
+	Canvas      Canvas      `json:"canvas"`
+	Executions  []Execution `json:"executions"`
+	DeletedAt   *time.Time  `json:"-"`
+}
+
+func NormalizeProjectType(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "comic") {
+		return "comic"
+	}
+	return "video"
 }
 
 type Message struct {
@@ -74,9 +83,9 @@ type Appearance struct {
 
 func DefaultAppearance() Appearance {
 	return Appearance{
-		EdgeColor:       "coral",
-		EdgeAnimated:    true,
-		EdgeWidth:       "default",
+		EdgeColor:       "neutral",
+		EdgeAnimated:    false,
+		EdgeWidth:       "thin",
 		BackgroundDots:  true,
 		AlignmentGuides: true,
 		EdgesVisible:    true,
@@ -98,7 +107,7 @@ func normalizeCanvasAppearance(input Appearance, configured bool) Appearance {
 		return DefaultAppearance()
 	}
 	appearance := DefaultAppearance()
-	if color := strings.ToLower(strings.TrimSpace(input.EdgeColor)); color == "coral" || color == "cyan" || color == "violet" || color == "gold" {
+	if color := strings.ToLower(strings.TrimSpace(input.EdgeColor)); color == "neutral" || color == "coral" || color == "cyan" || color == "violet" || color == "gold" {
 		appearance.EdgeColor = color
 	}
 	if width := strings.ToLower(strings.TrimSpace(input.EdgeWidth)); width == "thin" || width == "default" || width == "thick" {

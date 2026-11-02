@@ -37,7 +37,14 @@ export function AgentNodeComposerTopActions({ primaryActions = [], moreActions =
         action.onClick?.(event);
       }}
     >{action.icon}<span>{action.label}</span></button>)}
-    {menu.length ? <Dropdown menu={{ items: menu }} trigger={['click']} getPopupContainer={trigger => trigger.parentElement}>
+    {menu.length ? <Dropdown
+      menu={{ items: menu }}
+      trigger={['click']}
+      // 节点和输入框都有 overflow:hidden，菜单挂在父节点里会被裁掉。
+      // 挂到 body 后由 Ant Design 统一处理定位和层级，避免被上方视频节点遮挡。
+      getPopupContainer={() => document.body}
+      zIndex={1400}
+    >
       <Tooltip title="更多功能">
         <button type="button" className="agent-node-composer__more-action" aria-label="更多功能" onClick={stopCanvasEvent}>
           <Ellipsis size={16} />

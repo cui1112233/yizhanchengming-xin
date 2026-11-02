@@ -88,6 +88,48 @@ func TestFinalPromptUsesDirectorAssetsAndEffectiveConstraints(t *testing.T) {
 	}
 }
 
+func TestFinalPromptBaseSetupRemovesRelationshipTextFromStoredAssetPrompt(t *testing.T) {
+	records := recordsByKindAndName(Book{AssetRecords: []BookAsset{{
+		ID: "asset-me", Kind: "character", Name: "我",
+		Facts:         "现代都市女性，25岁左右，陆淮安的妻子，刚经历小产出院恢复期",
+		Appearance:    "清瘦，黑色长发",
+		Relationships: "陆淮安的妻子；与陆淮安共同生活",
+		Prompt:        "现代都市女性，25岁左右，陆淮安的妻子，与陆淮安共同生活，清瘦，黑色长发",
+	}}}, nil)
+	got := records[assetKey("character", "我")].Prompt
+	if strings.Contains(got, "陆淮安的妻子") || strings.Contains(got, "与陆淮安共同生活") {
+		t.Fatalf("stored relationship text leaked into compiled asset prompt: %q", got)
+	}
+	if strings.Contains(got, "刚经历小产出院恢复期") == false || !strings.Contains(got, "现代都市女性") || !strings.Contains(got, "黑色长发") {
+		t.Fatalf("compiled asset prompt lost visual content: %q", got)
+	}
+}
+
+func TestInferAssetReferencesFromContentDoesNotUseWholeBookFallback(t *testing.T) {
+	records := map[string]compiledAsset{
+		assetKey("character", "我"):   {Kind: "character", Name: "我", Prompt: "女主外形"},
+		assetKey("character", "陆淮安"): {Kind: "character", Name: "陆淮安", Prompt: "男主外形"},
+		assetKey("character", "黎姿"):  {Kind: "character", Name: "黎姿", Prompt: "配角外形"},
+		assetKey("scene", "医院走廊"):    {Kind: "scene", Name: "医院走廊", Prompt: "医院场景"},
+		assetKey("scene", "老宅客厅"):    {Kind: "scene", Name: "老宅客厅", Prompt: "客厅场景"},
+		assetKey("prop", "紫檀木拐杖"):    {Kind: "prop", Name: "紫檀木拐杖", Prompt: "拐杖"},
+		assetKey("prop", "鲜红陪嫁单"):    {Kind: "prop", Name: "鲜红陪嫁单", Prompt: "嫁妆单"},
+	}
+	characters, scenes, props := inferAssetReferencesFromContent(DirectorVideo{
+		FinalPrompt: "【基础设定】\n人物：黎姿：不应从旧基础设定继承\n\n00:00-00:03 | 我走在医院走廊，陆淮安随后跟上，手里没有道具。",
+		Shots:       []DirectorShot{{Description: "我和陆淮安在医院走廊内保持距离"}},
+	}, records)
+	if !slices.Equal(characters, []string{"陆淮安", "我"}) {
+		t.Fatalf("characters=%v", characters)
+	}
+	if !slices.Equal(scenes, []string{"医院走廊"}) {
+		t.Fatalf("scenes=%v", scenes)
+	}
+	if len(props) != 0 {
+		t.Fatalf("props=%v", props)
+	}
+}
+
 func TestFinalPromptUsesH3VideoRendererWhenTheH3PresetIsSelected(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
@@ -436,7 +478,7 @@ func TestFinalPromptUsesTheConfirmedVideoInputOrder(t *testing.T) {
 	}
 }
 
-func TestFinalPromptWithConstraintsDisabledContainsOnlyStoryboardPrompt(t *testing.T) {
+func TestFinalPromptWithRetiredConstraintMasterFlagStillUsesConfiguredLayers(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
 		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{"constraints": map[string]any{"enabled": false}})}, ExpectedRevision: batch.Revision,
@@ -447,8 +489,10 @@ func TestFinalPromptWithConstraintsDisabledContainsOnlyStoryboardPrompt(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if prompt.CompiledPrompt != "视频提示词：镜头画面：\n00:00-00:03 | 中景｜缓慢推轨 | 林晚进入客厅\n00:03-00:09 | 特写｜固定 | 她握紧玻璃杯\n资产：@林晚 @林家客厅 @玻璃杯" {
-		t.Fatalf("constraints disabled must leave only storyboard prompt, got:\n%s", prompt.CompiledPrompt)
+	for _, expected := range []string{"画面前缀：电影感运镜", "基础设定：", "画面约束提示词：高质量商业成片", "负面提示词：不要水印和畸形手指"} {
+		if !strings.Contains(prompt.CompiledPrompt, expected) {
+			t.Fatalf("retired constraint master flag must not disable %q, got:\n%s", expected, prompt.CompiledPrompt)
+		}
 	}
 }
 
@@ -627,6 +671,45 @@ func TestFinalPromptUsesSavedVideoPromptOverrideWithoutVisualPrompt(t *testing.T
 	}
 }
 
+func TestFinalPromptUsesSavedVideoPromptOverrideForDirectorFinalPrompt(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{"video": map[string]any{"enabled": true, "scope": "all", "presetId": "batch-video-sd", "presetKey": "sd-video-normal", "body": "SD 视频提示词预设正文"}})}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book = batch.Books[0]
+	sdResponse := "===VIDEO 01===\n时长：10秒\n导演生成的旧最终提示词"
+	if _, err := (&DirectorService{Store: store, Provider: &queuedDirectorProvider{values: []string{sdResponse}}}).RunDirector(context.Background(), "alice", batch.ID, book.ID); err != nil {
+		t.Fatal(err)
+	}
+	batch, err = store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book, video := batch.Books[0], batch.Books[0].Videos[0]
+	const edited = "用户保存后的最终分镜提示词"
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"videoPrompt": rawSetting(t, edited)}, ExpectedRevision: video.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	prompt, err := (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, video.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(prompt.DisplayPrompt, edited) || !strings.Contains(prompt.CompiledPrompt, edited) {
+		t.Fatalf("saved override must replace the director final prompt: %#v", prompt)
+	}
+	if strings.Contains(prompt.CompiledPrompt, "导演生成的旧最终提示词") {
+		t.Fatalf("director final prompt survived the user edit: %s", prompt.CompiledPrompt)
+	}
+}
+
 func TestFinalPromptRejectsOrphanedVideoIdentity(t *testing.T) {
 	store, batch, book, oldVideo := seedCompiledVideo(t)
 	provider := &queuedDirectorProvider{values: []string{validDirectorJSON()}}
@@ -724,14 +807,14 @@ func TestSDDirectorReturnsPlainTextCards(t *testing.T) {
 	if !strings.Contains(compiled.DisplayPrompt, "段内执行约束") {
 		t.Fatalf("DisplayPrompt must show SD card body:\n%s", compiled.DisplayPrompt)
 	}
-	// 基础设定默认开启：必须注入已提取的人物与场景。
-	if !strings.Contains(compiled.CompiledPrompt, "基础设定") || !strings.Contains(compiled.CompiledPrompt, "林溪：短发女主，右耳一颗小痣") {
-		t.Fatalf("基础设定必须注入已提取人物:\n%s", compiled.CompiledPrompt)
+	// 基础设定不是“整本书资产开关”：这段正文没有出现已提取的
+	// 林溪/客厅，因此不能把它们无条件塞进当前 VIDEO。
+	for _, forbidden := range []string{"基础设定", "林溪：短发女主，右耳一颗小痣", "客厅：现代中式客厅"} {
+		if strings.Contains(compiled.CompiledPrompt, forbidden) {
+			t.Fatalf("没有出现在当前分镜内容中的资产不应注入 %q:\n%s", forbidden, compiled.CompiledPrompt)
+		}
 	}
-	if !strings.Contains(compiled.CompiledPrompt, "客厅：现代中式客厅") {
-		t.Fatalf("基础设定必须注入已提取场景:\n%s", compiled.CompiledPrompt)
-	}
-	want := []string{"基础设定：", "画面质量提示词：统一的都市电影质感\n4K级细节", "视频提示词：", "画面限制：镜头不得跳轴", "负面提示词：不要字幕和水印"}
+	want := []string{"画面质量提示词：统一的都市电影质感\n4K级细节", "视频提示词：", "画面限制：镜头不得跳轴", "负面提示词：不要字幕和水印"}
 	last := -1
 	for _, part := range want {
 		at := strings.Index(compiled.CompiledPrompt, part)

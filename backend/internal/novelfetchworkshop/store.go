@@ -17,6 +17,7 @@ type Document struct {
 	Gender           string             `json:"gender,omitempty"`
 	GenderSource     GenderSource       `json:"genderSource,omitempty"`
 	GenderReason     string             `json:"genderReason,omitempty"`
+	GenderConfidence float64            `json:"genderConfidence,omitempty"`
 	BookInfo         BookInfo           `json:"bookInfo,omitempty"`
 	Meta             map[string]any     `json:"meta"`
 	BodyRefs         map[string]BodyRef `json:"bodyRefs,omitempty"`
@@ -96,6 +97,10 @@ type Store interface {
 	PutConfig(context.Context, string, map[string]any) error
 	PutRun(context.Context, string, RunRecord) error
 	ListRuns(context.Context, string, string) ([]RunRecord, error)
+}
+
+type ConfigOwnerLister interface {
+	ListConfigOwners(context.Context) ([]string, error)
 }
 
 func normalizeDocument(document Document) Document {
@@ -263,6 +268,17 @@ func (s *MemoryStore) PutConfig(_ context.Context, owner string, settings map[st
 	defer s.mu.Unlock()
 	s.configs[owner] = cloneMap(settings)
 	return nil
+}
+
+func (s *MemoryStore) ListConfigOwners(_ context.Context) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	owners := make([]string, 0, len(s.configs))
+	for owner := range s.configs {
+		owners = append(owners, owner)
+	}
+	sort.Strings(owners)
+	return owners, nil
 }
 
 func (s *MemoryStore) PutBody(_ context.Context, owner string, body BodyRecord) (BodyRef, error) {

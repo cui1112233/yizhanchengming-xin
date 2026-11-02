@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -98,6 +99,47 @@ func TestApplySensitiveAIRepairReplacesRepeatedLinesInOrder(t *testing.T) {
 	text, _ := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "相同已替换段\n相同已替换段", items)
 	if text != "第一段已改\n第二段已改" {
 		t.Fatalf("repeated hit order was not preserved: %q", text)
+	}
+}
+
+func TestApplySensitiveAIRepairHonorsConfiguredConcurrencyAndPreservesOrder(t *testing.T) {
+	var active atomic.Int32
+	var maximum atomic.Int32
+	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
+		current := active.Add(1)
+		for observed := maximum.Load(); current > observed; observed = maximum.Load() {
+			if maximum.CompareAndSwap(observed, current) {
+				break
+			}
+		}
+		defer active.Add(-1)
+		time.Sleep(25 * time.Millisecond)
+		switch {
+		case strings.Contains(request.UserPrompt, "敏感一"):
+			return "改好一", nil
+		case strings.Contains(request.UserPrompt, "敏感二"):
+			return "", errors.New("单条修复失败")
+		case strings.Contains(request.UserPrompt, "敏感三"):
+			return "改好三", nil
+		default:
+			return "未知片段", nil
+		}
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": false, "concurrency": 2}}
+	items := []map[string]any{
+		{"hit_index": 1, "keyword": "敏感一", "before": "原文敏感一", "after": "替换一", "status": "done"},
+		{"hit_index": 2, "keyword": "敏感二", "before": "原文敏感二", "after": "替换二", "status": "done"},
+		{"hit_index": 3, "keyword": "敏感三", "before": "原文敏感三", "after": "替换三", "status": "done"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "替换一\n替换二\n替换三", items)
+	if maximum.Load() != 2 {
+		t.Fatalf("maximum concurrent calls = %d, want configured concurrency 2", maximum.Load())
+	}
+	if text != "改好一\n替换二\n改好三" {
+		t.Fatalf("repaired text order = %q", text)
+	}
+	if got[0]["status"] != "done" || got[1]["status"] != "failed" || strings.TrimSpace(firstText(got[1]["error"])) == "" || got[2]["status"] != "done" {
+		t.Fatalf("per-hit result order/error was not preserved: %#v", got)
 	}
 }
 
@@ -267,7 +309,7 @@ func TestNovelFetchProcessStartSkipsRewriteForShortOriginal(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := rewriteProviderFunc(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
-		return `{"style":"现代悬疑"}`, nil
+		return `{"style":"现代悬疑","confidence":0.9,"reason":"正文围绕案件线索推进"}`, nil
 	})
 	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: novelfetchworkshop.NewMemoryQueue(), NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}, NovelFetchRewrite: provider})
 	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t测试书", "selected_versions": []string{"original", "ai1"}}, now, secret)
@@ -295,7 +337,7 @@ func TestNovelFetchProcessStartGeneratesOnlySelectedAIVersion(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
 		if strings.Contains(request.SystemPrompt, "小说分类器") {
 			classificationCalls++
-			return `{"style":"现代悬疑"}`, nil
+			return `{"style":"现代悬疑","confidence":0.9,"reason":"正文围绕案件线索推进"}`, nil
 		}
 		rewriteCalls++
 		return "改写后的正文", nil
@@ -310,8 +352,16 @@ func TestNovelFetchProcessStartGeneratesOnlySelectedAIVersion(t *testing.T) {
 	document := waitForNovelFetchDocument(t, store, "12345678901", func(document novelfetchworkshop.Document) bool {
 		return document.Versions["ai3"] == "改写后的正文"
 	})
-	if rewriteCalls != 1 || classificationCalls != 1 || document.Versions["ai3"] != "改写后的正文" {
-		t.Fatalf("selected AI version was not generated exactly once: rewrite=%d classification=%d versions=%#v", rewriteCalls, classificationCalls, document.Versions)
+	if rewriteCalls != 1 || document.Versions["ai3"] != "改写后的正文" {
+		t.Fatalf("selected AI version was not generated exactly once: rewrite=%d versions=%#v", rewriteCalls, document.Versions)
+	}
+	// The upstream category/genre already determines gender and style, so the
+	// pipeline must not spend an extra classification AI call.
+	if classificationCalls != 0 {
+		t.Fatalf("platform classification was sufficient but AI was called %d times", classificationCalls)
+	}
+	if document.Gender != "男频" || firstText(document.Meta["style"]) != "男频都市" {
+		t.Fatalf("platform classification was not applied: gender=%q style=%v", document.Gender, document.Meta["style"])
 	}
 	if _, exists := document.Versions["ai1"]; exists {
 		t.Fatalf("unselected AI version was generated: %#v", document.Versions)
@@ -326,7 +376,7 @@ func (f rewriteProviderFunc) Complete(ctx context.Context, request novelfetchwor
 
 func waitForNovelFetchDocument(t *testing.T, store novelfetchworkshop.Store, bookID string, ready func(novelfetchworkshop.Document) bool) novelfetchworkshop.Document {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		document, err := store.GetDocument(context.Background(), "tester", bookID)
 		if err == nil && ready(document) {

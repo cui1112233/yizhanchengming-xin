@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -70,6 +71,10 @@ func RegisterAuthRoutes(root *http.ServeMux, options AuthOptions) {
 			return
 		}
 		account, err := options.Store.FindAccount(r.Context(), strings.TrimSpace(input.Username))
+		if err != nil && !errors.Is(err, auth.ErrNotFound) {
+			writeAuthError(w, http.StatusServiceUnavailable, "登录服务暂不可用")
+			return
+		}
 		if err != nil || !account.Active || !auth.VerifyPassword(input.Password, account.PasswordHash, account.PasswordAlgorithm) {
 			writeAuthError(w, http.StatusUnauthorized, "用户名或密码错误")
 			return

@@ -84,7 +84,9 @@ func TestDefaultWorkshopSettingsIncludeImportedKnowledgeAndRules(t *testing.T) {
 	}
 	got := KnowledgeSummary(settings)
 	want := map[string]int{
-		"opening_phrases": 174, "rewrite_templates": 14, "high_imitation": 1,
+		"opening_phrases": 174, "opening_styles": 13,
+		"rewrite_templates": 14, "rewrite_profiles": 8, "temporary_instructions": 6,
+		"high_imitation": 1, "high_imitation_prompts": 1, "high_imitation_references": 0,
 		"sensitive_rules": 862, "symbol_rules": 17, "pair_fill_rules": 10,
 		"chapter_exact_rules": 9, "chapter_inline_rules": 9,
 	}
@@ -92,6 +94,35 @@ func TestDefaultWorkshopSettingsIncludeImportedKnowledgeAndRules(t *testing.T) {
 		if got[key] != expected {
 			t.Fatalf("%s = %d, want %d (summary=%#v)", key, got[key], expected, got)
 		}
+	}
+}
+
+func TestKnowledgeSubcollectionsStaySeparatedWhenSaved(t *testing.T) {
+	settings := EnsureWorkshopDefaults(DefaultWorkshopSettings())
+	item, err := SaveKnowledge(settings, "rewrite_templates", map[string]any{
+		"id": "instruction_test", "name": "测试临时指令", "collection": "temporary_instructions", "content": "只用于测试分类归属", "enabled": true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item["collection"] != "temporary_instructions" {
+		t.Fatalf("saved collection = %v, want temporary_instructions", item["collection"])
+	}
+	library, err := ListKnowledge(settings, "rewrite_templates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, current := range normalizeKnowledgeItems(library["items"]) {
+		if current["id"] == "instruction_test" {
+			found = current["collection"] == "temporary_instructions"
+		}
+	}
+	if !found {
+		t.Fatalf("saved temporary instruction missing from its own collection: %#v", library["items"])
+	}
+	if got := KnowledgeSummary(settings)["temporary_instructions"]; got != 7 {
+		t.Fatalf("temporary_instructions = %d, want 7", got)
 	}
 }
 

@@ -12,17 +12,23 @@ import (
 const localScriptVideoTaskPrefix = "go-local:"
 
 type scriptVideoLocalInput struct {
-	SourceTaskID  string   `json:"-"`
-	ModelKey      string   `json:"modelKey"`
-	Prompt        string   `json:"prompt"`
-	BookID        string   `json:"bookId"`
-	VideoID       string   `json:"videoId"`
-	Model         string   `json:"model"`
-	Duration      any      `json:"duration"`
-	AspectRatio   string   `json:"aspectRatio"`
-	Resolution    string   `json:"resolution"`
-	ImageURLs     []string `json:"imageUrls"`
-	GenerateAudio bool     `json:"generateAudio"`
+	SourceTaskID    string                     `json:"-"`
+	ModelKey        string                     `json:"modelKey"`
+	Prompt          string                     `json:"prompt"`
+	BookID          string                     `json:"bookId"`
+	VideoID         string                     `json:"videoId"`
+	Model           string                     `json:"model"`
+	Duration        any                        `json:"duration"`
+	AspectRatio     string                     `json:"aspectRatio"`
+	Resolution      string                     `json:"resolution"`
+	ImageURLs       []string                   `json:"imageUrls"`
+	ReferenceAssets []agentLocalReferenceAsset `json:"-"`
+	GenerateAudio   bool                       `json:"generateAudio"`
+}
+
+type agentLocalReferenceAsset struct {
+	ProjectID string `json:"projectId"`
+	AssetID   string `json:"assetId"`
 }
 
 func validateLocalScriptVideoInput(input scriptVideoLocalInput) error {

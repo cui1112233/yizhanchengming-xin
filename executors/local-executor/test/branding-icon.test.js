@@ -6,7 +6,7 @@ const { spawnSync } = require('node:child_process');
 
 test('Windows executor and web favicon use the same verified Yizhan icon asset', () => {
   const root = path.join(__dirname, '..');
-  const repoRoot = path.join(root, '..');
+  const repoRoot = path.join(root, '..', '..');
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const web = fs.readFileSync(path.join(repoRoot, 'frontend', 'index.html'), 'utf8');
   const main = fs.readFileSync(path.join(root, 'src', 'electron', 'main.js'), 'utf8');

@@ -11,11 +11,12 @@ import (
 // 避免与程序生成版本重复，也防止模型绕过用户开关。
 
 var (
-	reStripBaseSetupStart = regexp.MustCompile(`^【基础设定】`)
-	reStripBaseSetupBody  = regexp.MustCompile(`^(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)`)
-	reStripTimestamp      = regexp.MustCompile(`^\[?\d{1,2}:\d{2}\s*[-—~]`)
-	reStripTimeRange      = regexp.MustCompile(`^[（(]?\d+\s*[-—~]\s*\d+\s*(?:s|秒)[)）]`)
-	reStripBracket        = regexp.MustCompile(`^【`)
+	reStripBaseSetupStart  = regexp.MustCompile(`^(?:【基础设定】|基础设定[：:])`)
+	reStripBaseSetupBody   = regexp.MustCompile(`^(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)`)
+	reStripTimestamp       = regexp.MustCompile(`^\[?\d{1,2}:\d{2}\s*[-—~]`)
+	reStripTimeRange       = regexp.MustCompile(`^[（(]?\d+\s*[-—~]\s*\d+\s*(?:s|秒)[)）]`)
+	reStripBracket         = regexp.MustCompile(`^【`)
+	reStripSharedBodyStart = regexp.MustCompile(`^(?:画面前缀|画质约束|画面约束提示词|视频提示词|画面限制|负面提示词)[：:]`)
 
 	reStripStandaloneStart = regexp.MustCompile(`^(?:【|\[)?(?:人物与场景|人物卡|场景卡)(?:】|\])?(?:[：:].*)?$`)
 	reStripContentStart    = regexp.MustCompile(`^(?:【|\[)?(?:时间轴|画面内容|声音设计|氛围与画质规范)(?:】|\])?|^(?:镜头画面[：:]|(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)|\[?\d{1,2}:\d{2}\s*[-—~])`)
@@ -23,10 +24,10 @@ var (
 	reStripLegacySetupStart = regexp.MustCompile(`^(?:统一风格|统一人物|场景环境)[：:]`)
 	reStripLegacyBodyStart  = regexp.MustCompile(`^(?:镜头画面[：:]|【|(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)|\[?\d{1,2}:\d{2}\s*[-—~])`)
 
-	reStripPrefixLine      = regexp.MustCompile(`(^|\n)【画面前缀】[^\n]*\n?`)
-	reStripQualityLine     = regexp.MustCompile(`(^|\n)【画质约束】[^\n]*\n?`)
-	reStripRestrictionLine = regexp.MustCompile(`(^|\n)【画面限制】[^\n]*\n?`)
-	reStripNegativeLine    = regexp.MustCompile(`(^|\n)负面提示词：[^\n]*\n?`)
+	reStripPrefixLine      = regexp.MustCompile(`(?m)(^|\n)(?:【画面前缀】|画面前缀[：:])[^\n]*\n?`)
+	reStripQualityLine     = regexp.MustCompile(`(?m)(^|\n)(?:【画质约束】|画质约束[：:])[^\n]*\n?`)
+	reStripRestrictionLine = regexp.MustCompile(`(?m)(^|\n)(?:【画面限制】|画面限制[：:])[^\n]*\n?`)
+	reStripNegativeLine    = regexp.MustCompile(`(?m)(^|\n)负面提示词[：:][^\n]*\n?`)
 	reStripBlankRuns       = regexp.MustCompile(`\n{3,}`)
 )
 
@@ -39,10 +40,12 @@ func stripBaseSetupSection(text string) string {
 	lines := strings.Split(text, "\n")
 	out := make([]string, 0, len(lines))
 	inSetup := false
+	plainSetup := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if reStripBaseSetupStart.MatchString(trimmed) {
 			inSetup = true
+			plainSetup = !strings.HasPrefix(trimmed, "【")
 			continue
 		}
 		if inSetup {
@@ -50,9 +53,11 @@ func stripBaseSetupSection(text string) string {
 				reStripBaseSetupBody.MatchString(trimmed) ||
 				reStripTimestamp.MatchString(trimmed) ||
 				reStripTimeRange.MatchString(trimmed) ||
-				trimmed == ""
+				reStripSharedBodyStart.MatchString(trimmed) ||
+				(!plainSetup && trimmed == "")
 			if boundary {
 				inSetup = false
+				plainSetup = false
 			} else {
 				continue
 			}

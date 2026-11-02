@@ -57,3 +57,33 @@ Authenticated browser acceptance on the supplied project confirmed that:
 - `豆包资产图测试` loaded as a `2048 x 2048` image from the protected local
   artifact path, with no media error.
 - Both mapped video nodes loaded without a `素材不存在` error.
+
+## Final Lifecycle Source Repair
+
+Commit: `33f89804` (`fix(agent): complete shared production lifecycle`).
+
+- `Agent 优化` now detects a soft-deleted bound Agent project, creates a live
+  replacement and atomically rebinds the owner and batch before returning it.
+- A mapped video action now calls the existing single-video book-stage route
+  with the mapped `videoId`, effective provider and `missing` or `force` mode.
+  It no longer uses the whole-book production submit path or its default
+  `personal_api` argument.
+- The production router now injects an owner-scoped Batch Factory audio reader
+  into projection, so persisted TTS artifacts and their duration return as
+  mapped audio nodes without exposing the local storage path.
+
+Fresh verification around the commit:
+
+- `go test ./internal/agentworkspace ./internal/httpapi -run 'Test(MemoryBatchFactoryRebindRequiresOwnerAndLiveReplacementProject|SyncBatchFactoryBookProjectsOnlyExistingNodeTypes|BindBatchFactoryRecreatesDeletedBoundProject|RouterProjectsPersistedBatchFactoryAudioForOwner)$' -count=1`
+- `node --test src/user/pages/agent-canvas-batch-factory.test.js` (`14` passed,
+  `0` failed)
+- `vite build --outDir C:\Users\Administrator\AppData\Local\Temp\codex-v88-lifecycle-33f89804`
+  (`5514` modules transformed; build succeeded with the existing chunk-size
+  warning)
+- `git diff --cached --check`
+
+Each of the three focused regressions was also mutation-checked: removing the
+project recreation call, provider forwarding or audio-reader injection made
+its matching test fail before the repair was restored. This commit was not
+deployed or browser-accepted; the runtime evidence above still refers to the
+earlier local runtime SHA.

@@ -153,7 +153,7 @@ func (a *LocalExecutorVideoAdapter) Poll(ctx context.Context, owner, jobID strin
 		ref.MediaURL = a.artifactURL(owner, artifactID)
 	}
 	if ref.State == ProductionFailed && strings.TrimSpace(job.ErrorMessage) != "" {
-		return ref, fmt.Errorf("%s", boundedProviderError(job.ErrorMessage))
+		ref.ErrorMessage = boundedProviderError(job.ErrorMessage)
 	}
 	return ref, nil
 }

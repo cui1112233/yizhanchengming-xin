@@ -22,7 +22,7 @@ export function shouldOpenConnectionDrop({ sourceID, connectionCompleted, droppe
 }
 
 export function createNodeAt({ id, kind, position, asset = null, config = {} }) {
-  const type = ['script', 'text', 'image', 'video', 'audio'].includes(kind) ? kind : 'text';
+  const type = ['script', 'text', 'image', 'video', 'audio', 'director'].includes(kind) ? kind : 'text';
   const media = type === 'image' || type === 'video' || type === 'audio';
   const defaults = type === 'script'
     ? { title: '新剧本', config: { sourceText: '', splitModelId: '', splitState: { state: 'idle', errorMessage: '' } } }
@@ -30,8 +30,10 @@ export function createNodeAt({ id, kind, position, asset = null, config = {} }) 
     ? { title: '新音频', config: { prompt: '', voice: '', speed: 1 } }
     : type === 'image'
       ? { title: '新图片', config: { prompt: '', model: '', ratio: '16:9', quality: 'standard', resolution: '2K', count: 1, referenceAssets: [] } }
-      : type === 'video'
+    : type === 'video'
         ? { title: '新视频', config: { prompt: '', model: '', ratio: '', durationSeconds: 0, referenceAssets: [] } }
+        : type === 'director'
+          ? { title: '导演台预演', config: { referenceAssets: [], directorDesk: { rendererVersion: '2.5d-v1', sceneAsset: null, actors: [], camera: { zoom: 1, x: 0, y: 0 } } } }
         : { title: '新文本', config: {} };
   return {
     id,
@@ -56,6 +58,8 @@ export function appendReferenceAsset({ node, asset, limit = 10 }) {
     ? ['image']
     : node?.data?.type === 'text'
       ? ['image', 'video', 'audio']
+    : node?.data?.type === 'director'
+      ? ['image']
     : node?.data?.type === 'video'
       ? ['image', 'video']
       : node?.data?.type === 'audio'
@@ -110,6 +114,7 @@ export function removeReferenceAsset({ node, assetID }) {
 function referenceKindsForNode(type) {
   if (type === 'image') return ['image'];
   if (type === 'text') return ['image', 'video', 'audio'];
+  if (type === 'director') return ['image'];
   if (type === 'video') return ['image', 'video'];
   if (type === 'audio') return ['audio'];
   return [];

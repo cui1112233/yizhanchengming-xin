@@ -63,18 +63,22 @@ func TestGiantMaterialExecutorRoutesKeepControlPlaneSeparateAndHideVideoURL(t *t
 	}
 }
 
-func TestGiantMaterialJobRouteRejectsWhenNoExecutorIsOnline(t *testing.T) {
+func TestGiantMaterialJobRouteQueuesWhenNoExecutorIsOnline(t *testing.T) {
 	now := time.Date(2026, 10, 4, 13, 0, 0, 0, time.UTC)
 	service := giantmaterialexecutor.NewService(giantmaterialexecutor.NewMemoryStore(), func() time.Time { return now })
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, GiantMaterialExecutor: service})
 
 	response := signedJSONRequest(t, api, now, "alice", http.MethodPost, "/api/shuihuo-production/giant-material-jobs", map[string]any{"platform": giantmaterialexecutor.PlatformGiantMaterial, "materialId": "offline-material", "platformBookId": "offline-book", "title": "离线测试", "videoUrl": "https://material.hnqingyuwen.top/n8_videos/sample.mp4", "durationSeconds": 1, "modelVersion": "windows-paddleocr-v1"})
-	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "执行器未启动或当前离线") {
+	if response.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	job := decodeBody[map[string]giantmaterialexecutor.JobView](t, response)["job"]
+	if job.State != giantmaterialexecutor.JobQueued || job.TargetExecutorID != "" || !job.WaitingForExecutor {
+		t.Fatalf("job should wait in the public queue when no executor is online: %+v", job)
 	}
 }
 
-func TestGiantMaterialJobReadFailsStaleQueuedJobAfterExecutorGoesOffline(t *testing.T) {
+func TestGiantMaterialJobReadKeepsQueuedJobAfterExecutorGoesOffline(t *testing.T) {
 	now := time.Date(2026, 10, 4, 13, 0, 0, 0, time.UTC)
 	service := giantmaterialexecutor.NewService(giantmaterialexecutor.NewMemoryStore(), func() time.Time { return now })
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, GiantMaterialExecutor: service})
@@ -104,8 +108,8 @@ func TestGiantMaterialJobReadFailsStaleQueuedJobAfterExecutorGoesOffline(t *test
 		t.Fatalf("get=%d body=%s", get.Code, get.Body.String())
 	}
 	updated := decodeBody[map[string]giantmaterialexecutor.JobView](t, get)["job"]
-	if updated.State != giantmaterialexecutor.JobFailed || updated.ErrorCode != "executor_offline" {
-		t.Fatalf("stale queued job=%+v", updated)
+	if updated.State != giantmaterialexecutor.JobQueued || !updated.WaitingForExecutor || updated.ErrorCode != "" {
+		t.Fatalf("queued job should wait for a returning executor: %+v", updated)
 	}
 }
 

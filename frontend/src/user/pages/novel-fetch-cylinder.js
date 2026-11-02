@@ -7,11 +7,11 @@ export function cylinderVisualState(distance) {
   const amount = Math.min(Math.abs(normalizedDistance), 3.2);
 
   return {
-    rotateX: normalizedDistance === 0 ? 0 : clamp(normalizedDistance * -16, -48, 48),
-    translateZ: 28 - amount * 32,
-    scale: Math.max(0.78, 1 - amount * 0.075),
-    opacity: Math.max(0.18, 1 - amount * 0.26),
-    brightness: Math.max(0.52, 1 - amount * 0.15)
+    rotateX: normalizedDistance === 0 ? 0 : clamp(normalizedDistance * -10, -30, 30),
+    translateZ: 28 - amount * 18,
+    scale: Math.max(0.9, 1 - amount * 0.035),
+    opacity: Math.max(0.64, 1 - amount * 0.11),
+    brightness: Math.max(0.84, 1 - amount * 0.05)
   };
 }
 

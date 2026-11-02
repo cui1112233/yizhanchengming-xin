@@ -12,6 +12,8 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,6 +46,28 @@ func TestNovelFetchAutomationRetriesPersistedSensitiveAIStage(t *testing.T) {
 	}
 }
 
+func TestNovelFetchClassificationWaitResumesOnlyAfterConfirmation(t *testing.T) {
+	pending := novelfetchworkshop.Document{Gender: "未知", Meta: map[string]any{"status": "waiting_classification", "style": "待判定"}}
+	if novelFetchAutomationEligible(pending, time.Now().UTC()) {
+		t.Fatal("unresolved classification should wait for manual confirmation")
+	}
+	pending.Gender = "女频"
+	pending.Meta["style"] = "现代悬疑"
+	if !novelFetchAutomationEligible(pending, time.Now().UTC()) {
+		t.Fatal("confirmed classification should make the task retryable")
+	}
+}
+
+func TestNovelFetchSubmitChunksHonorsConfiguredBatchCap(t *testing.T) {
+	chunks := novelFetchSubmitChunks([]string{"1", "2", "3", "4", "5"}, 2)
+	if len(chunks) != 3 || len(chunks[0]) != 2 || len(chunks[1]) != 2 || len(chunks[2]) != 1 || chunks[2][0] != "5" {
+		t.Fatalf("chunks=%#v", chunks)
+	}
+	if len(novelFetchSubmitChunks([]string{"1", "2"}, 0)) != 1 {
+		t.Fatal("invalid batch size should use the default instead of disabling submission")
+	}
+}
+
 type duplicateNovelFetchQueue struct{ recordingNovelFetchQueue }
 
 func TestAppendWorkshopTaskLogPersistsTaskOperationLog(t *testing.T) {
@@ -66,6 +90,43 @@ func TestAppendWorkshopTaskLogPersistsTaskOperationLog(t *testing.T) {
 	log, ok := document.Logs[0].(map[string]any)
 	if !ok || log["event"] != "process_completed" || log["detail"] != "处理完成" || strings.TrimSpace(firstText(log["time"])) == "" {
 		t.Fatalf("persisted log=%#v", document.Logs[0])
+	}
+}
+
+func TestAppendWorkshopTaskLogBoundsHistoryAndRedactsCredentials(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	logs := make([]any, 205)
+	for index := range logs {
+		logs[index] = map[string]any{"time": "2026-10-01T00:00:00Z", "event": "old", "detail": strconv.Itoa(index)}
+	}
+	if err := store.PutDocument(ctx, "alice", novelfetchworkshop.Document{BookID: "book-log-safe", Logs: logs}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := appendWorkshopTaskLog(ctx, store, "alice", "book-log-safe", "fetch_failed", "Authorization: Bearer tok123 api_key=sekret Cookie: sid=abc"); err != nil {
+		t.Fatal(err)
+	}
+	document, err := store.GetDocument(ctx, "alice", "book-log-safe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(document.Logs) != 200 {
+		t.Fatalf("log history length=%d, want 200", len(document.Logs))
+	}
+	first, _ := document.Logs[0].(map[string]any)
+	if first["detail"] != "6" {
+		t.Fatalf("oldest retained event=%#v, want original event 6", first)
+	}
+	last, _ := document.Logs[len(document.Logs)-1].(map[string]any)
+	lastDetail, _ := last["detail"].(string)
+	for _, secret := range []string{"tok123", "sekret", "sid=abc"} {
+		if strings.Contains(lastDetail, secret) {
+			t.Fatalf("secret %q leaked into log detail %q", secret, lastDetail)
+		}
+	}
+	if last["event"] != "fetch_failed" || !strings.Contains(lastDetail, "[已隐藏]") {
+		t.Fatalf("last event=%#v, want redacted fetch failure", last)
 	}
 }
 
@@ -100,9 +161,110 @@ func (q *duplicateNovelFetchQueue) EnqueueUnique(context.Context, string, novelf
 	return false, nil
 }
 
+func (q *duplicateNovelFetchQueue) EnqueueUniqueBooks(_ context.Context, job novelfetchworkshop.ProcessJob, _ time.Duration) (bool, string, error) {
+	return false, job.ID, nil
+}
+
 func (q *recordingNovelFetchQueue) Enqueue(_ context.Context, job novelfetchworkshop.ProcessJob) error {
 	q.jobs = append(q.jobs, job)
 	return nil
+}
+
+type uniqueRecordingNovelFetchQueue struct {
+	recordingNovelFetchQueue
+	keys       map[string]bool
+	bookDedupe map[string]string
+}
+
+func (q *uniqueRecordingNovelFetchQueue) EnqueueUnique(ctx context.Context, key string, job novelfetchworkshop.ProcessJob, _ time.Duration) (bool, error) {
+	if q.keys == nil {
+		q.keys = map[string]bool{}
+	}
+	if q.keys[key] {
+		return false, nil
+	}
+	q.keys[key] = true
+	job.DedupeKey = key
+	return true, q.Enqueue(ctx, job)
+}
+
+func (q *uniqueRecordingNovelFetchQueue) EnqueueUniqueBooks(ctx context.Context, job novelfetchworkshop.ProcessJob, _ time.Duration) (bool, string, error) {
+	if q.bookDedupe == nil {
+		q.bookDedupe = map[string]string{}
+	}
+	for _, bookID := range job.BookIDs {
+		key := job.Owner + ":" + job.PlatformID + ":" + bookID
+		if existingID := q.bookDedupe[key]; existingID != "" {
+			return false, existingID, nil
+		}
+	}
+	for _, bookID := range job.BookIDs {
+		q.bookDedupe[job.Owner+":"+job.PlatformID+":"+bookID] = job.ID
+	}
+	job.DedupeKey = "books:" + job.Owner + ":" + job.PlatformID
+	return true, job.ID, q.Enqueue(ctx, job)
+}
+
+func TestRecoverStaleNovelFetchScheduleReusesPersistedDispatchIdentity(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	old := now.Add(-10 * time.Minute).Format(time.RFC3339Nano)
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{map[string]any{
+		"id": "schedule-recover", "status": "dispatching", "updatedAt": old, "dispatch_id": "dispatch-schedule-recover",
+		"job_id": "go-schedule-stable-1", "batch_id": "batch-stable-1", "book_ids": []any{"12345678901"},
+		"run_at": now.Add(-time.Hour).Format(time.RFC3339), "input_text": "12345678901\t恢复任务", "platform_id": "2", "max_txt": 4000,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.jobs) != 1 || queue.jobs[0].ID != "go-schedule-stable-1" || queue.jobs[0].BatchID != "batch-stable-1" {
+		t.Fatalf("recovery did not reuse the persisted job identity: %#v", queue.jobs)
+	}
+	settings, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schedule := settings["novel_fetch_schedules"].([]any)[0].(map[string]any)
+	if schedule["status"] != "queued" {
+		t.Fatalf("recovered schedule status=%#v, want queued", schedule["status"])
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if len(queue.jobs) != 1 {
+		t.Fatalf("recovered schedule was enqueued twice: %#v", queue.jobs)
+	}
+}
+
+func TestRecoverStaleNovelFetchScheduleAcceptsExistingQueueDedupe(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &duplicateNovelFetchQueue{}
+	now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{map[string]any{
+		"id": "schedule-existing", "status": "dispatching", "updatedAt": now.Add(-10 * time.Minute).Format(time.RFC3339Nano),
+		"dispatch_id": "dispatch-existing", "job_id": "go-schedule-existing", "batch_id": "batch-existing", "book_ids": []any{"12345678901"},
+		"run_at": now.Add(-time.Hour).Format(time.RFC3339), "input_text": "12345678901\t已有队列任务", "platform_id": "2", "max_txt": 4000,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schedule := settings["novel_fetch_schedules"].([]any)[0].(map[string]any)
+	if schedule["status"] != "queued" || len(queue.jobs) != 0 {
+		t.Fatalf("existing queued work was not reconciled safely: status=%#v jobs=%#v", schedule["status"], queue.jobs)
+	}
 }
 
 func (q *recordingNovelFetchQueue) Claim(ctx context.Context, wait time.Duration) (novelfetchworkshop.ProcessJob, error) {
@@ -376,6 +538,46 @@ func TestRecoverStaleNovelFetchTaskMakesItRetryableAndClosesRun(t *testing.T) {
 	}
 	if document.Meta["status"] != "waiting_retry" {
 		t.Fatalf("stale document status=%#v, want waiting_retry", document.Meta["status"])
+	}
+}
+
+type staleRecoveryRecordingQueue struct {
+	recordingNovelFetchQueue
+	jobIDs []string
+}
+
+func (q *staleRecoveryRecordingQueue) RecoverStaleJob(_ context.Context, jobID string) (bool, error) {
+	q.jobIDs = append(q.jobIDs, jobID)
+	return true, nil
+}
+
+func TestRecoverStaleNovelFetchTaskReleasesItsOldQueueJob(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	now := time.Date(2026, 10, 19, 1, 20, 0, 0, time.UTC)
+	old := now.Add(-10 * time.Minute).Format(time.RFC3339Nano)
+	if err := store.PutDocument(ctx, "tester", novelfetchworkshop.Document{
+		BookID: "stale-book-with-job-id", UpdatedAt: old,
+		Meta: map[string]any{"status": "processing", "queueState": "processing", "currentBatchId": "stale-batch", "currentProcessJobId": "stale-job-id"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	document, err := store.GetDocument(ctx, "tester", "stale-book-with-job-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	document.UpdatedAt = old
+	queue := &staleRecoveryRecordingQueue{}
+	recoverStaleNovelFetchTasks(ctx, store, "tester", map[string]any{"workflow": map[string]any{"auto_queue_task_timeout_seconds": 180}}, []novelfetchworkshop.Document{document}, now, queue)
+	if len(queue.jobIDs) != 1 || queue.jobIDs[0] != "stale-job-id" {
+		t.Fatalf("stale queue job was not released: %#v", queue.jobIDs)
+	}
+	updated, err := store.GetDocument(ctx, "tester", document.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Meta["status"] != "waiting_retry" || !novelFetchDocumentHasLogEvent(updated, "process_recovered") {
+		t.Fatalf("stale task recovery state/log missing: %#v", updated)
 	}
 }
 
@@ -1101,6 +1303,46 @@ func TestWorkshopProcessWorkerIsolatesFailedBookAndDefersOnlyThatBook(t *testing
 	}
 }
 
+func TestWorkshopProcessWorkerHonorsConfiguredFetchConcurrency(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	owner := "tester"
+	if err := store.PutConfig(ctx, owner, map[string]any{"fetch": map[string]any{"concurrency": 3}}); err != nil {
+		t.Fatal(err)
+	}
+	bookIDs := []string{"12345678901", "12345678902", "12345678903"}
+	for _, bookID := range bookIDs {
+		if err := store.PutDocument(ctx, owner, novelfetchworkshop.Document{BookID: bookID, Meta: map[string]any{"platformId": "2"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var active atomic.Int32
+	var maximum atomic.Int32
+	twoRequests := make(chan struct{})
+	var releaseRequests sync.Once
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		current := active.Add(1)
+		for previous := maximum.Load(); current > previous && !maximum.CompareAndSwap(previous, current); previous = maximum.Load() {
+		}
+		if current >= 2 {
+			releaseRequests.Do(func() { close(twoRequests) })
+		}
+		select {
+		case <-twoRequests:
+		case <-time.After(2 * time.Second):
+		}
+		active.Add(-1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "data": "并发抓取正文", "bookinfo": map[string]any{"category": "男频", "genre": "都市"}})
+	}))
+	defer upstream.Close()
+	worker := &workshopProcessWorker{store: store, queue: queue, registry: newWorkshopProcessRegistry(), fetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}}
+	worker.process(ctx, novelfetchworkshop.ProcessJob{ID: "job-fetch-concurrency", Owner: owner, BatchID: "batch-fetch-concurrency", BookIDs: bookIDs, MaxTxt: 4000})
+	if maximum.Load() < 2 {
+		t.Fatalf("maximum concurrent upstream requests=%d, want at least 2", maximum.Load())
+	}
+}
+
 func TestWorkshopProcessWorkerDefersOriginalFetchFailureBeforeAutoRetry(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	queue := novelfetchworkshop.NewMemoryQueue()
@@ -1197,7 +1439,7 @@ func TestWorkshopProcessWorkerFinalOriginalFetchFailureWaitsForAutoRetry(t *test
 func TestWorkshopProcessWorkerRetrySkipsCompletedFetchAndAIVersions(t *testing.T) {
 	store := novelfetchworkshop.NewMemoryStore()
 	document := novelfetchworkshop.Document{
-		BookID: "33333333333", Original: "已经抓取的正文", ProcessedText: "已经抓取的正文",
+		BookID: "33333333333", Gender: "男频", Original: "已经抓取的正文", ProcessedText: "已经抓取的正文",
 		Versions: map[string]any{"ai1": "已经生成的第一版"},
 		Meta:     map[string]any{"platformId": "2", "originalStatus": "done", "aiStatus": "failed"},
 	}
@@ -1220,7 +1462,7 @@ func TestWorkshopProcessWorkerRetrySkipsCompletedFetchAndAIVersions(t *testing.T
 			return rewriteProviderFunc(func(_ context.Context, request novelfetchworkshop.RewriteRequest) (string, error) {
 				if strings.Contains(request.SystemPrompt, "小说分类器") {
 					classificationCalls++
-					return `{"style":"现代悬疑"}`, nil
+					return `{"style":"现代悬疑","confidence":0.9,"reason":"正文围绕案件线索推进"}`, nil
 				}
 				rewriteCalls++
 				return "新生成的第二版", nil
@@ -1270,6 +1512,127 @@ func TestDispatchDueNovelFetchSchedulesEnqueuesOnce(t *testing.T) {
 	}
 	if _, err := queue.Claim(context.Background(), 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
 		t.Fatalf("schedule was enqueued more than once: %v", err)
+	}
+}
+
+func TestDispatchDueNovelFetchSchedulesSkipsBooksAlreadyInAnotherBatch(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	if err := store.PutDocument(ctx, "tester", novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "已保存原文", Meta: map[string]any{"platformId": "2", "originalStatus": "done"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{map[string]any{
+		"id": "schedule-duplicate", "status": "scheduled", "run_at": now.Add(-time.Minute).Format(time.RFC3339), "input_text": "12345678901\t重复定时书目", "platform_id": "2",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+		t.Fatalf("duplicate scheduled book was enqueued: %v", err)
+	}
+	settings, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schedule := settings["novel_fetch_schedules"].([]any)[0].(map[string]any)
+	if schedule["status"] != "completed" || len(scheduleStringSlice(schedule["skipped_existing_book_ids"])) != 1 {
+		t.Fatalf("duplicate schedule was not completed with a skip reason: %#v", schedule)
+	}
+}
+
+func TestConcurrentNovelFetchScheduleDispatchQueuesOnlyOneJob(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{map[string]any{
+		"id": "schedule-race", "status": "scheduled", "run_at": now.Add(-time.Minute).Format(time.RFC3339),
+		"input_text": "12345678901\t并发定时任务", "platform_id": "2", "max_txt": 4000,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			errs <- dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now)
+		}()
+	}
+	close(start)
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := queue.Claim(ctx, 50*time.Millisecond); err != nil {
+		t.Fatalf("scheduled task was not queued: %v", err)
+	}
+	if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+		t.Fatalf("concurrent dispatch created a second job: %v", err)
+	}
+}
+
+func TestRecoverIncompleteNovelFetchScheduleDoesNotBlindlyRequeue(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{map[string]any{
+		"id": "schedule-incomplete", "status": "dispatching", "updatedAt": now.Add(-10 * time.Minute).Format(time.RFC3339Nano),
+		"run_at": now.Add(-time.Hour).Format(time.RFC3339), "input_text": "12345678901\t信息缺失任务", "platform_id": "2",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+		t.Fatalf("incomplete dispatch was blindly requeued: %v", err)
+	}
+	settings, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schedule := settings["novel_fetch_schedules"].([]any)[0].(map[string]any)
+	if schedule["status"] != "failed" || !strings.Contains(firstText(schedule["error"]), "记录不完整") {
+		t.Fatalf("incomplete schedule did not retain a clear failure: %#v", schedule)
+	}
+}
+
+func TestRecoverNovelFetchScheduleWithUncertainSubmissionWaitsForVerification(t *testing.T) {
+	ctx := context.Background()
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := novelfetchworkshop.NewMemoryQueue()
+	now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	jobID, batchID := novelFetchScheduleDispatchIDs("tester", "schedule-verify", now.Add(-time.Hour))
+	if err := store.PutRun(ctx, "tester", novelfetchworkshop.RunRecord{RunID: jobID, BookID: batchID, Stage: "novel_fetch_process", Status: "upload_pending", TextModelID: "未指定", ModelID: "novel-fetch-workshop", ErrorMessage: "提交回执待确认"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutConfig(ctx, "tester", map[string]any{"novel_fetch_schedules": []any{map[string]any{
+		"id": "schedule-verify", "status": "dispatching", "updatedAt": now.Add(-10 * time.Minute).Format(time.RFC3339Nano),
+		"dispatch_id": "dispatch-verify", "job_id": jobID, "batch_id": batchID, "book_ids": []any{"12345678901"},
+		"run_at": now.Add(-time.Hour).Format(time.RFC3339), "input_text": "12345678901\t待核验", "platform_id": "2",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchDueNovelFetchSchedules(ctx, store, queue, "tester", now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := queue.Claim(ctx, 20*time.Millisecond); !errors.Is(err, novelfetchworkshop.ErrQueueEmpty) {
+		t.Fatalf("uncertain external submission was replayed: %v", err)
+	}
+	settings, err := store.GetConfig(ctx, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schedule := settings["novel_fetch_schedules"].([]any)[0].(map[string]any)
+	if schedule["status"] != "pending_verification" || !strings.Contains(firstText(schedule["error"]), "回执") {
+		t.Fatalf("uncertain submission was not held for verification: %#v", schedule)
 	}
 }
 
@@ -1554,11 +1917,57 @@ func TestNovelFetchWorkshopProcessStartReturnsBeforeBackgroundFetchCompletes(t *
 	for time.Now().Before(deadline) {
 		polled := doNovelFetchRequest(t, handler, http.MethodGet, "/api/novel-fetch-workshop/process/jobs/"+job.ID, nil, now, secret)
 		if bytes.Contains(polled.Body.Bytes(), []byte(`"status":"done"`)) {
+			document, err := store.GetDocument(context.Background(), "tester", "12345678901")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, event := range []string{"fetch_started", "original_raw_saved", "sensitive_processing_completed", "classification_completed"} {
+				if !novelFetchDocumentHasLogEvent(document, event) {
+					t.Fatalf("persisted task logs missing %q: %#v", event, document.Logs)
+				}
+			}
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("background fetch did not finish")
+}
+
+func TestNovelFetchWorkshopProcessStartReturnsExistingTaskForActiveDuplicateBook(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &uniqueRecordingNovelFetchQueue{}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	first := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复书目"}, now, secret)
+	if first.Code != http.StatusAccepted {
+		t.Fatalf("first start status=%d body=%s", first.Code, first.Body.String())
+	}
+	var firstJob map[string]any
+	if err := json.Unmarshal(first.Body.Bytes(), &firstJob); err != nil {
+		t.Fatal(err)
+	}
+	second := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复书目"}, now, secret)
+	if second.Code != http.StatusAccepted {
+		t.Fatalf("duplicate start status=%d body=%s", second.Code, second.Body.String())
+	}
+	var secondJob map[string]any
+	if err := json.Unmarshal(second.Body.Bytes(), &secondJob); err != nil {
+		t.Fatal(err)
+	}
+	if firstJob["id"] != secondJob["id"] || secondJob["existing"] != true || len(queue.jobs) != 1 {
+		t.Fatalf("duplicate request did not return the active job: first=%#v second=%#v jobs=%#v", firstJob, secondJob, queue.jobs)
+	}
+}
+
+func novelFetchDocumentHasLogEvent(document novelfetchworkshop.Document, want string) bool {
+	for _, raw := range document.Logs {
+		log, ok := raw.(map[string]any)
+		if ok && firstText(log["event"]) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestNovelFetchWorkshopFetchOriginalPersistsRawAndProcessedText(t *testing.T) {
@@ -1610,6 +2019,75 @@ func TestNovelFetchWorkshopRestoreOriginalReprocessesStoredRawText(t *testing.T)
 	}
 	if document.OriginalRaw != "完整原文内容" || document.ProcessedText != "完整原文" || document.Meta["originalStatus"] != "restored" {
 		t.Fatalf("restore mismatch: %#v", document)
+	}
+}
+
+func TestNovelFetchBatchRetryReusesStoredRawInsteadOfFetchingAgain(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	requests := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		requests++
+		_, _ = w.Write([]byte(`{"code":200,"data":"不应重新抓取"}`))
+	}))
+	defer upstream.Close()
+	store := novelfetchworkshop.NewMemoryStore()
+	document := novelfetchworkshop.Document{BookID: "stored-raw", OriginalRaw: "已保存的完整原文", MaxTxt: 4000, Meta: map[string]any{"platformId": "15", "originalStatus": "waiting_sensitive_ai", "sensitiveStatus": "waiting_retry"}}
+	if err := store.PutDocument(context.Background(), "tester", document); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Client: upstream.Client(), Endpoint: upstream.URL}})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/tasks/batch-retry", map[string]any{"ids": []string{"stored-raw"}}, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("batch retry status=%d body=%s", response.Code, response.Body.String())
+	}
+	updated, err := store.GetDocument(context.Background(), "tester", "stored-raw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 0 || updated.OriginalRaw != "已保存的完整原文" || updated.Meta["originalStatus"] != "done" {
+		t.Fatalf("retry did not resume from stored raw: requests=%d doc=%#v", requests, updated)
+	}
+}
+
+func TestNovelFetchReimportDoesNotOverwriteExistingDocumentData(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	original := novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "完整 raw", ProcessedText: "处理后正文", Original: "处理后正文", Versions: map[string]any{"ai1": "改写版本"}, Meta: map[string]any{"platformId": "15", "originalStatus": "done", "customFlag": "keep"}}
+	if err := store.PutDocument(context.Background(), "tester", original); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workshopProcessResult(context.Background(), store, "tester", "12345678901\t新导入标题", "15", "batch-new", 4000); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := store.GetDocument(context.Background(), "tester", "12345678901")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.OriginalRaw != original.OriginalRaw || updated.ProcessedText != original.ProcessedText || updated.Versions["ai1"] != original.Versions["ai1"] || updated.Meta["customFlag"] != "keep" {
+		t.Fatalf("reimport overwrote existing document data: %#v", updated)
+	}
+}
+
+func TestNovelFetchStartSkipsBooksAlreadyImportedInAnotherBatch(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	queue := &recordingNovelFetchQueue{}
+	original := novelfetchworkshop.Document{BookID: "12345678901", OriginalRaw: "已有完整原文", ProcessedText: "已有处理正文", Meta: map[string]any{"platformId": "15", "originalStatus": "done", "status": "completed"}}
+	if err := store.PutDocument(context.Background(), "tester", original); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store, NovelFetchQueue: queue})
+	response := doNovelFetchRequest(t, handler, http.MethodPost, "/api/novel-fetch-workshop/process/start", map[string]any{"inputText": "12345678901\t重复导入", "platform_id": "15"}, now, secret)
+	if response.Code != http.StatusOK || len(queue.jobs) != 0 {
+		t.Fatalf("duplicate start status=%d queued=%d body=%s", response.Code, len(queue.jobs), response.Body.String())
+	}
+	updated, err := store.GetDocument(context.Background(), "tester", original.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.OriginalRaw != original.OriginalRaw || updated.ProcessedText != original.ProcessedText {
+		t.Fatalf("duplicate start changed existing text: %#v", updated)
 	}
 }
 

@@ -8,7 +8,7 @@
 //
 // Optional:
 //
-//	QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL (defaults to http://two.121w.com)
+//	QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL (defaults to https://two.121w.com)
 //	QIANTIE_VIDEO_SMOKE_BOOK_ID (also performs a book readback)
 package main
 
@@ -38,7 +38,7 @@ func run() error {
 		return fmt.Errorf("QIANTIE_VIDEO_SMOKE_USERNAME and QIANTIE_VIDEO_SMOKE_PASSWORD are required")
 	}
 	service := &videomanagementconnector.TargetHTTPService{
-		BaseURL: env("QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL", "http://two.121w.com"),
+		BaseURL: env("QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL", "https://two.121w.com"),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()

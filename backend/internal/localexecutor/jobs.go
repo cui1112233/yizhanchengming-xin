@@ -3,6 +3,7 @@ package localexecutor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 )
@@ -67,6 +68,7 @@ func (s *Service) CreateJob(ctx context.Context, owner string, input CreateJobIn
 	if err := jobs.CreateJob(ctx, record); err != nil {
 		return JobView{}, err
 	}
+	s.notifyJobCreated()
 	return jobView(record), nil
 }
 
@@ -120,6 +122,28 @@ func (s *Service) ClaimJob(ctx context.Context, executorToken string) (ClaimResu
 		Job: jobView(record), LeaseToken: leaseToken,
 		LeaseGeneration: record.LeaseGeneration, LeaseExpiresAt: *record.LeaseExpiresAt,
 	}, nil
+}
+
+func (s *Service) ClaimJobWait(ctx context.Context, executorToken string, wait time.Duration) (ClaimResult, error) {
+	if wait <= 0 {
+		return s.ClaimJob(ctx, executorToken)
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	for {
+		signal := s.currentJobSignal()
+		claim, err := s.ClaimJob(ctx, executorToken)
+		if !errors.Is(err, ErrNoClaimableJob) {
+			return claim, err
+		}
+		select {
+		case <-ctx.Done():
+			return ClaimResult{}, ctx.Err()
+		case <-timer.C:
+			return ClaimResult{}, ErrNoClaimableJob
+		case <-signal:
+		}
+	}
 }
 
 func (s *Service) RenewJob(ctx context.Context, executorToken, jobID string, lease LeaseCredential) (LeaseView, error) {
@@ -237,6 +261,15 @@ func (s *Service) executorForToken(ctx context.Context, token string) (ExecutorR
 		return ExecutorRecord{}, ErrExecutorUnauthorized
 	}
 	return record, nil
+}
+
+// OwnerForToken returns the paired account owner for executor-only routes.
+func (s *Service) OwnerForToken(ctx context.Context, token string) (string, error) {
+	record, err := s.executorForToken(ctx, token)
+	if err != nil {
+		return "", err
+	}
+	return record.OwnerUsername, nil
 }
 
 func isProgressState(state JobState) bool {

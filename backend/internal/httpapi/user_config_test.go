@@ -83,4 +83,8 @@ func TestUserConfigSeedsImportedWorkshopCatalog(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("sensitive groups = %d, want 2", len(groups))
 	}
+	pet, ok := settings["pet"].(map[string]any)
+	if !ok || pet["id"] != "little-companion" {
+		t.Fatalf("default pet = %#v, want Little Companion", settings["pet"])
+	}
 }

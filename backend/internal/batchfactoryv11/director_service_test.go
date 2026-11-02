@@ -3,16 +3,40 @@ package batchfactoryv11
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"qiantie/backend/internal/prompt"
 )
 
 type queuedDirectorProvider struct {
 	values []string
 	calls  []TextCompletionRequest
+}
+
+func TestDirectorServiceHydratesLegacyVideoSelectionBeforeGeneration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	data := `[{"id":"batch-video-custom","module":"batch-factory","name":"自定义视频提示词","kind":"base","version":4,"revision":2,"status":"published","body":"后台最新视频提示词正文","protocolLock":{"format":"text","operation":"video-meta","slot":"batch.video-meta"}}]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	service := &DirectorService{PresetCatalog: prompt.NewCatalog(path)}
+	snapshot := DirectorSnapshot{Effective: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+		"video": map[string]any{"presetId": "batch-video-custom", "presetVersion": 1, "body": "旧版视频提示词正文"},
+	})}}
+	hydrated, err := service.hydrateVideoPromptPreset(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := aiReasoningPromptConfig(hydrated.Effective)
+	if config.Video.Body != "后台最新视频提示词正文" || config.Video.Version != 4 {
+		t.Fatalf("legacy video selection was not hydrated: %#v", config.Video)
+	}
 }
 
 func (p *queuedDirectorProvider) Complete(_ context.Context, input TextCompletionRequest) (string, error) {
@@ -34,6 +58,39 @@ func rawSetting(t *testing.T, value any) json.RawMessage {
 	return raw
 }
 
+func TestDirectorRetriesSDTextOnceAfterEmptyProviderResponse(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch:            SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{"video": map[string]any{"presetId": "batch-video-sd", "body": "SD VIDEO RULE"}})},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, err := store.GetBatch(context.Background(), "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book = batch.Books[0]
+	provider := &queuedDirectorProvider{values: []string{"", `===VIDEO 01===
+时长：10秒
+资产引用：人物=她；场景=客厅；道具=手机
+镜头画面：她站在客厅里，拿起手机。`}}
+	service := &DirectorService{Store: store, Provider: provider}
+	if _, err := service.RunDirectorWithSmartUnifiedStyle(context.Background(), "alice", batch.ID, book.ID, "影像媒介：真人数字电影短剧；整体氛围：克制悬疑。"); err != nil {
+		t.Fatalf("director should recover from one empty SD-text response: %v", err)
+	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("provider calls=%d, want 2", len(provider.calls))
+	}
+	retry := provider.calls[1]
+	if !retry.DisableJSONResponse || retry.Temperature != 0.2 || retry.MaxTokens != provider.calls[0].MaxTokens {
+		t.Fatalf("retry request=%+v, want disabled JSON, temperature 0.2, unchanged max tokens", retry)
+	}
+	if !strings.Contains(retry.SystemPrompt, "仅输出完整有效的 SD 分镜文本") || strings.Contains(retry.SystemPrompt, "不要解释") == false {
+		t.Fatalf("retry prompt must require complete SD text without explanation: %q", retry.SystemPrompt)
+	}
+}
+
 func TestDirectorRetriesOnceWhenGatewayReturnsNonJSONText(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	provider := &queuedDirectorProvider{values: []string{"先解释一下", validDirectorJSON()}}
@@ -43,6 +100,59 @@ func TestDirectorRetriesOnceWhenGatewayReturnsNonJSONText(t *testing.T) {
 	}
 	if len(provider.calls) != 2 || !provider.calls[1].DisableJSONResponse {
 		t.Fatalf("retry request should disable response_format: calls=%+v", provider.calls)
+	}
+}
+
+type truncatingDirectorProvider struct {
+	calls  []TextCompletionRequest
+	values []string
+}
+
+func (p *truncatingDirectorProvider) Complete(_ context.Context, input TextCompletionRequest) (string, error) {
+	p.calls = append(p.calls, input)
+	if len(p.values) == 0 {
+		return "", ErrUnavailable
+	}
+	value := p.values[0]
+	p.values = p.values[1:]
+	if value == "truncated" {
+		return "", fmt.Errorf("director provider output truncated (finish_reason=length)")
+	}
+	return value, nil
+}
+
+func TestAssetExtractionRetriesOnceAfterProviderOutputIsTruncated(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	provider := &truncatingDirectorProvider{values: []string{"truncated", `{"characters":[{"name":"林溪","prompt":"短发女主"}],"scenes":[],"props":[]}`}}
+
+	assets, err := (&DirectorService{Store: store, Provider: provider}).RunAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
+
+	if err != nil {
+		t.Fatalf("asset extraction should recover from one truncated response: %v", err)
+	}
+	if len(assets) != 1 || len(provider.calls) != 2 {
+		t.Fatalf("assets=%+v calls=%+v, want one extracted asset after exactly one retry", assets, provider.calls)
+	}
+	if !strings.Contains(provider.calls[1].SystemPrompt, "更紧凑") || !provider.calls[1].DisableJSONResponse {
+		t.Fatalf("retry must request compact output without JSON response mode: %#v", provider.calls[1])
+	}
+}
+
+type alwaysTruncatingDirectorProvider struct{ calls int }
+
+func (p *alwaysTruncatingDirectorProvider) Complete(_ context.Context, _ TextCompletionRequest) (string, error) {
+	p.calls++
+	return "", fmt.Errorf("director provider output truncated (finish_reason=length)")
+}
+
+func TestAssetExtractionReturnsExplicitErrorAfterSecondTruncation(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	provider := &alwaysTruncatingDirectorProvider{}
+
+	_, err := (&DirectorService{Store: store, Provider: provider}).RunAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
+
+	if err == nil || !strings.Contains(err.Error(), "finish_reason=length") || provider.calls != 2 {
+		t.Fatalf("err=%v calls=%d, want explicit second-truncation error after two attempts", err, provider.calls)
 	}
 }
 
@@ -235,6 +345,33 @@ func TestBuildDirectorContractDefersVisualPromptUntilVisualExtraction(t *testing
 	}
 }
 
+func TestBuildDirectorContractUsesComicPagePlanningInComicMode(t *testing.T) {
+	book := Book{ID: "book-1", Title: "测试书", SourceText: "林晚走进办公室，陆沉抬头看向她。", AssetRecords: []BookAsset{
+		{Kind: "character", Name: "林晚", Prompt: "漫画角色林晚", Source: "comic"},
+		{Kind: "character", Name: "旧林晚", Prompt: "视频角色旧林晚", Source: "director"},
+	}}
+	contract, err := BuildDirectorContract(book, HookRevision{}, DirectorSnapshot{
+		Mode: "original", MaxVideoDuration: 10, AspectRatio: "9:16",
+		Effective: SettingsPatch{"productionMode": rawSetting(t, "comic")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"漫画分页导演", "每个 storyboard 对应一张漫画页", "前后页连续"} {
+		if !strings.Contains(contract.SystemPrompt, want) {
+			t.Fatalf("comic director contract missing %q: %s", want, contract.SystemPrompt)
+		}
+	}
+	for _, forbidden := range []string{"视频提示词", "配音", "运镜"} {
+		if strings.Contains(contract.SystemPrompt, forbidden) {
+			t.Fatalf("comic director contract contains video-only rule %q: %s", forbidden, contract.SystemPrompt)
+		}
+	}
+	if !strings.Contains(contract.UserPrompt, "漫画角色林晚") || strings.Contains(contract.UserPrompt, "视频角色旧林晚") {
+		t.Fatalf("comic pagination must receive only comic assets: %s", contract.UserPrompt)
+	}
+}
+
 func TestBuildDirectorContractKeepsSelectedVideoPromptWhenLegacySwitchWasOff(t *testing.T) {
 	book := Book{ID: "book-1", Title: "测试书", SourceText: "正文"}
 	config := map[string]any{
@@ -276,6 +413,31 @@ func TestBuildDirectorContractUsesOnlySelectedNonH3VideoPresetRules(t *testing.T
 	}
 	if !strings.Contains(contract.SystemPrompt, "CUSTOM VIDEO RULE") {
 		t.Fatal("selected non-H3 video rule is missing")
+	}
+}
+
+func TestBuildDirectorContractTreatsCMFixedShotPresetAsSDTextProtocol(t *testing.T) {
+	book := Book{ID: "book-1", Title: "测试书", SourceText: "林晚走进客厅。"}
+	contract, err := BuildDirectorContract(book, HookRevision{}, DirectorSnapshot{
+		Mode: "original", MaxVideoDuration: 10, AspectRatio: "9:16",
+		Effective: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+			"video": map[string]any{
+				"presetId": "batch-video-sd-fixed-shot",
+				"body":     "CM_FIXED_SHOT_RULE",
+			},
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contract.SDTextProtocol {
+		t.Fatalf("CM fixed-shot preset must use the SD text protocol: %+v", contract)
+	}
+	if !strings.Contains(contract.SystemPrompt, "CM_FIXED_SHOT_RULE") {
+		t.Fatalf("CM fixed-shot body missing from system prompt:\n%s", contract.SystemPrompt)
+	}
+	if strings.Contains(contract.SystemPrompt, "V11 JSON 存储适配") {
+		t.Fatalf("CM fixed-shot preset must not be forced through the JSON director protocol:\n%s", contract.SystemPrompt)
 	}
 }
 
@@ -561,6 +723,46 @@ func TestAssetExtractionWithSDCombinedPresetUsesOneModelCall(t *testing.T) {
 	}
 	if !strings.Contains(provider.calls[0].SystemPrompt, "SD ONE CALL ASSET RULE") {
 		t.Fatalf("SD combined preset body was not used: %q", provider.calls[0].SystemPrompt)
+	}
+}
+
+func TestAssetExtractionWithCMAssetPresetRunsSceneAndPropPhases(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+			"assets": map[string]any{
+				"enabled": true,
+				"extraction": map[string]any{
+					"presetId":   "batch-character-meta",
+					"presetSlot": "batch.character-meta",
+					"body":       "执行方式：多阶段独立 AI 调用\nAI 调用六：独立场景提取\nCM SCENE PHASE RULE\nAI 调用七：独立道具提取\nCM PROP PHASE RULE\n9. 最终资产组装",
+				},
+			},
+		})}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{values: []string{
+		`{"characters":[{"name":"林溪","prompt":"完整人物外形与视频锚点"}],"scenes":[],"props":[]}`,
+		`{"scenes":[{"canonical_name":"客厅","scene_prompt":"完整场景锚点"}]}`,
+		`{"props":[{"canonical_name":"手机","prop_prompt":"完整道具锚点"}]}`,
+	}}
+	assets, err := (&DirectorService{Store: store, Provider: provider}).RunAssetExtraction(context.Background(), "alice", batch.ID, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 3 || len(assets) != 3 {
+		t.Fatalf("CM asset flow calls=%d assets=%+v, want initial, scene and prop requests", len(provider.calls), assets)
+	}
+	if !strings.Contains(provider.calls[1].SystemPrompt, "CM SCENE PHASE RULE") || !strings.Contains(provider.calls[2].SystemPrompt, "CM PROP PHASE RULE") {
+		t.Fatalf("CM phase rules were not routed to their dedicated calls: scene=%q prop=%q", provider.calls[1].SystemPrompt, provider.calls[2].SystemPrompt)
+	}
+	byName := map[string]string{}
+	for _, asset := range assets {
+		byName[asset.Name] = asset.Prompt
+	}
+	if byName["客厅"] != "完整场景锚点" || byName["手机"] != "完整道具锚点" {
+		t.Fatalf("CM phase prompts were not persisted: %+v", byName)
 	}
 }
 

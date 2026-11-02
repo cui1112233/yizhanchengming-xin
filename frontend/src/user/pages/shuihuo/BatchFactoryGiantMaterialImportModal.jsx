@@ -1,6 +1,6 @@
 import { Alert, Button, Checkbox, Descriptions, Input, InputNumber, Modal, Progress, Select, Space, Tag, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { appendNovelFetchIntake, classifyBookPublishMetadata, createBatchFromIntake, createNovelFetchIntake, getBatch, getBatchAutomationStatus, listAutomationPresets, retryBatchAutomation, startBatchAutomation, updateBookSource } from '../../../shared/api/batchFactoryV11';
+import { appendNovelFetchIntake, classifyBookPublishMetadata, createBatchFromIntake, createNovelFetchIntake, getBatch, getBatchAutomationStatus, listAutomationPresets, startBatchAutomation, updateBookSource } from '../../../shared/api/batchFactory';
 import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
 import { createGiantMaterialJob, waitForGiantMaterialJob } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
@@ -374,13 +374,20 @@ export function BatchFactoryGiantMaterialImportModal({ open, batch, onCancel, on
       .map(item => String(item.registeredBook.id));
     if (!bookIds.length) return;
     try {
-      const status = await getBatchAutomationStatus(batchId).catch(() => null);
-      const state = String(status?.state || status?.automation?.state || '').toLowerCase();
-      if (!state || state === 'idle') {
-        await startBatchAutomation(batchId, { presetId: automationPresetId || '', runMode: 'full_submit', autoPublish: true });
-      } else {
-        await retryBatchAutomation(batchId, bookIds);
-      }
+      const statusResponse = await getBatchAutomationStatus(batchId).catch(() => null);
+      const status = statusResponse?.automation || statusResponse || {};
+      const presetId = String(automationPresetId || status?.preset?.id || automationPresets[0]?.value || '').trim();
+      if (!presetId) throw new Error('请先选择自动化预设');
+      // 巨量素材会持续向同一个批次追加书。这里单独启动这一次新增的
+      // bookIds，不能用 retry：retry 只会重试旧任务里的失败书，新增书不会
+      // 被它看见，也不能重跑整个批次造成重复提交。
+      await startBatchAutomation(batchId, {
+        presetId,
+        runMode: String(status?.runMode || 'full_submit'),
+        autoPublish: status?.autoPublish !== false,
+        concurrency: Number(status?.concurrency || 1),
+        bookIds
+      });
       message.success('读取完成，已自动开始制作。');
     } catch (error) {
       message.warning(`自动开始制作失败：${errorText(error)}；可在工作台“自动生产”里手动启动。`);

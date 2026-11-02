@@ -65,8 +65,20 @@ func ResolveCanvasInputs(canvas Canvas, targetNodeID string, capability CanvasIn
 	}
 
 	incoming := make(map[string][]Edge, len(canvas.Nodes))
+	timingAudioSources := make(map[string]struct{})
 	for _, edge := range canvas.Edges {
+		if source, sourceExists := nodes[edge.Source]; sourceExists {
+			if target, targetExists := nodes[edge.Target]; targetExists && !canvasEdgeCanProvideInput(source.Type, target.Type) {
+				if edge.Target == targetNodeID {
+					inputs.Warnings = append(inputs.Warnings, fmt.Sprintf("已忽略不能连接到%s节点的%s素材 %s", canvasInputKindName(target.Type), canvasInputKindName(source.Type), source.ID))
+				}
+				continue
+			}
+		}
 		incoming[edge.Target] = append(incoming[edge.Target], edge)
+		if edge.Target == targetNodeID && strings.TrimSpace(edge.Relation) == "audio_source" {
+			timingAudioSources[edge.Source] = struct{}{}
+		}
 	}
 	visiting := make(map[string]struct{}, len(canvas.Nodes))
 	visited := make(map[string]struct{}, len(canvas.Nodes))
@@ -80,20 +92,23 @@ func ResolveCanvasInputs(canvas Canvas, targetNodeID string, capability CanvasIn
 			return nil
 		}
 		visiting[nodeID] = struct{}{}
-		for _, edge := range incoming[nodeID] {
-			if _, exists := nodes[edge.Source]; !exists {
-				inputs.Warnings = append(inputs.Warnings, fmt.Sprintf("已忽略不存在的上游节点 %s", strings.TrimSpace(edge.Source)))
-				continue
-			}
-			if err := visit(edge.Source); err != nil {
-				return err
+		source, sourceExists := nodes[nodeID]
+		isMediaBoundary := nodeID != targetNodeID && sourceExists && (source.Type == "image" || source.Type == "video" || source.Type == "audio")
+		if !isMediaBoundary {
+			for _, edge := range incoming[nodeID] {
+				if _, exists := nodes[edge.Source]; !exists {
+					inputs.Warnings = append(inputs.Warnings, fmt.Sprintf("已忽略不存在的上游节点 %s", strings.TrimSpace(edge.Source)))
+					continue
+				}
+				if err := visit(edge.Source); err != nil {
+					return err
+				}
 			}
 		}
 		delete(visiting, nodeID)
 		visited[nodeID] = struct{}{}
 
-		source, exists := nodes[nodeID]
-		if !exists || nodeID == targetNodeID {
+		if !sourceExists || nodeID == targetNodeID {
 			return nil
 		}
 		switch strings.TrimSpace(source.Type) {
@@ -106,6 +121,13 @@ func ResolveCanvasInputs(canvas Canvas, targetNodeID string, capability CanvasIn
 				appendSource(source.ID)
 			}
 		case "image", "video", "audio":
+			if source.Type == "audio" && !capability.AcceptsAudioReferences {
+				if _, timingOnly := timingAudioSources[source.ID]; timingOnly {
+					appendSource(source.ID)
+					inputs.Warnings = append(inputs.Warnings, "音频连线仅用于视频时长，不会上传给当前视频模型")
+					return nil
+				}
+			}
 			asset, err := resolveCanvasMediaInput(source, capability)
 			if err != nil {
 				return err
@@ -139,6 +161,26 @@ func ResolveCanvasInputs(canvas Canvas, targetNodeID string, capability CanvasIn
 		return ResolvedCanvasInputs{}, fmt.Errorf("%w: 当前模型最多支持 %d 个参考素材", ErrCanvasInputUnsupported, capability.MaxReferenceAssets)
 	}
 	return inputs, nil
+}
+
+func canvasEdgeCanProvideInput(sourceKind, targetKind string) bool {
+	sourceKind = strings.TrimSpace(sourceKind)
+	targetKind = strings.TrimSpace(targetKind)
+	if sourceKind == "text" {
+		return true
+	}
+	switch targetKind {
+	case "image", "director":
+		return sourceKind == "image"
+	case "video":
+		return sourceKind == "image" || sourceKind == "video" || sourceKind == "audio"
+	case "audio":
+		return sourceKind == "audio"
+	case "text":
+		return sourceKind == "text"
+	default:
+		return false
+	}
 }
 
 func canvasInputText(node Node) string {

@@ -168,6 +168,39 @@ func TestSliceFiveServesOnlyTheOwnersLocalMergedArtifact(t *testing.T) {
 	}
 }
 
+func TestSliceThreeServesExistingLocalMergeMediaAndCoverWithoutEnablingMergeWrites(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "正文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	artifactID := "merge_existing_media_1"
+	if _, err := files.SaveMP4(artifactID, strings.NewReader("0000ftypisom-local-merged-video")); err != nil {
+		t.Fatal(err)
+	}
+	coverBytes := append([]byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01, 0x01, 0x00, 0x00, 0x01}, bytes.Repeat([]byte{0}, 32)...)
+	if _, err := files.SaveImage(artifactID, "image/jpeg", bytes.NewReader(coverBytes)); err != nil {
+		t.Fatal(err)
+	}
+	output := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-media/" + artifactID
+	if _, err := store.CreateMergeJob(context.Background(), batchfactoryv11.MergeJob{Owner: "alice", BatchID: batch.ID, RequestID: "existing-media", Status: batchfactoryv11.MergeSucceeded, OutputURL: output, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 3, Store: store, Merge: &batchfactoryv11.MergeService{Store: store}, LocalArtifacts: files})
+
+	media := signedJSONRequest(t, api, now, "alice", http.MethodGet, output, nil)
+	if media.Code != http.StatusOK || !strings.Contains(media.Body.String(), "ftyp") {
+		t.Fatalf("media status=%d body=%q", media.Code, media.Body.String())
+	}
+	coverPath := "/api/batch-factory/v12/batches/" + batch.ID + "/merge-cover/" + artifactID
+	cover := signedJSONRequest(t, api, now, "alice", http.MethodGet, coverPath, nil)
+	if cover.Code != http.StatusOK || cover.Header().Get("Content-Type") != "image/jpeg" || cover.Body.Len() == 0 {
+		t.Fatalf("cover status=%d type=%q bytes=%d", cover.Code, cover.Header().Get("Content-Type"), cover.Body.Len())
+	}
+}
+
 func TestSliceFiveServesCachedMergeCoverOnlyToItsOwner(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()

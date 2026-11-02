@@ -1,7 +1,7 @@
 import { SettingOutlined } from '@ant-design/icons';
 import { Alert, Button, Input, Modal, Select, Space, Switch, Tabs, Tooltip, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { createConfigVersion, listSystemPresetCatalog, renameConfigVersion, saveBatchSettings } from '../../../shared/api/batchFactoryV11';
+import { createConfigVersion, listSystemPresetCatalog, renameConfigVersion, saveBatchSettings } from '../../../shared/api/batchFactory';
 
 const slots=[['extraction','SD 资产预设提示词','script.asset-extraction']];
 // Batch Factory extracts people, scenes, props and their SD identity data in

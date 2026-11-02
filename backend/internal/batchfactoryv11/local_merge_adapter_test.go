@@ -1,6 +1,7 @@
 package batchfactoryv11
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -78,6 +79,72 @@ func TestLocalMergeAdapterCreatesProtectedArtifactForCompletedMerge(t *testing.T
 			t.Fatalf("merge did not finish: %+v", result)
 		}
 		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestLocalMergeAdapterMergesOwnedLocalExecutorArtifact(t *testing.T) {
+	artifacts := localartifact.NewStore(t.TempDir(), 1<<20)
+	const artifactID = "lea_local_source_1"
+	if _, err := artifacts.SaveMP4(artifactID, bytes.NewReader([]byte("0000ftypisom-local-executor-video"))); err != nil {
+		t.Fatalf("save local executor video: %v", err)
+	}
+
+	adapter := NewLocalMergeAdapter(artifacts)
+	adapter.Merger = localMergeRunFunc(func(_ context.Context, inputs []string, output string, _ float64) error {
+		if len(inputs) != 1 {
+			return fmt.Errorf("inputs=%v", inputs)
+		}
+		body, err := os.ReadFile(inputs[0])
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(body, []byte("0000ftypisom-local-executor-video")) {
+			return fmt.Errorf("wrong local executor source: %q", body)
+		}
+		return os.WriteFile(output, []byte("0000ftypisom-local-merged-video"), 0o600)
+	})
+
+	queued, err := adapter.Submit(context.Background(), "batch-1", []MergeMedia{{
+		ProductionJobID: "job-1", VideoID: "video-1", Order: 0,
+		MediaURL: "/api/shuihuo-production/local-executor-artifacts/" + artifactID,
+	}}, MergeOptions{Speed: 1})
+	if err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		result, pollErr := adapter.Poll(context.Background(), "batch-1", queued)
+		if pollErr != nil {
+			t.Fatalf("poll: %v", pollErr)
+		}
+		if result.Status == MergeSucceeded {
+			return
+		}
+		if result.Status == MergeFailed {
+			t.Fatalf("merge failed: %s", result.ErrorMessage)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("merge did not finish: %+v", result)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestLocalExecutorArtifactIDFromMergeSourceRejectsAnythingButOwnedArtifactRoute(t *testing.T) {
+	if got, ok := localExecutorArtifactIDFromMergeSource("/api/shuihuo-production/local-executor-artifacts/lea_abc_123"); !ok || got != "lea_abc_123" {
+		t.Fatalf("valid local executor artifact route got=%q ok=%v", got, ok)
+	}
+	for _, raw := range []string{
+		"https://example.com/api/shuihuo-production/local-executor-artifacts/lea_abc_123",
+		"/api/shuihuo-production/local-executor-artifacts/lea_abc_123?download=1",
+		"/api/shuihuo-production/local-executor-artifacts/lea_abc_123/../../server-file",
+		"/api/shuihuo-production/local-executor-artifacts/lea_..",
+		"media://tapnow/u88/gen_task-46797-0",
+	} {
+		if got, ok := localExecutorArtifactIDFromMergeSource(raw); ok || got != "" {
+			t.Fatalf("unsafe source accepted: raw=%q id=%q", raw, got)
+		}
 	}
 }
 

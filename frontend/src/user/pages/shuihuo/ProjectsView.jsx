@@ -1,8 +1,8 @@
-import { AppstoreOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, DownOutlined, FileTextOutlined, FolderOpenOutlined, PlusOutlined, SearchOutlined, UploadOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { Alert, Button, Input, Modal, Popconfirm, Select, Switch, Upload, message } from 'antd';
+import { AppstoreOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, FileTextOutlined, FolderOpenOutlined, PlusOutlined, SearchOutlined, UnorderedListOutlined, UploadOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Alert, Button, Input, Modal, Popconfirm, Select, Upload, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { importProject } from '../../../shared/api/shuihuoProduction';
-import { getBatchFactoryMergeCoverBlob, getProductionStatus, isBatchFactoryMergeCoverURL } from '../../../shared/api/batchFactoryV11';
+import { getBatchFactoryMergeCoverBlob, getProductionStatus, isBatchFactoryMergeCoverURL } from '../../../shared/api/batchFactory';
 import { ProductionMediaBoundary } from '../batch-factory-v11/ProductionMediaBoundary';
 import { BatchFactoryCreateModal } from './BatchFactoryCreateModal';
 import { batchFactoryFallbackCoverFromProductionStatus, createCoverHydrationScheduler, isBatchFactoryV11Project } from './batchFactoryProjects';
@@ -87,9 +87,8 @@ function AuthenticatedProjectCover({ src, alt, batchId }) {
 export function ProjectsView({ projects, loadError, health, onCreate, onImported, onCreateBatch, onOpen, onDelete, onRefresh, openCreateOnLoad = false }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [collection, setCollection] = useState('all');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [createCollection, setCreateCollection] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
   const [name, setName] = useState('');
   const [sourceText, setSourceText] = useState('');
   const [file, setFile] = useState(null);
@@ -109,7 +108,6 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     setSourceText('');
     setFile(null);
     setSegmentationMode('paragraph');
-    setCreateCollection(false);
   }
 
   function selectSourceFile(nextFile) {
@@ -148,13 +146,12 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     const keyword = search.trim().toLocaleLowerCase();
     return [...(projects || [])]
       .filter(project => !keyword || project.name.toLocaleLowerCase().includes(keyword))
-      .filter(() => collection === 'all')
       .sort((left, right) => {
         const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
         const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
         return sortOrder === 'desc' ? rightTime - leftTime : leftTime - rightTime;
       });
-  }, [collection, projects, search, sortOrder]);
+  }, [projects, search, sortOrder]);
 
   function projectCount(project) {
     if (Number.isFinite(project.segmentCount)) return `${project.segmentCount} 个分镜`;
@@ -178,11 +175,11 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     {loadError ? <Alert className="shuihuo-project-load-error" type="warning" showIcon message="作品读取暂时失败" description={loadError} action={<Button size="small" onClick={() => onRefresh?.()}>重试</Button>} /> : null}
     <div className="shuihuo-project-library-toolbar">
       <Input className="shuihuo-project-search" prefix={<SearchOutlined />} value={search} onChange={event => setSearch(event.target.value)} placeholder="搜索作品..." allowClear />
-      <button className="shuihuo-project-filter" type="button" onClick={() => setCollection(collection === 'all' ? 'all' : 'all')}><span>{collection === 'all' ? '全部合集' : collection}</span><DownOutlined /></button>
-      <button className="shuihuo-project-filter" type="button" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}><ClockCircleOutlined /><span>{sortOrder === 'desc' ? '按时间降序' : '按时间升序'}</span><DownOutlined /></button>
-      <Button className="shuihuo-project-view-toggle" type="text" icon={<AppstoreOutlined />} aria-label="网格视图" title="网格视图" />
+      <span className="shuihuo-project-filter-label">全部作品</span>
+      <button className="shuihuo-project-filter" type="button" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}><ClockCircleOutlined /><span>{sortOrder === 'desc' ? '按时间降序' : '按时间升序'}</span></button>
+      <Button className="shuihuo-project-view-toggle" type="text" icon={viewMode === 'grid' ? <UnorderedListOutlined /> : <AppstoreOutlined />} onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} aria-label={viewMode === 'grid' ? '切换为列表视图' : '切换为网格视图'} title={viewMode === 'grid' ? '切换为列表视图' : '切换为网格视图'} />
     </div>
-    <div className="shuihuo-project-grid">
+    <div className={`shuihuo-project-grid${viewMode === 'list' ? ' is-list' : ''}`}>
       {visibleProjects.map(project => {
         const cover = projectCover(project);
         return <article className={`shuihuo-project-card${cover ? ' has-cover' : ''}`} key={project.id}>
@@ -196,7 +193,6 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
       {!visibleProjects.length && !loadError ? <div className="shuihuo-empty"><FileTextOutlined /><p>{projects?.length ? '没有匹配的作品' : '还没有项目'}</p><Button onClick={() => setOpen(true)}>从原文或字幕开始</Button><Button className="shuihuo-create-batch" onClick={() => setBatchOpen(true)}>批量工厂</Button></div> : null}
     </div>
     <Modal className="shuihuo-create-project-modal" title="新建漫剧" open={open} onCancel={() => { setOpen(false); reset(); }} footer={<><Button onClick={() => { setOpen(false); reset(); }}>取消</Button><Button type="primary" loading={busy} onClick={submit}>确定创建</Button></>} width={500}>
-      <div className="shuihuo-create-collection"><strong>创建合集</strong><Switch size="small" checked={createCollection} onChange={setCreateCollection} /><span>开启后可继承新作品的人物/场景设定</span></div>
       <label className="shuihuo-form-label" htmlFor="shuihuo-project-name">作品名称 <em>*</em></label>
       <Input id="shuihuo-project-name" value={name} onChange={event => setName(event.target.value)} placeholder="请输入作品名称" maxLength={255} />
       <label className="shuihuo-form-label" htmlFor="shuihuo-project-source">字幕内容 <em>*</em></label>

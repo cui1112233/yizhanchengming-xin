@@ -80,10 +80,10 @@ func importedKnowledge() (map[string]any, map[string]any) {
 		// The rules page edits the canonical sensitive catalog directly. Keeping
 		// it only as layout_rules.sensitive_rules made the page look empty even
 		// though the same rules were present in the imported seed.
-		"sensitive":         sensitive,
-		"layout_rules":      layout,
-		"symbol_rules":      symbol,
-		"chapter_rules":     chapter,
+		"sensitive":     sensitive,
+		"layout_rules":  layout,
+		"symbol_rules":  symbol,
+		"chapter_rules": chapter,
 	}
 	return knowledge, sensitive
 }
@@ -153,6 +153,20 @@ func EnsureWorkshopDefaults(settings map[string]any) map[string]any {
 		if app, _ := settings["appConfig"].(map[string]any); app != nil {
 			if knowledge, _ := app["knowledge"].(map[string]any); len(knowledge) > 0 {
 				settings["knowledgeLibraries"] = cloneMap(knowledge)
+			}
+		}
+	}
+	if app, _ := settings["appConfig"].(map[string]any); app != nil {
+		if knowledge, _ := app["knowledge"].(map[string]any); knowledge != nil {
+			if usage, exists := knowledge["usage_prompt"]; exists {
+				libraries, _ := settings["knowledgeLibraries"].(map[string]any)
+				if libraries == nil {
+					libraries = map[string]any{}
+				}
+				if _, alreadySet := libraries["usage_prompt"]; !alreadySet {
+					libraries["usage_prompt"] = usage
+				}
+				settings["knowledgeLibraries"] = libraries
 			}
 		}
 	}

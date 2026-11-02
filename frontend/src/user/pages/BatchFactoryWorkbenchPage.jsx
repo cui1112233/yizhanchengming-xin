@@ -9,7 +9,7 @@ import {
   getIntake,
   listBatchSummaries,
   startBatchAutomation
-} from '../../shared/api/batchFactoryV11';
+} from '../../shared/api/batchFactory';
 import { BatchFactoryNovelList } from './shuihuo/BatchFactoryNovelList';
 import { BatchFactoryCreateModal } from './shuihuo/BatchFactoryCreateModal';
 import { batchFactoryBatchFromResponse } from './shuihuo/batchFactoryProjects';
@@ -55,11 +55,12 @@ export default function BatchFactoryWorkbenchPage() {
   const pendingBatchIdRef = useRef(typeof window !== 'undefined'
     ? (() => {
       const params = new URLSearchParams(window.location.search);
-      return params.get('batch') || params.get('project') || '';
+      return params.get('batchId') || params.get('batch') || params.get('project') || '';
     })()
     : '');
   const pendingBatchId = pendingBatchIdRef.current;
   const mountedRef = useRef(true);
+  const refreshInFlightRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -73,7 +74,9 @@ export default function BatchFactoryWorkbenchPage() {
   }, []);
 
   const refreshBatches = useCallback(async ({ quiet = false } = {}) => {
-    setLoading(true);
+    if (refreshInFlightRef.current) return undefined;
+    refreshInFlightRef.current = true;
+    if (!quiet) setLoading(true);
     setError('');
     try {
       const next = batchesFromResult(await listBatchSummaries());
@@ -85,6 +88,7 @@ export default function BatchFactoryWorkbenchPage() {
       if (!quiet) message.error(reason);
       return [];
     } finally {
+      refreshInFlightRef.current = false;
       if (mountedRef.current) setLoading(false);
     }
   }, []);
@@ -100,6 +104,19 @@ export default function BatchFactoryWorkbenchPage() {
   }, []);
 
   useEffect(() => { refreshBatches({ quiet: true }); }, [refreshBatches]);
+
+  useEffect(() => {
+    if (activeBatch) return undefined;
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void refreshBatches({ quiet: true });
+    };
+    const timer = window.setInterval(refreshWhenVisible, 15000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [activeBatch, refreshBatches]);
 
   useEffect(() => {
     if (pendingHandoffRef.current || pendingBatchId) return undefined;
@@ -166,7 +183,7 @@ export default function BatchFactoryWorkbenchPage() {
 
   async function createBatch(input) {
     const created = input?.intakeId
-      ? await createBatchFromIntake(input.intakeId, { title: input.title, giantAutomation: input.giantAutomation })
+      ? await createBatchFromIntake(input.intakeId, { title: input.title, initialBatchSettings: input.initialBatchSettings, giantAutomationPlan: input.giantAutomationPlan })
       : await createManualIntake(input);
     const batch = asBatch(created);
     localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
@@ -181,17 +198,18 @@ export default function BatchFactoryWorkbenchPage() {
       const classified = rows.filter(item => item?.status === 'classified').length;
       const failed = rows.filter(item => item?.status === 'failed').length;
       if (classified) message.success(`已识别 ${classified} 本小说的男女频与风格`);
-      if (failed) message.warning(`${failed} 本小说的男女频与风格暂未识别，可在单书中重试；不影响生产。`);
+      if (failed) message.warning(`${failed} 本小说原文已获取，等待分类确认；确认分类后可继续改写。`);
       const refreshed = asBatch(await getBatch(batch.id));
       if (mountedRef.current) setActiveBatch(current => String(current?.id) === String(batch.id) ? refreshed : current);
       await refreshBatches({ quiet: true });
     }).catch(error => {
-      if (mountedRef.current) message.warning(`男女频与风格暂未识别：${error?.message || '可在单书中重试；不影响生产。'}`);
+      if (mountedRef.current) message.warning(`原文已获取，等待分类确认；确认分类后可继续改写。${error?.message ? `原因：${error.message}` : ''}`);
     });
     if (!input?.automationEnabled) return batch;
     try {
       await startBatchAutomation(batch.id, {
         scheduledAt: input.scheduledAt || '',
+        scheduleMode: input.scheduleMode || 'execute',
         presetId: input.presetId || '',
         runMode: input.runMode || (input.autoPublishEnabled ? 'full_submit' : 'video_no_submit'),
         autoPublish: input.autoPublishEnabled === true
@@ -203,12 +221,16 @@ export default function BatchFactoryWorkbenchPage() {
     return batch;
   }
 
+  const refreshActiveBatch = useCallback(async () => {
+    if (!activeBatch?.id) return undefined;
+    const latest = asBatch(await getBatch(activeBatch.id));
+    setActiveBatch(current => current?.updatedAt === latest?.updatedAt && current?.revision === latest?.revision ? current : latest);
+    return latest;
+  }, [activeBatch?.id]);
+
   if (activeBatch) {
     return <div className="shuihuo-production is-workbench batch-factory-canonical-entry">
-      <BatchFactoryNovelList batch={activeBatch} openAutomationOnLoad={openAutomationOnLoad} onBack={() => { setActiveBatch(null); refreshBatches({ quiet: true }); }} onBatchChanged={async () => {
-        setActiveBatch(asBatch(await getBatch(activeBatch.id)));
-        await refreshBatches({ quiet: true });
-      }} />
+      <BatchFactoryNovelList batch={activeBatch} openAutomationOnLoad={openAutomationOnLoad} onBack={() => { setActiveBatch(null); refreshBatches({ quiet: true }); }} onBatchChanged={refreshActiveBatch} />
     </div>;
   }
 
@@ -218,8 +240,8 @@ export default function BatchFactoryWorkbenchPage() {
       <div className="batch-factory-workbench-home-actions"><Button onClick={() => window.location.assign('/shuihuo-production/creative')}>创作漫剧</Button><Button icon={<ReloadOutlined />} loading={loading} onClick={() => refreshBatches()}>刷新</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>新建批量</Button></div>
     </section>
     {loading ? <div className="batch-factory-workbench-home-state"><Spin /><span>正在读取批量工程</span></div> : null}
-    {!loading && error ? <div className="batch-factory-workbench-home-state is-error"><strong>批量工程暂时无法读取</strong><span>{error}</span><Button onClick={() => refreshBatches()}>重试</Button></div> : null}
-    {!loading && !error ? <section className="batch-factory-workbench-grid">
+    {!loading && error ? <div className="batch-factory-workbench-home-state is-error"><strong>批量工程暂时无法读取</strong><span>{error}{batches.length ? '，当前仍显示上次读取的数据。' : ''}</span><Button onClick={() => refreshBatches()}>重试</Button></div> : null}
+    {!loading && (!error || batches.length > 0) ? <section className="batch-factory-workbench-grid">
       {batches.map(batch => <button type="button" className="batch-factory-workbench-card" key={batch.id} onClick={() => openBatch(batch.id)}><FileTextOutlined /><strong>{batch.title || '未命名批量'}</strong><span>{bookCount(batch)} 本小说</span><small>{batch.updatedAt || batch.createdAt || '刚刚创建'}</small></button>)}
       {!batches.length ? <div className="batch-factory-workbench-home-state"><FileTextOutlined /><strong>还没有批量工程</strong><span>新建批量后即可进入每本小说的完整生产工作台。</span><Button type="primary" onClick={() => setCreateOpen(true)}>新建批量</Button></div> : null}
     </section> : null}

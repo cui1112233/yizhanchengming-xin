@@ -27,7 +27,7 @@ const SCOPE_OPTIONS = [
   { label: '配音', value: 'tts' },
   { label: '视频生成', value: 'video' }
 ];
-const CONTENT_FEATURES = new Set(['script', 'novel-panel', 'novel-fetch', 'image', 'shuihuo-production']);
+const CONTENT_FEATURES = new Set(['script', 'novel-fetch', 'image', 'shuihuo-production']);
 
 function scopesOf(member) {
   const scopes = Array.isArray(member?.apiScopes) ? member.apiScopes : [];

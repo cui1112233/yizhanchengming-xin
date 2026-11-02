@@ -198,39 +198,30 @@ func (s *Service) CreateJob(ctx context.Context, owner string, input CreateJobIn
 	if existing, err := s.store.FindJobByKey(ctx, owner, key); err == nil {
 		// 同 key 的失败/取消任务允许重试：用新的视频地址重置为排队状态。
 		if existing.State == JobFailed || existing.State == JobCancelled {
-			if targetExecutorID == "" {
-				return JobView{}, ErrExecutorOffline
-			}
 			if requeued, retryErr := s.store.RequeueJob(ctx, existing.ID, record, s.now().UTC()); retryErr == nil {
-				return jobView(requeued), nil
+				return s.jobViewForOwner(ctx, owner, requeued)
 			} else if !errors.Is(retryErr, ErrJobNotFound) {
 				return JobView{}, retryErr
 			}
 		}
-		if existing.State == JobQueued && targetExecutorID == "" {
-			return JobView{}, ErrExecutorOffline
-		}
-		return jobView(existing), nil
+		return s.jobViewForOwner(ctx, owner, existing)
 	} else if err != ErrJobNotFound {
 		return JobView{}, err
-	}
-	if targetExecutorID == "" {
-		return JobView{}, ErrExecutorOffline
 	}
 	if err := s.store.CreateJob(ctx, record); err != nil {
 		if err == ErrJobConflict {
 			if existing, lookupErr := s.store.FindJobByKey(ctx, owner, key); lookupErr == nil {
-				return jobView(existing), nil
+				return s.jobViewForOwner(ctx, owner, existing)
 			}
 		}
 		return JobView{}, err
 	}
-	return jobView(record), nil
+	return s.jobViewForOwner(ctx, owner, record)
 }
 
 // pickTargetExecutor 选择新任务的钉选目标。preferredOS 非空时先在该平台
 // 的在线、未冷却设备里选最新；偏好平台没有能干活的设备才兜底其他平台；
-// 全都不可用时返回空串，由创建/重试入口明确拒绝，避免生成无人领取的排队任务。
+// 全都不可用时返回空串，任务留在公共队列，待执行器恢复后自动领取。
 // preferredOS 为空表示不按偏好过滤（显式 RetryJob 沿用"选最新在线设备"语义）。
 func (s *Service) pickTargetExecutor(ctx context.Context, owner, preferredOS string, now time.Time) (string, error) {
 	executors, err := s.store.ListExecutors(ctx, owner)
@@ -274,22 +265,23 @@ func (s *Service) GetJob(ctx context.Context, owner, id string) (JobView, error)
 	if err != nil {
 		return JobView{}, err
 	}
-	if record.State == JobQueued {
-		availableExecutorID, availabilityErr := s.pickTargetExecutor(ctx, owner, "", s.now().UTC())
-		if availabilityErr != nil {
-			return JobView{}, availabilityErr
-		}
-		if availableExecutorID == "" {
-			record, err = s.store.FailQueuedJob(ctx, owner, record.ID, FailureInput{
-				Code:    "executor_offline",
-				Message: ErrExecutorOffline.Error(),
-			}, s.now().UTC())
-			if err != nil {
-				return JobView{}, err
-			}
-		}
+	return s.jobViewForOwner(ctx, owner, record)
+}
+
+func (s *Service) jobViewForOwner(ctx context.Context, owner string, record JobRecord) (JobView, error) {
+	view := jobView(record)
+	if record.State != JobQueued {
+		return view, nil
 	}
-	return jobView(record), nil
+	availableExecutorID, err := s.pickTargetExecutor(ctx, owner, "", s.now().UTC())
+	if err != nil {
+		return JobView{}, err
+	}
+	if availableExecutorID != "" {
+		return view, nil
+	}
+	view.WaitingForExecutor = true
+	return view, nil
 }
 
 func (s *Service) CancelJob(ctx context.Context, owner, id string) (JobView, error) {
@@ -322,14 +314,11 @@ func (s *Service) RetryJob(ctx context.Context, owner, id string) (JobView, erro
 	if err != nil {
 		return JobView{}, err
 	}
-	if record.TargetExecutorID == "" {
-		return JobView{}, ErrExecutorOffline
-	}
 	requeued, err := s.store.RequeueJob(ctx, record.ID, record, s.now().UTC())
 	if err != nil {
 		return JobView{}, err
 	}
-	return jobView(requeued), nil
+	return s.jobViewForOwner(ctx, owner, requeued)
 }
 
 func (s *Service) Claim(ctx context.Context, token string) (ClaimResult, error) {

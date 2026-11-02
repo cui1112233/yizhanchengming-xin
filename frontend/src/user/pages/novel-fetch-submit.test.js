@@ -10,10 +10,15 @@ test('submission preview is valid only for the same selected tasks', () => {
   assert.equal(submissionPreviewMatches(['book-1'], ['book-1'], null), false);
 });
 
-test('single-version retry payload cannot include adjacent failed versions', () => {
+test('single-version retry keeps the original operation audit id', () => {
   assert.deepEqual(singleVersionRetryPayload({ book_id: 'book-9', version: 'ai3' }), {
     taskIds: ['book-9'],
     versions: ['ai3']
+  });
+  assert.deepEqual(singleVersionRetryPayload({ book_id: 'book-9', version: 'ai3', operation_id: 'op-1' }), {
+    taskIds: ['book-9'],
+    versions: ['ai3'],
+    operationId: 'op-1'
   });
   assert.equal(singleVersionRetryPayload({ bookId: 'book-9' }), null);
 });

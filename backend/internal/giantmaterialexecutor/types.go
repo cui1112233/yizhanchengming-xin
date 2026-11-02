@@ -180,6 +180,7 @@ type JobView struct {
 	ContentRangeLines string        `json:"contentRangeLines,omitempty"`
 	TargetExecutorID  string        `json:"targetExecutorId,omitempty"`
 	State             JobState      `json:"state"`
+	WaitingForExecutor bool          `json:"waitingForExecutor"`
 	CancelRequested   bool          `json:"cancelRequested"`
 	LeaseExecutorID   string        `json:"leaseExecutorId,omitempty"`
 	LeaseGeneration   int64         `json:"leaseGeneration"`

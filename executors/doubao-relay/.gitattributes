@@ -1,0 +1,19 @@
+# Windows runner(actions/checkout + core.autocrlf=true)默认把文本文件检出为 CRLF;
+# 版本号脚本、include_str! 的注入 JS、快照测试等都按 LF 写,这里统一固定 LF。
+# 不用 `* text=auto`:docs/analysis/reference 下有两份原样保留的 CRLF 参考文件。
+*.rs    text eol=lf
+*.toml  text eol=lf
+*.lock  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.sh    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.sql   text eol=lf
+*.ps1   text eol=lf

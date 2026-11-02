@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Spin, message } from 'antd';
 import { CommentaryWorkbench } from './shuihuo/CommentaryWorkbench';
 import { BatchFactoryNovelList } from './shuihuo/BatchFactoryNovelList';
@@ -7,14 +7,17 @@ import { projectLibraryRefreshResult } from './shuihuo/projectLibraryLoadState';
 import { ProjectsView } from './shuihuo/ProjectsView';
 import { AssetsView } from './shuihuo/AssetsView';
 import { confirmSegmentation, createProject, deleteProject, getProductionHealth, getProject, listModels, listProjects, paragraphSegmentation, replaceProjectSource, smartSegmentation } from '../../shared/api/shuihuoProduction';
-import { appendNovelFetchIntake, classifyFetchedBatchMetadata, createBatchFromIntake, createManualIntake, deleteBatchFactoryProject, getBatch, getIntake, listBatchSummaries, startBatchAutomation } from '../../shared/api/batchFactoryV11';
+import { appendNovelFetchIntake, classifyFetchedBatchMetadata, createBatchFromIntake, createManualIntake, deleteBatchFactoryProject, getBatch, getIntake, listBatchSummaries, startBatchAutomation } from '../../shared/api/batchFactory';
 import { BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, novelFetchIntakeBooks, pendingNovelFetchIntakeId } from './shuihuo/batchFactoryNovelFetchHandoff';
+import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus';
+import { batchExecutorKinds } from './shuihuo/batchFactoryLocalExecutor';
 import './shuihuo-production.css';
 
 const modelNames = { text: '文本模型', image: '图片模型', video: '视频模型', audio: '配音模型' };
-function readinessItems(health) {
+function readinessItems(health, executorKinds = [], executorOnline = false) {
   const enabled = new Set(health?.enabledModelKinds || []);
-  return [['数据库', health?.database], ['Redis', health?.redis], ['存储', health?.storage], ...Object.entries(modelNames).map(([kind, name]) => [name, { ready: enabled.has(kind), reason: enabled.has(kind) ? '' : `缺少已启用的${name}` }])];
+  const executorKindSet = new Set(executorKinds);
+  return [['数据库', health?.database], ['Redis', health?.redis], ['存储', health?.storage], ...Object.entries(modelNames).map(([kind, name]) => [name, executorKindSet.has(kind) ? { ready: executorOnline, executor: true, reason: executorOnline ? '一战晟铭执行器在线' : '一战晟铭执行器离线' } : { ready: enabled.has(kind), reason: enabled.has(kind) ? '' : `缺少已启用的${name}` }])];
 }
 
 export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
@@ -33,6 +36,12 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
   const refreshRequestRef = useRef(0);
   const projectsRef = useRef([]);
   const novelFetchHandoffRef = useRef('');
+  const requestedBatchIdRef = useRef(typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('batchId') || ''
+    : '');
+  const requestedBatchId = requestedBatchIdRef.current;
+  const activeBatchExecutorKinds = useMemo(() => batchExecutorKinds(activeBatchProject), [activeBatchProject]);
+  const { status: localExecutorStatus } = useLocalExecutorStatus({ enabled: activeBatchExecutorKinds.length > 0, intervalMs: 5000 });
   projectsRef.current = projects;
 
   useEffect(() => {
@@ -99,21 +108,46 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
   }, []);
   useEffect(() => { refreshProjects(); }, [refreshProjects]);
   useEffect(() => {
+    if (!requestedBatchId || pendingNovelFetchIntakeId(window.location.search)) return undefined;
+    const requestId = projectRequestRef.current + 1;
+    projectRequestRef.current = requestId;
+    getBatch(requestedBatchId).then(result => {
+      if (!mountedRef.current || requestId !== projectRequestRef.current) return;
+      const batch = batchFactoryBatchFromResponse(result);
+      localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
+      setActiveBatchProject(batch);
+      setView('batch-novels');
+    }).catch(error => {
+      if (mountedRef.current && requestId === projectRequestRef.current) {
+        message.error(error.message || '读取批量工程失败');
+      }
+    });
+    return () => {
+      if (requestId === projectRequestRef.current) projectRequestRef.current += 1;
+    };
+  }, [requestedBatchId]);
+  useEffect(() => {
     let active = true;
     getProductionHealth({ silent: true }).then(result => { if (active) { setHealth(result); setHealthError(''); } }).catch(error => { if (active) setHealthError(error.message || '无法读取运行依赖状态'); });
     return () => { active = false; };
   }, []);
 
   const openProject = useCallback(async project => {
+    const requestId = projectRequestRef.current + 1;
+    projectRequestRef.current = requestId;
     try {
       if (isBatchFactoryV11Project(project)) {
         const batch = batchFactoryBatchFromResponse(await getBatch(project.batchId));
+        if (!mountedRef.current || requestId !== projectRequestRef.current) return;
         localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
+        window.history.replaceState({}, '', `/batch-factory?batchId=${encodeURIComponent(batch.id)}`);
         setActiveBatchProject(batch);
         setView('batch-novels');
         return;
       }
-      setActiveProject(await getProject(project.id)); setView('studio');
+      const next = await getProject(project.id);
+      if (!mountedRef.current || requestId !== projectRequestRef.current) return;
+      setActiveProject(next); setView('studio');
     } catch (error) { message.error(error.message || '读取项目工作台失败'); }
   }, []);
 
@@ -168,28 +202,14 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     // 巨量素材弹窗已提前建好 intake（含 N 本占位书）：直接从 intake 建批量。
     // 旧路径 createManualIntake 的 Go 端 ManualIntakeInput 不认识 intakeId，会按空 InputText 解析报错。
     const created = input?.intakeId
-      ? await createBatchFromIntake(input.intakeId, { title: input.title, initialBatchSettings: input.initialBatchSettings, giantAutomation: input.giantAutomation })
+      ? await createBatchFromIntake(input.intakeId, { title: input.title, initialBatchSettings: input.initialBatchSettings, giantAutomationPlan: input.giantAutomationPlan })
       : await createManualIntake(input);
     const batch = created?.batch || created?.data?.batch || created;
     localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
     setActiveBatchProject(batch);
     setView('batch-novels');
     await refreshProjects();
-    if (input?.automationEnabled === true && batch?.id) {
-      try {
-        await startBatchAutomation(batch.id, {
-          scheduledAt: input.scheduledAt || '',
-          presetId: input.presetId || '',
-          runMode: input.runMode || (input.autoPublishEnabled === true ? 'full_submit' : 'video_no_submit'),
-          autoPublish: input.autoPublishEnabled === true,
-          concurrency: input.automationConcurrency
-        });
-        message.success(input.scheduledAt ? `批量工程已创建，服务端自动生产将在设定时间启动${input.autoPublishEnabled ? '，并自动上传视频管理系统' : ''}。` : `批量工程已创建，服务端自动生产已启动；关闭页面不影响执行${input.autoPublishEnabled ? '，完成后将自动上传视频管理系统' : ''}。`);
-      } catch (error) {
-        message.warning(`批量工程已创建，但自动生产启动失败：${error?.message || '请进入工程后手动启动'}`);
-      }
-    }
-    if (batch?.id && input?.automationEnabled !== true) {
+    if (batch?.id) {
       try {
         const result = await classifyFetchedBatchMetadata(batch.id);
         const rows = Array.isArray(result?.results) ? result.results : [];
@@ -202,6 +222,21 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
         await refreshProjects();
       } catch (error) {
         if (mountedRef.current) message.warning(`男女频与风格暂未识别：${error?.message || '可在单书中重试；不影响生产。'}`);
+      }
+    }
+    if (input?.automationEnabled === true && batch?.id) {
+      try {
+        await startBatchAutomation(batch.id, {
+          scheduledAt: input.scheduledAt || '',
+          scheduleMode: input.scheduleMode || 'execute',
+          presetId: input.presetId || '',
+          runMode: input.runMode || (input.autoPublishEnabled === true ? 'full_submit' : 'video_no_submit'),
+          autoPublish: input.autoPublishEnabled === true,
+          concurrency: input.automationConcurrency
+        });
+        message.success(input.scheduledAt ? `批量工程已创建，服务端自动生产将在设定时间启动${input.autoPublishEnabled ? '，并自动上传视频管理系统' : ''}。` : `批量工程已创建，服务端自动生产已启动；关闭页面不影响执行${input.autoPublishEnabled ? '，完成后将自动上传视频管理系统' : ''}。`);
+      } catch (error) {
+        message.warning(`批量工程已创建，但自动生产启动失败：${error?.message || '请进入工程后手动启动'}`);
       }
     }
     if (input?.intakeId && batch?.id) {
@@ -221,7 +256,7 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     if (!intakeId || novelFetchHandoffRef.current === intakeId) return;
     novelFetchHandoffRef.current = intakeId;
     let cancelled = false;
-    const clearHandoffQuery = () => window.history.replaceState({}, '', '/shuihuo-production');
+    const clearHandoffQuery = () => window.history.replaceState({}, '', '/batch-factory');
     const openImportedBatch = async batch => {
       if (cancelled || !batch?.id) return;
       localStorage.setItem(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, batch.id);
@@ -294,11 +329,11 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
   }
 
   return <div className={`shuihuo-production ${view === 'studio' || view === 'batch-novels' ? 'is-workbench' : ''}`}>
-    {view !== 'projects' && health ? <div className="shuihuo-readiness-strip" role="status" aria-live="polite"><strong className="shuihuo-readiness-title">运行依赖</strong>{readinessItems(health).map(([name, dependency]) => <span className={dependency?.ready ? 'ready' : 'missing'} key={name} title={dependency?.reason || `${name}已配置`}>{name}：{dependency?.ready ? '已配置' : '未配置'}{dependency?.ready || !dependency?.reason ? '' : `（${dependency.reason}）`}</span>)}</div> : null}
+    {view !== 'projects' && health ? <div className="shuihuo-readiness-strip" role="status" aria-live="polite"><strong className="shuihuo-readiness-title">运行依赖</strong>{readinessItems(health, activeBatchExecutorKinds, localExecutorStatus.online).map(([name, dependency]) => <span className={`${dependency?.ready ? 'ready' : 'missing'}${dependency?.executor ? ' is-local-executor' : ''}`} key={name} title={dependency?.reason || `${name}已配置`}>{dependency?.executor ? <><i aria-hidden="true" />{name}：一战晟铭执行器{dependency.ready ? '在线' : '离线'}</> : <>{name}：{dependency?.ready ? '已配置' : '未配置'}{dependency?.ready || !dependency?.reason ? '' : `（${dependency.reason}）`}</>}</span>)}</div> : null}
     {view === 'studio' && healthError ? <div className="shuihuo-readiness-strip" role="status" aria-live="polite"><span className="missing">状态读取失败：{healthError}</span></div> : null}
     {loading && view === 'projects' ? <div className="shuihuo-loading"><Spin /></div> : null}
     {!loading && view === 'projects' ? <ProjectsView projects={projects} loadError={projectsLoadError} health={health} onCreate={handleCreate} onImported={handleImported} onCreateBatch={handleCreateBatch} onOpen={openProject} onDelete={handleDelete} onRefresh={refreshProjects} openCreateOnLoad={openBatchOnLoad} /> : null}
-    {view === 'batch-novels' && activeBatchProject ? <BatchFactoryNovelList batch={activeBatchProject} onBack={() => { setActiveBatchProject(null); setView('projects'); refreshProjects(); }} onBatchChanged={async () => { const current = batchFactoryBatchFromResponse(await getBatch(activeBatchProject.id)); setActiveBatchProject(current); await refreshProjects(); }} /> : null}
+    {view === 'batch-novels' && activeBatchProject ? <BatchFactoryNovelList batch={activeBatchProject} onBack={() => { projectRequestRef.current += 1; window.history.replaceState({}, '', '/batch-factory'); setActiveBatchProject(null); setView('projects'); refreshProjects(); }} onBatchChanged={async () => { const current = batchFactoryBatchFromResponse(await getBatch(activeBatchProject.id)); setActiveBatchProject(current); await refreshProjects(); return current; }} /> : null}
     {view === 'studio' && activeProject ? <CommentaryWorkbench data={activeProject} readiness={health} importNotice={importNotice} onBackToProjects={() => { setImportNotice(null); setView('projects'); refreshProjects(); }} onOpenAssets={() => setAssetsOpen(true)} onDataChange={applyReadModel} /> : null}
     <Modal title="人物场景预设" open={assetsOpen} onCancel={() => setAssetsOpen(false)} footer={null} width="min(1360px, calc(100vw - 48px))" className="shuihuo-assets-modal" destroyOnClose={false}>
       {activeProject ? <AssetsView data={activeProject} onRefresh={refreshActive} embedded /> : null}

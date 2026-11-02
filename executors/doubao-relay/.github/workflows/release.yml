@@ -1,0 +1,192 @@
+# 打 tag v* → macOS universal / Windows x64 构建 → 有证书 secrets 时签名(+ macOS 公证)→ GitHub Release。
+# spec 13「release.yml」。不交叉编译,每个平台用自己的 runner。
+#
+# 可选 secrets(缺了就发未签名包,构建照常):
+#   macOS 签名:  APPLE_CERTIFICATE(base64 .p12)、APPLE_CERTIFICATE_PASSWORD、APPLE_SIGNING_IDENTITY
+#   macOS 公证:  APPLE_ID、APPLE_PASSWORD(app 专用密码)、APPLE_TEAM_ID
+#   Windows 签名:WINDOWS_CERTIFICATE(base64 .pfx)、WINDOWS_CERTIFICATE_PASSWORD
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.94.0"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9"
+  TAURI_CLI_VERSION: "^2.12"
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag 必须等于三处版本号
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(bash scripts/bump-version.sh --check "$TAG")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: CHANGELOG 必须有对应段落
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          grep -q "^## \[$VERSION\]" CHANGELOG.md || { echo "CHANGELOG.md 缺少 ## [$VERSION]"; exit 1; }
+
+  build-macos:
+    name: build macOS (universal)
+    needs: verify
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      BUNDLE_DIR: target/universal-apple-darwin/release/bundle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-macos
+      - name: install tauri-cli
+        run: cargo install tauri-cli --version "$TAURI_CLI_VERSION" --locked
+      - name: frontend install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      # 构建时不把签名变量交给 tauri(否则它会自己签一遍);签名统一走 scripts/sign-macos.sh
+      - name: cargo tauri build
+        run: env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD -u APPLE_SIGNING_IDENTITY -u APPLE_ID -u APPLE_PASSWORD -u APPLE_TEAM_ID cargo tauri build --target universal-apple-darwin
+      - name: sign
+        if: env.APPLE_CERTIFICATE != '' && env.APPLE_SIGNING_IDENTITY != ''
+        run: bash scripts/sign-macos.sh "$BUNDLE_DIR"
+      - name: notarize
+        if: env.APPLE_CERTIFICATE != '' && env.APPLE_SIGNING_IDENTITY != '' && env.APPLE_ID != '' && env.APPLE_PASSWORD != '' && env.APPLE_TEAM_ID != ''
+        run: |
+          for dmg in "$BUNDLE_DIR"/dmg/*.dmg; do
+            bash scripts/notarize-macos.sh "$dmg"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+  build-windows:
+    name: build Windows (x64)
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-windows
+      - name: install tauri-cli
+        run: cargo install tauri-cli --version "$env:TAURI_CLI_VERSION" --locked
+      - name: frontend install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: cargo tauri build
+        run: cargo tauri build --target x86_64-pc-windows-msvc
+      - name: sign
+        if: env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        run: ./scripts/sign-windows.ps1 -BundleDir target/x86_64-pc-windows-msvc/release/bundle
+      # 多路径上传时 upload-artifact 以公共祖先(bundle/)为根,下载后会落在 dist/msi/、dist/nsis/ 子目录里,
+      # 被 files: dist/* 漏掉。先拷进一个平铺目录再以单路径上传,产物在 dist/ 顶层。
+      - name: collect installers
+        shell: pwsh
+        run: |
+          $out = 'target/release-assets'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi $out
+          Copy-Item target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe $out
+          Get-ChildItem $out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: target/release-assets/*
+          if-no-files-found: error
+
+  publish:
+    name: GitHub Release
+    needs: [verify, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: 产物齐全(dmg / msi / setup.exe 都在 dist/ 顶层)
+        run: |
+          ls -la dist
+          for pat in '*.dmg' '*.msi' '*-setup.exe'; do
+            compgen -G "dist/$pat" >/dev/null || { echo "dist/ 缺少 $pat"; exit 1; }
+          done
+      - name: release notes(取 CHANGELOG 对应段)
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > release-notes.md
+          cat release-notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: doubao-relay v${{ needs.verify.outputs.version }}
+          body_path: release-notes.md
+          # 每种安装包单独列出:任何一种缺失都会因 fail_on_unmatched_files 而失败,不会只发 DMG
+          files: |
+            dist/*.dmg
+            dist/*.msi
+            dist/*-setup.exe
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true

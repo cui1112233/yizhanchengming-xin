@@ -15,9 +15,13 @@ func recordNovelFetchStyleDecision(meta map[string]any, decision novelfetchworks
 	}
 	style := strings.TrimSpace(decision.Style)
 	if style != "" {
+		if decision.Confidence <= 0 && decision.Source != "ai" {
+			decision.Confidence = 1
+		}
 		meta["style"] = style
 		meta["styleSource"] = decision.Source
 		meta["styleReason"] = decision.Reason
+		meta["styleConfidence"] = decision.Confidence
 		meta["styleStatus"] = "classified"
 		delete(meta, "styleError")
 		return
@@ -32,6 +36,7 @@ func recordNovelFetchStyleDecision(meta map[string]any, decision novelfetchworks
 	meta["styleStatus"] = "failed"
 	meta["styleError"] = reason
 	meta["styleReason"] = reason
+	meta["styleConfidence"] = 0.0
 }
 
 func inferNovelFetchStyleFailure(meta map[string]any) {

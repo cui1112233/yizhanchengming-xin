@@ -9,5 +9,6 @@ export function singleVersionRetryPayload(row = {}) {
   const bookId = row.bookId || row.book_id;
   const version = row.version;
   if (!bookId || !version) return null;
-  return { taskIds: [bookId], versions: [version] };
+  const operationId = String(row.operationId || row.operation_id || '').trim();
+  return operationId ? { taskIds: [bookId], versions: [version], operationId } : { taskIds: [bookId], versions: [version] };
 }

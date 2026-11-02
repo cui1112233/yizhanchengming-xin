@@ -34,120 +34,6 @@ func (s *ScriptHistoryStore) userDir(username string) (string, error) {
 	return filepath.Join(s.Root, username, "outputs"), nil
 }
 
-func validNovelHistoryID(id string) bool {
-	return strings.HasPrefix(id, "hist_") && len(id) > 5 && len(id) <= 90 && !strings.ContainsAny(id, `/\\`)
-}
-
-func (s *ScriptHistoryStore) novelHistoryDir(username string) (string, error) {
-	username = strings.TrimSpace(username)
-	if username == "" || strings.ContainsAny(username, `/\\`) || username == "." || username == ".." {
-		return "", fmt.Errorf("invalid user")
-	}
-	if s == nil || s.Root == "" {
-		return "", fmt.Errorf("history store is not configured")
-	}
-	return filepath.Join(s.Root, username, "novel-panel", "history"), nil
-}
-
-func novelHistoryID() string {
-	return fmt.Sprintf("hist_%s_%d", time.Now().UTC().Format("20060102_150405"), time.Now().UnixNano()%1000000)
-}
-
-func novelHistorySummary(workspace map[string]any) map[string]any {
-	preview := ""
-	for _, key := range []string{"novel_text", "novelText"} {
-		if value, ok := workspace[key].(string); ok && strings.TrimSpace(value) != "" {
-			preview = strings.Join(strings.Fields(value), " ")
-			if len([]rune(preview)) > 60 {
-				preview = string([]rune(preview)[:60])
-			}
-			break
-		}
-	}
-	count := func(key string) int {
-		if values, ok := workspace[key].([]any); ok {
-			return len(values)
-		}
-		return 0
-	}
-	return map[string]any{"source_preview": preview, "character_count": count("characters"), "scene_count": count("scenes"), "shot_count": count("outline_shots"), "duration": 0}
-}
-
-func (s *ScriptHistoryStore) loadNovelHistory(username, id string) (map[string]any, error) {
-	dir, err := s.novelHistoryDir(username)
-	if err != nil {
-		return nil, err
-	}
-	if !validNovelHistoryID(id) {
-		return nil, fmt.Errorf("invalid history id")
-	}
-	raw, err := os.ReadFile(filepath.Join(dir, id+".json"))
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var record map[string]any
-	if json.Unmarshal(raw, &record) != nil {
-		return nil, fmt.Errorf("invalid history record")
-	}
-	return record, nil
-}
-
-func (s *ScriptHistoryStore) listNovelHistory(username string) ([]any, error) {
-	dir, err := s.novelHistoryDir(username)
-	if err != nil {
-		return nil, err
-	}
-	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return []any{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	result := make([]any, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".json")
-		if !validNovelHistoryID(id) {
-			continue
-		}
-		record, readErr := s.loadNovelHistory(username, id)
-		if readErr == nil && record != nil {
-			delete(record, "workspace")
-			result = append(result, record)
-		}
-	}
-	return result, nil
-}
-
-func (s *ScriptHistoryStore) saveNovelHistory(username string, record map[string]any) error {
-	dir, err := s.novelHistoryDir(username)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	id, _ := record["history_id"].(string)
-	if !validNovelHistoryID(id) {
-		return fmt.Errorf("invalid history id")
-	}
-	raw, err := json.MarshalIndent(record, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := filepath.Join(dir, id+".json.tmp")
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, filepath.Join(dir, id+".json"))
-}
-
 func validScriptHistoryID(id string) bool {
 	return id != "" && id != "." && id != ".." && !strings.ContainsAny(id, `/\\`)
 }
@@ -244,26 +130,10 @@ func RegisterScriptHistoryRoutes(root *http.ServeMux, auth BridgeAuth, store *Sc
 		}
 		id := req.PathValue("id")
 		if req.Method == http.MethodGet && id == "" {
-			if history, historyErr := store.listNovelHistory(identity.Username); historyErr == nil {
-				data["history"] = history
-			}
 			writeJSON(w, http.StatusOK, data)
 			return
 		}
 		if req.Method == http.MethodGet {
-			if validNovelHistoryID(id) {
-				record, readErr := store.loadNovelHistory(identity.Username, id)
-				if readErr != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "history unavailable"})
-					return
-				}
-				if record == nil {
-					writeJSON(w, http.StatusNotFound, map[string]string{"error": "record not found"})
-					return
-				}
-				writeJSON(w, http.StatusOK, map[string]any{"record": record})
-				return
-			}
 			if !validScriptHistoryID(id) {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 				return
@@ -286,19 +156,6 @@ func RegisterScriptHistoryRoutes(root *http.ServeMux, auth BridgeAuth, store *Sc
 			var input map[string]any
 			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<20)).Decode(&input) != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
-				return
-			}
-			if workspace, ok := input["workspace"].(map[string]any); ok {
-				now := time.Now().UTC().Format(time.RFC3339Nano)
-				record := map[string]any{"schema": "v77_history_v1", "history_id": novelHistoryID(), "note": strings.TrimSpace(fmt.Sprint(input["note"])), "created_at": now, "updated_at": now, "summary": novelHistorySummary(workspace), "workspace": workspace}
-				if revision, exists := input["instruction_revision"]; exists {
-					record["instruction_revision"] = revision
-				}
-				if err := store.saveNovelHistory(identity.Username, record); err != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save failed"})
-					return
-				}
-				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "record": record})
 				return
 			}
 			value, _ := input["id"].(string)
@@ -333,36 +190,6 @@ func RegisterScriptHistoryRoutes(root *http.ServeMux, auth BridgeAuth, store *Sc
 			return
 		}
 		if req.Method == http.MethodPatch {
-			if validNovelHistoryID(id) && strings.HasSuffix(req.URL.Path, "/note") {
-				id = strings.TrimSuffix(id, "/note")
-			}
-			if validNovelHistoryID(id) {
-				var patch map[string]any
-				if json.NewDecoder(req.Body).Decode(&patch) != nil {
-					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
-					return
-				}
-				record, readErr := store.loadNovelHistory(identity.Username, id)
-				if readErr != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "history unavailable"})
-					return
-				}
-				if record == nil {
-					writeJSON(w, http.StatusNotFound, map[string]string{"error": "record not found"})
-					return
-				}
-				if note, ok := patch["note"]; ok {
-					record["note"] = strings.TrimSpace(fmt.Sprint(note))
-					record["note_updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
-				}
-				record["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
-				if err := store.saveNovelHistory(identity.Username, record); err != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save failed"})
-					return
-				}
-				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "record": record})
-				return
-			}
 			if !validScriptHistoryID(id) {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 				return
@@ -390,59 +217,7 @@ func RegisterScriptHistoryRoutes(root *http.ServeMux, auth BridgeAuth, store *Sc
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "entry": entry})
 			return
 		}
-		if req.Method == http.MethodPut && validNovelHistoryID(id) {
-			var input map[string]any
-			if json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<20)).Decode(&input) != nil {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
-				return
-			}
-			workspace, ok := input["workspace"].(map[string]any)
-			if !ok {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "workspace is required"})
-				return
-			}
-			record, readErr := store.loadNovelHistory(identity.Username, id)
-			if readErr != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "history unavailable"})
-				return
-			}
-			if record == nil {
-				writeJSON(w, http.StatusNotFound, map[string]string{"error": "record not found"})
-				return
-			}
-			record["workspace"] = workspace
-			record["summary"] = novelHistorySummary(workspace)
-			record["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
-			if note, exists := input["note"]; exists {
-				record["note"] = strings.TrimSpace(fmt.Sprint(note))
-			}
-			if revision, exists := input["instruction_revision"]; exists {
-				record["instruction_revision"] = revision
-			}
-			if err := store.saveNovelHistory(identity.Username, record); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save failed"})
-				return
-			}
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "record": record})
-			return
-		}
 		if req.Method == http.MethodDelete {
-			if validNovelHistoryID(id) {
-				dir, dirErr := store.novelHistoryDir(identity.Username)
-				if dirErr != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "history unavailable"})
-					return
-				}
-				if err := os.Remove(filepath.Join(dir, id+".json")); os.IsNotExist(err) {
-					writeJSON(w, http.StatusNotFound, map[string]string{"error": "record not found"})
-					return
-				} else if err != nil {
-					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "delete failed"})
-					return
-				}
-				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "history_id": id})
-				return
-			}
 			if id == "" {
 				data["entries"] = []any{}
 				_ = saveScriptHistory(dir, data)
@@ -484,29 +259,6 @@ func RegisterScriptHistoryRoutes(root *http.ServeMux, auth BridgeAuth, store *Sc
 	root.Handle("PUT /api/history/{id}", handler)
 	root.Handle("DELETE /api/history", handler)
 	root.Handle("DELETE /api/history/{id}", handler)
-	for _, item := range []struct{ method, pattern, target string }{
-		{http.MethodGet, "/api/novel-panel/history", "/api/history"},
-		{http.MethodGet, "/api/novel-panel/history/{id}", "/api/history/{id}"},
-		{http.MethodPost, "/api/novel-panel/history", "/api/history"},
-		{http.MethodPatch, "/api/novel-panel/history/{id}", "/api/history/{id}"},
-		{http.MethodPatch, "/api/novel-panel/history/{id}/note", "/api/history/{id}/note"},
-		{http.MethodPut, "/api/novel-panel/history/{id}", "/api/history/{id}"},
-		{http.MethodDelete, "/api/novel-panel/history", "/api/history"},
-		{http.MethodDelete, "/api/novel-panel/history/{id}", "/api/history/{id}"},
-	} {
-		root.Handle(item.method+" "+item.pattern, historyAliasHandler(handler, item.target))
-	}
-}
-
-func historyAliasHandler(handler http.Handler, target string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		clone := req.Clone(req.Context())
-		urlCopy := *req.URL
-		urlCopy.Path = strings.Replace(urlCopy.Path, "/api/novel-panel/history", "/api/history", 1)
-		urlCopy.RawPath = ""
-		clone.URL = &urlCopy
-		handler.ServeHTTP(w, clone)
-	})
 }
 
 func findHistoryEntry(data map[string]any, id string) map[string]any {

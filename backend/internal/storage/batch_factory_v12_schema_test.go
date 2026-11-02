@@ -52,10 +52,10 @@ func TestV12H3KernelSchemaPersistsTimelineCompilationAndProductionTrace(t *testi
 
 func TestV12MigrationsRegisterH3KernelAfterUpgradeAudit(t *testing.T) {
 	migrations := V12Migrations()
-	if len(migrations) != 4 {
+	if len(migrations) != 5 {
 		t.Fatalf("V12 migration count=%d, want 4: %+v", len(migrations), migrations)
 	}
-	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 {
+	if migrations[0].Version != 1200101 || migrations[1].Version != 1200102 || migrations[2].Version != 1200103 || migrations[3].Version != 1200104 || migrations[4].Version != 1200105 {
 		t.Fatalf("V12 migration order=%+v", migrations)
 	}
 }

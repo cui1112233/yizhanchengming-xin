@@ -14,14 +14,17 @@ import (
 	"time"
 
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 type AgentAudioServices struct {
 	Projects   agentworkspace.Store
+	Catalog    novelfetchworkshop.Store
 	Assets     agentworkspace.AssetStore
 	Objects    agentworkspace.AssetObjectStore
 	Generator  agentworkspace.AudioGenerator
 	Processor  agentworkspace.AudioProcessor
+	Waveform   agentAudioWaveform
 	QueueAudio bool
 	Now        func() time.Time
 }
@@ -95,12 +98,22 @@ func RegisterAgentAudioJobRoutes(root *http.ServeMux, middleware BridgeAuth, ser
 		} else if provider == "" {
 			provider = "personal_api"
 		}
+		capability, err := resolveAgentCanvasInputCapability(req.Context(), services.Catalog, owner, "audio", provider, modelID)
+		if err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+			return
+		}
+		resolvedInputs, err := agentResolvedCanvasInputSnapshotWithCapability(project.Canvas, node.ID, input.Prompt, compactAudioReferences(input.SourceAssetID), capability)
+		if err != nil {
+			writeAgentCanvasInputError(w, err)
+			return
+		}
 		now := services.Now().UTC()
 		requestedTaskID := newAgentID("generation")
 		task, err := services.Projects.CreateGenerationTask(req.Context(), owner, agentworkspace.CreateGenerationTaskInput{
 			ID: requestedTaskID, ProjectID: projectID, NodeID: node.ID, NodeVersion: node.Version,
 			Kind: "audio", Provider: provider, ModelID: modelID, Mode: string(input.Operation),
-			Settings:          map[string]any{"parameters": input.Settings, "advanced": input.Advanced, "sourceAssetId": input.SourceAssetID, "prompt": input.Prompt},
+			Settings:          map[string]any{"parameters": input.Settings, "advanced": input.Advanced, "sourceAssetId": input.SourceAssetID, "prompt": input.Prompt, "resolvedInputs": resolvedInputs},
 			ReferenceAssetIDs: compactAudioReferences(input.SourceAssetID), IdempotencyKey: request.IdempotencyKey, Now: now,
 		})
 		if err != nil {
@@ -139,6 +152,45 @@ func RegisterAgentAudioJobRoutes(root *http.ServeMux, middleware BridgeAuth, ser
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"task": awaiting, "assets": assets})
+	})))
+	root.Handle("GET /api/agent/tasks/{id}/audio-assets/{assetId}/waveform", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		identity, ok := BridgeIdentityFromContext(req.Context())
+		if !ok || strings.TrimSpace(identity.Username) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if services.Waveform == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "音频波形服务尚未配置"})
+			return
+		}
+		owner := strings.TrimSpace(identity.Username)
+		projectID := strings.TrimSpace(req.PathValue("id"))
+		asset, err := services.Assets.Asset(req.Context(), owner, projectID, strings.TrimSpace(req.PathValue("assetId")))
+		if err != nil {
+			writeAgentStoreError(w, err)
+			return
+		}
+		if asset.Kind != "audio" || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(asset.ContentType)), "audio/") {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "仅支持音频素材波形预览"})
+			return
+		}
+		body, err := services.Objects.Open(req.Context(), asset)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "音频素材读取失败"})
+			return
+		}
+		defer body.Close()
+		contents, err := io.ReadAll(io.LimitReader(body, agentAssetUploadMaxBytes+1))
+		if err != nil || len(contents) == 0 || len(contents) > agentAssetUploadMaxBytes {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "音频素材读取失败"})
+			return
+		}
+		summary, err := services.Waveform.Summary(req.Context(), asset, contents)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "音频波形解析失败"})
+			return
+		}
+		writeJSON(w, http.StatusOK, summary)
 	})))
 }
 

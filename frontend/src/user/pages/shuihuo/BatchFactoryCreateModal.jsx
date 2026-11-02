@@ -392,7 +392,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
         runMode: automationRunMode,
         automationConcurrency: normalizeAutomationConcurrency(automationConcurrency),
         initialBatchSettings: clone(initialBatchSettings),
-        giantAutomation: selectedPreset ? {
+        giantAutomationPlan: selectedPreset ? {
           presetId: selectedPreset.id,
           expectedPresetVersion: selectedPreset.version,
           runMode: automationRunMode,
@@ -404,6 +404,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       const batchId = batch?.id;
       if (!batchId) throw new Error('GIANT_MATERIAL_INTAKE_FAILED');
       let queued = 0;
+      let hasDirectReadFailure = false;
       for (const entry of selected) {
         try {
           if (giantOriginalReadStrategy === 'direct_first') {
@@ -433,9 +434,10 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
                   },
                   expectedRevision: Number(refreshedBook.revision || 0)
                 });
-                try { await classifyBookPublishMetadata(batchId, refreshedBook.id, { force: true }); } catch (_) { /* 分类可在工作区单独重试 */ }
+                try { await classifyBookPublishMetadata(batchId, refreshedBook.id, { force: false }); } catch (_) { /* 分类可在工作区单独重试 */ }
               }
             } catch (directFetchError) {
+              hasDirectReadFailure = true;
               const directReadError = normalizedError(directFetchError, '书城获取原文失败');
               const refreshedResponse = await getBatch(batchId);
               const refreshedBatch = refreshedResponse?.batch || refreshedResponse?.data?.batch || refreshedResponse?.data || refreshedResponse;
@@ -446,7 +448,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
                     ...(refreshedBook.sourceMetadata || {}),
                     originalReadStage: 'failed',
                     originalReadError: directReadError,
-                    contentPending: true,
+                    contentPending: false,
                     giantAutomationPlan
                   },
                   expectedRevision: Number(refreshedBook.revision || 0)
@@ -506,7 +508,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       }
       // 自动化只在整批素材的正文读取已全部派发后启动一次。引擎会把仍在直取或 OCR
       // 的书保持在“等待正文读取”，而不是把每条 ID 的成功回调都当成一条新生产任务。
-      if (giantAutomationPlan?.presetId) {
+      if (giantAutomationPlan?.presetId && !hasDirectReadFailure) {
         try {
           await startBatchAutomation(batchId, giantAutomationPlan);
         } catch (automationError) {
@@ -514,6 +516,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           console.warn('巨量书城读取已派发，但自动制作未启动', batchId, automationError);
           message.warning(`正文读取已派发；自动生产请在工作区重试：${normalizedError(automationError, '启动失败')}`);
         }
+      } else if (hasDirectReadFailure && giantAutomationPlan?.presetId) {
+        message.warning('部分书城原文获取失败，自动生产未启动；请在工作区手动重试直取或选择 OCR。');
       }
       if (queued || giantOriginalReadStrategy === 'direct_first') {
         try { await onBatchUpdated?.(batchId); } catch (refreshError) { console.warn('巨量读取任务已派发，但工作区刷新失败', refreshError); }

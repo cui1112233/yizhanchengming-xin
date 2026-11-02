@@ -47,6 +47,65 @@ test('runtime summary uses one non-cached batch endpoint', async t => {
   assert.equal(calls[0].options.cache, 'no-store');
 });
 
+test('book deletion uses the persisted production retention window', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    if (path === '/api/config') {
+      return new Response(JSON.stringify({ productionRetentionDays: 14 }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response(null, { status: 204 });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.deleteBatchFactoryBook('batch 1', 'book/1');
+
+  assert.deepEqual(calls.map(call => call.path), [
+    '/api/config',
+    '/api/batch-factory/v12/batches/batch%201/books/book%2F1?retentionDays=14'
+  ]);
+});
+
+test('project deletion uses the persisted production retention window', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    if (path === '/api/config') {
+      return new Response(JSON.stringify({ productionRetentionDays: 30 }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return new Response(null, { status: 204 });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.deleteBatchFactoryProject('batch 1');
+
+  assert.deepEqual(calls.map(call => call.path), [
+    '/api/config',
+    '/api/batch-factory/v12/batches/batch%201?retentionDays=30'
+  ]);
+});
+
+test('deletion stops when the retention setting cannot be read', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ error: '设置读取失败' }), { status: 500, headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await assert.rejects(() => batchFactoryV11.deleteBatchFactoryProject('batch 1'), /设置读取失败/);
+  assert.deepEqual(calls.map(call => call.path), ['/api/config']);
+});
+
 test('scope paths address batch, book and VIDEO overrides without legacy routes', () => {
 	assert.equal(bf11ScopePath({ scope: 'batch', batchId: 'b 1' }), '/api/batch-factory/v12/batches/b%201/settings');
 	assert.equal(bf11ScopePath({ scope: 'book', batchId: 'b1', bookId: 'k/1' }), '/api/batch-factory/v12/batches/b1/books/k%2F1/override');
@@ -58,6 +117,84 @@ test('source updates use the book-owned V11 route', () => {
   assert.match(String(batchFactoryV11.updateBookSource), /books\/\$\{id\(bookId\)\}\/source/);
 });
 
+test('comic page client uses book-owned V12 routes', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ pages: [], collections: [], image: {}, collection: {} }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.listComicPages('batch 1', 'book/1');
+  await batchFactoryV11.generateComicPage('batch 1', 'book/1', 'video?1', { imagePrompt: '完整漫画页' });
+  await batchFactoryV11.generateComicBook('batch 1', 'book/1');
+  await batchFactoryV11.setPrimaryComicPageImage('batch 1', 'book/1', 'page#1', 'image/1');
+	await batchFactoryV11.setComicPageReferenceImages('batch 1', 'book/1', 'video?1', ['ref-a']);
+	await batchFactoryV11.applyComicPageReferenceImages('batch 1', 'book/1', 'video?1');
+  await batchFactoryV11.createComicCollection('batch 1', 'book/1');
+  await batchFactoryV11.listComicCollections('batch 1', 'book/1');
+	await batchFactoryV11.getComicCollectionPublishRecord('batch 1', 'book/1', 'collection#1');
+	await batchFactoryV11.getN8ComicPublishStatus();
+	await batchFactoryV11.searchN8ComicWorks('小妾造反后');
+	await batchFactoryV11.publishComicCollection('batch 1', 'book/1', 'collection#1', { producerAdminName: '崔家铭', audioCategoryId: 3, workIds: [2001] });
+
+  assert.deepEqual(calls.map(call => [call.path, call.options.method || 'GET']), [
+    ['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-pages', 'GET'],
+    ['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-pages/video%3F1/generate', 'POST'],
+    ['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-collections/generate', 'POST'],
+    ['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-pages/page%231/images/image%2F1/primary', 'PUT'],
+		['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-pages/video%3F1/reference-images', 'PUT'],
+		['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-pages/video%3F1/reference-images/apply-to-all', 'POST'],
+		['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-collections', 'POST'],
+		['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-collections', 'GET'],
+		['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-collections/collection%231/publish', 'GET'],
+		['/api/batch-factory/v12/comic-publish/status', 'GET'],
+		['/api/batch-factory/v12/comic-publish/works?query=%E5%B0%8F%E5%A6%BE%E9%80%A0%E5%8F%8D%E5%90%8E', 'GET'],
+		['/api/batch-factory/v12/batches/batch%201/books/book%2F1/comic-collections/collection%231/publish', 'POST']
+	]);
+  assert.deepEqual(JSON.parse(calls[1].options.body), { imagePrompt: '完整漫画页' });
+  assert.deepEqual(JSON.parse(calls[4].options.body), { referenceImageUrls: ['ref-a'] });
+	assert.deepEqual(JSON.parse(calls[11].options.body), { producerAdminName: '崔家铭', audioCategoryId: 3, workIds: [2001] });
+});
+
+test('director prompt candidate requests use the public V12 HTTP contract', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ candidate: { id: 'candidate-1' }, video: { id: 'video?1' }, cancelled: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.createDirectorPromptCandidate('batch 1', 'book/1', '7');
+  await batchFactoryV11.getDirectorPromptCandidate('batch 1', 'book/1');
+  await batchFactoryV11.acceptDirectorPromptCandidate('batch 1', 'book/1', 'video?1', 'candidate-1', '8');
+  await batchFactoryV11.cancelDirectorPromptCandidate('batch 1', 'book/1', '9');
+
+  assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/director-prompt-candidate');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { expectedRevision: 7 });
+  assert.equal(calls[1].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/director-prompt-candidate');
+  assert.equal(calls[1].options.method || 'GET', 'GET');
+  assert.equal(calls[2].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/videos/video%3F1/director-prompt-candidate/accept');
+  assert.equal(calls[2].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[2].options.body), { candidateId: 'candidate-1', expectedRevision: 8 });
+  assert.equal(calls[3].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/director-prompt-candidate');
+  assert.equal(calls[3].options.method, 'DELETE');
+  assert.deepEqual(JSON.parse(calls[3].options.body), { expectedRevision: 9 });
+});
+
 test('per-book merge client never falls back to legacy batch merge routes', () => {
   assert.equal(typeof batchFactoryV11.submitBookMerge, 'function');
   assert.equal(typeof batchFactoryV11.getBookMergeStatus, 'function');
@@ -67,7 +204,7 @@ test('per-book merge client never falls back to legacy batch merge routes', () =
 });
 
 test('unsupported scope fails instead of falling back to a legacy API', () => {
-  assert.throws(() => bf11ScopePath({ scope: 'project', batchId: 'b1' }), /Unsupported V11 scope/);
+  assert.throws(() => bf11ScopePath({ scope: 'project', batchId: 'b1' }), /Unsupported batch factory scope/);
 });
 
 test('submitBookMerge sends the complete payload to the encoded V12 book merge route', async t => {
@@ -146,10 +283,14 @@ test('batch factory direct fetch uses its native V12 endpoint', async t => {
   t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
 
   await batchFactoryV11.fetchDirectOriginals({ platform: '15', bookIds: ['2084012035524801698'], maxTxt: 4000 });
-  assert.equal(calls[0].path, '/api/batch-factory/v12/fetch-originals');
+  assert.match(calls[0].path, /^\/api\/batch-factory\/v12\/fetch-originals\?/);
+  const requestURL = new URL(calls[0].path, 'http://qiantie.local');
+  assert.equal(requestURL.searchParams.get('platform'), '15');
+  assert.equal(requestURL.searchParams.get('maxTxt'), '4000');
+  assert.deepEqual(requestURL.searchParams.getAll('bookId'), ['2084012035524801698']);
   assert.equal(calls[0].options.method, 'POST');
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    platform: '15',
+    platform: 15,
     bookIds: ['2084012035524801698'],
     maxTxt: 4000
   });
@@ -183,6 +324,28 @@ test('a legacy empty book can fetch and persist its own original through V12', a
   await batchFactoryV11.fetchBookOriginal('batch 1', 'book/1');
   assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/fetch-original');
   assert.equal(calls[0].options.method, 'POST');
+});
+
+test('book audio planning uses the V12 book-owned route without creating a merge', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem() { return 'contract-test-token'; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ audioArtifactId: 'tts-1', durationSeconds: 7.5 }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  await batchFactoryV11.createBookAudioPlan('batch 1', 'book/1', { requestId: 'canvas-audio-1' });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].path, '/api/batch-factory/v12/batches/batch%201/books/book%2F1/audio-plan');
+  assert.equal(calls[0].options.method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { requestId: 'canvas-audio-1' });
 });
 
 test('single-book fetch forwards the selected content limit and platform', async t => {
@@ -290,6 +453,34 @@ test('merge-cover blob helper refuses external URLs so the app bearer token is n
   await assert.rejects(
     () => batchFactoryV11.getBatchFactoryMergeCoverBlob('https://media.example/cover.jpg'),
     /merge cover/i
+  );
+});
+
+test('private book asset images are fetched as authenticated blobs instead of native image requests', async t => {
+  assert.equal(typeof batchFactoryV11.getBookAssetImageBlob, 'function');
+
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.localStorage = { getItem(key) { return key === 'auth_token' ? 'contract-test-token' : ''; }, setItem() {}, removeItem() {} };
+  globalThis.fetch = async (path, options = {}) => {
+    calls.push({ path, headers: new Headers(options.headers || {}), options });
+    return new Response(new Blob(['contract-png'], { type: 'image/png' }), { status: 200, headers: { 'content-type': 'image/png' } });
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  const path = '/api/batch-factory/v12/batches/batch_1/books/book_1/assets/asset_1/images/image_1/content';
+  const blob = await batchFactoryV11.getBookAssetImageBlob(path);
+  assert.equal(blob.type, 'image/png');
+  assert.equal(calls[0].path, path);
+  assert.equal(calls[0].headers.get('authorization'), 'Bearer contract-test-token');
+  assert.equal(calls[0].options.silent, true);
+});
+
+test('book asset image blob helper refuses external URLs so the app bearer token cannot leak', async () => {
+  await assert.rejects(
+    () => batchFactoryV11.getBookAssetImageBlob('https://media.example/private.png'),
+    /book asset image/i
   );
 });
 

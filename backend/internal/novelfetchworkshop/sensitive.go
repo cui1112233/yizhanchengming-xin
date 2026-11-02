@@ -2,6 +2,7 @@ package novelfetchworkshop
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -357,19 +358,43 @@ func ApplySensitiveRules(text string, settings map[string]any) (string, int) {
 // The detail records are used by the task detail page and are safe to persist
 // without exposing the untouched raw document.
 func ApplySensitiveRulesWithDetails(text string, settings map[string]any) (string, int, []map[string]any) {
+	return ApplySensitiveRulesForScopeWithDetails(text, settings, "both")
+}
+
+// ApplySensitiveRulesForScopeWithDetails expands the current grouped rule
+// format and honors each group's original/AI switches.
+func ApplySensitiveRulesForScopeWithDetails(text string, settings map[string]any, scope string) (string, int, []map[string]any) {
 	if text == "" || settings == nil {
 		return text, 0, []map[string]any{}
 	}
 	rules := make([]any, 0)
-	collectSensitiveRules(settings, &rules)
+	collectSensitiveRulesForScope(settings, &rules, strings.ToLower(strings.TrimSpace(scope)))
+	// Prefer the most specific phrase when a catalog contains both a phrase
+	// and one of its shorter words (for example "侵犯" and "犯"). This keeps
+	// the intended phrase from being damaged by an earlier short replacement.
+	sort.SliceStable(rules, func(i, j int) bool {
+		left, _, _ := sensitiveRule(rules[i])
+		right, _, _ := sensitiveRule(rules[j])
+		return len([]rune(left)) > len([]rune(right))
+	})
 	result := text
 	changes := 0
 	items := make([]map[string]any, 0)
+	seenRules := make(map[string]struct{}, len(rules))
 	for _, raw := range rules {
 		find, replace, enabled := sensitiveRule(raw)
 		if !enabled || find == "" || find == replace {
 			continue
 		}
+		// Settings are exposed through several legacy-compatible mirror paths.
+		// A rule can therefore be collected more than once; applying the same
+		// replacement again would expand replacements such as "执法" ->
+		// "执法人员" into "执法人员人员".
+		ruleKey := find + "\x00" + replace + "\x00" + strings.ToLower(strings.TrimSpace(scope))
+		if _, exists := seenRules[ruleKey]; exists {
+			continue
+		}
+		seenRules[ruleKey] = struct{}{}
 		// Scan a stable snapshot once. Repeatedly searching the mutated result
 		// can loop forever when a replacement contains the original find text
 		// (for example, find="A", replace="A说明").
@@ -387,10 +412,14 @@ func ApplySensitiveRulesWithDetails(text string, settings map[string]any) (strin
 			before := sensitiveLine(source, index)
 			builder.WriteString(replace)
 			after := strings.Replace(before, find, replace, 1)
+			start := len([]rune(source[:index])) + 1
+			end := start + len([]rune(find)) - 1
 			changes++
 			items = append(items, map[string]any{
 				"hit_index": len(items) + 1,
 				"keyword":   find,
+				"start":     start,
+				"end":       end,
 				"before":    before,
 				"after":     after,
 				"status":    "done",
@@ -415,36 +444,67 @@ func sensitiveLine(text string, index int) string {
 	return text[start:end]
 }
 
-func collectSensitiveRules(value any, out *[]any) {
+func collectSensitiveRulesForScope(value any, out *[]any, scope string) {
 	switch typed := value.(type) {
 	case map[string]any:
-		for _, key := range []string{"sensitive_rules", "sensitiveRules", "rules"} {
-			if raw, ok := typed[key]; ok {
-				if key == "rules" {
-					// Only groups under a sensitive section are meaningful; plain
-					// knowledge item rules are handled by their own features.
-					if _, hasSensitive := typed["groups"]; !hasSensitive {
-						continue
-					}
+		if groups, ok := typed["groups"]; ok {
+			for _, rawGroup := range anySlice(groups) {
+				group, ok := rawGroup.(map[string]any)
+				if !ok || (group["enabled"] != nil && !boolValue(group["enabled"])) {
+					continue
 				}
-				collectSensitiveRules(raw, out)
+				if scope == "original" && group["apply_to_original"] != nil && !boolValue(group["apply_to_original"]) {
+					continue
+				}
+				if scope == "ai" && group["apply_to_ai"] != nil && !boolValue(group["apply_to_ai"]) {
+					continue
+				}
+				for _, rule := range anySlice(group["rules"]) {
+					*out = append(*out, rule)
+				}
 			}
 		}
-		if groups, ok := typed["groups"]; ok {
-			collectSensitiveRules(groups, out)
+		for _, key := range []string{"sensitive_rules", "sensitiveRules"} {
+			if raw, ok := typed[key]; ok {
+				for _, rule := range anySlice(raw) {
+					*out = append(*out, rule)
+				}
+			}
 		}
 		for _, key := range []string{"knowledge", "app_config", "appConfig", "layout_rules", "layout", "sensitive"} {
 			if nested, ok := typed[key]; ok {
-				collectSensitiveRules(nested, out)
+				collectSensitiveRulesForScope(nested, out, scope)
 			}
 		}
 	case []any:
-		*out = append(*out, typed...)
+		for _, item := range typed {
+			if nested, ok := item.(map[string]any); ok {
+				if _, hasGroups := nested["groups"]; hasGroups {
+					collectSensitiveRulesForScope(nested, out, scope)
+					continue
+				}
+			}
+			*out = append(*out, item)
+		}
 	case []map[string]any:
 		for _, item := range typed {
 			*out = append(*out, item)
 		}
 	}
+}
+
+func anySlice(value any) []any {
+	if values, ok := value.([]any); ok {
+		return values
+	}
+	if values, ok := value.([]map[string]any); ok {
+		result := make([]any, 0, len(values))
+		for _, item := range values {
+			result = append(result, item)
+		}
+		return result
+	}
+	return nil
 }
 
 func sensitiveRule(raw any) (string, string, bool) {

@@ -2,6 +2,7 @@ package batchfactoryv11
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 	input.AspectRatio = strings.TrimSpace(input.AspectRatio)
 	input.Status = strings.TrimSpace(input.Status)
 	input.SnapshotHash = strings.TrimSpace(input.SnapshotHash)
+	input.ReferenceImageURLs = normalizeComicReferenceURLs(input.ReferenceImageURLs)
 	if input.ComicPrompt == "" || input.ImagePrompt == "" {
 		return UpsertComicPageInput{}, ErrInvalid
 	}
@@ -26,6 +28,20 @@ func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, 
 	return input, nil
 }
 
+func normalizeComicReferenceURLs(urls []string) []string {
+	result := make([]string, 0, len(urls))
+	seen := make(map[string]bool, len(urls))
+	for _, url := range urls {
+		url = strings.TrimSpace(url)
+		if url == "" || seen[url] {
+			continue
+		}
+		seen[url] = true
+		result = append(result, url)
+	}
+	return result
+}
+
 func normalizeComicPageImageInput(input CreateComicPageImageInput) (CreateComicPageImageInput, error) {
 	valid, err := validBookAssetImageInput(CreateBookAssetImageInput(input))
 	if err != nil {
@@ -36,6 +52,7 @@ func normalizeComicPageImageInput(input CreateComicPageImageInput) (CreateComicP
 
 func cloneComicPage(page ComicPage) ComicPage {
 	page.Images = append([]ComicPageImage(nil), page.Images...)
+	page.ReferenceImageURLs = append([]string(nil), page.ReferenceImageURLs...)
 	return page
 }
 
@@ -83,15 +100,68 @@ func (s *MemoryStore) UpsertComicPage(_ context.Context, owner, batchID, bookID,
 		if entry.Owner == owner && entry.Value.BatchID == batchID && entry.Value.BookID == bookID && entry.Value.VideoID == videoID {
 			page := entry.Value
 			page.ComicPrompt, page.ImagePrompt, page.ModelID = input.ComicPrompt, input.ImagePrompt, input.ModelID
-			page.AspectRatio, page.Status, page.SnapshotHash, page.UpdatedAt, page.Revision = input.AspectRatio, input.Status, input.SnapshotHash, now, page.Revision+1
+			page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt, page.Revision = input.AspectRatio, input.Status, input.SnapshotHash, input.ReferenceImageURLs, now, page.Revision+1
 			s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 			return cloneComicPage(page), nil
 		}
 	}
 	s.seq++
-	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID, AspectRatio: input.AspectRatio, Status: input.Status, SnapshotHash: input.SnapshotHash, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID, AspectRatio: input.AspectRatio, Status: input.Status, SnapshotHash: input.SnapshotHash, ReferenceImageURLs: input.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.comicPages[page.ID] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 	return cloneComicPage(page), nil
+}
+
+func (s *MemoryStore) SetComicPageReferenceImages(_ context.Context, owner, batchID, bookID, videoID string, urls []string) (ComicPage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.ownedBookLocked(owner, batchID, bookID); err != nil {
+		return ComicPage{}, err
+	}
+	for id, entry := range s.comicPages {
+		page := entry.Value
+		if entry.Owner != owner || page.BatchID != batchID || page.BookID != bookID || page.VideoID != videoID {
+			continue
+		}
+		page.ReferenceImageURLs = normalizeComicReferenceURLs(urls)
+		page.Revision++
+		page.UpdatedAt = time.Now().UTC()
+		s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
+		return cloneComicPage(page), nil
+	}
+	return ComicPage{}, ErrNotFound
+}
+
+func (s *MemoryStore) ApplyComicPageReferenceImages(_ context.Context, owner, batchID, bookID, sourceVideoID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.ownedBookLocked(owner, batchID, bookID); err != nil {
+		return 0, err
+	}
+	var source ComicPage
+	found := false
+	for _, entry := range s.comicPages {
+		page := entry.Value
+		if entry.Owner == owner && page.BatchID == batchID && page.BookID == bookID && page.VideoID == sourceVideoID {
+			source, found = page, true
+			break
+		}
+	}
+	if !found {
+		return 0, ErrNotFound
+	}
+	now, updated := time.Now().UTC(), 0
+	for id, entry := range s.comicPages {
+		page := entry.Value
+		if entry.Owner != owner || page.BatchID != batchID || page.BookID != bookID {
+			continue
+		}
+		page.ReferenceImageURLs = append([]string(nil), source.ReferenceImageURLs...)
+		page.Revision++
+		page.UpdatedAt = now
+		s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
+		updated++
+	}
+	return updated, nil
 }
 
 func (s *MemoryStore) ListComicPages(_ context.Context, owner, batchID, bookID string) ([]ComicPage, error) {
@@ -173,16 +243,31 @@ func (s *MemoryStore) SetPrimaryComicPageImage(_ context.Context, owner, batchID
 	return s.comicPageImages[imageID].Value, nil
 }
 
-func (s *MemoryStore) CreateComicCollection(_ context.Context, owner, batchID, bookID string) (ComicCollection, []string, error) {
+func (s *MemoryStore) CreateComicCollection(_ context.Context, owner, batchID, bookID string, requested ...[]string) (ComicCollection, []string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	book, err := s.ownedBookLocked(owner, batchID, bookID)
 	if err != nil {
 		return ComicCollection{}, nil, err
 	}
-	items := make([]ComicCollectionItem, 0, len(book.Videos))
+	var requestedIDs []string
+	if len(requested) > 0 {
+		requestedIDs = requested[0]
+	}
+	selectedIDs, unknown := SelectComicCollectionVideoIDs(book.Videos, requestedIDs)
+	if len(unknown) > 0 || len(selectedIDs) == 0 {
+		return ComicCollection{}, unknown, ErrConflict
+	}
+	selectedSet := make(map[string]struct{}, len(selectedIDs))
+	for _, id := range selectedIDs {
+		selectedSet[id] = struct{}{}
+	}
+	items := make([]ComicCollectionItem, 0, len(selectedIDs))
 	missing := make([]string, 0)
-	for ordinal, video := range book.Videos {
+	for _, video := range book.Videos {
+		if _, ok := selectedSet[video.ID]; !ok {
+			continue
+		}
 		var page ComicPage
 		for _, entry := range s.comicPages {
 			if entry.Owner == owner && entry.Value.BatchID == batchID && entry.Value.BookID == bookID && entry.Value.VideoID == video.ID {
@@ -201,10 +286,15 @@ func (s *MemoryStore) CreateComicCollection(_ context.Context, owner, batchID, b
 			missing = append(missing, video.ID)
 			continue
 		}
-		items = append(items, ComicCollectionItem{Ordinal: ordinal + 1, VideoID: video.ID, ComicPageID: page.ID, ImageID: primary.ID, StorageRef: primary.StorageRef, MediaType: primary.MediaType})
+		items = append(items, ComicCollectionItem{Ordinal: len(items) + 1, VideoID: video.ID, ComicPageID: page.ID, ImageID: primary.ID, StorageRef: primary.StorageRef, MediaType: primary.MediaType})
 	}
 	if len(missing) > 0 {
 		return ComicCollection{}, missing, ErrConflict
+	}
+	for _, entry := range s.comicCollections {
+		if entry.Owner == owner && entry.Value.BatchID == batchID && entry.Value.BookID == bookID && sameComicCollectionItems(entry.Value.Items, items) {
+			return cloneComicCollection(entry.Value), nil, nil
+		}
 	}
 	s.seq++
 	collection := ComicCollection{ID: "comic-collection-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, Status: "ready", Items: items, CreatedAt: time.Now().UTC()}
@@ -224,5 +314,8 @@ func (s *MemoryStore) ListComicCollections(_ context.Context, owner, batchID, bo
 			collections = append(collections, cloneComicCollection(entry.Value))
 		}
 	}
-	return collections, nil
+	sort.SliceStable(collections, func(i, j int) bool {
+		return collections[i].CreatedAt.Before(collections[j].CreatedAt)
+	})
+	return latestDistinctComicCollections(collections), nil
 }

@@ -108,7 +108,7 @@ npm --prefix frontend run build
 .\scripts\build-go-local.ps1 -SkipGoBuild
 ```
 
-默认本地检查服务监听 `4001`（具体地址以环境变量和启动脚本输出为准）。停止旧进程或确认没有误启动 Node，可运行：
+默认本地检查服务监听 `4001`（具体地址以环境变量和启动脚本输出为准）。检查是否误启动了旧版主应用 Node 服务，可运行下面的 Go 启动保护检查；独立浏览器 Worker 和桌面执行器不属于主应用 API 进程：
 
 ```powershell
 .\scripts\verify-no-node-runtime.ps1

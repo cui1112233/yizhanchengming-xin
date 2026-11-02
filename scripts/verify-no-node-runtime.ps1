@@ -1,6 +1,9 @@
+# Go application runtime guard. ConfigRoots are optional and must name existing
+# configuration roots; standalone Worker/executor processes are intentionally
+# excluded because they are separate components, not the primary API runtime.
 [CmdletBinding()]
 param(
-  [string[]]$ConfigRoots = @('deploy'),
+  [string[]]$ConfigRoots = @(),
   [switch]$Strict
 )
 
@@ -26,7 +29,7 @@ try {
     ForEach-Object {
       $command = [string]$_.CommandLine
       $applicationProcess = ($command -match [regex]::Escape($repo)) -and
-        ($command -match '(?i)server\.js|local-executor|services[\\/]121-browser-worker')
+        ($command -match '(?i)app\.js|node-api|v88-node:|shuihuo-compat:')
       if ($applicationProcess) {
         Add-Finding 'process' $_.ProcessId $command $true
       }

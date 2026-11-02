@@ -5,6 +5,29 @@ import (
 	"testing"
 )
 
+func TestMemoryStoreDocumentRoundTripPreservesProcessedFields(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	want := Document{
+		BookID:           "book-123",
+		OriginalRaw:      "完整原文",
+		ProcessedText:    "处理后",
+		OriginalRawChars: 4,
+		ProcessedChars:   3,
+		MaxTxt:           3,
+	}
+	if err := store.PutDocument(ctx, "alice", want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetDocument(ctx, "alice", want.BookID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.OriginalRaw != want.OriginalRaw || got.ProcessedText != want.ProcessedText || got.OriginalRawChars != want.OriginalRawChars || got.ProcessedChars != want.ProcessedChars || got.MaxTxt != want.MaxTxt {
+		t.Fatalf("got = %+v, want = %+v", got, want)
+	}
+}
+
 func TestMemoryStoreBodyLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

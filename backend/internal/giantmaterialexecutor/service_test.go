@@ -45,14 +45,22 @@ func TestGiantExecutorRejectsDoubaoJobsAndClaimsOnlyItsPlatform(t *testing.T) {
 	}
 }
 
-func TestCreateJobRejectsWhenNoExecutorIsOnline(t *testing.T) {
+func TestQueuedJobReportsWhenNoExecutorIsOnline(t *testing.T) {
 	service := NewService(NewMemoryStore(), time.Now)
-	if _, err := service.CreateJob(context.Background(), "alice", testJobInput("offline-material", "offline-book")); err == nil {
-		t.Fatal("CreateJob accepted an OCR job with no online executor")
+	created, err := service.CreateJob(context.Background(), "alice", testJobInput("offline-material", "offline-book"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := service.GetJob(context.Background(), "alice", created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.State != JobQueued || !job.WaitingForExecutor {
+		t.Fatalf("job=%+v", job)
 	}
 }
 
-func TestGetJobFailsQueuedJobWhenItsExecutorGoesOffline(t *testing.T) {
+func TestGetJobKeepsQueuedJobWaitingWhenItsExecutorGoesOffline(t *testing.T) {
 	clock := &testClock{now: time.Date(2026, 10, 4, 10, 0, 0, 0, time.UTC)}
 	service := NewService(NewMemoryStore(), clock.Now)
 	pairTestExecutor(t, service, "alice")
@@ -66,11 +74,8 @@ func TestGetJobFailsQueuedJobWhenItsExecutorGoesOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.State != JobFailed {
-		t.Fatalf("queued job state=%q, want %q when no executor is online", updated.State, JobFailed)
-	}
-	if updated.ErrorCode != "executor_offline" {
-		t.Fatalf("queued job error code=%q, want executor_offline", updated.ErrorCode)
+	if updated.State != JobQueued || !updated.WaitingForExecutor || updated.ErrorCode != "" {
+		t.Fatalf("queued job should wait for a returning executor: %+v", updated)
 	}
 }
 

@@ -24,6 +24,7 @@ import { appendUniqueAssetID, classifyComposerAttachment } from './agent-compose
 import { findNodeMentionCandidates, insertNodeMention } from './agent-node-mentions';
 import { normalizeWorkspaceView, workspaceViewForActiveView, workspaceViewPatch, workspaceViewQuery } from './agent-workspace-view';
 import { batchFactoryGroupLabel, refreshBatchFactoryBookCanvas, syncBookThenLoadCanvas } from './agent-canvas-batch-factory';
+import { agentProjectCapabilities, agentProjectTypeLabel, agentProjectTypeOptions, normalizeAgentProjectType } from './agent-project-type';
 
 const blankSkill = { name: '', description: '', category: '创作', inputTemplate: '', body: '' };
 function formatTaskTime(value) {
@@ -67,6 +68,8 @@ export function AgentPageV2({ theme }) {
   const [skills, setSkills] = useState([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState([]);
   const [source, setSource] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [newProjectType, setNewProjectType] = useState('video');
   const [question, setQuestion] = useState('');
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const [composerPanel, setComposerPanel] = useState(null);
@@ -452,9 +455,9 @@ export function AgentPageV2({ theme }) {
     }
   }
 
-  async function createTask(expectedRequestId = taskRequestRef.current, { historyMode = 'push' } = {}) {
+  async function createTask(expectedRequestId = taskRequestRef.current, { historyMode = 'push', projectType = 'video' } = {}) {
     try {
-      const result = await createAgentTask();
+      const result = await createAgentTask({ projectType });
       const task = result.task;
       if (!task) throw new Error('未能创建任务');
       if (!mountedRef.current || taskRequestRef.current !== expectedRequestId) return null;
@@ -819,6 +822,11 @@ export function AgentPageV2({ theme }) {
   }, [activeTaskId, isCanvasWorkspace]);
 
   const visibleSkills = useMemo(() => skills.filter(skill => source === 'all' || skill.source === source), [skills, source]);
+  const visibleProjects = useMemo(() => projectFilter === 'all'
+    ? tasks
+    : tasks.filter(task => normalizeAgentProjectType(task.projectType) === projectFilter), [projectFilter, tasks]);
+  const activeProjectType = normalizeAgentProjectType(activeTask?.projectType);
+  const activeProjectCapabilities = agentProjectCapabilities(activeProjectType);
   const selectedSkills = skills.filter(skill => selectedSkillIds.includes(skill.id));
   const messages = activeTask?.messages || [];
   const selectedNodeContext = buildSelectedNodeContext(canvas, selectedCanvasNodes);
@@ -914,7 +922,7 @@ export function AgentPageV2({ theme }) {
     }
     dispatchPetState('working', { title: 'CM 正在处理任务' });
     try {
-      const createdTask = activeTask ? { task: activeTask, requestId } : await createTask(requestId);
+      const createdTask = activeTask ? { task: activeTask, requestId } : await createTask(requestId, { projectType: newProjectType });
       if (!createdTask) return;
       const task = createdTask.task;
       taskId = task.id;
@@ -1141,7 +1149,7 @@ export function AgentPageV2({ theme }) {
           onRename={openRenameTask}
           onBackHome={returnToAgentHome}
           onShowProjects={showAllAgentProjects}
-          onCreateProject={() => createTask()}
+          onCreateProject={() => createTask(taskRequestRef.current, { projectType: newProjectType })}
           onDeleteProject={confirmDeleteCurrentTask}
           onViewChange={activeView => {
             const nextView = workspaceViewForActiveView(viewStateRef.current, activeView);
@@ -1172,7 +1180,7 @@ export function AgentPageV2({ theme }) {
           onActivateGenerationResult={handleGenerationResultActivate}
           onCreateFromAsset={asset => canvasRef.current?.createFromAsset(asset)}
           onSelectTask={taskId => selectTask(taskId, { historyMode: 'push' })}
-          onNewProject={() => createTask()}
+          onNewProject={() => createTask(taskRequestRef.current, { projectType: newProjectType })}
           onClose={() => updateWorkspaceView({ drawerOpen: false })}
           footer={activeTask ? <><Button type="text" icon={<RotateCcw size={15} />} disabled={messages.length === 0} onClick={clearCurrentTask}>清空对话</Button><Popconfirm title="删除当前项目？" description="删除后无法恢复，不会影响其他项目。" okText="删除" cancelText="取消" okButtonProps={{ danger: true }} onConfirm={deleteCurrentTask}><Button type="text" danger icon={<Trash2 size={15} />}>删除项目</Button></Popconfirm></> : null}
         />
@@ -1182,6 +1190,8 @@ export function AgentPageV2({ theme }) {
             ref={canvasRef}
             key={activeTaskId}
             taskId={activeTaskId}
+            projectType={activeProjectType}
+            projectCapabilities={activeProjectCapabilities}
             requestedBookId={requestedBatchBookId}
             canvas={canvas}
             executions={executions}
@@ -1414,12 +1424,13 @@ export function AgentPageV2({ theme }) {
             <div className="agent-selected-skills">{selectedSkills.map(skill => <Tag closable key={skill.id} onClose={() => toggleSkill(skill.id)}>{skill.name}</Tag>)}{attachedFile ? <Tag closable onClose={() => setAttachedFile(null)}>{attachedFile.kind === 'media' ? '媒体' : '附件'}：{attachedFile.name}</Tag> : null}</div>
             <Input.TextArea ref={questionInputRef} value={question} autoSize={{ minRows: 4, maxRows: 8 }} placeholder="描述你的创作需求…" onChange={event => setQuestion(event.target.value)} onPressEnter={event => { if (!event.shiftKey) { event.preventDefault(); sendQuestion(); } }} />
             {nodeMentionPicker}
+            <div className="agent-creation-type-picker" aria-label="作品类型"><span>作品类型</span><Segmented value={newProjectType} onChange={setNewProjectType} options={agentProjectTypeOptions().map(option => ({ value: option.value, label: option.label }))} /></div>
             <div className="agent-composer-actions"><div className="agent-composer-actions-left"><button className="agent-context-chip" type="button" onClick={() => openComposerTool('mode')}>{selectedMode}<ChevronDown size={13} /></button><button className="agent-context-chip" type="button" onClick={() => openComposerTool('expert')}>{selectedExpert}<ChevronDown size={13} /></button><button className="agent-context-chip" type="button" onClick={() => openComposerTool('skill')}>技能{selectedSkillIds.length ? ` ${selectedSkillIds.length}` : ''}<ChevronDown size={13} /></button><button className="agent-context-chip" type="button" onClick={() => openComposerTool('file')}>添加附件</button></div><Button type="primary" icon={<Send size={15} />} loading={asking} disabled={!question.trim()} onClick={() => sendQuestion()}>开始创作</Button></div>
             {composerPanel === 'mode' ? <div className="agent-composer-context"><strong>模式</strong>{['创作助手', '分析拆解', '修改润色'].map(value => <button type="button" key={value} className={selectedMode === value ? 'active' : ''} onClick={() => { setSelectedMode(value); setComposerPanel(null); }}>{value}</button>)}</div> : null}
             {composerPanel === 'expert' ? <div className="agent-composer-context"><strong>专家</strong>{['CM 创作顾问', '前贴片广告策划', '短剧编剧'].map(value => <button type="button" key={value} className={selectedExpert === value ? 'active' : ''} onClick={() => { setSelectedExpert(value); setComposerPanel(null); }}>{value}</button>)}</div> : null}
             {composerPanel === 'skill' ? <div className="agent-skill-panel"><Segmented value={source} onChange={setSource} options={[{ label: '全部', value: 'all' }, { label: '平台自带', value: 'system' }, { label: '我的技能', value: 'user' }]} /><div className="agent-skill-list">{visibleSkills.map(skill => <article className={`agent-skill-card${selectedSkillIds.includes(skill.id) ? ' selected' : ''}`} key={skill.id}><strong>{skill.name}</strong><p>{skill.description || '未填写说明'}</p><Button size="small" type={selectedSkillIds.includes(skill.id) ? 'primary' : 'default'} onClick={() => toggleSkill(skill.id)}>{selectedSkillIds.includes(skill.id) ? '已选用' : '选用'}</Button></article>)}</div></div> : null}
           </div>
-          <section className="agent-recent-projects" aria-label="最近项目"><h3>最近项目</h3>{loading ? <span>正在读取项目…</span> : tasks.slice(0, 6).map(task => <button type="button" key={task.id} onClick={() => { window.history.pushState({}, '', `/agent/canvas?taskId=${encodeURIComponent(task.id)}`); window.dispatchEvent(new PopStateEvent('popstate')); }}><strong>{task.title}</strong><span>{task.preview || '尚未开始对话'}</span></button>)}</section>
+          <section className="agent-recent-projects" aria-label="最近项目"><div className="agent-project-list-head"><h3>最近项目</h3><Segmented size="small" value={projectFilter} onChange={setProjectFilter} options={[{ label: '全部', value: 'all' }, { label: '视频', value: 'video' }, { label: '漫画', value: 'comic' }]} /></div>{loading ? <span>正在读取项目…</span> : visibleProjects.slice(0, 6).map(task => <button type="button" key={task.id} onClick={() => { window.history.pushState({}, '', `/agent/canvas?taskId=${encodeURIComponent(task.id)}`); window.dispatchEvent(new PopStateEvent('popstate')); }}><strong>{task.title}<Tag>{agentProjectTypeLabel(task.projectType)}</Tag></strong><span>{task.preview || '尚未开始对话'}</span></button>)}</section>
         </div>
       </section>}
       <Modal title={editingSkillId ? '编辑我的技能' : '新建我的技能'} open={skillEditorOpen} onCancel={() => setSkillEditorOpen(false)} footer={null} destroyOnClose>

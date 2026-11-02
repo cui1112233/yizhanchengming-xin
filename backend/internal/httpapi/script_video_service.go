@@ -60,7 +60,14 @@ func (s *scriptVideoService) Submit(ctx context.Context, owner string, input scr
 		if model == "" {
 			model = "Seedance 2.0 Fast"
 		}
-		job, err := s.localExecutor.CreateJob(ctx, owner, localexecutor.CreateJobInput{SourceTaskID: sourceTaskID, Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"model": model, "prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": input.ImageURLs, "generateAudio": input.GenerateAudio}})
+		imageURLs := append([]string(nil), input.ImageURLs...)
+		if len(input.ReferenceAssets) > 0 {
+			imageURLs = make([]string, 0, len(input.ReferenceAssets))
+			for _, reference := range input.ReferenceAssets {
+				imageURLs = append(imageURLs, agentExecutorReferenceAssetURL(reference.ProjectID, reference.AssetID))
+			}
+		}
+		job, err := s.localExecutor.CreateJob(ctx, owner, localexecutor.CreateJobInput{SourceTaskID: sourceTaskID, Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"model": model, "prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": imageURLs, "generateAudio": input.GenerateAudio}})
 		if err != nil {
 			return scriptVideoSubmission{}, err
 		}

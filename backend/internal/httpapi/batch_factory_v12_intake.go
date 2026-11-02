@@ -19,7 +19,13 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		batches, err := store.ListBatches(r.Context(), owner)
+		var batches []batchfactoryv11.Batch
+		var err error
+		if lister, ok := store.(batchSummaryIndexLister); ok {
+			batches, err = lister.ListBatchSummaryIndex(r.Context(), owner)
+		} else {
+			batches, err = store.ListBatches(r.Context(), owner)
+		}
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -40,8 +46,10 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 				"updatedAt": batch.UpdatedAt, "revision": batch.Revision,
 				"bookCount": len(books), "books": books,
 			}
-			if strings.TrimSpace(batch.ProjectCoverJobID) != "" {
-				item["coverMedia"] = map[string]any{"kind": "image", "url": "/api/batch-factory/v12/batches/" + url.PathEscape(batch.ID) + "/merge-cover/" + url.PathEscape(batch.ProjectCoverJobID)}
+			if strings.TrimSpace(batch.ProjectCoverArtifactID) != "" {
+				item["coverMedia"] = map[string]any{"kind": "image", "url": "/api/batch-factory/v12/batches/" + url.PathEscape(batch.ID) + "/merge-cover/" + url.PathEscape(batch.ProjectCoverArtifactID)}
+			} else if strings.TrimSpace(batch.ProjectCoverMediaURL) != "" {
+				item["coverMedia"] = map[string]any{"kind": "video", "url": batch.ProjectCoverMediaURL}
 			}
 			summaries = append(summaries, item)
 		}

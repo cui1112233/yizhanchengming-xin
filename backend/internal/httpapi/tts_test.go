@@ -73,6 +73,34 @@ func TestRequestConfiguredTTSBytesAcceptsAudioAndRejectsJSON(t *testing.T) {
 	}
 }
 
+func TestDefaultTTSClientUsesConfiguredProxy(t *testing.T) {
+	previous := ttsHTTPProxyURL
+	defer func() { ttsHTTPProxyURL = previous }()
+	t.Setenv("QIANTIE_TTS_PROXY", "http://127.0.0.1:7890")
+	ttsHTTPProxyURL = ""
+	if got := configuredTTSProxyURL(); got != "http://127.0.0.1:7890" {
+		t.Fatalf("configuredTTSProxyURL() = %q, want configured Clash proxy", got)
+	}
+}
+
+func TestRequestDefaultTTSBytesUsesProxyTransport(t *testing.T) {
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.String() != "http://tts3.121w.com/v1/audio/speech" {
+			t.Fatalf("proxy received %s %s", r.Method, r.URL.String())
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("proxy-audio"))
+	}))
+	defer proxy.Close()
+	previousEndpoint, previousProxy := defaultTTSEndpoint, ttsHTTPProxyURL
+	defaultTTSEndpoint, ttsHTTPProxyURL = "http://tts3.121w.com/v1/audio/speech", proxy.URL
+	defer func() { defaultTTSEndpoint, ttsHTTPProxyURL = previousEndpoint, previousProxy }()
+	payload, contentType, err := requestDefaultTTSBytes(context.Background(), ttsRequest{Input: "测试"})
+	if err != nil || string(payload) != "proxy-audio" || contentType != "audio/mpeg" {
+		t.Fatalf("payload=%q contentType=%q err=%v", payload, contentType, err)
+	}
+}
+
 func TestRequestDefaultTTSBytesAcceptsAudio(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {

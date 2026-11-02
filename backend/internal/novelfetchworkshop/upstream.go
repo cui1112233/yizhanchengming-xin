@@ -46,7 +46,9 @@ type upstreamResponse struct {
 }
 
 func (f UpstreamFetcher) FetchAndProcess(ctx context.Context, bookID, platformID string, maxTxt int) (FetchAndProcessResult, error) {
-	fetched, err := f.Fetch(ctx, bookID, platformID, maxTxt)
+	// maxTxt is a local processing limit. Sending it upstream can irreversibly
+	// truncate the source before OriginalRaw is persisted.
+	fetched, err := f.Fetch(ctx, bookID, platformID, 0)
 	if err != nil {
 		return FetchAndProcessResult{}, err
 	}
@@ -75,7 +77,11 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 	query := parsed.Query()
 	query.Set("bookid", bookID)
 	query.Set("platform", platformID)
-	query.Set("max_txt", strconv.Itoa(maxTxt))
+	if maxTxt > 0 {
+		query.Set("max_txt", strconv.Itoa(maxTxt))
+	} else {
+		query.Del("max_txt")
+	}
 	parsed.RawQuery = query.Encode()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)

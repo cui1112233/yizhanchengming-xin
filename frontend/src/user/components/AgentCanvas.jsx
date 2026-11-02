@@ -26,7 +26,7 @@ import {
 } from '../pages/agent-canvas-context-menu';
 import { connectionDropChoices, createTypedCanvasEdge, syncCanvasEffectiveReferences, syncDirectorVideoLinks } from '../pages/agent-canvas-connections';
 import { cancelAgentGeneration, cancelAgentVideoJob, confirmAgentGeneration, confirmAgentImageGeneration, confirmAgentVideoJob, createAgentAudioGeneration, createAgentImageGeneration, createAgentImageTool, createAgentScriptSplit, createAgentShotBatchNodes, createAgentTextGeneration, createAgentVideoJob, createAgentVideoTool, getAgentGeneration, getAgentGenerationSummary, getAgentVideoJob, listAgentAssets, listAgentGenerations, listAgentScriptShots, listAgentVideoJobs, previewAgentCanvasInputs, removeAgentBatchFactoryNode, retryAgentGeneration, retryAgentVideoJob, syncAgentBatchFactoryBook, uploadAgentAsset } from '../../shared/api/agent';
-import { generateBookAssetImages, rewriteWorkingFront, runBookStage, saveBookOverride, saveVideoOverride, setPrimaryBookAssetImage, submitBookMerge, submitBookTo121, updateBookAsset, updateBookMetadata, updateBookSource } from '../../shared/api/batchFactoryV11';
+import { generateBookAssetImages, rewriteWorkingFront, runBookStage, saveBookOverride, saveVideoOverride, setPrimaryBookAssetImage, submitBookMerge, submitBookTo121, updateBookAsset, updateBookMetadata, updateBookSource } from '../../shared/api/batchFactory';
 import { listAvailableModels } from '../../shared/api/modelCatalog';
 import { buildNodeGenerationRequest, nextNodeGenerationAttempt, nodeExecutionReview } from '../pages/agent-canvas-node-generation';
 import { audioJobRequestForNode, canSubmitAudioNode } from '../pages/agent-canvas-audio-jobs';
@@ -387,6 +387,28 @@ function CanvasNodeRenderer(props) {
     busy: Boolean(localGeneration.busy || effectivePresentation?.busy),
     error: localGeneration.error || mappedPresentation?.errorMessage || (mergedGeneration.task?.state === 'failed' ? mergedGeneration.task.errorMessage : '')
   };
+
+  // 图片和视频生成完成后自动采用第一份结果。其余结果仍由生成历史保存，
+  // 不再让用户先在输入框里找“确认”按钮才能看到画布预览。
+  const autoApplyRef = useRef('');
+  useEffect(() => {
+    if (kind === 'image' && mergedGeneration.task?.state === 'awaiting_confirmation') {
+      const first = candidates[0];
+      const key = `image:${mergedGeneration.task.id}:${first?.id || first?.assetId || ''}`;
+      if (first?.id && autoApplyRef.current !== key) {
+        autoApplyRef.current = key;
+        void confirmImage(props.id, first.id);
+      }
+    }
+    if (kind === 'video' && videoJob?.state === 'awaiting_confirmation' && videoJob.resultAsset?.id) {
+      const key = `video:${videoJob.id}`;
+      if (autoApplyRef.current !== key) {
+        autoApplyRef.current = key;
+        void confirmVideo(props.id);
+      }
+    }
+  }, [candidates, confirmImage, confirmVideo, kind, mergedGeneration.task?.id, mergedGeneration.task?.state, props.id, videoJob]);
+
   return <CanvasNode
     {...props}
     isEditorOpen={activeEditorNodeID === props.id}

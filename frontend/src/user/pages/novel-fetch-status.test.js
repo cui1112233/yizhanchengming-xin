@@ -153,6 +153,13 @@ test('sensitive AI wait is shown separately from active processing', () => {
   assert.equal(novelFetchTaskStatus({ status: 'waiting_retry' }).status, 'waiting_retry');
 });
 
+test('classification wait is shown as a Chinese task state', () => {
+  assert.deepEqual(novelFetchTaskStatus({ status: 'waiting_classification' }), {
+    status: 'waiting_classification', label: '等待确认分类', color: 'orange'
+  });
+  assert.equal(novelFetchStageLabel('waiting_classification'), '等待确认分类');
+});
+
 test('processed and original counts are displayed together', () => {
   assert.equal(novelFetchCharCount({ processed_chars: 4000, original_raw_chars: 27831 }), '4000/27831');
   assert.equal(novelFetchCharCount({}), '-');

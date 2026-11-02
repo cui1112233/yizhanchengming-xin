@@ -18,12 +18,18 @@ var cmAssetPresetDefaults []byte
 //go:embed defaults/comic_styles.json
 var comicStyleDefaults []byte
 
+//go:embed defaults/comic_reference_scenes.json
+var comicReferenceSceneDefaults []byte
+
 //go:embed defaults/comic_style_previews/*.jpg
 var comicStylePreviews embed.FS
 
-// EnsureComicPresets adds only missing built-in comic presets to the durable
-// system catalog. Existing system-preset versions remain fully editable and
-// are never replaced by a later application start.
+//go:embed defaults/comic_reference_scenes/*.jpg
+var comicReferenceScenes embed.FS
+
+// EnsureComicPresets adds missing built-in comic presets to the durable
+// system catalog. It also performs narrowly scoped upgrades for recognized
+// legacy CM records while preserving newer administrator-authored versions.
 func EnsureComicPresets(path string) error {
 	path = filepath.Clean(path)
 	raw, err := os.ReadFile(path)
@@ -34,6 +40,16 @@ func EnsureComicPresets(path string) error {
 	if err := json.Unmarshal(raw, &records); err != nil {
 		return fmt.Errorf("read system prompt catalog: %w", err)
 	}
+	filtered := records[:0]
+	removedRetired := false
+	for _, record := range records {
+		if stringValue(record["id"]) == "batch-comic-bootstrap" && stringValue(record["createdBy"]) == "system" {
+			removedRetired = true
+			continue
+		}
+		filtered = append(filtered, record)
+	}
+	records = filtered
 	var defaults []map[string]any
 	if err := json.Unmarshal(comicPresetDefaults, &defaults); err != nil {
 		return fmt.Errorf("read built-in comic presets: %w", err)
@@ -46,8 +62,13 @@ func EnsureComicPresets(path string) error {
 	if err := json.Unmarshal(cmAssetPresetDefaults, &cmAssets); err != nil {
 		return fmt.Errorf("read built-in CM asset presets: %w", err)
 	}
+	var referenceScenes []map[string]any
+	if err := json.Unmarshal(comicReferenceSceneDefaults, &referenceScenes); err != nil {
+		return fmt.Errorf("read built-in comic reference scenes: %w", err)
+	}
 	defaults = append(defaults, styles...)
 	defaults = append(defaults, cmAssets...)
+	defaults = append(defaults, referenceScenes...)
 	existingVersions := make(map[string]bool, len(records))
 	latestVersion := make(map[string]int, len(records))
 	publishedIndex := make(map[string]int, len(records))
@@ -65,7 +86,7 @@ func EnsureComicPresets(path string) error {
 			publishedIndex[id] = index
 		}
 	}
-	changed := false
+	changed := removedRetired
 	for _, record := range defaults {
 		id := stringValue(record["id"])
 		version := intValue(record["version"])
@@ -74,8 +95,9 @@ func EnsureComicPresets(path string) error {
 		}
 		if latestVersion[id] > 0 {
 			legacyMaxVersion, isCMUpgrade := cmLegacySystemMaxVersions[id]
+			_, forceLegacyPageUpgrade := cmForcedLegacyPageUpgradeIDs[id]
 			index, hasPublished := publishedIndex[id]
-			if !isCMUpgrade || latestVersion[id] > legacyMaxVersion || !hasPublished || intValue(records[index]["version"]) > legacyMaxVersion || stringValue(records[index]["createdBy"]) != "system" {
+			if !isCMUpgrade || latestVersion[id] > legacyMaxVersion || !hasPublished || intValue(records[index]["version"]) > legacyMaxVersion || (!forceLegacyPageUpgrade && stringValue(records[index]["createdBy"]) != "system") {
 				continue
 			}
 			records[index]["status"] = "archived"
@@ -109,16 +131,27 @@ func EnsureComicPresets(path string) error {
 }
 
 var cmLegacySystemMaxVersions = map[string]int{
-	"batch-comic-assets":         2,
-	"vip-smart-character-derive": 1,
+	"batch-comic-assets":             2,
+	"vip-smart-character-derive":     1,
+	"batch-comic-page":               2,
+	"batch-comic-page-fusion-bw":     2,
+	"batch-comic-page-light":         2,
+	"batch-comic-page-premium-strip": 2,
+}
+
+var cmForcedLegacyPageUpgradeIDs = map[string]struct{}{
+	"batch-comic-page":               {},
+	"batch-comic-page-fusion-bw":     {},
+	"batch-comic-page-light":         {},
+	"batch-comic-page-premium-strip": {},
 }
 
 func presetVersionKey(id string, version int) string {
 	return fmt.Sprintf("%s\x00%d", id, version)
 }
 
-// OpenComicStylePreview returns only the display image paired with a built-in
-// style preset. Selecting a style never adds this image to generation inputs.
+// OpenComicStylePreview returns the embedded image paired with a built-in
+// style preset. It is used for both display and the optional global style reference.
 func OpenComicStylePreview(presetID string) ([]byte, string, bool) {
 	presetID = strings.TrimSpace(presetID)
 	const prefix = "batch-comic-style-"
@@ -127,6 +160,21 @@ func OpenComicStylePreview(presetID string) ([]byte, string, bool) {
 	}
 	name := strings.TrimPrefix(presetID, prefix) + ".jpg"
 	data, err := comicStylePreviews.ReadFile("defaults/comic_style_previews/" + name)
+	if err != nil {
+		return nil, "", false
+	}
+	return data, "image/jpeg", true
+}
+
+// OpenComicReferenceScene returns the real scene image sent to the image model.
+func OpenComicReferenceScene(presetID string) ([]byte, string, bool) {
+	presetID = strings.TrimSpace(presetID)
+	const prefix = "batch-comic-reference-scene-"
+	if !strings.HasPrefix(presetID, prefix) {
+		return nil, "", false
+	}
+	name := strings.TrimPrefix(presetID, prefix) + ".jpg"
+	data, err := comicReferenceScenes.ReadFile("defaults/comic_reference_scenes/" + name)
 	if err != nil {
 		return nil, "", false
 	}

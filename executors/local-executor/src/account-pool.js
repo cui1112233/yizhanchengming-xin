@@ -3,11 +3,14 @@ const ELIGIBLE = new Set(['available']);
 class AccountPool {
   constructor(accounts = []) {
     this.accounts = new Map();
+    this.order = [];
+    this.cursor = 0;
     for (const account of accounts) this.upsert(account);
   }
 
   upsert(account) {
     if (!account?.id) throw new Error('account id is required');
+    if (!this.accounts.has(account.id)) this.order.push(account.id);
     const previous = this.accounts.get(account.id) || {};
     this.accounts.set(account.id, {
       ...previous,
@@ -19,10 +22,15 @@ class AccountPool {
 
   acquire({ excludeIds = [], jobId = null } = {}) {
     const excluded = new Set(excludeIds);
-    for (const account of this.accounts.values()) {
+    if (this.order.length === 0) return null;
+    for (let offset = 0; offset < this.order.length; offset += 1) {
+      const index = (this.cursor + offset) % this.order.length;
+      const account = this.accounts.get(this.order[index]);
+      if (!account) continue;
       if (!excluded.has(account.id) && ELIGIBLE.has(account.state) && !account.jobId) {
         account.state = 'busy';
         account.jobId = jobId;
+        this.cursor = (index + 1) % this.order.length;
         return { ...account };
       }
     }

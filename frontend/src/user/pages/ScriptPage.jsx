@@ -9,6 +9,7 @@ import { textToSpeech } from '../../shared/api/tts';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { getMemberCenter } from '../../shared/api/member';
 import { apiRequest } from '../../shared/api/client';
+import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus.js';
 import { PET_APPLY_EVENT, PET_PREVIEW_EVENT, dispatchPetContext, dispatchPetState } from '../../shared/pet/stacky';
 import { dispatchCmSelection } from '../../shared/pet/cmBridge';
 import { getScriptDraftTabId, loadScriptDraft, saveScriptDraft } from './scriptDraftStorage';
@@ -33,6 +34,7 @@ import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
+import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 
 function videoModelKey(model) {
   return String(model?.key || model?.modelKey || model?.id || '').trim();
@@ -47,7 +49,7 @@ function videoModelLabel(model) {
   return details.length ? `${name}（${details.join('，')}）` : name;
 }
 
-const DEFAULT_SCRIPT_UNIFIED_CONFIG = { textModelId: '', imageModelId: '', videoModelKey: 'yd2-mini-video', imageAspectRatio: '9:16', videoAspectRatio: '9:16', videoResolution: '720p' };
+const DEFAULT_SCRIPT_UNIFIED_CONFIG = { textModelId: '', imageProvider: 'personal_api', imageModelId: '', videoProvider: 'personal_api', videoModelKey: 'yd2-mini-video', imageAspectRatio: '9:16', videoAspectRatio: '9:16', videoResolution: '720p' };
 
 function normalizeScriptUnifiedConfig(value = {}) {
   return {
@@ -130,6 +132,7 @@ function ScriptMentionMenu({ anchorRect, candidates, activeIndex, onChoose, onCr
 
 export function ScriptPage() {
   const [form] = Form.useForm();
+  const { status: localExecutorStatus } = useLocalExecutorStatus({ enabled: true, intervalMs: 30000 });
   const [extracting, setExtracting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -152,12 +155,14 @@ export function ScriptPage() {
   const [shotVideoTaskHistory, setShotVideoTaskHistory] = useState({});
   const [shotReferenceStates, setShotReferenceStates] = useState({});
   const [scriptVideoModelKey, setScriptVideoModelKey] = useState('yd2-mini-video');
+  const [scriptVideoProvider, setScriptVideoProvider] = useState('personal_api');
   const [canGenerateVideo, setCanGenerateVideo] = useState(false);
   const [scriptVideoModels, setScriptVideoModels] = useState([]);
   const [loadingScriptVideoModels, setLoadingScriptVideoModels] = useState(false);
   const [scriptModels, setScriptModels] = useState({ text: [], image: [] });
   const [scriptModelsLoaded, setScriptModelsLoaded] = useState(false);
   const [scriptModelSelection, setScriptModelSelection] = useState({ textModelId: '', imageModelId: '' });
+  const [scriptImageProvider, setScriptImageProvider] = useState('personal_api');
   const [scriptImageAspectRatio, setScriptImageAspectRatio] = useState('9:16');
   const [scriptVideoAspectRatio, setScriptVideoAspectRatio] = useState('9:16');
   const [scriptVideoResolution, setScriptVideoResolution] = useState('720p');
@@ -314,6 +319,10 @@ export function ScriptPage() {
       return defaultEnabledModelSelection(next, scriptModels);
     });
   }, [scriptModels, scriptModelsLoaded]);
+  const scriptImageProviderOptions = useMemo(() => providerOptionsForModels(scriptModels.image, 'image'), [scriptModels.image]);
+  const scriptVideoProviderOptions = useMemo(() => providerOptionsForModels(scriptVideoModels, 'video'), [scriptVideoModels]);
+  const scriptImageModelOptions = useMemo(() => modelOptionsForProvider(scriptModels.image, 'image', scriptImageProvider), [scriptModels.image, scriptImageProvider]);
+  const scriptVideoModelOptions = useMemo(() => modelOptionsForProvider(scriptVideoModels, 'video', scriptVideoProvider), [scriptVideoModels, scriptVideoProvider]);
   useEffect(() => { setSelectedShotIndexes(new Set()); }, [selectedFormat]);
   const rawShotCards = useMemo(() => {
     const parsed = getShotCardsWithinDuration(selectedFormat, output, selectedDuration);
@@ -526,24 +535,7 @@ export function ScriptPage() {
   async function generateVideoForShot(card, index, { withoutReferences = false } = {}) {
     const prompt = String(card || '').trim();
     if (!prompt) return message.warning('该分镜没有可生成的视频提示词');
-    if (scriptVideoModelKey === 'local-doubao-executor-video') {
-      try {
-        const result = await apiRequest('/api/shuihuo-production/local-executors', { suppressGlobalError: true, suppressAuthExpiry: true });
-        const executors = Array.isArray(result?.executors) ? result.executors : Array.isArray(result?.items) ? result.items : [];
-        if (!executors.some(item => item.online)) {
-          Modal.info({
-            title: '本地执行器未连接',
-            content: executors.length ? '已配对的执行器当前离线。请打开一战晟铭本地执行器，确认已配对并保持在线后再生成。' : '请先下载并打开一战晟铭本地执行器，在“设置”中生成配对码完成配对。',
-            okText: '前往设置',
-            onOk: () => { window.location.assign('/settings'); }
-          });
-          return;
-        }
-      } catch {
-        message.error('无法检查本地执行器状态，请稍后重试');
-        return;
-      }
-    }
+    if (scriptVideoProvider === 'doubao_local_executor' && !localExecutorStatus.online) message.warning('豆包执行器未在线，任务仍会提交并显示执行结果。');
     const fallbackDuration = selectedDuration === '15s' ? 15 : 10;
     const modelUsesShotDuration = scriptVideoModelKey === 'minimax-h3-video' || scriptVideoModelKey === 'seedance-2-0-official';
     const resolvedDuration = modelUsesShotDuration
@@ -573,7 +565,8 @@ export function ScriptPage() {
       const historyId = await ensureCurrentHistory();
       const videoPayload = buildScriptVideoPayload({
         prompt,
-        modelKey: scriptVideoModelKey,
+        modelKey: scriptVideoProvider === 'doubao_local_executor' ? 'local-doubao-executor-video' : scriptVideoModelKey,
+        model: scriptVideoProvider === 'doubao_local_executor' ? scriptVideoModelKey : '',
         duration: resolvedDuration.duration,
         resolution: scriptVideoResolution,
         aspectRatio: scriptVideoAspectRatio,
@@ -770,6 +763,8 @@ export function ScriptPage() {
           textModelId: defaults.textModelId || current.textModelId,
           imageModelId: defaults.imageModelId || current.imageModelId
         }));
+        setScriptImageProvider(defaults.imageProvider || 'personal_api');
+        setScriptVideoProvider(defaults.videoProvider || 'personal_api');
         setScriptVideoModelKey(defaults.videoModelKey);
         setScriptImageAspectRatio(defaults.imageAspectRatio);
         setScriptVideoAspectRatio(defaults.videoAspectRatio);
@@ -790,7 +785,9 @@ export function ScriptPage() {
   function openScriptUnifiedConfig() {
     setScriptConfigDraft(normalizeScriptUnifiedConfig({
       textModelId: scriptModelSelection.textModelId,
+      imageProvider: scriptImageProvider,
       imageModelId: scriptModelSelection.imageModelId,
+      videoProvider: scriptVideoProvider,
       videoModelKey: scriptVideoModelKey,
       imageAspectRatio: scriptImageAspectRatio,
       videoAspectRatio: scriptVideoAspectRatio,
@@ -806,6 +803,8 @@ export function ScriptPage() {
       const saved = await saveConfig({ scriptDefaults: next });
       const defaults = normalizeScriptUnifiedConfig(saved.scriptDefaults || next);
       setScriptModelSelection({ textModelId: defaults.textModelId, imageModelId: defaults.imageModelId });
+      setScriptImageProvider(defaults.imageProvider || 'personal_api');
+      setScriptVideoProvider(defaults.videoProvider || 'personal_api');
       setScriptVideoModelKey(defaults.videoModelKey);
       setScriptImageAspectRatio(defaults.imageAspectRatio);
       setScriptVideoAspectRatio(defaults.videoAspectRatio);
@@ -1943,8 +1942,10 @@ export function ScriptPage() {
       >
         <Space direction="vertical" size={14} style={{ width: '100%' }}>
           <Form.Item label="文本模型" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.textModelId || undefined} placeholder="选择文本模型" options={scriptModels.text.map(model => ({ value: model.id, label: model.displayName || model.id }))} onChange={textModelId => setScriptConfigDraft(current => ({ ...current, textModelId }))} /></Form.Item>
-          <Form.Item label="图片模型" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.imageModelId || undefined} placeholder="选择图片模型" options={scriptModels.image.map(model => ({ value: model.id, label: model.displayName || model.id }))} onChange={imageModelId => setScriptConfigDraft(current => ({ ...current, imageModelId }))} /></Form.Item>
-          <Form.Item label="视频模型" style={{ marginBottom: 0 }}><Select loading={loadingScriptVideoModels} value={scriptConfigDraft.videoModelKey} options={scriptVideoModels.map(model => ({ value: videoModelKey(model), label: videoModelLabel(model) }))} onChange={videoModelKey => setScriptConfigDraft(current => ({ ...current, videoModelKey }))} /></Form.Item>
+          <Form.Item label="图片生成通道" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.imageProvider || 'personal_api'} options={scriptImageProviderOptions} onChange={imageProvider => setScriptConfigDraft(current => ({ ...current, imageProvider, imageModelId: reconcileProviderModel({ models: scriptModels.image, kind: 'image', provider: imageProvider, modelId: current.imageModelId }).modelId }))} /></Form.Item>
+          <Form.Item label="图片模型" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.imageModelId || undefined} placeholder="选择当前通道的图片模型" options={modelOptionsForProvider(scriptModels.image, 'image', scriptConfigDraft.imageProvider)} onChange={imageModelId => setScriptConfigDraft(current => ({ ...current, imageModelId }))} /></Form.Item>
+          <Form.Item label="视频生成通道" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.videoProvider || 'personal_api'} options={scriptVideoProviderOptions} onChange={videoProvider => setScriptConfigDraft(current => ({ ...current, videoProvider, videoModelKey: reconcileProviderModel({ models: scriptVideoModels, kind: 'video', provider: videoProvider, modelId: current.videoModelKey }).modelId }))} /></Form.Item>
+          <Form.Item label="视频模型" style={{ marginBottom: 0 }}><Select loading={loadingScriptVideoModels} value={scriptConfigDraft.videoModelKey} options={modelOptionsForProvider(scriptVideoModels, 'video', scriptConfigDraft.videoProvider)} onChange={videoModelKey => setScriptConfigDraft(current => ({ ...current, videoModelKey }))} /></Form.Item>
           <Form.Item label="图片画幅" style={{ marginBottom: 0 }}><Segmented block options={['16:9', '9:16', '1:1']} value={scriptConfigDraft.imageAspectRatio} onChange={imageAspectRatio => setScriptConfigDraft(current => ({ ...current, imageAspectRatio }))} /></Form.Item>
           <Form.Item label="视频画幅" style={{ marginBottom: 0 }}><Segmented block options={['16:9', '9:16']} value={scriptConfigDraft.videoAspectRatio} onChange={videoAspectRatio => setScriptConfigDraft(current => ({ ...current, videoAspectRatio }))} /></Form.Item>
           <Form.Item label="视频分辨率" style={{ marginBottom: 0 }}><Segmented block options={['480p', '720p', '1080p']} value={scriptConfigDraft.videoResolution} onChange={videoResolution => setScriptConfigDraft(current => ({ ...current, videoResolution }))} /></Form.Item>
@@ -1968,6 +1969,7 @@ export function ScriptPage() {
         existingEntitySummary={compactEntitySummary(extractInfo, activeEntity?.isNew ? '' : activeEntity?.id)}
         textModelId={scriptModelSelection.textModelId}
         imageModelId={scriptModelSelection.imageModelId}
+        imageProvider={scriptImageProvider}
         imageAspectRatio={scriptImageAspectRatio}
         onChange={updateActiveEntity}
         onDelete={deleteActiveEntity}
@@ -2132,7 +2134,7 @@ function EntitySection({ title, type, count, items, protagonistIds = [], onAdd, 
   );
 }
 
-function EntityEditor({ entity, type, assetId, editorSessionId, isNew, open, fullscreen, novelText, extractionPreset, existingEntitySummary, textModelId, imageModelId, imageAspectRatio, onClose, onToggleFullscreen, onChange, onDelete }) {
+function EntityEditor({ entity, type, assetId, editorSessionId, isNew, open, fullscreen, novelText, extractionPreset, existingEntitySummary, textModelId, imageModelId, imageProvider, imageAspectRatio, onClose, onToggleFullscreen, onChange, onDelete }) {
   const [fields, setFields] = useState({});
   const [imageUrls, setImageUrls] = useState([]);
   const [mainImageUrl, setMainImageUrl] = useState('');
@@ -2223,6 +2225,7 @@ function EntityEditor({ entity, type, assetId, editorSessionId, isNew, open, ful
           assetId={assetId}
           generationPayload={{ ...buildReferenceAssetGenerationPayload({ type, entity, fields, novelText, extractionPreset }), asset_id: assetId }}
           imageModelId={imageModelId}
+          imageProvider={imageProvider}
           imageAspectRatio={imageAspectRatio}
           imageUrls={imageUrls}
           mainImageUrl={mainImageUrl}

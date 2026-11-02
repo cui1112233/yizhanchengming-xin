@@ -1,17 +1,18 @@
 import { Button, Image, Spin, Typography } from 'antd';
 import { ImagePlus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { generateReferenceAssetImage, loadReferenceAssetImage, uploadReferenceAssetImage } from '../../shared/api/novelPanel';
+import { generateReferenceAssetImage, getReferenceAssetImageTask, loadReferenceAssetImage, uploadReferenceAssetImage } from '../../shared/api/referenceAssets';
 import { appendImageCandidateAndSelectSingle } from '../pages/scriptEntityImages';
 import { createEntityImagePreviewLoader } from './entityImagePreviewLoader';
 import { createEntityImageRequestGuard } from './entityImageRequestGuard';
 
 function responseUrl(response) { return String(response?.url || response?.data?.url || response?.result?.url || '').trim(); }
 
-export default function EntityImagePanel({ assetType, assetId, generationPayload, imageModelId, imageAspectRatio, imageUrls = [], mainImageUrl = '', onChange, requestKey = assetId, disabled = false }) {
+export default function EntityImagePanel({ assetType, assetId, generationPayload, imageModelId, imageProvider, imageAspectRatio, imageUrls = [], mainImageUrl = '', onChange, requestKey = assetId, disabled = false }) {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [generationStatus, setGenerationStatus] = useState('');
   const [previewUrls, setPreviewUrls] = useState({});
   const [failedPreviewUrls, setFailedPreviewUrls] = useState([]);
   const inputRef = useRef(null);
@@ -21,7 +22,7 @@ export default function EntityImagePanel({ assetType, assetId, generationPayload
   const busy = uploading || generating;
 
   useEffect(() => () => guard.current.invalidate(), []);
-  useEffect(() => { setUploading(false); setGenerating(false); setError(''); }, [requestKey]);
+  useEffect(() => { setUploading(false); setGenerating(false); setError(''); setGenerationStatus(''); }, [requestKey]);
   useEffect(() => {
     const generation = previewGeneration.current + 1;
     previewGeneration.current = generation;
@@ -62,12 +63,21 @@ export default function EntityImagePanel({ assetType, assetId, generationPayload
   async function generate() {
     if (disabled) return;
     const token = guard.current.begin();
-    guard.current.commit(token, () => { setGenerating(true); setError(''); });
+    guard.current.commit(token, () => { setGenerating(true); setError(''); setGenerationStatus('正在提交图片任务...'); });
     try {
-      const response = await generateReferenceAssetImage({ ...generationPayload, ...(imageModelId ? { imageModelId } : {}), ...(imageAspectRatio ? { aspect_ratio: imageAspectRatio } : {}) });
-      const url = responseUrl(response);
+      const response = await generateReferenceAssetImage({ ...generationPayload, ...(imageProvider ? { imageProvider } : {}), ...(imageModelId ? { imageModelId } : {}), ...(imageAspectRatio ? { aspect_ratio: imageAspectRatio } : {}) });
+      let resolved = response;
+      const taskId = String(response?.taskId || response?.data?.taskId || '').trim();
+      if (taskId) {
+        guard.current.commit(token, () => setGenerationStatus('图片正在后台生成...'));
+        resolved = await waitForReferenceAssetImageTask(taskId, () => guard.current.isCurrent(token), status => {
+          guard.current.commit(token, () => setGenerationStatus(status));
+        });
+      }
+      const url = responseUrl(resolved);
       if (!url) throw new Error('图片生成接口未返回图片地址');
       update(appendImageCandidateAndSelectSingle(imageUrls, mainImageUrl, url), token);
+      guard.current.commit(token, () => setGenerationStatus('图片已生成'));
     } catch (caught) { guard.current.commit(token, () => setError(caught.message || '人物/场景图片生成失败，请稍后重试')); }
     finally { guard.current.commit(token, () => setGenerating(false)); }
   }
@@ -81,6 +91,20 @@ export default function EntityImagePanel({ assetType, assetId, generationPayload
         : <div className="entity-editor-image-empty"><ImagePlus size={34} /><span>暂无主图</span></div>}
     <div className="entity-editor-image-actions"><input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={upload} disabled={disabled || busy} /><Button icon={<Upload size={15} />} onClick={() => inputRef.current?.click()} disabled={disabled || busy}>上传图片</Button><Button type="primary" icon={<Sparkles size={15} />} onClick={generate} loading={generating} disabled={disabled || busy}>AI生成</Button></div>
     <div className="entity-editor-image-grid" aria-label="图片缩略图">{imageUrls.map(url => <div className={`entity-editor-image-thumbnail${url === mainImageUrl ? ' is-main' : ''}`} key={url}><button className="entity-editor-image-select" type="button" onClick={() => select(url)} disabled={disabled || busy} aria-label="选择图片">{previewUrls[url] ? <img src={previewUrls[url]} alt="实体图片缩略图" /> : failedPreviewUrls.includes(url) ? <ImagePlus size={16} /> : <Spin size="small" />}</button><button className="entity-editor-image-delete-control" type="button" disabled={disabled || busy} aria-label="删除图片" onClick={event => remove(event, url)}><Trash2 size={14} /></button></div>)}</div>
+    {generationStatus ? <Typography.Paragraph type="secondary" style={{ margin: '10px 0 0' }}>{generationStatus}</Typography.Paragraph> : null}
     {error ? <Typography.Paragraph type="danger" style={{ margin: '10px 0 0' }}>{error}</Typography.Paragraph> : null}
   </div>;
+}
+
+function wait(ms) { return new Promise(resolve => window.setTimeout(resolve, ms)); }
+
+async function waitForReferenceAssetImageTask(taskId, isCurrent, onStatus) {
+  for (;;) {
+    if (!isCurrent()) throw new Error('图片任务已取消');
+    const task = await getReferenceAssetImageTask(taskId);
+    if (task?.status === 'succeeded') return task;
+    if (task?.status === 'failed') throw new Error(task.error || '图片生成失败');
+    onStatus('图片正在后台生成...');
+    await wait(2500);
+  }
 }

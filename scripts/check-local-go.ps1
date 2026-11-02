@@ -17,6 +17,14 @@ function Check-Url([string]$Path, [int]$ExpectedStatus) {
     }
     Write-Output "PASS $Path ($($response.StatusCode))"
   } catch {
+	$status = 0
+	if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+		$status = [int]$_.Exception.Response.StatusCode
+	}
+	if ($status -eq $ExpectedStatus) {
+		Write-Output "PASS $Path ($status)"
+		return
+	}
     Write-Output "FAIL ${Path}: $($_.Exception.Message)"
     $script:failed = $true
   }
@@ -25,7 +33,7 @@ function Check-Url([string]$Path, [int]$ExpectedStatus) {
 Check-Url '/health' 200
 Check-Url '/' 200
 Check-Url '/novel-fetch' 200
-Check-Url '/novel-panel' 200
+Check-Url '/novel-panel' 404
 Check-Url '/shuihuo-production' 200
 Check-Url '/settings' 200
 

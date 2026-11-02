@@ -94,7 +94,7 @@ func (s *AdminStore) CreateDraft(actor string, input map[string]any) (map[string
 		}
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	item := map[string]any{"id": id, "module": stringValue(input["module"]), "name": strings.TrimSpace(stringValue(input["name"])), "kind": stringValue(input["kind"]), "description": stringValue(input["description"]), "compatibleBaseIds": cloneValue(input["compatibleBaseIds"]), "version": version + 1, "revision": 1, "status": "draft", "body": cloneValue(input["body"]), "protocolLock": cloneValue(input["protocolLock"]), "createdAt": now, "createdBy": actor, "publishedAt": nil, "publishedBy": nil}
+	item := map[string]any{"id": id, "module": stringValue(input["module"]), "name": strings.TrimSpace(stringValue(input["name"])), "kind": stringValue(input["kind"]), "description": stringValue(input["description"]), "compatibleBaseIds": cloneValue(input["compatibleBaseIds"]), "previewAssetId": strings.TrimSpace(stringValue(input["previewAssetId"])), "version": version + 1, "revision": 1, "status": "draft", "body": cloneValue(input["body"]), "protocolLock": cloneValue(input["protocolLock"]), "createdAt": now, "createdBy": actor, "publishedAt": nil, "publishedBy": nil}
 	items = append(items, item)
 	if err := s.writeLocked(items); err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func (s *AdminStore) UpdateDraft(actor, id string, version int, input map[string
 		if intValue(input["expectedRevision"]) != intValue(item["revision"]) {
 			return nil, &StoreError{Code: "conflict", Message: "草稿版本已变化，请刷新后再保存"}
 		}
-		for _, key := range []string{"module", "name", "kind", "description", "compatibleBaseIds", "body", "protocolLock"} {
+		for _, key := range []string{"module", "name", "kind", "description", "compatibleBaseIds", "previewAssetId", "body", "protocolLock"} {
 			item[key] = cloneValue(input[key])
 		}
 		item["name"] = strings.TrimSpace(stringValue(item["name"]))
@@ -212,6 +212,59 @@ func (s *AdminStore) Rollback(actor, id string, version int) (map[string]any, er
 		return nil, err
 	}
 	return target, nil
+}
+
+// Archive removes a published material from future selection while keeping its
+// version and image available to work already created with it.
+func (s *AdminStore) Archive(actor, id string, version int) (map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := validateActor(actor); err != nil {
+		return nil, err
+	}
+	items, err := s.readLocked()
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		if stringValue(item["id"]) != id || intValue(item["version"]) != version {
+			continue
+		}
+		if stringValue(item["status"]) != "published" {
+			return nil, &StoreError{Code: "conflict", Message: "只有已发布版本可以停用"}
+		}
+		item["status"] = "archived"
+		if err := s.writeLocked(items); err != nil {
+			return nil, err
+		}
+		return item, nil
+	}
+	return nil, &StoreError{Code: "not_found", Message: "提示词版本不存在"}
+}
+
+// Delete permanently removes one preset version. Historical projects keep
+// their own snapshots, so removing a catalog version does not rewrite them.
+func (s *AdminStore) Delete(actor, id string, version int) (map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := validateActor(actor); err != nil {
+		return nil, err
+	}
+	items, err := s.readLocked()
+	if err != nil {
+		return nil, err
+	}
+	for index, item := range items {
+		if stringValue(item["id"]) != id || intValue(item["version"]) != version {
+			continue
+		}
+		items = append(items[:index], items[index+1:]...)
+		if err := s.writeLocked(items); err != nil {
+			return nil, err
+		}
+		return item, nil
+	}
+	return nil, &StoreError{Code: "not_found", Message: "提示词版本不存在"}
 }
 
 func (s *AdminStore) readLocked() ([]map[string]any, error) {

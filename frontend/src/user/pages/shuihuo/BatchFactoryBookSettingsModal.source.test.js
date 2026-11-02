@@ -63,6 +63,69 @@ test('single-book constraints support the same system, personal and editable pro
 test('single-book media configuration saves video and comic modules together instead of dropping the combined region', () => {
   assert.match(source, /const moduleKey = region === 'media' \? 'video' : AI_REGION_KEYS\.get\(region\)/);
   assert.match(source, /region === 'media' \? \['video', 'comic'\] : region === 'video' \? \['video'\] : \[moduleKey\]/);
+  assert.match(source, /if \(region === 'media'\) \{[\s\S]*?patch\.productionMode = edited\?\.productionMode;[\s\S]*?\}/);
+});
+
+test('single-book comic style library lives in engine media settings instead of constraints', () => {
+  const mediaStart = source.indexOf('const mediaBody =');
+  const mediaEnd = source.indexOf('let body = null;', mediaStart);
+  const mediaBody = source.slice(mediaStart, mediaEnd);
+  const constraintsStart = source.indexOf("} else if (region === 'constraints') {");
+  const constraintsEnd = source.indexOf("} else if (region === 'media') {", constraintsStart);
+  const constraintsBody = source.slice(constraintsStart, constraintsEnd);
+
+  assert.match(mediaBody, /<BatchFactoryComicStylePicker/);
+  assert.doesNotMatch(constraintsBody, /<BatchFactoryComicStylePicker/);
+});
+
+test('single-book configuration can choose a separate image generation provider', () => {
+  assert.match(source, /图片生成通道/);
+  assert.match(source, /field="imageProvider"/);
+  assert.match(source, /from '.\/providerModelBinding'/);
+  assert.match(source, /'imageProvider'/);
+  assert.match(source, /providerOptionsForModels\(models, 'image'\)/);
+  assert.match(source, /providerOptionsForModels\(models, 'video'\)/);
+});
+
+test('single-book local Doubao provider exposes its supported video models', () => {
+  for (const [model, description] of [
+    ['Seedance 2.5', '旗舰视频标杆 · 5 倍消耗'],
+    ['Seedance 2.0', '进阶画面表现 · 2 倍消耗'],
+    ['Seedance 2.0 Fast', '快速出片选择'],
+    ['Seedance 2.0 Mini', '日常生成使用']
+  ]) {
+    assert.match(source, /providerModelSettingsPatch/);
+    assert.match(source, /modelOptionsForProvider/);
+  }
+  assert.match(source, /modelOptionsForProvider\(models, 'video', effectiveVideoProvider\)/);
+  assert.match(source, /providerModelSettingsPatch\(\{ models, kind: 'video'/);
+});
+
+test('single-book local Doubao provider exposes its supported image models', () => {
+  for (const [model, description] of [
+    ['Seedream 5.0 Flash', '专业快速'],
+    ['Seedream 5.0 Pro', '专业出图 · 4 倍消耗'],
+    ['Seedream 4.5', '日常生成'],
+    ['Seedream 4.0', '基础生图']
+  ]) {
+    assert.match(source, /providerModelSettingsPatch/);
+    assert.match(source, /modelOptionsForProvider/);
+  }
+  assert.match(source, /modelOptionsForProvider\(models, 'image', effectiveImageProvider\)/);
+  assert.match(source, /providerModelSettingsPatch\(\{ models, kind: 'image'/);
+  assert.doesNotMatch(source, /豆包本地版/);
+});
+
+test('switching the single-book image channel also selects a model from that channel', () => {
+  assert.match(source, /label="图片生成通道"[\s\S]*?onChange=\{imageProvider => patch\(providerModelSettingsPatch\(\{ models, kind: 'image'/);
+});
+
+test('inherited engine selects are not wrapped by a label that re-triggers option clicks', () => {
+  const start = source.indexOf('function InheritedField(');
+  const end = source.indexOf('function InheritedNumberField(', start);
+  const field = source.slice(start, end);
+  assert.match(field, /return <div className="batch-factory-engine-field"/);
+  assert.doesNotMatch(field, /return <label className="batch-factory-engine-field"/);
 });
 
 test('single-book configuration opens and saves one explicit region at a time', () => {
@@ -80,13 +143,14 @@ test('single-book assets expose script-compatible starred-character focus withou
   assert.match(source, /mode="multiple"/);
 });
 
-test('single-book assets use one combined SD asset preset', () => {
+test('single-book assets reuse one selector for video and comic asset presets', () => {
   assert.match(source, /script\.asset-extraction/);
-  assert.match(source, /SD 资产预设提示词/);
+  assert.match(source, /batch\.comic-assets/);
+  assert.match(source, /选择资产提示词/);
   assert.match(source, /updateAssetSelection\('extraction', selection\)/);
   assert.doesNotMatch(source, /updateAssetSelection\('character', selection\)/);
   assert.doesNotMatch(source, /updateAssetSelection\('scene', selection\)/);
-  assert.match(source, /const moduleKeys = region === 'video' \|\| region === 'media' \? \['video'\] : \[moduleKey\]/);
+  assert.match(source, /const moduleKeys = region === 'media' \? \['video', 'comic'\]/);
 });
 
 test('single-book engine settings can override opening variants and restore batch inheritance', () => {
@@ -134,24 +198,54 @@ test('keeps derived-opening presets out of single-book video settings', () => {
   assert.doesNotMatch(videoRegion, /原文直转导演/);
   assert.doesNotMatch(videoRegion, /爆款开头导演/);
   assert.doesNotMatch(videoRegion, /爆款开头改编/);
-  assert.match(source, /const moduleKeys = region === 'video' \|\| region === 'media' \? \['video'\]/);
+
 	assert.match(videoRegion, /<RuleModule required title="视频提示词"/);
   assert.match(videoRegion, /<PromptSelect required label="视频提示词"/);
-  assert.match(source, /const DEFAULT_VIDEO_PROMPT = \{ presetId: 'batch-video-sd'/);
+	assert.match(source, /const DEFAULT_VIDEO_PROMPT = \{ presetId: 'batch-video-sd'/);
 	assert.match(source, /video: requiredVideoPrompt\(aiPromptConfig\.video\)/);
 });
 
-test('uses the comic page preset for a book comic-generation override', () => {
+test('single-book constraints keep the smart-unified preset visible when old catalogs omit its category', () => {
+  assert.match(source, /SMART_UNIFIED_PRESET_ID = 'script-constraint-prefix-smart-unified'/);
+  assert.match(source, /category === 'prefix' && item\?\.id === SMART_UNIFIED_PRESET_ID/);
+  assert.match(source, /preset\.id === SMART_UNIFIED_PRESET_ID \? 'prefix'/);
+});
+
+test('single-book constraints hide the raw smart-unified system prompt from the editor', () => {
+  assert.match(source, /const isSmartUnified = value\.presetId === SMART_UNIFIED_PRESET_ID/);
+  assert.match(source, /智能统一由系统自动分析，原始系统提示词不在这里展示/);
+  assert.match(source, /isSmartUnified \? <Typography\.Text/);
+});
+
+test('uses the comic page and image-derivation presets for a book comic-generation override', () => {
   assert.match(source, /const comicPageRules = useMemo\(\(\) => catalog\.batch\.filter\(item => item\.slot === 'batch\.comic-page'\)/);
   assert.match(source, /const moduleKeys = region === 'media' \? \['video', 'comic'\]/);
-  assert.match(source, /<RuleModule title="漫画生成" value=\{ai\.comic\}/);
-  assert.match(source, /<PromptSelect label="漫画提示词" value=\{ai\.comic\}/);
+  assert.match(source, /<RuleModule title="漫画生成" value=\{\{ \.\.\.ai\.comic, enabled: productionMode === 'comic' \}\}/);
+  assert.match(source, /<PromptSelect required label="漫画提示词" value=\{ai\.comic\}/);
+  assert.match(source, /<PromptSelect label="图片描述词推导"/);
+});
+
+test('single-book media configuration uses one mutually exclusive production mode', () => {
+  assert.match(source, /productionMode/);
+  assert.match(source, /图片描述词推导/);
+  assert.match(source, /batch\.comic-image-derivation/);
+  assert.match(source, /选择资产提示词/);
+  assert.doesNotMatch(source, /<PromptSelect label="漫画资产提示词"/);
+});
+
+test('enabling comic production selects the default comic preset and uses comic-specific empty text', () => {
+  assert.match(source, /const defaultComicPage = comicPageRules\[0\]/);
+  assert.match(source, /patchAI\('comic', scoped\(\{ \.\.\.ai\.comic, \.\.\.selectedMeta\(comicPageRules, defaultComicPage\.id\), enabled: true \}\)\)/);
+  assert.match(source, /placeholder=\{required \? `请选择已发布\$\{label\}` : '未选择'\}/);
 });
 
 
 test('single-book settings keep publish mappings inside engine configuration without replacing inherited fields', () => {
   assert.match(source, /audioMergeEnabled/);
   assert.match(source, /label: '发布统一'/);
+  assert.match(source, /BatchFactoryComicPublishSettingsForm/);
+  assert.match(source, /productionMode === 'comic' \? <div[\s\S]*?BatchFactoryComicPublishSettingsForm/);
+  assert.match(source, /comicPublishSettings: mergePublishSettings/);
   assert.match(source, /mergePublishSettings/);
   assert.match(source, /网站配置档/);
   assert.match(source, /素材使用/);

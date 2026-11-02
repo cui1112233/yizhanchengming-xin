@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +29,103 @@ type BatchFactory121Publisher struct {
 	LocalFiles  *localartifact.Store
 	MergedFiles mergeworker.ObjectReader
 	Connector   videomanagementconnector.Service
+}
+
+func selectPublishMergeJobs(batch batchfactoryv11.Batch, book batchfactoryv11.Book, jobs []batchfactoryv11.MergeJob) ([]batchfactoryv11.MergeJob, error) {
+	requiredCount := 1
+	settings := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	var openingEnabled bool
+	if raw := settings["openingEnabled"]; len(raw) > 0 {
+		_ = json.Unmarshal(raw, &openingEnabled)
+	}
+	if openingEnabled && len(book.Videos) >= 2 {
+		requiredCount = 4
+		if raw := settings["openingCount"]; len(raw) > 0 {
+			if err := json.Unmarshal(raw, &requiredCount); err != nil {
+				return nil, fmt.Errorf("换开头数量配置无效")
+			}
+		}
+		if requiredCount < 1 || requiredCount > 8 {
+			return nil, fmt.Errorf("换开头数量必须在 1 到 8 之间")
+		}
+	}
+
+	newestByOpening := make(map[int]batchfactoryv11.MergeJob, requiredCount)
+	for _, job := range jobs {
+		if job.BookID != book.ID || job.Status != batchfactoryv11.MergeSucceeded || strings.TrimSpace(job.OutputURL) == "" {
+			continue
+		}
+		current, exists := newestByOpening[job.OpeningVariantIndex]
+		if !exists || job.UpdatedAt.After(current.UpdatedAt) {
+			newestByOpening[job.OpeningVariantIndex] = job
+		}
+	}
+
+	selected := make([]batchfactoryv11.MergeJob, 0, requiredCount)
+	for index := 0; index < requiredCount; index++ {
+		job, ok := newestByOpening[index]
+		if !ok {
+			if index == 0 {
+				return nil, fmt.Errorf("当前书没有可上传的原开头最终合成视频")
+			}
+			return nil, fmt.Errorf("当前书缺少换开头 %d 的最终合成视频", index)
+		}
+		selected = append(selected, job)
+	}
+	return selected, nil
+}
+
+func publish121Content(book batchfactoryv11.Book, workingFrontContent string) []byte {
+	source := book.SourceText
+	if source == "" {
+		source = book.TxtText
+	}
+	editedLines := make([]string, 0)
+	for _, line := range strings.Split(workingFrontContent, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			editedLines = append(editedLines, line)
+		}
+	}
+	if len(editedLines) == 0 {
+		return []byte(source)
+	}
+
+	limit := 5
+	switch value := book.SourceMetadata["contentRangeLines"].(type) {
+	case float64:
+		limit = int(value)
+	case int:
+		limit = value
+	case int64:
+		limit = int(value)
+	case json.Number:
+		if parsed, err := value.Int64(); err == nil {
+			limit = int(parsed)
+		}
+	}
+	if limit < 1 {
+		limit = 1
+	} else if limit > 500 {
+		limit = 500
+	}
+
+	sourceLines := strings.Split(source, "\n")
+	replacement, seen := 0, 0
+	for index, line := range sourceLines {
+		if strings.TrimSpace(line) == "" || seen >= limit {
+			continue
+		}
+		seen++
+		if replacement >= len(editedLines) {
+			continue
+		}
+		sourceLines[index] = editedLines[replacement]
+		replacement++
+	}
+	if replacement == 0 {
+		return []byte(strings.Join(editedLines, "\n"))
+	}
+	return []byte(strings.Join(sourceLines, "\n"))
 }
 
 func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, bookID string, input map[string]any) (map[string]any, error) {
@@ -93,10 +191,14 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	for key, value := range advanced {
 		fields[key] = value
 	}
-	content := []byte(book.SourceText)
-	if len(content) == 0 {
-		content = []byte(book.TxtText)
+	workingFrontContent := book.WorkingFrontContent
+	draft, err := p.Store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
+	if err == nil {
+		workingFrontContent = draft.Content
+	} else if !errors.Is(err, batchfactoryv11.ErrNotFound) {
+		return nil, err
 	}
+	content := publish121Content(book, workingFrontContent)
 	if len(content) == 0 {
 		return nil, fmt.Errorf("当前小说没有可上传的正文")
 	}
@@ -108,34 +210,56 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if err != nil {
 		return nil, err
 	}
-	var selected batchfactoryv11.MergeJob
-	for _, job := range jobs {
-		if job.BookID == bookID && job.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(job.OutputURL) != "" && (selected.ID == "" || job.UpdatedAt.After(selected.UpdatedAt)) {
-			selected = job
-		}
-	}
-	if selected.ID == "" {
-		return nil, fmt.Errorf("当前书没有可上传的最终合成视频")
-	}
-	video, err := p.readMerge(ctx, selected.OutputURL)
+	selectedJobs, err := selectPublishMergeJobs(batch, book, jobs)
 	if err != nil {
-		return nil, fmt.Errorf("读取最终合成视频失败：%w", err)
-	}
-	defer video.Close()
-	videoBytes, err := io.ReadAll(io.LimitReader(video, 512<<20))
-	if err != nil || len(videoBytes) == 0 {
-		return nil, fmt.Errorf("最终合成视频为空")
+		return nil, err
 	}
 	videoUploader, ok := p.Connector.(videomanagementconnector.VideoUploadService)
 	if !ok {
 		return nil, fmt.Errorf("视频管理系统 Go 连接器不支持视频上传")
 	}
 	targetSession := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
-	head, err := videoUploader.UploadVideo(ctx, targetSession, book.BookID+".mp4", videoBytes)
+	type publishVideo struct {
+		job      batchfactoryv11.MergeJob
+		filename string
+		content  []byte
+	}
+	videos := make([]publishVideo, 0, len(selectedJobs))
+	videoFiles := make([]string, 0, len(selectedJobs))
+	mergeJobIDs := make([]string, 0, len(selectedJobs))
+	openingVariantIndexes := make([]int, 0, len(selectedJobs))
+	for _, job := range selectedJobs {
+		video, readErr := p.readMerge(ctx, job.OutputURL)
+		if readErr != nil {
+			return nil, fmt.Errorf("读取开头 %d 最终合成视频失败：%w", job.OpeningVariantIndex, readErr)
+		}
+		videoBytes, readErr := io.ReadAll(io.LimitReader(video, 512<<20))
+		closeErr := video.Close()
+		if readErr != nil || closeErr != nil || len(videoBytes) == 0 {
+			return nil, fmt.Errorf("开头 %d 最终合成视频为空", job.OpeningVariantIndex)
+		}
+		filename := book.BookID + ".mp4"
+		if len(selectedJobs) > 1 {
+			filename = fmt.Sprintf("%s-opening-%d.mp4", book.BookID, job.OpeningVariantIndex)
+		}
+		videos = append(videos, publishVideo{job: job, filename: filename, content: videoBytes})
+		videoFiles = append(videoFiles, filename)
+		mergeJobIDs = append(mergeJobIDs, job.ID)
+		openingVariantIndexes = append(openingVariantIndexes, job.OpeningVariantIndex)
+	}
+	heads := make([]string, 0, len(videos))
+	for _, video := range videos {
+		head, uploadErr := videoUploader.UploadVideo(ctx, targetSession, video.filename, video.content)
+		if uploadErr != nil {
+			return nil, uploadErr
+		}
+		heads = append(heads, head)
+	}
+	headVideoJSON, err := marshalPublishedVideoHeads(heads)
 	if err != nil {
 		return nil, err
 	}
-	fields["jieya_ai_head_video"] = fmt.Sprintf("[%s]", head)
+	fields["jieya_ai_head_video"] = headVideoJSON
 	fields["jieya_ai_head_video_mode"] = "0"
 	fields["jieya_ai_head_horizontal_flip"] = "0"
 	submission, err := p.Connector.Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields})
@@ -163,17 +287,50 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	}
 	history := publishHistory(metadata["websiteSubmitHistory"])
 	history = append(history, map[string]any{
-		"status":      "uploaded",
-		"phase":       "completed",
-		"detail":      "视频管理系统已接收并回读确认",
-		"submittedAt": uploadedAt,
-		"bookId":      book.BookID,
+		"status":                "uploaded",
+		"phase":                 "completed",
+		"detail":                "视频管理系统已接收并回读确认",
+		"submittedAt":           uploadedAt,
+		"bookId":                book.BookID,
+		"videoCount":            len(videoFiles),
+		"openingVariantIndexes": openingVariantIndexes,
+		"mergeJobIds":           mergeJobIDs,
+		"videoFiles":            videoFiles,
 	})
 	metadata["websiteSubmitHistory"] = history
 	if _, err := p.Store.UpdateBookMetadata(ctx, owner, batchID, bookID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision}); err != nil {
 		return nil, fmt.Errorf("上传已成功，但保存上传状态失败：%w", err)
 	}
-	return map[string]any{"status": "uploaded", "bookId": book.BookID, "internalBookId": book.ID, "sourceTextFile": book.BookID + ".txt", "aiHeadVideoFile": book.BookID + ".mp4", "uploadedAt": uploadedAt, "response": remote, "readback": readback}, nil
+	return map[string]any{
+		"status":                "uploaded",
+		"bookId":                book.BookID,
+		"internalBookId":        book.ID,
+		"sourceTextFile":        book.BookID + ".txt",
+		"aiHeadVideoFile":       videoFiles[0],
+		"aiHeadVideoFiles":      videoFiles,
+		"videoCount":            len(videoFiles),
+		"openingVariantIndexes": openingVariantIndexes,
+		"mergeJobIds":           mergeJobIDs,
+		"uploadedAt":            uploadedAt,
+		"response":              remote,
+		"readback":              readback,
+	}, nil
+}
+
+func marshalPublishedVideoHeads(heads []string) (string, error) {
+	values := make([]map[string]any, 0, len(heads))
+	for _, head := range heads {
+		var value map[string]any
+		if err := json.Unmarshal([]byte(strings.TrimSpace(head)), &value); err != nil || len(value) == 0 {
+			return "", fmt.Errorf("视频管理系统返回了无效的视频对象")
+		}
+		values = append(values, value)
+	}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return "", fmt.Errorf("整理视频上传结果失败：%w", err)
+	}
+	return string(raw), nil
 }
 
 func clonePublishMetadata(source map[string]any) map[string]any {

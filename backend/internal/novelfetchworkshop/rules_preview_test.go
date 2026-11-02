@@ -18,6 +18,29 @@ func TestPreviewRulesMatchesWorkbenchCoreStages(t *testing.T) {
 	}
 }
 
+func TestProcessConfiguredTextRunsSensitiveAndSymbolStagesForOriginal(t *testing.T) {
+	settings := map[string]any{
+		"appConfig": map[string]any{
+			"layout":    map[string]any{"apply_to_original": true, "apply_to_ai": true, "apply_sensitive": true, "apply_symbol_rules": true},
+			"sensitive": map[string]any{"groups": []any{map[string]any{"enabled": true, "apply_to_original": true, "apply_to_ai": false, "rules": []any{map[string]any{"find": "坏词", "replace": "好词"}}}}},
+		},
+		"knowledgeLibraries": map[string]any{
+			"symbol_rules": map[string]any{"enable_symbol_trim": true, "symbol_trim_positions": "2", "symbol_trim_allow_adjacent": false, "symbol_rules": []any{map[string]any{"find": "，", "enabled": true}}},
+		},
+	}
+	text, trace, hits := ProcessConfiguredText("甲，坏词", "original", settings)
+	if text != "甲，\n好词" || len(hits) != 1 {
+		t.Fatalf("processed=%q hits=%#v", text, hits)
+	}
+	stages := map[string]bool{}
+	for _, stage := range trace {
+		stages[stage["stage"].(string)] = true
+	}
+	if !stages["sensitive"] || !stages["symbol_trim"] || !stages["chapter_2"] {
+		t.Fatalf("missing pipeline stages: %#v", trace)
+	}
+}
+
 func TestPreviewRulesHonorsScopeDisable(t *testing.T) {
 	text, trace := PreviewRules("第1章\n你好。。", "original", map[string]any{"apply_to_original": false}, nil)
 	if text != "第1章\n你好。。" || len(trace) != 1 {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { batchMediaCounts, resolveBookProductionText } from './batchFactoryRuntimeLogic.js';
+import { batchMediaCounts, resolveBookEditableContent, resolveBookProductionText } from './batchFactoryRuntimeLogic.js';
 
 test('resolves working production text before the configured source preview', () => {
   assert.equal(resolveBookProductionText({
@@ -12,6 +12,15 @@ test('resolves working production text before the configured source preview', ()
     sourceText: '第一行\n第二行\n第三行',
     sourceMetadata: { contentRangeLines: 2 }
   }), '第一行\n第二行');
+});
+
+test('comic editing uses the complete captured source instead of the video line range', () => {
+  const book = {
+    sourceText: '第一行\n第二行\n第三行',
+    sourceMetadata: { contentRangeLines: 1 }
+  };
+  assert.equal(resolveBookEditableContent(book, 'video'), '第一行');
+  assert.equal(resolveBookEditableContent(book, 'comic'), '第一行\n第二行\n第三行');
 });
 
 test('counts only playable VIDEO tasks and completed merge outputs', () => {

@@ -24,6 +24,48 @@ func applyVideoPromptOverrides(video *Video) {
 	if value, ok := optionalPromptValue(video.SettingsState.Patch, "comicPrompt"); ok {
 		video.ComicPrompt = value
 	}
+	if value, ok := optionalPromptValue(video.SettingsState.Patch, "comicImagePrompt"); ok {
+		video.ComicImagePrompt = value
+	}
+	if value, ok := optionalStringSliceValue(video.SettingsState.Patch, "comicRoles"); ok {
+		video.ComicRoles = value
+	}
+	if value, ok := optionalStringMapValue(video.SettingsState.Patch, "comicRoleStage"); ok {
+		video.ComicRoleStage = value
+	}
+	if value, ok := optionalStringSliceValue(video.SettingsState.Patch, "comicScenePresets"); ok {
+		video.ComicScenePresets = value
+	}
+}
+
+func optionalStringMapValue(patch SettingsPatch, key string) (map[string]string, bool) {
+	raw, ok := patch[key]
+	if !ok {
+		return nil, false
+	}
+	var values map[string]string
+	if json.Unmarshal(raw, &values) != nil {
+		return nil, false
+	}
+	return normalizedStringMap(values), true
+}
+
+func optionalStringSliceValue(patch SettingsPatch, key string) ([]string, bool) {
+	raw, ok := patch[key]
+	if !ok {
+		return nil, false
+	}
+	var values []string
+	if json.Unmarshal(raw, &values) != nil {
+		return nil, false
+	}
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			normalized = append(normalized, value)
+		}
+	}
+	return normalized, true
 }
 
 func optionalPromptValue(patch SettingsPatch, key string) (string, bool) {

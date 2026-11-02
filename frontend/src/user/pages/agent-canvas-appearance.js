@@ -1,4 +1,5 @@
 export const canvasEdgeColorOptions = Object.freeze([
+  Object.freeze({ value: 'neutral', label: '中性' }),
   Object.freeze({ value: 'coral', label: '珊瑚' }),
   Object.freeze({ value: 'cyan', label: '青蓝' }),
   Object.freeze({ value: 'violet', label: '紫罗兰' }),
@@ -12,9 +13,9 @@ export const canvasEdgeWidthOptions = Object.freeze([
 ]);
 
 export const defaultCanvasAppearance = Object.freeze({
-  edgeColor: 'coral',
-  edgeAnimated: true,
-  edgeWidth: 'default',
+  edgeColor: 'neutral',
+  edgeAnimated: false,
+  edgeWidth: 'thin',
   edgesVisible: true,
   backgroundDots: true,
   alignmentGuides: true

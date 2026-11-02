@@ -12,7 +12,7 @@ import {
   formatTokens
 } from './accountCenterShared';
 
-const CONTENT_FEATURES = new Set(['script', 'novel-panel', 'novel-fetch', 'image', 'shuihuo-production']);
+const CONTENT_FEATURES = new Set(['script', 'novel-fetch', 'image', 'shuihuo-production']);
 
 function contentProductionCalls(usage) {
   return Object.entries(usage?.callsByFeature || {})

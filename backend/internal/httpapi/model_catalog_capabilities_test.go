@@ -26,6 +26,9 @@ func TestPublicManagedModelCapabilitiesExcludeCredentialsAndValidateImageSetting
 	if strings.Join(capabilities.Resolutions, ",") != "1K,2K,4K" || capabilities.MaxOutputCount != 4 {
 		t.Fatalf("capabilities = %+v", capabilities)
 	}
+	if !capabilities.AcceptsTextPrompt || !capabilities.AcceptsImageReferences || capabilities.AcceptsVideoReferences || capabilities.AcceptsAudioReferences || capabilities.MaxReferenceAssets != 10 {
+		t.Fatalf("image input capabilities = %+v", capabilities)
+	}
 	if err := ValidateModelSettings(public, "image", map[string]any{"ratio": "16:9", "resolution": "8K", "count": 1}); err == nil || !strings.Contains(err.Error(), "resolution") {
 		t.Fatalf("invalid resolution error = %v", err)
 	}
@@ -37,7 +40,18 @@ func TestPublicManagedModelCapabilitiesAreKindSpecific(t *testing.T) {
 	if strings.Join(capabilities.ReferenceKinds, ",") != "image" || len(capabilities.QualityLevels) != 0 {
 		t.Fatalf("video capabilities = %+v", capabilities)
 	}
+	if !capabilities.AcceptsTextPrompt || !capabilities.AcceptsImageReferences || capabilities.AcceptsVideoReferences || capabilities.AcceptsAudioReferences || capabilities.MaxReferenceAssets != 10 {
+		t.Fatalf("video input capabilities = %+v", capabilities)
+	}
 	if err := ValidateModelSettings(video, "image", map[string]any{}); err == nil || !strings.Contains(err.Error(), "kind") {
 		t.Fatalf("kind mismatch error = %v", err)
+	}
+}
+
+func TestPublicManagedModelCapabilitiesDefaultUnknownInputsToUnsupported(t *testing.T) {
+	unknown := publicManagedModel(map[string]any{"id": "unknown", "kind": "unknown", "enabled": true})
+	capabilities := unknown["capabilities"].(PublicModelCapabilities)
+	if capabilities.AcceptsTextPrompt || capabilities.AcceptsImageReferences || capabilities.AcceptsVideoReferences || capabilities.AcceptsAudioReferences || capabilities.MaxReferenceAssets != 0 {
+		t.Fatalf("unknown capabilities = %+v", capabilities)
 	}
 }

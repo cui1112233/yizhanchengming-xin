@@ -39,6 +39,38 @@ test('keeps the full video management publication controls inside unified config
   assert.match(source, /连接与环境状态/);
 });
 
+test('shows simple comic publication defaults instead of video publication controls in comic mode', () => {
+  assert.match(source, /function BatchFactoryComicPublishSettingsForm/);
+  assert.match(source, /comicPublishSettings/);
+  assert.match(source, /producerAdminName/);
+  assert.match(source, /audioCategoryId/);
+  assert.match(source, /workMatchMode/);
+  assert.match(source, /制作者管理员账号/);
+	assert.match(source, /启用中的音频分类/);
+	assert.match(source, /audioCategoryName/);
+	assert.match(source, /启用中的音频分类/);
+	assert.match(source, /音频分类 ID（必填）/);
+	assert.match(source, /inferBatchN8AudioCategory/);
+	assert.match(source, /audioCategorySelectionMode/);
+	assert.match(source, /已根据批次 AI 分类自动匹配/);
+	assert.doesNotMatch(source, /没有配套音频时可以不填/);
+  assert.match(source, /按书名自动匹配/);
+  assert.match(source, /productionMode === 'comic'\s*\? <BatchFactoryComicPublishSettingsForm/);
+  assert.match(source, /: <BatchFactoryPublishSettingsForm/);
+});
+
+test('loads server-managed comic producer accounts into a searchable selector', () => {
+  const start = source.indexOf('export function BatchFactoryComicPublishSettingsForm');
+  const end = source.indexOf('export function BatchFactoryAiReasoningForm');
+  const comicPublishForm = source.slice(start, end);
+  assert.match(comicPublishForm, /getN8ComicPublishStatus/);
+  assert.match(comicPublishForm, /producerAccounts/);
+  assert.match(comicPublishForm, /<Select/);
+  assert.match(comicPublishForm, /showSearch/);
+  assert.match(comicPublishForm, /账号目录尚未配置/);
+  assert.doesNotMatch(comicPublishForm, /<Input\s+[\s\S]*?producerAdminName/);
+});
+
 test('stores a unified organization selection independently from AI classification fields', () => {
   assert.match(source, /get121OrganizationOptions/);
   assert.match(source, /<b>组织归属<\/b>/);
@@ -110,6 +142,54 @@ test('marks the video-management session stale and refreshes organizations after
 
 test('treats the legacy novel-fetch browser session as the same shared 121 login', () => {
   assert.match(source, /SESSION_CHECK_NAMES\s*=\s*\[\s*'视频管理系统登录会话',\s*'121 后台登录会话',\s*'目标站登录会话'\s*\]/);
+});
+
+test('unified configuration has the same mutually exclusive comic media settings as a single book', () => {
+  assert.match(source, /export function BatchFactoryMediaSettingsForm/);
+  assert.match(source, /const productionMode = value\.productionMode === 'comic' \? 'comic' : 'video';/);
+  assert.match(source, /title="漫画生成"/);
+  assert.match(source, /batch\.comic-page/);
+  assert.match(source, /batch\.comic-image-derivation/);
+  assert.match(source, /\{ key: 'media', label: '画面与视频', children: <BatchFactoryMediaSettingsForm value=\{draftPatch\} onChange=\{setDraftPatch\} active=\{open\} \/> \}/);
+});
+
+test('unified configuration exposes both local-executor provider selectors', () => {
+  assert.match(source, /from '.\/providerModelBinding'/);
+  assert.match(source, /图片生成通道/);
+  assert.match(source, /视频引擎/);
+  assert.match(source, /value\.imageProvider/);
+  assert.match(source, /value\.videoProvider/);
+  assert.match(source, /providerOptionsForModels\(models, 'image'\)/);
+  assert.match(source, /providerOptionsForModels\(models, 'video'\)/);
+});
+
+test('local Doubao video provider exposes the executor-supported model list', () => {
+  for (const [model, description] of [
+    ['Seedance 2.5', '旗舰视频标杆 · 5 倍消耗'],
+    ['Seedance 2.0', '进阶画面表现 · 2 倍消耗'],
+    ['Seedance 2.0 Fast', '快速出片选择'],
+    ['Seedance 2.0 Mini', '日常生成使用']
+  ]) {
+    assert.match(source, /reconcileProviderModel/);
+    assert.match(source, /modelOptionsForProvider/);
+  }
+  assert.match(source, /modelOptionsForProvider\(models, 'video', value\.videoProvider\)/);
+  assert.match(source, /reconcileProviderModel\(\{ models, kind: 'video'/);
+});
+
+test('local Doubao image provider exposes the executor-supported model list', () => {
+  for (const [model, description] of [
+    ['Seedream 5.0 Flash', '专业快速'],
+    ['Seedream 5.0 Pro', '专业出图 · 4 倍消耗'],
+    ['Seedream 4.5', '日常生成'],
+    ['Seedream 4.0', '基础生图']
+  ]) {
+    assert.match(source, /reconcileProviderModel/);
+    assert.match(source, /modelOptionsForProvider/);
+  }
+  assert.match(source, /modelOptionsForProvider\(models, 'image', value\.imageProvider\)/);
+  assert.match(source, /reconcileProviderModel\(\{ models, kind: 'image'/);
+  assert.doesNotMatch(source, /豆包本地版/);
 });
 
 test('automation preset dialog uses the unified button treatment', () => {
@@ -210,7 +290,7 @@ test('uses a website profile organization as the unified organization default', 
 });
 
 test('unified AI reasoning exposes all four constraint layers plus the base-setup switch', () => {
-  assert.match(source, /<b>画面前缀词（智能统一）<\/b>/);
+  assert.match(source, /<b>画面前缀词<\/b>/);
   assert.match(source, /<b>画质约束<\/b>/);
   assert.match(source, /<b>画面限制<\/b>/);
   assert.match(source, /<b>负面提示词<\/b>/);
@@ -231,6 +311,12 @@ test('unified constraint selector fetches and persists the preset body instead o
   assert.match(source, /apply\(String\(result\?\.texts\?\.\[normalizedId\] \|\| ''\)\)/);
   assert.match(source, /\{ \.\.\.presetValue\(selected\), constraintCategory: comicCategory, body \}/);
   assert.match(source, /\{ \.\.\.presetValue\(selected\), body \}/);
+});
+
+test('unified settings keep smart unified selectable when catalog metadata is incomplete', () => {
+  assert.match(source, /SMART_UNIFIED_PRESET_ID = 'script-constraint-prefix-smart-unified'/);
+  assert.match(source, /category === 'prefix' && item\.id === SMART_UNIFIED_PRESET_ID/);
+  assert.match(source, /preset\.id === SMART_UNIFIED_PRESET_ID \? 'prefix'/);
 });
 
 test('persists the default SD video prompt when unified settings are saved without a video selection', () => {

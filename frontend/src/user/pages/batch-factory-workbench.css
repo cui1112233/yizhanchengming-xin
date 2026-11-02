@@ -124,3 +124,14 @@
   .batch-factory-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .batch-factory-topbar { padding: 14px; }
 }
+
+.batch-factory-workbench { color: var(--text-primary); }
+.batch-factory-workbench .ant-typography,
+.batch-factory-workbench .ant-card-head-title { color: var(--text-primary); }
+.batch-factory-workbench .ant-typography-secondary,
+.batch-factory-workbench .batch-factory-novel-index,
+.batch-factory-workbench .batch-factory-novel-copy small,
+.batch-factory-workbench .batch-factory-progress-summary span { color: var(--text-secondary) !important; }
+.batch-factory-status-grid button { color: var(--text-secondary); }
+.batch-factory-status-grid button strong { color: var(--text-primary); }
+.batch-factory-abnormal-summary .ant-btn-dangerous { color: var(--text-danger); }

@@ -23,7 +23,14 @@ test('旧项目会得到稳定的故事板分类、选择和排序状态', () =>
     categories: {},
     order: [],
     libraryWidth: 340,
-    sectionHeights: { text: 220, audio: 240, image: 320 }
+    sectionHeights: { text: 220, audio: 240, image: 320 },
+    layout: {
+      director: 31,
+      column: 25,
+      leftRow: 66,
+      rightRow: 55,
+      sectionOrder: ['text', 'audio', 'image', 'video']
+    }
   });
   assert.deepEqual(storyboardCategoryOptions('image').map(item => item.label), ['全部', '角色', '场景', '物品', '其他']);
   assert.deepEqual(storyboardCategoryOptions('video').map(item => item.label), ['全部', '视频片段', '成片']);
@@ -84,6 +91,34 @@ test('故事板按素材独立保存分类且不会写入原节点或素材', ()
   assert.equal(storyboardItemCategory({ key: 'asset:image-2', kind: 'image' }, changed), 'character');
 });
 
+test('故事板布局比例和分区顺序会安全保存并去重', () => {
+  const state = normalizeStoryboardState({
+    layout: {
+      director: 2,
+      column: 92,
+      leftRow: 62,
+      rightRow: 58,
+      sectionOrder: ['video', 'text', 'video', 'unknown']
+    }
+  });
+  assert.deepEqual(state.layout, {
+    director: 18,
+    column: 82,
+    leftRow: 62,
+    rightRow: 58,
+    sectionOrder: ['video', 'text', 'audio', 'image']
+  });
+
+  const changed = patchStoryboardState(state, { layout: { column: 27 } });
+  assert.deepEqual(changed.layout, {
+    director: 18,
+    column: 27,
+    leftRow: 62,
+    rightRow: 58,
+    sectionOrder: ['video', 'text', 'audio', 'image']
+  });
+});
+
 test('素材排序只移动同一分类中的目标并保持稳定键', () => {
   const state = normalizeStoryboardState({ order: ['asset:a', 'asset:b', 'asset:c'] });
   const moved = moveStoryboardMaterial(state, 'asset:c', -1, ['asset:a', 'asset:b', 'asset:c']);
@@ -125,6 +160,13 @@ test('无效分类、重复排序键和未知字段都会被清理', () => {
     categories: { 'asset:video': 'final_video' },
     order: ['asset:a'],
     libraryWidth: 340,
-    sectionHeights: { text: 220, audio: 240, image: 320 }
+    sectionHeights: { text: 220, audio: 240, image: 320 },
+    layout: {
+      director: 31,
+      column: 25,
+      leftRow: 66,
+      rightRow: 55,
+      sectionOrder: ['text', 'audio', 'image', 'video']
+    }
   });
 });

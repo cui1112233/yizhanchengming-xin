@@ -1,0 +1,114 @@
+# 每个 PR / main 推送:fmt / clippy / test(Rust)+ typecheck / test / build(前端)+ 发布脚本自测。
+# spec 13 写的 matrix 含 ubuntu-latest;本项目只发 Windows / macOS(spec 02 平台),
+# Linux 上 Tauri 还要装 webkit2gtk 等系统库,计划 Task 6.2 定为 macos-latest + windows-latest。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # 与开发机一致;升级工具链时同时改 release.yml
+  RUST_TOOLCHAIN: "1.94.0"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9"
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 版本号三处同步
+        shell: bash
+        run: bash scripts/bump-version.sh --check
+
+      - name: frontend install
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: frontend typecheck
+        working-directory: frontend
+        run: pnpm typecheck
+
+      - name: frontend test
+        working-directory: frontend
+        run: pnpm test -- --run
+
+      - name: frontend build
+        working-directory: frontend
+        run: pnpm build
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace --locked
+
+  scripts:
+    name: release scripts
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: bump-version / sign / notarize 脚本自测(DRY_RUN)
+        run: bash scripts/tests/run.sh
+
+  scripts-windows:
+    name: release scripts (windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: sign-windows.ps1 语法 + DryRun 冒烟
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/sign-windows.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | Format-List; exit 1 }
+          $dir = Join-Path $env:RUNNER_TEMP 'bundle'
+          New-Item -ItemType Directory -Force -Path "$dir/msi", "$dir/nsis" | Out-Null
+          Set-Content -Path "$dir/msi/doubao-relay_0.0.0_x64_en-US.msi" -Value ''
+          Set-Content -Path "$dir/nsis/doubao-relay_0.0.0_x64-setup.exe" -Value ''
+          $env:WINDOWS_CERTIFICATE = 'ZmFrZQ=='
+          $env:WINDOWS_CERTIFICATE_PASSWORD = 'not-a-real-password'
+          $out = & ./scripts/sign-windows.ps1 -BundleDir $dir -DryRun *>&1 | Out-String
+          Write-Host $out
+          if ($out -match 'not-a-real-password') { throw 'password leaked into output' }
+          if ($out -notmatch 'signtool' -or $out -notmatch 'setup\.exe' -or $out -notmatch '\.msi') { throw 'unexpected dry-run output' }

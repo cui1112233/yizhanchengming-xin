@@ -5,7 +5,9 @@ export const DEFAULT_WORKSPACE_VIEW = Object.freeze({
   drawerOpen: false,
   drawerTab: 'nodes',
   drawerWidth: 288,
-  conversationOpen: true,
+  // The canvas should open focused on the work surface. The conversation is
+  // available from the bottom circular control and must be opt-in.
+  conversationOpen: false,
   conversationWidth: 360,
   snapToGrid: false,
   showMinimap: true,

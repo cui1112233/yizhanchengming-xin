@@ -1,19 +1,24 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 type agentCanvasInputPreviewRequest struct {
-	NodeID string `json:"nodeId"`
+	NodeID   string `json:"nodeId"`
+	Provider string `json:"provider"`
+	ModelID  string `json:"modelId"`
 }
 
-func registerAgentCanvasInputPreviewRoute(root *http.ServeMux, middleware BridgeAuth, projects agentworkspace.Store) {
+func registerAgentCanvasInputPreviewRoute(root *http.ServeMux, middleware BridgeAuth, projects agentworkspace.Store, catalog novelfetchworkshop.Store) {
 	if root == nil || projects == nil {
 		return
 	}
@@ -41,7 +46,12 @@ func registerAgentCanvasInputPreviewRoute(root *http.ServeMux, middleware Bridge
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "画布节点不存在"})
 			return
 		}
-		resolved, err := agentworkspace.ResolveCanvasInputs(canvas, input.NodeID, agentCanvasInputCapability(node.Type))
+		capability, err := resolveAgentCanvasInputCapability(req.Context(), catalog, identity.Username, node.Type, input.Provider, input.ModelID)
+		if err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+			return
+		}
+		resolved, err := agentworkspace.ResolveCanvasInputs(canvas, input.NodeID, capability)
 		if err != nil {
 			writeAgentCanvasInputError(w, err)
 			return
@@ -72,6 +82,38 @@ func agentCanvasInputCapability(nodeType string) agentworkspace.CanvasInputCapab
 	}
 }
 
+func resolveAgentCanvasInputCapability(ctx context.Context, catalog novelfetchworkshop.Store, owner, nodeType, provider, modelID string) (agentworkspace.CanvasInputCapability, error) {
+	nodeType, provider, modelID = strings.TrimSpace(nodeType), strings.TrimSpace(provider), strings.TrimSpace(modelID)
+	if provider == "doubao_local_executor" && (nodeType == "image" || nodeType == "video") {
+		return agentCanvasInputCapabilityFromPublic(publicModelCapabilities(map[string]any{"kind": nodeType})), nil
+	}
+	if catalog == nil || modelID == "" {
+		return agentCanvasInputCapability(nodeType), nil
+	}
+	settings, err := catalog.GetConfig(ctx, owner)
+	if err != nil {
+		return agentworkspace.CanvasInputCapability{}, err
+	}
+	for _, model := range modelCatalog(settings) {
+		if modelString(model, "id") != modelID && modelString(model, "modelId") != modelID {
+			continue
+		}
+		if modelString(model, "kind") != nodeType || !modelEnabled(model) {
+			return agentworkspace.CanvasInputCapability{}, fmt.Errorf("当前模型不可用")
+		}
+		return agentCanvasInputCapabilityFromPublic(publicModelCapabilities(model)), nil
+	}
+	return agentworkspace.CanvasInputCapability{}, fmt.Errorf("当前模型不可用")
+}
+
+func agentCanvasInputCapabilityFromPublic(capabilities PublicModelCapabilities) agentworkspace.CanvasInputCapability {
+	return agentworkspace.CanvasInputCapability{
+		AcceptsTextPrompt: capabilities.AcceptsTextPrompt, AcceptsImageReferences: capabilities.AcceptsImageReferences,
+		AcceptsVideoReferences: capabilities.AcceptsVideoReferences, AcceptsAudioReferences: capabilities.AcceptsAudioReferences,
+		MaxReferenceAssets: capabilities.MaxReferenceAssets,
+	}
+}
+
 func writeAgentCanvasInputError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, agentworkspace.ErrCanvasInputTargetNotFound):
@@ -81,4 +123,29 @@ func writeAgentCanvasInputError(w http.ResponseWriter, err error) {
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "画布输入解析失败"})
 	}
+}
+
+// agentResolvedCanvasInputSnapshot records the request exactly as it will be
+// submitted, together with the nodes and confirmed edge inputs that informed
+// it. Settings are already persisted with every generation task, so this
+// snapshot remains stable across queue retries.
+func agentResolvedCanvasInputSnapshot(canvas agentworkspace.Canvas, nodeID, nodeType, submittedPrompt string, referenceAssetIDs []string) (map[string]any, error) {
+	return agentResolvedCanvasInputSnapshotWithCapability(canvas, nodeID, submittedPrompt, referenceAssetIDs, agentCanvasInputCapability(nodeType))
+}
+
+func agentResolvedCanvasInputSnapshotWithCapability(canvas agentworkspace.Canvas, nodeID, submittedPrompt string, referenceAssetIDs []string, capability agentworkspace.CanvasInputCapability) (map[string]any, error) {
+	inputs, err := agentworkspace.ResolveCanvasInputs(canvas, nodeID, capability)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"prompt":            strings.TrimSpace(submittedPrompt),
+		"resolvedPrompt":    inputs.Prompt,
+		"sourceNodeIds":     inputs.SourceNodeIDs,
+		"images":            inputs.Images,
+		"videos":            inputs.Videos,
+		"audios":            inputs.Audios,
+		"referenceAssetIds": uniqueAgentGenerationIDs(referenceAssetIDs),
+		"warnings":          inputs.Warnings,
+	}, nil
 }

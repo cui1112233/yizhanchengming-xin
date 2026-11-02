@@ -42,13 +42,31 @@ FROM local_executor_pairings WHERE code_hash = ? FOR UPDATE`, codeHash[:]).Scan(
 	}
 
 	executor.OwnerUsername = pairing.OwnerUsername
-	_, err = tx.ExecContext(ctx, `INSERT INTO local_executors
+	var existingID string
+	err = tx.QueryRowContext(ctx, `SELECT id FROM local_executors
+WHERE owner_username = ? AND platform = ? AND device_name = ? AND os = ?
+ORDER BY updated_at DESC, id ASC LIMIT 1 FOR UPDATE`, executor.OwnerUsername, platform, executor.DeviceName, executor.OS).Scan(&existingID)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = nil
+	}
+	if err != nil {
+		return ExecutorRecord{}, err
+	}
+	if existingID != "" {
+		executor.ID = existingID
+		_, err = tx.ExecContext(ctx, `UPDATE local_executors SET token_hash = ?, app_version = ?,
+accounts_total = 0, accounts_available = 0, accounts_busy = 0, accounts_quota_exhausted = 0,
+accounts_login_error = 0, accounts_human_verification = 0, last_seen_at = NULL, updated_at = ?
+WHERE id = ?`, executor.TokenHash[:], executor.Version, executor.UpdatedAt, executor.ID)
+	} else {
+		_, err = tx.ExecContext(ctx, `INSERT INTO local_executors
 (id, owner_username, platform, token_hash, device_name, os, app_version,
  accounts_total, accounts_available, accounts_busy, accounts_quota_exhausted,
  accounts_login_error, accounts_human_verification, last_seen_at, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, NULL, ?, ?)`,
-		executor.ID, executor.OwnerUsername, executor.Platform, executor.TokenHash[:], executor.DeviceName,
-		executor.OS, executor.Version, executor.CreatedAt, executor.UpdatedAt)
+			executor.ID, executor.OwnerUsername, executor.Platform, executor.TokenHash[:], executor.DeviceName,
+			executor.OS, executor.Version, executor.CreatedAt, executor.UpdatedAt)
+	}
 	if err != nil {
 		return ExecutorRecord{}, err
 	}

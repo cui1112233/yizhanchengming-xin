@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,9 +20,11 @@ type Store interface {
 }
 
 type Service struct {
-	store Store
-	jobs  JobStore
-	now   func() time.Time
+	store       Store
+	jobs        JobStore
+	now         func() time.Time
+	jobSignalMu sync.Mutex
+	jobSignal   chan struct{}
 }
 
 func NewService(store Store, now func() time.Time) *Service {
@@ -29,7 +32,20 @@ func NewService(store Store, now func() time.Time) *Service {
 		now = time.Now
 	}
 	jobs, _ := store.(JobStore)
-	return &Service{store: store, jobs: jobs, now: now}
+	return &Service{store: store, jobs: jobs, now: now, jobSignal: make(chan struct{})}
+}
+
+func (s *Service) currentJobSignal() <-chan struct{} {
+	s.jobSignalMu.Lock()
+	defer s.jobSignalMu.Unlock()
+	return s.jobSignal
+}
+
+func (s *Service) notifyJobCreated() {
+	s.jobSignalMu.Lock()
+	close(s.jobSignal)
+	s.jobSignal = make(chan struct{})
+	s.jobSignalMu.Unlock()
 }
 
 func (s *Service) CreatePairing(ctx context.Context, owner, platform string) (PairingSecret, error) {
@@ -128,7 +144,13 @@ func (s *Service) List(ctx context.Context, owner string) ([]ExecutorView, error
 	}
 	now := s.now().UTC()
 	views := make([]ExecutorView, 0, len(records))
+	seen := make(map[string]bool)
 	for _, item := range records {
+		key := item.Platform + "\x00" + item.DeviceName + "\x00" + item.OS
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		online := item.LastSeenAt != nil && !item.LastSeenAt.Before(now.Add(-OnlineThreshold))
 		views = append(views, ExecutorView{
 			ID: item.ID, Name: item.DeviceName, Platform: item.Platform, OS: item.OS, Version: item.Version,
@@ -163,7 +185,9 @@ func normalizePairingCode(code string) string {
 	return strings.ToUpper(replacer.Replace(strings.TrimSpace(code)))
 }
 
-func hashPairingCode(code string) SecretHash { return sha256.Sum256([]byte(normalizePairingCode(code))) }
+func hashPairingCode(code string) SecretHash {
+	return sha256.Sum256([]byte(normalizePairingCode(code)))
+}
 func hashSecret(secret string) SecretHash { return sha256.Sum256([]byte(secret)) }
 
 const pairingAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

@@ -10,7 +10,7 @@ import (
 
 func (s *MySQLStore) GetShuihuoConfig(ctx context.Context, owner string) (map[string]any, error) {
 	var raw []byte
-	err := s.db.QueryRowContext(ctx, `SELECT config_json FROM batch_factory_v11_shuihuo_configs WHERE owner_username=?`, owner).Scan(&raw)
+	err := s.db.QueryRowContext(ctx, `SELECT config_json FROM batch_factory_v12_shuihuo_configs WHERE owner_username=?`, owner).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return map[string]any{}, nil
 	}
@@ -32,7 +32,7 @@ func (s *MySQLStore) SaveShuihuoConfig(ctx context.Context, owner string, config
 		return err
 	}
 	now := time.Now().UTC()
-	_, err = s.db.ExecContext(ctx, `INSERT INTO batch_factory_v11_shuihuo_configs(owner_username,config_json,revision,created_at,updated_at) VALUES(?,?,1,?,?) ON DUPLICATE KEY UPDATE config_json=?,revision=batch_factory_v11_shuihuo_configs.revision+1,updated_at=?`, owner, string(raw), now, now, string(raw), now)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_shuihuo_configs(owner_username,config_json,revision,created_at,updated_at) VALUES(?,?,1,?,?) ON DUPLICATE KEY UPDATE config_json=?,revision=batch_factory_v12_shuihuo_configs.revision+1,updated_at=?`, owner, string(raw), now, now, string(raw), now)
 	return err
 }
 

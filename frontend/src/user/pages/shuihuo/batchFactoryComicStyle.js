@@ -9,7 +9,7 @@ export function comicStyleSelection(preset) {
 
 export function normalizeComicReference(value) {
   const reference = value && typeof value === 'object' ? value : {};
-  return {
+  const normalized = {
     assetId: String(reference.assetId || ''),
     url: String(reference.url || ''),
     previewUrl: String(reference.previewUrl || reference.url || ''),
@@ -17,18 +17,43 @@ export function normalizeComicReference(value) {
     applyToAssets: reference.applyToAssets !== false,
     applyToPages: reference.applyToPages !== false
   };
+	if (reference.source) normalized.source = String(reference.source);
+  if (reference.style && typeof reference.style === 'object') normalized.style = { ...reference.style };
+  if (reference.scene && typeof reference.scene === 'object') normalized.scene = { ...reference.scene };
+  return normalized;
 }
 
 export function comicStylePreviewReference(preset) {
   const presetId = String(preset?.id || '');
+  if (!presetId || (!preset?.referenceUrl && !preset?.previewUrl)) return normalizeComicReference(null);
   return normalizeComicReference({
-    assetId: `preset:${presetId}`,
-    url: `/api/local-executor/v1/batch-comic-style-previews/${encodeURIComponent(presetId)}`,
+    assetId: `style:${presetId}`,
+    url: String(preset?.referenceUrl || `/api/local-executor/v1/batch-comic-style-previews/${encodeURIComponent(presetId)}`),
     previewUrl: String(preset?.previewUrl || ''),
     enabled: true,
     applyToAssets: true,
-    applyToPages: true
+    applyToPages: true,
+    source: 'style-library',
+    style: comicStyleSelection(preset)
   });
+}
+
+export function comicReferenceForSelectedStyle(currentValue, preset) {
+  const current = normalizeComicReference(currentValue);
+  const assetId = String(current.assetId || '');
+  const legacyAutomatic = assetId.startsWith('scene:') || assetId.startsWith('preset:') || current.source === 'scene-library' || current.source === 'builtin' || current.source === 'style-library';
+  if (assetId && !legacyAutomatic) return { ...current, source: 'manual-upload' };
+  return comicStylePreviewReference(preset);
+}
+
+export function comicReferenceNeedsStyleDefault(currentValue, preset) {
+  const current = normalizeComicReference(currentValue);
+  const next = comicStylePreviewReference(preset);
+  if (!next.assetId) return false;
+  const assetId = String(current.assetId || '');
+  const automatic = !assetId || assetId.startsWith('scene:') || assetId.startsWith('preset:') || assetId.startsWith('style:') || current.source === 'scene-library' || current.source === 'builtin' || current.source === 'style-library';
+  if (!automatic) return false;
+  return current.assetId !== next.assetId || current.source !== 'style-library';
 }
 
 export function wrapComicStyleIndex(index, count) {

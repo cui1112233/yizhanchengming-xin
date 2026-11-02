@@ -22,6 +22,8 @@ type MemoryStore struct {
 	batchFactoryBindings    map[string]BatchFactoryBinding
 	batchFactoryProjects    map[string]string
 	batchFactoryNodeOrigins map[string]BatchFactoryNodeOrigin
+	libraryFolders          map[string]LibraryFolder
+	libraryItems            map[string]LibraryItem
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -29,7 +31,7 @@ func NewMemoryStore() *MemoryStore {
 		projects: make(map[string]Project), imports: make(map[string]LegacyImport), videoJobs: make(map[string]VideoJob), videoIdempotency: make(map[string]string),
 		generationTasks: make(map[string]GenerationTask), generationIdempotency: make(map[string]string),
 		scriptShots: make(map[string]ScriptShot), shotGenerationLinks: make(map[string]ShotGenerationLink),
-		batchFactoryBindings: make(map[string]BatchFactoryBinding), batchFactoryProjects: make(map[string]string), batchFactoryNodeOrigins: make(map[string]BatchFactoryNodeOrigin),
+		batchFactoryBindings: make(map[string]BatchFactoryBinding), batchFactoryProjects: make(map[string]string), batchFactoryNodeOrigins: make(map[string]BatchFactoryNodeOrigin), libraryFolders: make(map[string]LibraryFolder), libraryItems: make(map[string]LibraryItem),
 	}
 }
 
@@ -65,7 +67,7 @@ func (s *MemoryStore) ListProjects(_ context.Context, owner string) ([]ProjectSu
 		if project.DeletedAt != nil || !strings.HasPrefix(key, owner+"\x00") {
 			continue
 		}
-		out = append(out, ProjectSummary{ID: project.ID, Title: project.Title, TitleMode: project.TitleMode, Preview: project.Preview, MessageCount: len(project.Messages), CreatedAt: project.CreatedAt, UpdatedAt: project.UpdatedAt})
+		out = append(out, ProjectSummary{ID: project.ID, Title: project.Title, TitleMode: project.TitleMode, ProjectType: NormalizeProjectType(project.ProjectType), Preview: project.Preview, MessageCount: len(project.Messages), CreatedAt: project.CreatedAt, UpdatedAt: project.UpdatedAt})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].UpdatedAt.After(out[j].UpdatedAt) })
 	return out, nil
@@ -84,6 +86,7 @@ func (s *MemoryStore) Project(_ context.Context, owner, id string) (Project, err
 func normalizeProject(project Project) Project {
 	project.ID = strings.TrimSpace(project.ID)
 	project.Title = strings.TrimSpace(project.Title)
+	project.ProjectType = NormalizeProjectType(project.ProjectType)
 	if project.Title == "" {
 		project.Title = "新项目"
 	}

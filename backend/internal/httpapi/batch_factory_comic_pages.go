@@ -834,6 +834,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 	const images = pages + "/{pageId}/images"
 	const image = images + "/{imageId}"
 	const collections = "/api/batch-factory/v12/batches/{batchId}/books/{bookId}/comic-collections"
+	const collectionDownload = collections + "/{collectionId}/download"
 	generator := comicPageGenerator{store: store, files: files, localExecutors: localExecutors, catalogStore: catalogStore, presetCatalog: presetCatalog, generationGate: generationGate}
 
 	mux.HandleFunc("GET "+pages, func(w http.ResponseWriter, r *http.Request) {
@@ -1295,6 +1296,26 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"collection": comicCollectionResponse(collection)})
 	})
+	mux.HandleFunc("GET "+collectionDownload, func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		archive, filename, err := buildComicCollectionImageZip(r.Context(), store, comicStore, files, owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("collectionId"))
+		if err != nil {
+			if errors.Is(err, batchfactoryv11.ErrNotFound) && strings.Contains(err.Error(), "第 ") {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+				return
+			}
+			writeStoreError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"comic-collection.zip\"; filename*=UTF-8''"+url.QueryEscape(filename))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(archive)
+	})
 	mux.HandleFunc("GET "+collections, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -1311,6 +1332,99 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"collections": result})
 	})
+}
+
+func buildComicCollectionImageZip(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, files *localartifact.Store, owner, batchID, bookID, collectionID string) ([]byte, string, error) {
+	if files == nil {
+		return nil, "", fmt.Errorf("%w: 漫画图片存储不可用", batchfactoryv11.ErrUnavailable)
+	}
+	batch, err := store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return nil, "", err
+	}
+	var title string
+	for _, book := range batch.Books {
+		if book.ID == bookID {
+			title = book.Title
+			break
+		}
+	}
+	if strings.TrimSpace(title) == "" {
+		return nil, "", batchfactoryv11.ErrNotFound
+	}
+	collections, err := comicStore.ListComicCollections(ctx, owner, batchID, bookID)
+	if err != nil {
+		return nil, "", err
+	}
+	var collection *batchfactoryv11.ComicCollection
+	for index := range collections {
+		if collections[index].ID == collectionID {
+			collection = &collections[index]
+			break
+		}
+	}
+	if collection == nil {
+		return nil, "", batchfactoryv11.ErrNotFound
+	}
+	if len(collection.Items) == 0 {
+		return nil, "", fmt.Errorf("%w: 漫画合集没有可下载的图片", batchfactoryv11.ErrConflict)
+	}
+
+	archive := bytes.Buffer{}
+	writer := zip.NewWriter(&archive)
+	for _, item := range collection.Items {
+		pageNumber := item.Ordinal
+		if pageNumber < 1 {
+			pageNumber = 1
+		}
+		if strings.TrimSpace(item.StorageRef) == "" {
+			_ = writer.Close()
+			return nil, "", fmt.Errorf("%w: 第 %d 页主图不可下载", batchfactoryv11.ErrNotFound, pageNumber)
+		}
+		file, openErr := files.Open(item.StorageRef)
+		if openErr != nil {
+			_ = writer.Close()
+			return nil, "", fmt.Errorf("%w: 第 %d 页主图文件不存在", batchfactoryv11.ErrNotFound, pageNumber)
+		}
+		entry, createErr := writer.Create(fmt.Sprintf("%s-%03d%s", comicDownloadFileStem(title), pageNumber, comicDownloadImageExtension(item.MediaType, item.StorageRef)))
+		if createErr == nil {
+			_, createErr = io.Copy(entry, file)
+		}
+		_ = file.Close()
+		if createErr != nil {
+			_ = writer.Close()
+			return nil, "", createErr
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, "", err
+	}
+	return archive.Bytes(), comicDownloadFileStem(title) + ".zip", nil
+}
+
+func comicDownloadFileStem(title string) string {
+	clean := strings.TrimSpace(title)
+	clean = strings.NewReplacer("\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_").Replace(clean)
+	clean = strings.Trim(clean, " .")
+	if clean == "" {
+		return "漫画合集"
+	}
+	return clean
+}
+
+func comicDownloadImageExtension(mediaType, storageRef string) string {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "image/jpeg", "image/jpg":
+		return ".jpg"
+	case "image/webp":
+		return ".webp"
+	case "image/png":
+		return ".png"
+	}
+	if extension := strings.ToLower(filepath.Ext(storageRef)); extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".webp" {
+		return extension
+	}
+	return ".png"
 }
 
 func comicCollectionPreflight(ctx context.Context, store batchfactoryv11.Store, comicStore batchfactoryv11.ComicPageStore, presetCatalog *prompt.Catalog, owner, batchID, bookID string, requestedVideoIDs []string) ([]string, []string, error) {

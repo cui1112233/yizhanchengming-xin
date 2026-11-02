@@ -59,6 +59,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
   const doneRef = useRef(false);
   const fallbackRef = useRef('');
   const autoStartRef = useRef('');
+  const hasRecoverableFailure = Boolean(error || persistedOriginalReadError);
 
   useEffect(() => {
     doneRef.current = false;
@@ -129,7 +130,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
           metadata: { ...(latestBook.sourceMetadata || {}), contentPending: false, originalReadStage: 'direct', originalReadError: '' },
           expectedRevision: Number(latestBook.revision || 0)
         });
-        try { await classifyBookPublishMetadata(batchId, latestBook.id, { force: true }); } catch (_) { /* 分类可在工作区单独重试 */ }
+        try { await classifyBookPublishMetadata(batchId, latestBook.id, { force: false }); } catch (_) { /* 分类可在工作区单独重试 */ }
         const existingPlan = latestBook.sourceMetadata?.giantAutomationPlan;
         if (existingPlan?.presetId) {
           try { await startSavedGiantAutomation(batchId, existingPlan); } catch (_) { /* 自动生产可在工作区重试 */ }
@@ -154,7 +155,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
           expectedRevision: Number(refreshedBook.revision || 0)
         });
       }
-      try { await classifyBookPublishMetadata(batchId, latestBook.id, { force: true }); } catch (_) { /* 分类失败不阻断生产，可单书重试 */ }
+      try { await classifyBookPublishMetadata(batchId, latestBook.id, { force: false }); } catch (_) { /* 分类失败不阻断生产，可单书重试 */ }
       const plan = latestBook.sourceMetadata?.giantAutomationPlan;
       if (plan?.presetId) {
         try {
@@ -236,7 +237,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
     enqueueDirectFirstRead(() => refetchOriginal(true));
   }, [visible, pending, batchId, book?.id, book?.sourceText, jobId, originalReadStrategy]);
 
-  if (!pending || !visible) return null;
+  if ((!pending && !hasRecoverableFailure) || !visible) return null;
   // 直取优先时，任务尚未绑定 OCR 并不代表失败；这里正在自动请求书城正文。
   // 只在入厂内容格里显示状态，避免顶部批量列表出现一串重复按钮。
   if (!jobId && originalReadStrategy === 'direct_first' && !error && !persistedOriginalReadError) {

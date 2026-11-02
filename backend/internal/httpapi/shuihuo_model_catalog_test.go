@@ -8,6 +8,16 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
+type readyLocalVideoClient struct{}
+
+func (readyLocalVideoClient) CreateVideoJob(context.Context, string, batchfactoryv11.LocalVideoJobInput) (batchfactoryv11.LocalVideoJob, error) {
+	return batchfactoryv11.LocalVideoJob{ID: "local-job", State: "queued"}, nil
+}
+
+func (readyLocalVideoClient) GetVideoJob(context.Context, string, string) (batchfactoryv11.LocalVideoJob, error) {
+	return batchfactoryv11.LocalVideoJob{ID: "local-job", State: "queued"}, nil
+}
+
 func TestLoadShuihuoOwnerConfigUsesManagedModelCatalog(t *testing.T) {
 	shuihuoStore := batchfactoryv11.NewMemoryStore()
 	if err := shuihuoStore.SaveShuihuoConfig(context.Background(), "tester", map[string]any{"textModelId": "legacy"}); err != nil {
@@ -27,6 +37,25 @@ func TestLoadShuihuoOwnerConfigUsesManagedModelCatalog(t *testing.T) {
 	catalog, ok := config["modelCatalog"].([]any)
 	if !ok || len(catalog) != 1 || catalog[0].(map[string]any)["id"] != "managed-text" {
 		t.Fatalf("unexpected managed catalog: %#v", config["modelCatalog"])
+	}
+}
+
+func TestLoadShuihuoOwnerConfigMigratesLegacyPersonalImageConfig(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	if err := store.SaveShuihuoConfig(context.Background(), "tester", map[string]any{
+		"image": map[string]any{
+			"provider": "openai_compatible", "baseUrl": "https://image.example/v1",
+			"model": "image-model", "apiKey": "image-secret",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	config, err := loadShuihuoOwnerConfig(context.Background(), store, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !shuihuoImageModelReady(shuihuoCollection(config, "modelCatalog", nil)[0]) {
+		t.Fatalf("legacy image config was not migrated to a ready model: %#v", config["modelCatalog"])
 	}
 }
 
@@ -105,6 +134,21 @@ func TestShuihuoAudioModelConfiguredUsesBuiltInDefaultTTS(t *testing.T) {
 		}},
 	}) {
 		t.Fatal("the built-in TTS fallback should remain available when a custom audio model is disabled")
+	}
+}
+
+func TestShuihuoVideoReadyCheckerAcceptsLocalDoubaoExecutor(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	if err := store.SaveShuihuoConfig(context.Background(), "tester", map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	production := &batchfactoryv11.ProductionService{
+		Enabled:       true,
+		LocalExecutor: batchfactoryv11.NewLocalExecutorVideoAdapter(readyLocalVideoClient{}, ""),
+	}
+	ready, reason := shuihuoVideoReadyChecker(store, nil, production)(context.Background(), "tester")
+	if !ready || reason != "" {
+		t.Fatalf("local Doubao executor should make video generation ready: ready=%v reason=%q", ready, reason)
 	}
 }
 

@@ -30,6 +30,7 @@ func TestHydrateBatchFactoryComicPromptConfigFreezesPublishedBodies(t *testing.T
 		{"id":"batch-comic-page","module":"batch-factory","name":"漫画提示词","kind":"base","version":1,"revision":1,"status":"published","body":"漫画页面正文","protocolLock":{"format":"json","slot":"batch.comic-page"}},
 		{"id":"comic-image-derive-default","module":"batch-factory","name":"图片描述词推导","kind":"base","version":1,"revision":1,"status":"published","body":"图片推导正文","protocolLock":{"format":"json","slot":"batch.comic-image-derivation"}},
 		{"id":"batch-comic-style-01","module":"batch-factory","name":"顶级韩漫风格","kind":"base","version":1,"revision":1,"status":"published","body":"韩漫画风正文","protocolLock":{"format":"style","slot":"batch.comic-style"}}
+		,{"id":"batch-comic-reference-scene-campus-b","module":"batch-factory","name":"校园B","kind":"base","version":1,"revision":1,"status":"published","body":"校园场景正文","protocolLock":{"format":"style","slot":"batch.comic-reference-scene"}}
 	]`
 	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
 		t.Fatal(err)
@@ -42,9 +43,10 @@ func TestHydrateBatchFactoryComicPromptConfigFreezesPublishedBodies(t *testing.T
 			map[string]any{"presetId": "script-constraint-comic-restriction"},
 			map[string]any{"presetId": "script-constraint-comic-negative"},
 		},
-		"presetId":        "batch-comic-page",
-		"imageDerivation": map[string]any{"presetId": "comic-image-derive-default"},
-		"style":           map[string]any{"presetId": "batch-comic-style-01"},
+		"presetId":             "batch-comic-page",
+		"imageDerivation":      map[string]any{"presetId": "comic-image-derive-default"},
+		"style":                map[string]any{"presetId": "batch-comic-style-01"},
+		"globalReferenceImage": map[string]any{"scene": map[string]any{"presetId": "batch-comic-reference-scene-campus-b"}},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -74,12 +76,39 @@ func TestHydrateBatchFactoryComicPromptConfigFreezesPublishedBodies(t *testing.T
 	if style["body"] != "韩漫画风正文" || style["presetSlot"] != "batch.comic-style" {
 		t.Fatalf("comic style was not frozen: %#v", style)
 	}
+	scene := comic["globalReferenceImage"].(map[string]any)["scene"].(map[string]any)
+	if scene["body"] != "校园场景正文" || scene["presetSlot"] != "batch.comic-reference-scene" {
+		t.Fatalf("comic reference scene was not frozen: %#v", scene)
+	}
 	constraints := comic["constraints"].([]any)
 	for _, item := range constraints {
 		selection := item.(map[string]any)
 		if selection["body"] == "" || selection["constraintCategory"] == "" {
 			t.Fatalf("comic constraint was not frozen: %#v", selection)
 		}
+	}
+}
+
+func TestHydrateBatchFactoryVideoPromptConfigFreezesPublishedBody(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	data := `[
+		{"id":"batch-video-custom","module":"batch-factory","name":"自定义视频提示词","kind":"base","version":4,"revision":2,"status":"published","body":"后台最新视频提示词正文","protocolLock":{"format":"text","operation":"video-meta","slot":"batch.video-meta"}}
+	]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	hydrated, err := hydrateBatchFactoryPromptConfig(prompt.NewCatalog(path), json.RawMessage(`{"video":{"presetId":"batch-video-custom"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(hydrated, &got); err != nil {
+		t.Fatal(err)
+	}
+	video := got["video"].(map[string]any)
+	if video["body"] != "后台最新视频提示词正文" || video["presetVersion"] != float64(4) || video["presetSlot"] != "batch.video-meta" {
+		t.Fatalf("video prompt was not frozen: %#v", video)
 	}
 }
 

@@ -13,6 +13,16 @@ test('comic page generation uses the current prompt, provider and existing image
   });
 });
 
+test('comic page payload keeps the director prompt and uses the derived image prompt for generation', () => {
+  const payload = comicPageGenerationPayload(
+    { imageAspectRatio: '9:16', imageProvider: 'doubao_local_executor', imageModelId: 'seedream' },
+    '漫画导演说明',
+    '图片模型执行提示词'
+  );
+  assert.equal(payload.comicPrompt, '漫画导演说明');
+  assert.equal(payload.imagePrompt, '图片模型执行提示词');
+});
+
 test('comic page generation respects an explicit image ratio without inheriting video ratio', () => {
   assert.deepEqual(comicPageGenerationPayload({ imageModelId: 'comic-model', imageAspectRatio: '1:1', aspectRatio: '9:16' }, '页面'), {
     comicPrompt: '页面',

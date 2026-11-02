@@ -4,6 +4,61 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+function ConvertTo-LocalRuntimeEntryPath {
+  param([string]$Entry)
+
+  return ($Entry.TrimStart([char[]]@('/', '\')) -replace '/', [IO.Path]::DirectorySeparatorChar)
+}
+
+function Test-LocalRuntimeManifest {
+  param(
+    [object]$Manifest,
+    [string]$ExpectedSha,
+    [string]$ExpectedBinaryPath,
+    [string]$FrontendDist,
+    [string]$GoDist
+  )
+
+  if ($null -eq $Manifest -or [string]$Manifest.gitSha -ne $ExpectedSha) { return $false }
+  $entry = [string]$Manifest.frontendEntry
+  if ([string]::IsNullOrWhiteSpace($entry)) { return $false }
+  $entryPath = ConvertTo-LocalRuntimeEntryPath $entry
+  if ([IO.Path]::IsPathRooted($entryPath) -or $entryPath -match '(^|[\\/])\.\.([\\/]|$)') { return $false }
+  if (-not (Test-Path -LiteralPath $ExpectedBinaryPath)) { return $false }
+  try {
+    $manifestBinary = [IO.Path]::GetFullPath([string]$Manifest.binaryPath)
+    $expectedBinary = [IO.Path]::GetFullPath($ExpectedBinaryPath)
+  } catch {
+    return $false
+  }
+  if (-not $manifestBinary.Equals($expectedBinary, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+  return (Test-Path -LiteralPath (Join-Path $FrontendDist $entryPath)) -and
+    (Test-Path -LiteralPath (Join-Path $GoDist $entryPath))
+}
+
+function Test-FrontendBuildRequired {
+  param(
+    [string]$SourceRoot,
+    [string]$DistIndexPath,
+    [string[]]$AdditionalInputs = @()
+  )
+
+  if (-not (Test-Path -LiteralPath $DistIndexPath)) { return $true }
+  $builtAt = (Get-Item -LiteralPath $DistIndexPath).LastWriteTimeUtc
+  $inputs = @()
+  foreach ($inputPath in @($SourceRoot) + $AdditionalInputs) {
+    if (-not (Test-Path -LiteralPath $inputPath)) { continue }
+    $item = Get-Item -LiteralPath $inputPath
+    if ($item.PSIsContainer) {
+      $inputs += Get-ChildItem -LiteralPath $item.FullName -Recurse -File -ErrorAction SilentlyContinue
+    } else {
+      $inputs += $item
+    }
+  }
+  return [bool]($inputs | Where-Object { $_.LastWriteTimeUtc -gt $builtAt } | Select-Object -First 1)
+}
+
 $repo = Split-Path -Parent $PSScriptRoot
 
 # Go is the only supported application runtime. Keep historical Node files on
@@ -25,14 +80,43 @@ if ($CheckOnly) {
 
 $binaryPath = Join-Path $repo 'backend/qiantie-local.exe'
 $goSourceRoot = Join-Path $repo 'backend'
-$needsBuild = -not (Test-Path $binaryPath)
-$buildMetaPath = Join-Path $repo '.direct-staging/qiantie-local.build-meta'
+$frontendRoot = Join-Path $repo 'frontend'
+$frontendDist = Join-Path $repo 'frontend/dist'
+$goDist = Join-Path $repo 'backend/web/dist'
+$runtimeManifestPath = Join-Path $repo '.local-review/runtime-manifest.json'
 $expectedBuildSHA = (& git -C $repo rev-parse --short HEAD).Trim()
-if (-not $needsBuild) {
-  $buildMeta = if (Test-Path -LiteralPath $buildMetaPath) { Get-Content -LiteralPath $buildMetaPath -Raw } else { '' }
-  if ($buildMeta -notmatch "(?m)^git_sha=$([regex]::Escape($expectedBuildSHA))$") {
-    $needsBuild = $true
+$needsBuild = -not (Test-Path $binaryPath)
+$frontendBuildRequired = Test-FrontendBuildRequired `
+  -SourceRoot (Join-Path $frontendRoot 'src') `
+  -DistIndexPath (Join-Path $frontendDist 'index.html') `
+  -AdditionalInputs @(
+    (Join-Path $frontendRoot 'public'),
+    (Join-Path $frontendRoot 'package.json'),
+    (Join-Path $frontendRoot 'package-lock.json'),
+    (Join-Path $frontendRoot 'vite.config.js'),
+    (Join-Path $frontendRoot 'scripts/clean-dist.mjs')
+  )
+if ($frontendBuildRequired) {
+  & npm.cmd --prefix $frontendRoot run build
+  if ($LASTEXITCODE -ne 0) {
+    throw "Frontend build failed with exit code $LASTEXITCODE; refusing to start an old embedded page."
   }
+  $needsBuild = $true
+}
+$runtimeManifest = $null
+if (-not $needsBuild) {
+  if (-not (Test-Path -LiteralPath $runtimeManifestPath)) {
+    $needsBuild = $true
+  } else {
+    try {
+      $runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
+    } catch {
+      $needsBuild = $true
+    }
+  }
+}
+if (-not $needsBuild -and -not (Test-LocalRuntimeManifest -Manifest $runtimeManifest -ExpectedSha $expectedBuildSHA -ExpectedBinaryPath $binaryPath -FrontendDist $frontendDist -GoDist $goDist)) {
+  $needsBuild = $true
 }
 if (-not $needsBuild) {
   $binaryTime = (Get-Item $binaryPath).LastWriteTimeUtc
@@ -56,6 +140,12 @@ if (-not $needsBuild) {
 }
 if ($needsBuild) {
   & (Join-Path $PSScriptRoot 'build-go-local.ps1')
+  if ($LASTEXITCODE -ne 0) {
+    throw "Local Go build failed with exit code $LASTEXITCODE; refusing to start an existing binary."
+  }
+  if (-not (Test-Path -LiteralPath $binaryPath) -or -not (Test-Path -LiteralPath $runtimeManifestPath)) {
+    throw 'Local Go build did not produce the required binary and runtime manifest; refusing to start an existing binary.'
+  }
 }
 
 Push-Location (Join-Path $repo 'backend')
@@ -65,6 +155,7 @@ try {
   # an inherited SHA here can make 4001 serve new files while reporting an old
   # release, which makes the runtime check misleading.
   $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
+  $env:QIANTIE_RUNTIME_MANIFEST_PATH = $runtimeManifestPath
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
     # Slice 3 keeps H3 director/audio/compile routes on Go. Higher slices
     # still require explicit video/merge/provider settings.

@@ -73,7 +73,7 @@ export function HistoryPage() {
   return <Space className="utility-page history-page" direction="vertical" size={16} style={{ width: '100%' }}>
     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
       <Typography.Title level={3} style={{ margin: 0 }}>项目与生成历史</Typography.Title>
-      <Popconfirm title="清空所有剧本生成记录？" description="小说面板和水货生产项目不会被删除。" onConfirm={handleClear}>
+      <Popconfirm title="清空所有剧本生成记录？" description="水货生产项目不会被删除。" onConfirm={handleClear}>
         <Button danger icon={<Trash2 size={16} aria-hidden="true" />} disabled={!entries.some(entry => entry.kind === 'script-history')}>清空剧本记录</Button>
       </Popconfirm>
     </Space>

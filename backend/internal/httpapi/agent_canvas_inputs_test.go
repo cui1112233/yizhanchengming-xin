@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 func TestAgentCanvasInputPreviewReturnsResolvedPromptAndReferences(t *testing.T) {
@@ -51,6 +52,19 @@ func TestAgentCanvasInputPreviewReturnsResolvedPromptAndReferences(t *testing.T)
 	}
 	if got, want := body.Inputs.SourceNodeIDs, []string{"text-1", "image-source", "image-target"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("sources=%#v want=%#v", got, want)
+	}
+}
+
+func TestResolveAgentCanvasInputCapabilityRejectsDisabledSelectedModel(t *testing.T) {
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "alice", map[string]any{"modelCatalog": []any{
+		map[string]any{"id": "image-disabled", "kind": "image", "enabled": false},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := resolveAgentCanvasInputCapability(context.Background(), catalog, "alice", "image", "personal_api", "image-disabled")
+	if err == nil || !strings.Contains(err.Error(), "当前模型不可用") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

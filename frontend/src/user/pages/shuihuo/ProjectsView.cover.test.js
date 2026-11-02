@@ -29,3 +29,17 @@ test('temporary project-list failure is shown as an error instead of an empty li
   assert.match(source, /作品读取暂时失败/);
   assert.match(source, /!visibleProjects\.length && !loadError/);
 });
+
+test('project library does not expose collection controls before collection data exists', () => {
+  assert.doesNotMatch(source, /createCollection/);
+  assert.doesNotMatch(source, /创建合集/);
+  assert.doesNotMatch(source, /collection === 'all'/);
+  assert.match(source, /全部作品/);
+});
+
+test('project library provides an operable grid and list view switch', () => {
+  assert.match(source, /const \[viewMode, setViewMode\] = useState\('grid'\)/);
+  assert.match(source, /onClick=\{\(\) => setViewMode\(viewMode === 'grid' \? 'list' : 'grid'\)\}/);
+  assert.match(source, /viewMode === 'grid' \? '切换为列表视图' : '切换为网格视图'/);
+  assert.match(source, /shuihuo-project-grid\$\{viewMode === 'list' \? ' is-list' : ''\}/);
+});

@@ -254,7 +254,7 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	if videoNode.AssetRef["id"] != production.Tasks[0].ID || videoNode.AssetRef["url"] != nil {
 		t.Fatalf("video node=%+v", videoNode)
 	}
-	if videoNode.Config["videoProvider"] != batchfactoryv11.VideoProviderDoubaoLocal || videoNode.Config["videoModelId"] != "local-doubao-executor-video" || videoNode.Config["modelId"] != "local-doubao-executor-video" {
+	if videoNode.Config["provider"] != batchfactoryv11.VideoProviderDoubaoLocal || videoNode.Config["videoProvider"] != batchfactoryv11.VideoProviderDoubaoLocal || videoNode.Config["videoModelId"] != "local-doubao-executor-video" || videoNode.Config["modelId"] != "local-doubao-executor-video" {
 		t.Fatalf("video execution settings=%+v", videoNode.Config)
 	}
 	audioSeconds, audioOK := projectionConfigPositiveNumber(videoNode.Config["connectedAudioDurationSeconds"])
@@ -274,7 +274,7 @@ func TestSyncBatchFactoryBookProjectsOnlyExistingNodeTypes(t *testing.T) {
 	if mergeNode.Title != "最终合成视频" || mergeNode.AssetRef["url"] != nil {
 		t.Fatalf("merge node=%+v", mergeNode)
 	}
-	if mergeNode.Config["publishStatus"] != "uploaded" || mergeNode.Config["publishOrganization"] != "org-1" {
+	if mergeNode.Config["publishStatus"] != "uploaded" || mergeNode.Config["publishOrganization"] != "org-1" || mergeNode.Config["bookRevision"] != float64(book.Revision) {
 		t.Fatalf("merge publish config=%+v", mergeNode.Config)
 	}
 	assertProjectionEdge(t, canvas.Edges, scriptNode.ID, imageNode.ID)
@@ -395,23 +395,51 @@ func TestSyncBatchFactoryBookRecoversMissingOriginWithoutDuplicateNode(t *testin
 	}
 }
 
-func TestSyncBatchFactoryBookDoesNotProjectMissingAudioRecord(t *testing.T) {
+func TestSyncBatchFactoryBookProjectsPendingAudioPlanBeforeFirstAudioRecord(t *testing.T) {
 	ctx := context.Background()
-	service, binding, book, _, _, _, merge := newProjectionFixture(t, ctx)
+	service, binding, book, _, _, _, _ := newProjectionFixtureWithMerge(t, ctx, false)
 	service.AudioRecords = batchFactoryAudioRecords{}
 
-	if _, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID); err != nil {
-		t.Fatal(err)
-	}
-	origins, err := service.CanvasStore.BatchFactoryNodeOrigins(ctx, "alice", binding.ProjectID, book.ID)
+	canvas, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, origin := range origins {
-		if origin.ResourceType == "audio" || origin.ResourceID == merge.AudioArtifactID && origin.ResourceType != "merge" {
-			t.Fatalf("missing audio record was projected: %+v", origin)
-		}
+	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", "audio-plan:"+book.ID)
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
+	if audioNode.Status != "queued" || audioNode.Summary != "生成配音并读取时长" {
+		t.Fatalf("pending audio node=%+v", audioNode)
 	}
+	assertProjectionEdge(t, canvas.Edges, audioNode.ID, mergeNode.ID)
+}
+
+func TestSyncBatchFactoryBookProjectsPersistedAudioBeforeFirstMerge(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixtureWithMerge(t, ctx, false)
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+	const audioID = "tts-before-merge"
+	if _, err := source.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: binding.BatchID, BookID: book.ID}, batchfactoryv11.SettingsUpdate{
+		Patch: batchfactoryv11.SettingsPatch{
+			"ttsAudioArtifactId":   json.RawMessage(`"` + audioID + `"`),
+			"audioDurationSeconds": json.RawMessage(`7.4`),
+		},
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service.AudioRecords = batchFactoryAudioRecords{
+		audioID: {ID: audioID, VersionID: "audio-before-merge-v1", Status: "succeeded", DurationSeconds: 7.4, MediaURL: "/api/audio/tts-before-merge"},
+	}
+
+	canvas, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	audioNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "audio", audioID)
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
+	if audioNode.Status != "succeeded" || audioNode.Config["durationSeconds"] != 7.4 {
+		t.Fatalf("audio node=%+v", audioNode)
+	}
+	assertProjectionEdge(t, canvas.Edges, audioNode.ID, mergeNode.ID)
 }
 
 func TestSyncBatchFactoryBookBumpsVersionWhenPrimaryImageChanges(t *testing.T) {
@@ -496,6 +524,37 @@ func TestReconcileBatchFactoryCanvasReplacesLegacyDuplicateOfProjectedEdge(t *te
 	}
 	if len(matching) != 1 || matching[0].ID != "projected" || matching[0].Relation != batchFactoryProjectionRelation {
 		t.Fatalf("expected exactly the authoritative projected edge, got %+v", matching)
+	}
+}
+
+func TestReconcileBatchFactoryCanvasRemovesOrphanedMappedNodeForCurrentBook(t *testing.T) {
+	script := Node{ID: "bf-script", Type: "script", Config: projectionConfig("batch-1", "book-1", "book_script", "book-1")}
+	staleVideo := Node{ID: "old-video", Type: "video", Config: projectionConfig("batch-1", "book-1", "video", "removed-video")}
+	manualNote := Node{ID: "manual-note", Type: "text", Title: "保留的手动笔记"}
+	origins := []BatchFactoryNodeOrigin{{NodeID: script.ID, ResourceType: "book_script", ResourceID: "book-1"}}
+	items := []batchFactoryProjectionItem{{node: script, origin: origins[0]}}
+	canvas := EmptyCanvas()
+	canvas.Nodes = []Node{script, staleVideo, manualNote}
+	canvas.Edges = []Edge{
+		{ID: "stale-reference", Source: script.ID, Target: staleVideo.ID, Relation: "batch_factory_projection"},
+		{ID: "manual-reference", Source: manualNote.ID, Target: script.ID, Relation: "manual"},
+	}
+
+	reconciled := reconcileBatchFactoryCanvas(canvas, origins, items, nil)
+	seen := map[string]bool{}
+	for _, node := range reconciled.Nodes {
+		seen[node.ID] = true
+	}
+	if seen[staleVideo.ID] {
+		t.Fatalf("orphaned Batch Factory node remained: %+v", reconciled.Nodes)
+	}
+	if !seen[manualNote.ID] {
+		t.Fatalf("manual node was removed: %+v", reconciled.Nodes)
+	}
+	for _, edge := range reconciled.Edges {
+		if edge.Source == staleVideo.ID || edge.Target == staleVideo.ID {
+			t.Fatalf("orphaned node edge remained: %+v", edge)
+		}
 	}
 }
 

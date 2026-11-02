@@ -94,7 +94,19 @@ func normalizeAlreadyUploadedAutomationState(state *automationStateFile) bool {
 		jobChanged := false
 		for _, raw := range books {
 			entry, _ := raw.(map[string]any)
-			if entry == nil || automationStringValue(entry["status"], "") != "failed" {
+			if entry == nil {
+				continue
+			}
+			if automationStringValue(entry["status"], "") == "completed" {
+				if automationBoolValue(entry["retryRequested"]) || entry["retryAt"] != nil || entry["retryReason"] != nil {
+					delete(entry, "retryRequested")
+					delete(entry, "retryAt")
+					delete(entry, "retryReason")
+					changed = true
+				}
+				continue
+			}
+			if automationStringValue(entry["status"], "") != "failed" {
 				continue
 			}
 			errorText := automationStringValue(entry["error"], "")

@@ -1,19 +1,20 @@
-import { Alert, Button, Divider, Input, InputNumber, Modal, Popconfirm, Popover, Segmented, Select, Space, Switch, Tabs, message} from 'antd';
+import { Alert, Button, Divider, Input, InputNumber, Modal, Popconfirm, Popover, Segmented, Select, Space, Switch, Tabs, Typography, message} from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { listAvailableModels, modelSelectOptions } from '../../../shared/api/modelCatalog';
-import { get121OrganizationOptions, getBatch, listSystemPresetCatalog, saveBookOverride } from '../../../shared/api/batchFactoryV11';
+import { get121OrganizationOptions, getBatch, listSystemPresetCatalog, saveBookOverride } from '../../../shared/api/batchFactory';
 import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { deleteScriptConstraintPrompt, getConstraintPresetTexts, listScriptConstraintPrompts, saveScriptConstraintPrompt, updateScriptConstraintPrompt } from '../../../shared/api/generation';
-import { modelOptionsForProvider, providerForCatalogModel, providerOptionsForModels, reconcileProviderModel } from './providerModelBinding';
+import { modelOptionsForProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { audioDurationFingerprint as runtimeAudioDurationFingerprint, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { batchFactoryPreviewText } from './batchFactoryContentRange';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
+import { BatchFactoryComicPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal';
 import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
 
 const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
-const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings'];
+const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings', 'comicPublishSettings'];
 const ENGINE_OVERRIDE_FIELDS = [...ENGINE_MODEL_OVERRIDE_FIELDS, ...ENGINE_PUBLISH_OVERRIDE_FIELDS];
 const BOOK_OVERRIDE_FIELDS = [...ENGINE_OVERRIDE_FIELDS, 'starredCharacterNames', 'openingEnabled', 'openingCount', 'aiPromptConfig'];
 const PUBLISH_CATALOG_FIELDS = new Set(['websiteProfiles', 'websiteStyleCatalog', 'organizations', 'organizationOptions']);
@@ -42,6 +43,7 @@ const EDITABLE_CONSTRAINT_LAYERS = CONSTRAINT_LAYERS.filter(([category]) => cate
 const DEFAULT_ENABLED_CONSTRAINT_CATEGORIES = ['prefix', 'quality', 'restriction', 'negative'];
 const DEFAULT_VIDEO_PROMPT = { presetId: 'batch-video-sd', presetName: 'SD 视频提示词', presetSlot: 'batch.video-meta', presetVersion: null, constraintCategory: '' };
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
+const SMART_UNIFIED_PRESET_ID = 'script-constraint-prefix-smart-unified';
 const TTS_VOICE_OPTIONS = [
   { label: '晓晓（女声·温柔）', value: 'zh-CN-XiaoxiaoNeural' },
   { label: '晓辰（女声·知性）', value: 'zh-CN-XiaochenNeural' },
@@ -97,12 +99,15 @@ function requiredVideoPrompt(value) {
 function mergePublishSettings(base, override) { return { ...(base || {}), ...(override || {}) }; }
 function effectiveValues(batchPatch, bookPatch) {
   const aiPromptConfig = mergePromptConfig(batchPatch?.aiPromptConfig, bookPatch?.aiPromptConfig);
-  const values = { ...(batchPatch || {}), ...(bookPatch || {}), aiPromptConfig: { ...aiPromptConfig, video: requiredVideoPrompt(aiPromptConfig.video) }, publishSettings: mergePublishSettings(batchPatch?.publishSettings, bookPatch?.publishSettings) };
+  const values = { ...(batchPatch || {}), ...(bookPatch || {}), aiPromptConfig: { ...aiPromptConfig, video: requiredVideoPrompt(aiPromptConfig.video) }, publishSettings: mergePublishSettings(batchPatch?.publishSettings, bookPatch?.publishSettings), comicPublishSettings: mergePublishSettings(batchPatch?.comicPublishSettings, bookPatch?.comicPublishSettings) };
   return normalizeAudioSourceSettings(values);
 }
 function selectedMeta(catalog, id) {
   const preset = catalog.find(item => item.id === id);
-  return preset ? { presetId: preset.id, presetName: preset.name, presetSlot: preset.slot, presetVersion: preset.version, constraintCategory: preset.constraintCategory || '' } : { presetId: '' };
+  return preset ? { presetId: preset.id, presetName: preset.name, presetSlot: preset.slot, presetVersion: preset.version, constraintCategory: preset.constraintCategory || (preset.id === SMART_UNIFIED_PRESET_ID ? 'prefix' : '') } : { presetId: '' };
+}
+function isConstraintPreset(item, category) {
+  return item?.constraintCategory === category || (category === 'prefix' && item?.id === SMART_UNIFIED_PRESET_ID);
 }
 function presetLabel(preset) { return String(preset?.name || preset?.presetName || preset?.label || preset?.id || '').trim(); }
 function optionFor(preset) { return { value: preset.id, label: <span className="batch-factory-preset-option"><span>{presetLabel(preset)}</span><small>v{preset.version || 1}</small></span> }; }
@@ -143,7 +148,8 @@ function normalizeConstraintRules(value) {
   }));
   return {
     ...current,
-    enabled: current.enabled === true,
+    // 约束模块没有总开关；历史配置里的 enabled 只保留兼容字段，不能再关闭整组约束。
+    enabled: true,
     baseSetup: { enabled: current.baseSetup?.enabled !== false },
     ...layers
   };
@@ -165,7 +171,7 @@ function withDirectorConstraintSelections(value) {
       constraintCategory: category
     }];
   });
-  return { ...rules, enabledCategories, selections };
+  return { ...rules, enabled: true, enabledCategories, selections };
 }
 
 export function buildBookOverridePatch(inherited, edited) {
@@ -194,6 +200,12 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
         .filter(([key, value]) => !equal(inheritedPublish[key], value)));
       if (Object.keys(publishOverride).length) patch.publishSettings = publishOverride;
       else if (Object.hasOwn(bookPatch || {}, 'publishSettings')) restoreKeys.push('publishSettings');
+      const inheritedComicPublish = inherited?.comicPublishSettings || {};
+      const editedComicPublish = edited?.comicPublishSettings || {};
+      const comicPublishOverride = Object.fromEntries(Object.entries(editedComicPublish)
+        .filter(([key, value]) => !equal(inheritedComicPublish[key], value)));
+      if (Object.keys(comicPublishOverride).length) patch.comicPublishSettings = comicPublishOverride;
+      else if (Object.hasOwn(bookPatch || {}, 'comicPublishSettings')) restoreKeys.push('comicPublishSettings');
       return { patch, restoreKeys };
     }
 
@@ -232,7 +244,7 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
 }
 
 function InheritedField({ label, field, value, inherited, options, onChange, loading }) {
-  return <label className="batch-factory-engine-field"><span><b>{label}</b></span><Select allowClear loading={loading} value={value || inherited || undefined} options={options} placeholder="未配置" onChange={next => onChange(next || '')} /></label>;
+  return <div className="batch-factory-engine-field"><span><b>{label}</b></span><Select allowClear loading={loading} value={value || inherited || undefined} options={options} placeholder="未配置" onChange={next => onChange(next || '')} /></div>;
 }
 
 function InheritedNumberField({ label, value, inherited, min, max, onChange }) {
@@ -272,6 +284,7 @@ function RuleModule({ title, value, onChange, children, required = false, showWh
 
 function ConstraintCategoryEditor({ category, label, value, systemOptions, personalPrompts, loading, saving, editingPromptId, onChange, onSelectSystem, onSelectPersonal, onSaveDraft, onSaveNamed, onEditPersonal, onDeletePersonal }) {
   const isSystem = value.source === 'system';
+  const isSmartUnified = value.presetId === SMART_UNIFIED_PRESET_ID;
   const selectedPersonalPrompt = personalPrompts.find(item => item.id === value.personalPromptId);
   return <div className="batch-factory-constraint-layer">
     <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}><b>{label}</b><Switch checked={value.enabled} onChange={enabled => onChange({ enabled })} /></Space>
@@ -281,9 +294,11 @@ function ConstraintCategoryEditor({ category, label, value, systemOptions, perso
         <Select allowClear loading={loading} value={value.personalPromptId || undefined} options={personalPrompts.map(item => ({ label: item.name || '未命名个人副本', value: item.id }))} placeholder="选择我的提示词，或直接编辑当前草稿" onChange={onSelectPersonal} style={{ width: '100%', marginTop: 8 }} />
         {selectedPersonalPrompt ? <Space size={8} wrap style={{ marginTop: 8 }}><Button size="small" onClick={() => onEditPersonal(selectedPersonalPrompt)}>编辑所选提示词</Button><Popconfirm title="确认删除该个人提示词？" onConfirm={() => onDeletePersonal(selectedPersonalPrompt.id)}><Button size="small" danger>删除</Button></Popconfirm></Space> : null}
       </>}
-      <span className="batch-factory-constraint-label">提示词内容</span>
-      <Input.TextArea rows={5} value={value.body} placeholder="选择预设后可编辑完整提示词；保存不会修改系统预设。" onChange={event => onChange({ source: 'draft', personalPromptId: '', body: event.target.value })} style={{ marginTop: 6 }} />
-      <Space wrap style={{ marginTop: 10 }}><Button loading={saving} onClick={onSaveDraft}>保存当前草稿</Button><Button type="primary" loading={saving} onClick={onSaveNamed}>{editingPromptId ? '保存编辑' : '保存为我的提示词'}</Button></Space>
+      {isSmartUnified ? <Typography.Text type="secondary" style={{ display: 'block', marginTop: 10 }}>智能统一由系统自动分析，原始系统提示词不在这里展示。</Typography.Text> : <>
+        <span className="batch-factory-constraint-label">提示词内容</span>
+        <Input.TextArea rows={5} value={value.body} placeholder="选择预设后可编辑完整提示词；保存不会修改系统预设。" onChange={event => onChange({ source: 'draft', personalPromptId: '', body: event.target.value })} style={{ marginTop: 6 }} />
+        <Space wrap style={{ marginTop: 10 }}><Button loading={saving} onClick={onSaveDraft}>保存当前草稿</Button><Button type="primary" loading={saving} onClick={onSaveNamed}>{editingPromptId ? '保存编辑' : '保存为我的提示词'}</Button></Space>
+      </>}
     </> : null}
   </div>;
 }
@@ -303,7 +318,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 	  ? batchPatch.automationPresetSnapshot
 	  : null;
   const region = REGION_LABELS[activeRegion] ? activeRegion : 'engine';
-  const inherited = useMemo(() => ({ ...batchPatch, aiPromptConfig: mergePromptConfig(batchPatch.aiPromptConfig, {}), publishSettings: mergePublishSettings(batchPatch.publishSettings, {}) }), [batch?.id, batch?.settingsState?.revision]);
+  const inherited = useMemo(() => ({ ...batchPatch, aiPromptConfig: mergePromptConfig(batchPatch.aiPromptConfig, {}), publishSettings: mergePublishSettings(batchPatch.publishSettings, {}), comicPublishSettings: mergePublishSettings(batchPatch.comicPublishSettings, {}) }), [batch?.id, batch?.settingsState?.revision]);
   const [form, setForm] = useState(() => effectiveValues(batchPatch, bookPatch));
   const [models, setModels] = useState([]);
   const [organizations, setOrganizations] = useState([]);
@@ -391,8 +406,12 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
 
   const comicAssetRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-assets'), [catalog.batch]);
   const characterPromptRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.character-meta'), [catalog.batch]);
+  const videoAssetRules = useMemo(() => [
+    ...scriptExtraction,
+    ...characterPromptRules.filter(item => item.id === 'batch-character-meta')
+  ], [scriptExtraction, characterPromptRules]);
   const scenePromptRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.scene-meta'), [catalog.batch]);
-  const scriptConstraints = useMemo(() => catalog.script.filter(item => item.kind === 'addon' && item.constraintCategory), [catalog.script]);
+  const scriptConstraints = useMemo(() => catalog.script.filter(item => item.kind === 'addon' && EDITABLE_CONSTRAINT_LAYERS.some(([category]) => isConstraintPreset(item, category))), [catalog.script]);
   const videoRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.video-meta'), [catalog.batch]);
   const visualRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.visual-meta'), [catalog.batch]);
   const comicPageRules = useMemo(() => catalog.batch.filter(item => item.slot === 'batch.comic-page'), [catalog.batch]);
@@ -444,7 +463,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
     return (ai.comic?.constraints || []).find(item => item.constraintCategory === category)?.presetId || undefined;
   }
   function comicConstraintOptions(category) {
-    return catalog.batch.filter(item => item.kind === 'addon' && item.constraintCategory === category).map(optionFor);
+    return catalog.script.filter(item => item.kind === 'addon' && item.constraintCategory === category).map(optionFor);
   }
   function updateComicConstraint(category, presetId) {
     const comic = ai.comic || {};
@@ -601,6 +620,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       <PromptSelect required label="漫画提示词" value={ai.comic} options={Object.assign(comicPageRules.map(optionFor), { catalog: comicPageRules })} disabled={loading} onChange={selection => patchAI('comic', scoped({ ...ai.comic, ...selection, enabled: true }))} />
       <PromptSelect label="图片描述词推导" value={ai.comic?.imageDerivation} options={Object.assign(comicImageDerivationRules.map(optionFor), { catalog: comicImageDerivationRules })} disabled={loading} onChange={selection => patchAI('comic', scoped({ ...ai.comic, imageDerivation: selection, enabled: true }))} />
     </RuleModule>
+    {visibility.comic ? <BatchFactoryComicStylePicker batchId={batch?.id} catalog={catalog.batch} value={ai.comic} inherited={!Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')} onChange={nextComic => patchAI('comic', scoped(nextComic))} /> : null}
   </div>;
   let body = null;
   if (region === 'engine') {
@@ -618,7 +638,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
         children: <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
           <Alert type="info" showIcon message={<span>当前书独立模型配置 <HelpTip title="当前书独立模型配置">这里只保存当前小说与批量默认值不同的参数。</HelpTip></span>} />
           {visibility.video ? <ConfigCard title="核心视频引擎" description="视频生成、分镜时长和画幅。"><div className="batch-factory-engine-grid">
-            <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider || 'personal_api'} inherited={inherited.videoProvider || 'personal_api'} options={videoProviderOptions} loading={false} onChange={videoProvider => patch(reconcileProviderModel({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId || inherited.videoModelId }))} />
+            <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider || 'personal_api'} inherited={inherited.videoProvider || 'personal_api'} options={videoProviderOptions} loading={false} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId || inherited.videoModelId }))} />
             <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={videoModelOptions} loading={effectiveVideoProvider === 'doubao_local_executor' ? false : loading} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), effectiveVideoProvider) } : {}) })} />
             <InheritedStoryboardDurationField value={form.storyboardDurationLimit} inherited={inherited.storyboardDurationLimit} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} />
             <InheritedField label="视频画幅" field="videoAspectRatio" value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} inherited={inherited.videoAspectRatio || (inherited.aspectRatio === '16:9' ? '16:9' : '9:16')} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} loading={false} onChange={videoAspectRatio => patch({ videoAspectRatio })} />
@@ -653,7 +673,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
           </section></ConfigCard> : null}
 
           <ConfigCard title="辅助生成" description="图片与文本模型用于资产、AI 推理和画面生成。"><div className="batch-factory-engine-grid">
-            <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} onChange={imageProvider => patch(reconcileProviderModel({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
+            <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
             <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : loading} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
             <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={loading} onChange={textModelId => patch({ textModelId })} />
             <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' }]} loading={false} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
@@ -664,7 +684,9 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
       {
         key: 'publish',
         label: '发布统一',
-        children: <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
+        children: productionMode === 'comic' ? <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
+          <BatchFactoryComicPublishSettingsForm value={form} onChange={patch} singleBook />
+        </div> : <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
           <Alert type="info" showIcon message="当前书独立发布配置" description="发布目录仍来自账号和批量作品；这里只保存当前书的差异值。" />
           <ConfigCard title="发布映射" description="网站风格继续读取本书 AI 判断结果。">
             <InheritedField label="网站配置档" value={publish.websiteProfileId} inherited={inheritedPublish.websiteProfileId} options={profiles.map(profile => ({ value: profile.id, label: profile.name || profile.id }))} loading={false} onChange={websiteProfileId => { const profile = profiles.find(item => item.id === websiteProfileId) || {}; patch({ publishSettings: { ...publish, websiteProfileId, versionProfile: profile.name || '' } }); }} />
@@ -685,21 +707,20 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
   } else if (region === 'assets') {
     body = <><Alert type="info" showIcon message="当前书的人物场景预设" description="人物、场景、道具的实际 Prompt 与图片在本书这一行的“添加角色 / 添加场景 / 添加道具”中维护；这里选择这本书调用的提取与推理预设。" />
       <RuleModule title="资产设置" value={assetRules} onChange={next => patchAI('assets', scoped(next))}>
-        <PromptSelect label={visibility.comic ? '漫画资产提示词' : '人物场景道具提取提示词'} value={visibility.comic ? ai.comic?.assets : assetRules.extraction} options={Object.assign((visibility.comic ? comicAssetRules : scriptExtraction).map(optionFor), { catalog: visibility.comic ? comicAssetRules : scriptExtraction })} disabled={loading} onChange={selection => visibility.comic ? patchAI('comic', scoped({ ...ai.comic, assets: selection, enabled: true })) : updateAssetSelection('extraction', selection)} />
+        <PromptSelect label={visibility.comic ? '漫画资产提示词' : '人物场景道具提取提示词'} value={visibility.comic ? ai.comic?.assets : assetRules.extraction} options={Object.assign((visibility.comic ? comicAssetRules : videoAssetRules).map(optionFor), { catalog: visibility.comic ? comicAssetRules : videoAssetRules })} disabled={loading} onChange={selection => visibility.comic ? patchAI('comic', scoped({ ...ai.comic, assets: selection, enabled: true })) : updateAssetSelection('extraction', selection)} />
         <label className="batch-factory-engine-field"><span><b>星标人物聚焦</b><HelpTip title="星标人物聚焦">与公网剧本生成一致：只作为导演分镜的剧情与镜头聚焦变量，不等同于分镜资产灰显。</HelpTip></span><Select mode="multiple" allowClear value={starredCharacterNames} options={characterOptions} placeholder={characterOptions.length ? '选择已提取的人物' : '请先提取人物资产'} onChange={starredCharacterNames => patch({ starredCharacterNames })} /></label>
         <Button onClick={() => { onClose?.(); onOpenBookAssets?.(book); }}>维护当前书人物场景预设</Button>
       </RuleModule>
     </>;
   } else if (region === 'constraints') {
-    body = <>{visibility.video ? <RuleModule title="智能统一" value={constraintRules} onChange={updateConstraintRules}>
+    body = <>{visibility.video ? <RuleModule required title="视觉约束" value={constraintRules} onChange={updateConstraintRules}>
       <ConstraintLayers value={constraintRules} records={scriptConstraints} personalPrompts={personalPrompts} loading={loading} saving={savingPersonalCategory} editingPromptId={editingPersonalPrompt.category} onChange={updateConstraintRules} onSelectSystem={selectSystemConstraint} onSelectPersonal={selectPersonalConstraint} onSaveDraft={category => savePersonalConstraint(category, null)} onSaveNamed={category => setPersonalPromptNameModal({ open: true, category, name: editingPersonalPrompt.category === category ? editingPersonalPrompt.name : '' })} onEditPersonal={(category, prompt) => { setEditingPersonalPrompt({ category, id: prompt.id, name: prompt.name || '' }); updateConstraintLayer(category, { source: 'draft', presetId: '', personalPromptId: '', body: prompt.body || '' }); }} onDeletePersonal={deletePersonalConstraint} />
     </RuleModule> : null}
     {visibility.comic ? <section className="batch-factory-engine-card"><header><b>漫画图片约束</b><HelpTip title="漫画图片约束">统一配置会自动继承到当前书；在这里改动后只覆盖当前书。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
       <label className="batch-factory-engine-field"><span><b>画质约束</b></span><Select allowClear value={selectedComicConstraint('comic_quality')} options={comicConstraintOptions('comic_quality')} placeholder="未选择" onChange={presetId => updateComicConstraint('comic_quality', presetId)} /></label>
       <label className="batch-factory-engine-field"><span><b>画面限制</b></span><Select allowClear value={selectedComicConstraint('comic_restriction')} options={comicConstraintOptions('comic_restriction')} placeholder="未选择" onChange={presetId => updateComicConstraint('comic_restriction', presetId)} /></label>
       <label className="batch-factory-engine-field"><span><b>负面提示词</b></span><Select allowClear value={selectedComicConstraint('comic_negative')} options={comicConstraintOptions('comic_negative')} placeholder="未选择" onChange={presetId => updateComicConstraint('comic_negative', presetId)} /></label>
-    </div></section> : null}
-    {visibility.comic ? <BatchFactoryComicStylePicker batchId={batch?.id} catalog={catalog.batch} value={ai.comic} inherited={!Object.hasOwn(bookPatch.aiPromptConfig || {}, 'comic')} onChange={nextComic => patchAI('comic', scoped(nextComic))} /> : null}</>;
+    </div></section> : null}</>;
   } else if (region === 'media') {
     body = mediaBody;
   } else if (region === 'video') {

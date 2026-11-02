@@ -24,8 +24,9 @@ func RegisterLocalExecutorArtifactRoutes(root *http.ServeMux, auth BridgeAuth, s
 			return
 		}
 		mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
-		if err != nil || strings.ToLower(mediaType) != "video/mp4" {
-			writeExecutorError(w, http.StatusBadRequest, "artifact must be video/mp4")
+		mediaType = strings.ToLower(mediaType)
+		if err != nil || !supportedExecutorArtifactMediaType(mediaType) {
+			writeExecutorError(w, http.StatusBadRequest, "artifact must be video/mp4, image/png, image/jpeg, or image/webp")
 			return
 		}
 		generation, err := strconv.ParseInt(strings.TrimSpace(req.Header.Get("X-Lease-Generation")), 10, 64)
@@ -52,7 +53,12 @@ func RegisterLocalExecutorArtifactRoutes(root *http.ServeMux, auth BridgeAuth, s
 			writeExecutorError(w, http.StatusInternalServerError, "artifact id generation failed")
 			return
 		}
-		saved, err := files.SaveMP4(artifactID, req.Body)
+		var saved localartifact.Artifact
+		if mediaType == "video/mp4" {
+			saved, err = files.SaveMP4(artifactID, req.Body)
+		} else {
+			saved, err = files.SaveImage(artifactID, mediaType, req.Body)
+		}
 		if err != nil {
 			writeArtifactStoreError(w, err)
 			return
@@ -99,9 +105,14 @@ func RegisterLocalExecutorArtifactRoutes(root *http.ServeMux, auth BridgeAuth, s
 			return
 		}
 		defer file.Close()
-		w.Header().Set("Content-Type", "video/mp4")
+		contentType, filename, err := artifactResponseMetadata(artifact.ID, artifact.MediaType)
+		if err != nil {
+			writeExecutorError(w, http.StatusInternalServerError, "invalid artifact media type")
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeContent(w, req, artifact.ID+".mp4", artifact.CreatedAt, file)
+		http.ServeContent(w, req, filename, artifact.CreatedAt, file)
 	})
 
 	root.Handle("GET /api/shuihuo-production/local-executor-artifacts/{id}", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -125,10 +136,42 @@ func RegisterLocalExecutorArtifactRoutes(root *http.ServeMux, auth BridgeAuth, s
 			return
 		}
 		defer file.Close()
-		w.Header().Set("Content-Type", "video/mp4")
+		contentType, filename, err := artifactResponseMetadata(artifact.ID, artifact.MediaType)
+		if err != nil {
+			writeExecutorError(w, http.StatusInternalServerError, "invalid artifact media type")
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeContent(w, req, artifact.ID+".mp4", artifact.CreatedAt, file)
+		http.ServeContent(w, req, filename, artifact.CreatedAt, file)
 	})))
+}
+
+func supportedExecutorArtifactMediaType(mediaType string) bool {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "video/mp4", "image/png", "image/jpeg", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func artifactResponseMetadata(id, mediaType string) (string, string, error) {
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	extension := ""
+	switch mediaType {
+	case "video/mp4":
+		extension = ".mp4"
+	case "image/png":
+		extension = ".png"
+	case "image/jpeg":
+		extension = ".jpg"
+	case "image/webp":
+		extension = ".webp"
+	default:
+		return "", "", errors.New("unsupported artifact media type")
+	}
+	return mediaType, id + extension, nil
 }
 
 func writeArtifactDomainError(w http.ResponseWriter, err error) {
@@ -144,7 +187,7 @@ func writeArtifactDomainError(w http.ResponseWriter, err error) {
 
 func writeArtifactStoreError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, localartifact.ErrInvalidMP4), errors.Is(err, localartifact.ErrInvalidID):
+	case errors.Is(err, localartifact.ErrInvalidMP4), errors.Is(err, localartifact.ErrInvalidImage), errors.Is(err, localartifact.ErrInvalidID):
 		writeExecutorError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, localartifact.ErrTooLarge):
 		writeExecutorError(w, http.StatusRequestEntityTooLarge, err.Error())

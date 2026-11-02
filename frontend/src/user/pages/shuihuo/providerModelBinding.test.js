@@ -6,6 +6,7 @@ import {
   providerOptionsForModels,
   reconcileProviderModel
 } from './providerModelBinding.js';
+import * as providerBinding from './providerModelBinding.js';
 
 const catalog = [
   { id: 'personal-image', kind: 'image', displayName: '个人中心图片', provider: 'personal_api' },
@@ -14,6 +15,28 @@ const catalog = [
   { id: 'comfy-video', kind: 'video', displayName: 'Comfy 视频', provider: 'autodl_comfyui' },
   { id: 'personal-video', kind: 'video', displayName: '个人中心视频', provider: 'personal_api' }
 ];
+
+test('provider selection writes the field names consumed by image and video settings', () => {
+  assert.equal(typeof providerBinding.providerModelSettingsPatch, 'function');
+  assert.deepEqual(providerBinding.providerModelSettingsPatch({
+    models: catalog,
+    kind: 'image',
+    provider: 'doubao_local_executor',
+    modelId: ''
+  }), {
+    imageProvider: 'doubao_local_executor',
+    imageModelId: 'Seedream 4.5'
+  });
+  assert.deepEqual(providerBinding.providerModelSettingsPatch({
+    models: catalog,
+    kind: 'video',
+    provider: 'doubao_local_executor',
+    modelId: ''
+  }), {
+    videoProvider: 'doubao_local_executor',
+    videoModelId: 'Seedance 2.0 Fast'
+  });
+});
 
 test('only exposes models belonging to the selected provider', () => {
   assert.deepEqual(modelOptionsForProvider(catalog, 'image', 'autodl_comfyui').map(item => item.value), ['comfy-image']);
@@ -45,4 +68,10 @@ test('provider options include enabled catalog providers such as FanKe video', (
 test('text and audio channels do not offer image or video-only executors', () => {
   assert.deepEqual(providerOptionsForModels(catalog, 'text').map(item => item.value), ['personal_api']);
   assert.deepEqual(modelOptionsForProvider(catalog, 'text', 'doubao_local_executor'), []);
+});
+
+test('OpenAI compatible catalog models belong to the personal API channel', () => {
+  const textModel = { id: 'custom-text', kind: 'text', provider: 'openai_compatible' };
+  assert.equal(providerForCatalogModel(textModel, 'personal_api'), 'personal_api');
+  assert.deepEqual(modelOptionsForProvider([textModel], 'text', 'personal_api').map(item => item.value), ['custom-text']);
 });

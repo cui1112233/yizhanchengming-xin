@@ -32,8 +32,8 @@
 .bf11-workbench .ant-typography,
 .bf11-workbench .ant-btn,
 .bf11-workbench .ant-card,
-.bf11-workbench .ant-empty-description { color: var(--bf11-text); }
-.bf11-workbench .ant-typography-secondary { color: var(--bf11-muted) !important; }
+.bf11-workbench .ant-empty-description { color: var(--text-primary); }
+.bf11-workbench .ant-typography-secondary { color: var(--text-secondary) !important; }
 .bf11-workbench .ant-input,
 .bf11-workbench .ant-input-affix-wrapper,
 .bf11-workbench .ant-select-selector {

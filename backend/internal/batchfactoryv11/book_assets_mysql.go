@@ -12,7 +12,7 @@ func ensureBookOwnership(ctx context.Context, q interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }, owner, batchID, bookID string) error {
 	var one int
-	err := q.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=?`, bookID, batchID, owner).Scan(&one)
+	err := q.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=?`, bookID, batchID, owner).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -23,7 +23,7 @@ func (s *MySQLStore) ListBookAssets(ctx context.Context, owner, batchID, bookID 
 	if err := ensureBookOwnership(ctx, s.db, owner, batchID, bookID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, batchID, bookID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, batchID, bookID)
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +34,7 @@ func (s *MySQLStore) ListBookAssets(ctx context.Context, owner, batchID, bookID 
 		if err := rows.Scan(&asset.ID, &asset.Kind, &asset.Name, &asset.FormalName, &asset.Facts, &asset.Appearance, &asset.Relationships, &asset.Prompt, &asset.ImageModelID, &asset.ImageAspectRatio, &asset.Source, &asset.ExtractionPresetID, &asset.ExtractionPresetVersion, &asset.Revision, &asset.CreatedAt, &asset.UpdatedAt); err != nil {
 			return nil, err
 		}
+		asset = normalizeLegacyComicBookAsset(asset)
 		if asset.Appearance == "" {
 			asset.Appearance = asset.Prompt
 		}
@@ -64,8 +65,8 @@ func (s *MySQLStore) CreateBookAsset(ctx context.Context, owner, batchID, bookID
 		return BookAsset{}, err
 	}
 	now := time.Now().UTC()
-	asset := BookAsset{ID: id, BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, Source: "manual", Revision: 1, CreatedAt: now, UpdatedAt: now}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'manual',1,?,?)`, asset.ID, owner, asset.BatchID, asset.BookID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nullableString(asset.ImageModelID), nullableString(asset.ImageAspectRatio), now, now); err != nil {
+	asset := BookAsset{ID: id, BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, Source: input.Source, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, asset.ID, owner, asset.BatchID, asset.BookID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nullableString(asset.ImageModelID), nullableString(asset.ImageAspectRatio), asset.Source, now, now); err != nil {
 		return BookAsset{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -87,7 +88,7 @@ func (s *MySQLStore) PersistExtractedBookAssets(ctx context.Context, owner strin
 	if err := ensureBookOwnership(ctx, tx, owner, book.BatchID, book.ID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND source='director'`, owner, book.BatchID, book.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND source='director'`, owner, book.BatchID, book.ID); err != nil {
 		return nil, err
 	}
 	output := DirectorResult{Characters: assets.Characters, Scenes: assets.Scenes, Props: assets.Props}
@@ -99,7 +100,7 @@ func (s *MySQLStore) PersistExtractedBookAssets(ctx context.Context, owner strin
 	// structured fields from the new extraction result.
 	now := time.Now().UTC()
 	for _, seed := range directorBookAssets(book, snapshot, output) {
-		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_book_assets SET
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_assets SET
 			formal_name=CASE WHEN TRIM(COALESCE(formal_name,''))='' THEN ? ELSE formal_name END,
 			facts=CASE WHEN TRIM(COALESCE(facts,''))='' THEN ? ELSE facts END,
 			appearance=CASE WHEN TRIM(COALESCE(appearance,''))='' THEN ? ELSE appearance END,
@@ -110,7 +111,7 @@ func (s *MySQLStore) PersistExtractedBookAssets(ctx context.Context, owner strin
 			return nil, err
 		}
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, book.BatchID, book.ID)
+	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, book.BatchID, book.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,13 @@ func (s *MySQLStore) PersistComicExtractedBookAssets(ctx context.Context, owner 
 	if err := ensureBookOwnership(ctx, tx, owner, book.BatchID, book.ID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND source='comic'`, owner, book.BatchID, book.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE i FROM batch_factory_v12_book_asset_images i
+		JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id
+		WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=?
+		AND (a.source='comic' OR (a.source='manual' AND a.extraction_preset_id IN (?,?)))`, owner, book.BatchID, book.ID, "batch-comic-assets", "vip-smart-character-derive"); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? AND (source='comic' OR (source='manual' AND extraction_preset_id IN (?,?)))`, owner, book.BatchID, book.ID, "batch-comic-assets", "vip-smart-character-derive"); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC()
@@ -157,12 +164,12 @@ func (s *MySQLStore) PersistComicExtractedBookAssets(ctx context.Context, owner 
 		if err != nil {
 			return nil, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,extraction_preset_id,extraction_preset_version,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'comic',?,?,1,?,?)`,
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,extraction_preset_id,extraction_preset_version,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'comic',?,?,1,?,?)`,
 			id, owner, book.BatchID, book.ID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nil, nil, nullableString(asset.ExtractionPresetID), nullableInt64(asset.ExtractionPresetVersion), now, now); err != nil {
 			return nil, err
 		}
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, book.BatchID, book.ID)
+	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=? ORDER BY kind,name,id`, owner, book.BatchID, book.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +180,7 @@ func (s *MySQLStore) PersistComicExtractedBookAssets(ctx context.Context, owner 
 		if err := rows.Scan(&asset.ID, &asset.Kind, &asset.Name, &asset.FormalName, &asset.Facts, &asset.Appearance, &asset.Relationships, &asset.Prompt, &asset.ImageModelID, &asset.ImageAspectRatio, &asset.Source, &asset.ExtractionPresetID, &asset.ExtractionPresetVersion, &asset.Revision, &asset.CreatedAt, &asset.UpdatedAt); err != nil {
 			return nil, err
 		}
+		asset = normalizeLegacyComicBookAsset(asset)
 		asset.BatchID, asset.BookID = book.BatchID, book.ID
 		result = append(result, asset)
 	}
@@ -200,13 +208,13 @@ func (s *MySQLStore) UpdateBookAsset(ctx context.Context, owner, batchID, bookID
 		return BookAsset{}, err
 	}
 	now := time.Now().UTC()
-	result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_book_assets SET name=?,formal_name=?,facts=?,appearance=?,relationships=?,prompt=?,image_model_id=?,image_aspect_ratio=?,source='manual',revision=revision+1,updated_at=? WHERE id=? AND owner_username=? AND batch_id=? AND book_id=? AND revision=?`, input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, nullableString(input.ImageModelID), nullableString(input.ImageAspectRatio), now, assetID, owner, batchID, bookID, input.ExpectedRevision)
+	result, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_assets SET name=?,formal_name=?,facts=?,appearance=?,relationships=?,prompt=?,image_model_id=?,image_aspect_ratio=?,revision=revision+1,updated_at=? WHERE id=? AND owner_username=? AND batch_id=? AND book_id=? AND revision=?`, input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, nullableString(input.ImageModelID), nullableString(input.ImageAspectRatio), now, assetID, owner, batchID, bookID, input.ExpectedRevision)
 	if err != nil {
 		return BookAsset{}, err
 	}
 	if affected, _ := result.RowsAffected(); affected != 1 {
 		var revision int64
-		err := tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID).Scan(&revision)
+		err := tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID).Scan(&revision)
 		if errors.Is(err, sql.ErrNoRows) {
 			return BookAsset{}, ErrNotFound
 		}
@@ -216,10 +224,11 @@ func (s *MySQLStore) UpdateBookAsset(ctx context.Context, owner, batchID, bookID
 		return BookAsset{}, ErrConflict
 	}
 	var asset BookAsset
-	err = tx.QueryRowContext(ctx, `SELECT kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v11_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID).Scan(&asset.Kind, &asset.Name, &asset.FormalName, &asset.Facts, &asset.Appearance, &asset.Relationships, &asset.Prompt, &asset.ImageModelID, &asset.ImageAspectRatio, &asset.Source, &asset.ExtractionPresetID, &asset.ExtractionPresetVersion, &asset.Revision, &asset.CreatedAt, &asset.UpdatedAt)
+	err = tx.QueryRowContext(ctx, `SELECT kind,name,COALESCE(formal_name,''),COALESCE(facts,''),COALESCE(appearance,''),COALESCE(relationships,''),prompt,COALESCE(image_model_id,''),COALESCE(image_aspect_ratio,''),source,COALESCE(extraction_preset_id,''),COALESCE(extraction_preset_version,0),revision,created_at,updated_at FROM batch_factory_v12_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID).Scan(&asset.Kind, &asset.Name, &asset.FormalName, &asset.Facts, &asset.Appearance, &asset.Relationships, &asset.Prompt, &asset.ImageModelID, &asset.ImageAspectRatio, &asset.Source, &asset.ExtractionPresetID, &asset.ExtractionPresetVersion, &asset.Revision, &asset.CreatedAt, &asset.UpdatedAt)
 	if err != nil {
 		return BookAsset{}, err
 	}
+	asset = normalizeLegacyComicBookAsset(asset)
 	asset.ID, asset.BatchID, asset.BookID = assetID, batchID, bookID
 	if err := tx.Commit(); err != nil {
 		return BookAsset{}, err
@@ -239,10 +248,10 @@ func (s *MySQLStore) DeleteBookAsset(ctx context.Context, owner, batchID, bookID
 	if err := ensureBookAssetOwnership(ctx, tx, owner, batchID, bookID, assetID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_asset_images WHERE asset_id=? AND owner_username=?`, assetID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_asset_images WHERE asset_id=? AND owner_username=?`, assetID, owner); err != nil {
 		return err
 	}
-	result, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID)
+	result, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, assetID, owner, batchID, bookID)
 	if err != nil {
 		return err
 	}
@@ -261,7 +270,7 @@ func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, bo
 		return nil
 	}
 
-	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,source FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, owner, book.BatchID, book.ID)
+	rows, err := tx.QueryContext(ctx, `SELECT id,kind,name,source FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, owner, book.BatchID, book.ID)
 	if err != nil {
 		return err
 	}
@@ -281,7 +290,7 @@ func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, bo
 	rows.Close()
 
 	hasImage := map[string]bool{}
-	imageRows, err := tx.QueryContext(ctx, `SELECT DISTINCT asset_id FROM batch_factory_v11_book_asset_images WHERE owner_username=?`, owner)
+	imageRows, err := tx.QueryContext(ctx, `SELECT DISTINCT asset_id FROM batch_factory_v12_book_asset_images WHERE owner_username=?`, owner)
 	if err != nil {
 		return err
 	}
@@ -303,7 +312,7 @@ func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, bo
 
 	// Delete stale rows first so later inserts never collide with freed names.
 	for _, id := range plan.Deletes {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v11_book_assets WHERE id=? AND owner_username=? AND source='director'`, id, owner); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM batch_factory_v12_book_assets WHERE id=? AND owner_username=? AND source='director'`, id, owner); err != nil {
 			return err
 		}
 	}
@@ -313,7 +322,7 @@ func persistDirectorBookAssets(ctx context.Context, tx *sql.Tx, owner string, bo
 		if err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,extraction_preset_id,extraction_preset_version,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'director',?,?,1,?,?)`,
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_assets(id,owner_username,batch_id,book_id,kind,name,formal_name,facts,appearance,relationships,prompt,image_model_id,image_aspect_ratio,source,extraction_preset_id,extraction_preset_version,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'director',?,?,1,?,?)`,
 			id, owner, book.BatchID, book.ID, asset.Kind, asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, nil, nil, nullableString(asset.ExtractionPresetID), nullableInt64(asset.ExtractionPresetVersion), now, now); err != nil {
 			return err
 		}

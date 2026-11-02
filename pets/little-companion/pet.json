@@ -1,0 +1,8 @@
+{
+  "id": "little-companion",
+  "displayName": "小家伙",
+  "description": "小家伙，陪你创作的原创桌面宠物。",
+  "renderer": "multi-sheet",
+  "assetBasePath": "/pets/little-companion",
+  "source": "User original design, source package 2026-10-18"
+}

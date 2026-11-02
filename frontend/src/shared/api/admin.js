@@ -96,6 +96,39 @@ export function rollbackPreset(id, version) {
   });
 }
 
+export function archivePreset(id, version) {
+  return apiRequest(`${base}/presets/${encodeURIComponent(id)}/archive`, {
+    method: 'POST',
+    body: JSON.stringify({ version })
+  });
+}
+
+export function deletePreset(id, version) {
+  return apiRequest(`${base}/presets/${encodeURIComponent(id)}/${encodeURIComponent(version)}`, {
+    method: 'DELETE'
+  });
+}
+
+export function uploadAdminComicMaterial(dataUrl) {
+  return apiRequest(`${base}/comic-materials/upload`, {
+    method: 'POST',
+    body: JSON.stringify({ dataUrl })
+  });
+}
+
+export function loadAdminComicMaterialPreview(preset) {
+  const id = encodeURIComponent(String(preset?.id || ''));
+  const slot = preset?.protocolLock?.slot;
+  const version = encodeURIComponent(String(preset?.version || ''));
+  const asset = encodeURIComponent(String(preset?.previewAssetId || ''));
+  const path = preset?.previewAssetId
+    ? `/api/presets/comic-material/${id}/preview?asset=${asset}&version=${version}`
+    : slot === 'batch.comic-style'
+      ? `/api/presets/comic-style/${id}/preview?version=${version}`
+      : `/api/presets/comic-reference-scene/${id}/preview?version=${version}`;
+  return apiRequest(path, { responseType: 'blob', silent: true });
+}
+
 export function listAdminAgentSkills() {
   return apiRequest(`${base}/agent-skills`);
 }

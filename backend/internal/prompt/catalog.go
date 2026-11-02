@@ -27,6 +27,7 @@ type presetRecord struct {
 	Status            string   `json:"status"`
 	Body              string   `json:"body"`
 	Categories        []string `json:"categories,omitempty"`
+	PreviewAssetID    string   `json:"previewAssetId,omitempty"`
 	ProtocolLock      struct {
 		Format    string `json:"format"`
 		Slot      string `json:"slot"`
@@ -51,6 +52,7 @@ type PublicPreset struct {
 	ProcessOperation   string   `json:"processOperation,omitempty"`
 	Categories         []string `json:"categories,omitempty"`
 	PreviewURL         string   `json:"previewUrl,omitempty"`
+	ReferenceURL       string   `json:"referenceUrl,omitempty"`
 }
 
 // PublishedPresetBody is the server-side snapshot used when a workbench saves
@@ -102,8 +104,18 @@ func publicPreset(record presetRecord) PublicPreset {
 		slot = &value
 	}
 	result := PublicPreset{ID: record.ID, Module: record.Module, Name: record.Name, Kind: record.Kind, Description: record.Description, CompatibleBaseIDs: append([]string(nil), record.CompatibleBaseIDs...), Version: record.Version, Revision: revision, Status: record.Status, Slot: slot, Categories: append([]string(nil), record.Categories...)}
-	if record.ProtocolLock.Slot == "batch.comic-style" {
+	if strings.TrimSpace(record.PreviewAssetID) != "" && (record.ProtocolLock.Slot == "batch.comic-style" || record.ProtocolLock.Slot == "batch.comic-reference-scene") {
+		result.PreviewURL = "/api/presets/comic-material/" + record.ID + "/preview"
+		result.ReferenceURL = "/api/local-executor/v1/batch-comic-materials/" + record.ID
+	} else if record.ProtocolLock.Slot == "batch.comic-style" {
 		result.PreviewURL = "/api/presets/comic-style/" + record.ID + "/preview"
+		result.ReferenceURL = "/api/local-executor/v1/batch-comic-style-previews/" + record.ID
+	}
+	if record.ProtocolLock.Slot == "batch.comic-reference-scene" {
+		if result.PreviewURL == "" {
+			result.PreviewURL = "/api/presets/comic-reference-scene/" + record.ID + "/preview"
+			result.ReferenceURL = "/api/local-executor/v1/batch-comic-reference-scenes/" + record.ID
+		}
 	}
 	switch record.ProtocolLock.Format {
 	case "constraint":
@@ -114,6 +126,21 @@ func publicPreset(record presetRecord) PublicPreset {
 		result.ProcessOperation = record.ProtocolLock.Operation
 	}
 	return result
+}
+
+// PublishedComicMaterialAsset returns the privately stored preview image for
+// an administrator-managed comic style or scene. Built-in images remain in
+// the embedded fallback library and intentionally return no asset ID here.
+func (c *Catalog) PublishedComicMaterialAsset(id string) (string, bool, error) {
+	record, found, err := c.PublishedByID(id)
+	if err != nil || !found {
+		return "", false, err
+	}
+	if record.ProtocolLock.Slot != "batch.comic-style" && record.ProtocolLock.Slot != "batch.comic-reference-scene" {
+		return "", false, nil
+	}
+	assetID := strings.TrimSpace(record.PreviewAssetID)
+	return assetID, assetID != "", nil
 }
 
 func (c *Catalog) Published(module string) ([]PublicPreset, error) {

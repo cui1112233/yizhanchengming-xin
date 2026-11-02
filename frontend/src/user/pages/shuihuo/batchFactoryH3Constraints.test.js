@@ -31,7 +31,7 @@ test('maps enabled script constraint layers into the H3 compile contract', () =>
   });
 });
 
-test('uses only the saved H3 visual baseline for smart unified and disables every layer with the master switch', () => {
+test('uses only the saved H3 visual baseline for smart unified and ignores the retired master switch', () => {
   const selected = {
     enabled: true,
     baseSetup: { enabled: true },
@@ -45,7 +45,7 @@ test('uses only the saved H3 visual baseline for smart unified and disables ever
 
   assert.deepEqual(buildBatchFactoryH3Constraints({ ...selected, enabled: false }), {
     prefix_text: '', quality_text: '', visual_restriction_text: '', negative_text: '',
-    switches: { smart_unified: false, base_setup: false, prefix: false, quality: false, visual_restriction: false, negative: false }
+    switches: { smart_unified: true, base_setup: true, prefix: false, quality: false, visual_restriction: false, negative: false }
   });
 });
 

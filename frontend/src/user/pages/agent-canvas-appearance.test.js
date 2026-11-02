@@ -10,9 +10,9 @@ import {
 
 test('canvas appearance defaults enable the V88 flow presentation', () => {
   assert.deepEqual(defaultCanvasAppearance, {
-    edgeColor: 'coral',
-    edgeAnimated: true,
-    edgeWidth: 'default',
+    edgeColor: 'neutral',
+    edgeAnimated: false,
+    edgeWidth: 'thin',
     edgesVisible: true,
     backgroundDots: true,
     alignmentGuides: true
@@ -30,12 +30,19 @@ test('canvas appearance retains explicit false settings and rejects unsupported 
     alignmentGuides: false
   });
   assert.deepEqual(appearance, {
-    edgeColor: 'coral',
+    edgeColor: 'neutral',
     edgeAnimated: false,
-    edgeWidth: 'default',
+    edgeWidth: 'thin',
     edgesVisible: false,
     backgroundDots: false,
     alignmentGuides: false
+  });
+});
+
+test('legacy colored edge preferences remain available after neutral becomes the default', () => {
+  assert.deepEqual(edgeStyleForAppearance({ edgeColor: 'coral', edgeWidth: 'default', edgeAnimated: true }), {
+    stroke: 'var(--agent-edge-coral)',
+    strokeWidth: 2
   });
 });
 

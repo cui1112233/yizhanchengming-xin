@@ -30,7 +30,7 @@ var defaultUserConfig = func() map[string]any {
 			"provider": "yd_video", "displayName": "中转亚迪",
 		},
 		"pet": map[string]any{
-			"id": "stacky", "displayName": "CM", "description": "CM，前贴的桌面宠物。", "spriteVersionNumber": 2, "spritesheetPath": "/pets/stacky/spritesheet.webp",
+			"id": "little-companion", "displayName": "小家伙", "description": "小家伙，陪你创作的原创桌面宠物。", "renderer": "multi-sheet", "assetBasePath": "/pets/little-companion", "previewPose": "idle",
 		},
 		"tts":           map[string]any{"voice": "zh-CN-XiaoxiaoNeural", "style": "general", "speed": 1.8, "pitch": 10},
 		"notifications": map[string]any{"soundEnabled": true, "petVisible": true, "soundVolume": 60},

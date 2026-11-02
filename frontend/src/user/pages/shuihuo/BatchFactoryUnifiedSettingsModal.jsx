@@ -20,6 +20,7 @@ import { getConstraintPresetTexts } from '../../../shared/api/generation';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
 import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readComicPublishDirectoryCache, writeComicPublishDirectoryCache } from './batchFactoryComicPublishAccounts';
+import { inferBatchN8AudioCategory } from './batchFactoryAudioCategory';
 
 const clone = value => JSON.parse(JSON.stringify(value || {}));
 const normalizeLegacyPatch = value => {
@@ -298,7 +299,7 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
   </>;
 }
 
-export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBook = false }) {
+export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBook = false, books = [] }) {
   const comicPublishSettings = value.comicPublishSettings || {};
 	const cachedDirectory = readComicPublishDirectoryCache();
 	const [producerAccounts, setProducerAccounts] = useState(cachedDirectory?.producerAccounts || []);
@@ -318,7 +319,6 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
 			const categories = Array.isArray(response?.audioCategories) ? response.audioCategories : [];
 			if (categories.length) setAudioCategories(categories);
 			setProducerAccountOrganizations(response?.producerAccountOrganizations && typeof response.producerAccountOrganizations === 'object' ? response.producerAccountOrganizations : {});
-			if (response?.audioCategories?.[0]) getN8ComicPublishAudios({ audioCategoryId: response.audioCategories[0].id, organizationId: comicPublishSettings.organizationId }, { silent: true, suppressGlobalError: true }).then(result => { if (active) setAudios(result?.audios || []); }).catch(() => {});
 			const latestDirectory = readComicPublishDirectoryCache();
 			writeComicPublishDirectoryCache({ ...response, audioCategories: categories.length ? categories : (latestDirectory?.audioCategories || cachedDirectory?.audioCategories || []) });
 			setProducerAccountsWarning(String(response?.producerAccountsWarning || ''));
@@ -341,6 +341,34 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
     ...value,
     comicPublishSettings: { ...comicPublishSettings, ...next }
   });
+  const inferredAudioCategory = useMemo(() => inferBatchN8AudioCategory(books, audioCategories), [books, audioCategories]);
+  useEffect(() => {
+    if (comicPublishSettings.audioCategorySelectionMode === 'manual') return;
+    const selected = inferredAudioCategory.category;
+    if (selected) {
+      if (Number(comicPublishSettings.audioCategoryId) !== Number(selected.id) || comicPublishSettings.audioCategoryName !== selected.name || comicPublishSettings.audioCategorySelectionMode !== 'auto') {
+        patchComicPublishSettings({ audioCategoryId: selected.id, audioCategoryName: selected.name, audioCategorySelectionMode: 'auto', specifiedAudioId: '', specifiedAudioName: '' });
+      }
+      return;
+    }
+    if (comicPublishSettings.audioCategorySelectionMode === 'auto' && comicPublishSettings.audioCategoryId) {
+      patchComicPublishSettings({ audioCategoryId: null, audioCategoryName: '', audioCategorySelectionMode: '', specifiedAudioId: '', specifiedAudioName: '' });
+    }
+  }, [inferredAudioCategory.category?.id, inferredAudioCategory.category?.name, inferredAudioCategory.reason, comicPublishSettings.audioCategorySelectionMode, books]);
+  useEffect(() => {
+    const organizationId = String(comicPublishSettings.organizationId || '').trim();
+    const audioCategoryId = String(comicPublishSettings.audioCategoryId || '').trim();
+    if (!organizationId || !audioCategoryId) { setAudios([]); return undefined; }
+    let active = true;
+    getN8ComicPublishAudios({ organizationId, audioCategoryId }, { silent: true, suppressGlobalError: true }).then(result => {
+      if (!active) return;
+      const candidates = Array.isArray(result?.audios) ? result.audios : [];
+      setAudios(candidates);
+      const selected = chooseN8Audio(candidates, comicPublishSettings.specifiedAudioId);
+      patchComicPublishSettings(selected ? { specifiedAudioId: selected.id, specifiedAudioName: selected.name } : { specifiedAudioId: '', specifiedAudioName: '' });
+    }).catch(() => { if (active) { setAudios([]); patchComicPublishSettings({ specifiedAudioId: '', specifiedAudioName: '' }); } });
+    return () => { active = false; };
+  }, [comicPublishSettings.organizationId, comicPublishSettings.audioCategoryId]);
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
     <Alert
       type="info"
@@ -367,7 +395,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
         </div>
         <div className="batch-factory-engine-field">
           <span><b>组织</b></span>
-          <Select placement="bottomLeft" value={String(comicPublishSettings.organizationId || '') || undefined} options={organizations.map(item => ({ value: String(item.id), label: `${item.name}（组织 ${item.id}）` }))} placeholder="请选择 N8 组织" getPopupContainer={() => document.body} onChange={organizationId => { const selected = organizations.find(item => String(item.id) === String(organizationId)); patchComicPublishSettings({ organizationId: String(organizationId || ''), organizationName: selected?.name || '' }); }} />
+          <Select placement="bottomLeft" value={String(comicPublishSettings.organizationId || '') || undefined} options={organizations.map(item => ({ value: String(item.id), label: `${item.name}（组织 ${item.id}）` }))} placeholder="请选择 N8 组织" getPopupContainer={() => document.body} onChange={organizationId => { const selected = organizations.find(item => String(item.id) === String(organizationId)); patchComicPublishSettings({ organizationId: String(organizationId || ''), organizationName: selected?.name || '', specifiedAudioId: '', specifiedAudioName: '' }); }} />
         </div>
       </div>
     </section>
@@ -386,8 +414,7 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
             getPopupContainer={() => document.body}
             onChange={audioCategoryName => {
               const selected = audioCategories.find(item => item.name === audioCategoryName);
-              patchComicPublishSettings({ audioCategoryName, audioCategoryId: selected?.id || null, specifiedAudioId: '', specifiedAudioName: '' });
-              getN8ComicPublishAudios({ audioCategoryId: selected?.id, organizationId: comicPublishSettings.organizationId }, { silent: true }).then(result => { const audio = chooseN8Audio(result?.audios); if (audio) patchComicPublishSettings({ specifiedAudioId: audio.id, specifiedAudioName: audio.name }); }).catch(() => {});
+              patchComicPublishSettings({ audioCategoryName, audioCategoryId: selected?.id || null, audioCategorySelectionMode: 'manual', specifiedAudioId: '', specifiedAudioName: '' });
             }}
           />
 		</div>
@@ -403,10 +430,11 @@ export function BatchFactoryComicPublishSettingsForm({ value, onChange, singleBo
             getPopupContainer={() => document.body}
             onChange={audioCategoryId => {
               const selected = audioCategories.find(item => String(item.id) === String(audioCategoryId));
-              patchComicPublishSettings({ audioCategoryId: selected?.id || null, audioCategoryName: selected?.name || '' });
+              patchComicPublishSettings({ audioCategoryId: selected?.id || null, audioCategoryName: selected?.name || '', audioCategorySelectionMode: 'manual', specifiedAudioId: '', specifiedAudioName: '' });
             }}
           />
 		</div>
+        <div className="batch-factory-engine-field"><span><b>指定音频</b></span><Select showSearch optionFilterProp="label" value={String(comicPublishSettings.specifiedAudioId || '') || undefined} options={audios.map(item => ({ value: String(item.id), label: `${item.name}（ID ${item.id}）` }))} placeholder="当前分类和组织下没有可用指定音频" onChange={specifiedAudioId => { const selected = audios.find(item => String(item.id) === String(specifiedAudioId)); patchComicPublishSettings({ specifiedAudioId: selected?.id || '', specifiedAudioName: selected?.name || '' }); }} /><small>{comicPublishSettings.audioCategorySelectionMode === 'auto' ? '已根据批次 AI 分类自动匹配，可更改' : inferredAudioCategory.reason === 'mixed' ? '批次书籍分类不一致，需手动选择音频分类' : inferredAudioCategory.reason === 'unclassified' ? '书籍 AI 分类未完成，需手动选择音频分类' : '已自动匹配，可更改'}</small></div>
         <label className="batch-factory-engine-field" style={{ gridColumn: '1 / -1' }}>
           <span><b>作品匹配方式</b></span>
           <Segmented
@@ -612,7 +640,7 @@ export function BatchFactoryUnifiedSettingsModal({ open, batch, onClose, onSaved
     <Tabs items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={draftPatch} onChange={setDraftPatch} sections={['models', 'audio']} active={open} /> },
       { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm batchId={batch?.id} productionMode={draftPatch.productionMode} value={draftPatch.aiPromptConfig} onChange={aiPromptConfig => setDraftPatch(current => ({ ...current, aiPromptConfig }))} /> },
-      { key: 'publish', label: '发布统一', forceRender: true, children: productionMode === 'comic' ? <BatchFactoryComicPublishSettingsForm value={draftPatch} onChange={setDraftPatch} /> : <BatchFactoryPublishSettingsForm value={draftPatch} onChange={setDraftPatch} active={open} /> }
+      { key: 'publish', label: '发布统一', forceRender: true, children: productionMode === 'comic' ? <BatchFactoryComicPublishSettingsForm value={draftPatch} onChange={setDraftPatch} books={batch?.books || []} /> : <BatchFactoryPublishSettingsForm value={draftPatch} onChange={setDraftPatch} active={open} /> }
     ]} />
   </Modal>;
 }

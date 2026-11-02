@@ -23,7 +23,6 @@ var adminGrantCapabilities = map[string]bool{
 var adminGrantScopes = map[string]bool{
 	"*":           true,
 	"script":      true,
-	"novel-panel": true,
 }
 
 // RegisterAdminGovernanceCompat keeps the account-application and backend-grant

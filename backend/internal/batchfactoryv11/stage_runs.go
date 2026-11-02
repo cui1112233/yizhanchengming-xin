@@ -22,8 +22,9 @@ const (
 type StageMode string
 
 const (
-	StageModeMissing StageMode = "missing"
-	StageModeForce   StageMode = "force"
+	StageModeMissing   StageMode = "missing"
+	StageModeForce     StageMode = "force"
+	StageModeBootstrap StageMode = "bootstrap"
 )
 
 type BookStageRun struct {
@@ -51,6 +52,17 @@ func validBookStage(value BookStage) bool {
 	switch value {
 	case BookStageAssets, BookStageDirector, BookStageOpening, BookStageVisual, BookStageComic, BookStageImage, BookStageVideo:
 		return true
+	default:
+		return false
+	}
+}
+
+func validStageMode(stage BookStage, mode StageMode) bool {
+	switch mode {
+	case StageModeMissing, StageModeForce:
+		return true
+	case StageModeBootstrap:
+		return stage == BookStageComic
 	default:
 		return false
 	}
@@ -95,7 +107,10 @@ func LatestFailedBookStageRun(values []BookStageRun) *BookStageRun {
 	}
 	failed := make([]BookStageRun, 0, len(latestByStage))
 	for _, value := range latestByStage {
-		if value.Status == ProductionFailed {
+		// A missing-mode director run that arrives after a revision already
+		// exists is a stale duplicate, not a user-actionable failure. Older
+		// records may still contain it, so keep it out of the retry state.
+		if value.Status == ProductionFailed && !(value.Stage == BookStageDirector && strings.Contains(value.ErrorMessage, "导演分镜已存在")) {
 			failed = append(failed, value)
 		}
 	}

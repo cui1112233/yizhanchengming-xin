@@ -34,15 +34,21 @@ test('giant original reads fall back safely and expose both recovery actions', (
   assert.match(progress, /persistedOriginalReadError/);
 });
 
-test('direct-first automatically hands a failed book-city read to OCR before reporting a failure', () => {
+test('direct-first reports a failed book-city read without automatically queueing OCR', () => {
   const source = read('BatchFactoryCreateModal.jsx');
   assert.match(source, /await fetchBookOriginal\(batchId, book\.id\)/);
-  assert.match(source, /await queueGiantOcrFallback\(batchId, entry, giantAutomationPlan, directReadError\)/);
-  assert.match(source, /书城获取失败，已自动转为滚屏 OCR/);
+  const directReadBlock = source.slice(
+    source.indexOf("if (giantOriginalReadStrategy === 'direct_first')"),
+    source.indexOf('const durationSeconds', source.indexOf("if (giantOriginalReadStrategy === 'direct_first')"))
+  );
+  assert.match(directReadBlock, /originalReadStage: 'failed'/);
+  assert.match(directReadBlock, /originalReadError: directReadError/);
+  assert.doesNotMatch(directReadBlock, /queueGiantOcrFallback/);
+  assert.doesNotMatch(directReadBlock, /自动转为滚屏 OCR/);
   assert.match(source, /await startBatchAutomation\(batchId, giantAutomationPlan\)/);
 });
 
-test('a giant batch starts its saved automation plan once after all source reads have been dispatched', () => {
+test('a giant batch does not start automation when a direct source read fails', () => {
   const source = read('BatchFactoryCreateModal.jsx');
   const directReadBlock = source.slice(
     source.indexOf("if (giantOriginalReadStrategy === 'direct_first')"),
@@ -51,6 +57,10 @@ test('a giant batch starts its saved automation plan once after all source reads
   const dispatchLoop = source.indexOf('for (const entry of selected)');
   const automationStart = source.indexOf('await startBatchAutomation(batchId, giantAutomationPlan)');
 
+  assert.match(source, /let hasDirectReadFailure = false/);
+  assert.match(directReadBlock, /hasDirectReadFailure = true/);
+  assert.match(directReadBlock, /contentPending: false/);
+  assert.match(source, /if \(giantAutomationPlan\?\.presetId && !hasDirectReadFailure\)/);
   assert.doesNotMatch(directReadBlock, /await startBatchAutomation\(batchId, giantAutomationPlan\)/);
   assert.ok(automationStart > dispatchLoop);
   assert.equal((source.match(/await startBatchAutomation\(batchId, giantAutomationPlan\)/g) || []).length, 1);

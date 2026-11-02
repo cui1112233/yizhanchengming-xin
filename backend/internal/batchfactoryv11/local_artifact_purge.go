@@ -130,7 +130,7 @@ func (s *MySQLStore) ClaimDueLocalArtifactPurge(ctx context.Context) (LocalArtif
 	}
 	defer tx.Rollback()
 	var item LocalArtifactPurge
-	err = tx.QueryRowContext(ctx, `SELECT id,storage_ref FROM batch_factory_v11_local_artifact_purges WHERE purge_after<=CURRENT_TIMESTAMP(6) AND (state IN ('pending','retry') OR (state='processing' AND updated_at<=DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 15 MINUTE))) ORDER BY purge_after,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&item.ID, &item.StorageRef)
+	err = tx.QueryRowContext(ctx, `SELECT id,storage_ref FROM batch_factory_v12_local_artifact_purges WHERE purge_after<=CURRENT_TIMESTAMP(6) AND (state IN ('pending','retry') OR (state='processing' AND updated_at<=DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 15 MINUTE))) ORDER BY purge_after,id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&item.ID, &item.StorageRef)
 	if err == sql.ErrNoRows {
 		if commitErr := tx.Commit(); commitErr != nil {
 			return LocalArtifactPurge{}, false, commitErr
@@ -140,7 +140,7 @@ func (s *MySQLStore) ClaimDueLocalArtifactPurge(ctx context.Context) (LocalArtif
 	if err != nil {
 		return LocalArtifactPurge{}, false, err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_local_artifact_purges SET state='processing',attempt_count=attempt_count+1,updated_at=CURRENT_TIMESTAMP(6) WHERE id=?`, item.ID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_local_artifact_purges SET state='processing',attempt_count=attempt_count+1,updated_at=CURRENT_TIMESTAMP(6) WHERE id=?`, item.ID); err != nil {
 		return LocalArtifactPurge{}, false, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -150,7 +150,7 @@ func (s *MySQLStore) ClaimDueLocalArtifactPurge(ctx context.Context) (LocalArtif
 }
 
 func (s *MySQLStore) MarkLocalArtifactPurgeDeleted(ctx context.Context, id int64) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v11_local_artifact_purges SET state='deleted',last_error=NULL,deleted_at=CURRENT_TIMESTAMP(6),updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND state='processing'`, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_local_artifact_purges SET state='deleted',last_error=NULL,deleted_at=CURRENT_TIMESTAMP(6),updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND state='processing'`, id)
 	return err
 }
 
@@ -165,7 +165,7 @@ func (s *MySQLStore) MarkLocalArtifactPurgeRetry(ctx context.Context, id int64, 
 	// Move the retry window forward. Without this, a permanently invalid file
 	// reference would be claimed again immediately and turn one periodic scan
 	// into a tight database loop.
-	_, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v11_local_artifact_purges SET state='retry',last_error=?,purge_after=DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 15 MINUTE),updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND state='processing'`, message, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_local_artifact_purges SET state='retry',last_error=?,purge_after=DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 15 MINUTE),updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND state='processing'`, message, id)
 	return err
 }
 
@@ -173,7 +173,7 @@ func (s *MySQLStore) MarkLocalArtifactPurgeRetry(ctx context.Context, id int64, 
 // before its merge-job rows are removed. It deliberately ignores remote URLs:
 // this local retention worker has no authority to remove TOS objects.
 func queueLocalMergedArtifactPurges(ctx context.Context, tx *sql.Tx, owner, batchID, bookID string, purgeAfter time.Time) error {
-	query := `SELECT COALESCE(book_id,''),COALESCE(output_url,'') FROM batch_factory_v11_merge_jobs WHERE owner_username=? AND batch_id=?`
+	query := `SELECT COALESCE(book_id,''),COALESCE(output_url,'') FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?`
 	args := []any{owner, batchID}
 	if strings.TrimSpace(bookID) != "" {
 		query += ` AND book_id=?`
@@ -193,7 +193,7 @@ func queueLocalMergedArtifactPurges(ctx context.Context, tx *sql.Tx, owner, batc
 		if !ok {
 			continue
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO batch_factory_v11_local_artifact_purges(owner_username,batch_id,book_id,storage_ref,purge_after,state,attempt_count,created_at,updated_at) VALUES(?,?,?,?,?,'pending',0,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6))`, owner, batchID, mergedBookID, storageRef, purgeAfter); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO batch_factory_v12_local_artifact_purges(owner_username,batch_id,book_id,storage_ref,purge_after,state,attempt_count,created_at,updated_at) VALUES(?,?,?,?,?,'pending',0,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6))`, owner, batchID, mergedBookID, storageRef, purgeAfter); err != nil {
 			return err
 		}
 	}

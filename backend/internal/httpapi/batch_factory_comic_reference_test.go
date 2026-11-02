@@ -44,6 +44,9 @@ func TestBatchComicReferenceUploadCanBeReadByOwnersExecutor(t *testing.T) {
 	if err := json.NewDecoder(upload.Body).Decode(&result); err != nil {
 		t.Fatal(err)
 	}
+	if result.Reference.Source != "manual-upload" {
+		t.Fatalf("uploaded reference source=%q, want manual-upload", result.Reference.Source)
+	}
 	_, err = store.SaveSettings(context.Background(), "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{
 		"productionMode": comicTestRaw(t, "comic"),
 		"aiPromptConfig": comicTestRaw(t, map[string]any{"comic": map[string]any{"enabled": true, "globalReferenceImage": result.Reference}}),
@@ -79,5 +82,24 @@ func TestBatchComicStylePreviewCanBeReadByPairedExecutor(t *testing.T) {
 	mux.ServeHTTP(response, request)
 	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "image/jpeg" || response.Body.Len() < 1000 {
 		t.Fatalf("style preview status=%d type=%q bytes=%d", response.Code, response.Header().Get("Content-Type"), response.Body.Len())
+	}
+}
+
+func TestBatchComicReferenceSceneCanBeReadByPairedExecutor(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	executors := localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return now })
+	pairing, _ := executors.CreatePairing(context.Background(), "alice", localexecutor.PlatformDoubao)
+	paired, err := executors.Pair(context.Background(), localexecutor.PairInput{Code: pairing.Code, Platform: localexecutor.PlatformDoubao, DeviceName: "comic-scene", OS: "windows", Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterBatchComicReferenceRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, batchfactoryv11.NewMemoryStore(), localartifact.NewStore(t.TempDir(), 1<<20), executors)
+	request := httptest.NewRequest(http.MethodGet, "/api/local-executor/v1/batch-comic-reference-scenes/batch-comic-reference-scene-campus-b", nil)
+	request.Header.Set("Authorization", "Bearer "+paired.Token)
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "image/jpeg" || response.Body.Len() < 1000 {
+		t.Fatalf("scene reference status=%d type=%q bytes=%d", response.Code, response.Header().Get("Content-Type"), response.Body.Len())
 	}
 }

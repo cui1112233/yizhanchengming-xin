@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestDeleteExecutorFailsReleasedJobWhenNoExecutorRemains(t *testing.T) {
+func TestDeleteExecutorQueuesReleasedJobWhenNoExecutorRemains(t *testing.T) {
 	service := NewService(NewMemoryStore(), time.Now)
 	pairing, err := service.CreatePairing(context.Background(), "alice", PlatformGiantMaterial)
 	if err != nil {
@@ -37,7 +37,7 @@ func TestDeleteExecutorFailsReleasedJobWhenNoExecutorRemains(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record.State != JobFailed || record.LeaseExecutorID != "" || record.ErrorCode != "executor_offline" {
+	if record.State != JobQueued || !record.WaitingForExecutor || record.LeaseExecutorID != "" || record.ErrorCode != "" {
 		t.Fatalf("record state=%s lease=%s error=%s", record.State, record.LeaseExecutorID, record.ErrorCode)
 	}
 	if err := service.DeleteExecutor(context.Background(), "alice", paired.ExecutorID); !errors.Is(err, ErrExecutorNotFound) {

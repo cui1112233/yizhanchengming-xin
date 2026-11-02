@@ -16,14 +16,14 @@ type MemoryStore struct {
 	jobs         map[string]JobRecord
 	sourceJobs   map[string]string
 	artifacts    map[string]ArtifactRecord
-	jobArtifacts map[string]string
+	jobArtifacts map[string][]string
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		pairings: make(map[string]PairingRecord), executors: make(map[string]ExecutorRecord), tokenIDs: make(map[string]string),
 		jobs: make(map[string]JobRecord), sourceJobs: make(map[string]string),
-		artifacts: make(map[string]ArtifactRecord), jobArtifacts: make(map[string]string),
+		artifacts: make(map[string]ArtifactRecord), jobArtifacts: make(map[string][]string),
 	}
 }
 
@@ -46,6 +46,15 @@ func (s *MemoryStore) PairExecutor(_ context.Context, codeHash SecretHash, platf
 	pairing.ConsumedAt = &consumed
 	s.pairings[key] = pairing
 	executor.OwnerUsername = pairing.OwnerUsername
+	// Re-pairing the same named machine refreshes its credential instead of
+	// creating a second visible device entry.
+	for id, existing := range s.executors {
+		if existing.OwnerUsername == executor.OwnerUsername && existing.Platform == platform && existing.DeviceName == executor.DeviceName && existing.OS == executor.OS {
+			delete(s.tokenIDs, secretHashKey(existing.TokenHash))
+			executor.ID = id
+			break
+		}
+	}
 	s.executors[executor.ID] = executor
 	s.tokenIDs[secretHashKey(executor.TokenHash)] = executor.ID
 	return executor, nil
@@ -93,8 +102,14 @@ func (s *MemoryStore) ListExecutors(_ context.Context, owner string) ([]Executor
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make([]ExecutorRecord, 0)
+	seen := make(map[string]bool)
 	for _, record := range s.executors {
 		if record.OwnerUsername == owner {
+			key := record.Platform + "\x00" + record.DeviceName + "\x00" + record.OS
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
 			out = append(out, record)
 		}
 	}

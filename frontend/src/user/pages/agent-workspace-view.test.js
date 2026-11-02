@@ -15,7 +15,7 @@ test('old canvases receive stable workflow workspace defaults', () => {
     drawerOpen: false,
     drawerTab: 'nodes',
     drawerWidth: 288,
-    conversationOpen: true,
+    conversationOpen: false,
     conversationWidth: 360,
     snapToGrid: false,
     showMinimap: true,

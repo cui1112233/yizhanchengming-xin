@@ -49,6 +49,80 @@ func TestFileAutomationStatusReaderUsesNewestMatchingRun(t *testing.T) {
 	}
 }
 
+func TestFileAutomationStatusReaderHidesRetryAtAfterTerminalFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "automation.json")
+	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"failed","books":{"book-1":{"bookId":"book-1","status":"failed","stage":"comic_images","retryAt":"2026-10-30T13:30:00Z"}}}}}`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewFileAutomationStatusReader(path).Status("alice", "batch-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	books, ok := status["books"].([]any)
+	if !ok || len(books) != 1 {
+		t.Fatalf("books=%#v", status["books"])
+	}
+	book, ok := books[0].(map[string]any)
+	if !ok || book["retryAt"] != nil {
+		t.Fatalf("terminal failure exposed stale retryAt: %#v", books[0])
+	}
+}
+
+func TestFileAutomationStatusReaderRepairsN8AlreadyUploadedImages(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "automation.json")
+	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"failed","books":{"book-1":{"bookId":"book-1","status":"failed","stage":"comic_publish","error":"N8接口返回错误：IMAGE_ALREADY_IN_CAROUSEL","retryRequested":true,"retryAt":"2026-10-30T13:30:00Z"}}}}}`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewFileAutomationStatusReader(path).Status("alice", "batch-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	books, ok := status["books"].([]any)
+	if !ok || len(books) != 1 {
+		t.Fatalf("books=%#v", status["books"])
+	}
+	book, ok := books[0].(map[string]any)
+	if !ok || book["status"] != "completed" || book["stage"] != "uploaded" || book["error"] != "" || book["retryAt"] != nil {
+		t.Fatalf("old N8 upload failure was not repaired: %#v", book)
+	}
+	if status["state"] != "completed" {
+		t.Fatalf("state=%v, want completed", status["state"])
+	}
+	persisted, err := os.ReadFile(path)
+	if err != nil || strings.Contains(string(persisted), `"status":"failed"`) {
+		t.Fatalf("repaired state was not persisted: %s (err=%v)", persisted, err)
+	}
+}
+
+func TestFileAutomationStatusReaderClearsStaleRetryRequestAfterBookCompletes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "automation.json")
+	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"completed","books":{"book-1":{"bookId":"book-1","status":"completed","stage":"published","retryRequested":true,"retryAt":"2026-10-30T13:30:00Z","retryReason":"content_policy"}}}}}`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewFileAutomationStatusReader(path).Status("alice", "batch-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	books, ok := status["books"].([]any)
+	if !ok || len(books) != 1 {
+		t.Fatalf("books=%#v", status["books"])
+	}
+	book, ok := books[0].(map[string]any)
+	if !ok || automationBoolValue(book["retryRequested"]) || book["retryAt"] != nil {
+		t.Fatalf("completed book still appears retryable: %#v", books[0])
+	}
+	persisted, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(persisted), `"retryRequested":true`) || strings.Contains(string(persisted), `"retryReason"`) {
+		t.Fatalf("completed book retry marker was not removed: %s", persisted)
+	}
+}
+
 func TestV12AutomationStatusRouteUsesPersistedState(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	path := filepath.Join(t.TempDir(), "automation.json")

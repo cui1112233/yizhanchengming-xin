@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var defaultChapterLine = regexp.MustCompile(`^\s*(?:0*\d+|第\s*(?:[0-9一二三四五六七八九十百千万零两]+)\s*(?:章|节|回|集|卷|部|篇|话|幕|季|场)|楔子|序章|序言|前言|引子|引言|正文|尾声|终章|后记|番外)\s*$`)
@@ -122,6 +123,107 @@ func previewPairFill(text string, layout map[string]any, symbol map[string]any) 
 	return strings.Join(lines, "\n")
 }
 
+func textHasRuleContent(text string) bool {
+	for _, char := range text {
+		if unicode.IsLetter(char) || unicode.IsNumber(char) || char == '_' {
+			return true
+		}
+	}
+	return false
+}
+
+func symbolAttachesRight(line []rune, index int, symbol rune) bool {
+	if strings.ContainsRune("“‘「『【《〈（([", symbol) {
+		return true
+	}
+	if !strings.ContainsRune("”’」』", symbol) {
+		return false
+	}
+	previous := rune(0)
+	if index > 0 {
+		previous = line[index-1]
+	}
+	return (index == 0 || strings.ContainsRune(" \t:：,，。！？?；;、", previous)) && textHasRuleContent(string(line[index+1:]))
+}
+
+func parseRulePositions(value any) []int {
+	parts := strings.FieldsFunc(ruleString(value), func(char rune) bool { return char == ',' || char == '，' || unicode.IsSpace(char) })
+	positions := make([]int, 0, len(parts))
+	for _, part := range parts {
+		if position, err := strconv.Atoi(part); err == nil && position > 0 {
+			positions = append(positions, position)
+		}
+	}
+	return positions
+}
+
+func previewSymbolTrim(text string, layout, symbol map[string]any) string {
+	if !ruleBool(layout, "apply_symbol_rules", true) || !ruleBool(symbol, "enable_symbol_trim", false) {
+		return text
+	}
+	positions := parseRulePositions(symbol["symbol_trim_positions"])
+	if len(positions) == 0 {
+		return text
+	}
+	triggers := map[rune]bool{}
+	for _, raw := range anySlice(symbol["symbol_rules"]) {
+		item, ok := raw.(map[string]any)
+		if !ok || item["enabled"] == false {
+			continue
+		}
+		chars := []rune(ruleString(item["find"]))
+		if len(chars) == 1 {
+			triggers[chars[0]] = true
+		}
+	}
+	if len(triggers) == 0 {
+		return text
+	}
+	allowAdjacent := ruleBool(symbol, "symbol_trim_allow_adjacent", false)
+	out := make([]string, 0)
+	for _, line := range strings.Split(normalizeRuleNewlines(text), "\n") {
+		queue := []string{line}
+		for len(queue) > 0 {
+			current := queue[0]
+			queue = queue[1:]
+			chars := []rune(current)
+			matched := -1
+			for _, position := range positions {
+				indexes := []int{position - 1}
+				if allowAdjacent {
+					indexes = []int{position - 2, position - 1, position}
+				}
+				for _, index := range indexes {
+					if index >= 0 && index < len(chars) && triggers[chars[index]] {
+						matched = index
+						break
+					}
+				}
+				if matched >= 0 {
+					break
+				}
+			}
+			if matched < 0 {
+				out = append(out, current)
+				continue
+			}
+			leftEnd, rightStart := matched+1, matched+1
+			if symbolAttachesRight(chars, matched, chars[matched]) {
+				leftEnd, rightStart = matched, matched
+			}
+			left := strings.TrimSpace(string(chars[:leftEnd]))
+			right := strings.TrimSpace(string(chars[rightStart:]))
+			if textHasRuleContent(left) {
+				out = append(out, left)
+			}
+			if textHasRuleContent(right) {
+				queue = append([]string{right}, queue...)
+			}
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
 func previewParagraphStyle(text string, layout, layoutRules map[string]any) string {
 	trimLines := ruleBool(layout, "trim_lines", true)
 	dropEmpty := ruleBool(layout, "drop_empty_lines", true)
@@ -217,13 +319,53 @@ func PreviewRules(text, scope string, layout map[string]any, knowledge map[strin
 	result = repeatedPunctuation(result)
 	stages = append(stages, ruleTraceStage("punctuation_1", "重复标点清理-首次", before, result))
 	before = result
+	result = previewSymbolTrim(result, layout, symbolRules)
+	stages = append(stages, ruleTraceStage("symbol_trim", "字位符号规则", before, result))
+	before = result
 	result = previewPairFill(result, layout, symbolRules)
 	stages = append(stages, ruleTraceStage("pair_fill", "成对补符号规则", before, result))
 	before = result
 	result = repeatedPunctuation(result)
 	stages = append(stages, ruleTraceStage("punctuation_2", "重复标点清理-二次", before, result))
 	before = result
+	result = previewChapterCleanup(result, layout, chapterRules)
+	stages = append(stages, ruleTraceStage("chapter_2", "章节清洗-二次", before, result))
+	before = result
 	result = previewParagraphStyle(result, layout, layoutRules)
 	stages = append(stages, ruleTraceStage("paragraph", "批量排版规则", before, result))
 	return result, stages
+}
+
+// ProcessConfiguredText is the single rule entry point used by previews,
+// fetched originals and generated AI versions.
+func ProcessConfiguredText(text, scope string, settings map[string]any) (string, []map[string]any, []map[string]any) {
+	if settings == nil {
+		settings = map[string]any{}
+	}
+	app := mapOrEmpty(settings["appConfig"])
+	layout := mapOrEmpty(settings["layout"])
+	if configured := mapOrEmpty(app["layout"]); len(configured) > 0 {
+		layout = configured
+	}
+	knowledge := mapOrEmpty(settings["knowledgeLibraries"])
+	if len(knowledge) == 0 {
+		knowledge = mapOrEmpty(app["knowledge"])
+	}
+	raw := normalizeRuleNewlines(text)
+	trace := []map[string]any{{"stage": "raw", "title": "抓取原文/raw", "chars": len([]rune(raw)), "lines": len(strings.Split(raw, "\n")), "changed": false, "samples": []map[string]any{}}}
+	if (scope == "original" && !ruleBool(layout, "apply_to_original", true)) || (scope == "ai" && !ruleBool(layout, "apply_to_ai", true)) {
+		return raw, trace, []map[string]any{}
+	}
+	processed := raw
+	hits := []map[string]any{}
+	if ruleBool(layout, "apply_sensitive", true) {
+		before := processed
+		processed, _, hits = ApplySensitiveRulesForScopeWithDetails(processed, settings, scope)
+		trace = append(trace, ruleTraceStage("sensitive", "敏感词替换", before, processed))
+	}
+	processed, stages := PreviewRules(processed, scope, layout, knowledge)
+	if len(stages) > 1 {
+		trace = append(trace, stages[1:]...)
+	}
+	return processed, trace, hits
 }

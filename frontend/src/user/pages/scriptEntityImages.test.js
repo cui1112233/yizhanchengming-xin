@@ -42,11 +42,11 @@ test('builds a scene generation request without inventing a character payload', 
 
 test('appending a generated result keeps explicit main-image selection untouched', () => {
   const current = ['https://img.example/existing.png'];
-  const next = appendImageCandidate(current, '/api/novel-panel/reference-assets/file/character/char-lin/main');
+  const next = appendImageCandidate(current, '/api/reference-assets/file/character/char-lin/main');
 
   assert.deepEqual(next, [
     'https://img.example/existing.png',
-    '/api/novel-panel/reference-assets/file/character/char-lin/main'
+    '/api/reference-assets/file/character/char-lin/main'
   ]);
   assert.deepEqual(appendImageCandidate(next, next[1]), next);
 });

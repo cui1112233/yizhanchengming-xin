@@ -47,6 +47,7 @@ type ArtifactStore interface {
 	CreateArtifact(context.Context, string, string, SecretHash, int64, ArtifactRecord, time.Time) (ArtifactRecord, error)
 	ArtifactForOwner(context.Context, string, string) (ArtifactRecord, error)
 	ArtifactForJob(context.Context, string) (ArtifactRecord, error)
+	ArtifactsForJob(context.Context, string) ([]ArtifactRecord, error)
 }
 
 func NewArtifactID() (string, error) { return randomID("lea_", 12) }
@@ -104,23 +105,48 @@ func (s *Service) GetArtifact(ctx context.Context, owner, id string) (ArtifactVi
 	return artifactView(record), nil
 }
 
+func (s *Service) GetJobArtifacts(ctx context.Context, owner, jobID string) ([]ArtifactView, error) {
+	artifacts, ok := s.store.(ArtifactStore)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	job, err := s.GetJob(ctx, owner, jobID)
+	if err != nil {
+		return nil, err
+	}
+	records, err := artifacts.ArtifactsForJob(ctx, job.ID)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]ArtifactView, 0, len(records))
+	for _, record := range records {
+		views = append(views, artifactView(record))
+	}
+	return views, nil
+}
+
 func (s *Service) validateResultArtifact(ctx context.Context, jobID, artifactID string) error {
 	artifacts, ok := s.store.(ArtifactStore)
 	if !ok {
 		return ErrInvalidInput
 	}
-	record, err := artifacts.ArtifactForJob(ctx, strings.TrimSpace(jobID))
+	records, err := artifacts.ArtifactsForJob(ctx, strings.TrimSpace(jobID))
 	if err != nil {
 		return err
 	}
-	if record.ID != strings.TrimSpace(artifactID) {
+	for _, record := range records {
+		if record.ID == strings.TrimSpace(artifactID) {
+			return nil
+		}
+	}
+	if len(records) > 0 {
 		return ErrArtifactConflict
 	}
-	return nil
+	return ErrArtifactNotFound
 }
 
 func validArtifactInput(input ArtifactInput) bool {
-	if input.ID == "" || len(input.ID) > 96 || input.MediaType != "video/mp4" || input.ByteSize <= 0 || input.StorageRef == "" || len(input.StorageRef) > 512 {
+	if input.ID == "" || len(input.ID) > 96 || !validArtifactMediaType(input.MediaType) || input.ByteSize <= 0 || input.StorageRef == "" || len(input.StorageRef) > 512 {
 		return false
 	}
 	if len(input.SHA256) != 64 {
@@ -128,4 +154,13 @@ func validArtifactInput(input ArtifactInput) bool {
 	}
 	decoded, err := hex.DecodeString(input.SHA256)
 	return err == nil && len(decoded) == 32
+}
+
+func validArtifactMediaType(mediaType string) bool {
+	switch mediaType {
+	case "video/mp4", "image/png", "image/jpeg", "image/webp":
+		return true
+	default:
+		return false
+	}
 }

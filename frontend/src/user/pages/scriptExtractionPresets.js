@@ -1,6 +1,5 @@
 export const EXTRACTION_PRESET_MIGRATIONS = {
-  standard: 'script-extract',
-  novelPanel: 'script-extract-novel-panel'
+  standard: 'script-extract'
 };
 
 export function filterExtractionPresets(catalog) {

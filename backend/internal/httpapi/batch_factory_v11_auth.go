@@ -40,6 +40,7 @@ type BridgeAuth struct {
 	Users           BridgeUserResolver
 	AuthStore       auth.Store
 	SessionResolver func(context.Context, string) (BridgeIdentity, error)
+	IdentityScope   func(context.Context, BridgeIdentity, string) (BridgeIdentity, error)
 }
 
 func canonicalBridgePayload(username, issuedAt, isOwner, method, pathname string) string {
@@ -142,6 +143,13 @@ func (a BridgeAuth) Middleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 			return
+		}
+		if a.IdentityScope != nil {
+			identity, err = a.IdentityScope(req.Context(), identity, req.Header.Get(HeaderNovelFetchAccount))
+			if err != nil {
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+				return
+			}
 		}
 		next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), bridgeIdentityKey{}, identity)))
 	})

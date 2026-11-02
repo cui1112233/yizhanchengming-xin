@@ -95,3 +95,42 @@ test('runner result contains only the books parsed for this batch, never the acc
   });
   assert.deepEqual(result.tasks.map(task => task.bookId), ['new-1', 'new-2']);
 });
+
+test('manual refetch ignores an existing original and fetches a fresh copy', async () => {
+  let fetches = 0;
+  await runNovelFetchBatch({
+    username: 'tester',
+    payload: { input_text: 'new-1', force_refetch: true },
+    configStore: {
+      getConfig: () => ({ workflow: { auto_classify_missing: false, auto_fetch_original: true, auto_rewrite_after_fetch: false, auto_submit_after_rewrite: false }, fetch: {}, rewrite: {} }),
+      getStyles: () => [], getPlatforms: () => []
+    },
+    tasks: {
+      saveTasks: async () => {},
+      getTask: async () => ({ meta: { bookId: 'new-1', originalStatus: 'done' }, document: { original: '旧正文' } }),
+      fetchOriginal: async () => { fetches += 1; return { status: 'done' }; }
+    },
+    parseBooks: () => ({ tasks: [{ bookId: 'new-1' }], duplicateCount: 0, emptyIdCount: 0 })
+  });
+  assert.equal(fetches, 1);
+});
+
+test('manual refetch does not generate AI copy', async () => {
+  let generated = 0;
+  await runNovelFetchBatch({
+    username: 'tester',
+    payload: { input_text: 'new-1', force_refetch: true, skip_rewrite: true },
+    configStore: {
+      getConfig: () => ({ workflow: { auto_classify_missing: false, auto_fetch_original: false, auto_rewrite_after_fetch: true, auto_submit_after_rewrite: false }, fetch: {}, rewrite: {} }),
+      getStyles: () => [], getPlatforms: () => []
+    },
+    tasks: {
+      saveTasks: async () => {},
+      getTask: async () => ({ meta: { bookId: 'new-1' } }),
+      fetchOriginal: async () => ({ status: 'done' })
+    },
+    parseBooks: () => ({ tasks: [{ bookId: 'new-1' }], duplicateCount: 0, emptyIdCount: 0 }),
+    generateAiVersions: async () => { generated += 1; return { status: 'done', generated: [] }; }
+  });
+  assert.equal(generated, 0);
+});

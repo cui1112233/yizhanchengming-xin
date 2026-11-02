@@ -47,3 +47,18 @@ test('Novel Fetch handoff never offers a same-batch duplicate override', () => {
   assert.doesNotMatch(page, /allowDuplicate/);
   assert.match(page, /同书城同 Book ID 的 \$\{duplicates\.length\} 本内容已跳过/);
 });
+
+test('batchId query opens that exact batch and cannot be overwritten by an older request', () => {
+  const page = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(page, /new URLSearchParams\(window\.location\.search\)\.get\('batchId'\)/);
+  assert.match(page, /getBatch\(requestedBatchId\)/);
+  assert.match(page, /requestId !== projectRequestRef\.current/);
+  assert.match(page, /setActiveBatchProject\(batch\);\s*setView\('batch-novels'\)/s);
+});
+
+test('giant-material creation forwards the saved immediate-execution plan under the backend field name', () => {
+  const page = fs.readFileSync(pagePath, 'utf8');
+
+  assert.match(page, /createBatchFromIntake\(input\.intakeId, \{ title: input\.title, initialBatchSettings: input\.initialBatchSettings, giantAutomationPlan: input\.giantAutomationPlan \}\)/);
+});

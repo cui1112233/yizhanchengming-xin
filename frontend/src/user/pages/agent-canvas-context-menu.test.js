@@ -250,6 +250,15 @@ test('text nodes can bind project assets selected from an at mention', () => {
   assert.deepEqual(repeated.data.config.referenceAssets.map(asset => asset.id), ['image-mention']);
 });
 
+test('creating a director desk keeps image references in the same persisted node config', () => {
+  const node = createNodeAt({ id: 'director-1', kind: 'director', position: { x: 12, y: 18 } });
+  const withScene = appendReferenceAsset({ node, asset: { id: 'scene-1', kind: 'image', name: '夜景.png' } });
+
+  assert.equal(node.data.type, 'director');
+  assert.equal(node.data.config.directorDesk.rendererVersion, '2.5d-v1');
+  assert.deepEqual(withScene.data.config.referenceAssets.map(asset => asset.id), ['scene-1']);
+});
+
 test('canvas registers pane and node context-menu handlers', () => {
   assert.match(canvasSource, /onPaneContextMenu=\{handlePaneContextMenu\}/);
   assert.match(canvasSource, /onNodeContextMenu=\{handleNodeContextMenu\}/);
@@ -267,6 +276,7 @@ test('canvas loads or uploads a project asset before committing a media node', (
 test('canvas exposes a standalone video node action alongside asset video import', () => {
   assert.match(canvasSource, /handleContextCreate\('video'\)/);
   assert.match(canvasSource, /新建视频/);
+  assert.match(canvasSource, /新建导演台/);
   assert.match(canvasSource, /从资产库添加/);
   assert.match(canvasSource, /openAssetPanel\('video'\)/);
 });

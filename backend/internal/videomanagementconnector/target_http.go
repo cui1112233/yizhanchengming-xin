@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -341,7 +342,17 @@ func (s *TargetHTTPService) client() *http.Client {
 	if s.Client != nil {
 		return s.Client
 	}
-	return &http.Client{Timeout: 120 * time.Second}
+	proxyURL := strings.TrimSpace(os.Getenv("QIANTIE_VIDEO_CONNECTOR_PROXY"))
+	if proxyURL == "" {
+		return &http.Client{Timeout: 120 * time.Second}
+	}
+	proxy, err := url.Parse(proxyURL)
+	if err != nil || proxy.Scheme == "" || proxy.Host == "" {
+		return &http.Client{Timeout: 120 * time.Second}
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = http.ProxyURL(proxy)
+	return &http.Client{Timeout: 120 * time.Second, Transport: transport}
 }
 func (s *TargetHTTPService) do(ctx context.Context, client *http.Client, method, endpoint, cookie string, body io.Reader) (*http.Response, error) {
 	return s.doWithContentType(ctx, client, method, endpoint, cookie, body, "application/json")

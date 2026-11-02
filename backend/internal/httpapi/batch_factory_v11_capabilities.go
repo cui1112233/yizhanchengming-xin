@@ -48,7 +48,11 @@ func capabilitiesForRuntime(slice int, productionAvailable bool, mergeAvailable 
 	if slice >= 5 && mergeAvailable {
 		caps["merge.run"] = Capability{Available: true}
 	}
-	if slice >= 6 && len(externalAvailability) > 0 && externalAvailability[0] {
+	// The Go-owned 121 publisher is registered alongside the merge flow. It
+	// can run as soon as slice 5 has enabled final-video production; account,
+	// source metadata, and target-site readiness are validated by the actual
+	// upload request instead of being hidden behind a stale release gate.
+	if slice >= 5 && len(externalAvailability) > 0 && externalAvailability[0] {
 		caps["publish.121"] = Capability{Available: true}
 	}
 	if slice >= 6 && len(externalAvailability) > 1 && externalAvailability[1] {

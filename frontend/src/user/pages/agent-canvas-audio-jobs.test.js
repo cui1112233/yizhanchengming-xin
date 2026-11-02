@@ -9,11 +9,12 @@ import {
   audioOperationNeedsModel,
   audioSourceAsset
 } from './agent-canvas-audio-jobs.js';
-import { createAgentAudioGeneration } from '../../shared/api/agent.js';
+import { createAgentAudioGeneration, getAgentAudioWaveform } from '../../shared/api/agent.js';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
 const composerSource = fs.readFileSync(path.resolve(dirname, '../components/AgentNodeComposer.jsx'), 'utf8');
+const waveformSource = fs.readFileSync(path.resolve(dirname, '../components/AgentAudioWaveform.jsx'), 'utf8');
 
 function audioNode(operation, overrides = {}) {
   return {
@@ -77,10 +78,29 @@ test('音频 API 使用正式项目音频任务入口', async () => {
   assert.equal(calls[0].options.method, 'POST');
 });
 
+test('音频波形只请求受保护素材的摘要入口', async () => {
+  const calls = [];
+  const summary = await getAgentAudioWaveform('project 1', 'audio/1', async (url, options) => {
+    calls.push({ url, options });
+    return { durationMs: 1200, peaks: [0.1] };
+  });
+  assert.equal(summary.durationMs, 1200);
+  assert.equal(calls[0].url, '/api/agent/tasks/project%201/audio-assets/audio%2F1/waveform');
+  assert.equal(calls[0].options.method, undefined);
+});
+
 test('画布和编辑器接入音频提交、试听和结果确认', () => {
   assert.match(canvasSource, /createAgentAudioGeneration/);
   assert.match(canvasSource, /submitAudioForNode/);
   assert.match(canvasSource, /confirmAgentGeneration/);
   assert.match(composerSource, /AuthenticatedAgentAudio/);
+  assert.match(composerSource, /waveform/);
   assert.match(composerSource, /onConfirmAudio/);
+});
+
+test('波形候选说明素材来源，并如实提示视频参考由模型能力决定', () => {
+  assert.match(composerSource, /waveformSourceLabel=\{asset\.name/);
+  assert.match(composerSource, /视频参考是否可用由目标视频模型决定/);
+  assert.match(waveformSource, /sourceLabel/);
+  assert.match(waveformSource, /downstreamLabel/);
 });

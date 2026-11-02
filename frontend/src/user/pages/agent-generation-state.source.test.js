@@ -16,6 +16,13 @@ test('画布加载并轮询当前项目的统一生成任务', () => {
   assert.match(canvasSource, /shouldAcceptGenerationResponse/);
 });
 
+test('画布读取并展示服务端的项目任务汇总', () => {
+  assert.match(canvasSource, /getAgentGenerationSummary/);
+  assert.match(canvasSource, /setGenerationSummary/);
+  assert.match(canvasSource, /agent-canvas-generation-summary/);
+  assert.match(canvasSource, /generationSummaryText\(generationSummary\)/);
+});
+
 test('节点输入框消费统一任务状态并恢复待确认结果', () => {
   assert.match(canvasSource, /mergeGenerationTask/);
   assert.match(canvasSource, /generationPresentation/);
@@ -36,4 +43,17 @@ test('统一任务列表加载失败只显示一次画布级提示，不污染�
   assert.doesNotMatch(canvasSource, /error:\s*localGeneration\.error[\s\S]{0,180}generationTasksLoadError/);
   assert.match(canvasSource, /className="agent-canvas-global-error"/);
   assert.match(canvasSource, /\{generationTasksLoadError\}/);
+});
+
+test('图片和音频使用统一生成任务取消重试，视频仍保持专用任务通道', () => {
+  assert.match(canvasSource, /cancelAgentGeneration/);
+  assert.match(canvasSource, /retryAgentGeneration/);
+  assert.match(canvasSource, /async function cancelGeneration\(nodeID\)/);
+  assert.match(canvasSource, /async function retryGeneration\(nodeID\)/);
+  assert.match(composerSource, /generationState\.presentation\?\.canCancel/);
+  assert.match(composerSource, /generationState\.presentation\?\.canRetry/);
+  assert.match(composerSource, /onCancelGeneration/);
+  assert.match(composerSource, /onRetryGeneration/);
+  assert.match(composerSource, /kind === 'video' && videoState\.canCancel/);
+  assert.match(composerSource, /kind === 'video' && videoState\.canRetry/);
 });

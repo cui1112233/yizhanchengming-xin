@@ -29,9 +29,10 @@ type MemoryStore struct {
 	drafts                map[string]Draft
 	bookAssets            map[string]memoryOwned[BookAsset]
 	bookAssetImages       map[string]memoryOwned[BookAssetImage]
-	comicPages           map[string]memoryOwned[ComicPage]
-	comicPageImages      map[string]memoryOwned[ComicPageImage]
-	comicCollections     map[string]memoryOwned[ComicCollection]
+	comicPages            map[string]memoryOwned[ComicPage]
+	comicSourceSegments   map[string]memoryOwned[ComicSourceSegment]
+	comicPageImages       map[string]memoryOwned[ComicPageImage]
+	comicCollections      map[string]memoryOwned[ComicCollection]
 	shuihuoConfigs        map[string]map[string]any
 	hooks                 map[string][]HookRevision
 	directors             map[string][]DirectorRevision
@@ -58,6 +59,7 @@ func NewMemoryStore() *MemoryStore {
 		bookAssets:            map[string]memoryOwned[BookAsset]{},
 		bookAssetImages:       map[string]memoryOwned[BookAssetImage]{},
 		comicPages:            map[string]memoryOwned[ComicPage]{},
+		comicSourceSegments:   map[string]memoryOwned[ComicSourceSegment]{},
 		comicPageImages:       map[string]memoryOwned[ComicPageImage]{},
 		comicCollections:      map[string]memoryOwned[ComicCollection]{},
 		shuihuoConfigs:        map[string]map[string]any{},
@@ -421,7 +423,7 @@ func (s *MemoryStore) DebugPatch(r ScopeRef) SettingsPatch {
 	return clonePatch(s.patches[scopeKey(r)])
 }
 
-func hydrateMemoryBatchSettingsState(b Batch, patches map[string]SettingsPatch, hooks map[string][]HookRevision, directors map[string][]DirectorRevision, bookAssets map[string]memoryOwned[BookAsset]) Batch {
+func hydrateMemoryBatchSettingsState(b Batch, patches map[string]SettingsPatch, hooks map[string][]HookRevision, directors map[string][]DirectorRevision, bookAssets map[string]memoryOwned[BookAsset], comicSourceSegments map[string]memoryOwned[ComicSourceSegment]) Batch {
 	b.SettingsState = SettingsState{
 		Patch:    clonePatch(patches[scopeKey(ScopeRef{Kind: ScopeBatch, BatchID: b.ID})]),
 		Revision: b.Revision,
@@ -463,6 +465,10 @@ func hydrateMemoryBatchSettingsState(b Batch, patches map[string]SettingsPatch, 
 				Revision: video.Revision,
 			}
 			applyVideoPromptOverrides(&video)
+			if ownedSegment, ok := comicSourceSegments[video.ID]; ok {
+				segment := comicSourceSegmentWithBoundaries(ownedSegment.Value)
+				video.ComicSourceSegment = &segment
+			}
 			if _, overridden := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); !overridden && book.DirectorRevision != nil && j < len(book.DirectorRevision.Output.Storyboard) {
 				video.VideoPrompt = storyboardVideoPrompt(book.DirectorRevision.Output.Storyboard[j])
 			}
@@ -478,7 +484,7 @@ func hydrateMemoryBatchSettingsState(b Batch, patches map[string]SettingsPatch, 
 func memoryBookAssets(all map[string]memoryOwned[BookAsset], batchID, bookID string) []BookAsset {
 	assets := make([]BookAsset, 0)
 	for _, owned := range all {
-		asset := owned.Value
+		asset := normalizeLegacyComicBookAsset(owned.Value)
 		if asset.BatchID == batchID && asset.BookID == bookID {
 			assets = append(assets, asset)
 		}
@@ -560,7 +566,7 @@ func (s *MemoryStore) CreateBatchFromIntake(ctx context.Context, owner, intakeID
 	bv := b.Value
 	bv.SourceIntakeID = intakeID
 	s.batches[batch.ID] = memoryOwned[Batch]{owner, bv}
-	batch = hydrateMemoryBatchSettingsState(bv, s.patches, s.hooks, s.directors, s.bookAssets)
+	batch = hydrateMemoryBatchSettingsState(bv, s.patches, s.hooks, s.directors, s.bookAssets, s.comicSourceSegments)
 	s.mu.Unlock()
 	return batch, nil
 }
@@ -613,7 +619,7 @@ func (s *MemoryStore) AppendBooksFromIntake(_ context.Context, owner, batchID, i
 	intakeRecord := ownedIntake.Value
 	intakeRecord.ConsumedAt = &now
 	s.intakes[intakeID] = memoryOwned[Intake]{Owner: owner, Value: intakeRecord}
-	return hydrateMemoryBatchSettingsState(batch, s.patches, s.hooks, s.directors, s.bookAssets), nil
+	return hydrateMemoryBatchSettingsState(batch, s.patches, s.hooks, s.directors, s.bookAssets, s.comicSourceSegments), nil
 }
 func (s *MemoryStore) CreateBatch(_ context.Context, owner string, input CreateBatchInput) (Batch, error) {
 	s.mu.Lock()
@@ -649,7 +655,7 @@ func (s *MemoryStore) CreateBatch(_ context.Context, owner string, input CreateB
 		s.patches[scopeKey(ScopeRef{Kind: ScopeBatch, BatchID: b.ID})] = cloneSettingsPatch(input.InitialBatchSettings)
 	}
 	s.batches[b.ID] = memoryOwned[Batch]{owner, b}
-	return hydrateMemoryBatchSettingsState(b, s.patches, s.hooks, s.directors, s.bookAssets), nil
+	return hydrateMemoryBatchSettingsState(b, s.patches, s.hooks, s.directors, s.bookAssets, s.comicSourceSegments), nil
 }
 func (s *MemoryStore) ListBatches(_ context.Context, owner string) ([]Batch, error) {
 	s.mu.Lock()
@@ -657,7 +663,7 @@ func (s *MemoryStore) ListBatches(_ context.Context, owner string) ([]Batch, err
 	out := []Batch{}
 	for _, v := range s.batches {
 		if v.Owner == owner {
-			out = append(out, hydrateMemoryBatchSettingsState(v.Value, s.patches, s.hooks, s.directors, s.bookAssets))
+			out = append(out, hydrateMemoryBatchSettingsState(v.Value, s.patches, s.hooks, s.directors, s.bookAssets, s.comicSourceSegments))
 		}
 	}
 	return out, nil
@@ -695,7 +701,8 @@ func (s *MemoryStore) UpdateBookMetadata(_ context.Context, owner, batchID, book
 
 func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
 	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
-	if input.ExpectedRevision < 1 || !validSourceText {
+	rawSourceText, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
+	if input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
 		return Book{}, ErrInvalid
 	}
 	s.mu.Lock()
@@ -713,8 +720,15 @@ func (s *MemoryStore) CaptureBookSource(_ context.Context, owner, batchID, bookI
 		if book.Revision != input.ExpectedRevision || (strings.TrimSpace(book.SourceText) != "" && !input.ReplaceSource) {
 			return Book{}, ErrConflict
 		}
-		book.SourceText = sourceText
-		book.TxtText = book.SourceText
+		if validSourceText || input.ReplaceSource {
+			book.SourceText = sourceText
+		}
+		if !validRawSourceText && validSourceText {
+			rawSourceText = book.SourceText
+		}
+		if validRawSourceText || validSourceText {
+			book.TxtText = rawSourceText
+		}
 		if shouldReplaceGeneratedBookTitle(book.Title, book.BookID, input.SourceTitle) {
 			book.Title = strings.TrimSpace(input.SourceTitle)
 		}
@@ -739,7 +753,7 @@ func (s *MemoryStore) GetBatch(_ context.Context, owner, id string) (Batch, erro
 	if !ok || v.Owner != owner {
 		return Batch{}, ErrNotFound
 	}
-	return hydrateMemoryBatchSettingsState(v.Value, s.patches, s.hooks, s.directors, s.bookAssets), nil
+	return hydrateMemoryBatchSettingsState(v.Value, s.patches, s.hooks, s.directors, s.bookAssets, s.comicSourceSegments), nil
 }
 
 func (s *MemoryStore) DeleteBook(_ context.Context, owner, batchID, bookID string) error {
@@ -1101,6 +1115,10 @@ func validBookAssetImageAspectRatio(ratio string) bool {
 
 func normalizeBookAssetInput(input CreateBookAssetInput) (CreateBookAssetInput, error) {
 	input.Kind = strings.TrimSpace(input.Kind)
+	input.Source = strings.ToLower(strings.TrimSpace(input.Source))
+	if input.Source == "" {
+		input.Source = "manual"
+	}
 	input.Name = strings.TrimSpace(input.Name)
 	input.FormalName = strings.TrimSpace(input.FormalName)
 	input.Facts = strings.TrimSpace(input.Facts)
@@ -1108,7 +1126,7 @@ func normalizeBookAssetInput(input CreateBookAssetInput) (CreateBookAssetInput, 
 	input.Relationships = strings.TrimSpace(input.Relationships)
 	input.Prompt = strings.TrimSpace(input.Prompt)
 	input.ImageModelID = strings.TrimSpace(input.ImageModelID)
-	if !validBookAssetKind(input.Kind) || input.Name == "" || input.Prompt == "" || len(input.Name) > 255 || !validBookAssetImageAspectRatio(input.ImageAspectRatio) {
+	if !validBookAssetKind(input.Kind) || (input.Source != "manual" && input.Source != "comic") || input.Name == "" || input.Prompt == "" || len(input.Name) > 255 || !validBookAssetImageAspectRatio(input.ImageAspectRatio) {
 		return CreateBookAssetInput{}, ErrInvalid
 	}
 	return input, nil
@@ -1147,7 +1165,7 @@ func (s *MemoryStore) CreateBookAsset(_ context.Context, owner, batchID, bookID 
 		return BookAsset{}, ErrNotFound
 	}
 	now := time.Now().UTC()
-	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, Source: "manual", Revision: 1, CreatedAt: now, UpdatedAt: now}
+	asset := BookAsset{ID: s.id("asset"), BatchID: batchID, BookID: bookID, Kind: input.Kind, Name: input.Name, FormalName: input.FormalName, Facts: input.Facts, Appearance: input.Appearance, Relationships: input.Relationships, Prompt: input.Prompt, ImageModelID: input.ImageModelID, ImageAspectRatio: input.ImageAspectRatio, Source: input.Source, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.bookAssets[asset.ID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	return asset, nil
 }
@@ -1176,7 +1194,7 @@ func (s *MemoryStore) UpdateBookAsset(_ context.Context, owner, batchID, bookID,
 	if input.ExpectedRevision != asset.Revision {
 		return BookAsset{}, ErrConflict
 	}
-	asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, asset.ImageModelID, asset.ImageAspectRatio, asset.Source, asset.Revision, asset.UpdatedAt = input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, input.ImageModelID, input.ImageAspectRatio, "manual", asset.Revision+1, time.Now().UTC()
+	asset.Name, asset.FormalName, asset.Facts, asset.Appearance, asset.Relationships, asset.Prompt, asset.ImageModelID, asset.ImageAspectRatio, asset.Revision, asset.UpdatedAt = input.Name, input.FormalName, input.Facts, input.Appearance, input.Relationships, input.Prompt, input.ImageModelID, input.ImageAspectRatio, asset.Revision+1, time.Now().UTC()
 	s.bookAssets[assetID] = memoryOwned[BookAsset]{Owner: owner, Value: asset}
 	return asset, nil
 }
@@ -1396,8 +1414,13 @@ func (s *MemoryStore) PersistDirectorRevision(_ context.Context, owner string, b
 	now := time.Now().UTC()
 	revision := DirectorRevision{ID: s.id("director"), BatchID: b.ID, BookID: book.ID, Revision: int64(len(s.directors[key]) + 1), Mode: snapshot.Mode, SnapshotID: s.id("snapshot"), SourceDigest: digest, HookRevisionID: hookID, Output: output, OrphanedOverrides: orphaned, CreatedAt: now}
 	newVideos := make([]Video, 0, len(output.Storyboard))
+	comicMode := normalizeProductionMode(snapshot.Effective) == "comic"
 	for i, draft := range output.Storyboard {
-		video := Video{ID: s.id("video"), BatchID: b.ID, BookID: book.ID, Label: fmt.Sprintf("VIDEO %02d", i+1), VideoPrompt: storyboardVideoPrompt(draft), VisualPrompt: draft.VisualPrompt, DurationSeconds: float64(draft.DurationSec), CompatibilityState: "active", Revision: 1}
+		label := fmt.Sprintf("VIDEO %02d", i+1)
+		if comicMode {
+			label = fmt.Sprintf("漫画页 %02d", i+1)
+		}
+		video := Video{ID: s.id("video"), BatchID: b.ID, BookID: book.ID, Label: label, VideoPrompt: storyboardVideoPrompt(draft), VisualPrompt: draft.VisualPrompt, DurationSeconds: float64(draft.DurationSec), CompatibilityState: "active", Revision: 1}
 		newVideos = append(newVideos, video)
 	}
 	revision.Videos = append([]Video(nil), newVideos...)
@@ -1540,7 +1563,7 @@ func (s *MemoryStore) PersistComicExtractedBookAssets(_ context.Context, owner s
 	}
 	for assetID, ownedAsset := range s.bookAssets {
 		asset := ownedAsset.Value
-		if ownedAsset.Owner == owner && asset.BatchID == book.BatchID && asset.BookID == book.ID && asset.Source == "comic" {
+		if ownedAsset.Owner == owner && asset.BatchID == book.BatchID && asset.BookID == book.ID && normalizeLegacyComicBookAsset(asset).Source == "comic" {
 			delete(s.bookAssets, assetID)
 		}
 	}

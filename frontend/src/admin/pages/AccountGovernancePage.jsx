@@ -21,8 +21,7 @@ const capabilityOptions = [
 
 const scopeOptions = [
   { value: '*', label: '全部模块' },
-  { value: 'script', label: '剧本生成' },
-  { value: 'novel-panel', label: '小说面板' }
+  { value: 'script', label: '剧本生成' }
 ];
 
 function errorMessage(error) {

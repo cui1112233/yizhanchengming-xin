@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange.js';
+import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, comicAnalysisCharactersForBook, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange.js';
 
 test('uses the saved per-book content range as the work-text boundary', () => {
   const book = { sourceMetadata: { contentRangeLines: 5 } };
@@ -12,6 +12,12 @@ test('keeps the full original separate from the limited work text', () => {
   const source = '一\n二\n三';
   assert.equal(batchFactoryPreviewText(source, { sourceMetadata: { contentRangeLines: 2 } }), '一\n二');
   assert.equal(source, '一\n二\n三');
+});
+
+test('treats an object-coercion placeholder as missing source text', () => {
+  assert.equal(batchFactoryPreviewText('[object Object]', { sourceMetadata: { contentRangeLines: 5 } }), '');
+  assert.equal(batchFactoryProductionText('[object Object]', '', {}), '');
+  assert.equal(sourceTextAfterViralAdoption({ type: 'click' }), '');
 });
 
 test('skips repeated page-state remnants and punctuation-only lines before applying the content range', () => {
@@ -40,6 +46,18 @@ test('uses only the configured non-empty lines as production text unless a worki
 test('defaults to a 4000-character fetch and upload body limit', () => {
   assert.equal(contentCaptureCharactersForBook({}), 4000);
   assert.equal(contentCaptureCharactersForBook({ sourceMetadata: { contentCaptureCharacters: 8000 } }), 8000);
+});
+
+test('reports the actual comic analysis characters at the nearest safe boundary', () => {
+  const source = `${'甲'.repeat(99)}。${'乙'.repeat(20)}。`;
+  assert.equal(comicAnalysisCharactersForBook({ sourceText: source, sourceMetadata: { comicAnalysisCharacters: 100 } }), 100);
+});
+
+test('keeps comic analysis target separate from the 4000-character capture limit', () => {
+  const source = `${'甲'.repeat(1999)}。${'乙'.repeat(2500)}。`;
+  const book = { sourceText: source, sourceMetadata: { comicAnalysisCharacters: 2000, contentCaptureCharacters: 4000 } };
+  assert.equal(comicAnalysisCharactersForBook(book), 2000);
+  assert.equal(contentCaptureCharactersForBook(book), 4000);
 });
 
 

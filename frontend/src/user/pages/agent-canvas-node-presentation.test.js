@@ -5,7 +5,8 @@ import {
   canvasNodeStatusLabel,
   canvasNodeTypeLabel,
   isMediaCanvasNodeType,
-  normalizeCanvasNodeType
+  normalizeCanvasNodeType,
+  usesPinnedBatchFactoryComposer
 } from './agent-canvas-node-presentation.js';
 
 test('legacy, blank, and unknown node types become text', () => {
@@ -43,4 +44,19 @@ test('节点编辑器只在画布过小时返回聚焦参数', () => {
   });
   assert.equal(canvasEditorFocusOptions(0.85), null);
   assert.equal(canvasEditorFocusOptions(1.2), null);
+});
+
+test('批量工厂剧本卡固定显示生产控制，不能被折叠编辑器隐藏', () => {
+  assert.equal(usesPinnedBatchFactoryComposer({
+    type: 'script',
+    config: { source: 'batch_factory', resourceType: 'book_script' }
+  }), true);
+  assert.equal(usesPinnedBatchFactoryComposer({
+    type: 'script',
+    config: { source: 'batch_factory', resourceType: 'video' }
+  }), false);
+  assert.equal(usesPinnedBatchFactoryComposer({
+    type: 'text',
+    config: { source: 'batch_factory', resourceType: 'book_script' }
+  }), false);
 });

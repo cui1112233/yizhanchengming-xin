@@ -123,8 +123,9 @@ func TestFailureCooldownFallbackAndTrialRestore(t *testing.T) {
 		FailureInput{Code: "ocr_crash", Message: "also died"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.CreateJob(context.Background(), "alice", testJobInput("m3", "b3")); !errors.Is(err, ErrExecutorOffline) {
-		t.Fatalf("requeue while all executors are cooling down error=%v", err)
+	queued, err := service.CreateJob(context.Background(), "alice", testJobInput("m3", "b3"))
+	if err != nil || queued.State != JobQueued || !queued.WaitingForExecutor {
+		t.Fatalf("requeue while all executors are cooling down=%+v error=%v", queued, err)
 	}
 	// 两台都在冷却：都领不到
 	if _, err := service.Claim(context.Background(), macToken); !errors.Is(err, ErrNoClaimableJob) {

@@ -1,4 +1,8 @@
 const { ApiError } = require('./api-client');
+const os = require('node:os');
+const path = require('node:path');
+const fs = require('node:fs/promises');
+const { downloadReferenceImages } = require('./reference-images');
 
 class AmbiguousAcceptanceError extends Error {
   constructor(message = 'submission acceptance is still unknown') {
@@ -42,6 +46,8 @@ class JobRunner {
     }
 
     let account = null;
+    let executionJob = job;
+    let referenceTempDir = '';
     let accepted = false;
     let accountReleaseState = 'available';
     try {
@@ -53,14 +59,15 @@ class JobRunner {
 
       await this.api.progress(this.token, job.id, lease, 'preparing');
       this.throwLeaseError(leaseError);
-      await this.adapter.prepare({ job, account, signal: controller.signal });
+      ({ job: executionJob, tempDir: referenceTempDir } = await this.materializeReferenceImages(job));
+      await this.adapter.prepare({ job: executionJob, account, signal: controller.signal });
       this.throwLeaseError(leaseError);
 
       let submission = null;
       for (let attempt = 1; attempt <= this.maxSubmitAttempts; attempt++) {
         await this.api.progress(this.token, job.id, lease, 'submitting');
         this.throwLeaseError(leaseError);
-        const outcome = await this.adapter.submit({ job, account, signal: controller.signal, attempt });
+        const outcome = await this.adapter.submit({ job: executionJob, account, signal: controller.signal, attempt });
         this.throwLeaseError(leaseError);
 
         if (outcome?.status === 'accepted') {
@@ -71,7 +78,7 @@ class JobRunner {
           await this.api.progress(this.token, job.id, lease, 'acceptance_unknown');
           let recovered = outcome;
           for (let recovery = 1; recovery <= this.maxRecoveryAttempts; recovery++) {
-            recovered = await this.adapter.recoverAcceptance({ job, account, signal: controller.signal, recovery });
+            recovered = await this.adapter.recoverAcceptance({ job: executionJob, account, signal: controller.signal, recovery });
             this.throwLeaseError(leaseError);
             if (recovered?.status !== 'unknown') break;
             await delay(this.retryDelayMs, controller.signal);
@@ -102,7 +109,7 @@ class JobRunner {
       await this.api.progress(this.token, job.id, lease, 'generating');
 
       const completion = await retrySameOperation(
-        () => this.adapter.waitForCompletion({ job, account, submissionId: submission.submissionId, signal: controller.signal }),
+        () => this.adapter.waitForCompletion({ job: executionJob, account, submissionId: submission.submissionId, signal: controller.signal }),
         this.maxCompletionAttempts,
         this.retryDelayMs,
         controller.signal
@@ -111,7 +118,7 @@ class JobRunner {
 
       await this.api.progress(this.token, job.id, lease, 'downloading');
       const artifact = await retrySameOperation(
-        () => this.adapter.fetchArtifact({ job, account, completion, signal: controller.signal }),
+        () => this.adapter.fetchArtifact({ job: executionJob, account, completion, signal: controller.signal }),
         this.maxDownloadAttempts,
         this.retryDelayMs,
         controller.signal
@@ -147,12 +154,24 @@ class JobRunner {
     } finally {
       if (timer) clearInterval(timer);
       await safeCall(() => this.adapter.dispose?.(job.id));
+      if (referenceTempDir) await safeCall(() => fs.rm(referenceTempDir, { recursive: true, force: true }));
       if (account) this.accountPool.release(account.id, accountReleaseState);
     }
   }
 
   throwLeaseError(error) {
     if (error) throw error;
+  }
+
+  async materializeReferenceImages(job) {
+    const payload = payloadOf(job);
+    if (Array.isArray(payload.images) && payload.images.length > 0) return { job, tempDir: '' };
+    if (!Array.isArray(payload.imageUrls) || payload.imageUrls.length === 0) return { job, tempDir: '' };
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'yizhan-reference-'));
+    const images = await downloadReferenceImages({
+      imageUrls: payload.imageUrls, jobId: job.id, baseUrl: this.api.baseUrl, token: this.token, tempDir, fetchImpl: this.api.fetch
+    });
+    return { job: { ...job, payload: { ...payload, images } }, tempDir };
   }
 }
 
@@ -185,6 +204,14 @@ function delay(ms, signal) {
     const timer = setTimeout(resolve, ms);
     signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason || new Error('aborted')); }, { once: true });
   });
+}
+
+function payloadOf(job = {}) {
+  if (job.payload && typeof job.payload === 'object' && !Buffer.isBuffer(job.payload)) return job.payload;
+  if (typeof job.payload === 'string') {
+    try { return JSON.parse(job.payload); } catch { throw new Error('job payload is invalid JSON'); }
+  }
+  return {};
 }
 
 module.exports = { JobRunner, AmbiguousAcceptanceError, retrySameOperation, isCancellation, isAccountHoldState };

@@ -29,6 +29,13 @@ test('共享头部使用品牌 Logo 菜单和图标化视图切换', () => {
   assert.doesNotMatch(header, /<Segmented/);
 });
 
+test('画布顶部项目入口使用紧凑品牌按钮和项目胶囊', () => {
+  const header = read('../components/AgentWorkspaceHeader.jsx');
+  assert.match(header, /agent-canvas-brand-menu/);
+  assert.match(header, /agent-canvas-project-title/);
+  assert.match(header, /ChevronDown/);
+});
+
 test('画布头部复用已有项目导航、创建和删除能力', () => {
   const page = read('./AgentPageV2.jsx');
   assert.match(page, /onBackHome=/);

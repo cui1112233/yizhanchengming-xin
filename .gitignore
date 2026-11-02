@@ -45,3 +45,7 @@ executors/local-executor/build/
 /.superpowers/
 /frontend/pnpm-lock.yaml
 /frontend/pnpm-workspace.yaml
+
+# Rust/Tauri build outputs.
+**/src-tauri/target/
+**/src-tauri/target-*/

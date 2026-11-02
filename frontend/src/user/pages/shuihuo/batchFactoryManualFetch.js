@@ -12,15 +12,41 @@ export function manualBookIDsFromInput(inputText = '') {
   return ids;
 }
 
+export function manualFetchedSourceText(value, depth = 0) {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return text === '[object Object]' ? '' : text;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth >= 3) return '';
+  for (const key of ['processedText', 'sourceText', 'text', 'content', 'data', 'rawData']) {
+    const text = manualFetchedSourceText(value[key], depth + 1);
+    if (text) return text;
+  }
+  return '';
+}
+
+function normalizeSourceTextMap(sourceTextByBookId) {
+  if (!sourceTextByBookId || typeof sourceTextByBookId !== 'object' || Array.isArray(sourceTextByBookId)) return {};
+  return Object.fromEntries(Object.entries(sourceTextByBookId).flatMap(([bookId, value]) => {
+    const text = manualFetchedSourceText(value);
+    return text ? [[bookId, text]] : [];
+  }));
+}
+
 export function hasFetchedManualSources(bookIds, sourceTextByBookId) {
-  return bookIds.length > 0 && bookIds.every(bookId => String(sourceTextByBookId?.[bookId] || '').trim());
+  return bookIds.length > 0 && bookIds.every(bookId => manualFetchedSourceText(sourceTextByBookId?.[bookId]));
 }
 
 export function buildManualBatchSubmission({ title, scheduledAt = '', automationEnabled = false, autoPublishEnabled = false, automationConcurrency = 2, runMode = '', ...input }) {
   const enabled = automationEnabled === true;
   const normalizedRunMode = String(runMode || '').trim();
+  const groups = Array.isArray(input.groups)
+    ? input.groups.map(group => ({ ...group, sourceTextByBookId: normalizeSourceTextMap(group?.sourceTextByBookId) }))
+    : input.groups;
   return {
     ...input,
+    ...(groups ? { groups } : {}),
+    ...(input.sourceTextByBookId ? { sourceTextByBookId: normalizeSourceTextMap(input.sourceTextByBookId) } : {}),
     title: String(title || '').trim(),
     scheduledAt: String(scheduledAt || ''),
     runMode: normalizedRunMode,

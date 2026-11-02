@@ -60,14 +60,19 @@ type Video struct {
 	// VideoPrompt is the Director/video-motion instruction compiled for the
 	// video model. VisualPrompt is deliberately separate and only drives the
 	// optional still-image generation chain.
-	VideoPrompt           string        `json:"videoPrompt,omitempty"`
-	AIOriginalVideoPrompt string        `json:"aiOriginalVideoPrompt,omitempty"`
-	VisualPrompt          string        `json:"visualPrompt,omitempty"`
-	ComicPrompt           string        `json:"comicPrompt,omitempty"`
-	DurationSeconds       float64       `json:"durationSeconds,omitempty"`
-	CompatibilityState    string        `json:"compatibilityState"`
-	Revision              int64         `json:"revision"`
-	SettingsState         SettingsState `json:"settingsState"`
+	VideoPrompt           string              `json:"videoPrompt,omitempty"`
+	AIOriginalVideoPrompt string              `json:"aiOriginalVideoPrompt,omitempty"`
+	VisualPrompt          string              `json:"visualPrompt,omitempty"`
+	ComicPrompt           string              `json:"comicPrompt,omitempty"`
+	ComicImagePrompt      string              `json:"comicImagePrompt,omitempty"`
+	ComicRoles            []string            `json:"comicRoles,omitempty"`
+	ComicRoleStage        map[string]string   `json:"comicRoleStage,omitempty"`
+	ComicScenePresets     []string            `json:"comicScenePresets,omitempty"`
+	DurationSeconds       float64             `json:"durationSeconds,omitempty"`
+	CompatibilityState    string              `json:"compatibilityState"`
+	Revision              int64               `json:"revision"`
+	SettingsState         SettingsState       `json:"settingsState"`
+	ComicSourceSegment    *ComicSourceSegment `json:"comicSourceSegment,omitempty"`
 }
 type Book struct {
 	ID                  string            `json:"id"`
@@ -229,6 +234,7 @@ type BookAsset struct {
 
 type CreateBookAssetInput struct {
 	Kind             string `json:"kind"`
+	Source           string `json:"source,omitempty"`
 	Name             string `json:"name"`
 	FormalName       string `json:"formalName,omitempty"`
 	Facts            string `json:"facts,omitempty"`
@@ -271,21 +277,22 @@ type CreateBookAssetImageInput struct {
 }
 
 type ComicPage struct {
-	ID           string           `json:"id"`
-	BatchID      string           `json:"batchId"`
-	BookID       string           `json:"bookId"`
-	VideoID      string           `json:"videoId"`
-	ComicPrompt  string           `json:"comicPrompt"`
-	ImagePrompt  string           `json:"imagePrompt"`
-	ModelID      string           `json:"modelId,omitempty"`
-	AspectRatio  string           `json:"aspectRatio"`
-	Status       string           `json:"status"`
-	SnapshotHash string           `json:"snapshotHash,omitempty"`
-	ConfigStale  bool             `json:"configStale,omitempty"`
-	Revision     int64            `json:"revision"`
-	Images       []ComicPageImage `json:"images"`
-	CreatedAt    time.Time        `json:"createdAt"`
-	UpdatedAt    time.Time        `json:"updatedAt"`
+	ID                 string           `json:"id"`
+	BatchID            string           `json:"batchId"`
+	BookID             string           `json:"bookId"`
+	VideoID            string           `json:"videoId"`
+	ComicPrompt        string           `json:"comicPrompt"`
+	ImagePrompt        string           `json:"imagePrompt"`
+	ReferenceImageURLs []string         `json:"referenceImageUrls,omitempty"`
+	ModelID            string           `json:"modelId,omitempty"`
+	AspectRatio        string           `json:"aspectRatio"`
+	Status             string           `json:"status"`
+	SnapshotHash       string           `json:"snapshotHash,omitempty"`
+	ConfigStale        bool             `json:"configStale,omitempty"`
+	Revision           int64            `json:"revision"`
+	Images             []ComicPageImage `json:"images"`
+	CreatedAt          time.Time        `json:"createdAt"`
+	UpdatedAt          time.Time        `json:"updatedAt"`
 }
 
 type UpsertComicPageInput struct {
@@ -344,8 +351,52 @@ type ComicPageStore interface {
 	ListComicPages(context.Context, string, string, string) ([]ComicPage, error)
 	CreateComicPageImage(context.Context, string, string, string, string, CreateComicPageImageInput) (ComicPageImage, error)
 	SetPrimaryComicPageImage(context.Context, string, string, string, string, string) (ComicPageImage, error)
-	CreateComicCollection(context.Context, string, string, string) (ComicCollection, []string, error)
+	SetComicPageReferenceImages(context.Context, string, string, string, string, []string) (ComicPage, error)
+	ApplyComicPageReferenceImages(context.Context, string, string, string, string) (int, error)
+	CreateComicCollection(context.Context, string, string, string, ...[]string) (ComicCollection, []string, error)
 	ListComicCollections(context.Context, string, string, string) ([]ComicCollection, error)
+}
+
+type ComicSourceSegment struct {
+	VideoID             string                `json:"videoId"`
+	BatchID             string                `json:"batchId"`
+	BookID              string                `json:"bookId"`
+	Ordinal             int                   `json:"ordinal"`
+	StartOffset         int                   `json:"startOffset"`
+	EndOffset           int                   `json:"endOffset"`
+	SourceText          string                `json:"sourceText"`
+	CharacterCount      int                   `json:"characterCount"`
+	BoundaryType        string                `json:"boundaryType"`
+	Reason              string                `json:"reason"`
+	SourceDigest        string                `json:"sourceDigest"`
+	SegmentationVersion int64                 `json:"segmentationVersion"`
+	PromptStale         bool                  `json:"promptStale"`
+	MediaStale          bool                  `json:"mediaStale"`
+	Revision            int64                 `json:"revision"`
+	SafeBoundaries      []ComicSourceBoundary `json:"safeBoundaries,omitempty"`
+}
+
+type ComicSourceSegmentation struct {
+	BatchID       string               `json:"batchId"`
+	BookID        string               `json:"bookId"`
+	SourceDigest  string               `json:"sourceDigest"`
+	CurrentDigest string               `json:"currentDigest"`
+	Stale         bool                 `json:"stale"`
+	Version       int64                `json:"version"`
+	Segments      []ComicSourceSegment `json:"segments"`
+}
+
+type ComicSourceSplitInput struct {
+	Direction        string `json:"direction"`
+	BoundaryOffset   int    `json:"boundaryOffset"`
+	ExpectedRevision int64  `json:"expectedRevision"`
+}
+
+type ComicSourceSegmentStore interface {
+	ReplaceComicSourceSegments(context.Context, string, string, string, string, []ComicSourceSegmentDraft) (ComicSourceSegmentation, error)
+	BindComicSourceSegments(context.Context, string, string, string, string, []string, []ComicSourceSegmentDraft) (ComicSourceSegmentation, error)
+	GetComicSourceSegmentation(context.Context, string, string, string) (ComicSourceSegmentation, error)
+	SplitComicSourceSegment(context.Context, string, string, string, string, ComicSourceSplitInput) (ComicSourceSegmentation, error)
 }
 
 type OrphanedOverride struct {
@@ -409,6 +460,7 @@ type UpdateBookMetadataInput struct {
 // fetched original; it must never replace an existing source text.
 type CaptureBookSourceInput struct {
 	SourceText       string         `json:"sourceText"`
+	RawSourceText    string         `json:"rawSourceText,omitempty"`
 	ReplaceSource    bool           `json:"replaceSource,omitempty"`
 	SourceTitle      string         `json:"sourceTitle,omitempty"`
 	SourceMetadata   map[string]any `json:"sourceMetadata,omitempty"`

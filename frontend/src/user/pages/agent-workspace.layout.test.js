@@ -9,6 +9,7 @@ const css = fs.readFileSync(path.resolve(dirname, '../../shared/styles/agent-wor
 const pageSource = fs.readFileSync(path.resolve(dirname, './AgentPageV2.jsx'), 'utf8');
 const canvasSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvas.jsx'), 'utf8');
 const controlsSource = fs.readFileSync(path.resolve(dirname, '../components/AgentCanvasControls.jsx'), 'utf8');
+const headerSource = fs.readFileSync(path.resolve(dirname, '../components/AgentWorkspaceHeader.jsx'), 'utf8');
 
 function cssBlock(selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -38,8 +39,77 @@ test('Agent 窄屏对话区使用有界底部面板', () => {
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-conversation-panel\s*\{[^}]*top:\s*auto[^}]*height:\s*min\(72dvh,\s*620px\)[^}]*width:\s*100%/);
 });
 
+test('画布底部圆形入口点击后在中间弹出项目对话，不压缩画布', () => {
+  const workspace = cssBlock('.agent-page .agent-canvas-workspace');
+  assert.match(workspace, /grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(workspace, /grid-template-rows:\s*44px\s+minmax\(0,\s*1fr\)/);
+
+  const conversation = cssBlock('.agent-page .agent-conversation-panel');
+  assert.match(conversation, /position:\s*absolute/);
+  assert.match(conversation, /z-index:\s*15/);
+  assert.match(conversation, /left:\s*50%/);
+  assert.match(conversation, /bottom:\s*124px/);
+  assert.match(conversation, /width:\s*min\(960px,\s*calc\(100% - 32px\)\)/);
+  assert.match(conversation, /transform:\s*translateX\(-50%\)/);
+  assert.match(conversation, /border:\s*1px solid var\(--agent-border\)/);
+
+  const collapsed = cssBlock('.agent-page .agent-canvas-workspace.is-conversation-collapsed');
+  assert.doesNotMatch(collapsed, /grid-template-rows/);
+
+  const toggle = cssBlock('.agent-page .agent-canvas-conversation-toggle');
+  assert.match(toggle, /position:\s*absolute/);
+  assert.match(toggle, /border-radius:\s*50%/);
+  assert.match(controlsSource, /aria-label=\{conversationOpen \? '收起项目对话' : '打开项目对话'\}/);
+});
+
 test('Agent 窄屏画布隐藏会遮挡输入按钮的桌面宠物', () => {
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.legacy-shell:has\(\.agent-page\.agent-workspace-v3\)\s*>\s*\.cm-penguin-shell\s*\{[^}]*display:\s*none/);
+});
+
+test('故事板桌面布局默认使用31比69并提供可拖动主分隔线', () => {
+  const storyboard = cssBlock('.agent-page .agent-canvas-workspace.is-storyboard');
+  assert.match(storyboard, /grid-template-columns:\s*minmax\(320px,\s*var\(--storyboard-director-split,\s*31%\)\)\s+minmax\(0,\s*1fr\)/);
+  assert.match(pageSource, /agent-storyboard-workspace-splitter/);
+  assert.match(pageSource, /aria-label="调整 AI 助手面板宽度"/);
+  assert.match(pageSource, /onDoubleClick=\{resetStoryboardDirectorSplit\}/);
+  const splitter = cssBlock('.agent-page .agent-storyboard-workspace-splitter');
+  assert.match(splitter, /cursor:\s*col-resize/);
+});
+
+test('故事板隐藏桌宠且素材卡片使用Liblib密度', () => {
+  assert.match(css, /\.legacy-shell:has\(\.agent-canvas-workspace\.is-storyboard\)\s*>\s*\.cm-penguin-shell\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.agent-page \.agent-storyboard-section\.is-text \.agent-storyboard-item__select[\s\S]*?min-height:\s*32px/);
+  assert.match(css, /\.agent-page \.agent-storyboard-section\.is-image \.agent-storyboard-section__items[\s\S]*?minmax\(88px,\s*1fr\)/);
+  assert.match(css, /\.agent-page \.agent-storyboard-section\.is-video \.agent-storyboard-section__items[\s\S]*?minmax\(210px,\s*1fr\)/);
+});
+
+test('工作流静态连线使用中性曲线且不绘制箭头', () => {
+  assert.doesNotMatch(canvasSource, /MarkerType\.ArrowClosed/);
+  assert.doesNotMatch(canvasSource, /markerEnd=\{markerEnd\}/);
+  assert.match(css, /--agent-edge-neutral/);
+  assert.match(css, /\.react-flow__edge\.selected \.react-flow__edge-path/);
+  assert.match(css, /\.react-flow__edge:hover \.react-flow__edge-path/);
+});
+
+test('工作流节点使用统一标题栏、类型图标和稳定媒体比例', () => {
+  assert.match(canvasSource, /function CanvasNodeTypeIcon/);
+  assert.match(canvasSource, /agent-canvas-node-type-icon/);
+  assert.match(canvasSource, /agent-canvas-node-drag-handle/);
+  assert.match(canvasSource, /agent-canvas-node-card-header-action/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-card-header\s*\{[^}]*min-height:\s*36px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node--image[^}]*width:\s*320px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-media[^}]*aspect-ratio:\s*16\s*\/\s*9/);
+});
+
+test('工作流支点保留大点击区并以小圆点贴在节点边缘', () => {
+  const target = cssBlock('.agent-page .agent-canvas-node-target');
+  const source = cssBlock('.agent-page .agent-canvas-node-quick-add');
+  assert.match(target, /width:\s*24px/);
+  assert.match(target, /height:\s*24px/);
+  assert.match(source, /width:\s*24px/);
+  assert.match(source, /height:\s*24px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-target::after[^}]*width:\s*8px[^}]*height:\s*8px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-quick-add::after[^}]*width:\s*8px[^}]*height:\s*8px/);
 });
 
 test('项目对话空状态提供只填入输入框的创作引导', () => {
@@ -77,10 +147,13 @@ test('项目对话把输入内容与工具条收在同一个输入框内', () =>
 });
 
 test('进入画布页后会重新读取当前项目画布', () => {
-  const canvasLoadEffect = pageSource.match(/Promise\.all\(\[getAgentCanvas\(activeTaskId\)[\s\S]*?\n\s*}, \[([^\]]+)\]\);/);
+  const canvasLoadEffect = pageSource.match(/const canvasRequest = syncBookThenLoadCanvas\(\{[\s\S]*?\n\s*}, \[([^\]]+)\]\);/);
   assert.ok(canvasLoadEffect, 'missing canvas load effect');
+  assert.match(canvasLoadEffect[0], /taskId: activeTaskId/);
+  assert.match(canvasLoadEffect[0], /getCanvas: getAgentCanvas/);
   assert.match(canvasLoadEffect[1], /activeTaskId/);
   assert.match(canvasLoadEffect[1], /isCanvasWorkspace/);
+  assert.match(canvasLoadEffect[1], /requestedBatchBookId/);
 });
 
 test('画布节点列表在已经处于工作流时也会重新触发定位', () => {
@@ -125,9 +198,44 @@ test('画布把全局工具与选中节点操作分层，常用控制收进底�
   assert.match(buttons, /border-radius:\s*[0-8]px/);
 });
 
+test('画布底部显示、缩放和项目对话入口合并为一个居中工具条', () => {
+  const dock = cssBlock('.agent-page .agent-canvas-bottom-dock');
+  assert.match(dock, /position:\s*absolute/);
+  assert.match(dock, /bottom:\s*12px/);
+  assert.match(dock, /left:\s*50%/);
+  assert.match(dock, /display:\s*flex/);
+  assert.match(dock, /transform:\s*translateX\(-50%\)/);
+
+  const displayControls = cssBlock('.agent-page .agent-canvas-display-controls');
+  const zoomControls = cssBlock('.agent-page .agent-canvas-zoom-controls');
+  const conversationToggle = cssBlock('.agent-page .agent-canvas-conversation-toggle');
+  assert.doesNotMatch(displayControls, /position:\s*absolute/);
+  assert.doesNotMatch(zoomControls, /position:\s*absolute/);
+  assert.doesNotMatch(conversationToggle, /position:\s*absolute/);
+  assert.match(controlsSource, /agent-canvas-bottom-dock[\s\S]*agent-canvas-conversation-toggle/);
+});
+
+test('工作流和故事版不显示浅色 Logo、小地图节点和音频控件', () => {
+  assert.match(headerSource, /<BrandLogo \/>/);
+  const projectMenu = cssBlock('.agent-page .agent-canvas-brand-menu');
+  assert.match(projectMenu, /border:\s*0/);
+  assert.match(projectMenu, /background:\s*transparent/);
+  assert.match(projectMenu, /color:\s*var\(--agent-secondary\)/);
+  const viewSwitchButton = cssBlock('.agent-page .agent-canvas-view-switch button');
+  assert.match(viewSwitchButton, /border:\s*0/);
+  assert.match(viewSwitchButton, /background:\s*transparent/);
+  const audioEdit = cssBlock('.agent-page .agent-canvas-node-audio-preview > button');
+  assert.match(audioEdit, /border:\s*1px solid var\(--agent-border\)/);
+  assert.match(audioEdit, /background:\s*var\(--agent-elevated\)/);
+  assert.match(css, /\.agent-page :is\(\.agent-canvas, \.agent-storyboard-workspace\) audio\s*\{[^}]*color-scheme:\s*dark/);
+  assert.match(canvasSource, /<MiniMap className="agent-canvas-minimap" nodeColor="#526277" maskColor="rgba\(7, 13, 21, 0\.72\)" pannable zoomable/);
+});
+
 test('文本节点预览保持可读尺寸，不与媒体节点共用过窄卡片', () => {
   assert.match(css, /\.agent-page \.agent-canvas-node--text\s*\{[^}]*width:\s*280px/);
   assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*min-height:\s*64px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*max-height:\s*68px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*-webkit-line-clamp:\s*4/);
 });
 
 test('项目抽屉打开后不会盖住左侧全局画布工具', () => {

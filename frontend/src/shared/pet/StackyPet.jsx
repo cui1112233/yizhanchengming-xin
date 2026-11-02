@@ -271,7 +271,6 @@ export function StackyPet({ username, accountSessionKey }) {
       }
       return [...characterQuestions, '帮我检查人物外形一致性', '帮我优化当前分镜节奏'].slice(0, 5);
     }
-    if (petContext.page === '小说面板') return ['帮我判断内容类型', '帮我优化统一风格', '帮我检查人物外形全局要求', '帮我优化镜头节奏', '帮我检查分镜额外要求'];
     return ['分析当前页面下一步', '帮我检查当前内容', '给我一个优化建议'];
   }, [petContext]);
 

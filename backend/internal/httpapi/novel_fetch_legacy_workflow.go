@@ -22,7 +22,7 @@ var novelFetchOperations = struct {
 // on the Go store. These routes are deliberately small adapters: they return
 // the same shapes the workbench expects while preserving the complete raw
 // text in each stored document.
-func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, usersDir string, rewriteProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error), targets ...videomanagementconnector.Service) {
+func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetchworkshop.Store, queue novelfetchworkshop.ProcessQueue, usersDir string, rewriteProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error), targets ...videomanagementconnector.Service) {
 	mux.HandleFunc("GET /api/novel-fetch-workshop/logs", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		docs, err := store.ListDocuments(req.Context(), identity.Username)
@@ -71,7 +71,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 				}
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"batch": map[string]any{"id": currentBatchID, "taskIds": ids, "bookIds": ids, "taskStates": states, "settingsSnapshot": map[string]any{"target_versions": targets}, "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}})
+		writeJSON(w, http.StatusOK, map[string]any{"batch": map[string]any{"id": currentBatchID, "status": deriveNovelFetchBatchStatus(filterNovelFetchBatchDocuments(docs, currentBatchID)), "taskIds": ids, "bookIds": ids, "taskStates": states, "settingsSnapshot": map[string]any{"target_versions": targets}, "updatedAt": time.Now().UTC().Format(time.RFC3339Nano)}})
 	})
 
 	// V78 的历史批次不是另建一套队列；批次快照直接从 Go 文档的 currentBatchId
@@ -102,7 +102,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			batches = append(batches, map[string]any{
 				"id": id, "taskIds": ids, "bookIds": ids, "taskStates": states,
 				"createdAt":        firstText(rows[0].Meta["batchCreatedAt"], rows[0].Meta["createdAt"]),
-				"status":           "done",
+				"status":           deriveNovelFetchBatchStatus(rows),
 				"settingsSnapshot": map[string]any{"target_versions": []string{"original"}},
 			})
 		}
@@ -148,7 +148,7 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		writeJSON(w, http.StatusOK, map[string]any{"source_batch_id": batchID, "preselected_book_ids": ids, "input_snapshot": strings.Join(lines, "\n"), "payload": map[string]any{"target_versions": []string{"original"}, "input_text": strings.Join(lines, "\n")}})
 	})
 
-	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/stop-selected", func(w http.ResponseWriter, req *http.Request) {
+	stopSelected := func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
 		var input struct {
 			IDs     []string `json:"ids"`
@@ -161,12 +161,28 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		if len(ids) == 0 {
 			ids = input.BookIDs
 		}
-		updated := 0
+		rows := make([]novelfetchworkshop.Document, 0, len(ids))
+		stoppableIDs := make([]string, 0, len(ids))
 		for _, id := range ids {
 			row, err := store.GetDocument(req.Context(), identity.Username, strings.TrimSpace(id))
 			if err != nil {
 				continue
 			}
+			status := strings.ToLower(firstText(row.Meta["status"], row.Meta["queueState"]))
+			if status == "completed" || status == "done" || status == "success" {
+				continue
+			}
+			rows = append(rows, row)
+			stoppableIDs = append(stoppableIDs, row.BookID)
+		}
+		if cancellationQueue, ok := queue.(novelfetchworkshop.ProcessCancellationQueue); ok {
+			if err := cancellationQueue.CancelBooks(req.Context(), identity.Username, stoppableIDs); err != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Redis 取消任务失败"})
+				return
+			}
+		}
+		updated := 0
+		for _, row := range rows {
 			if row.Meta == nil {
 				row.Meta = map[string]any{}
 			}
@@ -178,7 +194,11 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": updated})
-	})
+	}
+	mux.HandleFunc("POST /api/novel-fetch-workshop/tasks/stop-selected", stopSelected)
+	// Keep the old process-level stop action functional. Older pages posted
+	// here instead of using the newer task-scoped endpoint.
+	mux.HandleFunc("POST /api/novel-fetch-workshop/process/stop", stopSelected)
 
 	mux.HandleFunc("GET /api/novel-fetch-workshop/schedules", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -198,6 +218,9 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 		cfg, _ := store.GetConfig(req.Context(), identity.Username)
 		schedules, _ := cfg["novel_fetch_schedules"].([]any)
 		item["id"] = "schedule-" + time.Now().UTC().Format("20060102150405.000000000")
+		item["status"] = "scheduled"
+		// 定时处理的既定行为是处理完成后自动上传；普通立即处理不受影响。
+		item["auto_submit"] = true
 		item["updatedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
 		schedules = append(schedules, item)
 		cfg["novel_fetch_schedules"] = schedules
@@ -288,6 +311,39 @@ func registerNovelFetchLegacyWorkflowRoutes(mux *http.ServeMux, store novelfetch
 	})
 }
 
+func filterNovelFetchBatchDocuments(documents []novelfetchworkshop.Document, batchID string) []novelfetchworkshop.Document {
+	result := make([]novelfetchworkshop.Document, 0, len(documents))
+	for _, document := range documents {
+		if strings.TrimSpace(fmt.Sprint(document.Meta["currentBatchId"])) == batchID {
+			result = append(result, document)
+		}
+	}
+	return result
+}
+
+func deriveNovelFetchBatchStatus(documents []novelfetchworkshop.Document) string {
+	if len(documents) == 0 {
+		return "pending"
+	}
+	counts := map[string]int{}
+	for _, document := range documents {
+		counts[novelfetchworkshop.DeriveTaskStatus(document)]++
+	}
+	if counts[novelfetchworkshop.TaskStatusFailed] > 0 {
+		return "failed"
+	}
+	if counts[novelfetchworkshop.TaskStatusProcessing] > 0 {
+		return "processing"
+	}
+	if counts[novelfetchworkshop.TaskStatusQueued] > 0 {
+		return "queued"
+	}
+	if counts[novelfetchworkshop.TaskStatusCompleted] == len(documents) {
+		return "done"
+	}
+	return "pending"
+}
+
 func legacyOperationResponse(item map[string]any) map[string]any {
 	response := map[string]any{"ok": true, "operation": item}
 	for key, value := range item {
@@ -376,7 +432,9 @@ func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	var found any
 	var patch map[string]any
 	if !remove {
-		_ = decodeNovelFetchJSON(w, req, &patch)
+		if err := decodeNovelFetchJSON(w, req, &patch); err != nil {
+			return
+		}
 	}
 	for _, v := range raw {
 		m, _ := v.(map[string]any)
@@ -398,7 +456,10 @@ func updateSchedule(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		return
 	}
 	cfg["novel_fetch_schedules"] = out
-	_ = store.PutConfig(req.Context(), identity.Username, cfg)
+	if err := store.PutConfig(req.Context(), identity.Username, cfg); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "保存定时任务失败"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"schedule": found})
 }
 
@@ -416,10 +477,13 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 	if len(ids) == 0 {
 		ids = in.BookIDs
 	}
-	changed := 0
-	for _, id := range ids {
+	uniqueIDs := uniqueNovelFetchTaskIDs(ids)
+	changed, failed := 0, 0
+	updatedIDs := make([]string, 0, len(uniqueIDs))
+	for _, id := range uniqueIDs {
 		d, err := store.GetDocument(req.Context(), identity.Username, id)
 		if err != nil {
+			failed++
 			continue
 		}
 		if d.Meta == nil {
@@ -428,8 +492,9 @@ func updateTaskMeta(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		d.Meta[key] = in.Count
 		_ = store.PutDocument(req.Context(), identity.Username, d)
 		changed++
+		updatedIDs = append(updatedIDs, id)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "updated": changed})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "requested": len(uniqueIDs), "updated": changed, "skipped": 0, "failed": failed, "task_ids": updatedIDs})
 }
 
 func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchworkshop.Store, restore bool, resolveProvider func(*http.Request) (novelfetchworkshop.RewriteProvider, error)) {
@@ -439,6 +504,7 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		BookIDs            []string `json:"bookIds"`
 		Text               string   `json:"text"`
 		SensitiveAIEnabled bool     `json:"sensitive_ai_enabled"`
+		Scope              string   `json:"scope"`
 	}
 	if err := decodeNovelFetchJSON(w, req, &in); err != nil {
 		return
@@ -448,57 +514,113 @@ func applySensitive(w http.ResponseWriter, req *http.Request, store novelfetchwo
 		ids = in.BookIDs
 	}
 	settings, _ := store.GetConfig(req.Context(), identity.Username)
-	if in.SensitiveAIEnabled {
-		ai := mapOrEmpty(settings["sensitive_ai"])
-		if len(ai) == 0 {
-			ai = map[string]any{}
-		}
-		ai["enabled"] = true
-		settings["sensitive_ai"] = ai
-	}
 	var provider novelfetchworkshop.RewriteProvider
 	if in.SensitiveAIEnabled && resolveProvider != nil {
 		provider, _ = resolveProvider(req)
 	}
-	changed := 0
+	uniqueIDs := uniqueNovelFetchTaskIDs(ids)
+	changed, failed := 0, 0
+	updatedIDs := make([]string, 0, len(uniqueIDs))
 	replacements := 0
-	for _, id := range ids {
+	scope := strings.ToLower(strings.TrimSpace(in.Scope))
+	if scope != "original" && scope != "ai" && scope != "both" {
+		scope = "both"
+	}
+	for _, id := range uniqueIDs {
 		d, err := store.GetDocument(req.Context(), identity.Username, id)
 		if err != nil {
+			failed++
 			continue
 		}
 		d, err = hydrateNovelFetchDocument(req.Context(), store, identity.Username, d)
 		if err != nil {
+			failed++
 			continue
 		}
-		if restore && d.OriginalRaw != "" {
-			d.Original = d.OriginalRaw
-			d.ProcessedText = d.OriginalRaw
-		}
-		if d.ProcessedText == "" {
-			d.ProcessedText = d.Original
-		}
-		processed, count, sensitiveItems := novelfetchworkshop.ApplySensitiveRulesWithDetails(d.ProcessedText, settings)
-		processed, sensitiveItems = applySensitiveAIRepair(req.Context(), provider, settings, d.BookID, processed, sensitiveItems)
-		count = len(sensitiveItems)
-		d.ProcessedText = processed
-		d.Original = processed
-		replacements += count
 		if d.Meta == nil {
 			d.Meta = map[string]any{}
 		}
+		if scope == "original" || scope == "both" {
+			base := d.ProcessedText
+			if base == "" {
+				base = d.Original
+			}
+			if restore && d.OriginalRaw != "" {
+				base = novelfetchworkshop.ProcessRawText(d.OriginalRaw, d.MaxTxt).ProcessedText
+			}
+			var processed string
+			var sensitiveItems []map[string]any
+			var trace []map[string]any
+			if restore {
+				processed, _, sensitiveItems = novelfetchworkshop.ApplySensitiveRulesForScopeWithDetails(base, settings, "original")
+				processed, sensitiveItems = applySensitiveAIRepair(req.Context(), provider, settings, d.BookID, processed, sensitiveItems)
+			} else {
+				processed, trace, sensitiveItems, err = processWorkshopConfiguredText(req.Context(), store, identity.Username, d.BookID, base, "original", in.SensitiveAIEnabled, provider)
+				if err != nil {
+					continue
+				}
+				d.Meta["rulesTrace"] = trace
+			}
+			count := len(sensitiveItems)
+			d.ProcessedText = processed
+			d.Original = processed
+			replacements += count
+			d.Meta["sensitiveReplacementCount"] = count
+			d.Meta["sensitiveReplaced"] = count
+			setSensitiveDetails(d.Meta, sensitiveItems, count)
+		}
+		if !restore && (scope == "ai" || scope == "both") {
+			traceByVersion := mapOrEmpty(d.Meta["rulesTraceByVersion"])
+			for versionID, raw := range d.Versions {
+				if !strings.HasPrefix(strings.ToLower(versionID), "ai") {
+					continue
+				}
+				content := strings.TrimSpace(fmt.Sprint(raw))
+				if content == "" {
+					continue
+				}
+				processed, trace, sensitiveItems, processErr := processWorkshopConfiguredText(req.Context(), store, identity.Username, d.BookID, content, "ai", in.SensitiveAIEnabled, provider)
+				if processErr != nil {
+					failed++
+					continue
+				}
+				d.Versions[versionID] = processed
+				traceByVersion[versionID] = trace
+				replacements += len(sensitiveItems)
+				if ref, bodyErr := store.PutBody(req.Context(), identity.Username, novelfetchworkshop.BodyRecord{BookID: d.BookID, BodyRef: novelfetchworkshop.BodyRef{VersionID: versionID, State: "ready"}, Content: processed}); bodyErr == nil {
+					d.BodyRefs[versionID] = ref
+				}
+			}
+			d.Meta["rulesTraceByVersion"] = traceByVersion
+		}
 		d.Meta["sensitiveProcessed"] = true
-		d.Meta["sensitiveReplacementCount"] = count
 		d.Meta["sensitiveStatus"] = "done"
-		d.Meta["sensitiveReplaced"] = count
-		setSensitiveDetails(d.Meta, sensitiveItems, count)
-		d.Logs = append(d.Logs, map[string]any{"type": "sensitive_reprocessed", "at": time.Now().UTC().Format(time.RFC3339Nano), "replacements": count})
+		d.Logs = append(d.Logs, map[string]any{"type": "rules_processed", "at": time.Now().UTC().Format(time.RFC3339Nano), "scope": scope})
 		d.ProcessedChars = len([]rune(d.ProcessedText))
 		if err := persistNovelFetchBodies(req.Context(), store, identity.Username, &d, d.OriginalRaw, d.ProcessedText); err != nil {
+			failed++
 			continue
 		}
-		_ = store.PutDocument(req.Context(), identity.Username, d)
+		if err := store.PutDocument(req.Context(), identity.Username, d); err != nil {
+			failed++
+			continue
+		}
 		changed++
+		updatedIDs = append(updatedIDs, id)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "processed": changed, "applied": changed, "restored": restore, "replacements": replacements})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "requested": len(uniqueIDs), "updated": changed, "skipped": 0, "failed": failed, "task_ids": updatedIDs, "processed": changed, "applied": changed, "restored": restore, "replacements": replacements})
+}
+
+func uniqueNovelFetchTaskIDs(ids []string) []string {
+	result := make([]string, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
+	for _, raw := range ids {
+		id := strings.TrimSpace(raw)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		result = append(result, id)
+	}
+	return result
 }

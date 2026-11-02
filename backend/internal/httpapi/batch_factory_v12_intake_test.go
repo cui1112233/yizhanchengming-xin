@@ -14,12 +14,35 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
+type v12SummaryIndexStore struct {
+	*batchfactoryv11.MemoryStore
+	summaryCalls int
+}
+
+func (s *v12SummaryIndexStore) ListBatchSummaryIndex(_ context.Context, _ string) ([]batchfactoryv11.Batch, error) {
+	s.summaryCalls++
+	return []batchfactoryv11.Batch{{
+		ID:                     "batch-1",
+		Title:                  "封面测试",
+		ProjectCoverArtifactID: "merge_cover",
+		ProjectCoverMediaURL:   "https://media.example/first-shot.mp4",
+		Books:                  []batchfactoryv11.Book{{ID: "book-1", Title: "测试书"}},
+	}}, nil
+}
+
 func TestV12LegacyImageGenerationUsesManagedImageModel(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "secret"
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer image-secret" {
 			t.Errorf("authorization = %q", r.Header.Get("Authorization"))
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("decode provider payload: %v", err)
+		}
+		if _, exists := payload["quality"]; exists {
+			t.Errorf("legacy image payload unexpectedly included quality: %#v", payload)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data":[{"url":"https://images.example/generated.png"}]}`))
@@ -96,6 +119,19 @@ func TestV12BatchSummaryOmitsSourceText(t *testing.T) {
 	}
 }
 
+func TestV12BatchSummaryUsesLightweightCoverIndex(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := &v12SummaryIndexStore{MemoryStore: batchfactoryv11.NewMemoryStore()}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/summary", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"kind":"image"`) || !strings.Contains(rec.Body.String(), `/api/batch-factory/v12/batches/batch-1/merge-cover/merge_cover`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if store.summaryCalls != 1 {
+		t.Fatalf("summary index calls=%d, want 1", store.summaryCalls)
+	}
+}
+
 func TestV12NovelFetchIntakeRejectsEmptyBookList(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: batchfactoryv11.NewMemoryStore()})
@@ -119,7 +155,9 @@ func TestV12NovelFetchIntakeCanAppendBooksToBatch(t *testing.T) {
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create intake status=%d body=%s", created.Code, created.Body.String())
 	}
-	var payload struct{ Intake batchfactoryv11.Intake `json:"intake"` }
+	var payload struct {
+		Intake batchfactoryv11.Intake `json:"intake"`
+	}
 	if err := json.NewDecoder(bytes.NewReader(created.Body.Bytes())).Decode(&payload); err != nil {
 		t.Fatalf("decode intake: %v", err)
 	}

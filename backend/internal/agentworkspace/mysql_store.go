@@ -27,7 +27,7 @@ func nullableJSON(value any) (any, error) {
 }
 
 func (s *MySQLStore) ListProjects(ctx context.Context, owner string) ([]ProjectSummary, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT p.id, p.title, p.title_mode, p.preview, p.created_at, p.updated_at,
+	rows, err := s.db.QueryContext(ctx, `SELECT p.id, p.title, p.title_mode, p.project_type, p.preview, p.created_at, p.updated_at,
  (SELECT COUNT(*) FROM agent_messages m WHERE m.project_id = p.id AND m.owner_username = p.owner_username)
 FROM agent_projects p WHERE p.owner_username = ? AND p.deleted_at IS NULL ORDER BY p.updated_at DESC`, owner)
 	if err != nil {
@@ -37,7 +37,7 @@ FROM agent_projects p WHERE p.owner_username = ? AND p.deleted_at IS NULL ORDER 
 	out := make([]ProjectSummary, 0)
 	for rows.Next() {
 		var item ProjectSummary
-		if err := rows.Scan(&item.ID, &item.Title, &item.TitleMode, &item.Preview, &item.CreatedAt, &item.UpdatedAt, &item.MessageCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.TitleMode, &item.ProjectType, &item.Preview, &item.CreatedAt, &item.UpdatedAt, &item.MessageCount); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -47,9 +47,10 @@ FROM agent_projects p WHERE p.owner_username = ? AND p.deleted_at IS NULL ORDER 
 
 func (s *MySQLStore) Project(ctx context.Context, owner, id string) (Project, error) {
 	var project Project
-	err := s.db.QueryRowContext(ctx, `SELECT id, title, title_mode, preview, created_at, updated_at
+	err := s.db.QueryRowContext(ctx, `SELECT id, title, title_mode, project_type, preview, created_at, updated_at
 FROM agent_projects WHERE id = ? AND owner_username = ? AND deleted_at IS NULL`, id, owner).
-		Scan(&project.ID, &project.Title, &project.TitleMode, &project.Preview, &project.CreatedAt, &project.UpdatedAt)
+		Scan(&project.ID, &project.Title, &project.TitleMode, &project.ProjectType, &project.Preview, &project.CreatedAt, &project.UpdatedAt)
+	project.ProjectType = NormalizeProjectType(project.ProjectType)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Project{}, ErrProjectNotFound
 	}
@@ -133,8 +134,8 @@ func insertProject(ctx context.Context, tx *sql.Tx, owner string, project Projec
 	if err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO agent_projects (id, owner_username, title, title_mode, preview, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		project.ID, owner, project.Title, project.TitleMode, project.Preview, project.CreatedAt, project.UpdatedAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO agent_projects (id, owner_username, title, title_mode, project_type, preview, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		project.ID, owner, project.Title, project.TitleMode, NormalizeProjectType(project.ProjectType), project.Preview, project.CreatedAt, project.UpdatedAt); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO agent_canvases (project_id, owner_username, canvas_version, revision, canvas_json, viewport_json, appearance_json, view_state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

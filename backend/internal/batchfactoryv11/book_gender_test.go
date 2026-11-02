@@ -66,6 +66,26 @@ func TestBuildAssetExtractionContractCarriesBookGenderFallback(t *testing.T) {
 	}
 }
 
+func TestBuildComicAssetExtractionContractCarriesBookGenderFallback(t *testing.T) {
+	contract, err := BuildComicAssetExtractionContract(Book{
+		ID:             "comic-book-gender",
+		Title:          "女频漫画测试书",
+		SourceText:     "我走进屋里。",
+		SourceMetadata: map[string]any{"gender": "女频"},
+	}, DirectorSnapshot{Effective: SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+			"assets": map[string]any{"presetId": "batch-comic-assets", "body": "提取漫画资产"},
+		}}),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAnyGenderMarker(contract.SystemPrompt, "女") || !strings.Contains(contract.UserPrompt, `"book_gender":"女频"`) {
+		t.Fatalf("comic book gender fallback missing from contract: system=%q user=%q", contract.SystemPrompt, contract.UserPrompt)
+	}
+}
+
 func TestAssetExtractionContractSeparatesStaticAppearanceFromStoryActions(t *testing.T) {
 	contract, err := BuildAssetExtractionContract(Book{ID: "book-static", Title: "静态资产", SourceText: "她走进厅堂。"}, DirectorSnapshot{})
 	if err != nil {

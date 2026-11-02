@@ -10,10 +10,10 @@ import (
 )
 
 // registerV12MetadataCompat keeps the two metadata repair calls used by the
-// novel-fetch handoff on Go. They are deliberately deterministic: category
-// facts returned by 121 are applied first, and an unresolved gender remains
-// 待确认 instead of being guessed in the batch factory.
-func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, fetcher *novelfetchworkshop.UpstreamFetcher) {
+// novel-fetch handoff on Go. Classification uses the same upstream-first,
+// AI-fallback chain as novel fetch, so a manually supplied正文 is classified
+// before batch production starts.
+func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, fetcher *novelfetchworkshop.UpstreamFetcher, classification batchFetchClassification) {
 	if mux == nil || store == nil {
 		return
 	}
@@ -31,27 +31,28 @@ func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchf
 		}
 		results := make([]map[string]any, 0, len(batch.Books))
 		for _, book := range batch.Books {
-			meta := copyAnyMap(book.SourceMetadata)
-			decision := novelfetchworkshop.ResolveGender(req.Context(), stringValue(meta["gender"]), novelfetchworkshop.BookInfo{
-				Category: stringValue(meta["category"]), Genre: stringValue(meta["genre"]),
-			}, nil)
-			if decision.Gender != "" {
-				meta["gender"] = decision.Gender
-				meta["genderSource"] = string(decision.Source)
-				meta["genderReason"] = decision.Reason
+			info := novelfetchworkshop.BookInfo{
+				WorkTitle: book.Title,
+				Category:  firstMetadataString(book.SourceMetadata, "category"),
+				Genre:     firstMetadataString(book.SourceMetadata, "genre"),
+				Themes:    firstMetadataString(book.SourceMetadata, "themes", "theme"),
+				Labels:    firstMetadataString(book.SourceMetadata, "labels", "tags"),
 			}
-			style := firstMetadataString(meta, "style", "genre", "category")
-			if style != "" {
-				meta["style"] = style
+			meta := finalizeFetchedBatchClassification(classifyFetchedBatchBook(req.Context(), identity.Username, info, book.SourceText, book.SourceMetadata, classification))
+			decision := novelfetchworkshop.GenderDecision{
+				Gender: stringValue(meta["gender"]), Source: novelfetchworkshop.GenderSource(stringValue(meta["genderSource"])), Reason: stringValue(meta["genderReason"]),
 			}
+			style := firstMetadataString(meta, "style", "styleName", "style_name")
 			updated, updateErr := store.UpdateBookMetadata(req.Context(), identity.Username, batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: meta, ExpectedRevision: book.Revision})
 			status := "classified"
-			if updateErr != nil {
+			if updateErr != nil || stringValue(meta["classifyStatus"]) != "classified" {
 				status = "failed"
 			}
 			row := map[string]any{"bookId": book.ID, "status": status, "classification": map[string]any{"gender": decision.Gender, "genderSource": decision.Source, "genderReason": decision.Reason, "style": style}}
 			if updateErr != nil {
 				row["error"] = updateErr.Error()
+			} else if status == "failed" {
+				row["error"] = stringValue(meta["classifyError"])
 			} else {
 				_ = updated
 			}
@@ -102,12 +103,9 @@ func registerV12MetadataCompat(mux *http.ServeMux, auth BridgeAuth, store batchf
 			if fetched.BookInfo.Genre != "" {
 				meta["genre"] = fetched.BookInfo.Genre
 			}
-			decision := novelfetchworkshop.ResolveGender(req.Context(), stringValue(meta["gender"]), fetched.BookInfo, nil)
-			if decision.Gender != "" {
-				meta["gender"], meta["genderSource"], meta["genderReason"] = decision.Gender, string(decision.Source), decision.Reason
-			}
 			processed := novelfetchworkshop.ProcessRawText(fetched.OriginalRaw, 4000)
-			_, captureErr := store.CaptureBookSource(req.Context(), identity.Username, batchID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: processed.ProcessedText, SourceMetadata: meta, ExpectedRevision: book.Revision})
+			meta = finalizeFetchedBatchClassification(classifyFetchedBatchBook(req.Context(), identity.Username, fetched.BookInfo, processed.ProcessedText, meta, classification))
+			_, captureErr := store.CaptureBookSource(req.Context(), identity.Username, batchID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: processed.ProcessedText, RawSourceText: fetched.OriginalRaw, SourceMetadata: meta, ExpectedRevision: book.Revision})
 			if captureErr != nil {
 				row["status"] = "failed"
 				row["error"] = captureErr.Error()

@@ -71,6 +71,13 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			writeStoreError(w, batchfactoryv11.ErrInvalid)
 			return
 		}
+		if input.ComicAnalysisCharacters <= 0 {
+			input.ComicAnalysisCharacters = 2000
+		}
+		if input.ComicAnalysisCharacters < 100 || input.ComicAnalysisCharacters > 100000 {
+			writeStoreError(w, batchfactoryv11.ErrInvalid)
+			return
+		}
 		if input.ContentCaptureCharacters <= 0 {
 			input.ContentCaptureCharacters = 4000
 		}
@@ -107,6 +114,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 				books[index].SourceMetadata = map[string]any{}
 			}
 			books[index].SourceMetadata["contentRangeLines"] = input.ContentRangeLines
+			books[index].SourceMetadata["comicAnalysisCharacters"] = input.ComicAnalysisCharacters
 			books[index].SourceMetadata["contentCaptureCharacters"] = input.ContentCaptureCharacters
 			books[index].SourceMetadata["scheduledAt"] = strings.TrimSpace(input.ScheduledAt)
 			books[index].SourceMetadata["queueStatus"] = queueStatus
@@ -119,7 +127,7 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			Metadata: map[string]any{
 				"sourceMode": "manual_original", "platformId": input.PlatformID, "platformName": strings.TrimSpace(input.PlatformName), "parseMode": input.ParseMode,
 				"columnPresetId": input.ColumnPresetID, "columnOrder": input.ColumnOrder, "inputText": input.InputText,
-				"contentRangeLines": input.ContentRangeLines, "contentCaptureCharacters": input.ContentCaptureCharacters, "scheduledAt": strings.TrimSpace(input.ScheduledAt), "queueStatus": queueStatus,
+				"contentRangeLines": input.ContentRangeLines, "comicAnalysisCharacters": input.ComicAnalysisCharacters, "contentCaptureCharacters": input.ContentCaptureCharacters, "scheduledAt": strings.TrimSpace(input.ScheduledAt), "queueStatus": queueStatus,
 				"groupCount": len(input.Groups),
 			},
 		})
@@ -331,11 +339,43 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		var input batchfactoryv11.UpdateBookMetadataInput
+		var input struct {
+			Metadata         map[string]any `json:"metadata"`
+			MetadataPatch    map[string]any `json:"metadataPatch,omitempty"`
+			ExpectedRevision int64          `json:"expectedRevision"`
+		}
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		book, err := store.UpdateBookMetadata(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input)
+		if input.MetadataPatch != nil {
+			batch, err := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			var current *batchfactoryv11.Book
+			for index := range batch.Books {
+				if batch.Books[index].ID == r.PathValue("bookId") {
+					current = &batch.Books[index]
+					break
+				}
+			}
+			if current == nil {
+				writeStoreError(w, batchfactoryv11.ErrNotFound)
+				return
+			}
+			input.Metadata = make(map[string]any, len(current.SourceMetadata)+len(input.MetadataPatch))
+			for key, value := range current.SourceMetadata {
+				input.Metadata[key] = value
+			}
+			for key, value := range input.MetadataPatch {
+				input.Metadata[key] = value
+			}
+		}
+		book, err := store.UpdateBookMetadata(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), batchfactoryv11.UpdateBookMetadataInput{
+			Metadata:         input.Metadata,
+			ExpectedRevision: input.ExpectedRevision,
+		})
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -514,6 +554,20 @@ func settingsHandler(store batchfactoryv11.Store, catalog *prompt.Catalog, kind 
 				return
 			}
 			input.Patch["aiPromptConfig"] = hydrated
+		}
+		if raw, exists := input.Patch["productionMode"]; exists {
+			var mode string
+			if err := json.Unmarshal(raw, &mode); err != nil {
+				writeStoreError(w, fmt.Errorf("%w: 生产模式格式不正确", batchfactoryv11.ErrInvalid))
+				return
+			}
+			normalized, err := normalizeBatchFactoryProductionMode(mode)
+			if err != nil {
+				writeStoreError(w, fmt.Errorf("%w: %v", batchfactoryv11.ErrInvalid, err))
+				return
+			}
+			encoded, _ := json.Marshal(normalized)
+			input.Patch["productionMode"] = encoded
 		}
 		ref := batchfactoryv11.ScopeRef{Kind: kind, BatchID: r.PathValue("batchId"), BookID: r.PathValue("bookId"), VideoID: r.PathValue("videoId")}
 		result, err := store.SaveSettings(r.Context(), owner, ref, input)

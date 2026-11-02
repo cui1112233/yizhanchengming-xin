@@ -19,8 +19,30 @@ function localDoubaoModels(kind) {
     provider: 'doubao_local_executor',
     enabled: true,
     capabilities: kind === 'image'
-      ? { ratios: ['16:9', '9:16', '1:1'], qualityLevels: ['low', 'standard', 'high'], maxOutputCount: 4, referenceKinds: ['image'], resolutionManagedByModel: true }
-      : { ratios: ['16:9', '9:16'], resolutions: ['720P', '1080P'], duration: { min: 5, max: 15, default: 5 }, maxOutputCount: 1, referenceKinds: ['image'] }
+      ? {
+          ratios: ['16:9', '9:16', '1:1'],
+          qualityLevels: ['low', 'standard', 'high'],
+          maxOutputCount: 4,
+          referenceKinds: ['image'],
+          resolutionManagedByModel: true,
+          acceptsTextPrompt: true,
+          acceptsImageReferences: true,
+          acceptsVideoReferences: false,
+          acceptsAudioReferences: false,
+          maxReferenceAssets: 10
+        }
+      : {
+          ratios: ['16:9', '9:16'],
+          resolutions: ['720P', '1080P'],
+          duration: { min: 5, max: 15, default: 5 },
+          maxOutputCount: 1,
+          referenceKinds: ['image'],
+          acceptsTextPrompt: true,
+          acceptsImageReferences: true,
+          acceptsVideoReferences: false,
+          acceptsAudioReferences: false,
+          maxReferenceAssets: 10
+        }
   }));
 }
 
@@ -34,9 +56,9 @@ export function compatibleModels(models = [], { kind, provider } = {}) {
 }
 
 export function reconcileNodeModel(config = {}, models = [], kind = '') {
-  const selected = String(config.modelId || config.model || '').trim();
+  const selected = String(config.modelId || config.model || config[`${kind}ModelId`] || '').trim();
   const catalogModel = (Array.isArray(models) ? models : []).find(model => model?.kind === kind && model?.id === selected);
-  const provider = normalizeModelProvider(config.provider || providerForCatalogModel(catalogModel, 'personal_api'));
+  const provider = normalizeModelProvider(config.provider || config[`${kind}Provider`] || providerForCatalogModel(catalogModel, 'personal_api'));
   const available = compatibleModels(models, { kind, provider }).find(model => model.id === selected) || null;
   return {
     provider,
@@ -45,6 +67,19 @@ export function reconcileNodeModel(config = {}, models = [], kind = '') {
     available: Boolean(available),
     reason: selected && !available ? '当前模型不可用' : ''
   };
+}
+
+export function modelInputCapabilityError(model = {}, { prompt = '', imageReferences = 0, videoReferences = 0, audioReferences = 0 } = {}) {
+  const capabilities = model?.capabilities;
+  if (!capabilities || typeof capabilities !== 'object') return '';
+  if (String(prompt || '').trim() && capabilities.acceptsTextPrompt === false) return '当前模型不支持文字提示词';
+  if (Number(imageReferences) > 0 && capabilities.acceptsImageReferences === false) return '当前模型不支持图片参考';
+  if (Number(videoReferences) > 0 && capabilities.acceptsVideoReferences === false) return '当前模型不支持视频参考';
+  if (Number(audioReferences) > 0 && capabilities.acceptsAudioReferences === false) return '当前模型不支持音频参考';
+  const max = Number(capabilities.maxReferenceAssets);
+  const total = Math.max(0, Number(imageReferences) || 0) + Math.max(0, Number(videoReferences) || 0) + Math.max(0, Number(audioReferences) || 0);
+  if (Number.isFinite(max) && max >= 0 && total > max) return `当前模型最多支持 ${max} 个参考素材`;
+  return '';
 }
 
 export function capabilityDescription(model = {}) {

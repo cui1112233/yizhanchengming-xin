@@ -16,13 +16,13 @@ func (s *MySQLStore) CreateHookRevision(ctx context.Context, owner, batchID, boo
 	}
 	defer tx.Rollback()
 	var one int
-	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&one); errors.Is(err, sql.ErrNoRows) {
 		return HookRevision{}, ErrNotFound
 	} else if err != nil {
 		return HookRevision{}, err
 	}
 	var current int64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(revision),0) FROM batch_factory_v11_hook_revisions WHERE batch_id=? AND book_id=? AND owner_username=?`, batchID, bookID, owner).Scan(&current); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(revision),0) FROM batch_factory_v12_hook_revisions WHERE batch_id=? AND book_id=? AND owner_username=?`, batchID, bookID, owner).Scan(&current); err != nil {
 		return HookRevision{}, err
 	}
 	id, err := newID("hook")
@@ -31,7 +31,7 @@ func (s *MySQLStore) CreateHookRevision(ctx context.Context, owner, batchID, boo
 	}
 	now := time.Now().UTC()
 	value := HookRevision{ID: id, BatchID: batchID, BookID: bookID, Revision: current + 1, Status: "draft", Text: text, SourceDigest: digest, CreatedAt: now}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_hook_revisions(id,batch_id,book_id,owner_username,revision,status,hook_text,source_digest,created_at) VALUES(?,?,?,?,?,'draft',?,?,?)`, id, batchID, bookID, owner, value.Revision, text, digest, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_hook_revisions(id,batch_id,book_id,owner_username,revision,status,hook_text,source_digest,created_at) VALUES(?,?,?,?,?,'draft',?,?,?)`, id, batchID, bookID, owner, value.Revision, text, digest, now); err != nil {
 		return HookRevision{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -54,7 +54,7 @@ func (s *MySQLStore) ApproveHookRevision(ctx context.Context, owner, batchID, bo
 		return value, nil
 	}
 	now := time.Now().UTC()
-	res, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_hook_revisions SET status='approved',approved_at=? WHERE id=? AND batch_id=? AND book_id=? AND owner_username=?`, now, hookID, batchID, bookID, owner)
+	res, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_hook_revisions SET status='approved',approved_at=? WHERE id=? AND batch_id=? AND book_id=? AND owner_username=?`, now, hookID, batchID, bookID, owner)
 	if err != nil {
 		return HookRevision{}, err
 	}
@@ -77,7 +77,7 @@ type hookQueryer interface {
 }
 
 func loadHookRevision(ctx context.Context, q hookQueryer, owner, batchID, bookID, hookID string, forUpdate bool) (HookRevision, error) {
-	query := `SELECT id,revision,status,hook_text,source_digest,created_at,approved_at FROM batch_factory_v11_hook_revisions WHERE batch_id=? AND book_id=? AND owner_username=?`
+	query := `SELECT id,revision,status,hook_text,source_digest,created_at,approved_at FROM batch_factory_v12_hook_revisions WHERE batch_id=? AND book_id=? AND owner_username=?`
 	args := []any{batchID, bookID, owner}
 	if hookID != "" {
 		query += ` AND id=?`
@@ -111,7 +111,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	}
 	defer tx.Rollback()
 	var currentBookRevision int64
-	if err := tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, book.ID, book.BatchID, owner).Scan(&currentBookRevision); errors.Is(err, sql.ErrNoRows) {
+	if err := tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, book.ID, book.BatchID, owner).Scan(&currentBookRevision); errors.Is(err, sql.ErrNoRows) {
 		return DirectorRevision{}, ErrNotFound
 	} else if err != nil {
 		return DirectorRevision{}, err
@@ -131,11 +131,11 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		return DirectorRevision{}, err
 	}
 	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,NULL,?,?)`, snapshotID, owner, book.BatchID, book.ID, string(snapshotJSON), now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,NULL,?,?)`, snapshotID, owner, book.BatchID, book.ID, string(snapshotJSON), now); err != nil {
 		return DirectorRevision{}, err
 	}
 	var currentRevision int64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(revision),0) FROM batch_factory_v11_director_revisions WHERE batch_id=? AND book_id=? AND owner_username=?`, book.BatchID, book.ID, owner).Scan(&currentRevision); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(revision),0) FROM batch_factory_v12_director_revisions WHERE batch_id=? AND book_id=? AND owner_username=?`, book.BatchID, book.ID, owner).Scan(&currentRevision); err != nil {
 		return DirectorRevision{}, err
 	}
 	revisionID, err := newID("director")
@@ -150,12 +150,12 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	if hookID != "" {
 		hookValue = hookID
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_director_revisions(id,batch_id,book_id,owner_username,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, revisionID, book.BatchID, book.ID, owner, currentRevision+1, snapshotID, snapshot.Mode, digest, hookValue, string(outputJSON), now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_director_revisions(id,batch_id,book_id,owner_username,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, revisionID, book.BatchID, book.ID, owner, currentRevision+1, snapshotID, snapshot.Mode, digest, hookValue, string(outputJSON), now); err != nil {
 		return DirectorRevision{}, err
 	}
 
 	orphaned := []OrphanedOverride{}
-	rows, err := tx.QueryContext(ctx, `SELECT id,ordinal FROM batch_factory_v11_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, book.BatchID, book.ID, owner)
+	rows, err := tx.QueryContext(ctx, `SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, book.BatchID, book.ID, owner)
 	if err != nil {
 		return DirectorRevision{}, err
 	}
@@ -195,30 +195,34 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 			if err != nil {
 				return DirectorRevision{}, err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_orphaned_overrides(id,director_revision_id,video_id,patch_json,state,created_at) VALUES(?,?,?,?, 'orphaned',?)`, auditID, revisionID, videoID, string(encoded), now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_orphaned_overrides(id,director_revision_id,video_id,patch_json,state,created_at) VALUES(?,?,?,?, 'orphaned',?)`, auditID, revisionID, videoID, string(encoded), now); err != nil {
 				return DirectorRevision{}, err
 			}
 			orphaned = append(orphaned, OrphanedOverride{VideoID: videoID, Patch: patch, State: "orphaned"})
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_videos SET compatibility_state='orphaned',updated_at=? WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active'`, now, book.BatchID, book.ID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_videos SET compatibility_state='orphaned',updated_at=? WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active'`, now, book.BatchID, book.ID, owner); err != nil {
 		return DirectorRevision{}, err
 	}
 
 	videos := make([]Video, 0, len(output.Storyboard))
+	comicMode := normalizeProductionMode(snapshot.Effective) == "comic"
 	for ordinal, draft := range output.Storyboard {
 		videoID, err := newID("video")
 		if err != nil {
 			return DirectorRevision{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_videos(id,batch_id,book_id,owner_username,ordinal,compatibility_state,revision,created_at,updated_at) VALUES(?,?,?,?,?,'active',1,?,?)`, videoID, book.BatchID, book.ID, owner, ordinal, now, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_videos(id,batch_id,book_id,owner_username,ordinal,compatibility_state,revision,created_at,updated_at) VALUES(?,?,?,?,?,'active',1,?,?)`, videoID, book.BatchID, book.ID, owner, ordinal, now, now); err != nil {
 			return DirectorRevision{}, err
 		}
 		label := fmt.Sprintf("VIDEO %02d", ordinal+1)
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,?,?)`, videoID, label, storyboardVideoPrompt(draft), nullableString(draft.VisualPrompt), draft.DurationSec); err != nil {
+		if comicMode {
+			label = fmt.Sprintf("漫画页 %02d", ordinal+1)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,?,?)`, videoID, label, storyboardVideoPrompt(draft), nullableString(draft.VisualPrompt), draft.DurationSec); err != nil {
 			return DirectorRevision{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_director_video_links(director_revision_id,video_id,ordinal) VALUES(?,?,?)`, revisionID, videoID, ordinal); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_director_video_links(director_revision_id,video_id,ordinal) VALUES(?,?,?)`, revisionID, videoID, ordinal); err != nil {
 			return DirectorRevision{}, err
 		}
 		videos = append(videos, Video{ID: videoID, BatchID: book.BatchID, BookID: book.ID, Label: label, VideoPrompt: storyboardVideoPrompt(draft), VisualPrompt: draft.VisualPrompt, DurationSeconds: float64(draft.DurationSec), CompatibilityState: "active", Revision: 1})
@@ -226,7 +230,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	if err := persistDirectorBookAssets(ctx, tx, owner, book, snapshot, output, now); err != nil {
 		return DirectorRevision{}, err
 	}
-	assetRows, err := tx.QueryContext(ctx, `SELECT id,kind,name FROM batch_factory_v11_book_assets WHERE batch_id=? AND book_id=? AND owner_username=?`, book.BatchID, book.ID, owner)
+	assetRows, err := tx.QueryContext(ctx, `SELECT id,kind,name FROM batch_factory_v12_book_assets WHERE batch_id=? AND book_id=? AND owner_username=?`, book.BatchID, book.ID, owner)
 	if err != nil {
 		return DirectorRevision{}, err
 	}
@@ -260,11 +264,11 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		if err != nil {
 			return DirectorRevision{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?)`, video.ID, owner, book.BatchID, book.ID, video.ID, string(encoded), now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES('video',?,?,?,?,?,?,1,?)`, video.ID, owner, book.BatchID, book.ID, video.ID, string(encoded), now); err != nil {
 			return DirectorRevision{}, err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_books SET revision=?,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, currentBookRevision+1, now, book.ID, book.BatchID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=?,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, currentBookRevision+1, now, book.ID, book.BatchID, owner); err != nil {
 		return DirectorRevision{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -277,7 +281,7 @@ func loadLatestDirectorRevision(ctx context.Context, q batchQueryer, owner, batc
 	var value DirectorRevision
 	var hook sql.NullString
 	var raw []byte
-	err := q.QueryRowContext(ctx, `SELECT id,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at FROM batch_factory_v11_director_revisions WHERE batch_id=? AND book_id=? AND owner_username=? ORDER BY revision DESC LIMIT 1`, batchID, bookID, owner).Scan(&value.ID, &value.Revision, &value.SnapshotID, &value.Mode, &value.SourceDigest, &hook, &raw, &value.CreatedAt)
+	err := q.QueryRowContext(ctx, `SELECT id,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at FROM batch_factory_v12_director_revisions WHERE batch_id=? AND book_id=? AND owner_username=? ORDER BY revision DESC LIMIT 1`, batchID, bookID, owner).Scan(&value.ID, &value.Revision, &value.SnapshotID, &value.Mode, &value.SourceDigest, &hook, &raw, &value.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DirectorRevision{}, ErrNotFound
 	}

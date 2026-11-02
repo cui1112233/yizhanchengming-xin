@@ -21,10 +21,14 @@ export function NovelFetchSubpageShell({ title, description, onBack, actions, ch
 
 export function NovelFetchMetricStrip({ items }) {
   return <div className="novel-fetch-metric-strip">
-    {(items || []).map(item => <div className="novel-fetch-metric" key={item.key || item.label}>
+    {(items || []).map(item => {
+      const Tag = item.onClick ? 'button' : 'div';
+      return <Tag type={item.onClick ? 'button' : undefined} className={`novel-fetch-metric${item.active ? ' is-active' : ''}`} key={item.key || item.label} onClick={item.onClick}>
       <Typography.Text type="secondary">{item.label}</Typography.Text>
       <strong>{item.value ?? 0}</strong>
-    </div>)}
+      {item.description ? <span>{item.description}</span> : null}
+    </Tag>;
+    })}
   </div>;
 }
 
@@ -40,6 +44,15 @@ export function NovelFetchCylinderList({
   const viewportRef = useRef(null);
   const itemRefs = useRef(new Map());
   const rafRef = useRef(0);
+  const scrollCommitTimerRef = useRef(0);
+  const nearestIdRef = useRef(null);
+  const selectedIdRef = useRef(selectedId);
+  const onSelectRef = useRef(onSelect);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+    onSelectRef.current = onSelect;
+  }, [selectedId, onSelect]);
 
   function updateVisuals() {
     rafRef.current = 0;
@@ -71,12 +84,27 @@ export function NovelFetchCylinderList({
     if (nearestItem) {
       const nearestIndex = items.indexOf(nearestItem);
       const nearestId = getId(nearestItem, nearestIndex);
-      if (String(nearestId) !== String(selectedId ?? '')) onSelect?.(nearestId);
+      nearestIdRef.current = nearestId;
     }
   }
 
   function scheduleVisualUpdate() {
     if (!rafRef.current) rafRef.current = window.requestAnimationFrame(updateVisuals);
+  }
+
+  function commitCenteredItem() {
+    scrollCommitTimerRef.current = 0;
+    updateVisuals();
+    const nearestId = nearestIdRef.current;
+    if (nearestId !== null && String(nearestId) !== String(selectedIdRef.current ?? '')) {
+      onSelectRef.current?.(nearestId);
+    }
+  }
+
+  function handleScroll() {
+    scheduleVisualUpdate();
+    if (scrollCommitTimerRef.current) window.clearTimeout(scrollCommitTimerRef.current);
+    scrollCommitTimerRef.current = window.setTimeout(commitCenteredItem, 100);
   }
 
   function scrollItemIntoView(id, behavior = 'smooth') {
@@ -90,6 +118,7 @@ export function NovelFetchCylinderList({
     return () => {
       window.removeEventListener('resize', handleResize);
       if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+      if (scrollCommitTimerRef.current) window.clearTimeout(scrollCommitTimerRef.current);
     };
   }, [items]);
 
@@ -105,7 +134,7 @@ export function NovelFetchCylinderList({
     const nextItem = items[nextIndex];
     if (!nextItem) return;
     const nextId = getId(nextItem, nextIndex);
-    onSelect?.(nextId);
+    onSelectRef.current?.(nextId);
     scrollItemIntoView(nextId);
   }
 
@@ -117,7 +146,7 @@ export function NovelFetchCylinderList({
       role="listbox"
       tabIndex={0}
       aria-label={ariaLabel}
-      onScroll={scheduleVisualUpdate}
+      onScroll={handleScroll}
       onKeyDown={handleKeyDown}
     >
       {items.map((item, index) => {
@@ -135,7 +164,7 @@ export function NovelFetchCylinderList({
             else itemRefs.current.delete(id);
           }}
           onClick={() => {
-            onSelect?.(rawId);
+            onSelectRef.current?.(rawId);
             scrollItemIntoView(rawId);
           }}
         >

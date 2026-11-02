@@ -2,11 +2,12 @@ import { Button, Empty, Input, Switch, Upload as AntUpload, message } from 'antd
 import { Check, ChevronLeft, ChevronRight, ImagePlus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { getComicReferencePreviewBlob, uploadComicGlobalReference } from '../../../shared/api/batchFactoryV11';
+import { getComicReferencePreviewBlob, uploadComicGlobalReference } from '../../../shared/api/batchFactory';
 import {
+  comicReferenceForSelectedStyle,
+  comicReferenceNeedsStyleDefault,
   comicStyleCoverFlowStyle,
   comicStyleIndexFromDrag,
-  comicStylePreviewReference,
   comicStyleRelativeOffset,
   comicStyleSelection,
   comicStyleWheelDirection,
@@ -63,10 +64,9 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
   const selectedPreset = selectedIndex >= 0 ? styles[selectedIndex] : null;
   const activePreset = styles[activeIndex] || selectedPreset || null;
   const patch = next => onChange?.({ ...comic, ...next, enabled: true });
-  const selectStyle = preset => patch({ style: comicStyleSelection(preset) });
-  const usePreview = preset => {
+  const selectStyle = preset => {
     setLocalReferencePreview('');
-    patch({ globalReferenceImage: comicStylePreviewReference(preset) });
+    patch({ style: comicStyleSelection(preset), globalReferenceImage: comicReferenceForSelectedStyle(comic.globalReferenceImage, preset) });
   };
   const uploadReference = async file => {
     if (!batchId) return false;
@@ -75,7 +75,7 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
       const dataUrl = await fileAsDataURL(file);
       const result = await uploadComicGlobalReference(batchId, dataUrl);
       setLocalReferencePreview(dataUrl);
-      patch({ globalReferenceImage: normalizeComicReference(result?.reference) });
+      patch({ globalReferenceImage: normalizeComicReference({ ...result?.reference, source: 'manual-upload' }) });
       message.success('漫画全局参考图已上传');
     } catch (error) {
       message.error(error?.message || '漫画全局参考图上传失败');
@@ -92,6 +92,11 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
     }
     setActiveIndex(current => selectedIndex >= 0 ? selectedIndex : wrapComicStyleIndex(current, styles.length));
   }, [selectedIndex, styles.length]);
+
+  useEffect(() => {
+    if (inherited || !selectedPreset || !comicReferenceNeedsStyleDefault(comic.globalReferenceImage, selectedPreset)) return;
+    patch({ globalReferenceImage: comicReferenceForSelectedStyle(comic.globalReferenceImage, selectedPreset) });
+  }, [inherited, selectedPreset?.id, comic.globalReferenceImage?.assetId, comic.globalReferenceImage?.source]);
 
   useEffect(() => () => {
     if (wheelTimer.current) window.clearTimeout(wheelTimer.current);
@@ -140,7 +145,7 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
   };
 
   return <div className="batch-factory-comic-style-picker">
-    <div className="batch-factory-comic-style-heading"><div><b>画风库</b><span>{selectedPreset ? `当前画风：${selectedPreset.name}` : (inherited ? '继承统一配置 · 尚未选择画风' : '尚未选择画风')}</span></div><small>居中的画风即为当前选择；预览图不会自动发给 AI。</small></div>
+    <div className="batch-factory-comic-style-heading"><div><b>画风库</b><span>{selectedPreset ? `当前画风：${selectedPreset.name}` : (inherited ? '继承统一配置 · 尚未选择画风' : '尚未选择画风')}</span></div><small>居中的画风即为当前选择；画风库图片会默认作为参考图发给 AI。</small></div>
     {styles.length ? <div
       className="batch-factory-comic-coverflow"
       role="radiogroup"
@@ -169,7 +174,6 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
       <button type="button" className="batch-factory-comic-coverflow-nav is-next" aria-label="下一画风" disabled={disabled} onClick={() => move(1)}><ChevronRight size={20} /></button>
       <div className="batch-factory-comic-coverflow-caption" aria-live="polite">
         <div><b>{activePreset?.name || '尚未选择画风'}</b><small>{activePreset?.description || '选择一个漫画画风'}</small></div>
-        {selectedPreset ? <Button type="link" size="small" disabled={disabled} onClick={() => usePreview(selectedPreset)}>设为漫画全局参考图</Button> : null}
       </div>
     </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无已发布画风" />}
 
@@ -178,14 +182,14 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
         {localReferencePreview || reference.previewUrl ? <AuthenticatedPreview src={localReferencePreview || reference.previewUrl} alt="漫画全局参考图" /> : <ImagePlus size={28} />}
       </div>
       <div className="batch-factory-comic-reference-controls">
-        <div className="batch-factory-comic-reference-title"><b>漫画全局参考图</b><small>可来自画风预览图，也可单独上传。</small></div>
+        <div className="batch-factory-comic-reference-title"><b>漫画全局参考图</b><small>默认使用当前画风库图片，也可以手动上传替换。</small></div>
         <div className="batch-factory-comic-reference-actions">
           <AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadReference} disabled={disabled || uploading}><Button icon={<Upload size={15} />} loading={uploading}>上传参考图</Button></AntUpload>
-          {reference.assetId ? <Button aria-label="移除漫画全局参考图" icon={<Trash2 size={15} />} disabled={disabled} onClick={() => { setLocalReferencePreview(''); patch({ globalReferenceImage: null }); }} /> : null}
+          {reference.source === 'manual-upload' ? <Button aria-label="恢复画风库参考图" icon={<Trash2 size={15} />} disabled={disabled} onClick={() => { setLocalReferencePreview(''); patch({ globalReferenceImage: comicReferenceForSelectedStyle(null, selectedPreset) }); }} /> : null}
         </div>
         <div className="batch-factory-comic-reference-switches">
           <label><span>启用参考图</span><Switch size="small" checked={reference.enabled && Boolean(reference.assetId)} disabled={disabled || !reference.assetId} onChange={enabled => patch({ globalReferenceImage: { ...reference, enabled } })} /></label>
-          <label><span>用于资产图</span><Switch size="small" checked={reference.applyToAssets} disabled={disabled || !reference.assetId} onChange={applyToAssets => patch({ globalReferenceImage: { ...reference, applyToAssets } })} /></label>
+          <label><span>用于资产图（仅人物）</span><Switch size="small" checked={reference.applyToAssets} disabled={disabled || !reference.assetId} onChange={applyToAssets => patch({ globalReferenceImage: { ...reference, applyToAssets } })} /></label>
           <label><span>用于漫画页</span><Switch size="small" checked={reference.applyToPages} disabled={disabled || !reference.assetId} onChange={applyToPages => patch({ globalReferenceImage: { ...reference, applyToPages } })} /></label>
         </div>
       </div>

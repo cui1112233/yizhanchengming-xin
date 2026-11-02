@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, ScanSearch, Sparkles, Undo2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ExternalLink, MessageCircle, ScanSearch, Sparkles, Undo2, X } from 'lucide-react';
 import { askAgent, createAgentTask, getAgentTask } from '../api/agent';
 import { getConfig } from '../api/config';
 import {
@@ -37,16 +37,43 @@ import {
 import { cmResponseContract, parseCmActionProposal } from './cmActionProposal';
 import './cm-penguin-companion.css';
 import { DEFAULT_PET_ID, PET_SELECTION_EVENT, getPetDefinition, petAnimationDelay } from './petCatalog';
+import { responsiveCompanionPosition } from './companion-position.js';
+import { LittleCompanionSprite } from './LittleCompanionSprite';
+import {
+  littleCompanionChooseAction,
+  littleCompanionFatigueDelay,
+  littleCompanionIdleDelay,
+  littleCompanionInwardDistance,
+  littleCompanionPeekDuration
+} from './littleCompanionBehavior.js';
+import {
+  canLittleCompanionRoam,
+  clampLittleCompanionToViewport,
+  interpolateLittleCompanionPosition,
+  littleCompanionEdgeSide,
+  littleCompanionEdgeTarget,
+  littleCompanionInwardTarget,
+  littleCompanionPeekTarget,
+  littleCompanionWalkDuration,
+  littleCompanionWalkTarget
+} from './littleCompanionRoaming.js';
 
 const bubbleDurationMs = 7000;
 const positionStorageKey = 'qiantie:cm-penguin-position';
-const PET_WIDTH = 120;
-const PET_HEIGHT = 130;
+
+const createLittleIdleAction = () => ({
+  kind: 'idle',
+  pose: 'idle',
+  durationMs: littleCompanionIdleDelay(Math.random()),
+  resetFatigue: false
+});
 
 function loadPosition() {
   try {
     const value = JSON.parse(localStorage.getItem(positionStorageKey) || '{}');
-    if (Number.isFinite(value.left) && Number.isFinite(value.top)) return value;
+    if (Number.isFinite(value.left) && Number.isFinite(value.top)) {
+      return responsiveCompanionPosition(value, window.innerWidth, window.innerHeight);
+    }
   } catch {
     // Ignore restricted or malformed storage.
   }
@@ -58,10 +85,7 @@ function savePosition(position) {
 }
 
 function clampPosition(left, top) {
-  return {
-    left: Math.max(8, Math.min(window.innerWidth - PET_WIDTH - 8, left)),
-    top: Math.max(58, Math.min(window.innerHeight - PET_HEIGHT - 8, top))
-  };
+  return responsiveCompanionPosition({ left, top }, window.innerWidth, window.innerHeight);
 }
 
 function isMissingTask(error) {
@@ -97,6 +121,13 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
   const [lookFrame, setLookFrame] = useState(null);
   const [position, setPosition] = useState(loadPosition);
   const [chatOpen, setChatOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible');
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true);
+  const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  const [littleAction, setLittleAction] = useState(createLittleIdleAction);
+  const [littleDirection, setLittleDirection] = useState(1);
+  const [littleSpriteFailed, setLittleSpriteFailed] = useState(false);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
@@ -114,12 +145,234 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
   const spriteRef = useRef(null);
   const dragRef = useRef(null);
   const draggedRef = useRef(false);
+  const positionRef = useRef(position);
+  const roamingFrameRef = useRef(null);
+  const littleActionTimerRef = useRef(null);
+  const littleActionStartedAtRef = useRef(null);
+  const littleActionDurationRef = useRef(0);
+  const littleActiveMsRef = useRef(0);
+  const littleFatigueMsRef = useRef(littleCompanionFatigueDelay(Math.random()));
+
+  const updatePosition = useCallback(nextValue => {
+    setPosition(current => {
+      const next = typeof nextValue === 'function' ? nextValue(current) : nextValue;
+      positionRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const cancelRoaming = useCallback(() => {
+    if (roamingFrameRef.current !== null) window.cancelAnimationFrame(roamingFrameRef.current);
+    roamingFrameRef.current = null;
+  }, []);
+
+  const cancelLittleActionTimer = useCallback((countElapsed = true) => {
+    if (littleActionTimerRef.current !== null) window.clearTimeout(littleActionTimerRef.current);
+    if (countElapsed && littleActionStartedAtRef.current !== null) {
+      const elapsed = Math.min(
+        littleActionDurationRef.current,
+        Math.max(0, Date.now() - littleActionStartedAtRef.current)
+      );
+      littleActiveMsRef.current += elapsed;
+    }
+    littleActionTimerRef.current = null;
+    littleActionStartedAtRef.current = null;
+    littleActionDurationRef.current = 0;
+  }, []);
+
+  const handleLittleLoadError = useCallback(failed => {
+    setLittleSpriteFailed(failed === true);
+  }, []);
   const historyRef = useRef(null);
   const speechRef = useRef(null);
   const speechTimerRef = useRef(null);
   const scheduleTimerRef = useRef(null);
   const clickSpeechIndexRef = useRef(-1);
   const requestRef = useRef(0);
+
+  useEffect(() => {
+    function handleResize() {
+      const nextViewport = { width: window.innerWidth, height: window.innerHeight };
+      cancelRoaming();
+      cancelLittleActionTimer();
+      setViewport(nextViewport);
+      updatePosition(current => pet.id === 'little-companion'
+        ? clampLittleCompanionToViewport(current, nextViewport)
+        : responsiveCompanionPosition(current, nextViewport.width, nextViewport.height));
+      if (pet.id === 'little-companion') setLittleAction(createLittleIdleAction());
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [cancelLittleActionTimer, cancelRoaming, pet.id, updatePosition]);
+
+  useEffect(() => {
+    const handleVisibility = () => setPageVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = () => setReducedMotion(query.matches);
+    handleChange();
+    if (typeof query.addEventListener === 'function') query.addEventListener('change', handleChange);
+    else query.addListener?.(handleChange);
+    return () => {
+      if (typeof query.removeEventListener === 'function') query.removeEventListener('change', handleChange);
+      else query.removeListener?.(handleChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    cancelRoaming();
+    cancelLittleActionTimer(false);
+    littleActiveMsRef.current = 0;
+    littleFatigueMsRef.current = littleCompanionFatigueDelay(Math.random());
+    setLittleAction(createLittleIdleAction());
+    setLittleDirection(1);
+    setLittleSpriteFailed(false);
+    if (pet.id !== 'little-companion') updatePosition(loadPosition());
+    return () => {
+      cancelRoaming();
+      cancelLittleActionTimer(false);
+    };
+  }, [cancelLittleActionTimer, cancelRoaming, pet.id, updatePosition]);
+
+  const littleCanAct = canLittleCompanionRoam({
+    petId: pet.id,
+    state,
+    chatOpen,
+    dragging: isDragging,
+    pageVisible,
+    reducedMotion,
+    spriteFailed: littleSpriteFailed
+  });
+
+  useEffect(() => {
+    if (!littleCanAct) {
+      cancelLittleActionTimer();
+      if (pet.id === 'little-companion' && state === 'idle' && littleAction.kind !== 'idle') {
+        setLittleAction(createLittleIdleAction());
+      }
+      return undefined;
+    }
+    if (littleAction.kind === 'walk' || littleAction.kind === 'edge-walk' || littleAction.kind === 'inward-walk') {
+      return undefined;
+    }
+
+    const durationMs = Math.max(0, Number(littleAction.durationMs) || 0);
+    littleActionStartedAtRef.current = Date.now();
+    littleActionDurationRef.current = durationMs;
+    littleActionTimerRef.current = window.setTimeout(() => {
+      littleActionTimerRef.current = null;
+      littleActionStartedAtRef.current = null;
+      littleActionDurationRef.current = 0;
+
+      if (littleAction.resetFatigue) {
+        littleActiveMsRef.current = 0;
+        littleFatigueMsRef.current = littleCompanionFatigueDelay(Math.random());
+      } else {
+        littleActiveMsRef.current += durationMs;
+      }
+
+      if (littleAction.kind === 'peek') {
+        setLittleAction({
+          kind: 'inward-walk',
+          pose: 'walk',
+          durationMs: 0,
+          peekSide: littleAction.peekSide,
+          inwardDistance: littleCompanionInwardDistance(Math.random()),
+          resetFatigue: false
+        });
+        return;
+      }
+
+      if (littleAction.kind === 'idle') {
+        setLittleAction(littleCompanionChooseAction({
+          activeMs: littleActiveMsRef.current,
+          fatigueMs: littleFatigueMsRef.current,
+          actionRoll: Math.random(),
+          durationRoll: Math.random()
+        }));
+        return;
+      }
+
+      setLittleAction(createLittleIdleAction());
+    }, durationMs);
+
+    return () => cancelLittleActionTimer();
+  }, [cancelLittleActionTimer, littleAction, littleCanAct, pet.id, state]);
+
+  useEffect(() => {
+    const moving = littleAction.kind === 'walk'
+      || littleAction.kind === 'edge-walk'
+      || littleAction.kind === 'inward-walk';
+    if (!littleCanAct || !moving) {
+      cancelRoaming();
+      return undefined;
+    }
+
+    cancelRoaming();
+    const rect = spriteRef.current?.getBoundingClientRect();
+    const current = positionRef.current;
+    const start = Number.isFinite(current?.left) && Number.isFinite(current?.top)
+      ? current
+      : {
+          left: Number.isFinite(rect?.left) ? rect.left : viewport.width - 142,
+          top: Number.isFinite(rect?.top) ? rect.top : viewport.height - 148
+        };
+    const target = littleAction.kind === 'edge-walk'
+      ? littleCompanionPeekTarget(start, viewport)
+      : littleAction.kind === 'inward-walk'
+        ? littleCompanionInwardTarget(start, viewport, littleAction.peekSide, littleAction.inwardDistance)
+        : littleCompanionWalkTarget(start, viewport, Math.random(), Math.random());
+    const durationMs = littleCompanionWalkDuration(start, target, Math.random());
+
+    positionRef.current = start;
+    setLittleDirection(target.direction || (target.left >= start.left ? 1 : -1));
+
+    let startedAt = null;
+    function move(timestamp) {
+      if (startedAt === null) startedAt = timestamp;
+      const progress = durationMs > 0 ? (timestamp - startedAt) / durationMs : 1;
+      updatePosition(interpolateLittleCompanionPosition(start, target, progress));
+      if (progress < 1) {
+        roamingFrameRef.current = window.requestAnimationFrame(move);
+        return;
+      }
+
+      roamingFrameRef.current = null;
+      littleActiveMsRef.current += durationMs;
+      if (littleAction.kind === 'inward-walk') {
+        setLittleAction(createLittleIdleAction());
+        return;
+      }
+
+      const edgeSide = littleCompanionEdgeSide(target, viewport);
+      if (edgeSide) {
+        updatePosition(littleCompanionEdgeTarget(target, viewport, edgeSide));
+        setLittleAction({
+          kind: 'peek',
+          pose: 'peek',
+          durationMs: littleCompanionPeekDuration(Math.random()),
+          peekSide: edgeSide,
+          resetFatigue: false
+        });
+        return;
+      }
+
+      setLittleAction(createLittleIdleAction());
+    }
+    roamingFrameRef.current = window.requestAnimationFrame(move);
+    return cancelRoaming;
+  }, [
+    cancelRoaming,
+    littleAction,
+    littleCanAct,
+    updatePosition,
+    viewport
+  ]);
 
   const effectiveSelection = selection || bridgeContext.selection;
   const contextLabel = effectiveSelection?.label || bridgeContext.page || petContextRef.current.page || '当前页面';
@@ -472,6 +725,14 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
       clickSpeechIndexRef.current = ['戳我干嘛，我有在认真陪你。', '再摸一下也不是不行。', '哼，注意力被你拿走啦。'].indexOf(text);
       showSpeech({ text, priority: COMPANION_SPEECH_PRIORITY.click });
     }
+    if (pet.id === 'little-companion') {
+      if (!chatOpen) {
+        cancelRoaming();
+        cancelLittleActionTimer();
+        setLittleAction({ kind: 'dance', pose: 'dance', durationMs: 1_220, resetFatigue: false });
+      }
+      return;
+    }
     void openChat();
   }
 
@@ -479,6 +740,9 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
     if (event.button !== 0) return;
     const rect = spriteRef.current?.getBoundingClientRect();
     if (!rect) return;
+    cancelRoaming();
+    cancelLittleActionTimer();
+    setIsDragging(true);
     clearScheduleTimer();
     dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top };
     draggedRef.current = false;
@@ -493,14 +757,37 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
     if (Math.hypot(dx, dy) > 8) draggedRef.current = true;
     if (!draggedRef.current) return;
     const next = clampPosition(drag.left + dx, drag.top + dy);
-    setPosition(next);
-    savePosition(next);
+    updatePosition(next);
   }
 
   function endDrag(event) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    if (draggedRef.current) {
+      const manualPosition = positionRef.current;
+      if (pet.id === 'little-companion' && Number.isFinite(manualPosition?.left)) {
+        const edgeSide = littleCompanionEdgeSide(manualPosition, viewport);
+        if (edgeSide) {
+          const edgePosition = littleCompanionEdgeTarget(manualPosition, viewport, edgeSide);
+          updatePosition(edgePosition);
+          savePosition(edgePosition);
+          setLittleAction({
+            kind: 'peek',
+            pose: 'peek',
+            durationMs: littleCompanionPeekDuration(Math.random()),
+            peekSide: edgeSide,
+            resetFatigue: false
+          });
+        } else {
+          savePosition(manualPosition);
+          setLittleAction(createLittleIdleAction());
+        }
+      } else {
+        savePosition(manualPosition);
+      }
+    }
+    setIsDragging(false);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
 
@@ -599,9 +886,21 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
         </section>
       ) : null}
 
+      {pet.id === 'little-companion' && !chatOpen ? (
+        <button
+          className="cm-penguin-chat-trigger"
+          type="button"
+          title={`和 ${pet.displayName} 聊天`}
+          aria-label={`和 ${pet.displayName} 聊天`}
+          onClick={event => { event.stopPropagation(); void openChat(); }}
+        >
+          <MessageCircle size={15} />
+        </button>
+      ) : null}
+
       <div
         ref={spriteRef}
-        className={`cm-penguin-pet is-${state}`}
+        className={`cm-penguin-pet is-${state}${pet.renderer === 'multi-sheet' ? ' is-little-companion' : ''}`}
         style={{ '--cm-row': spriteRow, '--cm-frame': spriteFrame }}
         role="button"
         tabIndex={0}
@@ -618,7 +917,16 @@ export function CmPenguinCompanion({ username, accountSessionKey }) {
           }
         }}
       >
-        <img src={pet.spritesheetPath} alt="" draggable="false" style={{ imageRendering: pet.renderMode === 'smooth' ? 'auto' : undefined }} />
+        {pet.renderer === 'multi-sheet'
+          ? <LittleCompanionSprite
+              state={state}
+              label={pet.displayName}
+              direction={littleDirection}
+              idleStep={{ pose: littleAction.pose, durationMs: littleAction.durationMs }}
+              peekSide={littleAction.kind === 'peek' ? littleAction.peekSide : null}
+              onLoadError={handleLittleLoadError}
+            />
+          : <img className="cm-penguin-atlas" src={pet.spritesheetPath} alt="" draggable="false" style={{ imageRendering: pet.renderMode === 'smooth' ? 'auto' : undefined }} />}
       </div>
     </div>
   );

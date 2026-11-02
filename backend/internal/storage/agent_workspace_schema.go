@@ -141,6 +141,7 @@ func AgentWorkspaceMigrations() []Migration {
 				`ALTER TABLE agent_canvas_nodes ADD COLUMN config_json JSON NULL AFTER asset_ref_json`,
 			},
 			CallbackChecksum: "v88-agent-canvas-node-config-v1",
+			Adopt:            adoptAgentCanvasNodeConfigLedger,
 		},
 		{
 			Version: 8800006,
@@ -311,6 +312,50 @@ WHERE c.canvas_json IS NULL`,
 ) ENGINE=InnoDB`,
 			},
 			CallbackChecksum: "v88-agent-batch-factory-bindings-v1",
+		},
+		{
+			Version: 8800013,
+			SQL: []string{
+				`ALTER TABLE agent_generation_tasks ADD KEY idx_agent_generation_tasks_owner_history (owner_username, state, kind, model_id, updated_at, id)`,
+			},
+			CallbackChecksum: "v88-agent-generation-history-index-v1",
+		},
+		{
+			Version: 8800014,
+			SQL: []string{
+				`CREATE TABLE IF NOT EXISTS agent_library_folders (
+  id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, id),
+  KEY idx_agent_library_folders_owner_updated (owner_username, updated_at, id)
+) ENGINE=InnoDB`,
+				`CREATE TABLE IF NOT EXISTS agent_library_items (
+  id VARCHAR(96) NOT NULL,
+  folder_id VARCHAR(96) NOT NULL,
+  owner_username VARCHAR(191) NOT NULL,
+  source_project_id VARCHAR(96) NOT NULL,
+  source_asset_id VARCHAR(96) NOT NULL,
+  kind VARCHAR(16) NOT NULL,
+  name VARCHAR(191) NOT NULL,
+  tags_json JSON NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  PRIMARY KEY (owner_username, id),
+  UNIQUE KEY uq_agent_library_items_owner_folder_source (owner_username, folder_id, source_project_id, source_asset_id),
+  KEY idx_agent_library_items_owner_folder_updated (owner_username, folder_id, updated_at, id)
+) ENGINE=InnoDB`,
+			},
+			CallbackChecksum: "v88-agent-material-library-v1",
+		},
+		{
+			Version: 8800015,
+			SQL: []string{
+				`ALTER TABLE agent_projects ADD COLUMN project_type VARCHAR(16) NOT NULL DEFAULT 'video' AFTER title_mode`,
+			},
+			CallbackChecksum: "v88-agent-project-type-v1",
 		},
 	}
 }

@@ -182,6 +182,12 @@ func parseSDDirectorText(raw string, maxVideoDuration int) (DirectorResult, erro
 	return result, nil
 }
 
+// ParseSDDirectorText validates the SD plain-text director protocol for
+// consumers that reuse the Batch Factory director contract without its store.
+func ParseSDDirectorText(raw string, maxVideoDuration int) (DirectorResult, error) {
+	return parseSDDirectorText(raw, maxVideoDuration)
+}
+
 func ParseDirectorJSON(value string) (json.RawMessage, error) {
 	text := strings.TrimSpace(value)
 	if text == "" {
@@ -334,6 +340,12 @@ func normalizeDirectorNamedPrompts(value any, label string) ([]NamedPrompt, erro
 		if prompt == "" {
 			return nil, fmt.Errorf("%s[%d] 缺少提示词", label, index)
 		}
+		// 人物关系是结构化分析资料，不是人物的视觉锚点。旧版模型会把
+		// relationships 也抄进 prompt，导致基础设定把“某人的妻子”当成
+		// 外形提示词传给视频/图片模型；在统一入口把这类关系文字剥掉。
+		if label == "characters" {
+			prompt = mergeVisualAssetPrompt(facts, appearance, prompt, relationships)
+		}
 		if _, exists := seen[name]; exists {
 			return nil, fmt.Errorf("%s存在重复名称：%s", label, name)
 		}
@@ -341,6 +353,86 @@ func normalizeDirectorNamedPrompts(value any, label string) ([]NamedPrompt, erro
 		out = append(out, NamedPrompt{Name: name, FormalName: formalName, Facts: facts, Appearance: appearance, Relationships: relationships, Prompt: prompt})
 	}
 	return out, nil
+}
+
+func mergeVisualAssetPrompt(facts, appearance, prompt, relationships string) string {
+	parts := make([]string, 0, 2)
+	if value := visualFactsWithoutRelationships(facts, relationships); value != "" {
+		parts = append(parts, value)
+	}
+	if value := strings.TrimSpace(appearance); value != "" {
+		parts = append(parts, value)
+	}
+	if len(parts) > 0 {
+		return strings.Trim(strings.Join(parts, "，"), " ，，")
+	}
+	return visualPromptWithoutRelationships(prompt, relationships)
+}
+
+func visualPromptWithoutRelationships(prompt, relationships string) string {
+	return visualFactsWithoutRelationships(prompt, relationships)
+}
+
+// visualFactsWithoutRelationships keeps facts that help render a character
+// (age, gender, condition and role) but removes clauses that describe how the
+// character is related to somebody else. Relationship data stays in the
+// structured Relationships field and is consumed by story logic, not by the
+// visual model.
+func visualFactsWithoutRelationships(value, relationships string) string {
+	clauses := relationshipClauses(value)
+	if len(clauses) == 0 {
+		return ""
+	}
+	kept := make([]string, 0, len(clauses))
+	for _, clause := range clauses {
+		if isRelationshipClause(clause, relationships) {
+			continue
+		}
+		kept = append(kept, clause)
+	}
+	return strings.Trim(strings.Join(kept, "，"), " ，，；。")
+}
+
+func isRelationshipClause(clause, relationships string) bool {
+	clause = strings.TrimSpace(clause)
+	if clause == "" {
+		return false
+	}
+	for _, relationship := range relationshipClauses(relationships) {
+		relationship = strings.TrimSpace(relationship)
+		if len([]rune(relationship)) >= 2 && (strings.Contains(clause, relationship) || strings.Contains(relationship, clause)) {
+			return true
+		}
+	}
+	// Facts from older extraction prompts often shorten the relationship text,
+	// e.g. "陆淮安的妻子" versus the structured "陆淮安的合法妻子".
+	for _, marker := range []string{
+		"妻子", "丈夫", "老公", "老婆", "配偶", "夫妻", "妻婿", "孙媳", "孙子", "孙女",
+		"祖父", "祖母", "爷爷", "奶奶", "父亲", "母亲", "爸爸", "妈妈", "儿子", "女儿",
+		"兄弟", "姐妹", "长辈", "晚辈", "夫家", "主仆", "旧爱", "旧相识", "恋人", "爱人",
+		"情感牵扯", "女主角的", "男主角的",
+	} {
+		if strings.Contains(clause, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func relationshipClauses(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	value = strings.NewReplacer("；", "\n", ";", "\n", "。", "\n", ".", "\n", "，", "\n", ",", "\n").Replace(value)
+	parts := strings.Split(value, "\n")
+	clauses := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			clauses = append(clauses, part)
+		}
+	}
+	return clauses
 }
 
 func normalizeDirectorRefs(value any) []string {
@@ -386,6 +478,14 @@ func directorNameSet(values []NamedPrompt) map[string]struct{} {
 }
 
 func normalizeDirectorShots(value any, durationSec, videoIndex int, requireH3Metadata bool) ([]DirectorShot, error) {
+	return normalizeDirectorShotsWithOffset(value, durationSec, videoIndex, requireH3Metadata, 0)
+}
+
+// normalizeDirectorShotsWithOffset accepts a provider timeline that is
+// otherwise valid but uses the whole-book clock for a later VIDEO. Stored
+// VIDEO cards are segment-local by contract, so only an explicitly detected
+// cumulative offset is removed. Arbitrary gaps are still rejected below.
+func normalizeDirectorShotsWithOffset(value any, durationSec, videoIndex int, requireH3Metadata bool, timelineOffset int) ([]DirectorShot, error) {
 	items := directorArray(value)
 	if len(items) == 0 {
 		return nil, fmt.Errorf("storyboard[%d] 至少需要一个镜头", videoIndex)
@@ -412,6 +512,10 @@ func normalizeDirectorShots(value any, durationSec, videoIndex int, requireH3Met
 		endSec, err := directorRoundedSecond(endValue, fmt.Sprintf("storyboard[%d].shots[%d].end_sec", videoIndex, shotIndex))
 		if err != nil {
 			return nil, err
+		}
+		if timelineOffset > 0 {
+			startSec -= timelineOffset
+			endSec -= timelineOffset
 		}
 		if startSec != cursor {
 			return nil, fmt.Errorf("storyboard[%d] 镜头时间轴必须连续，期望从 %d 秒开始", videoIndex, cursor)
@@ -461,6 +565,39 @@ func normalizeDirectorShots(value any, durationSec, videoIndex int, requireH3Met
 		return nil, fmt.Errorf("storyboard[%d] 最后一个镜头必须结束在 %d 秒", videoIndex, durationSec)
 	}
 	return out, nil
+}
+
+func usesCumulativeStoryboardClock(value any, timelineOffset, durationSec int) bool {
+	if timelineOffset <= 0 {
+		return false
+	}
+	items := directorArray(value)
+	if len(items) == 0 {
+		return false
+	}
+	first, ok := directorMap(items[0])
+	if !ok {
+		return false
+	}
+	last, ok := directorMap(items[len(items)-1])
+	if !ok {
+		return false
+	}
+	firstStart, err := directorRoundedSecond(first["start_sec"], "storyboard.start_sec")
+	if err != nil && first["start_sec"] == nil {
+		firstStart, err = directorRoundedSecond(first["startSec"], "storyboard.startSec")
+	}
+	if err != nil {
+		return false
+	}
+	lastEnd, err := directorRoundedSecond(last["end_sec"], "storyboard.end_sec")
+	if err != nil && last["end_sec"] == nil {
+		lastEnd, err = directorRoundedSecond(last["endSec"], "storyboard.endSec")
+	}
+	if err != nil {
+		return false
+	}
+	return firstStart == timelineOffset && lastEnd == timelineOffset+durationSec
 }
 
 func NormalizeDirectorOutput(raw json.RawMessage, settings DirectorSettings) (DirectorResult, error) {
@@ -516,6 +653,7 @@ func NormalizeDirectorOutput(raw json.RawMessage, settings DirectorSettings) (Di
 		}
 	}
 	storyboard := make([]DirectorVideo, 0, len(sourceVideos))
+	bookTimelineOffset := 0
 	for videoIndex, item := range sourceVideos {
 		video, ok := directorMap(item)
 		if !ok {
@@ -572,6 +710,9 @@ func NormalizeDirectorOutput(raw json.RawMessage, settings DirectorSettings) (Di
 			visualPrompt = ""
 		}
 		shots, err := normalizeDirectorShots(video["shots"], durationSec, videoIndex, settings.RequireH3Metadata)
+		if err != nil && strings.Contains(err.Error(), "镜头时间轴必须连续") && usesCumulativeStoryboardClock(video["shots"], bookTimelineOffset, durationSec) {
+			shots, err = normalizeDirectorShotsWithOffset(video["shots"], durationSec, videoIndex, settings.RequireH3Metadata, bookTimelineOffset)
+		}
 		if err != nil {
 			return DirectorResult{}, err
 		}
@@ -604,6 +745,7 @@ func NormalizeDirectorOutput(raw json.RawMessage, settings DirectorSettings) (Di
 			Shots:        shots,
 			VideoDesc:    videoDesc,
 		})
+		bookTimelineOffset += durationSec
 	}
 	if settings.AudioTargetSeconds > 0 {
 		total := 0

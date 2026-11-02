@@ -211,7 +211,7 @@ func rejectGenericVideoAction(w http.ResponseWriter, req *http.Request, owner st
 		writeAgentGenerationTaskError(w, err)
 		return true
 	}
-	if task.Kind != "video" {
+	if task.Kind != "video" || strings.HasPrefix(task.Mode, "video_") {
 		return false
 	}
 	writeJSON(w, http.StatusConflict, map[string]string{"error": "视频任务请使用视频任务接口确认、取消或重试"})

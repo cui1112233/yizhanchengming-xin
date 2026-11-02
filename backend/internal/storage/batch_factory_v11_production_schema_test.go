@@ -1,8 +1,11 @@
 package storage
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestV11ProductionMigrationAddsDurableJobTaskAndEventTables(t *testing.T) {
@@ -28,15 +31,80 @@ func TestV11MigrationsRegisterProductionAfterDirector(t *testing.T) {
 	}
 }
 
+func TestV11ProductionTaskAttemptIndexMigrationLeavesOriginalProductionMigrationUnchanged(t *testing.T) {
+	joined := strings.ToLower(strings.Join(V11ProductionStatements(), "\n"))
+	if strings.Contains(joined, "opening_variant_index") {
+		t.Fatalf("already-ledgered production migration must not contain opening_variant_index: %s", joined)
+	}
+	if !strings.Contains(joined, "unique key uq_bfv11_production_task_attempt (job_id, video_id, attempt)") {
+		t.Fatalf("original production task unique key is missing: %s", joined)
+	}
+	var migration *Migration
+	for i := range V11Migrations() {
+		if V11Migrations()[i].Version == 1100026 {
+			migration = &V11Migrations()[i]
+			break
+		}
+	}
+	if migration == nil || migration.Reconcile == nil || migration.Adopt == nil {
+		t.Fatal("production task unique-key migration must reconcile existing and unledgered databases")
+	}
+}
+
+func TestV11ProductionTaskAttemptIndexMigrationDropsLegacyIndexAndRecreatesIt(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT COALESCE\\( \\(SELECT table_name").WithArgs("batch_factory_v11_production_tasks", "batch_factory_v12_production_tasks").WillReturnRows(sqlmock.NewRows([]string{"table_name"}).AddRow("batch_factory_v11_production_tasks"))
+	mock.ExpectQuery("SELECT COALESCE\\(GROUP_CONCAT").WithArgs("batch_factory_v11_production_tasks").WillReturnRows(sqlmock.NewRows([]string{"columns"}).AddRow("job_id,video_id,attempt"))
+	mock.ExpectQuery("SELECT COALESCE\\( \\(SELECT table_name").WithArgs("batch_factory_v11_production_tasks", "batch_factory_v12_production_tasks").WillReturnRows(sqlmock.NewRows([]string{"table_name"}).AddRow("batch_factory_v11_production_tasks"))
+	mock.ExpectQuery("SELECT COUNT\\(\\*\\) FROM information_schema.statistics").WithArgs("batch_factory_v11_production_tasks", "idx_bfv11_production_tasks_job_id").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectExec("ALTER TABLE batch_factory_v11_production_tasks ADD KEY idx_bfv11_production_tasks_job_id \\(job_id\\)").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("ALTER TABLE batch_factory_v11_production_tasks DROP INDEX uq_bfv11_production_task_attempt").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("ALTER TABLE batch_factory_v11_production_tasks ADD UNIQUE KEY uq_bfv11_production_task_attempt").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	tx, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureV11ProductionTaskAttemptIndex(context.Background(), tx); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestV11MergeProgressMigrationReconcilesRecordedPartialSchemas(t *testing.T) {
 	for _, migration := range V11Migrations() {
 		if migration.Version == 1100020 {
-			if migration.Reconcile == nil { t.Fatal("merge progress migration must reconcile a historically recorded partial schema") }
+			if migration.Reconcile == nil {
+				t.Fatal("merge progress migration must reconcile a historically recorded partial schema")
+			}
 			return
 		}
 	}
 	t.Fatal("merge progress migration is missing")
 }
+
+func TestV11OpeningVariantMigrationReconcilesRecordedPartialSchemas(t *testing.T) {
+	for _, migration := range V11Migrations() {
+		if migration.Version == 1100021 {
+			if migration.Reconcile == nil {
+				t.Fatal("opening variant migration must reconcile a historically recorded partial schema")
+			}
+			return
+		}
+	}
+	t.Fatal("opening variant migration is missing")
+}
+
 func TestV11BookStageRunsMigrationIsAdditiveAndDurable(t *testing.T) {
 	migrations := V11Migrations()
 	if len(migrations) < 16 || migrations[14].Version != 1100015 || migrations[14].CallbackChecksum != "batch-factory-v11-book-stage-runs-v1" {

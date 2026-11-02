@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,9 +17,13 @@ type authTestStore struct {
 	password string
 	session  auth.Session
 	sessions []auth.Session
+	findErr  error
 }
 
 func (s *authTestStore) FindAccount(context.Context, string) (auth.Account, error) {
+	if s.findErr != nil {
+		return auth.Account{}, s.findErr
+	}
 	if s.account.Username == "" {
 		return auth.Account{}, auth.ErrNotFound
 	}
@@ -62,6 +67,19 @@ func TestAuthRoutesRejectUnknownAccountWithoutLeakingDetails(t *testing.T) {
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized || strings.Contains(res.Body.String(), "password") || strings.Contains(res.Body.String(), "hash") {
+		t.Fatalf("login response = %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestAuthRoutesReportAccountStoreFailureWithoutCallingItBadCredentials(t *testing.T) {
+	store := &authTestStore{findErr: errors.New("mysql unavailable")}
+	mux := http.NewServeMux()
+	RegisterAuthRoutes(mux, AuthOptions{Store: store, Now: func() time.Time { return time.Unix(100, 0) }})
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"username":"alice","password":"correct-password"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), "登录服务暂不可用") {
 		t.Fatalf("login response = %d %s", res.Code, res.Body.String())
 	}
 }

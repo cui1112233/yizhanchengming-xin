@@ -125,6 +125,9 @@ func novelFetchAutomationEligible(document novelfetchworkshop.Document, now time
 	if status == "queued" || status == "running" || status == "processing" {
 		return false
 	}
+	if status == "waiting_classification" {
+		return novelFetchClassificationResolved(document)
+	}
 	// Raw text is persisted before sensitive-word AI runs. If that second
 	// stage fails, the task must be picked up again without fetching upstream
 	// a second time.
@@ -170,9 +173,13 @@ func novelFetchAutomationTimeout(settings map[string]any) time.Duration {
 // recoverStaleNovelFetchTasks turns orphaned processing states into retryable
 // work. A worker that disappears after marking a document processing must not
 // leave that document excluded from automation forever.
-func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.Store, owner string, settings map[string]any, documents []novelfetchworkshop.Document, now time.Time) {
+func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.Store, owner string, settings map[string]any, documents []novelfetchworkshop.Document, now time.Time, queues ...novelfetchworkshop.ProcessQueue) {
 	cutoff := now.Add(-novelFetchAutomationTimeout(settings))
 	staleBatches := map[string]bool{}
+	var recoveryQueue novelfetchworkshop.ProcessStaleJobRecoveryQueue
+	if len(queues) > 0 {
+		recoveryQueue, _ = queues[0].(novelfetchworkshop.ProcessStaleJobRecoveryQueue)
+	}
 	for _, document := range documents {
 		status := strings.ToLower(firstText(document.Meta["status"], document.Meta["queueState"], document.Meta["taskStatus"]))
 		if status != "processing" && status != "running" && status != "ai_processing" {
@@ -182,6 +189,25 @@ func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.S
 		if err != nil || updated.After(cutoff) {
 			continue
 		}
+		if recoveryQueue != nil {
+			staleJobID := firstText(document.Meta["currentProcessJobId"], document.Meta["current_process_job_id"])
+			if staleJobID == "" {
+				batchID := firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"])
+				if runs, runsErr := store.ListRuns(ctx, owner, batchID); runsErr == nil {
+					for _, run := range runs {
+						if run.Stage == "novel_fetch_process" && strings.EqualFold(strings.TrimSpace(run.Status), "running") {
+							staleJobID = run.RunID
+							break
+						}
+					}
+				}
+			}
+			if staleJobID != "" {
+				if _, recoverErr := recoveryQueue.RecoverStaleJob(ctx, staleJobID); recoverErr != nil {
+					continue
+				}
+			}
+		}
 		if document.Meta == nil {
 			document.Meta = map[string]any{}
 		}
@@ -190,10 +216,8 @@ func recoverStaleNovelFetchTasks(ctx context.Context, store novelfetchworkshop.S
 		document.Meta["queueState"] = "waiting_retry"
 		document.Meta["error"] = message
 		document.Meta["automationNextRetryAt"] = now.UTC().Format(time.RFC3339Nano)
-		document.Logs = append(document.Logs, map[string]any{"time": now.UTC().Format(time.RFC3339Nano), "event": "process_waiting_retry", "detail": message})
-		if len(document.Logs) > 200 {
-			document.Logs = document.Logs[len(document.Logs)-200:]
-		}
+		appendNovelFetchDocumentLog(&document, "process_recovered", "超时任务已转入等待重试", now)
+		appendNovelFetchDocumentLog(&document, "process_waiting_retry", message, now)
 		if err := store.PutDocument(ctx, owner, document); err == nil {
 			staleBatches[firstText(document.Meta["currentBatchId"], document.Meta["current_batch_id"])] = true
 		}
@@ -275,7 +299,7 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 	if err != nil {
 		return nil, err
 	}
-	recoverStaleNovelFetchTasks(ctx, store, owner, settings, documents, now)
+	recoverStaleNovelFetchTasks(ctx, store, owner, settings, documents, now, queue)
 	if refreshed, refreshErr := store.ListDocuments(ctx, owner); refreshErr == nil {
 		documents = refreshed
 	}
@@ -334,7 +358,13 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		SelectedVersions: novelFetchAutomationVersions(settings), TextModelID: firstText(settings["text_model_id"], settings["textModelId"], "未指定"),
 	}
 	var enqueueErr error
-	if uniqueQueue, ok := queue.(novelfetchworkshop.ProcessDedupQueue); ok {
+	if uniqueQueue, ok := queue.(novelfetchworkshop.ProcessBookDedupQueue); ok {
+		var queued bool
+		queued, _, enqueueErr = uniqueQueue.EnqueueUniqueBooks(ctx, job, 2*time.Hour)
+		if enqueueErr == nil && !queued {
+			return nil, nil
+		}
+	} else if uniqueQueue, ok := queue.(novelfetchworkshop.ProcessDedupQueue); ok {
 		var queued bool
 		queued, enqueueErr = uniqueQueue.EnqueueUnique(ctx, owner+":"+strings.Join(bookIDs, ","), job, 2*time.Hour)
 		if enqueueErr == nil && !queued {
@@ -350,7 +380,7 @@ func dispatchNovelFetchAutomationOwner(ctx context.Context, store novelfetchwork
 		return nil, enqueueErr
 	}
 	for _, bookID := range bookIDs {
-		if err := updateWorkshopTaskRuntimeState(ctx, store, owner, bookID, "queued", ""); err != nil {
+		if err := markNovelFetchTaskQueued(ctx, store, owner, bookID, job.ID, batchID, now); err != nil {
 			return nil, err
 		}
 	}

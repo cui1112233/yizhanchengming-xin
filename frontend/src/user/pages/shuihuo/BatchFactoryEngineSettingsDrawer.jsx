@@ -1,22 +1,19 @@
-import { Alert, Button, Input, InputNumber, Modal, Popover, Segmented, Select, Space, Switch, Tabs, Tag, message } from 'antd';
+import { Alert, Button, Input, InputNumber, Modal, Popover, Segmented, Select, Space, Switch, Tabs, Tag, Typography, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { listAvailableModels } from '../../../shared/api/modelCatalog';
 import { getConfig } from '../../../shared/api/config';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
 import { selectedModelState } from './modelSelectionState';
-import { videoProviderForModel } from './videoProviderBinding';
+import { modelOptionsForProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
+import { listLocalExecutors } from '../../../shared/api/batchFactory';
 
 const TARGET_ADMIN_URL = 'http://two.121w.com/tttadmin/index.php';
+const N8_MATERIAL_ALBUM_URL = 'https://n8-view.hnqingyuwen.top/#/material/album';
 // The shared novel-fetch verification service predates the VMS UI label.  It
 // still returns the original check name, so accept both names at this boundary.
 const SESSION_CHECK_NAMES = ['视频管理系统登录会话', '121 后台登录会话'];
 
-const providerOptions = [
-  { value: 'personal_api', label: '个人中心 API' },
-  { value: 'doubao_local_executor', label: '豆包本地执行器' },
-  { value: 'autodl_comfyui', label: 'AutoDL ComfyUI' }
-];
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
 const AUDIO_SOURCE_OPTIONS = [{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }];
 const TTS_VOICE_OPTIONS = [
@@ -61,6 +58,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   const [loginPassword, setLoginPassword] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
   const [accountTts, setAccountTts] = useState(DEFAULT_TTS);
+  const [localExecutors, setLocalExecutors] = useState([]);
   useEffect(() => {
     if (!open) return;
     const current = batch?.settingsState?.patch || {};
@@ -94,6 +92,14 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   useEffect(() => {
     if (!open) return undefined;
     let active = true;
+    listLocalExecutors().then(result => {
+      if (active) setLocalExecutors(Array.isArray(result?.executors) ? result.executors : []);
+    }).catch(() => { if (active) setLocalExecutors([]); });
+    return () => { active = false; };
+  }, [open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
     getConfig().then(config => {
       if (!active) return;
       setAccountTts({ ...DEFAULT_TTS, ...(config?.tts || {}) });
@@ -105,10 +111,15 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
     text: models.filter(model => model.kind === 'text').map(model => ({ value: model.id, label: model.displayName || model.name || model.modelId || model.id })),
     video: models.filter(model => model.kind === 'video').map(model => ({ value: model.id, label: model.displayName || model.name || model.modelId || model.id }))
   }), [models]);
+  const imageProviderOptions = useMemo(() => providerOptionsForModels(models, 'image'), [models]);
+  const videoProviderOptions = useMemo(() => providerOptionsForModels(models, 'video'), [models]);
+  const imageModelOptions = modelOptionsForProvider(models, 'image', form.imageProvider);
+  const videoModelOptions = modelOptionsForProvider(models, 'video', form.videoProvider);
   const selectedTextModel = selectedModelState(models.filter(model => model.kind === 'text'), form.textModelId);
   function modelPlaceholder(kind, label) {
     if (modelsLoading) return '正在读取个人中心模型…';
-    return modelOptions[kind].length ? `选择已启用${label}模型` : `个人中心没有已启用${label}模型`;
+    const options = kind === 'image' ? imageModelOptions : videoModelOptions;
+    return options.length ? `选择${label}模型` : `当前通道没有可用${label}模型`;
   }
   const tts = { ...DEFAULT_TTS, ...accountTts, ...(form.tts || {}) };
   function patch(next) { setForm(current => ({ ...current, ...next })); }
@@ -217,10 +228,10 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
           <Alert type="info" showIcon message="当前批次统一生产参数" description="这里统一设置当前批次所有小说；之后仍可进入任意单书单独修改，不会影响其它小说。" />
           <EngineCard title="核心视频引擎" description="当前设置应用到本批次全部小说；之后可单独修改任意一本。">
             <div className="batch-factory-engine-grid">
-              <Field label="视频引擎" note="生成通道"><Select value={form.videoProvider || 'personal_api'} options={providerOptions} onChange={videoProvider => patch({ videoProvider })} /></Field>
-              <Field label="视频模型" note="选择后自动匹配生成通道"><Select allowClear loading={modelsLoading} value={form.videoModelId || undefined} options={modelOptions.video} placeholder={modelPlaceholder('video', '视频')} onChange={videoModelId => patch({ videoModelId: videoModelId || '', ...(videoModelId ? { videoProvider: videoProviderForModel(videoModelId, form.videoProvider) } : {}) })} /></Field>
+              <Field label="视频引擎" note="生成通道"><Select value={form.videoProvider || 'personal_api'} options={videoProviderOptions} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId }))} /></Field>
+              <Field label="视频模型" note="选择后自动匹配生成通道"><Select allowClear loading={form.videoProvider === 'doubao_local_executor' ? false : modelsLoading} value={form.videoModelId || undefined} options={videoModelOptions} placeholder={modelPlaceholder('video', '视频')} onChange={videoModelId => patch({ videoModelId: videoModelId || '', ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), form.videoProvider) } : {}) })} /></Field>
               <Field label="分镜时长" note="单个 VIDEO 的目标上限"><Segmented value={storyboardDuration(form.storyboardDurationLimit)} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} /></Field>
-              <Field label="图片画幅" note="仅用于参考图与资产生图"><Segmented value={form.imageAspectRatio || form.aspectRatio || '9:16'} options={['16:9', '9:16', '1:1']} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></Field>
+              <Field label="图片画幅" note="漫画成图与视频参考图；资产图默认 16:9"><Segmented value={form.imageAspectRatio || form.aspectRatio || '9:16'} options={['16:9', '9:16', '1:1']} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></Field>
               <Field label="视频画幅" note="只影响视频输出"><Segmented value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} options={['16:9', '9:16']} onChange={videoAspectRatio => patch({ videoAspectRatio })} /></Field>
               <Field label="视频分辨率" note="随视频任务提交"><Segmented value={form.videoResolution || '720p'} options={['480p', '720p', '1080p']} onChange={videoResolution => patch({ videoResolution })} /></Field>
             </div>
@@ -250,9 +261,14 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
 
           <EngineCard title="辅助生成" description="图片与文本模型用于资产、AI 推理与画面生成。">
             <div className="batch-factory-engine-grid">
-              <Field label="图片模型" note="可留空，继承账号默认设置"><Select allowClear loading={modelsLoading} value={form.imageModelId || undefined} options={modelOptions.image} placeholder={modelPlaceholder('image', '图片')} onChange={imageModelId => patch({ imageModelId: imageModelId || '' })} /></Field>
+              <Field label="图片生成通道" note="图片任务的执行方式"><Select value={form.imageProvider || 'personal_api'} options={imageProviderOptions} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId }))} /></Field>
+              <Field label="图片模型" note="选择后自动匹配生成通道"><Select allowClear loading={form.imageProvider === 'doubao_local_executor' ? false : modelsLoading} value={form.imageModelId || undefined} options={imageModelOptions} placeholder={modelPlaceholder('image', '图片')} onChange={imageModelId => patch({ imageModelId: imageModelId || '', ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), form.imageProvider) } : {}) })} /></Field>
               <Field label="文本模型" note="AI 推理、分类与分镜生成"><Space direction="vertical" size={6} style={{ width: '100%' }}><Select allowClear loading={modelsLoading} value={form.textModelId || undefined} options={modelOptions.text} placeholder={modelPlaceholder('text', '文本')} onChange={textModelId => patch({ textModelId: textModelId || '' })} />{selectedTextModel.state === 'available' ? null : <Tag color={selectedTextModel.state === 'unavailable' ? 'red' : 'default'}>{selectedTextModel.label}</Tag>}</Space></Field>
             </div>
+            <Space wrap style={{ marginTop: 8 }}>
+              <Tag color={localExecutors.some(item => item.online) ? 'green' : 'default'}>豆包执行器 {localExecutors.some(item => item.online) ? '在线' : '未在线'}</Tag>
+              <Typography.Text type="secondary">图片和视频都可以选择豆包执行器；执行前请先在设置页完成配对。</Typography.Text>
+            </Space>
             {modelsError ? <Alert type="warning" showIcon message="模型目录暂不可用" description={modelsError} /> : null}
             {!modelsLoading && !modelsError && !models.length ? <Alert type="warning" showIcon message="个人中心没有已启用模型" description={<Space direction="vertical"><span>请先在个人中心按文本、图片、视频类型新增并启用模型，再返回当前批量作品选择。</span><Button type="link" href="/api-config">前往个人中心配置模型</Button></Space>} /> : null}
           </EngineCard>
@@ -270,7 +286,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
               <div className="batch-factory-vms-copy">
                 <div className="batch-factory-vms-title-row"><b>视频管理系统</b><Tag color={publishSessionReady ? 'green' : 'default'}>{publishSessionReady ? '已登录并验证' : account?.username ? '待重新验证' : '未登录'}</Tag></div>
                 <div className="batch-factory-vms-meta"><span>当前账号</span><strong>{account?.username || '尚未登录'}</strong></div>
-                <div className="batch-factory-vms-meta"><span>后台地址</span><a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">two.121w.com/tttadmin</a></div>
+                <div className="batch-factory-vms-meta"><span>后台地址</span><a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">two.121w.com/tttadmin</a></div><div className="batch-factory-vms-meta"><span>素材相册</span><a href={N8_MATERIAL_ALBUM_URL} target="_blank" rel="noreferrer">打开 N8 素材相册</a></div>
               </div>
             </div>
             <div className="batch-factory-vms-actions">

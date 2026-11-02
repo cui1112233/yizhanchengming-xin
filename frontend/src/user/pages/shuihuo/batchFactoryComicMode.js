@@ -13,11 +13,12 @@ export function comicPromptForImageAspect(settings = {}, prompt = '') {
     .trim();
 }
 
-export function comicPageGenerationPayload(settings = {}, prompt = '') {
-  const normalizedPrompt = comicPromptForImageAspect(settings, prompt);
-  return {
-    comicPrompt: normalizedPrompt,
-    imagePrompt: normalizedPrompt,
+export function comicPageGenerationPayload(settings = {}, prompt = '', imagePrompt = '') {
+	const normalizedPrompt = comicPromptForImageAspect(settings, prompt);
+	const normalizedImagePrompt = comicPromptForImageAspect(settings, imagePrompt || prompt);
+	return {
+		comicPrompt: normalizedPrompt,
+		imagePrompt: normalizedImagePrompt,
     provider: String(settings.imageProvider || '').trim(),
     modelId: String(settings.imageModelId || '').trim(),
     aspectRatio: imageAspectRatio(settings)

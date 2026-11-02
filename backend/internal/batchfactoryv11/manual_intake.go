@@ -20,6 +20,7 @@ type ManualIntakeInput struct {
 	ColumnOrder              string            `json:"columnOrder"`
 	InputText                string            `json:"inputText"`
 	ContentRangeLines        int               `json:"contentRangeLines,omitempty"`
+	ComicAnalysisCharacters  int               `json:"comicAnalysisCharacters,omitempty"`
 	ContentCaptureCharacters int               `json:"contentCaptureCharacters,omitempty"`
 	ScheduledAt              string            `json:"scheduledAt,omitempty"`
 	SourceTextByBookID       map[string]string `json:"sourceTextByBookId,omitempty"`

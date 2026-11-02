@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/auth"
+	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/prompt"
 )
 
@@ -23,13 +24,76 @@ func adminSystemFile(systemDir, name string) string {
 	return paths[0]
 }
 
-func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, accounts auth.Store, profiles *MemberProfileStore, catalogs ...*prompt.Catalog) {
+var presetSlotLabels = map[string]string{
+	"batch.assets-h3-skill":                "批量资产智能提取",
+	"batch.character-meta":                 "人物资产补充信息",
+	"batch.comic-assets":                   "漫画资产统一提取",
+	"batch.comic-image-derivation":         "漫画图片描述词推导",
+	"batch.comic-page":                     "漫画分镜与页面生成",
+	"batch.comic-reference-scene":          "漫画场景参考图库",
+	"batch.comic-style":                    "漫画画风库",
+	"batch.comic.assets.character":         "漫画人物资产推导",
+	"batch.comic.assets.prop":              "漫画道具资产推导",
+	"batch.comic.assets.scene":             "漫画场景资产推导",
+	"batch.comic.character-image-template": "漫画角色设定图",
+	"batch.hook-adaptation":                "开头剧情改编",
+	"batch.opening-meta":                   "开篇信息提取",
+	"batch.original-director":              "原文导演拆分",
+	"batch.prefix":                         "视频画面风格前缀",
+	"batch.prop-meta":                      "道具补充信息",
+	"batch.scene-meta":                     "场景补充信息",
+	"batch.video-meta":                     "视频分镜提示词",
+	"batch.viral-director":                 "爆款导演拆分",
+	"batch.visual-meta":                    "画面视觉提示词",
+	"novel-fetch.hook":                     "小说开头优化",
+	"novel-fetch.induce":                   "小说导读提取",
+	"novel.analysis":                       "小说分析",
+	"novel.character":                      "小说人物提取",
+	"novel.outline":                        "小说大纲提取",
+	"script.asset-extraction":              "剧本资产提取",
+	"script.audio-match":                   "剧本配音匹配",
+	"script.card.protocol":                 "剧本卡片输出规范",
+	"script.character-focus":               "角色重点设定",
+	"script.constraint.negative":           "通用负面提示词",
+	"script.constraint.prefix":             "通用画面前缀词",
+	"script.constraint.quality":            "通用画质约束",
+	"script.constraint.restriction":        "通用画面限制",
+	"script.constraint.wrapper":            "通用约束组合规则",
+	"script.continuous":                    "连续剧本生成",
+	"script.director.master":               "导演总控规则",
+	"script.extract":                       "剧本内容提取",
+	"script.format.q版":                     "Q版剧本格式",
+	"script.format.screenplay":             "影视剧本格式",
+	"script.format.shortdrama":             "短剧剧本格式",
+	"script.format.shotlist":               "分镜清单格式",
+	"script.format.storyboard":             "故事板格式",
+	"script.general":                       "通用剧本生成",
+	"script.hook":                          "剧本开头设计",
+	"script.novel-panel-extract":           "小说面板提取",
+	"script.quick-director":                "快速导演拆分",
+	"script.segmented":                     "分段剧本生成",
+	"shuihuo.asset.binding":                "水货资产绑定",
+	"shuihuo.asset.character-extraction":   "水货人物提取",
+	"shuihuo.asset.character-sheet":        "水货角色设定图",
+	"shuihuo.asset.extraction":             "水货资产提取",
+	"shuihuo.asset.prop-extraction":        "水货道具提取",
+	"shuihuo.asset.scene-extraction":       "水货场景提取",
+	"shuihuo.prompt.image":                 "水货图片提示词",
+	"shuihuo.prompt.negative":              "水货负面提示词",
+	"shuihuo.prompt.video":                 "水货视频提示词",
+	"shuihuo.segmentation.smart":           "水货智能分段",
+}
+
+func presetSlotLabel(slot string) string {
+	if label := presetSlotLabels[strings.TrimSpace(slot)]; label != "" {
+		return label
+	}
+	return "未命名调用位置"
+}
+
+func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, accounts auth.Store, profiles *MemberProfileStore, catalog *prompt.Catalog, files *localartifact.Store) {
 	if root == nil || accounts == nil || profiles == nil {
 		return
-	}
-	var catalog *prompt.Catalog
-	if len(catalogs) > 0 {
-		catalog = catalogs[0]
 	}
 	var adminStore *prompt.AdminStore
 	if catalog != nil {
@@ -75,6 +139,20 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"preset": item})
 	})))
+	root.Handle("DELETE /api/admin/presets/{id}/{version}", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if adminStore == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
+			return
+		}
+		identity, _ := BridgeIdentityFromContext(req.Context())
+		version, _ := strconv.Atoi(req.PathValue("version"))
+		item, err := adminStore.Delete(identity.Username, req.PathValue("id"), version)
+		if err != nil {
+			writeAdminStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"preset": item})
+	})))
 	root.Handle("POST /api/admin/presets/draft", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if adminStore == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "提示词目录尚未接入 Go 存储"})
@@ -110,7 +188,7 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"preset": item})
 	})))
-	for _, action := range []string{"publish", "rollback"} {
+	for _, action := range []string{"publish", "rollback", "archive"} {
 		action := action
 		root.Handle("POST /api/admin/presets/{id}/"+action, adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if adminStore == nil {
@@ -131,8 +209,10 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 			var err error
 			if action == "publish" {
 				item, err = adminStore.Publish(identity.Username, req.PathValue("id"), int(version))
-			} else {
+			} else if action == "rollback" {
 				item, err = adminStore.Rollback(identity.Username, req.PathValue("id"), int(version))
+			} else {
+				item, err = adminStore.Archive(identity.Username, req.PathValue("id"), int(version))
 			}
 			if err != nil {
 				writeAdminStoreError(w, err)
@@ -158,9 +238,25 @@ func RegisterAdminReadCompat(root *http.ServeMux, middleware BridgeAuth, account
 				continue
 			}
 			seen[*item.Slot] = true
-			slots = append(slots, map[string]string{"id": *item.Slot, "label": *item.Slot, "mode": "primary"})
+			slots = append(slots, map[string]string{"id": *item.Slot, "label": presetSlotLabel(*item.Slot), "mode": "primary"})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"slots": slots})
+	})))
+	root.Handle("POST /api/admin/comic-materials/upload", adminPresetAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if files == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "漫画素材存储尚未配置"})
+			return
+		}
+		input, ok := decodeAdminJSON(w, req, 24<<20)
+		if !ok {
+			return
+		}
+		assetID, err := saveComicMaterialImage(files, toString(input["dataUrl"]))
+		if err != nil {
+			writeComicMaterialUploadError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]string{"assetId": assetID})
 	})))
 	root.Handle("GET /api/admin/error-logs", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())

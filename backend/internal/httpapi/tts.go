@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -26,6 +27,30 @@ type ttsRequest struct {
 // tested without calling the real service. The UI already treats this service
 // as the configured default when no catalog audio model is present.
 var defaultTTSEndpoint = shuihuoDefaultTTSServiceURL
+var ttsHTTPProxyURL string
+
+const builtInTTSModelID = "builtin-default-tts"
+
+func configuredTTSProxyURL() string {
+	if strings.TrimSpace(ttsHTTPProxyURL) != "" {
+		return strings.TrimSpace(ttsHTTPProxyURL)
+	}
+	return strings.TrimSpace(os.Getenv("QIANTIE_TTS_PROXY"))
+}
+
+func ttsHTTPClient() *http.Client {
+	proxyURL := configuredTTSProxyURL()
+	if proxyURL == "" {
+		return &http.Client{Timeout: 60 * time.Second}
+	}
+	parsed, err := url.Parse(proxyURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return &http.Client{Timeout: 60 * time.Second}
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = http.ProxyURL(parsed)
+	return &http.Client{Timeout: 60 * time.Second, Transport: transport}
+}
 
 func registerTTSRoute(root *http.ServeMux, auth BridgeAuth, catalogStore novelfetchworkshop.Store) {
 	root.Handle("/api/tts", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +112,7 @@ func requestDefaultTTSBytes(ctx context.Context, input ttsRequest) ([]byte, stri
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Content-Type", "application/json")
-	response, err := (&http.Client{}).Do(req)
+	response, err := ttsHTTPClient().Do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("TTS 服务请求失败: %w", err)
 	}
@@ -169,7 +194,7 @@ func requestConfiguredTTSBytes(ctx context.Context, input ttsRequest, model map[
 	if req.Header.Get("Authorization") == "" {
 		req.Header.Set("Authorization", "Bearer "+shuihuoModelCredential(model))
 	}
-	response, err := (&http.Client{Timeout: 60 * time.Second}).Do(req)
+	response, err := ttsHTTPClient().Do(req)
 	if err != nil {
 		return nil, "", err
 	}
@@ -280,7 +305,7 @@ func configuredTTSRequest(template string, input ttsRequest, credential string) 
 		return "", nil, nil, err
 	}
 	method := strings.ToUpper(strings.TrimSpace(fmt.Sprint(envelope["method"])))
-	if method == "" || method == "<nil>" {
+	if method == "" || strings.EqualFold(method, "<nil>") {
 		method = http.MethodPost
 	}
 	headers := map[string]string{}

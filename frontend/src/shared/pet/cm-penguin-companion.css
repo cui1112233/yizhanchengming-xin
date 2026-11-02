@@ -27,8 +27,37 @@
 .cm-penguin-pet.is-working { animation-duration: .72s; }
 .cm-penguin-pet.is-success { animation-duration: .9s; }
 .cm-penguin-pet.is-error { animation: cm-penguin-error .38s ease-in-out infinite; }
+.cm-penguin-pet.is-little-companion {
+  overflow: visible;
+  animation: none;
+}
 
-.cm-penguin-pet img {
+.cm-penguin-chat-trigger {
+  position: absolute;
+  right: -2px;
+  bottom: 4px;
+  z-index: 2;
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid var(--legacy-border-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--legacy-card) 94%, transparent);
+  color: var(--legacy-muted);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .2);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cm-penguin-chat-trigger:hover,
+.cm-penguin-chat-trigger:focus-visible {
+  background: var(--legacy-input);
+  color: var(--legacy-text);
+  outline: none;
+}
+
+.cm-penguin-pet > .cm-penguin-atlas {
   display: block;
   width: 960px;
   height: 1430px;
@@ -36,6 +65,42 @@
   transform-origin: top left;
   image-rendering: pixelated;
   pointer-events: none;
+}
+
+.little-companion-sprite {
+  position: relative;
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin-top: 5px;
+  overflow: hidden;
+  clip-path: inset(0);
+  pointer-events: none;
+  transform: translateX(var(--little-edge-offset, 0)) scaleX(var(--little-facing-scale, 1));
+  transform-origin: center bottom;
+}
+
+.little-companion-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 120px;
+  height: 120px;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  pointer-events: none;
+}
+
+.little-companion-preload { display: none; }
+
+.little-companion-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--legacy-muted);
+  font-size: 12px;
 }
 
 .cm-penguin-speech {
@@ -408,6 +473,10 @@
 @keyframes cm-penguin-thinking {
   0%, 100% { transform: translateY(0); opacity: .45; }
   50% { transform: translateY(-3px); opacity: 1; }
+}
+
+@media (max-width: 760px) {
+  body:has(.novel-fetch-page) .cm-penguin-shell { display: none; }
 }
 
 @media (max-width: 640px) {

@@ -1,13 +1,20 @@
-import { batchFactoryPreviewText } from './batchFactoryContentRange.js';
+import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactorySourceText } from './batchFactoryContentRange.js';
 
 function normalizedText(value) {
   return String(value ?? '').trim();
 }
 
 export function resolveBookProductionText(book) {
-  const working = normalizedText(book?.workingFrontContent);
+  const working = batchFactorySourceText(book?.workingFrontContent);
   if (working) return working;
   return normalizedText(batchFactoryPreviewText(book?.sourceText, book));
+}
+
+export function resolveBookEditableContent(book, productionMode) {
+  const working = batchFactorySourceText(book?.workingFrontContent);
+  if (working) return working;
+  if (productionMode === 'comic') return batchFactoryCleanSourceText(book?.sourceText);
+  return resolveBookProductionText(book);
 }
 
 function stableHash(input) {

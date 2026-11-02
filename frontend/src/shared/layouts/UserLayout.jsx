@@ -1,5 +1,5 @@
 import { Avatar, Button, Checkbox, ConfigProvider, Form, Input, message, Modal } from 'antd';
-import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, Moon, NotebookTabs, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
+import { AudioLines, BookOpen, Bot, ChartNoAxesCombined, Clapperboard, FilePenLine, Fingerprint, Home, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings2, Sun } from 'lucide-react';
 import { cloneElement, Fragment, isValidElement, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Link } from '../components/Link';
@@ -15,6 +15,7 @@ import { getRouteAccessState, shouldPromptLoginForApiFailure } from './routeAcce
 import { AccountCenterLayout } from './AccountCenterLayout';
 import { captureAccountCenterOrigin, isAccountCenterPath, normalizeAccountCenterReturnPath } from './accountCenterNavigation.js';
 import { shouldAutoCollapseAgentNavigation } from './agentNavigation.js';
+import { preloadRoute } from '../../user/workbenchPreload.js';
 
 // 动态 Logo 包含 WebGL shader，不能阻塞任何已登录业务页的首屏，按真正使用时再下载。
 const SuperOpcLiquidMetalLogo = lazy(() => import('../components/SuperOpcLiquidMetalLogo'));
@@ -25,7 +26,6 @@ const navItems = [
   // Novel Fetch is served as the Go-embedded canonical workbench. Force a
   // document navigation so the SPA cannot swap in a stale React-only page.
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
-  { href: '/novel-panel', icon: NotebookTabs, label: '小说面板' },
   { href: '/batch-factory', icon: Clapperboard, label: '水货生产' },
   { href: '/agent', icon: Bot, label: 'Agent 工作区' },
   { href: '/tts', icon: AudioLines, label: '配音' }
@@ -456,7 +456,7 @@ export function UserLayout({ children }) {
           {visibleNavItems.map(item => {
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} reload={item.reload} className={pathname === item.href ? 'active' : ''}>
+              <Link key={item.href} href={item.href} reload={item.reload} className={pathname === item.href ? 'active' : ''} onIntent={() => { void preloadRoute(item.href); }}>
                 <span className="legacy-nav-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span>
                 <span className="legacy-nav-label">{item.label}</span>
                 <span className="legacy-nav-tooltip" aria-hidden="true">{item.label}</span>
@@ -465,16 +465,19 @@ export function UserLayout({ children }) {
           })}
         </nav>
         <div className="legacy-sidebar-tools">
-          <button
-            className="legacy-sidebar-tool legacy-theme-toggle"
-            type="button"
-            aria-label={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}
-            title={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}
-            onClick={toggleTheme}
-          >
-            <span className="legacy-nav-icon">{theme === 'dark' ? <Sun size={18} strokeWidth={1.8} aria-hidden="true" /> : <Moon size={18} strokeWidth={1.8} aria-hidden="true" />}</span>
-            <span className="legacy-nav-label">主题</span>
-          </button>
+          <label className="legacy-theme-switch" title={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}>
+            <input
+              type="checkbox"
+              checked={theme === 'dark'}
+              aria-label={theme === 'dark' ? '切换至浅色主题' : '切换至深色主题'}
+              onChange={toggleTheme}
+            />
+            <span className="legacy-theme-switch__track" aria-hidden="true">
+              <span className="legacy-theme-switch__clouds" />
+              <span className="legacy-theme-switch__stars" />
+              <span className="legacy-theme-switch__thumb"><Sun className="legacy-theme-switch__sun" size={17} strokeWidth={1.8} /><Moon className="legacy-theme-switch__moon" size={16} strokeWidth={1.8} /></span>
+            </span>
+          </label>
           <Link href="/settings" className="legacy-sidebar-tool" title="设置">
             <span className="legacy-nav-icon"><Settings2 size={18} strokeWidth={1.8} aria-hidden="true" /></span>
             <span className="legacy-nav-label">设置</span>

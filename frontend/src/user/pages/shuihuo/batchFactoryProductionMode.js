@@ -10,3 +10,12 @@ export function batchFactoryProductionModeVisibility(value) {
     comic: mode === 'comic'
   };
 }
+
+export function batchFactoryShouldPrepareAudio(settings = {}) {
+  return batchFactoryProductionMode(settings.productionMode) === 'video'
+    && settings.audioPlanningEnabled === true;
+}
+
+export function batchFactoryShouldRecompileVideoPrompts(settings = {}) {
+  return batchFactoryProductionMode(settings.productionMode) === 'video';
+}

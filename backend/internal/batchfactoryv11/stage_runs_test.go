@@ -92,6 +92,15 @@ func TestBookStageImageUsesConfiguredGenerator(t *testing.T) {
 	}
 }
 
+func TestComicBootstrapModeIsAvailableOnlyForTheComicStage(t *testing.T) {
+	if !validStageMode(BookStageComic, StageModeBootstrap) {
+		t.Fatal("comic bootstrap mode must be accepted for the comic stage")
+	}
+	if validStageMode(BookStageAssets, StageModeBootstrap) {
+		t.Fatal("comic bootstrap mode must not be accepted for the asset stage")
+	}
+}
+
 func TestLatestFailedBookStageRunIgnoresFailureResolvedByLaterAttempt(t *testing.T) {
 	firstFailure := BookStageRun{ID: "assets-1", Stage: BookStageAssets, Status: ProductionFailed, Attempt: 1, UpdatedAt: time.Unix(10, 0)}
 	resolvedRetry := BookStageRun{ID: "assets-2", Stage: BookStageAssets, Status: ProductionSucceeded, Attempt: 2, UpdatedAt: time.Unix(20, 0)}
@@ -100,6 +109,19 @@ func TestLatestFailedBookStageRunIgnoresFailureResolvedByLaterAttempt(t *testing
 	latest := LatestFailedBookStageRun([]BookStageRun{firstFailure, directorFailure, resolvedRetry})
 	if latest == nil || latest.ID != directorFailure.ID {
 		t.Fatalf("latest unresolved failure = %#v", latest)
+	}
+}
+
+func TestLatestFailedBookStageRunIgnoresDuplicateDirectorRevisionConflict(t *testing.T) {
+	duplicate := BookStageRun{
+		ID: "director-duplicate",
+		Stage: BookStageDirector,
+		Status: ProductionFailed,
+		ErrorMessage: "revision conflict: 导演分镜已存在；请使用重新生成导演分镜",
+		UpdatedAt: time.Unix(30, 0),
+	}
+	if latest := LatestFailedBookStageRun([]BookStageRun{duplicate}); latest != nil {
+		t.Fatalf("duplicate director revision conflict must not remain retryable: %#v", latest)
 	}
 }
 
@@ -123,6 +145,122 @@ func TestBookStageAssetMalformedModelOutputIsRetryable(t *testing.T) {
 	}
 	if summary.LastFailed == nil || summary.LastFailed.Stage != BookStageAssets || !strings.Contains(summary.LastFailed.ErrorMessage, "导演模型没有返回合法 JSON") {
 		t.Fatalf("failed asset run = %#v", summary.LastFailed)
+	}
+}
+
+func TestBookStageMissingSkipsExistingComicAssets(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{
+		"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"presetId": "batch-comic-assets", "body": "提取漫画资产"},
+	}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": comicConfig}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	store.mu.Lock()
+	store.bookAssets["comic-existing"] = memoryOwned[BookAsset]{Owner: "alice", Value: BookAsset{ID: "comic-existing", BatchID: batch.ID, BookID: book.ID, Kind: "character", Name: "林晚", Prompt: "黑发女性", Source: "comic"}}
+	store.mu.Unlock()
+	provider := &queuedDirectorProvider{}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}}
+
+	if _, err := service.Run(ctx, "alice", batch.ID, book.ID, BookStageAssets, StageModeMissing, "assets-missing", ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("existing comic assets triggered %d AI calls, want 0", len(provider.calls))
+	}
+}
+
+func TestBookStageMissingReplacesLegacyVideoPaginationWithComicSourceSegments(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{
+		Title: "漫画书", SourceText: "林晚走进办公室。", Videos: []CreateVideoInput{{Label: "漫画页 01", VideoPrompt: "林晚进门。"}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页"}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": comicConfig}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}}
+
+	if _, err := service.Run(ctx, "alice", batch.ID, book.ID, BookStageDirector, StageModeMissing, "director-missing", ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 1 {
+		t.Fatalf("legacy video pagination triggered %d segmentation calls, want 1", len(provider.calls))
+	}
+	segmentation, err := store.GetComicSourceSegmentation(ctx, "alice", batch.ID, book.ID)
+	if err != nil || len(segmentation.Segments) != 1 || segmentation.Segments[0].SourceText != "林晚走进办公室。" {
+		t.Fatalf("legacy pagination was not replaced by source segmentation: %#v, %v", segmentation, err)
+	}
+}
+
+func TestBookStageMissingSkipsCurrentComicSourceSegmentation(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	source := strings.Repeat("这是完整剧情句子，角色继续推动事件。", 12)
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{Title: "漫画书", SourceText: source}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页"}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": comicConfig}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	drafts, _ := FallbackComicSourceSegments(source, EnumerateComicSourceBoundaries(source))
+	if _, err := store.ReplaceComicSourceSegments(ctx, "alice", batch.ID, batch.Books[0].ID, sourceDigest(source), drafts); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}}
+	if _, err := service.Run(ctx, "alice", batch.ID, batch.Books[0].ID, BookStageDirector, StageModeMissing, "director-current", ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 0 {
+		t.Fatalf("current segmentation triggered %d model calls", len(provider.calls))
+	}
+}
+
+func TestBookStageMissingSkipsExistingComicPagePrompts(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{
+		Title: "漫画书", SourceText: "林晚走进办公室。", Videos: []CreateVideoInput{{Label: "漫画页 01", VideoPrompt: "林晚进门。"}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页"}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"productionMode": rawSetting(t, "comic"), "aiPromptConfig": comicConfig}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	video := book.Videos[0]
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{"comicPrompt": rawSetting(t, "导演说明"), "comicImagePrompt": rawSetting(t, "图片提示词")}, ExpectedRevision: video.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store, Provider: provider}}
+
+	if _, err := service.Run(ctx, "alice", batch.ID, book.ID, BookStageComic, StageModeMissing, "comic-missing", ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.calls) != 1 {
+		t.Fatalf("missing comic source segmentation triggered %d AI calls, want 1", len(provider.calls))
+	}
+	segmentation, err := store.GetComicSourceSegmentation(ctx, "alice", batch.ID, book.ID)
+	if err != nil || len(segmentation.Segments) != 1 || segmentation.Segments[0].SourceText != "林晚走进办公室。" {
+		t.Fatalf("existing prompts did not get continuous source segmentation: %#v, %v", segmentation, err)
 	}
 }
 

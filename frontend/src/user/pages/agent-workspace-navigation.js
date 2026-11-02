@@ -54,6 +54,39 @@ export function filterWorkspaceAssets(assets = [], filters = {}) {
   ));
 }
 
+function assetField(asset, key) {
+  return asset?.[key] ?? asset?.config?.[key] ?? asset?.metadata?.[key] ?? asset?.source?.[key] ?? '';
+}
+
+export function buildWorkspaceAssetGroupTree(assets = [], groups = [], nodes = []) {
+  const groupTitles = new Map((Array.isArray(groups) ? groups : []).map(group => [
+    String(group?.id || group?.groupId || ''),
+    String(group?.title || group?.name || group?.id || group?.groupId || '未命名分组')
+  ]));
+  const nodeGroups = new Map();
+  (Array.isArray(nodes) ? nodes : []).forEach(node => {
+    const config = node?.config ?? node?.data?.config ?? {};
+    const source = config.source ?? {};
+    const assetId = String(config.resourceId || config.assetId || source.resourceId || source.assetId || '').trim();
+    const groupId = String(node?.groupId ?? node?.data?.groupId ?? '').trim();
+    if (assetId && groupId) nodeGroups.set(assetId, groupId);
+  });
+  const grouped = new Map();
+  const fallbackGroupID = groupTitles.size === 1 ? [...groupTitles.keys()][0] : '';
+  (Array.isArray(assets) ? assets : []).forEach(asset => {
+    const assetId = String(asset?.id || asset?.assetId || '').trim();
+    const rawGroup = String(assetField(asset, 'groupId') || '').trim();
+    const bookId = String(assetField(asset, 'bookId') || '').trim();
+    const key = rawGroup || nodeGroups.get(assetId) || (bookId ? `book:${bookId}` : fallbackGroupID || 'ungrouped');
+    const title = String(
+      assetField(asset, 'bookTitle') || assetField(asset, 'bookName') || groupTitles.get(key) || groupTitles.get(rawGroup) || (bookId ? `书籍 ${bookId}` : '未分组')
+    );
+    if (!grouped.has(key)) grouped.set(key, { id: key, title, children: [] });
+    grouped.get(key).children.push(asset);
+  });
+  return [...grouped.values()];
+}
+
 export function workspaceExecutionKind(execution = {}) {
   const value = String(execution?.kind || execution?.mediaKind || execution?.toolName || execution?.tool || '').toLocaleLowerCase();
   if (value.includes('image')) return 'image';

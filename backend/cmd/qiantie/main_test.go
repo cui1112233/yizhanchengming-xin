@@ -39,6 +39,24 @@ func TestRuntimeHandlerKeepsAllAPIRequestsOnGo(t *testing.T) {
 	}
 }
 
+func TestRuntimeHandlerKeepsLocalExecutorDownloadsOnGo(t *testing.T) {
+	api := http.NewServeMux()
+	api.HandleFunc("GET /downloads/local-executor/manifest.json", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	static := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+	handler := newRuntimeHandler(api, static)
+
+	req := httptest.NewRequest(http.MethodGet, "/downloads/local-executor/manifest.json", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("local executor download reached status %d, want Go handler status %d", rec.Code, http.StatusNoContent)
+	}
+}
+
 func TestHealthURLNormalizesWildcardListenAddresses(t *testing.T) {
 	for _, tc := range []struct {
 		listen string

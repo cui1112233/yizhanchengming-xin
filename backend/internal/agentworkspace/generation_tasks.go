@@ -102,6 +102,12 @@ type GenerationTaskStore interface {
 	RetryGenerationTask(context.Context, string, string, string, RetryGenerationTaskInput) (GenerationTask, error)
 }
 
+// GenerationHistoryStore provides owner-scoped task history across projects.
+// Individual task results stay attached to their original immutable assets.
+type GenerationHistoryStore interface {
+	ListOwnerGenerationTasks(context.Context, string) ([]GenerationTask, error)
+}
+
 func validGenerationState(state GenerationState) bool {
 	switch state {
 	case GenerationDraft, GenerationQueued, GenerationRunning, GenerationAwaitingConfirmation, GenerationCompleted, GenerationFailed, GenerationCancelled:
@@ -257,6 +263,29 @@ func (s *MemoryStore) ListGenerationTasks(_ context.Context, owner, projectID st
 		return nil, ErrProjectNotFound
 	}
 	prefix := strings.TrimSpace(owner) + "\x00" + strings.TrimSpace(projectID) + "\x00"
+	out := make([]GenerationTask, 0)
+	for key, task := range s.generationTasks {
+		if strings.HasPrefix(key, prefix) {
+			out = append(out, cloneGenerationTask(task))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UpdatedAt.Equal(out[j].UpdatedAt) {
+			return out[i].ID > out[j].ID
+		}
+		return out[i].UpdatedAt.After(out[j].UpdatedAt)
+	})
+	return out, nil
+}
+
+func (s *MemoryStore) ListOwnerGenerationTasks(_ context.Context, owner string) ([]GenerationTask, error) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" {
+		return nil, ErrGenerationInvalid
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prefix := owner + "\x00"
 	out := make([]GenerationTask, 0)
 	for key, task := range s.generationTasks {
 		if strings.HasPrefix(key, prefix) {

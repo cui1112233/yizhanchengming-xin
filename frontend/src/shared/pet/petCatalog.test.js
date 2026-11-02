@@ -1,6 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getPetDefinition, petAnimationDelay, previewPetSelection } from './petCatalog.js';
+import { getPetDefinition, getPetOptions, petAnimationDelay, previewPetSelection } from './petCatalog.js';
+
+test('offers Little Companion as the default first selectable pet', () => {
+  assert.deepEqual(getPetOptions(), [
+    { label: '小家伙', value: 'little-companion' },
+    { label: 'CM', value: 'stacky' },
+    { label: '貔貅', value: 'pixiu' }
+  ]);
+  assert.deepEqual(
+    (({ id, displayName, renderer, assetBasePath, previewPose }) => ({ id, displayName, renderer, assetBasePath, previewPose }))(
+      getPetDefinition('little-companion')
+    ),
+    {
+      id: 'little-companion',
+      displayName: '小家伙',
+      renderer: 'multi-sheet',
+      assetBasePath: '/pets/little-companion',
+      previewPose: 'idle'
+    }
+  );
+});
 
 test('previews a selected pet immediately through the companion event', () => {
   const events = [];

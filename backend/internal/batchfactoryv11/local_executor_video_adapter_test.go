@@ -57,6 +57,20 @@ func TestLocalExecutorVideoAdapterKeepsV11IdentityAndCompiledPrompt(t *testing.T
 	}
 }
 
+func TestProductionServiceAllowsLocalExecutorWithRelativeArtifactURL(t *testing.T) {
+	service := &ProductionService{
+		LocalExecutor: NewLocalExecutorVideoAdapter(&fakeLocalVideoClient{}, ""),
+		Model:         FrozenVideoModel{MaxDuration: 15},
+	}
+	adapter, model, err := service.resolveProvider(context.Background(), "alice", VideoProviderDoubaoLocal)
+	if err != nil {
+		t.Fatalf("local executor should support the built-in relative artifact route: %v", err)
+	}
+	if adapter != nil || model.ID != "doubao-seedance" {
+		t.Fatalf("adapter=%T model=%+v", adapter, model)
+	}
+}
+
 func TestLocalExecutorVideoAdapterReturnsExactArtifactURLOnlyForSucceededJob(t *testing.T) {
 	client := &fakeLocalVideoClient{
 		createdOwner: "alice",
@@ -68,6 +82,21 @@ func TestLocalExecutorVideoAdapterReturnsExactArtifactURLOnlyForSucceededJob(t *
 		t.Fatal(err)
 	}
 	if ref.State != ProductionSucceeded || !strings.Contains(ref.MediaURL, "/api/shuihuo-production/local-executor-artifacts/artifact_2") {
+		t.Fatalf("ref=%+v", ref)
+	}
+}
+
+func TestLocalExecutorVideoAdapterReturnsFailedJobAsTerminalState(t *testing.T) {
+	client := &fakeLocalVideoClient{
+		createdOwner: "alice",
+		job:          LocalVideoJob{ID: "lej_failed", State: "failed", ErrorMessage: "豆包生成失败"},
+	}
+	adapter := NewLocalExecutorVideoAdapter(client, "https://platform.example")
+	ref, err := adapter.Poll(context.Background(), "alice", "lej_failed")
+	if err != nil {
+		t.Fatalf("terminal executor failure must be returned as task state, not a polling error: %v", err)
+	}
+	if ref.State != ProductionFailed || ref.ErrorMessage != "豆包生成失败" {
 		t.Fatalf("ref=%+v", ref)
 	}
 }

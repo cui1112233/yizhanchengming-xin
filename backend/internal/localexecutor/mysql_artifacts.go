@@ -30,19 +30,6 @@ func (s *MySQLStore) CreateArtifact(ctx context.Context, executorID, jobID strin
 		return ArtifactRecord{}, ErrInvalidJobState
 	}
 
-	existing, err := scanArtifact(tx.QueryRowContext(ctx, artifactSelect+` WHERE job_id = ? FOR UPDATE`, jobID).Scan)
-	if err == nil {
-		if !sameArtifactContent(existing, input) {
-			return ArtifactRecord{}, ErrArtifactConflict
-		}
-		if err := tx.Commit(); err != nil {
-			return ArtifactRecord{}, err
-		}
-		return existing, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return ArtifactRecord{}, err
-	}
 	if _, err := scanArtifact(tx.QueryRowContext(ctx, artifactSelect+` WHERE id = ? FOR UPDATE`, input.ID).Scan); err == nil {
 		return ArtifactRecord{}, ErrArtifactConflict
 	} else if !errors.Is(err, sql.ErrNoRows) {
@@ -74,11 +61,34 @@ func (s *MySQLStore) ArtifactForOwner(ctx context.Context, owner, id string) (Ar
 }
 
 func (s *MySQLStore) ArtifactForJob(ctx context.Context, jobID string) (ArtifactRecord, error) {
-	record, err := scanArtifact(s.db.QueryRowContext(ctx, artifactSelect+` WHERE job_id = ?`, jobID).Scan)
+	record, err := scanArtifact(s.db.QueryRowContext(ctx, artifactSelect+` WHERE job_id = ? ORDER BY created_at, id LIMIT 1`, jobID).Scan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ArtifactRecord{}, ErrArtifactNotFound
 	}
 	return record, err
+}
+
+func (s *MySQLStore) ArtifactsForJob(ctx context.Context, jobID string) ([]ArtifactRecord, error) {
+	rows, err := s.db.QueryContext(ctx, artifactSelect+` WHERE job_id = ? ORDER BY created_at, id`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var records []ArtifactRecord
+	for rows.Next() {
+		record, err := scanArtifact(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, ErrArtifactNotFound
+	}
+	return records, nil
 }
 
 func scanArtifact(scan scanFunc) (ArtifactRecord, error) {

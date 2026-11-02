@@ -67,6 +67,52 @@ func TestModelCatalogCRUDHidesCredential(t *testing.T) {
 	}
 }
 
+func TestModelCatalogListsLegacyStringEnabledModel(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"modelCatalog": []any{map[string]any{
+		"id": "legacy-text", "kind": "text", "displayName": "旧文字模型", "modelId": "legacy-model", "baseUrl": "https://example.com/v1", "credential": "secret", "enabled": "true",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/models?kind=text", nil, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Models) != 1 || payload.Models[0]["id"] != "legacy-text" || payload.Models[0]["enabled"] != true {
+		t.Fatalf("legacy enabled model was not available: %#v", payload.Models)
+	}
+}
+
+func TestModelCatalogListsBuiltInTTSWhenAudioCatalogIsEmpty(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	secret := "test-secret"
+	store := novelfetchworkshop.NewMemoryStore()
+	handler := NewRouter(RouterOptions{BridgeSecret: secret, Now: func() time.Time { return now }, NovelFetchStore: store})
+
+	response := doNovelFetchRequest(t, handler, http.MethodGet, "/api/models?kind=audio", nil, now, secret)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Models) != 1 || payload.Models[0]["id"] != builtInTTSModelID || payload.Models[0]["displayName"] != "默认 TTS" {
+		t.Fatalf("audio catalog=%#v", payload.Models)
+	}
+}
+
 func TestLegacyModelTestRoutesAreServedByGo(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	secret := "test-secret"

@@ -1,376 +1,376 @@
 {
-  "generatedAt": "2026-10-14T20:02:59.5118431Z",
-  "purpose": "Historical Node public API mounts retained as an audit record; migrated means the default runtime is owned by Go.",
-  "routes": [
-    {
-      "method": "*",
-      "path": "/api/local-executor/v1/jobs/:id/artifact",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/local-executor)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 297
-    },
-    {
-      "method": "*",
-      "path": "/api/local-executor/v1",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/local-executor)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 303
-    },
-    {
-      "method": "*",
-      "path": "/api/giant-material-executor/v1",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/giant-material-executor)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 307
-    },
-    {
-      "method": "*",
-      "path": "/api/login",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/login)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 407
-    },
-    {
-      "method": "*",
-      "path": "/api/account-recovery/purge/:username",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/account-recovery)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 409
-    },
-    {
-      "method": "*",
-      "path": "/api/member/team/members/:username",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/member)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 410
-    },
-    {
-      "method": "*",
-      "path": "/api/team-admin/teams/:teamId/members/:username",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/team-admin)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 411
-    },
-    {
-      "method": "*",
-      "path": "/api/account-recovery",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/account-recovery)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 412
-    },
-    {
-      "method": "*",
-      "path": "/api/team-admin",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/team-admin)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 421
-    },
-    {
-      "method": "*",
-      "path": "/api/account-admin",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/account-admin)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 427
-    },
-    {
-      "method": "*",
-      "path": "/api/member",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/member)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 433
-    },
-    {
-      "method": "*",
-      "path": "/api/client-errors",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/client-errors)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 439
-    },
-    {
-      "method": "*",
-      "path": "/api/applications",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/applications)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 440
-    },
-    {
-      "method": "*",
-      "path": "/api/admin",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/admin)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 441
-    },
-    {
-      "method": "*",
-      "path": "/api/presets",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/presets)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 442
-    },
-    {
-      "method": "*",
-      "path": "/api/script-constraint-prompts",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/script-constraint-prompts)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 443
-    },
-    {
-      "method": "*",
-      "path": "/api/novel-panel/settings",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/novel-panel)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 446
-    },
-    {
-      "method": "*",
-      "path": "/api/novel-panel",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/novel-panel)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 447
-    },
-    {
-      "method": "*",
-      "path": "/api/novel-fetch",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/novel-fetch)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 452
-    },
-    {
-      "method": "*",
-      "path": "/api/novel-fetch-upload",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/novel-fetch-upload)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 453
-    },
-    {
-      "method": "*",
-      "path": "/api/novel-fetch-workshop",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/novel-fetch-workshop)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 470
-    },
-    {
-      "method": "*",
-      "path": "/api/batch-rewrite",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/batch-rewrite)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 471
-    },
-    {
-      "method": "*",
-      "path": "/api/batch-factory",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/batch-factory)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 480
-    },
-    {
-      "method": "*",
-      "path": "/api/batch-factory",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/batch-factory)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 481
-    },
-    {
-      "method": "*",
-      "path": "/api/batch-factory",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/batch-factory)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 482
-    },
-    {
-      "method": "*",
-      "path": "/api/config",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/config)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 510
-    },
-    {
-      "method": "*",
-      "path": "/api/script-video",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/script-video)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 520
-    },
-    {
-      "method": "*",
-      "path": "/api",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 528
-    },
-    {
-      "method": "*",
-      "path": "/api/tts",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/tts)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 529
-    },
-    {
-      "method": "*",
-      "path": "/api/prompt",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/prompt)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 530
-    },
-    {
-      "method": "*",
-      "path": "/api/history",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/history)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 531
-    },
-    {
-      "method": "*",
-      "path": "/api/platform-projects",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/platform-projects)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 532
-    },
-    {
-      "method": "*",
-      "path": "/api/agent/skills",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/agent)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 533
-    },
-    {
-      "method": "*",
-      "path": "/api/agent",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/agent)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 534
-    },
-    {
-      "method": "*",
-      "path": "/api/shuihuo-production/local-executor-artifacts",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/shuihuo-production)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 537
-    },
-    {
-      "method": "*",
-      "path": "/api/shuihuo-production",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/shuihuo-production)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 541
-    },
-    {
-      "method": "*",
-      "path": "/api/shuihuo-production",
-      "owner": "go",
-      "status": "migrated",
-      "goHandler": "backend/internal/httpapi (mount /api/shuihuo-production)",
-      "test": "backend/internal/httpapi/*_test.go",
-      "source": "app.js",
-      "line": 547
-    }
-  ]
+    "generatedAt":  "2026-10-14T20:21:05.8846580Z",
+    "purpose":  "Historical Node public API mounts retained as an audit record; migrated means the default runtime is owned by Go.",
+    "routes":  [
+                   {
+                       "method":  "*",
+                       "path":  "/api/local-executor/v1/jobs/:id/artifact",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/local-executor)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  296
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/local-executor/v1",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/local-executor)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  302
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/giant-material-executor/v1",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/giant-material-executor)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  306
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/login",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/login)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  406
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/account-recovery/purge/:username",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/account-recovery)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  408
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/member/team/members/:username",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/member)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  409
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/team-admin/teams/:teamId/members/:username",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/team-admin)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  410
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/account-recovery",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/account-recovery)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  411
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/team-admin",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/team-admin)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  420
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/account-admin",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/account-admin)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  426
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/member",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/member)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  432
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/client-errors",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/client-errors)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  438
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/applications",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/applications)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  439
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/admin",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/admin)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  440
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/presets",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/presets)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  441
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/script-constraint-prompts",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/script-constraint-prompts)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  442
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/novel-panel/settings",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/novel-panel)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  445
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/novel-panel",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/novel-panel)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  446
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/novel-fetch",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/novel-fetch)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  451
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/novel-fetch-upload",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/novel-fetch-upload)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  452
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/novel-fetch-workshop",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/novel-fetch-workshop)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  469
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/batch-rewrite",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/batch-rewrite)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  470
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/batch-factory",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/batch-factory)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  478
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/batch-factory",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/batch-factory)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  479
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/batch-factory",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/batch-factory)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  480
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/config",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/config)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  508
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/script-video",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/script-video)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  518
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  526
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/tts",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/tts)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  527
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/prompt",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/prompt)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  528
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/history",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/history)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  529
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/platform-projects",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/platform-projects)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  530
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/agent/skills",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/agent)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  531
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/agent",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/agent)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  532
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/shuihuo-production/local-executor-artifacts",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/shuihuo-production)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  535
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/shuihuo-production",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/shuihuo-production)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  539
+                   },
+                   {
+                       "method":  "*",
+                       "path":  "/api/shuihuo-production",
+                       "owner":  "go",
+                       "status":  "migrated",
+                       "goHandler":  "backend/internal/httpapi (mount /api/shuihuo-production)",
+                       "test":  "backend/internal/httpapi/*_test.go",
+                       "source":  "app.js",
+                       "line":  545
+                   }
+               ]
 }

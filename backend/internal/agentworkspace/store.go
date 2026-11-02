@@ -37,6 +37,8 @@ type Store interface {
 	RecordLegacyImport(context.Context, LegacyImport) error
 	VideoJobStore
 	GenerationTaskStore
+	GenerationHistoryStore
+	LibraryStore
 	ScriptShotStore
 	BatchFactoryBindingStore
 }

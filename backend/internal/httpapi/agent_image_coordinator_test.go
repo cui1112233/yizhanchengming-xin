@@ -48,3 +48,59 @@ func TestAgentImageCoordinatorRunsQueuedWorkAfterHTTPReturns(t *testing.T) {
 	tasks, _ := store.ListGenerationTasks(context.Background(), "alice", "project-1")
 	t.Fatalf("task did not finish: %+v", tasks)
 }
+
+func TestAgentImageCoordinatorRunsDefaultImageGenerationMode(t *testing.T) {
+	now := time.Date(2026, 10, 24, 15, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
+	assets := agentworkspace.NewMemoryAssetStore()
+	called := make(chan AgentImageGenerationInput, 1)
+	services := AgentNodeGenerationServices{Projects: store, Assets: assets, Objects: &recordingAgentNodeObjectStore{}, QueueImages: true, Now: func() time.Time { return now }, ImageGenerate: func(_ context.Context, _ string, input AgentImageGenerationInput) ([]string, int, error) {
+		called <- input
+		return []string{"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"}, http.StatusOK, nil
+	}}
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, services)
+	recorder := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"雨夜街道","idempotencyKey":"default-image-mode"}`)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	coordinator := newAgentImageCoordinator(services)
+	if err := coordinator.pollPendingOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case input := <-called:
+		if input.Mode != "image_generation" {
+			t.Fatalf("mode=%q", input.Mode)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("default image mode did not reach image generator")
+	}
+}
+
+func TestAgentImageCoordinatorExplainsMissingResultStore(t *testing.T) {
+	now := time.Date(2026, 10, 25, 1, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft"})
+	assets := agentworkspace.NewMemoryAssetStore()
+	task, err := store.CreateGenerationTask(context.Background(), "alice", agentworkspace.CreateGenerationTaskInput{
+		ID: "generation-missing-store", ProjectID: "project-1", NodeID: "image-1", NodeVersion: 1, Kind: "image", Provider: "configured_model", ModelID: "image-primary", Mode: "image_generation",
+		Settings: map[string]any{"prompt": "雨夜街道"}, IdempotencyKey: "missing-result-store", Now: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	services := AgentNodeGenerationServices{Projects: store, Assets: assets, Now: func() time.Time { return now }, ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+		return nil, http.StatusOK, nil
+	}}
+	coordinator := newAgentImageCoordinator(services)
+	if err := coordinator.execute(context.Background(), task); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := store.GenerationTask(context.Background(), "alice", "project-1", task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ErrorMessage != "图片生成服务未配置：缺少结果素材存储" {
+		t.Fatalf("error=%q", updated.ErrorMessage)
+	}
+}

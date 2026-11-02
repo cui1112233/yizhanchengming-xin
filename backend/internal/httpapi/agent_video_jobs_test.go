@@ -137,6 +137,35 @@ func TestAgentVideoJobSubmitUsesRequestedReferenceAndEffectiveH3Settings(t *test
 	}
 }
 
+func TestAgentVideoJobStoresResolvedCanvasInputSnapshot(t *testing.T) {
+	now := time.Date(2026, 10, 23, 17, 5, 0, 0, time.UTC)
+	projects := agentworkspace.NewMemoryStore()
+	if err := projects.CreateProject(context.Background(), "alice", agentworkspace.Project{ID: "agent-1", Title: "项目", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.Canvas{
+		Version: 1, Nodes: []agentworkspace.Node{
+			{ID: "text-1", Type: "text", Title: "文案", Summary: "上游镜头文案", Version: 1, Status: "ready"},
+			{ID: "video-1", Type: "video", Title: "镜头", Version: 1, Status: "draft"},
+		}, Edges: []agentworkspace.Edge{{ID: "text-to-video", Source: "text-1", Target: "video-1"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	coordinator := &agentVideoCoordinator{
+		projects: projects, assets: agentworkspace.NewMemoryAssetStore(),
+		videos: &scriptVideoService{localExecutor: localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return now })},
+		now:    func() time.Time { return now },
+	}
+	job, _ := coordinator.submit(context.Background(), "alice", "agent-1", agentVideoJobRequest{
+		NodeID: "video-1", NodeVersion: 1, IdempotencyKey: "video-input-snapshot", Prompt: "本次视频指令", Provider: "doubao_local_executor", ModelID: "Seedance 2.5",
+		Parameters: map[string]any{"ratio": "16:9", "resolution": "1080P", "durationSeconds": 10, "count": 1},
+	})
+	if job.ID == "" {
+		t.Fatal("video job was not persisted")
+	}
+	snapshot, ok := job.Settings["resolvedInputs"].(map[string]any)
+	if !ok || snapshot["prompt"] != "本次视频指令" || snapshot["resolvedPrompt"] != "上游镜头文案" {
+		t.Fatalf("snapshot=%+v", job.Settings["resolvedInputs"])
+	}
+}
+
 func TestAgentVideoJobSubmitCarriesDisplayedSettingsIntoLocalExecutor(t *testing.T) {
 	now := time.Date(2026, 10, 21, 3, 0, 0, 0, time.UTC)
 	projects := agentworkspace.NewMemoryStore()

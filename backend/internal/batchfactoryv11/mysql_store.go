@@ -37,7 +37,7 @@ func (s *MySQLStore) CreateIntake(ctx context.Context, owner string, input Novel
 		return Intake{}, ErrInvalid
 	}
 	now := time.Now().UTC()
-	if _, err := s.db.ExecContext(ctx, `INSERT INTO batch_factory_v11_intakes(id,owner_username,payload_json,created_at) VALUES(?,?,?,?)`, id, owner, string(payload), now); err != nil {
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_intakes(id,owner_username,payload_json,created_at) VALUES(?,?,?,?)`, id, owner, string(payload), now); err != nil {
 		return Intake{}, err
 	}
 	return Intake{ID: id, Owner: owner, Payload: payload, CreatedAt: now}, nil
@@ -47,7 +47,7 @@ func (s *MySQLStore) GetIntake(ctx context.Context, owner, id string) (Intake, e
 	var v Intake
 	var payload []byte
 	var consumed sql.NullTime
-	err := s.db.QueryRowContext(ctx, `SELECT id,payload_json,consumed_at,created_at FROM batch_factory_v11_intakes WHERE id=? AND owner_username=?`, id, owner).Scan(&v.ID, &payload, &consumed, &v.CreatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT id,payload_json,consumed_at,created_at FROM batch_factory_v12_intakes WHERE id=? AND owner_username=?`, id, owner).Scan(&v.ID, &payload, &consumed, &v.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Intake{}, ErrNotFound
 	}
@@ -70,7 +70,7 @@ func (s *MySQLStore) CreateBatchFromIntake(ctx context.Context, owner, intakeID 
 	defer tx.Rollback()
 	var payload []byte
 	var consumed sql.NullTime
-	err = tx.QueryRowContext(ctx, `SELECT payload_json,consumed_at FROM batch_factory_v11_intakes WHERE id=? AND owner_username=? FOR UPDATE`, intakeID, owner).Scan(&payload, &consumed)
+	err = tx.QueryRowContext(ctx, `SELECT payload_json,consumed_at FROM batch_factory_v12_intakes WHERE id=? AND owner_username=? FOR UPDATE`, intakeID, owner).Scan(&payload, &consumed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, ErrNotFound
 	}
@@ -94,7 +94,7 @@ func (s *MySQLStore) CreateBatchFromIntake(ctx context.Context, owner, intakeID 
 	if err != nil {
 		return Batch{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_intakes SET consumed_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, intakeID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_intakes SET consumed_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, intakeID, owner); err != nil {
 		return Batch{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -115,7 +115,7 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 	defer tx.Rollback()
 	var payload []byte
 	var consumed sql.NullTime
-	if err = tx.QueryRowContext(ctx, `SELECT payload_json,consumed_at FROM batch_factory_v11_intakes WHERE id=? AND owner_username=? FOR UPDATE`, intakeID, owner).Scan(&payload, &consumed); errors.Is(err, sql.ErrNoRows) {
+	if err = tx.QueryRowContext(ctx, `SELECT payload_json,consumed_at FROM batch_factory_v12_intakes WHERE id=? AND owner_username=? FOR UPDATE`, intakeID, owner).Scan(&payload, &consumed); errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, ErrNotFound
 	} else if err != nil {
 		return Batch{}, err
@@ -124,7 +124,7 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 		return Batch{}, ErrConflict
 	}
 	var batchRevision int64
-	if err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_batches WHERE id=? AND owner_username=? FOR UPDATE`, batchID, owner).Scan(&batchRevision); errors.Is(err, sql.ErrNoRows) {
+	if err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_batches WHERE id=? AND owner_username=? FOR UPDATE`, batchID, owner).Scan(&batchRevision); errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, ErrNotFound
 	} else if err != nil {
 		return Batch{}, err
@@ -136,7 +136,7 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 	books := intake.Books
 	if !allowDuplicate {
 		existing := map[string]bool{}
-		rows, err := tx.QueryContext(ctx, `SELECT COALESCE(source_book_id,''),COALESCE(platform,'') FROM batch_factory_v11_book_records r JOIN batch_factory_v11_books b ON b.id=r.book_id WHERE b.batch_id=? AND b.owner_username=? FOR UPDATE`, batchID, owner)
+		rows, err := tx.QueryContext(ctx, `SELECT COALESCE(source_book_id,''),COALESCE(platform,'') FROM batch_factory_v12_book_records r JOIN batch_factory_v12_books b ON b.id=r.book_id WHERE b.batch_id=? AND b.owner_username=? FOR UPDATE`, batchID, owner)
 		if err != nil {
 			return Batch{}, err
 		}
@@ -158,7 +158,7 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 		books = uniqueBatchBooks(intake.Books, existing)
 	}
 	var nextOrdinal int
-	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(ordinal)+1,0) FROM batch_factory_v11_books WHERE batch_id=? AND owner_username=?`, batchID, owner).Scan(&nextOrdinal); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(ordinal)+1,0) FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=?`, batchID, owner).Scan(&nextOrdinal); err != nil {
 		return Batch{}, err
 	}
 	now := time.Now().UTC()
@@ -171,7 +171,7 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 		if sourceID == "" {
 			sourceID = bookID
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_books(id,batch_id,owner_username,ordinal,revision,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`, bookID, batchID, owner, nextOrdinal, now, now); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_books(id,batch_id,owner_username,ordinal,revision,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`, bookID, batchID, owner, nextOrdinal, now, now); err != nil {
 			return Batch{}, err
 		}
 		nextOrdinal++
@@ -186,16 +186,16 @@ func (s *MySQLStore) AppendBooksFromIntake(ctx context.Context, owner, batchID, 
 			// when inserting into a JSON column.
 			metadata = string(encodedMetadata)
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_records(book_id,source_book_id,source_task_id,platform,title,source_text,txt_text,txt_file_name,source_metadata_json) VALUES(?,?,?,?,?,?,?,?,?)`, bookID, nullableString(sourceID), nullableString(bookInput.SourceTaskID), nullableString(bookInput.Platform), bookInput.Title, nullableString(bookInput.SourceText), nullableString(bookInput.TxtText), nullableString(bookInput.TxtFileName), metadata); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_records(book_id,source_book_id,source_task_id,platform,title,source_text,txt_text,txt_file_name,source_metadata_json) VALUES(?,?,?,?,?,?,?,?,?)`, bookID, nullableString(sourceID), nullableString(bookInput.SourceTaskID), nullableString(bookInput.Platform), bookInput.Title, nullableString(bookInput.SourceText), nullableString(bookInput.TxtText), nullableString(bookInput.TxtFileName), metadata); err != nil {
 			return Batch{}, err
 		}
 	}
 	if len(books) > 0 {
-		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_batches SET revision=?,updated_at=? WHERE id=? AND owner_username=?`, batchRevision+1, now, batchID, owner); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET revision=?,updated_at=? WHERE id=? AND owner_username=?`, batchRevision+1, now, batchID, owner); err != nil {
 			return Batch{}, err
 		}
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_intakes SET consumed_at=? WHERE id=? AND owner_username=?`, now, intakeID, owner); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_intakes SET consumed_at=? WHERE id=? AND owner_username=?`, now, intakeID, owner); err != nil {
 		return Batch{}, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -230,14 +230,14 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 	if title == "" {
 		title = "Untitled Batch"
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_batches(id,owner_username,revision,created_at,updated_at) VALUES(?,?,1,?,?)`, batchID, owner, now, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_batches(id,owner_username,revision,created_at,updated_at) VALUES(?,?,1,?,?)`, batchID, owner, now, now); err != nil {
 		return Batch{}, err
 	}
 	var source any
 	if sourceIntakeID != "" {
 		source = sourceIntakeID
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_batch_records(batch_id,title,source_intake_id) VALUES(?,?,?)`, batchID, title, source); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_batch_records(batch_id,title,source_intake_id) VALUES(?,?,?)`, batchID, title, source); err != nil {
 		return Batch{}, err
 	}
 	batch := Batch{ID: batchID, Title: title, SourceIntakeID: sourceIntakeID, Revision: 1, Books: []Book{}, CreatedAt: now, UpdatedAt: now}
@@ -253,7 +253,7 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 		if sourceID == "" {
 			sourceID = bookID
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_books(id,batch_id,owner_username,ordinal,revision,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`, bookID, batchID, owner, bookOrdinal, now, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_books(id,batch_id,owner_username,ordinal,revision,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`, bookID, batchID, owner, bookOrdinal, now, now); err != nil {
 			return Batch{}, err
 		}
 		metadata := any(nil)
@@ -264,7 +264,7 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 			}
 			metadata = string(encodedMetadata)
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_book_records(book_id,source_book_id,source_task_id,platform,title,source_text,txt_text,txt_file_name,source_metadata_json) VALUES(?,?,?,?,?,?,?,?,?)`, bookID, nullableString(sourceID), nullableString(bi.SourceTaskID), nullableString(bi.Platform), bi.Title, nullableString(bi.SourceText), nullableString(bi.TxtText), nullableString(bi.TxtFileName), metadata); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_book_records(book_id,source_book_id,source_task_id,platform,title,source_text,txt_text,txt_file_name,source_metadata_json) VALUES(?,?,?,?,?,?,?,?,?)`, bookID, nullableString(sourceID), nullableString(bi.SourceTaskID), nullableString(bi.Platform), bi.Title, nullableString(bi.SourceText), nullableString(bi.TxtText), nullableString(bi.TxtFileName), metadata); err != nil {
 			return Batch{}, err
 		}
 		book := Book{ID: bookID, BookID: sourceID, BatchID: batchID, Title: bi.Title, SourceText: bi.SourceText, SourceTaskID: bi.SourceTaskID, Platform: bi.Platform, TxtText: bi.TxtText, TxtFileName: bi.TxtFileName, SourceMetadata: bi.SourceMetadata, Revision: 1, Videos: []Video{}}
@@ -273,10 +273,10 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 			if err != nil {
 				return Batch{}, err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_videos(id,batch_id,book_id,owner_username,ordinal,compatibility_state,revision,created_at,updated_at) VALUES(?,?,?,?,?,'active',1,?,?)`, videoID, batchID, bookID, owner, videoOrdinal, now, now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_videos(id,batch_id,book_id,owner_username,ordinal,compatibility_state,revision,created_at,updated_at) VALUES(?,?,?,?,?,'active',1,?,?)`, videoID, batchID, bookID, owner, videoOrdinal, now, now); err != nil {
 				return Batch{}, err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,?,?)`, videoID, vi.Label, nullableString(vi.VideoPrompt), nullableString(vi.VisualPrompt), nullableFloat(vi.DurationSeconds)); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,?,?)`, videoID, vi.Label, nullableString(vi.VideoPrompt), nullableString(vi.VisualPrompt), nullableFloat(vi.DurationSeconds)); err != nil {
 				return Batch{}, err
 			}
 			book.Videos = append(book.Videos, Video{ID: videoID, BatchID: batchID, BookID: bookID, Label: vi.Label, VideoPrompt: vi.VideoPrompt, VisualPrompt: vi.VisualPrompt, DurationSeconds: vi.DurationSeconds, CompatibilityState: "active", Revision: 1})
@@ -289,10 +289,10 @@ func createBatchTx(ctx context.Context, tx *sql.Tx, owner string, input CreateBa
 			return Batch{}, ErrInvalid
 		}
 		const initialRevision int64 = 2
-		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_batches SET revision=?,updated_at=? WHERE id=? AND owner_username=?`, initialRevision, now, batchID, owner); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET revision=?,updated_at=? WHERE id=? AND owner_username=?`, initialRevision, now, batchID, owner); err != nil {
 			return Batch{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`, string(ScopeBatch), batchID, owner, batchID, nil, nil, string(encoded), initialRevision, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`, string(ScopeBatch), batchID, owner, batchID, nil, nil, string(encoded), initialRevision, now); err != nil {
 			return Batch{}, err
 		}
 		batch.Revision = initialRevision
@@ -336,7 +336,7 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	}
 	defer tx.Rollback()
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&current)
+	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&current)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Book{}, ErrNotFound
 	}
@@ -348,10 +348,10 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 	}
 	// MySQL JSON rejects driver-bound []byte as _binary. Bind JSON as UTF-8 text
 	// so metadata updates (including direct-read and OCR state) are durable.
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_book_records SET source_metadata_json=? WHERE book_id=?`, string(metadata), bookID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET source_metadata_json=? WHERE book_id=?`, string(metadata), bookID); err != nil {
 		return Book{}, err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
 		return Book{}, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -371,7 +371,8 @@ func (s *MySQLStore) UpdateBookMetadata(ctx context.Context, owner, batchID, boo
 
 func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, bookID string, input CaptureBookSourceInput) (Book, error) {
 	sourceText, validSourceText := normalizeCapturedSourceText(input.SourceText)
-	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || !validSourceText {
+	rawSourceText, validRawSourceText := normalizeCapturedSourceText(input.RawSourceText)
+	if strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" || strings.TrimSpace(bookID) == "" || input.ExpectedRevision < 1 || (!validSourceText && !validRawSourceText) {
 		return Book{}, ErrInvalid
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -380,7 +381,7 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	}
 	defer tx.Rollback()
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&current)
+	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&current)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Book{}, ErrNotFound
 	}
@@ -392,7 +393,7 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	}
 	var source, currentTitle, sourceBookID sql.NullString
 	var rawMetadata []byte
-	err = tx.QueryRowContext(ctx, `SELECT source_text,title,source_book_id,source_metadata_json FROM batch_factory_v11_book_records WHERE book_id=? FOR UPDATE`, bookID).Scan(&source, &currentTitle, &sourceBookID, &rawMetadata)
+	err = tx.QueryRowContext(ctx, `SELECT source_text,title,source_book_id,source_metadata_json FROM batch_factory_v12_book_records WHERE book_id=? FOR UPDATE`, bookID).Scan(&source, &currentTitle, &sourceBookID, &rawMetadata)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Book{}, ErrNotFound
 	}
@@ -417,11 +418,18 @@ func (s *MySQLStore) CaptureBookSource(ctx context.Context, owner, batchID, book
 	if shouldReplaceGeneratedBookTitle(nextTitle, sourceBookID.String, input.SourceTitle) {
 		nextTitle = strings.TrimSpace(input.SourceTitle)
 	}
+	nextSourceText := source.String
+	if validSourceText || input.ReplaceSource {
+		nextSourceText = sourceText
+	}
+	if !validRawSourceText && validSourceText {
+		rawSourceText = nextSourceText
+	}
 	// See UpdateBookMetadata: this column is JSON, not a binary blob.
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_book_records SET title=?,source_text=?,txt_text=?,source_metadata_json=? WHERE book_id=?`, nextTitle, sourceText, sourceText, string(encodedMetadata), bookID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_book_records SET title=?,source_text=?,txt_text=?,source_metadata_json=? WHERE book_id=?`, nextTitle, nextSourceText, rawSourceText, string(encodedMetadata), bookID); err != nil {
 		return Book{}, err
 	}
-	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=revision+1,updated_at=? WHERE id=? AND batch_id=? AND owner_username=?`, time.Now().UTC(), bookID, batchID, owner); err != nil {
 		return Book{}, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -464,7 +472,7 @@ func nullableFloat(v float64) any {
 }
 
 func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v11_batches b JOIN batch_factory_v11_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +496,7 @@ func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, er
 		return out, nil
 	}
 
-	books, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,r.title,COALESCE(r.source_book_id,''),COALESCE(r.platform,''),b.revision FROM batch_factory_v11_books b JOIN batch_factory_v11_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`, owner)
+	books, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,r.title,COALESCE(r.source_book_id,''),COALESCE(r.platform,''),b.revision FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +530,7 @@ func (s *MySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, er
 // Keeping this as two bulk queries prevents the library page from turning N
 // historical batches into thousands of SQL statements.
 func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([]Batch, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v11_batches b JOIN batch_factory_v11_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT b.id,r.title,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.owner_username=? ORDER BY b.created_at DESC,b.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -544,7 +552,7 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	}
 	rows.Close()
 
-	bookRows, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v11_books b JOIN batch_factory_v11_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`, owner)
+	bookRows, err := s.db.QueryContext(ctx, `SELECT b.batch_id,b.id,COALESCE(r.source_book_id,''),COALESCE(r.title,''),COALESCE(r.platform,'') FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.owner_username=? ORDER BY b.batch_id,b.ordinal,b.id`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -566,7 +574,7 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	// A project card needs at most one already-generated cover. Reading that
 	// choice here in one bulk query prevents the browser from polling full
 	// production and merge histories for every old project after each reload.
-	coverRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,j.output_url FROM batch_factory_v11_merge_jobs j LEFT JOIN batch_factory_v11_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`, owner)
+	coverRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,j.output_url FROM batch_factory_v12_merge_jobs j LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username WHERE j.owner_username=? AND j.status='succeeded' AND COALESCE(j.output_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),j.updated_at DESC,j.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +604,7 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	// Not every batch has been merged into a final video yet. Reuse the first
 	// completed storyboard video as its project-card cover so the library can
 	// show real work without issuing one production-status request per card.
-	shotRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,t.media_url FROM batch_factory_v11_production_tasks t JOIN batch_factory_v11_production_jobs j ON j.id=t.job_id AND j.owner_username=t.owner_username LEFT JOIN batch_factory_v11_books b ON b.id=j.book_id AND b.owner_username=j.owner_username LEFT JOIN batch_factory_v11_videos v ON v.id=t.video_id AND v.owner_username=t.owner_username WHERE t.owner_username=? AND t.status='succeeded' AND COALESCE(t.media_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),COALESCE(v.ordinal,2147483647),t.updated_at DESC,t.id DESC`, owner)
+	shotRows, err := s.db.QueryContext(ctx, `SELECT j.batch_id,t.media_url FROM batch_factory_v12_production_tasks t JOIN batch_factory_v12_production_jobs j ON j.id=t.job_id AND j.owner_username=t.owner_username LEFT JOIN batch_factory_v12_books b ON b.id=j.book_id AND b.owner_username=j.owner_username LEFT JOIN batch_factory_v12_videos v ON v.id=t.video_id AND v.owner_username=t.owner_username WHERE t.owner_username=? AND t.status='succeeded' AND COALESCE(t.media_url,'')<>'' ORDER BY j.batch_id,COALESCE(b.ordinal,2147483647),COALESCE(v.ordinal,2147483647),t.updated_at DESC,t.id DESC`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -641,7 +649,7 @@ func (s *MySQLStore) GetBatch(ctx context.Context, owner, id string) (Batch, err
 // status poll into thousands of prepared statements on mature batches.
 func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string) (Batch, error) {
 	var batch Batch
-	err := s.db.QueryRowContext(ctx, `SELECT b.id,b.revision,b.created_at,b.updated_at FROM batch_factory_v11_batches b WHERE b.id=? AND b.owner_username=?`, id, owner).
+	err := s.db.QueryRowContext(ctx, `SELECT b.id,b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b WHERE b.id=? AND b.owner_username=?`, id, owner).
 		Scan(&batch.ID, &batch.Revision, &batch.CreatedAt, &batch.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, ErrNotFound
@@ -649,7 +657,7 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 	if err != nil {
 		return Batch{}, err
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id,revision FROM batch_factory_v11_books WHERE batch_id=? AND owner_username=? ORDER BY ordinal,id`, id, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,revision FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? ORDER BY ordinal,id`, id, owner)
 	if err != nil {
 		return Batch{}, err
 	}
@@ -661,6 +669,25 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 			return Batch{}, err
 		}
 		book.BatchID = batch.ID
+		videoRows, err := s.db.QueryContext(ctx, `SELECT id FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, id, book.ID, owner)
+		if err != nil {
+			return Batch{}, err
+		}
+		for videoRows.Next() {
+			var videoID string
+			if err := videoRows.Scan(&videoID); err != nil {
+				videoRows.Close()
+				return Batch{}, err
+			}
+			book.Videos = append(book.Videos, Video{ID: videoID, BatchID: batch.ID, BookID: book.ID})
+		}
+		if err := videoRows.Err(); err != nil {
+			videoRows.Close()
+			return Batch{}, err
+		}
+		if err := videoRows.Close(); err != nil {
+			return Batch{}, err
+		}
 		batch.Books = append(batch.Books, book)
 	}
 	if err := rows.Err(); err != nil {
@@ -673,7 +700,7 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 // giant-material recovery sweep. In particular it does not hydrate videos,
 // director revisions or assets for every historical batch on every sweep.
 func (s *MySQLStore) ListBatchRecoveryIndex(ctx context.Context, owner string) ([]Batch, error) {
-	const query = `SELECT ba.id,ba.revision,ba.created_at,ba.updated_at,COALESCE(bsp.patch_json,JSON_OBJECT()),b.id,b.revision,COALESCE(r.source_text,''),r.source_metadata_json,COALESCE(d.content,''),COALESCE(ksp.patch_json,JSON_OBJECT()) FROM batch_factory_v11_books b JOIN batch_factory_v11_book_records r ON r.book_id=b.id JOIN batch_factory_v11_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username LEFT JOIN batch_factory_v11_settings_patches bsp ON bsp.scope_type='batch' AND bsp.scope_id=ba.id AND bsp.owner_username=ba.owner_username LEFT JOIN batch_factory_v11_settings_patches ksp ON ksp.scope_type='book' AND ksp.scope_id=b.id AND ksp.owner_username=b.owner_username LEFT JOIN batch_factory_v11_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=ba.id WHERE b.owner_username=? AND JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.sourceMode'))='giant_material' ORDER BY ba.created_at DESC,ba.id DESC,b.ordinal,b.id`
+	const query = `SELECT ba.id,ba.revision,ba.created_at,ba.updated_at,COALESCE(bsp.patch_json,JSON_OBJECT()),b.id,b.revision,COALESCE(r.source_text,''),r.source_metadata_json,COALESCE(d.content,''),COALESCE(ksp.patch_json,JSON_OBJECT()) FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username LEFT JOIN batch_factory_v12_settings_patches bsp ON bsp.scope_type='batch' AND bsp.scope_id=ba.id AND bsp.owner_username=ba.owner_username LEFT JOIN batch_factory_v12_settings_patches ksp ON ksp.scope_type='book' AND ksp.scope_id=b.id AND ksp.owner_username=b.owner_username LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=ba.id WHERE b.owner_username=? AND JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.sourceMode'))='giant_material' ORDER BY ba.created_at DESC,ba.id DESC,b.ordinal,b.id`
 	rows, err := s.db.QueryContext(ctx, query, owner)
 	if err != nil {
 		return nil, err
@@ -743,7 +770,7 @@ func (s *MySQLStore) DeleteBookWithRetention(ctx context.Context, owner, batchID
 	}
 	defer tx.Rollback()
 	var one int
-	if err = tx.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+	if err = tx.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, bookID, batchID, owner).Scan(&one); errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	} else if err != nil {
 		return err
@@ -755,7 +782,7 @@ func (s *MySQLStore) DeleteBookWithRetention(ctx context.Context, owner, batchID
 	if err = deleteBookTx(ctx, tx, owner, batchID, bookID); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_batches SET revision=revision+1,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, batchID, owner)
+	_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET revision=revision+1,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, batchID, owner)
 	if err != nil {
 		return err
 	}
@@ -776,7 +803,7 @@ func (s *MySQLStore) DeleteBatchWithRetention(ctx context.Context, owner, batchI
 	}
 	defer tx.Rollback()
 	var one int
-	if err = tx.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v11_batches WHERE id=? AND owner_username=? FOR UPDATE`, batchID, owner).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+	if err = tx.QueryRowContext(ctx, `SELECT 1 FROM batch_factory_v12_batches WHERE id=? AND owner_username=? FOR UPDATE`, batchID, owner).Scan(&one); errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	} else if err != nil {
 		return err
@@ -785,7 +812,7 @@ func (s *MySQLStore) DeleteBatchWithRetention(ctx context.Context, owner, batchI
 	if err = queueLocalMergedArtifactPurges(ctx, tx, owner, batchID, "", purgeAfter); err != nil {
 		return err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id FROM batch_factory_v11_books WHERE batch_id=? AND owner_username=? FOR UPDATE`, batchID, owner)
+	rows, err := tx.QueryContext(ctx, `SELECT id FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? FOR UPDATE`, batchID, owner)
 	if err != nil {
 		return err
 	}
@@ -807,15 +834,15 @@ func (s *MySQLStore) DeleteBatchWithRetention(ctx context.Context, owner, batchI
 		}
 	}
 	for _, stmt := range []string{
-		`DELETE a FROM batch_factory_v11_external_audits a JOIN batch_factory_v11_external_intents i ON i.id=a.intent_id WHERE i.owner_username=? AND i.batch_id=?`,
-		`DELETE FROM batch_factory_v11_external_intents WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v11_merge_sources WHERE owner_username=? AND job_id IN (SELECT id FROM batch_factory_v11_merge_jobs WHERE owner_username=? AND batch_id=?)`,
-		`DELETE FROM batch_factory_v11_merge_jobs WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v11_settings_patches WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v11_config_snapshots WHERE owner_username=? AND batch_id=?`,
-		`DELETE FROM batch_factory_v11_drafts WHERE owner_username=? AND scope=?`,
-		`DELETE FROM batch_factory_v11_batch_records WHERE batch_id=?`,
-		`DELETE FROM batch_factory_v11_batches WHERE id=? AND owner_username=?`,
+		`DELETE a FROM batch_factory_v12_external_audits a JOIN batch_factory_v12_external_intents i ON i.id=a.intent_id WHERE i.owner_username=? AND i.batch_id=?`,
+		`DELETE FROM batch_factory_v12_external_intents WHERE owner_username=? AND batch_id=?`,
+		`DELETE FROM batch_factory_v12_merge_sources WHERE owner_username=? AND job_id IN (SELECT id FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?)`,
+		`DELETE FROM batch_factory_v12_merge_jobs WHERE owner_username=? AND batch_id=?`,
+		`DELETE FROM batch_factory_v12_settings_patches WHERE owner_username=? AND batch_id=?`,
+		`DELETE FROM batch_factory_v12_config_snapshots WHERE owner_username=? AND batch_id=?`,
+		`DELETE FROM batch_factory_v12_drafts WHERE owner_username=? AND scope=?`,
+		`DELETE FROM batch_factory_v12_batch_records WHERE batch_id=?`,
+		`DELETE FROM batch_factory_v12_batches WHERE id=? AND owner_username=?`,
 	} {
 		if err := execDeleteBatchStmt(ctx, tx, stmt, owner, batchID); err != nil {
 			return err
@@ -852,14 +879,14 @@ func deleteBookDefaultArgs(owner, batchID, bookID string) []any {
 // needs. Keep them next to each other so the number of placeholders can never
 // drift away from the number of arguments again.
 var deleteBookStmts = []deleteBookStmt{
-	{query: `DELETE a FROM batch_factory_v11_external_audits a JOIN batch_factory_v11_external_intents i ON i.id=a.intent_id WHERE i.owner_username=? AND i.batch_id=? AND i.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_external_intents WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_hidden_production_tasks WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE e FROM batch_factory_v11_production_events e JOIN batch_factory_v11_production_jobs j ON j.id=e.job_id WHERE j.owner_username=? AND j.batch_id=? AND j.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE t FROM batch_factory_v11_production_tasks t JOIN batch_factory_v11_production_jobs j ON j.id=t.job_id WHERE j.owner_username=? AND j.batch_id=? AND j.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_production_jobs WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_book_stage_runs WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_settings_patches WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE a FROM batch_factory_v12_external_audits a JOIN batch_factory_v12_external_intents i ON i.id=a.intent_id WHERE i.owner_username=? AND i.batch_id=? AND i.book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_external_intents WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_hidden_production_tasks WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE e FROM batch_factory_v12_production_events e JOIN batch_factory_v12_production_jobs j ON j.id=e.job_id WHERE j.owner_username=? AND j.batch_id=? AND j.book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE t FROM batch_factory_v12_production_tasks t JOIN batch_factory_v12_production_jobs j ON j.id=t.job_id WHERE j.owner_username=? AND j.batch_id=? AND j.book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_production_jobs WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_book_stage_runs WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_settings_patches WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	// V12 H3 records have restrictive foreign keys back to both the book and
 	// its director revision. They must be removed before their V11 parents;
 	// otherwise deleting an H3-enabled batch fails and the transaction rolls
@@ -867,25 +894,25 @@ var deleteBookStmts = []deleteBookStmt{
 	{query: `DELETE FROM batch_factory_v12_video_compilations WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{query: `DELETE FROM batch_factory_v12_canonical_timelines WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{query: `DELETE FROM batch_factory_v12_audio_measurements WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE o FROM batch_factory_v11_orphaned_overrides o JOIN batch_factory_v11_director_revisions d ON d.id=o.director_revision_id WHERE d.owner_username=? AND d.batch_id=? AND d.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE l FROM batch_factory_v11_director_video_links l JOIN batch_factory_v11_director_revisions d ON d.id=l.director_revision_id WHERE d.owner_username=? AND d.batch_id=? AND d.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_director_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_hook_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE i FROM batch_factory_v11_book_asset_images i JOIN batch_factory_v11_book_assets a ON a.id=i.asset_id WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE o FROM batch_factory_v12_orphaned_overrides o JOIN batch_factory_v12_director_revisions d ON d.id=o.director_revision_id WHERE d.owner_username=? AND d.batch_id=? AND d.book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE l FROM batch_factory_v12_director_video_links l JOIN batch_factory_v12_director_revisions d ON d.id=l.director_revision_id WHERE d.owner_username=? AND d.batch_id=? AND d.book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_director_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_hook_revisions WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE i FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id WHERE a.owner_username=? AND a.batch_id=? AND a.book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_book_assets WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{
-		query: `DELETE FROM batch_factory_v11_drafts WHERE owner_username=? AND draft_key=? AND scope=?`,
+		query: `DELETE FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND scope=?`,
 		args:  func(owner, batchID, bookID string) []any { return []any{owner, "working-front:" + bookID, batchID} },
 	},
-	{query: `DELETE FROM batch_factory_v11_config_snapshots WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_video_records WHERE video_id IN (SELECT id FROM batch_factory_v11_videos WHERE owner_username=? AND batch_id=? AND book_id=?)`, args: deleteBookDefaultArgs},
-	{query: `DELETE FROM batch_factory_v11_videos WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_config_snapshots WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_video_records WHERE video_id IN (SELECT id FROM batch_factory_v12_videos WHERE owner_username=? AND batch_id=? AND book_id=?)`, args: deleteBookDefaultArgs},
+	{query: `DELETE FROM batch_factory_v12_videos WHERE owner_username=? AND batch_id=? AND book_id=?`, args: deleteBookDefaultArgs},
 	{
-		query: `DELETE FROM batch_factory_v11_book_records WHERE book_id=?`,
+		query: `DELETE FROM batch_factory_v12_book_records WHERE book_id=?`,
 		args:  func(_, _, bookID string) []any { return []any{bookID} },
 	},
 	{
-		query: `DELETE FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=?`,
+		query: `DELETE FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=?`,
 		args:  func(owner, batchID, bookID string) []any { return []any{bookID, batchID, owner} },
 	},
 }
@@ -906,7 +933,7 @@ type batchQueryer interface {
 
 func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, error) {
 	var b Batch
-	err := q.QueryRowContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v11_batches b JOIN batch_factory_v11_batch_records r ON r.batch_id=b.id WHERE b.id=? AND b.owner_username=?`, id, owner).Scan(&b.ID, &b.Title, &b.SourceIntakeID, &b.Revision, &b.CreatedAt, &b.UpdatedAt)
+	err := q.QueryRowContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_intake_id,''),b.revision,b.created_at,b.updated_at FROM batch_factory_v12_batches b JOIN batch_factory_v12_batch_records r ON r.batch_id=b.id WHERE b.id=? AND b.owner_username=?`, id, owner).Scan(&b.ID, &b.Title, &b.SourceIntakeID, &b.Revision, &b.CreatedAt, &b.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Batch{}, ErrNotFound
 	}
@@ -914,7 +941,7 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 		return Batch{}, err
 	}
 	b.Books = []Book{}
-	rows, err := q.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_text,''),COALESCE(r.source_book_id,''),COALESCE(r.source_task_id,''),COALESCE(r.platform,''),COALESCE(r.txt_text,''),COALESCE(r.txt_file_name,''),r.source_metadata_json,b.revision FROM batch_factory_v11_books b JOIN batch_factory_v11_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? ORDER BY b.ordinal,b.id`, b.ID, owner)
+	rows, err := q.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_text,''),COALESCE(r.source_book_id,''),COALESCE(r.source_task_id,''),COALESCE(r.platform,''),COALESCE(r.txt_text,''),COALESCE(r.txt_file_name,''),r.source_metadata_json,b.revision FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? ORDER BY b.ordinal,b.id`, b.ID, owner)
 	if err != nil {
 		return Batch{}, err
 	}
@@ -944,7 +971,7 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 	// pool and deadlock every authenticated batch read.
 	for i := range b.Books {
 		var working sql.NullString
-		workingErr := q.QueryRowContext(ctx, `SELECT content FROM batch_factory_v11_drafts WHERE owner_username=? AND draft_key=? AND kind='working-front-content' AND scope=?`, owner, "working-front:"+b.Books[i].ID, b.ID).Scan(&working)
+		workingErr := q.QueryRowContext(ctx, `SELECT content FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND kind='working-front-content' AND scope=?`, owner, "working-front:"+b.Books[i].ID, b.ID).Scan(&working)
 		if workingErr != nil && !errors.Is(workingErr, sql.ErrNoRows) {
 			return Batch{}, workingErr
 		}
@@ -953,7 +980,7 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 		}
 	}
 	for i := range b.Books {
-		vrows, err := q.QueryContext(ctx, `SELECT v.id,r.label,COALESCE(r.video_prompt,''),COALESCE(r.visual_prompt,''),COALESCE(r.duration_seconds,0),v.compatibility_state,v.revision FROM batch_factory_v11_videos v JOIN batch_factory_v11_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, b.ID, b.Books[i].ID, owner)
+		vrows, err := q.QueryContext(ctx, `SELECT v.id,r.label,COALESCE(r.video_prompt,''),COALESCE(r.visual_prompt,''),COALESCE(r.duration_seconds,0),v.compatibility_state,v.revision FROM batch_factory_v12_videos v JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, b.ID, b.Books[i].ID, owner)
 		if err != nil {
 			return Batch{}, err
 		}
@@ -995,7 +1022,7 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 	}
 	if selectsVersion {
 		var config json.RawMessage
-		err = tx.QueryRowContext(ctx, `SELECT config_json FROM batch_factory_v11_config_versions WHERE id=? AND (owner_username IS NULL OR owner_username=?)`, versionID, owner).Scan(&config)
+		err = tx.QueryRowContext(ctx, `SELECT config_json FROM batch_factory_v12_config_versions WHERE id=? AND (owner_username IS NULL OR owner_username=?)`, versionID, owner).Scan(&config)
 		if errors.Is(err, sql.ErrNoRows) {
 			return SettingsResult{}, ErrNotFound
 		}
@@ -1012,7 +1039,7 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 	}
 	if ref.Kind == ScopeVideo {
 		var preEditPrompt string
-		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(video_prompt,'') FROM batch_factory_v11_video_records WHERE video_id=?`, ref.VideoID).Scan(&preEditPrompt); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(video_prompt,'') FROM batch_factory_v12_video_records WHERE video_id=?`, ref.VideoID).Scan(&preEditPrompt); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return SettingsResult{}, ErrNotFound
 			}
@@ -1029,7 +1056,7 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 	if err != nil {
 		return SettingsResult{}, err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(encoded), next)
+	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(encoded), next)
 	if err != nil {
 		return SettingsResult{}, err
 	}
@@ -1046,7 +1073,7 @@ func (s *MySQLStore) SaveSettings(ctx context.Context, owner string, ref ScopeRe
 		return SettingsResult{}, err
 	}
 	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,?,?,?)`, snapshotID, owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(effJSON), now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,?,?,?)`, snapshotID, owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(effJSON), now); err != nil {
 		return SettingsResult{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -1134,7 +1161,7 @@ func upsertSettingsPatch(ctx context.Context, tx *sql.Tx, owner string, ref Scop
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(encoded), revision)
+	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_settings_patches(scope_type,scope_id,owner_username,batch_id,book_id,video_id,patch_json,revision,updated_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE patch_json=VALUES(patch_json),revision=VALUES(revision),updated_at=VALUES(updated_at)`, string(ref.Kind), scopeID(ref), owner, ref.BatchID, nullIfEmpty(ref.BookID), nullIfEmpty(ref.VideoID), string(encoded), revision)
 	return err
 }
 
@@ -1161,11 +1188,11 @@ func lockScopeRevision(ctx context.Context, tx *sql.Tx, owner string, ref ScopeR
 	var err error
 	switch ref.Kind {
 	case ScopeBatch:
-		err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_batches WHERE id=? AND owner_username=? FOR UPDATE`, ref.BatchID, owner).Scan(&rev)
+		err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_batches WHERE id=? AND owner_username=? FOR UPDATE`, ref.BatchID, owner).Scan(&rev)
 	case ScopeBook:
-		err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, ref.BookID, ref.BatchID, owner).Scan(&rev)
+		err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_books WHERE id=? AND batch_id=? AND owner_username=? FOR UPDATE`, ref.BookID, ref.BatchID, owner).Scan(&rev)
 	case ScopeVideo:
-		err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_videos WHERE id=? AND book_id=? AND batch_id=? AND owner_username=? FOR UPDATE`, ref.VideoID, ref.BookID, ref.BatchID, owner).Scan(&rev)
+		err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_videos WHERE id=? AND book_id=? AND batch_id=? AND owner_username=? FOR UPDATE`, ref.VideoID, ref.BookID, ref.BatchID, owner).Scan(&rev)
 	default:
 		return 0, ErrInvalid
 	}
@@ -1179,11 +1206,11 @@ func updateScopeRevision(ctx context.Context, tx *sql.Tx, owner string, ref Scop
 	var err error
 	switch ref.Kind {
 	case ScopeBatch:
-		res, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_batches SET revision=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, next, ref.BatchID, owner)
+		res, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_batches SET revision=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND owner_username=?`, next, ref.BatchID, owner)
 	case ScopeBook:
-		res, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_books SET revision=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND batch_id=? AND owner_username=?`, next, ref.BookID, ref.BatchID, owner)
+		res, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_books SET revision=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND batch_id=? AND owner_username=?`, next, ref.BookID, ref.BatchID, owner)
 	case ScopeVideo:
-		res, err = tx.ExecContext(ctx, `UPDATE batch_factory_v11_videos SET revision=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND book_id=? AND batch_id=? AND owner_username=?`, next, ref.VideoID, ref.BookID, ref.BatchID, owner)
+		res, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_videos SET revision=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND book_id=? AND batch_id=? AND owner_username=?`, next, ref.VideoID, ref.BookID, ref.BatchID, owner)
 	default:
 		return ErrInvalid
 	}
@@ -1201,7 +1228,7 @@ func updateScopeRevision(ctx context.Context, tx *sql.Tx, owner string, ref Scop
 }
 func loadPatch(ctx context.Context, q batchQueryer, owner string, ref ScopeRef) (SettingsPatch, error) {
 	var raw []byte
-	err := q.QueryRowContext(ctx, `SELECT patch_json FROM batch_factory_v11_settings_patches WHERE scope_type=? AND scope_id=? AND owner_username=?`, string(ref.Kind), scopeID(ref), owner).Scan(&raw)
+	err := q.QueryRowContext(ctx, `SELECT patch_json FROM batch_factory_v12_settings_patches WHERE scope_type=? AND scope_id=? AND owner_username=?`, string(ref.Kind), scopeID(ref), owner).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SettingsPatch{}, nil
 	}
@@ -1233,7 +1260,7 @@ func effectiveSettings(ctx context.Context, q batchQueryer, owner string, ref Sc
 }
 
 func (s *MySQLStore) ConfigVersions(ctx context.Context, owner string) ([]ConfigVersion, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,config_json,created_at FROM batch_factory_v11_config_versions WHERE owner_username IS NULL OR owner_username=? ORDER BY created_at,id`, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,name,config_json,created_at FROM batch_factory_v12_config_versions WHERE owner_username IS NULL OR owner_username=? ORDER BY created_at,id`, owner)
 	if err != nil {
 		return nil, err
 	}
@@ -1272,7 +1299,7 @@ func (s *MySQLStore) CreateConfigVersion(ctx context.Context, owner string, vers
 		return ConfigVersion{}, err
 	}
 	version.ID, version.Name, version.CreatedAt = id, strings.TrimSpace(version.Name), time.Now().UTC()
-	if _, err := s.db.ExecContext(ctx, `INSERT INTO batch_factory_v11_config_versions(id,owner_username,name,config_json,created_at) VALUES(?,?,?,?,?)`, version.ID, owner, version.Name, version.Config, version.CreatedAt); err != nil {
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO batch_factory_v12_config_versions(id,owner_username,name,config_json,created_at) VALUES(?,?,?,?,?)`, version.ID, owner, version.Name, version.Config, version.CreatedAt); err != nil {
 		return ConfigVersion{}, err
 	}
 	return version, nil
@@ -1281,7 +1308,7 @@ func (s *MySQLStore) RenameConfigVersion(ctx context.Context, owner, id, name st
 	if strings.TrimSpace(name) == "" {
 		return ConfigVersion{}, ErrInvalid
 	}
-	result, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v11_config_versions SET name=? WHERE id=? AND owner_username=?`, strings.TrimSpace(name), id, owner)
+	result, err := s.db.ExecContext(ctx, `UPDATE batch_factory_v12_config_versions SET name=? WHERE id=? AND owner_username=?`, strings.TrimSpace(name), id, owner)
 	if err != nil {
 		return ConfigVersion{}, err
 	}
@@ -1294,7 +1321,7 @@ func (s *MySQLStore) RenameConfigVersion(ctx context.Context, owner, id, name st
 	}
 	var version ConfigVersion
 	var raw []byte
-	if err := s.db.QueryRowContext(ctx, `SELECT id,name,config_json,created_at FROM batch_factory_v11_config_versions WHERE id=? AND owner_username=?`, id, owner).Scan(&version.ID, &version.Name, &raw, &version.CreatedAt); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT id,name,config_json,created_at FROM batch_factory_v12_config_versions WHERE id=? AND owner_username=?`, id, owner).Scan(&version.ID, &version.Name, &raw, &version.CreatedAt); err != nil {
 		return ConfigVersion{}, err
 	}
 	version.Config = json.RawMessage(raw)
@@ -1312,7 +1339,7 @@ func (s *MySQLStore) ChangeImpact(ctx context.Context, owner, batchID string, up
 	return ChangeImpact{AffectedBooks: len(b.Books), AffectedVideos: videos, InvalidatesDirector: false, PreservesOverrides: true, ChangedKeys: ChangedKeys(update)}, nil
 }
 func (s *MySQLStore) ListPrompts(ctx context.Context, owner, kind string) ([]Prompt, error) {
-	query := `SELECT d.id,v.id,d.name,d.kind,v.content,v.revision,v.created_at FROM batch_factory_v11_prompt_definitions d JOIN batch_factory_v11_prompt_versions v ON v.prompt_id=d.id AND v.revision=(SELECT MAX(v2.revision) FROM batch_factory_v11_prompt_versions v2 WHERE v2.prompt_id=d.id AND v2.owner_username=d.owner_username) WHERE d.owner_username=?`
+	query := `SELECT d.id,v.id,d.name,d.kind,v.content,v.revision,v.created_at FROM batch_factory_v12_prompt_definitions d JOIN batch_factory_v12_prompt_versions v ON v.prompt_id=d.id AND v.revision=(SELECT MAX(v2.revision) FROM batch_factory_v12_prompt_versions v2 WHERE v2.prompt_id=d.id AND v2.owner_username=d.owner_username) WHERE d.owner_username=?`
 	args := []any{owner}
 	if kind != "" {
 		query += ` AND d.kind=?`
@@ -1352,10 +1379,10 @@ func (s *MySQLStore) CreatePrompt(ctx context.Context, owner string, p Prompt) (
 		return Prompt{}, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_prompt_definitions(id,owner_username,name,kind,created_at) VALUES(?,?,?,?,?)`, id, owner, p.Name, p.Kind, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_prompt_definitions(id,owner_username,name,kind,created_at) VALUES(?,?,?,?,?)`, id, owner, p.Name, p.Kind, now); err != nil {
 		return Prompt{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_prompt_versions(id,prompt_id,owner_username,revision,content,created_at) VALUES(?,?,?,1,?,?)`, vid, id, owner, p.Content, now); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_prompt_versions(id,prompt_id,owner_username,revision,content,created_at) VALUES(?,?,?,1,?,?)`, vid, id, owner, p.Content, now); err != nil {
 		return Prompt{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -1369,7 +1396,7 @@ func (s *MySQLStore) CreatePrompt(ctx context.Context, owner string, p Prompt) (
 }
 func (s *MySQLStore) GetDraft(ctx context.Context, owner, key, kind, scope string) (Draft, error) {
 	var d Draft
-	err := s.db.QueryRowContext(ctx, `SELECT draft_key,kind,scope,COALESCE(content,''),revision,updated_at FROM batch_factory_v11_drafts WHERE owner_username=? AND draft_key=? AND kind=? AND scope=?`, owner, key, kind, scope).Scan(&d.Key, &d.Kind, &d.Scope, &d.Content, &d.Revision, &d.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT draft_key,kind,scope,COALESCE(content,''),revision,updated_at FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND kind=? AND scope=?`, owner, key, kind, scope).Scan(&d.Key, &d.Kind, &d.Scope, &d.Content, &d.Revision, &d.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Draft{}, ErrNotFound
 	}
@@ -1385,12 +1412,12 @@ func (s *MySQLStore) SaveDraft(ctx context.Context, owner string, d Draft) (Draf
 	}
 	defer tx.Rollback()
 	var current int64
-	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v11_drafts WHERE owner_username=? AND draft_key=? AND kind=? AND scope=? FOR UPDATE`, owner, d.Key, d.Kind, d.Scope).Scan(&current)
+	err = tx.QueryRowContext(ctx, `SELECT revision FROM batch_factory_v12_drafts WHERE owner_username=? AND draft_key=? AND kind=? AND scope=? FOR UPDATE`, owner, d.Key, d.Kind, d.Scope).Scan(&current)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Draft{}, err
 	}
 	next := current + 1
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_drafts(owner_username,draft_key,kind,scope,content,revision,updated_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE content=VALUES(content),revision=VALUES(revision),updated_at=VALUES(updated_at)`, owner, d.Key, d.Kind, d.Scope, nullableString(d.Content), next); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_drafts(owner_username,draft_key,kind,scope,content,revision,updated_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE content=VALUES(content),revision=VALUES(revision),updated_at=VALUES(updated_at)`, owner, d.Key, d.Kind, d.Scope, nullableString(d.Content), next); err != nil {
 		return Draft{}, err
 	}
 	if err := tx.Commit(); err != nil {

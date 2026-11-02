@@ -29,101 +29,103 @@ type mergeSubmitInput struct {
 	AudioDurationSeconds float64 `json:"audioDurationSeconds"`
 }
 
-func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeService, files *localartifact.Store, output mergeworker.ObjectStore, remote mergeworker.ObjectReader) {
-	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/merge-artifacts/migrate-to-tos", func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		if files == nil || output == nil {
-			writeStoreError(w, batchfactoryv11.ErrUnavailable)
-			return
-		}
-		repository, ok := service.Store.(batchfactoryv11.MergeRepository)
-		if !ok {
-			writeStoreError(w, batchfactoryv11.ErrUnavailable)
-			return
-		}
-		batchID := r.PathValue("batchId")
-		jobs, err := repository.ListMergeJobs(r.Context(), owner, batchID)
-		if err != nil {
-			writeStoreError(w, err)
-			return
-		}
-		migrated, retained := 0, 0
-		for _, job := range jobs {
-			prefix := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/"
-			if job.Status != batchfactoryv11.MergeSucceeded || !strings.HasPrefix(strings.TrimSpace(job.OutputURL), prefix) {
-				continue
+func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeService, files *localartifact.Store, output mergeworker.ObjectStore, remote mergeworker.ObjectReader, writable bool) {
+	if writable {
+		mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/merge-artifacts/migrate-to-tos", func(w http.ResponseWriter, r *http.Request) {
+			owner, ok := bridgeOwner(r)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
 			}
-			artifactID := strings.TrimPrefix(strings.TrimSpace(job.OutputURL), prefix)
-			path, pathErr := files.Path(artifactID + ".mp4")
-			if pathErr != nil {
-				continue // already remote or a separately retained legacy artifact
+			if files == nil || output == nil {
+				writeStoreError(w, batchfactoryv11.ErrUnavailable)
+				return
 			}
-			if _, uploadErr := output.PutMerged(r.Context(), job.ID, path); uploadErr != nil {
-				retained++
-				continue
+			repository, ok := service.Store.(batchfactoryv11.MergeRepository)
+			if !ok {
+				writeStoreError(w, batchfactoryv11.ErrUnavailable)
+				return
 			}
-			updated := job
-			updated.OutputURL = prefix + job.ID
-			updated.ProgressPhase = "stored"
-			updated.ErrorMessage = ""
-			if _, updateErr := repository.UpdateMergeJob(r.Context(), owner, job.ID, updated); updateErr != nil {
-				retained++
-				continue
+			batchID := r.PathValue("batchId")
+			jobs, err := repository.ListMergeJobs(r.Context(), owner, batchID)
+			if err != nil {
+				writeStoreError(w, err)
+				return
 			}
-			if removeErr := files.Remove(artifactID + ".mp4"); removeErr != nil {
-				retained++
-				continue
+			migrated, retained := 0, 0
+			for _, job := range jobs {
+				prefix := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/"
+				if job.Status != batchfactoryv11.MergeSucceeded || !strings.HasPrefix(strings.TrimSpace(job.OutputURL), prefix) {
+					continue
+				}
+				artifactID := strings.TrimPrefix(strings.TrimSpace(job.OutputURL), prefix)
+				path, pathErr := files.Path(artifactID + ".mp4")
+				if pathErr != nil {
+					continue // already remote or a separately retained legacy artifact
+				}
+				if _, uploadErr := output.PutMerged(r.Context(), job.ID, path); uploadErr != nil {
+					retained++
+					continue
+				}
+				updated := job
+				updated.OutputURL = prefix + job.ID
+				updated.ProgressPhase = "stored"
+				updated.ErrorMessage = ""
+				if _, updateErr := repository.UpdateMergeJob(r.Context(), owner, job.ID, updated); updateErr != nil {
+					retained++
+					continue
+				}
+				if removeErr := files.Remove(artifactID + ".mp4"); removeErr != nil {
+					retained++
+					continue
+				}
+				migrated++
 			}
-			migrated++
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"migrated": migrated, "retained": retained})
-	})
-	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/merge", func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		var input mergeSubmitInput
-		if !decodeJSON(w, r, &input) {
-			return
-		}
-		if strings.TrimSpace(input.RequestID) == "" {
-			writeStoreError(w, batchfactoryv11.ErrInvalid)
-			return
-		}
-		job, err := service.SubmitBatchMerge(r.Context(), owner, r.PathValue("batchId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, AudioSource: input.AudioSource, AudioArtifactID: input.AudioArtifactID, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
-		if err != nil {
-			writeStoreError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusCreated, map[string]any{"job": job})
-	})
-	mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/merge", func(w http.ResponseWriter, r *http.Request) {
-		owner, ok := bridgeOwner(r)
-		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		var input mergeSubmitInput
-		if !decodeJSON(w, r, &input) {
-			return
-		}
-		if strings.TrimSpace(input.RequestID) == "" {
-			writeStoreError(w, batchfactoryv11.ErrInvalid)
-			return
-		}
-		jobs, err := service.SubmitBookMerge(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, AudioSource: input.AudioSource, AudioArtifactID: input.AudioArtifactID, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
-		if err != nil {
-			writeStoreError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusCreated, map[string]any{"jobs": jobs, "job": jobs[0]})
-	})
+			writeJSON(w, http.StatusOK, map[string]any{"migrated": migrated, "retained": retained})
+		})
+		mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/merge", func(w http.ResponseWriter, r *http.Request) {
+			owner, ok := bridgeOwner(r)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			var input mergeSubmitInput
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if strings.TrimSpace(input.RequestID) == "" {
+				writeStoreError(w, batchfactoryv11.ErrInvalid)
+				return
+			}
+			job, err := service.SubmitBatchMerge(r.Context(), owner, r.PathValue("batchId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, AudioSource: input.AudioSource, AudioArtifactID: input.AudioArtifactID, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"job": job})
+		})
+		mux.HandleFunc("POST /api/batch-factory/v11/batches/{batchId}/books/{bookId}/merge", func(w http.ResponseWriter, r *http.Request) {
+			owner, ok := bridgeOwner(r)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			var input mergeSubmitInput
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			if strings.TrimSpace(input.RequestID) == "" {
+				writeStoreError(w, batchfactoryv11.ErrInvalid)
+				return
+			}
+			jobs, err := service.SubmitBookMerge(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), input.RequestID, batchfactoryv11.MergeOptions{TimingMode: input.TimingMode, AudioSource: input.AudioSource, AudioArtifactID: input.AudioArtifactID, Speed: input.Speed, TTSSpeed: input.TTSSpeed, AudioDurationSeconds: input.AudioDurationSeconds})
+			if err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]any{"jobs": jobs, "job": jobs[0]})
+		})
+	}
 	registerMergeStatusRoute(mux, service, "v11")
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/merge-media/{artifactId}", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -142,10 +144,9 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, err)
 			return
 		}
-		expectedOutput := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/" + artifactID
 		found := false
 		for _, job := range jobs {
-			if job.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(job.OutputURL) == expectedOutput {
+			if job.Status == batchfactoryv11.MergeSucceeded && mergeOutputMatchesArtifact(batchID, artifactID, job.OutputURL) {
 				found = true
 				break
 			}
@@ -196,10 +197,9 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, err)
 			return
 		}
-		expectedOutput := "/api/batch-factory/v12/batches/" + batchID + "/merge-media/" + artifactID
 		found := false
 		for _, job := range jobs {
-			if job.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(job.OutputURL) == expectedOutput {
+			if job.Status == batchfactoryv11.MergeSucceeded && mergeOutputMatchesArtifact(batchID, artifactID, job.OutputURL) {
 				found = true
 				break
 			}
@@ -233,6 +233,16 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		http.ServeContent(w, r, artifactID+".jpg", time.Time{}, cover)
 	})
+}
+
+func mergeOutputMatchesArtifact(batchID, artifactID, outputURL string) bool {
+	outputURL = strings.TrimSpace(outputURL)
+	for _, version := range []string{"v11", "v12"} {
+		if outputURL == "/api/batch-factory/"+version+"/batches/"+batchID+"/merge-media/"+artifactID {
+			return true
+		}
+	}
+	return false
 }
 
 func registerMergeStatusRoute(mux *http.ServeMux, service *batchfactoryv11.MergeService, version string) {

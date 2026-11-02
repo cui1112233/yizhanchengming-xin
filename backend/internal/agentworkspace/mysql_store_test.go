@@ -21,11 +21,11 @@ func TestMySQLStoreCreatesProjectAndEmptyCanvasAtomically(t *testing.T) {
 	defer db.Close()
 	store := NewMySQLStore(db)
 	now := time.Date(2026, 10, 18, 1, 2, 3, 0, time.UTC)
-	appearanceJSON := `{"edgeColor":"coral","edgeAnimated":true,"edgeWidth":"default","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}`
+	appearanceJSON := `{"edgeColor":"neutral","edgeAnimated":false,"edgeWidth":"thin","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}`
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_projects (id, owner_username, title, title_mode, preview, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)).
-		WithArgs("project-1", "alice", "项目", "automatic", "", now, now).
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_projects (id, owner_username, title, title_mode, project_type, preview, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)).
+		WithArgs("project-1", "alice", "项目", "automatic", "video", "", now, now).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_canvases (project_id, owner_username, canvas_version, revision, canvas_json, viewport_json, appearance_json, view_state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)).
 		WithArgs("project-1", "alice", 1, int64(0), sqlmock.AnyArg(), nil, appearanceJSON, nil, now, now).
@@ -99,7 +99,7 @@ func TestMySQLStoreMapsDuplicateProjectForImportRecovery(t *testing.T) {
 	now := time.Date(2026, 10, 18, 1, 2, 3, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_projects (id, owner_username, title, title_mode, preview, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)).
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO agent_projects (id, owner_username, title, title_mode, project_type, preview, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)).
 		WillReturnError(&mysql.MySQLError{Number: 1062, Message: "duplicate"})
 	mock.ExpectRollback()
 
@@ -194,7 +194,7 @@ func TestMySQLStoreSaveCanvasWritesSnapshotAndReconcilesIndexes(t *testing.T) {
 	defer db.Close()
 	store := NewMySQLStore(db)
 	now := time.Date(2026, 10, 19, 1, 2, 3, 0, time.UTC)
-	appearanceJSON := `{"edgeColor":"coral","edgeAnimated":true,"edgeWidth":"default","backgroundDots":true,"alignmentGuides":true,"edgesVisible":false}`
+	appearanceJSON := `{"edgeColor":"neutral","edgeAnimated":false,"edgeWidth":"thin","backgroundDots":true,"alignmentGuides":true,"edgesVisible":false}`
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT revision FROM agent_canvases WHERE project_id = ? AND owner_username = ? FOR UPDATE`)).
@@ -234,7 +234,7 @@ func TestMySQLStoreSaveBatchFactoryProjectionRollsBackCanvasWhenOriginInsertFail
 	defer db.Close()
 	store := NewMySQLStore(db)
 	now := time.Date(2026, 10, 23, 11, 30, 0, 0, time.UTC)
-	appearanceJSON := `{"edgeColor":"coral","edgeAnimated":true,"edgeWidth":"default","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}`
+	appearanceJSON := `{"edgeColor":"neutral","edgeAnimated":false,"edgeWidth":"thin","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}`
 	binding := BatchFactoryBinding{Owner: "alice", BatchID: "batch-1", ProjectID: "project-1"}
 	origin := BatchFactoryNodeOrigin{ProjectID: binding.ProjectID, NodeID: "node-1", BatchID: binding.BatchID, BookID: "book-1", ResourceType: "book_script", ResourceID: "book-1", VersionID: "v1"}
 	wantErr := errors.New("origin insert failed")

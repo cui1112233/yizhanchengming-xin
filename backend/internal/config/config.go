@@ -64,6 +64,10 @@ type Config struct {
 	QingyuMaterialSelectURL       string
 	GiantMaterialPluginURL        string
 	GiantMaterialPluginToken      string
+	N8ComicBaseURL                string
+	N8ComicOpenAPIKey             string
+	N8AdminBaseURL                string
+	N8ComicProducerAccounts       []string
 	LegacyAccountsPath            string
 	PresetPath                    string
 	AutomationPresetPath          string
@@ -83,6 +87,10 @@ func FromEnv() (Config, error) {
 	cfg := Config{ListenAddr: envOr("QIANTIE_GO_LISTEN_ADDR", ":4000"), ReleaseSHA: strings.TrimSpace(os.Getenv("QIANTIE_RELEASE_SHA")), MySQLDSN: strings.TrimSpace(os.Getenv("QIANTIE_MYSQL_DSN")), BridgeSecret: strings.TrimSpace(os.Getenv("QIANTIE_BRIDGE_SECRET")), NovelFetch121Endpoint: envOr("QIANTIE_NOVEL_FETCH_121_ENDPOINT", "https://txt.121w.com/api.php"), NovelFetch121Timeout: time.Duration(novelTimeoutSeconds) * time.Second, DirectorEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_TEXT_ENDPOINT")), DirectorAPIKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_TEXT_API_KEY")), DirectorModel: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_TEXT_MODEL")), DynamicTextProvider: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER")) == "1", VideoEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_VIDEO_ENDPOINT")), VideoPollEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_VIDEO_POLL_ENDPOINT")), VideoAPIKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_VIDEO_API_KEY")), VideoModel: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_VIDEO_MODEL")), ProductionEnabled: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED")) == "1", MergeEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_ENDPOINT")), MergePollEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_POLL_ENDPOINT")), MergeAPIKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_API_KEY")), LocalMergeEnabled: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED")) == "1", MergeTOSEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_ENDPOINT")), MergeTOSRegion: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_REGION")), MergeTOSBucket: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_BUCKET")), MergeTOSAccessKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_ACCESS_KEY")), MergeTOSSecretKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_SECRET_KEY")), MergeTOSPublicBaseURL: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_PUBLIC_BASE_URL")), External121Enabled: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_121_ENABLED")) == "1", External121Endpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_121_ENDPOINT")), External121APIKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_121_API_KEY")), ExternalYadiEnabled: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_YADI_ENABLED")) == "1", ExternalYadiEndpoint: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_YADI_ENDPOINT")), ExternalYadiAPIKey: strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_YADI_API_KEY")), LocalExecutorArtifactDir: envOr("QIANTIE_LOCAL_EXECUTOR_ARTIFACT_DIR", "data/local-executor-artifacts"), LocalExecutorPublicBaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("QIANTIE_LOCAL_EXECUTOR_PUBLIC_BASE_URL")), "/"), QingyuN8AdminToken: strings.TrimSpace(os.Getenv("QINGYU_N8_ADMIN_TOKEN")), QingyuMaterialSelectURL: envOr("QINGYU_MATERIAL_SELECT_URL", "https://n8.hnqingyuwen.top/center-api/material/video/select")}
 	cfg.GiantMaterialPluginURL = strings.TrimRight(strings.TrimSpace(os.Getenv("QIANTIE_GIANT_MATERIAL_PLUGIN_URL")), "/")
 	cfg.GiantMaterialPluginToken = strings.TrimSpace(os.Getenv("QIANTIE_GIANT_MATERIAL_PLUGIN_TOKEN"))
+	cfg.N8ComicBaseURL = strings.TrimRight(envOr("QIANTIE_N8_COMIC_BASE_URL", "https://n8-view.hnqingyuwen.top/center-api"), "/")
+	cfg.N8ComicOpenAPIKey = strings.TrimSpace(os.Getenv("QIANTIE_N8_COMIC_OPEN_API_KEY"))
+	cfg.N8AdminBaseURL = strings.TrimRight(envOr("QIANTIE_N8_ADMIN_BASE_URL", "https://n8-view.hnqingyuwen.top/center-api/auth"), "/")
+	cfg.N8ComicProducerAccounts = uniqueEnvValues(os.Getenv("QIANTIE_N8_COMIC_PRODUCER_ACCOUNTS"))
 	cfg.LocalExecutorDownloadsDir = envOr("QIANTIE_LOCAL_EXECUTOR_DOWNLOADS_DIR", "data/downloads")
 	cfg.MergeEnabled = strings.TrimSpace(os.Getenv("QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED")) == "1" || cfg.LocalMergeEnabled
 	cfg.LegacyAccountsPath = strings.TrimSpace(os.Getenv("QIANTIE_LEGACY_ACCOUNTS_PATH"))
@@ -104,7 +112,10 @@ func FromEnv() (Config, error) {
 	cfg.AgentAssetTOSBucket = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_BUCKET"))
 	cfg.AgentAssetTOSAccessKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_ACCESS_KEY"))
 	cfg.AgentAssetTOSSecretKey = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_TOS_SECRET_KEY"))
-	cfg.AgentAssetLocalDir = strings.TrimSpace(os.Getenv("QIANTIE_AGENT_ASSET_LOCAL_DIR"))
+	// Agent Canvas must always have a durable local target for generated media.
+	// Without this fallback, a valid local executor is rejected before it receives
+	// work whenever a launcher omits QIANTIE_AGENT_ASSET_LOCAL_DIR.
+	cfg.AgentAssetLocalDir = envOr("QIANTIE_AGENT_ASSET_LOCAL_DIR", "data/agent-assets")
 	if cfg.NovelFetchTOSEndpoint == "" {
 		cfg.NovelFetchTOSEndpoint = cfg.MergeTOSEndpoint
 	}
@@ -119,6 +130,21 @@ func FromEnv() (Config, error) {
 	}
 	if cfg.NovelFetchTOSSecretKey == "" {
 		cfg.NovelFetchTOSSecretKey = cfg.MergeTOSSecretKey
+	}
+	if cfg.AgentAssetTOSEndpoint == "" {
+		cfg.AgentAssetTOSEndpoint = cfg.NovelFetchTOSEndpoint
+	}
+	if cfg.AgentAssetTOSRegion == "" {
+		cfg.AgentAssetTOSRegion = cfg.NovelFetchTOSRegion
+	}
+	if cfg.AgentAssetTOSBucket == "" {
+		cfg.AgentAssetTOSBucket = cfg.NovelFetchTOSBucket
+	}
+	if cfg.AgentAssetTOSAccessKey == "" {
+		cfg.AgentAssetTOSAccessKey = cfg.NovelFetchTOSAccessKey
+	}
+	if cfg.AgentAssetTOSSecretKey == "" {
+		cfg.AgentAssetTOSSecretKey = cfg.NovelFetchTOSSecretKey
 	}
 	if cfg.MySQLDSN == "" {
 		return Config{}, fmt.Errorf("QIANTIE_MYSQL_DSN is required")
@@ -164,6 +190,25 @@ func FromEnv() (Config, error) {
 		}
 	}
 	return cfg, nil
+}
+
+func uniqueEnvValues(raw string) []string {
+	seen := map[string]struct{}{}
+	values := make([]string, 0)
+	for _, item := range strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == '，' || r == ';' || r == '；' || r == '\n' || r == '\r'
+	}) {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		values = append(values, value)
+	}
+	return values
 }
 
 func decodeCredentialKey(raw string) ([]byte, error) {

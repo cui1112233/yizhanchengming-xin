@@ -13,6 +13,7 @@ const (
 	comicPageSlot            = "batch.comic-page"
 	comicImageDerivationSlot = "batch.comic-image-derivation"
 	comicStyleSlot           = "batch.comic-style"
+	comicReferenceSceneSlot  = "batch.comic-reference-scene"
 )
 
 func normalizeBatchFactoryProductionMode(value string) (string, error) {
@@ -36,8 +37,23 @@ func hydrateBatchFactoryPromptConfig(catalog *prompt.Catalog, raw json.RawMessag
 	if err := json.Unmarshal(raw, &config); err != nil || config == nil {
 		return nil, fmt.Errorf("漫画提示词配置格式不正确")
 	}
+	// Video selections are also chosen by ID in the browser. Resolve the
+	// published body here so the director receives the administrator's actual
+	// prompt instead of an ID with an empty body and its built-in fallback.
+	if video, ok := config["video"].(map[string]any); ok && video != nil {
+		if err := freezePromptSelection(catalog, video, "batch-factory", "batch.video-meta", ""); err != nil {
+			return nil, fmt.Errorf("视频提示词：%w", err)
+		}
+	}
 	comic, ok := config["comic"].(map[string]any)
 	if !ok || comic == nil {
+		if _, hasVideo := config["video"]; hasVideo {
+			encoded, err := json.Marshal(config)
+			if err != nil {
+				return nil, fmt.Errorf("保存视频提示词配置失败")
+			}
+			return encoded, nil
+		}
 		return raw, nil
 	}
 	if err := freezePromptSelection(catalog, comic, "batch-factory", comicPageSlot, ""); err != nil {
@@ -56,6 +72,13 @@ func hydrateBatchFactoryPromptConfig(catalog *prompt.Catalog, raw json.RawMessag
 	if style, ok := comic["style"].(map[string]any); ok && style != nil {
 		if err := freezePromptSelection(catalog, style, "batch-factory", comicStyleSlot, ""); err != nil {
 			return nil, fmt.Errorf("漫画画风：%w", err)
+		}
+	}
+	if reference, ok := comic["globalReferenceImage"].(map[string]any); ok && reference != nil {
+		if scene, ok := reference["scene"].(map[string]any); ok && scene != nil {
+			if err := freezePromptSelection(catalog, scene, "batch-factory", comicReferenceSceneSlot, ""); err != nil {
+				return nil, fmt.Errorf("漫画场景参考图：%w", err)
+			}
 		}
 	}
 	if values, ok := comic["constraints"].([]any); ok {

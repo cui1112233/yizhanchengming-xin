@@ -30,7 +30,7 @@ export function normalizeExtractInfo(value) {
   return {
     characters,
     scenes,
-    // 小说面板提取会返回一条由题材决定的统一风格。它是画面前缀的
+    // 提取流程会返回一条由题材决定的统一风格。它是画面前缀的
     // 动态来源，不能在剧本生成时丢弃，否则只能使用静态的“真人实拍”。
     visualStyle: typeof value?.visualStyle === 'string' ? value.visualStyle.trim() : '',
     protagonistIds: Array.isArray(value?.protagonistIds)

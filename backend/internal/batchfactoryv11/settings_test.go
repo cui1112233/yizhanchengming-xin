@@ -17,6 +17,18 @@ func TestSparsePatchPreservesFalseEmptyZero(t *testing.T) {
 	}
 }
 
+func TestNormalizeProductionModeDefaultsToVideo(t *testing.T) {
+	if got := normalizeProductionMode(SettingsPatch{}); got != "video" {
+		t.Fatalf("got %q want video", got)
+	}
+	if got := normalizeProductionMode(SettingsPatch{"productionMode": raw("comic")}); got != "comic" {
+		t.Fatalf("got %q want comic", got)
+	}
+	if got := normalizeProductionMode(SettingsPatch{"productionMode": raw("unknown")}); got != "video" {
+		t.Fatalf("got %q want video", got)
+	}
+}
+
 func TestRestoreInheritanceRemovesOnlySelectedCurrentScopeKeys(t *testing.T) {
 	current := SettingsPatch{"quality": raw("book"), "enabled": raw(false), "duration": raw(0)}
 	got := ApplySparseUpdate(current, SettingsUpdate{RestoreKeys: []string{"quality"}})

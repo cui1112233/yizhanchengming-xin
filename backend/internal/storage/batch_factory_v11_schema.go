@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 func V11FoundationStatements() []string {
@@ -450,14 +451,11 @@ func V11BookAssetsStatements() []string {
 // failure where the migration ledger was written even though the book-assets
 // table was absent. A healthy installation merely performs the existence check.
 func reconcileV11BookAssetsLedger(ctx context.Context, tx *sql.Tx) error {
-	var exists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
-  SELECT 1 FROM information_schema.tables
-  WHERE table_schema = DATABASE() AND table_name = 'batch_factory_v11_book_assets'
-)`).Scan(&exists); err != nil {
+	table, err := v11CanonicalTableName(ctx, tx, "batch_factory_v11_book_assets")
+	if err != nil {
 		return err
 	}
-	if exists {
+	if table == "batch_factory_v12_book_assets" {
 		return nil
 	}
 	for _, statement := range V11BookAssetsStatements() {
@@ -506,12 +504,32 @@ func reconcileV11SeparateVideoPromptLedger(ctx context.Context, tx *sql.Tx) erro
 }
 
 func v11ColumnExists(ctx context.Context, tx *sql.Tx, table, column string) (bool, error) {
+	canonical, err := v11CanonicalTableName(ctx, tx, table)
+	if err != nil {
+		return false, err
+	}
 	var exists bool
-	err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+	err = tx.QueryRowContext(ctx, `SELECT EXISTS(
   SELECT 1 FROM information_schema.columns
   WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
-)`, table, column).Scan(&exists)
+)`, canonical, column).Scan(&exists)
 	return exists, err
+}
+
+func v11CanonicalTableName(ctx context.Context, tx *sql.Tx, table string) (string, error) {
+	var canonical string
+	err := tx.QueryRowContext(ctx, `SELECT COALESCE(
+  (SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1),
+  (SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? LIMIT 1),
+  ''
+)`, table, strings.Replace(table, "batch_factory_v11_", "batch_factory_v12_", 1)).Scan(&canonical)
+	if err != nil {
+		return "", err
+	}
+	if canonical == "" {
+		return table, nil
+	}
+	return canonical, nil
 }
 
 func v11ColumnsExist(ctx context.Context, tx *sql.Tx, table string, columns ...string) (bool, error) {
@@ -525,8 +543,12 @@ func v11ColumnsExist(ctx context.Context, tx *sql.Tx, table string, columns ...s
 }
 
 func v11IndexExists(ctx context.Context, tx *sql.Tx, table, index string) (bool, error) {
+	canonical, err := v11CanonicalTableName(ctx, tx, table)
+	if err != nil {
+		return false, err
+	}
 	var count int
-	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`, table, index).Scan(&count)
+	err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`, canonical, index).Scan(&count)
 	return count > 0, err
 }
 
@@ -592,8 +614,12 @@ func reconcileV11MergeProgressLedger(ctx context.Context, tx *sql.Tx) error {
 }
 
 func ensureV11ProductionTaskAttemptIndex(ctx context.Context, tx *sql.Tx) error {
+	table, err := v11CanonicalTableName(ctx, tx, "batch_factory_v11_production_tasks")
+	if err != nil {
+		return err
+	}
 	var columns string
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(GROUP_CONCAT(column_name ORDER BY seq_in_index), '') FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'batch_factory_v11_production_tasks' AND index_name = 'uq_bfv11_production_task_attempt'`).Scan(&columns); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(GROUP_CONCAT(column_name ORDER BY seq_in_index), '') FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = 'uq_bfv11_production_task_attempt'`, table).Scan(&columns); err != nil {
 		return err
 	}
 	if columns == "job_id,video_id,opening_variant_index,attempt" {
@@ -605,15 +631,15 @@ func ensureV11ProductionTaskAttemptIndex(ctx context.Context, tx *sql.Tx) error 
 			return err
 		}
 		if !jobIndexExists {
-			if _, err := tx.ExecContext(ctx, `ALTER TABLE batch_factory_v11_production_tasks ADD KEY idx_bfv11_production_tasks_job_id (job_id)`); err != nil {
+			if _, err := tx.ExecContext(ctx, "ALTER TABLE "+table+" ADD KEY idx_bfv11_production_tasks_job_id (job_id)"); err != nil {
 				return err
 			}
 		}
-		if _, err := tx.ExecContext(ctx, `ALTER TABLE batch_factory_v11_production_tasks DROP INDEX uq_bfv11_production_task_attempt`); err != nil {
+		if _, err := tx.ExecContext(ctx, "ALTER TABLE "+table+" DROP INDEX uq_bfv11_production_task_attempt"); err != nil {
 			return err
 		}
 	}
-	_, err := tx.ExecContext(ctx, `ALTER TABLE batch_factory_v11_production_tasks ADD UNIQUE KEY uq_bfv11_production_task_attempt (job_id, video_id, opening_variant_index, attempt)`)
+	_, err = tx.ExecContext(ctx, "ALTER TABLE "+table+" ADD UNIQUE KEY uq_bfv11_production_task_attempt (job_id, video_id, opening_variant_index, attempt)")
 	return err
 }
 
@@ -858,6 +884,36 @@ func V11ComicPageSnapshotStatements() []string {
 	return []string{`ALTER TABLE batch_factory_v11_comic_pages ADD COLUMN snapshot_hash VARCHAR(64) NULL AFTER status`}
 }
 
+func V11ComicPageReferenceImageStatements() []string {
+	return []string{`ALTER TABLE batch_factory_v11_comic_pages ADD COLUMN reference_image_urls JSON NULL AFTER snapshot_hash`}
+}
+
+func V11ComicSourceSegmentStatements() []string {
+	return []string{`CREATE TABLE IF NOT EXISTS batch_factory_v11_comic_source_segments (
+  video_id VARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_username VARCHAR(191) NOT NULL,
+  batch_id VARCHAR(64) NOT NULL,
+  book_id VARCHAR(64) NOT NULL,
+  start_offset INT NOT NULL,
+  end_offset INT NOT NULL,
+  source_text MEDIUMTEXT NOT NULL,
+  character_count INT NOT NULL,
+  boundary_type VARCHAR(32) NOT NULL,
+  reason VARCHAR(64) NOT NULL,
+  source_digest VARCHAR(64) NOT NULL,
+  segmentation_version BIGINT NOT NULL,
+  prompt_stale BOOLEAN NOT NULL DEFAULT FALSE,
+  media_stale BOOLEAN NOT NULL DEFAULT FALSE,
+  revision BIGINT NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  KEY idx_bfv11_comic_source_book (owner_username,batch_id,book_id,segmentation_version),
+  FOREIGN KEY (batch_id) REFERENCES batch_factory_v11_batches(id) ON DELETE CASCADE,
+  FOREIGN KEY (book_id) REFERENCES batch_factory_v11_books(id) ON DELETE CASCADE,
+  FOREIGN KEY (video_id) REFERENCES batch_factory_v11_video_records(video_id) ON DELETE CASCADE
+) ENGINE=InnoDB`}
+}
+
 func V11Migrations() []Migration {
 	return []Migration{
 		{Version: 1100001, SQL: V11FoundationStatements(), CallbackChecksum: "batch-factory-v11-foundation-v1"},
@@ -905,6 +961,8 @@ func V11Migrations() []Migration {
 		{Version: 1100028, SQL: V11ComicPageStatements(), CallbackChecksum: "batch-factory-v11-comic-pages-v1", LegacyChecksums: []string{"402a7b76a317be5a5a753a64e179f6bee5d426b2382ba6b1fd8ad3f605e904c2"}},
 		{Version: 1100029, SQL: V11ComicPageStatements(), CallbackChecksum: "batch-factory-v11-comic-pages-repair-v1"},
 		{Version: 1100030, SQL: V11ComicPageSnapshotStatements(), CallbackChecksum: "batch-factory-v11-comic-page-snapshot-v1"},
+		{Version: 1100031, SQL: V11ComicPageReferenceImageStatements(), CallbackChecksum: "batch-factory-v11-comic-page-reference-images-v1"},
+		{Version: 1100032, SQL: V11ComicSourceSegmentStatements(), CallbackChecksum: "batch-factory-v11-comic-source-segments-v1"},
 	}
 }
 

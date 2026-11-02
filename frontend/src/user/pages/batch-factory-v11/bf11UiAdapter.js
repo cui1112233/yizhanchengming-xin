@@ -296,7 +296,8 @@ export function createBf11UiAdapter(api) {
       if (!batchId || !requestId) throw new Error('V11 batch and request ids are required');
       if (bookId) {
         if (typeof api.submitBookMerge !== 'function') throw new Error('单本小说合并接口未接入');
-        return api.submitBookMerge(batchId, bookId, requestId, {
+        return api.submitBookMerge(batchId, bookId, {
+          requestId,
           timingMode,
           speed: Number(speed),
           ttsSpeed: Number(ttsSpeed),

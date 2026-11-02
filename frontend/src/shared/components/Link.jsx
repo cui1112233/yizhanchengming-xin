@@ -1,8 +1,19 @@
-export function Link({ href, children, className, onClick, reload = false }) {
+import { useRef } from 'react';
+
+export function Link({ href, children, className, onClick, onIntent, reload = false }) {
+  const didIntent = useRef(false);
+  const triggerIntent = () => {
+    if (didIntent.current) return;
+    didIntent.current = true;
+    onIntent?.();
+  };
+
   return (
     <a
       href={href}
       className={className}
+      onMouseEnter={triggerIntent}
+      onFocus={triggerIntent}
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;

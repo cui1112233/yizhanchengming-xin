@@ -75,6 +75,20 @@ func (s *ReadbackMySQLStore) hydrateSettingsState(ctx context.Context, owner str
 				video.VideoPrompt = storyboardVideoPrompt(book.DirectorRevision.Output.Storyboard[videoIndex])
 			}
 		}
+		segmentation, err := s.GetComicSourceSegmentation(ctx, owner, batch.ID, book.ID)
+		if err == nil {
+			segmentsByVideo := make(map[string]ComicSourceSegment, len(segmentation.Segments))
+			for _, segment := range segmentation.Segments {
+				segmentsByVideo[segment.VideoID] = segment
+			}
+			for videoIndex := range book.Videos {
+				if segment, ok := segmentsByVideo[book.Videos[videoIndex].ID]; ok {
+					book.Videos[videoIndex].ComicSourceSegment = &segment
+				}
+			}
+		} else if !errors.Is(err, ErrNotFound) {
+			return Batch{}, err
+		}
 	}
 	return batch, nil
 }

@@ -1,7 +1,7 @@
 import { Button, Popover, Select } from 'antd';
 import { WandSparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { getBatch, listPrompts, saveBatchSettings } from '../../shared/api/batchFactoryV11';
+import { getBatch, listPrompts, saveBatchSettings } from '../../shared/api/batchFactory';
 import { batchFactoryPromptSelectorTypes, saveBatchFactoryPromptSelection } from '../pages/agent-canvas-prompt-selection';
 
 const PROMPT_LABELS = {

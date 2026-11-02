@@ -1,10 +1,7 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,40 +45,6 @@ func toString(value any) string {
 	return ""
 }
 
-func listNovelPanelHistory(root, username string) []map[string]any {
-	projectsDir := filepath.Join(root, username, "novel-panel", "projects")
-	entries, err := os.ReadDir(projectsDir)
-	if err != nil {
-		return []map[string]any{}
-	}
-	result := make([]map[string]any, 0)
-	for _, entry := range entries {
-		if !entry.Type().IsRegular() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		raw, err := os.ReadFile(filepath.Join(projectsDir, entry.Name()))
-		if err != nil {
-			continue
-		}
-		var project map[string]any
-		if json.Unmarshal(raw, &project) != nil {
-			continue
-		}
-		id := strings.TrimSpace(toString(project["id"]))
-		if id == "" {
-			id = strings.TrimSuffix(entry.Name(), ".json")
-		}
-		name := strings.TrimSpace(toString(project["name"]))
-		if name == "" {
-			name = "未命名小说面板项目"
-		}
-		created := platformTime(project["created_at"])
-		updated := platformTime(project["updated_at"])
-		result = append(result, map[string]any{"id": "novel-panel:" + id, "sourceId": id, "kind": "novel-panel", "typeLabel": "小说面板", "name": name, "summary": "小说分析、人物场景与分镜项目", "createdAt": created, "updatedAt": updated, "route": "/novel-panel?project=" + id})
-	}
-	return result
-}
-
 func RegisterPlatformProjectsRoute(root *http.ServeMux, middleware BridgeAuth, history *ScriptHistoryStore, store batchfactoryv11.Store) {
 	if root == nil || history == nil || store == nil {
 		return
@@ -118,7 +81,6 @@ func RegisterPlatformProjectsRoute(root *http.ServeMux, middleware BridgeAuth, h
 				}
 			}
 		}
-		entries = append(entries, listNovelPanelHistory(history.Root, identity.Username)...)
 		batches, batchErr := store.ListBatches(req.Context(), identity.Username)
 		unavailable := []string{}
 		if batchErr != nil {

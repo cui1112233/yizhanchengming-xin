@@ -7,12 +7,14 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 type recordingAgentNodeObjectStore struct {
@@ -73,6 +75,25 @@ func newAgentNodeGenerationTestStore(t *testing.T, now time.Time, node agentwork
 		t.Fatal(err)
 	}
 	return store
+}
+
+func TestAgentImageGenerationRejectsDisabledSelectedCatalogModel(t *testing.T) {
+	now := time.Date(2026, 10, 23, 18, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Version: 1, Status: "draft"})
+	catalog := novelfetchworkshop.NewMemoryStore()
+	if err := catalog.PutConfig(context.Background(), "alice", map[string]any{"modelCatalog": []any{
+		map[string]any{"id": "image-disabled", "kind": "image", "enabled": false},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
+		Projects: store, Catalog: catalog, Assets: agentworkspace.NewMemoryAssetStore(), QueueImages: true, Now: func() time.Time { return now },
+	})
+	response := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-disabled","prompt":"雨夜街道","idempotencyKey":"disabled-model"}`)
+	if response.Code != http.StatusUnprocessableEntity || !strings.Contains(response.Body.String(), "当前模型不可用") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
 }
 
 func TestAgentTextGenerationUsesRequestedOwnerModelAndAppliesResult(t *testing.T) {
@@ -143,6 +164,46 @@ func TestAgentImageGenerationRejectsUnsupportedNestedCapabilityValue(t *testing.
 	}
 	if calls != 0 {
 		t.Fatalf("image generator calls=%d, want 0", calls)
+	}
+}
+
+func TestAgentImageGenerationStoresResolvedCanvasInputSnapshot(t *testing.T) {
+	now := time.Date(2026, 10, 23, 10, 0, 0, 0, time.UTC)
+	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "text-1", Type: "text", Title: "设定", Summary: "雨夜街道", Version: 1, Status: "confirmed"})
+	canvas, err := store.Canvas(context.Background(), "alice", "project-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	canvas.Nodes = append(canvas.Nodes, agentworkspace.Node{ID: "image-1", Type: "image", Title: "画面", Version: 1, Status: "draft", Config: map[string]any{"prompt": "霓虹倒影"}})
+	canvas.Edges = []agentworkspace.Edge{{ID: "edge-text", Source: "text-1", Target: "image-1"}}
+	if _, err := store.SaveCanvas(context.Background(), "alice", "project-1", canvas, canvas.Revision, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterAgentNodeGenerationRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, AgentNodeGenerationServices{
+		Projects: store, Assets: agentworkspace.NewMemoryAssetStore(), QueueImages: true, Now: func() time.Time { return now },
+		ImageGenerate: func(context.Context, string, AgentImageGenerationInput) ([]string, int, error) {
+			return nil, http.StatusOK, nil
+		},
+	})
+	body := `{"nodeId":"image-1","nodeVersion":1,"modelId":"image-primary","prompt":"雨夜街道\n霓虹倒影","parameters":{"ratio":"16:9","quality":"standard","resolution":"2K","count":1},"idempotencyKey":"image-resolved-inputs"}`
+	recorder := agentRequest(t, mux, now, http.MethodPost, "/api/agent/tasks/project-1/image-generations", body)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	tasks, err := store.ListGenerationTasks(context.Background(), "alice", "project-1")
+	if err != nil || len(tasks) != 1 {
+		t.Fatalf("tasks=%+v err=%v", tasks, err)
+	}
+	snapshot, ok := tasks[0].Settings["resolvedInputs"].(map[string]any)
+	if !ok {
+		t.Fatalf("resolvedInputs=%#v", tasks[0].Settings["resolvedInputs"])
+	}
+	if got, want := snapshot["prompt"], "雨夜街道\n霓虹倒影"; got != want {
+		t.Fatalf("snapshot prompt=%#v want=%q", got, want)
+	}
+	if got, want := snapshot["sourceNodeIds"], []any{"text-1", "image-1"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("snapshot sources=%#v want=%#v", got, want)
 	}
 }
 

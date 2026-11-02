@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -82,6 +85,86 @@ func (d safeLocalMergeDownloader) Download(ctx context.Context, sources []MergeM
 	return paths, nil
 }
 
+const localExecutorArtifactMergePath = "/api/shuihuo-production/local-executor-artifacts/"
+
+var localExecutorArtifactID = regexp.MustCompile(`^lea_[A-Za-z0-9_-]{3,92}$`)
+
+// artifactAwareLocalMergeDownloader reads only the exact, owner-scoped media
+// route produced by the local executor. Every other source stays on the
+// public-HTTPS downloader path and retains its SSRF protections.
+type artifactAwareLocalMergeDownloader struct {
+	artifacts *localartifact.Store
+	remote    safeLocalMergeDownloader
+}
+
+func (d artifactAwareLocalMergeDownloader) Download(ctx context.Context, sources []MergeMedia, dir string, onProgress func(int, int)) ([]string, error) {
+	paths := make([]string, 0, len(sources))
+	for index, source := range sources {
+		sourceDir := filepath.Join(dir, fmt.Sprintf("%04d", index))
+		if artifactID, ok := localExecutorArtifactIDFromMergeSource(source.MediaURL); ok {
+			if d.artifacts == nil {
+				return nil, fmt.Errorf("local executor artifact store is unavailable")
+			}
+			if err := os.MkdirAll(sourceDir, 0o700); err != nil {
+				return nil, err
+			}
+			input, err := d.artifacts.Open(artifactID + ".mp4")
+			if err != nil {
+				return nil, fmt.Errorf("open local executor video %s: %w", artifactID, err)
+			}
+			outputPath := filepath.Join(sourceDir, "0000.mp4")
+			output, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			if err != nil {
+				_ = input.Close()
+				return nil, err
+			}
+			_, err = io.Copy(output, input)
+			closeInputErr := input.Close()
+			closeOutputErr := output.Close()
+			if err != nil {
+				_ = os.Remove(outputPath)
+				return nil, err
+			}
+			if closeInputErr != nil {
+				_ = os.Remove(outputPath)
+				return nil, closeInputErr
+			}
+			if closeOutputErr != nil {
+				_ = os.Remove(outputPath)
+				return nil, closeOutputErr
+			}
+			paths = append(paths, outputPath)
+		} else {
+			downloaded, err := d.remote.Download(ctx, []MergeMedia{{
+				ProductionJobID: source.ProductionJobID, VideoID: source.VideoID, MediaURL: source.MediaURL, Order: 0,
+			}}, sourceDir, nil)
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, downloaded...)
+		}
+		if onProgress != nil {
+			onProgress(index+1, len(sources))
+		}
+	}
+	return paths, nil
+}
+
+func localExecutorArtifactIDFromMergeSource(raw string) (string, bool) {
+	parsed, err := url.ParseRequestURI(strings.TrimSpace(raw))
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+	if !strings.HasPrefix(parsed.Path, localExecutorArtifactMergePath) {
+		return "", false
+	}
+	id := strings.TrimPrefix(parsed.Path, localExecutorArtifactMergePath)
+	if id == "" || strings.Contains(id, "/") || filepath.Base(id) != id || !localExecutorArtifactID.MatchString(id) {
+		return "", false
+	}
+	return id, true
+}
+
 func NewLocalMergeAdapter(artifacts *localartifact.Store) *LocalMergeAdapter {
 	workRoot := os.TempDir()
 	if artifacts != nil && strings.TrimSpace(artifacts.Root()) != "" {
@@ -94,7 +177,7 @@ func NewLocalMergeAdapter(artifacts *localartifact.Store) *LocalMergeAdapter {
 	_ = reclaimStaleLocalMergeWorkspaces(workRoot, time.Now())
 	return &LocalMergeAdapter{
 		Artifacts:  artifacts,
-		Downloader: safeLocalMergeDownloader{delegate: &mergeworker.Downloader{}},
+		Downloader: artifactAwareLocalMergeDownloader{artifacts: artifacts, remote: safeLocalMergeDownloader{delegate: &mergeworker.Downloader{}}},
 		Merger:     &mergeworker.FFmpegRunner{},
 		WorkRoot:   workRoot,
 		tasks:      map[string]MergeJob{},

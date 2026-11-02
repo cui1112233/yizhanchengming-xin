@@ -19,9 +19,10 @@ test('uses only Batch Factory data and keeps novel-fetch intake handoff', () => 
   assert.doesNotMatch(page, /CommentaryWorkbench/);
 });
 
-test('creates a batch from an intake when the giant-material flow has already registered its placeholder book', () => {
+test('preserves unified defaults when the giant-material flow creates its registered batch', () => {
   const page = fs.readFileSync(pagePath, 'utf8');
-  assert.match(page, /input\?\.intakeId\s*\?\s*await createBatchFromIntake\(input\.intakeId,\s*\{\s*title: input\.title,\s*giantAutomation: input\.giantAutomation\s*\}\)/s);
+  // Dropping initialBatchSettings here silently changes a comic batch back to video defaults.
+  assert.match(page, /input\?\.intakeId\s*\?\s*await createBatchFromIntake\(input\.intakeId,\s*\{\s*title: input\.title,\s*initialBatchSettings: input\.initialBatchSettings,\s*giantAutomationPlan: input\.giantAutomationPlan\s*\}\)/s);
 });
 
 test('novel-fetch handoff always opens a new batch instead of appending to the active batch', () => {
@@ -46,6 +47,11 @@ test('restores the last active batch when opening the canonical Shuihuo entry', 
   const page = fs.readFileSync(pagePath, 'utf8');
   assert.match(page, /localStorage\.getItem\(BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY\)/);
   assert.match(page, /openBatch\(activeBatchId\)/);
+});
+
+test('accepts the public batchId query parameter used by Batch Factory links', () => {
+  const page = fs.readFileSync(pagePath, 'utf8');
+  assert.match(page, /params\.get\('batchId'\) \|\| params\.get\('batch'\) \|\| params\.get\('project'\)/);
 });
 
 test('returns the created batch so giant-material OCR can bind its executor job', () => {

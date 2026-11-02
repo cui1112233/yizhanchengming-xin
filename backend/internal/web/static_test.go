@@ -66,13 +66,17 @@ func TestStaticHandlerServesAdminShell(t *testing.T) {
 	}{
 		{"/admin", "admin"},
 		{"/admin/presets", "admin"},
-		{"/novel-panel", "shell"},
 	} {
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, tc.path, nil))
 		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), tc.want) {
 			t.Fatalf("%s returned status %d body %q, want %q", tc.path, res.Code, res.Body.String(), tc.want)
 		}
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/novel-panel", nil))
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("removed novel panel status = %d, want %d", res.Code, http.StatusNotFound)
 	}
 }
 

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -44,7 +45,7 @@ func (s *agentImageCoordinator) pollPendingOnce(ctx context.Context) error {
 	if s == nil || s.services.Projects == nil {
 		return nil
 	}
-	tasks, err := s.services.Projects.ListRunnableGenerationTasksByModes(ctx, []string{"text_to_image", "image_to_image", "image_generation"}, 100)
+	tasks, err := s.services.Projects.ListRunnableGenerationTasksByModes(ctx, []string{"text_to_image", "image_to_image", "image_generation", "image_crop", "image_rotate", "image_mirror", "image_grid_split"}, 100)
 	if err != nil {
 		return err
 	}
@@ -77,8 +78,20 @@ func (s *agentImageCoordinator) release(id string) {
 
 func (s *agentImageCoordinator) execute(ctx context.Context, task agentworkspace.GenerationTask) error {
 	services := s.services
-	if services.ImageGenerate == nil || services.Assets == nil || services.Objects == nil {
-		return s.fail(ctx, task, "图片生成服务尚未配置")
+	if services.Assets == nil || services.Objects == nil || (imageToolTaskMode(task.Mode) && services.ImageProcess == nil) || (!imageToolTaskMode(task.Mode) && services.ImageGenerate == nil) {
+		log.Printf("agent image task unavailable id=%s mode=%s assets=%t objects=%t image_generate=%t image_process=%t", task.ID, task.Mode, services.Assets != nil, services.Objects != nil, services.ImageGenerate != nil, services.ImageProcess != nil)
+	}
+	if services.Assets == nil {
+		return s.fail(ctx, task, "图片生成服务未配置：缺少结果素材记录存储")
+	}
+	if services.Objects == nil {
+		return s.fail(ctx, task, "图片生成服务未配置：缺少结果素材存储")
+	}
+	if imageToolTaskMode(task.Mode) && services.ImageProcess == nil {
+		return s.fail(ctx, task, "图片编辑服务未配置")
+	}
+	if !imageToolTaskMode(task.Mode) && services.ImageGenerate == nil {
+		return s.fail(ctx, task, "图片生成服务未配置：缺少图片模型执行器")
 	}
 	if task.State == agentworkspace.GenerationQueued {
 		var err error
@@ -86,6 +99,22 @@ func (s *agentImageCoordinator) execute(ctx context.Context, task agentworkspace
 		if err != nil {
 			return err
 		}
+	}
+	if imageToolTaskMode(task.Mode) {
+		outputs, err := runAgentImageTool(ctx, task.OwnerUsername, task.ProjectID, task, services)
+		if err != nil {
+			return s.fail(ctx, task, err.Error())
+		}
+		results, err := persistAgentImageToolOutputs(ctx, task.OwnerUsername, task.ProjectID, outputs, services)
+		if err != nil {
+			return s.fail(ctx, task, "图片编辑结果保存失败")
+		}
+		current, err := services.Projects.GenerationTask(ctx, task.OwnerUsername, task.ProjectID, task.ID)
+		if err != nil || current.State == agentworkspace.GenerationCancelled {
+			return err
+		}
+		_, err = services.Projects.TransitionGenerationTask(ctx, task.OwnerUsername, task.ProjectID, task.ID, agentworkspace.GenerationTaskTransition{State: agentworkspace.GenerationAwaitingConfirmation, Results: results, SelectedResultID: results[0].ID, ExpectedUpdatedAt: current.UpdatedAt, Now: s.now().UTC()})
+		return err
 	}
 	parameters, _ := task.Settings["parameters"].(map[string]any)
 	advanced, _ := task.Settings["advanced"].(map[string]any)

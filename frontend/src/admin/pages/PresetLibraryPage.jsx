@@ -1,6 +1,7 @@
-import { Alert, Button, Collapse, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Alert, Button, Collapse, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, Typography, Upload as AntUpload, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { createPresetDraft, listAdminPresetSlots, listAdminPresets, publishPreset, rollbackPreset, updatePresetDraft } from '../../shared/api/admin';
+import { archivePreset, createPresetDraft, deletePreset, listAdminPresetSlots, listAdminPresets, loadAdminComicMaterialPreview, publishPreset, rollbackPreset, updatePresetDraft, uploadAdminComicMaterial } from '../../shared/api/admin';
 
 const modules = [
   { label: '剧本生成', value: 'script' },
@@ -70,8 +71,9 @@ const comicSlots = new Set([
   'batch.comic.assets.prop',
   'batch.comic.character-image-template',
   'batch.comic-page',
-  'batch.comic-image-derivation',
-  'batch.comic-style'
+	'batch.comic-image-derivation',
+	'batch.comic-style',
+	'batch.comic-reference-scene'
 ]);
 
 const comicAssetSlots = new Set([
@@ -88,6 +90,16 @@ const comicConstraintCategories = new Set([
   'comic_negative'
 ]);
 
+const comicConstraintLabels = {
+  comic_quality: '画质约束',
+  comic_restriction: '画面限制',
+  comic_negative: '负面提示词'
+};
+
+function constraintIDPrefix(category) {
+  return `script-constraint-${String(category || '').replace(/_/g, '-')}`;
+}
+
 // 批量工厂页与剧本生成页一样按 Collapse 分区展示：资产生成 → 剧情改编 → 视频提示词 → 漫画生成。
 // 顺序固定，便于管理员定位；版本管理与归属列保持不变。
 const batchFactoryPresetSections = [
@@ -95,6 +107,7 @@ const batchFactoryPresetSections = [
     key: 'batch-assets',
     title: '资产生成',
     description: '人物、场景、道具资产提取与一致性提示词。',
+	createSlot: 'batch.assets-h3-skill',
     matches: preset => [
       'batch-assets-h3',
       'batch-assets-h3-skill',
@@ -110,6 +123,7 @@ const batchFactoryPresetSections = [
     key: 'batch-adaptation',
     title: '剧情改编',
     description: '开头改编与导演拆分规则。',
+	createSlot: 'batch.hook-adaptation',
     matches: preset => [
       'batch-hook-adaptation',
       'batch-original-director',
@@ -121,6 +135,7 @@ const batchFactoryPresetSections = [
     key: 'batch-video',
     title: '视频提示词',
     description: '视频分镜、画面提示词与视频风格前缀。',
+	createSlot: 'batch.video-meta',
     matches: preset => [
       'batch-video-meta',
       'batch-video-h3-director',
@@ -136,10 +151,11 @@ const batchFactoryPresetSections = [
     matches: preset => comicSlots.has(preset.protocolLock?.slot)
       || comicConstraintCategories.has(preset.protocolLock?.category),
     subSections: [
-      { title: '资产推导', filter: preset => comicAssetSlots.has(preset.protocolLock?.slot) },
-      { title: '漫画分镜与页面', filter: preset => preset.protocolLock?.slot === 'batch.comic-page' },
-      { title: '图片描述词', filter: preset => preset.protocolLock?.slot === 'batch.comic-image-derivation' },
-      { title: '画风库', filter: preset => preset.protocolLock?.slot === 'batch.comic-style' },
+      { title: '资产推导', createSlot: 'batch.comic-assets', filter: preset => comicAssetSlots.has(preset.protocolLock?.slot) },
+      { title: '漫画分镜与页面', createSlot: 'batch.comic-page', filter: preset => preset.protocolLock?.slot === 'batch.comic-page' },
+      { title: '图片描述词', createSlot: 'batch.comic-image-derivation', filter: preset => preset.protocolLock?.slot === 'batch.comic-image-derivation' },
+      { title: '画风库', createSlot: 'batch.comic-style', filter: preset => preset.protocolLock?.slot === 'batch.comic-style' },
+	  { title: '场景参考图库', createSlot: 'batch.comic-reference-scene', filter: preset => preset.protocolLock?.slot === 'batch.comic-reference-scene' },
       { title: '漫画约束', filter: preset => comicConstraintCategories.has(preset.protocolLock?.category) }
     ]
   },
@@ -164,6 +180,23 @@ const batchFactoryPresetSections = [
     ]
   }
 ];
+
+function flattenBatchFactoryComicSections(sections) {
+  return sections.flatMap(section => {
+    if (section.key !== 'batch-comic' || !section.subSections) return [];
+    return section.subSections.map(sub => {
+      const items = sub.ids
+        ? section.items.filter(item => sub.ids.includes(item.id))
+        : section.items.filter(item => sub.filter?.(item.current));
+      return {
+        ...sub,
+        key: `${section.key}:${sub.title}`,
+        description: sub.description || '此处新增的预设词会直接归入当前漫画调用位置。',
+        items
+      };
+    }).filter(section => section.items.length > 0 || section.createSlot);
+  });
+}
 
 const formatPriority = [
   'script-card-protocol',
@@ -223,6 +256,29 @@ function emptyDraft(module) {
   };
 }
 
+function ComicMaterialPreview({ preset }) {
+  const [previewURL, setPreviewURL] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    let objectURL = '';
+    setPreviewURL('');
+    loadAdminComicMaterialPreview(preset).then(blob => {
+      if (!active) return;
+      objectURL = URL.createObjectURL(blob);
+      setPreviewURL(objectURL);
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      if (objectURL) URL.revokeObjectURL(objectURL);
+    };
+  }, [preset.id, preset.previewAssetId, preset.protocolLock?.slot, preset.version]);
+
+  return previewURL
+    ? <img src={previewURL} alt={`${preset.name}预览`} style={{ width: 64, height: 42, objectFit: 'cover', borderRadius: 4 }} />
+    : <span style={{ display: 'inline-block', width: 64, textAlign: 'center' }}>—</span>;
+}
+
 export function PresetLibraryPage() {
   const [module, setModule] = useState('script');
   const [batchFactoryMode, setBatchFactoryMode] = useState('video');
@@ -234,6 +290,8 @@ export function PresetLibraryPage() {
   const [editingExisting, setEditingExisting] = useState(false);
   const [editingPreset, setEditingPreset] = useState(null);
   const [saving, setSaving] = useState(false);
+	const [materialUploading, setMaterialUploading] = useState(false);
+	const [materialPreview, setMaterialPreview] = useState('');
   const [form] = Form.useForm();
 
   async function load() {
@@ -266,10 +324,17 @@ export function PresetLibraryPage() {
 
   useEffect(() => { load(); }, [module]);
 
-  function openCreate() {
-    form.setFieldsValue(emptyDraft(module));
+  function openCreate(slotID = '') {
+	const selected = slots.find(slot => slot.id === slotID);
+	const presetSlot = selected ? {
+	  slot: selected.id,
+	  kind: selected.mode === 'primary' ? 'base' : 'addon',
+	  protocolLock: JSON.stringify({ slot: selected.id }, null, 2)
+	} : {};
+    form.setFieldsValue({ ...emptyDraft(module), ...presetSlot });
     setEditingExisting(false);
     setEditingPreset(null);
+		setMaterialPreview('');
     setEditorOpen(true);
   }
 
@@ -282,10 +347,38 @@ export function PresetLibraryPage() {
     });
     setEditingExisting(true);
     setEditingPreset(preset);
+		setMaterialPreview(preset.previewAssetId ? `/api/presets/comic-material/${encodeURIComponent(preset.id)}/preview` : '');
     setEditorOpen(true);
   }
 
+	const isComicMaterialSlot = () => ['batch.comic-style', 'batch.comic-reference-scene'].includes(form.getFieldValue('slot'));
+	const uploadMaterial = async file => {
+		if (!isComicMaterialSlot()) {
+			message.warning('请先选择“画风库”或“场景参考图库”归属。');
+			return false;
+		}
+		setMaterialUploading(true);
+		try {
+			const dataUrl = await new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onload = () => resolve(String(reader.result || ''));
+				reader.onerror = () => reject(new Error('图片读取失败'));
+				reader.readAsDataURL(file);
+			});
+			const result = await uploadAdminComicMaterial(dataUrl);
+			form.setFieldValue('previewAssetId', result.assetId || '');
+			setMaterialPreview(dataUrl);
+			message.success('图片已上传，保存并发布后才会进入用户端图库。');
+		} catch (error) {
+			message.error(errorMessage(error));
+		} finally {
+			setMaterialUploading(false);
+		}
+		return false;
+	};
+
   async function saveDraft(values) {
+    const presetModule = editingPreset?.module || module;
     let protocolLock;
     try {
       protocolLock = JSON.parse(values.protocolLock || '{}');
@@ -294,20 +387,24 @@ export function PresetLibraryPage() {
       return;
     }
     if (values.constraintCategory) {
-      const prefix = `script-constraint-${values.constraintCategory}-`;
-      if (module !== 'script' || values.kind !== 'addon' || !values.id.startsWith(prefix)) {
-        form.setFields([{ name: 'id', errors: [`${values.constraintCategory} 类约束预设 ID 必须以 ${prefix} 开头`] }]);
+      const prefix = constraintIDPrefix(values.constraintCategory);
+      const validConstraintID = values.id === prefix || values.id.startsWith(`${prefix}-`);
+      if (presetModule !== 'script' || values.kind !== 'addon' || !validConstraintID) {
+        form.setFields([{ name: 'id', errors: [`${values.constraintCategory} 类约束预设 ID 必须是 ${prefix} 或以 ${prefix}- 开头`] }]);
         return;
       }
       protocolLock = { ...protocolLock, format: 'constraint', category: values.constraintCategory };
     }
     setSaving(true);
     try {
+      const nextProtocolLock = { ...protocolLock };
+      if (values.slot) nextProtocolLock.slot = values.slot;
+      else delete nextProtocolLock.slot;
       const input = {
         ...values,
-        module,
+        module: presetModule,
         compatibleBaseIds: [],
-        protocolLock: { ...protocolLock, slot: values.slot }
+        protocolLock: nextProtocolLock
       };
       if (editingPreset?.status === 'draft') {
         await updatePresetDraft(editingPreset.id, editingPreset.version, {
@@ -349,6 +446,26 @@ export function PresetLibraryPage() {
     }
   }
 
+	async function archive(preset) {
+		try {
+			await archivePreset(preset.id, preset.version);
+			message.success('已停用，后续新项目不会再显示此项；历史项目保持可用。');
+			load();
+		} catch (requestError) {
+			message.error(errorMessage(requestError));
+		}
+	}
+
+	async function removePreset(preset) {
+		try {
+			await deletePreset(preset.id, preset.version);
+			message.success(`V${preset.version} 已彻底删除。`);
+			load();
+		} catch (requestError) {
+			message.error(errorMessage(requestError));
+		}
+	}
+
   // 同一预设 ID 的多个版本折叠为一行，展开后仍可逐版本发布或回滚。
   const grouped = useMemo(() => {
     const map = new Map();
@@ -358,8 +475,9 @@ export function PresetLibraryPage() {
     });
     return [...map.entries()].map(([id, versions]) => {
       const sorted = [...versions].sort((a, b) => b.version - a.version);
+      const draft = sorted.find(version => version.status === 'draft');
       const published = versions.find(version => version.status === 'published');
-      const current = published || sorted[0];
+      const current = draft || published || sorted[0];
       return {
         id,
         name: current.name,
@@ -376,12 +494,24 @@ export function PresetLibraryPage() {
   }
 
   const columns = [
+	{
+		title: '图片', width: 92,
+		render: (_, row) => {
+			const preset = row.current;
+			const slot = preset.protocolLock?.slot;
+			if (slot !== 'batch.comic-style' && slot !== 'batch.comic-reference-scene') return '—';
+			return <ComicMaterialPreview preset={preset} />;
+		}
+	},
     { title: '名称', dataIndex: 'name', width: 170 },
     { title: '预设词 ID', dataIndex: 'id', width: 190, ellipsis: true },
     { title: '说明', dataIndex: 'description', ellipsis: true },
     {
       title: '归属', dataIndex: 'slot', width: 150,
-      render: slot => slots.find(item => item.id === slot)?.label || '待设置归属'
+      render: (slot, row) => slots.find(item => item.id === slot)?.label
+        || (comicConstraintLabels[row.current.protocolLock?.category]
+          ? `漫画约束 · ${comicConstraintLabels[row.current.protocolLock.category]}`
+          : '待设置归属')
     },
     { title: '当前版本', width: 100, render: (_, row) => row.current.version },
     {
@@ -393,9 +523,12 @@ export function PresetLibraryPage() {
       render: (_, row) => row.versions.length
     },
     {
-      title: '操作', key: 'actions', width: 150,
+      title: '操作', key: 'actions', width: 220,
       render: (_, row) => (
-        <Button size="small" onClick={() => openEdit(row.current)}>{row.current.status === 'draft' ? '继续编辑草稿' : '新建草稿'}</Button>
+        <Space size="small">
+          <Button size="small" onClick={() => openEdit(row.current)}>{row.current.status === 'draft' ? '继续编辑草稿' : '新建草稿'}</Button>
+          <Popconfirm title="删除后无法恢复，历史项目不受影响，确认删除这个版本吗？" onConfirm={() => removePreset(row.current)}><Button size="small" danger>删除</Button></Popconfirm>
+        </Space>
       )
     }
   ];
@@ -410,14 +543,16 @@ export function PresetLibraryPage() {
         <Space size="small">
           <Button size="small" onClick={() => openEdit(preset)}>{preset.status === 'draft' ? '编辑草稿' : '另存为新版本'}</Button>
           {preset.status === 'draft' && <Popconfirm title="发布后将立即影响后续生成请求" onConfirm={() => publish(preset)}><Button size="small" type="primary">发布</Button></Popconfirm>}
+          {preset.status === 'published' && <Popconfirm title="停用后新项目将无法选择，历史项目仍可复现" onConfirm={() => archive(preset)}><Button size="small" danger>停用</Button></Popconfirm>}
           {preset.status === 'archived' && <Popconfirm title="确认将此历史版本设为当前线上版本" onConfirm={() => rollback(preset)}><Button size="small">回滚</Button></Popconfirm>}
+          <Popconfirm title="删除后无法恢复，历史项目不受影响，确认删除这个版本吗？" onConfirm={() => removePreset(preset)}><Button size="small" danger>删除</Button></Popconfirm>
         </Space>
       )
     }
   ];
 
-  function presetTable(items) {
-    return (
+  function presetTable(items, slotID = '') {
+    return <>
       <Table
         rowKey={row => row.id}
         dataSource={items}
@@ -439,17 +574,40 @@ export function PresetLibraryPage() {
         }}
         pagination={false}
       />
-    );
+      {slotID ? <div style={{ border: '1px dashed #d9d9d9', borderTop: 0, padding: 8, textAlign: 'center' }}>
+        <Button type="text" aria-label="添加预设词" title="添加预设词" icon={<PlusOutlined />} onClick={() => openCreate(slotID)} />
+      </div> : null}
+    </>;
   }
 
-  const scriptSections = useMemo(() => {
-    const remaining = new Set(grouped.map(item => item.id));
-    return scriptPresetSections.map(section => {
-      const items = grouped.filter(item => remaining.has(item.id) && section.matches(item.current));
-      items.forEach(item => remaining.delete(item.id));
-      return { ...section, items };
-    }).filter(section => section.items.length > 0);
-  }, [grouped]);
+  const editorModule = editingPreset?.module || module;
+
+	function sectionHeader(section) {
+		return <Space direction="vertical" size={0}><Typography.Text strong>{section.title}</Typography.Text>{section.description ? <Typography.Text type="secondary">{section.description}</Typography.Text> : null}</Space>;
+	}
+
+  // 每个归属都是一个独立的后台分区。这样无论在哪个模块，右侧的
+  // “添加预设词”都会直接写入当前分区对应的归属，不需要再二次选择。
+  const librarySections = useMemo(() => {
+    const knownSlots = new Set(slots.map(slot => slot.id));
+    const sections = slots.map(slot => ({
+      key: slot.id,
+      title: slot.label,
+      description: '此处新增的预设词会直接归入该调用位置。',
+      createSlot: slot.id,
+      items: grouped.filter(item => item.slot === slot.id)
+    }));
+    const unassigned = grouped.filter(item => !knownSlots.has(item.slot));
+    if (unassigned.length > 0) {
+      sections.push({
+        key: 'unassigned',
+        title: '待整理的历史预设词',
+        description: '历史数据尚未标注调用位置，不能从这里新增。',
+        items: unassigned
+      });
+    }
+    return sections;
+  }, [grouped, slots]);
 
   const batchFactorySections = useMemo(() => {
     const remaining = new Set(grouped.map(item => item.id));
@@ -461,11 +619,12 @@ export function PresetLibraryPage() {
   }, [grouped]);
 
   const visibleBatchFactorySections = useMemo(() => {
-    const keys = batchFactoryMode === 'comic'
+    if (batchFactoryMode === 'comic') {
       // 漫画图片链路只显示漫画专用预设；通用 H3/SD 约束属于视频链路，
       // 不能混入漫画配置，否则管理员会误以为漫画生成仍在使用视频规则。
-      ? new Set(['batch-comic'])
-      : new Set(['batch-assets', 'batch-adaptation', 'batch-video', 'batch-constraints']);
+      return flattenBatchFactoryComicSections(batchFactorySections);
+    }
+    const keys = new Set(['batch-assets', 'batch-adaptation', 'batch-video', 'batch-constraints']);
     return batchFactorySections.filter(section => keys.has(section.key));
   }, [batchFactoryMode, batchFactorySections]);
 
@@ -477,17 +636,16 @@ export function PresetLibraryPage() {
             <Typography.Title level={3}>系统预设词</Typography.Title>
             <Typography.Paragraph>保存生成草稿，发布后自动由后端用于后续请求。普通用户无法读取正文。</Typography.Paragraph>
           </div>
-          <Button type="primary" onClick={openCreate}>添加预设词</Button>
         </div>
         <Segmented options={modules} value={module} onChange={setModule} />
         {error && <Alert type="error" showIcon message="无法读取此模块预设词" description={error} />}
-        {module === 'script' ? (
+        {module !== 'batch-factory' ? (
           <Collapse
-            defaultActiveKey={scriptSections.map(section => section.key)}
-            items={scriptSections.map(section => ({
+            defaultActiveKey={librarySections.map(section => section.key)}
+            items={librarySections.map(section => ({
               key: section.key,
-              label: <Space direction="vertical" size={0}><Typography.Text strong>{section.title}</Typography.Text><Typography.Text type="secondary">{section.description}</Typography.Text></Space>,
-              children: presetTable(section.items)
+              label: sectionHeader(section),
+              children: presetTable(section.items, section.createSlot)
             }))}
           />
         ) : module === 'batch-factory' ? (
@@ -506,19 +664,19 @@ export function PresetLibraryPage() {
                   } else if (sub.filter) {
                     subItems = section.items.filter(item => sub.filter(item.current));
                   }
-                  return subItems && subItems.length > 0 ? (
+                  return (subItems && (subItems.length > 0 || sub.createSlot)) ? (
                     <div key={sub.title} style={{ marginBottom: 16 }}>
-                      <Typography.Title level={5} style={{ marginTop: 8, marginBottom: 8 }}>{sub.title}</Typography.Title>
-                      {presetTable(subItems)}
+                      <div style={{ marginTop: 8, marginBottom: 8 }}>{sectionHeader(sub)}</div>
+                      {presetTable(subItems, sub.createSlot)}
                     </div>
                   ) : null;
                 }).filter(Boolean);
               } else {
-                children = presetTable(section.items);
+                children = presetTable(section.items, section.createSlot);
               }
               return {
                 key: section.key,
-                label: <Space direction="vertical" size={0}><Typography.Text strong>{section.title}</Typography.Text><Typography.Text type="secondary">{section.description}</Typography.Text></Space>,
+                label: sectionHeader(section),
                 children
               };
             })}
@@ -560,9 +718,20 @@ export function PresetLibraryPage() {
           {!editingExisting && <Alert type="info" showIcon message="选择归属后，发布的提示词会出现在该功能对应的项目下拉选择中。" />}
           {editingPreset?.status === 'draft' && <Alert type="info" showIcon message={`正在编辑草稿 V${editingPreset.version}：保存会原地更新，不会生成新版本。`} />}
           {editingPreset && editingPreset.status !== 'draft' && <Alert type="info" showIcon message={`V${editingPreset.version} 已锁定：保存会另存为新的草稿版本。`} />}
-          <Form.Item label="归属" name="slot" rules={[{ required: true, message: '请选择归属' }]}>
+          <Form.Item
+            label="归属"
+            name="slot"
+            dependencies={['constraintCategory']}
+            rules={[{
+              validator: (_, value) => value || form.getFieldValue('constraintCategory')
+                ? Promise.resolve()
+                : Promise.reject(new Error('请选择归属，或选择约束类别'))
+            }]}
+            extra={editorModule === 'script' ? '普通提示词选择调用位置；漫画约束使用下面的约束类别作为归属。' : undefined}
+          >
             <Select
-              placeholder="请选择提示词归属"
+              allowClear
+              placeholder="普通提示词请选择调用位置"
               options={slots.map(slot => ({ value: slot.id, label: `${slot.label}（${slot.mode === 'primary' ? '主提示词' : '补充提示词'}）` }))}
               onChange={slotId => {
                 const slot = slots.find(item => item.id === slotId);
@@ -570,7 +739,16 @@ export function PresetLibraryPage() {
               }}
             />
           </Form.Item>
-          {module === 'script' && <Form.Item label="约束类别（可选）" name="constraintCategory">
+		  <Form.Item name="previewAssetId" hidden><Input /></Form.Item>
+		  <Form.Item label="图库图片" extra="图库图片仅用于“漫画画风库”和“漫画场景参考图库”；场景图会与系统预设词正文一起发给 AI。">
+			  <Form.Item noStyle shouldUpdate={(prev, next) => prev.slot !== next.slot}>
+				  {() => isComicMaterialSlot() ? <Space direction="vertical">
+					  {materialPreview ? <img src={materialPreview} alt="漫画图库预览" style={{ width: 180, maxHeight: 120, objectFit: 'cover', borderRadius: 4 }} /> : null}
+					  <AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadMaterial} disabled={materialUploading}><Button loading={materialUploading}>上传或替换图片</Button></AntUpload>
+				  </Space> : <Typography.Text type="secondary">请先选择归属，再上传图片。</Typography.Text>}
+			  </Form.Item>
+		  </Form.Item>
+          {editorModule === 'script' && <Form.Item label="约束类别（漫画约束的归属）" name="constraintCategory">
             <Select allowClear placeholder="普通模块补充规则" options={constraintCategories} />
           </Form.Item>}
           <Form.Item label="用途说明" name="description"><Input placeholder="说明此预设词会影响的生成环节" /></Form.Item>

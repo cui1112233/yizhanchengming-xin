@@ -36,11 +36,13 @@ type AgentImageGenerator func(context.Context, string, AgentImageGenerationInput
 
 type AgentNodeGenerationServices struct {
 	Projects      agentworkspace.Store
+	Catalog       novelfetchworkshop.Store
 	TextModels    AgentTextModelResolver
 	TextComplete  AgentTextCompletionExecutor
 	Assets        agentworkspace.AssetStore
 	Objects       agentworkspace.AssetObjectStore
 	ImageGenerate AgentImageGenerator
+	ImageProcess  AgentImageProcessor
 	// QueueImages makes the HTTP endpoint persist work only; the backend
 	// coordinator performs generation after the response is returned.
 	QueueImages bool
@@ -111,10 +113,11 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 	if root == nil || services.Projects == nil {
 		return
 	}
-	registerAgentCanvasInputPreviewRoute(root, middleware, services.Projects)
+	registerAgentCanvasInputPreviewRoute(root, middleware, services.Projects, services.Catalog)
 	if services.Now == nil {
 		services.Now = time.Now
 	}
+	registerAgentImageToolRoutes(root, middleware, services)
 	if services.TextComplete == nil {
 		services.TextComplete = newAgentTextCompletionExecutor(services.TextModels)
 	}
@@ -243,6 +246,16 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "图片节点已变化，请重新打开后再生成"})
 			return
 		}
+		capability, err := resolveAgentCanvasInputCapability(req.Context(), services.Catalog, identity.Username, "image", input.Provider, input.ModelID)
+		if err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": err.Error()})
+			return
+		}
+		resolvedInputs, err := agentResolvedCanvasInputSnapshotWithCapability(canvas, input.NodeID, input.Prompt, input.ReferenceAssetIDs, capability)
+		if err != nil {
+			writeAgentCanvasInputError(w, err)
+			return
+		}
 		for _, referenceID := range input.ReferenceAssetIDs {
 			if services.Assets == nil {
 				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "项目素材存储尚未配置"})
@@ -271,7 +284,7 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 		if provider == "" {
 			provider = "configured_model"
 		}
-		settings := map[string]any{"prompt": input.Prompt, "parameters": cloneAgentSettings(input.Parameters), "advanced": cloneAgentSettings(input.Advanced), "size": generationInput.Size, "aspectRatio": generationInput.AspectRatio, "quality": generationInput.Quality, "resolution": generationInput.Resolution, "count": generationInput.Count}
+		settings := map[string]any{"prompt": input.Prompt, "parameters": cloneAgentSettings(input.Parameters), "advanced": cloneAgentSettings(input.Advanced), "size": generationInput.Size, "aspectRatio": generationInput.AspectRatio, "quality": generationInput.Quality, "resolution": generationInput.Resolution, "count": generationInput.Count, "resolvedInputs": resolvedInputs}
 		generation, err := services.Projects.CreateGenerationTask(req.Context(), identity.Username, agentworkspace.CreateGenerationTaskInput{
 			ID: newAgentID("generation"), ProjectID: projectID, NodeID: input.NodeID, NodeVersion: input.NodeVersion, Kind: "image", Provider: provider, ModelID: input.ModelID, Mode: mode,
 			Settings: settings, ReferenceAssetIDs: uniqueAgentGenerationIDs(input.ReferenceAssetIDs), IdempotencyKey: input.IdempotencyKey, Now: now,
@@ -537,8 +550,14 @@ func normalizeAgentImageGenerationInput(input agentImageGenerationRequest) (Agen
 	if _, ok := parameters["count"]; !ok && input.Count != 0 {
 		parameters["count"] = input.Count
 	}
-	if input.Mode != "" {
-		parameters["mode"] = input.Mode
+	modeForValidation := input.Mode
+	if modeForValidation == "image_generation" {
+		// Canvas uses image_generation as its default task label; model
+		// capabilities use text_to_image for the equivalent generation mode.
+		modeForValidation = "text_to_image"
+	}
+	if modeForValidation != "" {
+		parameters["mode"] = modeForValidation
 	}
 	if err := ValidateModelSettings(map[string]any{"kind": "image"}, "image", parameters); err != nil {
 		return AgentImageGenerationInput{}, err

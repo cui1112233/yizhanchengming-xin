@@ -262,11 +262,11 @@ func TestMemoryStoreRejectsGeneratedResultWhenNodeChanged(t *testing.T) {
 
 func TestEmptyCanvasUsesPersistentAppearanceDefaults(t *testing.T) {
 	appearance := EmptyCanvas().Appearance
-	if appearance.EdgeColor != "coral" || !appearance.EdgeAnimated || appearance.EdgeWidth != "default" || !appearance.BackgroundDots || !appearance.AlignmentGuides {
+	if appearance.EdgeColor != "neutral" || appearance.EdgeAnimated || appearance.EdgeWidth != "thin" || !appearance.BackgroundDots || !appearance.AlignmentGuides {
 		t.Fatalf("appearance=%+v", appearance)
 	}
 	appearanceJSON, err := json.Marshal(appearance)
-	if err != nil || string(appearanceJSON) != `{"edgeColor":"coral","edgeAnimated":true,"edgeWidth":"default","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}` {
+	if err != nil || string(appearanceJSON) != `{"edgeColor":"neutral","edgeAnimated":false,"edgeWidth":"thin","backgroundDots":true,"alignmentGuides":true,"edgesVisible":true}` {
 		t.Fatalf("appearance JSON=%s err=%v", appearanceJSON, err)
 	}
 }
@@ -286,7 +286,25 @@ func TestMemoryStoreNormalizesInvalidCanvasAppearance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved.Appearance.EdgeColor != "coral" || saved.Appearance.EdgeWidth != "default" || !saved.Appearance.EdgeAnimated || !saved.Appearance.BackgroundDots || !saved.Appearance.AlignmentGuides {
+	if saved.Appearance.EdgeColor != "neutral" || saved.Appearance.EdgeWidth != "thin" || saved.Appearance.EdgeAnimated || !saved.Appearance.BackgroundDots || !saved.Appearance.AlignmentGuides {
+		t.Fatalf("saved appearance=%+v", saved.Appearance)
+	}
+}
+
+func TestMemoryStoreKeepsNeutralCanvasAppearance(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	now := time.Date(2026, 10, 24, 1, 2, 3, 0, time.UTC)
+	if err := store.CreateProject(ctx, "alice", Project{ID: "project-neutral-appearance", Title: "项目", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	canvas := EmptyCanvas()
+	canvas.appearanceConfigured = true
+	saved, err := store.SaveCanvas(ctx, "alice", "project-neutral-appearance", canvas, 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Appearance != DefaultAppearance() {
 		t.Fatalf("saved appearance=%+v", saved.Appearance)
 	}
 }

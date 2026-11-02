@@ -1,5 +1,5 @@
 import { Dropdown } from 'antd';
-import { PanelsTopLeft, Pencil, Workflow } from 'lucide-react';
+import { ChevronDown, PanelsTopLeft, Pencil, Workflow } from 'lucide-react';
 import { BrandLogo } from '../../shared/components/BrandLogo';
 
 export function AgentWorkspaceHeader({
@@ -38,7 +38,8 @@ export function AgentWorkspaceHeader({
         </Dropdown>
         <button className="agent-canvas-project-title" type="button" onClick={onRename}>
           <span>{projectTitle || '未选择项目'}</span>
-          <Pencil size={13} />
+          <ChevronDown className="agent-canvas-project-title__chevron" size={12} />
+          <Pencil className="agent-canvas-project-title__edit" size={12} />
         </button>
         <div className="agent-canvas-view-switch" role="group" aria-label="项目视图">
           <button type="button" title="工作流" aria-label="工作流" aria-pressed={activeView === 'workflow'} className={activeView === 'workflow' ? 'is-active' : ''} onClick={() => onViewChange('workflow')}>

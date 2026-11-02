@@ -12,6 +12,12 @@ const jobSelect = `SELECT id, owner_username, source_task_id, platform, payload_
  accepted_at, accepted_account_id, submission_id, artifact_id, error_code, error_message,
  created_at, updated_at FROM local_executor_jobs`
 
+const claimJobCandidateQuery = `SELECT id FROM local_executor_jobs
+ WHERE owner_username = ? AND platform = ?
+ AND cancel_requested = FALSE AND accepted_at IS NULL
+ AND (state = ? OR (lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND state NOT IN (?, ?, ?)))
+ ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED`
+
 func (s *MySQLStore) CreateJob(ctx context.Context, record JobRecord) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO local_executor_jobs
 (id, owner_username, source_task_id, platform, payload_json, state, cancel_requested,
@@ -71,14 +77,16 @@ func (s *MySQLStore) ClaimJob(ctx context.Context, executor ExecutorRecord, leas
 	}
 	defer tx.Rollback()
 
-	record, err := scanJob(tx.QueryRowContext(ctx, jobSelect+` WHERE owner_username = ? AND platform = ?
- AND cancel_requested = FALSE AND accepted_at IS NULL
- AND (state = ? OR (lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND state NOT IN (?, ?, ?)))
- ORDER BY created_at ASC, id ASC LIMIT 1 FOR UPDATE SKIP LOCKED`,
-		executor.OwnerUsername, executor.Platform, JobQueued, now, JobSucceeded, JobFailed, JobCancelled).Scan)
+	var jobID string
+	err = tx.QueryRowContext(ctx, claimJobCandidateQuery,
+		executor.OwnerUsername, executor.Platform, JobQueued, now, JobSucceeded, JobFailed, JobCancelled).Scan(&jobID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return JobRecord{}, ErrNoClaimableJob
 	}
+	if err != nil {
+		return JobRecord{}, err
+	}
+	record, err := scanJob(tx.QueryRowContext(ctx, jobSelect+` WHERE id = ?`, jobID).Scan)
 	if err != nil {
 		return JobRecord{}, err
 	}

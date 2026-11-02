@@ -78,6 +78,7 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
   const [narratingSegmentIds, setNarratingSegmentIds] = useState(() => new Set());
   const [submittingTaskSegmentIds, setSubmittingTaskSegmentIds] = useState(() => new Set());
   const segmentationFileRef = useRef(null);
+  const narrationImportRef = useRef(null);
   const project = data.project;
   const media = data.media || [];
   const bindings = data.segmentAssetIDs || {};
@@ -463,6 +464,32 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
     setSegmenting(false);
     generateNarrations(data.segments?.map(item => item.id) || []);
   }
+  async function importNarrations(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    const segments = data.segments || [];
+    if (!files.length) return;
+    if (!confirmed) { message.warning('请先确认分镜后再导入配音'); return; }
+    if (files.length !== segments.length) {
+      message.error('配音文件数量与当前分镜数量不一致，请按分镜顺序选择同数量的音频文件');
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const [index, file] of files.entries()) {
+        const segment = segments[index];
+        const dataUrl = await audioBlobToDataUrl(file);
+        await uploadMedia(project.id, { kind: 'audio', filename: file.name, dataUrl, segmentId: segment.id });
+      }
+      await refreshProject();
+      setSegmenting(false);
+      message.success(`已按分镜顺序导入 ${files.length} 条配音`);
+    } catch (error) {
+      message.error(error.message || '导入配音失败');
+    } finally {
+      setBusy(false);
+    }
+  }
   const batchItems = [{ key: 'image', icon: <PictureOutlined />, label: '批量生成图片', disabled: !imageReady }, { key: 'video', icon: <VideoCameraOutlined />, label: '批量生成视频', disabled: !videoReady }, { key: 'audio', icon: <SoundOutlined />, label: '批量生成配音', disabled: !directNarrationReady }];
   const bindingAssets = binding ? (data.assets || []).filter(asset => asset.category === binding.category) : [];
 
@@ -479,6 +506,7 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
       footer={<><span className="shuihuo-segmentation-count">共 {candidates.length} 个分镜，{candidates.length} 条字幕</span><div><Button onClick={() => setSegmenting(false)}>取消</Button><Button type="primary" loading={busy} onClick={confirmCandidates}>确定应用</Button></div></>}
     >
       <input ref={segmentationFileRef} type="file" accept=".txt,.srt,text/plain,application/x-subrip" hidden onChange={importSegmentationFile} />
+      <input ref={narrationImportRef} type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4" multiple hidden onChange={importNarrations} />
       <div className="shuihuo-segmentation-toolbar">
         <Button icon={<UploadOutlined />} onClick={() => segmentationFileRef.current?.click()}>导入分镜</Button>
         <Select value={textModelId} onChange={setTextModelId} placeholder={textModels.length ? '选择文本模型' : 'Gemini-3-Pro-Pr...'} options={textModels.map(model => ({ value: model.id, label: model.name }))} />
@@ -487,7 +515,7 @@ export function CommentaryWorkbench({ data, readiness, importNotice, onBackToPro
         <InputNumber min={1} max={20} value={lines} onChange={value => setLines(value || 1)} addonBefore="行" />
         <Button icon={<OrderedListOutlined />} loading={busy && segmentMode === 'fixed'} onClick={() => previewSegmentation('fixed')}>按行拆分</Button>
         <Tooltip title={directNarrationReady ? '按各分镜的音色、语速和音调直接生成并保存配音' : directNarrationReason}><Button icon={<SoundOutlined />} disabled={!directNarrationReady} onClick={openAudioBatchFromSegmentation}>智能配音</Button></Tooltip>
-        <Tooltip title="批量导入配音需要音频与分镜自动匹配接口，当前未接入。"><Button icon={<FileTextOutlined />} disabled>导入配音</Button></Tooltip>
+        <Tooltip title={confirmed ? '按当前分镜顺序选择同数量的音频文件后导入' : '请先确认分镜后再导入配音'}><Button icon={<FileTextOutlined />} disabled={!confirmed || busy} onClick={() => narrationImportRef.current?.click()}>批量导入配音</Button></Tooltip>
         <Button icon={<DownloadOutlined />} disabled={!candidates.length} onClick={exportSegmentationCandidates}>导出分镜</Button>
       </div>
       <div className="shuihuo-segmentation-table" role="table" aria-label="分镜调整候选表">

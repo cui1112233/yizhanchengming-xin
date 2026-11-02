@@ -1,5 +1,6 @@
 import { reportClientError } from '../error-reporting.js';
 import { normalizeLocalExecutorsResponse } from './localExecutors.js';
+import { getSelectedNovelFetchAccount, isNovelFetchScopedPath } from './novelFetchAccountScope.js';
 
 export function getToken() {
   // The Go application is now the single runtime origin. Keep the session in
@@ -55,6 +56,10 @@ export async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (isNovelFetchScopedPath(path)) {
+    const selectedAccount = getSelectedNovelFetchAccount();
+    if (selectedAccount) headers.set('X-Qiantie-Novel-Fetch-Account', selectedAccount);
+  }
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
@@ -112,6 +117,3 @@ export function listMyErrorLogs(limit = 100) {
   return apiRequest(`/api/client-errors/mine?limit=${encodeURIComponent(limit)}`);
 }
 
-export function listNovelPanelAiDiagnostics(limit = 100) {
-  return apiRequest(`/api/novel-panel/diagnostics?limit=${encodeURIComponent(limit)}`);
-}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentCanvasURL, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, latestBookRevision, mappedBatchFactoryBooksNeedingRefresh, mappedNodeStatePresentation, projectedNodePresentation, removeBatchFactoryCanvasNodes, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
+import { agentCanvasURL, batchFactoryGroupLabel, batchFactoryMappedAction, bindBatchFactoryBookAndNavigate, bookGroupId, focusRequestedBookGroup, latestBookRevision, mappedBatchFactoryBooksNeedingRefresh, mappedNodeStatePresentation, projectedNodePresentation, refreshBatchFactoryBookCanvas, removeBatchFactoryCanvasNodes, runMappedBatchFactoryAudioPlan, runMappedBatchFactoryScriptStage, runMappedBatchFactoryVideoProduction, syncBookThenLoadCanvas, videoNodeTiming } from './agent-canvas-batch-factory.js';
 
 test('opens the bound project at the requested book group', () => {
   assert.equal(
@@ -9,11 +9,27 @@ test('opens the bound project at the requested book group', () => {
   );
 });
 
+test('opens the bound project in batch mode without a book selection', () => {
+  assert.equal(
+    agentCanvasURL({ projectId: 'agent-1', batchId: 'batch-1' }),
+    '/agent/canvas?taskId=agent-1&batchId=batch-1&view=workflow'
+  );
+});
+
 test('uses existing node types inside a book group', () => {
   assert.deepEqual(
     projectedNodePresentation({ type: 'image', groupId: bookGroupId('book-1') }),
     { groupId: 'book:book-1', groupLabel: '书籍素材', sourceLabel: '批量工厂' }
   );
+});
+
+test('labels a book group with its mapped script title before falling back to the book ID', () => {
+  const nodes = [
+    { type: 'agent', groupId: 'book:book-1', data: { type: 'image', title: '角色图' } },
+    { type: 'agent', groupId: 'book:book-1', data: { type: 'script', title: '小妾造反后' } }
+  ];
+  assert.equal(batchFactoryGroupLabel('book:book-1', nodes), '书籍分组 小妾造反后');
+  assert.equal(batchFactoryGroupLabel('book:book-2', nodes), '书籍分组 book-2');
 });
 
 test('binds a book project before navigating to its canvas URL', async () => {
@@ -41,6 +57,36 @@ test('synchronizes the requested book before loading its canvas and creating the
   });
   assert.deepEqual(calls, ['sync:agent-1:book-1', 'canvas:agent-1', 'queue:4']);
   assert.deepEqual(result.saveQueue, { revision: 4 });
+});
+
+test('refreshing a mapped book flushes local edits before it reloads the Batch Factory projection', async () => {
+  const calls = [];
+  const canvas = { revision: 8, nodes: [{ id: 'merge-1' }], edges: [] };
+  const result = await refreshBatchFactoryBookCanvas({
+    taskId: 'agent-1',
+    bookId: 'book-1',
+    queue: { flushRequired: async () => { calls.push('flush'); } },
+    sync: async (taskId, bookId) => { calls.push(`sync:${taskId}:${bookId}`); },
+    getCanvas: async taskId => { calls.push(`canvas:${taskId}`); return { canvas }; }
+  });
+
+  assert.deepEqual(calls, ['flush', 'sync:agent-1:book-1', 'canvas:agent-1']);
+  assert.equal(result.canvas, canvas);
+});
+
+test('refreshing a mapped book stops after a task switch instead of applying the old book response', async () => {
+  const calls = [];
+  const result = await refreshBatchFactoryBookCanvas({
+    taskId: 'agent-1',
+    bookId: 'book-1',
+    queue: { flushRequired: async () => { calls.push('flush'); } },
+    sync: async () => { calls.push('sync'); },
+    getCanvas: async () => { calls.push('canvas'); return { canvas: { revision: 8, nodes: [], edges: [] } }; },
+    isCurrent: () => false
+  });
+
+  assert.deepEqual(calls, ['flush']);
+  assert.deepEqual(result, { ignored: true });
 });
 
 test('focuses only nodes in the requested book group', () => {
@@ -131,6 +177,18 @@ test('submits and retries only the selected mapped video through its effective e
   }
 });
 
+test('runs a mapped audio card as the batch factory audio plan, not a merge', async () => {
+  const calls = [];
+  await runMappedBatchFactoryAudioPlan({
+    action: { type: 'audio', batchId: 'batch-1', bookId: 'book-1', resourceId: 'tts-before-merge' },
+    requestId: 'canvas-audio-1',
+    createAudioPlan: async (...args) => calls.push(args)
+  });
+  assert.deepEqual(calls, [[
+    'batch-1', 'book-1', { requestId: 'canvas-audio-1' }
+  ]]);
+});
+
 test('presents mapped failures with the safe error and retry state', () => {
   assert.deepEqual(mappedNodeStatePresentation({
     groupId: 'book:book-1',
@@ -138,6 +196,16 @@ test('presents mapped failures with the safe error and retry state', () => {
     config: { mappedState: 'failed', errorMessage: '批量工厂任务失败，请重试', canRetry: true }
   }), {
     state: 'failed', errorMessage: '批量工厂任务失败，请重试', canRetry: true, busy: false, message: '批量工厂任务失败，请重试'
+  });
+});
+
+test('keeps a mapped pending audio plan actionable before its first audio file exists', () => {
+  assert.deepEqual(mappedNodeStatePresentation({
+    groupId: 'book:book-1',
+    status: 'queued',
+    config: { resourceType: 'audio', audioPlanPending: true, mappedState: 'queued' }
+  }), {
+    state: 'draft', errorMessage: '', canRetry: false, busy: false, message: '待生成配音'
   });
 });
 

@@ -10,11 +10,14 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"qiantie/backend/internal/prompt"
 )
 
 type DirectorService struct {
-	Store    Store
-	Provider DirectorProvider
+	Store         Store
+	Provider      DirectorProvider
+	PresetCatalog *prompt.Catalog
 }
 
 // retryableModelOutputError keeps the production contract strict while making
@@ -159,7 +162,13 @@ func snapshotForAssetExtraction(batch Batch, book Book) (DirectorSnapshot, error
 
 func snapshotForBookWithAudioRequirement(batch Batch, book Book, requireMeasuredAudio bool) (DirectorSnapshot, error) {
 	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-	mode := rawString(effective, "productionMode", rawString(effective, "mode", "original"))
+	// productionMode now selects the output medium (video/comic); `mode` is the
+	// director's original/viral storytelling choice. Preserve old books whose
+	// productionMode held the director mode before this split was introduced.
+	mode := rawString(effective, "mode", "original")
+	if legacyMode := rawString(effective, "productionMode", ""); legacyMode == "original" || legacyMode == "viral" || legacyMode == "original_direct" || legacyMode == "viral_hook" {
+		mode = legacyMode
+	}
 	if mode == "original_direct" {
 		mode = "original"
 	}
@@ -195,11 +204,125 @@ func (s *DirectorService) validate() error {
 	return nil
 }
 
+// hydrateVideoPromptPreset keeps saved settings aligned with the published
+// server-owned video preset. New saves already freeze the body in the HTTP
+// layer; this runtime fallback also refreshes older settings when their saved
+// preset version is behind the currently published version.
+func (s *DirectorService) hydrateVideoPromptPreset(snapshot DirectorSnapshot) (DirectorSnapshot, error) {
+	if s == nil || s.PresetCatalog == nil {
+		return snapshot, nil
+	}
+	raw, ok := snapshot.Effective["aiPromptConfig"]
+	if !ok || len(raw) == 0 {
+		return snapshot, nil
+	}
+	var config map[string]any
+	if err := json.Unmarshal(raw, &config); err != nil || config == nil {
+		return snapshot, fmt.Errorf("%w: AI 提示词配置格式不正确", ErrInvalid)
+	}
+	video, ok := config["video"].(map[string]any)
+	if !ok || video == nil {
+		return snapshot, nil
+	}
+	id, _ := video["presetId"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return snapshot, nil
+	}
+	preset, found, err := s.PresetCatalog.PublishedBody("batch-factory", id)
+	if err != nil {
+		return snapshot, fmt.Errorf("%w: 读取视频提示词预设失败", ErrUnavailable)
+	}
+	if !found || strings.TrimSpace(preset.Body) == "" {
+		return snapshot, fmt.Errorf("%w: 视频提示词预设不存在或未发布", ErrInvalid)
+	}
+	storedVersion, _ := video["presetVersion"].(float64)
+	storedBody, _ := video["body"].(string)
+	if strings.TrimSpace(storedBody) != "" && int(storedVersion) == preset.Version {
+		return snapshot, nil
+	}
+	video["presetId"] = preset.ID
+	video["presetName"] = preset.Name
+	video["presetSlot"] = preset.Slot
+	video["presetVersion"] = preset.Version
+	video["body"] = preset.Body
+	video["constraintCategory"] = preset.ConstraintCategory
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return snapshot, fmt.Errorf("%w: 保存视频提示词配置失败", ErrInvalid)
+	}
+	snapshot.Effective["aiPromptConfig"] = encoded
+	return snapshot, nil
+}
+
 // productionBook returns a copy that keeps sourceText immutable while allowing
 // a user-approved per-book working front to drive Hook and Director generation.
 // The draft is deliberately separate from captured source text: publishing can
 // later choose either source or the approved rewrite without destructive edits.
 func (s *DirectorService) productionBook(ctx context.Context, owner, batchID string, book Book) (Book, error) {
+	return s.productionBookWithSourceMode(ctx, owner, batchID, book, false)
+}
+
+func (s *DirectorService) comicProductionBook(ctx context.Context, owner, batchID string, book Book) (Book, error) {
+	book, err := s.productionBookWithSourceMode(ctx, owner, batchID, book, true)
+	if err != nil {
+		return Book{}, err
+	}
+	book.SourceText = comicSourceTextForBook(book)
+	return book, nil
+}
+
+func comicSourceTextForBook(book Book) string {
+	source := strings.TrimSpace(book.SourceText)
+	limit := 2000
+	if raw, ok := book.SourceMetadata["comicAnalysisCharacters"]; ok {
+		switch value := raw.(type) {
+		case float64:
+			limit = int(value)
+		case int:
+			limit = value
+		case int64:
+			limit = int(value)
+		case json.Number:
+			if parsed, err := value.Int64(); err == nil {
+				limit = int(parsed)
+			}
+		}
+	}
+	if limit < 100 {
+		limit = 100
+	}
+	if limit > 100000 {
+		limit = 100000
+	}
+	runes := []rune(source)
+	if len(runes) <= limit {
+		return source
+	}
+	next := -1
+	for index := limit; index < len(runes); index++ {
+		if strings.ContainsRune("。！？!?；;\n", runes[index]) {
+			next = index
+			break
+		}
+	}
+	previous := -1
+	for index := limit - 1; index >= 0; index-- {
+		if strings.ContainsRune("。！？!?；;\n", runes[index]) {
+			previous = index
+			break
+		}
+	}
+	if previous >= 0 && (next < 0 || limit-previous <= next-limit) {
+		return string(runes[:previous+1])
+	}
+	if next >= 0 {
+		return string(runes[:next+1])
+	}
+	return string(runes[:limit])
+}
+
+func (s *DirectorService) productionBookWithSourceMode(ctx context.Context, owner, batchID string, book Book, completeSource bool) (Book, error) {
 	draft, err := s.Store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
 	if err == nil && strings.TrimSpace(draft.Content) != "" {
 		book.SourceText = strings.TrimSpace(draft.Content)
@@ -207,6 +330,10 @@ func (s *DirectorService) productionBook(ctx context.Context, owner, batchID str
 	}
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return Book{}, err
+	}
+	if completeSource {
+		book.SourceText = strings.TrimSpace(book.SourceText)
+		return book, nil
 	}
 	book.SourceText = productionTextForBook(book)
 	return book, nil
@@ -348,16 +475,24 @@ func (s *DirectorService) runDirector(ctx context.Context, owner, batchID, bookI
 	if err != nil {
 		return DirectorRevision{}, err
 	}
-	book, err = s.productionBook(ctx, owner, batchID, book)
+	snapshot, err := snapshotForBook(batch, book)
+	if err != nil {
+		return DirectorRevision{}, err
+	}
+	snapshot, err = s.hydrateVideoPromptPreset(snapshot)
+	if err != nil {
+		return DirectorRevision{}, err
+	}
+	if normalizeProductionMode(snapshot.Effective) == "comic" {
+		book, err = s.comicProductionBook(ctx, owner, batchID, book)
+	} else {
+		book, err = s.productionBook(ctx, owner, batchID, book)
+	}
 	if err != nil {
 		return DirectorRevision{}, err
 	}
 	if strings.TrimSpace(book.SourceText) == "" {
 		return DirectorRevision{}, fmt.Errorf("%w: source text is required", ErrInvalid)
-	}
-	snapshot, err := snapshotForBook(batch, book)
-	if err != nil {
-		return DirectorRevision{}, err
 	}
 	if smartUnifiedAnalysis != nil {
 		encoded, _ := json.Marshal(smartUnifiedAnalysis)
@@ -423,6 +558,10 @@ func (s *DirectorService) CreateDirectorPromptCandidate(ctx context.Context, own
 	if err != nil {
 		return DirectorPromptCandidate{}, err
 	}
+	snapshot, err = s.hydrateVideoPromptPreset(snapshot)
+	if err != nil {
+		return DirectorPromptCandidate{}, err
+	}
 	hook := HookRevision{}
 	if snapshot.Mode == "viral" {
 		hook, err = s.Store.LatestHookRevision(ctx, owner, batchID, bookID)
@@ -434,12 +573,24 @@ func (s *DirectorService) CreateDirectorPromptCandidate(ctx context.Context, own
 	if err != nil {
 		return DirectorPromptCandidate{}, err
 	}
+	contract = directorPromptCandidateContract(contract, len(book.Videos), 0)
 	result, err := s.completeDirectorContract(ctx, contract)
 	if err != nil {
 		return DirectorPromptCandidate{}, err
 	}
 	if len(result.Storyboard) != len(book.Videos) {
-		return DirectorPromptCandidate{}, fmt.Errorf("%w: regenerated storyboard count does not match existing videos", ErrConflict)
+		// Candidate regeneration only rewrites prompts for existing VIDEO rows.
+		// Never pad or truncate here: either operation could attach a prompt to
+		// the wrong VIDEO. Give the model one bounded correction attempt with
+		// the actual count and the observed mismatch made explicit.
+		retryContract := directorPromptCandidateContract(contract, len(book.Videos), len(result.Storyboard))
+		result, err = s.completeDirectorContract(ctx, retryContract)
+		if err != nil {
+			return DirectorPromptCandidate{}, err
+		}
+	}
+	if len(result.Storyboard) != len(book.Videos) {
+		return DirectorPromptCandidate{}, retryableModelOutputError(fmt.Errorf("候选重生成返回 %d 个 storyboard，当前已有 %d 个 VIDEO", len(result.Storyboard), len(book.Videos)))
 	}
 	latest, err := s.Store.GetBatch(ctx, owner, batchID)
 	if err != nil {
@@ -472,6 +623,37 @@ func (s *DirectorService) CreateDirectorPromptCandidate(ctx context.Context, own
 		return DirectorPromptCandidate{}, err
 	}
 	return candidate, nil
+}
+
+// directorPromptCandidateContract narrows the normal director contract to a
+// prompt-only regeneration for the already-created VIDEO rows. The existing
+// rows are the source of truth for cardinality and ordering; this operation
+// must never create, delete, or silently remap storyboard cards.
+func directorPromptCandidateContract(contract PromptContract, existingVideoCount, previousStoryboardCount int) PromptContract {
+	instruction := fmt.Sprintf(`
+候选提示词重生成模式（最高优先级）：这不是重新分页，也不是重新创建 VIDEO。当前已经存在恰好 %d 个 VIDEO，必须只返回恰好 %d 个 storyboard，按现有 VIDEO 的顺序一一对应。
+- 不得增加、删除、合并或拆分 storyboard；不得改变既有 VIDEO 的卡片边界。
+- 每个 storyboard 只负责生成对应 VIDEO 的候选提示词，必须保留该段剧情承接、人物、场景、道具和时间轴。
+- 返回数量不等于 %d 时，本次结果不可用。`, existingVideoCount, existingVideoCount, existingVideoCount)
+	if previousStoryboardCount > 0 {
+		instruction += fmt.Sprintf("\n上一轮返回了 %d 个 storyboard，数量不正确。请完整重做，并严格返回 %d 个 storyboard。", previousStoryboardCount, existingVideoCount)
+	}
+	contract.SystemPrompt += instruction
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(contract.UserPrompt), &payload); err == nil {
+		payload["candidate_regeneration"] = map[string]any{
+			"existing_video_count":      existingVideoCount,
+			"preserve_video_boundaries": true,
+			"preserve_video_order":      true,
+		}
+		if encoded, err := json.MarshalIndent(payload, "", "  "); err == nil {
+			contract.UserPrompt = string(encoded)
+		}
+	} else {
+		contract.UserPrompt += fmt.Sprintf("\n候选重生成约束：现有 VIDEO 数量为 %d，必须返回恰好 %d 个 storyboard，按现有顺序一一对应。", existingVideoCount, existingVideoCount)
+	}
+	return contract
 }
 
 func (s *DirectorService) DirectorPromptCandidate(ctx context.Context, owner, batchID, bookID string) (DirectorPromptCandidate, error) {
@@ -686,6 +868,12 @@ func (s *DirectorService) RunAssetExtraction(ctx context.Context, owner, batchID
 	// together with characters/scenes/props. Other renderer selections retain
 	// their historical post-extraction compilation behavior.
 	config = aiReasoningPromptConfig(snapshot.Effective)
+	if config.Assets.appliesTo(book, config.Assets.Extraction) && usesCMAssetRenderer(config.Assets.Extraction) {
+		assets, err = s.extractCMSceneAndPropPrompts(ctx, book, snapshot, config.Assets.Extraction, assets)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if !(config.Assets.appliesTo(book, config.Assets.Extraction) && usesCombinedAssetRenderer(config.Assets.Extraction)) {
 		assets, err = s.compileH3AssetPrompts(ctx, book, snapshot, assets)
 		if err != nil {

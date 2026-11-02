@@ -172,6 +172,29 @@ test('batch management, prompt persistence, production and merge actions use the
 });
 
 
+test('single-book merge passes requestId and merge options as the API payload', async () => {
+  const calls = [];
+  const api = {
+    submitBookMerge: async (...args) => { calls.push(args); return { ok: true }; }
+  };
+  await createBf11UiAdapter(api).runMerge({
+    batchId: 'b1',
+    bookId: 'k1',
+    requestId: 'r1',
+    timingMode: 'audio',
+    speed: '1.25',
+    ttsSpeed: '1.8',
+    audioDurationSeconds: '12.5'
+  });
+  assert.deepEqual(calls, [['b1', 'k1', {
+    requestId: 'r1',
+    timingMode: 'audio',
+    speed: 1.25,
+    ttsSpeed: 1.8,
+    audioDurationSeconds: 12.5
+  }]]);
+});
+
 test('production submission carries the selected provider without fallback', async () => {
   const calls = [];
   const api = {
@@ -179,6 +202,21 @@ test('production submission carries the selected provider without fallback', asy
   };
   await createBf11UiAdapter(api).runProduction({ batchId: 'b1', requestId: 'r1', provider: 'doubao_local_executor' });
   assert.deepEqual(calls, [['b1', 'r1', 'doubao_local_executor']]);
+});
+
+test('single-book production carries the selected video model to the API', async () => {
+  const calls = [];
+  const api = {
+    submitBookProduction: async (...args) => { calls.push(args); return { bookId: 'k1' }; }
+  };
+  await createBf11UiAdapter(api).runProduction({
+    batchId: 'b1',
+    bookId: 'k1',
+    requestId: 'r1',
+    provider: 'p',
+    videoModelId: 'model-1'
+  });
+  assert.deepEqual(calls, [['b1', 'k1', 'r1', 'p', 'model-1']]);
 });
 
 test('loadWorkbench exposes provider status and local executor inventory', async () => {

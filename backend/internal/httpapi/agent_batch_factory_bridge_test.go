@@ -76,6 +76,50 @@ func TestBindBatchFactoryReturnsSameProjectForSameOwner(t *testing.T) {
 	}
 }
 
+func TestBindBatchFactoryProjectsEveryBookIntoTheOneAgentProject(t *testing.T) {
+	now := time.Date(2026, 10, 24, 7, 0, 0, 0, time.UTC)
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "batch",
+		Books: []batchfactoryv11.CreateBookInput{
+			{Title: "book one", SourceText: "one"},
+			{Title: "book two", SourceText: "two"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projects := agentworkspace.NewMemoryStore()
+	mux := http.NewServeMux()
+	RegisterAgentBatchFactoryBridge(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }}, projects, batches, nil, func() time.Time { return now })
+
+	response := agentRequest(t, mux, now, http.MethodPost, "/api/batch-factory/v11/batches/"+batch.ID+"/agent-project", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("bind status=%d body=%s", response.Code, response.Body.String())
+	}
+	var binding agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &binding); err != nil {
+		t.Fatal(err)
+	}
+	for _, book := range batch.Books {
+		origins, err := projects.BatchFactoryNodeOrigins(context.Background(), "alice", binding.ProjectID, book.ID)
+		if err != nil || len(origins) == 0 {
+			t.Fatalf("book %q was not projected into Agent: origins=%+v err=%v", book.ID, origins, err)
+		}
+	}
+	canvas, err := projects.Canvas(context.Background(), "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := map[string]bool{}
+	for _, node := range canvas.Nodes {
+		groups[node.GroupID] = true
+	}
+	if len(groups) != len(batch.Books) {
+		t.Fatalf("canvas groups=%+v, want one group per book", groups)
+	}
+}
+
 func TestBindBatchFactoryRecreatesDeletedBoundProject(t *testing.T) {
 	now := time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
 	batches := batchfactoryv11.NewMemoryStore()
@@ -407,6 +451,63 @@ func TestBatchFactoryProjectionMediaReadsMergeByCurrentMergeVersion(t *testing.T
 	)
 	if err != nil || media != mediaURL {
 		t.Fatalf("media=%q err=%v, want current merge output %q", media, err, mediaURL)
+	}
+}
+
+func TestBatchFactoryProjectionMergeMediaStreamsLocalArtifact(t *testing.T) {
+	now := time.Date(2026, 10, 24, 9, 30, 0, 0, time.UTC)
+	ctx := context.Background()
+	batches := batchfactoryv11.NewMemoryStore()
+	batch, err := batches.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	files := localartifact.NewStore(t.TempDir(), 1024)
+	const artifactID = "merged-final"
+	const media = "0000ftypisom-canvas-final-video"
+	if _, err := files.SaveMedia(artifactID, "video/mp4", "mp4", bytes.NewBufferString(media)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := batches.CreateMergeJob(ctx, batchfactoryv11.MergeJob{
+		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "merge", Status: batchfactoryv11.MergeSucceeded,
+		OutputURL: "/api/batch-factory/v12/batches/" + batch.ID + "/merge-media/" + artifactID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	projects := agentworkspace.NewMemoryStore()
+	api := NewRouter(RouterOptions{
+		BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 5,
+		Store: batches, AgentWorkspace: projects, UserConfigStore: NewUserConfigStore(t.TempDir()),
+		Merge: &batchfactoryv11.MergeService{Store: batches, Enabled: true}, LocalArtifacts: files,
+	})
+
+	bound := agentRequest(t, api, now, http.MethodPost, "/api/batch-factory/v11/batches/"+batch.ID+"/agent-project", "")
+	if bound.Code != http.StatusOK {
+		t.Fatalf("bind status=%d body=%s", bound.Code, bound.Body.String())
+	}
+	var binding agentBatchFactoryBindingResponse
+	if err := json.Unmarshal(bound.Body.Bytes(), &binding); err != nil {
+		t.Fatal(err)
+	}
+	canvas, err := projects.Canvas(ctx, "alice", binding.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nodeID string
+	for _, node := range canvas.Nodes {
+		if node.Config["resourceType"] == "merge" && node.AssetRef["id"] != nil {
+			nodeID = node.ID
+			break
+		}
+	}
+	if nodeID == "" {
+		t.Fatalf("missing projected merge node: %+v", canvas.Nodes)
+	}
+
+	response := agentRequest(t, api, now, http.MethodGet, "/api/agent/tasks/"+binding.ProjectID+"/batch-factory/nodes/"+nodeID+"/media", "")
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "video/mp4" || response.Body.String() != media {
+		t.Fatalf("merge media status=%d type=%q body=%q", response.Code, response.Header().Get("Content-Type"), response.Body.String())
 	}
 }
 

@@ -21,7 +21,7 @@ test('侧边栏不再显示历史和问题日志入口', () => {
 });
 
 test('批量工厂工作区沿用水货生产主入口名称', () => {
-  assert.match(source, /pathname === '\/batch-factory' \|\| pathname\.startsWith\('\/batch-factory\/'\).*return '水货生产'/s);
+  assert.match(source, /pathname === '\/batch-factory' \|\| pathname\.startsWith\('\/batch-factory\/'\) \|\| pathname === '\/shuihuo-production'.*return '水货生产'/s);
 });
 
 test('小说获取侧边栏进入带导航的 Go 工作台外壳', () => {
@@ -57,7 +57,9 @@ test('routes account-center pages through the dedicated layout while the avatar 
 test('keeps theme and logout controls compact inside the collapsed sidebar', () => {
   assert.match(source, /className="legacy-sidebar-logout"/);
   assert.match(source, /<LogOut/);
-  assert.match(stylesheet, /\.legacy-theme-toggle\s*\{[^}]*border:\s*0;/s);
+  assert.match(source, /className="legacy-theme-switch"/);
+  assert.match(source, /legacy-theme-switch__track/);
+  assert.match(stylesheet, /\.legacy-theme-switch__track\s*\{/s);
   assert.match(stylesheet, /\.legacy-sidebar\.collapsed \.legacy-sidebar-user\s*\{[^}]*flex-direction:\s*column;/s);
   assert.match(stylesheet, /\.legacy-sidebar\.collapsed \.legacy-sidebar-user \.legacy-sidebar-logout-label\s*\{[^}]*display:\s*none;/s);
 });

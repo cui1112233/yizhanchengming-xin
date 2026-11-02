@@ -77,7 +77,7 @@ npm --prefix frontend run build
 .\scripts\start-local-go-review.ps1 -UseYcmMysql
 ```
 
-启动脚本读取 `.env.v88-review`，连接本地审核用 MySQL/Redis，并启动 Go 二进制。确认运行时没有误启 Node：
+启动脚本读取 `.env.v88-review`，连接本地审核用 MySQL/Redis，并启动 Go 二进制。可检查是否误启旧版 Node 主应用；独立浏览器 Worker 与桌面执行器不属于主 API 运行时：
 
 ```powershell
 .\scripts\verify-no-node-runtime.ps1

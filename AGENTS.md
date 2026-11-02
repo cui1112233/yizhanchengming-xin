@@ -46,3 +46,5 @@ For the current consolidation inventory/freeze baseline, read:
 ## 重构模式补充规则
 
 本项目当前按全量重构处理，不为旧 Node 发布链路保留兼容入口。`deploy/v88-direct` 已退出维护并删除；部署统一使用 `scripts/deploy-go-embedded.ps1`。历史文档只作为背景资料，不得重新创建已删除的 Node 部署目录或脚本。
+
+本机目录整理和临时文件归档约定见：`LOCAL_DEVELOPMENT_MEMORY.md`。新增文件前先按该文件判断应该放在源码、运行数据、构建产物还是 `_local-archive-20261028/`。

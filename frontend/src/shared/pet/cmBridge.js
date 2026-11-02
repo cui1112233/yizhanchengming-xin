@@ -32,8 +32,7 @@ let actionTail = Promise.resolve();
 const defaultCapabilities = {
   '/script': ['character.update', 'character.create', 'character.setProtagonist', 'scene.update', 'scene.create', 'script.replace', 'script.insert', 'shot.update', 'constraint.bind', 'constraint.update'],
   '/batch-factory': ['asset.update', 'asset.create', 'segment.update', 'segment.bindAsset'],
-  '/tts': ['tts.update'],
-  '/novel-panel': ['novel.selection.replace']
+  '/tts': ['tts.update']
 };
 
 function text(value, limit = 240) {

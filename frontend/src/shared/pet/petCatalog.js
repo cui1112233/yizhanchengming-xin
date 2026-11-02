@@ -23,8 +23,22 @@ const pixiuPet = Object.freeze({
   renderMode: 'smooth'
 });
 
-export const PET_DEFINITIONS = Object.freeze([stackyPet, pixiuPet]);
-export const DEFAULT_PET_ID = 'stacky';
+const littleCompanionPet = Object.freeze({
+  id: 'little-companion',
+  displayName: '小家伙',
+  description: '小家伙，陪你创作的原创桌面宠物。',
+  renderer: 'multi-sheet',
+  assetBasePath: '/pets/little-companion',
+  previewPose: 'idle',
+  behaviorProfile: 'cm-v1',
+  speechProfile: 'cm-v1',
+  renderMode: 'smooth'
+});
+
+// Keep the primary companion first so the settings selector and all new
+// workspaces agree on the same default without a separate ordering rule.
+export const PET_DEFINITIONS = Object.freeze([littleCompanionPet, stackyPet, pixiuPet]);
+export const DEFAULT_PET_ID = 'little-companion';
 export const PET_SELECTION_EVENT = 'qiantie:pet-selection';
 
 export function findPetDefinition(value) {

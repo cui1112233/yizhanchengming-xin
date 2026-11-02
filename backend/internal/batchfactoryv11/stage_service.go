@@ -37,6 +37,20 @@ type BookStageService struct {
 	ProviderOverride  string
 }
 
+func (s *BookStageService) RunComicBootstrap(ctx context.Context, owner, batchID, bookID string) (ComicBootstrapResult, error) {
+	if s == nil || s.Director == nil {
+		return ComicBootstrapResult{}, fmt.Errorf("%w: 漫画首次统一生成服务未配置", ErrUnavailable)
+	}
+	return s.Director.RunComicBootstrap(ctx, owner, batchID, bookID)
+}
+
+func (s *BookStageService) RunMissingComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) ([]Video, error) {
+	if s == nil || s.Director == nil {
+		return nil, fmt.Errorf("%w: 漫画缺页提示词恢复服务未配置", ErrUnavailable)
+	}
+	return s.Director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
+}
+
 func (s *BookStageService) repository() (BookStageRunRepository, error) {
 	if s == nil || s.Store == nil {
 		return nil, ErrUnavailable
@@ -180,7 +194,7 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	if !validBookStage(stage) {
 		return BookStageSummary{}, ErrInvalid
 	}
-	if mode != StageModeMissing && mode != StageModeForce {
+	if !validStageMode(stage, mode) {
 		return BookStageSummary{}, ErrInvalid
 	}
 	if strings.TrimSpace(requestID) == "" {
@@ -195,11 +209,43 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		return BookStageSummary{}, err
 	}
 	effectiveMode := normalizeProductionMode(ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
+	if mode == StageModeMissing && effectiveMode == "comic" {
+		if stage == BookStageDirector {
+			if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {
+				if segmentation, segmentErr := segmentStore.GetComicSourceSegmentation(ctx, owner, batchID, bookID); segmentErr == nil && !segmentation.Stale {
+					return s.Summary(ctx, owner, batchID, bookID)
+				}
+			}
+		} else if stage == BookStageComic {
+			// Existing page prompts are not enough to skip the comic stage: legacy
+			// batches may have prompts but no durable continuous-source segments.
+			// Let the stage run once so the source is segmented and attached to pages.
+			segmentationReady := false
+			if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {
+				if segmentation, segmentErr := segmentStore.GetComicSourceSegmentation(ctx, owner, batchID, bookID); segmentErr == nil && !segmentation.Stale {
+					segmentationReady = true
+				}
+			}
+			if segmentationReady && comicStageAlreadyComplete(book, stage, ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)) {
+				return s.Summary(ctx, owner, batchID, bookID)
+			}
+		} else if stage == BookStageAssets && comicAssetStageCanReuse(book) {
+			return s.Summary(ctx, owner, batchID, bookID)
+		} else if comicStageAlreadyComplete(book, stage, ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)) {
+			return s.Summary(ctx, owner, batchID, bookID)
+		}
+	}
 	if stage == BookStageVideo && effectiveMode == "comic" {
 		return BookStageSummary{}, fmt.Errorf("%w: 漫画生成已开启，不能生成视频", ErrConflict)
 	}
 	if stage == BookStageComic && effectiveMode != "comic" {
 		return BookStageSummary{}, fmt.Errorf("%w: 请先打开漫画生成", ErrConflict)
+	}
+	// Missing-mode automation is idempotent: once a director revision exists,
+	// do not create another stage run or ask the provider for the same book
+	// again. Explicit force mode remains the user-controlled regenerate path.
+	if stage == BookStageDirector && mode == StageModeMissing && book.DirectorRevision != nil {
+		return s.Summary(ctx, owner, batchID, bookID)
 	}
 	availability := s.availability(ctx, owner, stage)
 	inputRevision := ""
@@ -233,7 +279,29 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	case BookStageVisual:
 		_, err = s.Director.RunVisualPromptExtraction(ctx, owner, batchID, bookID)
 	case BookStageComic:
-		_, err = s.Director.RunComicPromptExtraction(ctx, owner, batchID, bookID)
+		if mode == StageModeBootstrap {
+			_, err = s.Director.RunComicBootstrap(ctx, owner, batchID, bookID)
+			break
+		}
+		if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {
+			segmentation, segmentErr := segmentStore.GetComicSourceSegmentation(ctx, owner, batchID, bookID)
+			if errors.Is(segmentErr, ErrNotFound) || (segmentErr == nil && segmentation.Stale) {
+				_, segmentErr = s.Director.RunComicSourceSegmentation(ctx, owner, batchID, bookID)
+			}
+			if segmentErr != nil {
+				err = segmentErr
+				break
+			}
+		}
+		if mode == StageModeMissing && comicStageAlreadyComplete(book, BookStageComic, ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)) {
+			// Source segmentation was the missing part; preserve already accepted
+			// page prompts and avoid requiring a second asset-extraction pass.
+			err = nil
+		} else if mode == StageModeMissing {
+			_, err = s.Director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
+		} else {
+			_, err = s.Director.RunComicPromptExtraction(ctx, owner, batchID, bookID)
+		}
 	case BookStageImage:
 		if s.ImageGenerator == nil {
 			err = fmt.Errorf("%w: 图片模型或图片生成服务未配置", ErrUnavailable)
@@ -241,7 +309,13 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 			err = s.ImageGenerator(ctx, owner, batchID, bookID)
 		}
 	case BookStageDirector:
-		if mode == StageModeMissing && book.DirectorRevision != nil {
+		if effectiveMode == "comic" {
+			var segmentation ComicSourceSegmentation
+			segmentation, err = s.Director.RunComicSourceSegmentation(ctx, owner, batchID, bookID)
+			if err == nil {
+				run.InputRevision = fmt.Sprintf("comic-source-v%d", segmentation.Version)
+			}
+		} else if mode == StageModeMissing && book.DirectorRevision != nil {
 			err = fmt.Errorf("%w: 导演分镜已存在；请使用重新生成导演分镜", ErrConflict)
 		} else {
 			var revision DirectorRevision
@@ -288,6 +362,33 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		return BookStageSummary{}, summaryErr
 	}
 	return summary, err
+}
+
+func comicStageAlreadyComplete(book Book, stage BookStage, effective SettingsPatch) bool {
+	switch stage {
+	case BookStageAssets:
+		for _, asset := range book.AssetRecords {
+			if strings.TrimSpace(asset.Source) == "comic" {
+				return true
+			}
+		}
+		return false
+	case BookStageDirector:
+		return len(book.Videos) > 0
+	case BookStageComic:
+		if len(book.Videos) == 0 {
+			return false
+		}
+		light := aiReasoningPromptConfig(effective).Comic.ID == "batch-comic-page-light"
+		for _, video := range book.Videos {
+			if strings.TrimSpace(video.ComicPrompt) == "" || (!light && strings.TrimSpace(video.ComicImagePrompt) == "") {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *BookStageService) usesUnifiedDirectorFlow(batch Batch, book Book) bool {

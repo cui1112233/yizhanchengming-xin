@@ -57,6 +57,47 @@ func TestCaptureBookSourcePreservesUserTitle(t *testing.T) {
 	}
 }
 
+func TestCaptureBookSourceKeepsRawTextSeparateFromProcessedText(t *testing.T) {
+	ctx := context.Background()
+	s := NewMemoryStore()
+	batch, err := s.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批量", Books: []CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	updated, err := s.CaptureBookSource(ctx, "alice", batch.ID, book.ID, CaptureBookSourceInput{
+		SourceText:       "处理后的正文",
+		RawSourceText:    "上游返回的原始正文\n保留原始换行",
+		ExpectedRevision: book.Revision,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SourceText != "处理后的正文" || updated.TxtText != "上游返回的原始正文\n保留原始换行" {
+		t.Fatalf("source text separation = source=%q raw=%q", updated.SourceText, updated.TxtText)
+	}
+}
+
+func TestCaptureBookSourceCanRetainRawOnlyAfterProcessingFailure(t *testing.T) {
+	ctx := context.Background()
+	s := NewMemoryStore()
+	batch, err := s.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批量", Books: []CreateBookInput{{Title: "book"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	updated, err := s.CaptureBookSource(ctx, "alice", batch.ID, book.ID, CaptureBookSourceInput{
+		RawSourceText: "完整抓取原文", ReplaceSource: true, ExpectedRevision: book.Revision,
+		SourceMetadata: map[string]any{"processingStatus": "failed", "processRetryable": true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SourceText != "" || updated.TxtText != "完整抓取原文" || updated.SourceMetadata["processingStatus"] != "failed" {
+		t.Fatalf("failed processing should keep only retryable raw text: %+v", updated)
+	}
+}
+
 func TestSavingBatchSettingsDoesNotDeleteBookOrVideoOverride(t *testing.T) {
 	ctx := context.Background()
 	s := NewMemoryStore()
@@ -178,7 +219,10 @@ func TestNovelFetchIntakeAppendsToCurrentBatchAndRetainsSourceBookID(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	intake, err := s.CreateIntake(ctx, "alice", NovelFetchIntakeInput{Books: []CreateBookInput{{BookID: "origin-2", SourceTaskID: "task-2", Title: "AI1·新书", SourceText: "已确认正文", SourceMetadata: map[string]any{"sourceContentVersion": "ai1"}}}})
+	intake, err := s.CreateIntake(ctx, "alice", NovelFetchIntakeInput{Books: []CreateBookInput{{
+		BookID: "origin-2", SourceTaskID: "task-2", Title: "AI1·新书", SourceText: "已确认正文", TxtText: "完整原始正文",
+		SourceMetadata: map[string]any{"sourceContentVersion": "ai1", "gender": "女频", "genderSource": "bookinfo", "genderReason": "平台分类明确"},
+	}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +234,7 @@ func TestNovelFetchIntakeAppendsToCurrentBatchAndRetainsSourceBookID(t *testing.
 		t.Fatalf("books=%+v", updated.Books)
 	}
 	got := updated.Books[1]
-	if got.BookID != "origin-2" || got.SourceTaskID != "task-2" || got.Title != "AI1·新书" || got.SourceText != "已确认正文" || got.SourceMetadata["sourceContentVersion"] != "ai1" {
+	if got.BookID != "origin-2" || got.SourceTaskID != "task-2" || got.Title != "AI1·新书" || got.SourceText != "已确认正文" || got.TxtText != "完整原始正文" || got.SourceMetadata["sourceContentVersion"] != "ai1" || got.SourceMetadata["genderSource"] != "bookinfo" {
 		t.Fatalf("appended book=%+v", got)
 	}
 	if _, err := s.AppendBooksFromIntake(ctx, "alice", batch.ID, intake.ID, false); err != ErrConflict {

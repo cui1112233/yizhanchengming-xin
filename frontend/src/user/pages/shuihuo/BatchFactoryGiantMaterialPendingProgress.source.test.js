@@ -17,6 +17,13 @@ test('direct-first preserves a failed book-city read instead of creating an OCR 
   assert.doesNotMatch(source, /directReadFailed \? startOcrFallback\(\) : refetchOriginal\(true\)/);
 });
 
+test('keeps manual recovery actions visible after a failed read has left the queue', () => {
+  assert.match(source, /const hasRecoverableFailure = Boolean\(error \|\| persistedOriginalReadError\)/);
+  assert.match(source, /if \(\(!pending && !hasRecoverableFailure\) \|\| !visible\) return null/);
+  assert.match(source, /onClick=\{\(\) => refetchOriginal\(false\)\}>获取正文/);
+  assert.match(source, /onClick=\{startOcrFallback\}>OCR/);
+});
+
 test('keeps direct original fetch available while OCR executor is offline', () => {
   assert.match(source, /OCR 执行器当前未在线；可直接重试书城获取正文/);
   assert.match(source, /onClick=\{\(\) => refetchOriginal\(false\)\}>获取正文/);

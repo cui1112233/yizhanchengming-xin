@@ -123,10 +123,18 @@ test('canvas input preview client asks the server to resolve one node', async ()
     calls.push({ path, options });
     return { inputs: { prompt: '雨夜街道' } };
   };
-  const result = await previewAgentCanvasInputs('project 1', 'image node', request);
+  const result = await previewAgentCanvasInputs('project 1', {
+    nodeId: 'image node',
+    provider: 'doubao_local_executor',
+    modelId: 'Seedream 4.5'
+  }, request);
   assert.equal(calls[0].path, '/api/agent/tasks/project%201/canvas-inputs/preview');
   assert.equal(calls[0].options.method, 'POST');
-  assert.deepEqual(JSON.parse(calls[0].options.body), { nodeId: 'image node' });
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    nodeId: 'image node',
+    provider: 'doubao_local_executor',
+    modelId: 'Seedream 4.5'
+  });
   assert.equal(result.inputs.prompt, '雨夜街道');
 });
 

@@ -246,6 +246,93 @@ test('pending canvas merge retains local workspace view state', () => {
   assert.deepEqual(merged.viewState, { activeView: 'storyboard', drawerWidth: 340 });
 });
 
+test('pending blank canvas cannot erase nodes and edges added by the server projection', () => {
+  const merged = mergePendingCanvas(
+    {
+      version: 1,
+      revision: 8,
+      nodes: [{ id: 'book-script', version: 2, status: 'succeeded', config: { resourceType: 'book_script', batchId: 'batch-1' } }],
+      edges: [{ id: 'book-script-to-video', source: 'book-script', target: 'video-1', data: { relation: 'batch_factory_projection' } }]
+    },
+    { version: 1, revision: 7, nodes: [], edges: [] }
+  );
+  assert.deepEqual(merged.nodes.map(node => node.id), ['book-script']);
+  assert.deepEqual(merged.edges.map(edge => edge.id), ['book-script-to-video']);
+});
+
+test('pending canvas cannot restore a removed Batch Factory mapped node', () => {
+  const merged = mergePendingCanvas(
+    {
+      version: 1,
+      revision: 9,
+      nodes: [{ id: 'book-script', type: 'script', position: { x: 20, y: 30 }, config: { source: 'batch_factory', resourceType: 'book_script', batchId: 'batch-1', bookId: 'book-1' } }],
+      edges: []
+    },
+    {
+      version: 1,
+      revision: 9,
+      nodes: [
+        { id: 'book-script', type: 'script', position: { x: 80, y: 90 }, config: { source: 'batch_factory', resourceType: 'book_script', batchId: 'batch-1', bookId: 'book-1' } },
+        { id: 'stale-video', type: 'video', position: { x: 400, y: 80 }, config: { source: 'batch_factory', resourceType: 'video', batchId: 'batch-1', bookId: 'book-1' } }
+      ],
+      edges: [{ id: 'stale-edge', source: 'book-script', target: 'stale-video', data: { relation: 'batch_factory_projection' } }]
+    }
+  );
+
+  assert.deepEqual(merged.nodes.map(node => node.id), ['book-script']);
+  assert.deepEqual(merged.nodes[0].position, { x: 80, y: 90 });
+  assert.deepEqual(merged.edges, []);
+});
+
+test('pending canvas keeps Batch Factory mapped state from the server', () => {
+  const merged = mergePendingCanvas(
+    {
+      version: 1,
+      revision: 9,
+      nodes: [{
+        id: 'video-1', type: 'video', title: 'VIDEO 01', status: 'draft', position: { x: 700, y: 80 },
+        config: { source: 'batch_factory', resourceType: 'video', batchId: 'batch-1', bookId: 'book-1', mappedState: 'draft', prompt: '批量工厂当前提示词' }
+      }],
+      edges: []
+    },
+    {
+      version: 1,
+      revision: 9,
+      nodes: [{
+        id: 'video-1', type: 'video', title: '旧 VIDEO', status: 'succeeded', position: { x: 760, y: 120 },
+        config: { source: 'batch_factory', resourceType: 'video', batchId: 'batch-1', bookId: 'book-1', mappedState: 'succeeded', prompt: '过期提示词' }
+      }],
+      edges: []
+    }
+  );
+
+  assert.equal(merged.nodes[0].title, 'VIDEO 01');
+  assert.equal(merged.nodes[0].status, 'draft');
+  assert.deepEqual(merged.nodes[0].position, { x: 760, y: 120 });
+  assert.equal(merged.nodes[0].config.prompt, '批量工厂当前提示词');
+  assert.equal(merged.nodes[0].config.mappedState, 'draft');
+});
+
+test('pending node edits preserve server projection configuration that was not edited locally', () => {
+  const merged = mergePendingCanvas(
+    {
+      version: 1,
+      revision: 8,
+      nodes: [{ id: 'book-script', version: 2, status: 'succeeded', config: { resourceType: 'book_script', batchId: 'batch-1', prompt: '旧提示词' } }],
+      edges: []
+    },
+    {
+      version: 1,
+      revision: 7,
+      nodes: [{ id: 'book-script', version: 1, status: 'draft', config: { prompt: '本地修改提示词' } }],
+      edges: []
+    }
+  );
+  assert.deepEqual(merged.nodes[0].config, { resourceType: 'book_script', batchId: 'batch-1', prompt: '本地修改提示词' });
+  assert.equal(merged.nodes[0].version, 2);
+  assert.equal(merged.nodes[0].status, 'succeeded');
+});
+
 test('canvas save queue reloads authoritative canvas on revision conflict', async () => {
   const statuses = [];
   const canvases = [];

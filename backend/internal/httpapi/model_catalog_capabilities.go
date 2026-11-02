@@ -13,15 +13,20 @@ type PublicDurationCapabilities struct {
 }
 
 type PublicModelCapabilities struct {
-	Ratios          []string                   `json:"ratios,omitempty"`
-	Resolutions     []string                   `json:"resolutions,omitempty"`
-	QualityLevels   []string                   `json:"qualityLevels,omitempty"`
-	Duration        PublicDurationCapabilities `json:"duration,omitempty"`
-	MaxOutputCount  int                        `json:"maxOutputCount,omitempty"`
-	ReferenceKinds  []string                   `json:"referenceKinds,omitempty"`
-	GenerationModes []string                   `json:"generationModes,omitempty"`
-	SupportsAudio   bool                       `json:"supportsAudio"`
-	AdvancedFlags   []string                   `json:"advancedFlags,omitempty"`
+	Ratios                 []string                   `json:"ratios,omitempty"`
+	Resolutions            []string                   `json:"resolutions,omitempty"`
+	QualityLevels          []string                   `json:"qualityLevels,omitempty"`
+	Duration               PublicDurationCapabilities `json:"duration,omitempty"`
+	MaxOutputCount         int                        `json:"maxOutputCount,omitempty"`
+	ReferenceKinds         []string                   `json:"referenceKinds,omitempty"`
+	GenerationModes        []string                   `json:"generationModes,omitempty"`
+	SupportsAudio          bool                       `json:"supportsAudio"`
+	AcceptsTextPrompt      bool                       `json:"acceptsTextPrompt"`
+	AcceptsImageReferences bool                       `json:"acceptsImageReferences"`
+	AcceptsVideoReferences bool                       `json:"acceptsVideoReferences"`
+	AcceptsAudioReferences bool                       `json:"acceptsAudioReferences"`
+	MaxReferenceAssets     int                        `json:"maxReferenceAssets,omitempty"`
+	AdvancedFlags          []string                   `json:"advancedFlags,omitempty"`
 }
 
 func publicModelCapabilities(model map[string]any) PublicModelCapabilities {
@@ -32,6 +37,7 @@ func publicModelCapabilities(model map[string]any) PublicModelCapabilities {
 			Ratios: []string{"16:9", "9:16", "1:1"}, Resolutions: []string{"1K", "2K", "4K"},
 			QualityLevels: []string{"low", "standard", "high"}, MaxOutputCount: 4,
 			ReferenceKinds: []string{"image"}, GenerationModes: []string{"text_to_image", "image_to_image"},
+			AcceptsTextPrompt: true, AcceptsImageReferences: true, MaxReferenceAssets: 10,
 			AdvancedFlags: []string{"negative_prompt", "seed", "autolink"},
 		}
 	case "video":
@@ -39,19 +45,18 @@ func publicModelCapabilities(model map[string]any) PublicModelCapabilities {
 			Ratios: []string{"16:9", "9:16"}, Resolutions: []string{"480P", "720P", "1080P"},
 			Duration: PublicDurationCapabilities{Min: 5, Max: 15, Default: 5}, MaxOutputCount: 1,
 			ReferenceKinds: []string{"image"}, GenerationModes: []string{"text_to_video", "image_to_video", "first_frame"},
+			AcceptsTextPrompt: true, AcceptsImageReferences: true, MaxReferenceAssets: 10,
 			AdvancedFlags: []string{"camera_motion", "autolink"},
 		}
 	case "audio":
 		return PublicModelCapabilities{
-			MaxOutputCount: 1, GenerationModes: []string{"speech", "music", "effect"},
+			MaxOutputCount: 1, GenerationModes: []string{"speech", "music", "effect"}, AcceptsTextPrompt: true,
 			AdvancedFlags: []string{"voice", "speed", "pitch", "emotion", "format"},
 		}
+	case "text":
+		return PublicModelCapabilities{MaxOutputCount: 1, GenerationModes: []string{"generate", "rewrite", "continue"}, AcceptsTextPrompt: true, AdvancedFlags: []string{"length", "creativity", "structure"}}
 	default:
-		return PublicModelCapabilities{
-			MaxOutputCount: 1, ReferenceKinds: []string{"text", "image", "video", "audio"},
-			GenerationModes: []string{"generate", "rewrite", "continue"},
-			AdvancedFlags:   []string{"length", "creativity", "structure"},
-		}
+		return PublicModelCapabilities{MaxOutputCount: 1}
 	}
 }
 

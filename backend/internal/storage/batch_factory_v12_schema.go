@@ -1,5 +1,12 @@
 package storage
 
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+)
+
 // V12 keeps its upgrade lineage outside V11 tables. The immutable snapshot is
 // the audit anchor for a legacy batch opened by the V12 workbench; source V11
 // rows are never rewritten as part of that transition.
@@ -110,5 +117,54 @@ func V12Migrations() []Migration {
 		{Version: 1200102, SQL: V12H3AggregateStatements(), CallbackChecksum: "batch-factory-v12-h3-aggregates-v1"},
 		{Version: 1200103, SQL: V12H3ProductionTraceStatements(), CallbackChecksum: "batch-factory-v12-h3-production-trace-v1"},
 		{Version: 1200104, SQL: []string{`ALTER TABLE batch_factory_v12_audio_measurements ADD COLUMN measurement_json JSON NULL`}, CallbackChecksum: "batch-factory-v12-line-audio-v1"},
+		{Version: 1200105, SQL: V12CanonicalTableRenameStatements(), CallbackChecksum: "batch-factory-v12-canonical-tables-v1", Adopt: adoptV12CanonicalTableRename},
 	}
+}
+
+// V12CanonicalTableRenameStatements performs the one-way physical cutover of
+// the old table names. The rows stay in the same tables; only the names used
+// by the active V12 code change. Keeping this as a migration, instead of
+// creating copies, avoids doubling the database and makes foreign keys follow
+// the original rows.
+func V12CanonicalTableRenameStatements() []string {
+	tables := []string{
+		"bridge_users", "batches", "books", "videos", "migration_audits", "capability_settings",
+		"intakes", "batch_records", "book_records", "video_records", "settings_patches",
+		"config_versions", "config_snapshots", "prompt_definitions", "prompt_versions", "drafts",
+		"hook_revisions", "director_revisions", "director_video_links", "orphaned_overrides",
+		"production_jobs", "production_tasks", "production_events", "hidden_production_tasks",
+		"merge_jobs", "merge_sources", "external_credentials", "external_intents", "external_audits",
+		"comic_pages", "comic_page_images", "comic_collections", "comic_collection_items", "comic_source_segments",
+		"book_assets", "book_asset_images", "book_stage_runs", "local_artifact_purges", "shuihuo_configs",
+	}
+	statements := make([]string, 0, len(tables))
+	for _, table := range tables {
+		statements = append(statements, "RENAME TABLE batch_factory_v11_"+table+" TO batch_factory_v12_"+table)
+	}
+	return statements
+}
+
+// Adopt makes a previously completed physical cutover safe to restart after
+// the migration ledger write was interrupted. It does not modify data.
+func adoptV12CanonicalTableRename(ctx context.Context, tx *sql.Tx) (bool, error) {
+	for _, statement := range V12CanonicalTableRenameStatements() {
+		parts := strings.Fields(statement)
+		if len(parts) != 5 {
+			return false, fmt.Errorf("unexpected canonical rename statement: %s", statement)
+		}
+		var sourceCount, targetCount int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?`, parts[2]).Scan(&sourceCount); err != nil {
+			return false, err
+		}
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?`, parts[4]).Scan(&targetCount); err != nil {
+			return false, err
+		}
+		if sourceCount > 0 {
+			return false, nil
+		}
+		if targetCount == 0 {
+			return false, fmt.Errorf("canonical table missing after partial cutover: %s", parts[4])
+		}
+	}
+	return true, nil
 }

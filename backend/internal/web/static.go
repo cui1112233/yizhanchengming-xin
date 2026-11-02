@@ -29,7 +29,7 @@ func StaticHandler(files fs.FS) http.Handler {
 			http.Redirect(w, req, target, http.StatusFound)
 			return
 		}
-		if name == "novel-panel/workbench" || strings.HasPrefix(name, "novel-panel/workbench/") {
+		if name == "novel-panel" || strings.HasPrefix(name, "novel-panel/") {
 			http.NotFound(w, req)
 			return
 		}

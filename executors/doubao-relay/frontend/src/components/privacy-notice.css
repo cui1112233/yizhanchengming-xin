@@ -1,0 +1,64 @@
+/* Task 5.2:首次启动全屏隐私声明 */
+.privacy-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.privacy-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 28px 32px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.privacy-title {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.privacy-lead {
+  margin: 12px 0 6px;
+  font-weight: 600;
+}
+
+.privacy-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  line-height: 24px;
+}
+
+.privacy-warnings li {
+  color: var(--dot-red);
+}
+
+.privacy-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 4px;
+  cursor: pointer;
+}
+
+.privacy-error {
+  margin: 8px 0 0;
+  color: var(--dot-red);
+}
+
+.privacy-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}

@@ -37,6 +37,25 @@ test('manual batch submission keeps schedule metadata with automation explicitly
   assert.equal(payload.autoPublishEnabled, false);
 });
 
+test('manual batch submission extracts fetched text instead of persisting object coercion', () => {
+  const payload = buildManualBatchSubmission({
+    title: '对象正文兼容',
+    groups: [{
+      platformId: '4',
+      platformName: '点众付费',
+      inputText: '11010564460\t测试书',
+      sourceTextByBookId: {
+        '11010564460': { data: { processedText: '第一行\n第二行' } },
+        '11010567086': '[object Object]'
+      }
+    }]
+  });
+
+  assert.deepEqual(payload.groups[0].sourceTextByBookId, {
+    '11010564460': '第一行\n第二行'
+  });
+});
+
 test('manual intake treats the leading 6-25 digit number of each row as a book ID', () => {
   assert.deepEqual(
     manualBookIDsFromInput('700000 六位数 ID\n748725 事不过三，过三遭殃\n2086529323515883958 长 ID'),

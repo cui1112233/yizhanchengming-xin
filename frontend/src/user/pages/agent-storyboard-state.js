@@ -1,3 +1,5 @@
+import { STORYBOARD_SPLIT_DEFAULTS, storyboardSplitRatio } from './agent-storyboard-split.js';
+
 const CATEGORY_OPTIONS = Object.freeze({
   text: Object.freeze([
     { value: 'all', label: '全部' },
@@ -37,6 +39,29 @@ export const STORYBOARD_LIBRARY_MAX_WIDTH = 520;
 export const STORYBOARD_SECTION_DEFAULT_HEIGHTS = Object.freeze({ text: 220, audio: 240, image: 320 });
 export const STORYBOARD_SECTION_MIN_HEIGHT = 120;
 export const STORYBOARD_SECTION_MAX_HEIGHT = 520;
+const STORYBOARD_SECTION_KINDS = Object.freeze(['text', 'audio', 'image', 'video']);
+
+function storyboardSectionOrder(value) {
+  const order = [];
+  const seen = new Set();
+  for (const kind of [...(Array.isArray(value) ? value : []), ...STORYBOARD_SECTION_KINDS]) {
+    if (!STORYBOARD_SECTION_KINDS.includes(kind) || seen.has(kind)) continue;
+    seen.add(kind);
+    order.push(kind);
+  }
+  return order;
+}
+
+function storyboardLayout(value) {
+  const source = safeObject(value);
+  return {
+    director: storyboardSplitRatio(source.director, 18, STORYBOARD_SPLIT_DEFAULTS.director),
+    column: storyboardSplitRatio(source.column, 18, STORYBOARD_SPLIT_DEFAULTS.column),
+    leftRow: storyboardSplitRatio(source.leftRow, 18, STORYBOARD_SPLIT_DEFAULTS.leftRow),
+    rightRow: storyboardSplitRatio(source.rightRow, 18, STORYBOARD_SPLIT_DEFAULTS.rightRow),
+    sectionOrder: storyboardSectionOrder(source.sectionOrder)
+  };
+}
 
 export function storyboardLibraryWidth(value, maxWidth = STORYBOARD_LIBRARY_MAX_WIDTH) {
   const numeric = Number(value);
@@ -62,7 +87,11 @@ export const DEFAULT_STORYBOARD_STATE = Object.freeze({
   categories: Object.freeze({}),
   order: Object.freeze([]),
   libraryWidth: STORYBOARD_LIBRARY_DEFAULT_WIDTH,
-  sectionHeights: STORYBOARD_SECTION_DEFAULT_HEIGHTS
+  sectionHeights: STORYBOARD_SECTION_DEFAULT_HEIGHTS,
+  layout: Object.freeze({
+    ...STORYBOARD_SPLIT_DEFAULTS,
+    sectionOrder: STORYBOARD_SECTION_KINDS
+  })
 });
 
 function safeObject(value) {
@@ -117,7 +146,8 @@ export function normalizeStoryboardState(value = {}) {
     categories,
     order,
     libraryWidth: storyboardLibraryWidth(source.libraryWidth),
-    sectionHeights
+    sectionHeights,
+    layout: storyboardLayout(source.layout)
   };
 }
 
@@ -129,7 +159,8 @@ export function patchStoryboardState(current = {}, patch = {}) {
     ...nextPatch,
     filters: { ...normalized.filters, ...safeObject(nextPatch.filters) },
     categories: { ...normalized.categories, ...safeObject(nextPatch.categories) },
-    sectionHeights: { ...normalized.sectionHeights, ...safeObject(nextPatch.sectionHeights) }
+    sectionHeights: { ...normalized.sectionHeights, ...safeObject(nextPatch.sectionHeights) },
+    layout: { ...normalized.layout, ...safeObject(nextPatch.layout) }
   });
 }
 

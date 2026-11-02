@@ -13,7 +13,7 @@ import (
 	"qiantie/backend/internal/prompt"
 )
 
-func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, executors *localexecutor.Service) {
+func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, store batchfactoryv11.Store, files *localartifact.Store, executors *localexecutor.Service, catalogs ...*prompt.Catalog) {
 	if root == nil || store == nil || files == nil {
 		return
 	}
@@ -55,6 +55,7 @@ func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, sto
 			AssetID:    assetID,
 			URL:        "/api/local-executor/v1/batch-comic-references/" + batchID + "/" + assetID,
 			PreviewURL: "/api/batch-factory/v12/batches/" + batchID + "/comic-references/" + assetID + "/content",
+			Source:     "manual-upload",
 			Enabled:    true, ApplyToAssets: true, ApplyToPages: true,
 		}
 		_ = saved
@@ -70,6 +71,10 @@ func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, sto
 	})))
 	if executors == nil {
 		return
+	}
+	var catalog *prompt.Catalog
+	if len(catalogs) > 0 {
+		catalog = catalogs[0]
 	}
 	root.HandleFunc("GET /api/local-executor/v1/batch-comic-references/{batchId}/{assetId}", func(w http.ResponseWriter, r *http.Request) {
 		token, ok := executorBearerToken(r)
@@ -103,6 +108,36 @@ func RegisterBatchComicReferenceRoutes(root *http.ServeMux, auth BridgeAuth, sto
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
 		w.Header().Set("Cache-Control", "private, max-age=86400")
 		_, _ = w.Write(payload)
+	})
+	root.HandleFunc("GET /api/local-executor/v1/batch-comic-reference-scenes/{presetId}", func(w http.ResponseWriter, r *http.Request) {
+		token, ok := executorBearerToken(r)
+		if !ok {
+			writeExecutorError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if _, err := executors.OwnerForToken(r.Context(), token); err != nil {
+			writeLocalJobError(w, err)
+			return
+		}
+		payload, mediaType, ok := prompt.OpenComicReferenceScene(r.PathValue("presetId"))
+		if !ok {
+			writeExecutorError(w, http.StatusNotFound, "comic reference scene not found")
+			return
+		}
+		w.Header().Set("Content-Type", mediaType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(payload)))
+		w.Header().Set("Cache-Control", "private, max-age=86400")
+		_, _ = w.Write(payload)
+	})
+	root.HandleFunc("GET /api/local-executor/v1/batch-comic-materials/{presetId}", func(w http.ResponseWriter, r *http.Request) {
+		token, ok := executorBearerToken(r)
+		if !ok {
+			writeExecutorError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if _, err := executors.OwnerForToken(r.Context(), token); err != nil || !servePublishedComicMaterial(w, r, catalog, files, r.PathValue("presetId")) {
+			writeExecutorError(w, http.StatusNotFound, "comic material not found")
+		}
 	})
 	root.HandleFunc("GET /api/local-executor/v1/batch-book-asset-images/{batchId}/{bookId}/{assetId}/{imageId}", func(w http.ResponseWriter, r *http.Request) {
 		token, ok := executorBearerToken(r)
@@ -149,6 +184,28 @@ func serveBatchComicReference(w http.ResponseWriter, r *http.Request, store batc
 	for _, book := range batch.Books {
 		if batchfactoryv11.ComicGlobalReference(batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)).AssetID == assetID {
 			allowed = true
+			break
+		}
+		comicStore, ok := store.(batchfactoryv11.ComicPageStore)
+		if !ok {
+			continue
+		}
+		pages, listErr := comicStore.ListComicPages(r.Context(), owner, batchID, book.ID)
+		if listErr != nil {
+			continue
+		}
+		for _, page := range pages {
+			for _, referenceURL := range page.ReferenceImageURLs {
+				if strings.HasSuffix(strings.TrimSpace(referenceURL), "/"+assetID) {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				break
+			}
+		}
+		if allowed {
 			break
 		}
 	}

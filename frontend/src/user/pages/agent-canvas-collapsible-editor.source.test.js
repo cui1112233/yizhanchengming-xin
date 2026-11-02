@@ -60,6 +60,10 @@ test('mapped Batch Factory script uses its card as the only visible node frame',
   assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-preview-shell:has\(\.agent-canvas-node-pinned-composer\)\s*\{[^}]*border:\s*0[^}]*padding:\s*0[^}]*background:\s*transparent[^}]*box-shadow:\s*none/);
 });
 
+test('ordinary canvas nodes keep one visible card frame', () => {
+  assert.match(workspaceStyles, /\.agent-page \.agent-canvas-node-card\s*\{[^}]*border:\s*1px solid var\(--agent-border-strong\)[^}]*border-radius:\s*8px[^}]*padding:\s*8px[^}]*background:\s*var\(--agent-panel\)[^}]*box-shadow:\s*0 7px 16px rgba\(0, 0, 0, 0\.16\)/);
+});
+
 test('opening a node editor leaves the viewport still so its prompt can retain keyboard focus', () => {
   assert.doesNotMatch(canvasSource, /flowInstance\.fitView\(\{ nodes: \[\{ id: nodeID \}\]/);
   assert.doesNotMatch(canvasSource, /canvasEditorFocusOptions\(viewportRef\.current\?\.zoom\)/);
@@ -221,6 +225,10 @@ test('expanded image editor shows persisted candidates and requires explicit con
   assert.match(canvasSource, /confirmAgentImageGeneration/);
   assert.match(canvasSource, /nodeExecutionReview/);
   assert.match(canvasSource, /canvas, executions = \[\]/);
+});
+
+test('image candidates expose a visible confirmation action without opening the more menu', () => {
+  assert.match(composerSource, /agent-node-composer__candidate-actions[\s\S]*?使用这张/);
 });
 
 test('generated image candidates stay bounded instead of rendering at their natural pixel size', () => {

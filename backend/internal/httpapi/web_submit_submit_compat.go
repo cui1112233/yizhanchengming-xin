@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/videomanagementconnector"
@@ -23,134 +21,77 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			return
 		}
 		var body struct {
-			TaskIDs  []string `json:"taskIds"`
-			IDs      []string `json:"ids"`
-			Versions []string `json:"versions"`
+			TaskIDs      []string `json:"taskIds"`
+			IDs          []string `json:"ids"`
+			Versions     []string `json:"versions"`
+			OperationID  string   `json:"operationId"`
+			ReadbackOnly bool     `json:"readback_only"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, req.Body, 64<<10)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请求内容无效"})
 			return
 		}
-		settings, err := store.GetConfig(req.Context(), identity.Username)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
-			return
-		}
-		app := mapOrEmpty(settings["appConfig"])
-		web := mapOrEmpty(app["web_submit"])
-		if web["enabled"] != true {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "网站提交尚未启用；请先保存账号并勾选启用网站提交"})
-			return
-		}
-		session := readUploadTargetSession(usersDir, identity.Username)
-		cookie := strings.TrimSpace(toString(session["cookie"]))
-		if cookie == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先在网站提交页保存账号密码并登录目标站"})
-			return
-		}
 		if len(body.TaskIDs) == 0 {
 			body.TaskIDs = body.IDs
 		}
-		versions := cleanStrings(body.Versions)
-		if len(versions) == 0 {
-			versions = cleanStrings(anyStrings(web["submit_versions"]))
-		}
-		if len(versions) == 0 {
-			versions = []string{"ai1"}
-		}
-		if len(body.TaskIDs) == 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "没有可提交的任务，请先勾选任务"})
+		result, err := executeWebSubmit(req.Context(), identity.Username, usersDir, store, webSubmitRequest{TaskIDs: body.TaskIDs, Versions: body.Versions, OperationID: body.OperationID, ReadbackOnly: body.ReadbackOnly}, genderJudgeResolver, targets...)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if requestErr, ok := err.(*webSubmitRequestError); ok {
+				status = requestErr.Status
+			}
+			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
-		results := []any{}
-		success := 0
-		failed := 0
-		for _, rawID := range body.TaskIDs {
-			bookID := strings.TrimSpace(rawID)
-			doc, docErr := store.GetDocument(req.Context(), identity.Username, bookID)
-			if docErr != nil {
-				results = append(results, map[string]any{"bookId": bookID, "status": "error", "error": "任务不存在"})
-				failed++
-				continue
-			}
-			meta := doc.Meta
-			if meta == nil {
-				meta = map[string]any{}
-			}
-			if genderNeedsResolution(doc.Gender) && genderJudgeResolver != nil {
-				if judge, judgeErr := genderJudgeResolver(req.Context(), identity.Username); judgeErr == nil {
-					resolveSubmissionGender(req.Context(), &doc, judge)
-					meta = doc.Meta
-				}
-			}
-			done := anyStrings(meta["siteSubmitDoneVersions"])
-			if len(done) == 0 {
-				done = anyStrings(meta["site_submit_done_versions"])
-			}
-			for _, version := range versions {
-				row := map[string]any{"bookId": bookID, "version": version, "status": "error"}
-				failedVersion := func(message string, externalRequested bool) {
-					row["error"] = message
-					markSubmissionFailure(meta, version, message)
-					doc.Logs = append(doc.Logs, map[string]any{"event": "site_submit", "version": version, "status": "failed", "error": message, "time": time.Now().UTC().Format(time.RFC3339), "externalRequested": externalRequested})
-					results = append(results, row)
-					failed++
-				}
-				if containsVersion(done, version) {
-					row["status"] = "skipped"
-					row["error"] = "该版本已确认提交"
-					results = append(results, row)
-					continue
-				}
-				if styleNeedsResolution(meta) {
-					failedVersion(webSubmitUnclassifiedStyleError, false)
-					continue
-				}
-				content, bodyErr := store.GetBody(req.Context(), identity.Username, bookID, version)
-				if bodyErr != nil || strings.TrimSpace(content.Content) == "" {
-					failedVersion("未找到正文版本", false)
-					continue
-				}
-				platform, _ := strconv.Atoi(firstText(meta["platformId"], meta["platform_id"]))
-				gender, style := submissionGenderStyle(doc)
-				fields, fieldErr := buildUploadFieldsCompat(platform, gender, style, mapOrEmpty(web["advanced"]), map[string]any{})
-				if fieldErr != nil {
-					failedVersion(fieldErr.Error(), false)
-					continue
-				}
-				if len(targets) > 0 && targets[0] != nil {
-					submission, submitErr := targets[0].Submit(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}, videomanagementconnector.SubmissionInput{BookID: bookID, Filename: bookID + ".txt", Content: []byte(content.Content), FormFields: fields})
-					if submitErr != nil {
-						failedVersion("上传失败", true)
-						continue
-					}
-					row["status"] = "submitted"
-					row["submissionId"] = submission.ID
-					row["error"] = nil
-					results = append(results, row)
-					success++
-					meta["siteSubmitStatus"] = "submitted"
-					done = append(done, version)
-					meta["siteSubmitDoneVersions"] = uniqueStrings(done)
-					meta["siteSubmitFailedVersions"] = removeString(anyStrings(meta["siteSubmitFailedVersions"]), version)
-					if errors := mapOrEmpty(meta["siteSubmitFailedErrors"]); len(errors) > 0 {
-						delete(errors, version)
-						meta["siteSubmitFailedErrors"] = errors
-					}
-					continue
-				}
-				failedVersion("视频管理系统 Go 连接器未执行上传", false)
-			}
-			doc.Meta = meta
-			_ = store.PutDocument(req.Context(), identity.Username, doc)
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": failed == 0, "results": results, "success_groups": success, "failed_groups": failed})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": result.Failed == 0, "operation_id": result.OperationID, "results": result.Results, "success_groups": result.Success, "failed_groups": result.Failed})
 	}))
 	// The legacy workbench calls /api/web-submit/submit, while the canonical
 	// compatibility route lives under /api/batch-rewrite/web-submit/submit.
 	// Keep both paths on the same handler so the Go 4001 page cannot 404.
 	root.Handle("POST /api/batch-rewrite/web-submit/submit", submitHandler)
 	root.Handle("POST /api/web-submit/submit", submitHandler)
+}
+
+func webSubmitSkipSubmitted(web map[string]any) bool {
+	value, exists := web["skip_submitted"]
+	if !exists {
+		return true
+	}
+	result, ok := value.(bool)
+	return !ok || result
+}
+
+func webSubmitProfile(web map[string]any, version string) map[string]any {
+	profileID := strings.TrimSpace(toString(mapOrEmpty(web["profile_bindings"])[version]))
+	if profileID == "" {
+		profileID = strings.TrimSpace(toString(mapOrEmpty(web["version_profiles"])[version]))
+	}
+	if profileID == "" {
+		profileID = strings.TrimSpace(toString(web["selected_profile"]))
+	}
+	profiles := arrayOrEmpty(web["upload_profiles"])
+	if profileID == "" && len(profiles) > 0 {
+		return mapOrEmpty(profiles[0])
+	}
+	for _, raw := range profiles {
+		profile := mapOrEmpty(raw)
+		if profileID == firstText(profile["id"], profile["name"]) || profileID == toString(profile["name"]) {
+			return profile
+		}
+	}
+	return map[string]any{}
+}
+
+func webSubmitAdvanced(web, profile map[string]any) map[string]any {
+	result := cloneAnyMap(mapOrEmpty(profile["advanced"]))
+	for key, value := range mapOrEmpty(web["advanced"]) {
+		result[key] = value
+	}
+	return result
+}
+
+func webSubmitOrganization(web, profile map[string]any) string {
+	return firstText(web["organization"], profile["organization"], mapOrEmpty(profile["advanced"])["organization"], "1")
 }
 
 func submissionGenderStyle(doc novelfetchworkshop.Document) (string, string) {
@@ -171,6 +112,7 @@ func resolveSubmissionGender(ctx context.Context, doc *novelfetchworkshop.Docume
 	}
 	decision := novelfetchworkshop.ResolveGender(ctx, "", info, judge)
 	doc.Gender, doc.GenderSource, doc.GenderReason = decision.Gender, decision.Source, decision.Reason
+	doc.GenderConfidence = decision.Confidence
 	syncNovelFetchClassificationMetadata(doc)
 }
 

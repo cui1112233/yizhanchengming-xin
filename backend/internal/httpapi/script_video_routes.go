@@ -92,7 +92,7 @@ func (r *scriptVideoRoutes) download(w http.ResponseWriter, req *http.Request, o
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
 		return
 	}
-	modelKey := map[string]string{batchfactoryv11.VideoProviderPersonalAPI: "yd2-mini-video", batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
+	modelKey := scriptVideoTaskModelKey(taskID, provider)
 	cfg, err := r.resolver(req.Context(), owner, modelKey)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -121,12 +121,19 @@ func (r *scriptVideoRoutes) download(w http.ResponseWriter, req *http.Request, o
 }
 
 func scriptVideoProvider(taskID string) (string, string) {
-	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
+	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:fanke-video-api:", batchfactoryv11.VideoProviderYFAISeedance}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
 		if strings.HasPrefix(taskID, item.prefix) {
 			return item.prefix, item.provider
 		}
 	}
 	return "", ""
+}
+
+func scriptVideoTaskModelKey(taskID, provider string) string {
+	if strings.HasPrefix(taskID, "yfai:fanke-video-api:") {
+		return "fanke-video-api"
+	}
+	return map[string]string{batchfactoryv11.VideoProviderPersonalAPI: "yd2-mini-video", batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
 }
 
 func (r *scriptVideoRoutes) submit(w http.ResponseWriter, req *http.Request, owner string) {
@@ -159,7 +166,7 @@ func (r *scriptVideoRoutes) submit(w http.ResponseWriter, req *http.Request, own
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "本地执行器服务不可用"})
 			return
 		}
-		job, err := r.localExecutor.CreateJob(req.Context(), owner, localexecutor.CreateJobInput{SourceTaskID: "script-video", Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": input.ImageURLs}})
+		job, err := r.localExecutor.CreateJob(req.Context(), owner, localexecutor.CreateJobInput{SourceTaskID: "script-video", Platform: localexecutor.PlatformDoubao, Payload: map[string]any{"model": firstText(input.Model, "Seedance 2.0 Fast"), "prompt": input.Prompt, "duration": input.Duration, "aspectRatio": input.AspectRatio, "resolution": input.Resolution, "imageUrls": input.ImageURLs}})
 		if err != nil {
 			writeLocalJobError(w, err)
 			return
@@ -217,7 +224,7 @@ func (r *scriptVideoRoutes) poll(w http.ResponseWriter, req *http.Request, owner
 		writeJSON(w, http.StatusOK, result)
 		return
 	}
-	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
+	for _, item := range []struct{ prefix, provider string }{{"yd2:", batchfactoryv11.VideoProviderPersonalAPI}, {"h3:", batchfactoryv11.VideoProviderAutoDLH3}, {"yfai:fanke-video-api:", batchfactoryv11.VideoProviderYFAISeedance}, {"yfai:", batchfactoryv11.VideoProviderYFAISeedance}} {
 		if strings.HasPrefix(taskID, item.prefix) {
 			prefix, provider = item.prefix, item.provider
 			break
@@ -227,7 +234,7 @@ func (r *scriptVideoRoutes) poll(w http.ResponseWriter, req *http.Request, owner
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported video task"})
 		return
 	}
-	modelKey := map[string]string{batchfactoryv11.VideoProviderPersonalAPI: "yd2-mini-video", batchfactoryv11.VideoProviderAutoDLH3: "minimax-h3-video", batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official"}[provider]
+	modelKey := scriptVideoTaskModelKey(taskID, provider)
 	if r.resolver == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频模型配置不可用"})
 		return

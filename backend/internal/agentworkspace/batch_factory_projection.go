@@ -269,20 +269,22 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	imageNodeByAssetID := map[string]string{}
 	merge, hasMerge := projectionLatestMerge(book.ID, mergeJobs)
 	audioSeconds := projectionJSONNumber(book.SettingsState.Patch["audioDurationSeconds"])
+	audioID := projectionJSONText(book.SettingsState.Patch["ttsAudioArtifactId"])
+	if hasMerge && strings.TrimSpace(merge.AudioArtifactID) != "" {
+		// A completed merge is the authoritative record of the track it used.
+		audioID = strings.TrimSpace(merge.AudioArtifactID)
+	}
 	var audioRecord BatchFactoryAudioRecord
 	hasAudioRecord := false
-	if hasMerge && s.AudioRecords != nil {
-		audioID := strings.TrimSpace(merge.AudioArtifactID)
-		if audioID != "" {
-			record, found, err := s.AudioRecords.BatchFactoryAudioRecord(ctx, owner, binding.BatchID, book.ID, audioID)
-			if err != nil {
-				return nil, nil, err
-			}
-			if found && strings.TrimSpace(record.ID) == audioID {
-				audioRecord, hasAudioRecord = record, true
-				if record.DurationSeconds > 0 {
-					audioSeconds = record.DurationSeconds
-				}
+	if audioID != "" && s.AudioRecords != nil {
+		record, found, err := s.AudioRecords.BatchFactoryAudioRecord(ctx, owner, binding.BatchID, book.ID, audioID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if found && strings.TrimSpace(record.ID) == audioID {
+			audioRecord, hasAudioRecord = record, true
+			if record.DurationSeconds > 0 {
+				audioSeconds = record.DurationSeconds
 			}
 		}
 	}
@@ -389,7 +391,7 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 			config["modelId"], config["videoModelId"] = modelID, modelID
 		}
 		if provider != "" {
-			config["videoProvider"] = provider
+			config["provider"], config["videoProvider"] = provider, provider
 		}
 		config["resourceRevision"] = video.Revision
 		allowedDurations := []float64{5, 10, 15}
@@ -432,27 +434,41 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	// The final video is a stable book-level node. It must be available before
 	// the first merge so the canvas can finish the same chain as Batch Factory.
 	mergeReady, mergeReason := projectionMergeReadiness(book.Videos, tasksByVideo)
-	var audioNodeID string
-	if hasMerge {
-		if audioID := strings.TrimSpace(merge.AudioArtifactID); audioID != "" && hasAudioRecord {
-			record := audioRecord
-			assetRef := map[string]any{"id": audioID, "kind": "audio", "source": "batch_factory"}
-			config := projectionConfig(binding.BatchID, book.ID, "audio", audioID)
-			if record.DurationSeconds > 0 {
-				config["durationSeconds"] = record.DurationSeconds
-			}
-			versionID := strings.TrimSpace(record.VersionID)
-			if versionID == "" {
-				versionID = projectionFingerprint(record.ID, record.Status, record.MediaURL, record.DurationSeconds)
-			}
-			applyMappedNodeState(config, record.Status, "")
-			audioNodeID = add("audio", audioID, versionID, Node{
-				Type: "audio", Title: "配音", Summary: merge.AudioSource, Status: NormalizeMappedNodeState(record.Status, "").Status, Position: Position{X: 360, Y: 120 + float64(len(assets)*180)},
-				AssetRef: assetRef, Config: config,
-			})
+	// Audio is a first-class production step, not an optional result of a
+	// completed merge. Project a stable pending card before the first TTS run
+	// so a newly bound book can complete the full Batch Factory chain on canvas.
+	audioResourceID := audioID
+	if audioResourceID == "" {
+		audioResourceID = "audio-plan:" + book.ID
+	}
+	audioAssetRef := map[string]any{"kind": "audio", "source": "batch_factory"}
+	config := projectionConfig(binding.BatchID, book.ID, "audio", audioResourceID)
+	config["audioPlanPending"] = !hasAudioRecord
+	versionID := projectionFingerprint(book.Revision, audioResourceID, "pending-audio-plan")
+	status, summary := "queued", "生成配音并读取时长"
+	if hasAudioRecord {
+		record := audioRecord
+		audioAssetRef["id"] = audioID
+		if record.DurationSeconds > 0 {
+			config["durationSeconds"] = record.DurationSeconds
+		}
+		versionID = strings.TrimSpace(record.VersionID)
+		if versionID == "" {
+			versionID = projectionFingerprint(record.ID, record.Status, record.MediaURL, record.DurationSeconds)
+		}
+		status = NormalizeMappedNodeState(record.Status, "").Status
+		summary = "系统配音"
+		if hasMerge && strings.TrimSpace(merge.AudioSource) != "" {
+			summary = merge.AudioSource
 		}
 	}
+	applyMappedNodeState(config, status, "")
+	audioNodeID := add("audio", audioResourceID, versionID, Node{
+		Type: "audio", Title: "配音", Summary: summary, Status: status, Position: Position{X: 360, Y: 120 + float64(len(assets)*180)},
+		AssetRef: audioAssetRef, Config: config,
+	})
 	mergeConfig := projectionConfig(binding.BatchID, book.ID, "merge", book.ID)
+	mergeConfig["bookRevision"] = book.Revision
 	publishSettings := projectionJSONMap(batchfactoryv11.ResolveSettings(append(append([]batchfactoryv11.SettingsPatch{}, batchSettings...), book.SettingsState.Patch)...)["publishSettings"])
 	mergeConfig["canMerge"] = mergeReady
 	mergeConfig["publishStatus"] = projectionMetadataText(book.SourceMetadata, "websiteSubmitStatus", "publishStatus")
@@ -575,8 +591,21 @@ func reconcileBatchFactoryCanvas(canvas Canvas, origins []BatchFactoryNodeOrigin
 		oldProjected[origin.NodeID] = struct{}{}
 	}
 	desired := make(map[string]struct{}, len(items))
+	projectionScopes := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		desired[item.node.ID] = struct{}{}
+		if scope := batchFactoryProjectionNodeScope(item.node); scope != "" {
+			projectionScopes[scope] = struct{}{}
+		}
+	}
+	staleMapped := make(map[string]struct{})
+	for _, node := range canvas.Nodes {
+		if _, keep := desired[node.ID]; keep {
+			continue
+		}
+		if _, projected := projectionScopes[batchFactoryProjectionNodeScope(node)]; projected {
+			staleMapped[node.ID] = struct{}{}
+		}
 	}
 	authoritativeEdgePairs := make(map[string]struct{}, len(projectedEdges))
 	for _, edge := range projectedEdges {
@@ -585,6 +614,9 @@ func reconcileBatchFactoryCanvas(canvas Canvas, origins []BatchFactoryNodeOrigin
 	nodes := make([]Node, 0, len(canvas.Nodes)+len(items))
 	for _, node := range canvas.Nodes {
 		if _, projected := oldProjected[node.ID]; projected {
+			continue
+		}
+		if _, stale := staleMapped[node.ID]; stale {
 			continue
 		}
 		if _, projected := desired[node.ID]; projected {
@@ -602,6 +634,9 @@ func reconcileBatchFactoryCanvas(canvas Canvas, origins []BatchFactoryNodeOrigin
 		if _, keep := desired[nodeID]; !keep {
 			removed[nodeID] = struct{}{}
 		}
+	}
+	for nodeID := range staleMapped {
+		removed[nodeID] = struct{}{}
 	}
 	edges := make([]Edge, 0, len(canvas.Edges)+len(projectedEdges))
 	for _, edge := range canvas.Edges {
@@ -629,6 +664,21 @@ func reconcileBatchFactoryCanvas(canvas Canvas, origins []BatchFactoryNodeOrigin
 	edges = append(edges, projectedEdges...)
 	canvas.Nodes, canvas.Edges = nodes, edges
 	return canvas
+}
+
+// batchFactoryProjectionNodeScope identifies only nodes written by the
+// projection. Keeping the batch and book together prevents a book refresh
+// from touching manual nodes or another book's group in the same project.
+func batchFactoryProjectionNodeScope(node Node) string {
+	if strings.TrimSpace(fmt.Sprint(node.Config["source"])) != "batch_factory" {
+		return ""
+	}
+	batchID := strings.TrimSpace(fmt.Sprint(node.Config["batchId"]))
+	bookID := strings.TrimSpace(fmt.Sprint(node.Config["bookId"]))
+	if batchID == "" || bookID == "" || batchID == "<nil>" || bookID == "<nil>" {
+		return ""
+	}
+	return batchID + "\x00" + bookID
 }
 
 func projectionEdges(projectID, bookID string, items []batchFactoryProjectionItem) []Edge {

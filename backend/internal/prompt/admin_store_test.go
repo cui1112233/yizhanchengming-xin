@@ -50,3 +50,33 @@ func TestAdminStoreDraftPublishRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAdminStoreDeleteRemovesAnyVersion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "presets.json")
+	seed := []map[string]any{{
+		"id": "demo", "module": "script", "name": "已发布", "kind": "base", "version": 1, "revision": 1, "status": "published", "body": "old", "protocolLock": map[string]any{"slot": "script.demo"},
+	}}
+	raw, _ := json.Marshal(seed)
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		t.Fatal(err)
+	}
+	store := NewAdminStore(path)
+	draft, err := store.CreateDraft("tester", map[string]any{"id": "demo", "module": "script", "name": "草稿", "kind": "base", "description": "", "compatibleBaseIds": []any{}, "body": "draft", "protocolLock": map[string]any{"slot": "script.demo"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Delete("tester", "demo", 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Get("demo", 1); err == nil {
+		t.Fatal("deleted published version is still readable")
+	}
+	version := intValue(draft["version"])
+	if _, err := store.Delete("tester", "demo", version); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Get("demo", version); err == nil {
+		t.Fatal("deleted draft is still readable")
+	}
+}

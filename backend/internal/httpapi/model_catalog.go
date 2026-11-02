@@ -479,21 +479,46 @@ func readModelCatalog(req *http.Request, store novelfetchworkshop.Store, owner, 
 		}
 		result = append(result, publicManagedModel(model))
 	}
+	// The maintained default TTS service backs /api/tts even when an account has
+	// not created a custom audio catalog entry. Surface it to Agent so the
+	// canvas can use the same real capability instead of presenting an empty
+	// model picker.
+	if kind == "audio" && strings.TrimSpace(defaultTTSEndpoint) != "" {
+		result = append([]map[string]any{{
+			"id": builtInTTSModelID, "kind": "audio", "displayName": "默认 TTS",
+			"modelId": builtInTTSModelID, "provider": "personal_api", "enabled": true,
+			"configured": true, "hasCredential": true,
+		}}, result...)
+	}
 	return result, nil
 }
 
 func modelCatalog(settings map[string]any) []map[string]any {
 	raw, _ := settings["modelCatalog"].([]any)
+	var catalog []map[string]any
 	if typed, ok := settings["modelCatalog"].([]map[string]any); ok {
-		return typed
+		catalog = typed
+	} else {
+		catalog = make([]map[string]any, 0, len(raw))
+		for _, value := range raw {
+			if model, ok := value.(map[string]any); ok {
+				catalog = append(catalog, model)
+			}
+		}
 	}
-	catalog := make([]map[string]any, 0, len(raw))
-	for _, value := range raw {
-		if model, ok := value.(map[string]any); ok {
-			catalog = append(catalog, model)
+	for _, model := range catalog {
+		if _, present := model["enabled"]; present {
+			model["enabled"] = normalizedModelEnabled(model["enabled"])
 		}
 	}
 	return catalog
+}
+
+func normalizedModelEnabled(value any) bool {
+	if enabled, ok := value.(bool); ok {
+		return enabled
+	}
+	return strings.EqualFold(strings.TrimSpace(fmt.Sprint(value)), "true")
 }
 
 func normalizeManagedModel(input map[string]any) (map[string]any, error) {

@@ -43,3 +43,22 @@ func TestV11BookAssetsMigrationIsAdditiveAndDurable(t *testing.T) {
 		}
 	}
 }
+
+func TestV11BookAssetImageOverridesMigrationIsAdditive(t *testing.T) {
+	var imageOverridesMigration Migration
+	for _, candidate := range V11Migrations() {
+		if candidate.Version == 1100027 {
+			imageOverridesMigration = candidate
+			break
+		}
+	}
+	if imageOverridesMigration.Version != 1100027 || imageOverridesMigration.CallbackChecksum != "batch-factory-v11-book-asset-image-overrides-v1" {
+		t.Fatalf("image override migration=%+v", imageOverridesMigration)
+	}
+	sql := strings.ToLower(strings.Join(imageOverridesMigration.SQL, "\n"))
+	for _, required := range []string{"batch_factory_v11_book_assets", "image_model_id", "image_aspect_ratio", " null"} {
+		if !strings.Contains(sql, required) {
+			t.Fatalf("image override migration misses %q: %s", required, sql)
+		}
+	}
+}

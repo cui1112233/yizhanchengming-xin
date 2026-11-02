@@ -63,7 +63,7 @@ func TestChecksumStableAcrossWhitespace(t *testing.T) {
 
 func TestAppMigrationsIncludesV11AndV12Migrations(t *testing.T) {
 	migrations := AppMigrations()
-	want := append(append(append(append(append([]Migration(nil), V11Migrations()...), V12Migrations()...), LocalExecutorMigrations()...), GiantMaterialExecutorMigrations()...), AgentWorkspaceMigrations()...)
+	want := append(append(append(append(append(append([]Migration(nil), V11Migrations()...), V12Migrations()...), LocalExecutorMigrations()...), GiantMaterialExecutorMigrations()...), AuthMigrations()...), AgentWorkspaceMigrations()...)
 	if len(migrations) != len(want) {
 		t.Fatalf("AppMigrations length=%d, want %d", len(migrations), len(want))
 	}
@@ -86,4 +86,17 @@ func TestMergePollerMigrationUsesMySQLCompatibleAddColumnSyntax(t *testing.T) {
 	if !strings.Contains(upper, "ADD COLUMN PROVIDER_TASK_ID") {
 		t.Fatalf("provider_task_id migration missing: %s", statements[0])
 	}
+}
+
+func TestLocalExecutorJobSourceTaskIDSupportsBatchFactoryIdentity(t *testing.T) {
+	migrations := LocalExecutorMigrations()
+	for _, migration := range migrations {
+		for _, statement := range migration.SQL {
+			upper := strings.ToUpper(statement)
+			if strings.Contains(upper, "MODIFY COLUMN SOURCE_TASK_ID VARCHAR(255)") {
+				return
+			}
+		}
+	}
+	t.Fatal("local executor migrations must widen source_task_id for batch, book and video identities")
 }

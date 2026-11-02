@@ -71,21 +71,50 @@ export function retainCanvasAssetPanel(panel, nodes = []) {
 
 export function mergePendingCanvas(serverCanvas, localCanvas) {
   const serverNodes = new Map((serverCanvas?.nodes || []).map(node => [node.id, node]));
+  const localNodes = Array.isArray(localCanvas?.nodes) ? localCanvas.nodes : [];
+  const localEdges = Array.isArray(localCanvas?.edges) ? localCanvas.edges : [];
+  const edgeKey = edge => String(edge?.id || `${edge?.source || ''}:${edge?.target || ''}:${edge?.data?.relation || ''}`);
+  const localEdgesByKey = new Map(localEdges.map(edge => [edgeKey(edge), edge]));
+  const isBatchFactoryMappedNode = node => String(node?.config?.source || '') === 'batch_factory';
+  const isBatchFactoryMappedEdge = edge => isBatchFactoryMappedNode(serverNodes.get(edge?.source)) || isBatchFactoryMappedNode(serverNodes.get(edge?.target));
+  const retainedLocalNodes = localNodes.filter(node => node?.id && (serverNodes.has(node.id) || !isBatchFactoryMappedNode(node)));
+  const mergedNodes = [
+    ...(serverCanvas?.nodes || []).map(serverNode => {
+      const localNode = localNodes.find(node => node?.id === serverNode.id);
+      if (!localNode) return serverNode;
+      if (isBatchFactoryMappedNode(serverNode) || isBatchFactoryMappedNode(localNode)) {
+        // The production record lives in Batch Factory. A pending browser
+        // draft may keep a just-dragged position, but can never replace the
+        // source record's state, prompt, version, or media reference.
+        return { ...serverNode, ...(localNode.position ? { position: localNode.position } : {}) };
+      }
+      return {
+        ...serverNode,
+        ...localNode,
+        version: serverNode.version,
+        status: serverNode.status,
+        config: { ...(serverNode.config || {}), ...(localNode.config || {}) },
+        ...(serverNode.assetRef ? { assetRef: serverNode.assetRef } : {})
+      };
+    }),
+    ...retainedLocalNodes.filter(node => !serverNodes.has(node.id))
+  ];
+  const mergedNodeIDs = new Set(mergedNodes.map(node => node.id));
+  const serverEdgeKeys = new Set((serverCanvas?.edges || []).map(edgeKey));
+  const mergedEdges = [
+    ...(serverCanvas?.edges || []).map(serverEdge => {
+      const localEdge = localEdgesByKey.get(edgeKey(serverEdge));
+      if (isBatchFactoryMappedEdge(serverEdge)) return serverEdge;
+      return localEdge ? { ...serverEdge, ...localEdge, data: { ...(serverEdge.data || {}), ...(localEdge.data || {}) } } : serverEdge;
+    }),
+    ...localEdges.filter(edge => !serverEdgeKeys.has(edgeKey(edge)) && mergedNodeIDs.has(edge?.source) && mergedNodeIDs.has(edge?.target))
+  ];
   return {
     ...serverCanvas,
     ...localCanvas,
     revision: Number(serverCanvas?.revision) || 0,
-    nodes: (localCanvas?.nodes || []).map(node => {
-      const serverNode = serverNodes.get(node.id);
-      if (!serverNode) return node;
-      return {
-        ...serverNode,
-        ...node,
-        version: serverNode.version,
-        status: serverNode.status,
-        ...(serverNode.assetRef ? { assetRef: serverNode.assetRef } : {})
-      };
-    })
+    nodes: mergedNodes,
+    edges: mergedEdges
   };
 }
 

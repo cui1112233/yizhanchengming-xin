@@ -10,10 +10,13 @@ import (
 )
 
 const localExecutorReleaseVersion = "1.0.3"
+const localRelayWindowsReleaseVersion = "1.2.0"
+const localRelayMacReleaseVersion = "1.0.0"
+const localRelayWindowsInstaller = "一战晟铭执行器-安装版.exe"
 
-// The native Go executor is now the only installer linked from the UI.  The
-// older Electron installer remains addressable for rollback only and is not
-// advertised by the manifest.
+// The Doubao relay is the Windows executor used by image/video generation.
+// The older Go-native installer remains addressable for rollback only and is
+// not advertised by the manifest.
 const goLocalExecutorReleaseVersion = "0.1.0"
 
 var localExecutorUpdateFilePattern = regexp.MustCompile(`^yizhan-local-executor-v88-[0-9]+\.[0-9]+\.[0-9]+-win-x64\.exe$`)
@@ -26,11 +29,15 @@ func RegisterLocalExecutorDownloadRoutes(root *http.ServeMux, downloadsDir strin
 	root.HandleFunc("GET /downloads/local-executor/manifest.json", func(w http.ResponseWriter, req *http.Request) {
 		origin := "http://" + req.Host
 		writeJSON(w, http.StatusOK, map[string]any{
-			"version": goLocalExecutorReleaseVersion,
-			"runtime": "go",
+			"version": localRelayWindowsReleaseVersion,
+			"versions": map[string]string{
+				"windows": localRelayWindowsReleaseVersion,
+				"macos":   localRelayMacReleaseVersion,
+			},
+			"runtime": "doubao_relay",
 			"downloads": map[string]any{
-				"mac":     nil,
-				"windows": strings.TrimRight(origin, "/") + "/downloads/local-executor/qiantie-executor-v88-" + goLocalExecutorReleaseVersion + "-win-x64.exe",
+				"mac":     strings.TrimRight(origin, "/") + "/downloads/local-executor/doubao-relay_" + localRelayMacReleaseVersion + "_universal.dmg",
+				"windows": strings.TrimRight(origin, "/") + "/downloads/local-executor/" + localRelayWindowsInstaller,
 			},
 		})
 	})
@@ -54,11 +61,17 @@ func RegisterLocalExecutorDownloadRoutes(root *http.ServeMux, downloadsDir strin
 		file := req.PathValue("file")
 		canonical := "qiantie-executor-v88-" + goLocalExecutorReleaseVersion + "-win-x64.exe"
 		legacy := "yizhan-local-executor-v88-" + localExecutorReleaseVersion + "-win-x64.exe"
-		if file != canonical && file != legacy {
+		windowsRelay := localRelayWindowsInstaller
+		macRelay := "doubao-relay_" + localRelayMacReleaseVersion + "_universal.dmg"
+		if file != canonical && file != legacy && file != windowsRelay && file != macRelay {
 			writeLocalExecutorDownloadError(w, http.StatusNotFound, "下载文件不存在")
 			return
 		}
-		serveLocalExecutorFile(w, req, filepath.Join(downloadsDir, file), "安装包正在发布，请稍后重试", "application/vnd.microsoft.portable-executable", false)
+		contentType := "application/vnd.microsoft.portable-executable"
+		if file == macRelay {
+			contentType = "application/x-apple-diskimage"
+		}
+		serveLocalExecutorFile(w, req, filepath.Join(downloadsDir, file), "安装包正在发布，请稍后重试", contentType, false)
 	})
 }
 

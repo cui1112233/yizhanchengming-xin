@@ -88,6 +88,7 @@ type AIReasoningPromptModule struct {
 // video/visual selections without changing either production path.
 type AIReasoningComicModule struct {
 	Enabled              bool                      `json:"enabled"`
+	TargetPageCount      int                       `json:"targetPageCount"`
 	Scope                string                    `json:"scope"`
 	BookIDs              []string                  `json:"bookIds"`
 	ID                   string                    `json:"presetId"`
@@ -106,12 +107,14 @@ type AIReasoningComicModule struct {
 }
 
 type ComicGlobalReferenceImage struct {
-	AssetID       string `json:"assetId"`
-	URL           string `json:"url"`
-	PreviewURL    string `json:"previewUrl,omitempty"`
-	Enabled       bool   `json:"enabled"`
-	ApplyToAssets bool   `json:"applyToAssets"`
-	ApplyToPages  bool   `json:"applyToPages"`
+	AssetID       string         `json:"assetId"`
+	URL           string         `json:"url"`
+	PreviewURL    string         `json:"previewUrl,omitempty"`
+	Source        string         `json:"source,omitempty"`
+	Scene         PresetSnapshot `json:"scene"`
+	Enabled       bool           `json:"enabled"`
+	ApplyToAssets bool           `json:"applyToAssets"`
+	ApplyToPages  bool           `json:"applyToPages"`
 }
 
 func ComicGlobalReference(settings SettingsPatch) ComicGlobalReferenceImage {
@@ -324,7 +327,17 @@ func selectedNonH3VideoPreset(video AIReasoningPromptModule) bool {
 }
 
 func selectedSDVideoPreset(video AIReasoningPromptModule) bool {
-	return strings.TrimSpace(video.ID) == "batch-video-sd"
+	// Both presets use the Batch Factory plain-text VIDEO protocol. The
+	// fixed-shot variant changes the model's shot-writing rules, not the
+	// transport/output protocol. Keeping it here prevents candidate
+	// regeneration from falling into the generic JSON renderer and producing
+	// the legacy "镜头画面：00:00..." fallback.
+	switch strings.TrimSpace(video.ID) {
+	case "batch-video-sd", "batch-video-sd-fixed-shot":
+		return true
+	default:
+		return false
+	}
 }
 
 func appendPublicStoryboardComposition(rules []string, config AIReasoningPromptConfig, snapshot DirectorSnapshot) []string {
@@ -364,7 +377,17 @@ func appendPublicStoryboardComposition(rules []string, config AIReasoningPromptC
 }
 
 func (m AIReasoningConstraintModule) appliesTo(book Book) bool {
-	return m.AIReasoningScope.appliesTo(book)
+	// The constraint module no longer has a master switch. Keep the scope
+	// behavior so a batch-level configuration can still target selected books.
+	if m.Scope != "custom" {
+		return true
+	}
+	for _, id := range m.BookIDs {
+		if id == book.ID {
+			return true
+		}
+	}
+	return false
 }
 
 func BuildHookContract(book Book, snapshot DirectorSnapshot) PromptContract {
@@ -440,7 +463,7 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 	system := strings.TrimSpace(`你是短剧制作资产提取器。只从小说原文提取实际出现的人物、场景与关键道具，并为每项写可直接用于图片生成的中文视觉提示词。
 不要生成分镜、镜头、VIDEO、改写正文或解释。不要杜撰原文没有出现的重要资产。
 只输出一个合法 JSON 对象，格式严格为：
-{"characters":[{"name":"人物名","formal_name":"正式人物名单中的标准名","facts":"人物事实：身份、性别、年龄阶段、别名等","appearance":"人物外形：脸型、发型、服装、体态等跨镜头锚点","relationships":"人物关系：与其他人物的关系及依据","prompt":"把以上四项合并后的完整视觉提示词"}],"scenes":[{"name":"场景名","prompt":"空间、时段、陈设、氛围等可见特征"}],"props":[{"name":"道具名","prompt":"材质、外观、状态等可见特征"}]}
+{"characters":[{"name":"人物名","formal_name":"正式人物名单中的标准名","facts":"人物事实：身份、性别、年龄阶段、别名等","appearance":"人物外形：脸型、发型、服装、体态等跨镜头锚点","relationships":"人物关系：与其他人物的关系及依据","prompt":"只合并人物事实与人物外形的完整视觉提示词"}],"scenes":[{"name":"场景名","prompt":"空间、时段、陈设、氛围等可见特征"}],"props":[{"name":"道具名","prompt":"材质、外观、状态等可见特征"}]}
 每个数组可以为空；每个元素必须同时有非空 name 与 prompt。`)
 	system += "\n" + staticAssetPromptRule
 	config := aiReasoningPromptConfig(snapshot.Effective)
@@ -489,11 +512,11 @@ func BuildAssetExtractionContract(book Book, snapshot DirectorSnapshot) (PromptC
 	system += `
 
 【批量工厂统一返回契约】
-在同一个合法 JSON 对象中返回 characters、scenes、props 三个数组。characters 的每项必须同时返回 name、formal_name、facts、appearance、relationships 与 prompt；prompt 必须把前四项合并为可直接用于图片和视频一致性的完整详细外形，而不是简短标签。scenes 与 props 的每项也必须同时有非空 name 与 prompt。不得返回第二份外形结果、不得要求后续逐人调用。`
+在同一个合法 JSON 对象中返回 characters、scenes、props 三个数组。characters 的每项必须同时返回 name、formal_name、facts、appearance、relationships 与 prompt；prompt 只能合并 facts 和 appearance，必须是可直接用于图片和视频一致性的完整详细外形，而不是简短标签；relationships 只保存在关系字段，禁止写入 prompt。scenes 与 props 的每项也必须同时有非空 name 与 prompt。不得返回第二份外形结果、不得要求后续逐人调用。`
 	system += `
 
 【资产预设四项权威】
-一次调用内先完成并综合：正式人物名单、人物事实、人物外形、人物关系；四项结果必须分别保留在结构化字段，并合并进 characters 的最终 prompt，绑定人物姓名、别名、性别、年龄阶段、关系和跨镜头外形锚点。不得把四项拆成后续调用，也不得只返回摘要或只返回人物外形。`
+一次调用内先完成并分别保留：正式人物名单、人物事实、人物外形、人物关系。人物关系用于剧情理解和选角，但不得进入 characters 的最终 prompt；最终 prompt 只合并人物事实与可见外形。不得把四项拆成后续调用，也不得只返回摘要或只返回人物外形。`
 	if bookGender := bookGenderForPrompt(book); bookGender != "" {
 		system += fmt.Sprintf(`
 
@@ -535,6 +558,9 @@ func BuildDirectorContract(book Book, hook HookRevision, snapshot DirectorSnapsh
 	if mode == "viral" && (hook.ID == "" || hook.Status != "approved") {
 		return PromptContract{}, fmt.Errorf("%w: viral mode requires approved Hook", ErrConflict)
 	}
+	if normalizeProductionMode(snapshot.Effective) == "comic" {
+		return buildComicPagePlanningContract(book, hook, snapshot)
+	}
 	durationRule := fmt.Sprintf("每个 VIDEO 的 duration_sec 必须为 1-%d 的整数。", snapshot.MaxVideoDuration)
 	if snapshot.FixedSingleVideo {
 		durationRule = fmt.Sprintf("固定开头已开启：只生产 VIDEO01；其 duration_sec 必须为 1-%d 的整数。其他 storyboard 仍需按原文完整分析并保留，但不会进入视频生产。", snapshot.MaxVideoDuration)
@@ -558,7 +584,7 @@ func BuildDirectorContract(book Book, hook HookRevision, snapshot DirectorSnapsh
 JSON 顶层必须包含 characters、scenes、props、storyboard、source_coverage。
 storyboard 每项必须包含 duration_sec、characters、props、scene、prefix_key、shots、video_desc。
 shots 中的每一项必须包含 start_sec、end_sec、shot_type、camera、description；description 是该镜头可拍、可见的画面动作描述，不能为空。不要把它改写成 shot_description、画面描述或其它字段名。
-shots 必须从 0 秒开始连续、无空白无重叠，最后一个 end_sec 必须等于 duration_sec。
+shots 必须从 0 秒开始连续、无空白无重叠，最后一个 end_sec 必须等于 duration_sec。每个 storyboard 都是独立的 VIDEO 段，时间轴必须在每段内重新从 0 秒开始；即使前一个 VIDEO 已经结束在 10 秒，后一个 VIDEO 的第一镜头仍必须写 start_sec=0，严禁使用整本书累计时间。
 分镜只“点名引用”，不许描写外形：storyboard.characters 只写人物名字数组、scene 只写场景名字、props 只写道具名字，名字必须来自顶层信息库。
 人物/场景长什么样，一律以资产设置为准，你不负责重新生成人物外形。
 用户消息中如附 assets 资产清单（本书已提取确认的人物/场景/道具），你的职责是“引用”，不是“重造”：
@@ -663,6 +689,65 @@ prefix_key 只能从指定列表选择。
 			// 公网“生成剧本”对应的分镜视频提示词与镜头结构。
 			RequireVisualPrompt: false,
 			RequireH3Metadata:   requireH3Metadata,
+		},
+	}, nil
+}
+
+func payloadComicAssets(book Book) map[string]any {
+	groups := map[string][]map[string]string{}
+	for _, asset := range book.AssetRecords {
+		if strings.TrimSpace(asset.Source) != "comic" {
+			continue
+		}
+		kind, name := strings.TrimSpace(asset.Kind), strings.TrimSpace(asset.Name)
+		if kind == "" || name == "" {
+			continue
+		}
+		groups[kind] = append(groups[kind], map[string]string{"name": name, "prompt": strings.TrimSpace(asset.Prompt)})
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(groups))
+	for kind, items := range groups {
+		out[kind] = items
+	}
+	return out
+}
+
+func buildComicPagePlanningContract(book Book, hook HookRevision, snapshot DirectorSnapshot) (PromptContract, error) {
+	system := `你是 Batch Factory 的漫画分页导演。完整阅读小说，只输出合法 JSON，不要输出 Markdown、标题或解释。
+JSON 顶层必须包含 characters、scenes、props、storyboard、source_coverage。
+每个 storyboard 对应一张漫画页，必须按原文顺序覆盖完整剧情，并让前后页连续。每页只承载一个清楚的小事件或情绪推进，避免一页塞入过多剧情。
+storyboard 每项仍使用兼容存储字段：duration_sec 固定为 1；characters 只列本页出现的人物；props 只列本页出现的关键道具；scene 只写本页主场景；prefix_key 使用 general_anime；video_desc 写本页完整剧情、分格建议、人物动作表情、对白与旁白；shots 只放一个覆盖 0 到 1 的页面说明，shot_type 与 camera 均写“漫画页”，description 与 video_desc 保持一致。
+characters、scenes、props 的 name 和 prompt 优先逐字复用用户消息中的 assets。不得凭空新增原文没有的人物、场景和道具。
+source_coverage.source_complete 必须在完整覆盖正文时为 true，source_end_marker 写正文最后一个明确事件，has_remaining_source 必须与实际覆盖情况一致。`
+	payload := map[string]any{
+		"book_id":      book.ID,
+		"title":        book.Title,
+		"mode":         snapshot.Mode,
+		"source_text":  book.SourceText,
+		"aspect_ratio": EffectiveImageAspectRatio(snapshot.Effective),
+	}
+	if assets := payloadComicAssets(book); len(assets) > 0 {
+		payload["assets"] = assets
+	}
+	if snapshot.Mode == "viral" {
+		payload["approved_hook"] = hook.Text
+	}
+	encoded, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return PromptContract{}, err
+	}
+	return PromptContract{
+		SystemPrompt: system,
+		UserPrompt:   string(encoded),
+		Temperature:  0.3,
+		MaxTokens:    directorOutputTokenBudget(snapshot),
+		Normalization: DirectorSettings{
+			MaxVideoDuration:  1,
+			AspectRatio:       EffectiveImageAspectRatio(snapshot.Effective),
+			AllowedPrefixKeys: append([]string(nil), DirectorPrefixKeys...),
 		},
 	}, nil
 }

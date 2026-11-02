@@ -31,7 +31,8 @@ export function listSavedNovels() {
 export function uploadLogin({ username, password }) {
   return apiRequest('/api/novel-fetch-workshop/upload/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password }),
+    suppressGlobalError: true
   });
 }
 
@@ -54,6 +55,8 @@ export function saveWebSubmitConfig(payload) {
 }
 export function checkWebSubmitEnvironment() { return apiRequest(`${WEB_SUBMIT_API}/environment`); }
 export function getWebSubmitHistory() { return apiRequest(`${WEB_SUBMIT_API}/history`); }
+export function webSubmitOrganizationsPath() { return '/api/batch-factory/v12/publish-121/organizations'; }
+export function getWebSubmitOrganizations() { return apiRequest(webSubmitOrganizationsPath()); }
 export function syncWebSubmitConfigs(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-configs`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function syncWebSubmitStyles(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/sync-styles`, { method: 'POST', body: JSON.stringify(payload) }); }
 export function testWebSubmitVisible(payload = {}) { return apiRequest(`${WEB_SUBMIT_API}/test-visible`, { method: 'POST', body: JSON.stringify(payload) }); }

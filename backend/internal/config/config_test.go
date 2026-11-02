@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -28,6 +29,34 @@ func TestFromEnvReadsOptionalGiantMaterialPlugin(t *testing.T) {
 	}
 	if cfg.GiantMaterialPluginURL != "http://127.0.0.1:18180" || cfg.GiantMaterialPluginToken != "plugin-token" {
 		t.Fatalf("giant material plugin config = %#v", cfg)
+	}
+}
+
+func TestFromEnvReadsN8ComicOpenAPIConfig(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_N8_COMIC_BASE_URL", "")
+	t.Setenv("QIANTIE_N8_COMIC_OPEN_API_KEY", "server-only-key")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.N8ComicBaseURL != "https://n8-view.hnqingyuwen.top/center-api" || cfg.N8ComicOpenAPIKey != "server-only-key" {
+		t.Fatalf("n8 comic config = %#v", cfg)
+	}
+}
+
+func TestFromEnvReadsUniqueN8ComicProducerAccounts(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_N8_COMIC_PRODUCER_ACCOUNTS", " 崔家铭,张三，崔家铭\n李四 ")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"崔家铭", "张三", "李四"}
+	if !reflect.DeepEqual(cfg.N8ComicProducerAccounts, want) {
+		t.Fatalf("producer accounts = %#v, want %#v", cfg.N8ComicProducerAccounts, want)
 	}
 }
 
@@ -172,6 +201,23 @@ func TestFromEnvReadsOptionalRedisRuntimeAddress(t *testing.T) {
 	}
 }
 
+func TestFromEnvReadsNovelFetchTOSConfig(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT", "https://tos.example.com")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_REGION", "cn-test")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_BUCKET", "novel-bodies")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ACCESS_KEY", "access")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_SECRET_KEY", "secret")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NovelFetchTOSBucket != "novel-bodies" || cfg.NovelFetchTOSEndpoint != "https://tos.example.com" || cfg.NovelFetchTOSRegion != "cn-test" {
+		t.Fatalf("novel fetch TOS config=%#v", cfg)
+	}
+}
+
 func TestFromEnvReadsOptionalLocalAgentAssetDirectory(t *testing.T) {
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
@@ -182,6 +228,64 @@ func TestFromEnvReadsOptionalLocalAgentAssetDirectory(t *testing.T) {
 	}
 	if cfg.AgentAssetLocalDir != `F:\local-review\agent-assets` {
 		t.Fatalf("agent asset local dir=%q", cfg.AgentAssetLocalDir)
+	}
+}
+
+func TestFromEnvUsesLocalAgentAssetDirectoryByDefault(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_AGENT_ASSET_LOCAL_DIR", "")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AgentAssetLocalDir != "data/agent-assets" {
+		t.Fatalf("default agent asset local dir=%q", cfg.AgentAssetLocalDir)
+	}
+}
+
+func TestFromEnvUsesSharedTOSConfigForNovelBodies(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT", "")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_REGION", "")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_BUCKET", "")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ACCESS_KEY", "")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_SECRET_KEY", "")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_ENDPOINT", "https://shared-tos.example.com")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_REGION", "cn-shared")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_BUCKET", "shared-bucket")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_ACCESS_KEY", "shared-access")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_MERGE_TOS_SECRET_KEY", "shared-secret")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NovelFetchTOSEndpoint != "https://shared-tos.example.com" || cfg.NovelFetchTOSBucket != "shared-bucket" {
+		t.Fatalf("novel fetch did not reuse shared TOS config: %#v", cfg)
+	}
+}
+
+func TestFromEnvUsesNovelFetchTOSForAgentAssetsWhenUnset(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT", "https://shared-tos.example.com")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_REGION", "cn-shared")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_BUCKET", "shared-bucket")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ACCESS_KEY", "shared-access")
+	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_SECRET_KEY", "shared-secret")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_ENDPOINT", "")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_REGION", "")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_BUCKET", "")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_ACCESS_KEY", "")
+	t.Setenv("QIANTIE_AGENT_ASSET_TOS_SECRET_KEY", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AgentAssetTOSEndpoint != "https://shared-tos.example.com" || cfg.AgentAssetTOSRegion != "cn-shared" || cfg.AgentAssetTOSBucket != "shared-bucket" || cfg.AgentAssetTOSAccessKey != "shared-access" || cfg.AgentAssetTOSSecretKey != "shared-secret" {
+		t.Fatalf("agent assets did not reuse Novel Fetch TOS config: %#v", cfg)
 	}
 }
 

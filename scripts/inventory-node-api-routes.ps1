@@ -1,3 +1,5 @@
+# HISTORICAL / INACTIVE: this audit requires the removed root app.js and must not
+# be used as a current V88 validation or release step. Kept as migration evidence.
 [CmdletBinding()]
 param(
   [string]$Output = 'docs/migration/node-api-contract-inventory.json'

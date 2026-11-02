@@ -59,7 +59,7 @@ test('account and login styles do not hide business text with transparent color'
     'shared/styles/team-collaboration.css'
   ]) {
     const css = fs.readFileSync(path.join(root, file), 'utf8');
-    assert.doesNotMatch(css, /(?:color|-webkit-text-fill-color):\s*transparent/);
+    assert.doesNotMatch(css, /(?:^|[;{}])\s*(?:color|-webkit-text-fill-color):\s*transparent/);
   }
 });
 
@@ -160,4 +160,89 @@ test('giant material status card and its states retain themed surfaces and borde
     const badgeSelector = `${selector} .giant-material-status-heading span`;
     assertThemedSurface(cssBlock(css, badgeSelector), badgeSelector);
   }
+});
+
+test('shuihuo production key text selectors use semantic text variables', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/shuihuo-production.css'), 'utf8');
+  assert.match(cssBlock(css, '.shuihuo-topbar h1'), /color:\s*var\(--text-primary\)/);
+  assert.match(cssBlock(css, '.shuihuo-page-heading p'), /color:\s*var\(--text-secondary\)/);
+  assert.match(cssBlock(css, '.shuihuo-project-card-cover-fallback small'), /color:\s*var\(--text-tertiary\)/);
+  assert.match(cssBlock(css, '.shuihuo-readiness-strip .missing'), /color:\s*var\(--text-danger\)/);
+  assert.match(cssBlock(css, '.shuihuo-readiness-strip .ready'), /color:\s*var\(--text-success\)/);
+});
+
+test('batch factory v11 theme key text selectors use semantic variables and themed status surfaces', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/batch-factory-v11/batch-factory-v11-theme.css'), 'utf8');
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-typography"), /color:\s*var\(--text-primary\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-typography-secondary"), /color:\s*var\(--text-secondary\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-card-title small"), /color:\s*var\(--text-tertiary\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-tag-red"), /color:\s*var\(--text-danger\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-tag-green"), /color:\s*var\(--text-success\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-tag-gold"), /color:\s*var\(--text-warning\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-tag-red"), /background:\s*var\(--surface-panel\)/);
+  assert.match(cssBlock(css, "[data-bf-v11-ui='final'] .bf11-workbench .ant-tag-red"), /border-color:\s*var\(--border-default\)/);
+});
+
+test('batch factory and shuihuo styles use semantic text tokens for status text', () => {
+  const files = [
+    'user/pages/shuihuo-production.css',
+    'user/pages/batch-factory-workbench.css',
+    'user/pages/batch-factory-v11/batch-factory-v11-theme.css',
+    'user/pages/batch-factory-v11/batch-factory-v11-workbench.css',
+    'user/pages/batch-factory-v11/batch-factory-v11-settings.css',
+    'user/pages/batch-factory-v11/batch-factory-v11-scoped.css',
+    'user/pages/batch-factory-v11/batch-factory-v11-detail.css',
+    'user/pages/batch-factory-v11/batch-factory-v11-batch-manager.css'
+  ];
+  for (const file of files) {
+    const css = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(css, /var\(--text-(?:primary|secondary|tertiary|disabled|danger|warning|success)\)/, `${file} must use semantic text tokens`);
+    assert.doesNotMatch(css, /(?:color|-webkit-text-fill-color):\s*transparent/);
+  }
+});
+
+test('batch factory workbench covers table, drawer, metadata and state text levels', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/batch-factory-workbench.css'), 'utf8');
+  assert.match(cssBlock(css, '.batch-factory-workbench'), /color:\s*var\(--text-primary\)/);
+  assert.match(cssBlock(css, '.batch-factory-status-grid button'), /color:\s*var\(--text-secondary\)/);
+  assert.match(cssBlock(css, '.batch-factory-status-grid button strong'), /color:\s*var\(--text-primary\)/);
+  assert.match(cssBlock(css, '.batch-factory-abnormal-summary .ant-btn-dangerous'), /color:\s*var\(--text-danger\)/);
+});
+
+test('batch factory v11 workbench covers task, metadata and error text levels', () => {
+  const css = fs.readFileSync(path.join(root, 'user/pages/batch-factory-v11/batch-factory-v11-workbench.css'), 'utf8');
+  assert.match(cssBlock(css, '.bf11-workbench .ant-typography'), /color:\s*var\(--text-primary\)/);
+  assert.match(cssBlock(css, '.bf11-workbench .ant-typography-secondary'), /color:\s*var\(--text-secondary\)/);
+  assert.match(cssBlock(css, '.bf11-card-title small'), /color:\s*var\(--text-tertiary\)/);
+  assert.match(cssBlock(css, '.bf11-book-row.is-error'), /color:\s*var\(--text-danger\)/);
+});
+
+test('batch factory v11 settings, detail and manager labels use semantic levels', () => {
+  const files = [
+    ['user/pages/batch-factory-v11/batch-factory-v11-settings.css', '.bf11-settings-drawer'],
+    ['user/pages/batch-factory-v11/batch-factory-v11-scoped.css', '.bf11-scoped-settings'],
+    ['user/pages/batch-factory-v11/batch-factory-v11-detail.css', '.bf11-book-collapse'],
+    ['user/pages/batch-factory-v11/batch-factory-v11-batch-manager.css', '.bf11-batch-manager-pane']
+  ];
+  for (const [file, selector] of files) {
+    const css = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(cssBlock(css, selector), /color:\s*var\(--text-(?:primary|secondary|tertiary)\)/, `${selector} must define readable text`);
+  }
+});
+
+test('light theme primary and disabled buttons keep readable text contrast', () => {
+  assert.match(globalCSS, /\[data-theme='light'\]\s+\.user-theme-active \.ant-btn-primary\s*\{[^}]*color:\s*#ffffff/s);
+  assert.match(globalCSS, /\.user-theme-active \.ant-btn:disabled\s*\{[^}]*color:\s*var\(--legacy-dim\)/s);
+  assert.match(globalCSS, /\.admin-theme-active \.ant-btn:disabled\s*\{[^}]*color:\s*var\(--admin-faint\)/s);
+});
+
+test('global AntD tags use theme-aware contrast without flattening dark status colors', () => {
+  assert.match(globalCSS, /\.user-theme-active \.ant-tag\s*,\s*\n\.admin-theme-active \.ant-tag\s*\{[^}]*color:\s*var\(--tag-text\)/s);
+  assert.match(globalCSS, /\.user-theme-active \.ant-tag\s*,\s*\n\.admin-theme-active \.ant-tag\s*\{[^}]*background:\s*var\(--tag-bg\)/s);
+  for (const color of ['green', 'blue', 'gold', 'purple', 'red']) {
+    assert.match(globalCSS, new RegExp(`\\.user-theme-active \\.ant-tag-${color}[^}]*color:\\s*var\\(--tag-${color}-text\\)`));
+    assert.match(globalCSS, new RegExp(`\\.user-theme-active \\.ant-tag-${color}[^}]*background:\\s*var\\(--tag-${color}-bg\\)`));
+  }
+  assert.doesNotMatch(globalCSS, /\.user-theme-active \.ant-tag\s*\{[^}]*color:\s*#fff\s*!important/s);
+  assert.doesNotMatch(globalCSS, /\.admin-theme-active \.ant-tag\s*\{[^}]*color:\s*#fff\s*!important/s);
 });

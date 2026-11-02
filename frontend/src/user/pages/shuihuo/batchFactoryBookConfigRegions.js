@@ -17,7 +17,7 @@ const AI_MODULE_BY_REGION = {
 export function bookConfigRegionStatus(book, region) {
   const patch = book?.settingsState?.patch || {};
   if (region === 'engine') {
-    return ENGINE_KEYS.some(key => Object.hasOwn(patch, key))
+    return (ENGINE_KEYS.some(key => Object.hasOwn(patch, key)) || ['video', 'comic'].some(key => Object.hasOwn(patch.aiPromptConfig || {}, key)))
       ? { label: '已单书覆盖', tone: 'overridden' }
       : { label: '继承作品配置', tone: 'inherited' };
   }

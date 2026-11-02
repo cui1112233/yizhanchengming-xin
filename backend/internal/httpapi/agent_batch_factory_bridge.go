@@ -4,15 +4,21 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/mergeworker"
 )
 
 type agentBatchFactoryBindingResponse struct {
@@ -29,9 +35,32 @@ type agentBatchFactoryBridgeStore interface {
 	agentworkspace.BatchFactoryProjectionReader
 }
 
+// agentBatchFactoryBridgeMedia reads only Batch Factory's private merge output.
+// Other projected media continues to use its established source URL.
+type agentBatchFactoryBridgeMedia struct {
+	Local  *localartifact.Store
+	Remote mergeworker.ObjectReader
+}
+
+func (m agentBatchFactoryBridgeMedia) openMerge(ctx context.Context, artifactID string) (io.ReadCloser, error) {
+	if m.Local != nil {
+		file, err := m.Local.Open(artifactID + ".mp4")
+		if err == nil {
+			return file, nil
+		}
+		if !errors.Is(err, localartifact.ErrInvalidID) && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+	if m.Remote != nil {
+		return m.Remote.Open(ctx, artifactID)
+	}
+	return nil, batchfactoryv11.ErrNotFound
+}
+
 // RegisterAgentBatchFactoryBridge exposes only owner-scoped references between
 // Batch Factory and Agent. It intentionally has no Batch Factory delete port.
-func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth, projects agentworkspace.Store, batches agentBatchFactoryBridgeStore, projection *agentworkspace.BatchFactoryProjectionService, clock func() time.Time) {
+func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth, projects agentworkspace.Store, batches agentBatchFactoryBridgeStore, projection *agentworkspace.BatchFactoryProjectionService, clock func() time.Time, mediaReaders ...agentBatchFactoryBridgeMedia) {
 	if root == nil || projects == nil || batches == nil {
 		return
 	}
@@ -47,6 +76,10 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 	}
 	if projection.CanvasStore == nil || projection.BatchFactory == nil {
 		return
+	}
+	var mergeMedia *agentBatchFactoryBridgeMedia
+	if len(mediaReaders) > 0 {
+		mergeMedia = &mediaReaders[0]
 	}
 
 	ownerFor := func(w http.ResponseWriter, req *http.Request) (string, bool) {
@@ -65,7 +98,7 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 		})))
 	}
 
-	handle("POST /api/batch-factory/v11/batches/{batchId}/agent-project", func(w http.ResponseWriter, req *http.Request, owner string) {
+	bindBatchFactory := func(w http.ResponseWriter, req *http.Request, owner string) {
 		batch, err := batches.GetBatch(req.Context(), owner, req.PathValue("batchId"))
 		if err != nil {
 			writeAgentBatchFactoryError(w, err)
@@ -73,12 +106,12 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 		}
 		binding, err := projects.BatchFactoryBinding(req.Context(), owner, batch.ID)
 		if err == nil {
-			binding, err = ensureLiveAgentBatchFactoryProject(req.Context(), projects, binding, clock)
+			binding, err = ensureLiveAgentBatchFactoryProject(req.Context(), projects, binding, batch, clock)
 		}
 		if errors.Is(err, agentworkspace.ErrBatchFactoryBindingNotFound) {
 			now := clock().UTC()
 			projectID := agentBatchFactoryProjectID(owner, batch.ID)
-			project := agentworkspace.Project{ID: projectID, Title: "批量工厂项目", TitleMode: "automatic", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
+			project := agentworkspace.Project{ID: projectID, Title: "批量工厂项目", TitleMode: "automatic", ProjectType: batchFactoryAgentProjectType(batch), CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
 			if createErr := projects.CreateProject(req.Context(), owner, project); createErr != nil && !errors.Is(createErr, agentworkspace.ErrProjectExists) {
 				writeAgentStoreError(w, createErr)
 				return
@@ -96,8 +129,15 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			writeAgentBatchFactoryError(w, err)
 			return
 		}
+		if err := syncAgentBatchFactoryBatchProjection(req.Context(), projection, owner, binding, batch); err != nil {
+			writeAgentBatchFactoryError(w, err)
+			return
+		}
 		writeJSON(w, http.StatusOK, bindingResponse(binding, "", batch.Revision, "bound"))
-	})
+	}
+	for _, version := range []string{"v11", "v12"} {
+		handle(fmt.Sprintf("POST /api/batch-factory/%s/batches/{batchId}/agent-project", version), bindBatchFactory)
+	}
 
 	handle("GET /api/agent/tasks/{id}/batch-factory", func(w http.ResponseWriter, req *http.Request, owner string) {
 		if _, err := projects.Project(req.Context(), owner, req.PathValue("id")); err != nil {
@@ -170,6 +210,20 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 			writeAgentBatchFactoryError(w, err)
 			return
 		}
+		if origin.ResourceType == "merge" && mergeMedia != nil {
+			if artifactID, ok := agentBatchFactoryMergeMediaArtifactID(mediaURL); ok {
+				file, openErr := mergeMedia.openMerge(req.Context(), artifactID)
+				if openErr != nil {
+					writeAgentBatchFactoryError(w, openErr)
+					return
+				}
+				defer file.Close()
+				w.Header().Set("Content-Type", "video/mp4")
+				w.Header().Set("X-Content-Type-Options", "nosniff")
+				_, _ = io.Copy(w, file)
+				return
+			}
+		}
 		http.Redirect(w, req, mediaURL, http.StatusFound)
 	})
 
@@ -219,7 +273,31 @@ func RegisterAgentBatchFactoryBridge(root *http.ServeMux, middleware BridgeAuth,
 	})
 }
 
-func ensureLiveAgentBatchFactoryProject(ctx context.Context, projects agentworkspace.Store, binding agentworkspace.BatchFactoryBinding, clock func() time.Time) (agentworkspace.BatchFactoryBinding, error) {
+func agentBatchFactoryMergeMediaArtifactID(mediaURL string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(mediaURL))
+	if err != nil || parsed.IsAbs() || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false
+	}
+	for _, version := range []string{"v11", "v12"} {
+		prefix := "/api/batch-factory/" + version + "/batches/"
+		if !strings.HasPrefix(parsed.Path, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(parsed.Path, prefix)
+		parts := strings.Split(rest, "/merge-media/")
+		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" || strings.Contains(parts[1], "/") {
+			return "", false
+		}
+		artifactID, decodeErr := url.PathUnescape(parts[1])
+		if decodeErr != nil || artifactID == "" || filepath.Base(artifactID) != artifactID {
+			return "", false
+		}
+		return artifactID, true
+	}
+	return "", false
+}
+
+func ensureLiveAgentBatchFactoryProject(ctx context.Context, projects agentworkspace.Store, binding agentworkspace.BatchFactoryBinding, batch batchfactoryv11.Batch, clock func() time.Time) (agentworkspace.BatchFactoryBinding, error) {
 	if _, err := projects.Project(ctx, binding.Owner, binding.ProjectID); err == nil {
 		return binding, nil
 	} else if !errors.Is(err, agentworkspace.ErrProjectNotFound) {
@@ -229,7 +307,7 @@ func ensureLiveAgentBatchFactoryProject(ctx context.Context, projects agentworks
 	for range 16 {
 		projectID := agentBatchFactoryReplacementProjectID(current.Owner, current.BatchID, current.ProjectID)
 		now := clock().UTC()
-		project := agentworkspace.Project{ID: projectID, Title: "批量工厂项目", TitleMode: "automatic", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
+		project := agentworkspace.Project{ID: projectID, Title: "批量工厂项目", TitleMode: "automatic", ProjectType: batchFactoryAgentProjectType(batch), CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
 		createErr := projects.CreateProject(ctx, current.Owner, project)
 		if errors.Is(createErr, agentworkspace.ErrProjectExists) {
 			if _, liveErr := projects.Project(ctx, current.Owner, projectID); errors.Is(liveErr, agentworkspace.ErrProjectNotFound) {
@@ -279,6 +357,19 @@ func syncAgentBatchFactoryBookProjection(ctx context.Context, projects agentwork
 	return bindingResponse(binding, bookID, canvas.Revision, "synchronized"), nil
 }
 
+// syncAgentBatchFactoryBatchProjection initializes every book as a separate
+// group inside the one Agent project bound to the Batch Factory batch. The
+// cards contain source references only; media and production state remain
+// owned by Batch Factory and are refreshed through the same projection path.
+func syncAgentBatchFactoryBatchProjection(ctx context.Context, projection *agentworkspace.BatchFactoryProjectionService, owner string, binding agentworkspace.BatchFactoryBinding, batch batchfactoryv11.Batch) error {
+	for _, book := range batch.Books {
+		if _, err := projection.SyncBatchFactoryBook(ctx, owner, binding, book.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func bindingResponse(binding agentworkspace.BatchFactoryBinding, bookID string, version int64, state string) agentBatchFactoryBindingResponse {
 	return agentBatchFactoryBindingResponse{ProjectID: binding.ProjectID, BatchID: binding.BatchID, BookID: strings.TrimSpace(bookID), Source: "batch_factory", Version: version, State: state}
 }
@@ -291,6 +382,25 @@ func agentBatchFactoryProjectID(owner, batchID string) string {
 func agentBatchFactoryReplacementProjectID(owner, batchID, previousProjectID string) string {
 	digest := sha256.Sum256([]byte(strings.TrimSpace(owner) + "\x00" + strings.TrimSpace(batchID) + "\x00" + strings.TrimSpace(previousProjectID)))
 	return agentBatchFactoryProjectID(owner, batchID) + "-" + hex.EncodeToString(digest[:6])
+}
+
+func batchFactoryAgentProjectType(batch batchfactoryv11.Batch) string {
+	mode := ""
+	if raw := batch.SettingsState.Patch["productionMode"]; len(raw) > 0 {
+		_ = json.Unmarshal(raw, &mode)
+	}
+	if strings.EqualFold(strings.TrimSpace(mode), "comic") {
+		return "comic"
+	}
+	for _, book := range batch.Books {
+		if raw := book.SettingsState.Patch["productionMode"]; len(raw) > 0 {
+			_ = json.Unmarshal(raw, &mode)
+			if strings.EqualFold(strings.TrimSpace(mode), "comic") {
+				return "comic"
+			}
+		}
+	}
+	return "video"
 }
 
 func agentBatchFactoryBindingForProject(ctx context.Context, projects agentworkspace.Store, batches agentBatchFactoryBridgeStore, owner, projectID string) (agentworkspace.BatchFactoryBinding, batchfactoryv11.Batch, error) {

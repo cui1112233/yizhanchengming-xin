@@ -261,12 +261,13 @@ func selectPrompts(names []string, library map[string]string) string {
 }
 
 type compiledAsset struct {
-	ID         string
-	Kind       string
-	Name       string
-	FormalName string
-	Prompt     string
-	ImageURL   string
+	ID            string
+	Kind          string
+	Name          string
+	FormalName    string
+	Relationships string
+	Prompt        string
+	ImageURL      string
 }
 
 func assetKey(kind, name string) string { return kind + "\x00" + name }
@@ -277,13 +278,13 @@ func recordsByKindAndName(book Book, fallback map[string][]NamedPrompt) map[stri
 		if strings.TrimSpace(asset.Name) == "" || strings.TrimSpace(asset.Kind) == "" {
 			continue
 		}
-		records[assetKey(asset.Kind, asset.Name)] = compiledAsset{ID: asset.ID, Kind: asset.Kind, Name: asset.Name, FormalName: strings.TrimSpace(asset.FormalName), Prompt: strings.TrimSpace(asset.Prompt)}
+		records[assetKey(asset.Kind, asset.Name)] = compiledAsset{ID: asset.ID, Kind: asset.Kind, Name: asset.Name, FormalName: strings.TrimSpace(asset.FormalName), Relationships: strings.TrimSpace(asset.Relationships), Prompt: mergeVisualAssetPrompt(asset.Facts, asset.Appearance, asset.Prompt, asset.Relationships)}
 	}
 	for kind, values := range fallback {
 		for _, value := range values {
 			key := assetKey(kind, value.Name)
 			if _, exists := records[key]; !exists {
-				records[key] = compiledAsset{Kind: kind, Name: value.Name, Prompt: strings.TrimSpace(value.Prompt)}
+				records[key] = compiledAsset{Kind: kind, Name: value.Name, Relationships: strings.TrimSpace(value.Relationships), Prompt: mergeVisualAssetPrompt(value.Facts, value.Appearance, value.Prompt, value.Relationships)}
 			}
 		}
 	}
@@ -444,6 +445,66 @@ func explicitAssetIDsFromPrompt(prompt string, records map[string]compiledAsset)
 	return uniqueAssetIDs(ids)
 }
 
+// inferAssetReferencesFromContent is the compatibility fallback for old
+// storyboard records that do not have structured characters/scene/props
+// fields. It only infers names occurring in this VIDEO's content; it never
+// falls back to every asset in the book.
+func inferAssetReferencesFromContent(video DirectorVideo, records map[string]compiledAsset) (characters, scenes, props []string) {
+	parts := []string{
+		stripSharedPromptSections(video.FinalPrompt),
+		video.VisualPrompt,
+		video.VideoDesc,
+		video.SceneMemory,
+		video.Scene,
+	}
+	for _, shot := range video.Shots {
+		parts = append(parts, shot.VisualContext, shot.Description, shot.Lighting, shot.Audio)
+	}
+	text := strings.TrimSpace(strings.Join(parts, "\n"))
+	if text == "" {
+		return nil, nil, nil
+	}
+	assets := make([]compiledAsset, 0, len(records))
+	for _, asset := range records {
+		if strings.TrimSpace(asset.Name) == "" || strings.TrimSpace(asset.Prompt) == "" {
+			continue
+		}
+		assets = append(assets, asset)
+	}
+	sort.SliceStable(assets, func(i, j int) bool {
+		left := len([]rune(assets[i].Name))
+		right := len([]rune(assets[j].Name))
+		if left != right {
+			return left > right
+		}
+		return assets[i].Name < assets[j].Name
+	})
+	seen := map[string]bool{}
+	for _, asset := range assets {
+		matched := strings.Contains(text, asset.Name)
+		if !matched && asset.FormalName != "" {
+			matched = strings.Contains(text, asset.FormalName)
+		}
+		if !matched {
+			continue
+		}
+		key := asset.Kind + "\x00" + asset.Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		switch asset.Kind {
+		case "character":
+			characters = append(characters, asset.Name)
+		case "scene":
+			scenes = append(scenes, asset.Name)
+		case "prop":
+			props = append(props, asset.Name)
+		}
+	}
+	return characters, scenes, props
+}
+
 func storyboardAssetMentions(groups ...[]compiledAsset) string {
 	seen := map[string]bool{}
 	mentions := []string{}
@@ -495,19 +556,15 @@ func baseSetupEnabled(values SettingsPatch) bool {
 	if json.Unmarshal(raw, &config) != nil {
 		return true
 	}
-	if config.Constraints.Enabled != nil && !*config.Constraints.Enabled {
-		return false
-	}
 	if config.Constraints.BaseSetup.Enabled == nil {
 		return true
 	}
 	return *config.Constraints.BaseSetup.Enabled
 }
 
-// constraintsApply is deliberately stricter than the historical per-field
-// flags. Once an AI-reasoning constraint module is saved and switched off,
-// none of its layers (including base assets) may silently survive in VIDEO
-// compilation. Legacy books without that module retain their old settings.
+// constraintsApply keeps the constraint module active for every configured
+// book. The old module-level enabled flag is no longer a user control; only
+// each individual layer (and the custom-book scope) decides what is injected.
 func constraintsApply(values SettingsPatch, config AIReasoningPromptConfig, book Book) bool {
 	if _, configured := values["aiPromptConfig"]; !configured {
 		return true
@@ -716,24 +773,13 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 	if len(characterRefs) == 0 {
 		characterRefs = draft.Characters
 	}
-	if len(characterRefs) == 0 {
-		// SD 纯文本分镜没有逐镜人物字段，也没有 VIDEO 级手动选择时，
-		// 默认带整本书已提取的全部人物，跟剧本生成一致。
-		characterRefs = namedPromptNames(book.Assets.Characters)
-	}
 	sceneRefs := rawStrings(values, "sceneRefs")
 	if len(sceneRefs) == 0 && draft.Scene != "" {
 		sceneRefs = []string{draft.Scene}
 	}
-	if len(sceneRefs) == 0 {
-		sceneRefs = namedPromptNames(book.Assets.Scenes)
-	}
 	propRefs := rawStrings(values, "propRefs")
 	if len(propRefs) == 0 {
 		propRefs = draft.Props
-	}
-	if len(propRefs) == 0 {
-		propRefs = namedPromptNames(book.Assets.Props)
 	}
 
 	records := recordsByKindAndName(book, map[string][]NamedPrompt{
@@ -741,6 +787,18 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		"scene":     book.Assets.Scenes,
 		"prop":      book.Assets.Props,
 	})
+	if len(characterRefs) == 0 || len(sceneRefs) == 0 || len(propRefs) == 0 {
+		inferredCharacters, inferredScenes, inferredProps := inferAssetReferencesFromContent(draft, records)
+		if len(characterRefs) == 0 {
+			characterRefs = inferredCharacters
+		}
+		if len(sceneRefs) == 0 {
+			sceneRefs = inferredScenes
+		}
+		if len(propRefs) == 0 {
+			propRefs = inferredProps
+		}
+	}
 	primaryImages, err := s.primaryAssetImages(ctx, owner, batchID, bookID, records)
 	if err != nil {
 		return FinalPrompt{}, err
@@ -860,8 +918,19 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 	}
 	var displayPrompt, videoPrompt, videoLabel string
 	if sdDirect {
-		videoPrompt = draft.FinalPrompt
+		// Historical SD director output may already contain an old shared
+		// setup block. Remove it before injecting the current book assets;
+		// otherwise the old relationship-polluted text survives beside the
+		// corrected asset block and appears as if the new preset was ignored.
+		videoPrompt = stripSharedPromptSections(draft.FinalPrompt)
 		displayPrompt = videoPrompt
+		// SD cards are already complete prompt bodies. A video-scope edit is
+		// therefore the user's replacement for this exact card, just as it is
+		// for structured director output below.
+		if override, ok := optionalPromptValue(video.SettingsState.Patch, "videoPrompt"); ok {
+			videoPrompt = stripSharedPromptSections(override)
+			displayPrompt = videoPrompt
+		}
 		videoLabel = "视频提示词"
 		// 旧 SD 卡片始终以“基础设定 → 画面质量提示词 → 视频提示词”
 		// 展示和提交。智能统一/普通前缀与画质约束都属于同一视觉质量段，

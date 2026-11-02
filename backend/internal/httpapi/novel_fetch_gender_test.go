@@ -30,7 +30,7 @@ func TestNovelFetchWorkshopUsesConfiguredGenderJudgeResolver(t *testing.T) {
 		NovelFetchAIGenderJudgeResolver: func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error) {
 			return func(context.Context, novelfetchworkshop.BookInfo) (string, error) {
 				judgeCalls++
-				return "女频", nil
+				return `{"gender":"女频","confidence":0.92,"reason":"正文情感关系线占主导"}`, nil
 			}, nil
 		},
 	})
@@ -50,7 +50,7 @@ func TestNovelFetchWorkshopUsesConfiguredGenderJudgeResolver(t *testing.T) {
 	if err := json.Unmarshal(fetch.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if judgeCalls != 1 || response.Task.Gender != "女频" || response.Task.GenderSource != novelfetchworkshop.GenderAI {
+	if judgeCalls != 1 || response.Task.Gender != "女频" || response.Task.GenderSource != novelfetchworkshop.GenderAI || response.Task.GenderConfidence != 0.92 || response.Task.Meta["genderConfidence"] != 0.92 {
 		t.Fatalf("gender judge was not used: calls=%d task=%#v", judgeCalls, response.Task)
 	}
 }

@@ -31,6 +31,10 @@ func SyncKnowledgeConfigViews(settings, patch map[string]any) {
 	}
 	apply := func(source map[string]any) {
 		for kind, value := range source {
+			if kind == "usage_prompt" {
+				libraries[kind] = value
+				continue
+			}
 			if kind == "high_imitation" || kind == "opening_phrases" || kind == "rewrite_templates" || kind == "sensitive" || kind == "layout_rules" || kind == "symbol_rules" || kind == "chapter_rules" || kind == "opening_analyzer" {
 				if library, ok := value.(map[string]any); ok {
 					libraries[kind] = cloneMap(library)
@@ -117,11 +121,96 @@ func ListKnowledge(settings map[string]any, kind string) (map[string]any, error)
 	if !knowledgeKinds[kind] && kind != "layout_rules" && kind != "symbol_rules" && kind != "chapter_rules" {
 		return nil, fmt.Errorf("资料库类型无效：%s", kind)
 	}
-	library := knowledgeLibrary(settings, kind)
+	// The public response is a view.  Keep the caller from changing the saved
+	// configuration while also restoring the legacy sub-library identity that
+	// the compact items list used to hide.
+	library := cloneMap(knowledgeLibrary(settings, kind))
 	if knowledgeKinds[kind] {
-		library["items"] = normalizeKnowledgeItems(library["items"])
+		library["items"] = knowledgeItemsWithCollections(library, kind)
 	}
 	return library, nil
+}
+
+func knowledgeCollectionNames(kind string) []string {
+	switch kind {
+	case "high_imitation":
+		return []string{"prompts", "references"}
+	case "rewrite_templates":
+		return []string{"profiles", "temporary_instructions"}
+	default:
+		return nil
+	}
+}
+
+func knowledgeItemCollection(library map[string]any, kind, id, requested string) string {
+	for _, name := range knowledgeCollectionNames(kind) {
+		if requested == name {
+			return name
+		}
+		for _, item := range normalizeKnowledgeItems(library[name]) {
+			if strings.TrimSpace(fmt.Sprint(item["id"])) == id {
+				return name
+			}
+		}
+	}
+	if kind == "high_imitation" {
+		if strings.Contains(strings.ToLower(id), "reference") {
+			return "references"
+		}
+		return "prompts"
+	}
+	if kind == "rewrite_templates" {
+		if strings.HasPrefix(strings.ToLower(id), "instruction_") {
+			return "temporary_instructions"
+		}
+		return "profiles"
+	}
+	return ""
+}
+
+func knowledgeItemsWithCollections(library map[string]any, kind string) []map[string]any {
+	items := normalizeKnowledgeItems(library["items"])
+	collections := knowledgeCollectionNames(kind)
+	if len(collections) == 0 {
+		return items
+	}
+	collectionByID := map[string]string{}
+	for _, name := range collections {
+		for _, item := range normalizeKnowledgeItems(library[name]) {
+			collectionByID[strings.TrimSpace(fmt.Sprint(item["id"]))] = name
+		}
+	}
+	for _, item := range items {
+		id := strings.TrimSpace(fmt.Sprint(item["id"]))
+		if collection := knowledgeItemCollection(library, kind, id, strings.TrimSpace(fmt.Sprint(item["collection"]))); collection != "" {
+			item["collection"] = collection
+		} else if collectionByID[id] != "" {
+			item["collection"] = collectionByID[id]
+		}
+	}
+	return items
+}
+
+func replaceKnowledgeCollectionItem(library map[string]any, kind, id, collection string, item map[string]any) {
+	for _, name := range knowledgeCollectionNames(kind) {
+		current := normalizeKnowledgeItems(library[name])
+		updated := make([]any, 0, len(current)+1)
+		found := false
+		for _, existing := range current {
+			if strings.TrimSpace(fmt.Sprint(existing["id"])) != id {
+				updated = append(updated, existing)
+				continue
+			}
+			if name == collection {
+				updated = append(updated, cloneMap(item))
+				found = true
+			}
+		}
+		if name == collection && !found {
+			updated = append(updated, cloneMap(item))
+		}
+		library[name] = updated
+	}
 }
 
 func SaveKnowledge(settings map[string]any, kind string, item map[string]any) (map[string]any, error) {
@@ -140,6 +229,9 @@ func SaveKnowledge(settings map[string]any, kind string, item map[string]any) (m
 	}
 	normalized := cloneMap(item)
 	normalized["id"] = id
+	if collection := knowledgeItemCollection(library, kind, id, strings.TrimSpace(fmt.Sprint(item["collection"]))); collection != "" {
+		normalized["collection"] = collection
+	}
 	if kind == "opening_phrases" {
 		text := strings.TrimSpace(fmt.Sprint(firstValue(item, "text", "general_phrase", "content", "template")))
 		if text == "" || text == "<nil>" {
@@ -164,6 +256,9 @@ func SaveKnowledge(settings map[string]any, kind string, item map[string]any) (m
 		items = append(items, normalized)
 	}
 	library["items"] = items
+	if collection := strings.TrimSpace(fmt.Sprint(normalized["collection"])); collection != "" {
+		replaceKnowledgeCollectionItem(library, kind, id, collection, normalized)
+	}
 	library["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 	if kind == "opening_phrases" {
 		styles := make([]any, 0)
@@ -197,6 +292,16 @@ func DeleteKnowledge(settings map[string]any, kind, id string) (bool, error) {
 		filtered = append(filtered, item)
 	}
 	library["items"] = filtered
+	for _, name := range knowledgeCollectionNames(kind) {
+		collection := normalizeKnowledgeItems(library[name])
+		updated := make([]any, 0, len(collection))
+		for _, item := range collection {
+			if strings.TrimSpace(fmt.Sprint(item["id"])) != strings.TrimSpace(id) {
+				updated = append(updated, item)
+			}
+		}
+		library[name] = updated
+	}
 	library["updated_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 	putKnowledgeLibrary(settings, kind, library)
 	return removed, nil
@@ -284,6 +389,40 @@ func KnowledgeSummary(settings map[string]any) map[string]int {
 			}
 		} else {
 			result[kind] = len(normalizeKnowledgeItems(library["items"]))
+		}
+	}
+	opening := knowledgeLibrary(settings, "opening_phrases")
+	high := knowledgeLibrary(settings, "high_imitation")
+	rewrite := knowledgeLibrary(settings, "rewrite_templates")
+	styles := map[string]bool{}
+	for _, style := range normalizeKnowledgeItems(opening["items"]) {
+		value := strings.TrimSpace(fmt.Sprint(style["style"]))
+		if value != "" && value != "<nil>" {
+			styles[value] = true
+		}
+	}
+	storedStyles, _ := opening["styles"].([]any)
+	for _, style := range storedStyles {
+		value := strings.TrimSpace(fmt.Sprint(style))
+		if value != "" && value != "<nil>" {
+			styles[value] = true
+		}
+	}
+	result["opening_styles"] = len(styles)
+	for _, item := range knowledgeItemsWithCollections(rewrite, "rewrite_templates") {
+		switch item["collection"] {
+		case "profiles":
+			result["rewrite_profiles"]++
+		case "temporary_instructions":
+			result["temporary_instructions"]++
+		}
+	}
+	for _, item := range knowledgeItemsWithCollections(high, "high_imitation") {
+		switch item["collection"] {
+		case "prompts":
+			result["high_imitation_prompts"]++
+		case "references":
+			result["high_imitation_references"]++
 		}
 	}
 	layout := knowledgeLibrary(settings, "layout_rules")

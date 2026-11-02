@@ -1,0 +1,67 @@
+[package]
+name = "doubao-relay"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "doubao_relay_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] } # protocol-asset:Task 2.9 结果缩略图 convertFileSrc;tray-icon:Task 5.2 系统托盘
+tauri-plugin-dialog = "2" # Task 2.9:新建任务弹窗选参考图
+tauri-plugin-single-instance = "2" # 一台电脑只允许一个 relay 实例运行
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7" # Task 2.3:CancellationToken
+tokio-tungstenite = "0.30"
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+url = "2"
+# 计划写 0.39,但 0.39.x 全系列 MSRV=1.95,本机 Rust 1.94 编不过;0.38 MSRV=1.88
+sysinfo = "0.38"
+async-trait = "0.1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+toml = "0.9"
+regex = "1"
+rand = "0.10"
+dirs = "6"
+ulid = "1" # Task 2.2
+sha2 = "0.10" # Task 2.2 / 3.1
+hex = "0.4" # Task 2.2
+# Task 2.5
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+aes = "0.8" # Task 3.1
+cbc = { version = "0.1", features = ["alloc"] } # Task 3.1
+base64 = "0.22" # Task 3.1
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] } # Task 2.6
+# Task 2.8:HTTP API
+axum = { version = "0.8", features = ["multipart"] }
+tower-http = { version = "0.6", features = ["cors", "fs", "trace", "limit"] }
+subtle = "2"
+mime = "0.3"
+tauri-plugin-clipboard-manager = "2" # Task 5.1
+hmac = "0.12" # Task 4.1
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+
+[dev-dependencies]
+tempfile = "3"
+# `tauri::test`(mock runtime)用于命令/事件的 IPC 级测试;resolver=2 下不会污染正常构建
+tauri = { version = "2", features = ["test"] }
+# Task 2.8:axum `oneshot` 测试与读响应体
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

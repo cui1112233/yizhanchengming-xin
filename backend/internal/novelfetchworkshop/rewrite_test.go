@@ -122,3 +122,72 @@ func TestGenerateAIRewritesForVersionsOnlySavesExplicitSelections(t *testing.T) 
 		t.Fatalf("unselected version was generated: %#v", document.Versions)
 	}
 }
+
+func TestGenerateAIRewritesRunsPostProcessorBeforeSavingBody(t *testing.T) {
+	store := NewMemoryStore()
+	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-rules", Original: "原文", ProcessedText: "原文"}); err != nil {
+		t.Fatal(err)
+	}
+	document, err := GenerateAIRewritesForVersionsProcessed(context.Background(), store, "alice", "book-rules", []string{"ai1"}, rewriteProviderFunc(func(_ context.Context, _ RewriteRequest) (string, error) {
+		return "模型坏词", nil
+	}), func(_ context.Context, versionID, text string) (string, []map[string]any, []map[string]any, error) {
+		if versionID != "ai1" || text != "模型坏词" {
+			t.Fatalf("processor input version=%q text=%q", versionID, text)
+		}
+		return "模型好词", []map[string]any{{"stage": "sensitive"}}, []map[string]any{{"keyword": "坏词"}}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.Versions["ai1"] != "模型好词" {
+		t.Fatalf("saved version=%q", document.Versions["ai1"])
+	}
+	body, err := store.GetBody(context.Background(), "alice", "book-rules", "ai1")
+	if err != nil || body.Content != "模型好词" {
+		t.Fatalf("saved body=%#v err=%v", body, err)
+	}
+	traceByVersion, _ := document.Meta["rulesTraceByVersion"].(map[string]any)
+	if traceByVersion["ai1"] == nil {
+		t.Fatalf("missing AI rule trace: %#v", document.Meta)
+	}
+}
+
+func TestGenerateAIRewritesConsumesSavedRewriteAndKnowledgeConfig(t *testing.T) {
+	store := NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "alice", map[string]any{
+		"appConfig": map[string]any{
+			"rewrite":   map[string]any{"process_line_count": 1, "anchor_line_count": 1, "temperature": 0.7, "ai_slot_methods": map[string]any{"ai1": "opening_instruction"}, "method_sequence": []any{"opening_instruction"}, "default_template_id": "tpl-1", "prompt": "账号改文要求"},
+			"ai":        map[string]any{"max_tokens": 2222},
+			"knowledge": map[string]any{"usage_prompt": "知识库只能参考结构"},
+		},
+		"knowledgeLibraries": map[string]any{
+			"rewrite_templates": map[string]any{"profiles": []any{map[string]any{"id": "tpl-1", "title": "指定模板", "prompt": "模板专用指令"}}},
+			"opening_phrases":   map[string]any{"items": []any{map[string]any{"id": "opening-1", "content": "爆款开头参考"}}},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PutDocument(context.Background(), "alice", Document{BookID: "book-config", Original: "第一行\n第二行\n第三行", ProcessedText: "第一行\n第二行\n第三行"}); err != nil {
+		t.Fatal(err)
+	}
+	var request RewriteRequest
+	document, err := GenerateAIRewritesForVersions(context.Background(), store, "alice", "book-config", []string{"ai1"}, rewriteProviderFunc(func(_ context.Context, value RewriteRequest) (string, error) {
+		request = value
+		return "已改第一行", nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"账号改文要求", "知识库只能参考结构", "模板专用指令", "爆款开头参考"} {
+		if !strings.Contains(request.UserPrompt, expected) {
+			t.Fatalf("prompt missing %q: %s", expected, request.UserPrompt)
+		}
+	}
+	if request.Temperature != 0.7 || request.MaxTokens != 2222 {
+		t.Fatalf("request settings=%#v", request)
+	}
+	evidence := document.Meta["rewriteEvidenceByVersion"].(map[string]any)["ai1"].(map[string]any)
+	if evidence["method"] != "opening_instruction" || evidence["template_id"] != "tpl-1" {
+		t.Fatalf("rewrite evidence=%#v", evidence)
+	}
+}

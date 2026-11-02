@@ -28,7 +28,7 @@ func TestMySQLStoreGetBatchDoesNotHoldBookRowsWhileLoadingDrafts(t *testing.T) {
 			"id", "title", "source_text", "source_book_id", "source_task_id", "platform",
 			"txt_text", "txt_file_name", "source_metadata_json", "revision",
 		}).AddRow("book-1", "小说一", "正文", "source-1", "", "qimao", "", "", []byte(`{}`), int64(1)))
-	mock.ExpectQuery("SELECT content FROM batch_factory_v11_drafts").
+	mock.ExpectQuery("SELECT content FROM batch_factory_v12_drafts").
 		WithArgs("alice", "working-front:book-1", "batch-1").
 		WillReturnRows(sqlmock.NewRows([]string{"content"}).AddRow("编辑后的正文"))
 	mock.ExpectQuery("SELECT v.id,r.label,COALESCE\\(r.video_prompt,''\\)").

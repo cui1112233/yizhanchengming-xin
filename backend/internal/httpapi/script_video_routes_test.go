@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localexecutor"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
@@ -80,14 +81,32 @@ func TestScriptVideoRoutesSubmitAndPollH3KeepLegacyContract(t *testing.T) {
 	}
 }
 
-func TestScriptVideoRoutesRejectReferenceImagesForLocalModel(t *testing.T) {
+func TestScriptVideoRoutesPassReferenceImagesToLocalExecutor(t *testing.T) {
+	service := localexecutor.NewService(localexecutor.NewMemoryStore(), func() time.Time { return time.Unix(100, 0) })
 	mux := http.NewServeMux()
-	RegisterScriptVideoRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return time.Unix(100, 0) }}, nil, nil)
+	RegisterScriptVideoRoutes(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return time.Unix(100, 0) }}, service, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/script-video", strings.NewReader(`{"modelKey":"local-doubao-executor-video","prompt":"镜头","imageUrls":["https://cdn.example/a.png"]}`))
 	SignBridgeRequest(req, "tester", false, time.Unix(100, 0), "secret")
 	res := httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
-	if res.Code != http.StatusConflict || !strings.Contains(res.Body.String(), "UNSUPPORTED_REFERENCE_IMAGES") {
+	if res.Code != http.StatusAccepted {
 		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	var created map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	taskID := strings.TrimPrefix(created["taskId"].(string), localScriptVideoTaskPrefix)
+	job, err := service.GetJob(context.Background(), "tester", taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	imageURLs, ok := payload["imageUrls"].([]any)
+	if !ok || len(imageURLs) != 1 || imageURLs[0] != "https://cdn.example/a.png" {
+		t.Fatalf("imageUrls=%#v", payload["imageUrls"])
 	}
 }

@@ -1,7 +1,7 @@
 import { Button, Empty, Tag, Typography, message } from 'antd';
 import { Bug, KeyRound, RefreshCw, ServerCrash } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { listMyErrorLogs, listNovelPanelAiDiagnostics } from '../../shared/api/client';
+import { listMyErrorLogs } from '../../shared/api/client';
 import { listBatchRewriteIssues } from '../../shared/api/novelFetchWorkshop';
 
 function formatTime(value) {
@@ -14,7 +14,6 @@ function readableKind(kind) {
   if (kind === 'client.api-response') return '操作请求失败';
   if (kind === 'client.window-error') return '页面运行异常';
   if (kind === 'client.unhandledrejection') return '操作未完成';
-  if (kind === 'novel-panel.ai') return '小说面板 AI 异常';
   if (kind === 'batch-rewrite.submit') return '小说获取：网站提交问题';
   if (kind === 'batch-rewrite.sensitive') return '小说获取：敏感词处理问题';
   if (kind === 'batch-rewrite.ai') return '小说获取：AI 文案处理问题';
@@ -25,19 +24,6 @@ function readableKind(kind) {
   if (kind.startsWith('client.batch-rewrite.rules')) return '小说获取：处理规则问题';
   if (kind.startsWith('client.batch-rewrite.api')) return '小说获取：接口问题';
   return '系统记录';
-}
-
-function diagnosticEntry(entry) {
-  const status = Number.isInteger(entry.http_status) ? entry.http_status : null;
-  return {
-    id: `novel-panel:${entry.id}`,
-    kind: 'novel-panel.ai',
-    message: entry.gate_summary || '小说面板 AI 请求记录',
-    at: entry.at,
-    path: entry.operation ? `小说面板 / ${entry.operation}` : '小说面板',
-    method: entry.outcome || 'AI 诊断',
-    status,
-  };
 }
 
 function severityForEntry(entry) {
@@ -59,7 +45,7 @@ function summarizeEntries(entries, now = Date.now()) {
     const timestamp = new Date(entry.at).getTime();
     return {
       recent: summary.recent + (Number.isFinite(timestamp) && timestamp >= dayAgo ? 1 : 0),
-      api: summary.api + (entry.kind === 'client.api-response' || entry.kind === 'client.api-network' || entry.kind === 'novel-panel.ai' || entry.kind.startsWith('batch-rewrite.') || entry.kind.startsWith('batch-factory.') ? 1 : 0),
+      api: summary.api + (entry.kind === 'client.api-response' || entry.kind === 'client.api-network' || entry.kind.startsWith('batch-rewrite.') || entry.kind.startsWith('batch-factory.') ? 1 : 0),
       access: summary.access + (entry.status === 401 || entry.status === 403 ? 1 : 0),
     };
   }, { recent: 0, api: 0, access: 0 });
@@ -72,14 +58,12 @@ export function IssueLogPage() {
   async function loadEntries() {
     setLoading(true);
     try {
-      const [errorsResult, diagnosticsResult, batchRewriteResult] = await Promise.allSettled([listMyErrorLogs(), listNovelPanelAiDiagnostics(), listBatchRewriteIssues()]);
+      const [errorsResult, batchRewriteResult] = await Promise.allSettled([listMyErrorLogs(), listBatchRewriteIssues()]);
       if (errorsResult.status === 'rejected') throw errorsResult.reason;
       const errors = errorsResult.value;
-      const diagnostics = diagnosticsResult.status === 'fulfilled' ? diagnosticsResult.value : { diagnostics: [] };
       const batchRewrite = batchRewriteResult.status === 'fulfilled' ? batchRewriteResult.value : { entries: [] };
       const combined = [
         ...(Array.isArray(errors.entries) ? errors.entries : []),
-        ...(Array.isArray(diagnostics.diagnostics) ? diagnostics.diagnostics.map(diagnosticEntry) : []),
         ...(Array.isArray(batchRewrite.entries) ? batchRewrite.entries : []),
       ].sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime());
       setEntries(combined);

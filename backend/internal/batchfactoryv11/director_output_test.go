@@ -88,6 +88,23 @@ func TestNormalizeAssetExtractionOutputKeepsCharacterStructure(t *testing.T) {
 	}
 }
 
+func TestNormalizeAssetExtractionOutputKeepsRelationshipsOutOfVisualPrompt(t *testing.T) {
+	assets, err := NormalizeAssetExtractionOutput(json.RawMessage(`{
+		"characters":[{"name":"我","facts":"现代都市女性，25岁左右，陆淮安的妻子，刚经历小产出院恢复期","appearance":"清瘦，黑色长发，白色针织衫","relationships":"陆淮安的妻子；与陆淮安共同生活","prompt":"现代都市女性，25岁左右，陆淮安的妻子；与陆淮安共同生活，清瘦，黑色长发，白色针织衫"}],
+		"scenes":[],"props":[]
+	}`))
+	if err != nil {
+		t.Fatalf("NormalizeAssetExtractionOutput returned error: %v", err)
+	}
+	got := assets.Characters[0].Prompt
+	if strings.Contains(got, "陆淮安的妻子") || strings.Contains(got, "与陆淮安共同生活") {
+		t.Fatalf("relationship text leaked into visual prompt: %q", got)
+	}
+	if strings.Contains(got, "刚经历小产出院恢复期") == false || !strings.Contains(got, "现代都市女性") || !strings.Contains(got, "黑色长发") {
+		t.Fatalf("visual prompt lost facts or appearance: %q", got)
+	}
+}
+
 func TestSDDirectorTextPreservesStructuredAssetReferences(t *testing.T) {
 	result, err := parseSDDirectorText(`===VIDEO 01===
 时长：10秒
@@ -281,6 +298,34 @@ func TestDirectorRejectsDiscontinuousShots(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "必须连续") {
 		t.Fatalf("expected continuity error, got %v", err)
+	}
+}
+
+func TestDirectorNormalizesCumulativeClockForLaterVideos(t *testing.T) {
+	var root map[string]any
+	if err := json.Unmarshal([]byte(twoDirectorVideosJSON(t)), &root); err != nil {
+		t.Fatal(err)
+	}
+	storyboard := root["storyboard"].([]any)
+	second := storyboard[1].(map[string]any)
+	for _, item := range second["shots"].([]any) {
+		shot := item.(map[string]any)
+		shot["start_sec"] = shot["start_sec"].(float64) + 9
+		shot["end_sec"] = shot["end_sec"].(float64) + 9
+	}
+	raw, err := json.Marshal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := NormalizeDirectorOutput(raw, DirectorSettings{
+		MaxVideoDuration: 15, AspectRatio: "9:16", AllowedPrefixKeys: []string{"modern_conflict"},
+	})
+	if err != nil {
+		t.Fatalf("cumulative provider clock should normalize: %v", err)
+	}
+	shots := result.Storyboard[1].Shots
+	if shots[0].StartSec != 0 || shots[0].EndSec != 3 || shots[1].StartSec != 3 || shots[1].EndSec != 9 {
+		t.Fatalf("unexpected rebased shots: %#v", shots)
 	}
 }
 

@@ -9,10 +9,11 @@ func TestScriptVideoModelSpecMapsPublicModelKeys(t *testing.T) {
 		acceptsImages  bool
 		wantTaskPrefix string
 	}{
-		{"yd2-mini-video", "personal_api", true, ""},
+		{"yd2-mini-video", "personal_api", true, "yd2:"},
 		{"minimax-h3-video", "autodl_comfyui", true, "h3:"},
 		{"seedance-2-0-official", "yfai_seedance", true, "yfai:"},
-		{"local-doubao-executor-video", "doubao_local_executor", false, "go-local:"},
+		{"fanke-video-api", "yfai_seedance", true, "yfai:fanke-video-api:"},
+		{"local-doubao-executor-video", "doubao_local_executor", true, "go-local:"},
 	}
 	for _, tc := range cases {
 		spec, ok := scriptVideoModelSpec(tc.modelKey)

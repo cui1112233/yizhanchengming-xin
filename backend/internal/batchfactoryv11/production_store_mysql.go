@@ -26,7 +26,7 @@ func (s *MySQLStore) FindProductionJob(ctx context.Context, owner, batchID, book
 
 func findProductionJob(ctx context.Context, q productionQueryer, owner, batchID, bookID, requestID string) (ProductionJob, error) {
 	var id string
-	err := q.QueryRowContext(ctx, `SELECT id FROM batch_factory_v11_production_jobs WHERE owner_username=? AND batch_id=? AND book_id=? AND request_id=?`, owner, batchID, bookID, requestID).Scan(&id)
+	err := q.QueryRowContext(ctx, `SELECT id FROM batch_factory_v12_production_jobs WHERE owner_username=? AND batch_id=? AND book_id=? AND request_id=?`, owner, batchID, bookID, requestID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProductionJob{}, ErrNotFound
 	}
@@ -39,7 +39,7 @@ func findProductionJob(ctx context.Context, q productionQueryer, owner, batchID,
 func loadProductionJob(ctx context.Context, q productionQueryer, owner, id string) (ProductionJob, error) {
 	var value ProductionJob
 	var state string
-	err := q.QueryRowContext(ctx, `SELECT id,batch_id,book_id,request_id,director_revision_id,status,created_at,updated_at FROM batch_factory_v11_production_jobs WHERE id=? AND owner_username=?`, id, owner).Scan(
+	err := q.QueryRowContext(ctx, `SELECT id,batch_id,book_id,request_id,director_revision_id,status,created_at,updated_at FROM batch_factory_v12_production_jobs WHERE id=? AND owner_username=?`, id, owner).Scan(
 		&value.ID, &value.BatchID, &value.BookID, &value.RequestID, &value.DirectorRevisionID, &state, &value.CreatedAt, &value.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -51,7 +51,7 @@ func loadProductionJob(ctx context.Context, q productionQueryer, owner, id strin
 	value.Owner = owner
 	value.Status = ProductionState(state)
 	value.Tasks = []ProductionTask{}
-	rows, err := q.QueryContext(ctx, `SELECT id,video_id,COALESCE(opening_variant_index,0),COALESCE(compilation_id,''),COALESCE(compilation_segment_key,''),provider,status,attempt,final_prompt_hash,compiled_prompt,COALESCE(compile_trace_json,'null'),COALESCE(reference_image_urls,'[]'),COALESCE(downgraded_asset_ids,'[]'),target_duration_seconds,requested_duration_seconds,actual_duration_seconds,COALESCE(provider_task_id,''),COALESCE(media_url,''),COALESCE(error_message,''),created_at,updated_at FROM batch_factory_v11_production_tasks task WHERE job_id=? AND owner_username=? AND NOT EXISTS (SELECT 1 FROM batch_factory_v11_hidden_production_tasks hidden WHERE hidden.task_id=task.id AND hidden.owner_username=task.owner_username) ORDER BY created_at,id`, id, owner)
+	rows, err := q.QueryContext(ctx, `SELECT id,video_id,COALESCE(opening_variant_index,0),COALESCE(compilation_id,''),COALESCE(compilation_segment_key,''),provider,status,attempt,final_prompt_hash,compiled_prompt,COALESCE(compile_trace_json,'null'),COALESCE(reference_image_urls,'[]'),COALESCE(downgraded_asset_ids,'[]'),target_duration_seconds,requested_duration_seconds,actual_duration_seconds,COALESCE(provider_task_id,''),COALESCE(media_url,''),COALESCE(error_message,''),created_at,updated_at FROM batch_factory_v12_production_tasks task WHERE job_id=? AND owner_username=? AND NOT EXISTS (SELECT 1 FROM batch_factory_v12_hidden_production_tasks hidden WHERE hidden.task_id=task.id AND hidden.owner_username=task.owner_username) ORDER BY created_at,id`, id, owner)
 	if err != nil {
 		return ProductionJob{}, err
 	}
@@ -101,12 +101,22 @@ func (s *MySQLStore) CreateProductionJob(ctx context.Context, value ProductionJo
 	}
 	now := time.Now().UTC()
 	value.ID = jobID
+	for index := range value.Tasks {
+		task := &value.Tasks[index]
+		var latestAttempt int
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(attempt),0) FROM batch_factory_v12_production_tasks WHERE owner_username=? AND video_id=? AND opening_variant_index=?`, value.Owner, task.VideoID, task.OpeningVariantIndex).Scan(&latestAttempt); err != nil {
+			return ProductionJob{}, err
+		}
+		task.Attempt = latestAttempt + 1
+	}
+	for index := range value.Tasks {
+		value.Tasks[index].Status = normalizeProductionState(value.Tasks[index].Status)
+	}
 	value.Status = productionJobState(value.Tasks)
 	value.CreatedAt, value.UpdatedAt = now, now
-	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_production_jobs(id,owner_username,batch_id,book_id,request_id,director_revision_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, value.BookID, value.RequestID, value.DirectorRevisionID, value.Status, now, now)
+	_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_production_jobs(id,owner_username,batch_id,book_id,request_id,director_revision_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)`, value.ID, value.Owner, value.BatchID, value.BookID, value.RequestID, value.DirectorRevisionID, value.Status, now, now)
 	if err != nil {
-		var duplicate *mysql.MySQLError
-		if errors.As(err, &duplicate) && duplicate.Number == 1062 {
+		if isProductionRequestDuplicate(err) {
 			_ = tx.Rollback()
 			return s.FindProductionJob(ctx, value.Owner, value.BatchID, value.BookID, value.RequestID)
 		}
@@ -137,7 +147,7 @@ func (s *MySQLStore) CreateProductionJob(ctx context.Context, value ProductionJo
 			}
 			compileTrace = string(encoded)
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_production_tasks(id,job_id,owner_username,video_id,opening_variant_index,compilation_id,compilation_segment_key,provider,attempt,final_prompt_hash,compiled_prompt,compile_trace_json,reference_image_urls,downgraded_asset_ids,target_duration_seconds,requested_duration_seconds,actual_duration_seconds,provider_task_id,media_url,status,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, task.ID, value.ID, value.Owner, task.VideoID, task.OpeningVariantIndex, nullableString(task.CompilationID), nullableString(task.CompilationSegmentKey), nullableString(task.Provider), task.Attempt, task.FinalPromptHash, task.CompiledPrompt, compileTrace, string(references), string(downgraded), task.TargetDurationSeconds, task.RequestedDurationSeconds, task.ActualDurationSeconds, nullableString(task.ProviderTaskID), nullableString(task.MediaURL), task.Status, nullableString(task.ErrorMessage), now, now); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_production_tasks(id,job_id,owner_username,video_id,opening_variant_index,compilation_id,compilation_segment_key,provider,attempt,final_prompt_hash,compiled_prompt,compile_trace_json,reference_image_urls,downgraded_asset_ids,target_duration_seconds,requested_duration_seconds,actual_duration_seconds,provider_task_id,media_url,status,error_message,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, task.ID, value.ID, value.Owner, task.VideoID, task.OpeningVariantIndex, nullableString(task.CompilationID), nullableString(task.CompilationSegmentKey), nullableString(task.Provider), task.Attempt, task.FinalPromptHash, task.CompiledPrompt, compileTrace, string(references), string(downgraded), task.TargetDurationSeconds, task.RequestedDurationSeconds, task.ActualDurationSeconds, nullableString(task.ProviderTaskID), nullableString(task.MediaURL), task.Status, nullableString(task.ErrorMessage), now, now); err != nil {
 			return ProductionJob{}, err
 		}
 		if err := insertProductionEvent(ctx, tx, value.ID, task.ID, value.Owner, "created", "", string(task.Status), ""); err != nil {
@@ -153,6 +163,11 @@ func (s *MySQLStore) CreateProductionJob(ctx context.Context, value ProductionJo
 	return loadProductionJob(ctx, s.db, value.Owner, value.ID)
 }
 
+func isProductionRequestDuplicate(err error) bool {
+	var duplicate *mysql.MySQLError
+	return errors.As(err, &duplicate) && duplicate.Number == 1062 && strings.Contains(duplicate.Message, "uq_bfv11_production_request")
+}
+
 func (s *MySQLStore) UpdateProductionTask(ctx context.Context, owner, jobID, taskID string, task ProductionTask) (ProductionJob, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -160,7 +175,7 @@ func (s *MySQLStore) UpdateProductionTask(ctx context.Context, owner, jobID, tas
 	}
 	defer tx.Rollback()
 	var prior string
-	err = tx.QueryRowContext(ctx, `SELECT status FROM batch_factory_v11_production_tasks WHERE id=? AND job_id=? AND owner_username=? FOR UPDATE`, taskID, jobID, owner).Scan(&prior)
+	err = tx.QueryRowContext(ctx, `SELECT status FROM batch_factory_v12_production_tasks WHERE id=? AND job_id=? AND owner_username=? FOR UPDATE`, taskID, jobID, owner).Scan(&prior)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ProductionJob{}, ErrNotFound
 	}
@@ -169,10 +184,10 @@ func (s *MySQLStore) UpdateProductionTask(ctx context.Context, owner, jobID, tas
 	}
 	task.Status = normalizeProductionState(task.Status)
 	now := time.Now().UTC()
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_production_tasks SET requested_duration_seconds=?,actual_duration_seconds=?,provider_task_id=?,media_url=?,status=?,error_message=?,updated_at=? WHERE id=? AND job_id=? AND owner_username=?`, task.RequestedDurationSeconds, task.ActualDurationSeconds, nullableString(task.ProviderTaskID), nullableString(task.MediaURL), task.Status, nullableString(productionError(errors.New(task.ErrorMessage))), now, taskID, jobID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_production_tasks SET requested_duration_seconds=?,actual_duration_seconds=?,provider_task_id=?,media_url=?,status=?,error_message=?,updated_at=? WHERE id=? AND job_id=? AND owner_username=?`, task.RequestedDurationSeconds, task.ActualDurationSeconds, nullableString(task.ProviderTaskID), nullableString(task.MediaURL), task.Status, nullableString(productionError(errors.New(task.ErrorMessage))), now, taskID, jobID, owner); err != nil {
 		return ProductionJob{}, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT status FROM batch_factory_v11_production_tasks WHERE job_id=? AND owner_username=? FOR UPDATE`, jobID, owner)
+	rows, err := tx.QueryContext(ctx, `SELECT status FROM batch_factory_v12_production_tasks WHERE job_id=? AND owner_username=? FOR UPDATE`, jobID, owner)
 	if err != nil {
 		return ProductionJob{}, err
 	}
@@ -194,7 +209,7 @@ func (s *MySQLStore) UpdateProductionTask(ctx context.Context, owner, jobID, tas
 		return ProductionJob{}, ErrNotFound
 	}
 	jobState := productionJobState(states)
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v11_production_jobs SET status=?,updated_at=? WHERE id=? AND owner_username=?`, jobState, now, jobID, owner); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_production_jobs SET status=?,updated_at=? WHERE id=? AND owner_username=?`, jobState, now, jobID, owner); err != nil {
 		return ProductionJob{}, err
 	}
 	if err := insertProductionEvent(ctx, tx, jobID, taskID, owner, "state_changed", prior, string(task.Status), productionError(errors.New(task.ErrorMessage))); err != nil {
@@ -213,7 +228,7 @@ func (s *MySQLStore) HideProductionTask(ctx context.Context, owner, batchID, boo
 	}
 	defer tx.Rollback()
 	var status, mediaURL string
-	err = tx.QueryRowContext(ctx, `SELECT task.status,COALESCE(task.media_url,'') FROM batch_factory_v11_production_tasks task JOIN batch_factory_v11_production_jobs job ON job.id=task.job_id WHERE task.id=? AND task.owner_username=? AND job.batch_id=? AND job.book_id=? AND task.video_id=? FOR UPDATE`, taskID, owner, batchID, bookID, videoID).Scan(&status, &mediaURL)
+	err = tx.QueryRowContext(ctx, `SELECT task.status,COALESCE(task.media_url,'') FROM batch_factory_v12_production_tasks task JOIN batch_factory_v12_production_jobs job ON job.id=task.job_id WHERE task.id=? AND task.owner_username=? AND job.batch_id=? AND job.book_id=? AND task.video_id=? FOR UPDATE`, taskID, owner, batchID, bookID, videoID).Scan(&status, &mediaURL)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -223,14 +238,14 @@ func (s *MySQLStore) HideProductionTask(ctx context.Context, owner, batchID, boo
 	if ProductionState(status) != ProductionSucceeded || strings.TrimSpace(mediaURL) == "" {
 		return ErrConflict
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO batch_factory_v11_hidden_production_tasks(task_id,owner_username,batch_id,book_id,video_id,deleted_at) VALUES(?,?,?,?,?,?)`, taskID, owner, batchID, bookID, videoID, time.Now().UTC()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT IGNORE INTO batch_factory_v12_hidden_production_tasks(task_id,owner_username,batch_id,book_id,video_id,deleted_at) VALUES(?,?,?,?,?,?)`, taskID, owner, batchID, bookID, videoID, time.Now().UTC()); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
 func (s *MySQLStore) ListProductionJobs(ctx context.Context, owner, batchID string) ([]ProductionJob, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id FROM batch_factory_v11_production_jobs WHERE owner_username=? AND batch_id=? ORDER BY created_at,id`, owner, batchID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM batch_factory_v12_production_jobs WHERE owner_username=? AND batch_id=? ORDER BY created_at,id`, owner, batchID)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +273,7 @@ func insertProductionEvent(ctx context.Context, tx *sql.Tx, jobID, taskID, owner
 	if strings.TrimSpace(taskID) != "" {
 		task = taskID
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v11_production_events(job_id,task_id,owner_username,event_type,from_state,to_state,message,created_at) VALUES(?,?,?,?,?,?,?,?)`, jobID, task, owner, eventType, nullableString(fromState), nullableString(toState), nullableString(productionError(errors.New(message))), time.Now().UTC()); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_production_events(job_id,task_id,owner_username,event_type,from_state,to_state,message,created_at) VALUES(?,?,?,?,?,?,?,?)`, jobID, task, owner, eventType, nullableString(fromState), nullableString(toState), nullableString(productionError(errors.New(message))), time.Now().UTC()); err != nil {
 		return err
 	}
 	return nil

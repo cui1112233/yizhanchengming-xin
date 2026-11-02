@@ -37,11 +37,11 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 
 func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800012 {
-		t.Fatalf("last migration=%v, want 8800012", migrations[len(migrations)-1].Version)
+	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800015 {
+		t.Fatalf("last migration=%v, want 8800015", migrations[len(migrations)-1].Version)
 	}
 	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800012 {
+		if migration.Version >= 8800015 {
 			t.Fatalf("agent migration must be less than new version %d", migration.Version)
 		}
 	}
@@ -49,8 +49,8 @@ func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 
 func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	if len(migrations) != 12 {
-		t.Fatalf("AgentWorkspaceMigrations length=%d, want 12", len(migrations))
+	if len(migrations) != 15 {
+		t.Fatalf("AgentWorkspaceMigrations length=%d, want 15", len(migrations))
 	}
 	if migrations[0].Version != 8800001 || migrations[0].CallbackChecksum != "v88-agent-workspace-foundation-v1" {
 		t.Fatalf("historical migration changed: %+v", migrations[0])
@@ -83,6 +83,9 @@ func TestAgentWorkspaceGroupMigrationIsAppendOnly(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(strings.Join(config.SQL, "\n")), "add column config_json json") {
 		t.Fatalf("missing config_json migration: %v", config.SQL)
+	}
+	if config.Adopt == nil {
+		t.Fatal("node config migration must adopt an already-applied config_json column into the migration ledger")
 	}
 	jobs := migrations[5]
 	if jobs.Version != 8800006 || jobs.CallbackChecksum != "v88-agent-video-jobs-v1" {
@@ -176,7 +179,7 @@ func TestAgentWorkspaceSchemaIncludesScriptShots(t *testing.T) {
 
 func TestAgentWorkspaceBatchFactoryBindingMigrationIsAppendOnlyAndSafe(t *testing.T) {
 	migrations := AgentWorkspaceMigrations()
-	binding := migrations[len(migrations)-1]
+	binding := migrations[len(migrations)-4]
 	if binding.Version != 8800012 || binding.CallbackChecksum != "v88-agent-batch-factory-bindings-v1" {
 		t.Fatalf("batch factory binding migration=%+v", binding)
 	}
@@ -197,5 +200,56 @@ func TestAgentWorkspaceBatchFactoryBindingMigrationIsAppendOnlyAndSafe(t *testin
 		if strings.Contains(schema, forbidden) {
 			t.Fatalf("batch factory binding schema contains forbidden column %q", forbidden)
 		}
+	}
+}
+
+func TestAgentWorkspaceGenerationHistoryIndexMigrationIsAppendOnly(t *testing.T) {
+	migrations := AgentWorkspaceMigrations()
+	history := migrations[len(migrations)-3]
+	if history.Version != 8800013 || history.CallbackChecksum != "v88-agent-generation-history-index-v1" {
+		t.Fatalf("generation history index migration=%+v", history)
+	}
+	schema := strings.ToLower(strings.Join(history.SQL, "\n"))
+	if !strings.Contains(schema, "idx_agent_generation_tasks_owner_history") {
+		t.Fatalf("missing generation history index: %v", history.SQL)
+	}
+	if strings.Contains(schema, "drop ") || strings.Contains(schema, "delete ") {
+		t.Fatalf("generation history index migration must be additive: %v", history.SQL)
+	}
+}
+
+func TestAgentWorkspaceMaterialLibraryMigrationIsAppendOnlyAndStoresReferencesOnly(t *testing.T) {
+	migrations := AgentWorkspaceMigrations()
+	library := migrations[len(migrations)-2]
+	if library.Version != 8800014 || library.CallbackChecksum != "v88-agent-material-library-v1" {
+		t.Fatalf("material library migration=%+v", library)
+	}
+	schema := strings.ToLower(strings.Join(library.SQL, "\n"))
+	for _, clause := range []string{
+		"create table if not exists agent_library_folders",
+		"create table if not exists agent_library_items",
+		"unique key uq_agent_library_items_owner_folder_source (owner_username, folder_id, source_project_id, source_asset_id)",
+		"idx_agent_library_items_owner_folder_updated",
+	} {
+		if !strings.Contains(schema, clause) {
+			t.Fatalf("missing material library schema clause %q: %v", clause, library.SQL)
+		}
+	}
+	for _, forbidden := range []string{"object_key", "media_bytes", "credential"} {
+		if strings.Contains(schema, forbidden) {
+			t.Fatalf("material library schema contains forbidden column %q", forbidden)
+		}
+	}
+}
+
+func TestAgentWorkspaceProjectTypeMigrationIsAppendOnly(t *testing.T) {
+	migrations := AgentWorkspaceMigrations()
+	typeMigration := migrations[len(migrations)-1]
+	if typeMigration.Version != 8800015 || typeMigration.CallbackChecksum != "v88-agent-project-type-v1" {
+		t.Fatalf("project type migration=%+v", typeMigration)
+	}
+	schema := strings.ToLower(strings.Join(typeMigration.SQL, "\n"))
+	if !strings.Contains(schema, "add column project_type") || strings.Contains(schema, "drop ") || strings.Contains(schema, "delete ") {
+		t.Fatalf("project type migration must be additive: %v", typeMigration.SQL)
 	}
 }

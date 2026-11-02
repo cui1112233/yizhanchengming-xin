@@ -5,7 +5,7 @@ function selectedLayer(constraints, category) {
   const enabledCategories = Array.isArray(constraints?.enabledCategories)
     ? new Set(constraints.enabledCategories)
     : DEFAULT_ENABLED_CATEGORIES;
-  const enabled = constraints?.enabled !== false && enabledCategories.has(category);
+  const enabled = enabledCategories.has(category);
   if (!enabled) return null;
   return (Array.isArray(constraints?.selections) ? constraints.selections : [])
     .find(item => item?.constraintCategory === category) || null;
@@ -21,7 +21,6 @@ export function buildBatchFactoryH3Constraints(constraints) {
   const restriction = selectedLayer(constraints, 'restriction');
   const negative = selectedLayer(constraints, 'negative');
   const smartUnified = prefix?.presetId === SMART_UNIFIED_PREFIX_PRESET_ID;
-  const enabled = constraints?.enabled !== false;
   return {
     prefix_text: smartUnified ? '' : text(prefix?.body),
     quality_text: text(quality?.body),
@@ -29,7 +28,7 @@ export function buildBatchFactoryH3Constraints(constraints) {
     negative_text: text(negative?.body),
     switches: {
       smart_unified: smartUnified,
-      base_setup: enabled && constraints?.baseSetup?.enabled !== false,
+      base_setup: constraints?.baseSetup?.enabled !== false,
       prefix: Boolean(prefix && !smartUnified && text(prefix?.body)),
       quality: Boolean(quality && text(quality?.body)),
       visual_restriction: Boolean(restriction && text(restriction?.body)),

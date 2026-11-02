@@ -12,15 +12,14 @@ test('centered cylinder item keeps full size and brightness', () => {
   });
 });
 
-test('distant cylinder item is clamped to readable edge values', () => {
-  assert.deepEqual(cylinderVisualState(10), {
-    rotateX: -48,
-    translateZ: -74.4,
-    scale: 0.78,
-    opacity: 0.18,
-    brightness: 0.52
-  });
-  assert.equal(cylinderVisualState(-10).rotateX, 48);
+test('distant cylinder item keeps a readable presence at the edge', () => {
+  const edge = cylinderVisualState(10);
+  assert.equal(edge.rotateX, -30);
+  assert.equal(edge.translateZ, -29.6);
+  assert.equal(edge.scale, 0.9);
+  assert.ok(edge.opacity >= 0.64);
+  assert.ok(edge.brightness >= 0.84);
+  assert.equal(cylinderVisualState(-10).rotateX, 30);
 });
 
 test('keyboard selection moves one item and stops at list boundaries', () => {

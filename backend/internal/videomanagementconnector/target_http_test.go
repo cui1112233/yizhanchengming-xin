@@ -6,9 +6,31 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestTargetHTTPServiceUsesConfiguredProxy(t *testing.T) {
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.String() != "http://two.121w.com/tttadmin/login.php" {
+			t.Fatalf("proxy endpoint = %s", r.URL.String())
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer proxy.Close()
+	previous := os.Getenv("QIANTIE_VIDEO_CONNECTOR_PROXY")
+	t.Setenv("QIANTIE_VIDEO_CONNECTOR_PROXY", proxy.URL)
+	defer os.Setenv("QIANTIE_VIDEO_CONNECTOR_PROXY", previous)
+	response, err := (&TargetHTTPService{BaseURL: "http://two.121w.com"}).client().Get("http://two.121w.com/tttadmin/login.php")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", response.StatusCode)
+	}
+}
 
 func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -12,7 +12,10 @@ import (
 )
 
 func TestUpstreamFetcherFetchAndProcessPreservesRawAndProcessesText(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Has("max_txt") {
+			t.Fatalf("full-text fetch must not send processing limit: %s", r.URL.RawQuery)
+		}
 		_, _ = w.Write([]byte(`{"code":200,"msg":"成功","data":"春风又绿江南岸","bookinfo":{"category":"男频"}}`))
 	}))
 	defer server.Close()
@@ -108,6 +111,27 @@ func TestBookInfoUnmarshalAcceptsPersistedStringThemeAndLabels(t *testing.T) {
 	}
 	if info.Themes != "言情、现实情感" || info.Labels != "现代" {
 		t.Fatalf("persisted book info = %#v", info)
+	}
+}
+
+func TestBookInfoJSONRoundTripPreservesFetchedMetadata(t *testing.T) {
+	want := BookInfo{
+		Category:  "女频",
+		Genre:     "现实情感",
+		WorkTitle: "鼓励式老公，却把行动都给了闺蜜",
+		Themes:    "言情、婚恋",
+		Labels:    "现代",
+	}
+	raw, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got BookInfo
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("round trip = %#v, want %#v; json=%s", got, want, raw)
 	}
 }
 

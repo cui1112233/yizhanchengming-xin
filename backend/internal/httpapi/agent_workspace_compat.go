@@ -73,7 +73,13 @@ func RegisterAgentWorkspaceCompat(root *http.ServeMux, middleware BridgeAuth, st
 	})
 	handle("POST /api/agent/tasks", func(w http.ResponseWriter, req *http.Request, owner string) {
 		now := clock().UTC()
-		project := agentworkspace.Project{ID: newAgentID("agent"), Title: "新项目", TitleMode: "automatic", CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
+		var body struct {
+			ProjectType string `json:"projectType"`
+		}
+		if req.Body != nil {
+			_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 8<<10)).Decode(&body)
+		}
+		project := agentworkspace.Project{ID: newAgentID("agent"), Title: "新项目", TitleMode: "automatic", ProjectType: agentworkspace.NormalizeProjectType(body.ProjectType), CreatedAt: now, UpdatedAt: now, Canvas: agentworkspace.EmptyCanvas()}
 		if err := store.CreateProject(req.Context(), owner, project); err != nil {
 			writeAgentStoreError(w, err)
 			return

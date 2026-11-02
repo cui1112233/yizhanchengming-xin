@@ -31,7 +31,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	service := &videomanagementconnector.TargetHTTPService{BaseURL: env("QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL", "http://two.121w.com")}
+	service := &videomanagementconnector.TargetHTTPService{BaseURL: env("QIANTIE_VIDEO_CONNECTOR_TARGET_BASE_URL", "https://two.121w.com")}
 	server := videomanagementconnector.NewServer(videomanagementconnector.Config{InternalToken: token}, service, store)
 	listen := env("QIANTIE_VIDEO_CONNECTOR_LISTEN_ADDR", ":8791")
 	httpServer := &http.Server{Addr: listen, Handler: server.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 120 * time.Second, WriteTimeout: 120 * time.Second}

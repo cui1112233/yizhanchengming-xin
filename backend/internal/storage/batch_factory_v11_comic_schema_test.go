@@ -34,3 +34,26 @@ func TestV11ComicPageMigrationIsAppendOnlyAfterBookAssetOverrides(t *testing.T) 
 		t.Fatalf("comic snapshot migration=%+v", snapshot)
 	}
 }
+
+func TestV11ComicSourceSegmentMigrationIsAppendOnly(t *testing.T) {
+	var migration Migration
+	for _, candidate := range V11Migrations() {
+		if candidate.Version == 1100032 {
+			migration = candidate
+			break
+		}
+	}
+	if migration.Version != 1100032 || migration.CallbackChecksum != "batch-factory-v11-comic-source-segments-v1" {
+		t.Fatalf("comic source migration=%+v", migration)
+	}
+	ddl := strings.ToLower(strings.Join(migration.SQL, "\n"))
+	for _, fragment := range []string{
+		"batch_factory_v11_comic_source_segments", "video_id", "start_offset", "end_offset",
+		"source_text", "character_count", "source_digest", "prompt_stale", "media_stale",
+		"revision", "foreign key (video_id)", "idx_bfv11_comic_source_book",
+	} {
+		if !strings.Contains(ddl, fragment) {
+			t.Fatalf("comic source migration missing %q", fragment)
+		}
+	}
+}

@@ -15,7 +15,7 @@ func TestMySQLBatchOwnershipCheckIsScopedAndLightweight(t *testing.T) {
 	}
 	defer db.Close()
 	store := NewMySQLStore(db)
-	query := `SELECT 1 FROM batch_factory_v11_batches WHERE id=\? AND owner_username=\?`
+	query := `SELECT 1 FROM batch_factory_v12_batches WHERE id=\? AND owner_username=\?`
 
 	mock.ExpectQuery(query).WithArgs("batch-1", "alice").WillReturnRows(sqlmock.NewRows([]string{"1"}).AddRow(1))
 	if err := store.EnsureBatchOwnership(context.Background(), "alice", "batch-1"); err != nil {

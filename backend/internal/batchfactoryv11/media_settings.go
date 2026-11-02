@@ -14,8 +14,9 @@ func EffectiveVideoAspectRatio(values SettingsPatch) string {
 	return "9:16"
 }
 
-// EffectiveImageAspectRatio is only for reference-image and asset-image work.
-// It intentionally permits square images without changing the video contract.
+// EffectiveImageAspectRatio is shared by all still-image work, including
+// reference images, asset images, and complete comic pages. It intentionally
+// permits square images without changing the video contract.
 func EffectiveImageAspectRatio(values SettingsPatch) string {
 	if aspect := rawString(values, "imageAspectRatio", ""); aspect == "9:16" || aspect == "16:9" || aspect == "1:1" {
 		return aspect

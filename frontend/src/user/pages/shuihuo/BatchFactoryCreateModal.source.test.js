@@ -32,10 +32,13 @@ test('offers immediate and Beijing-time automation with a frozen concurrency lim
   assert.match(source, /只生成分镜/);
   assert.match(source, /生成视频不提交/);
   assert.match(source, /自动启动时间（北京时间 UTC\+8）/);
-  assert.match(source, /到点启动自动生产；生成、合成与上传按后续流程继续，不会在此时间直接提交。/);
+  assert.match(source, /到设定时间才开始生产；生成、合成与上传按后续流程继续。/);
   assert.match(source, /全自动生成并提交（成片完成后上传）/);
   assert.match(source, /presetId: automationPresetID/);
   assert.match(source, /runMode: automationRunMode/);
+  assert.match(source, /scheduleMode: scheduledRun \? automationScheduleMode/);
+  assert.match(source, /定时执行/);
+  assert.match(source, /定时提交/);
   assert.match(source, /automationConcurrency/);
   assert.match(source, /同时处理书籍/);
   assert.match(source, /parseBeijingDatetimeLocal/);
@@ -73,6 +76,15 @@ test('lets a first-time batch owner switch production mode beside the unified ti
   assert.doesNotMatch(source, /key: 'media', label: '画面与视频'/);
 });
 
+test('shows comic analysis characters separately from the 4000-character capture limit', () => {
+  assert.match(source, /initialBatchSettings\.productionMode === 'comic'/);
+  assert.match(source, /生产模式<Select value=\{initialBatchSettings\.productionMode \|\| 'video'\}/);
+  assert.match(source, /漫画分析/);
+  assert.match(source, /comicAnalysisCharacters/);
+  assert.match(source, /contentCaptureCharacters/);
+  assert.match(source, /comicAnalysisCharacters,/);
+});
+
 test('uses the unified button treatment for the new batch toolbar', () => {
   assert.match(source, /className="shuihuo-create-project-modal"/);
   assert.match(stylesheet, /BF_CREATE_BATCH_BUTTONS_BEGIN[\s\S]*shuihuo-create-project-modal[\s\S]*box-shadow/);
@@ -81,7 +93,7 @@ test('uses the unified button treatment for the new batch toolbar', () => {
 test('grouped submit surfaces failed book cities and counts only fetched pending books', () => {
   // I3：失败书城可见——catch 里记录书城名并 console.warn，最终 warning 带出具体书城
   assert.match(source, /const failedPlatforms = \[\]/);
-  assert.match(source, /failedPlatforms\.push\(group\.platformName \|\| group\.platformId\)/);
+  assert.match(source, /failedPlatforms\.push\(platformLabel\)/);
   assert.match(source, /console\.warn\('分组抓取失败', group\.platformId, error\)/);
   assert.match(source, /以下书城抓取失败：\$\{failedPlatforms\.join\('、'\)\}/);
   assert.match(source, /失败的书已在列表中标红，可单独重试/);
@@ -109,7 +121,7 @@ test('offers giant material intake through the resident executor', () => {
 });
 
 test('giant immediate execution opens the same automation-plan dialog as other book cities', () => {
-  const toolbarStart = source.indexOf('{isGiantMaterial\n        ? <>');
+  const toolbarStart = source.search(/\{isGiantMaterial\r?\n        \? <>/);
   const toolbarEnd = source.indexOf('\n      <Button onClick={() => openAutomationDialog(\'scheduled\')}>开始定时</Button>', toolbarStart);
   const giantToolbar = toolbarStart >= 0 && toolbarEnd > toolbarStart ? source.slice(toolbarStart, toolbarEnd) : '';
   assert.match(giantToolbar, /onClick=\{\(\) => openAutomationDialog\('immediate'\)\}/);
@@ -117,7 +129,7 @@ test('giant immediate execution opens the same automation-plan dialog as other b
 });
 
 test('giant creation selects a versioned preset without requiring frozen metadata before dispatching reads', () => {
-	assert.match(source, /giantAutomation:/);
+	assert.match(source, /giantAutomationPlan:/);
 	assert.match(source, /expectedPresetVersion: selectedPreset\.version/);
 	assert.match(source, /automationPresetSnapshot\(automationPresets, automationPresetID\)/);
 	assert.doesNotMatch(source, /saveBatchSettings/);
@@ -132,4 +144,9 @@ test('lets giant batches choose a mutually exclusive original acquisition priori
   assert.match(source, /giantOriginalReadStrategy === 'direct_first'/);
   assert.match(source, /await fetchBookOriginal\(batchId, book\.id\)/);
   assert.match(source, /await createGiantMaterialJob\(/);
+});
+
+test('direct-first keeps a book-city failure visible and makes OCR a manual fallback', () => {
+  assert.match(source, /失败后保留原因，可在工作区手动使用滚屏 OCR。/);
+  assert.doesNotMatch(source, /失败后自动改用滚屏 OCR。/);
 });

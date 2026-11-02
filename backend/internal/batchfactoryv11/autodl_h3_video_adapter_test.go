@@ -10,6 +10,20 @@ import (
 	"testing"
 )
 
+func TestAutoDLH3VideoAdapterUsesConfiguredWorkflowWhenNoReferenceImages(t *testing.T) {
+	const workflowID = "saved_workflow_from_catalog"
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_, _ = w.Write([]byte(`{"id":"task-1"}`))
+	}))
+	defer server.Close()
+	adapter := &AutoDLH3VideoAdapter{CreateURL: server.URL + "/{workflow}", TasksURL: server.URL + "/result/{id}", APIKey: "fake-key", Model: AutoDLH3Model, WorkflowID: workflowID, ValidateURL: func(raw string) (*url.URL, error) { return url.Parse(raw) }}
+	_, err := adapter.Submit(context.Background(), FrozenVideoModel{ID: AutoDLH3Model, MaxDuration: 15}, FinalPrompt{CompiledPrompt: "prompt"})
+	if err != nil { t.Fatal(err) }
+	if !strings.Contains(gotPath, workflowID) { t.Fatalf("workflow path=%q", gotPath) }
+}
+
 func TestAutoDLH3VideoAdapterUsesTextWorkflowWhenNoReferenceImages(t *testing.T) {
 	var received map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

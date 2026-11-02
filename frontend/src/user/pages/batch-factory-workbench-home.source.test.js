@@ -13,3 +13,14 @@ test('styles the canonical batch home without rendering the legacy readiness str
   assert.match(css, /\.batch-factory-workbench-grid/);
   assert.doesNotMatch(page, /shuihuo-readiness-strip/);
 });
+
+test('refreshes visible batch home periodically and preserves the last list on request errors', () => {
+  assert.match(page, /setInterval\([^\n]*15000/);
+  assert.match(page, /visibilitychange/);
+  assert.match(page, /document\.hidden/);
+  const catchStart = page.indexOf('} catch (requestError) {');
+  const catchEnd = page.indexOf('} finally {', catchStart);
+  const catchBlock = page.slice(catchStart, catchEnd);
+  assert.match(catchBlock, /setError\(reason\)/);
+  assert.doesNotMatch(catchBlock, /setBatches\(\[\]\)/);
+});

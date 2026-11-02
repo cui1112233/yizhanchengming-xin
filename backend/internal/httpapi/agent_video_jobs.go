@@ -12,10 +12,12 @@ import (
 	"qiantie/backend/internal/agentworkspace"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
+	"qiantie/backend/internal/novelfetchworkshop"
 )
 
 type agentVideoCoordinator struct {
 	projects   agentworkspace.Store
+	catalog    novelfetchworkshop.Store
 	assets     agentworkspace.AssetStore
 	references agentworkspace.ReferenceURLProvider
 	videos     *scriptVideoService
@@ -46,6 +48,7 @@ type agentVideoJobRequest struct {
 
 var errUnsupportedVideoReference = errors.New("unsupported video reference")
 var errAgentVideoSettings = errors.New("invalid agent video settings")
+var errComicVideoGeneration = errors.New("漫画作品不支持视频生成")
 
 const agentVideoIngestLease = 5 * time.Minute
 
@@ -217,6 +220,13 @@ func decodeAgentVideoJobRequest(w http.ResponseWriter, req *http.Request, target
 }
 
 func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID string, request agentVideoJobRequest) (agentworkspace.VideoJob, error) {
+	project, err := s.projects.Project(ctx, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
+	if agentworkspace.NormalizeProjectType(project.ProjectType) == "comic" {
+		return agentworkspace.VideoJob{}, errComicVideoGeneration
+	}
 	canvas, err := s.projects.Canvas(ctx, owner, strings.TrimSpace(projectID))
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
@@ -235,6 +245,15 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
 	}
+	capability, err := resolveAgentCanvasInputCapability(ctx, s.catalog, owner, "video", normalized.Provider, normalized.ModelID)
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
+	resolvedInputs, err := agentResolvedCanvasInputSnapshotWithCapability(canvas, node.ID, normalized.Prompt, normalized.ReferenceAssetIDs, capability)
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
+	settings["resolvedInputs"] = resolvedInputs
 	if existing, existingErr := s.videoJobByIdempotency(ctx, owner, projectID, request.IdempotencyKey); existingErr == nil {
 		if _, err := s.createGeneration(ctx, owner, existing, ""); err != nil {
 			return existing, err
@@ -279,6 +298,13 @@ func (s *agentVideoCoordinator) submit(ctx context.Context, owner, projectID str
 }
 
 func (s *agentVideoCoordinator) retry(ctx context.Context, owner, projectID, jobID, idempotencyKey string) (agentworkspace.VideoJob, error) {
+	project, err := s.projects.Project(ctx, owner, strings.TrimSpace(projectID))
+	if err != nil {
+		return agentworkspace.VideoJob{}, err
+	}
+	if agentworkspace.NormalizeProjectType(project.ProjectType) == "comic" {
+		return agentworkspace.VideoJob{}, errComicVideoGeneration
+	}
 	original, err := s.projects.VideoJob(ctx, owner, strings.TrimSpace(projectID), strings.TrimSpace(jobID))
 	if err != nil {
 		return agentworkspace.VideoJob{}, err
@@ -830,6 +856,8 @@ func valueBool(value any) bool {
 }
 func writeAgentVideoJobError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, errComicVideoGeneration):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": errComicVideoGeneration.Error()})
 	case errors.Is(err, errAgentVideoSettings):
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": strings.TrimPrefix(err.Error(), errAgentVideoSettings.Error()+": ")})
 	case errors.Is(err, agentworkspace.ErrVideoJobNotFound):

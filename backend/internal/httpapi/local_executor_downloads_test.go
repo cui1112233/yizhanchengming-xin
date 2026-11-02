@@ -11,15 +11,12 @@ import (
 
 func TestLocalExecutorDownloadRoutesMirrorLegacySemantics(t *testing.T) {
 	dir := t.TempDir()
-	installer := filepath.Join(dir, "qiantie-executor-v88-0.1.0-win-x64.exe")
-	if err := os.WriteFile(installer, []byte("MZ-test"), 0o600); err != nil {
+	windowsInstaller := filepath.Join(dir, "一战晟铭执行器-安装版.exe")
+	if err := os.WriteFile(windowsInstaller, []byte("PK-test"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	manifest := filepath.Join(dir, "local-executor-updates", "stable", "manifest.json")
-	if err := os.MkdirAll(filepath.Dir(manifest), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(manifest, []byte(`{"version":"1.0.3"}`), 0o600); err != nil {
+	macInstaller := filepath.Join(dir, "doubao-relay_1.0.0_universal.dmg")
+	if err := os.WriteFile(macInstaller, []byte("dmg-test"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -32,14 +29,14 @@ func TestLocalExecutorDownloadRoutesMirrorLegacySemantics(t *testing.T) {
 		return rec
 	}
 
-	if rec := request("/downloads/local-executor/manifest.json"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "qiantie-executor-v88-0.1.0-win-x64.exe") || !strings.Contains(rec.Body.String(), `"runtime":"go"`) {
+	if rec := request("/downloads/local-executor/manifest.json"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "一战晟铭执行器-安装版.exe") || !strings.Contains(rec.Body.String(), `"windows":"1.2.0"`) || !strings.Contains(rec.Body.String(), `"macos":"1.0.0"`) || strings.Contains(rec.Body.String(), "windows_x64.zip") || !strings.Contains(rec.Body.String(), "doubao-relay_1.0.0_universal.dmg") || !strings.Contains(rec.Body.String(), `"runtime":"doubao_relay"`) {
 		t.Fatalf("manifest status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if rec := request("/downloads/local-executor/qiantie-executor-v88-0.1.0-win-x64.exe"); rec.Code != http.StatusOK || rec.Body.String() != "MZ-test" {
-		t.Fatalf("installer status=%d body=%q", rec.Code, rec.Body.String())
+	if rec := request("/downloads/local-executor/一战晟铭执行器-安装版.exe"); rec.Code != http.StatusOK || rec.Body.String() != "PK-test" || rec.Header().Get("Content-Type") != "application/vnd.microsoft.portable-executable" {
+		t.Fatalf("windows installer status=%d body=%q", rec.Code, rec.Body.String())
 	}
-	if rec := request("/downloads/local-executor/updates/stable/manifest.json"); rec.Code != http.StatusOK || rec.Body.String() != `{"version":"1.0.3"}` {
-		t.Fatalf("update manifest status=%d body=%s", rec.Code, rec.Body.String())
+	if rec := request("/downloads/local-executor/doubao-relay_1.0.0_universal.dmg"); rec.Code != http.StatusOK || rec.Body.String() != "dmg-test" {
+		t.Fatalf("mac installer status=%d body=%q", rec.Code, rec.Body.String())
 	}
 	if rec := request("/downloads/local-executor/missing.exe"); rec.Code != http.StatusNotFound {
 		t.Fatalf("missing status=%d body=%s", rec.Code, rec.Body.String())
@@ -68,7 +65,7 @@ func TestLocalExecutorDownloadMissingInstallerReturns503(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterLocalExecutorDownloadRoutes(mux, t.TempDir())
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://localhost/downloads/local-executor/qiantie-executor-v88-0.1.0-win-x64.exe", nil))
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://localhost/downloads/local-executor/一战晟铭执行器-安装版.exe", nil))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}

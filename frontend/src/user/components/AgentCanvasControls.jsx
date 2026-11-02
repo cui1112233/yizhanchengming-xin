@@ -43,19 +43,19 @@ export function AgentCanvasControls({
       <ControlButton label="适合屏幕" onClick={onFitView}><Maximize2 size={16} /></ControlButton>
       <ControlButton label={hasSelection ? '聚焦选中' : '请先选择节点'} disabled={!hasSelection} onClick={onFocusSelection}><Maximize2 size={16} /></ControlButton>
     </nav>
+    <span className="agent-canvas-tool-divider" />
+      <Tooltip title={conversationOpen ? '收起项目对话' : '打开项目对话'}>
+        <button
+          className={`agent-canvas-conversation-toggle${conversationOpen ? ' is-active' : ''}`}
+          type="button"
+          aria-label={conversationOpen ? '收起项目对话' : '打开项目对话'}
+          aria-pressed={conversationOpen}
+          onClick={onToggleConversation}
+        >
+          <MessageCircle size={18} />
+        </button>
+      </Tooltip>
     </div>
-
-    <Tooltip title={conversationOpen ? '收起项目对话' : '打开项目对话'}>
-      <button
-        className={`agent-canvas-conversation-toggle${conversationOpen ? ' is-active' : ''}`}
-        type="button"
-        aria-label={conversationOpen ? '收起项目对话' : '打开项目对话'}
-        aria-pressed={conversationOpen}
-        onClick={onToggleConversation}
-      >
-        <MessageCircle size={18} />
-      </button>
-    </Tooltip>
 
     <Modal className="agent-canvas-shortcuts-modal" title="画布快捷键" open={shortcutsOpen} footer={null} onCancel={() => setShortcutsOpen(false)}>
       <div className="agent-canvas-shortcuts-list">

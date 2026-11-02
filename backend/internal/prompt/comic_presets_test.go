@@ -19,7 +19,7 @@ func TestEnsureComicPresetsSeedsOnlyMissingRecords(t *testing.T) {
 	}
 	catalog := NewCatalog(path)
 	preset, found, err := catalog.PublishedBody("batch-factory", "batch-comic-page")
-	if err != nil || !found || !strings.Contains(preset.Body, "{{image_aspect_ratio}}") {
+	if err != nil || !found || !strings.Contains(preset.Body, "role_stage") {
 		t.Fatalf("comic page preset was not seeded: %#v, found=%v, err=%v", preset, found, err)
 	}
 	if err := EnsureComicPresets(path); err != nil {
@@ -50,10 +50,10 @@ func TestSystemComicPresetsArePublishedAndUsable(t *testing.T) {
 		{"script-constraint-comic-quality", "漫画画质约束", "script", "", "comic_quality", "{{image_aspect_ratio}}"},
 		{"script-constraint-comic-restriction", "漫画画面限制", "script", "", "comic_restriction", "三格版式"},
 		{"script-constraint-comic-negative", "漫画负面提示词", "script", "", "comic_negative", "成人写实比例"},
-		{"batch-comic-page", "漫画提示词", "batch-factory", "batch.comic-page", "", "本页版式"},
-		{"batch-comic-page-fusion-bw", "剧情漫画融合白框版", "batch-factory", "batch.comic-page", "", "白色外边框"},
-		{"batch-comic-page-light", "轻量分镜版", "batch-factory", "batch.comic-page", "", "轻量"},
-		{"batch-comic-page-premium-strip", "精品商业条漫版", "batch-factory", "batch.comic-page", "", "商业条漫"},
+		{"batch-comic-page", "CM·剧情漫画融合彩色版（默认）", "batch-factory", "batch.comic-page", "", "role_stage"},
+		{"batch-comic-page-fusion-bw", "CM·剧情漫画融合白框版", "batch-factory", "batch.comic-page", "", "本方案只约束「文字 UI」"},
+		{"batch-comic-page-light", "CM·轻量分镜版", "batch-factory", "batch.comic-page", "", "固定八节"},
+		{"batch-comic-page-premium-strip", "CM·精品商业条漫版", "batch-factory", "batch.comic-page", "", "商业条漫"},
 		{"comic-image-derive-default", "图片描述词推导", "batch-factory", "batch.comic-image-derivation", "", "图片模型"},
 	}
 	for _, test := range tests {
@@ -63,6 +63,34 @@ func TestSystemComicPresetsArePublishedAndUsable(t *testing.T) {
 		}
 		if preset.Name != test.name || preset.Slot != test.slot || preset.ConstraintCategory != test.category || !strings.Contains(preset.Body, test.phrase) || strings.Contains(preset.Name, "雪漫画·") {
 			t.Fatalf("%s has the wrong system-preset contract: %#v", test.id, preset)
+		}
+	}
+}
+
+func TestCMComicPagePresetsKeepRecoveredOriginalBodies(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	if err := os.WriteFile(path, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(path)
+	checks := map[string][]string{
+		"batch-comic-page":               {"格数与面积", "角色预设勾选", "腾讯动漫", "17173"},
+		"batch-comic-page-fusion-bw":     {"文字 UI", "画面与插画本身", "角色预设勾选"},
+		"batch-comic-page-light":         {"固定八节", "image_prompt", "角色预设勾选"},
+		"batch-comic-page-premium-strip": {"商业条漫", "image_prompt", "角色预设勾选"},
+	}
+	for id, phrases := range checks {
+		preset, found, err := catalog.PublishedBody("batch-factory", id)
+		if err != nil || !found {
+			t.Fatalf("%s unavailable: found=%v err=%v", id, found, err)
+		}
+		for _, phrase := range phrases {
+			if !strings.Contains(preset.Body, phrase) {
+				t.Fatalf("%s is not the recovered original body; missing %q", id, phrase)
+			}
 		}
 	}
 }
@@ -123,6 +151,42 @@ func TestEnsureComicPresetsPreservesAdministratorPublishedVersions(t *testing.T)
 	}
 	if published != 1 {
 		t.Fatalf("administrator preset published count = %d, want 1", published)
+	}
+}
+
+func TestEnsureComicPresetsUpgradesKnownLegacyComicPageEvenWhenCreatedByAdministrator(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	legacy := `[{
+		"id":"batch-comic-page-light","module":"batch-factory","name":"轻量分镜版","kind":"base","description":"旧版","compatibleBaseIds":[],"version":2,"revision":2,"status":"published","body":"旧的简化页面提示词","protocolLock":{"format":"json","operation":"comic-page","slot":"batch.comic-page"},"createdBy":"admin","publishedBy":"admin"
+	}]`
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	records := readComicPresetRecords(t, path)
+	assertComicPresetVersion(t, records, "batch-comic-page-light", 2, "archived", "轻量分镜版", "旧的简化页面提示词")
+	assertComicPresetVersion(t, records, "batch-comic-page-light", 3, "published", "CM·轻量分镜版", "")
+}
+
+func TestEnsureComicPresetsPreservesAdministratorComicPageV3(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	custom := `[{
+		"id":"batch-comic-page-light","module":"batch-factory","name":"管理员轻量版","kind":"base","description":"自定义","compatibleBaseIds":[],"version":3,"revision":1,"status":"published","body":"管理员自定义页面正文","protocolLock":{"format":"json","operation":"comic-page","slot":"batch.comic-page"},"createdBy":"admin","publishedBy":"admin"
+	}]`
+	if err := os.WriteFile(path, []byte(custom), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	records := readComicPresetRecords(t, path)
+	assertComicPresetVersion(t, records, "batch-comic-page-light", 3, "published", "管理员轻量版", "管理员自定义页面正文")
+	for _, record := range records {
+		if stringValue(record["id"]) == "batch-comic-page-light" && intValue(record["version"]) > 3 {
+			t.Fatalf("administrator V3 was unexpectedly superseded: %#v", record)
+		}
 	}
 }
 
@@ -194,6 +258,45 @@ func TestSystemComicStylePresetsExposeTwentyFivePreviewCards(t *testing.T) {
 		preview, contentType, found := OpenComicStylePreview(item.ID)
 		if !found || contentType != "image/jpeg" || len(preview) < 4 || !bytes.Equal(preview[:2], []byte{0xff, 0xd8}) {
 			t.Fatalf("comic style preview invalid for %q: found=%v type=%q bytes=%d", item.ID, found, contentType, len(preview))
+		}
+	}
+}
+
+func TestSystemComicReferenceScenesExposeThirteenRealImagesAndHiddenPrompts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	if err := os.WriteFile(path, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(path)
+	items, err := catalog.Published("batch-factory")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenes := make([]PublicPreset, 0, 13)
+	for _, item := range items {
+		if item.Slot != nil && *item.Slot == "batch.comic-reference-scene" {
+			scenes = append(scenes, item)
+		}
+	}
+	if len(scenes) != 13 {
+		t.Fatalf("comic reference scene count = %d, want 13", len(scenes))
+	}
+	seen := map[string]bool{}
+	for _, item := range scenes {
+		if seen[item.ID] || item.Name == "" || item.PreviewURL == "" {
+			t.Fatalf("comic reference scene metadata invalid: %#v", item)
+		}
+		seen[item.ID] = true
+		preset, found, err := catalog.PublishedBody("batch-factory", item.ID)
+		if err != nil || !found || !strings.Contains(preset.Body, "sharp anime lineart") {
+			t.Fatalf("comic reference scene hidden prompt unavailable for %q: %#v found=%v err=%v", item.ID, preset, found, err)
+		}
+		preview, contentType, found := OpenComicReferenceScene(item.ID)
+		if !found || contentType != "image/jpeg" || len(preview) < 4 || !bytes.Equal(preview[:2], []byte{0xff, 0xd8}) {
+			t.Fatalf("comic reference scene image invalid for %q: found=%v type=%q bytes=%d", item.ID, found, contentType, len(preview))
 		}
 	}
 }

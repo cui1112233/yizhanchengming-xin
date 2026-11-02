@@ -16,8 +16,10 @@ func scriptVideoModelSpec(modelKey string) (scriptVideoModel, bool) {
 		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderAutoDLH3, AcceptsReferenceImages: true, PublicTaskPrefix: "h3:"}, true
 	case "seedance-2-0-official":
 		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderYFAISeedance, AcceptsReferenceImages: true, PublicTaskPrefix: "yfai:"}, true
+	case "fanke-video-api":
+		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderYFAISeedance, AcceptsReferenceImages: true, PublicTaskPrefix: "yfai:fanke-video-api:"}, true
 	case "local-doubao-executor-video":
-		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderDoubaoLocal, PublicTaskPrefix: localScriptVideoTaskPrefix}, true
+		return scriptVideoModel{Provider: batchfactoryv11.VideoProviderDoubaoLocal, AcceptsReferenceImages: true, PublicTaskPrefix: localScriptVideoTaskPrefix}, true
 	default:
 		return scriptVideoModel{}, false
 	}

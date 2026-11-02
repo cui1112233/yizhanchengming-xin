@@ -42,12 +42,19 @@ func TestSliceThreeExposesReadOnlyEffectiveSettingsAndFinalPrompt(t *testing.T) 
 	}
 }
 
-func TestSliceTwoDoesNotExposeCompilerPreview(t *testing.T) {
+func TestSliceTwoExposesReadOnlyV11CompilerCompatibility(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()
-	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 2, Store: store, Compiler: &batchfactoryv11.PromptCompilerService{Store: store}})
-	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v11/batches/x/books/y/videos/z/final-prompt", nil)
-	if rec.Code != http.StatusNotFound {
+	batch, _ := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "b", Books: []batchfactoryv11.CreateBookInput{{Title: "k", SourceText: "林晚推门进入客厅。"}}})
+	director := &batchfactoryv11.DirectorService{Store: store, Provider: &directorHTTPProvider{output: directorHTTPJSON}}
+	revision, err := director.RunDirector(context.Background(), "alice", batch.ID, batch.Books[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 2, Store: store, Director: director, Compiler: &batchfactoryv11.PromptCompilerService{Store: store}})
+	path := "/api/batch-factory/v11/batches/" + batch.ID + "/books/" + batch.Books[0].ID + "/videos/" + revision.Videos[0].ID + "/final-prompt"
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, path, nil)
+	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }

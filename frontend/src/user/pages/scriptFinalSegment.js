@@ -1,6 +1,6 @@
 // 剧本生成“最终分段”：模型只管输出提示词（画面内容），
 // 程序把「已提取的人物/场景生成的基础设定 + 用户约束设置」注入每个分段卡片，
-// 与小说面板“按秒数分段并合并”的最终组装逻辑一致。
+// 按秒数分段并合并，保证最终镜头时长连续。
 import { getShotCards } from './scriptShotOutput.js';
 import { shouldInjectSmartUnifiedStyle } from './scriptGenerationRules.js';
 
@@ -95,10 +95,12 @@ export function stripBaseSetupSection(text) {
   const lines = String(text).split('\n');
   const out = [];
   let inSetup = false;
+  let plainSetup = false;
   for (const line of lines) {
     const trimmed = line.trim();
-    if (/^【基础设定】/.test(trimmed)) {
+    if (/^(?:【基础设定】|基础设定[：:])/.test(trimmed)) {
       inSetup = true;
+      plainSetup = !/^【/.test(trimmed);
       continue;
     }
     if (inSetup) {
@@ -106,8 +108,12 @@ export function stripBaseSetupSection(text) {
         || /^(?:#{1,6}\s*)?(?:镜头|分镜)\s*[第#]?\s*(?:\d+|[一二三四五六七八九十百千万两]+)/.test(trimmed)
         || /^\[?\d{1,2}:\d{2}\s*[-—~]/.test(trimmed)
         || /^[（(]?\d+\s*[-—~]\s*\d+\s*(?:s|秒)[)）]/.test(trimmed)
-        || trimmed === '';
-      if (boundary) inSetup = false;
+        || /^(?:画面前缀|画质约束|画面约束提示词|视频提示词|画面限制|负面提示词)[：:]/.test(trimmed)
+        || (!plainSetup && trimmed === '');
+      if (boundary) {
+        inSetup = false;
+        plainSetup = false;
+      }
       else continue;
     }
     out.push(line);

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildWorkspaceAssetGroupTree,
   buildWorkspaceGroupTree,
   filterWorkspaceAssets,
   filterWorkspaceExecutions,
@@ -40,6 +41,20 @@ test('素材搜索支持名称类型且侧栏宽度限制在可用范围', () =>
   assert.equal(workspaceDrawerWidth(120), 240);
   assert.equal(workspaceDrawerWidth(620), 460);
   assert.equal(workspaceDrawerWidth(336.4), 336);
+});
+
+test('项目素材按书籍分组并保留未分组素材', () => {
+  const groups = buildWorkspaceAssetGroupTree([
+    { id: 'asset-1', bookId: 'book-1', bookTitle: '第一本书', kind: 'image' },
+    { id: 'asset-2', config: { bookId: 'book-1' }, kind: 'video' },
+    { id: 'asset-3', kind: 'audio' }
+  ], [{ id: 'book:book-2', title: '第二本书' }], [
+    { id: 'node-2', groupId: 'book:book-2', config: { resourceId: 'asset-3' } }
+  ]);
+  assert.deepEqual(groups.map(group => [group.id, group.title, group.children.map(asset => asset.id)]), [
+    ['book:book-1', '第一本书', ['asset-1', 'asset-2']],
+    ['book:book-2', '第二本书', ['asset-3']]
+  ]);
 });
 
 test('生成历史按真实任务媒介与关键字筛选', () => {
