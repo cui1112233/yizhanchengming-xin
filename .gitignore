@@ -49,3 +49,8 @@ executors/local-executor/build/
 # Rust/Tauri build outputs.
 **/src-tauri/target/
 **/src-tauri/target-*/
+executors/**/target/
+executors/**/target-*/
+
+backend/backend/
+
