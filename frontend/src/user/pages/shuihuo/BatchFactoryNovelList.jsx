@@ -3071,6 +3071,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [logsError, setLogsError] = useState('');
   const [automationStatus, setAutomationStatus] = useState({ state: 'idle', counts: { total: 0, ready: 0, running: 0, pending: 0, failed: 0, blocked: 0 } });
   const [automationBusy, setAutomationBusy] = useState('');
+  const automationBusyAtRef = useRef(0);
   const [automationStartOpen, setAutomationStartOpen] = useState(false);
   const automationAutoOpenedRef = useRef(false);
   const [automationPresets, setAutomationPresets] = useState([]);
@@ -4247,7 +4248,18 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     return [...new Set(reasons)];
   }
   async function runAutomationAction(key, { immediate = false, bookIds = null, presetId = '' } = {}) {
-    if (!batch?.id || automationBusy) return;
+    if (!batch?.id) { message.error('页面批次尚未加载，请刷新后重试'); return; }
+    if (automationBusy) {
+      // 请求悬挂时旧实现会静默吞掉所有点击。超过 30 秒视为僵死，复位放行。
+      if (Date.now() - automationBusyAtRef.current > 30 * 1000) {
+        automationBusyAtRef.current = 0;
+        setAutomationBusy('');
+        message.warning('上一次请求超时，已重置状态');
+      } else {
+        message.info('上一次操作仍在执行，请稍候');
+        return;
+      }
+    }
     if (key === 'start' && automationActive) {
       message.info(automationStartBlockedLabel);
       return;
@@ -4281,6 +4293,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       return;
     }
     setAutomationBusy(key);
+    automationBusyAtRef.current = Date.now();
+    const hideAutomationLoading = message.loading('正在提交自动化任务…', 0);
     try {
       if (key === 'start' && !(await saveContentSettings(targetBookIDs))) return;
       let result;
@@ -4299,7 +4313,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       await Promise.allSettled([refreshBatch(), loadRuntimeStatus({ quiet: true })]);
     } catch (error) {
       message.error(error?.message || '批量工厂自动化操作失败');
-    } finally { setAutomationBusy(''); }
+    } finally { hideAutomationLoading(); automationBusyAtRef.current = 0; setAutomationBusy(''); }
   }
 
   function openMetadataEditor(book) {
