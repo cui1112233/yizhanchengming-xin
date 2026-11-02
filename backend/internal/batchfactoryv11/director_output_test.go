@@ -6,6 +6,21 @@ import (
 	"testing"
 )
 
+func TestStoryboardVideoPromptTranslatesShotEnums(t *testing.T) {
+	video := DirectorVideo{Shots: []DirectorShot{
+		{StartSec: 0, EndSec: 3, ShotType: "medium_long_shot", Camera: "eye_level", Description: "爷爷手拄紫檀木拐杖坐在正位"},
+		{StartSec: 3, EndSec: 5, ShotType: "close_up", Camera: "slow push", Description: "爷爷说出要孩子的要求"},
+	}}
+	got := storyboardVideoPrompt(video)
+	if !strings.Contains(got, "00:00-00:03 | 中远景｜平视 | 爷爷手拄紫檀木拐杖坐在正位") {
+		t.Fatalf("景别/机位未映射为中文: %q", got)
+	}
+	// 未知枚举保持原样，不做猜测。
+	if !strings.Contains(got, "特写｜slow push") {
+		t.Fatalf("未知机位不应被丢弃或改写: %q", got)
+	}
+}
+
 // 资产设置里的“合并资产提示词”是权威文本，卡片必须优先用它，
 // 不能再用事实/外形重新拼一份。
 func TestCompiledAssetPromptPrefersSavedPrompt(t *testing.T) {

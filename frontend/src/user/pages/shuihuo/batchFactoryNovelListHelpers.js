@@ -408,6 +408,49 @@ export function stripRelationshipText(text, relationships = '') {
     .join('，');
 }
 
+// 导演模型返回的景别/机位是英文枚举，只读弹窗里改为中文展示，不改存储文本。
+const SHOT_KEYWORD_LABELS = {
+  extreme_wide_shot: '大远景',
+  wide_shot: '远景',
+  long_shot: '远景',
+  full_shot: '全景',
+  medium_long_shot: '中远景',
+  medium_shot: '中景',
+  medium_close_up: '中近景',
+  extreme_close_up: '大特写',
+  close_up: '特写',
+  insert_shot: '插入镜头',
+  bird_eye_view: '鸟瞰',
+  eye_level: '平视',
+  high_angle: '俯拍',
+  low_angle: '仰拍',
+  dutch_angle: '斜角',
+  top_down: '俯拍',
+  pull_out: '拉镜',
+  push_in: '推镜',
+  pan_left: '左摇',
+  pan_right: '右摇',
+  tilt_up: '上摇',
+  tilt_down: '下摇',
+  zoom_in: '推近',
+  zoom_out: '拉远',
+  tracking: '跟拍',
+  handheld: '手持',
+  static: '固定',
+};
+
+const SHOT_TIMELINE_LINE = /^\d{2}:\d{2}-\d{2}:\d{2}\s*\|/;
+
+export function localizeShotKeywords(text) {
+  const keys = Object.keys(SHOT_KEYWORD_LABELS).sort((a, b) => b.length - a.length);
+  return String(text || '').split('\n').map(line => {
+    // 只在“时间码 | 景别｜机位 | 描述”这类时间轴行里替换，
+    // 避免误伤提示词中的 URL 或其他英文单词。
+    if (!SHOT_TIMELINE_LINE.test(line.trim())) return line;
+    return keys.reduce((acc, key) => acc.replace(new RegExp(key, 'gi'), SHOT_KEYWORD_LABELS[key]), line);
+  }).join('\n');
+}
+
 export function visualFactsWithoutRelationships(asset) {
   return stripRelationshipText(asset?.facts, asset?.relationships);
 }

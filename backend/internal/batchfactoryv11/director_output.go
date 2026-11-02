@@ -93,12 +93,72 @@ func storyboardVideoPrompt(video DirectorVideo) string {
 			"%02d:%02d-%02d:%02d | %s｜%s | %s",
 			shot.StartSec/60, shot.StartSec%60,
 			shot.EndSec/60, shot.EndSec%60,
-			strings.TrimSpace(shot.ShotType),
-			strings.TrimSpace(shot.Camera),
+			displayShotType(shot.ShotType),
+			displayCamera(shot.Camera),
 			strings.TrimSpace(shot.Description),
 		))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// 导演模型返回的景别/机位是英文枚举，卡片上直接展示会中英混杂，
+// 这里只做展示层的中文映射，未知值原样保留。
+var shotTypeLabels = map[string]string{
+	"extreme_wide_shot": "大远景",
+	"wide_shot":         "远景",
+	"long_shot":         "远景",
+	"full_shot":         "全景",
+	"medium_long_shot":  "中远景",
+	"medium_shot":       "中景",
+	"medium_close_up":   "中近景",
+	"close_up":          "特写",
+	"extreme_close_up":  "大特写",
+	"extreme_closeup":   "大特写",
+	"closeup":           "特写",
+	"insert_shot":       "插入镜头",
+	"over_the_shoulder": "过肩镜头",
+}
+
+var cameraLabels = map[string]string{
+	"eye_level":         "平视",
+	"high_angle":        "俯拍",
+	"low_angle":         "仰拍",
+	"dutch_angle":       "斜角",
+	"bird_eye_view":     "鸟瞰",
+	"top_down":          "俯拍",
+	"over_the_shoulder": "过肩",
+	"static":            "固定",
+	"fixed":             "固定",
+	"push_in":           "推镜",
+	"pull_out":          "拉镜",
+	"pan_left":          "左摇",
+	"pan_right":         "右摇",
+	"tilt_up":           "上摇",
+	"tilt_down":         "下摇",
+	"tracking":          "跟拍",
+	"handheld":          "手持",
+	"zoom_in":           "推近",
+	"zoom_out":          "拉远",
+}
+
+func displayShotType(value string) string {
+	return displayEnumLabel(value, shotTypeLabels)
+}
+
+func displayCamera(value string) string {
+	return displayEnumLabel(value, cameraLabels)
+}
+
+func displayEnumLabel(value string, labels map[string]string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	key := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(trimmed, "-", "_"), " ", "_"))
+	if label, ok := labels[key]; ok {
+		return label
+	}
+	return trimmed
 }
 
 var (
