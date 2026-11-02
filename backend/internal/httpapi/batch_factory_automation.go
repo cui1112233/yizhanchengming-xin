@@ -372,6 +372,13 @@ func (c *BatchAutomationCoordinator) loadLocked() (automationStateFile, error) {
 	if strings.TrimSpace(c.path) == "" {
 		return state, nil
 	}
+	// 优先读增量布局（automation/index.json + automation/jobs/<jobId>.json）。
+	if split, ok, err := c.loadSplitLocked(); err != nil {
+		return state, err
+	} else if ok {
+		return split, nil
+	}
+	// 增量布局不存在时尝试旧单文件并迁移；迁移失败不阻塞启动，沿用旧数据。
 	raw, err := os.ReadFile(c.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return state, nil
@@ -390,36 +397,133 @@ func (c *BatchAutomationCoordinator) loadLocked() (automationStateFile, error) {
 			return state, err
 		}
 	}
+	if err := c.migrateLegacyLocked(state); err != nil {
+		// 迁移失败继续用旧布局，下次启动重试。
+		return state, nil
+	}
 	return state, nil
+}
+
+// automationStorePaths 返回增量布局的索引文件与任务目录。
+func (c *BatchAutomationCoordinator) automationStorePaths() (indexPath, jobsDir string) {
+	dir := filepath.Join(filepath.Dir(c.path), "automation")
+	return filepath.Join(dir, "index.json"), filepath.Join(dir, "jobs")
+}
+
+func writeAutomationJSONAtomic(path string, value any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+func (c *BatchAutomationCoordinator) loadSplitLocked() (automationStateFile, bool, error) {
+	indexPath, jobsDir := c.automationStorePaths()
+	raw, err := os.ReadFile(indexPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return automationStateFile{}, false, nil
+	}
+	if err != nil {
+		return automationStateFile{}, false, err
+	}
+	var index struct {
+		Jobs []map[string]any `json:"jobs"`
+	}
+	if err := json.Unmarshal(raw, &index); err != nil {
+		return automationStateFile{}, false, err
+	}
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{}}
+	for _, entry := range index.Jobs {
+		jobID := automationStringValue(entry["id"], "")
+		if jobID == "" {
+			continue
+		}
+		jobRaw, err := os.ReadFile(filepath.Join(jobsDir, jobID+".json"))
+		if err != nil {
+			continue // 单个任务文件缺失不拖垮整体加载
+		}
+		var job map[string]any
+		if err := json.Unmarshal(jobRaw, &job); err != nil {
+			continue // 单个任务文件损坏不拖垮整体加载
+		}
+		state.Jobs[jobID] = job
+	}
+	return state, true, nil
 }
 
 func (c *BatchAutomationCoordinator) saveLocked(state automationStateFile) error {
 	if strings.TrimSpace(c.path) == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(c.path), 0o700); err != nil {
+	indexPath, jobsDir := c.automationStorePaths()
+	entries := make([]map[string]any, 0, len(state.Jobs))
+	for jobID, job := range state.Jobs {
+		if err := writeAutomationJSONAtomic(filepath.Join(jobsDir, jobID+".json"), job); err != nil {
+			return err
+		}
+		entries = append(entries, map[string]any{
+			"id": jobID, "owner": job["owner"], "batchId": job["batchId"],
+			"state": job["state"], "updatedAt": job["updatedAt"],
+		})
+	}
+	return writeAutomationJSONAtomic(indexPath, map[string]any{"version": 1, "jobs": entries})
+}
+
+// migrateLegacyLocked 把旧单文件拆分为增量布局，成功后旧文件改名 .migrated。
+func (c *BatchAutomationCoordinator) migrateLegacyLocked(state automationStateFile) error {
+	if err := c.saveLocked(state); err != nil {
 		return err
 	}
-	raw, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	tmp := c.path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, c.path)
+	return os.Rename(c.path, c.path+".migrated")
 }
 
 func (c *BatchAutomationCoordinator) setJob(owner, batchID, jobID string, job map[string]any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	state, err := c.loadLocked()
-	if err != nil {
+	if strings.TrimSpace(c.path) == "" {
+		return nil
+	}
+	indexPath, jobsDir := c.automationStorePaths()
+	if err := writeAutomationJSONAtomic(filepath.Join(jobsDir, jobID+".json"), job); err != nil {
 		return err
 	}
-	state.Jobs[jobID] = job
-	return c.saveLocked(state)
+	// 索引只在任务存在性或 state 变化时重写，避免每次心跳全量写索引。
+	entries := []map[string]any{}
+	if raw, err := os.ReadFile(indexPath); err == nil {
+		var index struct {
+			Jobs []map[string]any `json:"jobs"`
+		}
+		if json.Unmarshal(raw, &index) == nil {
+			entries = index.Jobs
+		}
+	}
+	found := false
+	stateChanged := false
+	for i, entry := range entries {
+		if automationStringValue(entry["id"], "") != jobID {
+			continue
+		}
+		found = true
+		if automationStringValue(entry["state"], "") != automationStringValue(job["state"], "") {
+			stateChanged = true
+		}
+		entries[i] = map[string]any{"id": jobID, "owner": job["owner"], "batchId": job["batchId"], "state": job["state"], "updatedAt": job["updatedAt"]}
+	}
+	if !found {
+		entries = append(entries, map[string]any{"id": jobID, "owner": job["owner"], "batchId": job["batchId"], "state": job["state"], "updatedAt": job["updatedAt"]})
+	}
+	if found && !stateChanged {
+		return nil
+	}
+	return writeAutomationJSONAtomic(indexPath, map[string]any{"version": 1, "jobs": entries})
 }
 
 // RecoverInterruptedJobs converts persisted runs without a live goroutine into
@@ -2120,7 +2224,7 @@ func cloneAutomationEntry(entry map[string]any) map[string]any {
 }
 
 // automationBookLogLimit 限制单本书保留的执行日志条数，避免状态文件无限增长。
-const automationBookLogLimit = 100
+const automationBookLogLimit = 200
 
 // appendAutomationBookLog 把一条阶段事件追加到单本书的执行日志里。
 // 同一句重复上报只更新时间，不重复占位，避免进度刷屏。

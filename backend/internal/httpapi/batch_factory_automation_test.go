@@ -596,12 +596,9 @@ func TestRecoverInterruptedJobsMarksPersistedRunningJobsStopped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	updated, err := os.ReadFile(path)
+	// 状态存储已拆分：通过协调器读回（内部会完成旧文件迁移）。
+	got, err := coordinator.loadLocked()
 	if err != nil {
-		t.Fatal(err)
-	}
-	var got automationStateFile
-	if err := json.Unmarshal(updated, &got); err != nil {
 		t.Fatal(err)
 	}
 	job := got.Jobs["job-1"]
@@ -1113,6 +1110,66 @@ func TestEnsureAutomationSourceLegacyEmptyBookStillFetches(t *testing.T) {
 	}
 	if requests != 1 {
 		t.Fatalf("upstream requests=%d, want 1 for legacy source recovery", requests)
+	}
+}
+
+func TestAutomationStateStoreMigration(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, "automation-state.json")
+	legacyState := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-1": {"id": "job-1", "owner": "alice", "batchId": "b1", "state": "completed", "updatedAt": "2026-01-01T00:00:00Z", "books": map[string]any{}},
+		"job-2": {"id": "job-2", "owner": "alice", "batchId": "b2", "state": "stopped", "updatedAt": "2026-01-02T00:00:00Z", "books": map[string]any{}},
+	}}
+	raw, err := json.Marshal(legacyState)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	coordinator := NewBatchAutomationCoordinator(nil, nil, nil, nil, nil, nil, nil, NewFileAutomationStatusReader(legacy), nil)
+	state, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Jobs) != 2 || state.Jobs["job-1"]["state"] != "completed" || state.Jobs["job-2"]["state"] != "stopped" {
+		t.Fatalf("migrated state = %#v", state.Jobs)
+	}
+	// 旧文件已改名，新布局文件已生成且内容等价。
+	if _, err := os.Stat(legacy); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy file should be renamed, stat err=%v", err)
+	}
+	if _, err := os.Stat(legacy + ".migrated"); err != nil {
+		t.Fatalf("migrated backup missing: %v", err)
+	}
+	for _, jobID := range []string{"job-1", "job-2"} {
+		payload, err := os.ReadFile(filepath.Join(dir, "automation", "jobs", jobID+".json"))
+		if err != nil {
+			t.Fatalf("job file missing: %v", err)
+		}
+		var job map[string]any
+		if err := json.Unmarshal(payload, &job); err != nil {
+			t.Fatal(err)
+		}
+		if job["id"] != jobID {
+			t.Fatalf("job file content = %#v", job)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "automation", "index.json")); err != nil {
+		t.Fatalf("index missing: %v", err)
+	}
+
+	// setJob 只写对应 job 文件：改 job-2 不影响 job-1 的内容。
+	if err := coordinator.setJob("alice", "b2", "job-2", map[string]any{"id": "job-2", "owner": "alice", "batchId": "b2", "state": "failed", "updatedAt": "2026-01-03T00:00:00Z", "books": map[string]any{}}); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Jobs["job-2"]["state"] != "failed" || reloaded.Jobs["job-1"]["state"] != "completed" {
+		t.Fatalf("after setJob state = %#v", reloaded.Jobs)
 	}
 }
 
