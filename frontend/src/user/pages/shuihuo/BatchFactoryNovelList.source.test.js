@@ -11,7 +11,8 @@ import { currentMergeJobsByOpening } from './batchFactoryMergeGroups.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const { normalizeSavedWebSubmit } = require(path.join(here, '../../../../../lib/novel-fetch-workshop/121-web-submit-service.js'));
-const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8');
+const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(here, 'batchFactoryNovelListHelpers.js'), 'utf8');
 const stylesheet = fs.readFileSync(path.join(here, '../shuihuo-production.css'), 'utf8');
 const engineSource = fs.readFileSync(path.join(here, 'BatchFactoryEngineSettingsDrawer.jsx'), 'utf8');
 const bookSettingsSource = fs.readFileSync(path.join(here, 'BatchFactoryBookSettingsModal.jsx'), 'utf8');

@@ -5,7 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8');
+const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(here, 'batchFactoryNovelListHelpers.js'), 'utf8');
 
 test('asset popup uses durable book-asset APIs instead of draft prompts', () => {
   assert.match(source, /listBookAssets/);
@@ -26,7 +27,7 @@ test('asset popup uploads real image bytes and manages durable image versions', 
 
 test('SD plain-text storyboards fall back to their final prompt when structured asset references are absent', () => {
   const start = source.indexOf('function storyboardAssetDefaults(');
-  const end = source.indexOf('\nfunction readStoryboardAssetSelection(', start);
+  const end = source.indexOf('function readStoryboardAssetSelection(', start);
   const helper = start >= 0 && end > start ? source.slice(start, end) : '';
   assert.match(helper, /storyboardAssetNamesFromPrompt/);
   assert.match(helper, /draft\.final_prompt/);
@@ -174,7 +175,7 @@ test('asset chips hide the trigger @ while preserving the underlying mention tok
 
 test('prompt caret offset tolerates a missing editor root', () => {
   const start = source.indexOf('function contentEditableTextOffset(root)');
-  const end = source.indexOf('\nfunction contentEditablePromptText(root)', start);
+  const end = source.indexOf('function contentEditablePromptText(root)', start);
   const helper = start >= 0 && end > start ? source.slice(start, end) : '';
   assert.match(helper, /if \(!root\)/);
   assert.match(helper, /if \(!selection\?\.rangeCount \|\| !root\.contains\(selection\.anchorNode\)\)/);

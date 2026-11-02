@@ -5,7 +5,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8');
+const source = fs.readFileSync(path.join(here, 'BatchFactoryNovelList.jsx'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(here, 'batchFactoryNovelListHelpers.js'), 'utf8');
 
 test('does not describe a failed direct-first read as an automatic OCR queue', () => {
   assert.match(source, /书城读取失败/);
