@@ -12,6 +12,7 @@ test('asset popup uses durable book-asset APIs instead of draft prompts', () => 
   assert.match(source, /createBookAsset/);
   assert.match(source, /updateBookAsset/);
   assert.doesNotMatch(source, /kind:\s*'asset-prompt'/);
+	assert.match(source, /source: productionMode === 'comic' \? 'comic' : 'manual'/);
 });
 
 test('asset popup uploads real image bytes and manages durable image versions', () => {
@@ -32,15 +33,74 @@ test('SD plain-text storyboards fall back to their final prompt when structured 
   assert.match(helper, /promptReferences/);
 });
 
-test('asset editor exposes and persists the four character structure fields', () => {
-  assert.match(source, /正式人物名单/);
+test('asset generation stops waiting when the background task reports a real failure', () => {
+  assert.match(source, /getBookAssetImageGenerationTask/);
+  assert.match(source, /task\.status === 'failed'/);
+  assert.match(source, /task\.error \|\| '资产图片生成失败'/);
+  assert.match(source, /waitForBookAssetImages\(batchId, book\.id, assetIds, result\?\.taskId \|\| ''\)/);
+});
+
+test('asset generation keeps its terminal result visible in the asset panel', () => {
+  const start = source.indexOf('async function generateImages(');
+  const end = source.indexOf('\n  async function generateEditedAssetImage()', start);
+  const handler = start >= 0 && end > start ? source.slice(start, end) : '';
+  assert.match(handler, /setImageGenerationResult\(\{ type: 'warning', message: summary \}\)/);
+  assert.match(handler, /setImageGenerationResult\(\{ type: 'success', message: summary \}\)/);
+  assert.match(handler, /const failure = error\?\.message \|\| '图片生成失败'/);
+  assert.match(handler, /setImageGenerationResult\(\{ type: 'error', message: failure \}\)/);
+  assert.match(source, /imageGenerationResult \? <Alert type=\{imageGenerationResult\.type\} showIcon closable onClose=\{\(\) => setImageGenerationResult\(null\)\} message="资产图片生成结果" description=\{imageGenerationResult\.message\} \/> : null/);
+});
+
+test('asset editor persists its single name as the character formal name', () => {
+  assert.match(source, /名称<Input/);
   assert.match(source, /人物事实/);
   assert.match(source, /人物外形/);
   assert.match(source, /人物关系/);
-  assert.match(source, /formalName: editing\.formalName/);
+  assert.match(source, /formalName: editing\.name/);
+  assert.doesNotMatch(source, /正式人物名单<Input/);
   assert.match(source, /facts: editing\.facts/);
   assert.match(source, /appearance: editing\.appearance/);
   assert.match(source, /relationships: editing\.relationships/);
+});
+
+test('asset editor uses one name as the character formal name and groups the remaining character details', () => {
+  const css = fs.readFileSync(path.join(here, '..', 'shuihuo-production.css'), 'utf8');
+  assert.match(source, /formalName: editing\.name/);
+  assert.match(source, /className="batch-factory-asset-editor-character-fields"/);
+  assert.doesNotMatch(source, /正式人物名单<Input/);
+  assert.match(css, /\.batch-factory-asset-editor-character-fields \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); gap: 10px; \}/);
+});
+
+test('batch asset editor keeps its image-model picker bound to the book image channel', () => {
+  assert.match(source, /import \{ modelOptionsForProvider \} from '\.\/providerModelBinding';/);
+  assert.match(source, /listAvailableModels\('image'\)/);
+  assert.match(source, /modelOptionsForProvider\(imageModels, 'image', imageProvider\)/);
+  assert.match(source, /batch-factory-asset-editor-config-row/);
+  assert.match(source, /资产分类<\/span><Select[\s\S]{0,900}图片模型<\/span><Select[\s\S]{0,900}图片画幅<\/span><Select/);
+  assert.match(source, /图片模型<\/span><Select allowClear value=\{editing\?\.imageModelId \|\| imageModelId \|\| undefined\}/);
+  assert.match(source, /图片画幅<\/span><Select allowClear value=\{editing\?\.imageAspectRatio \|\| imageAspectRatio \|\| undefined\}/);
+  assert.match(source, /imageModelId: editing\.imageModelId \|\| ''/);
+  assert.match(source, /imageAspectRatio: editing\.imageAspectRatio \|\| ''/);
+  assert.doesNotMatch(source, /if \(!imageModelId\) \{ message\.warning\('请先在引擎配置选择图片模型。'\); return false; \}/);
+  assert.doesNotMatch(source, /disabled=\{panelBusy \|\| !imageModelId\}/);
+});
+
+test('asset generation settings use a compact hierarchy instead of three plain form boxes', () => {
+  const css = fs.readFileSync(path.join(here, '..', 'shuihuo-production.css'), 'utf8');
+  assert.match(source, /className="batch-factory-asset-editor-config-row"[\s\S]{0,420}className="batch-factory-asset-editor-config-field is-model"/);
+  assert.match(css, /\.batch-factory-asset-editor-config-row \{ display: grid; grid-template-columns: 108px minmax\(0, 1fr\) 120px; align-items: end; gap: 8px; padding: 10px; border: 1px solid/);
+  assert.match(css, /\.batch-factory-asset-editor-config-field > span \{ color: #8fa8c4; font-size: 11px; \}/);
+});
+
+test('asset settings use a 16:9 default while keeping explicit per-asset overrides', () => {
+  assert.match(source, /const imageAspectRatio = '16:9'/);
+  assert.match(source, /资产画幅未单独选择时固定为 16:9/);
+  assert.match(source, /placeholder="默认 16:9"/);
+  assert.match(source, /imageAspectRatio: imageAspectRatio \|\| '16:9'/);
+  assert.match(source, /图片模型<\/span><Select allowClear value=\{editing\?\.imageModelId \|\| imageModelId \|\| undefined\}/);
+  assert.match(source, /图片画幅<\/span><Select allowClear value=\{editing\?\.imageAspectRatio \|\| imageAspectRatio \|\| undefined\}/);
+  assert.match(source, /imageModelId: editing\.imageModelId \|\| ''/);
+  assert.match(source, /imageAspectRatio: editing\.imageAspectRatio \|\| ''/);
 });
 
 test('prompt panel renders image-backed mentions and opens the picker in edit mode', () => {

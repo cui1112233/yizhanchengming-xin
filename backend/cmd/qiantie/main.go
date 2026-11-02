@@ -47,7 +47,7 @@ func main() {
 	staticHandler := webassets.Handler()
 	handler := newRuntimeHandler(apiHandler, staticHandler)
 	server := &http.Server{Addr: cfg.ListenAddr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
-	log.Printf("qiantie Go V11 listening on %s", cfg.ListenAddr)
+	log.Printf("qiantie Go V12 listening on %s", cfg.ListenAddr)
 	log.Fatal(server.ListenAndServe())
 }
 
@@ -57,7 +57,7 @@ func main() {
 // responses; there is no Node bridge or slice-based fallback.
 func newRuntimeHandler(apiHandler, staticHandler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req != nil && req.URL != nil && (req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/")) {
+		if req != nil && req.URL != nil && (req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") || strings.HasPrefix(req.URL.Path, "/downloads/local-executor/")) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}
@@ -79,10 +79,15 @@ func databaseDSN(raw string) (string, error) {
 func configureDatabasePool(db *sql.DB) {
 	// Status polling arrives in short bursts. Reuse connections instead of
 	// reopening and authenticating for every refresh.
+	// The local MySQL runs in Docker behind the Windows port proxy, which
+	// silently drops idle TCP connections. A large long-lived idle pool then
+	// hands out dead connections and transactions fail with
+	// "driver: bad connection". Keep the idle pool small and short-lived so
+	// stale connections are discarded before the proxy kills them.
 	db.SetMaxOpenConns(24)
-	db.SetMaxIdleConns(24)
-	db.SetConnMaxIdleTime(10 * time.Minute)
-	db.SetConnMaxLifetime(time.Hour)
+	db.SetMaxIdleConns(4)
+	db.SetConnMaxIdleTime(90 * time.Second)
+	db.SetConnMaxLifetime(5 * time.Minute)
 }
 
 func healthURL(listenAddr string) string {

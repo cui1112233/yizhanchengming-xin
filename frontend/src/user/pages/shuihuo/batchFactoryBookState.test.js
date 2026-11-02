@@ -1,11 +1,102 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState.js';
+import { shouldAutoClassifyBook, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState.js';
+
+test('does not block a failed book behind a stale running automation job', () => {
+  const status = { state: 'running', books: [{ bookId: 'book-1', status: 'failed', stage: 'comic_images' }] };
+  assert.equal(automationBookIsActive(status, 'book-1'), false);
+  assert.deepEqual(automationBookNeedsRetry(status, 'book-1'), { stage: 'comic_images' });
+});
+
+test('keeps an actually running book protected from manual duplicate retries', () => {
+  const status = { state: 'running', books: [{ bookId: 'book-1', status: 'running', stage: 'comic_images' }] };
+  assert.equal(automationBookIsActive(status, 'book-1'), true);
+  assert.equal(automationBookNeedsRetry(status, 'book-1'), null);
+});
+
+test('allows a queued retry to restart a failed automation run after service recovery', () => {
+  assert.deepEqual(batchFactoryAutomationRetryAction({
+    state: 'failed',
+    counts: { failed: 1, blocked: 0 },
+    books: [{ status: 'failed', retryRequested: true }]
+  }), {
+    label: '重新启动重试（1）',
+    disabled: false
+  });
+});
+
+test('does not count an already published book as a queued retry', () => {
+  assert.deepEqual(batchFactoryAutomationRetryAction({
+    state: 'failed',
+    counts: { failed: 1, blocked: 0 },
+    books: [
+      { status: 'completed', stage: 'published', retryRequested: true },
+      { status: 'failed', stage: 'comic_images', retryRequested: true }
+    ]
+  }), {
+    label: '重新启动重试（1）',
+    disabled: false
+  });
+});
 
 test('translates provider payment failures into an actionable status without exposing HTTP codes', () => {
   const message = batchFactoryVisibleError('YFAI Seedance returned HTTP 402');
   assert.equal(message, '当前视频模型的账户额度或权限不足，请更换视频模型，或检查该模型账户的额度与权限。');
   assert.doesNotMatch(message, /402|YFAI|Seedance/i);
+});
+
+test('retries incomplete classification once but leaves complete labels alone', () => {
+  const book = sourceMetadata => ({ sourceText: '正文', sourceMetadata });
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'failed', gender: '女频', style: '' })), true);
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'failed', gender: '女频', style: '待判定' })), true);
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'failed', gender: '', style: '现代悬疑' })), true);
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'pending_confirmation', gender: '女频', style: '' })), true);
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'manual', gender: '女频', style: '' })), false);
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'classified', gender: '女频', style: '现代悬疑' })), false);
+  assert.equal(shouldAutoClassifyBook(book({ classifyStatus: 'failed', gender: '女频', style: '现代悬疑' })), false);
+  assert.equal(shouldAutoClassifyBook({ sourceText: '', sourceMetadata: { classifyStatus: 'failed' } }), false);
+});
+
+test('does not turn an incomplete classification into a blocking red state', () => {
+  const state = batchFactoryBookState({
+    id: 'book-classification-failed',
+    sourceText: '正文已经获取',
+    sourceMetadata: { classifyStatus: 'failed', classifyError: '文本模型未返回完整的男女频和风格' }
+  });
+  assert.equal(state.label, '待分类');
+  assert.equal(state.tone, 'blue');
+  assert.match(state.detail, /男女频\/风格分类/);
+  assert.match(state.detail, /文本模型未返回/);
+});
+
+test('an incomplete classification no longer asks for manual confirmation', () => {
+  const state = batchFactoryBookState({
+    id: 'book-classification-confirmation',
+    sourceText: '正文已经获取',
+    sourceMetadata: { classifyStatus: 'pending_confirmation', classifyError: '已自动判断 2 次仍未完成：文本模型未返回有效风格' }
+  });
+  assert.equal(state.label, '待分类');
+  assert.doesNotMatch(state.detail, /人工确认/);
+  assert.match(state.detail, /已自动判断 2 次/);
+});
+
+test('complete labels flow straight to production stages regardless of status', () => {
+  const state = batchFactoryBookState({
+    id: 'book-classification-complete',
+    sourceText: '正文已经获取',
+    sourceMetadata: { classifyStatus: 'failed', gender: '女频', style: '现代悬疑' }
+  });
+  assert.notEqual(state.label, '待分类');
+  assert.doesNotMatch(state.detail, /男女频\/风格分类/);
+});
+
+test('shows persisted classification processing before production status', () => {
+  const state = batchFactoryBookState({
+    id: 'book-classification-processing',
+    sourceText: '正文已经获取',
+    sourceMetadata: { classifyStatus: 'processing' }
+  });
+  assert.deepEqual({ label: state.label, detail: state.detail }, { label: '执行中…', detail: '男女频/风格分类：正在识别' });
 });
 
 test('a failed VIDEO overrides manual changes with an exception state', () => {
@@ -23,6 +114,76 @@ test('completed batch merge makes a ready book wait for upload instead of comple
   assert.deepEqual({ label: state.label, detail: state.detail }, { label: '待上传', detail: '视频已合并，等待 121 提交' });
 });
 
+test('treats manually generated comic page primaries as image-ready', () => {
+  const book = {
+    id: 'book-comic',
+    sourceText: '正文',
+    settingsState: { patch: { productionMode: 'comic' } },
+    assetRecords: [{ source: 'comic', prompt: '人物' }],
+    videos: [
+      { id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '图片一' },
+      { id: 'page-2', comicPrompt: '画面二', comicImagePrompt: '图片二' }
+    ]
+  };
+  const timeline = batchFactoryBookTimeline(book, {
+    stageSummary: { runs: [], comicImageReady: true, comicImageReadyCount: 2, comicImageTotalCount: 2 }
+  });
+  assert.equal(timeline.find(item => item.key === 'video')?.status, 'completed');
+  assert.match(timeline.find(item => item.key === 'video')?.detail || '', /2\/2/);
+  assert.equal(batchFactoryBookState(book, {
+    stageSummary: { runs: [], comicImageReady: true, comicImageReadyCount: 2, comicImageTotalCount: 2 },
+    productionMode: 'comic'
+  }).label, '待整理');
+});
+
+test('does not mark comic prompts ready when the independent image prompt is missing', () => {
+  const book = {
+    id: 'book-comic-missing-image-prompt',
+    sourceText: '正文',
+    settingsState: { patch: { productionMode: 'comic' } },
+    assetRecords: [{ source: 'comic', prompt: '人物' }],
+    videos: [{ id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '' }]
+  };
+  const timeline = batchFactoryBookTimeline(book, { productionMode: 'comic' });
+  assert.equal(timeline.find(item => item.key === 'director')?.status, 'pending');
+  assert.match(timeline.find(item => item.key === 'director')?.detail || '', /等待漫画分页与提示词/);
+});
+
+test('marks a persisted comic collection as complete after all page images are ready', () => {
+  const book = {
+    id: 'book-comic',
+    sourceText: '正文',
+    settingsState: { patch: { productionMode: 'comic' } },
+    assetRecords: [{ source: 'comic', prompt: '人物' }],
+    videos: [{ id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '图片一' }]
+  };
+  const timeline = batchFactoryBookTimeline(book, {
+    stageSummary: { runs: [], comicImageReady: true, comicImageReadyCount: 1, comicImageTotalCount: 1, comicCollectionReady: true, comicCollectionCount: 1, comicCollectionPageCount: 1 }
+  });
+  assert.equal(timeline.find(item => item.key === 'complete')?.status, 'completed');
+  assert.match(timeline.find(item => item.key === 'complete')?.detail || '', /1 个合集/);
+  assert.equal(batchFactoryBookState(book, {
+    stageSummary: { runs: [], comicImageReady: true, comicImageReadyCount: 1, comicImageTotalCount: 1, comicCollectionReady: true, comicCollectionCount: 1, comicCollectionPageCount: 1 },
+    productionMode: 'comic'
+  }).label, '完成');
+});
+
+test('treats a published comic automation book as fully complete', () => {
+  const book = {
+    id: 'published-comic',
+    sourceText: '正文',
+    status: 'completed',
+    stage: 'published',
+    settingsState: { patch: { productionMode: 'comic' } },
+    assetRecords: [{ source: 'comic', prompt: '人物' }],
+    videos: [{ id: 'page-1', comicPrompt: '画面一', comicImagePrompt: '图片一' }]
+  };
+  const timeline = batchFactoryBookTimeline(book, { productionMode: 'comic' });
+  assert.equal(timeline.every(item => item.status === 'completed'), true);
+  assert.equal(timeline.find(item => item.key === 'complete')?.detail, '已整理 1 个合集');
+  assert.equal(batchFactoryBookState(book, { productionMode: 'comic' }).label, '完成');
+});
+
 test('builds a readable per-book production timeline and keeps a failed stage actionable', () => {
   const book = { id: 'book-1', sourceText: '正文', assetRecords: [{ id: 'character-1' }], videos: [{ id: 'video-1', videoPrompt: '镜头提示词' }] };
   const runtime = {
@@ -34,6 +195,19 @@ test('builds a readable per-book production timeline and keeps a failed stage ac
   assert.equal(timeline.find(item => item.key === 'video').status, 'failed');
   assert.match(timeline.find(item => item.key === 'video').detail, /provider rejected/);
   assert.equal(batchFactoryBookState(book, runtime).label, '异常');
+});
+
+test('uses comic production labels instead of video merge and upload labels', () => {
+  const book = {
+    id: 'comic-book',
+    sourceText: '正文',
+    assetRecords: [{ id: 'comic-asset', source: 'comic' }],
+    videos: [{ id: 'comic-page-1', comicPrompt: '画面提示词', comicImagePrompt: '出图提示词', comicSourceSegment: { sourceText: '正文片段' } }]
+  };
+  const timeline = batchFactoryBookTimeline(book, { productionMode: 'comic' });
+  assert.deepEqual(timeline.map(item => item.label), ['原文已就绪', '漫画资产已就绪', '漫画分页与提示词已就绪', '漫画图片生成', '漫画合集']);
+  assert.equal(timeline.find(item => item.key === 'video').label, '漫画图片生成');
+  assert.equal(batchFactoryBookState(book, { productionMode: 'comic' }).detail, '漫画分页与提示词已就绪，等待生成漫画图片');
 });
 
 test('counts only successfully uploaded books as batch completion', () => {

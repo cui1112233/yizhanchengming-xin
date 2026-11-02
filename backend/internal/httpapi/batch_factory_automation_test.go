@@ -47,6 +47,49 @@ func TestAcknowledgeComicRetryClearsQueuedMarker(t *testing.T) {
 	}
 }
 
+func TestCompletedAutomationJobWithDueComicRetryCanBeRecovered(t *testing.T) {
+	now := time.Date(2026, 11, 1, 10, 36, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "completed",
+		"books": map[string]any{
+			"book-retrying": map[string]any{
+				"status":         "running",
+				"retryRequested": true,
+				"retryReason":    "content_policy",
+				"retryAt":        "2026-11-01T10:35:22Z",
+			},
+			"book-ready": map[string]any{"status": "completed"},
+		},
+	}
+	if !automationHasDueRetry(job, now) {
+		t.Fatal("a completed job with a due book retry must be eligible for recovery")
+	}
+
+	entry := job["books"].(map[string]any)["book-retrying"].(map[string]any)
+	entry["retryAt"] = "2026-11-01T10:40:00Z"
+	if automationHasDueRetry(job, now) {
+		t.Fatal("a retry that is not due must not reopen a completed job")
+	}
+}
+
+func TestFailedAutomationJobWithDueComicRetryCanBeRecovered(t *testing.T) {
+	now := time.Date(2026, 11, 1, 10, 36, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "failed",
+		"books": map[string]any{
+			"book-retrying": map[string]any{
+				"status":         "running",
+				"retryRequested": true,
+				"retryReason":    "content_policy",
+				"retryAt":        "2026-11-01T10:35:22Z",
+			},
+		},
+	}
+	if !automationJobRetryDispatchDue(job, now) {
+		t.Fatal("a failed job with a due book retry must be resumed automatically")
+	}
+}
+
 func TestComicAutomationRetriesTransientGenerationUpToThreeTimes(t *testing.T) {
 	now := time.Date(2026, 10, 30, 10, 0, 0, 0, time.UTC)
 	coordinator := &BatchAutomationCoordinator{now: func() time.Time { return now }}
@@ -541,6 +584,29 @@ func TestResumeInterruptedAutomationJobOnlyReopensServiceRestart(t *testing.T) {
 	}
 }
 
+func TestResumeInterruptedAutomationJobKeepsCompletedComicCollectionForPublish(t *testing.T) {
+	now := time.Date(2026, 11, 2, 5, 10, 0, 0, time.UTC)
+	job := map[string]any{
+		"state": "stopped", "runMode": "full_submit", "lastError": automationServiceRestartMessage,
+		"books": map[string]any{
+			"book-1": map[string]any{
+				"status": "stopped", "stage": "comic_publish", "comicCollectionId": "collection-existing",
+			},
+		},
+	}
+
+	if !resumeInterruptedAutomationJob(job, now) {
+		t.Fatal("service-restart job should be resumed")
+	}
+	book := job["books"].(map[string]any)["book-1"].(map[string]any)
+	if book["status"] != "running" || book["stage"] != "comic_publish" {
+		t.Fatalf("publish-ready book must resume at comic_publish, got %#v", book)
+	}
+	if book["comicCollectionId"] != "collection-existing" {
+		t.Fatalf("existing collection must be retained, got %#v", book)
+	}
+}
+
 func TestNormalizeAutomationScheduleModeSeparatesExecutionAndSubmission(t *testing.T) {
 	if got := normalizeAutomationScheduleMode("execute"); got != "execute" {
 		t.Fatalf("execute mode=%q", got)
@@ -574,6 +640,25 @@ func TestAutomationPreflightRequiresServerSideExecutorAndModels(t *testing.T) {
 	err := coordinator.validateAutomationPreflight(context.Background(), "alice", batch, []batchfactoryv11.Book{book}, "video_no_submit")
 	if err == nil || !strings.Contains(err.Error(), "文本模型执行器未配置") {
 		t.Fatalf("preflight error=%v, want missing server executor", err)
+	}
+}
+
+func TestAutomationPreflightStopsComicPublishWithoutAvailableAudio(t *testing.T) {
+	coordinator := &BatchAutomationCoordinator{
+		comicPublish: func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error) {
+			return N8ComicPublishRecord{}, nil
+		},
+		comicPublishPreflight: func(context.Context, batchfactoryv11.SettingsPatch) error {
+			return fmt.Errorf("漫画发布设置不完整：没有可用指定音频")
+		},
+	}
+	batch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+		"productionMode":       json.RawMessage(`"comic"`),
+		"comicPublishSettings": json.RawMessage(`{"producerAdminName":"制作者","workIds":[9001]}`),
+	}}}
+	err := coordinator.validateAutomationPreflight(context.Background(), "alice", batch, []batchfactoryv11.Book{{ID: "book-1"}}, "full_submit")
+	if err == nil || !strings.Contains(err.Error(), "没有可用指定音频") {
+		t.Fatalf("preflight error=%v, want missing automatic audio", err)
 	}
 }
 
@@ -773,6 +858,20 @@ func TestResetRetryableAutomationBooksRestartsOnlyFailedEntries(t *testing.T) {
 	}
 }
 
+func TestResetRetryableAutomationBooksKeepsComicPublishStage(t *testing.T) {
+	now := time.Date(2026, 11, 2, 5, 30, 0, 0, time.UTC)
+	books := map[string]any{
+		"publish": map[string]any{"status": "failed", "stage": "comic_publish", "comicCollectionId": "collection-existing", "error": "missing settings"},
+	}
+
+	resetRetryableAutomationBooks(books, nil, now)
+
+	entry := books["publish"].(map[string]any)
+	if entry["status"] != "running" || entry["stage"] != "comic_publish" || entry["comicCollectionId"] != "collection-existing" {
+		t.Fatalf("publish retry must keep its collection and stage, got %#v", entry)
+	}
+}
+
 func TestResetRetryableAutomationBooksWithoutFilterRestartsAllFailures(t *testing.T) {
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 	books := map[string]any{
@@ -861,6 +960,78 @@ func TestEnsureAutomationSourceReturnsOriginalConflictWhenLatestBookStillHasNoBo
 
 	if err == nil || !strings.Contains(err.Error(), "保存自动获取正文失败") || !errors.Is(err, batchfactoryv11.ErrConflict) {
 		t.Fatalf("err=%v, want original capture conflict", err)
+	}
+}
+
+func TestEnsureAutomationSourceDirectFirstFailureDoesNotRefetch(t *testing.T) {
+	memoryStore := batchfactoryv11.NewMemoryStore()
+	batch, err := memoryStore.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
+		Title: "直取失败书", ID: "source-1", Platform: "15", SourceMetadata: map[string]any{
+			"originalReadStrategy": "direct_first",
+			"originalReadStage":    "failed",
+			"originalReadError":    "121 upstream business error 400: 参数不完整",
+			"contentPending":       false,
+		},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		_, _ = w.Write([]byte(`{"code":200,"data":"不应读取","bookinfo":{}}`))
+	}))
+	defer server.Close()
+	coordinator := NewBatchAutomationCoordinator(memoryStore, nil, nil, nil, nil, nil, nil, nil, nil)
+	coordinator.SetSourceFetcher(&novelfetchworkshop.UpstreamFetcher{Client: server.Client(), Endpoint: server.URL})
+
+	_, err = coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, batch.Books[0])
+
+	if err == nil || !strings.Contains(err.Error(), "书城原文获取失败，等待人工处理") {
+		t.Fatalf("err=%v, want direct-first source blocked", err)
+	}
+	if requests != 0 {
+		t.Fatalf("upstream requests=%d, want 0 for blocked direct-first source", requests)
+	}
+}
+
+func TestEnsureAutomationSourceLegacyEmptyBookStillFetches(t *testing.T) {
+	memoryStore := batchfactoryv11.NewMemoryStore()
+	batch, err := memoryStore.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "历史空正文", ID: "source-1", Platform: "15"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		_, _ = w.Write([]byte(`{"code":200,"data":"历史正文","bookinfo":{}}`))
+	}))
+	defer server.Close()
+	coordinator := NewBatchAutomationCoordinator(memoryStore, nil, nil, nil, nil, nil, nil, nil, nil)
+	coordinator.SetSourceFetcher(&novelfetchworkshop.UpstreamFetcher{Client: server.Client(), Endpoint: server.URL})
+
+	updated, err := coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, batch.Books[0])
+
+	if err != nil || updated.SourceText != "历史正文" {
+		t.Fatalf("updated=%+v err=%v, want legacy source recovery", updated, err)
+	}
+	if requests != 1 {
+		t.Fatalf("upstream requests=%d, want 1 for legacy source recovery", requests)
+	}
+}
+
+func TestAutomationPreflightRejectsDirectFirstBlockedBook(t *testing.T) {
+	coordinator := NewBatchAutomationCoordinator(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	book := batchfactoryv11.Book{Title: "直取失败书", SourceMetadata: map[string]any{
+		"originalReadStrategy": "direct_first",
+		"originalReadStage":    "failed",
+		"originalReadError":    "121 upstream business error 400: 参数不完整",
+	}}
+
+	err := coordinator.validateAutomationPreflight(context.Background(), "alice", batchfactoryv11.Batch{}, []batchfactoryv11.Book{book}, "storyboard_only")
+
+	if err == nil || !strings.Contains(err.Error(), "《直取失败书》书城原文获取失败，等待人工处理") {
+		t.Fatalf("err=%v, want blocked direct-first preflight error", err)
 	}
 }
 

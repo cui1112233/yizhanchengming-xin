@@ -1,4 +1,37 @@
+import { batchFactorySourceText } from './batchFactoryContentRange.js';
+
 function taskState(task) { return String(task?.status || '').trim().toLowerCase(); }
+
+const terminalAutomationBookStates = new Set(['failed', 'blocked', 'stopped', 'completed']);
+
+export function automationBookNeedsRetry(status, bookId) {
+  const book = (Array.isArray(status?.books) ? status.books : []).find(item => String(item?.bookId || '') === String(bookId || ''));
+  const state = String(book?.status || '').trim().toLowerCase();
+  return book && terminalAutomationBookStates.has(state) && state !== 'completed'
+    ? { stage: String(book.stage || '').trim() }
+    : null;
+}
+
+export function automationBookIsActive(status, bookId) {
+  const state = String(status?.state || '').trim().toLowerCase();
+  if (!['running', 'scheduled', 'paused', 'needs_attention'].includes(state)) return false;
+  const book = (Array.isArray(status?.books) ? status.books : []).find(item => String(item?.bookId || '') === String(bookId || ''));
+  if (!book) return true;
+  return !terminalAutomationBookStates.has(String(book.status || '').trim().toLowerCase());
+}
+
+export function batchFactoryAutomationRetryAction(status) {
+  const queued = (Array.isArray(status?.books) ? status.books : []).filter(book => book?.retryRequested === true && taskState(book) !== 'completed').length;
+  const failed = Number(status?.counts?.failed || 0) + Number(status?.counts?.blocked || 0);
+  const terminal = ['failed', 'completed', 'stopped'].includes(String(status?.state || '').trim().toLowerCase());
+  if (queued && terminal) {
+    return { label: `重新启动重试（${queued}）`, disabled: false };
+  }
+  return {
+    label: queued ? `重试队列中（${queued}）` : `重试失败小说（${failed}）`,
+    disabled: queued > 0 || failed < 1
+  };
+}
 
 // Provider responses are retained by the server for diagnosis, but raw HTTP
 // responses are not useful instructions for a production user.
@@ -89,8 +122,13 @@ function uploadStatus(book) {
   return 'pending';
 }
 
-export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary } = {}) {
-  const sourceReady = Boolean(String(book?.sourceText || '').trim());
+export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary, stageSummaries, productionMode = 'video' } = {}) {
+  // The detail modal historically passed the per-book summary under the
+  // plural key. Accept both shapes so its timeline uses the same live status
+  // as the list row.
+  stageSummary = stageSummary || stageSummaries;
+  const comicMode = productionMode === 'comic' || book?.settingsState?.patch?.productionMode === 'comic' || book?.settingsState?.patch?.aiPromptConfig?.comic?.enabled === true || (book?.assetRecords || []).some(asset => asset?.source === 'comic') || (book?.videos || []).some(video => String(video?.comicPrompt || '').trim());
+  const sourceReady = Boolean(batchFactorySourceText(book?.sourceText));
   const assets = latestStageRun(stageSummary, 'assets');
   const director = latestStageRun(stageSummary, 'director');
   const image = latestStageRun(stageSummary, 'image');
@@ -114,6 +152,25 @@ export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, 
   const mergeFailed = mergeStatusValue === 'failed';
   const mergeRunning = ['queued', 'running'].includes(mergeStatusValue);
   const uploadDetail = upload === 'running' ? '正在上传网络' : upload === 'completed' ? '上传成功' : upload === 'failed' ? (batchFactoryVisibleError(book?.sourceMetadata?.publishError) || '上传失败') : merged ? '等待上传网络' : '完成合成后可上传';
+  if (comicMode) {
+    const comicPublished = String(book?.status || '').toLowerCase() === 'completed'
+      && String(book?.stage || '').toLowerCase() === 'published';
+    const comicAssetsReady = comicPublished || (book?.assetRecords || []).some(asset => asset?.source === 'comic' && String(asset?.prompt || asset?.visualPrompt || '').trim());
+    const comicPromptsReady = comicPublished || ((book?.videos || []).length > 0 && (book?.videos || []).every(video => String(video?.comicPrompt || '').trim() && String(video?.comicImagePrompt || '').trim()));
+      const comicImageRun = latestStageRun(stageSummary, 'image');
+      const comicImageReady = comicPublished || stageSummary?.comicImageReady === true;
+      const comicImageStatus = comicImageReady ? 'completed' : statusFromRun(comicImageRun, 'pending');
+    const comicCollectionReady = stageSummary?.comicCollectionReady === true || comicPublished;
+    const comicCollectionCount = Number(stageSummary?.comicCollectionCount || 0);
+    const comicCollectionPageCount = Number(stageSummary?.comicCollectionPageCount || 0);
+    return [
+      { key: 'source', label: '原文已就绪', status: sourceReady ? 'completed' : 'pending', detail: sourceReady ? '原文已保存' : '等待原文' },
+      { key: 'assets', label: '漫画资产已就绪', status: comicAssetsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(assets?.errorMessage) || (comicAssetsReady ? '人物、场景、道具已准备' : '等待提取漫画资产') },
+      { key: 'director', label: '漫画分页与提示词已就绪', status: comicPromptsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(director?.errorMessage) || (comicPromptsReady ? '分页与每页分镜提示词已生成' : '等待漫画分页与提示词') },
+      { key: 'video', label: '漫画图片生成', status: comicImageStatus, detail: batchFactoryVisibleError(comicImageRun?.errorMessage) || (comicImageStatus === 'completed' ? `漫画页图片已生成${stageSummary?.comicImageTotalCount ? `（${stageSummary.comicImageReadyCount}/${stageSummary.comicImageTotalCount} 页）` : ''}` : comicImageStatus === 'running' ? '正在逐页生成漫画图片' : '等待生成漫画图片') },
+      { key: 'complete', label: '漫画合集', status: comicCollectionReady ? 'completed' : 'pending', detail: comicCollectionReady ? `已整理 ${comicCollectionCount || 1} 个合集${comicCollectionPageCount ? `（${comicCollectionPageCount} 页）` : ''}` : '等待全部漫画页主图生成后整理合集' }
+    ];
+  }
   return [
     { key: 'source', label: '原文已就绪', status: sourceReady ? 'completed' : 'pending', detail: sourceReady ? '原文已保存' : '等待原文' },
     { key: 'assets', label: '资产（人物/场景/图片）已就绪', status: assetsReady, detail: batchFactoryVisibleError(assets?.errorMessage) || (assetsReady === 'completed' ? '资产已生成或已维护' : '等待资产处理') },
@@ -124,11 +181,39 @@ export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, 
   ];
 }
 
-export function batchFactoryBookState(book, { productionStatus, mergeStatus, stageSummary } = {}) {
-  const sourceText = String(book?.sourceText || '').trim();
+export function shouldAutoClassifyBook(book) {
+  if (!String(book?.sourceText || '').trim()) return false;
+  const metadata = book?.sourceMetadata || {};
+  const status = String(metadata.classifyStatus || '').trim().toLowerCase();
+  if (['classified', 'manual'].includes(status)) return false;
+  const gender = String(metadata.gender || metadata.gender_name || '').trim();
+  const style = String(metadata.style || metadata.styleName || metadata.style_name || '').trim();
+  return !gender || gender === '待确认' || !style || ['待判定', '未判定'].includes(style);
+}
+
+function classificationReady(metadata = {}) {
+  const gender = String(metadata.gender || metadata.gender_name || '').trim();
+  const style = String(metadata.style || metadata.styleName || metadata.style_name || '').trim();
+  return Boolean(gender && gender !== '待确认' && style && !['待判定', '未判定'].includes(style));
+}
+
+export function batchFactoryBookState(book, { productionStatus, mergeStatus, stageSummary, productionMode = 'video' } = {}) {
+  const sourceText = batchFactorySourceText(book?.sourceText);
   const queueStatus = String(book?.sourceMetadata?.queueStatus || '').trim();
   const manual = hasManualAdjustment(book);
-  const timeline = batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary });
+  const classifyStatus = String(book?.sourceMetadata?.classifyStatus || '').trim().toLowerCase();
+  const classifyError = String(book?.sourceMetadata?.classifyError || '').trim();
+  // Once the backend has explicitly recorded the classification stage, show it
+  // before production stages. Legacy books without this field keep their old
+  // display and can be classified from the detail modal.
+  if (sourceText && ['failed', 'pending_confirmation'].includes(classifyStatus) && !classificationReady(book?.sourceMetadata)) {
+    return { label: '待分类', detail: `男女频/风格分类：${classifyError || '正在自动重试'}`, tone: 'blue', manual };
+  }
+  if (sourceText && ['processing', 'queued'].includes(classifyStatus)) {
+    return { label: '执行中…', detail: '男女频/风格分类：正在识别', tone: 'blue', manual };
+  }
+  const comicMode = productionMode === 'comic' || book?.settingsState?.patch?.productionMode === 'comic' || book?.settingsState?.patch?.aiPromptConfig?.comic?.enabled === true || (book?.assetRecords || []).some(asset => asset?.source === 'comic') || (book?.videos || []).some(video => String(video?.comicPrompt || '').trim());
+  const timeline = batchFactoryBookTimeline(book, { productionStatus, mergeStatus, stageSummary, productionMode: comicMode ? 'comic' : productionMode });
   const completeStep = timeline.find(item => item.key === 'complete');
   // 已经回读确认上传成功，就以“完成”收口；中间某次重试遗留的分镜失败
   // 不能把一件已经干完的活重新标红。
@@ -137,6 +222,10 @@ export function batchFactoryBookState(book, { productionStatus, mergeStatus, sta
   if (failedStep) return { label: '异常', detail: `${failedStep.label}：${failedStep.detail}`, tone: 'red', manual, failedStep };
   const activeStep = timeline.find(item => item.status === 'running');
   if (activeStep) return { label: '执行中…', detail: `${activeStep.label}：${activeStep.detail}`, tone: 'blue', manual };
+  if (comicMode) {
+    if (timeline.find(item => item.key === 'video')?.status === 'completed') return { label: '待整理', detail: '漫画页已生成，等待整理漫画合集', tone: 'cyan', manual };
+    if (timeline.find(item => item.key === 'director')?.status === 'completed') return { label: '待生成', detail: '漫画分页与提示词已就绪，等待生成漫画图片', tone: 'cyan', manual };
+  }
   const tasks = bookTasks(book, productionStatus);
   const videoProgress = batchFactoryVideoProgress(book, productionStatus);
   const failed = videoProgress.failed[0]?.task;
@@ -186,7 +275,7 @@ export function batchFactoryBatchProgress(books, runtime = {}) {
 }
 
 export function batchFactoryNovelTableRow(book, index, createdAt = '', runtime = {}) {
-  const sourceText = String(book?.sourceText || '').trim();
+  const sourceText = batchFactorySourceText(book?.sourceText);
   const state = batchFactoryBookState(book, runtime);
   return {
     id: index + 1,

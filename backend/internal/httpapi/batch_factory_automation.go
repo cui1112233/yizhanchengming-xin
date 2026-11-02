@@ -27,27 +27,28 @@ import (
 // It intentionally persists the same public job shape that the old worker
 // used, so the existing workbench does not need a second status protocol.
 type BatchAutomationCoordinator struct {
-	store          batchfactoryv11.Store
-	presets        AutomationPresetStore
-	stages         *batchfactoryv11.BookStageService
-	merge          *batchfactoryv11.MergeService
-	external       *external.Service
-	ttsStore       novelfetchworkshop.Store
-	fetcher        *novelfetchworkshop.UpstreamFetcher
-	classification batchFetchClassification
-	audioProbe     batchfactoryv11.H3AudioDurationProbe
-	localFiles     *localartifact.Store
-	path           string
-	now            func() time.Time
-	providerSync   func(context.Context, string) error
-	publish121     *BatchFactory121Publisher
-	comicGenerate  func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
-	comicPublish   func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
-	mu             sync.Mutex
-	controlMu      sync.Mutex
-	startMu        sync.Mutex
-	runCancels     map[string]context.CancelFunc
-	dispatcherOnce sync.Once
+	store                 batchfactoryv11.Store
+	presets               AutomationPresetStore
+	stages                *batchfactoryv11.BookStageService
+	merge                 *batchfactoryv11.MergeService
+	external              *external.Service
+	ttsStore              novelfetchworkshop.Store
+	fetcher               *novelfetchworkshop.UpstreamFetcher
+	classification        batchFetchClassification
+	audioProbe            batchfactoryv11.H3AudioDurationProbe
+	localFiles            *localartifact.Store
+	path                  string
+	now                   func() time.Time
+	providerSync          func(context.Context, string) error
+	publish121            *BatchFactory121Publisher
+	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
+	comicPublish          func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
+	comicPublishPreflight func(context.Context, batchfactoryv11.SettingsPatch) error
+	mu                    sync.Mutex
+	controlMu             sync.Mutex
+	startMu               sync.Mutex
+	runCancels            map[string]context.CancelFunc
+	dispatcherOnce        sync.Once
 }
 
 type comicGenerationProgressFunc func(stage, message string)
@@ -179,7 +180,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 	}
 	changed := false
 	for jobID, job := range state.Jobs {
-		if automationStringValue(job["state"], "") == "running" {
+		if automationJobRetryDispatchDue(job, now) {
 			books, _ := job["books"].(map[string]any)
 			retryDue := false
 			for _, raw := range books {
@@ -202,7 +203,28 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 				retryDue = true
 			}
 			if retryDue {
+				// Older runtimes could mark the whole job complete while a book
+				// still had a delayed retry queued. Reopen that persisted job only
+				// when the retry is due; do not restart it immediately on startup.
+				job["state"] = "running"
+				delete(job, "completedAt")
 				job["updatedAt"] = now
+				ready, failed, running := 0, 0, 0
+				for _, raw := range books {
+					entry, _ := raw.(map[string]any)
+					if entry == nil {
+						continue
+					}
+					switch automationStringValue(entry["status"], "") {
+					case "completed":
+						ready++
+					case "failed", "blocked", "stopped":
+						failed++
+					case "running":
+						running++
+					}
+				}
+				job["counts"] = automationCounts(len(books), running, failed, ready)
 				due = append(due, dueJob{owner: automationStringValue(job["owner"], ""), batchID: automationStringValue(job["batchId"], ""), jobID: jobID, job: job})
 				changed = true
 				continue
@@ -273,6 +295,29 @@ func automationRetryDue(entry map[string]any, now time.Time) bool {
 	return err == nil && !now.Before(when)
 }
 
+func automationHasDueRetry(job map[string]any, now time.Time) bool {
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry != nil && automationBoolValue(entry["retryRequested"]) && automationRetryDue(entry, now) {
+			return true
+		}
+	}
+	return false
+}
+
+func automationJobRetryDispatchDue(job map[string]any, now time.Time) bool {
+	if !automationHasDueRetry(job, now) {
+		return false
+	}
+	switch automationStringValue(job["state"], "") {
+	case "running", "completed", "failed":
+		return true
+	default:
+		return false
+	}
+}
+
 func shouldScheduleAutomationTimeoutRetry(stage string) bool {
 	switch strings.TrimSpace(stage) {
 	case "comic_images", "comic_asset_images":
@@ -313,6 +358,12 @@ func (c *BatchAutomationCoordinator) SetComicBookGenerator(generator func(contex
 func (c *BatchAutomationCoordinator) SetComicPublisher(publisher func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)) {
 	if c != nil {
 		c.comicPublish = publisher
+	}
+}
+
+func (c *BatchAutomationCoordinator) SetComicPublishPreflight(preflight func(context.Context, batchfactoryv11.SettingsPatch) error) {
+	if c != nil {
+		c.comicPublishPreflight = preflight
 	}
 }
 
@@ -440,7 +491,11 @@ func resumeInterruptedAutomationJob(job map[string]any, now time.Time) bool {
 			continue
 		}
 		if automationStringValue(entry["status"], "") != "completed" {
-			entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", "assets", "服务已恢复，自动化继续执行", "", now
+			stage, message := "assets", "服务已恢复，自动化继续执行"
+			if automationStringValue(job["runMode"], "full_submit") == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+				stage, message = "comic_publish", "服务已恢复，继续发布已生成漫画合集"
+			}
+			entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", stage, message, "", now
 			entry["retryRequested"] = true
 			running++
 		} else {
@@ -681,6 +736,13 @@ func (c *BatchAutomationCoordinator) validateAutomationPreflight(ctx context.Con
 	}
 	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
 	for _, book := range books {
+		if isDirectFirstSourceBlocked(book) {
+			title := strings.TrimSpace(book.Title)
+			if title == "" {
+				title = "未命名作品"
+			}
+			reasons = append(reasons, fmt.Sprintf("《%s》书城原文获取失败，等待人工处理", title))
+		}
 		effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 		if comicSettingString(effective, "textModelId", "") == "" {
 			reasons = append(reasons, "文本模型未配置")
@@ -724,6 +786,15 @@ func (c *BatchAutomationCoordinator) validateAutomationPreflight(ctx context.Con
 		}
 		if productionMode == "comic" && c.comicPublish == nil {
 			reasons = append(reasons, "漫画发布执行器未配置")
+		}
+		if productionMode == "comic" && c.comicPublishPreflight != nil {
+			for _, book := range books {
+				effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+				if err := c.comicPublishPreflight(ctx, effective); err != nil {
+					reasons = append(reasons, err.Error())
+					break
+				}
+			}
 		}
 		if productionMode != "comic" && c.publish121 == nil && c.external == nil {
 			reasons = append(reasons, "视频发布执行器未配置")
@@ -1186,6 +1257,15 @@ func hasReusableAudioPlan(book batchfactoryv11.Book) bool {
 	return math.Abs(measured-total) <= 0.05
 }
 
+func isDirectFirstSourceBlocked(book batchfactoryv11.Book) bool {
+	strategy := strings.ToLower(strings.TrimSpace(stringValue(book.SourceMetadata["originalReadStrategy"])))
+	if strategy == "" {
+		strategy = strings.ToLower(strings.TrimSpace(stringValue(book.SourceMetadata["sourceReadStrategy"])))
+	}
+	stage := strings.ToLower(strings.TrimSpace(stringValue(book.SourceMetadata["originalReadStage"])))
+	return strategy == "direct_first" && (stage == "failed" || stage == "source_blocked")
+}
+
 // ensureAutomationSource fills a book whose intake retained its ID but not its
 // original text. Immediate runs and retries must recover this required input
 // before starting audio planning rather than failing the whole production path.
@@ -1215,11 +1295,16 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 		}
 		return updated, nil
 	}
+	if isDirectFirstSourceBlocked(book) {
+		return book, fmt.Errorf("书城原文获取失败，等待人工处理：%s", reasonOrDefault(strings.TrimSpace(stringValue(book.SourceMetadata["originalReadError"])), "请手动重试直取或确认后使用 OCR"))
+	}
 	if len(productionLines(book)) > 0 {
-		gender := firstMetadataString(book.SourceMetadata, "gender", "gender_name")
-		style := firstMetadataString(book.SourceMetadata, "style", "styleName", "style_name")
-		classifyStatus := strings.ToLower(strings.TrimSpace(stringValue(book.SourceMetadata["classifyStatus"])))
-		if gender != "" && style != "" && (classifyStatus == "classified" || classifyStatus == "manual") {
+		// Classification is a metadata-enrichment step, not a production gate.
+		// Any usable gender/style pair continues; an incomplete pair is
+		// finalized into a default pair instead of stopping automation.
+		gender := validBatchGender(firstMetadataString(book.SourceMetadata, "gender", "gender_name"))
+		style := validBatchStyle(firstMetadataString(book.SourceMetadata, "style", "styleName", "style_name"))
+		if gender != "" && style != "" {
 			return book, nil
 		}
 		info := novelfetchworkshop.BookInfo{
@@ -1232,9 +1317,6 @@ func (c *BatchAutomationCoordinator) ensureAutomationSource(ctx context.Context,
 		updated, err := c.store.UpdateBookMetadata(ctx, owner, batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			return book, fmt.Errorf("保存分类状态失败：%w", err)
-		}
-		if metadata["classifyStatus"] != "classified" {
-			return updated, fmt.Errorf("男女频和风格分类未完成：%s", stringValue(metadata["classifyError"]))
 		}
 		return updated, nil
 	}
@@ -1610,6 +1692,34 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 				}
 				effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 				if comicSettingString(effective, "productionMode", "video") == "comic" {
+					if automationStringValue(job["runMode"], "full_submit") == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+						entry["message"], entry["updatedAt"] = "正在继续发布已生成漫画合集", c.now()
+						persist()
+						publishCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+						collection, collectionErr := c.latestComicCollection(publishCtx, owner, batchID, book.ID, automationStringValue(entry["comicCollectionId"], ""))
+						var publishErr error
+						var record N8ComicPublishRecord
+						if collectionErr != nil {
+							publishErr = collectionErr
+						} else if c.comicPublish == nil {
+							publishErr = fmt.Errorf("N8 漫画发布服务未配置")
+						} else {
+							record, publishErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, effective)
+						}
+						cancel()
+						if publishErr != nil {
+							fail("comic_publish", publishErr, "漫画合集发布失败")
+							continue
+						}
+						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
+						delete(entry, "retryRequested")
+						delete(entry, "retryAt")
+						delete(entry, "retryReason")
+						entry["comicCarouselId"], entry["comicPublishName"] = record.CarouselID, record.Name
+						entry["comicImageIDs"] = record.ImageIDs
+						persist()
+						continue
+					}
 					acknowledgeComicRetry(entry)
 					switch selectComicPreparationAction(book, effective) {
 					case comicPreparationBootstrap:
@@ -1779,6 +1889,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						} else {
 							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
 						}
+						delete(entry, "retryRequested")
+						delete(entry, "retryAt")
+						delete(entry, "retryReason")
 						entry["comicCarouselId"], entry["comicPublishName"] = record.CarouselID, record.Name
 						entry["comicImageIDs"] = record.ImageIDs
 						persist()
@@ -2367,7 +2480,11 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 		}
 		status := automationStringValue(entry["status"], "")
 		if status == "failed" || status == "blocked" || status == "paused" || status == "stopped" {
-			entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", "assets", "重新执行失败阶段", "", now
+			stage, message := "assets", "重新执行失败阶段"
+			if automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+				stage, message = "comic_publish", "重新发布已生成漫画合集"
+			}
+			entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", stage, message, "", now
 			entry["retryRequested"] = true
 			// 人工重试视为重新授权一轮自动重试预算；否则 3/3 用尽后的重试
 			// 会被 scheduleComicContentPolicyRetry 直接判死，按钮等于失效。

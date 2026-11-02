@@ -8,12 +8,19 @@ import (
 
 type AIGenderJudge func(ctx context.Context, info BookInfo) (string, error)
 
+type GenderAIResult struct {
+	Gender     string  `json:"gender"`
+	Confidence float64 `json:"confidence"`
+	Reason     string  `json:"reason"`
+}
+
 type GenderSource string
 
 const (
 	GenderManual   GenderSource = "manual"
 	GenderBookInfo GenderSource = "bookinfo"
 	GenderAI       GenderSource = "ai"
+	GenderFallback GenderSource = "fallback"
 	GenderUnknown  GenderSource = "unknown"
 )
 
@@ -35,11 +42,14 @@ type BookInfo struct {
 // which representation the upstream used.
 func (info *BookInfo) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Category  string          `json:"category"`
-		Genre     json.RawMessage `json:"genre"`
-		WorkTitle string          `json:"work_title"`
-		Theme     json.RawMessage `json:"theme"`
-		Labels    json.RawMessage `json:"labels"`
+		Category       string          `json:"category"`
+		Genre          json.RawMessage `json:"genre"`
+		WorkTitle      string          `json:"work_title"`
+		PersistedTitle string          `json:"workTitle"`
+		BookName       string          `json:"book_name"`
+		Theme          json.RawMessage `json:"theme"`
+		PersistedTheme json.RawMessage `json:"themes"`
+		Labels         json.RawMessage `json:"labels"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -49,8 +59,18 @@ func (info *BookInfo) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	themes := decodeBookInfoNames(raw.Theme)
+	if len(themes) == 0 {
+		themes = decodeBookInfoNames(raw.PersistedTheme)
+	}
 	labels := decodeBookInfoNames(raw.Labels)
-	*info = BookInfo{Category: raw.Category, Genre: genre, WorkTitle: raw.WorkTitle, Themes: strings.Join(themes, "、"), Labels: strings.Join(labels, "、")}
+	workTitle := strings.TrimSpace(raw.WorkTitle)
+	if workTitle == "" {
+		workTitle = strings.TrimSpace(raw.PersistedTitle)
+	}
+	if workTitle == "" {
+		workTitle = strings.TrimSpace(raw.BookName)
+	}
+	*info = BookInfo{Category: raw.Category, Genre: genre, WorkTitle: workTitle, Themes: strings.Join(themes, "、"), Labels: strings.Join(labels, "、")}
 	return nil
 }
 
@@ -93,31 +113,75 @@ func decodeUpstreamTextOrNumber(raw json.RawMessage) (string, error) {
 }
 
 type GenderDecision struct {
-	Gender string       `json:"gender"`
-	Source GenderSource `json:"genderSource"`
-	Reason string       `json:"genderReason"`
+	Gender     string       `json:"gender"`
+	Source     GenderSource `json:"genderSource"`
+	Reason     string       `json:"genderReason"`
+	Confidence float64      `json:"confidence"`
 }
 
 func ResolveGender(ctx context.Context, manual string, info BookInfo, judge AIGenderJudge) GenderDecision {
 	if strings.TrimSpace(manual) != "" {
-		return DecideGender(manual, BookInfo{}, "")
+		return trustedGenderDecision(DecideGender(manual, BookInfo{}, ""))
 	}
 	category := normalizeGender(info.Category)
 	genre := normalizeGender(info.Genre)
 	additional := normalizeAdditionalGender(info)
 	if category == "" && genre == "" && additional != "" {
-		return GenderDecision{Gender: additional, Source: GenderBookInfo, Reason: "采用平台主题与标签中的明确男女频倾向"}
+		return GenderDecision{Gender: additional, Source: GenderBookInfo, Reason: "采用平台主题与标签中的明确男女频倾向", Confidence: 1}
 	}
 	if (category != "" && genre != "" && category != genre) || category == "" && genre == "" {
 		if judge != nil {
-			aiGender, err := judge(ctx, info)
+			response, err := judge(ctx, info)
 			if err == nil {
-				return DecideGender("", info, aiGender)
+				aiResult := parseGenderAIResult(response)
+				if aiResult.Gender != "" {
+					decision := DecideGender("", info, aiResult.Gender)
+					if decision.Source == GenderAI {
+						decision.Confidence = aiResult.Confidence
+						decision.Reason = aiResult.Reason
+						return decision
+					}
+				}
 			}
 		}
 		return GenderDecision{Gender: "待确认", Source: GenderUnknown, Reason: "分类信息无法确定且 AI 未返回有效判断"}
 	}
-	return DecideGender("", info, "")
+	return trustedGenderDecision(DecideGender("", info, ""))
+}
+
+func trustedGenderDecision(decision GenderDecision) GenderDecision {
+	if decision.Source == GenderManual || decision.Source == GenderBookInfo {
+		decision.Confidence = 1
+	}
+	return decision
+}
+
+func parseGenderAIResult(content string) GenderAIResult {
+	raw := strings.TrimSpace(content)
+	if strings.HasPrefix(raw, "```") {
+		raw = strings.TrimSpace(strings.TrimPrefix(raw, "```json"))
+		raw = strings.TrimSpace(strings.TrimSuffix(raw, "```"))
+	}
+	var result GenderAIResult
+	if json.Unmarshal([]byte(raw), &result) == nil {
+		if gender := normalizeGender(result.Gender); gender != "" {
+			// reason/confidence are optional; the gender itself is the only
+			// value production needs.
+			if result.Confidence <= 0 {
+				result.Confidence = 0.8
+			}
+			if strings.TrimSpace(result.Reason) == "" {
+				result.Reason = "采用模型返回的男女频"
+			}
+			result.Gender = gender
+			return result
+		}
+	}
+	// Tolerate a plain-text answer such as "女频".
+	if gender := normalizeGender(raw); gender != "" {
+		return GenderAIResult{Gender: gender, Confidence: 0.8, Reason: "采用模型返回的男女频"}
+	}
+	return GenderAIResult{}
 }
 
 func DecideGender(manual string, info BookInfo, aiGender string) GenderDecision {

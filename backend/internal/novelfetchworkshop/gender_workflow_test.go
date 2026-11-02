@@ -9,7 +9,7 @@ func TestResolveGenderManualWinsOverBookInfoAndAI(t *testing.T) {
 	calls := 0
 	got := ResolveGender(context.Background(), "女频", BookInfo{Category: "男频", Genre: "男性向"}, func(context.Context, BookInfo) (string, error) {
 		calls++
-		return "男频", nil
+		return `{"gender":"男频","confidence":0.94,"reason":"平台分类冲突时按正文主线判断"}`, nil
 	})
 	if got.Gender != "女频" || got.Source != GenderManual || calls != 0 {
 		t.Fatalf("got=%#v calls=%d", got, calls)
@@ -51,9 +51,12 @@ func TestResolveGenderPreservesExplicitCategoryWhenGenreIsOrdinaryText(t *testin
 
 func TestResolveGenderUsesInjectedAIOnlyForConflictAndUnknown(t *testing.T) {
 	calls := 0
-	ai := func(context.Context, BookInfo) (string, error) { calls++; return "男频", nil }
+	ai := func(context.Context, BookInfo) (string, error) {
+		calls++
+		return `{"gender":"男频","confidence":0.93,"reason":"男主成长线为主"}`, nil
+	}
 	got := ResolveGender(context.Background(), "", BookInfo{Category: "男频", Genre: "女频"}, ai)
-	if got.Gender != "男频" || got.Source != GenderAI || calls != 1 {
+	if got.Gender != "男频" || got.Source != GenderAI || got.Confidence != 0.93 || got.Reason != "男主成长线为主" || calls != 1 {
 		t.Fatalf("conflict got=%#v calls=%d", got, calls)
 	}
 	got = ResolveGender(context.Background(), "", BookInfo{}, ai)
@@ -62,11 +65,11 @@ func TestResolveGenderUsesInjectedAIOnlyForConflictAndUnknown(t *testing.T) {
 	}
 }
 
-func TestResolveGenderAIUnableReturnsPendingConfirmation(t *testing.T) {
+func TestResolveGenderKeepsValidLowConfidenceAIResult(t *testing.T) {
 	got := ResolveGender(context.Background(), "", BookInfo{Category: "男频", Genre: "女频"}, func(context.Context, BookInfo) (string, error) {
-		return "", nil
+		return `{"gender":"女频","confidence":0.61,"reason":"线索不充分"}`, nil
 	})
-	if got.Gender != "待确认" || got.Source != GenderUnknown {
-		t.Fatalf("got=%#v", got)
+	if got.Gender != "女频" || got.Source != GenderAI || got.Confidence != 0.61 {
+		t.Fatalf("got=%#v, want valid AI classification with recorded confidence", got)
 	}
 }

@@ -93,6 +93,29 @@ func TestResolveSingleFetchPlatform(t *testing.T) {
 	}
 }
 
+func TestFinalizeFetchedBatchClassificationUsesDefaultsInsteadOfBlocking(t *testing.T) {
+	got := finalizeFetchedBatchClassification(map[string]any{"gender": "女频", "styleStatus": "failed", "styleError": "AI 风格判断失败：模型服务返回 HTTP 503"})
+	if got["classifyStatus"] != "classified" || got["style"] != "现代通用" || got["classifyNeedsReview"] != true {
+		t.Fatalf("metadata=%#v", got)
+	}
+	if note := fmt.Sprint(got["classifyNote"]); !strings.Contains(note, "HTTP 503") {
+		t.Fatalf("classify note = %q, want original style error retained for diagnosis", note)
+	}
+	if got["classifyError"] != "" {
+		t.Fatalf("classifyError = %#v, want no blocking error", got["classifyError"])
+	}
+}
+
+func TestFinalizeFetchedBatchClassificationDoesNotBlockValidLowConfidenceLabels(t *testing.T) {
+	got := finalizeFetchedBatchClassification(map[string]any{
+		"gender": "女频", "genderSource": "ai", "genderConfidence": 0.62,
+		"style": "现代悬疑", "styleSource": "ai", "styleConfidence": 0.6,
+	})
+	if got["classifyStatus"] != "classified" {
+		t.Fatalf("metadata=%#v, want valid labels accepted regardless of confidence threshold", got)
+	}
+}
+
 func TestClassifyFetchedBatchBookUsesAIForUnspecifiedBookInfo(t *testing.T) {
 	metadata := classifyFetchedBatchBook(context.Background(), "alice", novelfetchworkshop.BookInfo{}, "正文", map[string]any{}, batchFetchClassification{
 		AIGenderJudge: func(context.Context, novelfetchworkshop.BookInfo) (string, error) {
@@ -113,5 +136,33 @@ func TestClassifyFetchedBatchBookUsesAIForUnspecifiedBookInfo(t *testing.T) {
 	}
 	if metadata["styleConfidence"] != 0.9 {
 		t.Fatalf("style confidence = %#v", metadata["styleConfidence"])
+	}
+}
+
+func TestEnsureAutomationSourceRecoversPendingClassification(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	ctx := context.Background()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "批次", Books: []batchfactoryv11.CreateBookInput{{Title: "书", SourceText: "已获取正文"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	genderCalls, styleCalls := 0, 0
+	coordinator := &BatchAutomationCoordinator{store: store, classification: batchFetchClassification{
+		AIGenderJudge: func(context.Context, novelfetchworkshop.BookInfo) (string, error) {
+			genderCalls++
+			return `{"gender":"女频","confidence":0.95,"reason":"情感主线明确"}`, nil
+		},
+		RewriteProvider: singleFetchRewriteProvider(func(context.Context, novelfetchworkshop.RewriteRequest) (string, error) {
+			styleCalls++
+			return `{"style":"现代悬疑","confidence":0.95,"reason":"案件线索推动主线"}`, nil
+		}),
+	}}
+	book := batch.Books[0]
+	book.SourceMetadata = map[string]any{"classifyStatus": "pending_confirmation", "classifyError": "没有得到有效风格结果"}
+	if _, err := coordinator.ensureAutomationSource(ctx, "alice", batch.ID, book); err != nil {
+		t.Fatalf("ensureAutomationSource should continue instead of demanding manual confirmation, got %v", err)
+	}
+	if genderCalls != 1 || styleCalls != 1 {
+		t.Fatalf("reclassified once: gender calls=%d style calls=%d", genderCalls, styleCalls)
 	}
 }

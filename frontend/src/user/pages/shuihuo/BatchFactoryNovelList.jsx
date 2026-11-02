@@ -10,6 +10,7 @@ import {
   BarsOutlined,
   CloudUploadOutlined,
   CloseOutlined,
+	DownloadOutlined,
   FileTextOutlined,
   LoadingOutlined,
   ReloadOutlined,
@@ -62,6 +63,7 @@ import {
   getBookAssetImageGenerationTask,
   generateComicPage,
   downloadComicPromptZip,
+	downloadComicCollectionImageZip,
   getComicPagePromptPreview,
   listComicPages,
 	getComicSourceSegments,
@@ -132,7 +134,7 @@ import { BatchFactoryUnifiedSettingsModal } from './BatchFactoryUnifiedSettingsM
 import { BatchFactoryBookSettingsModal } from './BatchFactoryBookSettingsModal';
 import { audioPlanningRequired, normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { BatchFactoryGiantMaterialPendingProgress } from './BatchFactoryGiantMaterialPendingProgress';
-import { automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState';
+import { shouldAutoClassifyBook, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, comicAnalysisCharactersForBook, batchFactoryProductionText, batchFactorySourceText, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange';
 import { assetsForProductionMode } from './batchFactoryAssetMode';
 import { comicPageGenerationPayload, comicPromptForImageAspect } from './batchFactoryComicMode';
@@ -658,18 +660,26 @@ function completePublishMapping(_settings = {}, book = {}) {
   // submit; a batch profile may only supply presentation/advanced options.
   return Boolean(sourcePlatformIdForUpload(book));
 }
+function hasClassificationValues(metadata = {}) {
+  const gender = String(metadata?.gender || metadata?.gender_name || '').trim();
+  const style = String(metadata?.style || metadata?.styleName || metadata?.style_name || '').trim();
+  return Boolean(gender && gender !== '待确认' && style && !['待判定', '未判定'].includes(style));
+}
 function classificationLabel(metadata = {}) {
   const status = String(metadata?.classifyStatus || '').trim();
-  if (status === 'classified') return '已识别';
   if (status === 'manual') return '已手调';
-  if (status === 'pending_confirmation') return '待人工确认';
-  if (status === 'failed') return '识别失败';
+  if (status === 'classified') return metadata?.classifyNeedsReview ? '已自动分类' : '已识别';
+  if (status === 'failed' || status === 'pending_confirmation') return hasClassificationValues(metadata) ? '已自动分类' : '待识别';
   return '待识别';
 }
 function classificationDetail(metadata = {}) {
-  if (String(metadata?.classifyStatus || '').trim() === 'failed') return `原文已获取，等待分类确认；确认分类后可继续改写。${String(metadata?.classifyError || '男女频和风格识别未完成，请重试。').trim()}`;
-  if (String(metadata?.classifyStatus || '').trim() === 'classified') return String(metadata?.classifyReason || '已根据当前书正文保存识别结果。').trim();
-  if (String(metadata?.classifyStatus || '').trim() === 'pending_confirmation') return '原文已获取，等待分类确认；确认分类后可继续改写。';
+  const status = String(metadata?.classifyStatus || '').trim();
+  if (status === 'classified' && metadata?.classifyNeedsReview) return String(metadata?.classifyReason || '原文已获取，系统已自动确定男女频和风格，可在单书配置中修改。').trim();
+  if (status === 'classified') return String(metadata?.classifyReason || '已根据当前书正文保存识别结果。').trim();
+  if (status === 'failed' || status === 'pending_confirmation') {
+    if (hasClassificationValues(metadata)) return '原文已获取，系统已自动确定男女频和风格，可在单书配置中修改。';
+    return `原文已获取，正在自动重试分类。${String(metadata?.classifyNote || metadata?.classifyError || '').trim()}`.trim();
+  }
   return '尚未发起识别。';
 }
 const BATCH_FACTORY_TABLE_COLUMNS = [
@@ -2655,6 +2665,27 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 			message.success(`漫画合集已收集第 ${collectionStart}-${collectionEnd} 页主图。`);
 		} catch (error) { message.error(error?.message || '生成漫画合集失败'); } finally { setBusy(''); }
 	}
+	async function downloadCollectionImages(collection) {
+		if (!collection?.id || busy) return;
+		const requestKey = `collection-download-${collection.id}`;
+		setBusy(requestKey);
+		try {
+			const blob = await downloadComicCollectionImageZip(batchId, book.id, collection.id);
+			const objectURL = URL.createObjectURL(blob);
+			const anchor = document.createElement('a');
+			anchor.href = objectURL;
+			anchor.download = `${String(book.title || '漫画合集').replace(/[\\/:*?"<>|]/g, '_').trim() || '漫画合集'}.zip`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			anchor.remove();
+			window.setTimeout(() => URL.revokeObjectURL(objectURL), 1000);
+			message.success('漫画合集图片已开始打包下载。');
+		} catch (error) {
+			message.error(error?.message || '下载漫画合集图片失败');
+		} finally {
+			setBusy(current => current === requestKey ? '' : current);
+		}
+	}
 	async function regenerateCurrentPage() {
 		if (!selectedVideoId || !onGeneratePage) return;
 		await onGeneratePage?.(selectedVideoId, selectedVideo?.comicImagePrompt || selectedVideo?.comicPrompt || '');
@@ -2770,7 +2801,7 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 		<section className="batch-factory-comic-media-section batch-factory-comic-page-reference"><header><div><b>本页参考图</b><small>约束人物、服装和画风</small></div><span>{selectedPage?.referenceImageUrls?.length ? `已设置 ${selectedPage.referenceImageUrls.length} 张` : '未设置'}</span></header><Space wrap>{(selectedPage?.referenceImageUrls || []).map(referenceURL => <AuthenticatedComicPageReference key={referenceURL} referenceURL={referenceURL} />)}<AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadPageReference} disabled={!selectedVideoId || referenceUploading || Boolean(busy)}><Button size="small" icon={<UploadOutlined />} loading={referenceUploading}>上传参考图</Button></AntUpload><Button size="small" disabled={!selectedPage?.referenceImageUrls?.length || Boolean(busy)} loading={busy === 'reference-all'} onClick={applyPageReferenceToAll}>应用到全部</Button>{selectedPage?.referenceImageUrls?.length ? <Button size="small" danger disabled={Boolean(busy)} loading={busy === 'reference'} onClick={() => savePageReferences([], '当前漫画页参考图已清空。')}>清空</Button> : null}</Space></section>
 		<section className="batch-factory-comic-media-section batch-factory-comic-media-source"><ComicSourceContent segment={sourceSegment} ordinal={selectedIndex} onSplit={splitSource} embedded /></section>
 	</div>;
-	const collectionTab = <div className="batch-factory-comic-collections"><div className="batch-factory-comic-collection-actions"><div><b>漫画合集</b><small>按页码范围收集当前主图；同一本书可以分批生成多个合集。</small></div><Tag color={publishConfigured ? 'success' : 'warning'}>{publishStatusLoaded ? (publishConfigured ? '漫画后台已连接' : '漫画后台未配置') : '检查连接中'}</Tag></div><section className="batch-factory-comic-collection-range"><header><div><b>生成漫画合集</b><small>发布接口支持 2–35 页，未选中的页不会进入本合集。</small></div><Tag color={canMakeCollection ? 'success' : 'warning'}>{selectedCollectionPageCount} 页 · 已就绪 {selectedReadyPageCount} 页</Tag></header><div className="batch-factory-comic-collection-range-fields"><span>第</span><InputNumber min={1} max={maxCollectionPage} value={normalizedCollectionStart} onChange={value => updateCollectionRange(value, normalizedCollectionEnd)} /><span>页至</span><InputNumber min={normalizedCollectionStart} max={maxCollectionPage} value={normalizedCollectionEnd} onChange={value => updateCollectionRange(normalizedCollectionStart, value)} /><span>页</span></div><div className="batch-factory-comic-collection-range-shortcuts"><Button type="link" size="small" onClick={() => updateCollectionRange(1, Math.min(maxCollectionPage, 35))}>前 35 页</Button><Button type="link" size="small" onClick={() => updateCollectionRange(Math.max(1, maxCollectionPage - 34), maxCollectionPage)}>后 35 页</Button></div><Button className="batch-factory-comic-collection-range-submit" type="primary" loading={busy === 'collection'} disabled={!canMakeCollection || Boolean(busy)} onClick={makeCollection}>整理所选页为合集</Button></section>{collections.slice().reverse().map(collection => { const published = publishedByCollection[collection.id]; return <section key={collection.id}><header><b>{new Date(collection.createdAt).toLocaleString()}</b><Space><Tag color="success">{collection.items?.length || 0} 页</Tag>{published ? <Tag color="blue">已发布 #{published.carouselId}</Tag> : <Button size="small" disabled={!publishConfigured || (collection.items?.length || 0) < 2 || (collection.items?.length || 0) > 35} loading={busy === `publish-${collection.id}`} onClick={() => openComicPublish(collection)}>发布到漫画后台</Button>}</Space></header><div>{(collection.items || []).map(item => <figure key={`${collection.id}-${item.ordinal}`}><AuthenticatedComicPageImage imageUrl={item.url} alt={`第 ${item.ordinal} 页`} /><figcaption>第 ${item.ordinal} 页</figcaption></figure>)}</div></section>; })}{!collections.length ? <div className="batch-factory-cell-empty">先选择页码范围，再整理当前选中页的主图。</div> : null}</div>;
+	const collectionTab = <div className="batch-factory-comic-collections"><div className="batch-factory-comic-collection-actions"><div><b>漫画合集</b><small>按页码范围收集当前主图；同一本书可以分批生成多个合集。</small></div><Tag color={publishConfigured ? 'success' : 'warning'}>{publishStatusLoaded ? (publishConfigured ? '漫画后台已连接' : '漫画后台未配置') : '检查连接中'}</Tag></div><section className="batch-factory-comic-collection-range"><header><div><b>生成漫画合集</b><small>发布接口支持 2–35 页，未选中的页不会进入本合集。</small></div><Tag color={canMakeCollection ? 'success' : 'warning'}>{selectedCollectionPageCount} 页 · 已就绪 {selectedReadyPageCount} 页</Tag></header><div className="batch-factory-comic-collection-range-fields"><span>第</span><InputNumber min={1} max={maxCollectionPage} value={normalizedCollectionStart} onChange={value => updateCollectionRange(value, normalizedCollectionEnd)} /><span>页至</span><InputNumber min={normalizedCollectionStart} max={maxCollectionPage} value={normalizedCollectionEnd} onChange={value => updateCollectionRange(normalizedCollectionStart, value)} /><span>页</span></div><div className="batch-factory-comic-collection-range-shortcuts"><Button type="link" size="small" onClick={() => updateCollectionRange(1, Math.min(maxCollectionPage, 35))}>前 35 页</Button><Button type="link" size="small" onClick={() => updateCollectionRange(Math.max(1, maxCollectionPage - 34), maxCollectionPage)}>后 35 页</Button></div><Button className="batch-factory-comic-collection-range-submit" type="primary" loading={busy === 'collection'} disabled={!canMakeCollection || Boolean(busy)} onClick={makeCollection}>整理所选页为合集</Button></section>{collections.slice().reverse().map(collection => { const published = publishedByCollection[collection.id]; return <section key={collection.id}><header><b>{new Date(collection.createdAt).toLocaleString()}</b><Space><Tag color="success">{collection.items?.length || 0} 页</Tag><Button size="small" icon={<DownloadOutlined />} disabled={!collection.items?.length || Boolean(busy)} loading={busy === `collection-download-${collection.id}`} onClick={() => downloadCollectionImages(collection)}>下载图片</Button>{published ? <Tag color="blue">已发布 #{published.carouselId}</Tag> : <Button size="small" disabled={!publishConfigured || (collection.items?.length || 0) < 2 || (collection.items?.length || 0) > 35} loading={busy === `publish-${collection.id}`} onClick={() => openComicPublish(collection)}>发布到漫画后台</Button>}</Space></header><div>{(collection.items || []).map(item => <figure key={`${collection.id}-${item.ordinal}`}><AuthenticatedComicPageImage imageUrl={item.url} alt={`第 ${item.ordinal} 页`} /><figcaption>第 ${item.ordinal} 页</figcaption></figure>)}</div></section>; })}{!collections.length ? <div className="batch-factory-cell-empty">先选择页码范围，再整理当前选中页的主图。</div> : null}</div>;
 	return <><div className="batch-factory-comic-media-workbench">
 		<section className="batch-factory-comic-media-preview">{primary?.url ? <AuthenticatedComicPageImage imageUrl={primary.url} alt="当前漫画主图" preview /> : <div className="batch-factory-comic-media-preview-empty"><PictureOutlined /><strong>{selectedPage ? '当前漫画页还没有主图' : '当前分镜还没有漫画候选图'}</strong><span>{selectedComicPageStatus}</span><small>整体完成度 {readyComicPageCount} / {videos.length} 页（{comicCompletionPercent}%）</small></div>}</section>
 		<aside className="batch-factory-comic-media-tools">
@@ -5146,19 +5177,12 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     } finally { setActionBusy(''); }
   }
 
-  // 已有正文但没有分类结果的存量书，进入列表后自动补一次 AI 判断。
-  // 旧数据可能停在 processing/failed，不能因为状态值存在就永远跳过；
-  // 每本书每次进入列表只自动尝试一次，失败后仍可在详情里手动重试。
+  // 只为没有分类状态的旧书补一次判断；已记录失败的书只允许用户手动重试。
   useEffect(() => {
     if (!batch?.id || !books.length) return undefined;
     const pending = books.filter(book => {
-      const text = String(book?.sourceText || '').trim();
-      const metadata = book?.sourceMetadata || {};
-      const status = String(metadata.classifyStatus || '').trim().toLowerCase();
-      const hasGender = String(metadata.gender || metadata.gender_name || '').trim();
-      const hasStyle = String(metadata.style || metadata.styleName || metadata.style_name || '').trim();
       const attemptKey = `${batch.id}:${book.id}`;
-      return text && !hasGender && !hasStyle && !['classified', 'manual'].includes(status) && !autoClassificationInFlightRef.current.has(String(book.id)) && !autoClassificationAttemptedRef.current.has(attemptKey);
+      return shouldAutoClassifyBook(book) && !autoClassificationInFlightRef.current.has(String(book.id)) && !autoClassificationAttemptedRef.current.has(attemptKey);
     });
     if (!pending.length) return undefined;
     let active = true;
@@ -6044,9 +6068,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             const classifyBusy = actionBusy === `classify-${viewingBook.id}`;
             const sensitiveDetail = sensitiveProcessingDetail(viewingBook);
             const classifyFailed =
-              String(
-                viewingBook?.sourceMetadata?.classifyStatus || "",
-              ).trim() === "failed";
+              ["failed", "pending_confirmation"].includes(
+                String(
+                  viewingBook?.sourceMetadata?.classifyStatus || "",
+                ).trim(),
+              ) && !hasClassificationValues(viewingBook?.sourceMetadata);
             return (
               <div className="batch-factory-book-detail">
                 <section className="batch-factory-book-detail-status">
@@ -6060,7 +6086,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                       type="info"
                       showIcon
                       message="正在识别男女频、风格和标签…"
-                      description="识别把握不足时需人工确认，确认后才能继续生产。"
+                      description="识别完成后自动继续，不会打断生产流程。"
                     />
                   ) : null}
                   {classifyFailed ? (

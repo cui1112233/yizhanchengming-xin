@@ -200,7 +200,11 @@ func classifyFetchedBatchBook(ctx context.Context, owner string, bookInfo novelf
 			judge = resolved
 		}
 	}
-	classificationResult := novelfetchworkshop.ClassifyBook(ctx, stringValue(meta["gender"]), info, judge, providerForBatchClassification(ctx, owner, classification))
+	manualGender := ""
+	if strings.EqualFold(strings.TrimSpace(stringValue(meta["genderSource"])), "manual") {
+		manualGender = stringValue(meta["gender"])
+	}
+	classificationResult := novelfetchworkshop.ClassifyBook(ctx, manualGender, info, judge, providerForBatchClassification(ctx, owner, classification))
 	decision := classificationResult.Gender
 	if decision.Gender != "" {
 		meta["gender"] = decision.Gender
@@ -226,43 +230,88 @@ func providerForBatchClassification(ctx context.Context, owner string, classific
 
 // Fetching正文 and classifying its metadata are separate stages. Keep the
 // classification result explicit so a failed AI判断 can be retried without
-// fetching the正文 again.
+// fetching the正文 again. Classification always produces a usable pair: a
+// missing value is derived from the other one, and an unknown pair falls back
+// to a default so production is never blocked by a confirmation step.
 func finalizeFetchedBatchClassification(metadata map[string]any) map[string]any {
 	meta := copyAnyMap(metadata)
-	gender := firstMetadataString(meta, "gender", "gender_name")
-	style := firstMetadataString(meta, "style", "styleName", "style_name")
-	genderSource := strings.ToLower(firstMetadataString(meta, "genderSource"))
-	styleSource := strings.ToLower(firstMetadataString(meta, "styleSource"))
-	genderConfidence := targetNumber(meta["genderConfidence"])
-	styleConfidence := targetNumber(meta["styleConfidence"])
-	if genderSource == "ai" && genderConfidence < novelfetchworkshop.ClassificationConfidenceThreshold ||
-		styleSource == "ai" && styleConfidence < novelfetchworkshop.ClassificationConfidenceThreshold {
-		meta["classifyStatus"] = "pending_confirmation"
-		meta["classifyError"] = "AI 判断把握不足，请人工确认男女频和风格"
-		meta["classifyRetryable"] = false
-		return meta
+	gender := validBatchGender(firstMetadataString(meta, "gender", "gender_name"))
+	style := validBatchStyle(firstMetadataString(meta, "style", "styleName", "style_name"))
+	note := firstMetadataString(meta, "styleError")
+	needsReview := false
+	if gender == "" && style != "" {
+		gender = genderForBatchStyle(style)
+		meta["genderSource"] = "fallback"
+		meta["genderReason"] = "平台与 AI 未给出明确男女频，已按风格采用默认男女频"
+		meta["genderConfidence"] = 0.5
+		needsReview = true
 	}
-	if gender == "" || gender == "待确认" || style == "" || style == "待判定" || style == "未判定" {
-		meta["classifyStatus"] = "failed"
-		meta["classifyError"] = "男女频或风格判断把握不足，请人工确认后重试"
-		meta["classifyRetryable"] = true
-		return meta
+	if style == "" {
+		if gender == "" {
+			gender = "女频"
+			meta["genderSource"] = "fallback"
+			meta["genderReason"] = "未能判断男女频，已采用默认女频"
+			meta["genderConfidence"] = 0.5
+			needsReview = true
+		}
+		style = defaultBatchStyleForGender(gender)
+		meta["styleSource"] = "fallback"
+		meta["styleReason"] = "未能判断风格，已采用默认风格"
+		meta["styleConfidence"] = 0.5
+		needsReview = true
 	}
+	if strings.EqualFold(stringValue(meta["styleSource"]), "fallback") || strings.EqualFold(stringValue(meta["genderSource"]), "fallback") {
+		needsReview = true
+	}
+	if note != "" {
+		meta["classifyNote"] = note
+	}
+	meta["gender"] = gender
+	meta["style"] = style
+	meta["styleStatus"] = "classified"
+	delete(meta, "styleError")
 	meta["classifyStatus"] = "classified"
 	meta["classifyError"] = ""
 	meta["classifyRetryable"] = false
-	meta["classifyReason"] = fmt.Sprintf("已识别为%s（%s）/ %s（%s）", gender, confidenceSummary(genderSource, genderConfidence), style, confidenceSummary(styleSource, styleConfidence))
+	meta["classifyNeedsReview"] = needsReview
+	if needsReview {
+		meta["classifyReason"] = fmt.Sprintf("已自动采用%s / %s，可在单书配置中修改", gender, style)
+	} else {
+		meta["classifyReason"] = fmt.Sprintf("已识别为%s / %s", gender, style)
+	}
 	return meta
 }
 
-func confidenceSummary(source string, confidence float64) string {
-	if source == "ai" {
-		return fmt.Sprintf("AI 把握 %.0f%%", confidence*100)
+func validBatchGender(value string) string {
+	switch strings.TrimSpace(value) {
+	case "男频", "女频":
+		return strings.TrimSpace(value)
 	}
-	if source == "manual" {
-		return "人工选择"
+	return ""
+}
+
+func validBatchStyle(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "待判定" || value == "未判定" {
+		return ""
 	}
-	return "平台分类"
+	return value
+}
+
+func defaultBatchStyleForGender(gender string) string {
+	if gender == "男频" {
+		return "男频都市"
+	}
+	return "现代通用"
+}
+
+func genderForBatchStyle(style string) string {
+	switch style {
+	case "男频都市", "玄幻", "历史":
+		return "男频"
+	default:
+		return "女频"
+	}
 }
 
 func registerV12PublishClassificationRoute(mux *http.ServeMux, store batchfactoryv11.Store, classification batchFetchClassification) {
@@ -297,9 +346,9 @@ func registerV12PublishClassificationRoute(mux *http.ServeMux, store batchfactor
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "小说不存在"})
 			return
 		}
-		gender := firstMetadataString(book.SourceMetadata, "gender", "gender_name")
-		style := firstMetadataString(book.SourceMetadata, "style", "styleName", "style_name")
-		if !input.Force && gender != "" && style != "" && stringValue(book.SourceMetadata["classifyStatus"]) == "classified" {
+		gender := validBatchGender(firstMetadataString(book.SourceMetadata, "gender", "gender_name"))
+		style := validBatchStyle(firstMetadataString(book.SourceMetadata, "style", "styleName", "style_name"))
+		if !input.Force && gender != "" && style != "" {
 			writeJSON(w, http.StatusOK, map[string]any{"book": *book, "reused": true})
 			return
 		}
@@ -310,15 +359,9 @@ func registerV12PublishClassificationRoute(mux *http.ServeMux, store batchfactor
 			Labels:   firstMetadataString(book.SourceMetadata, "labels", "tags"),
 		}
 		metadata := finalizeFetchedBatchClassification(classifyFetchedBatchBook(r.Context(), owner, info, book.SourceText, book.SourceMetadata, classification))
-		gender = firstMetadataString(metadata, "gender", "gender_name")
-		style = firstMetadataString(metadata, "style", "styleName", "style_name")
 		updated, err := store.UpdateBookMetadata(r.Context(), owner, batch.ID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
-			return
-		}
-		if metadata["classifyStatus"] != "classified" {
-			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": metadata["classifyError"], "book": updated})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"book": updated, "reused": false})

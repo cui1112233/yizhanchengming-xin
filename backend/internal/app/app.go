@@ -23,6 +23,8 @@ import (
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
+	"qiantie/backend/internal/n8catalog"
+	"qiantie/backend/internal/n8comic"
 	"qiantie/backend/internal/novelfetchworkshop"
 	"qiantie/backend/internal/prompt"
 	"qiantie/backend/internal/storage"
@@ -142,11 +144,11 @@ func textGenderJudge(provider *batchfactoryv11.OpenAICompatibleProvider) novelfe
 	}
 	return func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
 		return provider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
-			SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
+			SystemPrompt:        "你是小说男女频分类助手。只输出 JSON：{\"gender\":\"男频或女频\"}。必须从「男频」「女频」中选择最接近的一项，不要留空，不要输出 JSON 以外的内容。",
 			UserPrompt:          "请根据以下分类信息和正文片段判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre + "；正文片段=" + genderTextExcerpt(info.Text),
 			Temperature:         0,
 			MaxTokens:           256,
-			DisableJSONResponse: true,
+			DisableJSONResponse: false,
 		})
 	}
 }
@@ -188,6 +190,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	agentWorkspaceStore := agentworkspace.NewMySQLStore(db)
 	agentAssetStore := agentworkspace.NewMySQLAssetStore(db)
 	var agentAssetObjects agentworkspace.AssetObjectStore
+	var legacyAgentAssetObjects agentworkspace.AssetObjectStore
+	if cfg.AgentAssetLocalDir != "" {
+		legacyAgentAssetObjects = agentworkspace.NewLocalAssetObjectStore(cfg.AgentAssetLocalDir)
+	}
 	novelFetchStore.LegacyConfigDir = cfg.ScriptHistoryDir
 	if cfg.NovelFetchTOSEndpoint != "" || cfg.NovelFetchTOSRegion != "" || cfg.NovelFetchTOSBucket != "" || cfg.NovelFetchTOSAccessKey != "" || cfg.NovelFetchTOSSecretKey != "" {
 		bodyStore, bodyStoreErr := novelfetchworkshop.NewBodyTOSStore(novelfetchworkshop.BodyTOSConfig{Endpoint: cfg.NovelFetchTOSEndpoint, Region: cfg.NovelFetchTOSRegion, Bucket: cfg.NovelFetchTOSBucket, AccessKey: cfg.NovelFetchTOSAccessKey, SecretKey: cfg.NovelFetchTOSSecretKey})
@@ -201,9 +207,13 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		if storeErr != nil {
 			return nil, storeErr
 		}
-		agentAssetObjects = store
-	} else if cfg.AgentAssetLocalDir != "" {
-		agentAssetObjects = agentworkspace.NewLocalAssetObjectStore(cfg.AgentAssetLocalDir)
+		if legacyAgentAssetObjects != nil {
+			agentAssetObjects = agentworkspace.NewMigratingAssetObjectStore(store, store, legacyAgentAssetObjects)
+		} else {
+			agentAssetObjects = store
+		}
+	} else {
+		agentAssetObjects = legacyAgentAssetObjects
 	}
 	var director *batchfactoryv11.DirectorService
 	var textProvider *batchfactoryv11.OpenAICompatibleProvider
@@ -223,11 +233,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	if textProvider != nil {
 		novelFetchAIGenderJudge = func(ctx context.Context, info novelfetchworkshop.BookInfo) (string, error) {
 			return textProvider.Complete(ctx, batchfactoryv11.TextCompletionRequest{
-				SystemPrompt:        "你是小说男女频分类助手。只输出“男频”或“女频”，无法确定时输出“待确认”，不要解释。",
+				SystemPrompt:        "你是小说男女频分类助手。只输出 JSON：{\"gender\":\"男频或女频\",\"confidence\":0.0,\"reason\":\"判断依据\"}。confidence 范围为 0 到 1；依据不足时 gender 留空、confidence 设为 0 并说明原因。不要输出 JSON 以外的内容。",
 				UserPrompt:          "请根据以下分类信息和正文片段判断小说男女频：分类=" + info.Category + "；题材=" + info.Genre + "；正文片段=" + genderTextExcerpt(info.Text),
 				Temperature:         0,
 				MaxTokens:           256,
-				DisableJSONResponse: true,
+				DisableJSONResponse: false,
 			})
 		}
 		novelFetchRewrite = novelFetchRewriteAdapter{provider: textProvider}
@@ -412,7 +422,10 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		director.Provider = effectiveTextProvider
 	}
 	targetBaseURL := videoManagementTargetBaseURL()
-	return httpapi.NewRouter(httpapi.RouterOptions{BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}}), nil
+	n8ComicClient := n8comic.NewClient(n8comic.Config{BaseURL: cfg.N8ComicBaseURL, APIKey: cfg.N8ComicOpenAPIKey})
+	n8ProducerDirectory := n8catalog.NewClient(nil, cfg.N8AdminBaseURL, cfg.QingyuN8AdminToken)
+	n8ComicWorks := n8catalog.NewWorksClient(nil, cfg.N8ComicBaseURL, cfg.QingyuN8AdminToken)
+	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts}}), nil
 }
 
 func shouldStartLocalArtifactPurger(cfg config.Config) bool {
