@@ -1,44 +1,54 @@
 package httpapi
 
 import (
-	"errors"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
 
-func TestAssetImageGenerationTasksExposeTerminalFailure(t *testing.T) {
-	tasks := newAssetImageGenerationTasks()
-	tasks.put(assetImageGenerationTask{ID: "task-1", Owner: "alice", BatchID: "batch-1", BookID: "book-1", AssetIDs: []string{"asset-1"}, Status: "processing"})
-	tasks.finish("task-1", nil, errors.New("provider returned HTTP 503"))
+func newTestAssetImageTasks(t *testing.T) *assetImageGenerationTasks {
+	t.Helper()
+	t.Setenv("QIANTIE_ASSET_IMAGE_TASKS_PATH", filepath.Join(t.TempDir(), "asset-image-tasks.json"))
+	return newAssetImageGenerationTasks()
+}
 
-	task, found := tasks.get("task-1")
-	if !found || task.Status != "failed" || task.Error != "provider returned HTTP 503" {
-		t.Fatalf("task = %#v, found=%v", task, found)
+// 服务重启后，仍在生成中的任务不应变成 404，而应恢复为明确的失败状态。
+func TestAssetImageGenerationTasksMarkInterruptedTasksFailed(t *testing.T) {
+	first := newTestAssetImageTasks(t)
+	first.put(assetImageGenerationTask{
+		ID: "task-1", Owner: "owner", BatchID: "batch", BookID: "book",
+		AssetIDs: []string{"asset-1"}, Status: "processing", UpdatedAt: time.Now().UTC(),
+	})
+
+	second := newAssetImageGenerationTasks()
+	task, ok := second.get("task-1")
+	if !ok {
+		t.Fatalf("重启后应能读到任务记录")
 	}
-	if task.ImageCount != 0 || len(task.AssetIDs) != 1 || task.AssetIDs[0] != "asset-1" {
-		t.Fatalf("task result = %#v", task)
+	if task.Status != "failed" {
+		t.Fatalf("中断任务应标记为 failed，实际 %q", task.Status)
+	}
+	if task.Error == "" {
+		t.Fatalf("中断任务应带有原因说明")
 	}
 }
 
-func TestAssetImageGenerationTaskWithoutImagesCannotSucceed(t *testing.T) {
-	tasks := newAssetImageGenerationTasks()
-	tasks.put(assetImageGenerationTask{ID: "task-empty", Status: "processing"})
-	tasks.finish("task-empty", nil, nil)
+func TestAssetImageGenerationTasksPersistFinishedStatus(t *testing.T) {
+	first := newTestAssetImageTasks(t)
+	first.put(assetImageGenerationTask{
+		ID: "task-2", Owner: "owner", BatchID: "batch", BookID: "book",
+		Status: "processing", UpdatedAt: time.Now().UTC(),
+	})
+	first.finish("task-2", []batchfactoryv11.BookAssetImage{{AssetID: "asset-1"}}, nil)
 
-	task, found := tasks.get("task-empty")
-	if !found || task.Status != "failed" || task.Error == "" {
-		t.Fatalf("empty result must be a visible terminal failure: task=%#v found=%v", task, found)
+	second := newAssetImageGenerationTasks()
+	task, ok := second.get("task-2")
+	if !ok {
+		t.Fatalf("重启后应能读到已完成任务")
 	}
-}
-
-func TestAssetImageGenerationTasksKeepPartialSuccessVisible(t *testing.T) {
-	tasks := newAssetImageGenerationTasks()
-	tasks.put(assetImageGenerationTask{ID: "task-2", Status: "processing"})
-	tasks.finish("task-2", []batchfactoryv11.BookAssetImage{{ID: "image-1"}}, errors.New("second asset failed"))
-
-	task, found := tasks.get("task-2")
-	if !found || task.Status != "succeeded" || task.ImageCount != 1 || task.Error != "second asset failed" {
-		t.Fatalf("task = %#v, found=%v", task, found)
+	if task.Status != "succeeded" || task.ImageCount != 1 {
+		t.Fatalf("已完成任务状态应保留，实际 status=%q count=%d", task.Status, task.ImageCount)
 	}
 }

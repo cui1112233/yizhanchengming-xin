@@ -2,8 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,10 +41,55 @@ type assetImageGenerationTask struct {
 type assetImageGenerationTasks struct {
 	mu    sync.RWMutex
 	tasks map[string]assetImageGenerationTask
+	path  string
 }
 
+const (
+	assetImageTaskStoreDefaultPath = "data/system/asset-image-generation-tasks.json"
+	assetImageTaskStoreRetention   = 200
+)
+
 func newAssetImageGenerationTasks() *assetImageGenerationTasks {
-	return &assetImageGenerationTasks{tasks: map[string]assetImageGenerationTask{}}
+	path := strings.TrimSpace(os.Getenv("QIANTIE_ASSET_IMAGE_TASKS_PATH"))
+	if path == "" {
+		path = assetImageTaskStoreDefaultPath
+	}
+	tasks := &assetImageGenerationTasks{tasks: map[string]assetImageGenerationTask{}, path: path}
+	tasks.load()
+	return tasks
+}
+
+// load 在进程启动时恢复任务记录。服务重启时仍在生成中的任务已经不可能继续，
+// 标记为失败并给出明确原因，避免前端只能拿到 404 而一直空轮询。
+func (tasks *assetImageGenerationTasks) load() {
+	content, err := os.ReadFile(tasks.path)
+	if err != nil {
+		return
+	}
+	var stored struct {
+		Tasks []assetImageGenerationTask `json:"tasks"`
+	}
+	if err := json.Unmarshal(content, &stored); err != nil {
+		log.Printf("load asset image generation tasks failed path=%s: %v", tasks.path, err)
+		return
+	}
+	changed := false
+	for _, task := range stored.Tasks {
+		if task.ID == "" {
+			continue
+		}
+		if task.Status == "processing" {
+			task.Status = "failed"
+			task.Error = "服务重启导致任务中断，请重新生成"
+			task.UpdatedAt = time.Now().UTC()
+			changed = true
+		}
+		task.AssetIDs = append([]string(nil), task.AssetIDs...)
+		tasks.tasks[task.ID] = task
+	}
+	if changed {
+		tasks.save()
+	}
 }
 
 func (tasks *assetImageGenerationTasks) put(task assetImageGenerationTask) {
@@ -47,6 +97,64 @@ func (tasks *assetImageGenerationTasks) put(task assetImageGenerationTask) {
 	defer tasks.mu.Unlock()
 	task.AssetIDs = append([]string(nil), task.AssetIDs...)
 	tasks.tasks[task.ID] = task
+	tasks.pruneLocked()
+	tasks.saveLocked()
+}
+
+// pruneLocked 只保留最近的任务记录，避免状态文件无限增长。
+func (tasks *assetImageGenerationTasks) pruneLocked() {
+	if len(tasks.tasks) <= assetImageTaskStoreRetention {
+		return
+	}
+	oldest := ""
+	var oldestAt time.Time
+	for id, task := range tasks.tasks {
+		if oldest == "" || task.UpdatedAt.Before(oldestAt) {
+			oldest, oldestAt = id, task.UpdatedAt
+		}
+	}
+	if oldest != "" {
+		delete(tasks.tasks, oldest)
+	}
+}
+
+func (tasks *assetImageGenerationTasks) save() {
+	tasks.mu.RLock()
+	defer tasks.mu.RUnlock()
+	tasks.saveLocked()
+}
+
+func (tasks *assetImageGenerationTasks) saveLocked() {
+	if strings.TrimSpace(tasks.path) == "" {
+		return
+	}
+	list := make([]assetImageGenerationTask, 0, len(tasks.tasks))
+	for _, task := range tasks.tasks {
+		list = append(list, task)
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].UpdatedAt.After(list[j].UpdatedAt) })
+	if len(list) > assetImageTaskStoreRetention {
+		list = list[:assetImageTaskStoreRetention]
+	}
+	content, err := json.MarshalIndent(map[string]any{"tasks": list}, "", "  ")
+	if err != nil {
+		log.Printf("encode asset image generation tasks failed: %v", err)
+		return
+	}
+	if dir := filepath.Dir(tasks.path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			log.Printf("create asset image task dir failed path=%s: %v", dir, err)
+			return
+		}
+	}
+	tempPath := tasks.path + ".tmp"
+	if err := os.WriteFile(tempPath, content, 0o644); err != nil {
+		log.Printf("write asset image generation tasks failed path=%s: %v", tasks.path, err)
+		return
+	}
+	if err := os.Rename(tempPath, tasks.path); err != nil {
+		log.Printf("commit asset image generation tasks failed path=%s: %v", tasks.path, err)
+	}
 }
 
 func (tasks *assetImageGenerationTasks) get(id string) (assetImageGenerationTask, bool) {
@@ -80,6 +188,7 @@ func (tasks *assetImageGenerationTasks) finish(id string, images []batchfactoryv
 		}
 	}
 	tasks.tasks[id] = task
+	tasks.saveLocked()
 }
 
 func assetImageGenerationTaskResponse(task assetImageGenerationTask) map[string]any {
