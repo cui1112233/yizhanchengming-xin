@@ -7,11 +7,20 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'BatchFactoryGiantMaterialPendingProgress.jsx'), 'utf8');
 
-test('automatically resumes legacy direct-first books and hands failed direct reads to OCR', () => {
+test('direct-first preserves a failed book-city read instead of creating an OCR job', () => {
   assert.match(source, /OCR 任务未派发/);
   assert.match(source, /原文获取/);
   assert.match(source, /enqueueDirectFirstRead/);
-  assert.match(source, /原始书城读取失败，正在自动改用滚屏 OCR/);
+  assert.match(source, /originalReadStage: 'failed'/);
+  assert.doesNotMatch(source, /原始书城读取失败，正在自动改用滚屏 OCR/);
+  assert.doesNotMatch(source, /directReadFailed \? startOcrFallback\(\) : refetchOriginal\(true\)/);
+});
+
+test('keeps direct original fetch available while OCR executor is offline', () => {
+  assert.match(source, /OCR 执行器当前未在线；可直接重试书城获取正文/);
+  assert.match(source, /onClick=\{\(\) => refetchOriginal\(false\)\}>获取正文/);
+  assert.match(source, /listGiantMaterialExecutors\(\)/);
+  assert.match(source, /await fetchBookOriginal\(batchId, latestBook\.id\)/);
 });
 
 test('starts a saved giant automation plan after a legacy direct read succeeds', () => {

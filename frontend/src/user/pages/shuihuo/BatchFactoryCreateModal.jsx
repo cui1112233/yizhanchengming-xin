@@ -1,13 +1,13 @@
 import { Alert, Button, Input, InputNumber, Modal, Select, Space, Switch, Tabs, Tag, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
-import { createNovelFetchIntake, fetchBookOriginal, fetchDirectOriginals, getBatch, getBatchAutomationStatus, listAutomationPresets, listBatches, startBatchAutomation, updateBookMetadata } from '../../../shared/api/batchFactoryV11';
+import { classifyBookPublishMetadata, createNovelFetchIntake, fetchBookOriginal, fetchDirectOriginals, getBatch, getBatchAutomationStatus, listAutomationPresets, listBatches, startBatchAutomation, updateBookMetadata } from '../../../shared/api/batchFactory';
 import { batchFactoryPlatformOptions } from './batchFactoryPlatformOptions';
-import { buildManualBatchSubmission, manualBookIDsFromInput, removePlatformGroup, replacePlatformGroup, totalGroupBookCount, upsertPlatformGroup } from './batchFactoryManualFetch';
+import { buildManualBatchSubmission, manualBookIDsFromInput, manualFetchedSourceText, removePlatformGroup, replacePlatformGroup, totalGroupBookCount, upsertPlatformGroup } from './batchFactoryManualFetch';
 import { automationPresetSnapshot, formatBeijingDatetimeLocal, normalizeAutomationConcurrency, parseBeijingDatetimeLocal } from './batchFactoryAutomationSchedule';
 import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
 import { parseGiantMaterialIds } from './batchFactoryGiantMaterialQueue.js';
-import { createGiantMaterialJob } from '../../../shared/api/giantMaterialExecutorPublic.js';
+import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
 import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
 import {
@@ -33,7 +33,7 @@ function normalizedError(error, fallback) {
     QINGYU_BOOK_METADATA_INCOMPLETE: '素材没有完整的平台书名或 Book ID，不能登记。',
     QINGYU_BOOK_SELECTION_REQUIRED: '该素材关联多条平台书籍记录，请先选择一条。',
     QINGYU_VIDEO_DURATION_MISSING: '素材没有返回有效的视频时长，暂时不能交给执行器处理。',
-    GIANT_EXECUTOR_OFFLINE: '巨量素材执行器未安装或未启动，请先安装并完成配对。',
+    GIANT_EXECUTOR_OFFLINE: '书城获取失败，OCR 执行器当前未在线；任务没有排队，请启动执行器后重试。',
     GIANT_EXECUTOR_FAILED: '巨量素材执行器处理失败，可重试失败项。',
     GIANT_EXECUTOR_TIMEOUT: '巨量素材执行器超时，任务仍可能在后台运行，请稍后查看状态。',
     GIANT_OCR_EMPTY: '没有识别到可登记的正文。',
@@ -78,11 +78,13 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const [scheduleTasks, setScheduleTasks] = useState([]);
   const [scheduleTasksLoading, setScheduleTasksLoading] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+  const [automationScheduleMode, setAutomationScheduleMode] = useState('execute');
   const [automationPresets, setAutomationPresets] = useState([]);
   const [automationPresetID, setAutomationPresetID] = useState('');
   const [automationRunMode, setAutomationRunMode] = useState('full_submit');
   const [automationConcurrency, setAutomationConcurrency] = useState(2);
   const [contentRangeLines, setContentRangeLines] = useState(5);
+  const [comicAnalysisCharacters, setComicAnalysisCharacters] = useState(2000);
   const [contentCaptureCharacters, setContentCaptureCharacters] = useState(4000);
   const [busy, setBusy] = useState(false);
   const [groups, setGroups] = useState([]);
@@ -139,6 +141,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   }, [open]);
 
   const isGiantMaterial = platformId === GIANT_MATERIAL_PLATFORM_OPTION.value;
+  const isComicProduction = initialBatchSettings.productionMode === 'comic';
   const inputBookIds = useMemo(() => manualBookIDsFromInput(inputText), [inputText]);
 
   function reset() {
@@ -155,11 +158,13 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     setScheduleTasksOpen(false);
     setScheduleTasks([]);
     setScheduledAt('');
+    setAutomationScheduleMode('execute');
     setAutomationDialogMode('scheduled');
     setAutomationPresetID('');
     setAutomationRunMode('full_submit');
     setAutomationConcurrency(2);
     setContentRangeLines(5);
+    setComicAnalysisCharacters(2000);
     setContentCaptureCharacters(4000);
     setGroups([]);
     setEditingPlatformId(null);
@@ -288,6 +293,13 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   }
 
   async function queueGiantOcrFallback(batchId, entry, giantAutomationPlan, directReadError = '') {
+    const executorResponse = await listGiantMaterialExecutors();
+    const executors = Array.isArray(executorResponse?.executors)
+      ? executorResponse.executors
+      : Array.isArray(executorResponse?.data?.executors) ? executorResponse.data.executors : [];
+    if (!executors.some(executor => executor?.online === true)) {
+      throw new Error('GIANT_EXECUTOR_OFFLINE');
+    }
     const durationSeconds = Number(entry.item.material?.durationSeconds || entry.item.material?.duration || 0);
     if (!(durationSeconds > 0)) throw new Error('QINGYU_VIDEO_DURATION_MISSING');
     const createdResponse = await createGiantMaterialJob({
@@ -361,6 +373,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       if ((scheduledRun || automationRun) && !selectedPreset) throw new Error('所选自动化预设不存在或没有可用配置，请重新选择。');
       const giantAutomationPlan = (scheduledRun || automationRun) ? {
         scheduledAt: scheduledAtISO,
+        scheduleMode: scheduledRun ? automationScheduleMode : 'execute',
         presetId: selectedPreset.id,
         runMode: automationRunMode,
         autoPublish: automationRun && automationRunMode === 'full_submit',
@@ -370,6 +383,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
         intakeId: intake.id,
         title: title.trim(),
         scheduledAt: scheduledAtISO,
+        scheduleMode: scheduledRun ? automationScheduleMode : 'execute',
         // 巨量书在 OCR 回填前没有可生产正文。自动生产计划先随书保存，
         // 由正文回填成功的那一刻启动，避免被普通自动化误判为“原文缺失”。
         automationEnabled: false,
@@ -383,7 +397,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           expectedPresetVersion: selectedPreset.version,
           runMode: automationRunMode,
           concurrency: normalizeAutomationConcurrency(automationConcurrency),
-          scheduledAt: scheduledAtISO
+          scheduledAt: scheduledAtISO,
+          scheduleMode: scheduledRun ? automationScheduleMode : 'execute'
         } : undefined
       });
       const batchId = batch?.id;
@@ -402,30 +417,43 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
             });
             try {
               await fetchBookOriginal(batchId, book.id);
+              // 书城直取成功后，结束巨量素材的占位读取状态；否则列表会一直
+              // 把已经拿到正文的书当成“等待 OCR”，自动生产也无法正确判断就绪。
+              const refreshedResponse = await getBatch(batchId);
+              const refreshedBatch = refreshedResponse?.batch || refreshedResponse?.data?.batch || refreshedResponse?.data || refreshedResponse;
+              const refreshedBook = findRegisteredGiantMaterialBook(refreshedBatch?.books, entry.item.id);
+              if (refreshedBook?.id) {
+                await updateBookMetadata(batchId, refreshedBook.id, {
+                  metadata: {
+                    ...(refreshedBook.sourceMetadata || {}),
+                    contentPending: false,
+                    originalReadStage: 'direct',
+                    originalReadError: '',
+                    giantAutomationPlan
+                  },
+                  expectedRevision: Number(refreshedBook.revision || 0)
+                });
+                try { await classifyBookPublishMetadata(batchId, refreshedBook.id, { force: true }); } catch (_) { /* 分类可在工作区单独重试 */ }
+              }
             } catch (directFetchError) {
               const directReadError = normalizedError(directFetchError, '书城获取原文失败');
-              try {
-                await queueGiantOcrFallback(batchId, entry, giantAutomationPlan, directReadError);
-                message.info(`书城获取失败，已自动转为滚屏 OCR：${entry.book.title || entry.item.id}`);
-                queued += 1;
-                continue;
-              } catch (fallbackError) {
-                const refreshedResponse = await getBatch(batchId);
-                const refreshedBatch = refreshedResponse?.batch || refreshedResponse?.data?.batch || refreshedResponse?.data || refreshedResponse;
-                const refreshedBook = findRegisteredGiantMaterialBook(refreshedBatch?.books, entry.item.id);
-                if (refreshedBook?.id) {
-                  await updateBookMetadata(batchId, refreshedBook.id, {
-                    metadata: {
-                      ...(refreshedBook.sourceMetadata || {}),
-                      originalReadStage: 'failed',
-                      originalReadError: `${directReadError}；自动转滚屏 OCR 失败：${normalizedError(fallbackError, '执行器任务派发失败')}`,
-                      contentPending: true
-                    },
-                    expectedRevision: Number(refreshedBook.revision || 0)
-                  });
-                }
-                throw fallbackError;
+              const refreshedResponse = await getBatch(batchId);
+              const refreshedBatch = refreshedResponse?.batch || refreshedResponse?.data?.batch || refreshedResponse?.data || refreshedResponse;
+              const refreshedBook = findRegisteredGiantMaterialBook(refreshedBatch?.books, entry.item.id);
+              if (refreshedBook?.id) {
+                await updateBookMetadata(batchId, refreshedBook.id, {
+                  metadata: {
+                    ...(refreshedBook.sourceMetadata || {}),
+                    originalReadStage: 'failed',
+                    originalReadError: directReadError,
+                    contentPending: true,
+                    giantAutomationPlan
+                  },
+                  expectedRevision: Number(refreshedBook.revision || 0)
+                });
               }
+              console.warn('巨量书城直取失败，等待用户手动重试或选择 OCR', entry.item.id, directFetchError);
+              continue;
             }
             queued += 1;
             continue;
@@ -487,15 +515,15 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           message.warning(`正文读取已派发；自动生产请在工作区重试：${normalizedError(automationError, '启动失败')}`);
         }
       }
-      if (queued) {
+      if (queued || giantOriginalReadStrategy === 'direct_first') {
         try { await onBatchUpdated?.(batchId); } catch (refreshError) { console.warn('巨量读取任务已派发，但工作区刷新失败', refreshError); }
       }
       message.success(queued
         ? giantOriginalReadStrategy === 'direct_first'
-          ? `已创建批量并通过书城获取 ${queued}/${selected.length} 本正文；失败的书可在工作区重试或改用滚屏 OCR。`
+          ? `已创建批量并通过书城获取 ${queued}/${selected.length} 本正文；失败的书保留原因，可在工作区手动重试或使用滚屏 OCR。`
           : `已创建批量并排队读取 ${queued}/${selected.length} 本书；正文进度请在工作区书卡查看。`
         : giantOriginalReadStrategy === 'direct_first'
-          ? '已创建批量，但书城获取原文失败；可在工作区重试或改用滚屏 OCR。'
+        ? '已创建批量，但书城获取原文失败；失败原因已保留，可在工作区手动重试或使用滚屏 OCR。'
           : '已创建批量，但读取任务派发失败；可在工作区用“原文获取”兜底。');
       reset();
     } catch (error) {
@@ -543,7 +571,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       const tasks = await Promise.all(batches.map(async batch => {
         const status = await getBatchAutomationStatus(batch.id).catch(() => null);
         const automation = status?.automation || status || {};
-        return { id: batch.id, title: batch.title || '未命名批量', state: automation.state || 'idle', scheduledAt: automation.scheduledAt || '' };
+        return { id: batch.id, title: batch.title || '未命名批量', state: automation.state || 'idle', scheduleMode: automation.scheduleMode || 'execute', scheduledAt: automation.scheduledAt || '' };
       }));
       setScheduleTasks(tasks.filter(task => task.state !== 'idle'));
     } catch (error) {
@@ -573,6 +601,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       const sourcesByGroup = {};
       const sourceMetadataByGroup = {};
       const failedPlatforms = [];
+      const failedReasons = [];
       let fetchedCount = 0;
       for (const group of groups) {
         const groupKey = String(group.platformId);
@@ -589,7 +618,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           const groupSources = {};
           const groupMetadata = {};
           for (const item of Array.isArray(result?.results) ? result.results : []) {
-            const text = String(item?.data || '').trim();
+            const text = manualFetchedSourceText(item?.data);
             if (item?.status === 'ok' && text) {
               const bookId = String(item.bookId);
               groupSources[bookId] = text;
@@ -606,7 +635,9 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
           }
         } catch (error) {
           // 单组抓取失败不阻断：该组正文留空，书照样创建，列表中标红后可单独重试
-          failedPlatforms.push(group.platformName || group.platformId);
+          const platformLabel = group.platformName || group.platformId;
+          failedPlatforms.push(platformLabel);
+          failedReasons.push(`${platformLabel}：${normalizedError(error, '请求失败')}`);
           console.warn('分组抓取失败', group.platformId, error);
           sourcesByGroup[groupKey] = { ...have };
         }
@@ -627,8 +658,10 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
         columnPresetId,
         columnOrder,
         contentRangeLines,
+        comicAnalysisCharacters,
         contentCaptureCharacters,
         scheduledAt: scheduledAtISO,
+        scheduleMode: scheduledRun ? automationScheduleMode : 'execute',
         automationEnabled,
         autoPublishEnabled: automationEnabled && automationRunMode === 'full_submit',
         presetId: automationPresetID,
@@ -638,7 +671,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       }));
       reset();
       if (failedPlatforms.length > 0) {
-        message.warning(`${fetchedCount}/${totalCount} 本已抓到正文；以下书城抓取失败：${failedPlatforms.join('、')}。失败的书已在列表中标红，可单独重试`);
+        message.warning(`${fetchedCount}/${totalCount} 本已抓到正文；以下书城抓取失败：${failedPlatforms.join('、')}。${failedReasons.join('；')}失败的书已在列表中标红，可单独重试`);
       } else if (fetchedCount < totalCount) {
         message.warning(`${fetchedCount}/${totalCount} 本已抓到正文，其余书将在列表中标红，可单独重试`);
       }
@@ -701,7 +734,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
       <Switch checked={giantOriginalReadStrategy === 'direct_first'} onChange={checked => setGiantOriginalReadStrategy(checked ? 'direct_first' : 'ocr_first')} />
       <span>优先直接获取原文</span>
       <small>{giantOriginalReadStrategy === 'direct_first'
-        ? '先通过书城和 Book ID 获取正文；失败后自动改用滚屏 OCR。'
+        ? '先通过书城和 Book ID 获取正文；失败后保留原因，可在工作区手动使用滚屏 OCR。'
         : '先读取视频滚屏；失败后自动通过书城获取正文。'}</small>
     </div> : null}
 
@@ -746,7 +779,10 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     ) : null}
 
     <div className="batch-factory-content-controls">
-      <label className="shuihuo-form-label">内容范围<InputNumber min={1} max={500} value={contentRangeLines} onChange={value => setContentRangeLines(value || 5)} addonAfter="行" /></label>
+      <label className="shuihuo-form-label">生产模式<Select value={initialBatchSettings.productionMode || 'video'} onChange={productionMode => setInitialBatchSettings(current => ({ ...current, productionMode }))} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} /></label>
+      {isComicProduction
+        ? <label className="shuihuo-form-label">漫画分析<InputNumber min={100} max={100000} step={100} value={comicAnalysisCharacters} onChange={value => setComicAnalysisCharacters(Math.min(100000, Math.max(100, Number(value) || 2000)))} addonAfter="字" /> <small>漫画分页最多 35 张</small></label>
+        : <label className="shuihuo-form-label">内容范围<InputNumber min={1} max={500} value={contentRangeLines} onChange={value => setContentRangeLines(value || 5)} addonAfter="行" /></label>}
       <label className="shuihuo-form-label">内容截取<Select value={contentCaptureCharacters} onChange={setContentCaptureCharacters} options={[1000, 2000, 4000, 8000, 12000, 20000, 50000, 100000].map(value => ({ value, label: `${value} 字` }))} /></label>
     </div>
   </Modal>
@@ -772,22 +808,23 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     open={scheduleDialogOpen}
     onCancel={() => setScheduleDialogOpen(false)}
     confirmLoading={busy}
-    okText={automationDialogMode === 'scheduled' ? '创建并定时执行' : '创建并立即执行'}
+    okText={automationDialogMode === 'scheduled' ? (automationScheduleMode === 'submit' ? '创建并定时提交' : '创建并定时执行') : '创建并立即执行'}
     cancelText="取消"
     onOk={() => submit({ scheduledRun: automationDialogMode === 'scheduled', automationRun: true })}
   >
     {automationDialogMode === 'scheduled' ? <><label className="shuihuo-form-label" htmlFor="batch-scheduled-at">自动启动时间（北京时间 UTC+8） <em>*</em></label>
     <Input id="batch-scheduled-at" type="datetime-local" value={scheduledAt} onChange={event => setScheduledAt(event.target.value)} />
-    <small>到点启动自动生产；生成、合成与上传按后续流程继续，不会在此时间直接提交。</small></> : <Alert type="info" showIcon message="创建完成后立即启动自动生产" description="不会直接提交；只有选择全自动模式且成片完成后，才会上传视频管理系统。" />}
+    <small>{automationScheduleMode === 'submit' ? '提前完成生产和合成；到设定时间才上传或发布。' : '到设定时间才开始生产；生成、合成与上传按后续流程继续。'}</small></> : <Alert type="info" showIcon message="创建完成后立即启动自动生产" description="不会直接提交；只有选择全自动模式且成片完成后，才会上传视频管理系统。" />}
     <label className="shuihuo-form-label">自动化预设 <em>*</em></label>
     <Select value={automationPresetID || undefined} onChange={setAutomationPresetID} placeholder="选择已保存预设" options={automationPresets.map(item => ({ value: item.id, label: `${item.name} · v${item.version}` }))} />
     <label className="shuihuo-form-label">执行模式</label>
-    <Select value={automationRunMode} onChange={setAutomationRunMode} options={[{ value: 'storyboard_only', label: '只生成分镜' }, { value: 'video_no_submit', label: '生成视频不提交' }, { value: 'full_submit', label: '全自动生成并提交（成片完成后上传）' }]} />
+    <Select value={automationRunMode} onChange={value => { setAutomationRunMode(value); if (value !== 'full_submit') setAutomationScheduleMode('execute'); }} options={[{ value: 'storyboard_only', label: '只生成分镜' }, { value: 'video_no_submit', label: '生成视频不提交' }, { value: 'full_submit', label: '全自动生成并提交（成片完成后上传）' }]} />
+    {automationDialogMode === 'scheduled' ? <><label className="shuihuo-form-label">定时方式</label><Select value={automationScheduleMode} onChange={setAutomationScheduleMode} options={[{ value: 'execute', label: '定时执行（到点才开始生产）' }, { value: 'submit', label: '定时提交（提前生产，到点上传/发布）', disabled: automationRunMode !== 'full_submit' }]} /></> : null}
     <label className="shuihuo-form-label">同时处理书籍</label>
     <Select value={automationConcurrency} onChange={value => setAutomationConcurrency(normalizeAutomationConcurrency(value))} options={[1, 2, 4].map(value => ({ value, label: `${value} 本并行` }))} />
   </Modal>
   <Modal title="定时任务" open={scheduleTasksOpen} onCancel={() => setScheduleTasksOpen(false)} footer={<Button onClick={() => setScheduleTasksOpen(false)}>关闭</Button>}>
     <Button loading={scheduleTasksLoading} onClick={openScheduleTasks}>刷新</Button>
-    <div className="batch-factory-log-list">{scheduleTasks.length ? scheduleTasks.map(task => <section key={task.id}><strong>{task.title}</strong><span>{task.scheduledAt ? `北京时间 ${formatBeijingDatetimeLocal(task.scheduledAt)}` : '立即执行'} · {task.state}</span></section>) : <p>{scheduleTasksLoading ? '读取中…' : '暂无定时任务'}</p>}</div>
+    <div className="batch-factory-log-list">{scheduleTasks.length ? scheduleTasks.map(task => <section key={task.id}><strong>{task.title}</strong><span>{task.scheduledAt ? `北京时间 ${formatBeijingDatetimeLocal(task.scheduledAt)}` : '立即执行'} · {task.scheduleMode === 'submit' ? '定时提交' : '定时执行'} · {task.state}</span></section>) : <p>{scheduleTasksLoading ? '读取中…' : '暂无定时任务'}</p>}</div>
   </Modal></>;
 }

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, message, Progress, Space, Tooltip } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import { classifyBookPublishMetadata, fetchBookOriginal, getBatch, getBatchAutomationStatus, startBatchAutomation, updateBookMetadata, updateBookSource } from '../../../shared/api/batchFactoryV11.js';
+import { classifyBookPublishMetadata, fetchBookOriginal, getBatch, getBatchAutomationStatus, startBatchAutomation, updateBookMetadata, updateBookSource } from '../../../shared/api/batchFactory.js';
 import { findRegisteredGiantMaterialBook } from './batchFactoryGiantMaterialImport.js';
-import { createGiantMaterialJob, getGiantMaterialJob } from '../../../shared/api/giantMaterialExecutorPublic.js';
+import { cancelGiantMaterialJob, createGiantMaterialJob, getGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
+import { giantMaterialOcrStatus } from './giantMaterialOcrStatus.js';
 
 // 旧批量在浏览器页面里创建，可能已经留下“direct_first + 待读取”的占位书。
 // 同一页面只允许一条直取请求在飞行，避免一次打开 20 本书把书城接口打爆。
@@ -27,6 +28,7 @@ async function startSavedGiantAutomation(batchId, plan) {
     if (['running', 'scheduled', 'paused'].includes(String(automation.state || '').toLowerCase())) return { started: false };
     await startBatchAutomation(batchId, {
       scheduledAt: plan.scheduledAt || '',
+      scheduleMode: plan.scheduleMode || 'execute',
       presetId: plan.presetId,
       runMode: plan.runMode || 'video_no_submit',
       autoPublish: plan.autoPublish === true,
@@ -50,6 +52,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
   const originalReadStrategy = String(metadata.originalReadStrategy || 'ocr_first');
   const persistedOriginalReadError = String(metadata.originalReadError || '').trim();
   const [progress, setProgress] = useState(null);
+  const [jobState, setJobState] = useState(null);
   const [error, setError] = useState('');
   const [refetching, setRefetching] = useState(false);
   const [ocrStarting, setOcrStarting] = useState(false);
@@ -61,6 +64,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
     doneRef.current = false;
     setError('');
     setProgress(null);
+    setJobState(null);
     if (!pending || !jobId || !batchId) return undefined;
     let stopped = false;
     const tick = async () => {
@@ -68,7 +72,12 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
         const response = await getGiantMaterialJob(jobId);
         const job = response?.job || response?.data?.job || response;
         if (stopped || !job) return;
+        setJobState(job);
         const state = String(job.state || '').toLowerCase();
+        if (state === 'queued' && job.waitingForExecutor === true) {
+          setProgress(job.progress || null);
+          return;
+        }
         if (state === 'succeeded') {
           setProgress({ completed: 100, total: 100, percent: 100 });
           if (!doneRef.current) {
@@ -107,14 +116,35 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
       const latestBook = findRegisteredGiantMaterialBook(latestBatch?.books, metadata.giantMaterialId) || (latestBatch?.books || []).find(item => item?.id === book.id);
       if (!latestBook?.id) throw new Error('GIANT_MATERIAL_BOOK_NOT_FOUND');
       if (String(latestBook.sourceText || '').trim()) {
+        await updateBookMetadata(batchId, latestBook.id, {
+          metadata: { ...(latestBook.sourceMetadata || {}), contentPending: false, originalReadStage: 'direct', originalReadError: '' },
+          expectedRevision: Number(latestBook.revision || 0)
+        });
+        try { await classifyBookPublishMetadata(batchId, latestBook.id, { force: true }); } catch (_) { /* 分类可在工作区单独重试 */ }
+        const existingPlan = latestBook.sourceMetadata?.giantAutomationPlan;
+        if (existingPlan?.presetId) {
+          try { await startSavedGiantAutomation(batchId, existingPlan); } catch (_) { /* 自动生产可在工作区重试 */ }
+        }
         onContentReady?.();
         return;
       }
+      if (jobId && jobState?.state === 'queued' && jobState?.waitingForExecutor === true) {
+        try { await cancelGiantMaterialJob(jobId); } catch (_) { /* A claimed job is allowed to finish independently. */ }
+      }
       await updateBookMetadata(batchId, latestBook.id, {
-        metadata: { ...(latestBook.sourceMetadata || {}), originalReadStage: 'direct', originalReadError: '', contentPending: true },
+        metadata: { ...(latestBook.sourceMetadata || {}), executorJobId: '', originalReadStage: 'direct', originalReadError: '', contentPending: true },
         expectedRevision: Number(latestBook.revision || 0)
       });
       await fetchBookOriginal(batchId, latestBook.id);
+      const refreshedResponse = await getBatch(batchId);
+      const refreshedBatch = refreshedResponse?.batch || refreshedResponse?.data?.batch || refreshedResponse?.data || refreshedResponse;
+      const refreshedBook = findRegisteredGiantMaterialBook(refreshedBatch?.books, metadata.giantMaterialId) || (refreshedBatch?.books || []).find(item => item?.id === book.id);
+      if (refreshedBook?.id) {
+        await updateBookMetadata(batchId, refreshedBook.id, {
+          metadata: { ...(refreshedBook.sourceMetadata || {}), contentPending: false, originalReadStage: 'direct', originalReadError: '' },
+          expectedRevision: Number(refreshedBook.revision || 0)
+        });
+      }
       try { await classifyBookPublishMetadata(batchId, latestBook.id, { force: true }); } catch (_) { /* 分类失败不阻断生产，可单书重试 */ }
       const plan = latestBook.sourceMetadata?.giantAutomationPlan;
       if (plan?.presetId) {
@@ -139,11 +169,6 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
           });
         }
       } catch (_) { /* 原错误优先展示；用户仍可手动重试 */ }
-      if (automatic && originalReadStrategy === 'direct_first') {
-        setError('原始书城读取失败，正在自动改用滚屏 OCR…');
-        await startOcrFallback();
-        return;
-      }
       setError(failure);
       if (!automatic) message.error(failure);
     } finally {
@@ -165,6 +190,13 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
         return;
       }
       const latestMetadata = latestBook.sourceMetadata || metadata;
+      const executorsResponse = await listGiantMaterialExecutors();
+      const executors = Array.isArray(executorsResponse?.executors)
+        ? executorsResponse.executors
+        : Array.isArray(executorsResponse?.data?.executors) ? executorsResponse.data.executors : [];
+      if (!executors.some(executor => executor?.online === true)) {
+        throw new Error('OCR 执行器当前未在线，未创建队列任务；请启动执行器后重试。');
+      }
       const durationSeconds = Number(latestMetadata.videoDurationSeconds || 0);
       if (!(durationSeconds > 0)) throw new Error('素材缺少有效视频时长，无法改用滚屏 OCR。');
       const job = await createGiantMaterialJob({ materialId: latestMetadata.giantMaterialId, platformBookId: latestMetadata.platformBookId, title: latestMetadata.sourceBookTitle || latestBook.title, videoUrl: latestMetadata.videoUrl, durationSeconds, contentRangeLines: latestMetadata.contentRangeLines });
@@ -187,15 +219,22 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
       && book?.id
       && !jobId
       && !String(book?.sourceText || '').trim()
-      && !persistedOriginalReadError
       && originalReadStrategy === 'direct_first'
+      && !persistedOriginalReadError
     );
     if (!shouldResume || autoStartRef.current === key) return;
     autoStartRef.current = key;
+    // 只补跑从未请求过书城的旧占位书。直取失败要保留失败原因，
+    // OCR 是用户主动选择的备用方式，不能自动变成无限等待的队列任务。
     enqueueDirectFirstRead(() => refetchOriginal(true));
-  }, [visible, pending, batchId, book?.id, book?.revision, book?.sourceText, jobId, persistedOriginalReadError, originalReadStrategy]);
+  }, [visible, pending, batchId, book?.id, book?.revision, book?.sourceText, jobId, persistedOriginalReadError, originalReadStrategy, metadata.originalReadStage]);
 
   if (!pending || !visible) return null;
+  // 直取优先时，任务尚未绑定 OCR 并不代表失败；这里正在自动请求书城正文。
+  // 只在入厂内容格里显示状态，避免顶部批量列表出现一串重复按钮。
+  if (!jobId && originalReadStrategy === 'direct_first' && !error && !persistedOriginalReadError) {
+    return <span className="batch-factory-giant-pending-compact is-direct-reading" onClick={event => event.stopPropagation()}><i>书城获取中</i></span>;
+  }
   if (error || persistedOriginalReadError || !jobId) {
     // 窄列（小说列表弹窗“内容”格）放不下整块 Alert：错误全文进悬浮提示，行内只留
     // 一行红字 + 横排两个恢复按钮，避免文字/按钮被挤断行。
@@ -212,15 +251,28 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
       </Tooltip>
     );
   }
+  if (originalReadStrategy === 'direct_first' && jobState?.state === 'queued' && jobState?.waitingForExecutor === true) {
+    const detail = 'OCR 执行器当前未在线；可直接重试书城获取正文，也可启动执行器后再做 OCR。';
+    return (
+      <Tooltip title={detail}>
+        <span className="batch-factory-giant-pending-compact" onClick={event => event.stopPropagation()}>
+          <i className="is-error-text">OCR 执行器未在线</i>
+          <Space size={4} className="is-actions">
+            <Button size="small" type="primary" loading={refetching} disabled={ocrStarting} onClick={() => refetchOriginal(false)}>获取正文</Button>
+            <Button size="small" loading={ocrStarting} disabled={refetching} onClick={startOcrFallback}>OCR</Button>
+          </Space>
+        </span>
+      </Tooltip>
+    );
+  }
   const percent = Math.max(0, Math.min(100, Number(progress?.percent || 0)));
-  const seconds = progress?.total ? ` · 视频 ${progress.completed || 0}/${progress.total} 秒` : '';
-  const detail = percent > 0 ? `正在读取正文 ${percent}%${seconds}` : '正在排队读取正文…';
+  const ocrStatus = giantMaterialOcrStatus({ ...jobState, progress });
   if (variant === 'banner') {
     return <div className="batch-factory-giant-pending-banner" onClick={event => event.stopPropagation()}>
-      <span className="is-title"><InfoCircleOutlined />滚屏 OCR · {book?.title || '当前小说'}</span>
-      <Progress percent={percent} size="small" status="active" />
-      <span className="is-detail">{detail}</span>
+      <span className="is-title"><InfoCircleOutlined />{ocrStatus.title} · {book?.title || '当前小说'}</span>
+      <Progress percent={percent} size="small" status={ocrStatus.progressStatus} />
+      <span className="is-detail">{ocrStatus.detail}</span>
     </div>;
   }
-  return <Alert className="batch-factory-giant-pending" type="info" showIcon message="滚屏 OCR" description={<><Progress percent={percent} size="small" status="active" /><span>{detail}</span></>} onClick={event => event.stopPropagation()} />;
+  return <Alert className="batch-factory-giant-pending" type="info" showIcon message={ocrStatus.title} description={<><Progress percent={percent} size="small" status={ocrStatus.progressStatus} /><span>{ocrStatus.detail}</span></>} onClick={event => event.stopPropagation()} />;
 }
