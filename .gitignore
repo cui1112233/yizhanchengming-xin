@@ -4,6 +4,12 @@ data/
 
 # V88 代码直传本地产物（不入库）
 /.direct-staging/
+/.cache/
+/.release/
+/test-results/
+/work/
+/frontend/.direct-staging/
+/_local-archive-*/
 /release/
 
 # Local review/runtime output and throwaway verification artifacts.
@@ -16,3 +22,26 @@ data/
 /.current-novel-config.json
 /.updated-novel-config.json
 /.env.v88-review
+
+# Generated local Go runtime artifacts.
+frontend/dist/
+backend/web/dist/
+backend/*.exe
+/*.exe
+backend/.data-v88-review/
+.data-v88-review/
+frontend/*.log
+backend/*.log
+.tools/
+backend/.tools/
+dist/
+executors/local-executor/build/
+
+# Local process logs, interrupted executable swaps, and Superpowers scratch state.
+/.local-*.err
+/.local-*.out
+/backend/.review-*.err
+/backend/*.exe~
+/.superpowers/
+/frontend/pnpm-lock.yaml
+/frontend/pnpm-workspace.yaml
