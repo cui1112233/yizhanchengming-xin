@@ -107,6 +107,15 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
     return () => { stopped = true; clearInterval(timer); };
   }, [jobId, pending, batchId, originalReadStrategy]);
 
+  async function fetchBookOriginalWithRetry(batchId, bookId) {
+    try {
+      return await fetchBookOriginal(batchId, bookId);
+    } catch (error) {
+      if (!/failed to fetch|networkerror|网络/i.test(String(error?.message || ''))) throw error;
+      return fetchBookOriginal(batchId, bookId);
+    }
+  }
+
   async function refetchOriginal(automatic = false) {
     if (!batchId || !book?.id || refetching) return;
     setRefetching(true);
@@ -135,7 +144,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
         metadata: { ...(latestBook.sourceMetadata || {}), executorJobId: '', originalReadStage: 'direct', originalReadError: '', contentPending: true },
         expectedRevision: Number(latestBook.revision || 0)
       });
-      await fetchBookOriginal(batchId, latestBook.id);
+      await fetchBookOriginalWithRetry(batchId, latestBook.id);
       const refreshedResponse = await getBatch(batchId);
       const refreshedBatch = refreshedResponse?.batch || refreshedResponse?.data?.batch || refreshedResponse?.data || refreshedResponse;
       const refreshedBook = findRegisteredGiantMaterialBook(refreshedBatch?.books, metadata.giantMaterialId) || (refreshedBatch?.books || []).find(item => item?.id === book.id);
