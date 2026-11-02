@@ -253,6 +253,7 @@ function batchFactorySourceVersionLabel(book = {}) {
   const metadata = book?.sourceMetadata || {};
   const version = String(metadata.sourceContentVersion || '').trim().toLowerCase();
   const sourceMode = String(metadata.sourceMode || '').trim().toLowerCase();
+  if (sourceMode === 'giant_material') return '巨量素材';
   if (/^ai[1-5]$/.test(version)) return `小说获取 ${version.toUpperCase()}`;
   if (version === 'sensitive') return '小说获取（敏感）';
   if (sourceMode === 'novel_fetch') return '小说获取';
@@ -279,7 +280,38 @@ function value(metadata, key) {
 }
 function bookPlatformName(book, platformNames = {}) {
   const metadata = book?.sourceMetadata || {};
+  const platformCode = String(metadata.platformCode || '').trim().toUpperCase();
+  if (platformCode === 'YG') return '点众付费';
+  const platform = String(book?.platform || '').trim().toUpperCase();
+  if (platform === 'YG' || platform === '阳光') return '点众付费';
   return String(metadata.platformName || metadata.platformLabel || platformNames[String(book?.platform || '')] || '').trim() || '未命名书城';
+}
+function batchFactorySourceKind(book = {}) {
+  const mode = String(book?.sourceMetadata?.sourceMode || '').trim().toLowerCase();
+  if (mode === 'giant_material') return '巨量素材';
+  if (mode === 'novel_fetch') return '小说获取';
+  if (mode === 'manual_original') return '书城原文';
+  return '原文';
+}
+function isBatchFactoryContentReadRunning(book = {}) {
+  const metadata = book?.sourceMetadata || {};
+  const stage = String(metadata.originalReadStage || '').trim().toLowerCase();
+  return metadata.contentPending === true && (stage === 'direct' || stage === 'ocr');
+}
+function batchFactorySourceStatus(book = {}) {
+  const metadata = book?.sourceMetadata || {};
+  const sourceReady = Boolean(batchFactorySourceText(book?.sourceText));
+  if (sourceReady) return { label: '原文已获取', detail: `${batchFactorySourceKind(book)} · ${batchFactoryCleanSourceText(book.sourceText).length} 字`, tone: 'ready' };
+  const error = String(metadata.originalReadError || '').trim();
+  if (String(metadata.originalReadStage || '').trim().toLowerCase() === 'failed' && error) return { label: '书城读取失败', detail: `${batchFactorySourceKind(book)} · ${error}；可手动重试或使用 OCR`, tone: 'error' };
+  if (metadata.contentPending) {
+    const stage = String(metadata.originalReadStage || '').trim().toLowerCase();
+    if (stage === 'ocr') return { label: 'OCR 等待执行器', detail: '巨量素材 · 已进入 OCR 队列，等待执行器领取', tone: 'running' };
+    if (stage === 'direct') return { label: '书城获取中', detail: `${batchFactorySourceKind(book)} · 正在读取书城原文`, tone: 'running' };
+    return { label: '正文读取中', detail: `${batchFactorySourceKind(book)} · 等待读取任务`, tone: 'running' };
+  }
+  if (error) return { label: '读取失败', detail: `${batchFactorySourceKind(book)} · ${error}`, tone: 'error' };
+  return { label: '原文待获取', detail: `${batchFactorySourceKind(book)} · 尚未获取正文`, tone: 'pending' };
 }
 function resultData(result, key) { return result?.[key] || result || {}; }
 
@@ -614,9 +646,9 @@ function classificationLabel(metadata = {}) {
   return '待识别';
 }
 function classificationDetail(metadata = {}) {
-  if (String(metadata?.classifyStatus || '').trim() === 'failed') return String(metadata?.classifyError || '男女频和风格识别未完成，请重试。').trim();
+  if (String(metadata?.classifyStatus || '').trim() === 'failed') return `原文已获取，等待分类确认；确认分类后可继续改写。${String(metadata?.classifyError || '男女频和风格识别未完成，请重试。').trim()}`;
   if (String(metadata?.classifyStatus || '').trim() === 'classified') return String(metadata?.classifyReason || '已根据当前书正文保存识别结果。').trim();
-  if (String(metadata?.classifyStatus || '').trim() === 'pending_confirmation') return 'AI 判断把握不足，请确认男女频和风格后继续。';
+  if (String(metadata?.classifyStatus || '').trim() === 'pending_confirmation') return '原文已获取，等待分类确认；确认分类后可继续改写。';
   return '尚未发起识别。';
 }
 const BATCH_FACTORY_TABLE_COLUMNS = [
@@ -686,11 +718,10 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
   const allSelected = books.length > 0 && books.every(book => selected.has(book.id));
   const selectedCount = selectedBookIds.length;
   const toggleAll = checked => onSelectionChange(checked ? books.map(book => book.id) : []);
-  const pendingContentBooks = books.filter(book => book?.sourceMetadata?.contentPending);
+  const pendingContentBooks = books.filter(isBatchFactoryContentReadRunning);
   return <div className="batch-factory-novel-list batch-factory-novel-fetch-list batch-factory-novel-list-v13" role="table" aria-label="小说列表">
-    {pendingContentBooks.length ? <div className="batch-factory-novel-pending-strip" role="status">
-      <span className="batch-factory-novel-pending-count">正在读取 {pendingContentBooks.length} 本书正文</span>
-      {pendingContentBooks.map(book => <BatchFactoryGiantMaterialPendingProgress key={book.id} book={book} batchId={batchId} variant="banner" onContentReady={onContentReady} />)}
+    {pendingContentBooks.length ? <div className="batch-factory-novel-pending-strip is-summary" role="status">
+      <span className="batch-factory-novel-pending-count">正在后台读取 {pendingContentBooks.length} 本正文，详细状态和恢复操作请看对应书籍的“入厂内容”。</span>
     </div> : null}
     <div className="batch-factory-novel-list-toolbar">
       <Space size={8}>
@@ -707,13 +738,14 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
       const row = batchFactoryNovelTableRow(book, index, createdAt, { productionStatus, mergeStatus, stageSummary: stageSummaries?.[book.id] });
       const metadata = book.sourceMetadata || {};
       const sourceSummary = batchFactorySourceSummary(book);
+      const sourceStatus = batchFactorySourceStatus(book);
       return <div className="batch-factory-novel-list-row" key={book.id} role="row">
         <span className="is-order"><Checkbox checked={selected.has(book.id)} onChange={event => onSelectionChange(event.target.checked ? [...selected, book.id] : [...selected].filter(id => id !== book.id))} aria-label={`选择 ${row.title}`} /><b>{String(index + 1).padStart(2, '0')}</b></span>
-        <span className="is-book"><strong title={row.title}>{row.title}</strong><small>ID {row.bookId} · {bookPlatformName(book, platformNames)}</small></span>
+        <span className="is-book"><strong title={row.title}>{row.title}</strong><small>ID {row.bookId} · {bookPlatformName(book, platformNames)} · {batchFactorySourceKind(book)}</small></span>
         <span className={`batch-factory-content-version ${sourceSummary.ready ? 'is-ready' : 'is-missing'}`} title={`${batchFactorySourceVersionLabel(book)} · ${sourceSummary.text}`}><i className={`batch-factory-content-mode is-${batchFactorySourceVersionClass(book)}`}>{batchFactorySourceVersionLabel(book)}</i></span>
         <span>{publicationMetadataValue(metadata, 'style')}</span>
         <span>{publicationMetadataValue(metadata, 'gender')}</span>
-        <span className={row.status === '处理中' ? 'is-scheduled' : ''} title={row.state?.detail}>{row.status}{row.state?.manual ? ' · 已手调' : ''}</span>
+        <span className={`batch-factory-source-status is-${sourceStatus.tone} ${row.status === '处理中' ? 'is-scheduled' : ''}`} title={`${sourceStatus.detail}${row.state?.detail ? ` · ${row.state.detail}` : ''}`}><b>{sourceStatus.label}</b><small>{row.status}{row.state?.manual ? ' · 已手调' : ''}</small></span>
         <span><Button size="small" onClick={() => onViewBook(book)}>查看</Button></span>
       </div>;
     })}
@@ -2420,6 +2452,7 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	const [audioCategories, setAudioCategories] = useState(cachedPublishDirectory?.audioCategories?.length ? cachedPublishDirectory.audioCategories : DEFAULT_AUDIO_CATEGORIES);
 	const [producerAccountOrganizations, setProducerAccountOrganizations] = useState(cachedPublishDirectory?.producerAccountOrganizations || {});
 	const [producerAccountsWarning, setProducerAccountsWarning] = useState('');
+	const [publishAudios, setPublishAudios] = useState([]);
 	const [publishedByCollection, setPublishedByCollection] = useState({});
 	const [publishForm, setPublishForm] = useState({ producerAdminName: '', organizationId: '1', audioCategoryId: null, specifiedAudioId: null, specifiedAudioName: '', workIdsText: '' });
 	const [workOptions, setWorkOptions] = useState([]);
@@ -2473,6 +2506,20 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	useEffect(() => {
 		load().catch(error => message.error(error?.message || '读取漫画媒体库失败'));
 	}, [batchId, book?.id, refreshNonce]);
+	useEffect(() => {
+		const organizationId = String(publishForm.organizationId || '').trim();
+		const audioCategoryId = String(publishForm.audioCategoryId || '').trim();
+		if (!publishTarget || !organizationId || !audioCategoryId) { setPublishAudios([]); return undefined; }
+		let active = true;
+		getN8ComicPublishAudios({ organizationId, audioCategoryId }, { silent: true, suppressGlobalError: true }).then(result => {
+			if (!active) return;
+			const candidates = Array.isArray(result?.audios) ? result.audios : [];
+			setPublishAudios(candidates);
+			const selected = chooseN8Audio(candidates, publishForm.specifiedAudioId);
+			setPublishForm(current => ({ ...current, specifiedAudioId: selected?.id || null, specifiedAudioName: selected?.name || '' }));
+		}).catch(() => { if (active) { setPublishAudios([]); setPublishForm(current => ({ ...current, specifiedAudioId: null, specifiedAudioName: '' })); } });
+		return () => { active = false; };
+	}, [publishTarget?.id, publishForm.organizationId, publishForm.audioCategoryId]);
 	useEffect(() => {
 		if (!collectionRangeTouched && collectionEnd === 1 && videos.length > 1) {
 			setCollectionEnd(Math.min(videos.length, 35));
@@ -2676,7 +2723,7 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
 	const canPublish = publishConfigured && publishPageCount >= 2 && publishPageCount <= 35 && selectedProducer && producerMatchesOrganization && String(publishForm.organizationId || '').trim() && Number(publishForm.audioCategoryId || 0) > 0 && Number(publishForm.specifiedAudioId || 0) > 0 && parsedWorkIDs().length > 0;
 	const audioCategoryOptions = audioCategories.map(item => ({ value: String(item.id), label: `${item.name}（ID ${item.id}）` }));
 	const InputNumber = props => props.placeholder === '启用中的音频分类 ID' && audioCategoryOptions.length ? <Select showSearch optionFilterProp="label" value={String(props.value || '') || undefined} options={audioCategoryOptions} placeholder="请选择 N8 启用中的音频分类" placement="bottomLeft" getPopupContainer={() => document.body} onChange={value => props.onChange?.(Number(value))} style={props.style} /> : <NativeInputNumber {...props} />;
-	const audioSelect = <label className="batch-factory-engine-field"><span><b>指定音频</b></span><Select value={String(publishForm.specifiedAudioId || '') || undefined} options={[]} disabled placeholder="请先在统一配置中选择音频" /></label>;
+	const audioSelect = <label className="batch-factory-engine-field"><span><b>指定音频</b></span><Select value={String(publishForm.specifiedAudioId || '') || undefined} showSearch optionFilterProp="label" options={publishAudios.map(item => ({ value: String(item.id), label: `${item.name}（ID ${item.id}）` }))} placeholder="当前分类和组织下没有可用指定音频" onChange={specifiedAudioId => { const selected = publishAudios.find(item => String(item.id) === String(specifiedAudioId)); setPublishForm(current => ({ ...current, specifiedAudioId: selected?.id || null, specifiedAudioName: selected?.name || '' })); }} /></label>;
 		const workSelect = <label className="batch-factory-engine-field"><span><b>作品</b></span><Select showSearch optionFilterProp="label" filterOption={false} loading={workSearchLoading} value={parsedWorkIDs().length === 1 ? String(parsedWorkIDs()[0]) : undefined} options={workOptions.map(work => ({ value: String(work.id), label: `${work.name}（ID ${work.id}）` }))} onSearch={query => searchComicWorks(query)} onChange={value => setPublishForm(current => ({ ...current, workIdsText: String(value || '') }))} placeholder={workSearchLoading ? '正在查询作品' : '输入书名搜索作品'} notFoundContent={workSearchError || '没有找到匹配作品'} /></label>;
 	const maxCollectionPage = Math.max(1, videos.length);
 	const normalizedCollectionStart = Math.min(Math.max(1, Number(collectionStart) || 1), maxCollectionPage);
@@ -3577,11 +3624,11 @@ function BatchLogs({ automationStatus, productionStatus, mergeStatus, error, boo
       : runMode === 'video_no_submit'
         ? '当前任务会生成视频与合成成片，停在“待上传”；刷新只回读状态，不会额外提交新任务。'
         : '自动生产会在成片后提交视频管理系统，并等待视频管理系统回读确认；未确认前不会显示上传成功。';
-  const giantWaitingBooks = books.filter(book => book?.sourceMetadata?.giantMaterialId && book?.sourceMetadata?.contentPending === true);
+  const giantWaitingBooks = books.filter(book => book?.sourceMetadata?.giantMaterialId && isBatchFactoryContentReadRunning(book));
   const isComicRetryQueued = book => book?.retryRequested === true && !['failed', 'blocked', 'stopped', 'completed'].includes(String(book?.status || '').toLowerCase());
   return <><Alert type={error ? 'warning' : 'info'} showIcon message={error || (productionMode === 'comic' ? '实时读取漫画自动生产与发布状态' : '实时读取 V12 自动生产、视频与合并状态')} description={modeDescription} />
     {automationStatus?.state && automationStatus.state !== 'idle' ? <Alert type={['paused', 'needs_attention', 'unavailable'].includes(automationStatus.state) ? 'warning' : automationStatus.state === 'completed' ? 'success' : 'info'} showIcon message={automationStatus.state === 'unavailable' ? '自动生产状态暂不可读' : automationStatus.state === 'paused' ? '自动生产 · 已暂停' : `自动生产 · ${automationStatus.state}`} description={automationStatus.state === 'unavailable' ? '不影响当前书的手动提取、配音、VIDEO 或上传操作。' : automationStatus.state === 'paused' ? `${automationStatus.lastError || '失败项最终自动补跑后仍未成功，已暂停等待处理。'}；并行 ${Number(automationStatus.concurrency || 2)} 本；就绪 ${Number(automationCounts.ready || 0)} / ${Number(automationCounts.total || automationBooks.length)}；失败 ${Number(automationCounts.failed || 0)}；阻塞 ${Number(automationCounts.blocked || 0)}` : `并行 ${Number(automationStatus.concurrency || 2)} 本；就绪 ${Number(automationCounts.ready || 0)} / ${Number(automationCounts.total || automationBooks.length)}；执行中 ${Number(automationCounts.running || 0)}；失败 ${Number(automationCounts.failed || 0)}；阻塞 ${Number(automationCounts.blocked || 0)}`} /> : null}
-	<div className="batch-factory-log-list">{giantWaitingBooks.map(book => <section key={`giant-source-${book.id}`}><strong>巨量素材 · {book.title || book.bookId}</strong><span>等待正文读取</span><p>{book.sourceMetadata?.originalReadStage === 'ocr' ? '正在等待滚屏 OCR 回填正文；正文到位后自动转为滚屏 OCR。' : '正在优先通过书城读取正文；失败后自动转为滚屏 OCR。'}</p></section>)}{automationBooks.map(book => {
+	<div className="batch-factory-log-list">{giantWaitingBooks.map(book => <section key={`giant-source-${book.id}`}><strong>巨量素材 · {book.title || book.bookId}</strong><span>等待正文读取</span><p>{book.sourceMetadata?.originalReadStage === 'ocr' ? '已进入滚屏 OCR 队列，等待执行器领取；正文回填后自动继续生产。' : book.sourceMetadata?.originalReadStage === 'failed' ? '书城原文获取失败；可手动重试或使用 OCR。' : '正在优先通过书城读取正文。'}</p></section>)}{automationBooks.map(book => {
 		const retryQueued = isComicRetryQueued(book);
 		const record = automationBookRecord(book);
 		const timeline = record ? batchFactoryBookTimeline(record, { productionStatus, mergeStatus, productionMode }) : [];
@@ -4072,7 +4119,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
     }
     if (fetchFailures.length) {
-      message.warning(`已添加 ${newlyAddedBooks.length} 本书；${fetchFailures.length} 本正文或分类获取失败，可在书籍详情中重试。`);
+      message.warning(`已添加 ${newlyAddedBooks.length} 本书；${fetchFailures.length} 本原文或分类尚未完成，可在书籍详情中查看状态并重试。`);
     } else {
       message.success(automationStarted ? `已添加 ${newlyAddedBooks.length} 本书，并已接入自动生产` : `已添加并获取 ${newlyAddedBooks.length} 本书的正文与分类信息`);
     }
@@ -5449,6 +5496,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
               book,
               productionMode,
             );
+            const sourceStatus = batchFactorySourceStatus(book);
             const videos = book.videos || [];
             const lastFailedStage = stageSummary?.lastFailed;
             const failedStageLabel =
@@ -5515,6 +5563,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                         {sourceVersionLabel}
                       </i>
                     </span>
+                    <span className={`batch-factory-source-kind is-${sourceStatus.tone}`} title={sourceStatus.detail}>{batchFactorySourceKind(book)}</span>
                   </div>
                   <span>
                     bookId：{book.bookId || "—"} · 书城：
@@ -5523,7 +5572,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                       ? `正文总字数 ${batchFactoryCleanSourceText(book.sourceText).length} 字 · 漫画分析 ${comicAnalysisCharactersForBook(book)} 字`
                       : `生产前 ${rangeLines} 行`}
                   </span>
-                  <p>{previewText || "原文尚未获取"}</p>
+                  <p className={!previewText ? `batch-factory-source-empty is-${sourceStatus.tone}` : ""}>{previewText || sourceStatus.label}</p>
                   {!previewText ? (
                     <BatchFactoryGiantMaterialPendingProgress
                       book={book}

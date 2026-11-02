@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { measureH3VideoLines } from './h3LineAudio.js';
 import { downloadProductionContent } from './batchFactoryContentDownload.js';
+import { currentMergeJobsByOpening } from './batchFactoryMergeGroups.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -52,8 +53,31 @@ test('book content exposes production-content edit and TXT download actions', ()
   assert.match(stylesheet, /\.batch-factory-workbench \.batch-factory-action-button-grid \.ant-btn/);
 });
 
+test('moves Agent optimization to the batch toolbar with all-book and single-book choices', () => {
+  const toolbar = source.match(/<div className="shuihuo-workbench-toolbar"[\s\S]*?<\/div>\n      <div className="shuihuo-workbench-export">/)?.[0] || '';
+  assert.match(toolbar, /Agent 优化/);
+  assert.match(toolbar, /全部小说/);
+  assert.match(toolbar, /优化选择\(\$\{selectedBookIds\.length\}\)/);
+  assert.match(source, /async function openSelectedInAgent\(\)/);
+  const bookContent = source.match(/className="batch-factory-book-content"[\s\S]*?<\/div>\n          <div className="shuihuo-workbench-cell batch-factory-book-config-cell"/)?.[0] || '';
+  assert.doesNotMatch(bookContent, /Agent 优化/);
+});
+
+test('labels the actual Novel Fetch intake version and source readiness in the book list', () => {
+  assert.match(source, /function batchFactorySourceVersionLabel\(book = \{\}\)/);
+  assert.match(source, /sourceContentVersion/);
+  assert.match(source, /小说获取（敏感）/);
+  assert.match(source, /小说获取 \$\{version\.toUpperCase\(\)\}/);
+  assert.match(source, /入厂内容/);
+  assert.match(stylesheet, /\.batch-factory-content-version\.is-ready small/);
+  assert.match(stylesheet, /\.batch-factory-content-mode\.is-ai1/);
+  assert.match(source, /batch-factory-production-source/);
+  assert.match(source, /batch-factory-book-title-row/);
+  assert.match(stylesheet, /grid-template-rows: auto auto minmax\(0, 1fr\) auto auto/);
+});
+
 test('keeps the batch factory header and rows on the same six-column grid', () => {
-  assert.match(stylesheet, /BF_WORKBENCH_SIX_COLUMN_ALIGNMENT_BEGIN[\s\S]*grid-template-columns:\s*56px minmax\(300px,\s*1\.04fr\) minmax\(170px,\s*\.60fr\) minmax\(330px,\s*1\.16fr\) minmax\(300px,\s*1\.02fr\) minmax\(210px,\s*\.72fr\)\s*!important/);
+  assert.match(stylesheet, /BF_WORKBENCH_LAYOUT_CONTRACT_BEGIN[\s\S]*--bf-workbench-columns:\s*56px minmax\(300px,\s*1\.04fr\) minmax\(176px,\s*\.60fr\) minmax\(330px,\s*1\.16fr\) minmax\(300px,\s*1\.02fr\) minmax\(220px,\s*\.72fr\)/);
 });
 
 test('applies the unified button treatment inside batch factory modals', () => {
@@ -331,11 +355,14 @@ test('refreshes the open book asset modal after an override save so consecutive 
   assert.match(source, /\[batch\?\.id, assetBook\?\.id, books\]/);
 });
 
-test('uses the engine image aspect ratio for asset images independently from video settings', () => {
-  assert.match(source, /engineSettings\?\.imageAspectRatio \|\| engineSettings\?\.aspectRatio/);
-  assert.match(source, /imageAspectRatio: imageAspectRatio \|\| '9:16'/);
+test('uses the independent 16:9 asset-image default instead of the unified image ratio', () => {
+  assert.match(source, /const imageAspectRatio = '16:9'/);
+  assert.match(source, /imageAspectRatio: imageAspectRatio \|\| '16:9'/);
+  assert.doesNotMatch(source, /engineSettings\?\.imageAspectRatio \|\| engineSettings\?\.aspectRatio/);
+  assert.match(source, /provider: imageProvider/);
   assert.doesNotMatch(source, /aria-label="当前书画幅"/);
 });
+
 
 test('keeps AI reasoning constraints in the same per-book override model as other V11 modules', () => {
   assert.match(reasoningSource, /constraints:\{\.\.\.scope\(n,true\)/);
@@ -391,6 +418,14 @@ test('renders every novel row with prompt and clip-library cells without a separ
 	assert.match(source, /function InlineMediaLibrary/);
 });
 
+test('shows comic asset prompt choices in the asset editor when comic production is active', () => {
+  assert.match(source, /function effectiveBookComicRules/);
+  assert.match(source, /listSystemPresetCatalog\('batch-factory'\)/);
+  assert.match(source, /batch\.comic-assets/);
+  assert.match(source, /productionMode === 'comic'/);
+  assert.match(source, /comic: \{ \.\.\.comicRules, assets: selection/);
+});
+
 test('manual add-books flow appends the new intake to the active batch', () => {
   assert.match(source, /appendNovelFetchIntake/);
   assert.match(source, /await appendNovelFetchIntake\(batch\.id, intake\.id, \{ allowDuplicate: allowDuplicate === true \}\)/);
@@ -403,6 +438,13 @@ test('manual add-books flow fetches original text and classification for each ne
   assert.match(source, /styleStatus.*failed/);
   assert.match(source, /男女频识别失败/);
   assert.match(source, /自动获取正文并识别风格、男女频/);
+});
+
+test('manual add-books flow continues an existing automation with only the newly added books', () => {
+  assert.match(source, /getBatchAutomationStatus\(batch\.id\)/);
+  assert.match(source, /presetId: presetID/);
+  assert.match(source, /bookIds: fetchedBookIDs/);
+  assert.match(source, /已添加 \$\{newlyAddedBooks\.length\} 本书，并已接入自动生产/);
 });
 
 test('puts selected storyboard assets into the storyboard prompt as @ mentions', () => {
@@ -534,6 +576,7 @@ test('shows actual merge queue position and active worker phase in task logs', (
 test('renders saved book-city and novel-fetch metadata without exposing internal platform IDs', () => {
   assert.match(source, /function bookPlatformName\(book/);
   assert.match(source, /metadata\.platformName/);
+  assert.match(source, /platformCode === 'YG'\) return '点众付费'/);
 	assert.match(source, /getWorkshopPlatforms/);
 	assert.match(source, /batchFactoryPlatformOptions/);
   assert.match(source, /platformNames\[String\(book\?\.platform \|\| ''\)\]/);
@@ -784,7 +827,7 @@ test('keeps one modal prompt mode through horizontal storyboard navigation', () 
 
 test('renders stacked comic and video prompt controls with an explicit regeneration action', () => {
   assert.match(source, /batch-factory-prompt-modal-tabs/);
-  assert.match(source, /promptKind === 'visual' \? '重新生成漫画提示词' : '重新生成导演分镜'/);
+  assert.match(source, /promptKind === 'visual' \? '重新生成漫画提示词' : '重新生成 AI'/);
   assert.match(source, /重新执行智能统一分析/);
   assert.match(source, /生成图片/);
   assert.match(source, /生成视频/);
@@ -794,6 +837,11 @@ test('refreshes the open prompt modal after a save so another edit uses its late
   assert.match(source, /if \(!promptBook\) return;/);
   assert.match(source, /setPromptBook\(refreshed\)/);
   assert.match(source, /\[selectedVideoId, selectedVideo\?\.revision\]/);
+});
+
+test('immediately replaces the open storyboard card with the saved server version', () => {
+  assert.match(source, /async function refreshBatch\(\) \{\s*return await onBatchChanged\?\.\(\);\s*\}/);
+  assert.match(source, /onSaved=\{async \(\) => \{\s*const latestBatch = await refreshBatch\(\);\s*const latestBook = latestBatch\?\.books\?\.find\(item => item\.id === promptBook\?\.id\);\s*if \(latestBook\) setPromptBook\(latestBook\);\s*return latestBook;\s*\}\}/);
 });
 
 test('uses the whole prompt cell as a stacked-card entry and opens its editor only in a modal', () => {
@@ -911,8 +959,8 @@ test('shows cleaned original text and the giant-material read state in the 小�
 test('keeps Batch Factory flush with the workbench while balancing wide-screen columns', () => {
   assert.match(stylesheet, /Keep the production table flush with its container/);
   assert.match(stylesheet, /width: 100%;/);
-  assert.match(stylesheet, /min-width: 1665px/);
-  assert.match(stylesheet, /grid-template-columns: 56px minmax\(300px, 1\.05fr\) minmax\(176px, \.70fr\) minmax\(205px, \.75fr\) minmax\(330px, 1fr\) minmax\(330px, 1fr\) minmax\(268px, \.80fr\)/);
+  assert.match(stylesheet, /--bf-workbench-min-width:\s*1382px/);
+  assert.match(stylesheet, /grid-template-columns:\s*var\(--bf-workbench-columns\)/);
   assert.doesNotMatch(stylesheet, /min-width: 1920px; grid-template-columns: 56px minmax\(355px, 1\.45fr\)/);
 });
 
@@ -1009,6 +1057,25 @@ test('always prepares TTS timing before recompiling when unified settings are sa
   const saveEnd = source.indexOf('  async function previewChangeImpact', saveStart);
   const saveBody = saveStart >= 0 && saveEnd > saveStart ? source.slice(saveStart, saveEnd) : '';
   assert.ok(saveBody.indexOf('await prepareAudioPlanningForBatch(syncedBatch)') < saveBody.indexOf('recompileUnifiedH3Prompts(compiledBatch)'), 'TTS timing must be prepared before director recompilation');
+});
+
+test('shows one current complete video per opening while retry attempts stay in history', () => {
+  const jobs = [
+    { id: 'opening-2-old', openingVariantIndex: 2, status: 'succeeded', outputUrl: '/2-old.mp4', updatedAt: '2026-10-17T10:00:00Z' },
+    { id: 'opening-0', openingVariantIndex: 0, status: 'succeeded', outputUrl: '/0.mp4', updatedAt: '2026-10-17T10:01:00Z' },
+    { id: 'opening-3', openingVariantIndex: 3, status: 'succeeded', outputUrl: '/3.mp4', updatedAt: '2026-10-17T10:03:00Z' },
+    { id: 'opening-1', openingVariantIndex: 1, status: 'succeeded', outputUrl: '/1.mp4', updatedAt: '2026-10-17T10:02:00Z' },
+    { id: 'opening-2-new', openingVariantIndex: 2, status: 'succeeded', outputUrl: '/2-new.mp4', updatedAt: '2026-10-17T10:04:00Z' }
+  ];
+
+  const result = currentMergeJobsByOpening(jobs);
+
+  assert.deepEqual(result.current.map(job => job.id), ['opening-0', 'opening-1', 'opening-2-new', 'opening-3']);
+  assert.equal(result.historyCount, 1);
+  assert.deepEqual(result.current.map(job => job.openingLabel), ['原开头', '换开头 1', '换开头 2', '换开头 3']);
+  assert.match(source, /currentMergeJobsByOpening\(mergeJobs\)/);
+  assert.match(source, /job\.openingLabel/);
+  assert.match(source, /上传组成/);
 });
 
 test('keeps a saved audio duration usable when its fingerprint is stale and refresh fails', () => {
@@ -1119,7 +1186,7 @@ test('keeps shot versions, final merge, and the selected 121 upload video in one
   assert.match(source, /function localStartTime\(\)/);
   assert.match(source, /请选择 121 组织归属/);
   assert.match(source, /txt: `\$\{book\.bookId\}\.txt`/);
-  assert.match(source, /mp4: `\$\{book\.bookId\}\.mp4`/);
+  assert.match(source, /mp4Files: mergeFiles\.files/);
   assert.match(source, /const hasBookUploadSource = book =>/);
   assert.match(source, /targetBooks\.every\(hasBookUploadSource\)/);
   assert.doesNotMatch(source, /<Modal title=\{mergeBook \?/);
@@ -1175,6 +1242,7 @@ test('compiles existing H3 director cards instead of regenerating them from vide
   assert.match(action, /await runBookStage\(batch\.id, book\.id, stage/);
   assert.match(source, /onRegenerateVisual=\{\(\) => runBookStageAction\(promptBook, 'comic', 'force'\)\}/);
 });
+
 
 test('refreshes the open storyboard modal after director regeneration', () => {
   const start = source.indexOf('async function runBookStageAction(book, stage');
@@ -1295,7 +1363,9 @@ test('shows asset prompt text on storyboard cards before and after VIDEO compila
   assert.match(source, /资产提示词：/);
   assert.match(source, /资产提示词已注入：/);
   assert.match(source, /【资产提示词】/);
-  assert.match(source, /structured\.join\('\\n'\)/);
+  assert.match(source, /function mergedAssetVisualPrompt\(asset\)/);
+  assert.match(source, /const prompt = mergedAssetVisualPrompt\(asset\)/);
+  assert.doesNotMatch(source, /asset\?\.relationships \? \`人物关系：\$\{asset\.relationships\}\`/);
   assert.match(source, /\.join\('\\n\\n'\)/);
 });
 
@@ -1358,4 +1428,35 @@ test('uses comic prompts rather than legacy visual prompts in the storyboard com
   assert.match(source, /promptKind === 'visual' \? \{ comicPrompt \} : \{ videoPrompt \}/);
   assert.match(source, />漫画提示词<\/button>/);
   assert.match(source, /runBookStageAction\(book, 'comic', 'force'\)/);
+});
+
+test('labels the asset-setting action as comic extraction for comic books', () => {
+  assert.match(source, /productionMode === 'comic' \? '提取漫画资产' : '提取资产'/);
+  assert.match(source, /productionMode === 'comic' \? '重新提取漫画资产' : '重新生成资产'/);
+});
+
+test('publishes a comic collection only after confirming the N8 fields', () => {
+	assert.match(source, /getN8ComicPublishStatus/);
+	assert.match(source, /publishComicCollection/);
+	assert.match(source, /发布到漫画后台/);
+	assert.match(source, /音频分类 ID/);
+	assert.match(source, /作品 ID/);
+	assert.match(source, /2 到 35 页/);
+	assert.match(source, /workIdsText/);
+	assert.match(source, /comicPublishSettings/);
+});
+
+test('exposes separate scheduled execution and scheduled submission modes', () => {
+  assert.match(source, /automationScheduleMode/);
+  assert.match(source, /scheduleMode: immediate \? 'execute' : automationScheduleMode/);
+  assert.match(source, /定时执行/);
+  assert.match(source, /定时提交/);
+});
+
+test('automatically classifies stored books that already have text but no publish metadata', () => {
+  assert.match(source, /autoClassificationInFlightRef/);
+  assert.match(source, /已有正文但没有分类结果的存量书/);
+  assert.match(source, /!hasGender && !hasStyle/);
+  assert.match(source, /await classifyBookMetadata\(book, false\)/);
+  assert.match(source, /!\['processing', 'failed', 'classified', 'manual'\]\.includes\(status\)/);
 });

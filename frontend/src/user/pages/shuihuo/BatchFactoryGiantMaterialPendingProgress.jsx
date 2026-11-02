@@ -164,7 +164,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
         const refreshedBook = findRegisteredGiantMaterialBook(refreshedBatch?.books, metadata.giantMaterialId) || (refreshedBatch?.books || []).find(item => item?.id === book.id);
         if (refreshedBook?.id) {
           await updateBookMetadata(batchId, refreshedBook.id, {
-            metadata: { ...(refreshedBook.sourceMetadata || {}), originalReadStage: 'failed', originalReadError: failure, contentPending: true },
+            metadata: { ...(refreshedBook.sourceMetadata || {}), originalReadStage: 'failed', originalReadError: failure, contentPending: false },
             expectedRevision: Number(refreshedBook.revision || 0)
           });
         }
@@ -211,7 +211,7 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
   }
 
   useEffect(() => {
-    const key = `${book?.id || ''}:${book?.revision || 0}`;
+    const key = String(book?.id || '');
     const shouldResume = Boolean(
       visible
       && pending
@@ -220,14 +220,12 @@ export function BatchFactoryGiantMaterialPendingProgress({ book, batchId, onCont
       && !jobId
       && !String(book?.sourceText || '').trim()
       && originalReadStrategy === 'direct_first'
-      && !persistedOriginalReadError
     );
     if (!shouldResume || autoStartRef.current === key) return;
     autoStartRef.current = key;
-    // 只补跑从未请求过书城的旧占位书。直取失败要保留失败原因，
-    // OCR 是用户主动选择的备用方式，不能自动变成无限等待的队列任务。
+    // Retry direct-first books once per visible book mount, including records that failed before this page opened.
     enqueueDirectFirstRead(() => refetchOriginal(true));
-  }, [visible, pending, batchId, book?.id, book?.revision, book?.sourceText, jobId, persistedOriginalReadError, originalReadStrategy, metadata.originalReadStage]);
+  }, [visible, pending, batchId, book?.id, book?.sourceText, jobId, originalReadStrategy]);
 
   if (!pending || !visible) return null;
   // 直取优先时，任务尚未绑定 OCR 并不代表失败；这里正在自动请求书城正文。
