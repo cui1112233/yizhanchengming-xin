@@ -234,7 +234,20 @@ export async function waitForBookAssetImages(batchId, bookId, assetIds, taskId =
   while (Date.now() < deadline) {
     try {
       if (taskId) {
-        const task = resultData(await getBookAssetImageGenerationTask(batchId, bookId, taskId)) || {};
+        let taskResponse;
+        try {
+          taskResponse = await getBookAssetImageGenerationTask(batchId, bookId, taskId);
+        } catch (error) {
+          // 任务记录在服务端已不存在（例如重启后旧版本没有持久化），
+          // 继续轮询只会把弹窗一直挂着，直接按终止处理。
+          if (Number(error?.status) === 404) {
+            const terminalError = new Error('资产图片生成任务已中断（服务可能重启），请重新生成。');
+            terminalError.assetImageTaskTerminal = true;
+            throw terminalError;
+          }
+          throw error;
+        }
+        const task = resultData(taskResponse) || {};
         if (task.status === 'failed') {
           const terminalError = new Error(task.error || '资产图片生成失败');
           terminalError.assetImageTaskTerminal = true;
