@@ -111,7 +111,7 @@ test('completed batch merge makes a ready book wait for upload instead of comple
   const state = batchFactoryBookState({ id: 'book-1', sourceText: '正文' }, {
     mergeStatus: { jobs: [{ bookId: 'book-1', status: 'succeeded', outputUrl: 'https://media.example/final.mp4' }] }
   });
-  assert.deepEqual({ label: state.label, detail: state.detail }, { label: '待上传', detail: '视频已合并，等待 121 提交' });
+  assert.deepEqual({ label: state.label, detail: state.detail }, { label: '待上传', detail: '视频已合并，等待视频管理系统提交' });
 });
 
 test('treats manually generated comic page primaries as image-ready', () => {

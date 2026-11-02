@@ -1,6 +1,21 @@
 import { batchFactorySourceText } from './batchFactoryContentRange.js';
+import automationStagesContract from './automationStages.json' with { type: 'json' };
 
 function taskState(task) { return String(task?.status || '').trim().toLowerCase(); }
+
+// 阶段文案单一来源：automationStages.json（Go 侧由 TestAutomationStagesContract
+// 守护一致）。契约缺失或缺条目时回退到本地文案，保证构建与旧数据不受影响。
+const automationStageLabels = (() => {
+  const map = {};
+  for (const stage of automationStagesContract?.stages || []) {
+    if (stage?.id && stage?.mode && stage?.label) map[`${stage.mode}:${stage.id}`] = stage.label;
+  }
+  return map;
+})();
+
+function stageLabel(mode, id, fallback) {
+  return automationStageLabels[`${mode}:${id}`] || fallback;
+}
 
 const terminalAutomationBookStates = new Set(['failed', 'blocked', 'stopped', 'completed']);
 
@@ -168,20 +183,20 @@ export function batchFactoryBookTimeline(book, { productionStatus, mergeStatus, 
     const comicCollectionCount = Number(stageSummary?.comicCollectionCount || 0);
     const comicCollectionPageCount = Number(stageSummary?.comicCollectionPageCount || 0);
     return [
-      { key: 'source', label: '原文已就绪', status: sourceReady ? 'completed' : 'pending', detail: sourceReady ? '原文已保存' : '等待原文' },
-      { key: 'assets', label: '漫画资产已就绪', status: comicAssetsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(assets?.errorMessage) || (comicAssetsReady ? '人物、场景、道具已准备' : '等待提取漫画资产') },
-      { key: 'director', label: '漫画分页与提示词已就绪', status: comicPromptsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(director?.errorMessage) || (comicPromptsReady ? '分页与每页分镜提示词已生成' : '等待漫画分页与提示词') },
-      { key: 'video', label: '漫画图片生成', status: comicImageStatus, detail: batchFactoryVisibleError(comicImageRun?.errorMessage) || (comicImageStatus === 'completed' ? `漫画页图片已生成${stageSummary?.comicImageTotalCount ? `（${stageSummary.comicImageReadyCount}/${stageSummary.comicImageTotalCount} 页）` : ''}` : comicImageStatus === 'running' ? '正在逐页生成漫画图片' : '等待生成漫画图片') },
-      { key: 'complete', label: '漫画合集', status: comicCollectionReady ? 'completed' : 'pending', detail: comicPublished ? '漫画合集已发布' : comicCollectionReady ? `已整理 ${comicCollectionCount || 1} 个合集${comicCollectionPageCount ? `（${comicCollectionPageCount} 页）` : ''}` : '等待全部漫画页主图生成后整理合集' }
+      { key: 'source', label: stageLabel('comic', 'source', '原文已就绪'), status: sourceReady ? 'completed' : 'pending', detail: sourceReady ? '原文已保存' : '等待原文' },
+      { key: 'assets', label: stageLabel('comic', 'assets', '漫画资产已就绪'), status: comicAssetsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(assets?.errorMessage) || (comicAssetsReady ? '人物、场景、道具已准备' : '等待提取漫画资产') },
+      { key: 'director', label: stageLabel('comic', 'director', '漫画分页与提示词已就绪'), status: comicPromptsReady ? 'completed' : 'pending', detail: batchFactoryVisibleError(director?.errorMessage) || (comicPromptsReady ? '分页与每页分镜提示词已生成' : '等待漫画分页与提示词') },
+      { key: 'video', label: stageLabel('comic', 'video', '漫画图片生成'), status: comicImageStatus, detail: batchFactoryVisibleError(comicImageRun?.errorMessage) || (comicImageStatus === 'completed' ? `漫画页图片已生成${stageSummary?.comicImageTotalCount ? `（${stageSummary.comicImageReadyCount}/${stageSummary.comicImageTotalCount} 页）` : ''}` : comicImageStatus === 'running' ? '正在逐页生成漫画图片' : '等待生成漫画图片') },
+      { key: 'complete', label: stageLabel('comic', 'complete', '漫画合集'), status: comicCollectionReady ? 'completed' : 'pending', detail: comicPublished ? '漫画合集已发布' : comicCollectionReady ? `已整理 ${comicCollectionCount || 1} 个合集${comicCollectionPageCount ? `（${comicCollectionPageCount} 页）` : ''}` : '等待全部漫画页主图生成后整理合集' }
     ];
   }
   return [
-    { key: 'source', label: '原文已就绪', status: sourceReady ? 'completed' : 'pending', detail: sourceReady ? '原文已保存' : '等待原文' },
-    { key: 'assets', label: '资产（人物/场景/图片）已就绪', status: assetsReady, detail: batchFactoryVisibleError(assets?.errorMessage) || (assetsReady === 'completed' ? '资产已生成或已维护' : '等待资产处理') },
-    { key: 'director', label: '文本提示词已就绪', status: promptReady, detail: batchFactoryVisibleError(director?.errorMessage) || (promptReady === 'completed' ? '分镜与提示词已生成' : '等待生成文本提示词') },
-    { key: 'video', label: '视频生成', status: videoStatus, detail: batchFactoryVisibleError(failedVideo?.errorMessage) || videoProgress.summary || batchFactoryVisibleError(videoRun?.errorMessage) || (videoStatus === 'completed' ? 'VIDEO 已生成' : '等待生成视频') },
-    { key: 'upload', label: upload === 'running' ? '正在上传网络' : upload === 'completed' ? '上传成功' : '上传网络', status: upload, detail: uploadDetail },
-    { key: 'complete', label: '完成', status: upload === 'completed' ? 'completed' : (mergeFailed ? 'failed' : mergeRunning ? 'running' : 'pending'), detail: batchFactoryVisibleError(merge?.errorMessage) || (upload === 'completed' ? '本书生产与上传均已完成' : mergeRunning ? '正在合成最终视频' : merged ? '等待上传成功回执' : '等待最终视频合成') }
+    { key: 'source', label: stageLabel('video', 'source', '原文已就绪'), status: sourceReady ? 'completed' : 'pending', detail: sourceReady ? '原文已保存' : '等待原文' },
+    { key: 'assets', label: stageLabel('video', 'assets', '资产（人物/场景/图片）已就绪'), status: assetsReady, detail: batchFactoryVisibleError(assets?.errorMessage) || (assetsReady === 'completed' ? '资产已生成或已维护' : '等待资产处理') },
+    { key: 'director', label: stageLabel('video', 'director', '文本提示词已就绪'), status: promptReady, detail: batchFactoryVisibleError(director?.errorMessage) || (promptReady === 'completed' ? '分镜与提示词已生成' : '等待生成文本提示词') },
+    { key: 'video', label: stageLabel('video', 'video', '视频生成'), status: videoStatus, detail: batchFactoryVisibleError(failedVideo?.errorMessage) || videoProgress.summary || batchFactoryVisibleError(videoRun?.errorMessage) || (videoStatus === 'completed' ? 'VIDEO 已生成' : '等待生成视频') },
+    { key: 'upload', label: upload === 'running' ? '正在上传网络' : upload === 'completed' ? '上传成功' : stageLabel('video', 'upload', '上传网络'), status: upload, detail: uploadDetail },
+    { key: 'complete', label: stageLabel('video', 'complete', '完成'), status: upload === 'completed' ? 'completed' : (mergeFailed ? 'failed' : mergeRunning ? 'running' : 'pending'), detail: batchFactoryVisibleError(merge?.errorMessage) || (upload === 'completed' ? '本书生产与上传均已完成' : mergeRunning ? '正在合成最终视频' : merged ? '等待上传成功回执' : '等待最终视频合成') }
   ];
 }
 
@@ -248,7 +263,7 @@ export function batchFactoryBookState(book, { productionStatus, mergeStatus, sta
   const failedMerge = merges.find(job => taskState(job) === 'failed');
   if (failedMerge) return { label: '异常', detail: `合并失败${batchFactoryVisibleError(failedMerge.errorMessage) ? `：${batchFactoryVisibleError(failedMerge.errorMessage)}` : ''}`, tone: 'red', manual };
   if (merges.some(job => ['queued', 'running'].includes(taskState(job)))) return { label: '处理中', detail: '合并中', tone: 'blue', manual };
-  if (merges.some(job => taskState(job) === 'succeeded' && String(job?.outputUrl || '').trim())) return { label: '待上传', detail: '视频已合并，等待 121 提交', tone: 'cyan', manual };
+  if (merges.some(job => taskState(job) === 'succeeded' && String(job?.outputUrl || '').trim())) return { label: '待上传', detail: '视频已合并，等待视频管理系统提交', tone: 'cyan', manual };
   if (timeline.find(item => item.key === 'video')?.status === 'completed') return { label: '待合成', detail: '所有分镜视频已生成，等待合成', tone: 'cyan', manual };
 
   if (queueStatus === 'scheduled_waiting') return { label: '待开始', detail: '定时待执行，等待设定时间释放', tone: 'default', manual };

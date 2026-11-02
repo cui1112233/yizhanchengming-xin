@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "stages": [
+    { "id": "source", "mode": "video", "label": "原文已就绪", "terminal": false },
+    { "id": "assets", "mode": "video", "label": "资产（人物/场景/图片）已就绪", "terminal": false },
+    { "id": "director", "mode": "video", "label": "文本提示词已就绪", "terminal": false },
+    { "id": "video", "mode": "video", "label": "视频生成", "terminal": false },
+    { "id": "upload", "mode": "video", "label": "上传网络", "terminal": false },
+    { "id": "complete", "mode": "video", "label": "完成", "terminal": true },
+    { "id": "source", "mode": "comic", "label": "原文已就绪", "terminal": false },
+    { "id": "assets", "mode": "comic", "label": "漫画资产已就绪", "terminal": false },
+    { "id": "director", "mode": "comic", "label": "漫画分页与提示词已就绪", "terminal": false },
+    { "id": "video", "mode": "comic", "label": "漫画图片生成", "terminal": false },
+    { "id": "complete", "mode": "comic", "label": "漫画合集", "terminal": true },
+    { "id": "preflight", "mode": "runtime", "label": "预检", "terminal": false },
+    { "id": "fetch_original", "mode": "runtime", "label": "获取原文", "terminal": false },
+    { "id": "storyboards", "mode": "runtime", "label": "分镜生成", "terminal": false },
+    { "id": "openings", "mode": "runtime", "label": "片头生成", "terminal": false },
+    { "id": "audio", "mode": "runtime", "label": "音频生成", "terminal": false },
+    { "id": "merge", "mode": "runtime", "label": "视频合成", "terminal": false },
+    { "id": "submit", "mode": "runtime", "label": "定时提交", "terminal": false },
+    { "id": "comic_assets", "mode": "runtime", "label": "漫画资产提取", "terminal": false },
+    { "id": "comic_bootstrap", "mode": "runtime", "label": "漫画资产初始化", "terminal": false },
+    { "id": "comic_images", "mode": "runtime", "label": "整本漫画出图", "terminal": false },
+    { "id": "comic_collection", "mode": "runtime", "label": "漫画合集整理", "terminal": false },
+    { "id": "comic_publish", "mode": "runtime", "label": "漫画发布", "terminal": false },
+    { "id": "upload_confirm", "mode": "runtime", "label": "已上传待确认", "terminal": false },
+    { "id": "published", "mode": "runtime", "label": "发布完成", "terminal": true },
+    { "id": "completed", "mode": "runtime", "label": "已完成", "terminal": true }
+  ]
+}
