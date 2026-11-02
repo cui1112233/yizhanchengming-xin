@@ -131,6 +131,7 @@ func TestCompileShuihuoComicCharacterPromptUsesEditableCMThreeViewPreset(t *test
 		batchfactoryv11.BookAsset{Kind: "character", Source: "comic", Prompt: "青衣少女，银簪"},
 		settings,
 		prompt.NewCatalog(path),
+		true,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -144,6 +145,7 @@ func TestCompileShuihuoComicCharacterPromptUsesEditableCMThreeViewPreset(t *test
 		batchfactoryv11.BookAsset{Kind: "scene", Source: "comic", Prompt: "古宅庭院"},
 		settings,
 		prompt.NewCatalog(path),
+		true,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -178,6 +180,7 @@ func TestCompileShuihuoComicAssetPromptScopesGlobalStyleReferenceToCharacters(t 
 				batchfactoryv11.BookAsset{Kind: test.kind, Source: "comic", Prompt: "资产描述"},
 				settings,
 				prompt.NewCatalog(path),
+				true,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -198,12 +201,44 @@ func TestCompileShuihuoComicAssetPromptAppliesStyleToLegacyAssetSource(t *testin
 		batchfactoryv11.BookAsset{Kind: "scene", Source: "manual", Prompt: "现代办公室"},
 		settings,
 		nil,
+		false,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(promptText, "Q版漫画画风") {
 		t.Fatalf("legacy asset source lost comic style: %s", promptText)
+	}
+}
+
+// 非漫画模式下，人物资产默认也套三视图，开关关闭时退化为单张设定图。
+func TestCompileShuihuoAssetPromptThreeViewToggle(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "presets.json")
+	if err := os.WriteFile(path, []byte(`[]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := prompt.EnsureComicPresets(path); err != nil {
+		t.Fatal(err)
+	}
+	catalog := prompt.NewCatalog(path)
+	asset := batchfactoryv11.BookAsset{Kind: "character", Source: "manual", Prompt: "青衣少女，银簪"}
+
+	withThreeView, _, err := compileShuihuoAssetImagePrompt(asset, batchfactoryv11.SettingsPatch{}, catalog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, phrase := range []string{"青衣少女，银簪", "正面近照、正面全身、侧面全身、背面全身", "白色底图"} {
+		if !strings.Contains(withThreeView, phrase) {
+			t.Fatalf("three-view prompt is missing %q: %s", phrase, withThreeView)
+		}
+	}
+
+	withoutThreeView, _, err := compileShuihuoAssetImagePrompt(asset, batchfactoryv11.SettingsPatch{}, catalog, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(withoutThreeView, "正面近照") || strings.Contains(withoutThreeView, "白色底图") {
+		t.Fatalf("three-view disabled but template still applied: %s", withoutThreeView)
 	}
 }
 

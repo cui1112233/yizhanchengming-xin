@@ -298,6 +298,7 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
   const [selectedAssetIds, setSelectedAssetIds] = useState([]);
   const [imageGenerating, setImageGenerating] = useState(false);
   const [imageGenerationResult, setImageGenerationResult] = useState(null);
+  const [assetImageThreeView, setAssetImageThreeView] = useState(true);
   const [assetImages, setAssetImages] = useState({});
   const [editing, setEditing] = useState(null);
 	const [imageModels, setImageModels] = useState([]);
@@ -432,7 +433,7 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
 			message.success(starred ? `已取消“${name}”的星标聚焦。` : `已将“${name}”设为星标聚焦人物。`);
 		} catch (error) { message.error(error?.message || '保存星标人物失败'); } finally { setSavingId(''); }
 	}
-  async function generateImages(assetIds = selectedAssetIds, candidateAssets = assets) {
+  async function generateImages(assetIds = selectedAssetIds, candidateAssets = assets, useThreeView = assetImageThreeView) {
     if (!assetIds.length) { message.warning('请先选择要生成图片的资产。'); return false; }
 	const selected = assetIds.map(assetId => candidateAssets.find(asset => asset.id === assetId)).filter(Boolean);
 	if (selected.length !== assetIds.length || selected.some(asset => !(asset.imageModelId || imageModelId))) {
@@ -446,7 +447,8 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
         assetIds,
         modelId: imageModelId,
         provider: imageProvider,
-        imageAspectRatio: imageAspectRatio || '16:9'
+        imageAspectRatio: imageAspectRatio || '16:9',
+        useThreeView: Boolean(useThreeView)
       });
       const initialImages = Array.isArray(result?.images) ? result.images : [];
       let savedImages = initialImages;
@@ -478,7 +480,7 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
   async function generateEditedAssetImage() {
     const savedAsset = await saveAsset({ close: false });
     if (!savedAsset) return;
-	if (await generateImages([savedAsset.id], [savedAsset])) setEditing(null);
+	if (await generateImages([savedAsset.id], [savedAsset], assetImageThreeView)) setEditing(null);
   }
   async function uploadImage(asset, event) {
     const file = event.target.files?.[0];
@@ -560,6 +562,7 @@ function AssetEditor({ book, batchId, onSaved, onGenerate, onRegenerate, onRetry
 	          {mainImage ? <div className="batch-factory-asset-editor-main"><AuthenticatedBookAssetImage imageUrl={mainImage.url} alt={`${assetName(editing)} 主图`} preview /></div>
 	            : <div className="batch-factory-asset-editor-main is-empty"><PictureOutlined /><span>暂无主图，请上传图片或用 AI 生成</span></div>}
 	          <div className="batch-factory-asset-editor-panel-actions">
+	            {editing?.kind === 'character' ? <Tooltip title="开启后人物资产图按“正面近照 + 正面/侧面/背面全身”三视图生成，便于分镜保持角色一致。"><span className="batch-factory-asset-editor-three-view"><Switch size="small" checked={assetImageThreeView} onChange={setAssetImageThreeView} disabled={panelBusy} />人物三视图</span></Tooltip> : null}
 	            <label className="batch-factory-image-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => uploadImage(editing, event)} disabled={panelBusy} />上传图片版本</label>
 	            <Tooltip title="先保存当前提示词；图片模型未单独选择时继承书籍引擎，资产画幅未单独选择时固定为 16:9。"><Button type="primary" loading={imageGenerating} disabled={panelBusy} onClick={generateEditedAssetImage}>AI生成</Button></Tooltip>
 	          </div>

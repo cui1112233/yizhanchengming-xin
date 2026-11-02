@@ -130,6 +130,28 @@ type shuihuoImageConcurrencyContextKey struct{}
 
 type shuihuoEffectiveSettingsContextKey struct{}
 
+type shuihuoAssetThreeViewContextKey struct{}
+
+// withShuihuoAssetThreeView 控制人物资产图是否套用三视图模板。
+// 未显式设置时默认开启，保持原有漫画资产出图行为。
+func withShuihuoAssetThreeView(ctx context.Context, enabled bool) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoAssetThreeViewContextKey{}, enabled)
+}
+
+func shuihuoAssetThreeViewEnabled(ctx context.Context) bool {
+	if ctx == nil {
+		return true
+	}
+	value, ok := ctx.Value(shuihuoAssetThreeViewContextKey{}).(bool)
+	if !ok {
+		return true
+	}
+	return value
+}
+
 // withShuihuoEffectiveSettings 把批次生效设置注入上下文，让出图函数在保存前
 // 读取水印等配置。未设置时水印功能默认关闭。
 func withShuihuoEffectiveSettings(ctx context.Context, settings map[string]any) context.Context {
@@ -3005,7 +3027,7 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 		if targetErr != nil {
 			return nil, targetErr
 		}
-		prompt, referenceImageURLs, compileErr := compileShuihuoAssetImagePrompt(asset, effective, presetCatalog)
+		prompt, referenceImageURLs, compileErr := compileShuihuoAssetImagePrompt(asset, effective, presetCatalog, shuihuoAssetThreeViewEnabled(ctx))
 		if compileErr != nil {
 			return nil, compileErr
 		}
@@ -3171,8 +3193,23 @@ func retryableShuihuoAssetImageTransportError(err error) bool {
 		strings.Contains(message, "temporary network")
 }
 
-func compileShuihuoAssetImagePrompt(asset batchfactoryv11.BookAsset, settings batchfactoryv11.SettingsPatch, presetCatalog *prompt.Catalog) (string, []string, error) {
+func compileShuihuoAssetImagePrompt(asset batchfactoryv11.BookAsset, settings batchfactoryv11.SettingsPatch, presetCatalog *prompt.Catalog, useThreeView bool) (string, []string, error) {
 	content := strings.TrimSpace(asset.Prompt)
+	// 人物资产默认套用 CM·角色三视图，包含正面近照与正/侧/背全身，
+	// 保证后续分镜复用同一角色外观；开关关闭时退化为单张设定图。
+	if asset.Kind == "character" && useThreeView {
+		if presetCatalog == nil {
+			return "", nil, fmt.Errorf("%w: CM·角色三视图提示词库不可用", batchfactoryv11.ErrUnavailable)
+		}
+		template, found, templateErr := presetCatalog.PublishedBody("batch-factory", cmCharacterThreeViewPresetID)
+		if templateErr != nil {
+			return "", nil, fmt.Errorf("%w: 读取CM·角色三视图失败", batchfactoryv11.ErrUnavailable)
+		}
+		if !found || template.Slot != "batch.comic.character-image-template" || strings.TrimSpace(template.Body) == "" {
+			return "", nil, fmt.Errorf("%w: CM·角色三视图未发布", batchfactoryv11.ErrUnavailable)
+		}
+		content = strings.TrimSpace(content + "\n\n" + template.Body)
+	}
 	// Asset images belong to the selected comic project, not to the historical
 	// extraction source label. Older/manual assets can still be part of a comic
 	// book, and must receive the selected comic style as well.
@@ -3189,19 +3226,6 @@ func compileShuihuoAssetImagePrompt(asset batchfactoryv11.BookAsset, settings ba
 	// degraded into photorealistic asset images.
 	if !batchfactoryv11.ComicImageStyleConfigured(settings) {
 		return "", nil, fmt.Errorf("%w: 当前漫画项目未加载已选择的画风，请先保存画面配置", batchfactoryv11.ErrConflict)
-	}
-	if asset.Kind == "character" {
-		if presetCatalog == nil {
-			return "", nil, fmt.Errorf("%w: CM·角色三视图提示词库不可用", batchfactoryv11.ErrUnavailable)
-		}
-		template, found, err := presetCatalog.PublishedBody("batch-factory", cmCharacterThreeViewPresetID)
-		if err != nil {
-			return "", nil, fmt.Errorf("%w: 读取CM·角色三视图失败", batchfactoryv11.ErrUnavailable)
-		}
-		if !found || template.Slot != "batch.comic.character-image-template" || strings.TrimSpace(template.Body) == "" {
-			return "", nil, fmt.Errorf("%w: CM·角色三视图未发布", batchfactoryv11.ErrUnavailable)
-		}
-		content = strings.TrimSpace(content + "\n\n" + template.Body)
 	}
 	contract, err := batchfactoryv11.BuildComicImageContract(settings, batchfactoryv11.ComicImagePurposeAsset, asset.Kind, content, nil, nil)
 	if err != nil {

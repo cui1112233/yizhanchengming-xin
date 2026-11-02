@@ -254,10 +254,11 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 			return
 		}
 		var input struct {
-			AssetIDs    []string `json:"assetIds"`
-			ModelID     string   `json:"modelId"`
-			Provider    string   `json:"provider"`
-			AspectRatio string   `json:"imageAspectRatio"`
+			AssetIDs      []string `json:"assetIds"`
+			ModelID       string   `json:"modelId"`
+			Provider      string   `json:"provider"`
+			AspectRatio   string   `json:"imageAspectRatio"`
+			UseThreeView  *bool    `json:"useThreeView"`
 		}
 		if !decodeJSON(w, r, &input) {
 			return
@@ -267,6 +268,11 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 		batchID := r.PathValue("batchId")
 		assetIDs := append([]string(nil), input.AssetIDs...)
 		modelID, aspectRatio, provider := input.ModelID, input.AspectRatio, input.Provider
+		// 未传时默认开启三视图，保持既有漫画资产出图行为。
+		threeView := true
+		if input.UseThreeView != nil {
+			threeView = *input.UseThreeView
+		}
 		taskID, idErr := localexecutor.NewArtifactID()
 		if idErr != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "无法创建资产图片生成任务"})
@@ -280,6 +286,7 @@ func registerV12AssetGenerationRoute(mux *http.ServeMux, store batchfactoryv11.S
 		go func() {
 			generationCtx, cancel := assetImageGenerationContext(context.Background())
 			defer cancel()
+			generationCtx = withShuihuoAssetThreeView(generationCtx, threeView)
 			images, generationErr := generateShuihuoAssetImagesWithRepair(generationCtx, store, files, owner, selectedBatch, assetIDs, modelID, aspectRatio, provider, localExecutors, presetCatalog, rewrite, catalogStore)
 			if generationErr != nil {
 				log.Printf("batch factory asset image generation failed batch=%s book=%s assets=%v model=%s provider=%s: %v", batchID, bookID, assetIDs, modelID, provider, generationErr)
