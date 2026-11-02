@@ -349,7 +349,7 @@ func TestComicAutomationStopsAfterWholeBookCollectionWithoutAudioOrVideo(t *test
 	}})
 	mode, _ := json.Marshal("comic")
 	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
-		Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig}, ExpectedRevision: batch.Revision,
+		Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`)}, ExpectedRevision: batch.Revision,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -413,7 +413,7 @@ func TestComicAutomationHonorsBookConcurrency(t *testing.T) {
 	}
 	comicConfig, _ := json.Marshal(map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"id": "batch-comic-assets", "body": "提取漫画人物、场景和道具"}, "imageDerivation": map[string]any{"body": "整理成可直接出图的提示词"}}})
 	mode, _ := json.Marshal("comic")
-	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig}, ExpectedRevision: batch.Revision}); err != nil {
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`)}, ExpectedRevision: batch.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	batch, _ = store.GetBatch(ctx, "alice", batch.ID)
@@ -441,6 +441,69 @@ func TestComicAutomationHonorsBookConcurrency(t *testing.T) {
 	}
 	if job["state"] != "completed" {
 		t.Fatalf("job state=%v, want completed", job["state"])
+	}
+}
+
+func TestAutomationRunSkipsBlockedBook(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{
+		{Title: "健康书", SourceText: "林晚走进办公室。"},
+		{Title: "缺模型书", SourceText: "林晚走进办公室。"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig, _ := json.Marshal(map[string]any{"comic": map[string]any{"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"id": "batch-comic-assets", "body": "提取漫画人物、场景和道具"}, "imageDerivation": map[string]any{"body": "整理成可直接出图的提示词"}}})
+	mode, _ := json.Marshal("comic")
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`)}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(ctx, "alice", batch.ID)
+	var healthy, blocked batchfactoryv11.Book
+	for _, candidate := range batch.Books {
+		if candidate.Title == "缺模型书" {
+			blocked = candidate
+		} else {
+			healthy = candidate
+		}
+	}
+	// 书级空值覆盖批级配置，模拟“只有这一本没配文本模型”。
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: batch.ID, BookID: blocked.ID}, batchfactoryv11.SettingsUpdate{Patch: batchfactoryv11.SettingsPatch{"textModelId": json.RawMessage(`""`)}, ExpectedRevision: blocked.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(ctx, "alice", batch.ID)
+	provider := &comicAutomationTextProvider{}
+	coordinator := NewBatchAutomationCoordinator(store, nil, &batchfactoryv11.BookStageService{
+		Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: provider},
+	}, nil, nil, nil, nil, nil, func() time.Time { return time.Unix(1700000000, 0) })
+	coordinator.SetComicBookGenerator(func(_ context.Context, _, _, _ string) (batchfactoryv11.ComicCollection, error) {
+		latest, getErr := store.GetBatch(ctx, "alice", batch.ID)
+		if getErr != nil {
+			return batchfactoryv11.ComicCollection{}, getErr
+		}
+		for _, candidate := range latest.Books {
+			if candidate.ID == healthy.ID {
+				return batchfactoryv11.ComicCollection{ID: "collection-1", Items: []batchfactoryv11.ComicCollectionItem{{VideoID: candidate.Videos[0].ID}}}, nil
+			}
+		}
+		return batchfactoryv11.ComicCollection{}, batchfactoryv11.ErrNotFound
+	})
+	entries := map[string]any{}
+	for _, book := range batch.Books {
+		entries[book.ID] = map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
+	}
+	job := map[string]any{"id": "job-blocked", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": entries}
+
+	coordinator.run(ctx, "alice", batch.ID, "job-blocked", job, batch)
+
+	blockedEntry := entries[blocked.ID].(map[string]any)
+	if blockedEntry["status"] != "blocked" || blockedEntry["stage"] != "preflight" || !strings.Contains(fmt.Sprint(blockedEntry["message"]), "文本模型") {
+		t.Fatalf("blocked entry=%#v, want blocked/preflight with reason", blockedEntry)
+	}
+	healthyEntry := entries[healthy.ID].(map[string]any)
+	if healthyEntry["status"] != "completed" {
+		t.Fatalf("healthy entry=%#v, want completed despite blocked neighbour", healthyEntry)
 	}
 }
 
@@ -630,24 +693,52 @@ func TestAutomationJobDueUsesPersistedScheduledTime(t *testing.T) {
 	}
 }
 
-func TestAutomationPreflightRequiresServerSideExecutorAndModels(t *testing.T) {
+func TestAutomationGlobalPreflightRequiresServerSideExecutor(t *testing.T) {
 	coordinator := &BatchAutomationCoordinator{stages: &batchfactoryv11.BookStageService{}}
 	batch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{"productionMode": json.RawMessage(`"video"`)}}}
-	book := batchfactoryv11.Book{ID: "book-1", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
-		"textModelId":  json.RawMessage(`"text-1"`),
-		"videoModelId": json.RawMessage(`"video-1"`),
-	}}}
-	err := coordinator.validateAutomationPreflight(context.Background(), "alice", batch, []batchfactoryv11.Book{book}, "video_no_submit")
+	err := coordinator.validateAutomationGlobalPreflight(context.Background(), "alice", batch, "video_no_submit")
 	if err == nil || !strings.Contains(err.Error(), "文本模型执行器未配置") {
 		t.Fatalf("preflight error=%v, want missing server executor", err)
 	}
 }
 
-func TestAutomationPreflightStopsComicPublishWithoutAvailableAudio(t *testing.T) {
+func TestAutomationGlobalPreflightIgnoresBookConfig(t *testing.T) {
+	coordinator := &BatchAutomationCoordinator{}
+	// 全局预检签名不再接收书列表：缺执行器时报全局原因，不含任何书级原因。
+	err := coordinator.validateAutomationGlobalPreflight(context.Background(), "alice", batchfactoryv11.Batch{}, "storyboard_only")
+	if err == nil || !strings.Contains(err.Error(), "文本模型执行器未配置") {
+		t.Fatalf("err=%v, want global executor reason", err)
+	}
+	if strings.Contains(err.Error(), "《") || strings.Contains(err.Error(), "发布配置未绑定") {
+		t.Fatalf("err=%v, must not contain per-book reasons", err)
+	}
+}
+
+func TestAutomationBookPreflightReason(t *testing.T) {
+	coordinator := &BatchAutomationCoordinator{}
+	batch := batchfactoryv11.Batch{}
+	book := batchfactoryv11.Book{ID: "book-1", Title: "书一"}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "execute_only"); !strings.Contains(reason, "文本模型") {
+		t.Fatalf("reason=%q, want missing text model", reason)
+	}
+	book.SettingsState.Patch = batchfactoryv11.SettingsPatch{"textModelId": json.RawMessage(`"text-1"`)}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "storyboard_only"); reason != "" {
+		t.Fatalf("storyboard_only should pass, got %q", reason)
+	}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "execute_only"); !strings.Contains(reason, "视频模型") {
+		t.Fatalf("reason=%q, want missing video model", reason)
+	}
+	book.SettingsState.Patch["videoModelId"] = json.RawMessage(`"video-1"`)
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "execute_only"); reason != "" {
+		t.Fatalf("execute_only should pass, got %q", reason)
+	}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "full_submit"); !strings.Contains(reason, "发布配置") {
+		t.Fatalf("reason=%q, want missing publish profile", reason)
+	}
+}
+
+func TestAutomationBookPreflightReportsComicPublishPreflight(t *testing.T) {
 	coordinator := &BatchAutomationCoordinator{
-		comicPublish: func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error) {
-			return N8ComicPublishRecord{}, nil
-		},
 		comicPublishPreflight: func(context.Context, batchfactoryv11.SettingsPatch) error {
 			return fmt.Errorf("漫画发布设置不完整：没有可用指定音频")
 		},
@@ -656,9 +747,14 @@ func TestAutomationPreflightStopsComicPublishWithoutAvailableAudio(t *testing.T)
 		"productionMode":       json.RawMessage(`"comic"`),
 		"comicPublishSettings": json.RawMessage(`{"producerAdminName":"制作者","workIds":[9001]}`),
 	}}}
-	err := coordinator.validateAutomationPreflight(context.Background(), "alice", batch, []batchfactoryv11.Book{{ID: "book-1"}}, "full_submit")
-	if err == nil || !strings.Contains(err.Error(), "没有可用指定音频") {
-		t.Fatalf("preflight error=%v, want missing automatic audio", err)
+	book := batchfactoryv11.Book{ID: "book-1", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+		"textModelId":     json.RawMessage(`"text-1"`),
+		"imageModelId":    json.RawMessage(`"image-1"`),
+		"publishSettings": json.RawMessage(`{"websiteProfileId":"p1"}`),
+	}}}
+	reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "full_submit")
+	if !strings.Contains(reason, "没有可用指定音频") {
+		t.Fatalf("reason=%q, want missing automatic audio", reason)
 	}
 }
 
@@ -1028,10 +1124,10 @@ func TestAutomationPreflightRejectsDirectFirstBlockedBook(t *testing.T) {
 		"originalReadError":    "121 upstream business error 400: 参数不完整",
 	}}
 
-	err := coordinator.validateAutomationPreflight(context.Background(), "alice", batchfactoryv11.Batch{}, []batchfactoryv11.Book{book}, "storyboard_only")
+	reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batchfactoryv11.Batch{}, book, "storyboard_only")
 
-	if err == nil || !strings.Contains(err.Error(), "《直取失败书》书城原文获取失败，等待人工处理") {
-		t.Fatalf("err=%v, want blocked direct-first preflight error", err)
+	if !strings.Contains(reason, "《直取失败书》书城原文获取失败，等待人工处理") {
+		t.Fatalf("reason=%q, want blocked direct-first preflight reason", reason)
 	}
 }
 

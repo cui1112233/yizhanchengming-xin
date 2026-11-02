@@ -273,7 +273,7 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 				scoped.Books = append(scoped.Books, book)
 			}
 		}
-		if validationErr := c.validateAutomationPreflight(ctx, item.owner, batch, scoped.Books, automationStringValue(item.job["runMode"], "full_submit")); validationErr != nil {
+		if validationErr := c.validateAutomationGlobalPreflight(ctx, item.owner, batch, automationStringValue(item.job["runMode"], "full_submit")); validationErr != nil {
 			item.job["state"], item.job["lastError"], item.job["updatedAt"] = "failed", validationErr.Error(), c.now()
 			_ = c.setJob(item.owner, item.batchID, item.jobID, item.job)
 			continue
@@ -683,7 +683,7 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	}
 	if initialState == "running" {
 		job["startedAt"] = c.now()
-		if err := c.validateAutomationPreflight(ctx, owner, batch, targetBooks, runMode); err != nil {
+		if err := c.validateAutomationGlobalPreflight(ctx, owner, batch, runMode); err != nil {
 			return nil, err
 		}
 	}
@@ -729,35 +729,15 @@ func (c *BatchAutomationCoordinator) activeAutomationJob(owner, batchID string) 
 	return nil
 }
 
-func (c *BatchAutomationCoordinator) validateAutomationPreflight(ctx context.Context, owner string, batch batchfactoryv11.Batch, books []batchfactoryv11.Book, runMode string) error {
+// validateAutomationGlobalPreflight 只保留“全批不可执行”的条件：执行器整体
+// 缺失或不可用。任意单书的配置缺陷不再整批拒绝，改由 automationBookPreflightReason
+// 在 run() 里逐书跳过。
+func (c *BatchAutomationCoordinator) validateAutomationGlobalPreflight(ctx context.Context, owner string, batch batchfactoryv11.Batch, runMode string) error {
 	reasons := make([]string, 0)
 	if c.stages == nil || c.stages.Director == nil || c.stages.Director.Provider == nil {
 		reasons = append(reasons, "文本模型执行器未配置")
 	}
 	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
-	for _, book := range books {
-		if isDirectFirstSourceBlocked(book) {
-			title := strings.TrimSpace(book.Title)
-			if title == "" {
-				title = "未命名作品"
-			}
-			reasons = append(reasons, fmt.Sprintf("《%s》书城原文获取失败，等待人工处理", title))
-		}
-		effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-		if comicSettingString(effective, "textModelId", "") == "" {
-			reasons = append(reasons, "文本模型未配置")
-		}
-		if runMode == "storyboard_only" {
-			continue
-		}
-		if productionMode == "comic" {
-			if comicSettingString(effective, "imageModelId", "") == "" {
-				reasons = append(reasons, "图片模型未配置")
-			}
-		} else if comicSettingString(effective, "videoModelId", "") == "" {
-			reasons = append(reasons, "视频模型未配置")
-		}
-	}
 	if productionMode == "comic" && runMode != "storyboard_only" {
 		if c.stages == nil || c.stages.ImageReady == nil {
 			reasons = append(reasons, "图片生成执行器未配置")
@@ -773,28 +753,8 @@ func (c *BatchAutomationCoordinator) validateAutomationPreflight(ctx context.Con
 		}
 	}
 	if runMode == "full_submit" {
-		for _, book := range books {
-			effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-			var publish map[string]any
-			if raw := effective["publishSettings"]; len(raw) > 0 {
-				_ = json.Unmarshal(raw, &publish)
-			}
-			if publish == nil || !hasAutomationPublishProfile(publish) {
-				reasons = append(reasons, "发布配置未绑定网站或组织")
-				break
-			}
-		}
 		if productionMode == "comic" && c.comicPublish == nil {
 			reasons = append(reasons, "漫画发布执行器未配置")
-		}
-		if productionMode == "comic" && c.comicPublishPreflight != nil {
-			for _, book := range books {
-				effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-				if err := c.comicPublishPreflight(ctx, effective); err != nil {
-					reasons = append(reasons, err.Error())
-					break
-				}
-			}
 		}
 		if productionMode != "comic" && c.publish121 == nil && c.external == nil {
 			reasons = append(reasons, "视频发布执行器未配置")
@@ -812,6 +772,48 @@ func (c *BatchAutomationCoordinator) validateAutomationPreflight(ctx context.Con
 		}
 	}
 	return fmt.Errorf("%w: 自动生产前检查失败：%s", batchfactoryv11.ErrInvalid, strings.Join(unique, "；"))
+}
+
+// automationBookPreflightReason 逐书预检，返回空串表示该书可执行。定时任务与
+// 立即任务都走 run()，因此同一套逐书预检对两种启动方式一致生效。
+func (c *BatchAutomationCoordinator) automationBookPreflightReason(ctx context.Context, owner string, batch batchfactoryv11.Batch, book batchfactoryv11.Book, runMode string) string {
+	if isDirectFirstSourceBlocked(book) {
+		title := strings.TrimSpace(book.Title)
+		if title == "" {
+			title = "未命名作品"
+		}
+		return fmt.Sprintf("《%s》书城原文获取失败，等待人工处理", title)
+	}
+	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	if comicSettingString(effective, "textModelId", "") == "" {
+		return "文本模型未配置"
+	}
+	if runMode == "storyboard_only" {
+		return ""
+	}
+	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
+	if productionMode == "comic" {
+		if comicSettingString(effective, "imageModelId", "") == "" {
+			return "图片模型未配置"
+		}
+	} else if comicSettingString(effective, "videoModelId", "") == "" {
+		return "视频模型未配置"
+	}
+	if runMode == "full_submit" {
+		var publish map[string]any
+		if raw := effective["publishSettings"]; len(raw) > 0 {
+			_ = json.Unmarshal(raw, &publish)
+		}
+		if publish == nil || !hasAutomationPublishProfile(publish) {
+			return "发布配置未绑定网站或组织"
+		}
+		if productionMode == "comic" && c.comicPublishPreflight != nil {
+			if err := c.comicPublishPreflight(ctx, effective); err != nil {
+				return err.Error()
+			}
+		}
+	}
+	return ""
 }
 
 func reasonOrDefault(reason, fallback string) string {
@@ -1675,6 +1677,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						continue
 					}
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "已按定时提交时间完成上传", c.now()
+					persist()
+					continue
+				}
+				if reason := c.automationBookPreflightReason(ctx, owner, batch, book, automationStringValue(job["runMode"], "full_submit")); reason != "" {
+					entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "blocked", "preflight", "", reason, c.now()
+					appendAutomationBookLog(entry, c.now(), "preflight", reason)
 					persist()
 					continue
 				}
