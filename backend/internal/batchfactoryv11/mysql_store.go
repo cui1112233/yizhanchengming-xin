@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -626,7 +627,103 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	if err := shotRows.Err(); err != nil {
 		return nil, err
 	}
+
+	// 漫画项目没有分镜成片，用首个漫画页主图作为卡片封面。封面必须来自一次
+	// 批量查询，否则项目库会退化成按项目逐个发图片请求。
+	comicRows, err := s.db.QueryContext(ctx, `SELECT p.batch_id,p.book_id,p.id,i.id FROM batch_factory_v12_comic_page_images i JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id AND p.owner_username=i.owner_username LEFT JOIN batch_factory_v12_books b ON b.id=p.book_id AND b.owner_username=p.owner_username LEFT JOIN batch_factory_v12_videos v ON v.id=p.video_id AND v.owner_username=p.owner_username WHERE i.owner_username=? AND i.is_primary=TRUE ORDER BY p.batch_id,COALESCE(b.ordinal,2147483647),COALESCE(v.ordinal,2147483647),i.created_at DESC,i.id DESC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	seenComic := map[string]bool{}
+	for comicRows.Next() {
+		var batchID, bookID, comicPageID, imageID string
+		if err := comicRows.Scan(&batchID, &bookID, &comicPageID, &imageID); err != nil {
+			comicRows.Close()
+			return nil, err
+		}
+		if seenComic[batchID] {
+			continue
+		}
+		seenComic[batchID] = true
+		if index, ok := batchIndexByID[batchID]; ok && batches[index].ProjectCoverArtifactID == "" && batches[index].ProjectCoverMediaURL == "" {
+			batches[index].ProjectCoverImageURL = projectCoverComicPageImageURL(batchID, bookID, comicPageID, imageID)
+		}
+	}
+	if err := comicRows.Err(); err != nil {
+		comicRows.Close()
+		return nil, err
+	}
+	comicRows.Close()
+
+	// 还没生成漫画页时，退到书籍资产主图，避免项目卡片长期是空白色块。
+	assetRows, err := s.db.QueryContext(ctx, `SELECT a.batch_id,a.book_id,a.id,i.id FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id AND a.owner_username=i.owner_username LEFT JOIN batch_factory_v12_books b ON b.id=a.book_id AND b.owner_username=a.owner_username WHERE i.owner_username=? AND i.is_primary=TRUE ORDER BY a.batch_id,COALESCE(b.ordinal,2147483647),i.created_at DESC,i.id DESC`, owner)
+	if err != nil {
+		return nil, err
+	}
+	seenAsset := map[string]bool{}
+	for assetRows.Next() {
+		var batchID, bookID, assetID, imageID string
+		if err := assetRows.Scan(&batchID, &bookID, &assetID, &imageID); err != nil {
+			assetRows.Close()
+			return nil, err
+		}
+		if seenAsset[batchID] {
+			continue
+		}
+		seenAsset[batchID] = true
+		if index, ok := batchIndexByID[batchID]; ok && batches[index].ProjectCoverImageURL == "" && batches[index].ProjectCoverArtifactID == "" && batches[index].ProjectCoverMediaURL == "" {
+			batches[index].ProjectCoverImageURL = projectCoverAssetImageURL(batchID, bookID, assetID, imageID)
+		}
+	}
+	if err := assetRows.Err(); err != nil {
+		assetRows.Close()
+		return nil, err
+	}
+	assetRows.Close()
+
+	// 项目卡片上的“漫画/视频”标记由批次或书籍设置里的 productionMode 决定。
+	modeRows, err := s.db.QueryContext(ctx, `SELECT batch_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type IN ('batch','book')`, owner)
+	if err != nil {
+		return nil, err
+	}
+	seenComicMode := map[string]bool{}
+	for modeRows.Next() {
+		var batchID, patchJSON string
+		if err := modeRows.Scan(&batchID, &patchJSON); err != nil {
+			modeRows.Close()
+			return nil, err
+		}
+		var patch struct {
+			ProductionMode string `json:"productionMode"`
+		}
+		if json.Unmarshal([]byte(patchJSON), &patch) == nil && strings.EqualFold(patch.ProductionMode, "comic") {
+			seenComicMode[batchID] = true
+		}
+	}
+	if err := modeRows.Err(); err != nil {
+		modeRows.Close()
+		return nil, err
+	}
+	modeRows.Close()
+	for batchID := range seenComicMode {
+		if index, ok := batchIndexByID[batchID]; ok {
+			batches[index].ProductionMode = "comic"
+		}
+	}
+	for index := range batches {
+		if batches[index].ProductionMode == "" {
+			batches[index].ProductionMode = "video"
+		}
+	}
 	return batches, nil
+}
+
+func projectCoverComicPageImageURL(batchID, bookID, comicPageID, imageID string) string {
+	return "/api/batch-factory/v12/batches/" + url.PathEscape(batchID) + "/books/" + url.PathEscape(bookID) + "/comic-pages/" + url.PathEscape(comicPageID) + "/images/" + url.PathEscape(imageID) + "/content"
+}
+
+func projectCoverAssetImageURL(batchID, bookID, assetID, imageID string) string {
+	return "/api/batch-factory/v12/batches/" + url.PathEscape(batchID) + "/books/" + url.PathEscape(bookID) + "/assets/" + url.PathEscape(assetID) + "/images/" + url.PathEscape(imageID) + "/content"
 }
 
 func projectCoverArtifactID(batchID, outputURL string) string {

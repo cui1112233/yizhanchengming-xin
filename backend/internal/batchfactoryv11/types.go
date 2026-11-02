@@ -96,16 +96,21 @@ type Book struct {
 	Videos              []Video           `json:"videos"`
 }
 type Batch struct {
-	ID                     string        `json:"id"`
-	Title                  string        `json:"title"`
-	SourceIntakeID         string        `json:"sourceIntakeId,omitempty"`
-	ProjectCoverArtifactID string        `json:"projectCoverArtifactId,omitempty"`
-	ProjectCoverMediaURL   string        `json:"projectCoverMediaUrl,omitempty"`
-	Revision               int64         `json:"revision"`
-	SettingsState          SettingsState `json:"settingsState"`
-	Books                  []Book        `json:"books"`
-	CreatedAt              time.Time     `json:"createdAt,omitempty"`
-	UpdatedAt              time.Time     `json:"updatedAt,omitempty"`
+	ID                     string `json:"id"`
+	Title                  string `json:"title"`
+	SourceIntakeID         string `json:"sourceIntakeId,omitempty"`
+	ProjectCoverArtifactID string `json:"projectCoverArtifactId,omitempty"`
+	ProjectCoverMediaURL   string `json:"projectCoverMediaUrl,omitempty"`
+	// ProjectCoverImageURL 是项目卡片在没有合并成片时的图片封面回退
+	// （取首个漫画页主图或首个资产主图），仅在摘要索引中填充。
+	ProjectCoverImageURL string `json:"-"`
+	// ProductionMode 是摘要索引里按设置推断出的项目类型（comic/video）。
+	ProductionMode string        `json:"-"`
+	Revision       int64         `json:"revision"`
+	SettingsState  SettingsState `json:"settingsState"`
+	Books          []Book        `json:"books"`
+	CreatedAt      time.Time     `json:"createdAt,omitempty"`
+	UpdatedAt      time.Time     `json:"updatedAt,omitempty"`
 }
 type CreateVideoInput struct {
 	Label           string  `json:"label"`

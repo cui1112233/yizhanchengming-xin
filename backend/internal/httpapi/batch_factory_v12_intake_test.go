@@ -119,6 +119,31 @@ func TestV12BatchSummaryOmitsSourceText(t *testing.T) {
 	}
 }
 
+type v12SummaryFallbackStore struct {
+	*batchfactoryv11.MemoryStore
+}
+
+func (s *v12SummaryFallbackStore) ListBatchSummaryIndex(_ context.Context, _ string) ([]batchfactoryv11.Batch, error) {
+	return []batchfactoryv11.Batch{{
+		ID:                   "batch-2",
+		Title:                "漫画封面",
+		ProjectCoverImageURL: "/api/batch-factory/v12/batches/batch-2/books/book-1/comic-pages/page-1/images/image-1/content",
+		ProductionMode:       "comic",
+		Books:                []batchfactoryv11.Book{{ID: "book-1", Title: "漫画书", Mode: "comic"}},
+	}}, nil
+}
+
+func TestV12BatchSummaryFallsBackToComicImageCoverAndMode(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	store := &v12SummaryFallbackStore{MemoryStore: batchfactoryv11.NewMemoryStore()}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/summary", nil)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, "comic-pages/page-1/images/image-1/content") || !strings.Contains(body, `"productionMode":"comic"`) {
+		t.Fatalf("status=%d body=%s", rec.Code, body)
+	}
+}
+
 func TestV12BatchSummaryUsesLightweightCoverIndex(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := &v12SummaryIndexStore{MemoryStore: batchfactoryv11.NewMemoryStore()}

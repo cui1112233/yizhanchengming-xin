@@ -93,6 +93,7 @@ body.shuihuo-reference-shell .legacy-content { padding: 0; overflow: auto; }
 .shuihuo-project-card-cover-fallback small { color: var(--text-tertiary); font-size: 12px; }
 .shuihuo-project-card-mode { padding: 3px 7px; color: #d9edff; border: 1px solid #5d7796; border-radius: 3px; background: rgba(12, 23, 39, .42); font-size: 11px; line-height: 1.2; }
 .shuihuo-project-card-mode.is-batch-factory { color: #d7ffef; border-color: #4f9d84; background: rgba(30, 113, 91, .35); }
+.shuihuo-project-card-kind { position: absolute; bottom: 10px; left: 10px; z-index: 1; padding: 3px 8px; color: #d9edff; border: 1px solid rgba(93, 119, 150, .8); border-radius: 3px; background: rgba(12, 23, 39, .72); font-size: 11px; line-height: 1.2; }
 .shuihuo-project-card-meta { display: grid; align-content: center; gap: 4px; min-height:45px; padding: 0 7px; background: transparent; }
 .shuihuo-project-card-meta strong { overflow: hidden; color: var(--sh-text); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .shuihuo-project-card-meta span { color: var(--sh-muted); font-size: 12px; }

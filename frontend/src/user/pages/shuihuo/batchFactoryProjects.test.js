@@ -18,6 +18,7 @@ test('V11 batches retain their upstream ID when shown in the shared personal wor
     batchId: 'batch-42',
     name: '九月批量',
     productionMode: 'batch_factory',
+    factoryMode: 'video',
     source: 'batch_factory_v11',
     createdAt: undefined,
     updatedAt: undefined,

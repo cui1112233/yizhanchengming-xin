@@ -2,7 +2,7 @@ import { AppstoreOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, F
 import { Alert, Button, Input, Modal, Popconfirm, Select, Upload, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { importProject } from '../../../shared/api/shuihuoProduction';
-import { getBatchFactoryMergeCoverBlob, getProductionStatus, isBatchFactoryMergeCoverURL } from '../../../shared/api/batchFactory';
+import { getBatchFactoryMergeCoverBlob, getBookAssetImageBlob, getComicPageImageBlob, getProductionStatus, isBatchFactoryMergeCoverURL, isBookAssetImageURL, isComicPageImageURL } from '../../../shared/api/batchFactory';
 import { ProductionMediaBoundary } from '../batch-factory-v11/ProductionMediaBoundary';
 import { BatchFactoryCreateModal } from './BatchFactoryCreateModal';
 import { batchFactoryFallbackCoverFromProductionStatus, createCoverHydrationScheduler, isBatchFactoryV11Project } from './batchFactoryProjects';
@@ -26,7 +26,10 @@ function formatTime(value) {
 
 function AuthenticatedProjectCover({ src, alt, batchId }) {
   const imageRef = useRef(null);
-  const protectedCover = isBatchFactoryMergeCoverURL(src);
+  const mergeCover = isBatchFactoryMergeCoverURL(src);
+  const assetCover = isBookAssetImageURL(src);
+  const comicCover = isComicPageImageURL(src);
+  const protectedCover = mergeCover || assetCover || comicCover;
   const [visible, setVisible] = useState(!protectedCover);
   const [blobURL, setBlobURL] = useState('');
   const [fallbackVideoURL, setFallbackVideoURL] = useState('');
@@ -67,12 +70,19 @@ function AuthenticatedProjectCover({ src, alt, batchId }) {
       if (media?.kind === 'video' && media.url) setFallbackVideoURL(media.url);
       else setFailed(true);
     });
-    getBatchFactoryMergeCoverBlob(src)
+    const loadCover = mergeCover ? getBatchFactoryMergeCoverBlob : comicCover ? getComicPageImageBlob : getBookAssetImageBlob;
+    loadCover(src)
       .then(blob => {
         objectURL = URL.createObjectURL(blob);
         if (active) setBlobURL(objectURL);
       })
-      .catch(recoverLegacyCover);
+      .catch(() => {
+        if (!mergeCover) {
+          if (active) setFailed(true);
+          return;
+        }
+        recoverLegacyCover();
+      });
     return () => {
       active = false;
       if (objectURL) URL.revokeObjectURL(objectURL);
@@ -80,7 +90,7 @@ function AuthenticatedProjectCover({ src, alt, batchId }) {
   }, [protectedCover, src, visible]);
 
   if (fallbackVideoURL) return <ProductionMediaBoundary showDownload={false}><video className="shuihuo-project-card-cover-media" src={fallbackVideoURL} muted playsInline preload="metadata" onLoadedMetadata={event => { event.currentTarget.currentTime = 0.001; }} onError={() => { setFallbackVideoURL(''); setFailed(true); }} aria-label={alt} /></ProductionMediaBoundary>;
-  if (failed) return <span className="shuihuo-project-card-cover-fallback"><strong>批量工厂</strong><small>历史成片已归档</small></span>;
+  if (failed) return <span className="shuihuo-project-card-cover-fallback"><strong>批量工厂</strong><small>{mergeCover ? '历史成片已归档' : '封面暂不可用'}</small></span>;
   return <img ref={imageRef} className="shuihuo-project-card-cover-media" src={protectedCover ? (blobURL || undefined) : src} alt={alt} loading="lazy" onError={() => { if (protectedCover) setFailed(true); }} />;
 }
 
@@ -158,6 +168,10 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     return project.segmentationStatus === 'confirmed' ? '已确认分镜' : '待生成分镜';
   }
 
+  function batchKindLabel(project) {
+    return project?.factoryMode === 'comic' ? '漫画' : '视频';
+  }
+
   function projectCover(project) {
     const media = project?.coverMedia;
     if (!media?.url) return null;
@@ -182,9 +196,13 @@ export function ProjectsView({ projects, loadError, health, onCreate, onImported
     <div className={`shuihuo-project-grid${viewMode === 'list' ? ' is-list' : ''}`}>
       {visibleProjects.map(project => {
         const cover = projectCover(project);
+        const batchProject = isBatchFactoryV11Project(project);
         return <article className={`shuihuo-project-card${cover ? ' has-cover' : ''}`} key={project.id}>
         <button type="button" className="shuihuo-project-card-open" onClick={() => onOpen(project)} aria-label={`打开${project.name}`}>
-          <div className="shuihuo-project-card-cover">{cover || <><span className={`shuihuo-project-card-mode ${isBatchFactoryV11Project(project) ? 'is-batch-factory' : ''}`}>{isBatchFactoryV11Project(project) ? '批量工厂' : '水货生产'}</span><span>{isBatchFactoryV11Project(project) ? '小说列表' : projectCount(project)}</span></>}</div>
+          <div className="shuihuo-project-card-cover">
+            {cover || <><span className={`shuihuo-project-card-mode ${batchProject ? 'is-batch-factory' : ''}`}>{batchProject ? '批量工厂' : '水货生产'}</span><span>{batchProject ? `${batchKindLabel(project)} · 小说列表` : projectCount(project)}</span></>}
+            {cover && batchProject ? <span className="shuihuo-project-card-kind">{batchKindLabel(project)}</span> : null}
+          </div>
           <div className="shuihuo-project-card-meta"><strong>{project.name}</strong><span>{formatTime(project.updatedAt || project.createdAt)}</span></div>
         </button>
         <div className="shuihuo-project-card-actions"><Button type="text" icon={<FolderOpenOutlined />} onClick={() => onOpen(project)} aria-label={`打开工作台 ${project.name}`} /><Popconfirm title={isBatchFactoryV11Project(project) ? '删除批量项目？' : '删除项目？此操作不会撤销。'} description={isBatchFactoryV11Project(project) ? '将删除其中全部小说和本地生产记录；不会影响已提交到 121 的内容。' : undefined} okText="删除" cancelText="取消" onConfirm={() => onDelete(project)}><Button type="text" danger icon={<DeleteOutlined />} aria-label={`删除${project.name}`} /></Popconfirm></div>

@@ -3197,10 +3197,7 @@ func compileShuihuoAssetImagePrompt(asset batchfactoryv11.BookAsset, settings ba
 	content := strings.TrimSpace(asset.Prompt)
 	// 人物资产默认套用 CM·角色三视图，包含正面近照与正/侧/背全身，
 	// 保证后续分镜复用同一角色外观；开关关闭时退化为单张设定图。
-	if asset.Kind == "character" && useThreeView {
-		if presetCatalog == nil {
-			return "", nil, fmt.Errorf("%w: CM·角色三视图提示词库不可用", batchfactoryv11.ErrUnavailable)
-		}
+	if asset.Kind == "character" && useThreeView && presetCatalog != nil {
 		template, found, templateErr := presetCatalog.PublishedBody("batch-factory", cmCharacterThreeViewPresetID)
 		if templateErr != nil {
 			return "", nil, fmt.Errorf("%w: 读取CM·角色三视图失败", batchfactoryv11.ErrUnavailable)

@@ -129,6 +129,14 @@ export function isBatchFactoryMergeCoverURL(value) {
   return Boolean(mergeCoverRequestPath(value));
 }
 
+export function isBookAssetImageURL(value) {
+  return Boolean(bookAssetImageRequestPath(value));
+}
+
+export function isComicPageImageURL(value) {
+  return Boolean(comicPageImageRequestPath(value));
+}
+
 // Native <img> requests cannot carry the app bearer token. Merge covers stay
 // private, so load the small cached JPG through the authenticated API client
 // instead of exposing a public video or image URL.

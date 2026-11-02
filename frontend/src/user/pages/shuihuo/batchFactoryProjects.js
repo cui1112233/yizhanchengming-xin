@@ -29,6 +29,7 @@ export function batchFactoryProjectsFrom(batches) {
       batchId,
       name: text(batch.title) || '未命名批量',
       productionMode: 'batch_factory',
+      factoryMode: text(batch.productionMode) === 'comic' ? 'comic' : 'video',
       source: BATCH_FACTORY_V11_SOURCE,
       createdAt: batch.createdAt,
       updatedAt: batch.updatedAt,
