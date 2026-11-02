@@ -794,10 +794,10 @@ func (c *BatchAutomationCoordinator) automationBookPreflightReason(ctx context.C
 	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
 	if productionMode == "comic" {
 		if comicSettingString(effective, "imageModelId", "") == "" {
-			return "图片模型未配置"
+			return "图片模型未配置；" + setupHintImage
 		}
 	} else if comicSettingString(effective, "videoModelId", "") == "" {
-		return "视频模型未配置"
+		return "视频模型未配置；" + setupHintVideoModel
 	}
 	if runMode == "full_submit" {
 		var publish map[string]any
@@ -1673,6 +1673,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					}
 					cancel()
 					if submitErr != nil {
+						if errors.Is(submitErr, errPublishUnconfirmed) {
+							entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "upload_confirm", submitErr.Error(), "已上传待确认：回读失败，重试时将优先回读", c.now()
+							appendAutomationBookLog(entry, c.now(), "upload_confirm", "已上传待确认：回读失败，重试时将优先回读")
+							failed.Add(1)
+							persist()
+							continue
+						}
 						fail("submit", submitErr, "定时提交失败")
 						continue
 					}
@@ -2034,6 +2041,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					publishErr := c.publishVideo(publishCtx, owner, batchID, book.ID)
 					publishCancel()
 					if publishErr != nil {
+						if errors.Is(publishErr, errPublishUnconfirmed) {
+							entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "upload_confirm", publishErr.Error(), "已上传待确认：回读失败，重试时将优先回读", c.now()
+							appendAutomationBookLog(entry, c.now(), "upload_confirm", "已上传待确认：回读失败，重试时将优先回读")
+							failed.Add(1)
+							persist()
+							continue
+						}
 						fail("upload", publishErr, "上传失败")
 						continue
 					}

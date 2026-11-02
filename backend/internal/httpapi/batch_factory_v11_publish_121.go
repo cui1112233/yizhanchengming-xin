@@ -128,6 +128,24 @@ func publish121Content(book batchfactoryv11.Book, workingFrontContent string) []
 	return []byte(strings.Join(sourceLines, "\n"))
 }
 
+// errPublishUnconfirmed 表示视频与正文已上传到视频管理系统，但回读确认失败。
+// 调用方应把该书写成“已上传待确认”（stage=upload_confirm），重试时优先回读，
+// 绝不无条件重传，避免在目标站产生重复作品。
+var errPublishUnconfirmed = errors.New("视频管理系统已上传但回读确认失败")
+
+// submissionConfirmedForBook 判断回读列表里是否真的存在该书。GetSubmission 的
+// 传输层成功不代表书已入库，空列表同样需要重新提交。
+func submissionConfirmedForBook(raw any, bookID string) bool {
+	if raw == nil || strings.TrimSpace(bookID) == "" {
+		return false
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(encoded), bookID)
+}
+
 func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, bookID string, input map[string]any) (map[string]any, error) {
 	if p == nil || p.Store == nil || p.Connector == nil {
 		return nil, fmt.Errorf("视频管理系统上传服务未配置")
@@ -137,6 +155,7 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if cookie == "" {
 		return nil, fmt.Errorf("请先保存账号密码并登录目标站")
 	}
+	targetSession := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
 	batch, err := p.Store.GetBatch(ctx, owner, batchID)
 	if err != nil {
 		return nil, err
@@ -158,6 +177,47 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 		return nil, fmt.Errorf("121 上传文件名只支持纯数字书号或 UUID 格式")
 	}
 	metadata := book.SourceMetadata
+	// 发布幂等三态：uploaded 直接短路；upload_pending_confirm 先回读，确认成功
+	// 补写 uploaded，确认不存在才带已持久化的视频 heads 重新提交正文。
+	force := input["force"] == true || strings.EqualFold(toString(input["force"]), "true")
+	submitStatus := strings.TrimSpace(toString(metadata["websiteSubmitStatus"]))
+	if submitStatus == "uploaded" && !force {
+		return map[string]any{"status": "uploaded", "bookId": book.BookID, "internalBookId": book.ID, "skipped": true}, nil
+	}
+	pendingHeads := []string{}
+	if submitStatus == "upload_pending_confirm" && !force {
+		confirmed, readErr := p.Connector.GetSubmission(ctx, targetSession, book.BookID)
+		if readErr != nil {
+			return nil, fmt.Errorf("%w：%v", errPublishUnconfirmed, readErr)
+		}
+		if submissionConfirmedForBook(confirmed.ReadbackRaw, book.BookID) {
+			uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)
+			confirmedMetadata := clonePublishMetadata(metadata)
+			confirmedMetadata["websiteSubmitStatus"] = "uploaded"
+			confirmedMetadata["publishStatus"] = "uploaded"
+			confirmedMetadata["websiteSubmitProgress"] = map[string]any{
+				"status":    "uploaded",
+				"phase":     "completed",
+				"message":   "视频管理系统回读确认成功（重试补齐）",
+				"updatedAt": uploadedAt,
+			}
+			if _, err := p.Store.UpdateBookMetadata(ctx, owner, batchID, bookID, batchfactoryv11.UpdateBookMetadataInput{Metadata: confirmedMetadata, ExpectedRevision: book.Revision}); err != nil {
+				return nil, fmt.Errorf("回读已成功，但保存上传状态失败：%w", err)
+			}
+			return map[string]any{
+				"status":         "uploaded",
+				"bookId":         book.BookID,
+				"internalBookId": book.ID,
+				"uploadedAt":     uploadedAt,
+				"readback":       mapOrEmpty(confirmed.ReadbackRaw),
+			}, nil
+		}
+		if raw, ok := metadata["websiteSubmitHeads"].([]any); ok {
+			for _, item := range raw {
+				pendingHeads = append(pendingHeads, fmt.Sprint(item))
+			}
+		}
+	}
 	platform := firstText(metadata["platformId"], metadata["platform_id"], book.Platform)
 	if mapped := map[string]string{"黑岩付费": "1", "番茄付费": "2", "七猫付费": "3", "点众付费": "4", "阅文付费": "6", "番茄免费": "7", "知乎付费": "15", "掌阅付费": "20", "卓越付费": "26", "九州书城": "29", "掌文付费": "31"}[platform]; mapped != "" {
 		platform = mapped
@@ -218,7 +278,6 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	if !ok {
 		return nil, fmt.Errorf("视频管理系统 Go 连接器不支持视频上传")
 	}
-	targetSession := videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}
 	type publishVideo struct {
 		job      batchfactoryv11.MergeJob
 		filename string
@@ -248,12 +307,32 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 		openingVariantIndexes = append(openingVariantIndexes, job.OpeningVariantIndex)
 	}
 	heads := make([]string, 0, len(videos))
-	for _, video := range videos {
-		head, uploadErr := videoUploader.UploadVideo(ctx, targetSession, video.filename, video.content)
-		if uploadErr != nil {
-			return nil, uploadErr
+	if len(pendingHeads) == len(videos) {
+		// 上一轮已上传成功、只是回读失败：直接复用持久化的 heads，不重复上传。
+		heads = append(heads, pendingHeads...)
+	} else {
+		for _, video := range videos {
+			head, uploadErr := videoUploader.UploadVideo(ctx, targetSession, video.filename, video.content)
+			if uploadErr != nil {
+				return nil, uploadErr
+			}
+			heads = append(heads, head)
 		}
-		heads = append(heads, head)
+		// 视频全部上传成功后先落盘“待确认”，再提交正文容器；此后任何失败重试
+		// 都会走回读优先路径，不会无条件重传。
+		pendingMetadata := clonePublishMetadata(metadata)
+		pendingMetadata["websiteSubmitStatus"] = "upload_pending_confirm"
+		pendingMetadata["websiteSubmitHeads"] = heads
+		pendingMetadata["websiteSubmitProgress"] = map[string]any{
+			"status":    "uploading",
+			"phase":     "confirm_pending",
+			"message":   "视频已上传，等待视频管理系统回读确认",
+			"updatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		}
+		if _, err := p.Store.UpdateBookMetadata(ctx, owner, batchID, bookID, batchfactoryv11.UpdateBookMetadataInput{Metadata: pendingMetadata, ExpectedRevision: book.Revision}); err != nil {
+			return nil, fmt.Errorf("视频管理系统上传进度保存失败：%w", err)
+		}
+		book.Revision++
 	}
 	headVideoJSON, err := marshalPublishedVideoHeads(heads)
 	if err != nil {
@@ -269,7 +348,7 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	remote := mapOrEmpty(submission.ReadbackRaw)
 	confirmed, err := p.Connector.GetSubmission(ctx, targetSession, book.BookID)
 	if err != nil {
-		return nil, fmt.Errorf("视频管理系统回读失败：%w", err)
+		return nil, fmt.Errorf("%w：%v", errPublishUnconfirmed, err)
 	}
 	readback := mapOrEmpty(confirmed.ReadbackRaw)
 	uploadedAt := time.Now().UTC().Format(time.RFC3339Nano)

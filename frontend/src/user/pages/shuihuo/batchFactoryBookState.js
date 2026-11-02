@@ -109,6 +109,7 @@ function statusFromRun(run, fallback = 'pending') {
 function websiteSubmitLabel(book) {
   const value = String(book?.sourceMetadata?.websiteSubmitStatus || book?.sourceMetadata?.publishStatus || '').trim().toLowerCase();
   if (['succeeded', 'success', 'completed', 'uploaded'].includes(value)) return '已回读';
+  if (value === 'upload_pending_confirm') return '已上传待确认';
   if (['running', 'uploading', 'queued', 'submitted'].includes(value)) return '待回读';
   if (['failed', 'error'].includes(value)) return '失败';
   return '—';
@@ -116,7 +117,7 @@ function websiteSubmitLabel(book) {
 
 function uploadStatus(book) {
   const value = String(book?.sourceMetadata?.publishStatus || book?.sourceMetadata?.websiteSubmitStatus || '').trim().toLowerCase();
-  if (['running', 'uploading', 'queued', 'submitted'].includes(value)) return 'running';
+  if (['running', 'uploading', 'queued', 'submitted', 'upload_pending_confirm'].includes(value)) return 'running';
   if (['succeeded', 'success', 'completed', 'uploaded'].includes(value)) return 'completed';
   if (['failed', 'error'].includes(value)) return 'failed';
   return 'pending';

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,8 @@ type recording121Connector struct {
 	uploadNames []string
 	submissions []videomanagementconnector.SubmissionInput
 	readbacks   int
+	readbackErr error
+	readbackRaw map[string]any
 }
 
 func (c *recording121Connector) Login(context.Context, videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
@@ -47,7 +50,14 @@ func (c *recording121Connector) Submit(_ context.Context, _ videomanagementconne
 
 func (c *recording121Connector) GetSubmission(_ context.Context, _ videomanagementconnector.Session, _ string) (videomanagementconnector.Submission, error) {
 	c.readbacks++
-	return videomanagementconnector.Submission{ID: "submission-1", Status: "uploaded", ReadbackRaw: map[string]any{"confirmed": true}}, nil
+	if c.readbackErr != nil {
+		return videomanagementconnector.Submission{}, c.readbackErr
+	}
+	raw := c.readbackRaw
+	if raw == nil {
+		raw = map[string]any{"confirmed": true}
+	}
+	return videomanagementconnector.Submission{ID: "submission-1", Status: "uploaded", ReadbackRaw: raw}, nil
 }
 
 func TestPublishOrganizationUsesNestedBatchPublishSettings(t *testing.T) {
@@ -245,6 +255,118 @@ func TestBatchFactory121PublisherRejectsIncompleteOpeningSetBeforeUpload(t *test
 	}
 	if len(connector.uploadNames) != 0 || len(connector.submissions) != 0 {
 		t.Fatalf("uploads/submissions = %d/%d, want 0/0", len(connector.uploadNames), len(connector.submissions))
+	}
+}
+
+func TestPublish121IdempotentUploaded(t *testing.T) {
+	publisher, connector, store, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	if _, err := store.UpdateBookMetadata(context.Background(), "alice", batch.ID, book.ID, batchfactoryv11.UpdateBookMetadataInput{
+		Metadata:         map[string]any{"websiteSubmitStatus": "uploaded"},
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1"})
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if result["status"] != "uploaded" || result["skipped"] != true {
+		t.Fatalf("result = %#v, want uploaded short-circuit", result)
+	}
+	if len(connector.uploadNames) != 0 || len(connector.submissions) != 0 || connector.readbacks != 0 {
+		t.Fatalf("uploads/submissions/readbacks = %d/%d/%d, want no remote calls", len(connector.uploadNames), len(connector.submissions), connector.readbacks)
+	}
+}
+
+func TestPublish121ReadbackFailureReturnsUnconfirmed(t *testing.T) {
+	publisher, connector, store, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	connector.readbackErr = errors.New("network timeout")
+
+	_, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1"})
+	if !errors.Is(err, errPublishUnconfirmed) {
+		t.Fatalf("Submit() error = %v, want errPublishUnconfirmed", err)
+	}
+	if len(connector.uploadNames) != 4 || len(connector.submissions) != 1 {
+		t.Fatalf("uploads/submissions = %d/%d, want 4/1 before readback", len(connector.uploadNames), len(connector.submissions))
+	}
+	updated, getErr := store.GetBatch(context.Background(), "alice", batch.ID)
+	if getErr != nil {
+		t.Fatal(getErr)
+	}
+	got := updated.Books[0].SourceMetadata["websiteSubmitStatus"]
+	if got != "upload_pending_confirm" {
+		t.Fatalf("websiteSubmitStatus = %#v, want upload_pending_confirm", got)
+	}
+	if n := publish121HeadCount(updated.Books[0].SourceMetadata["websiteSubmitHeads"]); n != 4 {
+		t.Fatalf("websiteSubmitHeads count = %d, want 4 persisted heads", n)
+	}
+}
+
+func publish121HeadCount(raw any) int {
+	switch heads := raw.(type) {
+	case []string:
+		return len(heads)
+	case []any:
+		return len(heads)
+	default:
+		return 0
+	}
+}
+
+func publish121WithPendingMetadata(t *testing.T, store *batchfactoryv11.MemoryStore, batchID string, book batchfactoryv11.Book) {
+	t.Helper()
+	metadata := map[string]any{}
+	for key, value := range book.SourceMetadata {
+		metadata[key] = value
+	}
+	metadata["websiteSubmitStatus"] = "upload_pending_confirm"
+	metadata["websiteSubmitHeads"] = []any{`{"name":"h0"}`, `{"name":"h1"}`, `{"name":"h2"}`, `{"name":"h3"}`}
+	if _, err := store.UpdateBookMetadata(context.Background(), "alice", batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{
+		Metadata:         metadata,
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPublish121PendingConfirmReadbackFirst(t *testing.T) {
+	publisher, connector, store, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	// 模拟上一轮：视频已上传、容器已提交、回读失败。
+	publish121WithPendingMetadata(t, store, batch.ID, book)
+	connector.readbackRaw = map[string]any{"data": []any{map[string]any{"bookid": book.BookID}}}
+
+	result, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1"})
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if result["status"] != "uploaded" {
+		t.Fatalf("result = %#v, want uploaded after readback confirm", result)
+	}
+	if len(connector.uploadNames) != 0 || len(connector.submissions) != 0 {
+		t.Fatalf("uploads/submissions = %d/%d, want readback-only path", len(connector.uploadNames), len(connector.submissions))
+	}
+	updated, _ := store.GetBatch(context.Background(), "alice", batch.ID)
+	if got := updated.Books[0].SourceMetadata["websiteSubmitStatus"]; got != "uploaded" {
+		t.Fatalf("websiteSubmitStatus = %#v, want uploaded", got)
+	}
+}
+
+func TestPublish121PendingConfirmResubmitsWhenMissingRemotely(t *testing.T) {
+	publisher, connector, store, batch, book := seedMultiOpening121Publisher(t, []int{0, 1, 2, 3})
+	publish121WithPendingMetadata(t, store, batch.ID, book)
+	// 第一次回读确认远端不存在 → 重新提交；提交后的回读返回正常。
+	connector.readbackRaw = map[string]any{"data": []any{}}
+
+	_, err := publisher.Submit(context.Background(), "alice", batch.ID, book.ID, map[string]any{"organization": "1"})
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if len(connector.uploadNames) != 0 {
+		t.Fatalf("uploads = %d, want reuse persisted heads", len(connector.uploadNames))
+	}
+	if len(connector.submissions) != 1 {
+		t.Fatalf("submissions = %d, want 1 resubmit", len(connector.submissions))
 	}
 }
 

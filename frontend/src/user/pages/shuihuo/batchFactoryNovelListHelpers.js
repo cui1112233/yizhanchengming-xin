@@ -191,7 +191,7 @@ export function batchFactorySourceStatus(book = {}) {
   if (String(metadata.originalReadStage || '').trim().toLowerCase() === 'failed' && error) return { label: '书城读取失败', detail: `${batchFactorySourceKind(book)} · ${error}；可手动重试或使用 OCR`, tone: 'error' };
   if (metadata.contentPending) {
     const stage = String(metadata.originalReadStage || '').trim().toLowerCase();
-    if (stage === 'ocr') return { label: 'OCR 等待执行器', detail: '巨量素材 · 已进入 OCR 队列，等待执行器领取', tone: 'running' };
+    if (stage === 'ocr') return { label: 'OCR 等待执行器', detail: '巨量素材 · 已进入 OCR 队列，等待执行器领取；请到「设置 → 执行器状态」检查执行器是否在线', tone: 'running' };
     if (stage === 'direct') return { label: '书城获取中', detail: `${batchFactorySourceKind(book)} · 正在读取书城原文`, tone: 'running' };
     return { label: '正文读取中', detail: `${batchFactorySourceKind(book)} · 等待读取任务`, tone: 'running' };
   }
@@ -595,7 +595,8 @@ export function decompressionCountForUpload(batch, book) {
 }
 
 export function isBookUploadedTo121(book) {
-  return String(book?.sourceMetadata?.websiteSubmitStatus || '').trim().toLowerCase() === 'uploaded';
+  return ['uploaded', 'upload_pending_confirm'].includes(
+    String(book?.sourceMetadata?.websiteSubmitStatus || '').trim().toLowerCase());
 }
 
 export function uploadProgressForBook(book) {
