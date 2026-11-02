@@ -1673,17 +1673,18 @@ function ComicMediaPanel({ batchId, book, comicPublishSettings = {}, initialVide
       listComicCollections(batchId, book.id),
       getComicSourceSegments(batchId, book.id, { silent: true, suppressGlobalError: true }).catch(() => ({ segmentation: null }))
     ]);
+    // 先渲染分页、合集和原文分段；发布记录稍后补，不能阻塞首屏数据。
     const nextCollections = resultData(collectionResponse, 'collections') || [];
-	    const publishRecords = await Promise.all(nextCollections.map(collection => getComicCollectionPublishRecord(batchId, book.id, collection.id, { silent: true, suppressGlobalError: true }).catch(() => null)));
-	    const nextPublished = {};
-	    nextCollections.forEach((collection, index) => {
-	      const record = publishRecords[index]?.publish;
-	      if (publishRecords[index]?.published === true && record) nextPublished[collection.id] = record;
-	    });
     setPages(resultData(pageResponse, 'pages') || []);
-	    setCollections(nextCollections);
-	    setPublishedByCollection(nextPublished);
+    setCollections(nextCollections);
     setSegmentation(resultData(sourceResponse, 'segmentation') || null);
+    const publishRecords = await Promise.all(nextCollections.map(collection => getComicCollectionPublishRecord(batchId, book.id, collection.id, { silent: true, suppressGlobalError: true }).catch(() => null)));
+    const nextPublished = {};
+    nextCollections.forEach((collection, index) => {
+      const record = publishRecords[index]?.publish;
+      if (publishRecords[index]?.published === true && record) nextPublished[collection.id] = record;
+    });
+    setPublishedByCollection(nextPublished);
   }
 	useEffect(() => {
 		setSelectedVideoId(initialVideoId || videos[0]?.id || '');
