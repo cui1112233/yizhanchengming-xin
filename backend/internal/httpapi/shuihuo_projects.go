@@ -140,6 +140,37 @@ type shuihuoImageSemaphoreContextKey struct{}
 
 type shuihuoGlobalImageSemaphoreContextKey struct{}
 
+// shuihuoGlobalImageSemaphores 把任务级出图名额拆成资产图和漫画页两个池：
+// 资产图阶段的书会长期占住名额，如果和页图共用同一池，漫画页进度就会长时间
+// 停在同一数字上。默认给页图 4 路、资产图 2 路。
+type shuihuoGlobalImageSemaphores struct {
+	asset *shuihuoImageSemaphore
+	page  *shuihuoImageSemaphore
+}
+
+const (
+	shuihuoImageStageAsset = "asset"
+	shuihuoImageStagePage  = "page"
+)
+
+type shuihuoImageStageContextKey struct{}
+
+// withShuihuoImageStage 标记当前出图属于哪个阶段，用于选择全局名额池。
+func withShuihuoImageStage(ctx context.Context, stage string) context.Context {
+	if ctx == nil || stage == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoImageStageContextKey{}, stage)
+}
+
+func shuihuoImageStageFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	stage, _ := ctx.Value(shuihuoImageStageContextKey{}).(string)
+	return stage
+}
+
 // withShuihuoGlobalImageConcurrency 给整个自动化任务加一层总并发上限。
 // 图片网关在同时流式返回太多大响应时会直接 RST 连接（实测 HTTP 200 后
 // wsarecv 被重置），所以“每书 4 路 × 多本书”会互相拖垮，总量必须收敛。
@@ -147,15 +178,29 @@ func withShuihuoGlobalImageConcurrency(ctx context.Context, limit int) context.C
 	if ctx == nil {
 		return ctx
 	}
-	return context.WithValue(ctx, shuihuoGlobalImageSemaphoreContextKey{}, newShuihuoImageSemaphoreRaw(limit))
+	if limit < 2 {
+		limit = 2
+	}
+	assetLimit := limit / 3
+	if assetLimit < 1 {
+		assetLimit = 1
+	}
+	pageLimit := limit - assetLimit
+	if pageLimit < 1 {
+		pageLimit = 1
+	}
+	return context.WithValue(ctx, shuihuoGlobalImageSemaphoreContextKey{}, &shuihuoGlobalImageSemaphores{
+		asset: newShuihuoImageSemaphoreRaw(assetLimit),
+		page:  newShuihuoImageSemaphoreRaw(pageLimit),
+	})
 }
 
-func shuihuoGlobalImageSemaphoreFromContext(ctx context.Context) *shuihuoImageSemaphore {
+func shuihuoGlobalImageSemaphoreFromContext(ctx context.Context) *shuihuoGlobalImageSemaphores {
 	if ctx == nil {
 		return nil
 	}
-	semaphore, _ := ctx.Value(shuihuoGlobalImageSemaphoreContextKey{}).(*shuihuoImageSemaphore)
-	return semaphore
+	semaphores, _ := ctx.Value(shuihuoGlobalImageSemaphoreContextKey{}).(*shuihuoGlobalImageSemaphores)
+	return semaphores
 }
 
 type shuihuoEffectiveSettingsContextKey struct{}
@@ -257,7 +302,14 @@ func acquireShuihuoGPTImageGenerationSlot(ctx context.Context, modelID string) (
 	if global == nil {
 		return releaseTask, nil
 	}
-	releaseGlobal, err := global.acquire(ctx)
+	pool := global.page
+	if shuihuoImageStageFromContext(ctx) == shuihuoImageStageAsset {
+		pool = global.asset
+	}
+	if pool == nil {
+		return releaseTask, nil
+	}
+	releaseGlobal, err := pool.acquire(ctx)
 	if err != nil {
 		releaseTask()
 		return nil, err
@@ -3115,7 +3167,7 @@ func generateShuihuoAssetImagesWithRepair(ctx context.Context, store batchfactor
 	// "立即执行" flow look frozen.
 	assetImageConcurrency := comicAssetConcurrencyFromContext(ctx)
 	// 资产图与漫画页共用统一配置的出图并发上限。
-	workCtx := withShuihuoImageConcurrency(ctx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
+	workCtx := withShuihuoImageStage(withShuihuoImageConcurrency(ctx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault)), shuihuoImageStageAsset)
 	// 资产图与漫画页共用统一配置，水印设置也一并注入。
 	workCtx = withShuihuoEffectiveSettings(workCtx, comicSettingsToMap(effective))
 	type assetImageResult struct {

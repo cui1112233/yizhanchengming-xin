@@ -508,7 +508,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	generationCtx, cancelGeneration := comicPageGenerationContext(ctx)
 	defer cancelGeneration()
 	// 单页重试不能绕过统一配置的出图并发上限。
-	generationCtx = withShuihuoImageConcurrency(generationCtx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault))
+	generationCtx = withShuihuoImageStage(withShuihuoImageConcurrency(generationCtx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault)), shuihuoImageStagePage)
 	// 把批次生效设置注入上下文，让出图保存前读取水印配置。
 	generationCtx = withShuihuoEffectiveSettings(generationCtx, comicSettingsToMap(effective))
 	generationPrompt := createdPage.ImagePrompt
