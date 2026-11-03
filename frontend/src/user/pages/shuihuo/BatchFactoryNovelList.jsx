@@ -4575,11 +4575,17 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       const stateLabel = ({ running: '运行中', paused: '已暂停', scheduled: '定时待执行', needs_attention: '待处理', stopped: '已停止', completed: '已完成', failed: '失败' })[automationState] || automationState;
       const problemCount = Number(automationCounts.failed || 0) + Number(automationCounts.blocked || 0);
       const batchRetryCount = (Array.isArray(automationStatus?.books) ? automationStatus.books : []).filter(book => book?.batchRetryPending === true).length;
+      // 漫画页进度条只统计漫画页主图，资产图阶段不会让它增长。这里把正在跑的
+      // 书按阶段拆开显示，避免把“在生成资产图”误读成卡死。
+      const runningBooks = (Array.isArray(automationStatus?.books) ? automationStatus.books : []).filter(book => book?.status === 'running');
+      const assetStageCount = runningBooks.filter(book => String(book?.stage || '').includes('asset')).length;
+      const pageStageCount = runningBooks.filter(book => book?.stage === 'comic_images').length;
       const lastError = String(automationStatus?.lastError || '').trim();
       return (
         <div data-testid="automation-status-line" className="batch-factory-automation-status-line">
           自动化：{stateLabel}
           {problemCount > 0 ? `，失败/阻塞 ${problemCount} 本` : ''}
+          {runningBooks.length > 0 ? `，出图中 ${runningBooks.length} 本（资产图 ${assetStageCount} 本 / 漫画页 ${pageStageCount} 本）` : ''}
           {batchRetryCount > 0 ? `，已跳过 ${batchRetryCount} 本等待批末回补` : ''}
           {lastError ? `，最近错误：${lastError}` : ''}
         </div>

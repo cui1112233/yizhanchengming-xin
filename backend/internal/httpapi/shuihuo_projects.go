@@ -3195,7 +3195,7 @@ func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batch
 			return mediaType, storageRef, source, err
 		}
 		lastErr = err
-		log.Printf("shuihuo asset image provider connection interrupted; retrying attempt=%d/%d model=%s: %v", attempt+1, maxAttempts, target.ModelID, err)
+		log.Printf("shuihuo image provider connection interrupted; retrying attempt=%d/%d model=%s: %v", attempt+1, maxAttempts, target.ModelID, err)
 		select {
 		case <-ctx.Done():
 			return "", "", "", ctx.Err()
@@ -3214,6 +3214,11 @@ func retryableShuihuoAssetImageTransportError(err error) bool {
 		strings.Contains(message, "connection reset") ||
 		strings.Contains(message, "unexpected eof") ||
 		strings.Contains(message, "server closed idle connection") ||
+		// 上游已返回 200，但响应体在传输中被截断。这类错误必须重新请求，
+		// 否则一张已经出好的图会被直接当成失败丢弃。
+		strings.Contains(message, "response body read failed") ||
+		strings.Contains(message, "context deadline exceeded") ||
+		strings.Contains(message, "tls handshake timeout") ||
 		strings.Contains(message, "temporary network")
 }
 
@@ -3345,6 +3350,13 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 			reportShuihuoImageEvent(ctx, "comic_images", message)
 		}
 		mediaType, storageRef, attemptErr := requestShuihuoProviderImage(ctx, files, target, model, endpoint, credential, attemptPrompt, referenceImageURLs)
+		if errors.Is(attemptErr, errShuihuoImageReferenceUnusable) && len(referenceImageURLs) > 0 {
+			// 网关读不到参考图（/edits 端点常见）时不能让整本书失败：
+			// 去掉参考图，用同一段提示词走纯文生图补一张。
+			log.Printf("shuihuo image provider cannot read references; retrying without references model=%s", target.ModelID)
+			reportShuihuoImageEvent(ctx, "comic_images", "上游无法读取参考图，改用纯文生图重试")
+			mediaType, storageRef, attemptErr = requestShuihuoProviderImage(ctx, files, target, model, endpoint, credential, attemptPrompt, nil)
+		}
 		if attemptErr == nil {
 			if attemptIndex > 0 {
 				reportShuihuoImageEvent(ctx, "comic_images", fmt.Sprintf("第 %d 次降级重试后图片生成成功", attemptIndex+1))
@@ -3402,10 +3414,19 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 	// Serialize only the provider generation call; a slow CDN download must not
 	// block the next GPT image request.
 	releaseImageSlot()
-	if readErr != nil || response.StatusCode < 200 || response.StatusCode >= 300 {
+	if readErr != nil {
+		// 上游很可能已经出图，只是响应体在传输中断（网关截断/连接重置）。
+		// 必须把读错误带进错误文本，否则重试判定匹配不到，已生成的图会被丢弃。
+		log.Printf("shuihuo image response body read failed provider=%s model=%s status=%d refs=%d: %v", target.Provider, target.ModelID, response.StatusCode, len(referenceImageURLs), readErr)
+		return "", "", fmt.Errorf("%w: image provider response body read failed status=%d refs=%d: %v", batchfactoryv11.ErrUpstream, response.StatusCode, len(referenceImageURLs), readErr)
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
 		if shuihuoImageResponseContentRejected(response.StatusCode, raw) {
 			return "", "", fmt.Errorf("%w: %s", errShuihuoImageContentPolicy, shuihuoImageProviderErrorDetail(raw))
+		}
+		if len(referenceImageURLs) > 0 && shuihuoImageProviderRejectedReferences(raw) {
+			return "", "", fmt.Errorf("%w: %s", errShuihuoImageReferenceUnusable, shuihuoImageProviderErrorDetail(raw))
 		}
 		return "", "", fmt.Errorf("%w: image provider returned HTTP %d%s", batchfactoryv11.ErrUpstream, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
 	}
@@ -3490,6 +3511,11 @@ func shuihuoImageDownloadHTTPClient() *http.Client {
 // errShuihuoImageContentPolicy 表示图片模型按内容审核拒收了提示词。
 // 调用方必须跳过这张图并继续其它图片，不能把它当成可重试的临时故障。
 var errShuihuoImageContentPolicy = fmt.Errorf("image prompt rejected by content policy")
+
+// errShuihuoImageReferenceUnusable 表示上游网关读不到我们上传的参考图
+// （常见于 /edits 端点只接受公网图片或字段格式不兼容）。这不是内容审核
+// 拒绝，也不该让整本书失败：调用方应去掉参考图，改用纯文生图再试一次。
+var errShuihuoImageReferenceUnusable = fmt.Errorf("image provider cannot read reference images")
 
 var shuihuoImagePromptSofteningRules = []struct {
 	from string
@@ -3774,6 +3800,20 @@ func shuihuoImageResponseContentRejected(statusCode int, raw []byte) bool {
 		// 不同网关的措辞不统一（“未能完成”“重新发送一次生成指令”也算），
 		// 所以匹配范围放宽到“重新发送/未能完成/无法完成”。
 		"未能成功生成图片", "未能完成", "无法完成", "重新发送", "unable to generate", "could not generate", "please resend"} {
+		if strings.Contains(detail, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// shuihuoImageProviderRejectedReferences reports whether a 4xx response means
+// the gateway could not read the reference images we uploaded, rather than the
+// prompt itself being rejected. The wording differs between gateways, so match
+// the common reference-image phrases.
+func shuihuoImageProviderRejectedReferences(raw []byte) bool {
+	detail := strings.ToLower(string(raw))
+	for _, keyword := range []string{"参考图", "参考图片", "reference image", "reference_image", "original image", "上传的图片"} {
 		if strings.Contains(detail, keyword) {
 			return true
 		}

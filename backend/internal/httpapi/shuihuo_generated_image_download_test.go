@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -397,5 +398,30 @@ func TestGPTImageGenerationSlotIsReleasedBeforeImageDownload(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestRetryableImageTransportErrorCoversBodyReadFailure(t *testing.T) {
+	// 上游已返回 200，但响应体在传输中断：必须重试，不能把已生成的图丢掉。
+	for _, message := range []string{
+		"image provider response body read failed status=200 refs=3: unexpected EOF",
+		"image provider response body read failed status=200 refs=0: context deadline exceeded",
+	} {
+		if !retryableShuihuoAssetImageTransportError(errors.New(message)) {
+			t.Fatalf("expected retryable transport error for %q", message)
+		}
+	}
+	if retryableShuihuoAssetImageTransportError(errors.New("image provider returned HTTP 400: 参考图无法读取")) {
+		t.Fatal("non-transport provider error must not be retried")
+	}
+}
+
+func TestProviderRejectedReferencesDetection(t *testing.T) {
+	raw := []byte(`{"error":{"message":"目前无法读取到可用于生成的参考图片。请重新上传人物参考图"}}`)
+	if !shuihuoImageProviderRejectedReferences(raw) {
+		t.Fatal("reference-image failure was not detected")
+	}
+	if shuihuoImageProviderRejectedReferences([]byte(`{"error":{"message":"提示词包含违规内容"}}`)) {
+		t.Fatal("prompt moderation failure must not be treated as reference-image failure")
 	}
 }

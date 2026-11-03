@@ -519,7 +519,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			log.Printf("comic page reuse repaired prompt batch=%s book=%s video=%s", batchID, bookID, videoID)
 		}
 	}
-	mediaType, storageRef, source, err := generateShuihuoImageArtifact(generationCtx, g.store, g.files, g.presetCatalog, owner, target, generationPrompt, contract.ReferenceImageURLs, g.localExecutors)
+	mediaType, storageRef, source, err := generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, generationPrompt, contract.ReferenceImageURLs, g.localExecutors)
 	if errors.Is(err, errShuihuoImageContentPolicy) {
 		// 两次降级仍被审核拒绝后，不要拿原提示词反复重试，而是先用文本模型
 		// 把整页提示词改写成合规版本，再生成一次。修复结果会缓存，后续整本
@@ -533,7 +533,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			if progress := comicGenerationProgressFromContext(ctx); progress != nil {
 				progress("comic_images", fmt.Sprintf("%s 提示词已改写为合规版本，正在重新生成", selectedPage.Label))
 			}
-			mediaType, storageRef, source, err = generateShuihuoImageArtifact(generationCtx, g.store, g.files, g.presetCatalog, owner, target, repaired, contract.ReferenceImageURLs, g.localExecutors)
+			mediaType, storageRef, source, err = generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, repaired, contract.ReferenceImageURLs, g.localExecutors)
 		}
 	}
 	if err != nil {
