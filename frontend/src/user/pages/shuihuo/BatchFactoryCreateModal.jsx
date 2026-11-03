@@ -64,7 +64,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
   const [automationPresets, setAutomationPresets] = useState([]);
   const [automationPresetID, setAutomationPresetID] = useState('');
   const [automationRunMode, setAutomationRunMode] = useState('full_submit');
-  const [automationConcurrency, setAutomationConcurrency] = useState(2);
+  const [automationConcurrency, setAutomationConcurrency] = useState(4);
   const [contentRangeLines, setContentRangeLines] = useState(5);
   const [comicAnalysisCharacters, setComicAnalysisCharacters] = useState(2000);
   const [contentCaptureCharacters, setContentCaptureCharacters] = useState(4000);

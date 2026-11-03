@@ -321,6 +321,7 @@ func publicAutomationJob(job map[string]any) map[string]any {
 				"message": book["message"], "error": book["error"], "publishError": book["publishError"], "updatedAt": book["updatedAt"],
 				"attempts": book["attempts"], "retryCount": book["retryCount"], "retryAt": retryAt,
 				"retryRequested": book["retryRequested"], "logs": publicAutomationBookLogs(book["logs"], 50),
+				"batchRetryPending": book["batchRetryPending"], "batchRetryCount": book["batchRetryCount"],
 			})
 		}
 	}

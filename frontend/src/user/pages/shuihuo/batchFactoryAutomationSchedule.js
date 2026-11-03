@@ -21,7 +21,7 @@ export function formatBeijingDatetimeLocal(value) {
   return `${beijing.getUTCFullYear()}-${pad(beijing.getUTCMonth() + 1)}-${pad(beijing.getUTCDate())}T${pad(beijing.getUTCHours())}:${pad(beijing.getUTCMinutes())}`;
 }
 
-export function normalizeAutomationConcurrency(value, fallback = 2) {
+export function normalizeAutomationConcurrency(value, fallback = 4) {
   const number = Number(value);
   return [1, 2, 4].includes(number) ? number : fallback;
 }

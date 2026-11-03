@@ -21,6 +21,7 @@ import (
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/mergeworker"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 )
 
 // BatchAutomationCoordinator is the Go owner of the V12 start/stop controls.
@@ -40,6 +41,7 @@ type BatchAutomationCoordinator struct {
 	path                  string
 	now                   func() time.Time
 	providerSync          func(context.Context, string) error
+	promptCatalog         *prompt.Catalog
 	publish121            *BatchFactory121Publisher
 	comicGenerate         func(context.Context, string, string, string) (batchfactoryv11.ComicCollection, error)
 	comicPublish          func(context.Context, string, string, string, batchfactoryv11.ComicCollection, batchfactoryv11.SettingsPatch) (N8ComicPublishRecord, error)
@@ -327,6 +329,54 @@ func shouldScheduleAutomationTimeoutRetry(stage string) bool {
 	default:
 		return true
 	}
+}
+
+// automationBatchRetryRounds 是批次末尾统一回补失败书籍的最大轮次。每一轮都在
+// 整批其余书结束后串行回补，避免失败书一直占着并发槽位。
+const automationBatchRetryRounds = 2
+
+// scheduleAutomationBatchEndRetry 把本书登记为“已跳过，等待批次末尾回补”。
+// 返回 false 表示回补预算已用完，调用方应把本书置为终态失败。
+func scheduleAutomationBatchEndRetry(entry map[string]any, stage string, err error, message string, round int, now time.Time) bool {
+	if entry == nil || round >= automationBatchRetryRounds {
+		return false
+	}
+	attempt := automationNumberValue(entry["batchRetryCount"], 0)
+	if attempt >= automationBatchRetryRounds {
+		return false
+	}
+	errorText := ""
+	if err != nil {
+		errorText = err.Error()
+	}
+	entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", stage, errorText, now
+	entry["batchRetryCount"] = attempt + 1
+	entry["batchRetryPending"] = true
+	entry["message"] = fmt.Sprintf("%s，已跳过，批次结束后自动回补（%d/%d）", message, attempt+1, automationBatchRetryRounds)
+	return true
+}
+
+// prepareAutomationBatchRetryRound 把上一轮被跳过、等待回补的书重新放回运行态，
+// 返回本轮回补的书 ID 集合。返回空集合表示没有待回补的书，批次可以收尾。
+func prepareAutomationBatchRetryRound(books map[string]any, round int, now time.Time) map[string]bool {
+	retry := make(map[string]bool)
+	for id, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil || !automationBoolValue(entry["batchRetryPending"]) {
+			continue
+		}
+		stage := "assets"
+		message := fmt.Sprintf("批次主体已完成，开始回补失败书籍（第 %d/%d 轮）", round, automationBatchRetryRounds)
+		if automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+			stage = "comic_publish"
+			message = fmt.Sprintf("批次主体已完成，重新发布已生成漫画合集（第 %d/%d 轮）", round, automationBatchRetryRounds)
+		}
+		entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", stage, message, "", now
+		delete(entry, "batchRetryPending")
+		appendAutomationBookLog(entry, now, stage, message)
+		retry[id] = true
+	}
+	return retry
 }
 
 func (c *BatchAutomationCoordinator) SetLocalFiles(files *localartifact.Store) {
@@ -751,6 +801,39 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	batch, err = c.applyPreset(ctx, owner, batch, preset, automationStringValue(input["productionMode"], ""))
 	if err != nil {
 		return nil, err
+	}
+	// A private-customization run may carry one pasted task's media settings
+	// (style, reference image and comic constraints) in addition to the saved
+	// automation preset. Apply that small overlay after the preset so starting
+	// automation cannot silently replace the choices made in the private form.
+	if rawOverlay, ok := input["settingsPatch"].(map[string]any); ok && len(rawOverlay) > 0 {
+		overlay := batchfactoryv11.SettingsPatch{}
+		for key, value := range rawOverlay {
+			if key == "aiPromptConfig" && c.promptCatalog != nil {
+				rawValue, marshalErr := json.Marshal(value)
+				if marshalErr != nil {
+					return nil, marshalErr
+				}
+				hydrated, hydrateErr := hydrateBatchFactoryPromptConfig(c.promptCatalog, rawValue)
+				if hydrateErr != nil {
+					return nil, hydrateErr
+				}
+				overlay[key] = hydrated
+				continue
+			}
+			raw, marshalErr := json.Marshal(value)
+			if marshalErr != nil {
+				return nil, marshalErr
+			}
+			overlay[key] = raw
+		}
+		if _, err := c.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: overlay, ExpectedRevision: batch.Revision}); err != nil {
+			return nil, err
+		}
+		batch, err = c.store.GetBatch(ctx, owner, batch.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	// Automatic production enters the same provider-sync boundary as the
 	// explicit production endpoint. Without this, the UI can show a configured
@@ -1663,6 +1746,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	// failed state instead of leaving a book stuck at "running" when an upstream
 	// model endpoint stops responding.
 	const stageTimeout = 10 * time.Minute
+	// 批次末尾统一回补：单本书失败时先跳过，等本批其余书全部跑完，再按顺序重跑
+	// 失败的书。生成链路是幂等的，回补会从缺失的页/阶段继续，不会重做已完成部分。
 	books := job["books"].(map[string]any)
 	concurrency := automationNumberValue(job["concurrency"], 1)
 	if concurrency > 4 {
@@ -1672,8 +1757,35 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	var workers sync.WaitGroup
 	var jobMu sync.Mutex
 	semaphore := make(chan struct{}, concurrency)
-	for _, book := range batch.Books {
-		book := book
+	// queue 是本次要调度的书：第一轮是全部书，后续轮次只追加上一轮失败被跳过的书。
+	queue := append([]batchfactoryv11.Book(nil), batch.Books...)
+	round := 0
+	roundEnd := len(queue)
+	for qi := 0; qi <= len(queue); qi++ {
+		if qi == roundEnd {
+			// 本轮派发的书已全部结束，再决定是否进入回补轮。
+			workers.Wait()
+			if control, _, controlErr := c.currentJobControl(owner, batchID, jobID); controlErr == nil && (control == "paused" || control == "stopped") {
+				return
+			}
+			if ctx.Err() != nil || round >= automationBatchRetryRounds {
+				break
+			}
+			retryIDs := prepareAutomationBatchRetryRound(books, round+1, c.now())
+			if len(retryIDs) == 0 {
+				break
+			}
+			round++
+			for _, candidate := range batch.Books {
+				if retryIDs[candidate.ID] {
+					queue = append(queue, candidate)
+				}
+			}
+			roundEnd = len(queue)
+			workers = sync.WaitGroup{}
+			semaphore = make(chan struct{}, concurrency)
+		}
+		book := queue[qi]
 		initialEntry, _ := books[book.ID].(map[string]any)
 		if initialEntry == nil {
 			initialEntry = map[string]any{}
@@ -1717,6 +1829,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 							persist()
 							return
 						}
+					}
+					// 还有回补轮次时先跳过本书，等本批其余书跑完再回来重试；这样
+					// 一本失败不会一直占着并发槽位拖住整批。
+					if scheduleAutomationBatchEndRetry(entry, stage, err, message, round, c.now()) {
+						appendAutomationBookLog(entry, c.now(), stage, message)
+						persist()
+						return
 					}
 					entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", stage, err.Error(), message, c.now()
 					appendAutomationBookLog(entry, c.now(), stage, message)
@@ -2617,6 +2736,9 @@ func resetRetryableAutomationBooks(books map[string]any, only map[string]bool, n
 			delete(entry, "contentPolicyRetryCount")
 			delete(entry, "retryAt")
 			delete(entry, "retryReason")
+			// 人工重试同样重置“批次末尾回补”的预算与等待标记。
+			delete(entry, "batchRetryCount")
+			delete(entry, "batchRetryPending")
 		}
 	}
 }
