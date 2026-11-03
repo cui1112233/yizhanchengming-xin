@@ -2006,6 +2006,20 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_bootstrap", "正在分析原文、分页并生成每页漫画提示词", c.now()
 						persist()
 						stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+						// 每页提示词都是一次独立的文本请求，串行会把一本书压在
+						// 10 分钟超时线上，并把整批拖成“跑一早上”。
+						stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, 5)
+						var bootstrapProgressMu sync.Mutex
+						stageCtx = batchfactoryv11.WithComicPromptProgress(stageCtx, func(completed, total int, pageLabel string) {
+							bootstrapProgressMu.Lock()
+							defer bootstrapProgressMu.Unlock()
+							if completed == 0 {
+								return
+							}
+							entry["message"] = fmt.Sprintf("漫画页提示词 %d/%d 已完成，最近完成：%s", completed, total, pageLabel)
+							entry["updatedAt"] = c.now()
+							persist()
+						})
 						_, bootstrapErr := c.stages.RunComicBootstrap(stageCtx, owner, batchID, book.ID)
 						cancel()
 						if bootstrapErr != nil {
