@@ -1246,6 +1246,27 @@ func firstConfiguredValue(values ...any) any {
 	return nil
 }
 
+func decodeSensitiveRepairArray(output string, repaired *[]string) error {
+	if err := json.Unmarshal([]byte(strings.TrimSpace(output)), repaired); err == nil {
+		return nil
+	}
+	// A few OpenAI-compatible providers prepend labels such as "Text response:"
+	// even when JSON mode is requested. Accept the first complete string array
+	// while keeping the existing length and sensitive-word checks below.
+	for offset, char := range output {
+		if char != '[' {
+			continue
+		}
+		candidate := []string{}
+		decoder := json.NewDecoder(strings.NewReader(output[offset:]))
+		if err := decoder.Decode(&candidate); err == nil {
+			*repaired = candidate
+			return nil
+		}
+	}
+	return json.Unmarshal([]byte(strings.TrimSpace(output)), repaired)
+}
+
 // applySensitiveAIRepair runs only when the user explicitly enables the
 // sensitive-word AI repair switch. Deterministic rules still run first; the
 // model then refines each hit line and the audit item records the source,
@@ -1329,7 +1350,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 		}
 		var repaired []string
 		if lastErr == nil {
-			lastErr = json.Unmarshal([]byte(output), &repaired)
+			lastErr = decodeSensitiveRepairArray(output, &repaired)
 			if lastErr == nil && len(repaired) != len(active) {
 				lastErr = fmt.Errorf("AI 整组返回数量不完整：%d/%d", len(repaired), len(active))
 			}
