@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,6 +18,31 @@ type batchFetchClassification struct {
 	AIGenderJudgeResolver func(context.Context, string) (novelfetchworkshop.AIGenderJudge, error)
 	RewriteProvider       novelfetchworkshop.RewriteProvider
 	RewriteResolver       func(context.Context, string) (novelfetchworkshop.RewriteProvider, error)
+}
+
+func captureBatchFetchedSource(ctx context.Context, store batchfactoryv11.Store, owner, batchID, bookID string, input batchfactoryv11.CaptureBookSourceInput) (batchfactoryv11.Book, error) {
+	updated, err := store.CaptureBookSource(ctx, owner, batchID, bookID, input)
+	if !errors.Is(err, batchfactoryv11.ErrConflict) {
+		return updated, err
+	}
+	latest, getErr := store.GetBatch(ctx, owner, batchID)
+	if getErr != nil {
+		return batchfactoryv11.Book{}, getErr
+	}
+	for index := range latest.Books {
+		book := &latest.Books[index]
+		if book.ID != bookID {
+			continue
+		}
+		// A concurrent fetch already won. Reuse it rather than replacing a valid
+		// source with the slower request's response.
+		if strings.TrimSpace(book.SourceText) != "" {
+			return *book, nil
+		}
+		input.ExpectedRevision = book.Revision
+		return store.CaptureBookSource(ctx, owner, batchID, bookID, input)
+	}
+	return batchfactoryv11.Book{}, batchfactoryv11.ErrNotFound
 }
 
 func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchworkshop.Store, owner, bookID string, result novelfetchworkshop.FetchAndProcessResult, classification batchFetchClassification) (novelfetchworkshop.FetchAndProcessResult, map[string]any, error) {
@@ -447,16 +473,11 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 			}
 		}
 		result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification)
-		for key, value := range book.SourceMetadata {
-			if _, exists := metadata[key]; !exists {
-				metadata[key] = value
-			}
-		}
 		productionText := result.ProcessedText
 		if processErr != nil {
 			productionText = ""
 		}
-		updated, err := store.CaptureBookSource(r.Context(), owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceTitle: book.Title, SourceMetadata: metadata, ExpectedRevision: book.Revision})
+		updated, err := captureBatchFetchedSource(r.Context(), store, owner, batch.ID, book.ID, batchfactoryv11.CaptureBookSourceInput{SourceText: productionText, RawSourceText: result.OriginalRaw, ReplaceSource: true, SourceTitle: book.Title, SourceMetadata: metadata, ExpectedRevision: book.Revision})
 		if err != nil {
 			writeStoreError(w, err)
 			return

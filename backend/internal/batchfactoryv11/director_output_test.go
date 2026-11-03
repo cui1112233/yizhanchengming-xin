@@ -112,6 +112,17 @@ func TestDirectorParseFencedJSON(t *testing.T) {
 	}
 }
 
+func TestDirectorParseUsesFirstCompleteJSONObjectBeforeTrailingCommentary(t *testing.T) {
+	input := `说明：{"characters":[],"scenes":[],"props":[]} 补充说明 {这不是 JSON}`
+	raw, err := ParseDirectorJSON(input)
+	if err != nil {
+		t.Fatalf("ParseDirectorJSON returned error: %v", err)
+	}
+	if got := string(raw); got != `{"characters":[],"scenes":[],"props":[]}` {
+		t.Fatalf("parsed JSON = %s", got)
+	}
+}
+
 func TestNormalizeAssetExtractionOutputKeepsCharacterStructure(t *testing.T) {
 	assets, err := NormalizeAssetExtractionOutput(json.RawMessage(`{
 		"characters":[{"name":"赵姨娘","formal_name":"赵姨娘","facts":"侯府侍妾，做侍妾二十年","appearance":"瘦削瓜子脸，黛青暗纹袄裙","relationships":"与侯门主母为主仆关系","prompt":"赵姨娘，侯府侍妾，瘦削瓜子脸，黛青暗纹袄裙"}],

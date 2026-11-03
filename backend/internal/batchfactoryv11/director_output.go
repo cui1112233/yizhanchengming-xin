@@ -260,6 +260,22 @@ func ParseDirectorJSON(value string) (json.RawMessage, error) {
 	if json.Valid([]byte(candidate)) {
 		return json.RawMessage(candidate), nil
 	}
+	// Some providers append an explanation (and occasionally another unmatched
+	// brace) after an otherwise complete object. Decode the first complete JSON
+	// object instead of letting later commentary invalidate the valid payload.
+	for offset, char := range candidate {
+		if char != '{' {
+			continue
+		}
+		fragment := candidate[offset:]
+		decoder := json.NewDecoder(strings.NewReader(fragment))
+		decoder.UseNumber()
+		var object map[string]any
+		if err := decoder.Decode(&object); err == nil && object != nil {
+			end := decoder.InputOffset()
+			return json.RawMessage(strings.TrimSpace(fragment[:end])), nil
+		}
+	}
 	start := strings.Index(candidate, "{")
 	end := strings.LastIndex(candidate, "}")
 	if start >= 0 && end > start {
