@@ -1022,7 +1022,7 @@ const webSubmitServiceSource = fs.readFileSync(path.join(here, '../../../../../l
 
 test('keeps Batch Factory website profile and style synchronization out of novel-fetch settings', () => {
   assert.match(engineSource, /syncWebSubmitConfigs\(\{ persist: false \}\)/);
-  assert.match(engineSource, /syncWebSubmitStyles\(\{ persist: false \}\)/);
+  assert.match(engineSource, /syncWebSubmitStyles\(\{ persist: true \}\)/);
   assert.match(webSubmitServiceSource, /async function syncConfigs\(owner, \{ persist = true \} = \{\}\)/);
   assert.match(webSubmitServiceSource, /async function syncStyles\(owner, \{ persist = true \} = \{\}\)/);
 });

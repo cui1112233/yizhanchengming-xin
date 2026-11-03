@@ -425,13 +425,15 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		var styles []map[string]any
+		var page string
 		if len(targets) > 0 && targets[0] != nil {
 			reader, ok := targets[0].(videomanagementconnector.StyleCatalogService)
 			if !ok {
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "视频管理系统 Go 连接器不支持风格目录读取"})
 				return
 			}
-			page, err := reader.RefreshStyles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			var err error
+			page, err = reader.RefreshStyles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
 			if err != nil {
 				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
 				return
@@ -442,6 +444,12 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		if len(styles) == 0 {
+			// 目标站会话失效时 zidingyi.php 会跳转到登录页，解析不到风格下拉框。
+			// 这种情况必须明确提示重新登录，否则会被误判成"目标站没有风格目录"。
+			if isTargetLoginPage(page) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "视频管理系统登录已失效，请重新登录后再同步风格目录"})
+				return
+			}
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用风格目录"})
 			return
 		}
@@ -865,6 +873,15 @@ func parseTargetStyles(body []byte) []map[string]any {
 	}
 	return out
 }
+// isTargetLoginPage 判断目标站返回的是否为管理员登录页。
+func isTargetLoginPage(page string) bool {
+	if strings.Contains(page, "管理员登录") {
+		return true
+	}
+	lower := strings.ToLower(page)
+	return strings.Contains(lower, `name="password"`) && strings.Contains(lower, `name="username"`)
+}
+
 func styleNames(styles []map[string]any) []string {
 	out := make([]string, 0, len(styles))
 	for _, item := range styles {

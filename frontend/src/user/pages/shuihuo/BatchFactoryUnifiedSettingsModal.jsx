@@ -282,7 +282,7 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
     if (!publishSessionReady) return message.warning('请先登录并验证视频管理系统');
     setSyncing('styles');
     try {
-      const result = await syncWebSubmitStyles({ persist: false });
+      const result = await syncWebSubmitStyles({ persist: true });
       const styles = Array.isArray(result?.settings?.style_catalog) ? result.settings.style_catalog : (Array.isArray(result?.styles) ? result.styles : []);
       patch({ publishSettings: { ...publish, websiteStyleCatalog: styles } });
     } catch (error) { message.error(error?.message || '同步风格目录失败'); }

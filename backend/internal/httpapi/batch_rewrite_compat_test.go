@@ -404,3 +404,15 @@ func TestBatchRewriteIssuesReadsGoDocumentLogs(t *testing.T) {
 		t.Fatalf("novel-fetch-workshop issues alias status=%d body=%s", aliasResponse.Code, aliasResponse.Body.String())
 	}
 }
+
+func TestIsTargetLoginPage(t *testing.T) {
+	loginPage := `<!DOCTYPE html><html><head><title>管理员登录</title></head><body>
+<form method="post" action="login.php"><input name="username"><input type="password" name="password"></form></body></html>`
+	if !isTargetLoginPage(loginPage) {
+		t.Fatal("管理员登录页未被识别为登录页")
+	}
+	stylePage := `<select id="style"><option value="1">古风虐文</option></select>`
+	if isTargetLoginPage(stylePage) {
+		t.Fatal("风格页面被误判为登录页")
+	}
+}
