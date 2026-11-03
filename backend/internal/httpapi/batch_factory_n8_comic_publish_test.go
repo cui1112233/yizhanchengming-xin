@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -319,10 +320,56 @@ func TestN8ComicPublisherResolvesTitleMatchForAutomaticPublish(t *testing.T) {
 		WorksDirectory: fakeN8ComicWorkDirectory{configured: true, works: []n8catalog.Work{
 			{ID: 9001, Name: "鼓励式老公,却把行动都给了闺蜜"},
 		}},
+		WorkTitleMapPath: filepath.Join(t.TempDir(), "n8-work-title-map.json"),
 	}
 	ids, err := publisher.resolveComicWorkIDs(context.Background(), "alice", batch.ID, batch.Books[0].ID)
 	if err != nil || !reflect.DeepEqual(ids, []int64{9001}) {
 		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+}
+
+type countingN8ComicWorkDirectory struct {
+	configured bool
+	works      []n8catalog.Work
+	calls      int
+}
+
+func (f *countingN8ComicWorkDirectory) Configured() bool { return f.configured }
+func (f *countingN8ComicWorkDirectory) SearchWorks(context.Context, string) ([]n8catalog.Work, error) {
+	f.calls++
+	return f.works, nil
+}
+
+func TestN8ComicPublisherReusesLocalTitleMap(t *testing.T) {
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "鼓励式老公，把行动都给了闺蜜"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := &countingN8ComicWorkDirectory{configured: true, works: []n8catalog.Work{
+		{ID: 9001, Name: "鼓励式老公,却把行动都给了闺蜜"},
+	}}
+	publisher := &BatchFactoryN8ComicPublisher{
+		Store:            store,
+		WorksDirectory:   directory,
+		WorkTitleMapPath: filepath.Join(t.TempDir(), "n8-work-title-map.json"),
+	}
+	first, err := publisher.resolveComicWorkIDs(context.Background(), "alice", batch.ID, batch.Books[0].ID)
+	if err != nil || !reflect.DeepEqual(first, []int64{9001}) {
+		t.Fatalf("first=%v err=%v", first, err)
+	}
+	if directory.calls != 1 {
+		t.Fatalf("首次匹配应查询目录一次，实际 %d 次", directory.calls)
+	}
+	second, err := publisher.resolveComicWorkIDs(context.Background(), "alice", batch.ID, batch.Books[0].ID)
+	if err != nil || !reflect.DeepEqual(second, []int64{9001}) {
+		t.Fatalf("second=%v err=%v", second, err)
+	}
+	if directory.calls != 1 {
+		t.Fatalf("命中本地映射后不应再查询 N8 目录，实际 %d 次", directory.calls)
 	}
 }
 

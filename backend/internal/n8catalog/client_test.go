@@ -190,3 +190,25 @@ func TestClientSearchesTitleFragmentWhenFullTitleHasNoMatch(t *testing.T) {
 		t.Fatalf("works = %#v", works)
 	}
 }
+
+func TestWorksClientUsesConfiguredWorksPath(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "data": map[string]any{"list": []map[string]any{
+			{"id": 7, "name": "同名作品"},
+		}}})
+	}))
+	defer server.Close()
+	client := NewWorksClientWithPath(server.Client(), server.URL, "token", "/material/work/select")
+	works, err := client.SearchWorks(context.Background(), "同名作品")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/material/work/select" {
+		t.Fatalf("path=%q", gotPath)
+	}
+	if len(works) != 1 || works[0].ID != 7 {
+		t.Fatalf("works=%+v", works)
+	}
+}

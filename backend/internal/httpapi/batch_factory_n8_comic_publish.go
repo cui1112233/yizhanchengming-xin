@@ -145,11 +145,16 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, 
 	if bookTitle == "" {
 		return nil, fmt.Errorf("找不到当前漫画的书名，无法自动匹配漫画后台作品")
 	}
+	target := normalizeComicWorkTitle(bookTitle)
+	// 先查本地缓存。命中时完全不访问 N8，因此 N8 修改作品接口不会影响
+	// 已经匹配过的书。
+	if cached := p.workTitleMap().lookup(target); len(cached) > 0 {
+		return cached, nil
+	}
 	works, err := p.WorksDirectory.SearchWorks(ctx, bookTitle)
 	if err != nil {
 		return nil, fmt.Errorf("按书名查询漫画后台作品失败：%w", err)
 	}
-	target := normalizeComicWorkTitle(bookTitle)
 	matched := make([]int64, 0, 1)
 	for _, work := range works {
 		if work.ID > 0 && normalizeComicWorkTitle(work.Name) == target {
@@ -165,6 +170,8 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, 
 	if len(matched) == 0 {
 		return nil, fmt.Errorf("漫画后台未找到与“%s”完全同名的作品，请先在漫画合集里确认关联作品", bookTitle)
 	}
+	// 匹配成功后写入本地缓存，下一次发布会直接命中。
+	p.workTitleMap().store(target, matched)
 	return matched, nil
 }
 
@@ -229,7 +236,19 @@ type BatchFactoryN8ComicPublisher struct {
 	WorksDirectory        N8ComicWorkDirectory
 	ProducerAccounts      []string
 	Now                   func() time.Time
-	mu                    sync.Mutex
+	// WorkTitleMapPath 是本地“书名 -> N8 作品 ID”缓存路径，为空时使用默认路径。
+	WorkTitleMapPath string
+	mu               sync.Mutex
+	titleMapOnce     sync.Once
+	titleMap         *n8WorkTitleMap
+}
+
+// workTitleMap 惰性初始化本地书名映射，避免所有构造点都必须显式赋值。
+func (p *BatchFactoryN8ComicPublisher) workTitleMap() *n8WorkTitleMap {
+	p.titleMapOnce.Do(func() {
+		p.titleMap = newN8WorkTitleMap(p.WorkTitleMapPath)
+	})
+	return p.titleMap
 }
 
 type n8ComicPublishInput struct {

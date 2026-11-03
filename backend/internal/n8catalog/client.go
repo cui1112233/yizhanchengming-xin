@@ -52,10 +52,15 @@ type ProducerAccount struct {
 	OrganizationIDs []string
 }
 
+// defaultN8WorksPath 是 N8 作品目录的默认接口路径。该路径会随 N8 后台
+// 版本变化，因此允许通过环境变量覆盖，避免改接口就必须重新发版。
+const defaultN8WorksPath = "/works/select"
+
 type WorksClient struct {
 	httpClient *http.Client
 	baseURL    string
 	adminToken string
+	worksPath  string
 }
 
 type DirectoryError struct {
@@ -86,6 +91,12 @@ func NewClient(httpClient *http.Client, baseURL, adminToken string) *Client {
 }
 
 func NewWorksClient(httpClient *http.Client, baseURL, adminToken string) *WorksClient {
+	return NewWorksClientWithPath(httpClient, baseURL, adminToken, "")
+}
+
+// NewWorksClientWithPath 允许覆盖作品查询路径。worksPath 为空时使用
+// defaultN8WorksPath，便于 N8 调整接口后只改配置而不改代码。
+func NewWorksClientWithPath(httpClient *http.Client, baseURL, adminToken, worksPath string) *WorksClient {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 20 * time.Second}
 	}
@@ -93,7 +104,14 @@ func NewWorksClient(httpClient *http.Client, baseURL, adminToken string) *WorksC
 	if strings.HasSuffix(baseURL, "/center-api") {
 		baseURL = strings.TrimSuffix(baseURL, "/center-api") + "/union-api"
 	}
-	return &WorksClient{httpClient: httpClient, baseURL: baseURL, adminToken: strings.TrimSpace(adminToken)}
+	worksPath = strings.TrimSpace(worksPath)
+	if worksPath == "" {
+		worksPath = defaultN8WorksPath
+	}
+	if !strings.HasPrefix(worksPath, "/") {
+		worksPath = "/" + worksPath
+	}
+	return &WorksClient{httpClient: httpClient, baseURL: baseURL, adminToken: strings.TrimSpace(adminToken), worksPath: worksPath}
 }
 
 func (c *WorksClient) Configured() bool {
@@ -149,7 +167,7 @@ func (c *WorksClient) searchWorksOnce(ctx context.Context, query string) ([]Work
 	if err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/works/select", bytes.NewReader(encoded))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+c.worksPath, bytes.NewReader(encoded))
 	if err != nil {
 		return nil, err
 	}
