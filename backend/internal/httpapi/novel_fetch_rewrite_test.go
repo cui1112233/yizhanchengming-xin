@@ -188,6 +188,24 @@ func TestApplySensitiveAIRepairAcceptsJSONArrayWrappedInProviderCommentary(t *te
 	}
 }
 
+func TestApplySensitiveAIRepairFallsBackToSafeDeterministicGroupReplacement(t *testing.T) {
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		return "Text response without a JSON array", nil
+	})
+	settings := map[string]any{"sensitive_ai": map[string]any{"enabled": true, "group_hits": true}}
+	items := []map[string]any{
+		{"keyword": "敏感1", "before": "第一段敏感1", "after": "第一段合规表达"},
+		{"keyword": "敏感2", "before": "第二段敏感2", "after": "第二段合规表达"},
+	}
+	text, got := applySensitiveAIRepair(context.Background(), provider, settings, "book-1", "第一段合规表达\n第二段合规表达", items)
+	if text != "第一段合规表达\n第二段合规表达" {
+		t.Fatalf("fallback changed deterministic text=%q", text)
+	}
+	if got[0]["status"] != "done" || got[1]["status"] != "done" {
+		t.Fatalf("safe deterministic fallback was not accepted: %#v", got)
+	}
+}
+
 func TestApplySensitiveAIRepairRejectsUnsafeOrIncompleteGroupOutput(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
 		return `["仍然包含敏感词"]`, nil
