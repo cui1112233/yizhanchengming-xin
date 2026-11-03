@@ -110,6 +110,7 @@ import {
   saveBookOverride,
   updateBookAsset,
   updateBookMetadata,
+  updateComicPage,
   updateBookSource,
   uploadBookAssetImage,
   uploadBookVideoMaterial,
@@ -1146,6 +1147,20 @@ function PromptPanel({ book, batch, batchId, settingsRevision, productionMode = 
         : videoPrompt;
       if (promptKind === 'video') setVideoPrompt(savedVideoPrompt);
 		const patch = promptKind === 'visual' ? { comicPrompt: comicDirectorPrompt, comicImagePrompt: comicPrompt } : { videoPrompt: savedVideoPrompt };
+      if (promptKind === 'visual') {
+        // The comic_pages row is the single source of truth for page prompts.
+        // Write it first so generation and the private-customization workspace
+        // read the same values; only then mirror them onto the video patch for
+        // the existing batch-factory display.
+        const director = String(comicDirectorPrompt || '').trim();
+        const image = String(comicPrompt || '').trim();
+        if (!director || !image) {
+          message.warning('漫画提示词与图片提示词都不能为空');
+          setSaving(false);
+          return;
+        }
+        await updateComicPage(batchId, book.id, selectedVideo.id, { comicPrompt: director, imagePrompt: image });
+      }
       await saveVideoOverride(batchId, book.id, selectedVideo.id, { patch, expectedRevision: Number(selectedVideo.revision || 0) });
       let h3CompileWarning = '';
       if (promptKind === 'video' && (book?.directorRevision?.output?.h3_director || book?.directorRevision?.output?.h3Director) && promptEditTrace) {

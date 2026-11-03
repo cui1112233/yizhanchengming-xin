@@ -330,3 +330,14 @@ test('keeps base setup as the switch controlling asset prompt display', () => {
   assert.match(source, /<span>基础设定<\/span>/);
   assert.match(source, /constraints\.baseSetup\?\.enabled/);
 });
+
+test('shows a compact collapsible style catalog from the existing web-submit config', () => {
+  assert.match(source, /const \[styleOpen, setStyleOpen\] = useState\(false\)/);
+  assert.match(source, /account\?\.style_catalog/);
+  assert.match(source, /styleCatalogNames\.length/);
+  assert.match(source, /尚未同步风格目录/);
+  assert.match(source, /batch-factory-style-catalog-list/);
+  assert.match(source, /setAccount\(current => \(\{ \.\.\.\(current \|\| \{\}\), style_catalog: styles \}\)\)/);
+  assert.match(stylesheet, /\.batch-factory-style-catalog\{/);
+  assert.match(stylesheet, /@media\(max-width:900px\)\{\.batch-factory-style-catalog/);
+});

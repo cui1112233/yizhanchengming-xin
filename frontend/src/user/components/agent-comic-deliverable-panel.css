@@ -1,0 +1,117 @@
+.agent-page .agent-comic-panel {
+  position: absolute;
+  z-index: 11;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  width: 296px;
+  max-height: calc(100% - 96px);
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--agent-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--agent-panel) 95%, transparent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(14px);
+  color: var(--agent-text);
+  font-size: 11px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+
+.agent-page .agent-comic-panel__header {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: -8px -8px 0;
+  border-bottom: 1px solid var(--agent-border);
+  padding: 7px 8px;
+  background: color-mix(in srgb, var(--agent-panel) 96%, transparent);
+}
+
+.agent-page .agent-comic-panel__header strong { font-size: 12px; font-weight: 600; }
+.agent-page .agent-comic-panel__readonly {
+  border: 1px solid var(--agent-border);
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--agent-muted);
+  font-size: 10px;
+}
+
+.agent-page .agent-comic-panel__toggle {
+  margin-left: auto;
+  border: 1px solid var(--agent-border);
+  border-radius: 5px;
+  padding: 1px 7px;
+  background: transparent;
+  color: var(--agent-secondary);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.agent-page .agent-comic-panel__toggle:hover { border-color: var(--agent-border-strong); background: var(--agent-hover); color: var(--agent-text); }
+
+.agent-page .agent-comic-panel__book { display: grid; gap: 5px; }
+.agent-page .agent-comic-panel__book + .agent-comic-panel__book { border-top: 1px solid var(--agent-border); padding-top: 7px; }
+
+.agent-page .agent-comic-panel__book-header { display: flex; align-items: baseline; gap: 6px; }
+.agent-page .agent-comic-panel__book-title { overflow: hidden; color: var(--agent-text); font-size: 11.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-comic-panel__progress { margin-left: auto; flex: 0 0 auto; color: var(--agent-muted); font-size: 10px; }
+
+.agent-page .agent-comic-panel__section-title { margin: 2px 0 0; color: var(--agent-muted); font-size: 10px; font-weight: 500; letter-spacing: 0.04em; }
+
+.agent-page .agent-comic-panel__pages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.agent-page .agent-comic-panel__page {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  margin: 0;
+  border: 1px solid var(--agent-border);
+  border-radius: 6px;
+  padding: 4px;
+  background: var(--agent-surface);
+}
+.agent-page .agent-comic-panel__page img,
+.agent-page .agent-comic-panel__page-placeholder { display: block; width: 100%; aspect-ratio: 3 / 4; border-radius: 4px; object-fit: cover; background: var(--agent-elevated); }
+.agent-page .agent-comic-panel__page-placeholder { display: grid; place-items: center; color: var(--agent-muted); font-size: 10px; }
+.agent-page .agent-comic-panel__page figcaption { display: grid; min-width: 0; gap: 1px; }
+.agent-page .agent-comic-panel__page-title { overflow: hidden; color: var(--agent-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+.agent-page .agent-comic-panel__state { flex: 0 0 auto; color: var(--agent-muted); font-size: 10px; }
+.agent-page .agent-comic-panel__state.is-succeeded { color: #4eaa82; }
+.agent-page .agent-comic-panel__state.is-running { color: #5c92c7; }
+.agent-page .agent-comic-panel__state.is-failed { color: #d84b4b; }
+.agent-page .agent-comic-panel__state.is-stale { color: #c3914e; }
+.agent-page .agent-comic-panel__state.is-unsynced,
+.agent-page .agent-comic-panel__publish-state.is-unsynced { color: var(--agent-muted); }
+
+.agent-page .agent-comic-panel__collections { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.agent-page .agent-comic-panel__collections li {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--agent-border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--agent-surface);
+}
+.agent-page .agent-comic-panel__collection-title { overflow: hidden; flex: 1 1 auto; color: var(--agent-text); text-overflow: ellipsis; white-space: nowrap; }
+.agent-page .agent-comic-panel__collection-count { flex: 0 0 auto; color: var(--agent-muted); font-size: 10px; }
+
+.agent-page .agent-comic-panel__publish { display: grid; gap: 3px; margin: 0; }
+.agent-page .agent-comic-panel__publish-row { display: flex; min-width: 0; align-items: baseline; gap: 6px; border: 1px solid var(--agent-border); border-radius: 6px; padding: 3px 6px; background: var(--agent-surface); }
+.agent-page .agent-comic-panel__publish-row dt { flex: 0 0 52px; margin: 0; color: var(--agent-muted); font-size: 10px; }
+.agent-page .agent-comic-panel__publish-state { display: flex; min-width: 0; flex-wrap: wrap; align-items: baseline; gap: 4px; margin: 0; color: var(--agent-text); font-size: 10.5px; }
+.agent-page .agent-comic-panel__publish-detail { overflow: hidden; max-width: 100%; color: var(--agent-muted); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+
+.agent-page .agent-comic-panel__empty { margin: 0; color: var(--agent-muted); font-size: 10px; }
+
+@media (max-width: 900px) {
+  .agent-page .agent-comic-panel { width: 248px; max-height: calc(100% - 120px); }
+}

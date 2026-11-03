@@ -3,6 +3,7 @@ import { Alert, Button, Divider, Input, InputNumber, Modal, Segmented, Select, S
 import { useEffect, useMemo, useState } from 'react';
 import { listAvailableModels, modelSelectOptions } from '../../../shared/api/modelCatalog';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
+import { apiErrorMessage } from '../../../shared/apiErrors';
 import {
   createAutomationPreset,
   deleteAutomationPreset,
@@ -156,6 +157,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
 export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
   const [checking, setChecking] = useState(false);
   const [syncing, setSyncing] = useState('');
+  const [styleOpen, setStyleOpen] = useState(false);
   const [account, setAccount] = useState(null);
   const [environment, setEnvironment] = useState(null);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -177,16 +179,37 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
   const hasSession = result => Boolean((result?.checks || []).some(check => SESSION_CHECK_NAMES.includes(check.name) && check.ok));
   const checkDetail = (result, name) => String((result?.checks || []).find(check => check.name === name)?.detail || '').trim();
   const sessionDetail = result => String((result?.checks || []).find(check => SESSION_CHECK_NAMES.includes(check.name))?.detail || (result?.checks || [])[0]?.detail || '').trim();
+  // 状态与同步共用后端同一个凭证解析结果（result.credential），前端不再自行
+  // 用“有没有账号”猜状态，也不再统一显示成“登录已失效”。
+  const credentialState = result => String(result?.credential?.state || '').trim();
+  const credentialLabel = result => {
+    const state = credentialState(result);
+    if (state === 'verified') return '已登录并验证';
+    if (state === 'expired') return '登录已过期';
+    if (state === 'incomplete') return '凭证不全';
+    if (state === 'not_logged_in') return '未登录';
+    if (state === 'unavailable') return '状态暂不可用';
+    return result ? (hasSession(result) ? '已登录并验证' : account?.username ? '待重新验证' : '未登录') : '等待检查';
+  };
   const publishSessionReady = Boolean(environment?.session && environment?.visible?.ok);
+  const credentialFailure = error => /^(TARGET_SESSION_EXPIRED|TARGET_NOT_LOGGED_IN|TARGET_CREDENTIAL_INCOMPLETE)$/.test(String(error?.code || ''));
   const organizationCatalogReady = Boolean(environment?.session);
+  // 风格目录与「同步风格目录」共用 GET /web-submit/config 的 settings.style_catalog，
+  // 不新增接口；同步成功后原地回写，避免用户刷新。
+  const styleCatalog = Array.isArray(account?.style_catalog) && account.style_catalog.length
+    ? account.style_catalog
+    : (Array.isArray(publish.websiteStyleCatalog) ? publish.websiteStyleCatalog : []);
+  const styleCatalogNames = styleCatalog
+    .map(item => String(typeof item === 'string' ? item : item?.name || item?.id || '').trim())
+    .filter(Boolean);
   const loadAccount = async () => {
     const [config, result] = await Promise.all([getWebSubmitConfig(), checkWebSubmitEnvironment()]);
     setAccount(config?.settings || config?.config || {});
     setEnvironment({ environment: result, session: hasSession(result), visible: null });
   };
   const markPublishSessionExpired = error => {
-    const detail = error?.message || '视频管理系统登录会话已失效，请重新验证登录';
-    setEnvironment(current => ({ ...current, error: detail, session: false, visible: { ok: false, error: detail } }));
+    const detail = apiErrorMessage(error, '视频管理系统登录会话已失效，请重新验证登录');
+    setEnvironment(current => ({ ...current, credential: { ...(current?.credential || {}), state: 'expired', code: 'TARGET_SESSION_EXPIRED', message: detail }, error: detail, session: false, visible: { ok: false, error: detail } }));
   };
   const refreshOrganizations = async () => {
     setOrganizationsError('');
@@ -275,7 +298,10 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
     try {
       const result = await syncWebSubmitConfigs({ persist: false });
       patch({ publishSettings: { ...publish, websiteProfiles: Array.isArray(result?.groups) ? result.groups : [] } });
-    } catch (error) { message.error(error?.message || '同步网站配置档失败'); }
+    } catch (error) {
+      if (credentialFailure(error)) markPublishSessionExpired(error);
+      message.error(apiErrorMessage(error, '同步网站配置档失败'));
+    }
     finally { setSyncing(''); }
   };
   const syncStyles = async () => {
@@ -284,16 +310,20 @@ export function BatchFactoryPublishSettingsForm({ value, onChange, active }) {
     try {
       const result = await syncWebSubmitStyles({ persist: true });
       const styles = Array.isArray(result?.settings?.style_catalog) ? result.settings.style_catalog : (Array.isArray(result?.styles) ? result.styles : []);
+      setAccount(current => ({ ...(current || {}), style_catalog: styles }));
       patch({ publishSettings: { ...publish, websiteStyleCatalog: styles } });
-    } catch (error) { message.error(error?.message || '同步风格目录失败'); }
+    } catch (error) {
+      if (credentialFailure(error)) markPublishSessionExpired(error);
+      message.error(apiErrorMessage(error, '同步风格目录失败'));
+    }
     finally { setSyncing(''); }
   };
   return <><Space direction="vertical" size={16} style={{ width: '100%' }}>
     <Alert type="info" showIcon message={<span>批量默认发布规则 <HelpTip title="批量默认发布规则">这里维护视频管理系统连接、网站配置映射和上传素材规则；单书配置可覆盖默认值。</HelpTip></span>} />
-    <section className="batch-factory-vms-connection-card"><div className="batch-factory-vms-main"><div className="batch-factory-vms-icon" aria-hidden="true">▣</div><div className="batch-factory-vms-copy"><div className="batch-factory-vms-title-row"><b>视频管理系统</b><span>{publishSessionReady ? '已登录并验证' : account?.username ? '待重新验证' : '未登录'}</span></div><div className="batch-factory-vms-meta"><span>当前账号</span><strong>{account?.username || '尚未登录'}</strong></div><div className="batch-factory-vms-meta"><span>后台地址</span><a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">two.121w.com/tttadmin</a></div><div className="batch-factory-vms-meta"><span>素材相册</span><a href={N8_MATERIAL_ALBUM_URL} target="_blank" rel="noreferrer">打开 N8 素材相册</a></div></div></div><div className="batch-factory-vms-actions"><Button href={TARGET_ADMIN_URL} target="_blank">打开后台</Button><Button onClick={openLoginForm}>{account?.username ? '更换账号' : '登录并验证'}</Button><Button onClick={selfCheck} loading={checking}>{account?.username ? '重新验证' : '环境自检'}</Button></div></section>
-    <div className="batch-factory-publish-two-column"><section className="batch-factory-engine-card"><header><b>发布映射</b><HelpTip title="发布映射">同步真实后台配置后，绑定到当前批量作品。</HelpTip></header><div className="batch-factory-engine-card-body"><label className="batch-factory-engine-field"><span><b>网站配置档</b></span><Select allowClear showSearch value={publish.websiteProfileId || undefined} options={(publish.websiteProfiles || []).map(profile => ({ value: profile.id, label: profile.name || profile.id }))} placeholder="同步网站配置档后选择" onChange={websiteProfileId => { const profile = (publish.websiteProfiles || []).find(item => item.id === websiteProfileId) || {}; patch({ publishSettings: { ...publish, websiteProfileId: websiteProfileId || '', versionProfile: profile.name || '', organization: websiteProfileOrganization(profile) } }); }} /></label><div className="batch-factory-publish-sync-row"><Button disabled={!publishSessionReady} onClick={syncProfiles} loading={syncing === 'profiles'}>同步网站配置档</Button><Button disabled={!publishSessionReady} onClick={syncStyles} loading={syncing === 'styles'}>同步风格目录</Button></div><div className="batch-factory-publish-ai-note"><b>组织归属</b><span>由网站配置档自动带入，不在这里重复选择。</span></div></div></section>
+    <section className="batch-factory-vms-connection-card"><div className="batch-factory-vms-main"><div className="batch-factory-vms-icon" aria-hidden="true">▣</div><div className="batch-factory-vms-copy"><div className="batch-factory-vms-title-row"><b>视频管理系统</b><span>{credentialLabel(environment?.environment)}</span></div><div className="batch-factory-vms-meta"><span>当前账号</span><strong>{account?.username || '尚未登录'}</strong></div><div className="batch-factory-vms-meta"><span>后台地址</span><a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">two.121w.com/tttadmin</a></div><div className="batch-factory-vms-meta"><span>素材相册</span><a href={N8_MATERIAL_ALBUM_URL} target="_blank" rel="noreferrer">打开 N8 素材相册</a></div></div></div><div className="batch-factory-vms-actions"><Button href={TARGET_ADMIN_URL} target="_blank">打开后台</Button><Button onClick={openLoginForm}>{account?.username ? '更换账号' : '登录并验证'}</Button><Button onClick={selfCheck} loading={checking}>{account?.username ? '重新验证' : '环境自检'}</Button></div></section>
+    <div className="batch-factory-publish-two-column"><section className="batch-factory-engine-card"><header><b>发布映射</b><HelpTip title="发布映射">同步真实后台配置后，绑定到当前批量作品。</HelpTip></header><div className="batch-factory-engine-card-body"><label className="batch-factory-engine-field"><span><b>网站配置档</b></span><Select allowClear showSearch value={publish.websiteProfileId || undefined} options={(publish.websiteProfiles || []).map(profile => ({ value: profile.id, label: profile.name || profile.id }))} placeholder="同步网站配置档后选择" onChange={websiteProfileId => { const profile = (publish.websiteProfiles || []).find(item => item.id === websiteProfileId) || {}; patch({ publishSettings: { ...publish, websiteProfileId: websiteProfileId || '', versionProfile: profile.name || '', organization: websiteProfileOrganization(profile) } }); }} /></label><div className="batch-factory-publish-sync-row"><Button disabled={!publishSessionReady} onClick={syncProfiles} loading={syncing === 'profiles'}>同步网站配置档</Button><Button disabled={!publishSessionReady} onClick={syncStyles} loading={syncing === 'styles'}>同步风格目录</Button></div><div className="batch-factory-style-catalog">{styleCatalogNames.length ? <button type="button" className="batch-factory-style-catalog-toggle" aria-expanded={styleOpen} onClick={() => setStyleOpen(open => !open)}><span className="batch-factory-style-catalog-label">风格目录</span><span className="batch-factory-style-catalog-count">{styleCatalogNames.length} 条</span><span className={`batch-factory-style-catalog-chevron${styleOpen ? ' is-open' : ''}`} aria-hidden="true" /></button> : <div className="batch-factory-style-catalog-toggle is-empty"><span className="batch-factory-style-catalog-label">风格目录</span><span className="batch-factory-style-catalog-empty">尚未同步风格目录</span></div>}{styleOpen && styleCatalogNames.length ? <div className="batch-factory-style-catalog-list">{styleCatalogNames.map((name, index) => <span className="batch-factory-style-catalog-name" key={`${name}-${index}`}>{name}</span>)}</div> : null}</div><div className="batch-factory-publish-ai-note"><b>组织归属</b><span>由网站配置档自动带入，不在这里重复选择。</span></div></div></section>
       <section className="batch-factory-engine-card"><header><b>批量默认上传规则</b><HelpTip title="批量默认上传规则">这些规则可被单书发布设置覆盖。</HelpTip></header><div className="batch-factory-engine-card-body"><label className="batch-factory-engine-field"><span><b>上传视频类型</b></span><Segmented value={publish.uploadVideoType || 'merged'} options={[{ value: 'merged', label: '合并成品' }, { value: 'individual', label: '独立 VIDEO' }]} onChange={uploadVideoType => patch({ publishSettings: { ...publish, uploadVideoType } })} /></label><div className="batch-factory-publish-rule-list"><section><div><b>素材复用</b></div><Switch checked={publish.materialReuse === true} onChange={materialReuse => patch({ publishSettings: { ...publish, materialReuse } })} /></section><section><div><b>水平翻转</b></div><Switch checked={publish.horizontalFlip === true} onChange={horizontalFlip => patch({ publishSettings: { ...publish, horizontalFlip } })} /></section><section><div><b>改文后上传</b></div><Switch checked={value.publishRewriteEnabled === true} onChange={publishRewriteEnabled => patch({ publishRewriteEnabled })} /></section></div></div></section></div>
-    <section className="batch-factory-engine-card"><header><b>连接与环境状态</b><HelpTip title="连接与环境状态">登录、后台页面和直接接口均需可用。</HelpTip></header><div className="batch-factory-engine-card-body"><div className="batch-factory-env-status-row"><div><b>登录会话</b><span>{environment ? (environment.session ? '已登录' : '未登录 / 已失效') : '等待检查'}</span><small>{sessionDetail(environment?.environment)}</small></div><div><b>后台页面</b><span>{environment?.visible ? (environment.visible.ok ? '可访问' : '验证未通过') : '等待检查'}</span></div><div><b>直接接口</b><span>{checkDetail(environment?.environment, '121 直接接口') || '等待检查'}</span></div><Button onClick={selfCheck} loading={checking}>重新检查</Button></div>{environment?.error ? <Alert type="error" showIcon message="视频管理系统环境自检失败" description={environment.error} /> : null}</div></section>
+    <section className="batch-factory-engine-card"><header><b>连接与环境状态</b><HelpTip title="连接与环境状态">登录、后台页面和直接接口均需可用。</HelpTip></header><div className="batch-factory-engine-card-body"><div className="batch-factory-env-status-row"><div><b>登录会话</b><span>{environment?.error ? '检查失败' : credentialLabel(environment?.environment)}</span><small>{sessionDetail(environment?.environment)}</small></div><div><b>后台页面</b><span>{environment?.visible ? (environment.visible.ok ? '可访问' : '验证未通过') : '等待检查'}</span></div><div><b>直接接口</b><span>{checkDetail(environment?.environment, '121 直接接口') || '等待检查'}</span></div><Button onClick={selfCheck} loading={checking}>重新检查</Button></div>{environment?.error ? <Alert type="error" showIcon message="视频管理系统环境自检失败" description={environment.error} /> : null}</div></section>
   </Space>
   <Modal title={account?.username ? '更换视频管理系统账号' : '登录视频管理系统'} open={loginOpen} onCancel={() => { setLoginPassword(''); setLoginOpen(false); }} onOk={login} confirmLoading={loginBusy} okText="登录并验证" destroyOnClose><Space direction="vertical" size={12} style={{ width: '100%' }}><Input value={loginUsername} autoComplete="username" placeholder="视频管理系统账号" onChange={event => setLoginUsername(event.target.value)} /><Input.Password value={loginPassword} autoComplete="current-password" placeholder="视频管理系统密码" onChange={event => setLoginPassword(event.target.value)} /><a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">打开视频管理系统后台</a></Space></Modal>
   </>;

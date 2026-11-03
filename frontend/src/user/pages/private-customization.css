@@ -1,0 +1,311 @@
+/* 私人定制页（/script）局部布局修正：不改 global.css，只在剧本工作台作用域内生效。 */
+
+/* P0-1：让 form 纵向分配高度，去掉 calc(100% - 78px) 造成的工作台底部裁切。 */
+.script-workbench-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.script-workbench-form .private-customization-workspaces {
+  flex: 0 0 auto;
+}
+
+.script-workbench-form .script-workbench {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+/* 漫画页不提供拖拽列；标签栏与工具栏内容较多时允许换行，避免横向溢出。 */
+.script-workbench-form .private-comic-workbench {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: minmax(320px, 37%) minmax(460px, 1fr);
+}
+
+.script-workbench-form .private-comic-workbench .script-tabs,
+.script-workbench-form .private-comic-workbench .script-toolbar {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .script-workbench-form .private-comic-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 输入区：标题并入剧本原文输入卡，沿用同一套深色输入外观。 */
+.script-workbench-form .private-comic-title-input {
+  display: block;
+  height: auto;
+  padding: 12px 48px 12px 14px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--legacy-border) !important;
+  border-radius: 13px 13px 0 0 !important;
+  background: var(--legacy-input) !important;
+  color: var(--legacy-text) !important;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: none !important;
+}
+
+.script-workbench-form .private-comic-title-input::placeholder {
+  color: var(--legacy-muted) !important;
+  font-weight: 400;
+}
+
+.script-workbench-form .private-comic-title-input:focus {
+  box-shadow: inset 0 0 0 1px rgba(166, 201, 255, 0.25) !important;
+}
+
+.script-workbench-form .private-comic-chat-shell .script-chat-textarea {
+  border-radius: 0 !important;
+}
+
+.script-workbench-form .private-comic-source-count {
+  color: var(--legacy-muted);
+  font-size: 12px;
+}
+
+.script-workbench-form .private-comic-hint {
+  display: block;
+  margin-top: 12px;
+}
+
+/* 资产卡：漫画提示词与图片推导直接可见，不再整体收进抽屉。 */
+.script-workbench-form .private-comic-prompt-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.script-workbench-form .private-comic-prompt-card .private-customization-field {
+  margin-bottom: 0;
+}
+
+.script-workbench-form .private-comic-prompt-card .private-customization-field > span {
+  font-size: 12px;
+}
+
+/* 展示区：任务结果放进与“剧本创作”一致的卡片样式。 */
+.script-workbench-form .private-comic-result-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 18px;
+}
+
+.script-workbench-form .private-comic-result-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.script-workbench-form .private-comic-result-heading span,
+.script-workbench-form .private-comic-task-meta {
+  color: var(--legacy-muted);
+  font-size: 12px;
+}
+
+/* P1：强调色统一到项目既有变量，不再使用独立的新配色。 */
+.script-workbench-form .private-customization-workspaces button.is-active {
+  border-color: var(--legacy-accent);
+  background: color-mix(in srgb, var(--legacy-accent) 16%, var(--surface-panel));
+}
+
+.script-workbench-form .private-customization-comic-no-publish {
+  border-color: color-mix(in srgb, var(--legacy-accent) 55%, var(--border-default));
+  color: var(--legacy-accent);
+}
+
+/* P1：漫画设置收进抽屉后，补批量工厂画风选择器需要的主题变量并去掉卡片底色。 */
+.private-comic-settings-drawer .private-customization-comic-settings {
+  --sh-bg: var(--surface-base);
+  --sh-panel: var(--surface-panel);
+  --sh-panel-strong: var(--surface-input);
+  --sh-line: var(--border-default);
+  --sh-text: var(--text-primary);
+  --sh-text-muted: var(--text-secondary);
+  --sh-muted: var(--text-secondary);
+  --sh-accent: var(--legacy-accent);
+  --sh-accent-dark: var(--legacy-accent);
+  --sh-danger: var(--text-danger);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.private-comic-settings-drawer .batch-factory-comic-style-heading span {
+  color: var(--legacy-accent);
+}
+
+/* 漫画链路：资产 → 资产图 → 分镜提示词 → 分镜生图，按真实数据展示进度。 */
+.script-workbench-form .private-comic-instruction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.script-workbench-form .private-comic-instruction-label {
+  color: var(--legacy-muted);
+  font-size: 12px;
+}
+
+.script-workbench-form .private-comic-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.script-workbench-form .private-comic-pipeline-step {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.script-workbench-form .private-comic-pipeline-step b {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.script-workbench-form .private-comic-pipeline-step small {
+  color: var(--legacy-muted);
+  font-size: 11px;
+}
+
+.script-workbench-form .private-comic-pipeline-step.is-done {
+  border-color: color-mix(in srgb, var(--legacy-accent) 45%, var(--border-default));
+}
+
+.script-workbench-form .private-comic-pipeline-step.is-done b {
+  color: var(--legacy-accent);
+}
+
+.script-workbench-form .private-comic-pipeline-step.is-active {
+  border-color: var(--legacy-accent);
+  background: color-mix(in srgb, var(--legacy-accent) 12%, var(--surface-panel));
+}
+
+.script-workbench-form .private-comic-asset-card {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.script-workbench-form .private-comic-prompt-line {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--legacy-border);
+}
+
+.script-workbench-form .private-comic-prompt-line:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.script-workbench-form .private-comic-prompt-line small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--legacy-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.script-workbench-form .private-comic-asset-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.script-workbench-form .private-comic-asset-actions .private-comic-inline-action {
+  height: 24px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.script-workbench-form .private-comic-more,
+.script-workbench-form .private-comic-advanced-note {
+  display: block;
+  margin-top: 6px;
+}
+
+.script-workbench-form .private-comic-prompt-card .entity-media-status {
+  margin-top: 4px;
+}
+
+/* 漫画页卡片沿用剧本分镜卡片的 shot-output-* 结构，这里只补页内图片与提示词编辑区。 */
+.private-comic-workbench .private-comic-asset-group + .private-comic-asset-group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--legacy-border);
+}
+
+.private-comic-workbench .private-comic-asset-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.private-comic-workbench .private-comic-page-title {
+  font-weight: 600;
+}
+
+.private-comic-workbench .private-comic-page-editor {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.private-comic-workbench .private-comic-page-editor label {
+  display: grid;
+  gap: 4px;
+}
+
+.private-comic-workbench .private-comic-page-editor label > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.private-comic-workbench .private-comic-page-image {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.private-comic-workbench .private-comic-page-image img {
+  max-width: 100%;
+  max-height: 520px;
+  border-radius: 10px;
+  background: var(--surface-panel);
+  object-fit: contain;
+}
+
+.private-comic-workbench .private-comic-page-placeholder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 24px;
+  border: 1px dashed var(--border-default);
+  border-radius: 10px;
+}
+

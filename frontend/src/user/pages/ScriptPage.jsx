@@ -38,6 +38,7 @@ import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScript
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 import PrivateComicWorkspace from './PrivateComicWorkspace';
 import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTaskSnapshot, privateComicTitle } from './privateCustomizationComic';
+import { comicPageGenerationPayload } from './shuihuo/batchFactoryComicMode';
 import './shuihuo-production.css';
 import './private-customization.css';
 
@@ -1684,27 +1685,88 @@ export function ScriptPage() {
     }
   }
 
+  function privateComicPagePayload(page) {
+    return comicPageGenerationPayload({
+      imageProvider: privateComicDraft.imageProvider || '',
+      imageModelId: page?.modelId || privateComicDraft.imageModelId || '',
+      imageAspectRatio: String(page?.aspectRatio || '').trim() || '9:16'
+    }, page?.comicPrompt || '', page?.imagePrompt || '');
+  }
+
+  async function waitForPrivateComicPageImages(batchId, bookId, videoIds, timeoutMs = 300000) {
+    if (!videoIds.length) return true;
+    const wanted = new Set(videoIds);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      let pages = [];
+      try {
+        const result = await listComicPages(batchId, bookId, { suppressGlobalError: true });
+        pages = Array.isArray(result?.pages) ? result.pages : [];
+      } catch (error) {
+        if ([401, 403].includes(Number(error?.status))) throw error;
+        continue;
+      }
+      const withImages = pages.filter(page => wanted.has(page?.videoId) && (Array.isArray(page.images) ? page.images.length : 0));
+      if (withImages.length >= wanted.size) {
+        await refreshPrivateComicTask(batchId);
+        return true;
+      }
+      const stillRunning = pages.some(page => wanted.has(page?.videoId) && ['generating', 'processing', 'running', 'queued'].includes(String(page?.status || '').trim().toLowerCase()));
+      if (!stillRunning && withImages.length) break;
+    }
+    await refreshPrivateComicTask(batchId);
+    return false;
+  }
+
   async function runPrivateComicPageImages(videoId = '') {
     const batchId = privateComicTask?.batchId;
     const bookId = privateComicTask?.bookId;
     if (!batchId || !bookId || privateComicAction) return;
+    const missingPromptPages = privateComicPages.filter(page => page?.videoId && !String(page?.imagePrompt || '').trim());
+    if (videoId && missingPromptPages.some(page => page.videoId === videoId)) {
+      message.warning('该页缺少图片提示词，请先生成分镜提示词');
+      return;
+    }
     const runnable = privateComicPages.filter(page => {
       if (!page?.videoId) return false;
-      if (!String(page?.comicPrompt || '').trim() && !String(page?.imagePrompt || '').trim()) return false;
+      if (!String(page?.imagePrompt || '').trim()) return false;
       if (videoId) return page.videoId === videoId;
       return !(Array.isArray(page.images) ? page.images : []).length;
     });
-    if (!runnable.length) return;
+    if (!runnable.length) {
+      if (videoId) return;
+      if (missingPromptPages.length) message.warning(`有 ${missingPromptPages.length} 页缺少图片提示词，请先生成分镜提示词`);
+      return;
+    }
     setPrivateComicAction('pages');
     setPrivateComicActionKey(videoId);
     setPrivateComicError('');
+    const submitted = [];
+    const conflicts = [];
+    const failures = [];
     try {
       for (const page of runnable) {
-        await generateComicPage(batchId, bookId, page.videoId, {});
+        try {
+          await generateComicPage(batchId, bookId, page.videoId, privateComicPagePayload(page));
+          submitted.push(page.videoId);
+        } catch (error) {
+          if (Number(error?.status) === 409) conflicts.push(page);
+          else failures.push({ page, error });
+        }
       }
-      await refreshPrivateComicTask(batchId);
-    } catch (error) {
-      setPrivateComicError(error?.message || '分镜生图失败');
+      if (conflicts.length) {
+        message.info(`有 ${conflicts.length} 页正在生成中，已启动轮询，完成后自动刷新`);
+      }
+      const pendingIds = submitted.concat(conflicts.map(page => page.videoId));
+      const completed = await waitForPrivateComicPageImages(batchId, bookId, pendingIds);
+      if (pendingIds.length && !completed) message.info('分镜生图仍在进行，可稍后点刷新查看结果');
+      if (failures.length) {
+        setPrivateComicError(`${failures.length} 页分镜生图失败：${failures[0].error?.message || '请稍后重试'}`);
+      }
+      if (!videoId && missingPromptPages.length) {
+        message.warning(`另有 ${missingPromptPages.length} 页缺少图片提示词，未参与本次出图`);
+      }
     } finally {
       setPrivateComicAction('');
       setPrivateComicActionKey('');
@@ -1729,10 +1791,8 @@ export function ScriptPage() {
       const result = await updateComicPage(batchId, bookId, videoId, {
         comicPrompt,
         imagePrompt,
-        referenceImageUrls: Array.isArray(page.referenceImageUrls) ? page.referenceImageUrls : [],
-        modelId: page.modelId || privateComicDraft.imageModelId || '',
-        aspectRatio: page.aspectRatio || '9:16',
-        status: page.status || 'prompt_ready'
+        modelId: page.modelId || privateComicDraft.imageModelId || undefined,
+        aspectRatio: page.aspectRatio || undefined
       });
       const updated = result?.page;
       if (updated) {
