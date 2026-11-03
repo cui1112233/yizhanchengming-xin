@@ -4557,6 +4557,35 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     published: totals.published + Number(summary?.comicPublishedCollectionCount || 0)
   }), { imageReady: 0, imageTotal: 0, collections: 0, collectionPages: 0, published: 0 });
 
+  // 自动化状态提示：列表打开时作为头部状态行渲染（不再整宽压住列表内容），
+  // 生产表视图下才作为表格上方的状态行。
+  const automationStatusNode = automationState !== 'idle' ? (() => {
+    const stateLabel = ({ running: '运行中', paused: '已暂停', scheduled: '定时待执行', needs_attention: '待处理', stopped: '已停止', completed: '已完成', failed: '失败' })[automationState] || automationState;
+    const problemCount = Number(automationCounts.failed || 0) + Number(automationCounts.blocked || 0);
+    const batchRetryCount = (Array.isArray(automationStatus?.books) ? automationStatus.books : []).filter(book => book?.batchRetryPending === true).length;
+    // 漫画页进度条只统计漫画页主图，资产图阶段不会让它增长。这里把正在跑的
+    // 书按阶段拆开显示，避免把“在生成资产图”误读成卡死。
+    const runningBooks = (Array.isArray(automationStatus?.books) ? automationStatus.books : []).filter(book => book?.status === 'running');
+    const assetStageCount = runningBooks.filter(book => String(book?.stage || '').includes('asset')).length;
+    const pageStageCount = runningBooks.filter(book => book?.stage === 'comic_images').length;
+    const lastError = String(automationStatus?.lastError || '').trim();
+    return (
+      <button
+        type="button"
+        data-testid="automation-status-line"
+        className="batch-factory-automation-status-line"
+        title="打开任务/日志查看自动化详情"
+        onClick={() => { setLogsOpen(true); loadRuntimeStatus(); }}
+      >
+        自动化：{stateLabel}
+        {problemCount > 0 ? `，失败/阻塞 ${problemCount} 本` : ''}
+        {runningBooks.length > 0 ? `，出图中 ${runningBooks.length} 本（资产图 ${assetStageCount} 本 / 漫画页 ${pageStageCount} 本）` : ''}
+        {batchRetryCount > 0 ? `，已跳过 ${batchRetryCount} 本等待批末回补` : ''}
+        {lastError ? `，最近错误：${lastError}` : ''}
+      </button>
+    );
+  })() : null;
+
   return <section className="shuihuo-workbench batch-factory-workbench">
     <header className="shuihuo-workbench-header">
       <div className="shuihuo-workbench-heading"><button className="shuihuo-back-link" type="button" title="返回批量作品列表" aria-label="返回批量作品列表" onClick={onBack}><ArrowLeftOutlined /></button><strong>批量工厂 V12 · {batch?.title || '未命名批量'}</strong><div className="shuihuo-workbench-progress" aria-label={`完成率 ${batchProgress.completionPercent}%`}><div className="shuihuo-workbench-progress-track batch-factory-completion-track">{progressSegments.map(segment => <i key={segment.key} className={`is-${segment.key}`} title={`${segment.label} ${segment.count} 本`} style={{ width: `${segment.percent}%` }} />)}</div><span>{batchProgress.completionPercent}%</span></div></div>
@@ -4571,26 +4600,6 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       <div className="shuihuo-workbench-export"><Button type="text" icon={<BarsOutlined />} onClick={() => { setLogsOpen(true); loadRuntimeStatus(); }} loading={logsLoading}>任务/日志</Button><Dropdown menu={{ items: uploadMenuItems, onClick: ({ key }) => batchProductionMode === 'comic' ? openComicBatchPublish(key) : setUploadMode(key) }}><Button icon={<UploadOutlined />}>{batchProductionMode === 'comic' ? '发布漫画' : '上传网络'}</Button></Dropdown></div>
       <div className="shuihuo-project-stats"><span><b>{books.length}</b> 本小说</span>{hasComicBooks ? <><span className="is-uploaded"><b>{comicStats.imageReady}/{comicStats.imageTotal}</b> 漫画图片</span><span><b>{comicStats.collections}</b> 漫画合集（{comicStats.collectionPages} 页）</span><span className={comicStats.published > 0 ? 'is-uploaded' : 'is-disabled'}><b>{comicStats.published}</b> 已发布合集</span></> : <><span className="is-uploaded"><b>{batchProgress.uploaded}</b> 上传成功</span>{batchProgress.failed ? <span className="is-failed"><b>{batchProgress.failed}</b> 异常</span> : null}{batchProgress.running ? <span className="is-running"><b>{batchProgress.running}</b> 执行中</span> : null}{batchProgress.awaitingUpload ? <span className="is-awaiting-upload"><b>{batchProgress.awaitingUpload}</b> 待上传</span> : null}{batchProgress.pending ? <span><b>{batchProgress.pending}</b> 待开始</span> : null}</>}{automationState !== 'idle' ? <span className={automationState === 'needs_attention' ? 'is-failed' : automationActive ? 'is-running' : 'is-awaiting-upload'}><b>{automationCounts.ready || 0}/{automationCounts.total || books.length}</b> 自动就绪</span> : null}{!hasComicBooks ? <><span><b>{mediaCounts.storyboards}</b> 分镜</span>{productionCapability.available ? <span className="is-running"><b>{mediaCounts.playable}</b> 可播放</span> : <span className="is-disabled">视频模块未启用</span>}{mergeCapability.available ? <span className="is-uploaded"><b>{mediaCounts.merges}</b> 成片</span> : <span className="is-disabled">合并模块未启用</span>}</> : null}</div>
     </header>
-    {automationState !== 'idle' ? (() => {
-      const stateLabel = ({ running: '运行中', paused: '已暂停', scheduled: '定时待执行', needs_attention: '待处理', stopped: '已停止', completed: '已完成', failed: '失败' })[automationState] || automationState;
-      const problemCount = Number(automationCounts.failed || 0) + Number(automationCounts.blocked || 0);
-      const batchRetryCount = (Array.isArray(automationStatus?.books) ? automationStatus.books : []).filter(book => book?.batchRetryPending === true).length;
-      // 漫画页进度条只统计漫画页主图，资产图阶段不会让它增长。这里把正在跑的
-      // 书按阶段拆开显示，避免把“在生成资产图”误读成卡死。
-      const runningBooks = (Array.isArray(automationStatus?.books) ? automationStatus.books : []).filter(book => book?.status === 'running');
-      const assetStageCount = runningBooks.filter(book => String(book?.stage || '').includes('asset')).length;
-      const pageStageCount = runningBooks.filter(book => book?.stage === 'comic_images').length;
-      const lastError = String(automationStatus?.lastError || '').trim();
-      return (
-        <div data-testid="automation-status-line" className="batch-factory-automation-status-line">
-          自动化：{stateLabel}
-          {problemCount > 0 ? `，失败/阻塞 ${problemCount} 本` : ''}
-          {runningBooks.length > 0 ? `，出图中 ${runningBooks.length} 本（资产图 ${assetStageCount} 本 / 漫画页 ${pageStageCount} 本）` : ''}
-          {batchRetryCount > 0 ? `，已跳过 ${batchRetryCount} 本等待批末回补` : ''}
-          {lastError ? `，最近错误：${lastError}` : ''}
-        </div>
-      );
-    })() : null}
     {
       novelListOpen ? (
         <section
@@ -4601,6 +4610,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
             <div>
               <strong>小说列表</strong>
               <span>共 {books.length} 本，查看书目信息或添加新书</span>
+              {automationStatusNode}
             </div>
             <Button
               icon={<ArrowLeftOutlined />}
