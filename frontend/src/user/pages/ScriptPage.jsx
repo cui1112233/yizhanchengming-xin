@@ -33,8 +33,21 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
+import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, generateComicPage, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listAutomationPresets, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, startBatchAutomation, updateComicPage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
+import PrivateComicWorkspace from './PrivateComicWorkspace';
+import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTaskSnapshot, privateComicTitle } from './privateCustomizationComic';
+import './shuihuo-production.css';
+import './private-customization.css';
+
+function privateComicOperationId() {
+  try {
+    return crypto.randomUUID();
+  } catch (_) {
+    return `comic-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
 
 function videoModelKey(model) {
   return String(model?.key || model?.modelKey || model?.id || '').trim();
@@ -242,6 +255,21 @@ export function ScriptPage() {
   }, []);
 
   const [quickDirectorOpen, setQuickDirectorOpen] = useState(false);
+  const [customizationWorkspace, setCustomizationWorkspace] = useState('script');
+  const [privateComicCatalog, setPrivateComicCatalog] = useState([]);
+  const [privateComicDraft, setPrivateComicDraft] = useState({ title: '', sourceText: '', comic: { enabled: true }, textModelId: '', imageModelId: '', imageProvider: 'personal_api' });
+  const [privateComicTask, setPrivateComicTask] = useState(null);
+  const [privateComicPendingReference, setPrivateComicPendingReference] = useState('');
+  const [privateComicBusy, setPrivateComicBusy] = useState(false);
+  const [privateComicError, setPrivateComicError] = useState('');
+  const [privateComicAutomationPresets, setPrivateComicAutomationPresets] = useState([]);
+  const [privateComicAssets, setPrivateComicAssets] = useState([]);
+  const [privateComicAssetImages, setPrivateComicAssetImages] = useState({});
+  const [privateComicAssetImageFailures, setPrivateComicAssetImageFailures] = useState([]);
+  const [privateComicPages, setPrivateComicPages] = useState([]);
+  const [privateComicAction, setPrivateComicAction] = useState('');
+  const [privateComicActionKey, setPrivateComicActionKey] = useState('');
+  const privateComicPollRequestRef = useRef(0);
   const [quickDirectorOptions, setQuickDirectorOptions] = useState({ matchAudio: false });
   const [sourceAudioUrl, setSourceAudioUrl] = useState('');
   const [sourceAudioDurationSeconds, setSourceAudioDurationSeconds] = useState(null);
@@ -323,6 +351,61 @@ export function ScriptPage() {
   const scriptVideoProviderOptions = useMemo(() => providerOptionsForModels(scriptVideoModels, 'video'), [scriptVideoModels]);
   const scriptImageModelOptions = useMemo(() => modelOptionsForProvider(scriptModels.image, 'image', scriptImageProvider), [scriptModels.image, scriptImageProvider]);
   const scriptVideoModelOptions = useMemo(() => modelOptionsForProvider(scriptVideoModels, 'video', scriptVideoProvider), [scriptVideoModels, scriptVideoProvider]);
+  const privateComicModelOptions = useMemo(() => ({
+    text: scriptModels.text.map(model => ({ value: model.id, label: model.displayName || model.id })),
+    image: scriptImageModelOptions
+  }), [scriptModels.text, scriptImageModelOptions]);
+  function privateComicScopedKey(baseKey) {
+    const username = String(draftUsernameRef.current || getCurrentUsername() || 'anonymous').trim().toLowerCase() || 'anonymous';
+    return `${baseKey}:${username}`;
+  }
+  useEffect(() => {
+    try {
+      const draftKey = privateComicScopedKey(privateComicDraftKey);
+      const taskKey = privateComicScopedKey(privateComicTaskKey);
+      const saved = JSON.parse(window.localStorage.getItem(draftKey) || 'null');
+      if (saved && typeof saved === 'object') setPrivateComicDraft(current => ({ ...current, ...saved, comic: { ...current.comic, ...(saved.comic || {}) } }));
+      const savedTask = JSON.parse(window.localStorage.getItem(taskKey) || 'null');
+      if (savedTask?.batchId) setPrivateComicTask(savedTask);
+      window.localStorage.removeItem(privateComicDraftKey);
+      window.localStorage.removeItem(privateComicTaskKey);
+    } catch {
+      // A malformed local draft should never prevent the page from opening.
+    }
+  }, []);
+  useEffect(() => {
+    if (customizationWorkspace !== 'comic' || privateComicCatalog.length) return undefined;
+    let active = true;
+    Promise.all([listSystemPresetCatalog('script'), listSystemPresetCatalog('batch-factory')])
+      .then(results => {
+        if (!active) return;
+        setPrivateComicCatalog(results.flatMap(result => Array.isArray(result?.catalog) ? result.catalog : []));
+      })
+      .catch(error => { if (active) setPrivateComicError(error?.message || '画风库和漫画预设读取失败'); });
+    return () => { active = false; };
+  }, [customizationWorkspace, privateComicCatalog.length]);
+  useEffect(() => {
+    if (customizationWorkspace !== 'comic' || privateComicAutomationPresets.length) return undefined;
+    let active = true;
+    listAutomationPresets()
+      .then(result => { if (active) setPrivateComicAutomationPresets(Array.isArray(result?.presets) ? result.presets : Array.isArray(result) ? result : []); })
+      .catch(() => { if (active) setPrivateComicAutomationPresets([]); });
+    return () => { active = false; };
+  }, [customizationWorkspace, privateComicAutomationPresets.length]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(privateComicScopedKey(privateComicDraftKey), JSON.stringify({ ...privateComicDraft, comic: { ...privateComicDraft.comic } }));
+    } catch {
+      // Local storage is only a convenience; generation must still work when it is unavailable.
+    }
+  }, [privateComicDraft]);
+  useEffect(() => {
+    try {
+      if (privateComicTask?.batchId) window.localStorage.setItem(privateComicScopedKey(privateComicTaskKey), JSON.stringify(privateComicTask));
+    } catch {
+      // Task restoration is best effort and never blocks the current run.
+    }
+  }, [privateComicTask]);
   useEffect(() => { setSelectedShotIndexes(new Set()); }, [selectedFormat]);
   const rawShotCards = useMemo(() => {
     const parsed = getShotCardsWithinDuration(selectedFormat, output, selectedDuration);
@@ -1433,6 +1516,377 @@ export function ScriptPage() {
     });
   }, [constraintModalOpen, activeConstraintCategory, draftConstraints, activeEntity, extractInfo]);
 
+  function privateComicBatchValue(result) {
+    return result?.batch || result?.data?.batch || result?.data || result;
+  }
+
+  function privateComicRuntimeTask(batch, runtime, current = {}) {
+    const automation = runtime?.automation || {};
+    const stage = Object.values(runtime?.stageSummaries || {})[0] || {};
+    const total = Number(stage.comicImageTotalCount || stage.comicCollectionPageCount || 0);
+    const ready = Number(stage.comicImageReadyCount || stage.comicCollectionPageCount || 0);
+    const progress = total > 0 ? Math.round((ready / total) * 100) : null;
+    const state = String(automation.state || '').toLowerCase();
+    const failed = ['failed', 'error', 'stopped'].includes(state) || Boolean(stage.lastFailed);
+    const complete = stage.comicCollectionReady === true || ['succeeded', 'completed', 'success'].includes(state);
+    return {
+      ...current,
+      batchId: current.batchId || batch?.id || '',
+      bookId: current.bookId || batch?.books?.[0]?.id || '',
+      status: failed ? 'failed' : complete ? 'succeeded' : (state || current.status || 'running'),
+      progress,
+      message: automation.message || stage.lastFailed?.message || stage.runs?.at?.(-1)?.message || '',
+      error: automation.error || stage.lastFailed?.error || ''
+    };
+  }
+
+  function reloadPrivateComicCatalog() {
+    setPrivateComicError('');
+    Promise.all([listSystemPresetCatalog('script'), listSystemPresetCatalog('batch-factory')])
+      .then(results => setPrivateComicCatalog(results.flatMap(result => Array.isArray(result?.catalog) ? result.catalog : [])))
+      .catch(error => setPrivateComicError(error?.message || '画风库和漫画预设读取失败'));
+  }
+
+  async function loadPrivateComicProductionData(batchId, bookId) {
+    if (!batchId || !bookId) return;
+    try {
+      const [assetResult, pageResult] = await Promise.all([
+        listBookAssets(batchId, bookId, { suppressGlobalError: true }),
+        listComicPages(batchId, bookId, { suppressGlobalError: true })
+      ]);
+      const assets = Array.isArray(assetResult?.assets) ? assetResult.assets : [];
+      const pages = Array.isArray(pageResult?.pages) ? pageResult.pages : [];
+      setPrivateComicAssets(assets);
+      setPrivateComicPages(pages);
+      const imageEntries = await Promise.all(assets.map(async asset => {
+        try {
+          const result = await listBookAssetImages(batchId, bookId, asset.id, { suppressGlobalError: true });
+          return [asset.id, Array.isArray(result?.images) ? result.images : []];
+        } catch (_) {
+          return [asset.id, []];
+        }
+      }));
+      setPrivateComicAssetImages(Object.fromEntries(imageEntries));
+    } catch (_) {
+      // 资产与分镜的只读补充失败时不覆盖任务主状态。
+    }
+  }
+
+  async function refreshPrivateComicTask(batchIdOverride = '', currentOverride = null) {
+    const batchId = batchIdOverride || privateComicTask?.batchId;
+    if (!batchId) return null;
+    const requestId = ++privateComicPollRequestRef.current;
+    try {
+      const [batchResult, runtime] = await Promise.all([
+        getBatch(batchId, { cache: 'no-store' }),
+        getBatchRuntimeSummary(batchId, { suppressGlobalError: true })
+      ]);
+      if (requestId !== privateComicPollRequestRef.current) return null;
+      const batch = privateComicBatchValue(batchResult);
+      const next = privateComicRuntimeTask(batch, runtime, currentOverride || privateComicTask);
+      setPrivateComicTask(next);
+      setPrivateComicError('');
+      if (next.bookId) await loadPrivateComicProductionData(batchId, next.bookId);
+      return next;
+    } catch (error) {
+      if (requestId !== privateComicPollRequestRef.current) return null;
+      setPrivateComicError(error?.message || '漫画任务状态暂时读取失败，请稍后刷新');
+      return null;
+    }
+  }
+
+  async function runPrivateComicAssets() {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || privateComicAction) return;
+    setPrivateComicAction('assets');
+    setPrivateComicError('');
+    try {
+      await runBookStage(batchId, bookId, 'assets', {
+        mode: privateComicAssets.length ? 'force' : 'missing',
+        textModelId: privateComicDraft.textModelId || undefined,
+        requestId: privateComicOperationId()
+      });
+      await refreshPrivateComicTask(batchId);
+    } catch (error) {
+      setPrivateComicError(error?.message || '漫画资产提取失败');
+    } finally {
+      setPrivateComicAction('');
+    }
+  }
+
+  async function runPrivateComicAssetImages(assetId = '') {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    const ids = assetId ? [assetId] : privateComicAssets
+      .filter(asset => !(Array.isArray(privateComicAssetImages?.[asset?.id]) && privateComicAssetImages[asset.id].length))
+      .map(asset => asset.id);
+    if (!batchId || !bookId || !ids.length || privateComicAction) return;
+    setPrivateComicAction('images');
+    setPrivateComicActionKey(assetId);
+    setPrivateComicAssetImageFailures(current => current.filter(id => !ids.includes(id)));
+    setPrivateComicError('');
+    try {
+      const result = await generateBookAssetImages(batchId, bookId, {
+        assetIds: ids,
+        modelId: privateComicDraft.imageModelId || undefined,
+        provider: privateComicDraft.imageProvider || undefined,
+        imageAspectRatio: '9:16',
+        useThreeView: true
+      });
+      const images = Array.isArray(result?.images) ? result.images : [];
+      if (!images.length && result?.taskId) {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          const status = await getBookAssetImageGenerationTask(batchId, bookId, result.taskId);
+          if (status?.status === 'processing' || status?.status === 'pending') continue;
+          if (status?.status === 'failed') throw new Error(status.error || '资产图生成失败');
+          break;
+        }
+      }
+      if (result?.warning) {
+        const finished = new Set(images.map(image => image.assetId || image.assetID));
+        const failed = ids.filter(id => !finished.has(id));
+        if (failed.length) setPrivateComicAssetImageFailures(failed);
+      }
+      await refreshPrivateComicTask(batchId);
+    } catch (error) {
+      setPrivateComicAssetImageFailures(ids);
+      setPrivateComicError(error?.message || '资产图生成失败');
+    } finally {
+      setPrivateComicAction('');
+      setPrivateComicActionKey('');
+    }
+  }
+
+  async function runPrivateComicPrompts() {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || privateComicAction) return;
+    const pageHasPrompt = page => Boolean(String(page?.comicPrompt || '').trim() || String(page?.imagePrompt || '').trim());
+    const promptPageCount = privateComicPages.filter(pageHasPrompt).length;
+    const mode = privateComicPages.length && promptPageCount >= privateComicPages.length
+      ? 'force'
+      : promptPageCount > 0 ? 'missing' : 'bootstrap';
+    setPrivateComicAction('prompts');
+    setPrivateComicError('');
+    try {
+      await runBookStage(batchId, bookId, 'comic', {
+        mode,
+        textModelId: privateComicDraft.textModelId || undefined,
+        requestId: privateComicOperationId()
+      });
+      await refreshPrivateComicTask(batchId);
+    } catch (error) {
+      setPrivateComicError(error?.message || '分镜提示词生成失败');
+    } finally {
+      setPrivateComicAction('');
+    }
+  }
+
+  async function runPrivateComicPageImages(videoId = '') {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || privateComicAction) return;
+    const runnable = privateComicPages.filter(page => {
+      if (!page?.videoId) return false;
+      if (!String(page?.comicPrompt || '').trim() && !String(page?.imagePrompt || '').trim()) return false;
+      if (videoId) return page.videoId === videoId;
+      return !(Array.isArray(page.images) ? page.images : []).length;
+    });
+    if (!runnable.length) return;
+    setPrivateComicAction('pages');
+    setPrivateComicActionKey(videoId);
+    setPrivateComicError('');
+    try {
+      for (const page of runnable) {
+        await generateComicPage(batchId, bookId, page.videoId, {});
+      }
+      await refreshPrivateComicTask(batchId);
+    } catch (error) {
+      setPrivateComicError(error?.message || '分镜生图失败');
+    } finally {
+      setPrivateComicAction('');
+      setPrivateComicActionKey('');
+    }
+  }
+
+  async function savePrivateComicPagePrompts(page, prompts = {}) {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    const videoId = page?.videoId;
+    const comicPrompt = String(prompts.comicPrompt || '').trim();
+    const imagePrompt = String(prompts.imagePrompt || '').trim();
+    if (!comicPrompt || !imagePrompt) {
+      message.warning('漫画提示词与图片提示词都不能为空');
+      return false;
+    }
+    if (!batchId || !bookId || !videoId || privateComicAction) return false;
+    setPrivateComicAction('save');
+    setPrivateComicActionKey(videoId);
+    setPrivateComicError('');
+    try {
+      const result = await updateComicPage(batchId, bookId, videoId, {
+        comicPrompt,
+        imagePrompt,
+        referenceImageUrls: Array.isArray(page.referenceImageUrls) ? page.referenceImageUrls : [],
+        modelId: page.modelId || privateComicDraft.imageModelId || '',
+        aspectRatio: page.aspectRatio || '9:16',
+        status: page.status || 'prompt_ready'
+      });
+      const updated = result?.page;
+      if (updated) {
+        setPrivateComicPages(current => current.map(item => item.videoId === videoId
+          ? { ...item, ...updated, images: Array.isArray(item.images) ? item.images : [] }
+          : item));
+      }
+      message.success('提示词已保存');
+      await refreshPrivateComicTask(batchId);
+      return true;
+    } catch (error) {
+      setPrivateComicError(error?.message || '提示词保存失败');
+      return false;
+    } finally {
+      setPrivateComicAction('');
+      setPrivateComicActionKey('');
+    }
+  }
+
+  async function downloadPrivateComicPackage() {
+    const batchId = privateComicTask?.batchId;
+    const bookId = privateComicTask?.bookId;
+    if (!batchId || !bookId || privateComicAction) return;
+    setPrivateComicAction('download');
+    setPrivateComicError('');
+    try {
+      const blob = await downloadComicPromptZip(batchId, bookId);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `${privateComicTitle(privateComicDraft.sourceText, privateComicDraft.title) || '漫画'}_全部提示词与图片.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      message.success('已开始下载全部内容');
+    } catch (error) {
+      setPrivateComicError(error?.message || '打包下载失败');
+    } finally {
+      setPrivateComicAction('');
+    }
+  }
+
+  async function loadPrivateComicAutomationPreset() {
+    if (privateComicAutomationPresets[0]?.id) return privateComicAutomationPresets[0];
+    const result = await listAutomationPresets();
+    const presets = Array.isArray(result?.presets) ? result.presets : Array.isArray(result) ? result : [];
+    setPrivateComicAutomationPresets(presets);
+    return presets[0];
+  }
+
+  async function startPrivateComicAutomation(batchId, bookId, settingsPatch = undefined, presetOverride = null) {
+    const preset = presetOverride || await loadPrivateComicAutomationPreset();
+    if (!preset?.id) throw new Error('请先在批量工厂保存一个自动化预设，再开始生成漫画');
+    await startBatchAutomation(batchId, {
+      presetId: preset.id,
+      bookIds: bookId ? [bookId] : undefined,
+      runMode: 'video_no_submit',
+      productionMode: 'comic',
+      autoPublish: false,
+      settingsPatch
+    });
+  }
+
+  async function submitPrivateComic() {
+    if (privateComicBusy) return;
+    setPrivateComicError('');
+    setPrivateComicBusy(true);
+    try {
+      const initialBatchSettings = buildPrivateComicSettings({
+        sourceText: privateComicDraft.sourceText,
+        comic: privateComicDraft.comic,
+        textModelId: privateComicDraft.textModelId,
+        imageModelId: privateComicDraft.imageModelId,
+        imageProvider: privateComicDraft.imageProvider || scriptImageProvider
+      });
+      let settingsForStart = initialBatchSettings;
+      const preset = await loadPrivateComicAutomationPreset();
+      if (!preset?.id) throw new Error('请先在批量工厂保存一个自动化预设，再开始生成漫画');
+      const created = await createPrivateComicTask({
+        title: privateComicTitle(privateComicDraft.sourceText, privateComicDraft.title),
+        sourceText: privateComicDraft.sourceText,
+        initialBatchSettings
+      });
+      const snapshot = privateComicTaskSnapshot(created);
+      if (!snapshot.batchId) throw new Error('漫画任务已创建，但没有返回任务编号');
+      setPrivateComicTask(snapshot);
+      if (privateComicPendingReference) {
+        const uploaded = await uploadComicGlobalReference(snapshot.batchId, privateComicPendingReference);
+        const uploadedReference = uploaded?.reference || {};
+        settingsForStart = mergePrivateComicReference(initialBatchSettings, uploadedReference);
+        setPrivateComicDraft(current => ({
+          ...current,
+          comic: {
+            ...(current.comic || {}),
+            globalReferenceImage: settingsForStart.aiPromptConfig.comic.globalReferenceImage
+          }
+        }));
+        setPrivateComicPendingReference('');
+      }
+      await startPrivateComicAutomation(snapshot.batchId, snapshot.bookId, settingsForStart, preset);
+      setPrivateComicTask(current => ({ ...current, status: 'running' }));
+      await refreshPrivateComicTask(snapshot.batchId, { ...snapshot, status: 'running' });
+    } catch (error) {
+      setPrivateComicError(error?.message || '漫画任务启动失败');
+      setPrivateComicTask(current => current ? { ...current, status: 'failed', error: error?.message || '漫画任务启动失败' } : current);
+    } finally {
+      setPrivateComicBusy(false);
+    }
+  }
+
+  async function retryPrivateComic() {
+    if (!privateComicTask?.batchId || privateComicBusy) return;
+    setPrivateComicBusy(true);
+    setPrivateComicError('');
+    try {
+      let settingsPatch = buildPrivateComicSettings({
+        sourceText: privateComicDraft.sourceText,
+        comic: privateComicDraft.comic,
+        textModelId: privateComicDraft.textModelId,
+        imageModelId: privateComicDraft.imageModelId,
+        imageProvider: privateComicDraft.imageProvider || scriptImageProvider
+      });
+      if (privateComicPendingReference) {
+        const uploaded = await uploadComicGlobalReference(privateComicTask.batchId, privateComicPendingReference);
+        settingsPatch = mergePrivateComicReference(settingsPatch, uploaded?.reference || {});
+        setPrivateComicDraft(current => ({
+          ...current,
+          comic: {
+            ...(current.comic || {}),
+            globalReferenceImage: settingsPatch.aiPromptConfig.comic.globalReferenceImage
+          }
+        }));
+        setPrivateComicPendingReference('');
+      }
+      await startPrivateComicAutomation(privateComicTask.batchId, privateComicTask.bookId, settingsPatch);
+      setPrivateComicTask(current => ({ ...current, status: 'running', error: '' }));
+      await refreshPrivateComicTask(privateComicTask.batchId, { ...privateComicTask, status: 'running' });
+    } catch (error) {
+      setPrivateComicError(error?.message || '漫画任务重试失败');
+    } finally {
+      setPrivateComicBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (customizationWorkspace !== 'comic' || !privateComicTask?.batchId) return undefined;
+    let active = true;
+    const poll = () => { if (active) void refreshPrivateComicTask(); };
+    poll();
+    const timer = window.setInterval(poll, 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [customizationWorkspace, privateComicTask?.batchId]);
+
   return (
     <Form
       className="script-workbench-form"
@@ -1461,10 +1915,19 @@ export function ScriptPage() {
         }
       }}
     >
+      <div className="private-customization-workspaces" role="tablist" aria-label="私人定制工作区">
+        <button type="button" role="tab" id="private-customization-tab-script" aria-controls="private-customization-panel-script" aria-selected={customizationWorkspace === 'script'} className={customizationWorkspace === 'script' ? 'is-active' : ''} onClick={() => setCustomizationWorkspace('script')}>剧本创作</button>
+        <button type="button" role="tab" id="private-customization-tab-comic" aria-controls="private-customization-panel-comic" aria-selected={customizationWorkspace === 'comic'} className={customizationWorkspace === 'comic' ? 'is-active' : ''} onClick={() => setCustomizationWorkspace('comic')}>漫画生成</button>
+      </div>
       <div
         ref={workbenchRef}
+        id="private-customization-panel-script"
+        role="tabpanel"
+        aria-labelledby="private-customization-tab-script"
         className="script-workbench utility-workbench"
-        style={leftPanelWidth ? { gridTemplateColumns: `${leftPanelWidth}px 8px minmax(460px, 1fr)` } : undefined}
+        style={customizationWorkspace === 'script'
+          ? (leftPanelWidth ? { gridTemplateColumns: `${leftPanelWidth}px 8px minmax(460px, 1fr)` } : undefined)
+          : { display: 'none' }}
       >
         <div className="script-left">
         <div className="script-left-scroll">
@@ -1530,8 +1993,8 @@ export function ScriptPage() {
         />
         <div className="script-right">
         <div className="script-tabs">
-          <Typography.Text strong>剧本生成</Typography.Text>
-          <Button type="text" icon={<Settings2 size={16} aria-hidden="true" />} onClick={openScriptUnifiedConfig} title="剧本生成统一配置">统一配置</Button>
+          <Typography.Text strong>剧本创作</Typography.Text>
+          <Button type="text" icon={<Settings2 size={16} aria-hidden="true" />} onClick={openScriptUnifiedConfig} title="剧本创作统一配置">统一配置</Button>
           <Form.Item name="mode" noStyle>
             <Segmented
               options={[
@@ -1681,6 +2144,39 @@ export function ScriptPage() {
         </div>
         </div>
       </div>
+      {customizationWorkspace === 'comic' ? (
+        <PrivateComicWorkspace
+          catalog={privateComicCatalog}
+          modelOptions={privateComicModelOptions}
+          draft={privateComicDraft}
+          onDraftChange={setPrivateComicDraft}
+          onSubmit={submitPrivateComic}
+          task={privateComicTask}
+          comicAssets={privateComicAssets}
+          comicAssetImages={privateComicAssetImages}
+          comicAssetImageFailures={privateComicAssetImageFailures}
+          comicPages={privateComicPages}
+          action={privateComicAction}
+          actionKey={privateComicActionKey}
+          onExtractAssets={() => void runPrivateComicAssets()}
+          onGenerateAssetImage={asset => void runPrivateComicAssetImages(asset?.id || '')}
+          onGenerateMissingAssetImages={() => void runPrivateComicAssetImages()}
+          onGeneratePrompts={() => void runPrivateComicPrompts()}
+          onGeneratePageImage={page => void runPrivateComicPageImages(page?.videoId || '')}
+          onGenerateAllPageImages={() => void runPrivateComicPageImages()}
+          onSavePagePrompt={(page, prompts) => savePrivateComicPagePrompts(page, prompts)}
+          onDownloadAll={() => void downloadPrivateComicPackage()}
+          busy={privateComicBusy}
+          error={privateComicError}
+          presetReady={Boolean(privateComicAutomationPresets[0]?.id)}
+          onRefresh={() => void refreshPrivateComicTask()}
+          onRetry={() => void retryPrivateComic()}
+          onPendingReferenceChange={setPrivateComicPendingReference}
+          onOpenUnifiedConfig={openScriptUnifiedConfig}
+          onReloadCatalog={reloadPrivateComicCatalog}
+          onOpenBatchFactory={() => window.location.assign(`/batch-factory?batchId=${encodeURIComponent(privateComicTask?.batchId || '')}`)}
+        />
+      ) : null}
       <Modal title="生成的视频" open={Boolean(previewVideoTask?.videoUrl)} footer={null} onCancel={() => setPreviewVideoTask(null)} width={520}>
         {previewVideoTask?.videoUrl ? <video controls autoPlay style={{ width: '100%', maxHeight: '70vh' }} src={previewVideoTask.videoUrl} /> : null}
       </Modal>
@@ -1735,7 +2231,7 @@ export function ScriptPage() {
           />
         </Space>
       </Modal>
-      <Modal title="剧本生成历史" open={historyOpen} footer={null} onCancel={() => setHistoryOpen(false)}>
+      <Modal title="剧本创作历史" open={historyOpen} footer={null} onCancel={() => setHistoryOpen(false)}>
         {historyLoading ? <Typography.Text type="secondary">正在加载历史记录…</Typography.Text> : historyEntries.length ? historyEntries.map(entry => {
           const archivedVideoCount = Object.values(entry.videoTaskHistory || {}).reduce((total, tasks) => total + (Array.isArray(tasks) ? tasks.length : 0), 0);
           return <Button key={entry.id} block style={{ height: 'auto', marginBottom: 8, textAlign: 'left', whiteSpace: 'normal' }} onClick={() => restoreHistory(entry)}><div>{entry.preview || '未命名剧本'}</div><Typography.Text type="secondary">{entry.duration || '-'} · 视频 {Object.keys(entry.videoTasks || {}).length + archivedVideoCount} 个</Typography.Text></Button>;
@@ -1932,7 +2428,7 @@ export function ScriptPage() {
         </Typography.Paragraph>
       </Modal>
       <Modal
-        title="剧本生成 · 统一配置"
+        title={customizationWorkspace === 'comic' ? '漫画生成 · 统一配置' : '剧本创作 · 统一配置'}
         open={scriptConfigOpen}
         onCancel={() => setScriptConfigOpen(false)}
         onOk={saveScriptUnifiedConfig}

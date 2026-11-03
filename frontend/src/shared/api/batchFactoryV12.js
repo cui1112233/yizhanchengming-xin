@@ -197,6 +197,10 @@ export function createManualIntake(payload) {
   return apiRequest(bf11Path('intakes/manual'), { method: 'POST', body: body(payload) });
 }
 
+export function createPrivateComicTask(payload = {}) {
+  return apiRequest(bf11Path('private-comic/tasks'), { method: 'POST', body: body(payload) });
+}
+
 export function getIntake(intakeId) {
   return apiRequest(bf11Path(`intakes/${id(intakeId)}`));
 }
@@ -482,6 +486,10 @@ export function splitComicSourceSegment(batchId, bookId, videoId, payload) {
 
 export function generateComicPage(batchId, bookId, videoId, payload) {
   return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/generate`), { method: 'POST', body: body(payload) });
+}
+
+export function updateComicPage(batchId, bookId, videoId, payload) {
+  return apiRequest(comicPagesPath(batchId, bookId, id(videoId)), { method: 'PUT', body: body(payload) });
 }
 
 export function generateComicBook(batchId, bookId) {
@@ -833,6 +841,7 @@ export default {
   setPrimaryBookAssetImage,
   getBookAssetImageGenerationTask,
   listComicPages,
+  updateComicPage,
   generateComicPage,
   downloadComicPromptZip,
   generateComicBook,

@@ -107,7 +107,7 @@ func NewRouter(options RouterOptions) http.Handler {
 		// the service disabled for all write/submit operations.
 		options.Production = &batchfactoryv11.ProductionService{Store: options.Store, Compiler: options.Compiler}
 	}
-	if options.AutomationCoordinator == nil && options.Store != nil && options.Director != nil && options.AutomationStatusReader != nil {
+	if options.AutomationCoordinator == nil && options.Store != nil && options.AutomationStatusReader != nil {
 		var providerSync func(context.Context, string) error
 		if options.Production != nil && options.Production.ProviderRegistry != nil {
 			providerSync = func(ctx context.Context, owner string) error {
@@ -144,13 +144,17 @@ func NewRouter(options RouterOptions) http.Handler {
 			options.AutomationCoordinator.SetComicPublisher(options.N8ComicPublisher.PublishFromSettings)
 			options.AutomationCoordinator.SetComicPublishPreflight(options.N8ComicPublisher.ValidateSettings)
 		}
+		log.Printf("[DIAG] AutomationCoordinator reader=%v path=%q", options.AutomationStatusReader != nil, func() string { if options.AutomationStatusReader != nil { return options.AutomationStatusReader.Path() }; return "(nil)" }())
 		if err := options.AutomationCoordinator.RecoverInterruptedJobs(); err != nil {
 			log.Printf("recover interrupted batch automation jobs: %v", err)
+		} else {
+			log.Printf("[DIAG] RecoverInterruptedJobs OK (no error)")
 		}
-		// 不再自动 Resume：Recover 已把 running→stopped 并标记“服务重启”。
-		// 进程重启意味着所有 worker goroutine 已丢失，自动 Resume 只会造出
-		// 僵尸 state=running 但没人干活的 job，把“启动自动生产”按钮永久置
-		// 灰。用户必须在 UI 重新手动启动，Start() 才会派发真实 goroutine。
+		if err := options.AutomationCoordinator.ResumeInterruptedJobs(context.Background()); err != nil {
+			log.Printf("resume interrupted batch automation jobs: %v", err)
+		} else {
+			log.Printf("[DIAG] ResumeInterruptedJobs OK (no error)")
+		}
 		options.AutomationCoordinator.StartScheduledDispatcher()
 	}
 	v11 := http.NewServeMux()
