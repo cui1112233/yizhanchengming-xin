@@ -16,7 +16,7 @@ import (
 	"qiantie/backend/internal/localartifact"
 )
 
-func TestProviderImageRequestRequestsBase64AndRetriesWithoutIt(t *testing.T) {
+func TestProviderImageRequestFallsBackToBase64WhenDownloadFails(t *testing.T) {
 	var (
 		mu     sync.Mutex
 		bodies []string
@@ -27,13 +27,13 @@ func TestProviderImageRequestRequestsBase64AndRetriesWithoutIt(t *testing.T) {
 		mu.Lock()
 		bodies = append(bodies, string(body))
 		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
 		if strings.Contains(string(body), "response_format") {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(`{"error":{"message":"unknown parameter: response_format"}}`))
+			_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + tinyPNG + `"}]}`))
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + tinyPNG + `"}]}`))
+		// 默认返回一个无法下载的 CDN 地址，触发 base64 兜底。
+		_, _ = w.Write([]byte(`{"data":[{"url":"http://127.0.0.1:1/unavailable.png"}]}`))
 	}))
 	defer server.Close()
 
@@ -54,13 +54,13 @@ func TestProviderImageRequestRequestsBase64AndRetriesWithoutIt(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	if len(bodies) != 2 {
-		t.Fatalf("requests=%d, want first base64 request then fallback", len(bodies))
+		t.Fatalf("requests=%d, want URL request then base64 fallback", len(bodies))
 	}
-	if !strings.Contains(bodies[0], `"response_format":"b64_json"`) {
-		t.Fatalf("first request must ask for base64: %s", bodies[0])
+	if strings.Contains(bodies[0], "response_format") {
+		t.Fatalf("first request must use URL mode: %s", bodies[0])
 	}
-	if strings.Contains(bodies[1], "response_format") {
-		t.Fatalf("fallback request must drop response_format: %s", bodies[1])
+	if !strings.Contains(bodies[1], `"response_format":"b64_json"`) {
+		t.Fatalf("fallback request must ask for base64: %s", bodies[1])
 	}
 }
 

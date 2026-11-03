@@ -3456,9 +3456,11 @@ func shuihuoImageResponseRejectsResponseFormat(raw []byte) bool {
 func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, model map[string]any, endpoint, credential, imagePrompt string, referenceImageURLs []string) (string, string, error) {
 	size := shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)
 	useEdits := len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID)
-	for attempt := 0; attempt < 2; attempt++ {
-		// 第一次要求 base64；若网关不认该字段，第二次去掉再试。
-		withResponseFormat := attempt == 0
+	for attempt := 0; attempt < 3; attempt++ {
+		// 默认走 URL 模式：小响应在网关上更不容易被截断。只有 URL 下载失败时才
+		// 改用 base64 重发一次，绕开不稳定的 CDN；若网关不接受 response_format，
+		// 再去掉该字段退回 URL 模式。
+		withResponseFormat := attempt == 1
 		req, err := newShuihuoProviderImageRequest(ctx, endpoint, target.ModelID, imagePrompt, target.AspectRatio, referenceImageURLs, model, withResponseFormat)
 		if err != nil {
 			return "", "", err
@@ -3488,7 +3490,7 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		}
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
 			log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
-			if attempt == 0 && !useEdits && shuihuoImageResponseRejectsResponseFormat(raw) {
+			if withResponseFormat && !useEdits && shuihuoImageResponseRejectsResponseFormat(raw) {
 				log.Printf("shuihuo image gateway rejected response_format; retrying without it model=%s", target.ModelID)
 				continue
 			}
@@ -3516,6 +3518,11 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		}
 		mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, shuihuoImageDownloadHTTPClient(), result.Data[0].B64JSON, result.Data[0].URL, credential, endpoint)
 		if err != nil {
+			// 图已经生成，只是 CDN 下载不下来：改用 base64 重发一次，跳开 CDN。
+			if errors.Is(err, errShuihuoImageDownloadUnusable) && attempt == 0 {
+				log.Printf("shuihuo image download unavailable; retrying with base64 model=%s", target.ModelID)
+				continue
+			}
 			return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
 		}
 		// 统一配置启用水印时，在保存前叠加白底方框文字。
@@ -3596,6 +3603,10 @@ var errShuihuoImageContentPolicy = fmt.Errorf("image prompt rejected by content 
 // （常见于 /edits 端点只接受公网图片或字段格式不兼容）。这不是内容审核
 // 拒绝，也不该让整本书失败：调用方应去掉参考图，改用纯文生图再试一次。
 var errShuihuoImageReferenceUnusable = fmt.Errorf("image provider cannot read reference images")
+
+// errShuihuoImageDownloadUnusable 表示图已经生成成功，但返回的 CDN 地址
+// 下载不下来。调用方可以改用 base64 响应重发一次，绕开这个不稳定的 CDN。
+var errShuihuoImageDownloadUnusable = fmt.Errorf("generated image could not be downloaded")
 
 var shuihuoImagePromptSofteningRules = []struct {
 	from string
@@ -4521,12 +4532,12 @@ func decodeShuihuoGeneratedImage(ctx context.Context, client *http.Client, b64, 
 		}
 	}
 	if downloadErr != nil && statusCode != 0 {
-		return "", nil, fmt.Errorf("image download failed with HTTP %d: %w", statusCode, downloadErr)
+		return "", nil, fmt.Errorf("%w: HTTP %d: %v", errShuihuoImageDownloadUnusable, statusCode, downloadErr)
 	}
 	if downloadErr != nil {
-		return "", nil, fmt.Errorf("image download failed: %w", downloadErr)
+		return "", nil, fmt.Errorf("%w: %v", errShuihuoImageDownloadUnusable, downloadErr)
 	}
-	return "", nil, fmt.Errorf("image download returned no payload")
+	return "", nil, fmt.Errorf("%w: no payload", errShuihuoImageDownloadUnusable)
 }
 
 func decodeShuihuoBase64(value string) ([]byte, error) {
