@@ -61,6 +61,39 @@ func TestComicPageImagesKeepCandidatesAndExactlyOnePrimary(t *testing.T) {
 	}
 }
 
+func TestComicPageUpsertHonorsExpectedRevision(t *testing.T) {
+	store, batch, book := seedDirectorBook(t, "original", false)
+	video := book.Videos[0]
+	page, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "出图",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "出图", Status: "generating", ExpectedRevision: page.Revision,
+	})
+	if err != nil || updated.Revision != page.Revision+1 {
+		t.Fatalf("conditional upsert revision=%d err=%v, want %d", updated.Revision, err, page.Revision+1)
+	}
+	if _, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "出图", Status: "generation_failed", ExpectedRevision: page.Revision,
+	}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale revision write err=%v, want ErrConflict", err)
+	}
+	if _, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "出图", Status: "generation_failed", ExpectedRevision: 999,
+	}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("future revision write err=%v, want ErrConflict", err)
+	}
+	// 不带 ExpectedRevision 的调用保持原来的覆盖语义。
+	if _, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, UpsertComicPageInput{
+		ComicPrompt: "漫画页", ImagePrompt: "出图", Status: "image_ready",
+	}); err != nil {
+		t.Fatalf("unconditional upsert err=%v", err)
+	}
+}
+
 func TestComicPageReferenceImagesPersistAndApplyToEveryExistingPage(t *testing.T) {
 	store := NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{Title: "K", SourceText: "正文", Videos: []CreateVideoInput{{Label: "一"}, {Label: "二"}}}}})

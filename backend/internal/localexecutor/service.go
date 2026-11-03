@@ -27,6 +27,12 @@ type Service struct {
 	jobSignal   chan struct{}
 }
 
+// PendingPairingStore 是 Store 的可选只读扩展。未实现的 Store 仍可正常工作，
+// 状态接口只会省略待配对字段，不影响既有配对、心跳和领任务协议。
+type PendingPairingStore interface {
+	ListPendingPairings(ctx context.Context, owner, platform string, now time.Time) ([]PairingRecord, error)
+}
+
 func NewService(store Store, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
@@ -75,6 +81,37 @@ func (s *Service) CreatePairing(ctx context.Context, owner, platform string) (Pa
 		return PairingSecret{}, err
 	}
 	return PairingSecret{Code: code, ExpiresAt: expires}, nil
+}
+
+// PendingPairing 返回该账号最新的一条未消费配对记录，供状态接口在刷新后还原
+// "待配对"状态。过期记录由存储层过滤并清理，返回值只含指纹，不含明文配对码。
+func (s *Service) PendingPairing(ctx context.Context, owner, platform string) (*PendingPairing, error) {
+	owner = strings.TrimSpace(owner)
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	if owner == "" {
+		return nil, ErrInvalidInput
+	}
+	lister, ok := s.store.(PendingPairingStore)
+	if !ok {
+		return nil, nil
+	}
+	records, err := lister.ListPendingPairings(ctx, owner, platform, s.now().UTC())
+	if err != nil || len(records) == 0 {
+		return nil, err
+	}
+	newest := records[0]
+	return &PendingPairing{
+		Platform:    newest.Platform,
+		Fingerprint: pairingFingerprint(newest.CodeHash),
+		CreatedAt:   newest.CreatedAt,
+		ExpiresAt:   newest.ExpiresAt,
+		Expired:     !newest.ExpiresAt.After(s.now().UTC()),
+	}, nil
+}
+
+// pairingFingerprint 只暴露哈希前缀，便于前后端对齐"同一个配对码"而不泄露明文。
+func pairingFingerprint(hash SecretHash) string {
+	return fmt.Sprintf("%x", hash[:4])
 }
 
 func (s *Service) Pair(ctx context.Context, input PairInput) (PairResult, error) {

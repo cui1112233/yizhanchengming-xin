@@ -110,6 +110,8 @@ npm --prefix frontend run build
 
 默认本地检查服务监听 `4001`（具体地址以环境变量和启动脚本输出为准）。检查是否误启动了旧版主应用 Node 服务，可运行下面的 Go 启动保护检查；独立浏览器 Worker 和桌面执行器不属于主应用 API 进程：
 
+> **如果页面里“作品全没了”，先看启动日志里的 `本地启动配置：slice=...`。** 代码里 `QIANTIE_BATCH_FACTORY_V11_SLICE` 默认是 `0`，而 Slice 小于 `1` 时 V12 批次路由不会注册，`GET /api/batch-factory/v12/batches/summary` 返回 404，前端就表现为作品列表为空。`scripts/start-local-go.ps1` 会强制把 Slice 兜底到 `3`（`0`/空/非数字都会提升并警告），用临时端口验证可加 `-SkipBuild -ListenAddr ':4002'` 复用现有二进制直接启动。
+
 ```powershell
 .\scripts\verify-no-node-runtime.ps1
 ```

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -914,5 +915,124 @@ func TestComicPageConfigStaleUsesSavedPageReferences(t *testing.T) {
 	}
 	if comicPageConfigStale(ctx, store, nil, "alice", current, book.ID, pages[0]) {
 		t.Fatalf("page with unchanged saved reference was marked stale: %+v", pages[0])
+	}
+}
+
+// TestComicPagePutIsPatchNotFullRow is the contract for editing prompts: PUT
+// only replaces fields the client actually sent. Server-owned snapshotHash,
+// status, reference images and page images must survive.
+func TestComicPagePutIsPatchNotFullRow(t *testing.T) {
+	ctx := context.Background()
+	now := time.Unix(1700000000, 0)
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{
+			Title:  "第一本",
+			Videos: []batchfactoryv11.CreateVideoInput{{Label: "分镜一", VideoPrompt: "视频一"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	video := book.Videos[0]
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	pagesPath := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + book.ID + "/comic-pages"
+
+	const snapshotHash = "contract-snapshot-hash"
+	created, err := store.UpsertComicPage(ctx, "alice", batch.ID, book.ID, video.ID, batchfactoryv11.UpsertComicPageInput{
+		ComicPrompt:        "导演页描述",
+		ImagePrompt:        "出图描述",
+		ReferenceImageURLs: []string{"https://example.com/ref.png"},
+		ModelID:            "seedream-5-flash-local",
+		AspectRatio:        "3:4",
+		Status:             "image_ready",
+		SnapshotHash:       snapshotHash,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateComicPageImage(ctx, "alice", batch.ID, book.ID, created.ID, batchfactoryv11.CreateComicPageImageInput{
+		URL: "https://example.com/page.png", MediaType: "image/png", Source: "provider",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	response := signedJSONRequest(t, api, now, "alice", http.MethodPut, pagesPath+"/"+video.ID, map[string]any{
+		"comicPrompt": "修改后的导演页描述",
+		"imagePrompt": "修改后的出图描述",
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("patch status=%d body=%s", response.Code, response.Body.String())
+	}
+	page := decodeBody[struct {
+		Page batchfactoryv11.ComicPage `json:"page"`
+	}](t, response).Page
+	if page.ComicPrompt != "修改后的导演页描述" || page.ImagePrompt != "修改后的出图描述" {
+		t.Fatalf("prompts not patched: %+v", page)
+	}
+	// SnapshotHash is server-owned (json:"-"), so verify it on the stored row.
+	pages, err := store.ListComicPages(ctx, "alice", batch.ID, book.ID)
+	if err != nil || len(pages) != 1 {
+		t.Fatalf("pages=%+v err=%v", pages, err)
+	}
+	stored := pages[0]
+	if stored.SnapshotHash != snapshotHash {
+		t.Fatalf("snapshotHash cleared by PUT: %q", stored.SnapshotHash)
+	}
+	if stored.Status != "image_ready" || stored.ModelID != "seedream-5-flash-local" || stored.AspectRatio != "3:4" {
+		t.Fatalf("status/model/aspect replaced by PUT: %+v", stored)
+	}
+	if len(stored.ReferenceImageURLs) != 1 || stored.ReferenceImageURLs[0] != "https://example.com/ref.png" {
+		t.Fatalf("referenceImageUrls replaced by PUT: %+v", stored.ReferenceImageURLs)
+	}
+	if len(stored.Images) != 1 {
+		t.Fatalf("page images lost after PUT: %+v", stored.Images)
+	}
+
+	// Creating a page through the same PUT still applies defaults.
+	batch, err = store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{
+		Title:  "第二批次",
+		Books:  []batchfactoryv11.CreateBookInput{{Title: "第二本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "分镜一"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newBook := batch.Books[0]
+	newVideo := newBook.Videos[0]
+	newPath := "/api/batch-factory/v12/batches/" + batch.ID + "/books/" + newBook.ID + "/comic-pages/" + newVideo.ID
+	newPageResponse := signedJSONRequest(t, api, now, "alice", http.MethodPut, newPath, map[string]any{
+		"comicPrompt": "新页导演描述",
+		"imagePrompt": "新页出图描述",
+	})
+	if newPageResponse.Code != http.StatusOK {
+		t.Fatalf("create status=%d body=%s", newPageResponse.Code, newPageResponse.Body.String())
+	}
+	newPage := decodeBody[struct {
+		Page batchfactoryv11.ComicPage `json:"page"`
+	}](t, newPageResponse).Page
+	if newPage.Status != "prompt_ready" || newPage.AspectRatio != "9:16" {
+		t.Fatalf("new page defaults=%+v", newPage)
+	}
+}
+
+func TestClassifyComicPageShortageSeparatesInFlightStaleAndFailed(t *testing.T) {
+	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	videos := []batchfactoryv11.Video{{ID: "v1"}, {ID: "v2"}, {ID: "v3"}, {ID: "v4"}}
+	pages := []batchfactoryv11.ComicPage{
+		{VideoID: "v1", Status: "generating", UpdatedAt: now.Add(-2 * time.Minute)},
+		{VideoID: "v2", Status: "generating", UpdatedAt: now.Add(-40 * time.Minute)},
+		{VideoID: "v3", Status: "generation_failed", UpdatedAt: now},
+	}
+	shortage := classifyComicPageShortage(pages, videos, []string{"v1", "v2", "v3", "v4"}, now)
+	if shortage.Total != 4 || shortage.InFlight != 1 || shortage.Stale != 1 || shortage.Failed != 2 {
+		t.Fatalf("shortage=%+v", shortage)
+	}
+	if !errors.Is(shortage, batchfactoryv11.ErrConflict) {
+		t.Fatalf("shortage should unwrap ErrConflict, got %v", shortage)
+	}
+	if message := shortage.Error(); !strings.Contains(message, "1 页仍在生成") || !strings.Contains(message, "1 页生成租约已过期") || !strings.Contains(message, "2 页生成失败") {
+		t.Fatalf("shortage message=%q", message)
 	}
 }

@@ -54,6 +54,7 @@ func deleteBatchWithRetention(ctx context.Context, store batchfactoryv11.Store, 
 }
 
 func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, catalog *prompt.Catalog) {
+	registerPrivateCustomizationComicRoute(mux, store, catalog)
 	mux.HandleFunc("POST /api/batch-factory/v11/intakes/manual", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {

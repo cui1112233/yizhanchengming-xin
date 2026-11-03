@@ -458,12 +458,29 @@ func reconcileV11BookAssetsLedger(ctx context.Context, tx *sql.Tx) error {
 	if table == "batch_factory_v12_book_assets" {
 		return nil
 	}
-	for _, statement := range V11BookAssetsStatements() {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
-			return err
-		}
+	statements := V11BookAssetsStatements()
+	if _, err := tx.ExecContext(ctx, statements[0]); err != nil {
+		return err
 	}
-	return nil
+	// MySQL requires foreign-key constraint names to be unique per database.
+	// A leftover batch_factory_v11_book_assets table from an interrupted
+	// migration collides with the same constraint already held by the canonical
+	// batch_factory_v12_book_assets table, so skip the ADD when it exists.
+	exists, err := v11ConstraintExists(ctx, tx, "fk_bfv11_assets_book")
+	if err != nil || exists {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, statements[1])
+	return err
+}
+
+func v11ConstraintExists(ctx context.Context, tx *sql.Tx, name string) (bool, error) {
+	var exists bool
+	err := tx.QueryRowContext(ctx, `SELECT EXISTS(
+  SELECT 1 FROM information_schema.table_constraints
+  WHERE table_schema = DATABASE() AND constraint_name = ?
+)`, name).Scan(&exists)
+	return exists, err
 }
 
 // V11BookAssetDetailsStatements adds structured asset fields in a new

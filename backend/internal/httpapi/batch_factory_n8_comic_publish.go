@@ -22,6 +22,11 @@ import (
 
 const n8ComicPublishDraftKind = "n8-comic-publish"
 
+// errN8ComicCarouselIncomplete 表示漫画图片已经上传（imageIDs 可直接复用），
+// 但 N8 合集还没有创建完成。它是可续建状态：既不能当成发布成功，也不是
+// 内容审核失败，重试时只需要复用 imageIDs 重新建合集。
+var errN8ComicCarouselIncomplete = errors.New("N8 漫画图片已上传，但合集尚未创建完成")
+
 type n8ComicPublishSettings struct {
 	ProducerAdminName string  `json:"producerAdminName"`
 	OrganizationID    string  `json:"organizationId"`
@@ -589,10 +594,19 @@ func (p *BatchFactoryN8ComicPublisher) Publish(ctx context.Context, owner, batch
 	if err != nil {
 		return N8ComicPublishRecord{}, err
 	}
-	result, err := p.Client.Publish(ctx, n8comic.PublishRequest{ProducerAdminName: input.ProducerAdminName, Name: name, Images: images, WorkIDs: input.WorkIDs, AudioCategoryID: input.AudioCategoryID, AudioID: input.AudioID})
+	// 上一次可能已经上传了全部/部分图片但建合集失败。复用这些 imageIDs，
+	// 本轮只上传缺图并重新创建合集，避免整本图片重传。
+	var uploadedIDs []int64
+	if saved, ok := p.savedUploadedRecord(ctx, owner, batchID, collectionID); ok && len(saved.ImageIDs) == len(images) {
+		uploadedIDs = saved.ImageIDs
+	}
+	result, err := p.Client.Publish(ctx, n8comic.PublishRequest{ProducerAdminName: input.ProducerAdminName, Name: name, Images: images, WorkIDs: input.WorkIDs, AudioCategoryID: input.AudioCategoryID, AudioID: input.AudioID, UploadedImageIDs: uploadedIDs})
 	if err != nil {
-		if len(result.ImageIDs) > 0 {
-			record := N8ComicPublishRecord{Status: "uploaded", Name: name, ProducerAdminName: input.ProducerAdminName, AudioCategoryID: input.AudioCategoryID, WorkIDs: append([]int64(nil), input.WorkIDs...), ImageIDs: append([]int64(nil), result.ImageIDs...), PublishedAt: now}
+		if uploaded := countComicPublishImageIDs(result.ImageIDs); uploaded > 0 {
+			// 只要已经有一部分图片入库，就把它们持久化，标记为独立终态
+			// upload_incomplete；不能返回 nil，否则自动化会把“合集未创建”
+			// 误记成发布完成。
+			record := N8ComicPublishRecord{Status: "upload_incomplete", Name: name, ProducerAdminName: input.ProducerAdminName, AudioCategoryID: input.AudioCategoryID, WorkIDs: append([]int64(nil), input.WorkIDs...), ImageIDs: append([]int64(nil), result.ImageIDs...), PublishedAt: now}
 			encoded, encodeErr := json.Marshal(record)
 			if encodeErr != nil {
 				return N8ComicPublishRecord{}, encodeErr
@@ -600,7 +614,7 @@ func (p *BatchFactoryN8ComicPublisher) Publish(ctx context.Context, owner, batch
 			if _, saveErr := p.Store.SaveDraft(ctx, owner, batchfactoryv11.Draft{Key: collectionID, Kind: n8ComicPublishDraftKind, Scope: batchID, Content: string(encoded)}); saveErr != nil {
 				return N8ComicPublishRecord{}, fmt.Errorf("N8 图片已上传，但保存上传记录失败：%w", saveErr)
 			}
-			return record, nil
+			return record, fmt.Errorf("%w：%v", errN8ComicCarouselIncomplete, err)
 		}
 		return N8ComicPublishRecord{}, err
 	}
@@ -628,16 +642,44 @@ func comicImageExtension(mediaType string) string {
 	}
 }
 
+// savedRecord 只对真正发布成功的记录短路。uploaded/upload_incomplete 必须
+// 继续走后面的建合集流程，否则会把“图片已上传但合集不存在”当成发布完成。
 func (p *BatchFactoryN8ComicPublisher) savedRecord(ctx context.Context, owner, batchID, collectionID string) (N8ComicPublishRecord, bool) {
 	draft, err := p.Store.GetDraft(ctx, owner, collectionID, n8ComicPublishDraftKind, batchID)
 	if err != nil {
 		return N8ComicPublishRecord{}, false
 	}
 	var record N8ComicPublishRecord
-	if json.Unmarshal([]byte(draft.Content), &record) != nil || (record.Status != "published" && record.Status != "uploaded") || (record.Status == "published" && record.CarouselID <= 0) || len(record.ImageIDs) == 0 {
+	if json.Unmarshal([]byte(draft.Content), &record) != nil || record.Status != "published" || record.CarouselID <= 0 || len(record.ImageIDs) == 0 {
 		return N8ComicPublishRecord{}, false
 	}
 	return record, true
+}
+
+// savedUploadedRecord 读取上次“图片已上传、合集未完成”的记录，用于续建时
+// 复用 imageIDs。兼容历史上写入的 uploaded 记录。
+func (p *BatchFactoryN8ComicPublisher) savedUploadedRecord(ctx context.Context, owner, batchID, collectionID string) (N8ComicPublishRecord, bool) {
+	draft, err := p.Store.GetDraft(ctx, owner, collectionID, n8ComicPublishDraftKind, batchID)
+	if err != nil {
+		return N8ComicPublishRecord{}, false
+	}
+	var record N8ComicPublishRecord
+	if json.Unmarshal([]byte(draft.Content), &record) != nil || (record.Status != "uploaded" && record.Status != "upload_incomplete") || len(record.ImageIDs) == 0 {
+		return N8ComicPublishRecord{}, false
+	}
+	return record, true
+}
+
+// countComicPublishImageIDs 统计已经拿到 N8 图片 ID 的页数；0 表示还没
+// 有任何图片入库，不需要写 upload_incomplete 记录。
+func countComicPublishImageIDs(ids []int64) int {
+	count := 0
+	for _, id := range ids {
+		if id > 0 {
+			count++
+		}
+	}
+	return count
 }
 
 func n8ComicCollectionName(producer, title string, now time.Time) (string, error) {

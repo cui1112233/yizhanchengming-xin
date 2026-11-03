@@ -47,3 +47,44 @@ func TestPairingSameMachineRefreshesExistingExecutor(t *testing.T) {
 		t.Fatalf("views=%+v", views)
 	}
 }
+
+func TestPendingPairingTracksExpiryAndCleanup(t *testing.T) {
+	base := time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)
+	current := base
+	store := NewMemoryStore()
+	service := NewService(store, func() time.Time { return current })
+
+	secret, err := service.CreatePairing(context.Background(), "alice", PlatformDoubao)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending, err := service.PendingPairing(context.Background(), "alice", PlatformDoubao)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending == nil || pending.Expired || len(pending.Fingerprint) != 8 || pending.Platform != PlatformDoubao {
+		t.Fatalf("pending=%+v", pending)
+	}
+
+	current = base.Add(PairingTTL + time.Second)
+	pending, err = service.PendingPairing(context.Background(), "alice", PlatformDoubao)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending == nil || !pending.Expired {
+		t.Fatalf("expired pending=%+v", pending)
+	}
+
+	// 超过保留期后记录被清理，状态接口不再返回任何待配对信息。
+	current = base.Add(pairingCleanupRetention + time.Second)
+	pending, err = service.PendingPairing(context.Background(), "alice", PlatformDoubao)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending != nil {
+		t.Fatalf("pending must be cleaned up: %+v", pending)
+	}
+	if store.PairingPlaintextSeen(secret.Code) {
+		t.Fatal("pairing store must never hold plaintext codes")
+	}
+}

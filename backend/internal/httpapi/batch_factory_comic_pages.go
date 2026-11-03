@@ -128,6 +128,16 @@ func comicPageGenerationInFlightError(err error) bool {
 	return strings.Contains(message, "当前漫画页正在生成") || strings.Contains(message, "当前漫画页已有生成任务")
 }
 
+// comicPageClaimError 把页级条件写回的版本冲突统一转换为“该页正在生成”。
+// 只有版本冲突才走这里：它表示另一个 worker 已经改了同一页，属于在途，
+// 不应被上层当成内容审核失败或永久失败。
+func comicPageClaimError(err error) error {
+	if err == nil || !errors.Is(err, batchfactoryv11.ErrConflict) {
+		return err
+	}
+	return fmt.Errorf("%w: 当前漫画页正在生成，请等待本次结果完成后再重试", batchfactoryv11.ErrConflict)
+}
+
 // The provider may finish after the browser request has gone away. Keep the
 // whole book pipeline alive long enough to write the returned artifact and
 // build the collection; otherwise a successful image can be lost during the
@@ -438,11 +448,17 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 		input.ModelID = configuredModel
 	}
 	// A page reference is durable page data, so a retry keeps the user's selected image.
+	var storedPage batchfactoryv11.ComicPage
+	hasStoredPage := false
 	if pages, listErr := comicStore.ListComicPages(ctx, owner, batchID, bookID); listErr != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, listErr
 	} else {
 		for _, page := range pages {
-			if page.VideoID == videoID && comicPageGenerationTaskExists(page) {
+			if page.VideoID != videoID {
+				continue
+			}
+			storedPage, hasStoredPage = page, true
+			if comicPageGenerationTaskExists(page) {
 				if !ownsLocalGenerationGate && !comicPageGenerationTaskIsStale(page, time.Now().UTC()) {
 					return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: 当前漫画页已有生成任务，请等待完成后再重新生成", batchfactoryv11.ErrConflict)
 				}
@@ -451,19 +467,35 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 				// connection. Reopen that page as failed before continuing; this
 				// keeps the next automatic retry idempotent and prevents a single
 				// orphaned page from blocking the whole book forever.
-				_, recoverErr := comicStore.UpsertComicPage(ctx, owner, batchID, bookID, videoID, batchfactoryv11.UpsertComicPageInput{
+				recovered, recoverErr := comicStore.UpsertComicPage(ctx, owner, batchID, bookID, videoID, batchfactoryv11.UpsertComicPageInput{
 					ComicPrompt: page.ComicPrompt, ImagePrompt: page.ImagePrompt, ReferenceImageURLs: page.ReferenceImageURLs,
 					ModelID: page.ModelID, AspectRatio: page.AspectRatio, Status: "generation_failed", SnapshotHash: page.SnapshotHash,
+					ExpectedRevision: page.Revision,
 				})
 				if recoverErr != nil {
+					if errors.Is(recoverErr, batchfactoryv11.ErrConflict) {
+						return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, comicPageClaimError(recoverErr)
+					}
 					return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("回收旧漫画页生成任务失败: %w", recoverErr)
 				}
+				storedPage = recovered
 				log.Printf("comic page recovered stale generation lease batch=%s book=%s video=%s", batchID, bookID, videoID)
 			}
-			if page.VideoID == videoID && len(page.ReferenceImageURLs) > 0 {
+			if len(page.ReferenceImageURLs) > 0 {
 				input.ReferenceImageURLs = page.ReferenceImageURLs
-				break
 			}
+		}
+	}
+	// The comic page row is the single source of truth for a page's prompts.
+	// Older callers (including the private-customization workspace before it
+	// sent a full payload) may omit them; fill them from the stored row instead
+	// of rejecting the request.
+	if hasStoredPage {
+		if strings.TrimSpace(input.ComicPrompt) == "" {
+			input.ComicPrompt = storedPage.ComicPrompt
+		}
+		if strings.TrimSpace(input.ImagePrompt) == "" {
+			input.ImagePrompt = storedPage.ImagePrompt
 		}
 	}
 	if strings.TrimSpace(input.ImagePrompt) == "" {
@@ -483,9 +515,15 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	input.ImagePrompt = contract.Prompt
 	input.SnapshotHash = contract.SnapshotHash
 	input.Status = "generating"
+	// 申领页级租约时按读到的 revision 做条件更新：如果另一个 worker 已经
+	// 抢先申领，这里的写回会命中版本冲突，而不是覆盖对方的 generating 状态。
+	input.ExpectedRevision = 0
+	if hasStoredPage {
+		input.ExpectedRevision = storedPage.Revision
+	}
 	createdPage, err := comicStore.UpsertComicPage(ctx, owner, batchID, bookID, videoID, input)
 	if err != nil {
-		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
+		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, comicPageClaimError(err)
 	}
 	generationFailed := true
 	defer func() {
@@ -494,6 +532,9 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 		}
 		failedInput := input
 		failedInput.Status = "generation_failed"
+		// 失败写回同样按 owner/revision 条件更新，避免把另一轮已经写好的
+		// 页面（或新租约）覆盖成 generation_failed。
+		failedInput.ExpectedRevision = createdPage.Revision
 		_, _ = comicStore.UpsertComicPage(context.Background(), owner, batchID, bookID, videoID, failedInput)
 	}()
 	config, err := loadShuihuoOwnerConfig(ctx, g.store, owner, g.catalogStore)
@@ -559,8 +600,61 @@ func comicPageAssetLookupText(page batchfactoryv11.Video, imagePrompt string) st
 }
 
 // comicPageRefillDelay 是整本出图首轮结束后、对在途锁跳过的缺页进行补图前的
-// 等待时长。独立变量便于测试收紧。
+// 最长等待时长。独立变量便于测试收紧。
 var comicPageRefillDelay = 60 * time.Second
+
+// comicPageRefillPollInterval 是补图前的页状态轮询间隔。原来固定睡满
+// comicPageRefillDelay 才补图，在途页提前完成时这段时间纯属空转。
+var comicPageRefillPollInterval = 5 * time.Second
+
+// comicPageSettleDelay 是补图轮之后、构建合集之前等待“仍在别的 worker 手里”
+// 的页面结束的最长时间。页级生成上下文是 15 分钟，这里取 12 分钟，避免把
+// 在途页误判成缺图，也避免真的死等。
+var comicPageSettleDelay = 12 * time.Minute
+
+// waitComicPageSettled 轮询页面状态，直到请求的页都不再处于未过期在途状态，
+// 或等待超时。它不清理 lease，只在真正缺图且没有在途任务时立即返回。
+func waitComicPageSettled(ctx context.Context, store batchfactoryv11.ComicPageStore, owner, batchID, bookID string, videos []batchfactoryv11.Video, pages []batchfactoryv11.ComicPage) ([]batchfactoryv11.ComicPage, error) {
+	deadline := time.Now().Add(comicPageSettleDelay)
+	for {
+		if !comicPagesHaveInFlightGeneration(pages, videos) {
+			return pages, nil
+		}
+		if time.Now().After(deadline) {
+			return pages, nil
+		}
+		timer := time.NewTimer(comicPageRefillPollInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return pages, ctx.Err()
+		case <-timer.C:
+		}
+		if progress := comicGenerationProgressFromContext(ctx); progress != nil {
+			progress("comic_images", "仍有漫画页在其它任务中生成，等待释放后继续补齐")
+		}
+		latest, err := store.ListComicPages(ctx, owner, batchID, bookID)
+		if err != nil {
+			return pages, err
+		}
+		pages = latest
+	}
+}
+
+// comicPagesHaveInFlightGeneration 判断是否还有未过期的在途页生成任务。
+// 没有在途任务时补图轮不必等待，可以立刻补齐缺失页。
+func comicPagesHaveInFlightGeneration(pages []batchfactoryv11.ComicPage, videos []batchfactoryv11.Video) bool {
+	now := time.Now().UTC()
+	for _, page := range pages {
+		if !comicVideoInList(videos, page.VideoID) {
+			continue
+		}
+		if comicPageGenerationTaskExists(page) && !comicPageGenerationTaskIsStale(page, now) {
+			return true
+		}
+	}
+	return false
+}
 
 // missingComicPageWorkItems 返回还没有主图的页面任务，用于整本生成的补图轮。
 // 页序 index 与原 generationVideos 对齐，保证进度文案与合集顺序不变。
@@ -723,19 +817,49 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		if progress != nil {
 			progress("comic_images", fmt.Sprintf("有 %d 页因在途锁暂未生成，等待后自动补齐缺失页", len(missingWork)))
 		}
-		timer := time.NewTimer(comicPageRefillDelay)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return batchfactoryv11.ComicCollection{}, ctx.Err()
-		case <-timer.C:
+		// 轮询等待而不是固定睡满：在途页一释放锁就立刻补图，全部补齐则跳过补图轮。
+		deadline := time.Now().Add(comicPageRefillDelay)
+		for len(missingWork) > 0 {
+			if !comicPagesHaveInFlightGeneration(existingPages, generationVideos) {
+				break
+			}
+			if time.Now().After(deadline) {
+				break
+			}
+			timer := time.NewTimer(comicPageRefillPollInterval)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return batchfactoryv11.ComicCollection{}, ctx.Err()
+			case <-timer.C:
+			}
+			if existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID); err != nil {
+				return batchfactoryv11.ComicCollection{}, err
+			}
+			missingWork = missingComicPageWorkItems(generationVideos, existingPages)
 		}
-		if err = runPages(missingWork); err != nil {
-			return batchfactoryv11.ComicCollection{}, err
+		if len(missingWork) > 0 {
+			if err = runPages(missingWork); err != nil {
+				return batchfactoryv11.ComicCollection{}, err
+			}
+			if existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID); err != nil {
+				return batchfactoryv11.ComicCollection{}, err
+			}
 		}
-		existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID)
+		// 补图轮之后可能仍有页面在别的 worker 手里（例如上一轮 detached
+		// 生成还没释放 lease）。先等它们自然结束，再判断是否真的缺图，避免
+		// 把“在途锁”误报成内容审核缺图。
+		existingPages, err = waitComicPageSettled(ctx, comicStore, owner, batchID, bookID, generationVideos, existingPages)
 		if err != nil {
 			return batchfactoryv11.ComicCollection{}, err
+		}
+		if missingWork := missingComicPageWorkItems(generationVideos, existingPages); len(missingWork) > 0 {
+			if err = runPages(missingWork); err != nil {
+				return batchfactoryv11.ComicCollection{}, err
+			}
+			if existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID); err != nil {
+				return batchfactoryv11.ComicCollection{}, err
+			}
 		}
 	}
 	if progress != nil {
@@ -747,9 +871,70 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	}
 	collection, missing, err := comicStore.CreateComicCollection(ctx, owner, batchID, bookID, requestedVideoIDs)
 	if err != nil && len(missing) > 0 {
+		if latest, listErr := comicStore.ListComicPages(ctx, owner, batchID, bookID); listErr == nil {
+			return batchfactoryv11.ComicCollection{}, classifyComicPageShortage(latest, generationVideos, missing, time.Now().UTC())
+		}
 		return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: %d 个漫画页缺少主图（%s）", err, len(missing), strings.Join(missing, ","))
 	}
 	return collection, err
+}
+
+// comicPageShortageError 把“缺主图”拆成三种来源：仍在生成、lease 已过期、
+// 真正生成失败/被内容审核拒绝。自动化只对最后一种消耗内容审核重试预算，
+// 在途页和过期 lease 不应被写成“两次降级后仍被内容审核拒绝”。
+type comicPageShortageError struct {
+	Total    int
+	InFlight int
+	Stale    int
+	Failed   int
+	Missing  []string
+}
+
+func (e *comicPageShortageError) Error() string {
+	if e == nil {
+		return ""
+	}
+	parts := make([]string, 0, 3)
+	if e.InFlight > 0 {
+		parts = append(parts, fmt.Sprintf("%d 页仍在生成", e.InFlight))
+	}
+	if e.Stale > 0 {
+		parts = append(parts, fmt.Sprintf("%d 页生成租约已过期", e.Stale))
+	}
+	if e.Failed > 0 {
+		parts = append(parts, fmt.Sprintf("%d 页生成失败", e.Failed))
+	}
+	return fmt.Sprintf("%d 个漫画页缺少主图（%s）", e.Total, strings.Join(parts, "，"))
+}
+
+func (e *comicPageShortageError) Unwrap() error { return batchfactoryv11.ErrConflict }
+
+func classifyComicPageShortage(pages []batchfactoryv11.ComicPage, videos []batchfactoryv11.Video, missing []string, now time.Time) *comicPageShortageError {
+	shortage := &comicPageShortageError{Total: len(missing), Missing: append([]string(nil), missing...)}
+	for _, videoID := range missing {
+		if !comicVideoInList(videos, videoID) {
+			shortage.Failed++
+			continue
+		}
+		var matched *batchfactoryv11.ComicPage
+		for index := range pages {
+			if pages[index].VideoID == videoID {
+				matched = &pages[index]
+				break
+			}
+		}
+		switch {
+		case matched == nil:
+			shortage.Failed++
+		case comicPageGenerationTaskIsStale(*matched, now):
+			shortage.Stale++
+		case comicPageGenerationTaskExists(*matched):
+			shortage.InFlight++
+		default:
+			shortage.Failed++
+		}
+	}
+	return shortage
 }
 
 func comicVideoInList(videos []batchfactoryv11.Video, videoID string) bool {
@@ -920,11 +1105,38 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		var input batchfactoryv11.UpsertComicPageInput
+		var input batchfactoryv11.PatchComicPageInput
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		created, err := comicStore.UpsertComicPage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input)
+		var created batchfactoryv11.ComicPage
+		var err error
+		if patcher, ok := comicStore.(batchfactoryv11.ComicPagePatcher); ok {
+			created, err = patcher.PatchComicPage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), input)
+		} else {
+			// Compatibility fallback for stores that only implement the full-row
+			// upsert contract: convert the provided patch fields into a full input.
+			full := batchfactoryv11.UpsertComicPageInput{}
+			if input.ComicPrompt != nil {
+				full.ComicPrompt = *input.ComicPrompt
+			}
+			if input.ImagePrompt != nil {
+				full.ImagePrompt = *input.ImagePrompt
+			}
+			if input.ReferenceImageURLs != nil {
+				full.ReferenceImageURLs = *input.ReferenceImageURLs
+			}
+			if input.ModelID != nil {
+				full.ModelID = *input.ModelID
+			}
+			if input.AspectRatio != nil {
+				full.AspectRatio = *input.AspectRatio
+			}
+			if input.Status != nil {
+				full.Status = *input.Status
+			}
+			created, err = comicStore.UpsertComicPage(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("videoId"), full)
+		}
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -1683,6 +1895,36 @@ func buildComicPromptZip(ctx context.Context, store batchfactoryv11.Store, comic
 	}
 	if err := writeComicZipText(zipWriter, "最终完整出图提示词.md", promptMarkdown.String()); err != nil {
 		return nil, "", err
+	}
+
+	// 复用同一个打包接口，把已生成的漫画页主图一并放入压缩包；没有图片时
+	// 仍然只导出提示词与资产图片，保持原有调用方的行为。
+	for pageIndex, page := range pages {
+		if files == nil {
+			break
+		}
+		for imageIndex, image := range page.Images {
+			storageRef := strings.TrimSpace(image.StorageRef)
+			if storageRef == "" {
+				continue
+			}
+			file, openErr := files.Open(storageRef)
+			if openErr != nil {
+				continue
+			}
+			extension := filepath.Ext(storageRef)
+			if extension == "" {
+				extension = comicZipImageExtension(image.MediaType)
+			}
+			entry, createErr := zipWriter.Create(fmt.Sprintf("漫画页/第%02d页_%02d%s", pageIndex+1, imageIndex+1, extension))
+			if createErr == nil {
+				_, createErr = io.Copy(entry, file)
+			}
+			_ = file.Close()
+			if createErr != nil {
+				return nil, "", createErr
+			}
+		}
 	}
 
 	assets, err := store.ListBookAssets(ctx, owner, batchID, bookID)

@@ -22,6 +22,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Slice 默认值是 0，且 Slice<1 时 V12 批次路由不会注册。直接运行本二进制
+	// 很容易漏设环境变量，表现为前端“作品全没了”，这里必须留下显式日志。
+	if cfg.Slice < 1 {
+		log.Printf("WARNING: QIANTIE_BATCH_FACTORY_V11_SLICE=%d，V12 批次路由（/api/batch-factory/v12/batches/summary 等）不会注册；本地请使用 scripts/start-local-go.ps1（最低兜底 1，默认 3）。", cfg.Slice)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		if err := runHealthcheck(healthURL(cfg.ListenAddr)); err != nil {
 			log.Fatal(err)

@@ -61,6 +61,7 @@ var frozenV12V11AliasPatterns = []string{
 	"POST /api/batch-factory/v12/publish/{provider}/intents",
 	"POST /api/batch-factory/v12/publish/{provider}/intents/{intentId}/confirm",
 	"POST /api/batch-factory/v12/publish/{provider}/intents/{intentId}/submit",
+	"POST /api/batch-factory/v12/private-comic/tasks",
 	"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/assets/{assetId}/images/{imageId}/primary",
 	"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/metadata",
 	"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/override",

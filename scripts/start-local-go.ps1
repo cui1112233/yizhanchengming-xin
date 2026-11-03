@@ -1,5 +1,7 @@
-param(
+﻿param(
   [switch]$CheckOnly,
+  # 临时验证/排障用：复用现有二进制直接启动，不重建前端与 Go。
+  [switch]$SkipBuild,
   [string]$ListenAddr = $(if ($env:QIANTIE_GO_LISTEN_ADDR) { $env:QIANTIE_GO_LISTEN_ADDR } else { ':4001' })
 )
 
@@ -61,6 +63,24 @@ function Test-FrontendBuildRequired {
 
 $repo = Split-Path -Parent $PSScriptRoot
 
+# Slice 是 V12 批次路由的注册门槛：代码默认值是 0，Slice<1 时
+# registerV12IntakeRoutes 不会执行，/api/batch-factory/v12/batches/summary
+# 会变成裸 404，前端表现就是“作品全没了”。注意 PowerShell 里字符串 "0"
+# 是非空值，`if (-not $env:...)` 不会把它当成“未设置”，所以必须显式校验。
+$sliceValue = 0
+$rawSlice = [string]$env:QIANTIE_BATCH_FACTORY_V11_SLICE
+if (-not [int]::TryParse($rawSlice, [ref]$sliceValue) -or $sliceValue -lt 1) {
+  if (-not [string]::IsNullOrWhiteSpace($rawSlice)) {
+    Write-Warning "QIANTIE_BATCH_FACTORY_V11_SLICE='$rawSlice' 会关闭 V12 批次路由（summary 返回 404）；本地启动已强制提升为 3。"
+  }
+  $sliceValue = 3
+  $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
+}
+# Slice 不足 4 时视频生产路由不会注册，此时 PRODUCTION_ENABLED=1 只是空转。
+if ($sliceValue -lt 4 -and $env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED -eq '1') {
+  Write-Warning "当前 Slice=$sliceValue，视频生产/提交路由不会注册；如需视频请改用 scripts/start-local-go-review.ps1 -EnableBatchProduction（Slice 4）。"
+}
+
 # Go is the only supported application runtime. Keep historical Node files on
 # disk for migration/rollback audit, but refuse to start Go alongside an
 # accidentally enabled application Node service. The checker ignores Node
@@ -96,7 +116,7 @@ $frontendBuildRequired = Test-FrontendBuildRequired `
     (Join-Path $frontendRoot 'vite.config.js'),
     (Join-Path $frontendRoot 'scripts/clean-dist.mjs')
   )
-if ($frontendBuildRequired) {
+if ($frontendBuildRequired -and -not $SkipBuild) {
   & npm.cmd --prefix $frontendRoot run build
   if ($LASTEXITCODE -ne 0) {
     throw "Frontend build failed with exit code $LASTEXITCODE; refusing to start an old embedded page."
@@ -138,7 +158,13 @@ if (-not $needsBuild) {
     Select-Object -First 1
   $needsBuild = $latestAsset -and $latestAsset.LastWriteTimeUtc -gt $binaryTime
 }
-if ($needsBuild) {
+if ($SkipBuild) {
+  if (-not (Test-Path -LiteralPath $binaryPath)) {
+    throw "SkipBuild 已指定，但本地二进制不存在：$binaryPath；请先运行 scripts/build-go-local.ps1。"
+  }
+  Write-Output "SkipBuild：直接复用现有二进制 $binaryPath，不重建前端/Go。"
+}
+if ($needsBuild -and -not $SkipBuild) {
   & (Join-Path $PSScriptRoot 'build-go-local.ps1')
   if ($LASTEXITCODE -ne 0) {
     throw "Local Go build failed with exit code $LASTEXITCODE; refusing to start an existing binary."
@@ -156,11 +182,7 @@ try {
   # release, which makes the runtime check misleading.
   $env:QIANTIE_RELEASE_SHA = (& git -C $repo rev-parse --short HEAD).Trim()
   $env:QIANTIE_RUNTIME_MANIFEST_PATH = $runtimeManifestPath
-  if (-not $env:QIANTIE_BATCH_FACTORY_V11_SLICE) {
-    # Slice 3 keeps H3 director/audio/compile routes on Go. Higher slices
-    # still require explicit video/merge/provider settings.
-    $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
-  }
+  # Slice 已在脚本入口统一校验并兜底为 3（>=1 才会注册 V12 批次路由）。
   if (-not $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER) {
     # Text credentials are selected from the account model catalog at request
     # time; do not put a key in this launcher.
@@ -205,6 +227,11 @@ try {
   if (-not $env:QIANTIE_GO_AUTH_ENABLED) {
     $env:QIANTIE_GO_AUTH_ENABLED = '1'
   }
+  Write-Output ("本地启动配置：slice={0} production={1} merge={2} addr={3}" -f `
+    $env:QIANTIE_BATCH_FACTORY_V11_SLICE, `
+    $env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED, `
+    $env:QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED, `
+    $ListenAddr)
   & .\qiantie-local.exe
   exit $LASTEXITCODE
 } finally {

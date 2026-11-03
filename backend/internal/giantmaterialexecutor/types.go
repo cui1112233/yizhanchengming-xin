@@ -33,6 +33,9 @@ const (
 	HeartbeatIntervalSeconds = 15
 	MaxResultBytes           = 2 << 20
 	DefaultPreferredOS       = "windows"
+	// pairingCleanupRetention 是过期配对记录的保留时长。过期配对码本身已不可用，
+	// 超过保留期后从现有 giant_executor_pairings 表清理，不新增表。
+	pairingCleanupRetention = time.Hour
 )
 
 type SecretHash [32]byte
@@ -50,6 +53,16 @@ type PairingRecord struct {
 type PairingSecret struct {
 	Code      string    `json:"code"`
 	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// PendingPairing 是"已生成配对码但还没有设备消费"的只读视图，
+// 只暴露指纹与时间，不回传明文配对码或哈希。
+type PendingPairing struct {
+	Platform    string    `json:"platform"`
+	Fingerprint string    `json:"fingerprint"`
+	CreatedAt   time.Time `json:"createdAt"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	Expired     bool      `json:"expired"`
 }
 
 type PairInput struct {

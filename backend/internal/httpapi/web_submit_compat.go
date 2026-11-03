@@ -1,12 +1,101 @@
 package httpapi
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"qiantie/backend/internal/videomanagementconnector"
 )
+
+// 视频管理系统凭证的四种可区分状态。状态接口、环境自检、同步配置档/风格目录
+// 都只读取 resolveTargetCredential 的结果，避免出现“页面显示已登录并验证、
+// 同步却报登录已失效”的两套判定。
+const (
+	TargetCredentialVerified    = "verified"
+	TargetCredentialNotLoggedIn = "not_logged_in"
+	TargetCredentialIncomplete  = "incomplete"
+	TargetCredentialExpired     = "expired"
+	TargetCredentialUnavailable = "unavailable"
+)
+
+type targetCredential struct {
+	State     string                           `json:"state"`
+	Code      string                           `json:"code,omitempty"`
+	Message   string                           `json:"message"`
+	Username  string                           `json:"username,omitempty"`
+	CheckedAt string                           `json:"checkedAt"`
+	Session   videomanagementconnector.Session `json:"-"`
+}
+
+func (c targetCredential) verified() bool { return c.State == TargetCredentialVerified }
+
+// resolveTargetCredential 是目标站凭证解析的唯一入口：读取同一份
+// upload-target.json 会话，调用连接器同一个 CheckSession，并把结果归类为
+// 未登录 / 凭证不全 / 已过期 / 不可用 / 已验证。调用方不得再自行判断
+// cookie 或登录页。
+func resolveTargetCredential(ctx context.Context, session map[string]any, accountUsername string, targets ...videomanagementconnector.Service) targetCredential {
+	cookie := strings.TrimSpace(toString(session["cookie"]))
+	targetUsername := strings.TrimSpace(toString(session["targetUsername"]))
+	if strings.TrimSpace(accountUsername) == "" {
+		accountUsername = targetUsername
+	}
+	result := targetCredential{Username: strings.TrimSpace(accountUsername), CheckedAt: time.Now().UTC().Format(time.RFC3339)}
+	if cookie == "" {
+		if result.Username != "" {
+			result.State = TargetCredentialIncomplete
+			result.Code = ErrorCodeTargetCredentialIncomplete
+			result.Message = MessageTargetCredentialIncomplete
+		} else {
+			result.State = TargetCredentialNotLoggedIn
+			result.Code = ErrorCodeTargetNotLoggedIn
+			result.Message = MessageTargetNotLoggedIn
+		}
+		return result
+	}
+	result.Session = videomanagementconnector.Session{Cookie: cookie, TargetUsername: targetUsername}
+	if len(targets) == 0 || targets[0] == nil {
+		result.State = TargetCredentialUnavailable
+		result.Code = ErrorCodeTargetConnectorUnavailable
+		result.Message = MessageTargetConnectorUnavailable
+		return result
+	}
+	err := targets[0].CheckSession(ctx, result.Session)
+	switch {
+	case err == nil:
+		result.State = TargetCredentialVerified
+		result.Message = MessageTargetSessionVerified
+	case errors.Is(err, videomanagementconnector.ErrSessionExpired):
+		result.State = TargetCredentialExpired
+		result.Code = ErrorCodeTargetSessionExpired
+		result.Message = MessageTargetSessionExpired
+	case errors.Is(err, videomanagementconnector.ErrSessionMissing):
+		result.State = TargetCredentialNotLoggedIn
+		result.Code = ErrorCodeTargetNotLoggedIn
+		result.Message = MessageTargetNotLoggedIn
+	default:
+		result.State = TargetCredentialUnavailable
+		result.Code = ErrorCodeTargetConnectorUnavailable
+		result.Message = fmt.Sprintf("%s（%v）", MessageTargetConnectorUnavailable, err)
+	}
+	return result
+}
+
+// writeTargetCredentialError 让状态接口之外的同步类接口复用同一套状态文案与
+// 稳定错误码，前端不会再收到一句笼统的“登录已失效”。
+func writeTargetCredentialError(w http.ResponseWriter, credential targetCredential) {
+	status := http.StatusBadRequest
+	switch credential.State {
+	case TargetCredentialExpired:
+		status = http.StatusUnauthorized
+	case TargetCredentialUnavailable:
+		status = http.StatusBadGateway
+	}
+	writeJSON(w, status, map[string]any{"ok": false, "error": credential.Message, "code": credential.Code, "credential": credential})
+}
 
 func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAuth, usersDir string, targets ...videomanagementconnector.Service) {
 	if root == nil || middleware.AuthStore == nil || strings.TrimSpace(usersDir) == "" {
@@ -19,20 +108,9 @@ func RegisterWebSubmitTargetCheckCompat(root *http.ServeMux, middleware BridgeAu
 			return
 		}
 		session := readUploadTargetSession(usersDir, identity.Username)
-		cookie := strings.TrimSpace(toString(session["cookie"]))
-		if cookie == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "请先保存账号密码并登录目标站"})
-			return
-		}
-		valid := false
-		if len(targets) > 0 && targets[0] != nil {
-			err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
-			valid = err == nil
-		} else {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器未配置"})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": valid, "output": []any{}, "result": map[string]any{"checks": map[string]any{"login_session": valid, "upload_endpoint": "/tttadmin/api/zbooklist_upload.php"}}})
+		credential := resolveTargetCredential(req.Context(), session, "", targets...)
+		valid := credential.verified()
+		writeJSON(w, http.StatusOK, map[string]any{"ok": valid, "credential": credential, "output": []any{}, "result": map[string]any{"checks": map[string]any{"login_session": valid, "upload_endpoint": "/tttadmin/api/zbooklist_upload.php"}}})
 	})))
 	root.Handle("GET /api/batch-factory/v12/publish-121/organizations", middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())

@@ -309,6 +309,23 @@ type UpsertComicPageInput struct {
 	AspectRatio        string   `json:"aspectRatio"`
 	Status             string   `json:"status,omitempty"`
 	SnapshotHash       string   `json:"-"`
+	// ExpectedRevision 是内部条件写回版本号。大于 0 时只有当前行 revision
+	// 与之相同才会更新，用于避免两个生成任务把同一页互相覆盖；HTTP 请求
+	// 不读取该字段，因此保持 json:"-"。
+	ExpectedRevision int64 `json:"-"`
+}
+
+// PatchComicPageInput is the HTTP contract for updating one comic page without
+// replacing the whole row. Pointer fields distinguish "not provided" from
+// "provided as empty"; an omitted field keeps the stored value. SnapshotHash is
+// server-owned and is never accepted from a client.
+type PatchComicPageInput struct {
+	ComicPrompt        *string   `json:"comicPrompt,omitempty"`
+	ImagePrompt        *string   `json:"imagePrompt,omitempty"`
+	ReferenceImageURLs *[]string `json:"referenceImageUrls,omitempty"`
+	ModelID            *string   `json:"modelId,omitempty"`
+	AspectRatio        *string   `json:"aspectRatio,omitempty"`
+	Status             *string   `json:"status,omitempty"`
 }
 
 type ComicPageImage struct {
@@ -349,6 +366,13 @@ type ComicCollection struct {
 	Status    string                `json:"status"`
 	Items     []ComicCollectionItem `json:"items"`
 	CreatedAt time.Time             `json:"createdAt"`
+}
+
+// ComicPagePatcher is implemented by stores that can update a comic page with
+// patch semantics. The HTTP layer uses it when available and falls back to the
+// full-row UpsertComicPage contract otherwise.
+type ComicPagePatcher interface {
+	PatchComicPage(context.Context, string, string, string, string, PatchComicPageInput) (ComicPage, error)
 }
 
 type ComicPageStore interface {

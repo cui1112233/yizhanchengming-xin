@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -100,6 +101,11 @@ func (s *MySQLStore) upsertComicPageOnce(ctx context.Context, owner, batchID, bo
 	var page ComicPage
 	err = tx.QueryRowContext(ctx, `SELECT id,revision,created_at FROM batch_factory_v12_comic_pages WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? FOR UPDATE`, owner, batchID, bookID, videoID).Scan(&page.ID, &page.Revision, &page.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
+		if input.ExpectedRevision > 0 {
+			// 调用方认为自己持有某一版页面，但这一行已经不存在，说明页面被
+			// 删除或重建过；按版本冲突处理，避免把旧结果写到新页面上。
+			return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
+		}
 		page.ID, err = newID("comic-page")
 		if err != nil {
 			return ComicPage{}, err
@@ -107,6 +113,9 @@ func (s *MySQLStore) upsertComicPageOnce(ctx context.Context, owner, batchID, bo
 		page.Revision, page.CreatedAt = 1, now
 		_, err = tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_pages(id,owner_username,batch_id,book_id,video_id,comic_prompt,image_prompt,model_id,aspect_ratio,status,snapshot_hash,reference_image_urls,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, page.ID, owner, batchID, bookID, videoID, input.ComicPrompt, input.ImagePrompt, nullableString(input.ModelID), input.AspectRatio, input.Status, nullableString(input.SnapshotHash), comicReferenceURLsJSON(input.ReferenceImageURLs), now, now)
 	} else if err == nil {
+		if input.ExpectedRevision > 0 && page.Revision != input.ExpectedRevision {
+			return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
+		}
 		page.Revision++
 		_, err = tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET comic_prompt=?,image_prompt=?,model_id=?,aspect_ratio=?,status=?,snapshot_hash=?,reference_image_urls=?,revision=?,updated_at=? WHERE id=? AND owner_username=?`, input.ComicPrompt, input.ImagePrompt, nullableString(input.ModelID), input.AspectRatio, input.Status, nullableString(input.SnapshotHash), comicReferenceURLsJSON(input.ReferenceImageURLs), page.Revision, now, page.ID, owner)
 	}
@@ -120,6 +129,87 @@ func (s *MySQLStore) upsertComicPageOnce(ctx context.Context, owner, batchID, bo
 	page.ComicPrompt, page.ImagePrompt, page.ModelID = input.ComicPrompt, input.ImagePrompt, input.ModelID
 	page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt = input.AspectRatio, input.Status, input.SnapshotHash, input.ReferenceImageURLs, now
 	return page, nil
+}
+
+func (s *MySQLStore) PatchComicPage(ctx context.Context, owner, batchID, bookID, videoID string, patch PatchComicPageInput) (ComicPage, error) {
+	var lastErr error
+	for attempt := 1; attempt <= comicPageWriteRetryLimit; attempt++ {
+		page, err := s.patchComicPageOnce(ctx, owner, batchID, bookID, videoID, patch)
+		if err == nil || !retryableComicPageWriteError(err) || attempt == comicPageWriteRetryLimit {
+			return page, err
+		}
+		lastErr = err
+		if waitErr := waitComicPageWriteRetry(ctx, attempt); waitErr != nil {
+			return ComicPage{}, waitErr
+		}
+	}
+	return ComicPage{}, lastErr
+}
+
+func (s *MySQLStore) patchComicPageOnce(ctx context.Context, owner, batchID, bookID, videoID string, patch PatchComicPageInput) (ComicPage, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return ComicPage{}, err
+	}
+	defer tx.Rollback()
+	if err := ensureBookOwnership(ctx, tx, owner, batchID, bookID); err != nil {
+		return ComicPage{}, err
+	}
+	if err := ensureComicVideoOwnership(ctx, tx, owner, batchID, bookID, videoID); err != nil {
+		return ComicPage{}, err
+	}
+	now := time.Now().UTC()
+	var (
+		pageID    string
+		revision  int64
+		createdAt time.Time
+		existing  UpsertComicPageInput
+		refsJSON  []byte
+	)
+	err = tx.QueryRowContext(ctx, `SELECT id,revision,created_at,comic_prompt,image_prompt,COALESCE(model_id,''),aspect_ratio,status,COALESCE(snapshot_hash,''),COALESCE(reference_image_urls,JSON_ARRAY()) FROM batch_factory_v12_comic_pages WHERE owner_username=? AND batch_id=? AND book_id=? AND video_id=? FOR UPDATE`, owner, batchID, bookID, videoID).Scan(&pageID, &revision, &createdAt, &existing.ComicPrompt, &existing.ImagePrompt, &existing.ModelID, &existing.AspectRatio, &existing.Status, &existing.SnapshotHash, &refsJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		merged, mergeErr := applyComicPagePatch(UpsertComicPageInput{}, patch)
+		if mergeErr != nil {
+			return ComicPage{}, mergeErr
+		}
+		pageID, err = newID("comic-page")
+		if err != nil {
+			return ComicPage{}, err
+		}
+		revision, createdAt = 1, now
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_comic_pages(id,owner_username,batch_id,book_id,video_id,comic_prompt,image_prompt,model_id,aspect_ratio,status,snapshot_hash,reference_image_urls,revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`, pageID, owner, batchID, bookID, videoID, merged.ComicPrompt, merged.ImagePrompt, nullableString(merged.ModelID), merged.AspectRatio, merged.Status, nullableString(merged.SnapshotHash), comicReferenceURLsJSON(merged.ReferenceImageURLs), now, now); err != nil {
+			return ComicPage{}, err
+		}
+		if err := tx.Commit(); err != nil {
+			return ComicPage{}, err
+		}
+		return comicPageFromUpsertInput(pageID, revision, createdAt, now, batchID, bookID, videoID, merged), nil
+	}
+	if err != nil {
+		return ComicPage{}, err
+	}
+	_ = json.Unmarshal(refsJSON, &existing.ReferenceImageURLs)
+	merged, err := applyComicPagePatch(existing, patch)
+	if err != nil {
+		return ComicPage{}, err
+	}
+	revision++
+	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_comic_pages SET comic_prompt=?,image_prompt=?,model_id=?,aspect_ratio=?,status=?,snapshot_hash=?,reference_image_urls=?,revision=?,updated_at=? WHERE id=? AND owner_username=?`, merged.ComicPrompt, merged.ImagePrompt, nullableString(merged.ModelID), merged.AspectRatio, merged.Status, nullableString(merged.SnapshotHash), comicReferenceURLsJSON(merged.ReferenceImageURLs), revision, now, pageID, owner); err != nil {
+		return ComicPage{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ComicPage{}, err
+	}
+	return comicPageFromUpsertInput(pageID, revision, createdAt, now, batchID, bookID, videoID, merged), nil
+}
+
+func comicPageFromUpsertInput(pageID string, revision int64, createdAt, updatedAt time.Time, batchID, bookID, videoID string, input UpsertComicPageInput) ComicPage {
+	return ComicPage{
+		ID: pageID, BatchID: batchID, BookID: bookID, VideoID: videoID,
+		ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID,
+		AspectRatio: input.AspectRatio, Status: input.Status, SnapshotHash: input.SnapshotHash,
+		ReferenceImageURLs: input.ReferenceImageURLs, Revision: revision, CreatedAt: createdAt, UpdatedAt: updatedAt,
+	}
 }
 
 func (s *MySQLStore) ListComicPages(ctx context.Context, owner, batchID, bookID string) ([]ComicPage, error) {

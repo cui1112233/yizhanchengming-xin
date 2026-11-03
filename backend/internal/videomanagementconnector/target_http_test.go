@@ -2,6 +2,7 @@ package videomanagementconnector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -92,6 +93,49 @@ func TestTargetHTTPServiceLoginAndSubmitUseOneCookieContract(t *testing.T) {
 	}
 	if value, ok := book.(map[string]any); !ok || value["success"] != true {
 		t.Fatalf("book=%#v", book)
+	}
+}
+
+// 目标站会话失效时 zidingyi.php 会 302 到 login.php，客户端跟随跳转后最终
+// 仍是 HTTP 200。CheckSession 必须识别正文里的登录页，否则会把过期会话
+// 判成“已登录并验证”，与同步风格目录的结果自相矛盾。
+func TestTargetHTTPServiceCheckSessionDetectsLoginPageAfterRedirect(t *testing.T) {
+	loginPage := `<!DOCTYPE html><html><head><title>管理员登录</title></head><body>
+<form id="loginForm"><input type="text" name="username"><input type="password" name="password"></form></body></html>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/tttadmin/zidingyi.php":
+			http.Redirect(w, r, "/tttadmin/login.php", http.StatusFound)
+		case "/tttadmin/login.php":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(loginPage))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+	err := service.CheckSession(context.Background(), Session{Cookie: "PHPSESSID=stale"})
+	if !errors.Is(err, ErrSessionExpired) {
+		t.Fatalf("expired session err=%v, want ErrSessionExpired", err)
+	}
+	if err := service.CheckSession(context.Background(), Session{}); !errors.Is(err, ErrSessionMissing) {
+		t.Fatalf("missing cookie err=%v, want ErrSessionMissing", err)
+	}
+}
+
+func TestTargetHTTPServiceCheckSessionAcceptsRealStylePage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tttadmin/zidingyi.php" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`<select id="style"><option value="1">古风虐文</option></select>`))
+	}))
+	defer server.Close()
+	service := &TargetHTTPService{BaseURL: server.URL, Client: server.Client()}
+	if err := service.CheckSession(context.Background(), Session{Cookie: "PHPSESSID=ok"}); err != nil {
+		t.Fatalf("valid session err=%v", err)
 	}
 }
 

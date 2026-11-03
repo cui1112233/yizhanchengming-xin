@@ -16,6 +16,7 @@ var v12V11AliasPatterns = []string{
 	"GET /api/batch-factory/v12/batches/{batchId}",
 	"POST /api/batch-factory/v12/intakes/{intakeId}/batches",
 	"POST /api/batch-factory/v12/intakes/manual",
+	"POST /api/batch-factory/v12/private-comic/tasks",
 	"POST /api/batch-factory/v12/batches/{batchId}/intakes/{intakeId}/books",
 	"PUT /api/batch-factory/v12/batches/{batchId}/settings",
 	"PUT /api/batch-factory/v12/batches/{batchId}/books/{bookId}/metadata",

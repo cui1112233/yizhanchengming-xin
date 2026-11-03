@@ -9,6 +9,13 @@ const (
 	ErrorCodeVideoProviderNotConfigured = "VIDEO_PROVIDER_NOT_CONFIGURED"
 	ErrorCodeExecutorNotReady           = "EXECUTOR_NOT_READY"
 	ErrorCodeGiantPluginNotConfigured   = "GIANT_PLUGIN_NOT_CONFIGURED"
+
+	// 视频管理系统（121 后台）凭证状态。状态接口与同步接口共用同一套码，
+	// 前端据此区分“没登录 / 凭证不全 / 已过期 / 连接不可用”。
+	ErrorCodeTargetNotLoggedIn          = "TARGET_NOT_LOGGED_IN"
+	ErrorCodeTargetCredentialIncomplete = "TARGET_CREDENTIAL_INCOMPLETE"
+	ErrorCodeTargetSessionExpired       = "TARGET_SESSION_EXPIRED"
+	ErrorCodeTargetConnectorUnavailable = "TARGET_CONNECTOR_UNAVAILABLE"
 )
 
 // 与 frontend/src/shared/apiErrorCodes.json 完全一致的文案镜像，仅用于契约
@@ -18,6 +25,12 @@ const (
 	MessageVideoProviderNotConfigured = "视频生成通道未配置：请到「批量工厂 → 设置 → 视频生成通道」选择通道并填写密钥后保存。"
 	MessageExecutorNotReady           = "执行器未就绪：请到「设置 → 执行器状态」生成配对码并安装执行器；巨量素材也可改用“优先直接获取原文”。"
 	MessageGiantPluginNotConfigured   = "巨量素材解析服务未配置：请在服务器设置 QIANTIE_GIANT_MATERIAL_PLUGIN_URL/TOKEN（或青语 N8 令牌）后重试。"
+
+	MessageTargetNotLoggedIn          = "尚未登录视频管理系统：请点击「登录并验证」，输入视频管理系统账号密码。"
+	MessageTargetCredentialIncomplete = "凭证不全：只保存了视频管理系统账号，没有有效登录会话，请重新登录并验证。"
+	MessageTargetSessionExpired       = "视频管理系统登录已过期：请重新登录并验证后再同步。"
+	MessageTargetConnectorUnavailable = "无法连接视频管理系统：请检查服务器到 two.121w.com 的网络或 Go 连接器配置。"
+	MessageTargetSessionVerified      = "已登录并验证"
 )
 
 // codeCarrier 让任何包（例如 batchfactoryv11）都能在不依赖 httpapi 的前提下

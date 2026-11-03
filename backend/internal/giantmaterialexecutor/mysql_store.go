@@ -150,6 +150,31 @@ VALUES (?, ?, ?, ?, ?, NULL, ?)`, record.ID, record.OwnerUsername, record.Platfo
 	return err
 }
 
+// ListPendingPairings 复用现有 giant_executor_pairings 表读取待配对记录，
+// 不新增 schema；读取时顺手清理超过保留期的过期记录。最近一条未消费记录
+// 即使已过期也会返回，由调用方通过 ExpiresAt 判断是否仍然有效。
+func (s *MySQLStore) ListPendingPairings(ctx context.Context, owner, platform string, now time.Time) ([]PairingRecord, error) {
+	// 清理是尽力而为：失败不能影响状态读取和既有配对流程。
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM giant_executor_pairings
+WHERE owner_username = ? AND expires_at < ?`, owner, now.Add(-pairingCleanupRetention))
+	var record PairingRecord
+	var codeHash, consumed []byte
+	err := s.db.QueryRowContext(ctx, `SELECT id, owner_username, platform, code_hash, expires_at, consumed_at, created_at
+FROM giant_executor_pairings
+WHERE owner_username = ? AND platform = ? AND consumed_at IS NULL AND created_at >= ?
+ORDER BY created_at DESC, id ASC LIMIT 1`, owner, platform, now.Add(-pairingCleanupRetention)).Scan(
+		&record.ID, &record.OwnerUsername, &record.Platform, &codeHash, &record.ExpiresAt, &consumed, &record.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	copy(record.CodeHash[:], codeHash)
+	return []PairingRecord{record}, nil
+}
+
 func (s *MySQLStore) PairExecutor(ctx context.Context, codeHash SecretHash, platform string, executor ExecutorRecord, now time.Time) (ExecutorRecord, error) {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {

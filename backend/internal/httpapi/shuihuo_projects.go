@@ -140,18 +140,99 @@ type shuihuoImageSemaphoreContextKey struct{}
 
 type shuihuoGlobalImageSemaphoreContextKey struct{}
 
-// shuihuoGlobalImageSemaphores 把任务级出图名额拆成资产图和漫画页两个池：
-// 资产图阶段的书会长期占住名额，如果和页图共用同一池，漫画页进度就会长时间
-// 停在同一数字上。默认给页图 4 路、资产图 2 路。
+// shuihuoGlobalImageSemaphores 是任务级出图总名额。
+//
+// 旧实现把总名额固定切成“资产图一半 + 页图一半”。实测一轮自动化里同时并行的
+// 书几乎总处在同一阶段：资产图阶段只能用满 4 路，另外 4 路页图名额一直空转；
+// 页图阶段反过来空转资产名额。等于 8 路总并发实际只跑出 4 路产能。
+//
+// 现在改为“总名额共享 + 阶段保底”：另一阶段没有排队请求时，本阶段可以用满全部
+// 名额；另一阶段一旦有等待中的请求，就为它保留 reserve 个名额，避免资产图把
+// 页图饿住、或页图把资产图饿住。总量始终不超过 limit，保持对网关 RST 的收敛。
 type shuihuoGlobalImageSemaphores struct {
-	asset *shuihuoImageSemaphore
-	page  *shuihuoImageSemaphore
+	mu      sync.Mutex
+	limit   int
+	reserve int
+	inUse   map[string]int
+	waiting map[string]int
 }
 
 const (
 	shuihuoImageStageAsset = "asset"
 	shuihuoImageStagePage  = "page"
 )
+
+func newShuihuoGlobalImageSemaphores(limit int) *shuihuoGlobalImageSemaphores {
+	if limit < 2 {
+		limit = 2
+	}
+	reserve := limit / 2
+	if reserve < 1 {
+		reserve = 1
+	}
+	return &shuihuoGlobalImageSemaphores{
+		limit:   limit,
+		reserve: reserve,
+		inUse:   make(map[string]int, 2),
+		waiting: make(map[string]int, 2),
+	}
+}
+
+func shuihuoOtherImageStage(stage string) string {
+	if stage == shuihuoImageStageAsset {
+		return shuihuoImageStagePage
+	}
+	return shuihuoImageStageAsset
+}
+
+// acquire 按阶段领取一个名额。capFor 只限制“本阶段还能再拿几个”：
+//   - 另一阶段没有排队时，capFor = limit - 另一阶段在用量，即可以用满剩余名额；
+//   - 另一阶段有排队且用不满保底名额时，先给它留出 reserve，本阶段最多用
+//     limit - reserve。
+func (g *shuihuoGlobalImageSemaphores) acquire(ctx context.Context, stage string) (func(), error) {
+	if stage != shuihuoImageStageAsset {
+		stage = shuihuoImageStagePage
+	}
+	other := shuihuoOtherImageStage(stage)
+	g.mu.Lock()
+	g.waiting[stage]++
+	g.mu.Unlock()
+	acquired := false
+	defer func() {
+		if !acquired {
+			g.mu.Lock()
+			g.waiting[stage]--
+			g.mu.Unlock()
+		}
+	}()
+	for {
+		g.mu.Lock()
+		capFor := g.limit - g.inUse[other]
+		if g.waiting[other] > 0 && g.inUse[other] < g.reserve {
+			capFor = g.limit - g.reserve
+		}
+		if g.inUse[stage] < capFor {
+			g.inUse[stage]++
+			g.waiting[stage]--
+			g.mu.Unlock()
+			acquired = true
+			var once sync.Once
+			return func() {
+				once.Do(func() {
+					g.mu.Lock()
+					g.inUse[stage]--
+					g.mu.Unlock()
+				})
+			}, nil
+		}
+		g.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
 
 type shuihuoImageStageContextKey struct{}
 
@@ -178,21 +259,7 @@ func withShuihuoGlobalImageConcurrency(ctx context.Context, limit int) context.C
 	if ctx == nil {
 		return ctx
 	}
-	if limit < 2 {
-		limit = 2
-	}
-	assetLimit := limit / 2
-	if assetLimit < 1 {
-		assetLimit = 1
-	}
-	pageLimit := limit - assetLimit
-	if pageLimit < 1 {
-		pageLimit = 1
-	}
-	return context.WithValue(ctx, shuihuoGlobalImageSemaphoreContextKey{}, &shuihuoGlobalImageSemaphores{
-		asset: newShuihuoImageSemaphoreRaw(assetLimit),
-		page:  newShuihuoImageSemaphoreRaw(pageLimit),
-	})
+	return context.WithValue(ctx, shuihuoGlobalImageSemaphoreContextKey{}, newShuihuoGlobalImageSemaphores(limit))
 }
 
 func shuihuoGlobalImageSemaphoreFromContext(ctx context.Context) *shuihuoGlobalImageSemaphores {
@@ -302,14 +369,7 @@ func acquireShuihuoGPTImageGenerationSlot(ctx context.Context, modelID string) (
 	if global == nil {
 		return releaseTask, nil
 	}
-	pool := global.page
-	if shuihuoImageStageFromContext(ctx) == shuihuoImageStageAsset {
-		pool = global.asset
-	}
-	if pool == nil {
-		return releaseTask, nil
-	}
-	releaseGlobal, err := pool.acquire(ctx)
+	releaseGlobal, err := global.acquire(ctx, shuihuoImageStageFromContext(ctx))
 	if err != nil {
 		releaseTask()
 		return nil, err

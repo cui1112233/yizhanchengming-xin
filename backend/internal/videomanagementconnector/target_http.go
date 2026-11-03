@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +15,15 @@ import (
 	"os"
 	"strings"
 	"time"
+)
+
+// 目标站的会话失效不会返回 401/403：zidingyi.php 会 302 跳转到 login.php，
+// 而 http.Client 默认跟随跳转，最终仍是 HTTP 200 的登录页。因此会话状态
+// 必须同时看“响应正文是不是登录页”，否则状态接口会把已过期会话当成已登录。
+var (
+	ErrSessionMissing     = errors.New("target site session missing")
+	ErrSessionExpired     = errors.New("target site session expired")
+	ErrSessionUnavailable = errors.New("target site session unavailable")
 )
 
 // VideoUploadService is the optional media step used by the batch publisher.
@@ -178,23 +188,47 @@ func (s *TargetHTTPService) GetBook(ctx context.Context, session Session, bookID
 	return value, nil
 }
 
+// CheckSession 是会话状态的唯一判定入口：同时校验 HTTP 状态码和响应正文。
+// 目标站在会话失效时会 302 到 login.php（最终 200），只判断状态码会把失效
+// 会话误判为“已登录并验证”，与随后同步风格目录的“登录已失效”互相矛盾。
 func (s *TargetHTTPService) CheckSession(ctx context.Context, session Session) error {
+	if strings.TrimSpace(session.Cookie) == "" {
+		return ErrSessionMissing
+	}
 	base, err := s.base()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrSessionUnavailable, err)
 	}
 	response, err := s.do(ctx, s.client(), http.MethodGet, base+"/tttadmin/zidingyi.php", session.Cookie, nil)
 	if err != nil {
-		return fmt.Errorf("target site session: %w", err)
+		return fmt.Errorf("%w: %v", ErrSessionUnavailable, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-		return fmt.Errorf("target site session expired")
+		return ErrSessionExpired
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("target site session returned HTTP %d", response.StatusCode)
+		return fmt.Errorf("%w: HTTP %d", ErrSessionUnavailable, response.StatusCode)
+	}
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if LooksLikeLoginPage(string(body)) {
+		return ErrSessionExpired
 	}
 	return nil
+}
+
+// LooksLikeLoginPage 判断目标站响应正文是否为管理员登录页。会话失效时
+// zidingyi.php 会跳转到 login.php，正文包含“管理员登录”和登录表单。
+func LooksLikeLoginPage(page string) bool {
+	text := strings.TrimSpace(page)
+	if text == "" {
+		return false
+	}
+	if strings.Contains(text, "管理员登录") {
+		return true
+	}
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, `name="password"`) && strings.Contains(lower, `name="username"`)
 }
 
 func (s *TargetHTTPService) Submit(ctx context.Context, session Session, input SubmissionInput) (Submission, error) {

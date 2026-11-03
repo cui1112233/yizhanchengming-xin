@@ -50,8 +50,10 @@ func WithComicPromptConcurrency(ctx context.Context, concurrency int) context.Co
 	if concurrency < 1 {
 		concurrency = 1
 	}
-	if concurrency > 5 {
-		concurrency = 5
+	// 逐页提示词是纯文本请求，不占图片网关名额；实测 35 页在 5 路并发下要
+	// 10~11 分钟，提到 8 路可以把排队轮次压下来。
+	if concurrency > 8 {
+		concurrency = 8
 	}
 	return context.WithValue(ctx, comicPromptConcurrencyContextKey{}, concurrency)
 }

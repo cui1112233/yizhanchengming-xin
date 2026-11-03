@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -343,5 +344,104 @@ func TestN8ComicWorkSearchRouteReturnsMatchingWorks(t *testing.T) {
 	}
 	if !reflect.DeepEqual(payload.Works, []n8catalog.Work{{ID: 9001, Name: "小妾造反后"}}) {
 		t.Fatalf("works=%#v", payload.Works)
+	}
+}
+
+// incompleteN8ComicClient 第一次调用模拟“图片上传成功、建合集失败”，
+// 之后成功；用于验证 uploaded 记录不再短路、且下一轮复用 imageIDs。
+type incompleteN8ComicClient struct {
+	calls    int
+	requests []n8comic.PublishRequest
+	failNext bool
+}
+
+func (c *incompleteN8ComicClient) Configured() bool { return true }
+
+func (c *incompleteN8ComicClient) Publish(_ context.Context, request n8comic.PublishRequest) (n8comic.PublishResult, error) {
+	c.calls++
+	c.requests = append(c.requests, request)
+	ids := make([]int64, len(request.Images))
+	for index := range ids {
+		if index < len(request.UploadedImageIDs) && request.UploadedImageIDs[index] > 0 {
+			ids[index] = request.UploadedImageIDs[index]
+		} else {
+			ids[index] = int64(9200 + index)
+		}
+	}
+	if c.failNext {
+		c.failNext = false
+		return n8comic.PublishResult{ImageIDs: ids}, fmt.Errorf("N8 创建漫画合集网络错误")
+	}
+	return n8comic.PublishResult{CarouselID: 888, ImageIDs: ids}, nil
+}
+
+func TestN8ComicPublishIncompleteRecordContinuesAndReusesImageIDs(t *testing.T) {
+	now := time.Date(2026, 11, 3, 8, 0, 0, 0, time.FixedZone("CST", 8*60*60))
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
+		Title: "漫画批次",
+		Books: []batchfactoryv11.CreateBookInput{{Title: "第一本", Videos: []batchfactoryv11.CreateVideoInput{{Label: "一"}, {Label: "二"}}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	pngBytes, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, video := range book.Videos {
+		page, err := store.UpsertComicPage(context.Background(), "alice", batch.ID, book.ID, video.ID, batchfactoryv11.UpsertComicPageInput{ComicPrompt: "漫画页", ImagePrompt: "出图", Status: "ready"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		content := append([]byte(nil), pngBytes...)
+		content = append(content, bytes.Repeat([]byte{'\n'}, index)...)
+		artifact, err := files.SaveImage("n8-incomplete-image-"+page.ID, "image/png", bytes.NewReader(content))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.CreateComicPageImage(context.Background(), "alice", batch.ID, book.ID, page.ID, batchfactoryv11.CreateComicPageImageInput{StorageRef: artifact.StorageRef, MediaType: "image/png", Source: "upload"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	collection, missing, err := store.CreateComicCollection(context.Background(), "alice", batch.ID, book.ID)
+	if err != nil || len(missing) != 0 {
+		t.Fatalf("collection=%+v missing=%v err=%v", collection, missing, err)
+	}
+	client := &incompleteN8ComicClient{failNext: true}
+	publisher := &BatchFactoryN8ComicPublisher{Store: store, LocalFiles: files, Client: client, Now: func() time.Time { return now }}
+	input := n8ComicPublishInput{ProducerAdminName: "崔家铭", AudioCategoryID: 3, AudioID: 77, WorkIDs: []int64{2001}}
+
+	first, err := publisher.Publish(context.Background(), "alice", batch.ID, book.ID, collection.ID, input)
+	if !errors.Is(err, errN8ComicCarouselIncomplete) {
+		t.Fatalf("first publish err=%v, want errN8ComicCarouselIncomplete", err)
+	}
+	if first.Status != "upload_incomplete" || len(first.ImageIDs) != 2 || first.ImageIDs[0] <= 0 || first.ImageIDs[1] <= 0 {
+		t.Fatalf("first publish record=%+v", first)
+	}
+
+	second, err := publisher.Publish(context.Background(), "alice", batch.ID, book.ID, collection.ID, input)
+	if err != nil {
+		t.Fatalf("second publish err=%v", err)
+	}
+	if second.Status != "published" || second.CarouselID != 888 {
+		t.Fatalf("second publish record=%+v", second)
+	}
+	if client.calls != 2 {
+		t.Fatalf("N8 calls=%d, want 2", client.calls)
+	}
+	reused := client.requests[1].UploadedImageIDs
+	if len(reused) != 2 || reused[0] != first.ImageIDs[0] || reused[1] != first.ImageIDs[1] {
+		t.Fatalf("second request UploadedImageIDs=%v, want %v", reused, first.ImageIDs)
+	}
+
+	// 发布成功后 savedRecord 才允许短路，不再请求 N8。
+	if _, err := publisher.Publish(context.Background(), "alice", batch.ID, book.ID, collection.ID, input); err != nil {
+		t.Fatalf("repeat publish err=%v", err)
+	}
+	if client.calls != 2 {
+		t.Fatalf("published record did not short circuit, N8 calls=%d", client.calls)
 	}
 }

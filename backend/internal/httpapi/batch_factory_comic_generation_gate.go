@@ -9,10 +9,10 @@ import (
 )
 
 // The page status is the durable lease for a comic-image generation request.
-// A provider call is allowed to run for up to ten minutes; anything left in
-// generating beyond this window plus a safety margin is an orphaned lease
-// (usually caused by a service restart or a disconnected old request).
-const comicPageGenerationStaleAfter = 15 * time.Minute
+// A provider call is allowed to run for up to 15 minutes; the lease is
+// deliberately longer than that generation context so a still-running worker
+// is never mistaken for an orphan and taken over by a second request.
+const comicPageGenerationStaleAfter = 25 * time.Minute
 
 // comicPageGenerationGate prevents duplicate requests for the same page from
 // queueing multiple expensive provider jobs at the same time.

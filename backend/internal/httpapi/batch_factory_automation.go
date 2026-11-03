@@ -352,7 +352,25 @@ func scheduleAutomationBatchEndRetry(entry map[string]any, stage string, err err
 	entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", stage, errorText, now
 	entry["batchRetryCount"] = attempt + 1
 	entry["batchRetryPending"] = true
-	entry["message"] = fmt.Sprintf("%s，已跳过，批次结束后自动回补（%d/%d）", message, attempt+1, automationBatchRetryRounds)
+	entry["message"] = fmt.Sprintf("%s，已进入回补队列，并发槽位一空出就立即回补（%d/%d）", message, attempt+1, automationBatchRetryRounds)
+	return true
+}
+
+// prepareAutomationBookRetry 把一本等待回补的书切回运行态。它既可以由
+// 批末统一切换使用，也可以在某本书失败后立即重新入队时单本调用。
+func prepareAutomationBookRetry(entry map[string]any, round int, now time.Time) bool {
+	if entry == nil || !automationBoolValue(entry["batchRetryPending"]) {
+		return false
+	}
+	stage := "assets"
+	message := fmt.Sprintf("开始回补失败书籍（第 %d/%d 轮）", round, automationBatchRetryRounds)
+	if automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
+		stage = "comic_publish"
+		message = fmt.Sprintf("重新发布已生成漫画合集（第 %d/%d 轮）", round, automationBatchRetryRounds)
+	}
+	entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", stage, message, "", now
+	delete(entry, "batchRetryPending")
+	appendAutomationBookLog(entry, now, stage, message)
 	return true
 }
 
@@ -362,19 +380,9 @@ func prepareAutomationBatchRetryRound(books map[string]any, round int, now time.
 	retry := make(map[string]bool)
 	for id, raw := range books {
 		entry, _ := raw.(map[string]any)
-		if entry == nil || !automationBoolValue(entry["batchRetryPending"]) {
-			continue
+		if prepareAutomationBookRetry(entry, round, now) {
+			retry[id] = true
 		}
-		stage := "assets"
-		message := fmt.Sprintf("批次主体已完成，开始回补失败书籍（第 %d/%d 轮）", round, automationBatchRetryRounds)
-		if automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
-			stage = "comic_publish"
-			message = fmt.Sprintf("批次主体已完成，重新发布已生成漫画合集（第 %d/%d 轮）", round, automationBatchRetryRounds)
-		}
-		entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", stage, message, "", now
-		delete(entry, "batchRetryPending")
-		appendAutomationBookLog(entry, now, stage, message)
-		retry[id] = true
 	}
 	return retry
 }
@@ -1231,6 +1239,109 @@ func acknowledgeComicRetry(entry map[string]any) {
 
 const comicAutomaticRetryLimit = 3
 
+// 缺页全部是在途/过期租约时的额外重排次数；这条路径不消耗内容审核预算。
+const comicInFlightRetryLimit = 2
+
+// 漫画整本生成不再使用固定的 60 分钟上限：一本 35 页漫画实测端到端需要
+// 110~155 分钟，固定上限会把正常任务当作超时失败。这里改为“预算 + 进度
+// 心跳”租约——初始预算按页数和并发量算，每完成一页就续期，只有真正停滞
+// （连续 idle 时间没有任何进度事件）才取消。
+const (
+	comicGenerationPerPageBudget = 20 * time.Minute
+	comicGenerationMinBudget     = 60 * time.Minute
+	comicGenerationCushion       = 30 * time.Minute
+	comicGenerationIdleExtend    = 20 * time.Minute
+	comicGenerationHardCap       = 6 * time.Hour
+	comicPublishStageTimeout     = 45 * time.Minute
+)
+
+// comicGenerationBudget 按“页数 / 有效并发”估算一本漫画的初始时间预算。
+// 初始预算只需要覆盖第一页出结果之前的时间，之后由心跳续期接管。
+func comicGenerationBudget(pageCount, concurrency int) time.Duration {
+	if pageCount < 1 {
+		pageCount = 1
+	}
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if concurrency > 8 {
+		concurrency = 8
+	}
+	rounds := (pageCount + concurrency - 1) / concurrency
+	budget := time.Duration(rounds)*comicGenerationPerPageBudget + comicGenerationCushion
+	if budget < comicGenerationMinBudget {
+		budget = comicGenerationMinBudget
+	}
+	return budget
+}
+
+func comicGenerationPageCount(book batchfactoryv11.Book) int {
+	pages := len(book.Videos)
+	if pages > comicPageGenerationLimit {
+		pages = comicPageGenerationLimit
+	}
+	if pages < 1 {
+		pages = 1
+	}
+	return pages
+}
+
+// comicGenerationLease 是进度心跳租约。touch 每次把 deadline 推到“现在 +
+// idle”，hardDeadline 防止心跳无限延长；两者都由后台 watchdog 检查。
+type comicGenerationLease struct {
+	mu           sync.Mutex
+	deadline     time.Time
+	hardDeadline time.Time
+}
+
+func (l *comicGenerationLease) touch(extend time.Duration) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	next := time.Now().Add(extend)
+	if next.After(l.hardDeadline) {
+		next = l.hardDeadline
+	}
+	if next.After(l.deadline) {
+		l.deadline = next
+	}
+	l.mu.Unlock()
+}
+
+func (l *comicGenerationLease) expired(now time.Time) bool {
+	if l == nil {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return now.After(l.deadline) || now.After(l.hardDeadline)
+}
+
+var comicGenerationLeaseTick = 15 * time.Second
+
+func comicGenerationLeaseContext(parent context.Context, initial, hardCap time.Duration) (context.Context, *comicGenerationLease, context.CancelFunc) {
+	start := time.Now()
+	ctx, cancel := context.WithCancel(parent)
+	lease := &comicGenerationLease{deadline: start.Add(initial), hardDeadline: start.Add(hardCap)}
+	go func() {
+		ticker := time.NewTicker(comicGenerationLeaseTick)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				if lease.expired(now) {
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return ctx, lease, cancel
+}
+
 func retryableComicAutomationError(err error) bool {
 	if err == nil {
 		return false
@@ -1774,35 +1885,32 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	var workers sync.WaitGroup
 	var jobMu sync.Mutex
 	semaphore := make(chan struct{}, concurrency)
-	// queue 是本次要调度的书：第一轮是全部书，后续轮次只追加上一轮失败被跳过的书。
+	// queue 是本次要调度的书。失败的书一旦登记为待回补，就立刻重新入队；
+	// 只要有一个并发槽位空出就立即回补，不再等整批其它书全部跑完。
 	queue := append([]batchfactoryv11.Book(nil), batch.Books...)
-	round := 0
-	roundEnd := len(queue)
-	for qi := 0; qi <= len(queue); qi++ {
-		if qi == roundEnd {
-			// 本轮派发的书已全部结束，再决定是否进入回补轮。
-			workers.Wait()
-			if control, _, controlErr := c.currentJobControl(owner, batchID, jobID); controlErr == nil && (control == "paused" || control == "stopped") {
-				return
-			}
-			if ctx.Err() != nil || round >= automationBatchRetryRounds {
-				break
-			}
-			retryIDs := prepareAutomationBatchRetryRound(books, round+1, c.now())
-			if len(retryIDs) == 0 {
-				break
-			}
-			round++
-			for _, candidate := range batch.Books {
-				if retryIDs[candidate.ID] {
-					queue = append(queue, candidate)
-				}
-			}
-			roundEnd = len(queue)
-			workers = sync.WaitGroup{}
-			semaphore = make(chan struct{}, concurrency)
+	var queueMu sync.Mutex
+	queueCond := sync.NewCond(&queueMu)
+	inflight := 0
+	enqueueBatchRetry := func(book batchfactoryv11.Book) {
+		queueMu.Lock()
+		queue = append(queue, book)
+		queueCond.Signal()
+		queueMu.Unlock()
+	}
+	qi := 0
+	for {
+		queueMu.Lock()
+		for qi >= len(queue) && inflight > 0 {
+			queueCond.Wait()
+		}
+		if qi >= len(queue) {
+			queueMu.Unlock()
+			break
 		}
 		book := queue[qi]
+		qi++
+		inflight++
+		queueMu.Unlock()
 		// Workers persist their book entry into the same maps, so the initial
 		// read and clone must hold the same mutex to avoid a concurrent map
 		// read/write against the previous round's workers.
@@ -1813,11 +1921,21 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		}
 		entry := cloneAutomationEntry(initialEntry)
 		jobMu.Unlock()
+		if automationBoolValue(entry["batchRetryPending"]) {
+			// 回补的书在入队时仍是 failed；真正开始执行时再切回 running。
+			prepareAutomationBookRetry(entry, automationNumberValue(entry["batchRetryCount"], 0), c.now())
+		}
 		workers.Add(1)
 		semaphore <- struct{}{}
-		go func() {
+		go func(book batchfactoryv11.Book) {
 			defer workers.Done()
-			defer func() { <-semaphore }()
+			defer func() {
+				<-semaphore
+				queueMu.Lock()
+				inflight--
+				queueCond.Broadcast()
+				queueMu.Unlock()
+			}()
 			// The one-item loop lets every existing stage exit its own book with
 			// continue while the other book workers keep running.
 			for range [1]struct{}{} {
@@ -1835,7 +1953,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 				// 同时上报阶段与去敏、审核拒绝、降级重试事件，因此单独加锁，
 				// 保证日志追加与持久化不并发写同一个 entry。
 				var entryLogMu sync.Mutex
+				var generationLease *comicGenerationLease
 				recordComicEvent := func(stage, message string) {
+					// 任何出图/资产进度事件都算心跳：只要还在推进，就不判定超时。
+					if generationLease != nil {
+						generationLease.touch(comicGenerationIdleExtend)
+					}
 					entryLogMu.Lock()
 					entry["stage"], entry["message"], entry["updatedAt"] = stage, message, c.now()
 					delete(entry, "retryAt")
@@ -1852,11 +1975,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 							return
 						}
 					}
-					// 还有回补轮次时先跳过本书，等本批其余书跑完再回来重试；这样
-					// 一本失败不会一直占着并发槽位拖住整批。
-					if scheduleAutomationBatchEndRetry(entry, stage, err, message, round, c.now()) {
+					// 还有回补预算时把本书重新入队；并发槽位一空出就立即回补，
+					// 不再等本批其余书全部跑完。
+					if scheduleAutomationBatchEndRetry(entry, stage, err, message, automationNumberValue(entry["batchRetryCount"], 0), c.now()) {
 						appendAutomationBookLog(entry, c.now(), stage, message)
 						persist()
+						enqueueBatchRetry(book)
 						return
 					}
 					entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", stage, err.Error(), message, c.now()
@@ -1902,16 +2026,23 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					}
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "submit", "到设定时间，正在提交成品", c.now()
 					persist()
-					publishCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+					submitSettings := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+					submitTimeout := stageTimeout
+					if comicSettingString(submitSettings, "productionMode", "video") == "comic" {
+						// 漫画发布要先上传 2–35 张图再建合集，N8 回调入库是异步的，
+						// 10 分钟阶段超时会把正常发布误判成失败。
+						submitTimeout = comicPublishStageTimeout
+					}
+					publishCtx, cancel := context.WithTimeout(ctx, submitTimeout)
 					var submitErr error
-					if comicSettingString(batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch), "productionMode", "video") == "comic" {
+					if comicSettingString(submitSettings, "productionMode", "video") == "comic" {
 						collection, collectionErr := c.latestComicCollection(publishCtx, owner, batchID, book.ID, automationStringValue(entry["comicCollectionId"], ""))
 						if collectionErr != nil {
 							submitErr = collectionErr
 						} else if c.comicPublish == nil {
 							submitErr = fmt.Errorf("N8 漫画发布服务未配置")
 						} else {
-							_, submitErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
+							_, submitErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, submitSettings)
 						}
 					} else {
 						submitErr = c.publishVideo(publishCtx, owner, batchID, book.ID)
@@ -1955,7 +2086,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					if automationStringValue(job["runMode"], "full_submit") == "full_submit" && automationStringValue(entry["stage"], "") == "comic_publish" && strings.TrimSpace(automationStringValue(entry["comicCollectionId"], "")) != "" {
 						entry["message"], entry["updatedAt"] = "正在继续发布已生成漫画合集", c.now()
 						persist()
-						publishCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+						publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
 						collection, collectionErr := c.latestComicCollection(publishCtx, owner, batchID, book.ID, automationStringValue(entry["comicCollectionId"], ""))
 						var publishErr error
 						var record N8ComicPublishRecord
@@ -1967,14 +2098,23 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 							record, publishErr = c.comicPublish(publishCtx, owner, batchID, book.ID, collection, effective)
 						}
 						cancel()
-						if publishErr != nil {
-							fail("comic_publish", publishErr, "漫画合集发布失败")
+						if publishErr != nil || record.Status != "published" {
+							// 只复用已上传 imageIDs、继续建合集；不能当成发布完成。
+							if publishErr == nil {
+								publishErr = errN8ComicCarouselIncomplete
+							}
+							entry["publishState"] = "upload_incomplete"
+							if len(record.ImageIDs) > 0 {
+								entry["comicImageIDs"] = record.ImageIDs
+							}
+							fail("comic_publish", publishErr, "漫画图片已上传，正在继续创建合集")
 							continue
 						}
 						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
 						delete(entry, "retryRequested")
 						delete(entry, "retryAt")
 						delete(entry, "retryReason")
+						delete(entry, "publishState")
 						entry["comicCarouselId"], entry["comicPublishName"] = record.CarouselID, record.Name
 						entry["comicImageIDs"] = record.ImageIDs
 						persist()
@@ -2098,9 +2238,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					}
 					entry["stage"], entry["message"], entry["updatedAt"] = "comic_images", "正在逐页生成漫画并整理合集", c.now()
 					persist()
-					generationCtx, generationCancel := context.WithTimeout(ctx, comicBookDetachedGenerationTimeout)
+					generationCtx, lease, generationCancel := comicGenerationLeaseContext(ctx, comicGenerationBudget(comicGenerationPageCount(book), 4), comicGenerationHardCap)
+					generationLease = lease
 					collection, generateErr := c.generateComicWithRetry(generationCtx, entry, persist, func(attemptCtx context.Context) (batchfactoryv11.ComicCollection, error) {
-						generateCtx, cancel := context.WithTimeout(attemptCtx, 60*time.Minute)
+						// 每次 attempt 不再使用固定 60 分钟：attempt 继承整本的
+						// 心跳租约，只有整本真正停滞时才被取消。
+						generateCtx, cancel := context.WithCancel(attemptCtx)
 						defer cancel()
 						generateCtx = withComicGenerationProgress(generateCtx, recordComicEvent)
 						generateCtx = withShuihuoImageEvent(generateCtx, recordComicEvent)
@@ -2110,6 +2253,22 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					generationCancel()
 					if generateErr != nil {
 						failureStage, failureDetail := comicGenerationFailureStage(generateErr)
+						// 缺页如果只是“仍在生成”或“lease 已过期”，不是内容审核失败：
+						// 不消耗内容审核重试预算，也不使用“两次降级后仍被拒绝”的文案。
+						var shortage *comicPageShortageError
+						if errors.As(generateErr, &shortage) && shortage.Total > 0 && shortage.Failed == 0 {
+							attempts := automationNumberValue(entry["inflightRetryCount"], 0)
+							if attempts < comicInFlightRetryLimit {
+								inflightMessage := fmt.Sprintf("漫画页仍在生成中，等待后立即回补（%d/%d）", attempts+1, comicInFlightRetryLimit)
+								entry["status"], entry["stage"], entry["message"], entry["error"], entry["updatedAt"] = "running", "comic_images", inflightMessage, generateErr.Error(), c.now()
+								entry["inflightRetryCount"] = attempts + 1
+								appendAutomationBookLog(entry, c.now(), "comic_images", inflightMessage)
+								delete(entry, "retryAt")
+								persist()
+								enqueueBatchRetry(book)
+								continue
+							}
+						}
 						// 被内容审核拒绝的资产图会跳过，页会被跳过，合集/资产校验
 						// 因此报缺图。这里不把整本打成永久失败，而是按退避时间自动
 						// 重试缺失内容，其它书照常继续。
@@ -2144,7 +2303,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						}
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_publish", "正在发布漫画合集", c.now()
 						persist()
-						publishCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+						publishCtx, cancel := context.WithTimeout(ctx, comicPublishStageTimeout)
 						record, publishErr := c.comicPublish(publishCtx, owner, batchID, book.ID, collection, batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
 						cancel()
 						if publishErr != nil {
@@ -2155,17 +2314,25 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 								persist()
 								continue
 							}
-							fail("comic_publish", publishErr, "漫画合集发布失败")
+						}
+						if publishErr != nil || record.Status != "published" {
+							// 图片已上传但合集没建起来：这是可续建状态，不能映射成
+							// completed。放回回补队列，下一轮只复用 imageIDs 建合集。
+							if publishErr == nil {
+								publishErr = errN8ComicCarouselIncomplete
+							}
+							entry["publishState"] = "upload_incomplete"
+							if len(record.ImageIDs) > 0 {
+								entry["comicImageIDs"] = record.ImageIDs
+							}
+							fail("comic_publish", publishErr, "漫画图片已上传，正在继续创建合集")
 							continue
 						}
-						if record.Status == "uploaded" {
-							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "uploaded", "漫画图片已上传，已停止重复发布", c.now()
-						} else {
-							entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
-						}
+						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "published", "漫画合集已发布", c.now()
 						delete(entry, "retryRequested")
 						delete(entry, "retryAt")
 						delete(entry, "retryReason")
+						delete(entry, "publishState")
 						entry["comicCarouselId"], entry["comicPublishName"] = record.CarouselID, record.Name
 						entry["comicImageIDs"] = record.ImageIDs
 						persist()
@@ -2315,7 +2482,7 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 				entry["productionTasks"] = len(production.Tasks)
 				persist()
 			}
-		}()
+		}(book)
 	}
 	workers.Wait()
 	if control, _, controlErr := c.currentJobControl(owner, batchID, jobID); controlErr == nil && (control == "paused" || control == "stopped") {

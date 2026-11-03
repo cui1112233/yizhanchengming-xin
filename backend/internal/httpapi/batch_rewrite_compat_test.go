@@ -5,14 +5,140 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/videomanagementconnector"
 )
+
+// staleCredentialConnector 模拟目标站会话已过期：CheckSession 与 RefreshStyles
+// 都返回登录页，用于验证状态接口与同步接口使用同一个凭证判定。
+type staleCredentialConnector struct{}
+
+func (c *staleCredentialConnector) Login(context.Context, videomanagementconnector.LoginInput) (videomanagementconnector.Session, error) {
+	return videomanagementconnector.Session{}, nil
+}
+func (c *staleCredentialConnector) CheckSession(context.Context, videomanagementconnector.Session) error {
+	return videomanagementconnector.ErrSessionExpired
+}
+func (c *staleCredentialConnector) RefreshCatalogs(context.Context, videomanagementconnector.Session) (videomanagementconnector.Catalogs, error) {
+	return videomanagementconnector.Catalogs{}, nil
+}
+func (c *staleCredentialConnector) Submit(context.Context, videomanagementconnector.Session, videomanagementconnector.SubmissionInput) (videomanagementconnector.Submission, error) {
+	return videomanagementconnector.Submission{}, nil
+}
+func (c *staleCredentialConnector) GetSubmission(context.Context, videomanagementconnector.Session, string) (videomanagementconnector.Submission, error) {
+	return videomanagementconnector.Submission{}, nil
+}
+func (c *staleCredentialConnector) RefreshStyles(context.Context, videomanagementconnector.Session) (string, error) {
+	return `<html><title>管理员登录</title><input name="username"><input name="password"></html>`, nil
+}
+
+func TestWebSubmitStatusAndSyncShareExpiredCredential(t *testing.T) {
+	now := time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)
+	usersDir := filepath.Join(t.TempDir(), "users")
+	userDir := filepath.Join(usersDir, "tester")
+	if err := os.MkdirAll(userDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(userDir, "upload-target.json"), []byte(`{"cookie":"PHPSESSID=stale","targetUsername":"operator"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := novelfetchworkshop.NewMemoryStore()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	mux := http.NewServeMux()
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, usersDir, &staleCredentialConnector{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/web-submit/environment", nil)
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("environment status=%d body=%s", res.Code, res.Body.String())
+	}
+	var env struct {
+		OK         bool `json:"ok"`
+		Credential struct {
+			State   string `json:"state"`
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"credential"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.OK || env.Credential.State != TargetCredentialExpired || env.Credential.Code != ErrorCodeTargetSessionExpired {
+		t.Fatalf("environment credential=%#v ok=%v body=%s", env.Credential, env.OK, res.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/batch-rewrite/web-submit/sync-styles", strings.NewReader(`{"persist":false}`))
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res = httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("sync-styles status=%d body=%s", res.Code, res.Body.String())
+	}
+	var syncErr struct {
+		Code       string `json:"code"`
+		Error      string `json:"error"`
+		Credential struct {
+			State string `json:"state"`
+		} `json:"credential"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &syncErr); err != nil {
+		t.Fatal(err)
+	}
+	if syncErr.Code != ErrorCodeTargetSessionExpired || syncErr.Credential.State != TargetCredentialExpired || !strings.Contains(syncErr.Error, "过期") {
+		t.Fatalf("sync-styles body=%s", res.Body.String())
+	}
+}
+
+func TestWebSubmitStatusDistinguishesIncompleteCredential(t *testing.T) {
+	now := time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)
+	store := novelfetchworkshop.NewMemoryStore()
+	if err := store.PutConfig(context.Background(), "tester", map[string]any{"appConfig": map[string]any{"web_submit": map[string]any{"username": "operator"}}}); err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	accountStore := &authTestStore{account: auth.Account{Username: "tester", Active: true}}
+	RegisterBatchRewriteConfigCompat(mux, BridgeAuth{Secret: "secret", Now: func() time.Time { return now }, AuthStore: accountStore}, store, t.TempDir())
+	req := httptest.NewRequest(http.MethodGet, "/api/batch-rewrite/web-submit/environment", nil)
+	SignBridgeRequest(req, "tester", false, now, "secret")
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	var env struct {
+		Credential struct {
+			State string `json:"state"`
+			Code  string `json:"code"`
+		} `json:"credential"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Credential.State != TargetCredentialIncomplete || env.Credential.Code != ErrorCodeTargetCredentialIncomplete {
+		t.Fatalf("credential=%#v body=%s", env.Credential, res.Body.String())
+	}
+}
+
+func TestStyleNameDiffReportsRealAddsAndRemovals(t *testing.T) {
+	old := []string{"古风虐文", "现代甜文", "已下线风格"}
+	fresh := []string{"古风虐文", "现代甜文", "新增风格"}
+	if added := styleNameDiff(fresh, old); !reflect.DeepEqual(added, []string{"新增风格"}) {
+		t.Fatalf("added=%#v", added)
+	}
+	if removed := styleNameDiff(old, fresh); !reflect.DeepEqual(removed, []string{"已下线风格"}) {
+		t.Fatalf("removed=%#v", removed)
+	}
+	if unchanged := styleNameDiff(old, old); len(unchanged) != 0 {
+		t.Fatalf("unchanged diff=%#v", unchanged)
+	}
+}
 
 func TestTargetConfigItemsAcceptsNestedListResponse(t *testing.T) {
 	var payload map[string]any
@@ -328,8 +454,8 @@ func TestBatchRewriteTaskListPreservesSensitiveAIProvenance(t *testing.T) {
 	if err := store.PutDocument(context.Background(), "tester", novelfetchworkshop.Document{
 		BookID: "book-ai-sensitive",
 		Meta: map[string]any{
-			"bookName": "AI 敏感测试",
-			"sensitiveHits": map[string]any{"mode": "ai_group", "hit_count": 2, "hits": []any{}},
+			"bookName":       "AI 敏感测试",
+			"sensitiveHits":  map[string]any{"mode": "ai_group", "hit_count": 2, "hits": []any{}},
 			"sensitiveFixed": map[string]any{"mode": "ai_group", "fixed_count": 1, "failed_count": 1, "items": []any{}},
 		},
 	}); err != nil {
@@ -345,7 +471,9 @@ func TestBatchRewriteTaskListPreservesSensitiveAIProvenance(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", res.Code, res.Body.String())
 	}
-	var payload struct{ Tasks []map[string]any `json:"tasks"` }
+	var payload struct {
+		Tasks []map[string]any `json:"tasks"`
+	}
 	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}

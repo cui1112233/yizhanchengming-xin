@@ -60,6 +60,9 @@ type PublishRequest struct {
 	WorkIDs           []int64
 	AudioCategoryID   int64
 	AudioID           int64
+	// UploadedImageIDs 用于“图片已上传、合集未创建完成”的续建场景。长度必须
+	// 与 Images 一致，下标对应同一页；大于 0 的位置直接复用，0 的位置重新上传。
+	UploadedImageIDs []int64
 }
 
 type PublishResult struct {
@@ -142,12 +145,18 @@ func (c *Client) Publish(ctx context.Context, input PublishRequest) (PublishResu
 		return PublishResult{}, fmt.Errorf("音频分类 ID 和指定音频 ID 必须大于 0")
 	}
 
+	if len(input.UploadedImageIDs) > 0 && len(input.UploadedImageIDs) != len(input.Images) {
+		return PublishResult{}, fmt.Errorf("已上传图片记录与当前漫画页数不一致，不能复用")
+	}
+
 	// N8 文档要求：多张图先全部申请并上传，再统一查询 image/read。
 	// 如果上传一张就立刻查询，TOS 回调还没完成时会把后续流程卡在
 	// IMAGE_NOT_READY，导致合集发布看起来一直失败。
-	imageIDs, uploadErr := c.uploadImages(ctx, input.ProducerAdminName, input.Images)
+	imageIDs, uploadErr := c.uploadImages(ctx, input.ProducerAdminName, input.Images, input.UploadedImageIDs)
 	if uploadErr != nil {
-		return PublishResult{}, uploadErr
+		// 返回部分成功的 imageIDs：调用方可以把已上传的页持久化，下一次只
+		// 重试缺图和建合集，避免整本书 35 张图全部重传。
+		return PublishResult{ImageIDs: imageIDs}, uploadErr
 	}
 
 	payload := map[string]any{
@@ -174,22 +183,31 @@ type pendingImage struct {
 	fileName  string
 	signature string
 	imageID   int64
+	// target 是该页在 Images 原始数组中的下标；跳过的已上传页不占用 pending，
+	// 因此必须显式记录，否则 imageIDs 的顺序会错位。
+	target int
 }
 
-func (c *Client) uploadImages(ctx context.Context, producer string, inputs []ImageInput) ([]int64, error) {
+func (c *Client) uploadImages(ctx context.Context, producer string, inputs []ImageInput, uploaded []int64) ([]int64, error) {
+	imageIDs := make([]int64, len(inputs))
 	pending := make([]pendingImage, 0, len(inputs))
-	for _, input := range inputs {
+	for index, input := range inputs {
+		if index < len(uploaded) && uploaded[index] > 0 {
+			imageIDs[index] = uploaded[index]
+			continue
+		}
 		item, err := c.prepareImageUpload(ctx, producer, input)
 		if err != nil {
-			return nil, err
+			// 已上传的页仍然保留在 imageIDs 里，便于调用方持久化后只补缺图。
+			return imageIDs, err
 		}
+		item.target = index
 		pending = append(pending, item)
 	}
 
-	imageIDs := make([]int64, len(pending))
-	for index, item := range pending {
-		if item.imageID > 0 {
-			imageIDs[index] = item.imageID
+	for index := range pending {
+		if pending[index].imageID > 0 {
+			imageIDs[pending[index].target] = pending[index].imageID
 		}
 	}
 	// N8 入库回调是异步的。逐张等待会让 35 张图最多串行等待 52 分钟，
@@ -229,7 +247,7 @@ func (c *Client) uploadImages(ctx context.Context, producer string, inputs []Ima
 				errorMu.Unlock()
 				continue
 			}
-			imageIDs[index] = imageID
+			imageIDs[pending[index].target] = imageID
 		}
 	}
 	waitGroup.Add(workerCount)
@@ -242,7 +260,7 @@ func (c *Client) uploadImages(ctx context.Context, producer string, inputs []Ima
 	close(jobs)
 	waitGroup.Wait()
 	if firstErr != nil {
-		return nil, firstErr
+		return imageIDs, firstErr
 	}
 	return imageIDs, nil
 }

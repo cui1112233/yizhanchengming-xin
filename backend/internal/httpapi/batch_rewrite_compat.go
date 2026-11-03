@@ -328,22 +328,13 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 			return
 		}
 		session := readUploadTargetSession(usersDir, identity.Username)
-		cookie := strings.TrimSpace(toString(session["cookie"]))
-		loggedIn := false
-		detail := "未登录"
-		if cookie != "" {
-			if len(targets) > 0 && targets[0] != nil {
-				if err := targets[0].CheckSession(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])}); err != nil {
-					detail = "共享登录会话已失效，请先到小说获取重新登录"
-				} else {
-					loggedIn = true
-					detail = "已登录（Go 连接器共享会话）"
-				}
-			} else {
-				detail = "视频管理系统 Go 连接器未配置"
-			}
+		accountUsername := ""
+		if settings, err := store.GetConfig(req.Context(), identity.Username); err == nil {
+			accountUsername = firstText(mapOrEmpty(mapOrEmpty(settings["appConfig"])["web_submit"])["username"], session["targetUsername"])
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": detail}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
+		credential := resolveTargetCredential(req.Context(), session, accountUsername, targets...)
+		loggedIn := credential.verified()
+		writeJSON(w, http.StatusOK, map[string]any{"ok": loggedIn, "credential": credential, "checks": []any{map[string]any{"name": "目标站登录会话", "ok": loggedIn, "detail": credential.Message}, map[string]any{"name": "上传接口", "ok": true, "detail": "/tttadmin/api/zbooklist_upload.php"}}})
 	}))
 	root.Handle("GET /api/batch-rewrite/web-submit/environment", webSubmitEnvironmentHandler)
 	webSubmitHistoryHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -419,9 +410,15 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&body)
 		session := readUploadTargetSession(usersDir, identity.Username)
-		cookie := strings.TrimSpace(toString(session["cookie"]))
-		if cookie == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先保存账号密码并登录目标站"})
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			return
+		}
+		accountUsername := firstText(mapOrEmpty(mapOrEmpty(settings["appConfig"])["web_submit"])["username"], session["targetUsername"])
+		credential := resolveTargetCredential(req.Context(), session, accountUsername, targets...)
+		if !credential.verified() {
+			writeTargetCredentialError(w, credential)
 			return
 		}
 		var styles []map[string]any
@@ -429,49 +426,44 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		if len(targets) > 0 && targets[0] != nil {
 			reader, ok := targets[0].(videomanagementconnector.StyleCatalogService)
 			if !ok {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "视频管理系统 Go 连接器不支持风格目录读取"})
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器不支持风格目录读取", "code": ErrorCodeTargetConnectorUnavailable})
 				return
 			}
-			var err error
-			page, err = reader.RefreshStyles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			page, err = reader.RefreshStyles(req.Context(), credential.Session)
 			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站风格目录读取失败"})
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "目标站风格目录读取失败", "code": ErrorCodeTargetConnectorUnavailable})
 				return
 			}
 			styles = parseTargetStyles([]byte(page))
 		} else {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频管理系统 Go 连接器未配置"})
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": MessageTargetConnectorUnavailable, "code": ErrorCodeTargetConnectorUnavailable})
 			return
 		}
 		if len(styles) == 0 {
-			// 目标站会话失效时 zidingyi.php 会跳转到登录页，解析不到风格下拉框。
-			// 这种情况必须明确提示重新登录，否则会被误判成"目标站没有风格目录"。
+			// 复检期间会话可能刚好过期：与状态接口用同一个登录页判定和文案。
 			if isTargetLoginPage(page) {
-				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "视频管理系统登录已失效，请重新登录后再同步风格目录"})
+				expired := targetCredential{State: TargetCredentialExpired, Code: ErrorCodeTargetSessionExpired, Message: MessageTargetSessionExpired, Username: credential.Username, CheckedAt: credential.CheckedAt}
+				writeTargetCredentialError(w, expired)
 				return
 			}
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用风格目录"})
-			return
-		}
-		settings, err := store.GetConfig(req.Context(), identity.Username)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "目标站未返回可用风格目录", "code": ErrorCodeTargetConnectorUnavailable})
 			return
 		}
 		app := mapOrEmpty(settings["appConfig"])
 		web := mapOrEmpty(app["web_submit"])
 		old := stringArray(settings["styles"])
+		newNames := styleNames(styles)
 		web["style_catalog"] = styles
 		app["web_submit"] = web
 		settings["appConfig"] = app
 		if body.Persist == nil || *body.Persist {
-			settings["styles"] = styleNames(styles)
+			settings["styles"] = newNames
 			if err := store.PutConfig(req.Context(), identity.Username, settings); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "保存风格目录失败"})
 				return
 			}
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "styles": styleNames(styles), "style_sync": map[string]any{"old_count": len(old), "new_count": len(styles), "added": styleNames(styles), "removed": []any{}}, "output": []string{"已从视频管理系统同步风格目录"}})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": web, "styles": newNames, "style_sync": map[string]any{"old_count": len(old), "new_count": len(styles), "added": styleNameDiff(newNames, old), "removed": styleNameDiff(old, newNames)}, "output": []string{"已从视频管理系统同步风格目录"}})
 	}))
 	root.Handle("POST /api/batch-rewrite/web-submit/sync-styles", webSubmitSyncStylesHandler)
 	webSubmitSyncConfigsHandler := middleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -485,9 +477,15 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 		}
 		_ = json.NewDecoder(http.MaxBytesReader(w, req.Body, 16<<10)).Decode(&body)
 		session := readUploadTargetSession(usersDir, identity.Username)
-		cookie := strings.TrimSpace(toString(session["cookie"]))
-		if cookie == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请先保存账号密码并登录目标站"})
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			return
+		}
+		accountUsername := firstText(mapOrEmpty(mapOrEmpty(settings["appConfig"])["web_submit"])["username"], session["targetUsername"])
+		credential := resolveTargetCredential(req.Context(), session, accountUsername, targets...)
+		if !credential.verified() {
+			writeTargetCredentialError(w, credential)
 			return
 		}
 		var payload map[string]any
@@ -496,27 +494,22 @@ func RegisterBatchRewriteConfigCompat(root *http.ServeMux, middleware BridgeAuth
 				RefreshProfiles(context.Context, videomanagementconnector.Session) (any, error)
 			})
 			if !ok {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "视频管理系统 Go 连接器不支持配置档读取"})
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "视频管理系统 Go 连接器不支持配置档读取", "code": ErrorCodeTargetConnectorUnavailable})
 				return
 			}
-			value, err := reader.RefreshProfiles(req.Context(), videomanagementconnector.Session{Cookie: cookie, TargetUsername: toString(session["targetUsername"])})
+			value, err := reader.RefreshProfiles(req.Context(), credential.Session)
 			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站配置档读取失败"})
+				writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "目标站配置档读取失败", "code": ErrorCodeTargetConnectorUnavailable})
 				return
 			}
 			payload = mapOrEmpty(value)
 		} else {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "视频管理系统 Go 连接器未配置"})
+			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": MessageTargetConnectorUnavailable, "code": ErrorCodeTargetConnectorUnavailable})
 			return
 		}
 		items, hasItems := targetConfigItems(payload)
 		if !hasItems || len(items) == 0 {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "目标站未返回可用配置档"})
-			return
-		}
-		settings, err := store.GetConfig(req.Context(), identity.Username)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "读取提交配置失败"})
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "目标站未返回可用配置档", "code": ErrorCodeTargetConnectorUnavailable})
 			return
 		}
 		app := mapOrEmpty(settings["appConfig"])
@@ -873,13 +866,11 @@ func parseTargetStyles(body []byte) []map[string]any {
 	}
 	return out
 }
-// isTargetLoginPage 判断目标站返回的是否为管理员登录页。
+
+// isTargetLoginPage 判断目标站返回的是否为管理员登录页。判定规则由连接器
+// 统一持有，避免状态接口和同步接口各自识别一套标记。
 func isTargetLoginPage(page string) bool {
-	if strings.Contains(page, "管理员登录") {
-		return true
-	}
-	lower := strings.ToLower(page)
-	return strings.Contains(lower, `name="password"`) && strings.Contains(lower, `name="username"`)
+	return videomanagementconnector.LooksLikeLoginPage(page)
 }
 
 func styleNames(styles []map[string]any) []string {
@@ -893,6 +884,28 @@ func stringArray(value any) []string {
 	out := []string{}
 	for _, item := range arrayOrEmpty(value) {
 		out = append(out, toString(item))
+	}
+	return out
+}
+
+// styleNameDiff 返回 base 中存在而 other 中不存在的名称，保持 base 顺序并去重。
+// 同步风格目录用它算出真实的 added/removed，而不是把新目录整体当作 added。
+func styleNameDiff(base, other []string) []string {
+	excluded := make(map[string]struct{}, len(other))
+	for _, name := range other {
+		excluded[name] = struct{}{}
+	}
+	out := make([]string, 0, len(base))
+	seen := make(map[string]struct{}, len(base))
+	for _, name := range base {
+		if _, ok := excluded[name]; ok {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
 	}
 	return out
 }

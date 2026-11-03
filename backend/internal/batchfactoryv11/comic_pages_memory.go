@@ -2,11 +2,60 @@ package batchfactoryv11
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// applyComicPagePatch merges a client patch into an existing page row. Only
+// fields that were actually provided are replaced; the final row still has to
+// satisfy the comic page invariant (both prompts non-empty).
+func applyComicPagePatch(base UpsertComicPageInput, patch PatchComicPageInput) (UpsertComicPageInput, error) {
+	if patch.ComicPrompt != nil {
+		base.ComicPrompt = strings.TrimSpace(*patch.ComicPrompt)
+	}
+	if patch.ImagePrompt != nil {
+		base.ImagePrompt = strings.TrimSpace(*patch.ImagePrompt)
+	}
+	if patch.ModelID != nil {
+		if value := strings.TrimSpace(*patch.ModelID); value != "" {
+			base.ModelID = value
+		}
+	}
+	if patch.AspectRatio != nil {
+		if value := strings.TrimSpace(*patch.AspectRatio); value != "" {
+			base.AspectRatio = value
+		}
+	}
+	if patch.Status != nil {
+		// An empty status means "leave it alone"; a real status is applied.
+		if value := strings.TrimSpace(*patch.Status); value != "" {
+			base.Status = value
+		}
+	}
+	if patch.ReferenceImageURLs != nil {
+		base.ReferenceImageURLs = normalizeComicReferenceURLs(*patch.ReferenceImageURLs)
+	}
+	base.ComicPrompt = strings.TrimSpace(base.ComicPrompt)
+	base.ImagePrompt = strings.TrimSpace(base.ImagePrompt)
+	if base.ComicPrompt == "" || base.ImagePrompt == "" {
+		return UpsertComicPageInput{}, ErrInvalid
+	}
+	base.ModelID = strings.TrimSpace(base.ModelID)
+	base.AspectRatio = strings.TrimSpace(base.AspectRatio)
+	if base.AspectRatio == "" {
+		base.AspectRatio = "9:16"
+	}
+	base.Status = strings.TrimSpace(base.Status)
+	if base.Status == "" {
+		base.Status = "prompt_ready"
+	}
+	base.SnapshotHash = strings.TrimSpace(base.SnapshotHash)
+	base.ReferenceImageURLs = normalizeComicReferenceURLs(base.ReferenceImageURLs)
+	return base, nil
+}
 
 func normalizeComicPageInput(input UpsertComicPageInput) (UpsertComicPageInput, error) {
 	input.ComicPrompt = strings.TrimSpace(input.ComicPrompt)
@@ -99,14 +148,68 @@ func (s *MemoryStore) UpsertComicPage(_ context.Context, owner, batchID, bookID,
 	for id, entry := range s.comicPages {
 		if entry.Owner == owner && entry.Value.BatchID == batchID && entry.Value.BookID == bookID && entry.Value.VideoID == videoID {
 			page := entry.Value
+			if input.ExpectedRevision > 0 && page.Revision != input.ExpectedRevision {
+				return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
+			}
 			page.ComicPrompt, page.ImagePrompt, page.ModelID = input.ComicPrompt, input.ImagePrompt, input.ModelID
 			page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs, page.UpdatedAt, page.Revision = input.AspectRatio, input.Status, input.SnapshotHash, input.ReferenceImageURLs, now, page.Revision+1
 			s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 			return cloneComicPage(page), nil
 		}
 	}
+	if input.ExpectedRevision > 0 {
+		// 期望版本大于 0 说明调用方在写回一版已有页面；此时找不到行同样
+		// 属于版本冲突（页面被删除或重建）。
+		return ComicPage{}, fmt.Errorf("%w: 漫画页版本已变化", ErrConflict)
+	}
 	s.seq++
 	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: input.ComicPrompt, ImagePrompt: input.ImagePrompt, ModelID: input.ModelID, AspectRatio: input.AspectRatio, Status: input.Status, SnapshotHash: input.SnapshotHash, ReferenceImageURLs: input.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
+	s.comicPages[page.ID] = memoryOwned[ComicPage]{Owner: owner, Value: page}
+	return cloneComicPage(page), nil
+}
+
+func (s *MemoryStore) PatchComicPage(_ context.Context, owner, batchID, bookID, videoID string, patch PatchComicPageInput) (ComicPage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	book, err := s.ownedBookLocked(owner, batchID, bookID)
+	if err != nil {
+		return ComicPage{}, err
+	}
+	foundVideo := false
+	for _, video := range book.Videos {
+		if video.ID == videoID {
+			foundVideo = true
+			break
+		}
+	}
+	if !foundVideo {
+		return ComicPage{}, ErrNotFound
+	}
+	now := time.Now().UTC()
+	for id, entry := range s.comicPages {
+		if entry.Owner != owner || entry.Value.BatchID != batchID || entry.Value.BookID != bookID || entry.Value.VideoID != videoID {
+			continue
+		}
+		page := entry.Value
+		merged, mergeErr := applyComicPagePatch(UpsertComicPageInput{
+			ComicPrompt: page.ComicPrompt, ImagePrompt: page.ImagePrompt, ReferenceImageURLs: page.ReferenceImageURLs,
+			ModelID: page.ModelID, AspectRatio: page.AspectRatio, Status: page.Status, SnapshotHash: page.SnapshotHash,
+		}, patch)
+		if mergeErr != nil {
+			return ComicPage{}, mergeErr
+		}
+		page.ComicPrompt, page.ImagePrompt, page.ModelID = merged.ComicPrompt, merged.ImagePrompt, merged.ModelID
+		page.AspectRatio, page.Status, page.SnapshotHash, page.ReferenceImageURLs = merged.AspectRatio, merged.Status, merged.SnapshotHash, merged.ReferenceImageURLs
+		page.UpdatedAt, page.Revision = now, page.Revision+1
+		s.comicPages[id] = memoryOwned[ComicPage]{Owner: owner, Value: page}
+		return cloneComicPage(page), nil
+	}
+	merged, err := applyComicPagePatch(UpsertComicPageInput{}, patch)
+	if err != nil {
+		return ComicPage{}, err
+	}
+	s.seq++
+	page := ComicPage{ID: "comic-page-" + strconv.FormatInt(s.seq, 10), BatchID: batchID, BookID: bookID, VideoID: videoID, ComicPrompt: merged.ComicPrompt, ImagePrompt: merged.ImagePrompt, ModelID: merged.ModelID, AspectRatio: merged.AspectRatio, Status: merged.Status, SnapshotHash: merged.SnapshotHash, ReferenceImageURLs: merged.ReferenceImageURLs, Revision: 1, CreatedAt: now, UpdatedAt: now}
 	s.comicPages[page.ID] = memoryOwned[ComicPage]{Owner: owner, Value: page}
 	return cloneComicPage(page), nil
 }

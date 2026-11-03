@@ -3,6 +3,7 @@ package localexecutor
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -113,6 +114,27 @@ func (s *MemoryStore) ListExecutors(_ context.Context, owner string) ([]Executor
 			out = append(out, record)
 		}
 	}
+	return out, nil
+}
+
+// ListPendingPairings 返回最近一条未消费的配对记录（新的在前），并在读取时
+// 清理超过保留期的过期记录。已过期的最近记录仍会返回，由调用方判断有效性。
+func (s *MemoryStore) ListPendingPairings(_ context.Context, owner, platform string, now time.Time) ([]PairingRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cutoff := now.Add(-pairingCleanupRetention)
+	out := make([]PairingRecord, 0, 4)
+	for key, record := range s.pairings {
+		if record.ExpiresAt.Before(cutoff) {
+			delete(s.pairings, key)
+			continue
+		}
+		if record.OwnerUsername != owner || record.Platform != platform || record.ConsumedAt != nil || record.CreatedAt.Before(cutoff) {
+			continue
+		}
+		out = append(out, record)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
 	return out, nil
 }
 
