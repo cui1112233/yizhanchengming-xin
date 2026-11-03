@@ -3641,10 +3641,10 @@ func shuihuoHTTP2ImageGatewayHost(host string) bool {
 func shuihuoImageDownloadHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ForceAttemptHTTP2 = true
-	// 图片 CDN 常见故障是 status=200 之后 body 长时间读不完：120s 超时会让
-	// 每次失败白等两分钟，再叠加多次重试就变成几分钟卡死。这里收敛到 25s，
-	// 失败快速重试；真正的生成耗时不受影响。
-	return &http.Client{Timeout: 25 * time.Second, Transport: transport}
+	// 25s 超时实测是回归：img2.yydsbest.com 对大图常常需要几十秒才读完，
+	// 收到 200 但 25s 内读不完会被判失败，导致整批一张都落不了库。恢复
+	// 到 120s，让正常下载有机会完成；真正的抖动仍由重试和 b64 兜底处理。
+	return &http.Client{Timeout: 120 * time.Second, Transport: transport}
 }
 
 // errShuihuoImageContentPolicy 表示图片模型按内容审核拒收了提示词。
@@ -4645,8 +4645,8 @@ func downloadShuihuoGeneratedImage(ctx context.Context, client *http.Client, ima
 var shuihuoImageDownloadSemaphore = newShuihuoImageSemaphoreRaw(2)
 
 func downloadShuihuoGeneratedImageWithRetry(ctx context.Context, client *http.Client, imageURL, credential string, withCredential bool) (string, []byte, int, error) {
-	// 两次足够：第一次失败多半是 CDN 抖动，第二次再失败就交给上层重新生成。
-	const maxAttempts = 2
+	// 三次：CDN 抖动经常连续两次；第二次就放弃会让已生成好的图被丢弃。
+	const maxAttempts = 3
 	parsed, _ := url.Parse(imageURL)
 	host := "unknown"
 	if parsed != nil && parsed.Host != "" {
