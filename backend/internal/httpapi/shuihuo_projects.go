@@ -93,6 +93,14 @@ func newShuihuoImageSemaphore(limit int) *shuihuoImageSemaphore {
 	return &shuihuoImageSemaphore{limit: shuihuoClampImageConcurrency(limit)}
 }
 
+// newShuihuoImageSemaphoreRaw 不做每书 4 路上限的裁剪，专供任务级总并发使用。
+func newShuihuoImageSemaphoreRaw(limit int) *shuihuoImageSemaphore {
+	if limit < 1 {
+		limit = 1
+	}
+	return &shuihuoImageSemaphore{limit: limit}
+}
+
 func (s *shuihuoImageSemaphore) setLimit(limit int) {
 	limit = shuihuoClampImageConcurrency(limit)
 	s.mu.Lock()
@@ -129,6 +137,26 @@ var shuihuoImageGenerationSemaphore = newShuihuoImageSemaphore(shuihuoImageGener
 type shuihuoImageConcurrencyContextKey struct{}
 
 type shuihuoImageSemaphoreContextKey struct{}
+
+type shuihuoGlobalImageSemaphoreContextKey struct{}
+
+// withShuihuoGlobalImageConcurrency 给整个自动化任务加一层总并发上限。
+// 图片网关在同时流式返回太多大响应时会直接 RST 连接（实测 HTTP 200 后
+// wsarecv 被重置），所以“每书 4 路 × 多本书”会互相拖垮，总量必须收敛。
+func withShuihuoGlobalImageConcurrency(ctx context.Context, limit int) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoGlobalImageSemaphoreContextKey{}, newShuihuoImageSemaphoreRaw(limit))
+}
+
+func shuihuoGlobalImageSemaphoreFromContext(ctx context.Context) *shuihuoImageSemaphore {
+	if ctx == nil {
+		return nil
+	}
+	semaphore, _ := ctx.Value(shuihuoGlobalImageSemaphoreContextKey{}).(*shuihuoImageSemaphore)
+	return semaphore
+}
 
 type shuihuoEffectiveSettingsContextKey struct{}
 
@@ -215,12 +243,29 @@ func acquireShuihuoGPTImageGenerationSlot(ctx context.Context, modelID string) (
 		return func() {}, nil
 	}
 	// 批次任务在上下文里带有独立信号量时，优先按该任务的并发上限排队。
-	if semaphore := shuihuoImageSemaphoreFromContext(ctx); semaphore != nil {
-		return semaphore.acquire(ctx)
+	task := shuihuoImageSemaphoreFromContext(ctx)
+	if task == nil {
+		// 单页手动生成等没有任务上下文的路径，回落到进程级上限。
+		shuihuoImageGenerationSemaphore.setLimit(shuihuoImageConcurrencyFromContext(ctx))
+		task = shuihuoImageGenerationSemaphore
 	}
-	// 单页手动生成等没有任务上下文的路径，回落到进程级上限。
-	shuihuoImageGenerationSemaphore.setLimit(shuihuoImageConcurrencyFromContext(ctx))
-	return shuihuoImageGenerationSemaphore.acquire(ctx)
+	releaseTask, err := task.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	global := shuihuoGlobalImageSemaphoreFromContext(ctx)
+	if global == nil {
+		return releaseTask, nil
+	}
+	releaseGlobal, err := global.acquire(ctx)
+	if err != nil {
+		releaseTask()
+		return nil, err
+	}
+	return func() {
+		releaseGlobal()
+		releaseTask()
+	}, nil
 }
 
 func textProviderForShuihuo(director *batchfactoryv11.DirectorService, ownerProvider batchfactoryv11.DirectorProvider) batchfactoryv11.DirectorProvider {

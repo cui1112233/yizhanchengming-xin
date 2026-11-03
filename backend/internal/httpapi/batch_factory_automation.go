@@ -1753,6 +1753,14 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	if concurrency > 4 {
 		concurrency = 4
 	}
+	// 每本书各自最多 4 路出图，但整个任务还需要一个总并发上限：实测图片网关
+	// 在并发响应体过多时会直接 RST（HTTP 200 后 wsarecv 被重置），4 本书 × 4 路
+	// 的超卖反而让每张图都要重试。默认收敛到 6 路，可用 job 字段覆盖。
+	imageGlobalConcurrency := automationNumberValue(job["imageGlobalConcurrency"], 6)
+	if imageGlobalConcurrency < 1 {
+		imageGlobalConcurrency = 6
+	}
+	ctx = withShuihuoGlobalImageConcurrency(ctx, int(imageGlobalConcurrency))
 	var failed atomic.Int32
 	var workers sync.WaitGroup
 	var jobMu sync.Mutex
