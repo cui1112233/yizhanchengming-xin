@@ -3418,87 +3418,119 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 	return "", "", "", policyErr
 }
 
+// newShuihuoProviderImageRequest 构造一次图片生成请求：支持编辑的模型走
+// /images/edits 携带参考图，其余走 /images/generations。
+// withResponseFormat 控制是否要求网关直接返回 base64；第三方网关默认常只回
+// 一个 CDN URL，迫使我们再下载一次，而该 CDN 极易在 200 后读超时。
+func newShuihuoProviderImageRequest(ctx context.Context, endpoint, modelID, prompt, aspectRatio string, referenceImageURLs []string, model map[string]any, withResponseFormat bool) (*http.Request, error) {
+	if len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, modelID) {
+		return newShuihuoImageEditRequest(ctx, endpoint, modelID, prompt, shuihuoImageSize(aspectRatio), referenceImageURLs)
+	}
+	payload := map[string]any{"model": modelID, "prompt": prompt, "n": 1, "size": shuihuoImageSizeForModel(modelID, aspectRatio)}
+	if withResponseFormat {
+		payload["response_format"] = "b64_json"
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return req, nil
+}
+
+// shuihuoImageResponseRejectsResponseFormat 识别网关不认识 response_format
+// 字段的报错，用于自动去掉该字段后重发一次。
+func shuihuoImageResponseRejectsResponseFormat(raw []byte) bool {
+	detail := strings.ToLower(string(raw))
+	for _, keyword := range []string{"response_format", "response format", "unknown parameter", "unsupported parameter", "unrecognized", "不支持的参数", "未知参数"} {
+		if strings.Contains(detail, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
 // requestShuihuoProviderImage 执行一次图片供应商请求（含排队、解码与落盘）。
 // 内容审核拒绝会返回 errShuihuoImageContentPolicy，由调用方决定是否降级重试。
 func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, model map[string]any, endpoint, credential, imagePrompt string, referenceImageURLs []string) (string, string, error) {
-	var req *http.Request
-	var err error
-	if len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID) {
-		req, err = newShuihuoImageEditRequest(ctx, endpoint, target.ModelID, imagePrompt, shuihuoImageSize(target.AspectRatio), referenceImageURLs)
-	} else {
-		payload := map[string]any{"model": target.ModelID, "prompt": imagePrompt, "n": 1, "size": shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)}
-		// gpt-image compatible gateways return a URL or base64 payload according
-		// to their own configuration and reject the legacy response_format field.
-		if !shuihuoIsGPTImageModel(target.ModelID) {
-			payload["response_format"] = "b64_json"
-		}
-		body, _ := json.Marshal(payload)
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	size := shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)
+	useEdits := len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID)
+	for attempt := 0; attempt < 2; attempt++ {
+		// 第一次要求 base64；若网关不认该字段，第二次去掉再试。
+		withResponseFormat := attempt == 0
+		req, err := newShuihuoProviderImageRequest(ctx, endpoint, target.ModelID, imagePrompt, target.AspectRatio, referenceImageURLs, model, withResponseFormat)
 		if err != nil {
-			return "", "", fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
+			return "", "", err
 		}
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if err != nil {
-		return "", "", fmt.Errorf("%w: image provider request failed", batchfactoryv11.ErrUpstream)
-	}
-	log.Printf("shuihuo image request provider=%s model=%s endpoint=%s refs=%d size=%s", target.Provider, target.ModelID, endpoint, len(referenceImageURLs), shuihuoImageSizeForModel(target.ModelID, target.AspectRatio))
-	req.Header.Set("Authorization", "Bearer "+credential)
-	releaseImageSlot, err := acquireShuihuoGPTImageGenerationSlot(ctx, target.ModelID)
-	if err != nil {
-		return "", "", fmt.Errorf("%w: 等待图片模型请求失败: %v", batchfactoryv11.ErrUpstream, err)
-	}
-	client := shuihuoImageGenerationHTTPClient(endpoint)
-	response, err := client.Do(req)
-	if err != nil {
+		log.Printf("shuihuo image request provider=%s model=%s endpoint=%s refs=%d size=%s b64=%t edits=%t", target.Provider, target.ModelID, endpoint, len(referenceImageURLs), size, withResponseFormat, useEdits)
+		req.Header.Set("Authorization", "Bearer "+credential)
+		releaseImageSlot, err := acquireShuihuoGPTImageGenerationSlot(ctx, target.ModelID)
+		if err != nil {
+			return "", "", fmt.Errorf("%w: 等待图片模型请求失败: %v", batchfactoryv11.ErrUpstream, err)
+		}
+		client := shuihuoImageGenerationHTTPClient(endpoint)
+		response, err := client.Do(req)
+		if err != nil {
+			releaseImageSlot()
+			return "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+		response.Body.Close()
+		// Serialize only the provider generation call; a slow CDN download must not
+		// block the next GPT image request.
 		releaseImageSlot()
-		return "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
-	}
-	raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
-	response.Body.Close()
-	// Serialize only the provider generation call; a slow CDN download must not
-	// block the next GPT image request.
-	releaseImageSlot()
-	if readErr != nil {
-		// 上游很可能已经出图，只是响应体在传输中断（网关截断/连接重置）。
-		// 必须把读错误带进错误文本，否则重试判定匹配不到，已生成的图会被丢弃。
-		log.Printf("shuihuo image response body read failed provider=%s model=%s status=%d refs=%d: %v", target.Provider, target.ModelID, response.StatusCode, len(referenceImageURLs), readErr)
-		return "", "", fmt.Errorf("%w: image provider response body read failed status=%d refs=%d: %v", batchfactoryv11.ErrUpstream, response.StatusCode, len(referenceImageURLs), readErr)
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
-		if shuihuoImageResponseContentRejected(response.StatusCode, raw) {
-			return "", "", fmt.Errorf("%w: %s", errShuihuoImageContentPolicy, shuihuoImageProviderErrorDetail(raw))
+		if readErr != nil {
+			// 上游很可能已经出图，只是响应体在传输中断（网关截断/连接重置）。
+			// 必须把读错误带进错误文本，否则重试判定匹配不到，已生成的图会被丢弃。
+			log.Printf("shuihuo image response body read failed provider=%s model=%s status=%d refs=%d: %v", target.Provider, target.ModelID, response.StatusCode, len(referenceImageURLs), readErr)
+			return "", "", fmt.Errorf("%w: image provider response body read failed status=%d refs=%d: %v", batchfactoryv11.ErrUpstream, response.StatusCode, len(referenceImageURLs), readErr)
 		}
-		if len(referenceImageURLs) > 0 && shuihuoImageProviderRejectedReferences(raw) {
-			return "", "", fmt.Errorf("%w: %s", errShuihuoImageReferenceUnusable, shuihuoImageProviderErrorDetail(raw))
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
+			if attempt == 0 && !useEdits && shuihuoImageResponseRejectsResponseFormat(raw) {
+				log.Printf("shuihuo image gateway rejected response_format; retrying without it model=%s", target.ModelID)
+				continue
+			}
+			if shuihuoImageResponseContentRejected(response.StatusCode, raw) {
+				return "", "", fmt.Errorf("%w: %s", errShuihuoImageContentPolicy, shuihuoImageProviderErrorDetail(raw))
+			}
+			// /edits 端点不存在或不被网关接受时，同样按“参考图不可用”回退到
+			// 纯文生图，避免整本书因为一个可选参考图而失败。
+			if useEdits && (response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusMethodNotAllowed) {
+				return "", "", fmt.Errorf("%w: %s", errShuihuoImageReferenceUnusable, shuihuoImageProviderErrorDetail(raw))
+			}
+			if len(referenceImageURLs) > 0 && shuihuoImageProviderRejectedReferences(raw) {
+				return "", "", fmt.Errorf("%w: %s", errShuihuoImageReferenceUnusable, shuihuoImageProviderErrorDetail(raw))
+			}
+			return "", "", fmt.Errorf("%w: image provider returned HTTP %d%s", batchfactoryv11.ErrUpstream, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
 		}
-		return "", "", fmt.Errorf("%w: image provider returned HTTP %d%s", batchfactoryv11.ErrUpstream, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
+		var result struct {
+			Data []struct {
+				B64JSON string `json:"b64_json"`
+				URL     string `json:"url"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
+			return "", "", fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
+		}
+		mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, shuihuoImageDownloadHTTPClient(), result.Data[0].B64JSON, result.Data[0].URL, credential, endpoint)
+		if err != nil {
+			return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
+		}
+		// 统一配置启用水印时，在保存前叠加白底方框文字。
+		imageBytes, mediaType = applyShuihuoImageWatermark(ctx, imageBytes, mediaType)
+		artifactID, err := localexecutor.NewArtifactID()
+		if err != nil {
+			return "", "", err
+		}
+		saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
+		if err != nil {
+			return "", "", err
+		}
+		return mediaType, saved.StorageRef, nil
 	}
-	var result struct {
-		Data []struct {
-			B64JSON string `json:"b64_json"`
-			URL     string `json:"url"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(raw, &result) != nil || len(result.Data) == 0 {
-		return "", "", fmt.Errorf("%w: image provider response is invalid", batchfactoryv11.ErrUpstream)
-	}
-	mediaType, imageBytes, err := decodeShuihuoGeneratedImage(ctx, shuihuoImageDownloadHTTPClient(), result.Data[0].B64JSON, result.Data[0].URL, credential, endpoint)
-	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", batchfactoryv11.ErrUpstream, err)
-	}
-	// 统一配置启用水印时，在保存前叠加白底方框文字。
-	imageBytes, mediaType = applyShuihuoImageWatermark(ctx, imageBytes, mediaType)
-	artifactID, err := localexecutor.NewArtifactID()
-	if err != nil {
-		return "", "", err
-	}
-	saved, err := files.SaveImage(artifactID, mediaType, bytes.NewReader(imageBytes))
-	if err != nil {
-		return "", "", err
-	}
-	return mediaType, saved.StorageRef, nil
+	return "", "", fmt.Errorf("%w: image provider rejected response_format", batchfactoryv11.ErrUpstream)
 }
 
 // applyShuihuoImageWatermark 读取统一配置中的水印设置，在生成的图片右下角
@@ -3550,7 +3582,10 @@ func shuihuoHTTP2ImageGatewayHost(host string) bool {
 func shuihuoImageDownloadHTTPClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ForceAttemptHTTP2 = true
-	return &http.Client{Timeout: 120 * time.Second, Transport: transport}
+	// 图片 CDN 常见故障是 status=200 之后 body 长时间读不完：120s 超时会让
+	// 每次失败白等两分钟，再叠加多次重试就变成几分钟卡死。这里收敛到 25s，
+	// 失败快速重试；真正的生成耗时不受影响。
+	return &http.Client{Timeout: 25 * time.Second, Transport: transport}
 }
 
 // errShuihuoImageContentPolicy 表示图片模型按内容审核拒收了提示词。
@@ -4541,13 +4576,25 @@ func downloadShuihuoGeneratedImage(ctx context.Context, client *http.Client, ima
 	return detectedShuihuoImageMediaType(payload), payload, response.StatusCode, nil
 }
 
+// shuihuoImageDownloadSemaphore 单独给 CDN 下载限流：生成阶段已经受
+// gpt-image 信号量约束，但下载大图同样会抢占同一出口带宽，多路同时下载
+// 会把 CDN 挤到读不完 body。这里固定 2 路，避免下载互相拖垮。
+var shuihuoImageDownloadSemaphore = newShuihuoImageSemaphoreRaw(2)
+
 func downloadShuihuoGeneratedImageWithRetry(ctx context.Context, client *http.Client, imageURL, credential string, withCredential bool) (string, []byte, int, error) {
-	const maxAttempts = 3
+	// 两次足够：第一次失败多半是 CDN 抖动，第二次再失败就交给上层重新生成。
+	const maxAttempts = 2
 	parsed, _ := url.Parse(imageURL)
 	host := "unknown"
 	if parsed != nil && parsed.Host != "" {
 		host = parsed.Host
 	}
+
+	releaseDownload, acquireErr := shuihuoImageDownloadSemaphore.acquire(ctx)
+	if acquireErr != nil {
+		return "", nil, 0, acquireErr
+	}
+	defer releaseDownload()
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		mediaType, payload, status, err := downloadShuihuoGeneratedImage(ctx, client, imageURL, credential, withCredential)
