@@ -128,6 +128,8 @@ var shuihuoImageGenerationSemaphore = newShuihuoImageSemaphore(shuihuoImageGener
 
 type shuihuoImageConcurrencyContextKey struct{}
 
+type shuihuoImageSemaphoreContextKey struct{}
+
 type shuihuoEffectiveSettingsContextKey struct{}
 
 type shuihuoAssetThreeViewContextKey struct{}
@@ -173,11 +175,29 @@ func shuihuoEffectiveSettingsFromContext(ctx context.Context) map[string]any {
 
 // withShuihuoImageConcurrency 把当前书生效的出图并发写进上下文，由真正的
 // 图片请求读取。未设置时使用默认并发。
+//
+// 每次调用会同时挂一个属于本次任务（通常是一本书）的信号量实例：出图并发
+// 是“每本书各自 N 路”，不是全进程共用一个 N 路上限，否则多本书并行时互相
+// 抢槽位，屏幕上写着 4 路实际全批只有 4 张在跑。
 func withShuihuoImageConcurrency(ctx context.Context, concurrency int) context.Context {
 	if ctx == nil {
 		return ctx
 	}
-	return context.WithValue(ctx, shuihuoImageConcurrencyContextKey{}, shuihuoClampImageConcurrency(concurrency))
+	limit := shuihuoClampImageConcurrency(concurrency)
+	if existing, ok := ctx.Value(shuihuoImageSemaphoreContextKey{}).(*shuihuoImageSemaphore); ok && existing != nil {
+		existing.setLimit(limit)
+		return context.WithValue(ctx, shuihuoImageConcurrencyContextKey{}, limit)
+	}
+	ctx = context.WithValue(ctx, shuihuoImageConcurrencyContextKey{}, limit)
+	return context.WithValue(ctx, shuihuoImageSemaphoreContextKey{}, newShuihuoImageSemaphore(limit))
+}
+
+func shuihuoImageSemaphoreFromContext(ctx context.Context) *shuihuoImageSemaphore {
+	if ctx == nil {
+		return nil
+	}
+	semaphore, _ := ctx.Value(shuihuoImageSemaphoreContextKey{}).(*shuihuoImageSemaphore)
+	return semaphore
 }
 
 func shuihuoImageConcurrencyFromContext(ctx context.Context) int {
@@ -194,6 +214,11 @@ func acquireShuihuoGPTImageGenerationSlot(ctx context.Context, modelID string) (
 	if !shuihuoIsGPTImageModel(modelID) {
 		return func() {}, nil
 	}
+	// 批次任务在上下文里带有独立信号量时，优先按该任务的并发上限排队。
+	if semaphore := shuihuoImageSemaphoreFromContext(ctx); semaphore != nil {
+		return semaphore.acquire(ctx)
+	}
+	// 单页手动生成等没有任务上下文的路径，回落到进程级上限。
 	shuihuoImageGenerationSemaphore.setLimit(shuihuoImageConcurrencyFromContext(ctx))
 	return shuihuoImageGenerationSemaphore.acquire(ctx)
 }

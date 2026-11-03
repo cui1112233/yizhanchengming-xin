@@ -193,15 +193,15 @@ func TestGPTImageGenerationRequestsAreSerialized(t *testing.T) {
 		},
 	}
 	const requests = 4
+	// 统一配置设成 1 路时必须保持串行；同一任务共用同一个信号量实例。
+	taskCtx := withShuihuoImageConcurrency(context.Background(), 1)
 	var workers sync.WaitGroup
 	errs := make(chan error, requests)
 	for range requests {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			// 统一配置设成 1 路时必须保持串行。
-			ctx := withShuihuoImageConcurrency(context.Background(), 1)
-			_, _, _, err := generateShuihuoImageArtifact(ctx, nil, files, nil, "alice", target, "test prompt", nil, nil)
+			_, _, _, err := generateShuihuoImageArtifact(taskCtx, nil, files, nil, "alice", target, "test prompt", nil, nil)
 			errs <- err
 		}()
 	}
@@ -245,14 +245,14 @@ func TestGPTImageGenerationRequestsHonorConfiguredConcurrency(t *testing.T) {
 		},
 	}
 	const requests = 4
+	taskCtx := withShuihuoImageConcurrency(context.Background(), 2)
 	var workers sync.WaitGroup
 	errs := make(chan error, requests)
 	for range requests {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			ctx := withShuihuoImageConcurrency(context.Background(), 2)
-			_, _, _, err := generateShuihuoImageArtifact(ctx, nil, files, nil, "alice", target, "test prompt", nil, nil)
+			_, _, _, err := generateShuihuoImageArtifact(taskCtx, nil, files, nil, "alice", target, "test prompt", nil, nil)
 			errs <- err
 		}()
 	}
@@ -268,14 +268,72 @@ func TestGPTImageGenerationRequestsHonorConfiguredConcurrency(t *testing.T) {
 	}
 }
 
+func TestGPTImageConcurrencyIsPerTaskNotProcessWide(t *testing.T) {
+	var active atomic.Int32
+	var maximum atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		current := active.Add(1)
+		for observed := maximum.Load(); current > observed; observed = maximum.Load() {
+			if maximum.CompareAndSwap(observed, current) {
+				break
+			}
+		}
+		time.Sleep(30 * time.Millisecond)
+		active.Add(-1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZgS8AAAAASUVORK5CYII="}]}`))
+	}))
+	defer server.Close()
+
+	files := localartifact.NewStore(t.TempDir(), 1<<20)
+	target := shuihuoAssetImageTarget{
+		Provider:    "personal_api",
+		ModelID:     "gpt-image-2",
+		AspectRatio: "1:1",
+		CatalogModel: map[string]any{
+			"endpoint":   server.URL + "/v1/images/generations",
+			"credential": "test-secret",
+		},
+	}
+	// 两本书并行、各自配置 2 路时，全进程应有 4 个请求在跑，而不是共用 2 路。
+	taskCtxs := []context.Context{
+		withShuihuoImageConcurrency(context.Background(), 2),
+		withShuihuoImageConcurrency(context.Background(), 2),
+	}
+	var workers sync.WaitGroup
+	errs := make(chan error, 4)
+	for _, ctx := range taskCtxs {
+		for range 2 {
+			workers.Add(1)
+			go func(taskCtx context.Context) {
+				defer workers.Done()
+				_, _, _, err := generateShuihuoImageArtifact(taskCtx, nil, files, nil, "alice", target, "test prompt", nil, nil)
+				errs <- err
+			}(ctx)
+		}
+	}
+	workers.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := maximum.Load(); got != 4 {
+		t.Fatalf("maximum simultaneous gpt-image requests=%d, want 4", got)
+	}
+}
+
 func TestGPTImageGenerationSlotCanBeCancelledWhileWaiting(t *testing.T) {
-	release, err := acquireShuihuoGPTImageGenerationSlot(withShuihuoImageConcurrency(context.Background(), 1), "gpt-image-2")
+	// 出图并发是新语义：一个任务（一本书）内共用同一个信号量实例。
+	taskCtx := withShuihuoImageConcurrency(context.Background(), 1)
+	release, err := acquireShuihuoGPTImageGenerationSlot(taskCtx, "gpt-image-2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer release()
 
-	ctx, cancel := context.WithCancel(withShuihuoImageConcurrency(context.Background(), 1))
+	ctx, cancel := context.WithCancel(taskCtx)
 	cancel()
 	if _, err := acquireShuihuoGPTImageGenerationSlot(ctx, "gpt-image-2"); err == nil || !strings.Contains(err.Error(), "context canceled") {
 		t.Fatalf("cancelled slot wait error=%v, want context canceled", err)
