@@ -159,9 +159,13 @@ func (c *WorksClient) SearchWorks(ctx context.Context, query string) ([]Work, er
 }
 
 func (c *WorksClient) searchWorksOnce(ctx context.Context, query string) ([]Work, error) {
+	// N8 作品目录只支持 filtering 条件；传 keyword 会被忽略并返回整库数据，
+	// 因此这里固定使用 name LIKE 精确到书名。
 	payload := map[string]any{
 		"page_size": 100,
-		"keyword":   query,
+		"filtering": []map[string]any{
+			{"field": "name", "operator": "LIKE", "value": query},
+		},
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {

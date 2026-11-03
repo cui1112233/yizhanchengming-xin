@@ -140,13 +140,17 @@ func TestClientSearchesWorksByName(t *testing.T) {
 			t.Fatalf("missing server-side N8 admin token")
 		}
 		var body struct {
-			PageSize int    `json:"page_size"`
-			Keyword  string `json:"keyword"`
+			PageSize  int `json:"page_size"`
+			Filtering []struct {
+				Field    string `json:"field"`
+				Operator string `json:"operator"`
+				Value    string `json:"value"`
+			} `json:"filtering"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if body.PageSize != 100 || body.Keyword != "小妾造反后" {
+		if body.PageSize != 100 || len(body.Filtering) != 1 || body.Filtering[0].Field != "name" || body.Filtering[0].Operator != "LIKE" || body.Filtering[0].Value != "小妾造反后" {
 			t.Fatalf("body = %#v", body)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "data": map[string]any{"list": []map[string]any{
@@ -168,13 +172,15 @@ func TestClientSearchesWorksByName(t *testing.T) {
 func TestClientSearchesTitleFragmentWhenFullTitleHasNoMatch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
-			Keyword string `json:"keyword"`
+			Filtering []struct {
+				Value string `json:"value"`
+			} `json:"filtering"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
 		list := []map[string]any{}
-		if body.Keyword == "把行动都给了闺蜜" {
+		if len(body.Filtering) == 1 && body.Filtering[0].Value == "把行动都给了闺蜜" {
 			list = append(list, map[string]any{"id": 989025, "name": "鼓励式老公,却把行动都给了闺蜜"})
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "data": map[string]any{"list": list}})
