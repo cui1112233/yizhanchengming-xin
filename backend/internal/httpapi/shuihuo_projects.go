@@ -181,7 +181,7 @@ func withShuihuoGlobalImageConcurrency(ctx context.Context, limit int) context.C
 	if limit < 2 {
 		limit = 2
 	}
-	assetLimit := limit / 3
+	assetLimit := limit / 2
 	if assetLimit < 1 {
 		assetLimit = 1
 	}
