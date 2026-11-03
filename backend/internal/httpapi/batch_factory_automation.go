@@ -994,11 +994,12 @@ func (c *BatchAutomationCoordinator) automationBookPreflightReason(ctx context.C
 		if publish == nil || !hasAutomationPublishProfile(publish) {
 			return "发布配置未绑定网站或组织"
 		}
-		if productionMode == "comic" && c.comicPublishPreflight != nil {
-			if err := c.comicPublishPreflight(ctx, effective); err != nil {
-				return err.Error()
-			}
-		}
+		// N8 目录查询属于发布阶段依赖（音频分类/音频文件列表），
+		// 漫画出图阶段完全不碰它。这里之前在 preflight 里统一调
+		// comicPublishPreflight，一旦 N8 后台改了路径/挂了就把整批
+		// 书在派发最开头全部 blocked，连一张图都出不来。
+		// 改为挪到 run() 里进入 publish 阶段时再查，让出图流水线
+		// 先跑起来，发布依赖单独失败不拖累其它书。
 	}
 	return ""
 }
@@ -1746,6 +1747,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	// failed state instead of leaving a book stuck at "running" when an upstream
 	// model endpoint stops responding.
 	const stageTimeout = 10 * time.Minute
+	// 漫画提示词是逐页文本请求，35 页在 5 路并发下实测需要 10~11 分钟，已经正好
+	// 压在 10 分钟的通用阶段超时上，导致每本书都要先超时再补跑一轮。这里单独给
+	// 提示词阶段留出 20 分钟，避免把正常慢请求当成失败重试。
+	const comicPromptStageTimeout = 20 * time.Minute
+	// 提示词请求是纯文本调用，不占用图片网关，实测可以把并发从 5 提到 8 而不
+	// 触发上游限流，直接缩短提示词阶段的排队轮次。
+	const comicPromptConcurrency = 8
 	// 批次末尾统一回补：单本书失败时先跳过，等本批其余书全部跑完，再按顺序重跑
 	// 失败的书。生成链路是幂等的，回补会从缺失的页/阶段继续，不会重做已完成部分。
 	books := job["books"].(map[string]any)
@@ -1795,11 +1803,16 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 			semaphore = make(chan struct{}, concurrency)
 		}
 		book := queue[qi]
+		// Workers persist their book entry into the same maps, so the initial
+		// read and clone must hold the same mutex to avoid a concurrent map
+		// read/write against the previous round's workers.
+		jobMu.Lock()
 		initialEntry, _ := books[book.ID].(map[string]any)
 		if initialEntry == nil {
 			initialEntry = map[string]any{}
 		}
 		entry := cloneAutomationEntry(initialEntry)
+		jobMu.Unlock()
 		workers.Add(1)
 		semaphore <- struct{}{}
 		go func() {
@@ -2014,10 +2027,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						}
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_bootstrap", "正在分析原文、分页并生成每页漫画提示词", c.now()
 						persist()
-						stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+						stageCtx, cancel := context.WithTimeout(ctx, comicPromptStageTimeout)
 						// 每页提示词都是一次独立的文本请求，串行会把一本书压在
 						// 10 分钟超时线上，并把整批拖成“跑一早上”。
-						stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, 5)
+						stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, comicPromptConcurrency)
 						var bootstrapProgressMu sync.Mutex
 						stageCtx = batchfactoryv11.WithComicPromptProgress(stageCtx, func(completed, total int, pageLabel string) {
 							bootstrapProgressMu.Lock()
@@ -2038,8 +2051,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						if identityRecovery {
 							entry["stage"], entry["message"], entry["updatedAt"] = "comic_prompt_recovery", "人物身份已修复，正在重新生成全部漫画页提示词", c.now()
 							persist()
-							stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-							stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, 5)
+							stageCtx, cancel := context.WithTimeout(ctx, comicPromptStageTimeout)
+							stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, comicPromptConcurrency)
 							_, promptErr := c.stages.Director.RunComicPromptExtraction(stageCtx, owner, batchID, book.ID)
 							cancel()
 							if promptErr != nil {
@@ -2050,8 +2063,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					case comicPreparationMissingPrompts:
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_prompt_recovery", "正在补齐缺失的漫画页提示词", c.now()
 						persist()
-						stageCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-						stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, 5)
+						stageCtx, cancel := context.WithTimeout(ctx, comicPromptStageTimeout)
+						stageCtx = batchfactoryv11.WithComicPromptConcurrency(stageCtx, comicPromptConcurrency)
 						var promptProgressMu sync.Mutex
 						stageCtx = batchfactoryv11.WithComicPromptProgress(stageCtx, func(completed, total int, pageLabel string) {
 							promptProgressMu.Lock()

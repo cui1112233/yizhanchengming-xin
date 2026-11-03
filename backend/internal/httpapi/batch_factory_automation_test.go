@@ -734,9 +734,13 @@ func TestAutomationBookPreflightReason(t *testing.T) {
 	}
 }
 
-func TestAutomationBookPreflightReportsComicPublishPreflight(t *testing.T) {
+func TestAutomationBookPreflightSkipsComicPublishPreflight(t *testing.T) {
+	// comicPublishPreflight 现在挪到 run() 的 publish 阶段再查；
+	// preflight 只检查出图必需的前置条件，N8 目录挂了不能卡出图。
+	preflightCalled := false
 	coordinator := &BatchAutomationCoordinator{
 		comicPublishPreflight: func(context.Context, batchfactoryv11.SettingsPatch) error {
+			preflightCalled = true
 			return fmt.Errorf("漫画发布设置不完整：没有可用指定音频")
 		},
 	}
@@ -750,8 +754,11 @@ func TestAutomationBookPreflightReportsComicPublishPreflight(t *testing.T) {
 		"publishSettings": json.RawMessage(`{"websiteProfileId":"p1"}`),
 	}}}
 	reason := coordinator.automationBookPreflightReason(context.Background(), "alice", batch, book, "full_submit")
-	if !strings.Contains(reason, "没有可用指定音频") {
-		t.Fatalf("reason=%q, want missing automatic audio", reason)
+	if reason != "" {
+		t.Fatalf("reason=%q, want empty: preflight should not call publish preflight", reason)
+	}
+	if preflightCalled {
+		t.Fatal("comicPublishPreflight must not be called during preflight anymore")
 	}
 }
 
