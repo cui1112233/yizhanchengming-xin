@@ -120,7 +120,6 @@ func NewRouter(options RouterOptions) http.Handler {
 			VideoReady: shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production),
 		}
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, automationStages, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
-		options.AutomationCoordinator.promptCatalog = options.PresetCatalog
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
 		options.AutomationCoordinator.SetSourceFetcher(options.NovelFetchFetcher)
 		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: options.NovelFetchStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
@@ -133,6 +132,8 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetComicBookGenerator(comicGenerator.generateBook)
 	}
 	if options.AutomationCoordinator != nil {
+		// Keep injected coordinators on the router's prompt catalog too.
+		options.AutomationCoordinator.promptCatalog = options.PresetCatalog
 		options.AutomationCoordinator.SetSourceClassification(batchFetchClassification{
 			AIGenderJudge:         options.NovelFetchAIGenderJudge,
 			AIGenderJudgeResolver: options.NovelFetchAIGenderJudgeResolver,
@@ -146,9 +147,10 @@ func NewRouter(options RouterOptions) http.Handler {
 		if err := options.AutomationCoordinator.RecoverInterruptedJobs(); err != nil {
 			log.Printf("recover interrupted batch automation jobs: %v", err)
 		}
-		if err := options.AutomationCoordinator.ResumeInterruptedJobs(context.Background()); err != nil {
-			log.Printf("resume interrupted batch automation jobs: %v", err)
-		}
+		// 不再自动 Resume：Recover 已把 running→stopped 并标记“服务重启”。
+		// 进程重启意味着所有 worker goroutine 已丢失，自动 Resume 只会造出
+		// 僵尸 state=running 但没人干活的 job，把“启动自动生产”按钮永久置
+		// 灰。用户必须在 UI 重新手动启动，Start() 才会派发真实 goroutine。
 		options.AutomationCoordinator.StartScheduledDispatcher()
 	}
 	v11 := http.NewServeMux()
