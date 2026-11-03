@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -41,7 +42,7 @@ func registerProductionRoutes(mux *http.ServeMux, service *batchfactoryv11.Produ
 		if !decodeJSON(w, r, &input) {
 			return
 		}
-		err := service.ProviderRegistry.Put(r.Context(), owner, batchfactoryv11.VideoProviderConfig{
+		err := saveVideoProviderConfig(r.Context(), service.ProviderRegistry, owner, batchfactoryv11.VideoProviderConfig{
 			Provider: input.Provider, APIKey: input.APIKey, Model: input.Model,
 			CreateURL: input.CreateURL, TasksURL: input.TasksURL, ResultURL: input.ResultURL, WorkflowID: input.WorkflowID,
 		})
@@ -189,4 +190,13 @@ func registerProductionStatusRoute(mux *http.ServeMux, service *batchfactoryv11.
 		}
 		writeJSON(w, http.StatusOK, status)
 	})
+}
+
+// saveVideoProviderConfig persists explicit provider settings when the registry
+// supports it, while keeping the in-memory contract for test registries.
+func saveVideoProviderConfig(ctx context.Context, registry batchfactoryv11.VideoProviderRegistry, owner string, cfg batchfactoryv11.VideoProviderConfig) error {
+	if persister, ok := registry.(batchfactoryv11.VideoProviderConfigPersister); ok {
+		return persister.SaveConfig(ctx, owner, cfg)
+	}
+	return registry.Put(ctx, owner, cfg)
 }

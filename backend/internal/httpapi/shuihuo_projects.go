@@ -1118,7 +1118,6 @@ func registerShuihuoProjectCompatRoutes(root *http.ServeMux, auth BridgeAuth, st
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"settings": settings})
 			return
-			return
 		}
 		if len(parts) == 2 && parts[1] == "asset-generation-config" && (r.Method == http.MethodGet || r.Method == http.MethodPut) {
 			if len(batch.Books) == 0 {
@@ -3438,13 +3437,23 @@ func shuihuoLongRunningImageHTTPClient() *http.Client {
 // HTTP/1.1; VVEAI advertises HTTP/2 and sends HTTP/2 frames when called as H1.
 func shuihuoImageGenerationHTTPClient(endpoint string) *http.Client {
 	parsed, err := url.Parse(strings.TrimSpace(endpoint))
-	if err == nil && strings.EqualFold(strings.TrimSuffix(parsed.Hostname(), "."), "api.vveai.com") {
+	if err == nil && shuihuoHTTP2ImageGatewayHost(parsed.Hostname()) {
 		return shuihuoLongRunningImageHTTPClient()
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ForceAttemptHTTP2 = false
 	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
 	return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+}
+
+func shuihuoHTTP2ImageGatewayHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	switch host {
+	case "api.vveai.com", "ggwk1.online", "www.ggwk1.online":
+		return true
+	default:
+		return false
+	}
 }
 
 func shuihuoImageDownloadHTTPClient() *http.Client {
@@ -4023,7 +4032,7 @@ func resolveShuihuoImageTarget(selectedModelID, fallbackModelID, aspectRatio, fa
 			CatalogModel: candidate,
 		}, nil
 	}
-	return shuihuoAssetImageTarget{}, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
+	return shuihuoAssetImageTarget{}, withErrorCode(fmt.Errorf("%w: 图片模型未配置；%s", batchfactoryv11.ErrUnavailable, setupHintImage), ErrorCodeImageModelNotConfigured)
 }
 
 func resolveShuihuoAssetImageSettings(asset batchfactoryv11.BookAsset, fallbackModelID, _ string) (modelID, aspectRatio string) {
@@ -4214,7 +4223,7 @@ func generateShuihuoSegmentImage(ctx context.Context, store batchfactoryv11.Stor
 		break
 	}
 	if model == nil {
-		return nil, fmt.Errorf("%w: image model is not configured", batchfactoryv11.ErrUnavailable)
+		return nil, withErrorCode(fmt.Errorf("%w: 图片模型未配置；%s", batchfactoryv11.ErrUnavailable, setupHintImage), ErrorCodeImageModelNotConfigured)
 	}
 	endpoint, err := shuihuoImageGenerationEndpoint(modelString(model, "endpoint"))
 	if err != nil {

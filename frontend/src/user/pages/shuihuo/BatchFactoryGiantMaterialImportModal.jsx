@@ -4,8 +4,8 @@ import { appendNovelFetchIntake, classifyBookPublishMetadata, createBatchFromInt
 import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.js';
 import { createGiantMaterialJob, waitForGiantMaterialJob } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
-import {
-  availableGiantMaterialBooks,
+import { apiErrorMessage } from '../../../shared/apiErrors.js';
+import { availableGiantMaterialBooks,
   buildGiantMaterialIntake,
   buildGiantMaterialPlaceholderIntake,
   findRegisteredGiantMaterialBook,
@@ -16,34 +16,9 @@ import {
 } from './batchFactoryGiantMaterialImport.js';
 import { createGiantMaterialPlatformBookClaims, createGiantMaterialQueue, parseGiantMaterialIds, queueSummary, runSequentialGiantMaterialQueue } from './batchFactoryGiantMaterialQueue.js';
 
-const ERROR_MESSAGES = {
-  QINGYU_AUTH_NOT_CONFIGURED: '本机尚未配置青语服务令牌。',
-  QINGYU_AUTH_FAILED: '青语授权已失效，需要更新令牌。',
-  QINGYU_BOOK_METADATA_INCOMPLETE: '素材没有完整的平台书名或 Book ID，不能登记。',
-  QINGYU_BOOK_SELECTION_REQUIRED: '该素材关联多条平台书籍记录，请先选择要登记的一条。',
-  QINGYU_VIDEO_DURATION_MISSING: '素材没有返回有效的视频时长，暂时不能交给执行器处理。',
-  GIANT_OCR_EMPTY: '没有识别到可登记的正文。',
-  OCR_NO_TEXT: '没有识别到可登记的正文。',
-  OCR_TIMEOUT: '识别超时，可以重试失败步骤。',
-  OCR_CANCELLED: '已取消读取，没有写入当前批量。',
-  GIANT_EXECUTOR_OFFLINE: 'Windows 巨量素材执行器未安装或未启动，请先安装并完成配对。',
-  GIANT_EXECUTOR_FAILED: 'Windows 巨量素材执行器处理失败，可重试失败项。',
-  GIANT_EXECUTOR_TIMEOUT: 'Windows 巨量素材执行器超时，任务仍可能在后台运行，请稍后查看状态。',
-  BATCH_FACTORY_V11_READ_ONLY: '批量工厂写入接口当前不可用。',
-  GIANT_MATERIAL_INTAKE_FAILED: '正文已识别，但批量登记接口没有返回 intake。',
-  TEXT_MODEL_REQUIRED: '正文已登记，但当前没有配置可用的文本模型，暂时无法完成 AI 判断。',
-  BOOK_CLASSIFICATION_PROVIDER_FAILED: '正文已登记，但文本模型调用失败，暂时无法完成 AI 判断。',
-  SOURCE_TEXT_REQUIRED: '正文已登记，但当前书没有可供 AI 判断的正文。'
-};
 
 function errorText(error) {
-  const code = String(error?.message || error?.code || '').trim();
-  const friendly = ERROR_MESSAGES[code] || code || '巨量素材登记失败。';
-  // 服务器返回的 502/503 网页错误会是一整段 HTML，直接显示会刷屏；换成一句人话。
-  if (/<html[\s>]|502 Bad Gateway|503 Service/i.test(friendly)) {
-    return '服务器通讯短暂中断（正在更新或重启），请重试。';
-  }
-  return friendly;
+  return apiErrorMessage(error, '巨量素材登记失败。');
 }
 
 function showExecutorInstallHelp() {
@@ -74,7 +49,7 @@ function queueDetail(item) {
     if (classificationStatus === 'failed') return `已存在相同巨量素材，未重复登记；AI 判断失败：${item.classificationError || '可在小说详情中重试。'}`;
     return '当前批量已有相同巨量素材 ID，未重复登记。';
   }
-  if (item.status === 'error') return ERROR_MESSAGES[item.error] || item.error || '处理失败，可重试。';
+  if (item.status === 'error') return apiErrorMessage({ code: item.error }, item.error || '处理失败，可重试。');
   if (item.status === 'running') {
     if (item.stage === 'resolve') return '正在查询青语素材和平台书籍信息…';
     if (item.stage === 'ocr') return '正在由 Windows 巨量素材执行器读取滚屏正文…';

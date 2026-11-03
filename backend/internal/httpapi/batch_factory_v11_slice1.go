@@ -619,7 +619,17 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		}
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": message})
 	case errors.Is(err, batchfactoryv11.ErrUnavailable):
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "capability unavailable"})
+		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrUnavailable.Error()+": "))
+		if message == "" || message == batchfactoryv11.ErrUnavailable.Error() {
+			message = "capability unavailable"
+		}
+		// code 是新增字段：前端据此显示“缺什么 → 去哪配 → 怎么开”，
+		// error 文案保持原样以兼容旧调用方。
+		payload := map[string]string{"error": message}
+		if code := errorCodeOf(err); code != "" {
+			payload["code"] = code
+		}
+		writeJSON(w, http.StatusServiceUnavailable, payload)
 	case errors.Is(err, batchfactoryv11.ErrUpstream):
 		message := strings.TrimSpace(err.Error())
 		if message == "" || message == batchfactoryv11.ErrUpstream.Error() {

@@ -334,7 +334,7 @@ func writeGiantExecutorServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, giantmaterialexecutor.ErrExecutorNotFound):
 		writeGiantExecutorError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, giantmaterialexecutor.ErrExecutorOffline):
-		writeGiantExecutorError(w, http.StatusServiceUnavailable, err.Error())
+		writeGiantExecutorJSON(w, http.StatusServiceUnavailable, map[string]any{"error": err.Error(), "code": ErrorCodeExecutorNotReady})
 	case errors.Is(err, giantmaterialexecutor.ErrNoClaimableJob), errors.Is(err, giantmaterialexecutor.ErrStaleLease), errors.Is(err, giantmaterialexecutor.ErrJobCancelled), errors.Is(err, giantmaterialexecutor.ErrInvalidJobState), errors.Is(err, giantmaterialexecutor.ErrJobConflict):
 		writeGiantExecutorError(w, http.StatusConflict, err.Error())
 	default:

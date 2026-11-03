@@ -1,15 +1,22 @@
 import { Button, Drawer, Form, Input, Popconfirm, Select, Switch, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { createAdminModel, deleteAdminModel, listAdminModels, setAdminModelEnabled, testAdminModel, updateAdminModel } from '../../shared/api/shuihuoProduction';
+import providerCapabilities from '../../user/pages/batch-factory-v11/videoProviderCapabilities.json';
+
+// Video adapters are derived from the shared provider contract file.
+const videoAdapters = providerCapabilities.providers.reduce((result, item) => {
+  if (!item.adminAdapter || result.some(adapter => adapter.value === item.adminAdapter)) return result;
+  result.push({ value: item.adminAdapter, label: item.adminLabel, kind: 'video' });
+  return result;
+}, []);
 
 const adapters = [
   { value: 'text_completion', label: '文本分析', kind: 'text' },
   { value: 'jimeng_image', label: '即梦生图', kind: 'image' },
-  { value: 'vidu_image_to_video', label: 'Vidu 图生视频', kind: 'video' },
-  { value: 'yd_video', label: 'YD2.0 Mini 图生视频', kind: 'video' },
-  { value: 'local_executor_video', label: '本地豆包执行器', kind: 'video' },
+  ...videoAdapters,
   { value: 'generic_http', label: '通用 HTTP 配音（仅管理员）', kind: 'audio' }
 ];
+
 
 export function ShuihuoModelCatalogPage() {
   const [models, setModels] = useState([]);

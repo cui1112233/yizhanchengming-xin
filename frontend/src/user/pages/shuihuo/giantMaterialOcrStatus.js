@@ -9,7 +9,7 @@ export function giantMaterialOcrStatus(job = {}) {
   if (state === 'queued' && job.waitingForExecutor === true) {
     return {
       title: '等待 OCR 执行器上线',
-      detail: '正文尚未开始读取。执行器上线后会自动领取任务。',
+      detail: '正文尚未开始读取。请到「设置 → 执行器状态」检查巨量素材执行器是否已安装、配对并在线；执行器上线后会自动领取任务。',
       progressStatus: 'normal'
     };
   }

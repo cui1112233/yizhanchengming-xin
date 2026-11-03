@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -13,7 +12,12 @@ type videoProviderConfigReader interface {
 	GetConfig(context.Context, string) (map[string]any, error)
 }
 
-func registerVideoProviderStatusRoute(mux *http.ServeMux, auth BridgeAuth, reader videoProviderConfigReader, version string, catalogStores ...novelfetchworkshop.Store) {
+// registerVideoProviderStatusRoute reports the same effective setting that the
+// production submit path uses. When the runtime registry is available it is
+// synchronized from the account config and read through View, so the settings
+// drawer and video submission cannot disagree. Early-slice setups without a
+// production service keep the read-only account-config fallback.
+func registerVideoProviderStatusRoute(mux *http.ServeMux, auth BridgeAuth, reader videoProviderConfigReader, registry batchfactoryv11.VideoProviderRegistry, store batchfactoryv11.Store, version string, catalogStores ...novelfetchworkshop.Store) {
 	if mux == nil || reader == nil {
 		return
 	}
@@ -31,56 +35,30 @@ func registerVideoProviderStatusRoute(mux *http.ServeMux, auth BridgeAuth, reade
 		if len(catalogStores) > 0 {
 			mergeManagedModelCatalog(r.Context(), config, catalogStores[0], owner)
 		}
-		writeJSON(w, http.StatusOK, videoProviderStatus(config, r.URL.Query().Get("provider")))
+		provider := batchfactoryv11.NormalizeVideoProviderForHTTP(r.URL.Query().Get("provider"))
+		if registry != nil {
+			// Feed the registry from the exact same configuration the submit
+			// path reads, then report the registry's view. The sync step only
+			// needs the batch store; View also works from persisted settings.
+			if store != nil {
+				_ = syncShuihuoConfiguredVideoModels(r.Context(), store, registry, owner, catalogStores...)
+			}
+			if view, viewErr := registry.View(r.Context(), owner, provider); viewErr == nil && view.Configured {
+				if view.Model == "" {
+					view.Model = batchfactoryv11.DefaultVideoModelFor(provider)
+				}
+				writeJSON(w, http.StatusOK, view)
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, videoProviderStatus(config, provider))
 	})))
 }
 
+// videoProviderStatus is the read-only fallback used before a production
+// service exists. The derivation itself lives in batchfactoryv11 so the
+// registry hydration and this response share one priority order.
 func videoProviderStatus(config map[string]any, rawProvider string) map[string]any {
-	provider := batchfactoryv11.NormalizeVideoProviderForHTTP(rawProvider)
-	model := ""
-	configured := false
-	video, _ := config["video"].(map[string]any)
-	catalogVersion, _ := config["modelCatalogVersion"].(float64)
-	if catalog, ok := config["modelCatalog"].([]any); ok && catalogVersion >= 1 {
-		catalogID := map[string]string{
-			batchfactoryv11.VideoProviderPersonalAPI:  "yd2-mini-video",
-			batchfactoryv11.VideoProviderAutoDLH3:     "minimax-h3-video",
-			batchfactoryv11.VideoProviderYFAISeedance: "seedance-2-0-official",
-		}[provider]
-		for _, item := range catalog {
-			entry, ok := item.(map[string]any)
-			if !ok || strings.TrimSpace(toString(entry["id"])) != catalogID {
-				continue
-			}
-			model = strings.TrimSpace(toString(entry["modelId"]))
-			configured = strings.TrimSpace(toString(entry["credential"])) != ""
-			break
-		}
-	} else {
-		switch provider {
-		case batchfactoryv11.VideoProviderPersonalAPI:
-			model = batchfactoryv11.DefaultPersonalVideoModel
-			configured = strings.TrimSpace(toString(video["ydApiKey"])) != "" || strings.TrimSpace(toString(video["apiKey"])) != ""
-		case batchfactoryv11.VideoProviderAutoDLH3:
-			model = batchfactoryv11.AutoDLH3Model
-			configured = strings.TrimSpace(toString(video["h3ApiKey"])) != "" || strings.TrimSpace(toString(video["apiKey"])) != ""
-		case batchfactoryv11.VideoProviderYFAISeedance:
-			model = "seedance-2-0-official"
-		case batchfactoryv11.VideoProviderDoubaoLocal:
-			model = "doubao-seedance"
-		}
-	}
-	if model == "" {
-		switch provider {
-		case batchfactoryv11.VideoProviderPersonalAPI:
-			model = batchfactoryv11.DefaultPersonalVideoModel
-		case batchfactoryv11.VideoProviderAutoDLH3:
-			model = batchfactoryv11.AutoDLH3Model
-		case batchfactoryv11.VideoProviderYFAISeedance:
-			model = "seedance-2-0-official"
-		case batchfactoryv11.VideoProviderDoubaoLocal:
-			model = "doubao-seedance"
-		}
-	}
-	return map[string]any{"provider": provider, "model": model, "configured": configured}
+	cfg := batchfactoryv11.ResolveVideoProviderSetting(config, rawProvider)
+	return map[string]any{"provider": cfg.Provider, "model": cfg.Model, "configured": cfg.IsConfigured()}
 }

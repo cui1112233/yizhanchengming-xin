@@ -165,7 +165,7 @@ func (s *ProductionService) resolveProvider(ctx context.Context, owner, provider
 	}
 	if provider == VideoProviderAutoDLH3 {
 		if s.ProviderRegistry == nil {
-			return nil, FrozenVideoModel{}, fmt.Errorf("%w: AutoDL H3 provider registry is unavailable", ErrUnavailable)
+			return nil, FrozenVideoModel{}, wrapNotConfigured(fmt.Errorf("%w: AutoDL H3 provider registry is unavailable", ErrUnavailable))
 		}
 		cfg, err := s.ProviderRegistry.Resolve(ctx, owner, provider)
 		if err != nil {
@@ -190,7 +190,7 @@ func (s *ProductionService) resolveProvider(ctx context.Context, owner, provider
 	}
 	if provider == VideoProviderYFAISeedance {
 		if s.ProviderRegistry == nil {
-			return nil, FrozenVideoModel{}, fmt.Errorf("%w: YFAI Seedance provider registry is unavailable", ErrUnavailable)
+			return nil, FrozenVideoModel{}, wrapNotConfigured(fmt.Errorf("%w: YFAI Seedance provider registry is unavailable", ErrUnavailable))
 		}
 		cfg, err := s.ProviderRegistry.Resolve(ctx, owner, provider)
 		if err != nil {

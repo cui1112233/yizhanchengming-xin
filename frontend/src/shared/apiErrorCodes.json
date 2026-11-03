@@ -1,0 +1,26 @@
+{
+  "codes": [
+    { "code": "IMAGE_MODEL_NOT_CONFIGURED", "message": "图片模型未配置：请到「管理员 → 水货生产模型」添加并启用图片模型，并填写服务地址与服务端密钥。" },
+    { "code": "VIDEO_PROVIDER_NOT_CONFIGURED", "message": "视频生成通道未配置：请到「批量工厂 → 设置 → 视频生成通道」选择通道并填写密钥后保存。" },
+    { "code": "EXECUTOR_NOT_READY", "message": "执行器未就绪：请到「设置 → 执行器状态」生成配对码并安装执行器；巨量素材也可改用“优先直接获取原文”。" },
+    { "code": "GIANT_PLUGIN_NOT_CONFIGURED", "message": "巨量素材解析服务未配置：请在服务器设置 QIANTIE_GIANT_MATERIAL_PLUGIN_URL/TOKEN（或青语 N8 令牌）后重试。" },
+    { "code": "INVALID_GIANT_MATERIAL_ID", "message": "请输入10—25位数字巨量素材 ID。" },
+    { "code": "QINGYU_AUTH_NOT_CONFIGURED", "message": "巨量素材解析服务未配置：请在服务器设置 QIANTIE_GIANT_MATERIAL_PLUGIN_URL/TOKEN（或青语 N8 令牌）后重试。" },
+    { "code": "QINGYU_AUTH_FAILED", "message": "巨量素材解析服务授权失效：请更新青语 N8 令牌后重试。" },
+    { "code": "QINGYU_BOOK_METADATA_INCOMPLETE", "message": "素材没有完整的平台书名或 Book ID，不能登记。" },
+    { "code": "QINGYU_BOOK_SELECTION_REQUIRED", "message": "该素材关联多条平台书籍记录，请先选择要登记的一条。" },
+    { "code": "QINGYU_VIDEO_DURATION_MISSING", "message": "素材没有返回有效的视频时长，暂时不能交给执行器处理。" },
+    { "code": "GIANT_OCR_EMPTY", "message": "没有识别到可登记的正文。" },
+    { "code": "OCR_NO_TEXT", "message": "没有识别到可登记的正文。" },
+    { "code": "OCR_TIMEOUT", "message": "识别超时，可以重试失败步骤。" },
+    { "code": "OCR_CANCELLED", "message": "已取消读取，没有写入当前批量。" },
+    { "code": "GIANT_EXECUTOR_OFFLINE", "message": "执行器未就绪：请到「设置 → 执行器状态」生成配对码并安装执行器；巨量素材也可改用“优先直接获取原文”。" },
+    { "code": "GIANT_EXECUTOR_FAILED", "message": "Windows 巨量素材执行器处理失败，可重试失败项。" },
+    { "code": "GIANT_EXECUTOR_TIMEOUT", "message": "Windows 巨量素材执行器超时，任务仍可能在后台运行，请稍后查看状态。" },
+    { "code": "BATCH_FACTORY_V11_READ_ONLY", "message": "批量工厂写入接口当前不可用。" },
+    { "code": "GIANT_MATERIAL_INTAKE_FAILED", "message": "正文已识别，但批量登记接口没有返回 intake。" },
+    { "code": "TEXT_MODEL_REQUIRED", "message": "正文已登记，但当前没有配置可用的文本模型，暂时无法完成 AI 判断。" },
+    { "code": "BOOK_CLASSIFICATION_PROVIDER_FAILED", "message": "正文已登记，但文本模型调用失败，暂时无法完成 AI 判断。" },
+    { "code": "SOURCE_TEXT_REQUIRED", "message": "正文已登记，但当前书没有可供 AI 判断的正文。" }
+  ]
+}

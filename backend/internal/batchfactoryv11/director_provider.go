@@ -3,6 +3,7 @@ package batchfactoryv11
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -70,7 +71,7 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 	client := p.Client
 	if client == nil {
-		client = &http.Client{Timeout: directorProviderRequestTimeout}
+		client = openAICompatibleHTTPClient(p.Endpoint)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -112,4 +113,21 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		return "", fmt.Errorf("director provider returned empty content")
 	}
 	return content, nil
+}
+
+func openAICompatibleHTTPClient(endpoint string) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	parsed, err := url.Parse(strings.TrimSpace(endpoint))
+	host := ""
+	if err == nil {
+		host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."))
+	}
+	if host == "api.vveai.com" || host == "ggwk1.online" || host == "www.ggwk1.online" {
+		transport.ForceAttemptHTTP2 = true
+		transport.TLSNextProto = nil
+	} else {
+		transport.ForceAttemptHTTP2 = false
+		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	}
+	return &http.Client{Timeout: directorProviderRequestTimeout, Transport: transport}
 }

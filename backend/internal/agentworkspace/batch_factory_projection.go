@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -23,6 +24,31 @@ type BatchFactoryProjectionReader interface {
 	ListBookAssetImages(context.Context, string, string, string, string) ([]batchfactoryv11.BookAssetImage, error)
 	ListProductionJobs(context.Context, string, string) ([]batchfactoryv11.ProductionJob, error)
 	ListMergeJobs(context.Context, string, string) ([]batchfactoryv11.MergeJob, error)
+	// Comic pages and collections are projected as read-only canvas state so
+	// the Agent canvas can show the same comic deliverable the workbench shows.
+	ListComicPages(context.Context, string, string, string) ([]batchfactoryv11.ComicPage, error)
+	ListComicCollections(context.Context, string, string, string) ([]batchfactoryv11.ComicCollection, error)
+	// GetDraft reads the persisted N8 comic publish record. The projection
+	// never writes drafts back.
+	GetDraft(context.Context, string, string, string, string) (batchfactoryv11.Draft, error)
+}
+
+// n8ComicPublishDraftKind is the durable draft kind written by Batch Factory
+// after an N8 comic collection publish. The projection reads it as status only.
+const n8ComicPublishDraftKind = "n8-comic-publish"
+
+// BatchFactoryPublishResult is the read-only outcome of an external publish
+// intent (providers 121 and yadi). It carries no payload or credential data.
+type BatchFactoryPublishResult struct {
+	Provider    string
+	Status      string
+	SubmittedAt *time.Time
+}
+
+// BatchFactoryPublishResultReader lets the canvas see 121/YD publish outcomes
+// without giving the canvas any write path into the publish system.
+type BatchFactoryPublishResultReader interface {
+	BatchFactoryPublishResults(context.Context, string, string, string) ([]BatchFactoryPublishResult, error)
 }
 
 // BatchFactoryMergeStatusReader refreshes in-flight merge jobs before a
@@ -138,11 +164,12 @@ type BatchFactoryProjectionStore interface {
 }
 
 type BatchFactoryProjectionService struct {
-	CanvasStore  BatchFactoryProjectionStore
-	BatchFactory BatchFactoryProjectionReader
-	MergeStatus  BatchFactoryMergeStatusReader
-	AudioRecords BatchFactoryAudioReader
-	Now          func() time.Time
+	CanvasStore    BatchFactoryProjectionStore
+	BatchFactory   BatchFactoryProjectionReader
+	MergeStatus    BatchFactoryMergeStatusReader
+	AudioRecords   BatchFactoryAudioReader
+	PublishResults BatchFactoryPublishResultReader
+	Now            func() time.Time
 }
 
 type batchFactoryProjectionItem struct {
@@ -431,6 +458,145 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 		nodeIDByResource[projectionResourceKey("video", video.ID)] = nodeID
 	}
 
+	// Comic pages and collections are read-only deliverables. They hang off the
+	// video that produced them and feed the collection used by N8 publishing.
+	comicPageNodeByID := map[string]string{}
+	{
+		pages, err := s.BatchFactory.ListComicPages(ctx, owner, binding.BatchID, book.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		videoOrder := make(map[string]int, len(book.Videos))
+		for index, video := range book.Videos {
+			videoOrder[video.ID] = index
+		}
+		sort.SliceStable(pages, func(i, j int) bool {
+			left, leftOK := videoOrder[pages[i].VideoID]
+			right, rightOK := videoOrder[pages[j].VideoID]
+			if leftOK != rightOK {
+				return leftOK
+			}
+			if leftOK && left != right {
+				return left < right
+			}
+			if !pages[i].CreatedAt.Equal(pages[j].CreatedAt) {
+				return pages[i].CreatedAt.Before(pages[j].CreatedAt)
+			}
+			return pages[i].ID < pages[j].ID
+		})
+		comicBaseY := 340 + float64(len(assets)*180)
+		for index, page := range pages {
+			primary := projectionPrimaryComicImage(page.Images)
+			pageStatus := page.Status
+			if pageStatus == "" {
+				pageStatus = "draft"
+			}
+			if page.ConfigStale {
+				pageStatus = "stale"
+			}
+			pageConfig := projectionConfig(binding.BatchID, book.ID, "comic_page", page.ID)
+			pageConfig["videoId"] = page.VideoID
+			pageConfig["comicPrompt"], pageConfig["imagePrompt"] = page.ComicPrompt, page.ImagePrompt
+			pageConfig["resourceRevision"] = page.Revision
+			pageConfig["configStale"] = page.ConfigStale
+			if page.ModelID != "" {
+				pageConfig["modelId"] = page.ModelID
+			}
+			if page.AspectRatio != "" {
+				pageConfig["ratio"] = page.AspectRatio
+			}
+			if page.SnapshotHash != "" {
+				pageConfig["snapshotHash"] = page.SnapshotHash
+			}
+			pageAssetRef := map[string]any{"kind": "comic_page", "source": "batch_factory", "comicPageId": page.ID}
+			if primary.ID != "" {
+				pageAssetRef["id"] = primary.ID
+				pageAssetRef["mediaType"] = primary.MediaType
+				if primary.URL != "" {
+					pageAssetRef["url"] = primary.URL
+				}
+			}
+			applyMappedNodeState(pageConfig, pageStatus, "")
+			pageNodeID := add("comic_page", page.ID, projectionFingerprint(page.Revision, page.Status, page.ConfigStale, primary.ID, primary.Revision, primary.URL), Node{
+				Type: "image", Title: fmt.Sprintf("漫画页 %02d", index+1), Summary: page.ComicPrompt,
+				Status: NormalizeMappedNodeState(pageStatus, "").Status, Position: Position{X: 360, Y: comicBaseY + float64(index*180)},
+				AssetRef: pageAssetRef, Config: pageConfig,
+			})
+			comicPageNodeByID[page.ID] = pageNodeID
+			if sourceID := nodeIDByResource[projectionResourceKey("video", page.VideoID)]; sourceID != "" {
+				items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, sourceID)
+			}
+			for _, reference := range page.ReferenceImageURLs {
+				if sourceID := imageNodeByURL[strings.TrimSpace(reference)]; sourceID != "" {
+					items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, sourceID)
+				}
+			}
+		}
+
+		collections, err := s.BatchFactory.ListComicCollections(ctx, owner, binding.BatchID, book.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		sort.SliceStable(collections, func(i, j int) bool {
+			if !collections[i].CreatedAt.Equal(collections[j].CreatedAt) {
+				return collections[i].CreatedAt.Before(collections[j].CreatedAt)
+			}
+			return collections[i].ID < collections[j].ID
+		})
+		for index, collection := range collections {
+			draft, err := s.BatchFactory.GetDraft(ctx, owner, collection.ID, n8ComicPublishDraftKind, binding.BatchID)
+			if err != nil && !errors.Is(err, batchfactoryv11.ErrNotFound) {
+				return nil, nil, err
+			}
+			var record struct {
+				Status      string    `json:"status"`
+				PublishedAt time.Time `json:"publishedAt"`
+				CarouselID  int64     `json:"carouselId"`
+				WorkIDs     []int64   `json:"workIds"`
+			}
+			if err == nil && strings.TrimSpace(draft.Content) != "" {
+				_ = json.Unmarshal([]byte(draft.Content), &record)
+			}
+			n8Status := strings.TrimSpace(record.Status)
+			collectionConfig := projectionConfig(binding.BatchID, book.ID, "comic_collection", collection.ID)
+			collectionConfig["comicStatus"] = collection.Status
+			collectionConfig["pageCount"] = len(collection.Items)
+			collectionConfig["n8PublishStatus"] = n8Status
+			if record.CarouselID > 0 {
+				collectionConfig["n8PublishCarouselId"] = record.CarouselID
+			}
+			if len(record.WorkIDs) > 0 {
+				collectionConfig["n8PublishWorkIds"] = append([]int64(nil), record.WorkIDs...)
+			}
+			if !record.PublishedAt.IsZero() {
+				collectionConfig["n8PublishedAt"] = record.PublishedAt.UTC().Format(time.RFC3339)
+			}
+			collectionStatus := "queued"
+			switch n8Status {
+			case "published":
+				collectionStatus = "succeeded"
+			case "uploaded":
+				collectionStatus = "running"
+			}
+			applyMappedNodeState(collectionConfig, collectionStatus, "")
+			collectionAssetRef := map[string]any{"kind": "comic_collection", "source": "batch_factory", "collectionId": collection.ID}
+			if len(collection.Items) > 0 && collection.Items[0].URL != "" {
+				collectionAssetRef["url"] = collection.Items[0].URL
+			}
+			collectionNodeID := add("comic_collection", collection.ID, projectionFingerprint(collection.Status, len(collection.Items), n8Status, record.CarouselID, record.PublishedAt), Node{
+				Type: "image", Title: "漫画合集", Summary: fmt.Sprintf("%d 页", len(collection.Items)),
+				Status: collectionStatus, Position: Position{X: 1040, Y: 420 + float64(index*200)},
+				AssetRef: collectionAssetRef, Config: collectionConfig,
+			})
+			for _, item := range collection.Items {
+				if sourceID := comicPageNodeByID[item.ComicPageID]; sourceID != "" {
+					items[len(items)-1].node.SourceNodeIDs = appendUniqueString(items[len(items)-1].node.SourceNodeIDs, sourceID)
+				}
+			}
+			nodeIDByResource[projectionResourceKey("comic_collection", collection.ID)] = collectionNodeID
+		}
+	}
+
 	// The final video is a stable book-level node. It must be available before
 	// the first merge so the canvas can finish the same chain as Batch Factory.
 	mergeReady, mergeReason := projectionMergeReadiness(book.Videos, tasksByVideo)
@@ -478,15 +644,41 @@ func (s *BatchFactoryProjectionService) projectBook(ctx context.Context, owner s
 	if organization := projectionMetadataText(publishSettings, "organization"); organization != "" {
 		mergeConfig["publishOrganization"] = organization
 	}
+	// 121/YD publish outcomes come from the read-only external publish records.
+	// They are never written back; the canvas only surfaces what already
+	// happened.
+	publish121Status, publishYadiStatus := "", ""
+	if s.PublishResults != nil {
+		results, err := s.PublishResults.BatchFactoryPublishResults(ctx, owner, binding.BatchID, book.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, result := range results {
+			switch strings.ToLower(strings.TrimSpace(result.Provider)) {
+			case "121":
+				publish121Status = result.Status
+				mergeConfig["publish121Status"] = result.Status
+				if result.SubmittedAt != nil {
+					mergeConfig["publish121SubmittedAt"] = result.SubmittedAt.UTC().Format(time.RFC3339)
+				}
+			case "yadi":
+				publishYadiStatus = result.Status
+				mergeConfig["publishYadiStatus"] = result.Status
+				if result.SubmittedAt != nil {
+					mergeConfig["publishYadiSubmittedAt"] = result.SubmittedAt.UTC().Format(time.RFC3339)
+				}
+			}
+		}
+	}
 	assetRef := map[string]any{"kind": "video", "source": "batch_factory"}
-	mergeStatus, mergeVersion, mergeSummary := "queued", projectionFingerprint(book.Revision, "merge-pending", mergeReady, mergeReason), mergeReason
+	mergeStatus, mergeVersion, mergeSummary := "queued", projectionFingerprint(book.Revision, "merge-pending", mergeReady, mergeReason, publish121Status, publishYadiStatus), mergeReason
 	if hasMerge {
 		assetRef["id"] = merge.ID
 		mergeConfig["mergeJobId"] = merge.ID
 		mergeConfig["canPublish"] = merge.Status == batchfactoryv11.MergeSucceeded && strings.TrimSpace(merge.OutputURL) != ""
 		applyMappedNodeState(mergeConfig, string(merge.Status), merge.ErrorMessage)
 		mergeStatus = NormalizeMappedNodeState(string(merge.Status), merge.ErrorMessage).Status
-		mergeVersion = projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources)
+		mergeVersion = projectionFingerprint(merge.ID, merge.Status, merge.OutputURL, merge.UpdatedAt, merge.Sources, publish121Status, publishYadiStatus)
 		mergeSummary = ""
 	} else {
 		mergeConfig["canPublish"] = false
@@ -776,6 +968,18 @@ func projectionPrimaryImage(images []batchfactoryv11.BookAssetImage) batchfactor
 		}
 	}
 	return batchfactoryv11.BookAssetImage{}
+}
+
+func projectionPrimaryComicImage(images []batchfactoryv11.ComicPageImage) batchfactoryv11.ComicPageImage {
+	for _, image := range images {
+		if image.IsPrimary {
+			return image
+		}
+	}
+	if len(images) > 0 {
+		return images[0]
+	}
+	return batchfactoryv11.ComicPageImage{}
 }
 
 func projectionConfig(batchID, bookID, resourceType, resourceID string) map[string]any {

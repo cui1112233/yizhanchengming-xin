@@ -38,20 +38,23 @@ async function loadVideoProviderState(api) {
   const empty = {
     personalAPI: { provider: 'personal_api', model: 'yd2.0-mini', configured: false },
     doubaoLocal: { provider: 'doubao_local_executor', model: 'doubao-seedance', configured: false },
-    h3: { provider: 'autodl_comfyui', model: 'minimax-h3-video', configured: false }
+    h3: { provider: 'autodl_comfyui', model: 'minimax-h3-video', configured: false },
+    yfai: { provider: 'yfai_seedance', model: 'seedance-2-0-official', configured: false }
   };
   const statusRequests = [
     typeof api.getVideoProviderStatus === 'function' ? api.getVideoProviderStatus('personal_api') : Promise.resolve(null),
     typeof api.getVideoProviderStatus === 'function' ? api.getVideoProviderStatus('doubao_local_executor') : Promise.resolve(null),
     typeof api.getVideoProviderStatus === 'function' ? api.getVideoProviderStatus('autodl_comfyui') : Promise.resolve(null),
+    typeof api.getVideoProviderStatus === 'function' ? api.getVideoProviderStatus('yfai_seedance') : Promise.resolve(null),
     typeof api.listLocalExecutors === 'function' ? api.listLocalExecutors() : Promise.resolve({ executors: [] })
   ];
-  const [personal, doubao, h3, executors] = await Promise.all(statusRequests.map(request => Promise.resolve(request).catch(() => null)));
+  const [personal, doubao, h3, yfai, executors] = await Promise.all(statusRequests.map(request => Promise.resolve(request).catch(() => null)));
   return {
     videoProviders: {
       personalAPI: personal?.provider ? { ...empty.personalAPI, ...personal } : empty.personalAPI,
       doubaoLocal: doubao?.provider ? { ...empty.doubaoLocal, ...doubao } : empty.doubaoLocal,
-      h3: h3?.provider ? { ...empty.h3, ...h3 } : empty.h3
+      h3: h3?.provider ? { ...empty.h3, ...h3 } : empty.h3,
+      yfai: yfai?.provider ? { ...empty.yfai, ...yfai } : empty.yfai
     },
     localExecutors: Array.isArray(executors?.executors) ? executors.executors : []
   };

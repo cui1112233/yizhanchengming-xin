@@ -9,6 +9,14 @@ import (
 	"testing"
 )
 
+func TestOpenAICompatibleHTTPClientUsesHTTP2ForGGWKEndpoint(t *testing.T) {
+	client := openAICompatibleHTTPClient("https://www.ggwk1.online/v1/chat/completions")
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || !transport.ForceAttemptHTTP2 || transport.TLSNextProto != nil {
+		t.Fatalf("transport=%#v, want HTTP/2-capable transport", client.Transport)
+	}
+}
+
 func TestOpenAICompatibleProviderRequestsJSONObjectResponse(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request map[string]any

@@ -38,7 +38,7 @@ func registerConfiguredImageGenerationRoute(mux *http.ServeMux, store batchfacto
 		}
 		result, status, err := configuredBatchImage(r.Context(), store, catalogStore, owner, input.Prompt, input.ImageModelID, input.Size)
 		if err != nil {
-			writeJSON(w, status, map[string]string{"error": err.Error(), "code": "BFV11_IMAGE_GENERATION_FAILED"})
+			writeJSON(w, status, map[string]string{"error": err.Error(), "code": errorCodeOr(err, "BFV11_IMAGE_GENERATION_FAILED")})
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
@@ -83,7 +83,7 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 		break
 	}
 	if model == nil {
-		return nil, http.StatusServiceUnavailable, fmt.Errorf("图片模型未配置")
+		return nil, http.StatusServiceUnavailable, withErrorCode(fmt.Errorf("图片模型未配置；%s", setupHintImage), ErrorCodeImageModelNotConfigured)
 	}
 	endpointRaw := modelString(model, "endpoint")
 	if endpointRaw == "" {
@@ -95,7 +95,7 @@ func configuredBatchImages(ctx context.Context, store batchfactoryv11.Store, cat
 	}
 	credential := shuihuoModelCredential(model)
 	if credential == "" {
-		return nil, http.StatusServiceUnavailable, fmt.Errorf("图片模型凭据未配置")
+		return nil, http.StatusServiceUnavailable, withErrorCode(fmt.Errorf("图片模型凭据未配置；%s", setupHintImage), ErrorCodeImageModelNotConfigured)
 	}
 	payload := map[string]any{"model": modelString(model, "modelId"), "prompt": prompt}
 	if input.Count > 0 {

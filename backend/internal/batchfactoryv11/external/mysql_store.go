@@ -85,6 +85,37 @@ func (s *MySQLStore) GetIntent(ctx context.Context, owner, id string) (Submissio
 	return value, nil
 }
 
+// ListIntentsByBatch is a read-only query used by the Agent canvas projection.
+// It selects no payload bytes so projected state cannot include secrets.
+func (s *MySQLStore) ListIntentsByBatch(ctx context.Context, owner, batchID string) ([]SubmissionIntent, error) {
+	if s == nil || s.db == nil {
+		return nil, ErrUnavailable
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id,provider,batch_id,book_id,payload_digest,expires_at,confirmed_at,submitted_at FROM batch_factory_v12_external_intents WHERE owner_username=? AND batch_id=? ORDER BY created_at DESC LIMIT 100`, owner, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SubmissionIntent{}
+	for rows.Next() {
+		var value SubmissionIntent
+		var provider, bookID string
+		var confirmed, submitted sql.NullTime
+		if err := rows.Scan(&value.ID, &provider, &value.BatchID, &bookID, &value.PayloadDigest, &value.ExpiresAt, &confirmed, &submitted); err != nil {
+			return nil, err
+		}
+		value.Owner, value.Provider, value.BookID = owner, Provider(provider), bookID
+		if confirmed.Valid {
+			value.ConfirmedAt = &confirmed.Time
+		}
+		if submitted.Valid {
+			value.SubmittedAt = &submitted.Time
+		}
+		out = append(out, value)
+	}
+	return out, rows.Err()
+}
+
 func (s *MySQLStore) ConfirmIntent(ctx context.Context, owner, id string) (SubmissionIntent, error) {
 	if s == nil || s.db == nil {
 		return SubmissionIntent{}, ErrUnavailable

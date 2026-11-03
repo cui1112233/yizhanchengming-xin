@@ -306,7 +306,11 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		novelFetchQueue = novelfetchworkshop.NewRedisQueueWithDo("qiantie:novel-fetch", novelfetchworkshop.RedisDoFunc(redisTransport.Do))
 	}
 	compiler := &batchfactoryv11.PromptCompilerService{Store: store}
-	videoRegistry := batchfactoryv11.NewMemoryVideoProviderRegistry()
+	// Explicit video provider settings are persisted in the owner config document
+	// so a restart keeps the last saved provider; catalog-driven sync stays in
+	// memory because the model catalog is already durable.
+	videoRegistry := batchfactoryv11.NewPersistentVideoProviderRegistry(novelFetchStore)
+	videoRegistry.Warm(ctx)
 	localExecutorService := localexecutor.NewService(localexecutor.NewMySQLStore(db), nil)
 	giantMaterialExecutorService := giantmaterialexecutor.NewService(giantmaterialexecutor.NewMySQLStore(db), nil)
 	if _, err := giantMaterialExecutorService.ConsolidateExecutors(ctx); err != nil {

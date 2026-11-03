@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
@@ -47,5 +48,32 @@ func TestV12VideoProviderStatusUsesManagedCatalog(t *testing.T) {
 	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/video-provider/status?provider=personal_api", nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"model":"yd-model"`) || !strings.Contains(rec.Body.String(), `"configured":true`) {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestV12VideoProviderStatusUsesRuntimeRegistry(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	config := NewUserConfigStore(filepath.Join(t.TempDir(), "users"))
+	accountConfig := novelfetchworkshop.NewMemoryStore()
+	registry := batchfactoryv11.NewPersistentVideoProviderRegistry(accountConfig)
+	if err := registry.SaveConfig(context.Background(), "alice", batchfactoryv11.VideoProviderConfig{
+		Provider: batchfactoryv11.VideoProviderPersonalAPI,
+		APIKey:   "yd-secret",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	api := NewRouter(RouterOptions{
+		BridgeSecret:    "secret",
+		Now:             func() time.Time { return now },
+		UserConfigStore: config,
+		NovelFetchStore: accountConfig,
+		Production:      &batchfactoryv11.ProductionService{ProviderRegistry: registry},
+	})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/video-provider/status?provider=personal_api", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"model":"yd2.0-mini"`) || !strings.Contains(rec.Body.String(), `"configured":true`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "yd-secret") {
+		t.Fatal("video provider status leaked a credential")
 	}
 }

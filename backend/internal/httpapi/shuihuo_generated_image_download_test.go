@@ -131,6 +131,12 @@ func TestShuihuoImageGenerationHTTPClientSelectsProtocolByEndpoint(t *testing.T)
 		t.Fatal("VVEAI endpoint must use the HTTP/2-capable transport")
 	}
 
+	ggwk := shuihuoImageGenerationHTTPClient("https://www.ggwk1.online/v1/images/generations")
+	ggwkTransport := ggwk.Transport.(*http.Transport)
+	if !ggwkTransport.ForceAttemptHTTP2 || ggwkTransport.TLSNextProto != nil {
+		t.Fatal("GGWK endpoint must use the HTTP/2-capable transport")
+	}
+
 	other := shuihuoImageGenerationHTTPClient("https://images.example.test/v1/images/generations")
 	otherTransport := other.Transport.(*http.Transport)
 	if otherTransport.ForceAttemptHTTP2 || otherTransport.TLSNextProto == nil {

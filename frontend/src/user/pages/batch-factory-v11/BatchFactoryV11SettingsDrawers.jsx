@@ -16,15 +16,17 @@ import { FixedSingleVideoControl } from './FixedSingleVideoControl';
 import { buildConfigVersionSyncPatch, configVersionOptions } from './bf11UiAdapter.js';
 import { runSaveFlow } from './saveFlow.js';
 import './batch-factory-v11-settings.css';
+import providerCapabilities from './videoProviderCapabilities.json';
 
 const full = { width: '100%' };
 const CHANGE_IMPACT_DEBOUNCE_MS = 250;
 
-const VIDEO_PROVIDERS = [
-  { value: 'personal_api', label: 'API 配置模型' },
-  { value: 'doubao_local_executor', label: '本地执行器模型' },
-  { value: 'autodl_comfyui', label: 'API 配置模型' }
-];
+// 通道清单来自共享契约文件，管理员模型目录使用同一份数据。
+const VIDEO_PROVIDERS = providerCapabilities.providers.map(({ id, label }) => ({ value: id, label }));
+const VIDEO_PROVIDER_DEFAULT_MODELS = providerCapabilities.providers.reduce((result, item) => {
+  result[item.id] = item.defaultModel;
+  return result;
+}, {});
 
 function configuredModelOptions(models = []) {
   return (Array.isArray(models) ? models : [])
@@ -341,9 +343,7 @@ export function ProductionSettingsDrawer({
               value={form.videoProvider || 'personal_api'}
               onChange={videoProvider => patch({
                 videoProvider,
-                videoModelId: videoProvider === 'doubao_local_executor'
-                  ? 'doubao-seedance'
-                  : videoProvider === 'autodl_comfyui' ? 'minimax-h3-video' : 'yd2.0-mini'
+                videoModelId: VIDEO_PROVIDER_DEFAULT_MODELS[videoProvider] || 'yd2.0-mini'
               })}
               options={VIDEO_PROVIDERS}
               style={full}
@@ -357,6 +357,9 @@ export function ProductionSettingsDrawer({
               </Tag>
               <Tag color={videoProviders.h3?.configured ? 'green' : 'default'}>
                 AutoDL H3 {videoProviders.h3?.configured ? '已配置' : '未配置'}
+              </Tag>
+              <Tag color={videoProviders.yfai?.configured ? 'green' : 'default'}>
+                梵客 Seedance {videoProviders.yfai?.configured ? '已配置' : '未配置'}
               </Tag>
             </Space>
             {(form.videoProvider || 'personal_api') === 'doubao_local_executor' ? <div className="bf11-provider-pairing">

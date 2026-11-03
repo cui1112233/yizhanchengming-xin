@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hasReadyLocalExecutor, localExecutorStatus, parseLocalExecutorsResponse } from './localExecutors.js';
+import { hasReadyLocalExecutor, localExecutorStatus, mergeExecutorState, parseLocalExecutorsResponse } from './localExecutors.js';
 
 test('parseLocalExecutorsResponse prefers canonical executors and keeps items as compatibility fallback', () => {
   const canonical = [{ id: 'canonical', online: true }];
@@ -24,4 +24,11 @@ test('localExecutorStatus reports paired and online device counts from canonical
     onlineCount: 1
   });
   assert.deepEqual(localExecutorStatus(null), { online: false, paired: 0, onlineCount: 0 });
+});
+
+test('mergeExecutorState keeps backend state and overlays a fresh pairing code', () => {
+  assert.equal(mergeExecutorState({ state: 'online', devices: [{ id: 'a', online: true }] }, null), 'online');
+  assert.equal(mergeExecutorState({ state: 'not_installed', devices: [] }, { code: '123456' }), 'needs_pairing');
+  assert.equal(mergeExecutorState({ state: 'offline', devices: [{ id: 'a', online: false }] }, { code: '123456' }), 'offline');
+  assert.equal(mergeExecutorState(null, null), 'not_installed');
 });

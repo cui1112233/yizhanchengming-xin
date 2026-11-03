@@ -59,7 +59,7 @@ func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetch
 			return generateAgentLocalDoubaoImage(ctx, executors, files, assets, references, owner, localModel, input)
 		}
 		if store == nil || catalogStore == nil {
-			return nil, http.StatusServiceUnavailable, fmt.Errorf("图片模型执行器未配置")
+			return nil, http.StatusServiceUnavailable, withErrorCode(fmt.Errorf("图片模型执行器未配置"), ErrorCodeImageModelNotConfigured)
 		}
 		result, status, err := configuredBatchImages(ctx, store, catalogStore, owner, input)
 		if err != nil {
@@ -71,7 +71,7 @@ func newAgentImageGenerator(store batchfactoryv11.Store, catalogStore novelfetch
 
 func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor.Service, files *localartifact.Store, assets agentworkspace.AssetStore, references agentworkspace.ReferenceURLProvider, owner, model string, input AgentImageGenerationInput) ([]string, int, error) {
 	if executors == nil || files == nil {
-		return nil, http.StatusServiceUnavailable, fmt.Errorf("豆包本地执行器未配置")
+		return nil, http.StatusServiceUnavailable, withErrorCode(fmt.Errorf("豆包本地执行器未配置"), ErrorCodeExecutorNotReady)
 	}
 	items, err := executors.List(ctx, owner)
 	if err != nil {
@@ -85,7 +85,7 @@ func generateAgentLocalDoubaoImage(ctx context.Context, executors *localexecutor
 		}
 	}
 	if !online {
-		return nil, http.StatusServiceUnavailable, fmt.Errorf("没有在线的豆包本地执行器")
+		return nil, http.StatusServiceUnavailable, withErrorCode(fmt.Errorf("没有在线的豆包本地执行器"), ErrorCodeExecutorNotReady)
 	}
 	referenceImages, err := agentLocalImageReferenceURLs(ctx, assets, owner, input.ProjectID, input.ReferenceAssetIDs)
 	if err != nil {

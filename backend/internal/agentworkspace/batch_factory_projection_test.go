@@ -822,3 +822,121 @@ func TestNormalizeMappedNodeStateUsesOnlyCanvasStatesAndSafeErrors(t *testing.T)
 		t.Fatalf("cancelled=%+v", cancelled)
 	}
 }
+
+type projectionPublishResultFixture struct {
+	calls   int
+	results []BatchFactoryPublishResult
+	err     error
+}
+
+func (f *projectionPublishResultFixture) BatchFactoryPublishResults(context.Context, string, string, string) ([]BatchFactoryPublishResult, error) {
+	f.calls++
+	return append([]BatchFactoryPublishResult(nil), f.results...), f.err
+}
+
+func TestSyncBatchFactoryBookProjectsComicNodesAndPublishStatus(t *testing.T) {
+	ctx := context.Background()
+	service, binding, book, _, _, _, _ := newProjectionFixture(t, ctx)
+	source := service.BatchFactory.(*batchfactoryv11.MemoryStore)
+
+	page, err := source.UpsertComicPage(ctx, "alice", binding.BatchID, book.ID, book.Videos[0].ID, batchfactoryv11.UpsertComicPageInput{
+		ComicPrompt: "雨夜巷口，林晚回身", ImagePrompt: "漫画分镜，高对比", ModelID: "comic-model-1", AspectRatio: "9:16", Status: "succeeded",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	primary, err := source.CreateComicPageImage(ctx, "alice", binding.BatchID, book.ID, page.ID, batchfactoryv11.CreateComicPageImageInput{
+		URL: "https://cdn.example.com/comic-1.png", MediaType: "image/png", Source: "provider",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	collection, _, err := source.CreateComicCollection(ctx, "alice", binding.BatchID, book.ID, []string{book.Videos[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := `{"status":"published","carouselId":42,"workIds":[7],"publishedAt":"2026-10-23T10:05:00Z"}`
+	if _, err := source.SaveDraft(ctx, "alice", batchfactoryv11.Draft{Key: collection.ID, Kind: n8ComicPublishDraftKind, Scope: binding.BatchID, Content: record}); err != nil {
+		t.Fatal(err)
+	}
+
+	submitted := time.Date(2026, 10, 23, 10, 6, 0, 0, time.UTC)
+	publish := &projectionPublishResultFixture{results: []BatchFactoryPublishResult{
+		{Provider: "121", Status: "submitted", SubmittedAt: &submitted},
+		{Provider: "yadi", Status: "confirmed"},
+	}}
+	service.PublishResults = publish
+
+	canvas, err := service.SyncBatchFactoryBook(ctx, "alice", binding, book.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if publish.calls != 1 {
+		t.Fatalf("publish result reader calls=%d, want 1", publish.calls)
+	}
+
+	pageNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "comic_page", page.ID)
+	if pageNode.Type != "image" || pageNode.Config["comicPrompt"] != "雨夜巷口，林晚回身" || pageNode.Config["imagePrompt"] != "漫画分镜，高对比" ||
+		pageNode.Config["modelId"] != "comic-model-1" || pageNode.Config["ratio"] != "9:16" || pageNode.Config["videoId"] != book.Videos[0].ID {
+		t.Fatalf("comic page node=%+v", pageNode)
+	}
+	if _, ok := projectionConfigPositiveNumber(pageNode.Config["resourceRevision"]); !ok {
+		t.Fatalf("comic page revision missing: %+v", pageNode.Config)
+	}
+	if pageNode.AssetRef["kind"] != "comic_page" || pageNode.AssetRef["id"] != primary.ID || pageNode.AssetRef["comicPageId"] != page.ID || pageNode.AssetRef["url"] != primary.URL {
+		t.Fatalf("comic page assetRef=%+v", pageNode.AssetRef)
+	}
+	videoNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "video", book.Videos[0].ID)
+	if !reflect.DeepEqual(pageNode.SourceNodeIDs, []string{videoNode.ID}) {
+		t.Fatalf("comic page sources=%v, want [%s]", pageNode.SourceNodeIDs, videoNode.ID)
+	}
+
+	collectionNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "comic_collection", collection.ID)
+	if collectionNode.Type != "image" || collectionNode.Status != "succeeded" || collectionNode.Config["n8PublishStatus"] != "published" {
+		t.Fatalf("comic collection node=%+v", collectionNode)
+	}
+	var collectionPublish struct {
+		CarouselID  int64   `json:"n8PublishCarouselId"`
+		WorkIDs     []int64 `json:"n8PublishWorkIds"`
+		PageCount   int     `json:"pageCount"`
+		PublishedAt string  `json:"n8PublishedAt"`
+		MappedState string  `json:"mappedState"`
+	}
+	encodedConfig, err := json.Marshal(collectionNode.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(encodedConfig, &collectionPublish); err != nil {
+		t.Fatal(err)
+	}
+	if collectionPublish.CarouselID != 42 || collectionPublish.PageCount != 1 {
+		t.Fatalf("comic collection config=%s", encodedConfig)
+	}
+	if !reflect.DeepEqual(collectionPublish.WorkIDs, []int64{7}) {
+		t.Fatalf("comic collection workIds=%v", collectionPublish.WorkIDs)
+	}
+	if collectionPublish.PublishedAt != "2026-10-23T10:05:00Z" || collectionPublish.MappedState != "succeeded" {
+		t.Fatalf("comic collection publish fields=%s", encodedConfig)
+	}
+	if !reflect.DeepEqual(collectionNode.SourceNodeIDs, []string{pageNode.ID}) {
+		t.Fatalf("comic collection sources=%v, want [%s]", collectionNode.SourceNodeIDs, pageNode.ID)
+	}
+
+	mergeNode := projectedNode(t, service.CanvasStore, ctx, binding, book.ID, "merge", book.ID)
+	if mergeNode.Config["publish121Status"] != "submitted" || mergeNode.Config["publishYadiStatus"] != "confirmed" {
+		t.Fatalf("merge publish fields=%+v", mergeNode.Config)
+	}
+	if mergeNode.Config["publish121SubmittedAt"] != "2026-10-23T10:06:00Z" {
+		t.Fatalf("merge 121 submittedAt=%v", mergeNode.Config["publish121SubmittedAt"])
+	}
+
+	edgeCount := 0
+	for _, edge := range canvas.Edges {
+		if edge.Relation == batchFactoryProjectionRelation {
+			edgeCount++
+		}
+	}
+	if edgeCount == 0 {
+		t.Fatal("comic projection produced no batch_factory edges")
+	}
+}

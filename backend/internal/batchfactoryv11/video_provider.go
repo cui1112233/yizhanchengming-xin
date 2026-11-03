@@ -18,6 +18,24 @@ const (
 	DefaultPersonalVideoTasksURL  = "https://ydapi.yadiai.cn/openapi/v1/video/tasks"
 )
 
+// ErrorCodeVideoProviderNotConfigured 是视频生成通道缺配置的稳定错误码；
+// httpapi 会把它透传到响应 code 字段，前端据此显示设置入口。
+const ErrorCodeVideoProviderNotConfigured = "VIDEO_PROVIDER_NOT_CONFIGURED"
+
+type notConfiguredError struct{ err error }
+
+func (e notConfiguredError) Error() string     { return e.err.Error() }
+func (e notConfiguredError) Unwrap() error     { return e.err }
+func (e notConfiguredError) ErrorCode() string { return ErrorCodeVideoProviderNotConfigured }
+
+// wrapNotConfigured 保留原错误文本与 errors.Is 语义，只附加稳定错误码。
+func wrapNotConfigured(err error) error {
+	if err == nil {
+		return nil
+	}
+	return notConfiguredError{err: err}
+}
+
 type VideoProviderConfig struct {
 	Provider   string
 	APIKey     string
@@ -57,6 +75,19 @@ func (r *MemoryVideoProviderRegistry) Put(_ context.Context, owner string, cfg V
 	if owner == "" {
 		return fmt.Errorf("%w: owner is required", ErrInvalid)
 	}
+	normalized, err := normalizeVideoProviderConfig(cfg)
+	if err != nil {
+		return err
+	}
+	r.putNormalized(owner, normalized)
+	return nil
+}
+
+// normalizeVideoProviderConfig applies provider defaults and validates the
+// minimum credentials required before a provider can be used. It is shared by
+// the in-memory registry and the persistent registry so both paths accept the
+// same input.
+func normalizeVideoProviderConfig(cfg VideoProviderConfig) (VideoProviderConfig, error) {
 	cfg.Provider = normalizeVideoProvider(cfg.Provider)
 	switch cfg.Provider {
 	case VideoProviderPersonalAPI:
@@ -66,7 +97,7 @@ func (r *MemoryVideoProviderRegistry) Put(_ context.Context, owner string, cfg V
 		}
 		cfg.APIKey = strings.TrimSpace(cfg.APIKey)
 		if cfg.APIKey == "" {
-			return fmt.Errorf("%w: personal video API key is required", ErrInvalid)
+			return cfg, fmt.Errorf("%w: personal video API key is required", ErrInvalid)
 		}
 		if strings.TrimSpace(cfg.CreateURL) == "" {
 			cfg.CreateURL = DefaultPersonalVideoCreateURL
@@ -86,7 +117,7 @@ func (r *MemoryVideoProviderRegistry) Put(_ context.Context, owner string, cfg V
 	case VideoProviderAutoDLH3:
 		cfg.APIKey = strings.TrimSpace(cfg.APIKey)
 		if cfg.APIKey == "" {
-			return fmt.Errorf("%w: AutoDL H3 API key is required", ErrInvalid)
+			return cfg, fmt.Errorf("%w: AutoDL H3 API key is required", ErrInvalid)
 		}
 		cfg.Model = strings.TrimSpace(cfg.Model)
 		if cfg.Model == "" {
@@ -100,12 +131,12 @@ func (r *MemoryVideoProviderRegistry) Put(_ context.Context, owner string, cfg V
 		}
 		cfg.WorkflowID = strings.TrimSpace(cfg.WorkflowID)
 		if cfg.WorkflowID != "" && !validAutoDLH3WorkflowID(cfg.WorkflowID) {
-			return fmt.Errorf("%w: AutoDL H3 workflow id is invalid", ErrInvalid)
+			return cfg, fmt.Errorf("%w: AutoDL H3 workflow id is invalid", ErrInvalid)
 		}
 	case VideoProviderYFAISeedance:
 		cfg.APIKey = strings.TrimSpace(cfg.APIKey)
 		if cfg.APIKey == "" {
-			return fmt.Errorf("%w: YFAI Seedance API key is required", ErrInvalid)
+			return cfg, fmt.Errorf("%w: YFAI Seedance API key is required", ErrInvalid)
 		}
 		cfg.Model = strings.TrimSpace(cfg.Model)
 		if cfg.Model == "" {
@@ -115,12 +146,22 @@ func (r *MemoryVideoProviderRegistry) Put(_ context.Context, owner string, cfg V
 			cfg.CreateURL = "https://yf.token6688.com"
 		}
 	default:
-		return fmt.Errorf("%w: unsupported video provider", ErrInvalid)
+		return cfg, fmt.Errorf("%w: unsupported video provider", ErrInvalid)
 	}
+	return cfg, nil
+}
+
+func (r *MemoryVideoProviderRegistry) putNormalized(owner string, cfg VideoProviderConfig) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.values[owner+"\x00"+cfg.Provider] = cfg
-	return nil
+}
+
+func (r *MemoryVideoProviderRegistry) has(owner, provider string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, ok := r.values[owner+"\x00"+provider]
+	return ok
 }
 
 func (r *MemoryVideoProviderRegistry) Resolve(_ context.Context, owner, provider string) (VideoProviderConfig, error) {
@@ -139,7 +180,7 @@ func (r *MemoryVideoProviderRegistry) Resolve(_ context.Context, owner, provider
 	cfg, ok := r.values[owner+"\x00"+provider]
 	r.mu.RUnlock()
 	if !ok {
-		return VideoProviderConfig{}, fmt.Errorf("%w: video provider is not configured", ErrUnavailable)
+		return VideoProviderConfig{}, wrapNotConfigured(fmt.Errorf("%w: 视频生成通道未配置；请到「批量工厂 → 设置 → 视频生成通道」选择通道并填写密钥后保存。", ErrUnavailable))
 	}
 	return cfg, nil
 }
@@ -203,3 +244,96 @@ func VideoModelMatchesProviderModel(selectedModel, providerModel, provider strin
 
 // NormalizeVideoProviderForHTTP normalizes provider names accepted by HTTP clients.
 func NormalizeVideoProviderForHTTP(provider string) string { return normalizeVideoProvider(provider) }
+
+// DefaultVideoModelFor returns the built-in model id used when a provider has
+// no explicitly saved or catalog-configured model.
+func DefaultVideoModelFor(provider string) string {
+	switch normalizeVideoProvider(provider) {
+	case VideoProviderPersonalAPI:
+		return DefaultPersonalVideoModel
+	case VideoProviderAutoDLH3:
+		return AutoDLH3Model
+	case VideoProviderYFAISeedance:
+		return "seedance-2-0-official"
+	case VideoProviderDoubaoLocal:
+		return "doubao-seedance"
+	default:
+		return ""
+	}
+}
+
+// IsConfigured reports whether the channel holds an API credential. The local
+// doubao channel is judged by the executor status instead, matching the legacy
+// provider-status response.
+func (cfg VideoProviderConfig) IsConfigured() bool {
+	return strings.TrimSpace(cfg.APIKey) != ""
+}
+
+// CatalogIDForProvider maps a provider id to the model catalog id used by the
+// admin catalog page. Providers without a catalog entry return an empty id.
+func CatalogIDForProvider(provider string) string { return catalogIDForProvider(provider) }
+
+// catalogIDForProvider maps the stable provider id to the model catalog id used
+// by the admin catalog page.
+func catalogIDForProvider(provider string) string {
+	switch normalizeVideoProvider(provider) {
+	case VideoProviderPersonalAPI:
+		return "yd2-mini-video"
+	case VideoProviderAutoDLH3:
+		return "minimax-h3-video"
+	case VideoProviderYFAISeedance:
+		return "seedance-2-0-official"
+	default:
+		return ""
+	}
+}
+
+// ResolveVideoProviderSetting derives the effective provider setting from an
+// account config document using the same priority as the runtime registry:
+// explicitly saved videoProviders > managed model catalog > legacy video keys.
+// It is read-only and never exposes credentials.
+func ResolveVideoProviderSetting(config map[string]any, rawProvider string) VideoProviderConfig {
+	provider := normalizeVideoProvider(rawProvider)
+	cfg := VideoProviderConfig{Provider: provider, Model: DefaultVideoModelFor(provider)}
+	if config == nil {
+		return cfg
+	}
+	if providers, ok := config["videoProviders"].(map[string]any); ok {
+		if entry, ok := providers[provider].(map[string]any); ok {
+			cfg.APIKey = configString(entry, "apiKey")
+			if model := configString(entry, "model"); model != "" {
+				cfg.Model = model
+			}
+			return cfg
+		}
+	}
+	catalogVersion := configNumber(config["modelCatalogVersion"])
+	if catalogID := catalogIDForProvider(provider); catalogID != "" && catalogVersion >= 1 {
+		models, _ := config["modelCatalog"].([]any)
+		for _, item := range models {
+			entry, ok := item.(map[string]any)
+			if !ok || configString(entry, "id") != catalogID {
+				continue
+			}
+			cfg.APIKey = configString(entry, "credential")
+			if model := configString(entry, "modelId"); model != "" {
+				cfg.Model = model
+			}
+			return cfg
+		}
+	}
+	video, _ := config["video"].(map[string]any)
+	switch provider {
+	case VideoProviderPersonalAPI:
+		cfg.APIKey = configString(video, "ydApiKey")
+		if cfg.APIKey == "" {
+			cfg.APIKey = configString(video, "apiKey")
+		}
+	case VideoProviderAutoDLH3:
+		cfg.APIKey = configString(video, "h3ApiKey")
+		if cfg.APIKey == "" {
+			cfg.APIKey = configString(video, "apiKey")
+		}
+	}
+	return cfg
+}

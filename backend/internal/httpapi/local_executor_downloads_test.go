@@ -41,8 +41,18 @@ func TestLocalExecutorDownloadRoutesMirrorLegacySemantics(t *testing.T) {
 	if rec := request("/downloads/local-executor/missing.exe"); rec.Code != http.StatusNotFound {
 		t.Fatalf("missing status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if rec := request("/downloads/local-executor/updates/stable/../../secret.exe"); rec.Code != http.StatusNotFound && rec.Code != http.StatusMovedPermanently {
+	if rec := request("/downloads/local-executor/updates/stable/../../secret.exe"); rec.Code != http.StatusNotFound && rec.Code != http.StatusMovedPermanently && rec.Code != http.StatusTemporaryRedirect {
 		t.Fatalf("traversal status=%d body=%s", rec.Code, rec.Body.String())
+	} else if rec.Code != http.StatusNotFound {
+		// ServeMux 会先用 301/307 清洗路径；跟随跳转后仍必须是 404，
+		// 不能因为清洗把 secret.exe 变成可下载文件。
+		location := rec.Header().Get("Location")
+		if !strings.HasPrefix(location, "/downloads/local-executor/") {
+			t.Fatalf("traversal redirect escaped downloads root: %q", location)
+		}
+		if followed := request(location); followed.Code != http.StatusNotFound {
+			t.Fatalf("traversal followed to status=%d body=%s", followed.Code, followed.Body.String())
+		}
 	}
 }
 

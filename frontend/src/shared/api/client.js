@@ -20,16 +20,18 @@ export function isSessionAuthFailure(response) {
   return response?.headers?.get?.('X-Qiantie-Auth-Failure') === 'session';
 }
 
-function readableErrorMessage(text, status) {
+function parseApiError(text, status) {
   try {
     const payload = JSON.parse(text);
-    if (payload && typeof payload.error === 'string' && payload.error.trim()) {
-      return payload.error.trim();
+    if (payload && typeof payload === 'object') {
+      const message = typeof payload.error === 'string' && payload.error.trim() ? payload.error.trim() : '';
+      const code = typeof payload.code === 'string' ? payload.code.trim() : '';
+      return { message: message || text || `请求失败：${status}`, code };
     }
   } catch (_) {
     // Plain-text responses use their original body below.
   }
-  return text || `请求失败：${status}`;
+  return { message: text || `请求失败：${status}`, code: '' };
 }
 
 function notifyApiFailure({ path, method, status, message, sessionAuthFailure = false }) {
@@ -94,7 +96,10 @@ export async function apiRequest(path, options = {}) {
   const allowedStatuses = Array.isArray(options.allowStatuses) ? options.allowStatuses : [];
   if (!response.ok && !allowedStatuses.includes(response.status)) {
     const text = await response.text();
-    const error = new Error(readableErrorMessage(text, response.status));
+    const parsedError = parseApiError(text, response.status);
+    const error = new Error(parsedError.message);
+    // 服务端稳定错误码透传给调用方；没有 code 的旧接口仍按 error 文案处理。
+    if (parsedError.code) error.code = parsedError.code;
     error.status = response.status;
     error.responseText = text;
     const failure = { kind: 'api-response', message: error.message, stack: error.stack, source: path, method: options.method || 'GET', status: response.status };

@@ -103,6 +103,9 @@ type IntentStore interface {
 	GetIntent(context.Context, string, string) (SubmissionIntent, error)
 	ConfirmIntent(context.Context, string, string) (SubmissionIntent, error)
 	MarkSubmitted(context.Context, string, string, time.Time) (SubmissionIntent, error)
+	// ListIntentsByBatch is a read-only projection source. It never mutates
+	// intents and never exposes payloads outside the owning account scope.
+	ListIntentsByBatch(context.Context, string, string) ([]SubmissionIntent, error)
 }
 
 type AuditStore interface {
@@ -559,6 +562,54 @@ func (s *Service) Submit(ctx context.Context, owner, provider, intentID string) 
 	return ref, nil
 }
 
+// PublishResult is the read-only publish outcome projected into the Agent
+// canvas. It deliberately carries no payload or credential material.
+type PublishResult struct {
+	Provider    Provider
+	Status      string
+	SubmittedAt *time.Time
+}
+
+// PublishResults returns the latest intent per provider for one batch. An
+// empty bookID matches batch-level publish intents, so a book projection still
+// sees the batch's 121/YD outcome.
+func (s *Service) PublishResults(ctx context.Context, owner, batchID, bookID string) ([]PublishResult, error) {
+	if s == nil || s.Intents == nil || strings.TrimSpace(owner) == "" || strings.TrimSpace(batchID) == "" {
+		return nil, nil
+	}
+	intents, err := s.Intents.ListIntentsByBatch(ctx, owner, batchID)
+	if err != nil {
+		return nil, err
+	}
+	bookID = strings.TrimSpace(bookID)
+	latest := map[Provider]SubmissionIntent{}
+	order := make([]Provider, 0, len(intents))
+	for _, intent := range intents {
+		if bookID != "" && strings.TrimSpace(intent.BookID) != "" && strings.TrimSpace(intent.BookID) != bookID {
+			continue
+		}
+		current, exists := latest[intent.Provider]
+		if !exists {
+			order = append(order, intent.Provider)
+		}
+		if !exists || !intent.ExpiresAt.Before(current.ExpiresAt) {
+			latest[intent.Provider] = intent
+		}
+	}
+	out := make([]PublishResult, 0, len(order))
+	for _, provider := range order {
+		intent := latest[provider]
+		status := "pending"
+		if intent.SubmittedAt != nil {
+			status = "submitted"
+		} else if intent.ConfirmedAt != nil {
+			status = "confirmed"
+		}
+		out = append(out, PublishResult{Provider: provider, Status: status, SubmittedAt: intent.SubmittedAt})
+	}
+	return out, nil
+}
+
 func digestPayload(payload []byte) string {
 	// The payload is already frozen at intent creation; hashing bytes preserves the
 	// exact confirmation material without storing secrets in the UI response.
@@ -658,6 +709,19 @@ func (m *MemoryStore) MarkSubmitted(_ context.Context, owner, id string, at time
 	value.SubmittedAt = &at
 	m.intents[id] = value
 	return value, nil
+}
+func (m *MemoryStore) ListIntentsByBatch(_ context.Context, owner, batchID string) ([]SubmissionIntent, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]SubmissionIntent, 0, len(m.intents))
+	for _, value := range m.intents {
+		if value.Owner != owner || value.BatchID != strings.TrimSpace(batchID) {
+			continue
+		}
+		value.Payload = nil
+		out = append(out, value)
+	}
+	return out, nil
 }
 func (m *MemoryStore) AppendAudit(_ context.Context, value AuditRecord) (AuditRecord, error) {
 	m.mu.Lock()

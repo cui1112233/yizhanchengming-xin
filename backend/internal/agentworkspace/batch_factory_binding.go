@@ -53,7 +53,7 @@ func ValidateBatchFactoryNodeOrigin(origin BatchFactoryNodeOrigin) error {
 		return ErrBatchFactoryNodeOriginInvalid
 	}
 	switch strings.TrimSpace(origin.ResourceType) {
-	case "book_script", "book_asset", "audio", "video", "merge":
+	case "book_script", "book_asset", "audio", "video", "merge", "comic_page", "comic_collection":
 		return nil
 	default:
 		return ErrBatchFactoryNodeOriginInvalid

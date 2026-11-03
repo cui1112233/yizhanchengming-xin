@@ -120,6 +120,7 @@ func NewRouter(options RouterOptions) http.Handler {
 			VideoReady: shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production),
 		}
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, automationStages, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
+		options.AutomationCoordinator.promptCatalog = options.PresetCatalog
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
 		options.AutomationCoordinator.SetSourceFetcher(options.NovelFetchFetcher)
 		comicGenerator := comicPageGenerator{store: options.Store, files: options.LocalArtifacts, localExecutors: options.LocalExecutors, catalogStore: options.NovelFetchStore, presetCatalog: options.PresetCatalog, generationGate: comicGenerationGate, rewritePrompt: func(ctx context.Context, owner string, request novelfetchworkshop.RewriteRequest) (string, error) {
@@ -330,7 +331,11 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerBatchAutomationRoutes(v12, auth, options.AutomationCoordinator, "v12")
 	}
 	RegisterBatchFactoryScheduleRoutes(v12, auth, options.UserDataDir, options.Now)
-	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, "v12", options.NovelFetchStore)
+	var videoProviderRegistry batchfactoryv11.VideoProviderRegistry
+	if options.Production != nil {
+		videoProviderRegistry = options.Production.ProviderRegistry
+	}
+	registerVideoProviderStatusRoute(v12, auth, options.UserConfigStore, videoProviderRegistry, options.Store, "v12", options.NovelFetchStore)
 	if options.Store != nil {
 		runtimeStageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, ImageReady: shuihuoImageReadyChecker(options.Store, options.NovelFetchStore), VideoReady: shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production)}
 		registerRuntimeSummaryRoute(v12, auth, options.Store, runtimeStageService, options.Production, mergeStatus, options.AutomationStatusReader, "v12")
@@ -393,8 +398,10 @@ func NewRouter(options RouterOptions) http.Handler {
 				}
 				projection := &agentworkspace.BatchFactoryProjectionService{
 					CanvasStore: projectionStore, BatchFactory: batchFactoryBridgeStore,
-					MergeStatus:  mergeStatus,
-					AudioRecords: newBatchFactoryProductionAudioReader(batchFactoryBridgeStore, options.LocalArtifacts), Now: options.Now,
+					MergeStatus:    mergeStatus,
+					AudioRecords:   newBatchFactoryProductionAudioReader(batchFactoryBridgeStore, options.LocalArtifacts),
+					PublishResults: newBatchFactoryPublishResults(options.External),
+					Now:            options.Now,
 				}
 				RegisterAgentBatchFactoryBridge(root, auth, options.AgentWorkspace, batchFactoryBridgeStore, projection, options.Now, agentBatchFactoryBridgeMedia{Local: options.LocalArtifacts, Remote: mergeMedia})
 			}
@@ -504,6 +511,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	RegisterLocalExecutorDownloadRoutes(root, options.LocalExecutorDownloadsDir)
 	RegisterGiantMaterialExecutorRoutes(root, auth, options.GiantMaterialExecutor)
+	registerExecutorStatusRoute(root, auth, options.LocalExecutors, options.GiantMaterialExecutor)
 	RegisterGiantMaterialResolverRoutes(root, auth, options.GiantMaterialResolver)
 	if options.NovelFetchStore != nil {
 		novelFetch := http.NewServeMux()

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { getConfig, saveConfig } from '../../shared/api/config';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { apiRequest } from '../../shared/api/client';
-import { createLocalExecutorPairing as createDoubaoExecutorPairing, getLocalExecutorReleaseManifest } from '../../shared/api/localExecutors.js';
+import { createLocalExecutorPairing as createDoubaoExecutorPairing, getExecutorStatus, getLocalExecutorReleaseManifest, mergeExecutorState } from '../../shared/api/localExecutors.js';
 import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus.js';
 import {
   createGiantMaterialPairing,
@@ -17,6 +17,20 @@ import { DEFAULT_PET_ID, dispatchPetSelection, getPetDefinition, getPetOptions, 
 import { LittleCompanionSprite } from '../../shared/pet/LittleCompanionSprite';
 
 const petOptions = getPetOptions();
+
+// 两种执行器共用一套状态说法：未安装 / 需配对 / 离线 / 在线。state 来自
+// 统一状态接口；pairing 是刚生成、尚未被设备消费的本地配对码。
+function executorStatusText(devices = [], pairing = null, state = '') {
+  const paired = Array.isArray(devices) ? devices.length : 0;
+  const online = paired ? devices.filter(item => item?.online).length : 0;
+  // 统一状态接口给出 state；未加载时用设备列表本地推导，配对码优先。
+  const effective = mergeExecutorState({ state, devices }, pairing);
+  if (effective === 'not_installed') return '未安装：下载客户端后生成配对码';
+  if (effective === 'needs_pairing') return '需配对：在客户端输入配对码完成绑定';
+  if (effective === 'online') return `在线：${online} 台在线 / 共 ${paired} 台已配对`;
+  if (effective === 'offline') return `离线：${paired} 台已配对，请打开客户端`;
+  return '状态读取中…';
+}
 
 export function SettingsPage() {
   const [form] = Form.useForm();
@@ -33,6 +47,7 @@ export function SettingsPage() {
   const [giantPairingBusy, setGiantPairingBusy] = useState(false);
   const [giantPreference, setGiantPreference] = useState({ preferredOs: 'windows' });
   const [pairing, setPairing] = useState(null);
+  const [executorOverview, setExecutorOverview] = useState(null);
   const [localExecutorRelease, setLocalExecutorRelease] = useState({ windows: '', macos: '', windowsUrl: '', macosUrl: '' });
   const [executorTestBusy, setExecutorTestBusy] = useState('');
   const [executorTestResult, setExecutorTestResult] = useState(null);
@@ -76,6 +91,14 @@ export function SettingsPage() {
       message.error(error.message || '读取巨量素材执行器失败');
     } finally { setLoadingGiantMaterialExecutors(false); }
   }
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => getExecutorStatus().then(value => { if (alive) setExecutorOverview(value); }).catch(() => {});
+    load();
+    const timer = window.setInterval(load, 30000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => { loadGiantMaterialExecutors(); }, []);
 
@@ -398,19 +421,37 @@ export function SettingsPage() {
         </section>
         </div>
 
+        <section className="settings-section settings-executor-section" aria-labelledby="settings-executor-overview-title">
+          <div>
+            <h2 id="settings-executor-overview-title">执行器状态</h2>
+            <p>两种执行器都运行在自己的电脑上：豆包负责图片/视频，巨量素材负责 OCR 读取正文。状态口径统一为：未安装、需配对、离线、在线。</p>
+          </div>
+          <div className="settings-executor-layout">
+            <div className="settings-executor-status-grid">
+              <div className="settings-executor-status">
+                <div className="settings-executor-icon"><Video size={20} /></div>
+                <div>
+                  <strong>豆包（图片/视频）</strong>
+                  <span>{executorStatusText(executorOverview?.local?.devices ?? localExecutors, pairing, executorOverview?.local?.state)}</span>
+                </div>
+              </div>
+              <div className="settings-executor-status">
+                <div className="settings-executor-icon"><Video size={20} /></div>
+                <div>
+                  <strong>巨量素材（OCR）</strong>
+                  <span>{executorStatusText(executorOverview?.giant?.devices ?? giantMaterialExecutors, giantPairing, executorOverview?.giant?.state)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="settings-section settings-executor-section" aria-labelledby="settings-executor-title">
           <div>
             <h2 id="settings-executor-title">一战晟铭执行器</h2>
             <p>在自己的电脑上使用豆包生成图片和视频。下载安装后，用一次性配对码连接，之后会自动接收网页任务。</p>
           </div>
           <div className="settings-executor-layout">
-            <div className="settings-executor-status">
-              <div className="settings-executor-icon"><Video size={20} /></div>
-              <div>
-                <strong>本机图片与视频执行通道</strong>
-                <span>{localExecutors.length} 台已配对 · {localExecutors.filter(item => item.online).length} 台在线</span>
-              </div>
-            </div>
             {pairing ? <p className="settings-executor-pairing">请在一战晟铭执行器中输入配对码：<strong>{pairing.code}</strong>（10 分钟内有效，只能使用一次）</p> : null}
             <div className="settings-executor-actions settings-executor-actions-doubao">
               <div className="settings-executor-action-row settings-executor-action-row-top">
@@ -455,16 +496,6 @@ export function SettingsPage() {
             <p>Windows 与 macOS 本地 OCR 执行器。首次绑定一次，之后会在后台自动连接，不需要重复配对。</p>
           </div>
           <div className="settings-executor-layout">
-            <div className="settings-executor-status">
-              <div className="settings-executor-icon"><Video size={20} /></div>
-              <div>
-                <strong>巨量素材读取通道</strong>
-                <span>
-                  {giantMaterialExecutors.length} 台已绑定 · {giantMaterialExecutors.filter(item => item.online).length} 台在线
-                  {giantLatestVersions.windows || giantLatestVersions.macos ? ` · 最新版本 ${giantLatestVersions.windows || giantLatestVersions.macos}` : ''}
-                </span>
-              </div>
-            </div>
             <div className="settings-giant-preference">
               <span className="settings-giant-preference-label">优先读取平台</span>
               <Segmented size="small" value={giantPreference?.preferredOs || 'windows'}

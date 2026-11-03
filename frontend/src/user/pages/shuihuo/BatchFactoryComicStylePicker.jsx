@@ -184,7 +184,7 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
       <div className="batch-factory-comic-reference-controls">
         <div className="batch-factory-comic-reference-title"><b>漫画全局参考图</b><small>默认使用当前画风库图片，也可以手动上传替换。</small></div>
         <div className="batch-factory-comic-reference-actions">
-          <AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadReference} disabled={disabled || uploading}><Button icon={<Upload size={15} />} loading={uploading}>上传参考图</Button></AntUpload>
+          <AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadReference} disabled={disabled || uploading || !batchId}><Button icon={<Upload size={15} />} loading={uploading} title={!batchId ? '提交漫画任务后才能上传自定义参考图' : '上传参考图'}>上传参考图</Button></AntUpload>
           {reference.source === 'manual-upload' ? <Button aria-label="恢复画风库参考图" icon={<Trash2 size={15} />} disabled={disabled} onClick={() => { setLocalReferencePreview(''); patch({ globalReferenceImage: comicReferenceForSelectedStyle(null, selectedPreset) }); }} /> : null}
         </div>
         <div className="batch-factory-comic-reference-switches">

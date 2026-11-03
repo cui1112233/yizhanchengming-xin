@@ -1,0 +1,36 @@
+{
+  "providers": [
+    {
+      "id": "personal_api",
+      "label": "API 配置模型",
+      "defaultModel": "yd2.0-mini",
+      "catalogId": "yd2-mini-video",
+      "adminAdapter": "yd_video",
+      "adminLabel": "YD2.0 Mini 图生视频"
+    },
+    {
+      "id": "doubao_local_executor",
+      "label": "本地执行器模型",
+      "defaultModel": "doubao-seedance",
+      "catalogId": "",
+      "adminAdapter": "local_executor_video",
+      "adminLabel": "本地豆包执行器"
+    },
+    {
+      "id": "autodl_comfyui",
+      "label": "API 配置模型（AutoDL H3）",
+      "defaultModel": "minimax-h3-video",
+      "catalogId": "minimax-h3-video",
+      "adminAdapter": "yd_video",
+      "adminLabel": "YD2.0 Mini 图生视频"
+    },
+    {
+      "id": "yfai_seedance",
+      "label": "梵客 Seedance（yfai）",
+      "defaultModel": "seedance-2-0-official",
+      "catalogId": "seedance-2-0-official",
+      "adminAdapter": "yfai_seedance",
+      "adminLabel": "梵客 Seedance 图生视频"
+    }
+  ]
+}

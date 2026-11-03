@@ -24,6 +24,26 @@ export async function listLocalExecutors(options = {}) {
   return parseLocalExecutorsResponse(result);
 }
 
+// 执行器状态的统一只读入口：一次返回本地与巨量两类执行器的
+// 在线/离线/未安装状态和设备列表，页面不再分别猜测两套口径。
+export function getExecutorStatus(options = {}) {
+  return apiRequest('/api/shuihuo-production/executors/status', {
+    suppressGlobalError: true,
+    ...options
+  });
+}
+
+export function mergeExecutorState(group, pairing) {
+  const devices = Array.isArray(group?.devices) ? group.devices : [];
+  const paired = devices.length;
+  // 刚生成配对码但设备还没上线时，本地配对状态优先于后端快照。
+  if (paired === 0 && pairing?.code) return 'needs_pairing';
+  const state = String(group?.state || '').trim();
+  if (state) return state;
+  if (paired === 0) return 'not_installed';
+  return devices.some(item => item?.online) ? 'online' : 'offline';
+}
+
 export function createLocalExecutorPairing() {
   return apiRequest('/api/shuihuo-production/local-executors/pairings', {
     method: 'POST',

@@ -49,6 +49,30 @@ func TestFileAutomationStatusReaderUsesNewestMatchingRun(t *testing.T) {
 	}
 }
 
+func TestFileAutomationStatusReaderReadsSplitAutomationLayout(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "batch-factory-v11-automation.json")
+	jobsDir := filepath.Join(root, "automation", "jobs")
+	if err := os.MkdirAll(jobsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "automation", "index.json"), []byte(`{"jobs":[{"id":"job-split"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	job := `{"owner":"alice","batchId":"batch-1","id":"job-split","state":"running","runMode":"full_submit","counts":{"total":1,"running":1},"books":{"book-1":{"bookId":"book-1","title":"第一本","status":"running","stage":"comic_images","message":"出图中","logs":[]}}}`
+	if err := os.WriteFile(filepath.Join(jobsDir, "job-split.json"), []byte(job), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, err := NewFileAutomationStatusReader(path).Status("alice", "batch-1")
+	if err != nil || status["id"] != "job-split" {
+		t.Fatalf("split status=%+v err=%v", status, err)
+	}
+	books, ok := status["books"].([]any)
+	if !ok || len(books) != 1 {
+		t.Fatalf("split books=%#v", status["books"])
+	}
+}
+
 func TestFileAutomationStatusReaderHidesRetryAtAfterTerminalFailure(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "automation.json")
 	raw := `{"jobs":{"job":{"owner":"alice","batchId":"batch-1","id":"job-1","state":"failed","books":{"book-1":{"bookId":"book-1","status":"failed","stage":"comic_images","retryAt":"2026-10-30T13:30:00Z"}}}}}`

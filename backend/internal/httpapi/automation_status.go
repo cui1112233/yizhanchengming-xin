@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -36,20 +37,19 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 	if r == nil || r.path == "" {
 		return idle, nil
 	}
-	raw, err := os.ReadFile(r.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return idle, nil
-	}
+	state, splitLayout, err := readAutomationState(r.path)
 	if err != nil {
-		return nil, fmt.Errorf("read automation status: %w", err)
-	}
-	var state automationStateFile
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return nil, fmt.Errorf("decode automation status: %w", err)
+		return nil, err
 	}
 	if normalizeAlreadyUploadedAutomationState(&state) {
-		if err := writeAutomationStateFile(r.path, state); err != nil {
-			return nil, fmt.Errorf("repair automation status: %w", err)
+		var writeErr error
+		if splitLayout {
+			writeErr = writeSplitAutomationState(r.path, state)
+		} else {
+			writeErr = writeAutomationStateFile(r.path, state)
+		}
+		if writeErr != nil {
+			return nil, fmt.Errorf("repair automation status: %w", writeErr)
 		}
 	}
 	matched := make([]map[string]any, 0, len(state.Jobs))
@@ -74,6 +74,73 @@ func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]a
 		return publicAutomationJob(matched[0]), nil
 	}
 	return idle, nil
+}
+
+// readAutomationState supports both the legacy single JSON file and the
+// current split layout used for live jobs. The writer migrated to split files
+// so a growing batch cannot rewrite one large file on every progress update.
+func readAutomationState(path string) (automationStateFile, bool, error) {
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{}}
+	indexPath := filepath.Join(filepath.Dir(path), "automation", "index.json")
+	indexRaw, indexErr := os.ReadFile(indexPath)
+	if indexErr == nil {
+		var index struct {
+			Jobs []map[string]any `json:"jobs"`
+		}
+		if err := json.Unmarshal(indexRaw, &index); err != nil {
+			return state, true, fmt.Errorf("decode automation index: %w", err)
+		}
+		jobsDir := filepath.Join(filepath.Dir(indexPath), "jobs")
+		for _, entry := range index.Jobs {
+			jobID := strings.TrimSpace(toString(entry["id"]))
+			if jobID == "" {
+				continue
+			}
+			jobRaw, err := os.ReadFile(filepath.Join(jobsDir, jobID+".json"))
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return state, true, fmt.Errorf("read automation job: %w", err)
+			}
+			var job map[string]any
+			if err := json.Unmarshal(jobRaw, &job); err != nil {
+				return state, true, fmt.Errorf("decode automation job: %w", err)
+			}
+			state.Jobs[jobID] = job
+		}
+		return state, true, nil
+	}
+	if !errors.Is(indexErr, os.ErrNotExist) {
+		return state, true, fmt.Errorf("read automation index: %w", indexErr)
+	}
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return state, false, nil
+	}
+	if err != nil {
+		return state, false, fmt.Errorf("read automation status: %w", err)
+	}
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return state, false, fmt.Errorf("decode automation status: %w", err)
+	}
+	if state.Jobs == nil {
+		state.Jobs = map[string]map[string]any{}
+	}
+	return state, false, nil
+}
+
+func writeSplitAutomationState(path string, state automationStateFile) error {
+	jobsDir := filepath.Join(filepath.Dir(path), "automation", "jobs")
+	if err := os.MkdirAll(jobsDir, 0o700); err != nil {
+		return err
+	}
+	for jobID, job := range state.Jobs {
+		if err := writeAutomationJSONAtomic(filepath.Join(jobsDir, jobID+".json"), job); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // normalizeAlreadyUploadedAutomationState repairs old task records written by

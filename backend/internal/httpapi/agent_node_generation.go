@@ -267,7 +267,7 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			}
 		}
 		if services.ImageGenerate == nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "图片模型执行器未配置"})
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "图片模型执行器未配置", "code": ErrorCodeImageModelNotConfigured})
 			return
 		}
 		generationInput, settingsErr := normalizeAgentImageGenerationInput(input)
@@ -322,7 +322,11 @@ func RegisterAgentNodeGenerationRoutes(root *http.ServeMux, middleware BridgeAut
 			if status < 400 || status > 599 {
 				status = http.StatusBadGateway
 			}
-			writeJSON(w, status, map[string]string{"error": err.Error()})
+			payload := map[string]string{"error": err.Error()}
+			if code := errorCodeOf(err); code != "" {
+				payload["code"] = code
+			}
+			writeJSON(w, status, payload)
 			return
 		}
 		if len(resultURLs) == 0 {

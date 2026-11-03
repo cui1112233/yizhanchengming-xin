@@ -1,6 +1,7 @@
 import { Alert, Button, Input, InputNumber, Modal, Select, Space, Switch, Tabs, Tag, message } from 'antd';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
+import { apiErrorMessage } from '../../../shared/apiErrors.js';
 import { classifyBookPublishMetadata, createNovelFetchIntake, fetchBookOriginal, fetchDirectOriginals, getBatch, getBatchAutomationStatus, listAutomationPresets, listBatches, startBatchAutomation, updateBookMetadata } from '../../../shared/api/batchFactory';
 import { batchFactoryPlatformOptions } from './batchFactoryPlatformOptions';
 import { buildManualBatchSubmission, manualBookIDsFromInput, manualFetchedSourceText, removePlatformGroup, replacePlatformGroup, totalGroupBookCount, upsertPlatformGroup } from './batchFactoryManualFetch';
@@ -25,26 +26,7 @@ const DEFAULT_COLUMN_ORDER = '书籍ID,书名,男女频,风格,标签,推荐理�
 const clone = value => JSON.parse(JSON.stringify(value || {}));
 
 function normalizedError(error, fallback) {
-  const code = String(error?.message || '').trim();
-  const messages = {
-    INVALID_GIANT_MATERIAL_ID: '请输入10—25位数字巨量素材 ID。',
-    QINGYU_AUTH_NOT_CONFIGURED: '本机尚未配置青语服务令牌。',
-    QINGYU_AUTH_FAILED: '青语授权已失效，需要更新令牌。',
-    QINGYU_BOOK_METADATA_INCOMPLETE: '素材没有完整的平台书名或 Book ID，不能登记。',
-    QINGYU_BOOK_SELECTION_REQUIRED: '该素材关联多条平台书籍记录，请先选择一条。',
-    QINGYU_VIDEO_DURATION_MISSING: '素材没有返回有效的视频时长，暂时不能交给执行器处理。',
-    GIANT_EXECUTOR_OFFLINE: '书城获取失败，OCR 执行器当前未在线；任务没有排队，请启动执行器后重试。',
-    GIANT_EXECUTOR_FAILED: '巨量素材执行器处理失败，可重试失败项。',
-    GIANT_EXECUTOR_TIMEOUT: '巨量素材执行器超时，任务仍可能在后台运行，请稍后查看状态。',
-    GIANT_OCR_EMPTY: '没有识别到可登记的正文。',
-    OCR_NO_TEXT: '没有识别到可登记的正文。'
-  };
-  const friendly = messages[code] || code || String(fallback || '请求失败').trim();
-  // 服务器返回的 502/503 网页错误会是一整段 HTML，直接显示会刷屏；换成一句人话。
-  if (/<html[\s>]|502 Bad Gateway|503 Service/i.test(friendly)) {
-    return '服务器通讯短暂中断（正在更新或重启），请稍后重试。';
-  }
-  return friendly;
+  return apiErrorMessage(error, fallback || '请求失败');
 }
 
 const GIANT_MATERIAL_PLATFORM_OPTION = { value: 'giant_material', label: '巨量获取' };
@@ -248,8 +230,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
 
   const GIANT_ITEM_ERRORS = {
     INVALID_GIANT_MATERIAL_ID: 'ID 格式不对，应为 10—25 位数字',
-    QINGYU_AUTH_NOT_CONFIGURED: '本机尚未配置青语服务令牌',
-    QINGYU_AUTH_FAILED: '青语授权已失效，需要更新令牌',
+    QINGYU_AUTH_NOT_CONFIGURED: '巨量素材解析服务未配置：请配置服务器插件地址与令牌',
+    QINGYU_AUTH_FAILED: '巨量素材解析服务授权失效：请更新青语 N8 令牌',
     QINGYU_MATERIAL_RESPONSE_INVALID: '青语服务没有返回有效素材',
     QINGYU_BOOK_METADATA_INCOMPLETE: '素材没有完整的平台书名或 Book ID',
     QINGYU_VIDEO_DURATION_MISSING: '素材没有有效的视频时长'

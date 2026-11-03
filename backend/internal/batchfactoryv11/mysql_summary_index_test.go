@@ -37,6 +37,17 @@ func TestListBatchSummaryIndexReadsOnlyProjectCardFields(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "media_url"}).
 			AddRow("batch-1", "https://media.example/merge-fallback.mp4").
 			AddRow("batch-2", "https://media.example/first-shot.mp4"))
+	// 漫画页主图与书籍资产主图是项目卡片封面的后续回退来源；这里返回空表，
+	// 验证查询存在且不会覆盖已经选中的成片封面。
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT p.batch_id,p.book_id,p.id,i.id FROM batch_factory_v12_comic_page_images i JOIN batch_factory_v12_comic_pages p ON p.id=i.comic_page_id AND p.owner_username=i.owner_username LEFT JOIN batch_factory_v12_books b ON b.id=p.book_id AND b.owner_username=p.owner_username LEFT JOIN batch_factory_v12_videos v ON v.id=p.video_id AND v.owner_username=p.owner_username WHERE i.owner_username=? AND i.is_primary=TRUE ORDER BY p.batch_id,COALESCE(b.ordinal,2147483647),COALESCE(v.ordinal,2147483647),i.created_at DESC,i.id DESC`)).
+		WithArgs("alice").
+		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "book_id", "comic_page_id", "image_id"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT a.batch_id,a.book_id,a.id,i.id FROM batch_factory_v12_book_asset_images i JOIN batch_factory_v12_book_assets a ON a.id=i.asset_id AND a.owner_username=i.owner_username LEFT JOIN batch_factory_v12_books b ON b.id=a.book_id AND b.owner_username=a.owner_username WHERE i.owner_username=? AND i.is_primary=TRUE ORDER BY a.batch_id,COALESCE(b.ordinal,2147483647),i.created_at DESC,i.id DESC`)).
+		WithArgs("alice").
+		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "book_id", "asset_id", "image_id"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT batch_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type IN ('batch','book')`)).
+		WithArgs("alice").
+		WillReturnRows(sqlmock.NewRows([]string{"batch_id", "patch_json"}))
 
 	got, err := NewMySQLStore(db).ListBatchSummaryIndex(context.Background(), "alice")
 	if err != nil {
