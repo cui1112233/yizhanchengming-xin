@@ -206,7 +206,7 @@ func TestApplySensitiveAIRepairFallsBackToSafeDeterministicGroupReplacement(t *t
 	}
 }
 
-func TestApplySensitiveAIRepairRejectsUnsafeOrIncompleteGroupOutput(t *testing.T) {
+func TestApplySensitiveAIRepairFallsBackWhenGroupOutputIsUnsafeOrIncomplete(t *testing.T) {
 	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
 		return `["仍然包含敏感词"]`, nil
 	})
@@ -219,8 +219,8 @@ func TestApplySensitiveAIRepairRejectsUnsafeOrIncompleteGroupOutput(t *testing.T
 	if text != "替换后\n替换后2" {
 		t.Fatalf("unsafe group changed text=%q", text)
 	}
-	if got[0]["status"] != "failed" || got[1]["status"] != "failed" {
-		t.Fatalf("unsafe/incomplete statuses=%#v", got)
+	if got[0]["status"] != "done" || got[1]["status"] != "done" || got[0]["source"] != "deterministic_fallback" {
+		t.Fatalf("unsafe/incomplete output did not use safe deterministic fallback: %#v", got)
 	}
 }
 

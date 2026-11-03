@@ -1349,10 +1349,8 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 			}
 		}
 		var repaired []string
-		parseFailed := false
 		if lastErr == nil {
 			lastErr = decodeSensitiveRepairArray(output, &repaired)
-			parseFailed = lastErr != nil
 			if lastErr == nil && len(repaired) != len(active) {
 				lastErr = fmt.Errorf("AI 整组返回数量不完整：%d/%d", len(repaired), len(active))
 			}
@@ -1366,7 +1364,7 @@ func applySensitiveAIRepair(ctx context.Context, provider novelfetchworkshop.Rew
 			}
 		}
 		if lastErr != nil {
-			fallbackSafe := parseFailed && strings.TrimSpace(output) != ""
+			fallbackSafe := strings.TrimSpace(output) != ""
 			for _, item := range active {
 				after := strings.TrimSpace(fmt.Sprint(item["after"]))
 				keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
