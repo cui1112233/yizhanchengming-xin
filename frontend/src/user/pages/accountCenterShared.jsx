@@ -10,7 +10,7 @@ export const ROLE_META = {
 export const FEATURE_LABELS = {
   agent: 'Agent 工作区',
   chat: '对话生成',
-  script: '剧本生成',
+  script: '私人定制',
   image: '生图工具',
   tts: '配音',
   unknown: '其他'

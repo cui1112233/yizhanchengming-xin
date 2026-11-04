@@ -34,7 +34,10 @@ func BuildComicAssetExtractionContract(book Book, snapshot DirectorSnapshot) (Pr
 	}
 	preset := aiReasoningPromptConfig(snapshot.Effective).Comic.Assets
 	if strings.TrimSpace(preset.Body) == "" {
-		return PromptContract{}, fmt.Errorf("%w: 请先在资产设置中选择漫画资产提示词", ErrConflict)
+		// Missing selection is a configuration problem, not a stale revision.
+		// Keep the message free of any sentinel prefix so the UI can show the
+		// exact action the user must take.
+		return PromptContract{}, NewConfigRequiredError("请在资产设置中选择漫画资产提示词")
 	}
 	payloadValues := map[string]any{"book_id": book.ID, "title": book.Title, "source_text": book.SourceText, "production": "comic"}
 	if bookGender := bookGenderForPrompt(book); bookGender != "" {

@@ -7,11 +7,11 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/ffmpegbin"
 )
 
 const (
@@ -65,7 +65,10 @@ func (p *FFmpegAgentAudioWaveform) Summary(ctx context.Context, asset agentworks
 	if binaryName == "" {
 		binaryName = "ffmpeg"
 	}
-	command := exec.CommandContext(ctx, binaryName, "-nostdin", "-hide_banner", "-loglevel", "error", "-i", source, "-vn", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1")
+	command, _, err := ffmpegbin.Command(ctx, binaryName, "-nostdin", "-hide_banner", "-loglevel", "error", "-i", source, "-vn", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1")
+	if err != nil {
+		return AgentAudioWaveformSummary{}, err
+	}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		return AgentAudioWaveformSummary{}, err

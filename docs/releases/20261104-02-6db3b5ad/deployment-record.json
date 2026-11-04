@@ -1,0 +1,34 @@
+{
+    "deployment":  {
+                       "buildId":  "20261104-02-6db3b5ad",
+                       "deployedAt":  "2026-11-04T04:43:17.6572180Z",
+                       "oldProcesses":  [
+                                            {
+                                                "pid":  30276,
+                                                "startedAt":  "2026-11-04 12:07:04",
+                                                "binarySha256":  "e2a4d76fcf353a7ddcc9037748123aabee228a4a0fe989461f6bb69a4fc788dc",
+                                                "binaryBytes":  77317632
+                                            }
+                                        ],
+                       "newProcesses":  [
+                                            {
+                                                "pid":  37896,
+                                                "startedAt":  "2026-11-04 12:39:13",
+                                                "binarySha256":  "89c82e424c9945c2a9422b5943fa215c4cc464fed0dfc9154519241a7468807c",
+                                                "binaryBytes":  77329408
+                                            }
+                                        ],
+                       "frontendDistSource":  "%TEMP%\\v88-dist-snapshot-20261104-123546",
+                       "snapshotIndexSha256":  "",
+                       "frontendEntry":  "/assets/user-CKV6--Bb.js",
+                       "rollbackBinary":  ".release/v88/20261104-02-6db3b5ad/previous-qiantie-local.exe",
+                       "unverified":  [
+                                          "capabilities 认证接口（401，无登录 token）",
+                                          "/api/presets 接口口径（401，文件口径代替）",
+                                          "v12/batches 真实耗时（401）",
+                                          "禁用能力 JSON 404（401）",
+                                          "API gzip 压缩比（401）"
+                                      ]
+                   },
+    "archiveDir":  "docs/releases/20261104-02-6db3b5ad"
+}\n

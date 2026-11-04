@@ -18,10 +18,12 @@ func EffectiveVideoAspectRatio(values SettingsPatch) string {
 // reference images, asset images, and complete comic pages. It intentionally
 // permits square images without changing the video contract.
 func EffectiveImageAspectRatio(values SettingsPatch) string {
-	if aspect := rawString(values, "imageAspectRatio", ""); aspect == "9:16" || aspect == "16:9" || aspect == "1:1" {
+	// Supported values come from SupportedImageAspectRatios so stored legacy
+	// values keep reading unchanged and new ratios stay in one place.
+	if aspect := rawString(values, "imageAspectRatio", ""); IsSupportedImageAspectRatio(aspect) {
 		return aspect
 	}
-	if legacy := rawString(values, "aspectRatio", ""); legacy == "9:16" || legacy == "16:9" || legacy == "1:1" {
+	if legacy := rawString(values, "aspectRatio", ""); IsSupportedImageAspectRatio(legacy) {
 		return legacy
 	}
 	return "9:16"

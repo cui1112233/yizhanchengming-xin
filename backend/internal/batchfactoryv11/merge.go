@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -386,6 +387,10 @@ func (s *MergeService) submitMerge(ctx context.Context, owner, batchID, onlyBook
 			return MergeJob{}, fmt.Errorf("%w: book %s is not ready for merge", ErrConflict, book.ID)
 		}
 		tasks := productionTaskSelections(productionJobs, book.ID, book.DirectorRevision.ID)
+		// 历史轮次（orphaned 记录）可能是旧 director revision，按当前 revision 过滤会
+		// 把它们整批排除；这里另建一份不限 revision 的任务表，只用于同 ordinal 的
+		// 「上一版」候选。
+		allTasks := productionTaskSelectionsAllRevisions(productionJobs, book.ID)
 		mediaVideos := book.Videos
 		// Fixed opening keeps all Director cards for review, but merges VIDEO01 only.
 		if snapshot, snapshotErr := snapshotForBook(batch, book); snapshotErr != nil {
@@ -401,7 +406,7 @@ func (s *MergeService) submitMerge(ctx context.Context, owner, batchID, onlyBook
 			}
 		}
 		for _, video := range mediaVideos {
-			candidates := tasks[video.ID]
+			candidates := storyboardTaskCandidates(video, book, tasks, allTasks)
 			// Book merge picks the media produced for this exact opening
 			// variant of VIDEO01; every other storyboard keeps the main
 			// version selected by the user or the latest success.
@@ -576,6 +581,59 @@ func productionTaskSelections(jobs []ProductionJob, bookID, directorRevisionID s
 		}
 	}
 	return out
+}
+
+// productionTaskSelectionsAllRevisions groups every task of the book regardless
+// of the director revision. Historical (orphaned) records were produced under an
+// older revision, so a revision-filtered lookup would hide media that still
+// exists and is still playable.
+func productionTaskSelectionsAllRevisions(jobs []ProductionJob, bookID string) map[string][]productionTaskSelection {
+	out := map[string][]productionTaskSelection{}
+	for _, job := range jobs {
+		if job.BookID != bookID {
+			continue
+		}
+		for _, task := range job.Tasks {
+			out[task.VideoID] = append(out[task.VideoID], productionTaskSelection{JobID: job.ID, Task: task})
+		}
+	}
+	return out
+}
+
+// storyboardTaskCandidates returns the media candidates for one active
+// storyboard: its own tasks plus tasks that belong to historical video records
+// with the same ordinal ("上一版"). Candidates are ordered by update time so the
+// latest success remains the default when the user has not pinned a version.
+func storyboardTaskCandidates(video Video, book Book, current, all map[string][]productionTaskSelection) []productionTaskSelection {
+	candidates := append([]productionTaskSelection{}, current[video.ID]...)
+	if len(book.VideoHistory) == 0 {
+		sortProductionTaskSelections(candidates)
+		return candidates
+	}
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		seen[candidate.Task.ID] = true
+	}
+	for _, history := range book.VideoHistory {
+		if history.Ordinal != video.Ordinal {
+			continue
+		}
+		for _, candidate := range all[history.ID] {
+			if seen[candidate.Task.ID] {
+				continue
+			}
+			seen[candidate.Task.ID] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+	sortProductionTaskSelections(candidates)
+	return candidates
+}
+
+func sortProductionTaskSelections(items []productionTaskSelection) {
+	sort.SliceStable(items, func(left, right int) bool {
+		return items[left].Task.UpdatedAt.Before(items[right].Task.UpdatedAt)
+	})
 }
 
 // selectedProductionTask resolves the user-confirmed main media version. A

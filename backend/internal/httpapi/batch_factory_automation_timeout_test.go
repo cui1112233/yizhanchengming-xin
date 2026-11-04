@@ -2,8 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 func TestComicGenerationBudgetScalesWithPages(t *testing.T) {
@@ -98,5 +101,90 @@ func TestPrepareAutomationBookRetryOnlyAcceptsPendingBooks(t *testing.T) {
 
 	if prepareAutomationBookRetry(map[string]any{"status": "failed"}, 1, now) {
 		t.Fatal("book without batchRetryPending must not be scheduled")
+	}
+}
+
+func TestAutomationRetryResumesFromFailedStage(t *testing.T) {
+	now := time.Now().UTC()
+	for _, stage := range []string{"assets", "director", "opening", "video"} {
+		entry := map[string]any{"status": "failed", "stage": stage, "batchRetryPending": true, "batchRetryCount": 1}
+		if !prepareAutomationBookRetry(entry, 1, now) {
+			t.Fatalf("stage %s must be retryable", stage)
+		}
+		if got := automationStringValue(entry["resumeStage"], ""); got != stage {
+			t.Fatalf("resumeStage = %q, want %q: retry must not restart from assets", got, stage)
+		}
+		if got := automationStringValue(entry["stage"], ""); got != stage {
+			t.Fatalf("stage = %q, want %q", got, stage)
+		}
+	}
+	// 合成阶段失败说明视频已完成，只需回到 video 重新回读，不能重建视频记录。
+	entry := map[string]any{"status": "failed", "stage": "merge", "batchRetryPending": true, "batchRetryCount": 1}
+	if !prepareAutomationBookRetry(entry, 1, now) {
+		t.Fatal("merge failure must be retryable")
+	}
+	if got := automationStringValue(entry["resumeStage"], ""); got != "video" {
+		t.Fatalf("resumeStage = %q, want video", got)
+	}
+}
+
+func TestProductionInFlightDoesNotFailTheBookOrConsumeRetryBudget(t *testing.T) {
+	now := time.Now().UTC()
+	entry := map[string]any{"status": "failed", "stage": "video", "batchRetryCount": 1, "error": "视频生成超时或已停止"}
+	job := batchfactoryv11.ProductionJob{
+		BookID:    "book_1",
+		RequestID: "request_1",
+		Status:    batchfactoryv11.ProductionRunning,
+		Tasks:     []batchfactoryv11.ProductionTask{{Status: batchfactoryv11.ProductionRunning}},
+	}
+	fetch := func(context.Context) (batchfactoryv11.BatchStatus, error) {
+		return batchfactoryv11.BatchStatus{Jobs: []batchfactoryv11.ProductionJob{job}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	waited, err := waitProductionStatus(ctx, fetch, "book_1", "request_1", 20*time.Millisecond)
+	if !errors.Is(err, errProductionInFlight) {
+		t.Fatalf("err = %v, want errProductionInFlight: in-flight tasks must not be reported as failure", err)
+	}
+	if len(waited.Tasks) != len(job.Tasks) {
+		t.Fatalf("waited job lost tasks: %+v", waited)
+	}
+	if scheduleAutomationBatchEndRetry(entry, "video", err, "视频仍在生成", 1, now) {
+		t.Fatal("in-flight production must not schedule a whole-book retry")
+	}
+	if automationNumberValue(entry["batchRetryCount"], 0) != 1 {
+		t.Fatalf("batchRetryCount = %v, must stay unchanged", entry["batchRetryCount"])
+	}
+	if automationBoolValue(entry["batchRetryPending"]) {
+		t.Fatal("in-flight production must not mark the book as retry-pending")
+	}
+}
+
+func TestProductionWaitFinalReadAcceptsAJobThatJustCompleted(t *testing.T) {
+	inFlight := batchfactoryv11.ProductionJob{
+		BookID: "book_1", RequestID: "request_1", Status: batchfactoryv11.ProductionRunning,
+		Tasks: []batchfactoryv11.ProductionTask{{Status: batchfactoryv11.ProductionRunning}},
+	}
+	done := batchfactoryv11.ProductionJob{
+		BookID: "book_1", RequestID: "request_1", Status: batchfactoryv11.ProductionSucceeded,
+		Tasks: []batchfactoryv11.ProductionTask{{Status: batchfactoryv11.ProductionSucceeded, MediaURL: "https://cdn/v.mp4"}},
+	}
+	calls := 0
+	fetch := func(context.Context) (batchfactoryv11.BatchStatus, error) {
+		calls++
+		if calls > 1 {
+			// 终态回读时看到任务已经完成。
+			return batchfactoryv11.BatchStatus{Jobs: []batchfactoryv11.ProductionJob{done}}, nil
+		}
+		return batchfactoryv11.BatchStatus{Jobs: []batchfactoryv11.ProductionJob{inFlight}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+	defer cancel()
+	job, err := waitProductionStatus(ctx, fetch, "book_1", "request_1", 20*time.Millisecond)
+	if err != nil {
+		t.Fatalf("err = %v, want nil: the last task finished before the deadline check", err)
+	}
+	if len(job.Tasks) != 1 || job.Tasks[0].MediaURL == "" {
+		t.Fatalf("job = %+v, want the completed production", job)
 	}
 }

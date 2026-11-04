@@ -1,0 +1,21 @@
+{
+  "buildId": "20261104-04-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "publishedAt": "2026-11-04 14:46:33 +08:00",
+  "archiveDir": "docs/releases/20261104-04-6db3b5ad",
+  "releaseDir": ".release/v88/20261104-04-6db3b5ad",
+  "frontendEntry": "/assets/user-M4kZML8e.js",
+  "frontendSnapshot": "C:/Users/Administrator/AppData/Local/Temp/v88-dist-snapshot-20261104-144423; index.html sha256 cda9b2106d11e7ada54b8842e3fe80544daaa3fcf748b6c01ee6316d55956dfe; 126 files; mtime 2026-11-04 14:22:00",
+  "slice": 5,
+  "capabilities": "enabled=13 disabled=[publish.yadi]",
+  "oldPid": 38352,
+  "oldPidStartedAt": "2026-11-04 13:45:11",
+  "oldBinarySha256": "7870f4bbf16c492f1d2c46c8e6a6c9f8f09e5decb5a6ef3841babc3243ccc709",
+  "newPid": 5612,
+  "newPidStartedAt": "2026-11-04 14:46:33",
+  "newBinarySha256": "f8ef9dd2d5672d3ea152aacf4b8dca953a4c8d9ce0b832d676f3f958d8655a52",
+  "rollbackBinary": ".release/v88/20261104-04-6db3b5ad/previous-qiantie-local.exe",
+  "rollbackCommand": "Stop-Process -Id 5612 -Force; Copy-Item '.release/v88/20261104-04-6db3b5ad/previous-qiantie-local.exe' 'backend/qiantie-local.exe' -Force; .\\scripts\\start-local-go-review.ps1 -SkipBuild",
+  "remoteDeploy": "not-executed（本批按指令只发布本机 4001）",
+  "notes": "Slice 5 由 scripts/start-local-go.ps1 强制提升 + scripts/start-local-go-review.ps1 默认分支显式设置；backend/internal/config/config.go 默认值仍为 3（未改）。"
+}

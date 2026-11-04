@@ -30,6 +30,14 @@ test('apiErrorMessage maps the four setup codes to the shared copy', () => {
   }
 });
 
+test('CAPABILITY_NOT_ENABLED 显示为可读的能力未开启文案', () => {
+  assert.ok(contract.codes.some(item => item.code === 'CAPABILITY_NOT_ENABLED'));
+  const message = apiErrorMessage({ code: 'CAPABILITY_NOT_ENABLED', message: '404 page not found' });
+  assert.equal(message, ERROR_MESSAGES.CAPABILITY_NOT_ENABLED);
+  assert.match(message, /未开启/);
+  assert.doesNotMatch(message, /404 page not found/);
+});
+
 test('apiErrorMessage keeps legacy text and rewrites HTML gateway pages', () => {
   assert.equal(apiErrorMessage({ message: '旧的错误文案' }), '旧的错误文案');
   assert.equal(apiErrorMessage({ message: '502 Bad Gateway' }), '服务器通讯短暂中断（正在更新或重启），请稍后重试。');

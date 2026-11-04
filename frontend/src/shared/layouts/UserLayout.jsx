@@ -22,7 +22,7 @@ const SuperOpcLiquidMetalLogo = lazy(() => import('../components/SuperOpcLiquidM
 
 const navItems = [
   { href: '/', icon: Home, label: '首页' },
-  { href: '/script', icon: FilePenLine, label: '剧本生成' },
+  { href: '/script', icon: FilePenLine, label: '私人定制' },
   // Novel Fetch is served as the Go-embedded canonical workbench. Force a
   // document navigation so the SPA cannot swap in a stale React-only page.
   { href: '/novel-fetch', icon: BookOpen, label: '小说获取', reload: true },
@@ -83,6 +83,7 @@ export function UserLayout({ children }) {
   const isHome = pathname === '/';
   const isAgentRoute = pathname === '/agent' || pathname === '/agent/canvas';
   const isAgentCanvasRoute = pathname === '/agent/canvas';
+  // 全站统一：页面标题只在内容区出现一次；顶栏只显示真实全局状态，没有状态时整条收起。
   const routeAccess = getRouteAccessState({ pathname, isLoggedIn });
   const displayAvatar = avatarDisplay(avatar, username);
   // 悬浮助手需要用它区分账号会话；它不能再作为主页面容器的 React key。
@@ -164,7 +165,12 @@ export function UserLayout({ children }) {
   useEffect(() => {
     const receive = event => {
       const detail = event.detail || {};
-      if (detail.text) setGlobalStatus(expiringHeaderStatus(detail.text, detail.tone || 'info', detail.durationMs));
+      if (!detail.text) {
+        // 业务页可以发空文本主动清空状态，避免顶栏保留已经过期的队列文案。
+        setGlobalStatus({ text: '', tone: 'idle', expiresAt: 0 });
+        return;
+      }
+      setGlobalStatus(expiringHeaderStatus(detail.text, detail.tone || 'info', detail.durationMs));
     };
     window.addEventListener(GLOBAL_STATUS_EVENT, receive);
     return () => window.removeEventListener(GLOBAL_STATUS_EVENT, receive);
@@ -510,10 +516,9 @@ export function UserLayout({ children }) {
       </aside>
       <Fragment>
         <main className="legacy-main">
-          {!isAgentCanvasRoute ? <header className="legacy-topbar">
-            <span className="legacy-page-title">{pageTitle(pathname)}</span>
-            <div className={`legacy-global-status legacy-global-status--${globalStatus.tone}`} role="status" aria-live="polite">{globalStatus.text}</div>
+          {!isAgentCanvasRoute && globalStatus.text ? <header className="legacy-topbar">
             <div className="legacy-userbar" aria-hidden="true" />
+            <div className={`legacy-global-status legacy-global-status--${globalStatus.tone}`} role="status" aria-live="polite">{globalStatus.text}</div>
           </header> : null}
           <section className={`legacy-content${isAgentRoute ? ' legacy-content--agent' : ''}${isAgentCanvasRoute ? ' legacy-content--agent-canvas' : ''}`}>{pageContent}</section>
         </main>

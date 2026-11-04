@@ -218,3 +218,94 @@ func TestWorksClientUsesConfiguredWorksPath(t *testing.T) {
 		t.Fatalf("works=%+v", works)
 	}
 }
+
+func TestClientListsOrganizationsFromNestedTree(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/center-api/auth/organization/tree" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("N8-Admin-Token") != "server-token" {
+			t.Fatalf("missing server-side N8 admin token")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "message": "成功", "data": []map[string]any{
+			{
+				"id": 1, "name": "总部", "status": "ENABLE",
+				"children": []map[string]any{
+					{"id": 11, "name": "制作一组", "status": "ENABLE", "children": []any{}},
+					{"id": 12, "name": "制作二组", "status": "ENABLE", "children": []any{}},
+				},
+			},
+		}})
+	}))
+	defer server.Close()
+
+	organizations, err := NewClient(server.Client(), server.URL+"/center-api", "server-token").ListOrganizations(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(organizations, []Organization{{ID: "1", Name: "总部"}, {ID: "11", Name: "制作一组"}, {ID: "12", Name: "制作二组"}}) {
+		t.Fatalf("organizations = %#v", organizations)
+	}
+}
+
+func TestClientListsEnabledAudioCategories(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/center-api/material/category/select" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "message": "成功", "data": map[string]any{"list": []map[string]any{
+			{"id": 12, "name": "都市", "status": "ENABLE"},
+			{"id": 13, "name": "古风", "status": "DISABLE"},
+		}}})
+	}))
+	defer server.Close()
+
+	categories, err := NewClient(server.Client(), server.URL+"/center-api", "server-token").ListAudioCategories(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(categories) != 1 || categories[0].ID != 12 || categories[0].Name != "都市" {
+		t.Fatalf("categories = %#v", categories)
+	}
+}
+
+func TestClientExposesUpstreamRejectionCodeWithoutToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "UN_LOGIN", "message": "登录已失效", "data": nil})
+	}))
+	defer server.Close()
+
+	client := NewClient(server.Client(), server.URL+"/center-api/auth", "server-token")
+	_, err := client.ListOrganizations(context.Background())
+	var failure *DirectoryError
+	if !errors.As(err, &failure) {
+		t.Fatalf("expected DirectoryError, got %v", err)
+	}
+	if failure.Kind != "service_rejected" || failure.Code != "UN_LOGIN" || failure.Message != "登录已失效" {
+		t.Fatalf("failure = %+v", failure)
+	}
+	if strings.Contains(err.Error(), "server-token") {
+		t.Fatal("diagnostic contains private data")
+	}
+}
+
+func TestClientReadsCamelCaseOrganizationInfo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "SUCCESS", "data": map[string]any{"list": []map[string]any{
+			{"name": "驼峰组织账号", "status": "ENABLE", "organizationInfo": []map[string]any{{"id": 1}, {"id": 11}}},
+			{"name": "下划线组织账号", "status": "ENABLE", "organization_info": []map[string]any{{"id": 2}}},
+		}}})
+	}))
+	defer server.Close()
+
+	entries, err := NewClient(server.Client(), server.URL+"/center-api", "server-token").ListProducerAccountDirectory(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("entries = %#v", entries)
+	}
+	if !reflect.DeepEqual(entries[0].OrganizationIDs, []string{"1", "11"}) || !reflect.DeepEqual(entries[1].OrganizationIDs, []string{"2"}) {
+		t.Fatalf("organization bindings = %#v", entries)
+	}
+}

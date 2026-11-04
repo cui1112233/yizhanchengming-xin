@@ -3468,7 +3468,7 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 		if err != nil {
 			return "", "", "", err
 		}
-		mediaType, storageRef, err := waitForLocalExecutorImage(ctx, localExecutors, files, owner, target.ModelID, imagePrompt, shuihuoImageSize(target.AspectRatio), map[string]any{"referenceImages": resolvedReferences, "imageUrls": resolvedReferences})
+		mediaType, storageRef, err := waitForLocalExecutorImage(ctx, localExecutors, files, owner, target.ModelID, imagePrompt, shuihuoImageSize(target.AspectRatio), map[string]any{"ratio": target.AspectRatio, "referenceImages": resolvedReferences, "imageUrls": resolvedReferences})
 		return mediaType, storageRef, "doubao_local_executor", err
 	}
 	model := target.CatalogModel
@@ -3536,7 +3536,7 @@ func generateShuihuoImageArtifact(ctx context.Context, store batchfactoryv11.Sto
 // 一个 CDN URL，迫使我们再下载一次，而该 CDN 极易在 200 后读超时。
 func newShuihuoProviderImageRequest(ctx context.Context, endpoint, modelID, prompt, aspectRatio string, referenceImageURLs []string, model map[string]any, withResponseFormat bool) (*http.Request, error) {
 	if len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, modelID) {
-		return newShuihuoImageEditRequest(ctx, endpoint, modelID, prompt, shuihuoImageSize(aspectRatio), referenceImageURLs)
+		return newShuihuoImageEditRequest(ctx, endpoint, modelID, prompt, shuihuoImageSizeForModel(modelID, aspectRatio), referenceImageURLs)
 	}
 	payload := map[string]any{"model": modelID, "prompt": prompt, "n": 1, "size": shuihuoImageSizeForModel(modelID, aspectRatio)}
 	if withResponseFormat {
@@ -4573,8 +4573,14 @@ func shuihuoImageSize(aspectRatio string) string {
 		return "1024x1792"
 	case "3:4":
 		return "1536x2048"
+	case "2:3":
+		return "1024x1536"
 	case "1:1":
 		return "1024x1024"
+	case "4:3":
+		return "1024x768"
+	case "3:2":
+		return "1536x1024"
 	default:
 		return "1792x1024"
 	}
@@ -4587,9 +4593,9 @@ func shuihuoImageSizeForModel(modelID, aspectRatio string) string {
 	// OpenAI-compatible gpt-image endpoints commonly support 1024x1024,
 	// 1024x1536 and 1536x1024, rather than the older 1024x1792 sizes.
 	switch strings.TrimSpace(aspectRatio) {
-	case "9:16", "3:4":
+	case "9:16", "3:4", "2:3":
 		return "1024x1536"
-	case "16:9", "4:3":
+	case "16:9", "4:3", "3:2":
 		return "1536x1024"
 	default:
 		return "1024x1024"

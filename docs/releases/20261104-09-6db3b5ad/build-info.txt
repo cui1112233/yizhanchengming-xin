@@ -1,0 +1,11 @@
+buildId=20261104-09-6db3b5ad
+builtAt=2026-11-04T14:33:02.1903116Z
+gitSha=6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8
+worktreeDirty=True
+frontendEntry=/assets/user-DmXbWs5q.js
+windowsBinary=.release/v88/20261104-09-6db3b5ad/qiantie-local.exe
+windowsSha256=f155f3c59e5ad5395bddb7d0148d5e7c6b10b3a22d07000d5104a0ee849900a1
+linuxBinary=.release/v88/20261104-09-6db3b5ad/qiantie-server-linux-amd64
+linuxSha256=0785707cff093c20ac7e77ec49625ab7357e3133652587ed0949d7b0e1827e61
+dataPackage=.release/v88/20261104-09-6db3b5ad/20261104-09-6db3b5ad-data.zip
+dataPackageSha256=4b7e228ad62c61c1c363c9c9a663064aa3804dd80786f0ab22732f8e601fa1b2

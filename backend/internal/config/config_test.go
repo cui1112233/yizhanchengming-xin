@@ -18,7 +18,14 @@ func TestFromEnvRequiresMySQLAndBridgeSecret(t *testing.T) {
 	}
 }
 
+// keepUnstagedSlice pins the slice to 0 for tests that only exercise unrelated
+// config fields; the shipped default is 3 (see TestFromEnvDefaultsToSliceThree).
+func keepUnstagedSlice(t *testing.T) {
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_SLICE", "0")
+}
+
 func TestFromEnvReadsOptionalGiantMaterialPlugin(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_GIANT_MATERIAL_PLUGIN_URL", "http://127.0.0.1:18180")
@@ -33,6 +40,7 @@ func TestFromEnvReadsOptionalGiantMaterialPlugin(t *testing.T) {
 }
 
 func TestFromEnvReadsN8ComicOpenAPIConfig(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_N8_COMIC_BASE_URL", "")
@@ -47,6 +55,7 @@ func TestFromEnvReadsN8ComicOpenAPIConfig(t *testing.T) {
 }
 
 func TestFromEnvReadsUniqueN8ComicProducerAccounts(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_N8_COMIC_PRODUCER_ACCOUNTS", " 崔家铭,张三，崔家铭\n李四 ")
@@ -57,6 +66,22 @@ func TestFromEnvReadsUniqueN8ComicProducerAccounts(t *testing.T) {
 	want := []string{"崔家铭", "张三", "李四"}
 	if !reflect.DeepEqual(cfg.N8ComicProducerAccounts, want) {
 		t.Fatalf("producer accounts = %#v, want %#v", cfg.N8ComicProducerAccounts, want)
+	}
+}
+
+func TestFromEnvDefaultsToSliceThree(t *testing.T) {
+	t.Setenv("QIANTIE_MYSQL_DSN", "user:pass@tcp(mysql:3306)/qiantie")
+	t.Setenv("QIANTIE_BRIDGE_SECRET", "secret")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_SLICE", "")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_TEXT_ENDPOINT", "https://example.com/v1/chat/completions")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_TEXT_API_KEY", "text-key")
+	t.Setenv("QIANTIE_BATCH_FACTORY_V11_TEXT_MODEL", "text-model")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Slice != 3 {
+		t.Fatalf("default slice=%d, want 3", cfg.Slice)
 	}
 }
 
@@ -165,6 +190,7 @@ func TestFromEnvAcceptsExplicitLocalMergeForSliceFiveWithoutRemoteProvider(t *te
 }
 
 func TestFromEnvUsesConfigurableNovelFetchUpstream(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_NOVEL_FETCH_121_ENDPOINT", "")
@@ -189,6 +215,7 @@ func TestFromEnvUsesConfigurableNovelFetchUpstream(t *testing.T) {
 }
 
 func TestFromEnvReadsOptionalRedisRuntimeAddress(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_REDIS_URL", "redis://localhost:6379")
@@ -202,6 +229,7 @@ func TestFromEnvReadsOptionalRedisRuntimeAddress(t *testing.T) {
 }
 
 func TestFromEnvReadsNovelFetchTOSConfig(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT", "https://tos.example.com")
@@ -219,6 +247,7 @@ func TestFromEnvReadsNovelFetchTOSConfig(t *testing.T) {
 }
 
 func TestFromEnvReadsOptionalLocalAgentAssetDirectory(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_AGENT_ASSET_LOCAL_DIR", `F:\local-review\agent-assets`)
@@ -232,6 +261,7 @@ func TestFromEnvReadsOptionalLocalAgentAssetDirectory(t *testing.T) {
 }
 
 func TestFromEnvUsesLocalAgentAssetDirectoryByDefault(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_AGENT_ASSET_LOCAL_DIR", "")
@@ -245,6 +275,7 @@ func TestFromEnvUsesLocalAgentAssetDirectoryByDefault(t *testing.T) {
 }
 
 func TestFromEnvUsesSharedTOSConfigForNovelBodies(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT", "")
@@ -267,6 +298,7 @@ func TestFromEnvUsesSharedTOSConfigForNovelBodies(t *testing.T) {
 }
 
 func TestFromEnvUsesNovelFetchTOSForAgentAssetsWhenUnset(t *testing.T) {
+	keepUnstagedSlice(t)
 	t.Setenv("QIANTIE_MYSQL_DSN", "mysql")
 	t.Setenv("QIANTIE_BRIDGE_SECRET", "bridge")
 	t.Setenv("QIANTIE_NOVEL_FETCH_TOS_ENDPOINT", "https://shared-tos.example.com")

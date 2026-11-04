@@ -1,3 +1,5 @@
+import { isSupportedImageAspectRatio } from '../../shared/imageAspectRatios.js';
+
 const IMAGE_DEFAULTS = Object.freeze({ ratio: '16:9', quality: 'standard', resolution: '2K', count: 1 });
 const VIDEO_DEFAULTS = Object.freeze({ ratio: '16:9', resolution: '720P', durationSeconds: 5, count: 1, generateAudio: false });
 const TEXT_DEFAULTS = Object.freeze({ operation: 'generate', length: 'standard', creativity: 'balanced' });
@@ -41,7 +43,7 @@ function normalizedParameters(kind, value = {}) {
     else if (value[key] !== undefined) parameters[key] = value[key];
   }
   if (type === 'image') {
-    if (!['16:9', '9:16', '1:1'].includes(parameters.ratio)) parameters.ratio = IMAGE_DEFAULTS.ratio;
+    if (!isSupportedImageAspectRatio(parameters.ratio)) parameters.ratio = IMAGE_DEFAULTS.ratio;
     if (!['low', 'standard', 'high'].includes(parameters.quality)) parameters.quality = IMAGE_DEFAULTS.quality;
     if (!['1K', '2K', '4K'].includes(parameters.resolution)) parameters.resolution = IMAGE_DEFAULTS.resolution;
     parameters.count = [1, 2, 3, 4].includes(Number(parameters.count)) ? Number(parameters.count) : 1;

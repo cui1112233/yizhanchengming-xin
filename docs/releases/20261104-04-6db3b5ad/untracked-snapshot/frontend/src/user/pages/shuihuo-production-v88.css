@@ -1,0 +1,82 @@
+/* V88 视觉统一 · 水货生产
+ * 只做视觉层：令牌映射、容器内边距、空态/卡片/过渡样式。
+ * 不改任何业务逻辑、接口调用、状态徽标与进度条数据来源。 */
+
+/* 1. 颜色令牌映射（仅暗色；浅色主题沿用原有 --sh-* 值，避免变暗） */
+[data-theme='dark'] .shuihuo-production,
+[data-theme='dark'] .shuihuo-theme-active {
+  --sh-bg: var(--v88-color-bg);
+  --sh-panel: var(--v88-color-surface);
+  --sh-panel-strong: var(--v88-color-surface-2);
+  --sh-line: var(--v88-color-border);
+  --sh-text: var(--v88-color-text-1);
+  --sh-muted: var(--v88-color-text-3);
+  --sh-accent: var(--v88-color-primary);
+  --sh-accent-dark: var(--v88-color-primary-active);
+  --sh-danger: var(--v88-color-danger);
+}
+
+/* 2. 容器：统一页面内边距，宽度铺满 */
+.shuihuo-project-library {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--v88-space-page) var(--v88-space-page) var(--v88-space-7);
+}
+@media (max-width: 760px) {
+  .shuihuo-project-library { padding: var(--v88-space-4) var(--v88-space-3); }
+}
+
+/* 3. 按钮：统一圆角与过渡；危险语义继续由 antd danger 提供，不改按钮行为 */
+.shuihuo-production .ant-btn {
+  border-radius: var(--v88-radius-md);
+  transition: background-color var(--v88-motion-fast) var(--v88-ease),
+              border-color var(--v88-motion-fast) var(--v88-ease),
+              color var(--v88-motion-fast) var(--v88-ease);
+}
+.shuihuo-production .ant-btn-primary:not(:disabled) {
+  color: var(--v88-color-text-on-primary);
+  border-color: var(--v88-color-primary);
+  background: var(--v88-color-primary);
+}
+.shuihuo-production .ant-btn-dangerous:not(:disabled) {
+  color: var(--v88-color-danger);
+  border-color: var(--v88-color-danger);
+}
+
+/* 4. 空态：沿用现有真实条件（.shuihuo-empty 只在无项目时渲染），统一视觉 */
+.shuihuo-production .shuihuo-empty,
+.shuihuo-production .shuihuo-workbench-empty {
+  border: 1px dashed var(--v88-color-border);
+  border-radius: var(--v88-radius-lg);
+  color: var(--v88-color-text-3);
+  background: transparent;
+}
+
+/* 5. 卡片与动效：统一圆角与过渡时长 */
+.shuihuo-production .shuihuo-project-card-cover {
+  border-radius: var(--v88-radius-md);
+  transition: border-color var(--v88-motion-base) var(--v88-ease),
+              transform var(--v88-motion-base) var(--v88-ease);
+}
+.shuihuo-production .shuihuo-project-card-actions {
+  transition: opacity var(--v88-motion-base) var(--v88-ease);
+}
+.shuihuo-production .shuihuo-workbench-row,
+.shuihuo-production .shuihuo-prompt-row,
+.shuihuo-production .shuihuo-image-card,
+.shuihuo-production .shuihuo-segmentation-table {
+  transition: border-color var(--v88-motion-base) var(--v88-ease),
+              background-color var(--v88-motion-base) var(--v88-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shuihuo-production .shuihuo-project-card-cover,
+  .shuihuo-production .shuihuo-project-card-actions,
+  .shuihuo-production .shuihuo-workbench-row,
+  .shuihuo-production .shuihuo-prompt-row,
+  .shuihuo-production .shuihuo-image-card,
+  .shuihuo-production .shuihuo-segmentation-table {
+    transition: none;
+  }
+}

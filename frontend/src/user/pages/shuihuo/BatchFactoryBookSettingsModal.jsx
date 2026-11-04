@@ -5,15 +5,16 @@ import { get121OrganizationOptions, getBatch, listSystemPresetCatalog, saveBookO
 import { getConfig } from '../../../shared/api/config';
 import { textToSpeech } from '../../../shared/api/tts';
 import { deleteScriptConstraintPrompt, getConstraintPresetTexts, listScriptConstraintPrompts, saveScriptConstraintPrompt, updateScriptConstraintPrompt } from '../../../shared/api/generation';
-import { modelOptionsForProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
+import { modelOptionsForProvider, normalizeModelProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { audioDurationFingerprint as runtimeAudioDurationFingerprint, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { batchFactoryPreviewText } from './batchFactoryContentRange';
 import { BatchFactoryComicStylePicker } from './BatchFactoryComicStylePicker';
 import { BatchFactoryComicPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal';
 import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
+import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../../shared/imageAspectRatios';
 
-const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts'];
+const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts', 'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings', 'comicPublishSettings'];
 const ENGINE_OVERRIDE_FIELDS = [...ENGINE_MODEL_OVERRIDE_FIELDS, ...ENGINE_PUBLISH_OVERRIDE_FIELDS];
 const BOOK_OVERRIDE_FIELDS = [...ENGINE_OVERRIDE_FIELDS, 'starredCharacterNames', 'openingEnabled', 'openingCount', 'aiPromptConfig'];
@@ -243,21 +244,40 @@ export function buildBookRegionUpdate(inherited, bookPatch, region, edited, engi
   return { patch, restoreKeys };
 }
 
-function InheritedField({ label, field, value, inherited, options, onChange, loading }) {
-  return <div className="batch-factory-engine-field"><span><b>{label}</b></span><Select allowClear loading={loading} value={value || inherited || undefined} options={options} placeholder="未配置" onChange={next => onChange(next || '')} /></div>;
+// 生效来源只标偏差：继承批次统一配置、或值等于批次统一配置（最近一次保存
+// 统一配置时写入本书）时完全不渲染标注，避免每个字段都挂一段“当前生效：…”
+// 把真正需要注意的单书偏差淹没。整页的继承说明只在弹窗顶部出现一次。
+// explicit 必须由调用方传入“单书 patch 是否真的写了这个键”。表单里的值来自
+// effectiveValues(批次 + 单书)，带默认值的字段即使单书没覆盖也会有值，不能靠
+// value 是否为空来判断来源。
+function FieldSource({ value, inherited, explicit }) {
+  if (!explicit) return null;
+  const same = JSON.stringify(value ?? null) === JSON.stringify(inherited ?? null);
+  if (same) return null;
+  return <Popover trigger="click" placement="top" title="单书自定义" content={<div className="batch-factory-help-popover">该项已在本单书单独设置，不会跟随批次统一配置。</div>}><em className="batch-factory-field-source is-custom">自定义</em></Popover>;
 }
 
-function InheritedNumberField({ label, value, inherited, min, max, onChange }) {
-  return <label className="batch-factory-engine-field"><span><b>{label}</b></span><InputNumber min={min} max={max} value={value ?? inherited ?? undefined} placeholder="未配置" onChange={next => onChange(next ?? '')} /></label>;
+function InheritedField({ label, field, value, inherited, options, onChange, loading, explicit }) {
+  return <div className="batch-factory-engine-field"><span><b>{label}</b><FieldSource value={value} inherited={inherited} explicit={explicit} /></span><Select allowClear loading={loading} value={value || inherited || undefined} options={options} placeholder="未配置" onChange={next => onChange(next || '')} /></div>;
 }
 
-function InheritedStoryboardDurationField({ value, inherited, onChange }) {
+function InheritedMultiField({ label, value, inherited, options, onChange, loading, explicit }) {
+  const current = Array.isArray(value) ? value : undefined;
+  const inheritedValue = Array.isArray(inherited) ? inherited : [];
+  return <div className="batch-factory-engine-field"><span><b>{label}</b><FieldSource value={current} inherited={inherited} explicit={explicit} /></span><Select mode="multiple" allowClear loading={loading} value={current ?? inheritedValue} options={options} placeholder="默认继承全局修复模型" onChange={next => onChange(next || [])} /></div>;
+}
+
+function InheritedNumberField({ label, value, inherited, min, max, onChange, explicit, precision }) {
+  return <label className="batch-factory-engine-field"><span><b>{label}</b><FieldSource value={value} inherited={inherited} explicit={explicit} /></span><InputNumber min={min} max={max} precision={precision} value={value ?? inherited ?? undefined} placeholder="未配置" onChange={next => onChange(next ?? '')} /></label>;
+}
+
+function InheritedStoryboardDurationField({ value, inherited, onChange, explicit }) {
   const duration = Number(value ?? inherited) === 15 ? 15 : 10;
-  return <div className="batch-factory-engine-field"><span><b>分镜时长</b><HelpTip title="分镜时长">视频提示词按此上限切分。</HelpTip></span><Segmented value={duration} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={onChange} /></div>;
+  return <div className="batch-factory-engine-field"><span><b>分镜时长</b><HelpTip title="分镜时长">视频提示词按此上限切分。</HelpTip><FieldSource value={value} inherited={inherited} explicit={explicit} /></span><Segmented value={duration} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={onChange} /></div>;
 }
 
-function InheritedSwitchField({ label, value, inherited, onChange }) {
-  return <label className="batch-factory-engine-field"><span><b>{label}</b></span><Switch checked={value ?? inherited ?? false} onChange={onChange} /></label>;
+function InheritedSwitchField({ label, value, inherited, onChange, explicit }) {
+  return <label className="batch-factory-engine-field"><span><b>{label}</b><FieldSource value={value} inherited={inherited} explicit={explicit} /></span><Switch checked={value ?? inherited ?? false} onChange={onChange} /></label>;
 }
 function AudioOptionCard({ title, description, help, value, inherited, onChange, disabled = false }) {
   return <section className={`batch-factory-audio-option${disabled ? ' is-disabled' : ''}`}><div><div className="batch-factory-option-title"><b>{title}</b><HelpTip title={title}>{help || description}</HelpTip></div></div><Switch disabled={disabled} checked={value ?? inherited ?? false} onChange={onChange} /></section>;
@@ -396,9 +416,10 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
     image: modelSelectOptions(models, 'image'),
     video: modelSelectOptions(models, 'video')
   }), [models]);
-  const effectiveVideoProvider = form.videoProvider || inherited.videoProvider || 'personal_api';
+  const effectiveVideoModelId = form.videoModelId || inherited.videoModelId;
+  const effectiveVideoProvider = normalizeModelProvider(form.videoProvider || inherited.videoProvider || 'personal_api', 'personal_api', effectiveVideoModelId);
   const videoProviderOptions = useMemo(() => providerOptionsForModels(models, 'video'), [models]);
-  const videoModelOptions = modelOptionsForProvider(models, 'video', effectiveVideoProvider);
+  const videoModelOptions = modelOptionsForProvider(models, 'video', effectiveVideoProvider, effectiveVideoModelId, { expandFanKeModels: true });
   const effectiveImageProvider = form.imageProvider || inherited.imageProvider || 'personal_api';
   const imageProviderOptions = useMemo(() => providerOptionsForModels(models, 'image'), [models]);
   const imageModelOptions = modelOptionsForProvider(models, 'image', effectiveImageProvider);
@@ -638,14 +659,14 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
         children: <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
           <Alert type="info" showIcon message={<span>当前书独立模型配置 <HelpTip title="当前书独立模型配置">这里只保存当前小说与批量默认值不同的参数。</HelpTip></span>} />
           {visibility.video ? <ConfigCard title="核心视频引擎" description="视频生成、分镜时长和画幅。"><div className="batch-factory-engine-grid">
-            <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider || 'personal_api'} inherited={inherited.videoProvider || 'personal_api'} options={videoProviderOptions} loading={false} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId || inherited.videoModelId }))} />
-            <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={videoModelOptions} loading={effectiveVideoProvider === 'doubao_local_executor' ? false : loading} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), effectiveVideoProvider) } : {}) })} />
-            <InheritedStoryboardDurationField value={form.storyboardDurationLimit} inherited={inherited.storyboardDurationLimit} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} />
-            <InheritedField label="视频画幅" field="videoAspectRatio" value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} inherited={inherited.videoAspectRatio || (inherited.aspectRatio === '16:9' ? '16:9' : '9:16')} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} loading={false} onChange={videoAspectRatio => patch({ videoAspectRatio })} />
-            <InheritedField label="视频分辨率" field="videoResolution" value={form.videoResolution || '720p'} inherited={inherited.videoResolution || '720p'} options={[{ value: '480p', label: '480p' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} loading={false} onChange={videoResolution => patch({ videoResolution })} />
+            <InheritedField label="视频引擎" field="videoProvider" value={form.videoProvider ? normalizeModelProvider(form.videoProvider, 'personal_api', effectiveVideoModelId) : ''} inherited={effectiveVideoProvider} options={videoProviderOptions} loading={false} explicit={Object.hasOwn(bookPatch, 'videoProvider')} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId || inherited.videoModelId, expandFanKeModels: true }))} />
+            <InheritedField label="视频模型" field="videoModelId" value={form.videoModelId} inherited={inherited.videoModelId} options={videoModelOptions} loading={effectiveVideoProvider === 'doubao_local_executor' ? false : loading} explicit={Object.hasOwn(bookPatch, 'videoModelId')} onChange={videoModelId => patch({ videoModelId, ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), effectiveVideoProvider) } : {}) })} />
+            <InheritedStoryboardDurationField value={form.storyboardDurationLimit} inherited={inherited.storyboardDurationLimit} explicit={Object.hasOwn(bookPatch, 'storyboardDurationLimit')} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} />
+            <InheritedField label="视频画幅" field="videoAspectRatio" value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} inherited={inherited.videoAspectRatio || (inherited.aspectRatio === '16:9' ? '16:9' : '9:16')} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }]} loading={false} explicit={Object.hasOwn(bookPatch, 'videoAspectRatio')} onChange={videoAspectRatio => patch({ videoAspectRatio })} />
+            <InheritedField label="视频分辨率" field="videoResolution" value={form.videoResolution || '720p'} inherited={inherited.videoResolution || '720p'} options={[{ value: '480p', label: '480p' }, { value: '720p', label: '720p' }, { value: '1080p', label: '1080p' }]} loading={false} explicit={Object.hasOwn(bookPatch, 'videoResolution')} onChange={videoResolution => patch({ videoResolution })} />
           </div>
           <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-            <span><b>换开头</b><HelpTip title="换开头">2 个及以上分镜的书为分镜一生成多个开场变体并分别合成上传；不改这里就跟随批量（批量当前：{inherited.openingEnabled === true ? `开启 · ${inherited.openingCount ?? 4} 条（含原始）` : '关闭'}）。</HelpTip></span>
+            <span><b>换开头</b><HelpTip title="换开头">2 个及以上分镜的书为分镜一生成多个开场变体并分别合成上传；不改这里就跟随批量（批量当前：{inherited.openingEnabled === true ? `开启 · ${inherited.openingCount ?? 4} 条（含原始）` : '关闭'}）。</HelpTip><FieldSource value={form.openingEnabled === true ? `开启 · ${form.openingCount ?? inherited.openingCount ?? 4} 条（含原始）` : '关闭'} inherited={inherited.openingEnabled === true ? `开启 · ${inherited.openingCount ?? 4} 条（含原始）` : '关闭'} explicit={Object.hasOwn(bookPatch, 'openingEnabled') || Object.hasOwn(bookPatch, 'openingCount')} /></span>
             <Space>
               <Switch checked={form.openingEnabled === true} onChange={enabled => patch({ openingEnabled: enabled, openingCount: form.openingCount ?? inherited.openingCount ?? 4 })} />
               <InputNumber min={1} max={8} precision={0} disabled={form.openingEnabled !== true} value={form.openingCount ?? inherited.openingCount ?? 4} onChange={count => patch({ openingCount: count ?? 4 })} addonAfter="条（含原始）" />
@@ -669,15 +690,20 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
               <label className="batch-factory-engine-field"><span><b>音调</b><HelpTip title="音调">改变后需重新读取时长。</HelpTip></span><InputNumber min={-50} max={50} step={1} value={tts.pitch} onChange={pitch => patchTts({ pitch: pitch ?? DEFAULT_TTS.pitch })} /></label>
             </div>
             {audioDurationStale ? <Alert type="warning" showIcon message={<span>配音时长已过期 <HelpTip title="配音时长已过期">当前正文或 TTS 参数已变化，请重新生成配音并读取时长。</HelpTip></span>} /> : null}
-            {audioEnabled ? <div className="batch-factory-book-audio-duration"><InheritedNumberField label="配音目标（秒）" value={form.audioDurationSeconds ?? 0} inherited={inherited.audioDurationSeconds ?? 0} min={0} max={86400} onChange={audioDurationSeconds => patch({ audioDurationSeconds })} /></div> : null}
+            {audioEnabled ? <div className="batch-factory-book-audio-duration"><InheritedNumberField label="配音目标（秒）" value={form.audioDurationSeconds ?? 0} inherited={inherited.audioDurationSeconds ?? 0} explicit={Object.hasOwn(bookPatch, 'audioDurationSeconds')} min={0} max={86400} precision={2} onChange={audioDurationSeconds => patch({ audioDurationSeconds })} /></div> : null}
           </section></ConfigCard> : null}
 
           <ConfigCard title="辅助生成" description="图片与文本模型用于资产、AI 推理和画面生成。"><div className="batch-factory-engine-grid">
-            <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
-            <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : loading} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
-            <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={loading} onChange={textModelId => patch({ textModelId })} />
-            <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={[{ value: '16:9', label: '16:9' }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' }]} loading={false} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
+            <InheritedField label="图片生成通道" field="imageProvider" value={form.imageProvider || 'personal_api'} inherited={inherited.imageProvider || 'personal_api'} options={imageProviderOptions} loading={false} explicit={Object.hasOwn(bookPatch, 'imageProvider')} onChange={imageProvider => patch(providerModelSettingsPatch({ models, kind: 'image', provider: imageProvider, modelId: form.imageModelId || inherited.imageModelId }))} />
+            <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : loading} explicit={Object.hasOwn(bookPatch, 'imageModelId')} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
+            <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={loading} explicit={Object.hasOwn(bookPatch, 'textModelId')} onChange={textModelId => patch({ textModelId })} />
+            <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIO_OPTIONS} loading={false} explicit={Object.hasOwn(bookPatch, 'imageAspectRatio')} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
           </div></ConfigCard>
+          <ConfigCard title="敏感词处理" description="默认继承统一配置；这里可单独覆盖当前书。AI 修复失败会降级到规则/打码并等待人工确认。">
+            <InheritedSwitchField label="AI 修复" value={form.sensitiveAIEnabled} inherited={inherited.sensitiveAIEnabled !== false} explicit={Object.hasOwn(bookPatch, 'sensitiveAIEnabled')} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} />
+            <InheritedMultiField label="修复模型" value={form.sensitiveAIModels} inherited={inherited.sensitiveAIModels} options={modelOptions.text} loading={loading} explicit={Object.hasOwn(bookPatch, 'sensitiveAIModels')} onChange={sensitiveAIModels => patch({ sensitiveAIModels })} />
+            <label className="batch-factory-engine-field"><span><b>失败时策略</b></span><Segmented block value={form.sensitiveAIOnFailure || inherited.sensitiveAIOnFailure || 'review'} options={[{ value: 'review', label: '保留原文待确认' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
+          </ConfigCard>
         </div>
       },
       { key: 'media', label: '画面与视频', children: mediaBody },
@@ -689,8 +715,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
         </div> : <div className="batch-factory-engine-drawer batch-factory-book-engine-content">
           <Alert type="info" showIcon message="当前书独立发布配置" description="发布目录仍来自账号和批量作品；这里只保存当前书的差异值。" />
           <ConfigCard title="发布映射" description="网站风格继续读取本书 AI 判断结果。">
-            <InheritedField label="网站配置档" value={publish.websiteProfileId} inherited={inheritedPublish.websiteProfileId} options={profiles.map(profile => ({ value: profile.id, label: profile.name || profile.id }))} loading={false} onChange={websiteProfileId => { const profile = profiles.find(item => item.id === websiteProfileId) || {}; patch({ publishSettings: { ...publish, websiteProfileId, versionProfile: profile.name || '' } }); }} />
-            <InheritedField label={hasOrganizationOverride ? '组织归属（当前书覆盖）' : '组织归属（继承批量组织归属）'} value={publish.organization} inherited={inheritedPublish.organization} options={organizationOptions} loading={loading} onChange={organization => patch({ publishSettings: { ...publish, organization } })} />
+            <InheritedField label="网站配置档" value={publish.websiteProfileId} inherited={inheritedPublish.websiteProfileId} options={profiles.map(profile => ({ value: profile.id, label: profile.name || profile.id }))} loading={false} explicit={Object.hasOwn(bookPatch.publishSettings || {}, 'websiteProfileId')} onChange={websiteProfileId => { const profile = profiles.find(item => item.id === websiteProfileId) || {}; patch({ publishSettings: { ...publish, websiteProfileId, versionProfile: profile.name || '' } }); }} />
+            <InheritedField label={hasOrganizationOverride ? '组织归属（当前书覆盖）' : '组织归属（继承批量组织归属）'} value={publish.organization} inherited={inheritedPublish.organization} options={organizationOptions} loading={loading} explicit={Object.hasOwn(bookPatch.publishSettings || {}, 'organization')} onChange={organization => patch({ publishSettings: { ...publish, organization } })} />
             <Alert type="info" showIcon message="男女频、风格和标签属于当前书" description="这里不会覆盖书级 AI 判断结果。" />
           </ConfigCard>
           <ConfigCard title="上传规则" description="只影响当前小说。">
@@ -699,7 +725,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
               <label className="batch-factory-engine-field"><span><b>素材使用</b><HelpTip title="素材使用">当前书发布策略。</HelpTip></span><Select value={publish.materialReuse === true ? 'reuse' : 'no_reuse'} options={[{ value: 'no_reuse', label: '不复用' }, { value: 'reuse', label: '复用' }]} onChange={value => patch({ publishSettings: { ...publish, materialReuse: value === 'reuse' } })} /></label>
               <label className="batch-factory-engine-field"><span><b>水平翻转</b><HelpTip title="水平翻转">当前书发布策略。</HelpTip></span><Select value={publish.horizontalFlip === true ? 'flip' : 'no_flip'} options={[{ value: 'no_flip', label: '不翻转' }, { value: 'flip', label: '翻转' }]} onChange={value => patch({ publishSettings: { ...publish, horizontalFlip: value === 'flip' } })} /></label>
             </div>
-            <InheritedSwitchField label="改文后上传" value={form.publishRewriteEnabled} inherited={inherited.publishRewriteEnabled} onChange={publishRewriteEnabled => patch({ publishRewriteEnabled })} />
+            <InheritedSwitchField label="改文后上传" value={form.publishRewriteEnabled} inherited={inherited.publishRewriteEnabled} explicit={Object.hasOwn(bookPatch, 'publishRewriteEnabled')} onChange={publishRewriteEnabled => patch({ publishRewriteEnabled })} />
           </ConfigCard>
         </div>
       }
@@ -708,7 +734,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
     body = <><Alert type="info" showIcon message="当前书的人物场景预设" description="人物、场景、道具的实际 Prompt 与图片在本书这一行的“添加角色 / 添加场景 / 添加道具”中维护；这里选择这本书调用的提取与推理预设。" />
       <RuleModule title="资产设置" value={assetRules} onChange={next => patchAI('assets', scoped(next))}>
         <PromptSelect label={visibility.comic ? '漫画资产提示词' : '人物场景道具提取提示词'} value={visibility.comic ? ai.comic?.assets : assetRules.extraction} options={Object.assign((visibility.comic ? comicAssetRules : videoAssetRules).map(optionFor), { catalog: visibility.comic ? comicAssetRules : videoAssetRules })} disabled={loading} onChange={selection => visibility.comic ? patchAI('comic', scoped({ ...ai.comic, assets: selection, enabled: true })) : updateAssetSelection('extraction', selection)} />
-        <label className="batch-factory-engine-field"><span><b>星标人物聚焦</b><HelpTip title="星标人物聚焦">与公网剧本生成一致：只作为导演分镜的剧情与镜头聚焦变量，不等同于分镜资产灰显。</HelpTip></span><Select mode="multiple" allowClear value={starredCharacterNames} options={characterOptions} placeholder={characterOptions.length ? '选择已提取的人物' : '请先提取人物资产'} onChange={starredCharacterNames => patch({ starredCharacterNames })} /></label>
+        <label className="batch-factory-engine-field"><span><b>星标人物聚焦</b><HelpTip title="星标人物聚焦">与公网私人定制一致：只作为导演分镜的剧情与镜头聚焦变量，不等同于分镜资产灰显。</HelpTip></span><Select mode="multiple" allowClear value={starredCharacterNames} options={characterOptions} placeholder={characterOptions.length ? '选择已提取的人物' : '请先提取人物资产'} onChange={starredCharacterNames => patch({ starredCharacterNames })} /></label>
         <Button onClick={() => { onClose?.(); onOpenBookAssets?.(book); }}>维护当前书人物场景预设</Button>
       </RuleModule>
     </>;
@@ -742,7 +768,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
     footer={<Space>{hasBookOverride ? <Button danger disabled={saving} onClick={restoreCurrentRegion}>恢复{region === 'engine' ? (engineTab === 'publish' ? '批量发布配置' : engineTab === 'media' ? '批量画面与视频配置' : '批量模型配置') : '作品配置'}</Button> : null}<Button onClick={onClose}>取消</Button><Button type="primary" loading={saving} onClick={save}>保存{region === 'engine' ? (engineTab === 'publish' ? '当前书发布配置' : engineTab === 'media' ? '当前书画面与视频配置' : '当前书模型配置') : '当前书覆盖'}</Button></Space>}
   >
 		{frozenAutomationPreset?.id ? <Alert type="info" showIcon message={`继承统一配置：${frozenAutomationPreset.name || frozenAutomationPreset.id} · v${frozenAutomationPreset.version || 1}`} description="当前书未保存覆盖时，始终使用该批次冻结的统一配置。" /> : null}
-    {region !== 'engine' ? <Alert type="info" showIcon message="继承状态" description="本分区未改动时继续使用当前批量作品配置；保存或恢复只影响当前小说，不会改动同批次其它书。" /> : null}
+    <div className="batch-factory-inherit-hint">整页默认继承批次统一配置；改动哪个字段，哪个字段就变成“自定义”，保存后不会跟随批次。</div>
     {loadError ? <Alert type="warning" showIcon message="配置目录读取失败" description={loadError} /> : null}
     {region !== 'engine' ? <Divider orientation="left">{REGION_LABELS[region]}</Divider> : null}
     {body}

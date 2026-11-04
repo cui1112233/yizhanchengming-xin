@@ -1,0 +1,129 @@
+/* V88 视觉统一 · 小说获取（/novel-fetch）
+   只在本页作用域内生效；不改 global.css 任何既有规则，也不碰其它页面。
+   令牌来自 shared/styles/v88-tokens.css，按钮基类来自 shared/styles/v88-ui.css。 */
+
+/* 1. 容器：铺满 + 统一页面内边距；只让内容区局部滚动，不出现整栏横向滚动条 */
+.novel-fetch-workbench {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--v88-space-page);
+  overflow-x: hidden;
+}
+.novel-fetch-workbench > .ant-tabs { min-width: 0; }
+.novel-fetch-workbench > .ant-tabs > .ant-tabs-nav {
+  margin: calc(var(--v88-space-page) * -1) calc(var(--v88-space-page) * -1) 16px;
+  padding: var(--v88-space-3) var(--v88-space-page) 0;
+}
+@media (max-width: 640px) {
+  .novel-fetch-workbench { padding: var(--v88-space-3); }
+  .novel-fetch-workbench > .ant-tabs > .ant-tabs-nav {
+    margin: calc(var(--v88-space-3) * -1) calc(var(--v88-space-3) * -1) 12px;
+    padding: var(--v88-space-2) var(--v88-space-3) 0;
+  }
+}
+
+/* 2. 按钮：统一圆角与高度；主/危险变体按令牌着色，覆盖本页遗留的蓝色主按钮写法 */
+.novel-fetch-workbench .ant-btn {
+  border-radius: var(--v88-radius-md);
+  transition: background-color var(--v88-motion-fast) var(--v88-ease),
+              border-color var(--v88-motion-fast) var(--v88-ease),
+              color var(--v88-motion-fast) var(--v88-ease);
+}
+.novel-fetch-workbench .novel-fetch-public-actions .ant-btn { min-height: 36px; border-radius: var(--v88-radius-md); }
+.novel-fetch-workbench .ant-btn.v88-btn--primary:not(:disabled) {
+  color: var(--v88-color-text-on-primary);
+  border-color: var(--v88-color-primary);
+  background: var(--v88-color-primary);
+}
+.novel-fetch-workbench .ant-btn.v88-btn--primary:not(:disabled):hover {
+  border-color: var(--v88-color-primary-hover);
+  background: var(--v88-color-primary-hover);
+}
+.novel-fetch-workbench .ant-btn.v88-btn--danger:not(:disabled) {
+  color: var(--v88-color-danger);
+  border-color: var(--v88-color-danger);
+  background: var(--v88-color-danger-soft);
+}
+.novel-fetch-workbench .ant-btn.v88-btn--danger:not(:disabled):hover {
+  color: var(--v88-color-text-1);
+  border-color: var(--v88-color-danger);
+  background: var(--v88-color-danger);
+}
+
+/* 3. 卡片与面板：统一底色、边框和圆角（仅暗色主题，浅色主题保持原样） */
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-public-workspace,
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-public-result,
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-current-batch,
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-automation-bar {
+  border: 1px solid var(--v88-color-border);
+  border-radius: var(--v88-radius-lg);
+  background: var(--v88-color-surface);
+  box-shadow: var(--v88-shadow-card);
+  backdrop-filter: none;
+}
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-stat-card,
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-version-card {
+  border: 1px solid var(--v88-color-border);
+  border-radius: var(--v88-radius-md);
+  background: var(--v88-color-surface-2);
+}
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-version-option,
+[data-theme='dark'] .novel-fetch-workbench .novel-fetch-content-limit {
+  border-radius: var(--v88-radius-md);
+  background: var(--v88-color-input);
+}
+
+/* 4. 等待态：转圈与文案同行，不靠静态文字冒充进度 */
+.novel-fetch-inline-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v88-space-2);
+  color: var(--v88-color-text-2);
+  font-size: var(--v88-font-body);
+}
+.novel-fetch-cylinder-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v88-space-2);
+}
+
+/* 5. 空态：嵌在表格/面板里时不重复画一层卡片 */
+.novel-fetch-workbench .v88-empty,
+.novel-fetch-schedule-modal .v88-empty {
+  min-height: 180px;
+  padding: var(--v88-space-5);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 6. 动效：卡片/选项/行状态统一切换时长，减少动态时直接关闭 */
+.novel-fetch-workbench .novel-fetch-public-workspace,
+.novel-fetch-workbench .novel-fetch-public-result,
+.novel-fetch-workbench .novel-fetch-current-batch,
+.novel-fetch-workbench .novel-fetch-stat-card,
+.novel-fetch-workbench .novel-fetch-version-option,
+.novel-fetch-workbench .novel-fetch-shortcut,
+.novel-fetch-workbench .novel-fetch-row {
+  transition: border-color var(--v88-motion-base) var(--v88-ease),
+              background-color var(--v88-motion-base) var(--v88-ease),
+              box-shadow var(--v88-motion-base) var(--v88-ease);
+}
+.novel-fetch-workbench .novel-fetch-version-option:hover {
+  border-color: var(--v88-color-primary);
+  background: var(--v88-color-primary-soft);
+}
+.novel-fetch-workbench .novel-fetch-version-option.is-selected {
+  box-shadow: inset 3px 0 0 var(--v88-color-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .novel-fetch-workbench,
+  .novel-fetch-workbench * ,
+  .novel-fetch-workbench .ant-btn {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+  }
+}

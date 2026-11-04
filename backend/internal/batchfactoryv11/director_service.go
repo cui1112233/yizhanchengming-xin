@@ -933,11 +933,26 @@ func (s *DirectorService) RunOpeningVariants(ctx context.Context, owner, batchID
 		return nil, err
 	}
 	contract := BuildOpeningVariantsContract(book, first, followUps, meta, variantCount, snapshot.MaxVideoDuration)
-	text, err := s.Provider.Complete(ctx, TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens, DisableJSONResponse: true})
-	if err != nil {
-		return nil, err
+	// Truncated model output is retried exactly once with a compact-output
+	// instruction. A second truncation fails the stage instead of looping: the
+	// failure keeps the provider reason so the operator can see the cause.
+	const maxOpeningVariantAttempts = 2
+	var variants []OpeningVariant
+	for attempt := 1; attempt <= maxOpeningVariantAttempts; attempt++ {
+		request := TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens, DisableJSONResponse: true}
+		if attempt > 1 {
+			request.SystemPrompt += fmt.Sprintf("\n上一轮输出因长度截断。请更紧凑地输出全部 %d 个变体，保留完整结尾，不要解释，不要 Markdown。", variantCount)
+		}
+		text, completionErr := s.Provider.Complete(ctx, request)
+		if completionErr != nil {
+			if isTruncatedDirectorOutput(completionErr) && attempt < maxOpeningVariantAttempts {
+				continue
+			}
+			return nil, completionErr
+		}
+		variants = parseOpeningVariants(text, snapshot.MaxVideoDuration, first.DurationSec, variantCount)
+		break
 	}
-	variants := parseOpeningVariants(text, snapshot.MaxVideoDuration, first.DurationSec, variantCount)
 	merged, err := s.saveOpeningVariants(ctx, owner, batchID, bookID, book.Videos[0].ID, variants)
 	if err != nil {
 		return nil, err

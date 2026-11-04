@@ -1,0 +1,22 @@
+{
+  "buildId": "20261104-03-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "publishedAt": "2026-11-04 13:45:11 +08:00",
+  "archiveDir": "docs/releases/20261104-03-6db3b5ad",
+  "releaseDir": ".release/v88/20261104-03-6db3b5ad",
+  "frontendEntry": "/assets/user-CEHz_Uc5.js",
+  "frontendDistSource": "C:/Users/Administrator/AppData/Local/Temp/v88-dist-snapshot-20261104-134001 (index.html sha256 eaba3aa6bbfafd81dde97c6a8c631b698583968005dc1c892cb9fa418e28cb82, 124 files, mtime 2026-11-04 13:18:14)",
+  "oldPid": 37896,
+  "oldPidStartedAt": "2026-11-04 12:39:13",
+  "oldBinarySha256": "89c82e424c9945c2a9422b5943fa215c4cc464fed0dfc9154519241a7468807c",
+  "newPid": 38352,
+  "newPidStartedAt": "2026-11-04 13:45:11",
+  "newBinarySha256": "7870f4bbf16c492f1d2c46c8e6a6c9f8f09e5decb5a6ef3841babc3243ccc709",
+  "binaryBytes": 77351936,
+  "rollbackBinary": ".release/v88/20261104-03-6db3b5ad/previous-qiantie-local.exe",
+  "rollbackCommand": "Stop-Process -Id 38352 -Force; Copy-Item '.release/v88/20261104-03-6db3b5ad/previous-qiantie-local.exe' 'backend/qiantie-local.exe' -Force; .\\scripts\\start-local-go-review.ps1 -SkipBuild",
+  "dataPackageSha256": "4b7e228ad62c61c1c363c9c9a663064aa3804dd80786f0ab22732f8e601fa1b2",
+  "linuxBinarySha256": "ccf0b4ad9c580a922d423a356dabda892032acae72ce179d3fe1b77e34c228e7",
+  "remoteDeploy": "not-executed（未提供 -TargetHost/-RemoteDataDir）",
+  "notes": "本次为 local-only 发布：仅切换本机 4001。远端 .rollback 备份与远程校验未执行、未验证。"
+}

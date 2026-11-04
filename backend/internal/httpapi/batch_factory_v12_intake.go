@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -8,6 +9,13 @@ import (
 
 	"qiantie/backend/internal/batchfactoryv11"
 )
+
+// batchShuihuoProjectLister lets the V12 batch list read the "shuihuo project"
+// flag for every batch in one query. Stores that do not implement it keep the
+// previous per-batch fallback.
+type batchShuihuoProjectLister interface {
+	ListShuihuoProjectBatchIDs(context.Context, string) (map[string]bool, error)
+}
 
 // registerV12IntakeRoutes keeps the public novel-fetch handoff on the same
 // durable Go batch store as the V11 workbench routes. The browser uses V12 for
@@ -70,14 +78,7 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 			writeStoreError(w, err)
 			return
 		}
-		filtered := make([]batchfactoryv11.Batch, 0, len(batches))
-		for _, batch := range batches {
-			detail, detailErr := store.GetBatch(r.Context(), owner, batch.ID)
-			if detailErr != nil || !isShuihuoProjectBatch(detail) {
-				filtered = append(filtered, batch)
-			}
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"batches": filtered})
+		writeJSON(w, http.StatusOK, map[string]any{"batches": filterShuihuoProjectBatches(r.Context(), store, owner, batches)})
 	})
 	mux.HandleFunc("POST /api/batch-factory/v12/intakes/novel-fetch", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -116,6 +117,32 @@ func registerV12IntakeRoutes(mux *http.ServeMux, store batchfactoryv11.Store) {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"intake": intake})
 	})
+}
+
+// filterShuihuoProjectBatches hides batches that the batch settings mark as
+// Shuihuo projects. When the store supports a bulk flag query this is one
+// statement; otherwise (and on query failure) it keeps the original per-batch
+// behaviour, including keeping batches whose detail cannot be read.
+func filterShuihuoProjectBatches(ctx context.Context, store batchfactoryv11.Store, owner string, batches []batchfactoryv11.Batch) []batchfactoryv11.Batch {
+	filtered := make([]batchfactoryv11.Batch, 0, len(batches))
+	if lister, ok := store.(batchShuihuoProjectLister); ok {
+		flags, err := lister.ListShuihuoProjectBatchIDs(ctx, owner)
+		if err == nil {
+			for _, batch := range batches {
+				if !flags[batch.ID] {
+					filtered = append(filtered, batch)
+				}
+			}
+			return filtered
+		}
+	}
+	for _, batch := range batches {
+		detail, detailErr := store.GetBatch(ctx, owner, batch.ID)
+		if detailErr != nil || !isShuihuoProjectBatch(detail) {
+			filtered = append(filtered, batch)
+		}
+	}
+	return filtered
 }
 
 // batchProductionMode 让项目卡片显示“漫画/视频”。摘要索引会带上推断结果；

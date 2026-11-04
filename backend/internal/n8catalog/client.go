@@ -66,11 +66,18 @@ type WorksClient struct {
 type DirectoryError struct {
 	Kind   string
 	Status int
+	// Code/Message 保留上游业务响应里的 code 与 message，便于区分
+	// “上游明确返回未登录/无权限”和“目录确实是空的”。两者都不会包含令牌。
+	Code    string
+	Message string
 }
 
 func (e *DirectoryError) Error() string {
 	if e.Status != 0 {
 		return fmt.Sprintf("N8 directory %s (HTTP %d)", e.Kind, e.Status)
+	}
+	if code := strings.TrimSpace(e.Code); code != "" {
+		return fmt.Sprintf("N8 directory %s (code %s)", e.Kind, code)
 	}
 	return "N8 directory " + e.Kind
 }
@@ -187,8 +194,9 @@ func (c *WorksClient) searchWorksOnce(ctx context.Context, query string) ([]Work
 		return nil, &DirectoryError{Kind: "http", Status: response.StatusCode}
 	}
 	var envelope struct {
-		Code string `json:"code"`
-		Data struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
 			List []struct {
 				ID       int64  `json:"id"`
 				Name     string `json:"name"`
@@ -201,7 +209,7 @@ func (c *WorksClient) searchWorksOnce(ctx context.Context, query string) ([]Work
 		return nil, &DirectoryError{Kind: "invalid_response"}
 	}
 	if envelope.Code != "SUCCESS" {
-		return nil, &DirectoryError{Kind: "service_rejected"}
+		return nil, &DirectoryError{Kind: "service_rejected", Code: envelope.Code, Message: envelope.Message}
 	}
 	works := make([]Work, 0, len(envelope.Data.List))
 	for _, item := range envelope.Data.List {
@@ -270,12 +278,16 @@ func (c *Client) ListProducerAccountDirectory(ctx context.Context) ([]ProducerAc
 			return nil, &DirectoryError{Kind: "connection"}
 		}
 		var envelope struct {
-			Code string `json:"code"`
-			Data struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+			Data    struct {
 				List []struct {
-					Name             string          `json:"name"`
-					Status           string          `json:"status"`
-					OrganizationInfo json.RawMessage `json:"organization_info"`
+					Name string `json:"name"`
+					// N8 同一份管理员数据里两种命名都存在：organization_info 与
+					// organizationInfo。只读其中一种会让大部分账号拿不到组织绑定。
+					Status                string          `json:"status"`
+					OrganizationInfo      json.RawMessage `json:"organization_info"`
+					OrganizationInfoCamel json.RawMessage `json:"organizationInfo"`
 				} `json:"list"`
 			} `json:"data"`
 		}
@@ -289,7 +301,7 @@ func (c *Client) ListProducerAccountDirectory(ctx context.Context) ([]ProducerAc
 			return nil, &DirectoryError{Kind: "invalid_response"}
 		}
 		if envelope.Code != "SUCCESS" {
-			return nil, &DirectoryError{Kind: "service_rejected"}
+			return nil, &DirectoryError{Kind: "service_rejected", Code: envelope.Code, Message: envelope.Message}
 		}
 		for _, item := range envelope.Data.List {
 			name := strings.TrimSpace(item.Name)
@@ -300,7 +312,7 @@ func (c *Client) ListProducerAccountDirectory(ctx context.Context) ([]ProducerAc
 				continue
 			}
 			seen[name] = struct{}{}
-			accounts = append(accounts, ProducerAccount{Name: name, OrganizationIDs: organizationIDs(item.OrganizationInfo)})
+			accounts = append(accounts, ProducerAccount{Name: name, OrganizationIDs: organizationIDs(item.OrganizationInfo, item.OrganizationInfoCamel)})
 		}
 		if len(envelope.Data.List) < pageSize {
 			break
@@ -310,14 +322,7 @@ func (c *Client) ListProducerAccountDirectory(ctx context.Context) ([]ProducerAc
 	return accounts, nil
 }
 
-func organizationIDs(raw json.RawMessage) []string {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil
-	}
-	var value any
-	if json.Unmarshal(raw, &value) != nil {
-		return nil
-	}
+func organizationIDs(raws ...json.RawMessage) []string {
 	seen := map[string]struct{}{}
 	result := make([]string, 0)
 	var walk func(any)
@@ -342,7 +347,19 @@ func organizationIDs(raw json.RawMessage) []string {
 			}
 		}
 	}
-	walk(value)
+	for _, raw := range raws {
+		if len(raw) == 0 || string(raw) == "null" {
+			continue
+		}
+		var value any
+		if json.Unmarshal(raw, &value) != nil {
+			continue
+		}
+		walk(value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
 	return result
 }
 
@@ -366,14 +383,15 @@ func (c *Client) ListOrganizations(ctx context.Context) ([]Organization, error) 
 		return nil, &DirectoryError{Kind: "http", Status: response.StatusCode}
 	}
 	var envelope struct {
-		Code string          `json:"code"`
-		Data json.RawMessage `json:"data"`
+		Code    string          `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, 4<<20)).Decode(&envelope); err != nil {
 		return nil, &DirectoryError{Kind: "invalid_response"}
 	}
 	if envelope.Code != "SUCCESS" {
-		return nil, &DirectoryError{Kind: "service_rejected"}
+		return nil, &DirectoryError{Kind: "service_rejected", Code: envelope.Code, Message: envelope.Message}
 	}
 	var roots any
 	if err := json.Unmarshal(envelope.Data, &roots); err != nil {
@@ -430,8 +448,9 @@ func (c *Client) ListAudio(ctx context.Context, organizationID string) ([]Audio,
 		return nil, &DirectoryError{Kind: "http", Status: response.StatusCode}
 	}
 	var envelope struct {
-		Code string `json:"code"`
-		Data struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
 			List []Audio `json:"list"`
 		} `json:"data"`
 	}
@@ -439,7 +458,7 @@ func (c *Client) ListAudio(ctx context.Context, organizationID string) ([]Audio,
 		return nil, &DirectoryError{Kind: "invalid_response"}
 	}
 	if envelope.Code != "SUCCESS" {
-		return nil, &DirectoryError{Kind: "service_rejected"}
+		return nil, &DirectoryError{Kind: "service_rejected", Code: envelope.Code, Message: envelope.Message}
 	}
 	result := make([]Audio, 0, len(envelope.Data.List))
 	for _, item := range envelope.Data.List {
@@ -472,8 +491,9 @@ func (c *Client) ListAudioCategories(ctx context.Context) ([]AudioCategory, erro
 		return nil, &DirectoryError{Kind: "http", Status: response.StatusCode}
 	}
 	var envelope struct {
-		Code string `json:"code"`
-		Data struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
 			List []AudioCategory `json:"list"`
 		} `json:"data"`
 	}
@@ -481,7 +501,7 @@ func (c *Client) ListAudioCategories(ctx context.Context) ([]AudioCategory, erro
 		return nil, &DirectoryError{Kind: "invalid_response"}
 	}
 	if envelope.Code != "SUCCESS" {
-		return nil, &DirectoryError{Kind: "service_rejected"}
+		return nil, &DirectoryError{Kind: "service_rejected", Code: envelope.Code, Message: envelope.Message}
 	}
 	result := make([]AudioCategory, 0, len(envelope.Data.List))
 	for _, item := range envelope.Data.List {

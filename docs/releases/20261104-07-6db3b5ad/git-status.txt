@@ -1,0 +1,228 @@
+ M backend/cmd/merge-worker/main.go
+ M backend/cmd/qiantie/main.go
+ M backend/cmd/qiantie/main_test.go
+ M backend/internal/app/app.go
+ M backend/internal/batchfactoryv11/autodl_h3_video_adapter.go
+ M backend/internal/batchfactoryv11/autodl_h3_video_adapter_test.go
+ M backend/internal/batchfactoryv11/book_asset_image_overrides_test.go
+ M backend/internal/batchfactoryv11/comic_image_contract.go
+ M backend/internal/batchfactoryv11/comic_image_contract_test.go
+ M backend/internal/batchfactoryv11/comic_pages_mysql.go
+ M backend/internal/batchfactoryv11/comic_prompt_service.go
+ M backend/internal/batchfactoryv11/comic_prompt_service_test.go
+ M backend/internal/batchfactoryv11/director_service.go
+ M backend/internal/batchfactoryv11/h3_audio_measurement.go
+ M backend/internal/batchfactoryv11/media_settings.go
+ M backend/internal/batchfactoryv11/media_settings_test.go
+ M backend/internal/batchfactoryv11/memory_store.go
+ M backend/internal/batchfactoryv11/mysql_load_batch_pool_test.go
+ M backend/internal/batchfactoryv11/mysql_recovery_index_test.go
+ M backend/internal/batchfactoryv11/mysql_store.go
+ M backend/internal/batchfactoryv11/opening_service_test.go
+ M backend/internal/batchfactoryv11/production.go
+ M backend/internal/batchfactoryv11/production_test.go
+ M backend/internal/batchfactoryv11/settings_test.go
+ M backend/internal/batchfactoryv11/stage_runs_test.go
+ M backend/internal/batchfactoryv11/stage_service.go
+ M backend/internal/batchfactoryv11/stage_service_summary_test.go
+ M backend/internal/batchfactoryv11/types.go
+ M backend/internal/batchfactoryv11/video_duration_probe.go
+ M backend/internal/batchfactoryv11/video_provider.go
+ M backend/internal/batchfactoryv11/video_provider_binding_test.go
+ M backend/internal/batchfactoryv11/yfai_seedance_adapter.go
+ M backend/internal/config/config.go
+ M backend/internal/config/config_test.go
+ M backend/internal/httpapi/agent_audio_processor.go
+ M backend/internal/httpapi/agent_audio_waveform.go
+ M backend/internal/httpapi/agent_node_generation.go
+ M backend/internal/httpapi/agent_node_generation_test.go
+ M backend/internal/httpapi/auth.go
+ M backend/internal/httpapi/automation_status.go
+ M backend/internal/httpapi/batch_factory_automation.go
+ M backend/internal/httpapi/batch_factory_automation_test.go
+ M backend/internal/httpapi/batch_factory_comic_pages.go
+ M backend/internal/httpapi/batch_factory_n8_comic_publish.go
+ M backend/internal/httpapi/batch_factory_runtime_summary.go
+ M backend/internal/httpapi/batch_factory_v11_capabilities.go
+ M backend/internal/httpapi/batch_factory_v11_capabilities_test.go
+ M backend/internal/httpapi/batch_factory_v11_errors_test.go
+ M backend/internal/httpapi/batch_factory_v11_merge.go
+ M backend/internal/httpapi/batch_factory_v11_slice1.go
+ M backend/internal/httpapi/batch_factory_v12_aliases.go
+ M backend/internal/httpapi/batch_factory_v12_aliases_test.go
+ M backend/internal/httpapi/batch_factory_v12_fetch.go
+ M backend/internal/httpapi/batch_factory_v12_fetch_test.go
+ M backend/internal/httpapi/batch_factory_v12_intake.go
+ M backend/internal/httpapi/batch_factory_v12_intake_test.go
+ M backend/internal/httpapi/batch_factory_v12_single_fetch.go
+ M backend/internal/httpapi/batch_factory_v12_single_fetch_classification_test.go
+ M backend/internal/httpapi/error_codes.go
+ M backend/internal/httpapi/member_profile.go
+ M backend/internal/httpapi/member_profile_test.go
+ M backend/internal/httpapi/model_catalog.go
+ M backend/internal/httpapi/model_catalog_capabilities.go
+ M backend/internal/httpapi/reference_assets_image.go
+ M backend/internal/httpapi/router.go
+ M backend/internal/httpapi/runtime_build_info_test.go
+ M backend/internal/httpapi/shuihuo_asset_generation_test.go
+ M backend/internal/httpapi/shuihuo_projects.go
+ M backend/internal/httpapi/shuihuo_projects_segmentation_test.go
+ M backend/internal/httpapi/user_config.go
+ M backend/internal/httpapi/user_config_test.go
+ M backend/internal/httpapi/web_submit_submit_compat.go
+ M backend/internal/httpapi/web_submit_submit_compat_test.go
+ M backend/internal/mergeworker/downloader.go
+ M backend/internal/mergeworker/ffmpeg.go
+ M backend/internal/mergeworker/handler.go
+ M backend/internal/mergeworker/handler_test.go
+ M backend/internal/mergeworker/media_test.go
+ M backend/internal/mergeworker/memory.go
+ M backend/internal/mergeworker/object_store.go
+ M backend/internal/mergeworker/object_store_test.go
+ M backend/internal/mergeworker/redis.go
+ M backend/internal/mergeworker/redis_test.go
+ M backend/internal/mergeworker/tos_sdk.go
+ M backend/internal/mergeworker/types.go
+ M backend/internal/mergeworker/worker.go
+ M backend/internal/mergeworker/worker_test.go
+ M backend/internal/novelfetchworkshop/legacy_document_migration_test.go
+ M backend/internal/novelfetchworkshop/mysql_store.go
+ M backend/internal/novelfetchworkshop/mysql_store_test.go
+ M backend/internal/prompt/catalog.go
+ M backend/internal/prompt/catalog_test.go
+ M backend/internal/prompt/comic_presets.go
+ M backend/internal/prompt/comic_presets_test.go
+ M backend/internal/storage/agent_workspace_schema_test.go
+ M backend/internal/storage/local_executor_schema.go
+ M backend/internal/storage/migrations_test.go
+ M docs/v88-startup-and-config.md
+ M frontend/package.json
+ M frontend/src/admin/pages/AccountGovernancePage.jsx
+ M frontend/src/admin/pages/PresetLibraryPage.jsx
+ M frontend/src/shared/api/apiErrors.test.js
+ M frontend/src/shared/api/batchFactoryV11.test.js
+ M frontend/src/shared/api/batchFactoryV12.js
+ M frontend/src/shared/api/localExecutors.js
+ M frontend/src/shared/api/localExecutors.test.js
+ M frontend/src/shared/apiErrorCodes.json
+ M frontend/src/shared/error-reporting.js
+ M frontend/src/shared/layouts/UserLayout.jsx
+ M frontend/src/shared/notifications/globalTaskCenter.js
+ M frontend/src/shared/pet/petCatalog.js
+ M frontend/src/shared/pet/petCatalog.test.js
+ M frontend/src/shared/styles/agent-workspace.css
+ M frontend/src/shared/styles/global.css
+ M frontend/src/shared/styles/theme.js
+ M frontend/src/user/components/AgentCanvas.jsx
+ M frontend/src/user/components/AgentNodeParameterPopover.jsx
+ M frontend/src/user/main.jsx
+ M frontend/src/user/pages/AgentPageV2.jsx
+ M frontend/src/user/pages/HistoryPage.jsx
+ M frontend/src/user/pages/HomePage.jsx
+ M frontend/src/user/pages/MemberCenterPage.jsx
+ M frontend/src/user/pages/NovelFetchPage.jsx
+ M frontend/src/user/pages/PrivateComicWorkspace.jsx
+ M frontend/src/user/pages/PrivateComicWorkspace.source.test.js
+ M frontend/src/user/pages/ProfilePage.jsx
+ M frontend/src/user/pages/ScriptPage.jsx
+ M frontend/src/user/pages/SettingsPage.jsx
+ M frontend/src/user/pages/SettingsPage.local-executor.source.test.js
+ M frontend/src/user/pages/ShuihuoProductionPage.jsx
+ M frontend/src/user/pages/TtsPage.jsx
+ M frontend/src/user/pages/accountCenterShared.jsx
+ M frontend/src/user/pages/agent-canvas-image-settings.js
+ M frontend/src/user/pages/agent-model-capabilities.js
+ M frontend/src/user/pages/agent-node-config.js
+ M frontend/src/user/pages/agent-workspace.layout.test.js
+ M frontend/src/user/pages/private-customization.css
+ M frontend/src/user/pages/scriptDraftStorage.js
+ M frontend/src/user/pages/shuihuo-production.css
+ M frontend/src/user/pages/shuihuo/AssetsView.jsx
+ M frontend/src/user/pages/shuihuo/AssetsView.source.test.js
+ M frontend/src/user/pages/shuihuo/BatchFactoryAiReasoningModal.jsx
+ M frontend/src/user/pages/shuihuo/BatchFactoryAutomationStartFeedback.source.test.js
+ M frontend/src/user/pages/shuihuo/BatchFactoryBookSettingsModal.jsx
+ M frontend/src/user/pages/shuihuo/BatchFactoryBookSettingsModal.source.test.js
+ M frontend/src/user/pages/shuihuo/BatchFactoryComicStylePicker.jsx
+ M frontend/src/user/pages/shuihuo/BatchFactoryEngineSettingsDrawer.jsx
+ M frontend/src/user/pages/shuihuo/BatchFactoryNovelList.assets.source.test.js
+ M frontend/src/user/pages/shuihuo/BatchFactoryNovelList.jsx
+ M frontend/src/user/pages/shuihuo/BatchFactoryNovelList.source.test.js
+ M frontend/src/user/pages/shuihuo/BatchFactoryUnifiedSettingsModal.jsx
+ M frontend/src/user/pages/shuihuo/BatchFactoryUnifiedSettingsModal.source.test.js
+ M frontend/src/user/pages/shuihuo/batchFactoryBookConfigRegions.js
+ M frontend/src/user/pages/shuihuo/batchFactoryBookState.js
+ M frontend/src/user/pages/shuihuo/batchFactoryBookState.test.js
+ M frontend/src/user/pages/shuihuo/batchFactoryComicBulkActions.source.test.js
+ M frontend/src/user/pages/shuihuo/batchFactoryComicMode.js
+ M frontend/src/user/pages/shuihuo/batchFactoryComicMode.test.js
+ M frontend/src/user/pages/shuihuo/batchFactoryNovelListHelpers.js
+ M frontend/src/user/pages/shuihuo/providerModelBinding.js
+ M frontend/src/user/pages/shuihuo/providerModelBinding.test.js
+ M scripts/start-local-go-review.ps1
+ M scripts/start-local-go.ps1
+?? .backups/
+?? _shots/
+?? backend/cmd/pet-migration/
+?? backend/current-release.json
+?? backend/internal/batchfactoryv11/audio_duration_builtin.go
+?? backend/internal/batchfactoryv11/audio_duration_builtin_test.go
+?? backend/internal/batchfactoryv11/image_aspect_ratios.go
+?? backend/internal/batchfactoryv11/moderation_retry_test.go
+?? backend/internal/batchfactoryv11/resubmit_no_receipt_test.go
+?? backend/internal/batchfactoryv11/yfai_seedance_poll_test.go
+?? backend/internal/ffmpegbin/
+?? backend/internal/httpapi/automation_mysql_store.go
+?? backend/internal/httpapi/automation_state_store_test.go
+?? backend/internal/httpapi/comic_readiness.go
+?? backend/internal/httpapi/comic_readiness_test.go
+?? backend/internal/httpapi/model_catalog_quota_test.go
+?? backend/internal/httpapi/response_compression.go
+?? backend/internal/httpapi/response_compression_test.go
+?? backend/internal/mergeworker/concat_copy.go
+?? backend/internal/mergeworker/concat_copy_test.go
+?? backend/internal/petmigrate/
+?? backend/internal/prompt/defaults/admin_presets.json
+?? backend/internal/prompt/defaults/admin_previews/
+?? backend/internal/storage/automation_schema.go
+?? docs/design/
+?? docs/integrations/
+?? docs/releases/
+?? docs/requirements/
+?? docs/superpowers/plans/2026-11-04-private-studio-unified-workbench.md
+?? docs/superpowers/specs/2026-11-04-comic-prompt-and-readiness-consolidation-design.md
+?? docs/superpowers/specs/2026-11-04-private-customization-ui-design.md
+?? docs/verification/
+?? frontend/public/assets/empty-1x1.png
+?? frontend/src/shared/components/V88Button.jsx
+?? frontend/src/shared/components/V88EmptyState.jsx
+?? frontend/src/shared/error-reporting.test.js
+?? frontend/src/shared/imageAspectRatios.js
+?? frontend/src/shared/imageAspectRatios.test.js
+?? frontend/src/shared/layouts/UserLayout.topbar.test.js
+?? frontend/src/shared/layouts/UserLayout.topbar.test.js.bak
+?? frontend/src/shared/layouts/UserLayout.topbar.test.js.tmp
+?? frontend/src/shared/styles/v88-tokens.css
+?? frontend/src/shared/styles/v88-ui.css
+?? frontend/src/user/pages/PrivateStudioWorkbench.layout.test.js
+?? frontend/src/user/pages/TtsPage.layout.test.js
+?? frontend/src/user/pages/agent-workspace-v88.layout.test.js
+?? frontend/src/user/pages/home-v88.css
+?? frontend/src/user/pages/home-v88.layout.test.js
+?? frontend/src/user/pages/novel-fetch-v88.css
+?? frontend/src/user/pages/novel-fetch-v88.layout.test.js
+?? frontend/src/user/pages/private-studio/
+?? frontend/src/user/pages/shuihuo-production-v88.css
+?? frontend/src/user/pages/shuihuo-production-v88.layout.test.js
+?? frontend/src/user/pages/shuihuo/BatchFactoryErrorNotice.jsx
+?? frontend/src/user/pages/shuihuo/BatchFactorySettingsPrecedence.source.test.js
+?? frontend/src/user/pages/shuihuo/BatchFactoryUiFixes.source.test.js
+?? frontend/src/user/pages/shuihuo/batchFactoryErrorParse.js
+?? frontend/src/user/pages/shuihuo/batchFactoryErrorParse.test.js
+?? frontend/src/user/pages/shuihuo/batchFactoryVisibleError.test.js
+?? frontend/src/user/pages/tts-workbench.css
+?? frontend/src/user/pages/webSubmitFeedback.js
+?? frontend/src/user/pages/webSubmitFeedback.test.js
+?? screenshots/
+?? scripts/package-media-engine.ps1
+?? scripts/release-v88.ps1

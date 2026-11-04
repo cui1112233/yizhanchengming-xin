@@ -5,10 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"qiantie/backend/internal/ffmpegbin"
 )
 
 type CommandExecutor func(context.Context, string, ...string) error
@@ -283,6 +284,15 @@ func (r *FFmpegRunner) merge(ctx context.Context, inputPaths []string, outputPat
 	if err := manifest.Close(); err != nil {
 		return err
 	}
+	width, height, err := mergeCanvas(aspectRatio)
+	if err != nil {
+		return err
+	}
+	if concatCopyEnabled() && speed == 1 {
+		if r.tryConcatCopy(ctx, manifestPath, outputPath, width, height) {
+			return nil
+		}
+	}
 	args, err := BuildFFmpegArgs(manifestPath, outputPath, speed, aspectRatio)
 	if err != nil {
 		return err
@@ -291,25 +301,10 @@ func (r *FFmpegRunner) merge(ctx context.Context, inputPaths []string, outputPat
 	if binary == "" {
 		binary = "ffmpeg"
 	}
-	run := r.Exec
-	if run == nil {
-		run = func(ctx context.Context, name string, args ...string) error {
-			cmd := exec.CommandContext(ctx, name, args...)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				message := strings.TrimSpace(string(output))
-				if len(message) > 512 {
-					message = message[:512]
-				}
-				if message == "" {
-					return fmt.Errorf("ffmpeg failed: %w", err)
-				}
-				return fmt.Errorf("ffmpeg failed: %s", message)
-			}
-			return nil
-		}
+	if r.Exec == nil {
+		return ffmpegbin.Run(ctx, binary, args...)
 	}
-	return run(ctx, binary, args...)
+	return r.Exec(ctx, binary, args...)
 }
 
 func (r *FFmpegRunner) run(ctx context.Context, args ...string) error {
@@ -317,25 +312,10 @@ func (r *FFmpegRunner) run(ctx context.Context, args ...string) error {
 	if binary == "" {
 		binary = "ffmpeg"
 	}
-	run := r.Exec
-	if run == nil {
-		run = func(ctx context.Context, name string, args ...string) error {
-			cmd := exec.CommandContext(ctx, name, args...)
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				message := strings.TrimSpace(string(output))
-				if len(message) > 512 {
-					message = message[:512]
-				}
-				if message == "" {
-					return fmt.Errorf("ffmpeg failed: %w", err)
-				}
-				return fmt.Errorf("ffmpeg failed: %s", message)
-			}
-			return nil
-		}
+	if r.Exec == nil {
+		return ffmpegbin.Run(ctx, binary, args...)
 	}
-	return run(ctx, binary, args...)
+	return r.Exec(ctx, binary, args...)
 }
 
 func escapeConcatPath(value string) string {

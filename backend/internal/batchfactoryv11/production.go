@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type ProductionState string
@@ -19,6 +21,22 @@ const (
 	ProductionFailed    ProductionState = "failed"
 	ProductionCancelled ProductionState = "cancelled"
 )
+
+// ResubmitWithoutReceiptAfter is the grace period a queued/running task may stay
+// without a provider task id before it is treated as an interrupted submission.
+const ResubmitWithoutReceiptAfter = 2 * time.Minute
+
+// SupersededWithoutReceiptMarker is the durable marker written on the cancelled
+// task. Its presence is the "this video was already re-submitted once" guard.
+const SupersededWithoutReceiptMarker = "提交超时未取得 provider 任务号，已自动重新投递"
+
+// supersededProductionTask records one task whose submission never returned a
+// provider id, so the retry can cancel it with an auditable reason.
+type supersededProductionTask struct {
+	jobID  string
+	task   ProductionTask
+	waited time.Duration
+}
 
 type FrozenVideoModel struct {
 	ID                 string `json:"id"`
@@ -124,6 +142,11 @@ type ProductionOptions struct {
 	Force         bool
 	VideoID       string
 	CompilationID string
+	// StripReferenceImages drops reference images for one explicit retry. It is
+	// only requested by the moderation-rejection retry path and is gated by an
+	// opt-in switch, because a text-only rerun has not been confirmed against
+	// every provider yet.
+	StripReferenceImages bool
 }
 
 type h3CompilationPromptResolver interface {
@@ -182,6 +205,7 @@ func (s *ProductionService) resolveProvider(ctx context.Context, owner, provider
 		adapter := &AutoDLH3VideoAdapter{
 			CreateURL: cfg.CreateURL, TasksURL: cfg.TasksURL,
 			APIKey: cfg.APIKey, Model: model.ID, WorkflowID: cfg.WorkflowID,
+			FallbackReferenceImageURL: AutoDLH3FallbackImageURL(),
 		}
 		if err := adapter.Validate(); err != nil {
 			return nil, FrozenVideoModel{}, err
@@ -252,7 +276,14 @@ func productionError(err error) string {
 	// multibyte characters never exceed it and the INSERT never fails with
 	// Error 1406 (Data too long), which used to cause an infinite retry loop.
 	if len(message) > 200 {
-		return message[:200] + "..."
+		// Byte slicing can land inside a multibyte rune, which stores invalid
+		// UTF-8 and shows up as broken characters in the UI. Back off to the
+		// closest rune boundary while keeping the same 200-byte budget.
+		limit := 200
+		for limit > 0 && !utf8.RuneStart(message[limit]) {
+			limit--
+		}
+		return message[:limit] + "..."
 	}
 	return message
 }
@@ -272,6 +303,16 @@ func (s *ProductionService) SubmitBookProduction(ctx context.Context, owner, bat
 
 func (s *ProductionService) SubmitBookProductionWithProvider(ctx context.Context, owner, batchID, bookID, requestID, provider string) (ProductionJob, error) {
 	return s.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{})
+}
+
+// stripReferenceImagesFromPrompt removes every carrier a provider adapter could
+// read a reference image from, so a moderation retry is genuinely text-only.
+func stripReferenceImagesFromPrompt(prompt FinalPrompt) FinalPrompt {
+	prompt.ReferenceImageURLs = nil
+	prompt.DowngradedAssetIDs = nil
+	delete(prompt.EffectiveSettings.Values, "imageUrls")
+	delete(prompt.EffectiveSettings.Values, "referenceImages")
+	return prompt
 }
 
 // SubmitBookProductionWithOptions keeps normal generation idempotent while an
@@ -298,6 +339,51 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		return ProductionJob{}, findErr
 	}
 
+	batch, err := s.Store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return ProductionJob{}, err
+	}
+	book, err := bookFromBatch(batch, bookID)
+	if err != nil {
+		return ProductionJob{}, err
+	}
+	// The effective per-book selection is authoritative at submission time:
+	// a caller may still pass the batch engine (or a preset default), but the
+	// book's own videoModelId/videoProvider must decide which provider submits.
+	// This is the seam that used to let a book configured for YFAI Seedance be
+	// submitted through AutoDL H3 because the batch patch won.
+	effectiveSettings := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	selectedModel := strings.TrimSpace(rawString(effectiveSettings, "videoModelId", ""))
+	batchModel := strings.TrimSpace(rawString(batch.SettingsState.Patch, "videoModelId", ""))
+	if selectedModel != "" {
+		selectedProvider := normalizeVideoProvider(VideoProviderForModel(selectedModel, rawString(effectiveSettings, "videoProvider", provider)))
+		if selectedProvider != provider || selectedModel != batchModel {
+			log.Printf("batch factory video submit: book=%s provider=%s model=%s batchModel=%s bookOverride=true", bookID, selectedProvider, selectedModel, batchModel)
+		}
+		provider = selectedProvider
+	}
+
+	// A retried VIDEO keeps its identity while the engine selected for the book
+	// may have changed. Record the switch (no credentials) so a release trace
+	// can prove the stored provider was not silently reused.
+	if current, statusErr := s.GetBatchStatus(ctx, owner, batchID); statusErr == nil {
+		var storedProvider, storedVideoID string
+		var latest time.Time
+		for _, job := range current.Jobs {
+			for _, task := range job.Tasks {
+				if job.BookID != bookID || strings.TrimSpace(task.Provider) == "" {
+					continue
+				}
+				if storedProvider == "" || task.UpdatedAt.After(latest) {
+					latest, storedProvider, storedVideoID = task.UpdatedAt, normalizeVideoProvider(task.Provider), task.VideoID
+				}
+			}
+		}
+		if storedProvider != "" && storedProvider != provider {
+			log.Printf("video resubmit: video=%s storedProvider=%s effectiveProvider=%s model=%s switched=true", storedVideoID, storedProvider, provider, selectedModel)
+		}
+	}
+
 	adapter, model, providerErr := s.resolveProvider(ctx, owner, provider)
 	if providerErr != nil {
 		return ProductionJob{}, providerErr
@@ -307,15 +393,6 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 	}
 	if strings.TrimSpace(model.ID) == "" {
 		return ProductionJob{}, fmt.Errorf("%w: frozen video model is required", ErrInvalid)
-	}
-
-	batch, err := s.Store.GetBatch(ctx, owner, batchID)
-	if err != nil {
-		return ProductionJob{}, err
-	}
-	book, err := bookFromBatch(batch, bookID)
-	if err != nil {
-		return ProductionJob{}, err
 	}
 	if book.DirectorRevision == nil || book.DirectorRevision.ID == "" {
 		return ProductionJob{}, fmt.Errorf("%w: active Director revision is required", ErrConflict)
@@ -339,14 +416,49 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		return ProductionJob{}, err
 	}
 	blockedVideos := map[string]bool{}
+	resubmittedVideos := map[string]bool{}
+	supersededTasks := make([]supersededProductionTask, 0)
+	now := time.Now().UTC()
+	// Pass 1: the marker is durable evidence that this video already consumed
+	// its single no-receipt re-submission, even when the marker sits on a task
+	// from an older job.
 	for _, prior := range priorJobs {
 		if prior.BookID != bookID || prior.DirectorRevisionID != book.DirectorRevision.ID {
 			continue
 		}
 		for _, task := range prior.Tasks {
-			if !options.Force && (task.Status == ProductionQueued || task.Status == ProductionRunning || task.Status == ProductionSucceeded) {
-				blockedVideos[fmt.Sprintf("%s#v%d", task.VideoID, task.OpeningVariantIndex)] = true
+			if task.ErrorMessage == SupersededWithoutReceiptMarker {
+				resubmittedVideos[task.VideoID] = true
 			}
+		}
+	}
+	for _, prior := range priorJobs {
+		if prior.BookID != bookID || prior.DirectorRevisionID != book.DirectorRevision.ID {
+			continue
+		}
+		for _, task := range prior.Tasks {
+			if options.Force {
+				continue
+			}
+			key := fmt.Sprintf("%s#v%d", task.VideoID, task.OpeningVariantIndex)
+			if task.Status == ProductionSucceeded || strings.TrimSpace(task.ProviderTaskID) != "" {
+				blockedVideos[key] = true
+				continue
+			}
+			if task.Status != ProductionQueued && task.Status != ProductionRunning {
+				continue
+			}
+			// A queued/running task without a provider id means submission was
+			// interrupted before the receipt was stored. Older local builds
+			// blocked it forever; allow exactly one re-submission per video once
+			// the grace period has passed and no earlier re-submission exists.
+			waited := now.Sub(task.UpdatedAt)
+			if waited < ResubmitWithoutReceiptAfter || resubmittedVideos[task.VideoID] || task.ErrorMessage == SupersededWithoutReceiptMarker {
+				blockedVideos[key] = true
+				continue
+			}
+			resubmittedVideos[task.VideoID] = true
+			supersededTasks = append(supersededTasks, supersededProductionTask{jobID: prior.ID, task: task, waited: waited})
 		}
 	}
 	mediaVideos := book.Videos
@@ -378,7 +490,6 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		return ProductionJob{}, fmt.Errorf("%w: no pending VIDEOs to produce", ErrConflict)
 	}
 
-	now := time.Now().UTC()
 	job := ProductionJob{ID: "", Owner: owner, BatchID: batchID, BookID: bookID, RequestID: requestID, DirectorRevisionID: book.DirectorRevision.ID, Status: ProductionQueued, Tasks: []ProductionTask{}, CreatedAt: now, UpdatedAt: now}
 	prompts := make(map[string]FinalPrompt, len(pendingVideos))
 	// buildTask compiles one VIDEO at one opening-variant index. Every compile
@@ -417,6 +528,9 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		if compileErr != nil {
 			return compileErr
 		}
+		if options.StripReferenceImages {
+			prompt = stripReferenceImagesFromPrompt(prompt)
+		}
 		selectedModel := rawString(prompt.EffectiveSettings.Values, "videoModelId", "")
 		if !VideoModelMatchesProviderModel(selectedModel, model.ID, provider) {
 			return fmt.Errorf("%w: selected video model %q is not available for provider %s", ErrConflict, selectedModel, provider)
@@ -445,6 +559,16 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 	if err != nil {
 		return ProductionJob{}, err
 	}
+	for _, superseded := range supersededTasks {
+		task := superseded.task
+		task.Status = ProductionCancelled
+		task.ErrorMessage = SupersededWithoutReceiptMarker
+		task.UpdatedAt = time.Now().UTC()
+		if _, updateErr := repository.UpdateProductionTask(ctx, owner, superseded.jobID, task.ID, task); updateErr != nil {
+			return ProductionJob{}, updateErr
+		}
+		log.Printf("batch factory resubmitted queued video without provider receipt video=%s variant=%d waited=%s job=%s", task.VideoID, task.OpeningVariantIndex, superseded.waited.Round(time.Second), job.ID)
+	}
 
 	for _, task := range job.Tasks {
 		prompt, ok := prompts[fmt.Sprintf("%s#v%d", task.VideoID, task.OpeningVariantIndex)]
@@ -472,7 +596,28 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 				ReferenceImageURLs: append([]string(nil), prompt.ReferenceImageURLs...),
 			})
 		} else {
-			ref, submitErr = adapter.Submit(ctx, model, prompt)
+			submitAdapter := adapter
+			submitModel := model
+			// 梵客视频按书选的型号优先于账号目录里的默认型号；旧值（无后缀）继续用默认型号。
+			if provider == VideoProviderYFAISeedance && s.ProviderRegistry != nil {
+				if fanKeModel := FanKeModelFromSelection(rawString(prompt.EffectiveSettings.Values, "videoModelId", "")); fanKeModel != "" {
+					cfg, resolveErr := s.ProviderRegistry.Resolve(ctx, owner, provider)
+					if resolveErr != nil {
+						submitErr = resolveErr
+					} else {
+						nextAdapter := &YFAISeedanceAdapter{BaseURL: cfg.CreateURL, APIKey: cfg.APIKey, Model: fanKeModel}
+						if validateErr := nextAdapter.Validate(); validateErr != nil {
+							submitErr = validateErr
+						} else {
+							submitModel.ID = fanKeModel
+							submitAdapter = nextAdapter
+						}
+					}
+				}
+			}
+			if submitErr == nil {
+				ref, submitErr = submitAdapter.Submit(ctx, submitModel, prompt)
+			}
 		}
 		task.UpdatedAt = time.Now().UTC()
 		if submitErr != nil {

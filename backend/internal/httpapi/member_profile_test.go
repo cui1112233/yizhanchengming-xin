@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -72,6 +73,92 @@ func TestMemberSecuritySeparatesRememberedSessions(t *testing.T) {
 	}
 	if _, ok := persistent[0].(map[string]any)["expiresAt"]; !ok {
 		t.Fatalf("remembered session must expose expiry: %#v", persistent[0])
+	}
+}
+
+func TestMemberAvatarURLVersionsLegacyRows(t *testing.T) {
+	legacy := map[string]any{"avatarUrl": "/user-content/avatars/owner.png", "updatedAt": "2026-11-04T11:43:33Z"}
+	got, _ := memberAvatarURL(legacy).(string)
+	if !strings.HasPrefix(got, "/user-content/avatars/owner.png?v=") {
+		t.Fatalf("legacy avatarUrl=%q, want a versioned URL", got)
+	}
+	versioned := map[string]any{"avatarUrl": "/user-content/avatars/owner.png?v=abc123", "updatedAt": "2026-11-04T11:43:33Z"}
+	if memberAvatarURL(versioned) != "/user-content/avatars/owner.png?v=abc123" {
+		t.Fatalf("versioned avatarUrl was rewritten: %v", memberAvatarURL(versioned))
+	}
+}
+
+func TestAuthAccountPayloadIncludesOwnerAvatar(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "member-profiles.json"), []byte(`[{"username":"owner","avatarUrl":"/user-content/avatars/owner.png?v=abc123","displayName":"站长"}]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payload := authAccountPayload(auth.Account{Username: "owner", IsOwner: true, Active: true}, NewMemberProfileStore(dir))
+	if payload["role"] != "dev" {
+		t.Fatalf("owner role=%v, want dev", payload["role"])
+	}
+	if payload["avatarUrl"] != "/user-content/avatars/owner.png?v=abc123" {
+		t.Fatalf("owner avatarUrl=%v, want the profile avatar", payload["avatarUrl"])
+	}
+	if payload["displayName"] != "站长" {
+		t.Fatalf("owner displayName=%v, want profile displayName", payload["displayName"])
+	}
+}
+
+// TestMemberAvatarUploadIsServableWithVersionedURL covers the full upload ->
+// store -> read-back loop. Upload used to report success while the recorded
+// /user-content/avatars/… URL had no serving route, so the browser got 404 and
+// Antd Avatar silently kept showing the initial-letter placeholder.
+func TestMemberAvatarUploadIsServableWithVersionedURL(t *testing.T) {
+	now := time.Date(2026, 11, 4, 3, 0, 0, 0, time.UTC)
+	systemDir := t.TempDir()
+	avatarDir := t.TempDir()
+	accounts := &authTestStore{account: auth.Account{Username: "alice", IsOwner: true, Active: true, CreatedAt: now}}
+	mux := http.NewServeMux()
+	RegisterMemberProfileRoutes(mux, BridgeAuth{Secret: "test-secret", Now: func() time.Time { return now }, AuthStore: accounts}, NewMemberProfileStore(systemDir), accounts, avatarDir)
+
+	imageBytes := []byte("\x89PNG\r\n\x1a\navatar-bytes")
+	body := `{"avatarDataUrl":"data:image/png;base64,` + base64.StdEncoding.EncodeToString(imageBytes) + `"}`
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/member/avatar", strings.NewReader(body))
+	SignBridgeRequest(uploadReq, "alice", true, now, "test-secret")
+	uploadRes := httptest.NewRecorder()
+	mux.ServeHTTP(uploadRes, uploadReq)
+	if uploadRes.Code != http.StatusOK {
+		t.Fatalf("upload status=%d body=%s", uploadRes.Code, uploadRes.Body.String())
+	}
+	var payload struct {
+		Member map[string]any `json:"member"`
+	}
+	if err := json.NewDecoder(strings.NewReader(uploadRes.Body.String())).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	avatarURL, _ := payload.Member["avatarUrl"].(string)
+	if !strings.HasPrefix(avatarURL, "/user-content/avatars/alice.png?v=") {
+		t.Fatalf("avatarUrl=%q, want a versioned /user-content/avatars URL", avatarURL)
+	}
+	if _, err := os.Stat(filepath.Join(avatarDir, "alice.png")); err != nil {
+		t.Fatalf("avatar file was not written: %v", err)
+	}
+
+	readReq := httptest.NewRequest(http.MethodGet, avatarURL, nil)
+	readRes := httptest.NewRecorder()
+	mux.ServeHTTP(readRes, readReq)
+	if readRes.Code != http.StatusOK {
+		t.Fatalf("avatar fetch status=%d, want 200", readRes.Code)
+	}
+	if contentType := readRes.Header().Get("Content-Type"); contentType != "image/png" {
+		t.Fatalf("avatar Content-Type=%q, want image/png", contentType)
+	}
+	if readRes.Body.String() != string(imageBytes) {
+		t.Fatalf("avatar body=%q, want the uploaded bytes", readRes.Body.String())
+	}
+
+	for _, path := range []string{"/user-content/avatars/alice.svg", "/user-content/avatars/missing.png"} {
+		missing := httptest.NewRecorder()
+		mux.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, path, nil))
+		if missing.Code != http.StatusNotFound {
+			t.Fatalf("%s status=%d, want 404", path, missing.Code)
+		}
 	}
 }
 

@@ -43,7 +43,9 @@ func RegisterWebSubmitSubmitCompat(root *http.ServeMux, middleware BridgeAuth, u
 			writeJSON(w, status, map[string]string{"error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": result.Failed == 0, "operation_id": result.OperationID, "results": result.Results, "success_groups": result.Success, "failed_groups": result.Failed})
+		// 保持 200 以兼容旧前端：非 2xx 会让老客户端直接进入硬失败分支并丢掉逐版本结果。
+		// 整体成败通过 ok + result(all_ok/partial/all_failed) + 每个失败项的 code/message 表达。
+		writeJSON(w, http.StatusOK, map[string]any{"ok": result.Failed == 0, "result": webSubmitOverallResult(result.Success, result.Failed), "operation_id": result.OperationID, "results": decorateWebSubmitResults(result.Results), "success_groups": result.Success, "failed_groups": result.Failed})
 	}))
 	// The legacy workbench calls /api/web-submit/submit, while the canonical
 	// compatibility route lives under /api/batch-rewrite/web-submit/submit.
@@ -154,4 +156,53 @@ func markSubmissionFailure(meta map[string]any, version, message string) {
 	errors := mapOrEmpty(meta["siteSubmitFailedErrors"])
 	errors[version] = strings.TrimSpace(message)
 	meta["siteSubmitFailedErrors"] = errors
+}
+
+// webSubmitOverallResult 用稳定字段表达整体结果，避免调用方再从 ok 布尔值猜测。
+func webSubmitOverallResult(success, failed int) string {
+	switch {
+	case failed == 0:
+		return "all_ok"
+	case success == 0:
+		return "all_failed"
+	default:
+		return "partial"
+	}
+}
+
+// decorateWebSubmitResults 为失败项补齐 code/message，便于前端逐条展示可操作原因。
+func decorateWebSubmitResults(items []any) []any {
+	if len(items) == 0 {
+		return items
+	}
+	decorated := make([]any, 0, len(items))
+	for _, item := range items {
+		row, ok := item.(map[string]any)
+		if !ok {
+			decorated = append(decorated, item)
+			continue
+		}
+		cloned := make(map[string]any, len(row)+2)
+		for key, value := range row {
+			cloned[key] = value
+		}
+		switch strings.ToLower(strings.TrimSpace(toString(cloned["status"]))) {
+		case "pending_confirmation":
+			if strings.TrimSpace(toString(cloned["code"])) == "" {
+				cloned["code"] = "WEB_SUBMIT_PENDING_CONFIRMATION"
+			}
+			if strings.TrimSpace(toString(cloned["message"])) == "" {
+				cloned["message"] = firstText(cloned["error"], "上传已接收，正在等待目标站回读确认")
+			}
+		case "error", "failed":
+			if strings.TrimSpace(toString(cloned["code"])) == "" {
+				cloned["code"] = "WEB_SUBMIT_FAILED"
+			}
+			if strings.TrimSpace(toString(cloned["message"])) == "" {
+				cloned["message"] = firstText(cloned["error"], "网站提交失败")
+			}
+		}
+		decorated = append(decorated, cloned)
+	}
+	return decorated
 }

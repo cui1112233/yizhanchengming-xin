@@ -1,0 +1,103 @@
+{
+  "buildId": "20261104-06-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "worktreeDirty": true,
+  "changedPathCount": 182,
+  "untrackedPathCount": 52,
+  "frontendSnapshot": {
+    "dir": "%TEMP%\\v88-dist-snapshot-20261104-1648",
+    "indexHtmlSha256": "96d0888eea12bd67a147183e9d33bebcc2bc9714243a29b44ee80f34fded5882",
+    "indexHtmlMtimeLocal": "2026-11-04T16:44:27+08:00",
+    "fileCount": 126,
+    "contentDiffVsGoDist": 0
+  },
+  "frontendEntry": "/assets/user-DI3gtQxT.js",
+  "binaries": {
+    "windows": {
+      "path": ".release/v88/20261104-06-6db3b5ad/qiantie-local.exe",
+      "bytes": 77468672,
+      "sha256": "28b7019165b60ac152260d35947707abe472d481bb3f1f9a47bd6f2a0dbbb661"
+    },
+    "linux": {
+      "path": ".release/v88/20261104-06-6db3b5ad/qiantie-server-linux-amd64",
+      "bytes": 70570146,
+      "sha256": "c1785f00ba3e55911e469a9f5c1584369353687d71b5131ff445f0ce09f2e7f9"
+    }
+  },
+  "local4001": {
+    "previousPid": 25300,
+    "previousSha256": "e0a82f13c93dbe6bc1bf1f0453bfed5f4f30c69e0e48848044593537db6c1e48",
+    "lastObservedActivityBeforeRestart": "2026-11-04T16:53:37+08:00（2 条 ESTABLISHED 到 4001，客户端 PID 5564/13656；进程 CPU 94.53s）",
+    "restartMoment": "2026-11-04T16:53:55+08:00 停止旧进程；16:54:02 新进程启动",
+    "newPid": 32800,
+    "newStartTime": "2026-11-04T16:54:02+08:00",
+    "newSha256": "28b7019165b60ac152260d35947707abe472d481bb3f1f9a47bd6f2a0dbbb661",
+    "panicConcurrentMapFatalLines": 0,
+    "error1038Lines": 1,
+    "capabilitiesLine": "batch-factory capabilities slice=5 enabled=13 disabled=[publish.yadi]"
+  },
+  "production": {
+    "host": "115.190.156.223",
+    "domain": "yzcm.site",
+    "service": "qiantie.service",
+    "binaryPath": "/opt/www/qiantie/qiantie",
+    "previousSha256": "2fbea42470ca1e8d1148c6489d33e4f5f10676245f93d979071cd2a6d373f663",
+    "previousFrontendEntry": "/assets/user-BdLg_lUI.js",
+    "newSha256": "c1785f00ba3e55911e469a9f5c1584369353687d71b5131ff445f0ce09f2e7f9",
+    "newFrontendEntry": "/assets/user-DI3gtQxT.js",
+    "newPid": 4126558,
+    "activeEnterTimestamp": "2026-11-04T16:56:44+08:00",
+    "backupBinary": "/root/backup-20261104/qiantie.pre-20261104-165530",
+    "backupRuntimeManifest": "/root/backup-20261104/runtime-release.pre-20261104-165530.json",
+    "dataUploaded": false,
+    "panicConcurrentMapFatalLines": 0,
+    "capabilitiesLine": "batch-factory capabilities slice=5 enabled=13 disabled=[publish.yadi]",
+    "ffmpeg": "/usr/bin/ffmpeg (ffmpeg 6.1.1-3ubuntu5)"
+  },
+  "consistency": {
+    "frontendEntryIdentical": true,
+    "servedAssetSha256": {
+      "/assets/user-DI3gtQxT.js": "2ba4a50426bb7111c040e96241749d56c8df8f99c2f74143efb24f0a1eb12772",
+      "/assets/user-BGt2r7ux.css": "6f9b88473f995b09099432d1a269aeaccd44daabeb946c85d07a90e2fb471420",
+      "/assets/createLucideIcon-Dij8BbqA.js": "6f96decee11e94f389ce746b316600513f808f821785e097a239ae385b5b9559",
+      "/assets/createLucideIcon-DBptg6Cj.css": "32ebb39c907ffd1350813ab89c91a119e0c32961c57a859a8bf39e96fb102f29"
+    },
+    "note": "两端 4 个入口资源逐字节相同；二进制因平台不同 SHA 不同，但来自同一前端快照与同一 HEAD。"
+  },
+  "binaryStringCheck": {
+    "qiantie-local.exe": {
+      "敏感词": 57, "处敏感词未处理": 2, "内置解析": 1, "Estimated": 4,
+      "audio_duration_builtin": 1, "重试失败小说": 4, "yfai": 47, "is_final": 1,
+      "/v1/skills/balance": 1, "user-DI3gtQxT.js": 23,
+      "16:9": 41, "9:16": 52, "1:1": 40, "4:3": 7, "3:4": 20, "3:2": 6, "2:3": 9
+    },
+    "qiantie-server-linux-amd64": {
+      "敏感词": 57, "处敏感词未处理": 2, "内置解析": 1, "Estimated": 4,
+      "audio_duration_builtin": 1, "重试失败小说": 4, "yfai": 40, "is_final": 1,
+      "/v1/skills/balance": 1, "user-DI3gtQxT.js": 23,
+      "16:9": 41, "9:16": 52, "1:1": 40, "4:3": 7, "3:4": 19, "3:2": 6, "2:3": 9
+    }
+  },
+  "sourceVerification": {
+    "BatchFactoryUnifiedSettingsModal.jsx:132": "<div className=\"batch-factory-engine-field\"> 视频模型（原 label）",
+    "BatchFactoryUnifiedSettingsModal.jsx:149": "<div ...><Select mode=\"multiple\" ...> 修复模型（原 label）",
+    "audio_duration_builtin.go": "存在，14151 字节；WAV/MP3/M4A/FLAC/AAC 解析 + Estimated",
+    "batchFactoryBookState.js:252/263": "job failed → label '异常' + 阶段 + 真实错误",
+    "BatchFactoryNovelList.jsx:2858/4991": "audio_planning → '配音与逐行时长'",
+    "BatchFactoryNovelList.jsx:5003": "失败卡片描述含 '可重试失败小说'"
+  },
+  "verified": {
+    "localPages": { "/": "200/646B", "/script": "200/646B", "/tts": "200/646B", "/batch-factory": "200/646B" },
+    "productionPages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "localAssets": "4/4 200",
+    "productionAssets": "4/4 200",
+    "oldEntry404BothEnds": true,
+    "productionModelsVideoStatus": 401
+  },
+  "unverified": [
+    "线上 /api/models?kind=video 未登录 401，无法确认 YFAI 分组是否出现在返回列表",
+    "鉴权类接口只验证到 401/404 边界；未发起任何付费 POST",
+    "线上 QIANTIE_AUTOMATION_RESUME_ON_BOOT 未开启（启动日志 skip resuming），属既有配置"
+  ],
+  "deployedAt": "2026-11-04T16:58:00+08:00"
+}

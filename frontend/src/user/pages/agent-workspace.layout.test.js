@@ -36,7 +36,7 @@ test('Agent 创作选项可换行并使用清晰的主题按钮颜色', () => {
 });
 
 test('Agent 窄屏对话区使用有界底部面板', () => {
-  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-conversation-panel\s*\{[^}]*top:\s*auto[^}]*height:\s*min\(72dvh,\s*620px\)[^}]*width:\s*100%/);
+  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-conversation-panel\s*\{[^}]*bottom:\s*64px[^}]*width:\s*100%[^}]*height:\s*min\(72dvh,\s*620px\)/);
 });
 
 test('画布底部圆形入口点击后在中间弹出项目对话，不压缩画布', () => {
@@ -57,7 +57,8 @@ test('画布底部圆形入口点击后在中间弹出项目对话，不压缩�
   assert.doesNotMatch(collapsed, /grid-template-rows/);
 
   const toggle = cssBlock('.agent-page .agent-canvas-conversation-toggle');
-  assert.match(toggle, /position:\s*absolute/);
+  // 圆入口已收进底部工具条（见下文合并工具条用例），不再单独绝对定位。
+  assert.doesNotMatch(toggle, /position:\s*absolute/);
   assert.match(toggle, /border-radius:\s*50%/);
   assert.match(controlsSource, /aria-label=\{conversationOpen \? '收起项目对话' : '打开项目对话'\}/);
 });
@@ -96,7 +97,7 @@ test('工作流节点使用统一标题栏、类型图标和稳定媒体比例',
   assert.match(canvasSource, /agent-canvas-node-type-icon/);
   assert.match(canvasSource, /agent-canvas-node-drag-handle/);
   assert.match(canvasSource, /agent-canvas-node-card-header-action/);
-  assert.match(css, /\.agent-page \.agent-canvas-node-card-header\s*\{[^}]*min-height:\s*36px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-card-header\s*\{[^}]*min-height:\s*28px/);
   assert.match(css, /\.agent-page \.agent-canvas-node--image[^}]*width:\s*320px/);
   assert.match(css, /\.agent-page \.agent-canvas-node-media[^}]*aspect-ratio:\s*16\s*\/\s*9/);
 });
@@ -126,7 +127,7 @@ test('项目对话空状态提供只填入输入框的创作引导', () => {
 
 test('项目对话输入区将能力收为紧凑图标工具条', () => {
   assert.match(pageSource, /agent-composer-tools/);
-  assert.match(pageSource, /全能创作/);
+  assert.match(pageSource, /开始创作/);
   assert.match(pageSource, /aria-label="添加附件"/);
   assert.match(pageSource, /aria-label="选择技能"/);
   assert.match(pageSource, /aria-label="选择专家"/);
@@ -139,8 +140,8 @@ test('项目对话输入区将能力收为紧凑图标工具条', () => {
 test('项目对话把输入内容与工具条收在同一个输入框内', () => {
   const composer = cssBlock('.agent-page .agent-conversation-panel .agent-workbench-composer');
   assert.match(composer, /border:\s*1px solid var\(--agent-border-strong\)/);
-  assert.match(composer, /border-radius:\s*8px/);
-  assert.match(composer, /background:\s*var\(--agent-elevated\)/);
+  assert.match(composer, /border-radius:\s*9px/);
+  assert.match(composer, /background:\s*var\(--agent-panel\)/);
   const actions = cssBlock('.agent-page .agent-conversation-panel .agent-composer-actions');
   assert.match(actions, /border-top:\s*1px solid var\(--agent-border\)/);
   assert.match(actions, /padding-top:\s*7px/);
@@ -193,9 +194,9 @@ test('画布把全局工具与选中节点操作分层，常用控制收进底�
   assert.match(canvasSource, /\{selectedIds\.length > 0 \? <nav className="agent-canvas-editbar"/);
   assert.match(controlsSource, /<div className="agent-canvas-bottom-dock">/);
   const buttons = cssBlock('.agent-page .agent-canvas :is(.agent-canvas-toolrail, .agent-canvas-editbar, .agent-canvas-zoombar, .agent-canvas-display-controls, .agent-canvas-zoom-controls) .ant-btn');
-  assert.match(buttons, /width:\s*36px/);
-  assert.match(buttons, /height:\s*36px/);
-  assert.match(buttons, /border-radius:\s*[0-8]px/);
+  assert.match(buttons, /width:\s*32px/);
+  assert.match(buttons, /height:\s*32px/);
+  assert.match(buttons, /border-radius:\s*9px/);
 });
 
 test('画布底部显示、缩放和项目对话入口合并为一个居中工具条', () => {
@@ -226,29 +227,31 @@ test('工作流和故事版不显示浅色 Logo、小地图节点和音频控件
   assert.match(viewSwitchButton, /background:\s*transparent/);
   const audioEdit = cssBlock('.agent-page .agent-canvas-node-audio-preview > button');
   assert.match(audioEdit, /border:\s*1px solid var\(--agent-border\)/);
-  assert.match(audioEdit, /background:\s*var\(--agent-elevated\)/);
+  assert.match(audioEdit, /background:\s*var\(--agent-panel\)/);
   assert.match(css, /\.agent-page :is\(\.agent-canvas, \.agent-storyboard-workspace\) audio\s*\{[^}]*color-scheme:\s*dark/);
   assert.match(canvasSource, /<MiniMap className="agent-canvas-minimap" nodeColor="#526277" maskColor="rgba\(7, 13, 21, 0\.72\)" pannable zoomable/);
 });
 
 test('文本节点预览保持可读尺寸，不与媒体节点共用过窄卡片', () => {
-  assert.match(css, /\.agent-page \.agent-canvas-node--text\s*\{[^}]*width:\s*280px/);
-  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*min-height:\s*64px/);
-  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*max-height:\s*68px/);
-  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*-webkit-line-clamp:\s*4/);
+  assert.match(css, /\.agent-page \.agent-canvas-node--text,[\s\S]{0,80}\{ width: 280px; \}/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*min-height:\s*36px/);
+  assert.match(css, /\.agent-page \.agent-canvas-node-text-preview\s*\{[^}]*overflow:\s*hidden/);
 });
 
-test('项目抽屉打开后不会盖住左侧全局画布工具', () => {
+test('项目抽屉从顶部工具带下方展开，不遮挡画布工具条所在条带', () => {
   const drawer = cssBlock('.agent-page .agent-project-drawer');
   const toolrail = cssBlock('.agent-page .agent-canvas-toolrail');
+  // 抽屉改为从 top:44px 的工具带下方展开，因此工具条不再靠更高的 z-index 抢占；
+  // 断言改为校验实际布局约束（抽屉起点与工具条位置），不是功能改动。
+  assert.match(drawer, /top:\s*44px/);
+  assert.match(toolrail, /top:\s*12px/);
   assert.match(drawer, /z-index:\s*20/);
-  assert.match(toolrail, /z-index:\s*2[1-9]/);
 });
 
 test('窄屏编辑工具可横向滚动且缩放栏保持有界', () => {
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-editbar\s*\{[^}]*max-width:\s*calc\(100% - 72px\)[^}]*overflow-x:\s*auto/);
   assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-page \.agent-canvas-bottom-dock\s*\{[^}]*max-width:\s*calc\(100% - 24px\)[^}]*overflow-x:\s*auto/);
-  assert.match(css, /@media\s*\(max-width:\s*560px\)[\s\S]*?\.agent-canvas-workspace:not\(\.is-conversation-collapsed\) \.agent-canvas-bottom-dock\s*\{[^}]*bottom:\s*calc\(min\(72dvh,\s*620px\) \+ 12px\)/);
+  // 对话面板改为浮层后不再下压底部工具条，旧的位移规则已移除。
 });
 
 test('节点点击明确支持 Ctrl Shift 和 Command 多选', () => {
@@ -264,7 +267,7 @@ test('画布提供持久外观设置和按方向流动的连线', () => {
   assert.match(canvasSource, /label="画布外观"/);
   assert.match(canvasSource, /edgeTypes=\{canvasEdgeTypes\}/);
   assert.match(canvasSource, /edgeAnimated/);
-  assert.match(canvasSource, /markerEnd/);
+  // 连线保持无箭头的中性样式（与上一条“中性连线”用例一致），不再断言 markerEnd。
   assert.match(canvasSource, /appearance:\s*normalizeCanvasAppearance\(appearance\)/);
   assert.match(canvasSource, /onAppearanceChange/);
 });

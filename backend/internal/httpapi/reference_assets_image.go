@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
@@ -293,7 +294,7 @@ func decodeReferenceAssetImageResult(ctx context.Context, result map[string]any)
 
 func referenceAssetImageRatio(input map[string]any) string {
 	ratio := strings.TrimSpace(toString(input["aspect_ratio"]))
-	if ratio == "16:9" || ratio == "9:16" || ratio == "1:1" {
+	if batchfactoryv11.IsSupportedImageAspectRatio(ratio) {
 		return ratio
 	}
 	return "9:16"

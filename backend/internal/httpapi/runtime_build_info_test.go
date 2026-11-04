@@ -36,6 +36,27 @@ func TestRuntimeBuildInfoReportsInjectedReleaseSHA(t *testing.T) {
 	}
 }
 
+func TestRuntimeBuildInfoReportsMediaEngine(t *testing.T) {
+	handler := NewRouter(RouterOptions{ReleaseSHA: "abc123"})
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runtime-build-info", nil))
+
+	var body struct {
+		MediaEngine struct {
+			Available     bool   `json:"available"`
+			FFmpegPath    string `json:"ffmpeg_path"`
+			FFmpegVersion string `json:"ffmpeg_version"`
+			FFprobePath   string `json:"ffprobe_path"`
+		} `json:"media_engine"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.MediaEngine.Available && (body.MediaEngine.FFmpegPath == "" || body.MediaEngine.FFmpegVersion == "") {
+		t.Fatalf("media engine must expose path and version when available: %#v", body.MediaEngine)
+	}
+}
+
 func TestRuntimeBuildInfoReadsRuntimeManifest(t *testing.T) {
 	manifestPath := filepath.Join(t.TempDir(), "runtime-manifest.json")
 	if err := os.WriteFile(manifestPath, []byte(`{"gitSha":"manifest123","frontendEntry":"/assets/index-current.js"}`), 0o600); err != nil {

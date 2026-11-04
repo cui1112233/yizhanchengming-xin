@@ -4,6 +4,7 @@ import {
   normalizeModelProvider,
   providerForCatalogModel
 } from './shuihuo/providerModelBinding.js';
+import { IMAGE_ASPECT_RATIOS } from '../../shared/imageAspectRatios.js';
 
 function localDoubaoModels(kind) {
   const options = kind === 'video'
@@ -20,7 +21,7 @@ function localDoubaoModels(kind) {
     enabled: true,
     capabilities: kind === 'image'
       ? {
-          ratios: ['16:9', '9:16', '1:1'],
+          ratios: IMAGE_ASPECT_RATIOS,
           qualityLevels: ['low', 'standard', 'high'],
           maxOutputCount: 4,
           referenceKinds: ['image'],

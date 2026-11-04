@@ -186,13 +186,17 @@ test('makes a saved unified configuration authoritative for every book', () => {
   assert.match(source, /const UNIFIED_CONFIGURATION_KEYS = \[/);
   assert.match(source, /UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?'openingEnabled', 'openingCount'[\s\S]*?\]/);
   assert.match(source, /async function syncUnifiedSettingsToBooks\(currentBatch\)/);
-  assert.match(source, /restoreKeys: UNIFIED_CONFIGURATION_KEYS/);
+  // 保存统一配置 = 批量写透到本批次全部书（覆盖单书已改过的值）。
+  // 旧实现用 restoreKeys 删除书级覆盖值，等价于“批次盖单书”，不能再出现。
+  assert.match(source, /const pushPatch = Object\.fromEntries\(pushKeys\.map/);
+  assert.match(source, /saveBookOverrideWithRetry\([\s\S]{0,120}\{ patch: pushPatch \}/);
+  assert.doesNotMatch(source, /restoreKeys: UNIFIED_CONFIGURATION_KEYS/);
   assert.match(source, /await syncUnifiedSettingsToBooks\(savedBatch\)/);
 });
 
 test('recompiles existing H3 VIDEO prompts after a unified configuration save without regenerating director cards', () => {
   assert.match(source, /async function recompileUnifiedH3Prompts\(currentBatch\)/);
-  assert.match(source, /await recompileUnifiedH3Prompts\(syncedBatch\)/);
+  assert.match(source, /await recompileUnifiedH3Prompts\(compiledBatch\)/);
   assert.match(source, /compileBookH3Videos\(book, \{ interactive: false, allowAudioSynthesis: true \}\)/);
 });
 
@@ -1053,15 +1057,23 @@ test('always prepares TTS timing before recompiling when unified settings are sa
   const start = source.indexOf('async function prepareAudioPlanningForBatch(currentBatch)');
   const end = source.indexOf('async function compileBookH3Videos(book,', start);
   const preparation = start >= 0 && end > start ? source.slice(start, end) : '';
-  assert.match(source, /const shouldPrepareAudio = normalized\.audioPlanningEnabled === true;/);
-  assert.match(source, /await prepareAudioPlanningForBatch\(syncedBatch\)/);
   assert.match(preparation, /await ensureBookAudioDuration\(book, \{ force: true, quiet: true, batchSnapshot: currentBatch \}\)/);
   assert.doesNotMatch(preparation, /runBookStage|runBatchDirector|submitBatchProduction|runProduction/);
 
+  // 保存只负责落库与关弹窗；配音测量与提示词重编译在后台队列里按顺序执行。
   const saveStart = source.indexOf('async function saveSettings(patch)');
-  const saveEnd = source.indexOf('  async function previewChangeImpact', saveStart);
+  const saveEnd = source.indexOf('  // 保存后的后台收尾', saveStart);
   const saveBody = saveStart >= 0 && saveEnd > saveStart ? source.slice(saveStart, saveEnd) : '';
-  assert.ok(saveBody.indexOf('await prepareAudioPlanningForBatch(syncedBatch)') < saveBody.indexOf('recompileUnifiedH3Prompts(compiledBatch)'), 'TTS timing must be prepared before director recompilation');
+  assert.doesNotMatch(saveBody, /await prepareAudioPlanningForBatch/);
+  assert.doesNotMatch(saveBody, /await recompileUnifiedH3Prompts/);
+  assert.match(saveBody, /message\.success\(`统一配置已覆盖本批次 /);
+  assert.match(saveBody, /void runSettingsBackgroundSync\(normalized, syncedBatch\)/);
+
+  const backgroundStart = source.indexOf('async function runSettingsBackgroundSync(patch, initialBatch)');
+  const backgroundEnd = source.indexOf('  function retrySettingsBackgroundSync', backgroundStart);
+  const backgroundBody = backgroundStart >= 0 && backgroundEnd > backgroundStart ? source.slice(backgroundStart, backgroundEnd) : '';
+  assert.ok(backgroundBody.indexOf('await ensureBookAudioDuration(') < backgroundBody.indexOf('await recompileUnifiedH3Prompts('), 'TTS timing must be prepared before director recompilation');
+  assert.match(backgroundBody, /bgTask|backgroundSettingsTask/);
 });
 
 test('shows one current complete video per opening while retry attempts stay in history', () => {
@@ -1464,4 +1476,14 @@ test('automatically classifies stored books that already have text but no publis
   assert.match(source, /!hasGender && !hasStyle/);
   assert.match(source, /await classifyBookMetadata\(book, false\)/);
   assert.match(source, /!\['processing', 'failed', 'classified', 'manual'\]\.includes\(status\)/);
+});
+
+test('shows a failed automation stage on the book card instead of a silent waiting state', () => {
+  // 自动化在 audio_planning 等时间线之外的阶段失败时，卡片必须给出失败阶段、
+  // 真实错误和重试入口，不能只显示“待开始/等待”。
+  assert.match(source, /automationBook\.stale \? '历史自动生产失败' : '自动生产失败'\}：\$\{stageText\}/);
+  assert.match(source, /automationBookForCard\(automationStatus, batch\.id, book\.id\)/);
+  assert.match(source, /audio_planning: '配音与逐行时长'/);
+  assert.match(source, /retryLastFailedStage\(book\)/);
+  assert.match(source, /automationBook\.error\) \|\| automationBook\.message/);
 });

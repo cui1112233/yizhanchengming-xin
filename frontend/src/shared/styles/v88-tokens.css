@@ -1,0 +1,95 @@
+/* V88 设计令牌（第一批：配音页 /tts 启用，后续页面按批次接入）
+   位置说明：放在 shared/styles 与 global.css、theme.js 同目录，避免再开一层 theme 目录。
+   本文件只新增 --v88-* 变量，不改写 global.css 里任何既有规则。 */
+
+:root {
+  /* 颜色：暗色基准 */
+  --v88-color-bg: #070b11;
+  --v88-color-surface: #0e1621;
+  --v88-color-surface-2: #111b28;
+  --v88-color-input: #0b111a;
+  --v88-color-border: rgba(151, 168, 190, .22);
+  --v88-color-border-strong: rgba(176, 195, 219, .36);
+
+  /* 主色 = 青绿；珊瑚降级为强调/警示；靛蓝只做信息与链接 */
+  --v88-color-primary: #63dfc0;
+  --v88-color-primary-hover: #7de8cf;
+  --v88-color-primary-active: #4fcbb0;
+  --v88-color-primary-soft: rgba(99, 223, 192, .12);
+  --v88-color-emphasis: #f07167;
+  --v88-color-danger: #ff9b9d;
+  --v88-color-danger-soft: rgba(255, 155, 157, .12);
+  --v88-color-success: #75ddb4;
+  --v88-color-warning: #ffd08a;
+  --v88-color-info: #9da8ff;
+
+  /* 文字三级 + 主色上的反白字 */
+  --v88-color-text-1: #f5f7fb;
+  --v88-color-text-2: #c7d0dd;
+  --v88-color-text-3: #a7b4c5;
+  --v88-color-text-on-primary: #04120f;
+
+  /* 圆角 */
+  --v88-radius-sm: 6px;
+  --v88-radius-md: 9px;
+  --v88-radius-lg: 12px;
+  --v88-radius-pill: 999px;
+
+  /* 间距阶梯 */
+  --v88-space-page: 24px;
+  --v88-space-1: 4px;
+  --v88-space-2: 8px;
+  --v88-space-3: 12px;
+  --v88-space-4: 16px;
+  --v88-space-5: 20px;
+  --v88-space-6: 24px;
+  --v88-space-7: 32px;
+
+  /* 字号 */
+  --v88-font-page-title: 24px;
+  --v88-font-section-title: 16px;
+  --v88-font-body: 13px;
+  --v88-font-caption: 12px;
+
+  /* 动效 */
+  --v88-motion-fast: 120ms;
+  --v88-motion-base: 160ms;
+  --v88-motion-slow: 200ms;
+  --v88-ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* 阴影 */
+  --v88-shadow-card: 0 8px 32px rgba(0, 0, 0, .22);
+  --v88-shadow-raised: 0 18px 48px rgba(0, 0, 0, .28);
+}
+
+/* 减少动态：三档时长归零，动画类由各页面自行关闭 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --v88-motion-fast: 0ms;
+    --v88-motion-base: 0ms;
+    --v88-motion-slow: 0ms;
+  }
+}
+
+/* 私人定制变量映射（下一轮启用，本轮不改那边正在改的文件）
+   --ps-bg      #0a101d          -> --v88-color-bg            （冲突：令牌 #070b11 优先）
+   --ps-panel   #101827          -> --v88-color-surface       （冲突：令牌 #0e1621 优先）
+   --ps-line    rgba(157,176,218,.17) -> --v88-color-border   （冲突：令牌 .22 优先）
+   --ps-line-soft rgba(...,.11)  -> --v88-color-border（降低透明度由使用方处理）
+   --ps-text    #edf2ff          -> --v88-color-text-1        （冲突：令牌 #f5f7fb 优先）
+   --ps-muted   #8996b1          -> --v88-color-text-2        （冲突：令牌 #c7d0dd 优先）
+   --ps-muted-2 #65738e          -> --v88-color-text-3        （冲突：令牌 #a7b4c5 优先）
+   --ps-indigo  #9da8ff          -> --v88-color-info          （一致）
+   --ps-mint    #65dfce          -> --v88-color-primary       （冲突：令牌 #63dfc0 优先）
+   目前只在 .v88-tokens-active 下生效，未加该 class 的页面保持原值。 */
+.v88-tokens-active {
+  --ps-bg: var(--v88-color-bg);
+  --ps-panel: var(--v88-color-surface);
+  --ps-line: var(--v88-color-border);
+  --ps-line-soft: var(--v88-color-border);
+  --ps-text: var(--v88-color-text-1);
+  --ps-muted: var(--v88-color-text-2);
+  --ps-muted-2: var(--v88-color-text-3);
+  --ps-indigo: var(--v88-color-info);
+  --ps-mint: var(--v88-color-primary);
+}

@@ -1,6 +1,7 @@
 import { InputNumber, Popover, Segmented, Select, Switch } from 'antd';
 import { SlidersHorizontal } from 'lucide-react';
 import { formatNodeParameterSummary, normalizeNodeConfig } from '../pages/agent-node-config';
+import { IMAGE_ASPECT_RATIOS } from '../../shared/imageAspectRatios';
 
 const labels = {
   image: { title: '图片参数', ratio: '比例', quality: '画质', resolution: '清晰度', count: '数量' },
@@ -63,7 +64,7 @@ export function AgentNodeParameterPopover({ kind, config = {}, capabilities = {}
   const stop = event => event.stopPropagation();
   const maxCount = Math.max(1, Math.min(4, Number(capabilities.maxOutputCount) || (kind === 'image' ? 4 : 1)));
   const countOptions = optionList(Array.from({ length: maxCount }, (_, index) => index + 1), kind === 'image' ? '张' : '个');
-  const imageRatios = valuesOr(['16:9', '9:16', '1:1'], capabilities.ratios);
+  const imageRatios = valuesOr(IMAGE_ASPECT_RATIOS, capabilities.ratios);
   const imageResolutions = optionList(valuesOr(['1K', '2K', '4K'], capabilities.resolutions));
   const imageQualityLevels = choices.quality.filter(item => !capabilities.qualityLevels?.length || capabilities.qualityLevels.includes(item.value));
   const imageQualityPatch = quality => capabilities.resolutionManagedByModel

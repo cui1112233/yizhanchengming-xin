@@ -51,6 +51,51 @@ func TestCatalogListsPublishedPresetsAndConstraintText(t *testing.T) {
 	}
 }
 
+func TestCatalogReloadsWhenPublishedFileChanges(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "presets.json")
+	first := `[{"id":"base","module":"script","name":"第一版","kind":"base","compatibleBaseIds":[],"version":1,"status":"published"}]`
+	if err := os.WriteFile(path, []byte(first), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(path)
+	items, err := catalog.Published("script")
+	if err != nil || len(items) != 1 || items[0].Name != "第一版" {
+		t.Fatalf("first Published() = %+v, %v", items, err)
+	}
+	second := `[{"id":"base","module":"script","name":"第二版","kind":"base","compatibleBaseIds":[],"version":1,"status":"published"}]`
+	if err := os.WriteFile(path, []byte(second), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	items, err = catalog.Published("script")
+	if err != nil || len(items) != 1 || items[0].Name != "第二版" {
+		t.Fatalf("cached Published() did not reload: %+v, %v", items, err)
+	}
+}
+
+func TestCatalogCacheIsNotExposedToCallers(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "presets.json")
+	data := `[{"id":"base","module":"script","name":"Base","kind":"base","compatibleBaseIds":["origin"],"categories":["cat"],"version":1,"status":"published"}]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(path)
+	records, err := catalog.load()
+	if err != nil || len(records) != 1 {
+		t.Fatalf("load() = %+v, %v", records, err)
+	}
+	records[0].CompatibleBaseIDs[0] = "mutated"
+	records[0].Categories[0] = "mutated"
+	reloaded, err := catalog.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded[0].CompatibleBaseIDs[0] != "origin" || reloaded[0].Categories[0] != "cat" {
+		t.Fatalf("cache was mutated through a caller copy: %+v", reloaded[0])
+	}
+}
+
 func TestCatalogResolveRequiresCompatibleBase(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "presets.json")

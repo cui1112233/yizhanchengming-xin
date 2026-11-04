@@ -9,12 +9,12 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/ffmpegbin"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/mergeworker"
 )
@@ -270,10 +270,16 @@ func renderMergeCover(ctx context.Context, files *localartifact.Store, remote me
 	defer cleanup()
 
 	var stderr bytes.Buffer
-	command := exec.CommandContext(ctx, "ffmpeg", "-v", "error", "-ss", "0.1", "-i", inputPath, "-frames:v", "1", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1")
+	command, binaryPath, cmdErr := ffmpegbin.Command(ctx, "ffmpeg", "-v", "error", "-ss", "0.1", "-i", inputPath, "-frames:v", "1", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1")
+	if cmdErr != nil {
+		return nil, cmdErr
+	}
 	command.Stderr = &stderr
 	cover, err := command.Output()
 	if err != nil {
+		if ffmpegbin.IsMissing(err) {
+			return nil, &ffmpegbin.MissingError{Binary: "ffmpeg", Tried: []string{binaryPath}}
+		}
 		message := strings.TrimSpace(stderr.String())
 		if message == "" {
 			return nil, fmt.Errorf("render merge cover: %w", err)

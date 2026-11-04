@@ -5,7 +5,8 @@ param(
   [switch]$UseLocalMysql,
   [switch]$UseReviewMysql,
   [switch]$EnableBatchProduction,
-  [switch]$EnableLocalMerge
+  [switch]$EnableLocalMerge,
+  [switch]$SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -113,10 +114,12 @@ if ($EnableLocalMerge) {
   Remove-Item Env:QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED -ErrorAction SilentlyContinue
   Write-Output 'Batch Factory video production is explicitly enabled.'
 } else {
-  $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
-  Remove-Item Env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED -ErrorAction SilentlyContinue
-  Remove-Item Env:QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED -ErrorAction SilentlyContinue
-  Remove-Item Env:QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED -ErrorAction SilentlyContinue
+  # 与线上运行时对齐：默认 Slice 5（能力 13 项，仅 publish.yadi 关闭）。
+  $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '5'
+  $env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED = '1'
+  $env:QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED = '1'
+  $env:QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED = '1'
+  Write-Output 'Batch Factory slice 5 (production + merge) enabled to match production runtime.'
 }
 $env:QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER = '1'
 # No Node/3001 fallback. Migrated routes are served directly by Go.
@@ -164,5 +167,5 @@ if (-not (Test-Path -LiteralPath $ffmpegPath)) {
 $env:Path = $ffmpegDir + [IO.Path]::PathSeparator + $env:Path
 Write-Output ('Using FFmpeg {0}' -f $ffmpegPath)
 
-& (Join-Path $PSScriptRoot 'start-local-go.ps1') -ListenAddr $ListenAddr
+& (Join-Path $PSScriptRoot 'start-local-go.ps1') -ListenAddr $ListenAddr -SkipBuild:$SkipBuild
 exit $LASTEXITCODE

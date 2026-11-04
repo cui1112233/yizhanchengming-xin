@@ -3,6 +3,7 @@ package prompt
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,7 +110,8 @@ func TestEnsureComicPresetsUpgradesRecognizedLegacySystemSeeds(t *testing.T) {
 	}
 	records := readComicPresetRecords(t, path)
 	assertComicPresetVersion(t, records, "batch-comic-assets", 2, "archived", "漫画资产提示词", "旧漫画资产正文")
-	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "published", "CM·漫画资产统一推导", "")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "archived", "CM·漫画资产统一推导", "")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 4, "published", "CM·漫画资产统一推导", "")
 	assertComicPresetVersion(t, records, "vip-smart-character-derive", 1, "archived", "VIP 智能角色推导", "旧角色正文")
 	assertComicPresetVersion(t, records, "vip-smart-character-derive", 2, "published", "CM·VIP 智能角色推导", "")
 }
@@ -127,10 +129,11 @@ func TestEnsureComicPresetsUpgradesOriginalV1SystemSeed(t *testing.T) {
 	}
 	records := readComicPresetRecords(t, path)
 	assertComicPresetVersion(t, records, "batch-comic-assets", 1, "archived", "漫画资产提示词", "旧漫画资产正文")
-	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "published", "CM·漫画资产统一推导", "")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "archived", "CM·漫画资产统一推导", "")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 4, "published", "CM·漫画资产统一推导", "")
 }
 
-func TestEnsureComicPresetsPreservesAdministratorPublishedVersions(t *testing.T) {
+func TestEnsureComicPresetsSeedsNewerAdministratorVersion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "presets.json")
 	custom := `[{
 		"id":"batch-comic-assets","module":"batch-factory","name":"管理员漫画资产提示词","kind":"base","description":"自定义","compatibleBaseIds":[],"version":3,"revision":1,"status":"published","body":"管理员自定义正文","protocolLock":{"format":"json","operation":"comic-assets","slot":"batch.comic-assets"},"createdBy":"admin","publishedBy":"admin"
@@ -142,7 +145,8 @@ func TestEnsureComicPresetsPreservesAdministratorPublishedVersions(t *testing.T)
 		t.Fatal(err)
 	}
 	records := readComicPresetRecords(t, path)
-	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "published", "管理员漫画资产提示词", "管理员自定义正文")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 3, "archived", "管理员漫画资产提示词", "管理员自定义正文")
+	assertComicPresetVersion(t, records, "batch-comic-assets", 4, "published", "CM·漫画资产统一推导", "")
 	published := 0
 	for _, record := range records {
 		if stringValue(record["id"]) == "batch-comic-assets" && stringValue(record["status"]) == "published" {
@@ -298,5 +302,100 @@ func TestSystemComicReferenceScenesExposeThirteenRealImagesAndHiddenPrompts(t *t
 		if !found || contentType != "image/jpeg" || len(preview) < 4 || !bytes.Equal(preview[:2], []byte{0xff, 0xd8}) {
 			t.Fatalf("comic reference scene image invalid for %q: found=%v type=%q bytes=%d", item.ID, found, contentType, len(preview))
 		}
+	}
+}
+
+func TestEnsureComicPresetsSeedsAdministratorGaps(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "system", "presets.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	artifactDir := filepath.Join(dir, "artifacts")
+	seed := `[
+		{"id":"batch-comic-style-13","module":"batch-factory","name":"旧版黑白","version":1,"revision":1,"status":"published","createdBy":"system"},
+		{"id":"batch-character-meta","module":"batch-factory","name":"本地更高版本","version":9,"revision":1,"status":"published","createdBy":"choushiyiguai"},
+		{"id":"dup-entry","module":"batch-factory","name":"重复草稿","version":1,"revision":1,"status":"draft"},
+		{"id":"dup-entry","module":"batch-factory","name":"重复发布","version":1,"revision":2,"status":"published"}
+	]`
+	if err := os.WriteFile(path, []byte(seed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path, artifactDir); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(path)
+
+	preset, found, err := catalog.PublishedBody("batch-factory", "batch-comic-style-13")
+	if err != nil || !found {
+		t.Fatalf("style 13 upgrade missing: found=%v err=%v", found, err)
+	}
+	if preset.Version != 2 || preset.Name != "Q版豆丁2D漫风" {
+		t.Fatalf("style 13 = %#v, want version 2 Q版豆丁2D漫风", preset)
+	}
+
+	preset, found, err = catalog.PublishedBody("batch-factory", "batch-character-meta")
+	if err != nil || !found {
+		t.Fatalf("local higher version missing: found=%v err=%v", found, err)
+	}
+	if preset.Version != 9 || preset.Name != "本地更高版本" {
+		t.Fatalf("local higher version overwritten: %#v", preset)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var records []map[string]any
+	if err := json.Unmarshal(raw, &records); err != nil {
+		t.Fatal(err)
+	}
+	keys := map[string]bool{}
+	published := map[string]int{}
+	duplicates := 0
+	for _, record := range records {
+		id, _ := record["id"].(string)
+		version := int(record["version"].(float64))
+		key := fmt.Sprintf("%s\x00%d", id, version)
+		if keys[key] {
+			duplicates++
+		}
+		keys[key] = true
+		if id == "dup-entry" {
+			published[id]++
+			if record["status"] != "published" || record["name"] != "重复发布" {
+				t.Fatalf("duplicate collapse kept wrong record: %#v", record)
+			}
+		}
+	}
+	if duplicates != 0 {
+		t.Fatalf("duplicate id+version entries = %d, want 0", duplicates)
+	}
+	if published["dup-entry"] != 1 {
+		t.Fatalf("dup-entry records = %d, want 1", published["dup-entry"])
+	}
+
+	beforeSecondRun, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureComicPresets(path, artifactDir); err != nil {
+		t.Fatal(err)
+	}
+	afterSecondRun, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(beforeSecondRun, afterSecondRun) {
+		t.Fatal("second EnsureComicPresets run modified the catalog (not idempotent)")
+	}
+
+	previewPath := filepath.Join(artifactDir, "lea_60sljNPSgUfP7ECq.jpg")
+	info, err := os.Stat(previewPath)
+	if err != nil {
+		t.Fatalf("embedded style preview not materialized: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("embedded style preview is empty")
 	}
 }

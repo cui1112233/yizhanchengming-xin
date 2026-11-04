@@ -277,6 +277,14 @@ test('keeps the unified video prompt selector independent from its help tip', ()
   assert.match(source, /<div className="batch-factory-engine-field"><span><b>视频提示词<\/b><HelpTip/);
 });
 
+test('keeps model dropdowns outside the label that owns the help-tip button', () => {
+  // label 的受控元素若先命中“？”按钮，点击下拉会激活该按钮并让弹层失焦收起（闪回）。
+  // 修复模型（多选）、视频模型（单选）都必须用 div 包字段。
+  assert.doesNotMatch(source, /<label className="batch-factory-engine-field"><span><b>(?:修复模型|视频模型)<\/b><HelpTip[^>]*>[^<]*<\/HelpTip><\/span><Select/);
+  assert.match(source, /<div className="batch-factory-engine-field"><span><b>修复模型<\/b><HelpTip[\s\S]*?<Select mode="multiple"/);
+  assert.match(source, /<div className="batch-factory-engine-field"><span><b>视频模型<\/b><HelpTip[\s\S]*?<Select/);
+});
+
 test('keeps the automation gear beside the unified configuration label', () => {
   assert.match(source, /<div className="batch-factory-unified-settings-title"><BatchFactoryAutomationPresetManager value=\{draftPatch\} onLoad=\{setDraftPatch\} \/><span>统一配置<\/span><\/div>/);
 });
@@ -340,4 +348,10 @@ test('shows a compact collapsible style catalog from the existing web-submit con
   assert.match(source, /setAccount\(current => \(\{ \.\.\.\(current \|\| \{\}\), style_catalog: styles \}\)\)/);
   assert.match(stylesheet, /\.batch-factory-style-catalog\{/);
   assert.match(stylesheet, /@media\(max-width:900px\)\{\.batch-factory-style-catalog/);
+});
+
+test('统一配置面板不超视口且底部保存按钮固定', () => {
+  assert.match(stylesheet, /\.batch-factory-unified-settings-modal\s*\{[^}]*max-height:\s*calc\(100vh - 48px\)/s);
+  assert.match(stylesheet, /\.batch-factory-unified-settings-modal \.ant-modal-body\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(stylesheet, /\.batch-factory-unified-settings-modal \.ant-modal-footer\s*\{[^}]*position:\s*sticky;[^}]*bottom:\s*0/s);
 });

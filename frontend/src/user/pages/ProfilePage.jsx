@@ -6,6 +6,32 @@ import { getEmailVerificationStatus, requestEmailVerification } from '../../shar
 import { PageHeader, Panel, RoleBadge, avatarFallback, formatDate } from './accountCenterShared';
 import { Link } from '../../shared/components/Link';
 
+// 上传接口返回成功只代表文件已落盘；还要确认浏览器真的能取到这张图。
+// 取不到时 Antd Avatar 会静默回退到首字母占位，所以这里先回读一次。
+function verifyAvatarImage(url) {
+  return new Promise((resolve, reject) => {
+    if (!url) {
+      reject(new Error('头像已保存，但服务端未返回头像地址，请刷新页面重试'));
+      return;
+    }
+    const probe = new Image();
+    const timer = window.setTimeout(() => {
+      probe.onload = null;
+      probe.onerror = null;
+      reject(new Error('头像已保存，但图片加载超时，请刷新页面重试'));
+    }, 15000);
+    probe.onload = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    probe.onerror = () => {
+      window.clearTimeout(timer);
+      reject(new Error('头像已保存，但图片加载失败，请刷新页面重试'));
+    };
+    probe.src = url;
+  });
+}
+
 export default function ProfilePage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
@@ -83,11 +109,13 @@ export default function ProfilePage() {
       setSaving(true);
       try {
         const result = await uploadMemberAvatar(reader.result);
+        const avatarUrl = result?.member?.avatarUrl;
+        await verifyAvatarImage(avatarUrl);
         setCenter(current => ({ ...current, member: result.member }));
         window.dispatchEvent(new CustomEvent('qiantie:profile-updated'));
         message.success('头像已更新');
       } catch (error) {
-        message.error(error.message || '头像上传失败');
+        message.error(error.message || '头像上传失败，请重试');
       } finally {
         setSaving(false);
       }

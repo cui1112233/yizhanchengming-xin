@@ -21,6 +21,11 @@
     { "code": "GIANT_MATERIAL_INTAKE_FAILED", "message": "正文已识别，但批量登记接口没有返回 intake。" },
     { "code": "TEXT_MODEL_REQUIRED", "message": "正文已登记，但当前没有配置可用的文本模型，暂时无法完成 AI 判断。" },
     { "code": "BOOK_CLASSIFICATION_PROVIDER_FAILED", "message": "正文已登记，但文本模型调用失败，暂时无法完成 AI 判断。" },
-    { "code": "SOURCE_TEXT_REQUIRED", "message": "正文已登记，但当前书没有可供 AI 判断的正文。" }
+    { "code": "SOURCE_TEXT_REQUIRED", "message": "正文已登记，但当前书没有可供 AI 判断的正文。" },
+    { "code": "TARGET_NOT_LOGGED_IN", "message": "尚未登录视频管理系统：请点击「登录并验证」，输入视频管理系统账号密码。" },
+    { "code": "TARGET_CREDENTIAL_INCOMPLETE", "message": "凭证不全：只保存了视频管理系统账号，没有有效登录会话，请重新登录并验证。" },
+    { "code": "TARGET_SESSION_EXPIRED", "message": "视频管理系统登录已过期：请重新登录并验证后再同步。" },
+    { "code": "TARGET_CONNECTOR_UNAVAILABLE", "message": "无法连接视频管理系统：请检查服务器到 two.121w.com 的网络或 Go 连接器配置。" },
+    { "code": "CAPABILITY_NOT_ENABLED", "message": "该功能未开启：请管理员启用对应能力（Slice 门控）后重试。" }
   ]
 }

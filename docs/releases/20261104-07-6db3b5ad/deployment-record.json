@@ -1,0 +1,44 @@
+{
+  "buildId": "20261104-07-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "deployedAt": "2026-11-04T19:51:41+08:00",
+  "target": "115.190.156.223:/opt/www/qiantie/qiantie",
+  "service": "qiantie.service",
+  "frontendEntry": "/assets/user-BjQlfAO6.js",
+  "frontendEntryBytes": 136686,
+  "frontendEntrySha256": "788a341cf9bdae84e49a8a96c532281898d463882ef8eaaf36113de4f068b55c",
+  "linuxBinaryBytes": 70647970,
+  "linuxBinarySha256": "20e0abfe119f21930802ed65be1e12f2268f6c16cb738d4ed915bc52b69905be",
+  "windowsBinaryBytes": 77566976,
+  "windowsBinarySha256": "2ec4c4481ae62e6633ced0391bfab7540421f0b86a1173c82a9f0fc62965c483",
+  "previous": {
+    "buildId": "20261104-06-6db3b5ad",
+    "frontendEntry": "/assets/user-DI3gtQxT.js",
+    "binarySha256": "c1785f00ba3e55911e469a9f5c1584369353687d71b5131ff445f0ce09f2e7f9",
+    "binaryBytes": 70570146,
+    "mainPid": 4126558,
+    "activeSince": "2026-11-04T16:56:44+08:00"
+  },
+  "newMainPid": 4131779,
+  "backups": {
+    "root": "/root/backup-20261104",
+    "binary": { "name": "qiantie.prev-20261104-1948", "bytes": 70570146, "sha256": "c1785f00ba3e55911e469a9f5c1584369353687d71b5131ff445f0ce09f2e7f9" },
+    "serviceUnit": { "name": "qiantie.service-20261104-1948.txt", "bytes": 397, "sha256": "4f6634e8a1362191fa39d20875025570ab65291fb90b598e542df9ccf81ec257" },
+    "database": { "name": "qiantie-db-pre-20261104-1948.sql.gz", "bytes": 60565662, "sha256": "bfd6628aa92a7a8c83bd394b4b33d1186df65dda6721a092bb4bea7a979cc411" },
+    "dataDir": { "name": "qiantie-data-pre-20261104-1948.tgz", "bytes": 164560442, "sha256": "109840b82b8152b1d832f0f99b640a933191458e3234ec5527d65ef17424de68" }
+  },
+  "verification": {
+    "health": 200,
+    "pages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "entryAssets": "4/4 200",
+    "oldEntry": 404,
+    "logPanicHits": 0,
+    "capabilities": "slice=5 enabled=13 disabled=[publish.yadi]",
+    "apiUnauthenticated": { "/api/presets": 401, "/api/batch-factory/v12/batches": 401, "/api/batch-factory/v12/batches/summary": 401, "/api/batch-factory/v12/capabilities": 401, "/api/models?kind=video": 401 }
+  },
+  "notes": [
+    "线上数据与 presets 未上传；数据包仅存档。",
+    "本机 4001 未改动（PID 35836，继续运行 06 二进制）。",
+    "artifacts: 本机运行旧二进制前需自行更新 backend/qiantie-local.exe（本批未替换）。"
+  ]
+}

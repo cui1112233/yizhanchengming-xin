@@ -22,3 +22,10 @@ test('automation menu exposes the preset chooser instead of presenting it as a s
   assert.match(source, /placeholder="选择已保存预设"/);
   assert.match(source, /runAutomationAction\('start', \{ immediate: true \}\)/);
 });
+
+test('immediate start asks for explicit confirmation before launching', () => {
+  assert.match(source, /function confirmImmediateAutomation\(\)/);
+  assert.match(source, /Modal\.confirm\(/);
+  assert.match(source, /是否自动提交 121：\$\{autoSubmit \? '是' : '否'\}/);
+  assert.match(source, /okButtonProps: \{ danger: autoSubmit \}/);
+});

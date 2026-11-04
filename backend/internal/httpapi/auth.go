@@ -29,7 +29,11 @@ func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[
 	var avatarURL any
 	if account.IsOwner {
 		role = "dev"
-	} else if profiles != nil {
+	}
+	// Owner 账号同样需要读取成员资料里的 displayName / avatarUrl。旧逻辑把这段
+	// 放在 else 分支，导致 owner（页面上的 DEV 账号）的上传头像永远不会出现在
+	// 侧边栏与个人中心头部。
+	if profiles != nil {
 		var profile map[string]any
 		for _, row := range profiles.readArray("member-profiles.json") {
 			if row["username"] == account.Username {
@@ -38,13 +42,13 @@ func authAccountPayload(account auth.Account, profiles *MemberProfileStore) map[
 			}
 		}
 		if profile != nil {
-			if value, ok := profile["role"].(string); ok && (value == "dev" || value == "manager") {
+			if value, ok := profile["role"].(string); ok && !account.IsOwner && (value == "dev" || value == "manager") {
 				role = value
 			}
 			if value, ok := profile["displayName"].(string); ok && strings.TrimSpace(value) != "" {
 				displayName = value
 			}
-			avatarURL = profile["avatarUrl"]
+			avatarURL = memberAvatarURL(profile)
 		}
 	}
 	return map[string]any{"username": account.Username, "active": account.Active, "isOwner": account.IsOwner, "role": role, "displayName": displayName, "avatarUrl": avatarURL, "effectivePermissions": []string{}}

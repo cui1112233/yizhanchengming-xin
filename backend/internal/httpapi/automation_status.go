@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +16,8 @@ import (
 )
 
 type FileAutomationStatusReader struct {
-	path string
+	path       string
+	stateStore AutomationStateStore
 }
 
 // Path exposes the shared persistence location to the native Go coordinator.
@@ -32,18 +34,35 @@ func NewFileAutomationStatusReader(path string) *FileAutomationStatusReader {
 	return &FileAutomationStatusReader{path: strings.TrimSpace(path)}
 }
 
+func (r *FileAutomationStatusReader) SetStateStore(store AutomationStateStore) {
+	if r != nil {
+		r.stateStore = store
+	}
+}
+
 func (r *FileAutomationStatusReader) Status(owner, batchID string) (map[string]any, error) {
 	idle := map[string]any{"state": "idle", "counts": idleAutomationCounts()}
-	if r == nil || r.path == "" {
+	if r == nil {
 		return idle, nil
 	}
-	state, splitLayout, err := readAutomationState(r.path)
+	var state automationStateFile
+	var splitLayout bool
+	var err error
+	if r.stateStore != nil {
+		state, _, err = r.stateStore.Load(context.Background())
+	} else if r.path != "" {
+		state, splitLayout, err = readAutomationState(r.path)
+	} else {
+		return idle, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 	if normalizeAlreadyUploadedAutomationState(&state) {
 		var writeErr error
-		if splitLayout {
+		if r.stateStore != nil {
+			writeErr = r.stateStore.Save(context.Background(), state)
+		} else if splitLayout {
 			writeErr = writeSplitAutomationState(r.path, state)
 		} else {
 			writeErr = writeAutomationStateFile(r.path, state)

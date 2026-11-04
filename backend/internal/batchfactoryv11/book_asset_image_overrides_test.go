@@ -49,7 +49,7 @@ func TestBookAssetImageOverridesRejectInvalidAspectRatio(t *testing.T) {
 	book := batch.Books[0]
 
 	var invalidCreate CreateBookAssetInput
-	if err := json.Unmarshal([]byte(`{"kind":"character","name":"林晚","prompt":"女医生","imageAspectRatio":"4:3"}`), &invalidCreate); err != nil {
+	if err := json.Unmarshal([]byte(`{"kind":"character","name":"林晚","prompt":"女医生","imageAspectRatio":"7:5"}`), &invalidCreate); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.CreateBookAsset(ctx, "alice", batch.ID, book.ID, invalidCreate); err != ErrInvalid {
@@ -61,7 +61,7 @@ func TestBookAssetImageOverridesRejectInvalidAspectRatio(t *testing.T) {
 		t.Fatal(err)
 	}
 	var invalidUpdate UpdateBookAssetInput
-	if err := json.Unmarshal([]byte(`{"name":"顾遥","prompt":"律师","imageAspectRatio":"4:3","expectedRevision":1}`), &invalidUpdate); err != nil {
+	if err := json.Unmarshal([]byte(`{"name":"顾遥","prompt":"律师","imageAspectRatio":"7:5","expectedRevision":1}`), &invalidUpdate); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.UpdateBookAsset(ctx, "alice", batch.ID, book.ID, asset.ID, invalidUpdate); err != ErrInvalid {

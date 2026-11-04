@@ -1,13 +1,16 @@
-import { Button } from 'antd';
+import { ConfigProvider } from 'antd';
 import { AudioLines, Bot, ChevronRight, Clapperboard, FilePenLine } from 'lucide-react';
 import { useState } from 'react';
 import { BrandLogo } from '../../shared/components/BrandLogo';
 import { GradientButton } from '../../shared/components/GradientButton';
 import { Link } from '../../shared/components/Link';
+import { V88Button } from '../../shared/components/V88Button';
+import { createV88AntTheme } from '../../shared/styles/theme';
 import HomeSplashCursor from '../components/HomeSplashCursor';
+import './home-v88.css';
 
 const quickActions = [
-  { href: '/script', className: 'card-write', icon: FilePenLine, title: '新建剧本项目', desc: '导入小说，生成可编辑剧本与制作素材' },
+  { href: '/script', className: 'card-write', icon: FilePenLine, title: '私人定制', desc: '粘贴内容，生成剧本或漫画制作素材' },
   { href: '/batch-factory', className: 'card-shuihuo', icon: Clapperboard, title: '水货生产', desc: '统一管理批次、单书配置、分镜生产与视频提交' },
   { href: '/agent', className: 'card-agent', icon: Bot, title: 'AI 智能 Agent', desc: '专属助手对话，辅助精细化剧本包装' },
   { href: '/tts', className: 'card-tts', icon: AudioLines, title: '声音配音工坊', desc: '多音色情感合成，让你的画面声临其境' }
@@ -15,7 +18,7 @@ const quickActions = [
 
 const navItems = [
   { href: '/', label: '首页' },
-  { href: '/script', label: '剧本生成' },
+  { href: '/script', label: '私人定制' },
   { href: '/novel-fetch', label: '小说获取' },
   { href: '/batch-factory', label: '水货生产' },
   { href: '/agent', label: 'Agent 工作区' },
@@ -39,6 +42,7 @@ export function HomePage({ isLoggedIn, onOpenLogin }) {
   }
 
   return (
+    <ConfigProvider theme={createV88AntTheme('dark')}>
     <div className="home-page">
       <section className="home-video-hero">
         <video className="home-hero-video" autoPlay muted loop playsInline>
@@ -79,7 +83,8 @@ export function HomePage({ isLoggedIn, onOpenLogin }) {
         })}
       </section>
 
-      <section id="contact" className="home-contact-section"><div><h2>需要配置账号或部署环境？</h2><p>联系管理员获取登录账号、API 配置和本地部署支持。</p></div><Button onClick={() => openProtectedPage('/settings')}>打开设置</Button></section>
+      <section id="contact" className="home-contact-section"><div><h2>需要配置账号或部署环境？</h2><p>联系管理员获取登录账号、API 配置和本地部署支持。</p></div><V88Button variant="secondary" onClick={() => openProtectedPage('/settings')}>打开设置</V88Button></section>
     </div>
+    </ConfigProvider>
   );
 }

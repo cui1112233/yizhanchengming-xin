@@ -14,6 +14,7 @@ import (
 	"qiantie/backend/internal/auth"
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/batchfactoryv11/external"
+	"qiantie/backend/internal/ffmpegbin"
 	"qiantie/backend/internal/giantmaterialexecutor"
 	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/localexecutor"
@@ -74,6 +75,7 @@ type RouterOptions struct {
 	PresetCatalog                   *prompt.Catalog
 	AutomationPresetStore           AutomationPresetStore
 	AutomationStatusReader          *FileAutomationStatusReader
+	AutomationStateStore            AutomationStateStore
 	AutomationCoordinator           *BatchAutomationCoordinator
 	PersonalPromptStore             *prompt.PersonalStore
 	ScriptHistoryStore              *ScriptHistoryStore
@@ -132,6 +134,10 @@ func NewRouter(options RouterOptions) http.Handler {
 		options.AutomationCoordinator.SetComicBookGenerator(comicGenerator.generateBook)
 	}
 	if options.AutomationCoordinator != nil {
+		options.AutomationCoordinator.SetAutomationStateStore(options.AutomationStateStore)
+		if options.AutomationStatusReader != nil {
+			options.AutomationStatusReader.SetStateStore(options.AutomationStateStore)
+		}
 		// Keep injected coordinators on the router's prompt catalog too.
 		options.AutomationCoordinator.promptCatalog = options.PresetCatalog
 		options.AutomationCoordinator.SetSourceClassification(batchFetchClassification{
@@ -144,27 +150,29 @@ func NewRouter(options RouterOptions) http.Handler {
 			options.AutomationCoordinator.SetComicPublisher(options.N8ComicPublisher.PublishFromSettings)
 			options.AutomationCoordinator.SetComicPublishPreflight(options.N8ComicPublisher.ValidateSettings)
 		}
-		log.Printf("[DIAG] AutomationCoordinator reader=%v path=%q", options.AutomationStatusReader != nil, func() string { if options.AutomationStatusReader != nil { return options.AutomationStatusReader.Path() }; return "(nil)" }())
+		log.Printf("[DIAG] AutomationCoordinator reader=%v path=%q", options.AutomationStatusReader != nil, func() string {
+			if options.AutomationStatusReader != nil {
+				return options.AutomationStatusReader.Path()
+			}
+			return "(nil)"
+		}())
 		if err := options.AutomationCoordinator.RecoverInterruptedJobs(); err != nil {
 			log.Printf("recover interrupted batch automation jobs: %v", err)
 		} else {
 			log.Printf("[DIAG] RecoverInterruptedJobs OK (no error)")
 		}
-		if err := options.AutomationCoordinator.ResumeInterruptedJobs(context.Background()); err != nil {
-			log.Printf("resume interrupted batch automation jobs: %v", err)
-		} else {
-			log.Printf("[DIAG] ResumeInterruptedJobs OK (no error)")
-		}
+		// 启动时默认不自动恢复（只做 RecoverInterruptedJobs 标记）。自动恢复会
+		// 把书重新置为 running 并立即重新派发，缺少执行器/发布配置时会产生
+		// 一批无效重试；需要显式开启 QIANTIE_AUTOMATION_RESUME_ON_BOOT=1。
+		resumeAutomationOnBoot(options.AutomationCoordinator)
 		options.AutomationCoordinator.StartScheduledDispatcher()
 	}
 	v11 := http.NewServeMux()
 	v12 := http.NewServeMux()
 	publish121Available := options.VideoManagementConnector != nil || (options.External != nil && options.External.Enabled[external.Provider121])
 	publishYadiAvailable := options.External != nil && options.External.Enabled[external.ProviderYadi]
-	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, publish121Available, publishYadiAvailable))
 	// V12 is the public workbench namespace. Keep its capability contract on
 	// Go even while a few legacy V12 adapters still bridge to Node.
-	v12.HandleFunc("GET /api/batch-factory/v12/capabilities", capabilityHandlerForRuntime(options.Slice, options.Production != nil && options.Production.Enabled, options.Merge != nil && options.Merge.Enabled, publish121Available, publishYadiAvailable))
 	if options.Store != nil && options.Slice >= 1 {
 		registerSliceOneRoutes(v11, options.Store, options.PresetCatalog)
 		registerV12IntakeRoutes(v12, options.Store)
@@ -301,6 +309,7 @@ func NewRouter(options RouterOptions) http.Handler {
 			"runtime_manifest_sha": manifest.GitSHA,
 			"bridge_hits":          audit.BridgeHits,
 			"bridge_paths":         audit.Paths,
+			"media_engine":         ffmpegbin.Current(),
 		})
 	})
 	auth := BridgeAuth{Secret: options.BridgeSecret, Now: options.Now, Users: options.Users, AuthStore: options.AuthStore, SessionResolver: options.SessionResolver}
@@ -317,6 +326,20 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	registerBatchFactory121Publish(v11, auth, publish121)
 	registerBatchFactory121Publish(v12, auth, publish121)
+	// Capabilities are derived from the routes that were actually registered on
+	// the V11 source mux. This keeps the advertised surface and the real
+	// handlers from drifting apart as slices are enabled.
+	gates := capabilityGates{
+		ProductionEnabled: options.Production != nil && options.Production.Enabled,
+		MergeEnabled:      options.Merge != nil && options.Merge.Enabled,
+		Publish121:        publish121Available,
+		PublishYadi:       publishYadiAvailable,
+	}
+	capabilities := deriveCapabilities(options.Slice, gates, v11, v12)
+	v11.HandleFunc("GET /api/batch-factory/v11/capabilities", capabilityHandler(capabilities))
+	v12.HandleFunc("GET /api/batch-factory/v12/capabilities", capabilityHandler(capabilities))
+	enabledCapabilities, disabledCapabilities := capabilityBootSummary(capabilities)
+	log.Printf("batch-factory capabilities slice=%d enabled=%d disabled=%v", options.Slice, enabledCapabilities, disabledCapabilities)
 	if options.Store != nil {
 		registerV12SmartUnifiedRefresh(v12, auth, options.Store, options.TextProvider)
 	}
@@ -492,9 +515,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerScriptDirectorPipelineCompat(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
 	}
 	if legacyV11Public() {
-		root.Handle("/api/batch-factory/v11/", auth.Middleware(v11))
+		root.Handle("/api/batch-factory/v11/", auth.Middleware(capabilityNotFoundHandler(v11)))
 	}
-	root.Handle("/api/batch-factory/v12/", auth.Middleware(v12))
+	root.Handle("/api/batch-factory/v12/", auth.Middleware(capabilityNotFoundHandler(v12)))
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}
@@ -709,7 +732,10 @@ func NewRouter(options RouterOptions) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
-	return root
+	// Compress JSON responses at the outermost layer so every registered route
+	// benefits without touching individual handlers. Non-JSON streams (images,
+	// ServeContent Range/304) are passed through untouched.
+	return withJSONCompression(root)
 }
 
 // registerCanonicalNovelFetchWebSubmitAliases keeps the public workshop

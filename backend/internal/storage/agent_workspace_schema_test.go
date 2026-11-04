@@ -37,11 +37,11 @@ func TestAgentWorkspaceMigrationIsAppendOnlyAndComplete(t *testing.T) {
 
 func TestAppMigrationsEndsWithAgentWorkspaceMigration(t *testing.T) {
 	migrations := AppMigrations()
-	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800015 {
-		t.Fatalf("last migration=%v, want 8800015", migrations[len(migrations)-1].Version)
+	if len(migrations) == 0 || migrations[len(migrations)-1].Version != 8800016 {
+		t.Fatalf("last migration=%v, want 8800016", migrations[len(migrations)-1].Version)
 	}
 	for _, migration := range migrations[:len(migrations)-1] {
-		if migration.Version >= 8800015 {
+		if migration.Version >= 8800016 {
 			t.Fatalf("agent migration must be less than new version %d", migration.Version)
 		}
 	}

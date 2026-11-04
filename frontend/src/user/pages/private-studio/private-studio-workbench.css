@@ -1,0 +1,780 @@
+/* 私人定制 · 统一创作工作台（阶段 1：三栏骨架）
+   规格来源：private-customization-ui-preview.html
+   全部选择器限定在 .private-studio-workbench 内，不污染 global.css / shuihuo-production.css */
+
+.private-studio-workbench {
+  --ps-bg: #0a101d;
+  --ps-panel: #101827;
+  --ps-line: rgba(157, 176, 218, .17);
+  --ps-line-soft: rgba(157, 176, 218, .11);
+  --ps-text: #edf2ff;
+  --ps-muted: #8996b1;
+  --ps-muted-2: #65738e;
+  --ps-indigo: #9da8ff;
+  --ps-mint: #65dfce;
+  position: relative;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 1px solid var(--ps-line);
+  border-radius: 18px;
+  background: rgba(11, 17, 29, .82);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .28);
+}
+
+/* 外壳宽度随可用区域自适应：不再用 1180px 上限把工作台锁在中间 */
+.script-workbench-form {
+  padding: 14px 18px 18px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.script-workbench-form > .private-studio-workbench {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  grid-template-columns: 326px 8px minmax(0, 1fr);
+}
+
+.script-workbench-form > .private-studio-workbench.private-comic-workbench {
+  grid-template-columns: 326px 8px minmax(0, 1fr);
+}
+
+.private-studio-workbench > .private-studio-side {
+  min-width: 0;
+  border-right: 1px solid var(--ps-line-soft);
+}
+
+.private-studio-workbench > .private-studio-main {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 双页签：左栏顶部并排两列 */
+.private-studio-workbench .private-customization-workspaces {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 4px;
+  border: 1px solid var(--ps-line-soft);
+  border-radius: 11px;
+  background: rgba(9, 16, 29, .66);
+}
+
+.private-studio-workbench .private-customization-workspaces button {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+/* 顶部标题 + 历史版本 / 更多设置 */
+.private-studio-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.private-studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.private-studio-workbench .private-studio-header-action.ant-btn {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ps-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ps-muted);
+  font-size: 11px;
+}
+
+.private-studio-workbench .private-studio-header-action.ant-btn:hover:not(:disabled) {
+  border-color: rgba(157, 168, 255, .45);
+  color: var(--ps-text);
+  background: rgba(157, 168, 255, .08);
+}
+
+.private-studio-workbench .private-studio-header-action.ant-btn:disabled {
+  color: var(--ps-muted-2);
+}
+
+/* 三栏内容区：中栏 1fr + 预览 260px */
+.private-studio-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+
+.private-studio-center {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.private-studio-center > .script-output {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.private-studio-side-preview {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 18px 18px 0;
+}
+
+/* 左栏：字数行 / 三段进度 / 素材标签 */
+.private-studio-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--ps-muted-2);
+  font-size: 11px;
+}
+
+.private-studio-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.private-studio-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ps-muted-2);
+  font-size: 12px;
+}
+
+.private-studio-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--ps-line);
+  border-radius: 50%;
+  background: rgba(8, 14, 25, .72);
+  color: var(--ps-muted-2);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.private-studio-step.is-done {
+  color: var(--ps-text);
+}
+
+.private-studio-step.is-done .private-studio-step-dot {
+  border-color: transparent;
+  background: var(--ps-mint);
+  color: #092b2b;
+}
+
+.private-studio-step.is-active {
+  color: var(--ps-text);
+}
+
+.private-studio-step.is-active .private-studio-step-dot {
+  border-color: transparent;
+  background: var(--ps-indigo);
+  color: #121a33;
+}
+
+.private-studio-assets {
+  margin-top: 18px;
+}
+
+.private-studio-assets-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--ps-text);
+  font-size: 11px;
+}
+
+.private-studio-assets-action {
+  color: var(--ps-muted-2);
+  font-weight: 400;
+}
+
+.private-studio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.private-studio-chip {
+  padding: 6px 9px;
+  border: 1px solid rgba(157, 176, 218, .22);
+  border-radius: 999px;
+  background: rgba(12, 21, 36, .72);
+  color: var(--ps-text);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.private-studio-chip {
+  transition: border-color .15s ease, background-color .15s ease;
+}
+
+.private-studio-chip:hover {
+  border-color: rgba(157, 168, 255, .48);
+  background: rgba(157, 168, 255, .1);
+}
+
+button.private-studio-chip:focus-visible {
+  outline: 2px solid var(--ps-indigo);
+  outline-offset: 2px;
+}
+
+span.private-studio-chip {
+  cursor: default;
+}
+
+span.private-studio-chip:hover {
+  border-color: rgba(157, 176, 218, .22);
+  background: rgba(12, 21, 36, .72);
+}
+
+/* 左栏通栏主按钮 */
+.private-studio-primary-wrap {
+  margin-top: 18px;
+}
+
+.private-studio-workbench .private-studio-primary.ant-btn {
+  width: 100%;
+  height: auto;
+  padding: 11px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #aeb7ff, #62dfcf);
+  color: #10172b;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 8px 22px rgba(101, 223, 206, .13);
+}
+
+.private-studio-workbench .private-studio-primary.ant-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #bcc4ff, #74e6d7);
+  color: #10172b;
+}
+
+.private-studio-workbench .private-studio-primary.ant-btn:disabled {
+  background: rgba(157, 168, 255, .14);
+  color: var(--ps-muted-2);
+  box-shadow: none;
+}
+
+.private-studio-chip > span {
+  color: var(--ps-muted);
+}
+
+.private-studio-chip-add {
+  color: var(--ps-muted);
+}
+
+/* 下一步提示卡 */
+.private-studio-note-card {
+  padding: 11px 12px;
+  border: 1px solid rgba(157, 168, 255, .2);
+  border-radius: 11px;
+  background: rgba(157, 168, 255, .055);
+  color: var(--ps-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.private-studio-note-card > b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ps-indigo);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.private-studio-note-card > p {
+  margin: 0;
+}
+
+/* 中栏分镜草稿卡头 */
+.private-studio-canvas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--ps-line-soft);
+  border-radius: 13px;
+  background: rgba(16, 24, 39, .72);
+  color: var(--ps-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.private-studio-canvas-head > span {
+  color: var(--ps-muted-2);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* 中栏工具行：稿子视觉的胶囊下拉 + 右侧约束/主按钮 */
+.private-studio-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.private-studio-toolbar-left,
+.private-studio-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.private-studio-tool-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--ps-line);
+  border-radius: 9px;
+  background: rgba(11, 20, 35, .72);
+}
+
+.private-studio-tool-label {
+  color: var(--ps-muted-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.private-studio-tool-pill .ant-select-selector {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 4px !important;
+}
+
+.private-studio-tool-pill .ant-select-selection-item {
+  color: #eef2ff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.private-studio-tool-pill .ant-select-arrow {
+  color: var(--ps-muted);
+}
+
+.private-studio-tool-pill-button {
+  padding: 6px 11px;
+  font-size: 11px;
+}
+
+.private-studio-tool-primary {
+  border: 0 !important;
+  background: linear-gradient(135deg, #aeb7ff, #62dfcf) !important;
+  color: #10172b !important;
+  font-weight: 750;
+  box-shadow: 0 8px 22px rgba(101, 223, 206, .13);
+}
+
+.private-studio-tool-primary:disabled {
+  opacity: .55;
+  box-shadow: none;
+}
+
+/* 分镜/漫画页状态标签：只读后端派生字段 */
+.private-studio-shot-status {
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: rgba(157, 168, 255, .11);
+  color: var(--ps-indigo);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* 左栏上固定 / 下滚动：输入区与提取按钮固定，只有素材列表滚动 */
+.private-studio-workbench .script-left-scroll {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 14px 16px;
+}
+
+.private-studio-workbench .private-studio-left-fixed {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.private-studio-workbench .private-studio-left-scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+
+/* 草稿保存真实状态：等待 / 保存中 / 已保存 / 失败 */
+.private-studio-workbench .private-customization-save-state.is-idle {
+  color: var(--ps-muted-2);
+}
+
+.private-studio-workbench .private-customization-save-state.is-idle i {
+  background: var(--ps-muted-2);
+}
+
+.private-studio-workbench .private-customization-save-state.is-saving {
+  color: var(--ps-muted);
+}
+
+.private-studio-workbench .private-customization-save-state.is-saving i {
+  background: var(--ps-muted);
+}
+
+.private-studio-workbench .private-customization-save-state.is-failed {
+  color: #ff7b84;
+}
+
+.private-studio-workbench .private-customization-save-state.is-failed i {
+  background: #ff7b84;
+}
+
+.private-studio-workbench .private-studio-draft-error {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 123, 132, .4);
+  border-radius: 8px;
+  background: rgba(255, 77, 90, .1);
+  color: #ff7b84;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 提取：工具行右端的紧凑主按钮，不再占整行 */
+.private-studio-workbench .script-chat-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+
+.private-studio-workbench .script-chat-tools > .private-studio-extract.ant-btn {
+  flex: 0 0 auto;
+  width: auto;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #aeb7ff, #62dfcf);
+  color: #10172b;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 6px 16px rgba(101, 223, 206, .12);
+}
+
+.private-studio-workbench .script-chat-tools > .private-studio-extract.ant-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #bcc4ff, #74e6d7);
+  color: #10172b;
+}
+
+.private-studio-workbench .script-chat-tools > .private-studio-extract.ant-btn:disabled {
+  background: rgba(157, 168, 255, .14);
+  color: var(--ps-muted-2);
+  box-shadow: none;
+}
+
+/* 空态输入框只占 4 行，内容多时最多长到 10 行；提取仍在输入区上方 */
+.private-studio-workbench .script-left .script-chat-textarea {
+  min-height: 112px;
+}
+
+/* 左栏纵向收紧：空态在 1440×900 / 1280×800 内一屏装下 */
+.private-studio-workbench .script-left .private-customization-brand-row,
+.private-studio-workbench .script-left .private-customization-workspaces,
+.private-studio-workbench .script-left .private-customization-panel-heading,
+.private-studio-workbench .script-left .script-chat-shell {
+  margin-bottom: 10px;
+}
+
+.private-studio-workbench .script-left .private-studio-steps {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* 人物 / 场景卡：单行摘要，不内联展开编辑内容与空态长文案 */
+.private-studio-workbench .entity-section {
+  margin-top: 10px;
+}
+
+.private-studio-workbench .entity-section-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ps-line-soft);
+}
+
+.private-studio-workbench .entity-section.is-empty .entity-section-header {
+  border-bottom: 0;
+}
+
+.private-studio-workbench .entity-section-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 10px;
+  overflow: hidden;
+}
+
+.private-studio-workbench .entity-section-name {
+  max-width: 84px;
+  padding: 3px 8px;
+  overflow: hidden;
+  border: 1px solid var(--ps-line);
+  border-radius: 7px;
+  background: rgba(9, 16, 29, .6);
+  color: var(--ps-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.private-studio-workbench .entity-section-name:hover {
+  border-color: rgba(157, 168, 255, .45);
+  color: var(--ps-text);
+}
+
+.private-studio-workbench .entity-section-name:focus-visible {
+  outline: 2px solid var(--ps-indigo);
+  outline-offset: 2px;
+}
+
+.private-studio-workbench .entity-section-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ps-muted-2);
+  cursor: pointer;
+}
+
+.private-studio-workbench .entity-section-info:hover,
+.private-studio-workbench .entity-section-info:focus-visible {
+  color: var(--ps-text);
+  outline: 2px solid var(--ps-indigo);
+  outline-offset: 1px;
+}
+
+.private-studio-workbench .entity-section-more.ant-btn {
+  height: 24px;
+  margin-left: auto;
+  padding: 0 8px;
+  color: var(--ps-muted);
+  font-size: 11px;
+}
+
+/* 1280 / 1024 级视口：先把右栏预览折到中栏下方，避免 1fr + 260px 挤压 */
+@media (max-width: 1180px) {
+  .private-studio-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .private-studio-side-preview {
+    padding: 0 18px 18px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .script-workbench-form > .private-studio-workbench {
+    grid-template-columns: 300px 8px minmax(0, 1fr);
+  }
+
+  .script-workbench-form > .private-studio-workbench.private-comic-workbench {
+    grid-template-columns: 300px 8px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .script-workbench-form > .private-studio-workbench,
+  .script-workbench-form > .private-studio-workbench.private-comic-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .private-studio-workbench > .private-studio-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--ps-line-soft);
+  }
+
+  .private-studio-workbench .script-resize-handle {
+    display: none;
+  }
+
+  .private-studio-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .private-studio-side-preview {
+    padding: 0 18px 18px;
+  }
+}
+
+@media (max-width: 560px) {
+  .private-studio-content {
+    padding: 0;
+  }
+}
+
+/* 漫画页签：与剧本页签一致的单行素材卡、来源提示与查看全部 */
+.private-studio-workbench .private-customization-source-hint {
+  color: var(--ps-muted-2);
+  font-size: 11px;
+}
+
+.private-studio-workbench .private-comic-asset-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 0;
+}
+
+.private-studio-workbench .private-comic-asset-row + .private-comic-asset-row {
+  border-top: 1px solid var(--ps-line-soft);
+}
+
+.private-studio-workbench .private-comic-asset-row-label {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 52px;
+  color: var(--ps-text);
+  font-size: 12px;
+}
+
+.private-studio-workbench .private-comic-asset-row-label span {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.private-studio-workbench .private-comic-asset-name {
+  max-width: 84px;
+  overflow: hidden;
+  padding: 2px 8px;
+  border: 1px solid var(--ps-line);
+  border-radius: 999px;
+  color: var(--ps-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.private-studio-workbench .private-comic-asset-empty {
+  color: var(--ps-muted-2);
+  font-size: 11px;
+}
+
+.private-comic-asset-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.private-comic-asset-preview-row:last-child {
+  border-bottom: 0;
+}
+
+/* 约束条件弹窗：剧本创作与漫画生成共用同一个壳与分区 */
+.private-studio-constraints-modal .ant-modal-body {
+  max-height: 66vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.private-studio-constraints-modal .private-studio-constraint-body {
+  display: grid;
+  gap: 10px;
+}
+
+.private-studio-constraints-modal .private-studio-constraint-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 146, 196, .22);
+  border-radius: 12px;
+  background: rgba(16, 24, 39, .5);
+}
+
+.private-studio-constraints-modal .script-constraint-section {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 146, 196, .22);
+  border-radius: 12px;
+  background: rgba(16, 24, 39, .5);
+}
+
+.private-studio-constraints-modal .script-constraint-section:last-child {
+  margin-bottom: 0;
+}
+
+.private-studio-constraints-modal .private-studio-constraint-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.private-studio-constraints-modal .private-studio-constraint-description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.private-studio-constraints-modal .private-customization-comic-settings {
+  --sh-bg: var(--surface-base);
+  --sh-panel: var(--surface-panel);
+  --sh-panel-strong: var(--surface-input);
+  --sh-line: var(--border-default);
+  --sh-text: var(--text-primary);
+  --sh-text-muted: var(--text-secondary);
+  --sh-muted: var(--text-secondary);
+  --sh-accent: var(--legacy-accent);
+  --sh-accent-dark: var(--legacy-accent);
+  --sh-danger: var(--text-danger);
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.private-studio-constraints-modal .private-comic-advanced-note {
+  display: block;
+  margin-top: 2px;
+}

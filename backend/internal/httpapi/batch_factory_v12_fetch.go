@@ -54,7 +54,7 @@ func registerV12FetchOriginalsRoute(mux *http.ServeMux, store batchfactoryv11.St
 				results = append(results, map[string]any{"bookId": bookID, "platform": input.Platform, "status": "error", "data": nil, "error": err.Error(), "length": 0, "attempts": attempts, "retryable": retryableBatchFetchError(err)})
 				continue
 			}
-			result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification)
+			result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification, defaultBatchSensitiveConfig())
 			if processErr != nil {
 				results = append(results, map[string]any{
 					"bookId": bookID, "platform": input.Platform, "status": "processing_error",

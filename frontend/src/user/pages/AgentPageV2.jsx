@@ -1,10 +1,11 @@
-import { Button, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
+import { Button, ConfigProvider, Form, Input, Modal, Popconfirm, Segmented, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { ArrowRight, ArrowUp, Bot, ChevronDown, ChevronUp, Clock3, FilePenLine, FileText, Film, Image as ImageIcon, MessageCircle, MoreHorizontal, Music, Paperclip, Pin, RotateCcw, SearchCheck, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { activateAgentGenerationResult, approveAgentDirectorPlan, askAgent, clearAgentTask, createAgentShotBatchNodes, createAgentTask, createMyAgentSkill, deleteAgentTask, deleteMyAgentSkill, getAgentCanvas, getAgentGenerationSummary, getAgentTask, getMyAgentSkill, listAgentAssets, listAgentExecutions, listAgentGenerations, listAgentScriptShots, listAgentSkills, listAgentTasks, renameAgentTask, saveAgentCanvas, syncAgentBatchFactoryBook, updateMyAgentSkill, uploadAgentAsset } from '../../shared/api/agent';
 import { getCurrentUsername } from '../../shared/api/auth';
 import { dispatchPetContext, dispatchPetSkills, dispatchPetState } from '../../shared/pet/stacky';
 import SuperOpcLiquidMetalLogo from '../../shared/components/SuperOpcLiquidMetalLogo';
+import { createV88AntTheme } from '../../shared/styles/theme';
 import { AgentCanvas } from '../components/AgentCanvas';
 import { AgentDirectorConversation } from '../components/AgentDirectorConversation';
 import { AgentStoryboardWorkspace } from '../components/AgentStoryboardWorkspace';
@@ -1132,7 +1133,10 @@ export function AgentPageV2({ theme }) {
     }
   }
 
+  const antTheme = useMemo(() => createV88AntTheme('dark'), []);
+
   return (
+    <ConfigProvider theme={antTheme}>
     <div className={`agent-page utility-workbench agent-workspace-v3${isCanvasWorkspace && !viewState.drawerOpen ? ' agent-task-drawer-collapsed' : ''}`}>
       {isCanvasWorkspace ? <div
         className={`${viewState.conversationOpen ? 'agent-canvas-workspace' : 'agent-canvas-workspace is-conversation-collapsed'}${viewState.activeView === 'storyboard' ? ' is-storyboard' : ' is-workflow'}${storyboardDirectorResizing ? ' is-resizing-director' : ''}`}
@@ -1448,5 +1452,6 @@ export function AgentPageV2({ theme }) {
         <Input aria-label="任务名称" autoFocus value={renameValue} maxLength={80} onChange={event => setRenameValue(event.target.value)} onPressEnter={saveRename} />
       </Modal>
     </div>
+    </ConfigProvider>
   );
 }

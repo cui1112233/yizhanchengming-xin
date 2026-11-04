@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "node scripts/clean-dist.mjs && vite build --emptyOutDir=false",
-    "test": "node --test src/shared/api/*.test.js src/shared/layouts/*.test.js src/user/pages/*.layout.test.js",
+    "test": "node --test src/shared/api/*.test.js src/shared/layouts/*.test.js src/user/pages/*.layout.test.js src/user/pages/webSubmitFeedback.test.js src/user/pages/shuihuo/BatchFactoryCreateModalPublishTab.source.test.js src/user/pages/shuihuo/BatchFactoryComicDirectoryWarnings.source.test.js",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

@@ -1,0 +1,324 @@
+/* 私人定制 · 统一创作工作台（阶段 1：三栏骨架）
+   规格来源：private-customization-ui-preview.html
+   全部选择器限定在 .private-studio-workbench 内，不污染 global.css / shuihuo-production.css */
+
+.private-studio-workbench {
+  --ps-bg: #0a101d;
+  --ps-panel: #101827;
+  --ps-line: rgba(157, 176, 218, .17);
+  --ps-line-soft: rgba(157, 176, 218, .11);
+  --ps-text: #edf2ff;
+  --ps-muted: #8996b1;
+  --ps-muted-2: #65738e;
+  --ps-indigo: #9da8ff;
+  --ps-mint: #65dfce;
+  position: relative;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  border: 1px solid var(--ps-line);
+  border-radius: 18px;
+  background: rgba(11, 17, 29, .82);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .28);
+}
+
+/* 外壳比例：326px 侧栏 + 8px 拖拽把手 + 主区（设计稿 326px + 1fr） */
+.script-workbench-form > .private-studio-workbench {
+  grid-template-columns: 326px 8px minmax(0, 1fr);
+}
+
+.script-workbench-form > .private-studio-workbench.private-comic-workbench {
+  grid-template-columns: 326px minmax(0, 1fr);
+}
+
+.private-studio-workbench > .private-studio-side {
+  min-width: 0;
+  border-right: 1px solid var(--ps-line-soft);
+}
+
+.private-studio-workbench > .private-studio-main {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 双页签：左栏顶部并排两列 */
+.private-studio-workbench .private-customization-workspaces {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 4px;
+  border: 1px solid var(--ps-line-soft);
+  border-radius: 11px;
+  background: rgba(9, 16, 29, .66);
+}
+
+.private-studio-workbench .private-customization-workspaces button {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+/* 顶部标题 + 历史版本 / 更多设置 */
+.private-studio-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.private-studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.private-studio-workbench .private-studio-header-action.ant-btn {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ps-line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ps-muted);
+  font-size: 11px;
+}
+
+.private-studio-workbench .private-studio-header-action.ant-btn:hover:not(:disabled) {
+  border-color: rgba(157, 168, 255, .45);
+  color: var(--ps-text);
+  background: rgba(157, 168, 255, .08);
+}
+
+.private-studio-workbench .private-studio-header-action.ant-btn:disabled {
+  color: var(--ps-muted-2);
+}
+
+/* 三栏内容区：中栏 1fr + 预览 260px */
+.private-studio-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+
+.private-studio-center {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.private-studio-center > .script-output {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.private-studio-side-preview {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 18px 18px 0;
+}
+
+/* 左栏：字数行 / 三段进度 / 素材标签 */
+.private-studio-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--ps-muted-2);
+  font-size: 11px;
+}
+
+.private-studio-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.private-studio-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ps-muted-2);
+  font-size: 12px;
+}
+
+.private-studio-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--ps-line);
+  border-radius: 50%;
+  background: rgba(8, 14, 25, .72);
+  color: var(--ps-muted-2);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.private-studio-step.is-done {
+  color: var(--ps-text);
+}
+
+.private-studio-step.is-done .private-studio-step-dot {
+  border-color: transparent;
+  background: var(--ps-mint);
+  color: #092b2b;
+}
+
+.private-studio-step.is-active {
+  color: var(--ps-text);
+}
+
+.private-studio-step.is-active .private-studio-step-dot {
+  border-color: transparent;
+  background: var(--ps-indigo);
+  color: #121a33;
+}
+
+.private-studio-assets {
+  margin-top: 18px;
+}
+
+.private-studio-assets-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--ps-text);
+  font-size: 11px;
+}
+
+.private-studio-assets-action {
+  color: var(--ps-muted-2);
+  font-weight: 400;
+}
+
+.private-studio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.private-studio-chip {
+  padding: 6px 9px;
+  border: 1px solid rgba(157, 176, 218, .22);
+  border-radius: 999px;
+  background: rgba(12, 21, 36, .72);
+  color: var(--ps-text);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.private-studio-chip:hover {
+  border-color: rgba(157, 168, 255, .48);
+  background: rgba(157, 168, 255, .1);
+}
+
+span.private-studio-chip {
+  cursor: default;
+}
+
+span.private-studio-chip:hover {
+  border-color: rgba(157, 176, 218, .22);
+  background: rgba(12, 21, 36, .72);
+}
+
+/* 左栏通栏主按钮 */
+.private-studio-primary-wrap {
+  margin-top: 18px;
+}
+
+.private-studio-workbench .private-studio-primary.ant-btn {
+  width: 100%;
+  height: auto;
+  padding: 11px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #aeb7ff, #62dfcf);
+  color: #10172b;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 8px 22px rgba(101, 223, 206, .13);
+}
+
+.private-studio-workbench .private-studio-primary.ant-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #bcc4ff, #74e6d7);
+  color: #10172b;
+}
+
+.private-studio-workbench .private-studio-primary.ant-btn:disabled {
+  background: rgba(157, 168, 255, .14);
+  color: var(--ps-muted-2);
+  box-shadow: none;
+}
+
+.private-studio-chip > span {
+  color: var(--ps-muted);
+}
+
+.private-studio-chip-add {
+  color: var(--ps-muted);
+}
+
+/* 下一步提示卡 */
+.private-studio-note-card {
+  padding: 11px 12px;
+  border: 1px solid rgba(157, 168, 255, .2);
+  border-radius: 11px;
+  background: rgba(157, 168, 255, .055);
+  color: var(--ps-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.private-studio-note-card > b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ps-indigo);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.private-studio-note-card > p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .script-workbench-form > .private-studio-workbench,
+  .script-workbench-form > .private-studio-workbench.private-comic-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .private-studio-workbench > .private-studio-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--ps-line-soft);
+  }
+
+  .private-studio-workbench .script-resize-handle {
+    display: none;
+  }
+
+  .private-studio-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .private-studio-side-preview {
+    padding: 0 18px 18px;
+  }
+}
+
+@media (max-width: 560px) {
+  .private-studio-content {
+    padding: 0;
+  }
+}

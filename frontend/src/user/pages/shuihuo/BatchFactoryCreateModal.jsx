@@ -10,7 +10,7 @@ import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.j
 import { parseGiantMaterialIds } from './batchFactoryGiantMaterialQueue.js';
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
-import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
+import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryComicPublishSettingsForm, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
 import {
   availableGiantMaterialBooks,
   buildGiantMaterialPlaceholderIntakes,
@@ -241,6 +241,8 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     return GIANT_ITEM_ERRORS[code] || '解析失败，可重试';
   }
 
+  const giantConfigBlockingCodes = new Set(['QINGYU_AUTH_FAILED', 'QINGYU_AUTH_NOT_CONFIGURED', 'GIANT_PLUGIN_NOT_CONFIGURED']);
+
   async function resolveAllGiantMaterials() {
     const { valid, invalid } = parseGiantMaterialIds(inputText);
     if (!valid.length && !invalid.length) return message.warning('请输入巨量素材 ID（每行一个）');
@@ -264,8 +266,13 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
             ? { ...row, status: 'resolved', material, books, selectedBookKey: giantMaterialBookKey(books[0]) }
             : row));
         } catch (error) {
+          const code = String(error?.message || error?.code || 'QINGYU_UPSTREAM_FAILED');
+          if (giantConfigBlockingCodes.has(code)) {
+            setGiantError(code);
+            break;
+          }
           setGiantItems(current => current.map(row => row.id === id
-            ? { ...row, status: 'error', error: String(error?.message || error?.code || 'QINGYU_UPSTREAM_FAILED') }
+            ? { ...row, status: 'error', error: code }
             : row));
         }
       }
@@ -724,6 +731,15 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
         : '先读取视频滚屏；失败后自动通过书城获取正文。'}</small>
     </div> : null}
 
+    {isGiantMaterial && giantError ? <Alert
+      type="error"
+      showIcon
+      message="服务器令牌失效，需更新青语 N8 后台登录令牌后重新解析。"
+      description="这是服务器级配置故障，其余素材不再逐个请求；更新令牌后点“重新解析”即可继续。"
+      action={<Button size="small" onClick={resolveAllGiantMaterials}>重新解析</Button>}
+      style={{ marginBottom: 12 }}
+    /> : null}
+
     {isGiantMaterial && giantItems.length ? <div className="batch-factory-giant-items">
       {giantItems.map((item, index) => <div key={`${item.id}-${index}`} className={item.status === 'error' ? 'batch-factory-giant-item is-error' : 'batch-factory-giant-item'}>
         <span className="batch-factory-giant-item-index">{index + 1}</span>
@@ -735,7 +751,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
               <span className="batch-factory-giant-item-meta">Book ID {(selectGiantMaterialBook(item.material, item.selectedBookKey)?.platformBookId) || '—'}</span>
               {item.books.length > 1 ? <Select size="small" style={{ minWidth: 180 }} value={item.selectedBookKey || undefined} onChange={value => setGiantItems(current => current.map(row => row.id === item.id ? { ...row, selectedBookKey: value } : row))} options={item.books.map(book => ({ value: giantMaterialBookKey(book), label: `${book.title} · ${book.platformBookId}` }))} /> : null}
             </>
-            : <span className="batch-factory-giant-item-title">正在解析 {item.id}…</span>}
+            : <span className="batch-factory-giant-item-title">{giantError ? `等待重新解析 ${item.id}` : `正在解析 ${item.id}…`}</span>}
       </div>)}
     </div> : null}
 
@@ -786,7 +802,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     <Tabs items={[
       { key: 'models', label: '模型配置', children: <BatchFactoryEngineSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} sections={['models', 'audio']} active={initialSettingsOpen} /> },
       { key: 'reasoning', label: 'AI 推理', children: <BatchFactoryAiReasoningForm productionMode={initialBatchSettings.productionMode} value={initialBatchSettings.aiPromptConfig} onChange={aiPromptConfig => setInitialBatchSettings(current => ({ ...current, aiPromptConfig }))} /> },
-      { key: 'publish', label: '发布统一', children: <BatchFactoryPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} active={initialSettingsOpen} /> }
+      { key: 'publish', label: '发布统一', children: isComicProduction ? <BatchFactoryComicPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} /> : <BatchFactoryPublishSettingsForm value={initialBatchSettings} onChange={setInitialBatchSettings} active={initialSettingsOpen} /> }
     ]} />
   </Modal>
   <Modal

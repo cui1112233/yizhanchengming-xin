@@ -205,6 +205,64 @@ func TestBookStageMissingReplacesLegacyVideoPaginationWithComicSourceSegments(t 
 	}
 }
 
+// 统一配置保存只写配置，不改内容；自动化重启时也只以 StageModeMissing 跑缺失
+// 阶段。Run 在 Director 分支遇到已存在的 DirectorRevision 直接返回当前摘要
+// （stage_service.go:283-284，不会再创建 stage run 或调用 provider），因此
+// 已完成的分镜与提示词不会被重置为待执行。
+func TestBookStageMissingKeepsCompletedDirectorStageAndPrompts(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "批次", Books: []CreateBookInput{{Title: "书", SourceText: "她转身离开，没有回头。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book := batch.Books[0]
+	if _, err := store.PersistDirectorRevision(ctx, "alice", book, DirectorSnapshot{}, "digest-1", "", DirectorResult{
+		Storyboard: []DirectorVideo{{FinalPrompt: "固定提示词 A"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := latest.Books[0]
+	if before.DirectorRevision == nil || len(before.Videos) == 0 {
+		t.Fatal("seed director revision failed")
+	}
+	beforePrompts := map[string]string{}
+	for _, video := range before.Videos {
+		beforePrompts[video.ID] = video.VideoPrompt
+	}
+	service := &BookStageService{Store: store, Director: &DirectorService{Store: store}}
+
+	if _, err := service.Run(ctx, "alice", batch.ID, before.ID, BookStageDirector, StageModeMissing, "director-missing", ""); err != nil {
+		t.Fatalf("已完成导演阶段没有跳过，err=%v", err)
+	}
+	store.mu.Lock()
+	runCount := len(store.bookStageRuns)
+	store.mu.Unlock()
+	if runCount != 0 {
+		t.Fatalf("已完成导演阶段仍然新建了 stage run：%d", runCount)
+	}
+	after, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterBook := after.Books[0]
+	if afterBook.DirectorRevision == nil || afterBook.DirectorRevision.ID != before.DirectorRevision.ID {
+		t.Fatal("统一配置保存后已完成导演阶段被重置")
+	}
+	if len(afterBook.Videos) != len(beforePrompts) {
+		t.Fatalf("已生成分镜数量变化：got %d want %d", len(afterBook.Videos), len(beforePrompts))
+	}
+	for _, video := range afterBook.Videos {
+		if video.VideoPrompt != beforePrompts[video.ID] {
+			t.Fatalf("已生成提示词被改写：video=%s", video.ID)
+		}
+	}
+}
+
 func TestBookStageMissingSkipsCurrentComicSourceSegmentation(t *testing.T) {
 	ctx := context.Background()
 	store := NewMemoryStore()

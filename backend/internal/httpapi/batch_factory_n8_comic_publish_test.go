@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -490,5 +491,129 @@ func TestN8ComicPublishIncompleteRecordContinuesAndReusesImageIDs(t *testing.T) 
 	}
 	if client.calls != 2 {
 		t.Fatalf("published record did not short circuit, N8 calls=%d", client.calls)
+	}
+}
+
+func TestComicPublishStatusDistinguishesDirectoryFromPublishKey(t *testing.T) {
+	// 线上真实形态：目录令牌有效（有数据），但发布密钥未配置。
+	publisher := &BatchFactoryN8ComicPublisher{ProducerDirectory: healthyDirectory{}, OrganizationDirectory: healthyDirectory{}}
+	mux := http.NewServeMux()
+	registerN8ComicPublishRoutes(mux, publisher)
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/batch-factory/v12/comic-publish/status", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	status := decodeBody[struct {
+		Configured             bool   `json:"configured"`
+		DirectoryAvailable     bool   `json:"directoryAvailable"`
+		PublishKeyConfigured   bool   `json:"publishKeyConfigured"`
+		PublishKeyHint         string `json:"publishKeyHint"`
+		Organizations          []any  `json:"organizations"`
+		AudioCategories        []any  `json:"audioCategories"`
+		OrganizationsWarning   string `json:"organizationsWarning"`
+		AudioCategoriesWarning string `json:"audioCategoriesWarning"`
+	}](t, recorder)
+	if !status.DirectoryAvailable {
+		t.Fatalf("directoryAvailable should be true when directories return data: %+v", status)
+	}
+	if status.PublishKeyConfigured || status.Configured {
+		t.Fatalf("publishKeyConfigured must stay false without the publish key: %+v", status)
+	}
+	if status.PublishKeyHint != "QIANTIE_N8_COMIC_OPEN_API_KEY" {
+		t.Fatalf("publishKeyHint=%q", status.PublishKeyHint)
+	}
+	if len(status.Organizations) != 1 || len(status.AudioCategories) != 1 {
+		t.Fatalf("directories should still carry data: %+v", status)
+	}
+	if status.OrganizationsWarning != "" || status.AudioCategoriesWarning != "" {
+		t.Fatalf("healthy directories must not warn: %+v", status)
+	}
+}
+
+type healthyDirectory struct{}
+
+func (healthyDirectory) Configured() bool { return true }
+func (healthyDirectory) ListProducerAccounts(context.Context) ([]string, error) {
+	return []string{"account"}, nil
+}
+func (healthyDirectory) ListOrganizations(context.Context) ([]n8catalog.Organization, error) {
+	return []n8catalog.Organization{{ID: "1", Name: "总部"}}, nil
+}
+func (healthyDirectory) ListAudioCategories(context.Context) ([]n8catalog.AudioCategory, error) {
+	return []n8catalog.AudioCategory{{ID: 12, Name: "都市", Status: "ENABLE"}}, nil
+}
+
+// failingDirectory 模拟上游 HTTP 200 但业务 code 非 SUCCESS 的情况
+// （例如令牌失效返回 UN_LOGIN）。这类响应过去会被吞成空数组。
+type failingDirectory struct{ err error }
+
+func (f failingDirectory) Configured() bool { return true }
+func (f failingDirectory) ListProducerAccounts(context.Context) ([]string, error) {
+	return nil, f.err
+}
+func (f failingDirectory) ListOrganizations(context.Context) ([]n8catalog.Organization, error) {
+	return nil, f.err
+}
+func (f failingDirectory) ListAudioCategories(context.Context) ([]n8catalog.AudioCategory, error) {
+	return nil, f.err
+}
+
+func TestComicPublishStatusSurfacesUpstreamRejectionWarning(t *testing.T) {
+	failure := &n8catalog.DirectoryError{Kind: "service_rejected", Code: "UN_LOGIN", Message: "登录已失效"}
+	publisher := &BatchFactoryN8ComicPublisher{ProducerDirectory: failingDirectory{err: failure}, OrganizationDirectory: failingDirectory{err: failure}}
+	mux := http.NewServeMux()
+	registerN8ComicPublishRoutes(mux, publisher)
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/batch-factory/v12/comic-publish/status", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	status := decodeBody[struct {
+		DirectoryAvailable      bool   `json:"directoryAvailable"`
+		PublishKeyConfigured    bool   `json:"publishKeyConfigured"`
+		OrganizationsWarning    string `json:"organizationsWarning"`
+		AudioCategoriesWarning  string `json:"audioCategoriesWarning"`
+		ProducerAccountsWarning string `json:"producerAccountsWarning"`
+	}](t, recorder)
+	if status.DirectoryAvailable {
+		t.Fatalf("directoryAvailable must be false when a directory reports an error, got %+v", status)
+	}
+	if status.PublishKeyConfigured {
+		t.Fatalf("publishKeyConfigured should follow the publish client, got %+v", status)
+	}
+	for name, warning := range map[string]string{
+		"organizations":    status.OrganizationsWarning,
+		"audioCategories":  status.AudioCategoriesWarning,
+		"producerAccounts": status.ProducerAccountsWarning,
+	} {
+		if !strings.Contains(warning, "UN_LOGIN") {
+			t.Fatalf("%s warning missing upstream code: %q", name, warning)
+		}
+		if strings.Contains(warning, "token") || strings.Contains(warning, "令牌明文") {
+			t.Fatalf("%s warning leaks sensitive data: %q", name, warning)
+		}
+	}
+}
+
+func TestComicPublishAudioCategoriesSurfacesUpstreamRejectionWarning(t *testing.T) {
+	failure := &n8catalog.DirectoryError{Kind: "service_rejected", Code: "UN_LOGIN", Message: "登录已失效"}
+	publisher := &BatchFactoryN8ComicPublisher{ProducerDirectory: failingDirectory{err: failure}}
+	mux := http.NewServeMux()
+	registerN8ComicPublishRoutes(mux, publisher)
+
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/batch-factory/v12/comic-publish/audio-categories", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	payload := decodeBody[struct {
+		AudioCategories        []n8catalog.AudioCategory `json:"audioCategories"`
+		AudioCategoriesWarning string                    `json:"audioCategoriesWarning"`
+	}](t, recorder)
+	if len(payload.AudioCategories) != 0 || !strings.Contains(payload.AudioCategoriesWarning, "UN_LOGIN") {
+		t.Fatalf("payload=%+v", payload)
 	}
 }

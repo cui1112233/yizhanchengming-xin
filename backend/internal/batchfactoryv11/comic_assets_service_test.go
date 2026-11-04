@@ -2,6 +2,7 @@ package batchfactoryv11
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -21,6 +22,28 @@ func TestNormalizeProductionModeExplicitVideoOverridesComicModule(t *testing.T) 
 	})
 	if mode != "video" {
 		t.Fatalf("mode=%q, want video", mode)
+	}
+}
+
+func TestBuildComicAssetExtractionContractReportsMissingSelectionAsConfig(t *testing.T) {
+	_, err := BuildComicAssetExtractionContract(Book{ID: "book-1", Title: "长篇漫画", SourceText: "完整小说正文"}, DirectorSnapshot{
+		Effective: SettingsPatch{
+			"productionMode": rawSetting(t, "comic"),
+			"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true}}),
+		},
+	})
+	if err == nil {
+		t.Fatal("expected a missing comic asset prompt error")
+	}
+	// 缺配置必须是可以直接照做的动作文案，不能带 revision conflict 前缀。
+	if err.Error() != "请在资产设置中选择漫画资产提示词" {
+		t.Fatalf("err=%q, want plain action text", err.Error())
+	}
+	if !errors.Is(err, ErrConfigRequired) {
+		t.Fatalf("err=%v, want ErrConfigRequired", err)
+	}
+	if errors.Is(err, ErrConflict) {
+		t.Fatalf("missing configuration must not be reported as ErrConflict: %v", err)
 	}
 }
 

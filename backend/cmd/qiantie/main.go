@@ -14,6 +14,7 @@ import (
 
 	"qiantie/backend/internal/app"
 	"qiantie/backend/internal/config"
+	"qiantie/backend/internal/ffmpegbin"
 	webassets "qiantie/backend/web"
 )
 
@@ -22,8 +23,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Slice 默认值是 0，且 Slice<1 时 V12 批次路由不会注册。直接运行本二进制
-	// 很容易漏设环境变量，表现为前端“作品全没了”，这里必须留下显式日志。
+	// Slice 默认值是 3（见 config.FromEnv）；显式设成 <1 时 V12 批次路由不会
+	// 注册，表现为前端“作品全没了”，这里必须留下显式日志。
 	if cfg.Slice < 1 {
 		log.Printf("WARNING: QIANTIE_BATCH_FACTORY_V11_SLICE=%d，V12 批次路由（/api/batch-factory/v12/batches/summary 等）不会注册；本地请使用 scripts/start-local-go.ps1（最低兜底 1，默认 3）。", cfg.Slice)
 	}
@@ -33,6 +34,7 @@ func main() {
 		}
 		return
 	}
+	ffmpegbin.LogStartup()
 	dsn, err := databaseDSN(cfg.MySQLDSN)
 	if err != nil {
 		log.Fatal(err)
@@ -62,7 +64,7 @@ func main() {
 // responses; there is no Node bridge or slice-based fallback.
 func newRuntimeHandler(apiHandler, staticHandler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req != nil && req.URL != nil && (req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") || strings.HasPrefix(req.URL.Path, "/downloads/local-executor/")) {
+		if req != nil && req.URL != nil && (req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/api/") || strings.HasPrefix(req.URL.Path, "/downloads/local-executor/") || strings.HasPrefix(req.URL.Path, "/user-content/avatars/")) {
 			apiHandler.ServeHTTP(w, req)
 			return
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -307,7 +308,11 @@ func registerSliceOneRoutes(mux *http.ServeMux, store batchfactoryv11.Store, cat
 			writeStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"batch": batch})
+		payload := map[string]any{"batch": batch}
+		if readiness := comicReadinessByBook(r.Context(), store, catalog, owner, batch); len(readiness) > 0 {
+			payload["comicReadiness"] = readiness
+		}
+		writeJSON(w, http.StatusOK, payload)
 	})
 	mux.HandleFunc("DELETE /api/batch-factory/v11/batches/{batchId}/books/{bookId}", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -601,10 +606,21 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, batchfactoryv11.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
-	case errors.Is(err, batchfactoryv11.ErrConflict):
+	case errors.Is(err, batchfactoryv11.ErrConfigRequired):
+		// Missing, user-fixable selection: return the plain action text without
+		// the sentinel prefix so the UI never shows a fake revision conflict.
 		message := strings.TrimSpace(err.Error())
-		if message == "" || message == batchfactoryv11.ErrConflict.Error() {
-			message = "revision conflict"
+		if message == "" || message == batchfactoryv11.ErrConfigRequired.Error() {
+			message = "请先在设置中完成所需配置后重试"
+		}
+		writeJSON(w, http.StatusConflict, map[string]string{"error": message})
+	case errors.Is(err, batchfactoryv11.ErrConflict):
+		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrConflict.Error()+": "))
+		// ErrConflict is only a revision/lock conflict. A specific business
+		// reason keeps its own text; a bare or version-specific conflict gets
+		// the retry action instead of the raw sentinel string.
+		if message == "" || message == batchfactoryv11.ErrConflict.Error() || strings.Contains(message, "版本已变化") || strings.Contains(strings.ToLower(message), "revision") {
+			message = "数据版本冲突，请重试"
 		}
 		writeJSON(w, http.StatusConflict, map[string]string{"error": message})
 	case errors.Is(err, batchfactoryv11.ErrInvalid):
@@ -632,12 +648,18 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		}
 		writeJSON(w, http.StatusServiceUnavailable, payload)
 	case errors.Is(err, batchfactoryv11.ErrUpstream):
-		message := strings.TrimSpace(err.Error())
+		message := strings.TrimSpace(strings.TrimPrefix(err.Error(), batchfactoryv11.ErrUpstream.Error()+": "))
 		if message == "" || message == batchfactoryv11.ErrUpstream.Error() {
 			message = "temporary upstream failure"
 		}
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": message})
+		payload := map[string]string{"error": message}
+		if code := errorCodeOf(err); code != "" {
+			payload["code"] = code
+		}
+		writeJSON(w, http.StatusServiceUnavailable, payload)
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		// 未知错误必须留下可检索的日志，否则线上只能看到 500 而无法定位来源。
+		log.Printf("store error: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error", "code": "INTERNAL"})
 	}
 }

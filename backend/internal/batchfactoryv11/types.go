@@ -17,7 +17,30 @@ var (
 	// It is deliberately distinct from ErrConflict so callers can retry it
 	// without telling users that their saved batch revision is stale.
 	ErrUpstream = errors.New("temporary upstream failure")
+	// ErrConfigRequired marks a user-fixable missing selection (for example a
+	// comic asset prompt the book never chose). It is deliberately distinct
+	// from ErrConflict so a missing setting is never reported as a stale
+	// revision, and a stale revision is never reported as a missing setting.
+	ErrConfigRequired = errors.New("configuration required")
 )
+
+// ConfigRequiredError carries the plain action text the user can follow. It
+// unwraps to ErrConfigRequired without prefixing that sentinel onto the text.
+type ConfigRequiredError struct {
+	Message string
+}
+
+func (e ConfigRequiredError) Error() string {
+	return e.Message
+}
+
+func (e ConfigRequiredError) Unwrap() error {
+	return ErrConfigRequired
+}
+
+func NewConfigRequiredError(message string) error {
+	return ConfigRequiredError{Message: message}
+}
 
 type SettingsPatch map[string]json.RawMessage
 
@@ -69,6 +92,9 @@ type Video struct {
 	ComicRoleStage        map[string]string   `json:"comicRoleStage,omitempty"`
 	ComicScenePresets     []string            `json:"comicScenePresets,omitempty"`
 	DurationSeconds       float64             `json:"durationSeconds,omitempty"`
+	// Ordinal 是这个分镜在书内的顺序。历史轮次（orphaned）记录也带 ordinal，
+	// 前端据此把上一轮已生成成功的视频挂回同一个分镜。
+	Ordinal               int                 `json:"ordinal"`
 	CompatibilityState    string              `json:"compatibilityState"`
 	Revision              int64               `json:"revision"`
 	SettingsState         SettingsState       `json:"settingsState"`
@@ -94,6 +120,9 @@ type Book struct {
 	Assets              DirectorAssets    `json:"assets,omitempty"`
 	AssetRecords        []BookAsset       `json:"assetRecords,omitempty"`
 	Videos              []Video           `json:"videos"`
+	// VideoHistory 保留被轮换成 orphaned 的历史视频记录（轻量字段）。它让前端能把
+	// 上一轮已经生成成功的媒体继续展示为「上一版」，而不是随轮换凭空消失。
+	VideoHistory []Video `json:"videoHistory,omitempty"`
 }
 type Batch struct {
 	ID                     string `json:"id"`
@@ -282,22 +311,27 @@ type CreateBookAssetImageInput struct {
 }
 
 type ComicPage struct {
-	ID                 string           `json:"id"`
-	BatchID            string           `json:"batchId"`
-	BookID             string           `json:"bookId"`
-	VideoID            string           `json:"videoId"`
-	ComicPrompt        string           `json:"comicPrompt"`
-	ImagePrompt        string           `json:"imagePrompt"`
-	ReferenceImageURLs []string         `json:"referenceImageUrls,omitempty"`
-	ModelID            string           `json:"modelId,omitempty"`
-	AspectRatio        string           `json:"aspectRatio"`
-	Status             string           `json:"status"`
-	SnapshotHash       string           `json:"snapshotHash,omitempty"`
-	ConfigStale        bool             `json:"configStale,omitempty"`
-	Revision           int64            `json:"revision"`
-	Images             []ComicPageImage `json:"images"`
-	CreatedAt          time.Time        `json:"createdAt"`
-	UpdatedAt          time.Time        `json:"updatedAt"`
+	ID                 string   `json:"id"`
+	BatchID            string   `json:"batchId"`
+	BookID             string   `json:"bookId"`
+	VideoID            string   `json:"videoId"`
+	ComicPrompt        string   `json:"comicPrompt"`
+	ImagePrompt        string   `json:"imagePrompt"`
+	ReferenceImageURLs []string `json:"referenceImageUrls,omitempty"`
+	ModelID            string   `json:"modelId,omitempty"`
+	AspectRatio        string   `json:"aspectRatio"`
+	Status             string   `json:"status"`
+	SnapshotHash       string   `json:"snapshotHash,omitempty"`
+	ConfigStale        bool     `json:"configStale,omitempty"`
+	// 以下三个字段由 HTTP 读接口派生，不落库；前端只渲染，不再自行重算。
+	PromptStatus    string           `json:"promptStatus,omitempty"`
+	ImageStatus     string           `json:"imageStatus,omitempty"`
+	PrimaryFallback bool             `json:"primaryFallback,omitempty"`
+	GenerationState string           `json:"generationState,omitempty"`
+	Revision        int64            `json:"revision"`
+	Images          []ComicPageImage `json:"images"`
+	CreatedAt       time.Time        `json:"createdAt"`
+	UpdatedAt       time.Time        `json:"updatedAt"`
 }
 
 type UpsertComicPageInput struct {
@@ -384,6 +418,18 @@ type ComicPageStore interface {
 	ApplyComicPageReferenceImages(context.Context, string, string, string, string) (int, error)
 	CreateComicCollection(context.Context, string, string, string, ...[]string) (ComicCollection, []string, error)
 	ListComicCollections(context.Context, string, string, string) ([]ComicCollection, error)
+}
+
+// ComicSourceIndex is the minimal source data needed to decide whether a comic
+// page binding is stale. It lets the comic-pages read path avoid hydrating the
+// whole batch (all books, videos and drafts) just to compare digests.
+type ComicSourceIndex struct {
+	SourceText   string
+	VideoDigests map[string]string
+}
+
+type ComicSourceIndexStore interface {
+	GetBookComicSourceIndex(context.Context, string, string, string) (ComicSourceIndex, bool, error)
 }
 
 type ComicSourceSegment struct {

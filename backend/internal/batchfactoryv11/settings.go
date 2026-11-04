@@ -63,6 +63,32 @@ func mergeAIPromptConfig(base, next json.RawMessage) json.RawMessage {
 		return append([]byte(nil), next...)
 	}
 	for key, value := range patch {
+		// A book-level partial write (for example only the comic page preset)
+		// must not erase the batch-level sibling selections under the same
+		// module. Merge plain JSON objects one level deeper; arrays and scalars
+		// keep the newer layer's value.
+		merged[key] = mergeJSONObject(merged[key], value)
+	}
+	encoded, err := json.Marshal(merged)
+	if err != nil {
+		return append([]byte(nil), next...)
+	}
+	return encoded
+}
+
+func mergeJSONObject(base, next json.RawMessage) json.RawMessage {
+	if len(base) == 0 {
+		return append([]byte(nil), next...)
+	}
+	merged := map[string]json.RawMessage{}
+	if err := json.Unmarshal(base, &merged); err != nil {
+		return append([]byte(nil), next...)
+	}
+	patch := map[string]json.RawMessage{}
+	if err := json.Unmarshal(next, &patch); err != nil {
+		return append([]byte(nil), next...)
+	}
+	for key, value := range patch {
 		merged[key] = append([]byte(nil), value...)
 	}
 	encoded, err := json.Marshal(merged)
@@ -84,6 +110,18 @@ func ResolveSettings(layers ...SettingsPatch) SettingsPatch {
 		}
 	}
 	return out
+}
+
+// EffectiveProductionMode returns the batch-wide production switch. The batch
+// layer is authoritative because the workbench renders one mode for the whole
+// batch; a stale single-book productionMode (left behind by an older switch)
+// must not drag a video batch into the comic stage sequence. Batches that only
+// stored the mode on the book keep working when the batch layer is silent.
+func EffectiveProductionMode(batchPatch, bookPatch SettingsPatch) string {
+	if mode := rawString(batchPatch, "productionMode", ""); mode == "comic" || mode == "video" {
+		return mode
+	}
+	return normalizeProductionMode(ResolveSettings(batchPatch, bookPatch))
 }
 
 func ChangedKeys(update SettingsUpdate) []string {

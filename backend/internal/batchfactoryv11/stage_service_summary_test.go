@@ -34,6 +34,42 @@ func TestBookStageVideoAvailabilityUsesConfiguredModelCheck(t *testing.T) {
 	t.Fatal("video availability missing")
 }
 
+func TestBookStageAvailabilityIsReusedAcrossBooks(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{
+		Title: "shared availability",
+		Books: []CreateBookInput{{Title: "one"}, {Title: "two"}, {Title: "three"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readinessCalls := 0
+	service := &BookStageService{
+		Store:      store,
+		Production: &ProductionService{Enabled: true},
+		ImageReady: func(context.Context, string) (bool, string) {
+			readinessCalls++
+			return true, ""
+		},
+		VideoReady: func(context.Context, string) (bool, string) {
+			readinessCalls++
+			return true, ""
+		},
+	}
+	availability := service.Availability(ctx, "alice")
+	for _, book := range batch.Books {
+		if _, err := service.SummaryWithAvailability(ctx, "alice", batch.ID, book.ID, availability); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Availability is owner-level: one ImageReady + one VideoReady evaluation
+	// for the whole batch, regardless of the number of books.
+	if readinessCalls != 2 {
+		t.Fatalf("readiness checks = %d, want 2", readinessCalls)
+	}
+}
+
 type countingBatchReadStore struct {
 	*MemoryStore
 	getBatchCalls   int

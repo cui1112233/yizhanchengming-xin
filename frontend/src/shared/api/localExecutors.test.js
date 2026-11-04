@@ -26,9 +26,10 @@ test('localExecutorStatus reports paired and online device counts from canonical
   assert.deepEqual(localExecutorStatus(null), { online: false, paired: 0, onlineCount: 0 });
 });
 
-test('mergeExecutorState keeps backend state and overlays a fresh pairing code', () => {
-  assert.equal(mergeExecutorState({ state: 'online', devices: [{ id: 'a', online: true }] }, null), 'online');
-  assert.equal(mergeExecutorState({ state: 'not_installed', devices: [] }, { code: '123456' }), 'needs_pairing');
-  assert.equal(mergeExecutorState({ state: 'offline', devices: [{ id: 'a', online: false }] }, { code: '123456' }), 'offline');
-  assert.equal(mergeExecutorState(null, null), 'not_installed');
+test('mergeExecutorState keeps backend state and restores needs_pairing from backend pairing', () => {
+  assert.equal(mergeExecutorState({ state: 'online', devices: [{ id: 'a', online: true }] }), 'online');
+  assert.equal(mergeExecutorState({ state: 'not_installed', devices: [], pairing: { fingerprint: 'abcd1234' } }), 'needs_pairing');
+  assert.equal(mergeExecutorState({ state: 'not_installed', devices: [], pairing: { fingerprint: 'abcd1234', expired: true } }), 'not_installed');
+  assert.equal(mergeExecutorState({ state: 'offline', devices: [{ id: 'a', online: false }] }), 'offline');
+  assert.equal(mergeExecutorState(null), 'not_installed');
 });

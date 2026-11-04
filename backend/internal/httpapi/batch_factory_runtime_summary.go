@@ -60,8 +60,11 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 		}
 		stageSummaries := result["stageSummaries"].(map[string]any)
 		comicStore, hasComicPages := store.(batchfactoryv11.ComicPageStore)
+		// Stage availability is owner-level. Evaluate it once per request instead
+		// of reloading the owner settings for every book in the batch.
+		stageAvailability := stageService.Availability(r.Context(), owner)
 		for _, book := range batch.Books {
-			summary, summaryErr := stageService.Summary(r.Context(), owner, batch.ID, book.ID)
+			summary, summaryErr := stageService.SummaryWithAvailability(r.Context(), owner, batch.ID, book.ID, stageAvailability)
 			if summaryErr != nil {
 				stageSummaries[book.ID] = map[string]any{"bookId": book.ID, "runs": []any{}, "unavailable": true, "error": summaryErr.Error()}
 				continue
@@ -81,24 +84,11 @@ func registerRuntimeSummaryRoute(mux *http.ServeMux, auth BridgeAuth, store batc
 			if hasComicPages && len(book.Videos) > 0 {
 				pages, pagesErr := comicStore.ListComicPages(r.Context(), owner, batch.ID, book.ID)
 				if pagesErr == nil {
-					ready := 0
-					for _, video := range book.Videos {
-						for _, page := range pages {
-							if page.VideoID != video.ID {
-								continue
-							}
-							for _, image := range page.Images {
-								if image.IsPrimary {
-									ready++
-									break
-								}
-							}
-							break
-						}
-					}
-					stageSummary["comicImageReadyCount"] = ready
-					stageSummary["comicImageTotalCount"] = len(book.Videos)
-					stageSummary["comicImageReady"] = ready == len(book.Videos)
+					readiness := buildComicReadiness(book.Videos, pages, comicPageGenerationLimit)
+					stageSummary["comicImageReadyCount"] = readiness.PrimaryReadyCount
+					stageSummary["comicImageTotalCount"] = readiness.PagesTotal
+					stageSummary["comicImageReady"] = readiness.ImageReadyCount == readiness.PagesTotal
+					stageSummary["comicReadiness"] = readiness
 				}
 				collections, collectionsErr := comicStore.ListComicCollections(r.Context(), owner, batch.ID, book.ID)
 				if collectionsErr == nil {

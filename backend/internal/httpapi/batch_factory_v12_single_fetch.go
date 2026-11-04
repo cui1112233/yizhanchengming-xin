@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,6 +13,163 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/novelfetchworkshop"
 )
+
+// 批量工厂自己的敏感词处理配置：批次级设置为主，单书设置按现有继承体系覆盖。
+// 旧批次没有这三个字段时按默认值读取（开启 AI 修复、继承全局模型、失败保留原文待确认）。
+type batchSensitiveConfig struct {
+	Enabled   bool
+	Models    []string
+	OnFailure string
+}
+
+const (
+	batchSensitiveOnFailureReview = "review"
+	batchSensitiveOnFailureFail   = "fail"
+)
+
+func defaultBatchSensitiveConfig() batchSensitiveConfig {
+	return batchSensitiveConfig{Enabled: true, OnFailure: batchSensitiveOnFailureReview}
+}
+
+func resolveBatchSensitiveConfig(layers ...batchfactoryv11.SettingsPatch) batchSensitiveConfig {
+	cfg := defaultBatchSensitiveConfig()
+	effective := batchfactoryv11.ResolveSettings(layers...)
+	if raw, ok := effective["sensitiveAIEnabled"]; ok && len(raw) > 0 {
+		var enabled bool
+		if json.Unmarshal(raw, &enabled) == nil {
+			cfg.Enabled = enabled
+		}
+	}
+	if raw, ok := effective["sensitiveAIModels"]; ok && len(raw) > 0 {
+		var models []string
+		if json.Unmarshal(raw, &models) == nil {
+			for _, model := range models {
+				if trimmed := strings.TrimSpace(model); trimmed != "" {
+					cfg.Models = append(cfg.Models, trimmed)
+				}
+			}
+		} else {
+			var single string
+			if json.Unmarshal(raw, &single) == nil {
+				for _, model := range strings.Split(single, ",") {
+					if trimmed := strings.TrimSpace(model); trimmed != "" {
+						cfg.Models = append(cfg.Models, trimmed)
+					}
+				}
+			}
+		}
+	}
+	if raw, ok := effective["sensitiveAIOnFailure"]; ok && len(raw) > 0 {
+		var strategy string
+		if json.Unmarshal(raw, &strategy) == nil && strings.EqualFold(strings.TrimSpace(strategy), batchSensitiveOnFailureFail) {
+			cfg.OnFailure = batchSensitiveOnFailureFail
+		}
+	}
+	return cfg
+}
+
+// batchSensitiveOutcome 记录本次处理的降级结果，供界面显示“有 N 处未处理已保留原文”。
+type batchSensitiveOutcome struct {
+	ReviewRequired bool
+	ReviewCount    int
+	AIModels       []string
+}
+
+// processBatchConfiguredText 是批量工厂的三级降级链路：
+// 1) AI 修复（开关打开且配置了可用模型，按模型顺序逐个尝试）；
+// 2) 确定性规则脱敏（规则结果已不含命中词则视为完成）；
+// 3) 仍不安全时打码并标记待人工确认，绝不把未处理的原样内容当成合规内容。
+func processBatchConfiguredText(ctx context.Context, store novelfetchworkshop.Store, owner, bookID, text, scope string, cfg batchSensitiveConfig, provider novelfetchworkshop.RewriteProvider) (string, []map[string]any, []map[string]any, batchSensitiveOutcome, error) {
+	outcome := batchSensitiveOutcome{}
+	settings, err := store.GetConfig(ctx, owner)
+	if err != nil {
+		return text, nil, nil, outcome, err
+	}
+	processed, trace, items := novelfetchworkshop.ProcessConfiguredText(text, scope, settings)
+	if len(items) == 0 {
+		return processed, trace, items, outcome, nil
+	}
+	if cfg.Enabled && provider != nil {
+		models := append([]string(nil), cfg.Models...)
+		if len(models) == 0 {
+			if model := firstText(mapOrEmpty(settings["sensitive_ai"])["model"], mapOrEmpty(mapOrEmpty(settings["appConfig"])["sensitive_ai"])["model"], settings["text_model_id"], settings["textModelId"]); model != "" {
+				models = []string{model}
+			}
+		}
+		for _, model := range models {
+			ai := mapOrEmpty(settings["sensitive_ai"])
+			if len(ai) == 0 {
+				ai = mapOrEmpty(mapOrEmpty(settings["appConfig"])["sensitive_ai"])
+			}
+			attemptSettings := make(map[string]any, len(settings)+1)
+			for key, value := range settings {
+				attemptSettings[key] = value
+			}
+			attemptAI := make(map[string]any, len(ai)+2)
+			for key, value := range ai {
+				attemptAI[key] = value
+			}
+			attemptAI["enabled"] = true
+			attemptAI["model"] = model
+			attemptSettings["sensitive_ai"] = attemptAI
+			before := processed
+			processed, items = applySensitiveAIRepair(ctx, provider, attemptSettings, bookID, processed, items)
+			failed := 0
+			for _, item := range items {
+				if strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "failed") {
+					failed++
+				}
+			}
+			trace = append(trace, map[string]any{"stage": "sensitive_ai", "title": "敏感词 AI 修复", "model": model, "changed": before != processed, "chars": len([]rune(processed)), "failed": failed})
+			if failed == 0 {
+				outcome.AIModels = append(outcome.AIModels, model)
+				break
+			}
+		}
+	}
+	unresolved := 0
+	keywords := make([]string, 0, len(items))
+	for _, item := range items {
+		keyword := strings.TrimSpace(fmt.Sprint(item["keyword"]))
+		if keyword == "<nil>" {
+			keyword = ""
+		}
+		finalText := strings.TrimSpace(fmt.Sprint(item["after"]))
+		if finalText == "<nil>" {
+			finalText = ""
+		}
+		// 命中词已不在替换结果里才算真正脱敏（AI 结果由 AI 层自行校验）。
+		if keyword != "" && !containsSensitiveKeyword(finalText, keyword) {
+			if !strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "done") {
+				item["status"] = "done"
+				item["source"] = "rules"
+			}
+			continue
+		}
+		if keyword == "" && strings.EqualFold(strings.TrimSpace(fmt.Sprint(item["status"])), "done") {
+			continue
+		}
+		// 规则结果仍含命中词：打码兜底，同时保留“未处理”标记供人工确认。
+		item["status"] = "failed"
+		item["source"] = "mask"
+		item["masked"] = true
+		if keyword != "" {
+			keywords = append(keywords, keyword)
+		}
+		unresolved++
+	}
+	if unresolved > 0 {
+		if cfg.OnFailure == batchSensitiveOnFailureFail {
+			return processed, trace, items, outcome, fmt.Errorf("敏感词 AI 修复失败 %d 处，已停止后续处理", unresolved)
+		}
+		for _, keyword := range keywords {
+			processed = strings.ReplaceAll(processed, keyword, strings.Repeat("＊", len([]rune(keyword))))
+		}
+		outcome.ReviewRequired = true
+		outcome.ReviewCount = unresolved
+	}
+	return processed, trace, items, outcome, nil
+}
 
 type batchFetchClassification struct {
 	AIGenderJudge         novelfetchworkshop.AIGenderJudge
@@ -45,7 +203,7 @@ func captureBatchFetchedSource(ctx context.Context, store batchfactoryv11.Store,
 	return batchfactoryv11.Book{}, batchfactoryv11.ErrNotFound
 }
 
-func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchworkshop.Store, owner, bookID string, result novelfetchworkshop.FetchAndProcessResult, classification batchFetchClassification) (novelfetchworkshop.FetchAndProcessResult, map[string]any, error) {
+func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchworkshop.Store, owner, bookID string, result novelfetchworkshop.FetchAndProcessResult, classification batchFetchClassification, sensitive batchSensitiveConfig) (novelfetchworkshop.FetchAndProcessResult, map[string]any, error) {
 	metadata := map[string]any{
 		"originalRawStatus":        "done",
 		"originalRawChars":         result.OriginalRawChars,
@@ -54,6 +212,11 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 		"sourceMode":               "novel_fetch",
 		"maxTxt":                   result.MaxTxt,
 		"processingConfigRevision": "novel-fetch-rules-v1",
+		"sensitiveAIEnabled":       sensitive.Enabled,
+		"sensitiveAIOnFailure":     sensitive.OnFailure,
+	}
+	if len(sensitive.Models) > 0 {
+		metadata["sensitiveAIModels"] = sensitive.Models
 	}
 	if result.BookInfo.Category != "" {
 		metadata["category"] = result.BookInfo.Category
@@ -82,9 +245,8 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 	}
 	provider := providerForBatchClassification(ctx, owner, classification)
 	metadata["processingFingerprint"] = novelFetchProcessingFingerprint(settings)
-	processed, trace, sensitiveItems, processErr := processWorkshopConfiguredText(
-		ctx, workshopStore, owner, bookID, result.ProcessedText, "original",
-		novelFetchSensitiveAIEnabled(settings), provider,
+	processed, trace, sensitiveItems, outcome, processErr := processBatchConfiguredText(
+		ctx, workshopStore, owner, bookID, result.ProcessedText, "original", sensitive, provider,
 	)
 	result.ProcessedText = processed
 	result.ProcessedChars = len([]rune(processed))
@@ -111,6 +273,17 @@ func prepareBatchFetchedSource(ctx context.Context, workshopStore novelfetchwork
 		metadata["processError"] = processErr.Error()
 		metadata["sensitiveStatus"] = "partial"
 		return result, metadata, processErr
+	}
+	// 三级降级：未能安全处理的命中原样保留正文并打码，标记待人工确认后继续后续阶段，
+	// 不再把整本书报废成“原文待获取”。
+	metadata["sensitiveReviewRequired"] = outcome.ReviewRequired
+	metadata["sensitiveReviewCount"] = outcome.ReviewCount
+	if len(outcome.AIModels) > 0 {
+		metadata["sensitiveAIModelsApplied"] = outcome.AIModels
+	}
+	if outcome.ReviewRequired {
+		metadata["sensitiveStatus"] = "review_required"
+		metadata["sensitiveReviewMessage"] = fmt.Sprintf("有 %d 处敏感词未处理，已保留原文，需人工确认", outcome.ReviewCount)
 	}
 	metadata["originalStatus"] = "done"
 	metadata["queueStage"] = "classification"
@@ -180,7 +353,34 @@ func persistBatchFetchFailure(ctx context.Context, store batchfactoryv11.Store, 
 	metadata["fetchRetryable"] = retryableBatchFetchError(err)
 	metadata["fetchAttempts"] = attempts
 	metadata["fetchFailedAt"] = time.Now().UTC()
-	_, _ = store.UpdateBookMetadata(ctx, owner, batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: book.Revision})
+	// 失败登记本身也可能因为重试期间 revision 已变化而写不进去；先回读最新
+	// revision，写失败时再回读重试一次，避免失败原因静默丢失。
+	latest := book
+	if batch, readErr := store.GetBatch(ctx, owner, batchID); readErr == nil {
+		for _, candidate := range batch.Books {
+			if candidate.ID == book.ID {
+				latest = candidate
+				break
+			}
+		}
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		if _, writeErr := store.UpdateBookMetadata(ctx, owner, batchID, book.ID, batchfactoryv11.UpdateBookMetadataInput{Metadata: metadata, ExpectedRevision: latest.Revision}); writeErr == nil {
+			return
+		} else if !errors.Is(writeErr, batchfactoryv11.ErrConflict) {
+			return
+		}
+		batch, readErr := store.GetBatch(ctx, owner, batchID)
+		if readErr != nil {
+			return
+		}
+		for _, candidate := range batch.Books {
+			if candidate.ID == book.ID {
+				latest = candidate
+				break
+			}
+		}
+	}
 }
 
 func retryableBatchFetchError(err error) bool {
@@ -472,7 +672,7 @@ func registerV12SingleFetchRoute(mux *http.ServeMux, store batchfactoryv11.Store
 				return
 			}
 		}
-		result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification)
+		result, metadata, processErr := prepareBatchFetchedSource(r.Context(), workshopStore, owner, bookID, result, classification, resolveBatchSensitiveConfig(batch.SettingsState.Patch, book.SettingsState.Patch))
 		productionText := result.ProcessedText
 		if processErr != nil {
 			productionText = ""

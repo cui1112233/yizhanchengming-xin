@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -201,6 +202,7 @@ func (s *MemberProfileStore) member(ctxUsername string, accounts auth.Store) map
 			member[key] = value
 		}
 	}
+	member["avatarUrl"] = memberAvatarURL(profile)
 	for _, row := range s.readArray("member-profile-details.json") {
 		if row["username"] != ctxUsername {
 			continue
@@ -262,6 +264,26 @@ func memberTeamGovernance(manager map[string]any) map[string]any {
 	return map[string]any{"managerUsername": manager["username"], "monthlyTokenLimit": monthlyLimit, "thresholds": []any{70, 90, 100}, "updatedAt": nil, "updatedBy": nil, "usage": usage["month"], "quota": memberQuota(monthlyLimit, 0)}
 }
 
+// memberAvatarURL returns the public avatar URL for a profile. Rows written
+// before uploads carried a content digest only contain the stable
+// /user-content/avatars/<username>.<ext> path, so append a version derived from
+// updatedAt; otherwise a browser that cached the old 404 keeps showing the
+// initial-letter placeholder until the file changes.
+func memberAvatarURL(profile map[string]any) any {
+	raw, ok := profile["avatarUrl"].(string)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return profile["avatarUrl"]
+	}
+	if strings.Contains(raw, "?v=") {
+		return raw
+	}
+	updated, _ := profile["updatedAt"].(string)
+	if strings.TrimSpace(updated) == "" {
+		return raw
+	}
+	return raw + "?v=" + url.QueryEscape(updated)
+}
+
 func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, accounts auth.Store) (map[string]any, error) {
 	const maxBytes = 2 * 1024 * 1024
 	value := strings.TrimSpace(dataURL)
@@ -312,7 +334,10 @@ func (s *MemberProfileStore) updateAvatar(username, dataURL, avatarDir string, a
 		profile = map[string]any{"username": username}
 		profiles = append(profiles, profile)
 	}
-	profile["avatarUrl"] = "/user-content/avatars/" + username + "." + ext
+	// 头像文件名固定为 <username>.<ext>，同一扩展名重复上传时 URL 不变，
+	// 浏览器会复用旧缓存（甚至复用旧 404）。用内容摘要作为版本号保证每次都取到新图。
+	sum := sha256.Sum256(decoded)
+	profile["avatarUrl"] = "/user-content/avatars/" + username + "." + ext + "?v=" + hex.EncodeToString(sum[:8])
 	profile["updatedAt"] = time.Now().UTC().Format(time.RFC3339)
 	if err := s.writeArray("member-profiles.json", profiles); err != nil {
 		return nil, err
@@ -474,6 +499,7 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 	if root == nil || profiles == nil || accounts == nil {
 		return
 	}
+	registerMemberAvatarContentRoute(root, avatarDir)
 	root.Handle("GET /api/member/me", authMiddleware.Middleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		identity, ok := BridgeIdentityFromContext(req.Context())
 		if !ok {
@@ -711,4 +737,50 @@ func RegisterMemberProfileRoutes(root *http.ServeMux, authMiddleware BridgeAuth,
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"notification": entry})
 	})))
+}
+
+// registerMemberAvatarContentRoute serves uploaded member avatars. The upload
+// endpoint stores files in MemberAvatarDir and records "/user-content/avatars/…"
+// as the public URL, so this route must exist in the Go runtime; otherwise the
+// browser receives a 404 for every uploaded avatar and Antd Avatar silently falls
+// back to the initial-letter placeholder while the upload itself reports success.
+func registerMemberAvatarContentRoute(root *http.ServeMux, avatarDir string) {
+	if root == nil {
+		return
+	}
+	dir := strings.TrimSpace(avatarDir)
+	if dir == "" {
+		return
+	}
+	root.HandleFunc("GET /user-content/avatars/{file}", func(w http.ResponseWriter, req *http.Request) {
+		name := req.PathValue("file")
+		// Only plain file names inside the avatar directory are served. Reject
+		// separators, dot-only names and non-image extensions so the route cannot
+		// be used to read arbitrary files.
+		if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+			http.NotFound(w, req)
+			return
+		}
+		switch strings.ToLower(filepath.Ext(name)) {
+		case ".png", ".jpg", ".jpeg", ".webp":
+		default:
+			http.NotFound(w, req)
+			return
+		}
+		file, err := os.Open(filepath.Join(dir, name))
+		if err != nil {
+			http.NotFound(w, req)
+			return
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil || info.IsDir() {
+			http.NotFound(w, req)
+			return
+		}
+		// Uploads append ?v=<content digest>, but legacy rows still hold the plain
+		// URL; require revalidation so a stale cached response cannot win.
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeContent(w, req, name, info.ModTime(), file)
+	})
 }

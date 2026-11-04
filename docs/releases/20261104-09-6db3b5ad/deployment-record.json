@@ -1,0 +1,47 @@
+{
+  "buildId": "20261104-09-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "archiveDir": "docs/releases/20261104-09-6db3b5ad",
+  "releaseDir": ".release/v88/20261104-09-6db3b5ad",
+  "target": "prod 115.190.156.223:/opt/www/qiantie",
+  "deployedAt": "2026-11-04T22:37:10+08:00",
+  "frontendEntry": "/assets/user-DmXbWs5q.js",
+  "frontendEntryBytes": 136740,
+  "frontendEntrySha256": "923047ac2e46588e1c9726e78427c51a82be75ddba6513cd4dea85aa3f5cccd6",
+  "linuxBinary": { "path": "qiantie-server-linux-amd64", "bytes": 70668450, "sha256": "0785707cff093c20ac7e77ec49625ab7357e3133652587ed0949d7b0e1827e61" },
+  "windowsBinary": { "path": "qiantie-local.exe", "bytes": 77593088, "sha256": "f155f3c59e5ad5395bddb7d0148d5e7c6b10b3a22d07000d5104a0ee849900a1" },
+  "dataPackage": { "path": "20261104-09-6db3b5ad-data.zip", "bytes": 12262944, "sha256": "4b7e228ad62c61c1c363c9c9a663064aa3804dd80786f0ab22732f8e601fa1b2", "uploaded": false },
+  "previous": {
+    "buildId": "20261104-08-6db3b5ad",
+    "frontendEntry": "/assets/user-yp8TBcng.js",
+    "binarySha256": "ba7e8ed25fc1e2f6c451d45c338cd7c1d40a302b646515d817e555d913555a2c",
+    "binaryBytes": 70647970,
+    "mainPid": 4135379
+  },
+  "newMainPid": 4137338,
+  "backups": [
+    { "file": "/root/backup-20261104/qiantie.prev-20261104-2235", "bytes": 70647970, "sha256": "ba7e8ed25fc1e2f6c451d45c338cd7c1d40a302b646515d817e555d913555a2c" },
+    { "file": "/root/backup-20261104/qiantie.service-20261104-2235.txt", "bytes": 397, "sha256": "4f6634e8a1362191fa39d20875025570ab65291fb90b598e542df9ccf81ec257" },
+    { "file": "/root/backup-20261104/qiantie-db-pre-20261104-2235.sql.gz", "bytes": 69761504, "sha256": "08e40f95b162322d4a41dbedd2cb8552a00ffcf42a0678ef5a3eec319ac90b22" },
+    { "file": "/root/backup-20261104/qiantie-data-pre-20261104-2235.tgz", "bytes": 164560756, "sha256": "7995e965e9dbad7db5c5935bd5593799bf20f7c7793b16c11eb9fb9bc2008782" }
+  ],
+  "verification": {
+    "health": 200,
+    "runtimeBuildId": "20261104-09-6db3b5ad",
+    "runtimeEntry": "/assets/user-DmXbWs5q.js",
+    "newEntryHttp": 200,
+    "newEntryBytes": 136740,
+    "newEntrySha256": "923047ac2e46588e1c9726e78427c51a82be75ddba6513cd4dea85aa3f5cccd6",
+    "previousEntryHttp": 404,
+    "pages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "panicFatalLines": 0,
+    "capabilities": "14 feature keys, 13 available, disabled=publish.yadi",
+    "envSlice": "QIANTIE_BATCH_FACTORY_V11_SLICE=5",
+    "comicPublishStatusAnon": 401,
+    "comicPublishStatusSigned": 200,
+    "n8ProducerDirectoryReturned": 2,
+    "n8ServiceRejectedLines": 0,
+    "batch0a9bSignedStatus": 200
+  },
+  "localNote": "本机 4001 未更新（PID 28076，仍是 06 二进制），本批只部署线上。"
+}

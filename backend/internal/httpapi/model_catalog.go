@@ -3,12 +3,18 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"qiantie/backend/internal/novelfetchworkshop"
@@ -311,7 +317,21 @@ func registerModelCatalogRoutes(root *http.ServeMux, auth NovelFetchBridgeAuth, 
 			writeJSON(w, http.StatusForbidden, map[string]any{"error": "无权管理模型"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"quotas": []any{}})
+		settings, err := store.GetConfig(req.Context(), identity.Username)
+		if err != nil {
+			writeJSON(w, http.StatusOK, map[string]any{"quotas": []any{}})
+			return
+		}
+		// Only providers with a real balance endpoint are queried; every other
+		// model keeps the previous "not queried" behaviour. A single provider
+		// failure is reported on that entry only and never fails the endpoint.
+		quotas := make([]any, 0)
+		for _, model := range modelCatalog(settings) {
+			if quota, ok := yfaiModelQuota(req.Context(), model); ok {
+				quotas = append(quotas, quota)
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"quotas": quotas})
 	})
 	mux.HandleFunc("GET /api/config/models/local-doubao-executor-video/pairing-status", func(w http.ResponseWriter, req *http.Request) {
 		identity, _ := BridgeIdentityFromContext(req.Context())
@@ -575,4 +595,152 @@ func publicManagedModel(model map[string]any) map[string]any {
 	result["hasCredential"] = strings.TrimSpace(fmt.Sprint(model["credential"])) != "" && fmt.Sprint(model["credential"]) != "<nil>"
 	result["capabilities"] = publicModelCapabilities(model)
 	return result
+}
+
+const (
+	yfaiBalanceTimeout  = 5 * time.Second
+	yfaiBalanceCacheTTL = 5 * time.Minute
+)
+
+// yfaiBalance is the parsed result of GET /v1/skills/balance. Amounts are US
+// dollars parsed from the "$x.xxxxxx" strings the gateway returns.
+type yfaiBalance struct {
+	Status    string
+	Available float64
+	Total     float64
+	Percent   float64
+}
+
+type yfaiBalanceCacheEntry struct {
+	checkedAt time.Time
+	value     yfaiBalance
+}
+
+// yfaiBalanceCache is process-local only: keys never leave memory and nothing
+// is persisted or logged. The cache key is model id + credential fingerprint.
+var yfaiBalanceCache = struct {
+	mu    sync.Mutex
+	items map[string]yfaiBalanceCacheEntry
+}{items: map[string]yfaiBalanceCacheEntry{}}
+
+func yfaiModelQuota(ctx context.Context, model map[string]any) (map[string]any, bool) {
+	if strings.TrimSpace(firstText(model["adapterKind"])) != "yfai_seedance" {
+		return nil, false
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(firstText(model["baseUrl"])), "/")
+	parsed, err := url.Parse(baseURL)
+	if err != nil || strings.ToLower(parsed.Hostname()) != "yf.token6688.com" {
+		return nil, false
+	}
+	modelID := firstText(model["id"])
+	if modelID == "" {
+		modelID = firstText(model["modelId"])
+	}
+	credential := strings.TrimSpace(firstText(model["credential"]))
+	if credential == "" {
+		return map[string]any{"modelId": modelID, "status": "not_configured", "unit": "USD", "checkedAt": time.Now().UTC().Format(time.RFC3339)}, true
+	}
+	cacheKey := modelID + "|" + yfaiCredentialFingerprint(credential)
+	yfaiBalanceCache.mu.Lock()
+	entry, cached := yfaiBalanceCache.items[cacheKey]
+	yfaiBalanceCache.mu.Unlock()
+	if cached && time.Since(entry.checkedAt) < yfaiBalanceCacheTTL {
+		return yfaiQuotaPayload(modelID, entry.value, entry.checkedAt), true
+	}
+	value := fetchYFAIBalance(ctx, baseURL, credential)
+	checkedAt := time.Now().UTC()
+	yfaiBalanceCache.mu.Lock()
+	yfaiBalanceCache.items[cacheKey] = yfaiBalanceCacheEntry{checkedAt: checkedAt, value: value}
+	yfaiBalanceCache.mu.Unlock()
+	return yfaiQuotaPayload(modelID, value, checkedAt), true
+}
+
+func yfaiQuotaPayload(modelID string, value yfaiBalance, checkedAt time.Time) map[string]any {
+	quota := map[string]any{"modelId": modelID, "status": value.Status, "unit": "USD", "checkedAt": checkedAt.UTC().Format(time.RFC3339)}
+	if value.Status == "available" || value.Status == "depleted" {
+		quota["available"] = roundYFAIUSD(value.Available)
+		quota["total"] = roundYFAIUSD(value.Total)
+		quota["percent"] = value.Percent
+	}
+	return quota
+}
+
+func fetchYFAIBalance(ctx context.Context, baseURL, credential string) yfaiBalance {
+	if strings.TrimSpace(credential) == "" {
+		return yfaiBalance{Status: "not_configured"}
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, yfaiBalanceTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, baseURL+"/v1/skills/balance", nil)
+	if err != nil {
+		return yfaiBalance{Status: "error"}
+	}
+	request.Header.Set("Authorization", "Bearer "+credential)
+	request.Header.Set("Accept", "application/json")
+	client := &http.Client{Timeout: yfaiBalanceTimeout}
+	response, err := client.Do(request)
+	if err != nil {
+		var timeoutErr net.Error
+		if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &timeoutErr) && timeoutErr.Timeout()) {
+			return yfaiBalance{Status: "timeout"}
+		}
+		return yfaiBalance{Status: "error"}
+	}
+	defer response.Body.Close()
+	switch {
+	case response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden:
+		return yfaiBalance{Status: "unauthorized"}
+	case response.StatusCode == http.StatusPaymentRequired:
+		return yfaiBalance{Status: "depleted"}
+	case response.StatusCode < 200 || response.StatusCode >= 300:
+		return yfaiBalance{Status: "error"}
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&payload); err != nil {
+		return yfaiBalance{Status: "error"}
+	}
+	available, hasAvailable := yfaiUSDAmount(payload["available_balance"])
+	if !hasAvailable {
+		available, hasAvailable = yfaiUSDAmount(payload["balance"])
+	}
+	total, hasTotal := yfaiUSDAmount(payload["balance"])
+	if !hasTotal {
+		total = available
+	}
+	if !hasAvailable || !hasTotal {
+		return yfaiBalance{Status: "error"}
+	}
+	if available < 0 {
+		available = 0
+	}
+	result := yfaiBalance{Available: available, Total: total}
+	if total > 0 {
+		result.Percent = math.Min(100, available/total*100)
+	}
+	if available <= 0 {
+		result.Status = "depleted"
+	} else {
+		result.Status = "available"
+	}
+	return result
+}
+
+func yfaiUSDAmount(value any) (float64, bool) {
+	raw := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(fmt.Sprint(value)), "$"))
+	if raw == "" || raw == "<nil>" {
+		return 0, false
+	}
+	raw = strings.ReplaceAll(raw, ",", "")
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func roundYFAIUSD(value float64) float64 { return math.Round(value*1e6) / 1e6 }
+
+func yfaiCredentialFingerprint(credential string) string {
+	sum := sha256.Sum256([]byte(credential))
+	return fmt.Sprintf("%x", sum[:8])
 }

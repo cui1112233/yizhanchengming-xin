@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"qiantie/backend/internal/ffmpegbin"
 	"qiantie/backend/internal/mergeworker"
 )
 
@@ -54,6 +55,7 @@ func run() error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	ffmpegbin.LogStartup()
 	worker := &mergeworker.Worker{
 		Store:      store,
 		Queue:      store,

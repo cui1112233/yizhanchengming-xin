@@ -144,6 +144,28 @@ func TestNormalizeAgentImageGenerationInputUsesNestedNodeSettings(t *testing.T) 
 	}
 }
 
+func TestNormalizeAgentImageGenerationInputSupportsPortraitAndLandscapeRatios(t *testing.T) {
+	cases := []struct{ ratio, size string }{
+		{"2:3", "768x1152"},
+		{"3:4", "768x1024"},
+		{"4:3", "1024x768"},
+		{"3:2", "1152x768"},
+	}
+	for _, tc := range cases {
+		input, err := normalizeAgentImageGenerationInput(agentImageGenerationRequest{
+			Provider: "doubao_local_executor", ModelID: "Seedream 5.0 Pro", Prompt: "海报",
+			Mode:       "text_to_image",
+			Parameters: map[string]any{"ratio": tc.ratio, "quality": "standard", "resolution": "1K", "count": float64(1)},
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", tc.ratio, err)
+		}
+		if input.AspectRatio != tc.ratio || input.Size != tc.size {
+			t.Fatalf("%s normalized input=%+v", tc.ratio, input)
+		}
+	}
+}
+
 func TestAgentImageGenerationRejectsUnsupportedNestedCapabilityValue(t *testing.T) {
 	now := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
 	store := newAgentNodeGenerationTestStore(t, now, agentworkspace.Node{ID: "image-1", Type: "image", Title: "图片", Version: 1, Status: "draft"})

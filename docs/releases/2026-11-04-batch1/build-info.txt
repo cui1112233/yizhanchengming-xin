@@ -1,0 +1,51 @@
+V88 第一批发布 构建记录
+=======================
+
+Git 基线
+--------
+branch            : v88
+HEAD              : 6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8
+本版定义          : HEAD 6db3b5ad + 工作区 diff 快照（未 commit）
+改动路径数        : 118（git status --porcelain）
+未跟踪文件数      : 24（见 untracked-files.txt）
+
+前端构建
+--------
+命令              : npm.cmd run build  (cwd=frontend)
+结果              : exit 0，✓ built in 16.91s
+产出入口          : dist/assets/user-bhhBrVux.js
+说明              : 仅既有 chunk>500kB 警告，无新增报错
+
+Go 构建
+-------
+命令              : scripts/build-go-local.ps1
+结果              : exit 0（含 frontend/dist -> backend/web/dist 同步、品牌/pets 资源复制）
+二进制            : backend/qiantie-local.exe
+大小              : 77,315,584 bytes
+构建时间          : 2026-11-04 11:56:08 (本地)
+SHA256            : 5EBE4FDDD68B4E11D29DEDFC9A94CC54ED28111E52DE31D8CAAF2F6A8A9C93F4
+
+runtime-manifest.json
+--------------------
+{"gitSha":"6db3b5ad","binaryPath":"F:\\脚本测试\\一战晟铭-v88\\backend\\qiantie-local.exe",
+ "builtAt":"2026-11-04T03:56:09.4234278Z","frontendEntry":"/assets/user-bhhBrVux.js"}
+
+发布前运行态
+------------
+4001 进程         : PID 21332（启动 2026-11-04 11:10:46，同路径二进制）
+说明              : 本次构建在原路径覆盖了该进程启动时所用二进制的磁盘内容，
+                    其原始字节未能留存；可用的较早回滚二进制为
+                    %TEMP%\v88-backup-20261104-103339\qiantie-local.exe
+                    (SHA256 C72A2CA231ED53B18A513615A29A2F3E87BFC0FB18B9F861838BDF972B6EB7C7)
+
+部署时重建（4001 启动触发）
+--------------------------
+触发原因          : frontend/src/user/pages/ProfilePage.jsx 于 2026-11-04 11:59:36 被其它会话修改，
+                    start-local-go-review.ps1 的 needsBuild 判定因此触发重建
+重建时间          : 2026-11-04 12:07:02
+最终部署二进制    : backend/qiantie-local.exe，77,317,632 bytes
+SHA256            : E2A4D76FCF353A7DDCC9037748123AABEE228A4A0FE989461F6BB69A4FC788DC
+前端入口          : /assets/user-2gZgH99m.js
+说明              : 4002 烟雾验证跑的是 11:56 版（入口 /assets/user-bhhBrVux.js）；
+                    4001 实际部署的是 12:07 重建版，Go 侧同源，前端额外包含 11:59 的 ProfilePage 改动。
+

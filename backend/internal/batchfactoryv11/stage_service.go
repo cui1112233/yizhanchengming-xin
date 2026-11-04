@@ -4,8 +4,34 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"strings"
 )
+
+// StripReferenceImagesOnModerationEnv opts into dropping reference images when
+// a failed video retry was rejected by moderation. Default off always keeps the
+// historical behaviour: the same images are submitted again.
+const StripReferenceImagesOnModerationEnv = "QIANTIE_BATCH_STRIP_REFERENCE_IMAGES_ON_MODERATION"
+
+// moderationRejectionKeywords are provider-agnostic hints. They are only ever
+// used together with the opt-in switch above, never to reclassify an error.
+var moderationRejectionKeywords = []string{"审核", "违规", "敏感", "内容不符合", "moderation", "content_policy", "sensitive", "nsfw"}
+
+func stripReferenceImagesOnModerationEnabled() bool {
+	value := strings.TrimSpace(os.Getenv(StripReferenceImagesOnModerationEnv))
+	return value == "1" || strings.EqualFold(value, "true")
+}
+
+func isModerationRejectionMessage(message string) bool {
+	lower := strings.ToLower(message)
+	for _, keyword := range moderationRejectionKeywords {
+		if strings.Contains(lower, keyword) {
+			return true
+		}
+	}
+	return false
+}
 
 type BookStageAvailability struct {
 	Stage     BookStage `json:"stage"`
@@ -109,7 +135,18 @@ func (s *BookStageService) availability(ctx context.Context, owner string, stage
 	}
 }
 
+// Availability evaluates the owner-level stage gates. Image/video readiness
+// reads the owner settings, so callers that summarise many books in one request
+// should compute this once and reuse it through SummaryWithAvailability.
+func (s *BookStageService) Availability(ctx context.Context, owner string) []BookStageAvailability {
+	return []BookStageAvailability{s.availability(ctx, owner, BookStageAssets), s.availability(ctx, owner, BookStageDirector), s.availability(ctx, owner, BookStageOpening), s.availability(ctx, owner, BookStageVisual), s.availability(ctx, owner, BookStageComic), s.availability(ctx, owner, BookStageImage), s.availability(ctx, owner, BookStageVideo)}
+}
+
 func (s *BookStageService) Summary(ctx context.Context, owner, batchID, bookID string) (BookStageSummary, error) {
+	return s.SummaryWithAvailability(ctx, owner, batchID, bookID, s.Availability(ctx, owner))
+}
+
+func (s *BookStageService) SummaryWithAvailability(ctx context.Context, owner, batchID, bookID string, availability []BookStageAvailability) (BookStageSummary, error) {
 	repository, err := s.repository()
 	if err != nil {
 		return BookStageSummary{}, err
@@ -118,7 +155,6 @@ func (s *BookStageService) Summary(ctx context.Context, owner, batchID, bookID s
 	if err != nil {
 		return BookStageSummary{}, err
 	}
-	availability := []BookStageAvailability{s.availability(ctx, owner, BookStageAssets), s.availability(ctx, owner, BookStageDirector), s.availability(ctx, owner, BookStageOpening), s.availability(ctx, owner, BookStageVisual), s.availability(ctx, owner, BookStageComic), s.availability(ctx, owner, BookStageImage), s.availability(ctx, owner, BookStageVideo)}
 	return BookStageSummary{BookID: bookID, Runs: runs, Availability: availability, LastFailed: LatestFailedBookStageRun(runs)}, nil
 }
 
@@ -187,10 +223,10 @@ func immediateVideoProviderFailure(job ProductionJob) error {
 }
 
 func (s *BookStageService) Run(ctx context.Context, owner, batchID, bookID string, stage BookStage, mode StageMode, requestID, videoID string) (BookStageSummary, error) {
-	return s.run(ctx, owner, batchID, bookID, stage, mode, requestID, videoID, "")
+	return s.run(ctx, owner, batchID, bookID, stage, mode, requestID, videoID, "", false)
 }
 
-func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID string, stage BookStage, mode StageMode, requestID, videoID, frozenCompilationID string) (BookStageSummary, error) {
+func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID string, stage BookStage, mode StageMode, requestID, videoID, frozenCompilationID string, stripReferenceImages bool) (BookStageSummary, error) {
 	if !validBookStage(stage) {
 		return BookStageSummary{}, ErrInvalid
 	}
@@ -341,13 +377,13 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		}
 		if mode == StageModeMissing {
 			var job ProductionJob
-			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{VideoID: videoID, CompilationID: frozenCompilationID})
+			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{VideoID: videoID, CompilationID: frozenCompilationID, StripReferenceImages: stripReferenceImages})
 			if err == nil {
 				err = immediateVideoProviderFailure(job)
 			}
 		} else {
 			var job ProductionJob
-			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{Force: true, VideoID: videoID, CompilationID: frozenCompilationID})
+			job, err = s.Production.SubmitBookProductionWithOptions(ctx, owner, batchID, bookID, requestID, provider, ProductionOptions{Force: true, VideoID: videoID, CompilationID: frozenCompilationID, StripReferenceImages: stripReferenceImages})
 			if err == nil {
 				err = immediateVideoProviderFailure(job)
 			}
@@ -406,16 +442,47 @@ func (s *BookStageService) RetryLastFailed(ctx context.Context, owner, batchID, 
 		if !found {
 			return BookStageSummary{}, fmt.Errorf("%w: 当前小说没有失败步骤", ErrConflict)
 		}
-		return s.run(ctx, owner, batchID, bookID, BookStageVideo, StageModeForce, requestID, failedTask.VideoID, failedTask.CompilationID)
+		strip := s.stripReferenceImagesOnModerationRetry(ctx, owner, batchID, bookID, failedTask.VideoID, failedTask.ErrorMessage)
+		retried, retryErr := s.run(ctx, owner, batchID, bookID, BookStageVideo, StageModeForce, requestID, failedTask.VideoID, failedTask.CompilationID, strip)
+		return retried, annotateStrippedRetry(retryErr, strip)
 	}
 	if strings.TrimSpace(videoID) == "" && summary.LastFailed.Stage == BookStageVideo {
 		videoID = summary.LastFailed.InputRevision
 	}
 	frozenCompilationID := ""
+	strip := false
 	if summary.LastFailed.Stage == BookStageVideo {
 		frozenCompilationID = s.latestFailedH3CompilationID(ctx, owner, batchID, bookID, videoID)
+		strip = s.stripReferenceImagesOnModerationRetry(ctx, owner, batchID, bookID, videoID, summary.LastFailed.ErrorMessage)
 	}
-	return s.run(ctx, owner, batchID, bookID, summary.LastFailed.Stage, StageModeForce, requestID, videoID, frozenCompilationID)
+	retried, retryErr := s.run(ctx, owner, batchID, bookID, summary.LastFailed.Stage, StageModeForce, requestID, videoID, frozenCompilationID, strip)
+	return retried, annotateStrippedRetry(retryErr, strip)
+}
+
+// stripReferenceImagesOnModerationRetry decides one retry's image policy. The
+// switch is opt-in and the failed message must actually look like a moderation
+// rejection; both conditions are required before images are dropped.
+func (s *BookStageService) stripReferenceImagesOnModerationRetry(ctx context.Context, owner, batchID, bookID, videoID, message string) bool {
+	if !stripReferenceImagesOnModerationEnabled() {
+		return false
+	}
+	if strings.TrimSpace(message) == "" && strings.TrimSpace(videoID) != "" {
+		if task, found := s.latestFailedProductionTask(ctx, owner, batchID, bookID, videoID); found {
+			message = task.ErrorMessage
+		}
+	}
+	if !isModerationRejectionMessage(message) {
+		return false
+	}
+	log.Printf("batch factory retry strips reference images batch=%s book=%s video=%s", batchID, bookID, videoID)
+	return true
+}
+
+func annotateStrippedRetry(err error, stripped bool) error {
+	if err == nil || !stripped {
+		return err
+	}
+	return fmt.Errorf("%w（已按审核失败去除参考图重试）", err)
 }
 
 func (s *BookStageService) latestFailedH3CompilationID(ctx context.Context, owner, batchID, bookID, videoID string) string {

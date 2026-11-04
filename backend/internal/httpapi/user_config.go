@@ -14,6 +14,12 @@ import (
 	"qiantie/backend/internal/novelfetchworkshop"
 )
 
+// defaultPetSetting 是后端唯一的宠物默认值，对应前端 petCatalog.js 的
+// DEFAULT_PET_ID。用户已保存的 pet 会在 mergeConfigMap 中覆盖它，不会被重置。
+var defaultPetSetting = map[string]any{
+	"id": "little-companion", "displayName": "小家伙", "description": "小家伙，陪你创作的原创桌面宠物。", "renderer": "multi-sheet", "assetBasePath": "/pets/little-companion", "previewPose": "idle",
+}
+
 var defaultUserConfig = func() map[string]any {
 	config := map[string]any{
 		"provider":                "openai",
@@ -29,9 +35,7 @@ var defaultUserConfig = func() map[string]any {
 		"video": map[string]any{
 			"provider": "yd_video", "displayName": "中转亚迪",
 		},
-		"pet": map[string]any{
-			"id": "little-companion", "displayName": "小家伙", "description": "小家伙，陪你创作的原创桌面宠物。", "renderer": "multi-sheet", "assetBasePath": "/pets/little-companion", "previewPose": "idle",
-		},
+		"pet":           cloneConfigMap(defaultPetSetting),
 		"tts":           map[string]any{"voice": "zh-CN-XiaoxiaoNeural", "style": "general", "speed": 1.8, "pitch": 10},
 		"notifications": map[string]any{"soundEnabled": true, "petVisible": true, "soundVolume": 60},
 		"avatar":        nil,

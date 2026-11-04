@@ -653,6 +653,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
 .batch-factory-book-config-region b { font-size: 12px; }
 .batch-factory-book-config-region small { color: var(--sh-muted); font-size: 11px; line-height: 1.35; }
 .batch-factory-book-config-region.is-overridden { border-left-color: #f3c969; }
+.batch-factory-book-config-region.is-pushed { border-left-color: #63dfc0; }
 .batch-factory-book-config-region.is-disabled { border-left-color: #9a86c6; }
 .batch-factory-book-config-region.is-inherited { border-left-color: #4a6b8a; }
 .batch-factory-storyboard-video-map { display: flex; flex-wrap: wrap; gap: 5px; min-height: 24px; margin-bottom: 8px; }
@@ -4697,4 +4698,279 @@ body.shuihuo-reference-shell
   .batch-factory-comic-prompt-affixes {
     grid-template-columns: 1fr;
   }
+}
+
+/* ===== 统一错误展示：标题 + 人话摘要 + 折叠原始信息 + 一键复制 ===== */
+.batch-factory-error-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--sh-danger, #f08a8a) 46%, var(--sh-line, rgba(151, 168, 190, .16)));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--sh-danger, #f08a8a) 10%, transparent);
+}
+.batch-factory-error-notice-title {
+  color: var(--sh-danger, #f08a8a);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.batch-factory-error-notice-summary {
+  margin: 0;
+  min-width: 0;
+  color: var(--sh-text, #f5f7fb);
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.batch-factory-error-notice-summary.is-clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.batch-factory-error-notice-toggle {
+  align-self: flex-start;
+  padding: 0;
+  color: var(--sh-accent, #63dfc0);
+  border: 0;
+  background: transparent;
+  font-size: 11.5px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.batch-factory-error-notice-toggle:hover { text-decoration: underline; }
+.batch-factory-error-notice-raw {
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .26);
+}
+.batch-factory-error-notice-raw-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.batch-factory-error-notice-raw-row > span { color: var(--sh-muted, #8391a4); white-space: nowrap; }
+.batch-factory-error-notice-raw-row > code {
+  min-width: 0;
+  color: var(--sh-text, #f5f7fb);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.batch-factory-error-notice-raw-full {
+  margin: 0;
+  min-width: 0;
+  color: var(--sh-muted, #8391a4);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.batch-factory-error-notice-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.batch-factory-error-notice.is-compact { padding: 8px 10px; gap: 4px; }
+.batch-factory-error-notice.is-compact .batch-factory-error-notice-title { font-size: 12px; }
+.batch-factory-error-notice.is-compact .batch-factory-error-notice-summary { font-size: 11.5px; }
+
+/* 自动化失败提示：整行底部通栏，不再占“编辑内容”单元格的正文空间。 */
+.batch-factory-book-row-error-strip {
+  grid-column: 1 / -1;
+  min-width: 0;
+  width: 100%;
+  padding: 2px 0;
+  border-top: 1px solid var(--sh-line, #1d2b40);
+}
+.batch-factory-book-row-error-strip .batch-factory-error-notice { width: 100%; }
+
+/* 持久失败记录压成一条 28px 细线：左侧 3px 状态色，折叠态只有一句话 + “详情”。
+   展开后才显示原始 code/message/request_id、复制与重试，避免再占满整行。 */
+.batch-factory-error-notice.is-line {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  border-left: 3px solid var(--sh-danger, #f08a8a);
+  border-radius: 0;
+  background: transparent;
+}
+.batch-factory-error-notice-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+}
+.batch-factory-error-notice-line-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--sh-text, #f5f7fb);
+  font-size: 12px;
+  line-height: 28px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.batch-factory-error-notice-line-btn {
+  flex: none;
+  padding: 0 4px;
+  color: var(--sh-accent, #63dfc0);
+  border: 0;
+  background: transparent;
+  font-size: 11.5px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.batch-factory-error-notice-line-btn:hover { text-decoration: underline; }
+.batch-factory-error-notice.is-line.is-expanded { padding-bottom: 8px; }
+.batch-factory-error-notice.is-line.is-expanded .batch-factory-error-notice-line { min-height: 24px; }
+.batch-factory-error-notice.is-line.is-expanded .batch-factory-error-notice-line-text { line-height: 24px; }
+
+/* 统一配置面板：高度不超视口，内容区内部滚动，底部保存按钮固定。 */
+.ant-modal.batch-factory-unified-settings-modal {
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  padding-bottom: 24px;
+}
+.batch-factory-unified-settings-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+}
+.batch-factory-unified-settings-modal .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--sh-accent, #63dfc0) 60%, #888) transparent;
+}
+.batch-factory-unified-settings-modal .ant-modal-body::-webkit-scrollbar { width: 10px; }
+.batch-factory-unified-settings-modal .ant-modal-body::-webkit-scrollbar-track { background: transparent; }
+.batch-factory-unified-settings-modal .ant-modal-body::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sh-accent, #63dfc0) 60%, #888);
+}
+.batch-factory-unified-settings-modal .ant-modal-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--sh-line, #1d2b40);
+  background: var(--sh-panel, #0e1621);
+}
+@media (max-width: 960px) {
+  .ant-modal.batch-factory-unified-settings-modal {
+    top: 12px;
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 24px);
+    padding-bottom: 12px;
+  }
+  .batch-factory-unified-settings-modal .ant-modal-content { max-height: calc(100vh - 24px); }
+}
+
+/* 批次表“操作”列右侧固定：横向滚动时按钮仍可见，宽度不压缩。 */
+.batch-factory-novel-list-v13 .batch-factory-novel-list-head > span:nth-child(7),
+.batch-factory-novel-list-v13 .batch-factory-novel-list-row > span:nth-child(7) {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  min-width: 76px;
+  background: var(--sh-panel, #0e1621);
+  box-shadow: -10px 0 14px -10px rgba(0, 0, 0, .55);
+}
+.batch-factory-novel-list-v13 .batch-factory-novel-list-head > span:nth-child(7) {
+  z-index: 3;
+  background: var(--sh-panel-strong, #111b28);
+}
+@media (max-width: 960px) {
+  .batch-factory-novel-list-v13 .batch-factory-novel-list-head > span:nth-child(7),
+  .batch-factory-novel-list-v13 .batch-factory-novel-list-row > span:nth-child(7) { min-width: 68px; }
+}
+
+/* 单书配置只在“真正偏离批次”的字段上挂一个短徽标，继承态完全不出文字。 */
+.batch-factory-field-source {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-style: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.batch-factory-field-source.is-custom { display: inline-block; color: var(--sh-accent, #63dfc0); cursor: pointer; white-space: nowrap; }
+/* 整页继承说明只出现一次。 */
+.batch-factory-inherit-hint {
+  color: var(--sh-muted, #8391a4);
+  font-size: 11.5px;
+  margin: 2px 0 10px;
+}
+.batch-factory-unified-settings-scope {
+  color: var(--sh-muted, #8391a4);
+  font-size: 11.5px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 420px;
+  display: inline-block;
+  line-height: 1.5;
+}
+
+/* 保存统一配置后的后台收尾（配音测量 / 提示词重编译）：批次级进度条与行内进度。 */
+.batch-factory-background-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(99, 223, 192, 0.35);
+  border-radius: 8px;
+  background: rgba(99, 223, 192, 0.08);
+  font-size: 12px;
+  color: #a9c3c6;
+}
+.batch-factory-background-task.is-error {
+  border-color: rgba(255, 122, 122, 0.45);
+  background: rgba(255, 122, 122, 0.08);
+  color: #ffb3b3;
+}
+.batch-factory-background-task-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.batch-factory-book-row-bg-task {
+  grid-column: 1 / -1;
+  padding: 4px 12px 6px;
+  font-size: 11.5px;
+  color: #9fb3b8;
 }

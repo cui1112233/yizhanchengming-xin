@@ -110,17 +110,26 @@ export function loadScriptDraft(storage, username, tabId) {
   }
 }
 
+export function storageFailureReason(error) {
+  const name = String(error?.name || '');
+  if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') return '本地存储空间已满';
+  if (name === 'SecurityError') return '浏览器已禁用本地存储（隐私模式）';
+  return String(error?.message || '浏览器本地存储不可用');
+}
+
 export function saveScriptDraft(storage, username, tabId, draft) {
-  if (!tabId) return false;
+  if (!tabId) return { ok: false, reason: '缺少草稿标识，无法保存' };
+  if (!storage) return { ok: false, reason: '浏览器本地存储不可用' };
   try {
     const normalized = normalizeDraft({ ...draft, version: draftVersion });
-    if (!normalized) return false;
-    storage?.setItem(tabDraftKey(username, tabId), JSON.stringify({
+    if (!normalized) return { ok: false, reason: '草稿内容不完整，无法保存' };
+    const savedAt = new Date();
+    storage.setItem(tabDraftKey(username, tabId), JSON.stringify({
       ...normalized,
-      savedAt: new Date().toISOString()
+      savedAt: savedAt.toISOString()
     }));
-    return true;
-  } catch {
-    return false;
+    return { ok: true, savedAt };
+  } catch (error) {
+    return { ok: false, reason: storageFailureReason(error) };
   }
 }

@@ -322,7 +322,7 @@ func TestBuildComicPromptContractUsesComicAssetsAndConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(contract.SystemPrompt, "完整9:16画幅条漫页") || !strings.Contains(contract.SystemPrompt, "阅读顺序") || !strings.Contains(contract.SystemPrompt, "Q版日系条漫") || !strings.Contains(contract.SystemPrompt, "必须有分格") || !strings.Contains(contract.SystemPrompt, "不要水印") {
+	if !strings.Contains(contract.SystemPrompt, "完整9:16竖幅构图条漫页") || !strings.Contains(contract.SystemPrompt, "阅读顺序") || !strings.Contains(contract.SystemPrompt, "Q版日系条漫") || !strings.Contains(contract.SystemPrompt, "必须有分格") || !strings.Contains(contract.SystemPrompt, "不要水印") {
 		t.Fatalf("system prompt misses comic rules: %s", contract.SystemPrompt)
 	}
 	if strings.Contains(contract.SystemPrompt, "二点五至三点五头身") || strings.Contains(contract.SystemPrompt, "圆脸大眼") {
@@ -706,5 +706,23 @@ func TestRunComicPromptExtractionAllowsLightPresetEmptyImagePrompt(t *testing.T)
 	}
 	if updated[0].ComicPrompt != "轻量版导演说明" || updated[0].ComicImagePrompt != "" {
 		t.Fatalf("light preset result changed unexpectedly: %+v", updated[0])
+	}
+}
+
+func TestComicPromptTextForAspectSwitchesOrientationWording(t *testing.T) {
+	portrait := comicPromptTextForAspect("一张3:4竖版条漫页", "2:3")
+	if !strings.Contains(portrait, "2:3竖幅构图") || strings.Contains(portrait, "竖版") {
+		t.Fatalf("portrait ratio kept stale wording: %s", portrait)
+	}
+	landscape := comicPromptTextForAspect("一张3:4竖版条漫页", "4:3")
+	if !strings.Contains(landscape, "4:3横幅构图") || strings.Contains(landscape, "竖版") || strings.Contains(landscape, "条漫") {
+		t.Fatalf("landscape ratio kept portrait wording: %s", landscape)
+	}
+	square := comicPromptTextForAspect("一张3:4竖版条漫页", "1:1")
+	if !strings.Contains(square, "1:1方形构图") || strings.Contains(square, "竖版") {
+		t.Fatalf("square ratio kept portrait wording: %s", square)
+	}
+	if got := comicPromptTextForAspect("成图为{{image_aspect_ratio}}{{image_orientation}}的中文漫画页", "3:2"); !strings.Contains(got, "3:2横幅构图") {
+		t.Fatalf("structure lock did not use landscape orientation: %s", got)
 	}
 }

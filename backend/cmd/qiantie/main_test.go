@@ -57,6 +57,24 @@ func TestRuntimeHandlerKeepsLocalExecutorDownloadsOnGo(t *testing.T) {
 	}
 }
 
+func TestRuntimeHandlerKeepsMemberAvatarsOnGo(t *testing.T) {
+	api := http.NewServeMux()
+	api.HandleFunc("GET /user-content/avatars/{file}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	static := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+	handler := newRuntimeHandler(api, static)
+
+	req := httptest.NewRequest(http.MethodGet, "/user-content/avatars/alice.png", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("avatar path reached status %d, want Go handler status %d", rec.Code, http.StatusNoContent)
+	}
+}
+
 func TestHealthURLNormalizesWildcardListenAddresses(t *testing.T) {
 	for _, tc := range []struct {
 		listen string

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { archivePreset, createPresetDraft, deletePreset, listAdminPresetSlots, listAdminPresets, loadAdminComicMaterialPreview, publishPreset, rollbackPreset, updatePresetDraft, uploadAdminComicMaterial } from '../../shared/api/admin';
 
 const modules = [
-  { label: '剧本生成', value: 'script' },
+  { label: '私人定制', value: 'script' },
   { label: '小说获取', value: 'novel-fetch' },
   { label: '水货生产', value: 'shuihuo-production' },
   { label: '批量工厂', value: 'batch-factory' }
@@ -28,7 +28,7 @@ const scriptPresetSections = [
   {
     key: 'base-setup',
     title: '基础设定（人物 / 场景）',
-    description: '对应剧本生成输入框的「切换指令 → 提取方案」，用于提取人物与场景。',
+    description: '对应私人定制输入框的「切换指令 → 提取方案」，用于提取人物与场景。',
     matches: preset => preset.protocolLock?.format === 'extract' || preset.id === 'script-extract'
   },
   {

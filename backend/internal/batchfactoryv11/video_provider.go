@@ -8,10 +8,13 @@ import (
 )
 
 const (
-	VideoProviderPersonalAPI      = "personal_api"
-	VideoProviderDoubaoLocal      = "doubao_local_executor"
-	VideoProviderAutoDLH3         = "autodl_comfyui"
-	VideoProviderYFAISeedance     = "yfai_seedance"
+	VideoProviderPersonalAPI  = "personal_api"
+	VideoProviderDoubaoLocal  = "doubao_local_executor"
+	VideoProviderAutoDLH3     = "autodl_comfyui"
+	VideoProviderYFAISeedance = "yfai_seedance"
+	// VideoProviderYFAI 是“视频引擎”下拉里的 YFAI 官方直连分组。执行层仍复用
+	// VideoProviderYFAISeedance 的适配器与密钥，两者只区分配置分组口径。
+	VideoProviderYFAI             = "yfai"
 	PersonalVideoProviderID       = "yd_video"
 	DefaultPersonalVideoModel     = "yd2.0-mini"
 	DefaultPersonalVideoCreateURL = "https://ydapi.yadiai.cn/openapi/v1/video/create"
@@ -194,7 +197,12 @@ func (r *MemoryVideoProviderRegistry) View(_ context.Context, owner, provider st
 }
 
 func normalizeVideoProvider(provider string) string {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
+	normalized := strings.ToLower(strings.TrimSpace(provider))
+	// 梵客视频的具体型号保存为 fanke-video-api::<modelId>，执行层统一走梵客适配器。
+	if strings.HasPrefix(normalized, "fanke-video-api") {
+		return VideoProviderYFAISeedance
+	}
+	switch normalized {
 	case "", "personal", "personal_api", "yd_video", "yadi":
 		return VideoProviderPersonalAPI
 	case "doubao", "doubao_local", "doubao_local_executor", "local-doubao-executor-video":
@@ -204,8 +212,58 @@ func normalizeVideoProvider(provider string) string {
 	case "yfai", "yfai_seedance", "seedance-2-0-official":
 		return VideoProviderYFAISeedance
 	default:
-		return strings.ToLower(strings.TrimSpace(provider))
+		return normalized
 	}
+}
+
+const fanKeVideoSelectionPrefix = "fanke-video-api::"
+
+// FanKeModelFromSelection 从 "fanke-video-api::<modelId>" 里取出具体型号；
+// 旧值（裸 fanke-video-api）返回空，由调用方回退到目录里的默认型号。
+func FanKeModelFromSelection(modelID string) string {
+	raw := strings.TrimSpace(modelID)
+	if !strings.HasPrefix(strings.ToLower(raw), fanKeVideoSelectionPrefix) {
+		return ""
+	}
+	return strings.TrimSpace(raw[len(fanKeVideoSelectionPrefix):])
+}
+
+// VideoCatalogEngines is the complete "视频引擎" grouping enum for book
+// settings. YFAI is added alongside the four existing groups; nothing is
+// removed or renamed.
+var VideoCatalogEngines = []string{
+	VideoProviderPersonalAPI,
+	VideoProviderDoubaoLocal,
+	VideoProviderAutoDLH3,
+	VideoProviderYFAI,
+	VideoProviderYFAISeedance,
+}
+
+// CatalogEngineForModel maps a catalog model to its engine group. It only
+// decides the settings grouping; the execution provider is still chosen by
+// VideoProviderForModel/normalizeVideoProvider.
+func CatalogEngineForModel(modelID, fallback string) string {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(modelID)), "fanke-video-api") {
+		// 梵客聚合站自己的型号（含它的 Seedance 变体）保留在梵客分组。
+		return VideoProviderYFAISeedance
+	}
+	switch strings.ToLower(strings.TrimSpace(modelID)) {
+	case "seedance-2-0-official":
+		return VideoProviderYFAI
+	case "fanke-video-api":
+		// 梵客聚合站自己的型号（含它的 Seedance 变体）保留在梵客分组。
+		return VideoProviderYFAISeedance
+	case "minimax-h3-video":
+		return VideoProviderAutoDLH3
+	case "yd2-mini-video", "yd2.0-mini":
+		return VideoProviderPersonalAPI
+	case "local-doubao-executor-video", "doubao-seedance":
+		return VideoProviderDoubaoLocal
+	}
+	if strings.EqualFold(strings.TrimSpace(fallback), VideoProviderYFAI) {
+		return VideoProviderYFAI
+	}
+	return normalizeVideoProvider(fallback)
 }
 
 // VideoProviderForModel keeps the saved model selection and the runtime
@@ -213,6 +271,9 @@ func normalizeVideoProvider(provider string) string {
 // model IDs, so the model selection is the authoritative choice whenever it
 // is one of the built-in video models.
 func VideoProviderForModel(modelID, fallback string) string {
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(modelID)), "fanke-video-api") {
+		return VideoProviderYFAISeedance
+	}
 	switch strings.ToLower(strings.TrimSpace(modelID)) {
 	case "minimax-h3-video":
 		return VideoProviderAutoDLH3

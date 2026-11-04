@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -86,5 +87,66 @@ func TestUserConfigSeedsImportedWorkshopCatalog(t *testing.T) {
 	pet, ok := settings["pet"].(map[string]any)
 	if !ok || pet["id"] != "little-companion" {
 		t.Fatalf("default pet = %#v, want Little Companion", settings["pet"])
+	}
+}
+
+func TestUserConfigKeepsSavedPetChoice(t *testing.T) {
+	store := NewUserConfigStore(t.TempDir())
+	cases := []struct {
+		saved   any
+		wantPet string
+	}{
+		{"pixiu", "pixiu"},
+		{"stacky", "stacky"},
+		{map[string]any{"id": "pixiu", "displayName": "貔貅"}, "pixiu"},
+	}
+	for _, item := range cases {
+		if err := store.write("returning-user", map[string]any{"pet": item.saved}); err != nil {
+			t.Fatal(err)
+		}
+		settings, err := store.GetConfig(context.Background(), "returning-user")
+		if err != nil {
+			t.Fatal(err)
+		}
+		petID := ""
+		if pet, ok := settings["pet"].(map[string]any); ok {
+			petID, _ = pet["id"].(string)
+		} else {
+			petID, _ = settings["pet"].(string)
+		}
+		if petID != item.wantPet {
+			t.Fatalf("saved pet %#v resolved to %q, want %q", item.saved, petID, item.wantPet)
+		}
+	}
+}
+
+func TestUserConfigPetChoiceSurvivesSaveAndReload(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	accounts := &authTestStore{account: auth.Account{Username: "tester", Active: true, IsOwner: true}}
+	catalogStore := novelfetchworkshop.NewMemoryStore()
+	userConfig := NewUserConfigStore(t.TempDir())
+	mux := http.NewServeMux()
+	registerUserConfigRoutes(mux, BridgeAuth{Secret: "test-secret", Now: func() time.Time { return now }, AuthStore: accounts}, userConfig, accounts, catalogStore)
+
+	post := httptest.NewRequest(http.MethodPost, "/api/config", strings.NewReader(`{"pet":"stacky"}`))
+	SignBridgeRequest(post, "tester", true, now, "test-secret")
+	postResponse := httptest.NewRecorder()
+	mux.ServeHTTP(postResponse, post)
+	if postResponse.Code != http.StatusOK {
+		t.Fatalf("save pet status=%d body=%s", postResponse.Code, postResponse.Body.String())
+	}
+
+	for attempt := 0; attempt < 2; attempt++ {
+		request := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+		SignBridgeRequest(request, "tester", true, now, "test-secret")
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, request)
+		var payload map[string]any
+		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["pet"] != "stacky" {
+			t.Fatalf("reload %d pet = %#v, want explicit stacky preserved", attempt, payload["pet"])
+		}
 	}
 }

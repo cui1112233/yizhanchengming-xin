@@ -19,8 +19,31 @@ function stageLabel(mode, id, fallback) {
 
 const terminalAutomationBookStates = new Set(['failed', 'blocked', 'stopped', 'completed']);
 
+// 超过该时长的失败记录只作为历史记录展示，不再冒充当前自动化状态。
+export const AUTOMATION_BOOK_ERROR_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// 卡片只能消费“属于当前批次 + 属于本书”的自动化记录。
+// 跨批次的历史 job 即便 bookId 撞上，也不允许渲染到当前书卡。
+export function automationBookForCard(status, batchId, bookId, now = Date.now()) {
+  const statusBatch = String(status?.batchId || '').trim();
+  const currentBatch = String(batchId || '').trim();
+  if (statusBatch && currentBatch && statusBatch !== currentBatch) return null;
+  const wanted = String(bookId || '').trim();
+  if (!wanted) return null;
+  const book = (Array.isArray(status?.books) ? status.books : [])
+    .find(item => String(item?.bookId || '').trim() === wanted);
+  if (!book) return null;
+  const state = String(book.status || '').trim().toLowerCase();
+  const stamp = Date.parse(String(book.updatedAt || book.finishedAt || book.startedAt || ''));
+  const stale = terminalAutomationBookStates.has(state) && state !== 'completed'
+    && Number.isFinite(stamp) && (now - stamp) > AUTOMATION_BOOK_ERROR_MAX_AGE_MS;
+  return stale ? { ...book, stale: true } : { ...book, stale: false };
+}
+
 export function automationBookNeedsRetry(status, bookId) {
-  const book = (Array.isArray(status?.books) ? status.books : []).find(item => String(item?.bookId || '') === String(bookId || ''));
+  const wanted = String(bookId || '').trim();
+  if (!wanted) return null;
+  const book = (Array.isArray(status?.books) ? status.books : []).find(item => String(item?.bookId || '').trim() === wanted);
   const state = String(book?.status || '').trim().toLowerCase();
   return book && terminalAutomationBookStates.has(state) && state !== 'completed'
     ? { stage: String(book.stage || '').trim() }
@@ -30,7 +53,9 @@ export function automationBookNeedsRetry(status, bookId) {
 export function automationBookIsActive(status, bookId) {
   const state = String(status?.state || '').trim().toLowerCase();
   if (!['running', 'scheduled', 'paused', 'needs_attention'].includes(state)) return false;
-  const book = (Array.isArray(status?.books) ? status.books : []).find(item => String(item?.bookId || '') === String(bookId || ''));
+  const wanted = String(bookId || '').trim();
+  if (!wanted) return false;
+  const book = (Array.isArray(status?.books) ? status.books : []).find(item => String(item?.bookId || '').trim() === wanted);
   if (!book) return true;
   return !terminalAutomationBookStates.has(String(book.status || '').trim().toLowerCase());
 }
@@ -55,6 +80,12 @@ export function batchFactoryVisibleError(error) {
   if (!raw) return '';
   if (/\b402\b|insufficient[_\s-]?funds|payment required/i.test(raw)) {
     return '当前视频模型的账户额度或权限不足，请更换视频模型，或检查该模型账户的额度与权限。';
+  }
+  if (/\b40[13]\b|invalid[_\s-]?api[_\s-]?key|unauthori[sz]ed|密钥无效|无权限/i.test(raw)) {
+    return '视频模型的 API Key 无效或无权限，请到「API 配置」检查或重建密钥。';
+  }
+  if (/\b429\b|too many requests|rate limit|限流/i.test(raw)) {
+    return '视频模型接口限流，请稍后再试；系统会按上游 Retry-After 自动退避。';
   }
   return raw;
 }
@@ -216,7 +247,7 @@ function classificationReady(metadata = {}) {
   return Boolean(gender && gender !== '待确认' && style && !['待判定', '未判定'].includes(style));
 }
 
-export function batchFactoryBookState(book, { productionStatus, mergeStatus, stageSummary, productionMode = 'video' } = {}) {
+export function batchFactoryBookState(book, { productionStatus, mergeStatus, stageSummary, productionMode = 'video', automationBook } = {}) {
   const sourceText = batchFactorySourceText(book?.sourceText);
   const queueStatus = String(book?.sourceMetadata?.queueStatus || '').trim();
   const manual = hasManualAdjustment(book);
@@ -246,6 +277,16 @@ export function batchFactoryBookState(book, { productionStatus, mergeStatus, sta
   if (failedStep) return { label: '异常', detail: `${failedStep.label}：${failedStep.detail}`, tone: 'red', manual, failedStep };
   const activeStep = timeline.find(item => item.status === 'running');
   if (activeStep) return { label: '执行中…', detail: `${activeStep.label}：${activeStep.detail}`, tone: 'blue', manual };
+  // 自动化任务可能在时间线之外的阶段失败（例如 audio_planning 的配音时长测量）。
+  // 这种情况过去会一路落到“待开始/原文已就绪”，用户只能看到“等待”却查不到原因。
+  if (!failedStep && taskState(automationBook) === 'failed') {
+    const stage = String(automationBook?.stage || '').trim();
+    const stageText = stageLabel('video', stage, stage === 'audio_planning' ? '配音与逐行时长' : '自动化');
+    const message = String(automationBook?.message || '').trim();
+    const error = String(automationBook?.error || '').trim();
+    const detail = message || `${stageText}失败`;
+    return { label: '异常', detail: error && error !== detail ? `${detail}（${batchFactoryVisibleError(error)}）` : detail, tone: 'red', manual, failedStage: { stage, message: detail, errorMessage: error } };
+  }
   if (comicMode) {
     if (timeline.find(item => item.key === 'video')?.status === 'completed') return { label: '待整理', detail: '漫画页已生成，等待整理漫画合集', tone: 'cyan', manual };
     if (timeline.find(item => item.key === 'director')?.status === 'completed') return { label: '待生成', detail: '漫画分页与提示词已就绪，等待生成漫画图片', tone: 'cyan', manual };

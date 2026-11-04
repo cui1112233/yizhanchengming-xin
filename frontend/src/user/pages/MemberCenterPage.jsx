@@ -60,7 +60,7 @@ export default function MemberCenterPage() {
 
         <div className="ac-dashboard-grid ac-dashboard-grid-3">
           <Panel title="本月额度" eyebrow="MONTHLY QUOTA"><div className="ac-quota-value"><strong>{formatTokens(month.totalTokens)}</strong><span>/ {quota === null ? '不限额' : `${formatTokens(quota)} Tokens`}</span></div><Progress percent={quota === null ? 0 : quotaPercent} showInfo={quota !== null} status={quotaPercent >= 100 ? 'exception' : 'active'} /><div className="ac-panel-footnote">{quota === null ? '当前账号没有设置月度上限' : `剩余 ${formatTokens(Math.max(0, quota - Number(month.totalTokens || 0)))} Tokens`}</div></Panel>
-          <Panel title="AI 服务状态" eyebrow="AI ACCESS"><div className="ac-service-list">{['Agent 对话', '剧本生成', '小说创作', '生图工具'].map(label => <div key={label}><span className={apiEnabled ? 'dot-on' : 'dot-off'} />{label}<b>{apiEnabled ? '已启用' : '未授权'}</b></div>)}</div><Link href="/api-config" className="ac-text-link">查看 API 配置 <ArrowUpRight size={14} /></Link></Panel>
+          <Panel title="AI 服务状态" eyebrow="AI ACCESS"><div className="ac-service-list">{['Agent 对话', '私人定制', '小说创作', '生图工具'].map(label => <div key={label}><span className={apiEnabled ? 'dot-on' : 'dot-off'} />{label}<b>{apiEnabled ? '已启用' : '未授权'}</b></div>)}</div><Link href="/api-config" className="ac-text-link">查看 API 配置 <ArrowUpRight size={14} /></Link></Panel>
           <Panel title="用量构成" eyebrow="USAGE BREAKDOWN"><FeatureBars byFeature={month.byFeature} total={month.totalTokens} limit={5} /></Panel>
         </div>
 

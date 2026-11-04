@@ -53,6 +53,9 @@ func TestShuihuoImageGenerationEndpointAndSize(t *testing.T) {
 	if shuihuoImageSize("9:16") != "1024x1792" || shuihuoImageSize("1:1") != "1024x1024" {
 		t.Fatalf("unexpected image sizes")
 	}
+	if shuihuoImageSize("2:3") != "1024x1536" || shuihuoImageSize("3:4") != "1536x2048" || shuihuoImageSize("4:3") != "1024x768" || shuihuoImageSize("3:2") != "1536x1024" {
+		t.Fatalf("unexpected new image sizes")
+	}
 }
 
 func TestExtractShuihuoDocxText(t *testing.T) {

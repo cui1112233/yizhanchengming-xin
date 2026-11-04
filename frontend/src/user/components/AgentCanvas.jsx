@@ -46,6 +46,7 @@ import { AuthenticatedAgentImage } from './AuthenticatedAgentImage';
 import { AuthenticatedAgentVideo } from './AuthenticatedAgentVideo';
 import { AuthenticatedAgentAudio } from './AuthenticatedAgentAudio';
 import { AgentCanvasControls } from './AgentCanvasControls';
+import { AgentComicDeliverablePanel } from './AgentComicDeliverablePanel';
 import { AgentDirectorDeskNode } from './AgentDirectorDeskNode';
 import { DirectorDeskLoadBoundary } from './director-desk/DirectorDeskLoadBoundary';
 import { createDirectorDeskHostAdapter } from './director-desk/DirectorDeskHostAdapter';
@@ -2647,6 +2648,7 @@ export const AgentCanvas = forwardRef(function AgentCanvas({ taskId, canvas, pro
 
       {generationTasksLoadError ? <p className="agent-canvas-global-error" role="alert">{generationTasksLoadError}</p> : null}
       {generationSummary ? <p className="agent-canvas-generation-summary" role="status" aria-live="polite">{generationSummaryText(generationSummary)}</p> : null}
+      <AgentComicDeliverablePanel nodes={currentCanvas.nodes} />
 
       {connectionDropMenu ? <section className="agent-canvas-connection-drop-menu" aria-label="新建后续节点" style={{ left: connectionDropMenu.left, top: connectionDropMenu.top }}>
         <strong>新建后续节点</strong>

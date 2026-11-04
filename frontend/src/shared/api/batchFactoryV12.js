@@ -146,16 +146,36 @@ export function getBatchFactoryMergeCoverBlob(coverUrl) {
   return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
 }
 
+// 漫画页图片体积较大，一次请求超时或服务端短暂不可用时不应直接判定为永久失败，
+// 否则预览会一直停在“图片加载失败”。仅对网络中断（无状态码）与 5xx 做有限重试，
+// 401/403/404 属于确定性失败，重试没有意义。
+const IMAGE_BLOB_RETRY_DELAYS = [400, 1200];
+
+async function requestImageBlobWithRetry(path) {
+  let lastError;
+  for (let attempt = 0; attempt <= IMAGE_BLOB_RETRY_DELAYS.length; attempt += 1) {
+    try {
+      return await apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+    } catch (error) {
+      lastError = error;
+      const status = typeof error?.status === 'number' ? error.status : 0;
+      if ((status !== 0 && status < 500) || attempt === IMAGE_BLOB_RETRY_DELAYS.length) break;
+      await new Promise(resolve => setTimeout(resolve, IMAGE_BLOB_RETRY_DELAYS[attempt]));
+    }
+  }
+  throw lastError;
+}
+
 export function getBookAssetImageBlob(imageUrl) {
   const path = bookAssetImageRequestPath(imageUrl);
   if (!path) return Promise.reject(new Error('Book asset image URL is not a local Batch Factory asset image'));
-  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+  return requestImageBlobWithRetry(path);
 }
 
 export function getComicPageImageBlob(imageUrl) {
   const path = comicPageImageRequestPath(imageUrl);
   if (!path) return Promise.reject(new Error('Comic page image URL is not a local Batch Factory comic image'));
-  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+  return requestImageBlobWithRetry(path);
 }
 
 export function getComicReferencePreviewBlob(imageUrl) {
@@ -163,7 +183,7 @@ export function getComicReferencePreviewBlob(imageUrl) {
   if (!COMIC_STYLE_PREVIEW_PATTERN.test(path) && !COMIC_REFERENCE_SCENE_PREVIEW_PATTERN.test(path) && !COMIC_MATERIAL_PREVIEW_PATTERN.test(path) && !COMIC_GLOBAL_REFERENCE_PATTERN.test(path)) {
     return Promise.reject(new Error('Comic reference preview URL is not a protected Batch Factory image'));
   }
-  return apiRequest(path, { responseType: 'blob', silent: true, suppressGlobalError: true });
+  return requestImageBlobWithRetry(path);
 }
 
 export function bf11Path(path = '') {
@@ -485,11 +505,13 @@ export function splitComicSourceSegment(batchId, bookId, videoId, payload) {
 }
 
 export function generateComicPage(batchId, bookId, videoId, payload) {
-  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/generate`), { method: 'POST', body: body(payload) });
+  // 409 是“该页已有在途生成”，由调用方合并成一条提示并启动轮询；
+  // 这里不再触发全局顶栏错误，避免同一个失败被全局拦截器和页面各弹一次。
+  return apiRequest(comicPagesPath(batchId, bookId, `${id(videoId)}/generate`), { method: 'POST', body: body(payload), suppressGlobalError: true });
 }
 
 export function updateComicPage(batchId, bookId, videoId, payload) {
-  return apiRequest(comicPagesPath(batchId, bookId, id(videoId)), { method: 'PUT', body: body(payload) });
+  return apiRequest(comicPagesPath(batchId, bookId, id(videoId)), { method: 'PUT', body: body(payload), suppressGlobalError: true });
 }
 
 export function generateComicBook(batchId, bookId) {

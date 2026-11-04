@@ -1,0 +1,3 @@
+source,username,path,before_kind,before_pet_id,after_pet_id,action,error
+F:\脚本测试\一战晟铭-v88\data\users,choushiyiguai,F:\脚本测试\一战晟铭-v88\data\users\choushiyiguai\api-config.json,string,little-companion,little-companion,保持,
+F:\脚本测试\一战晟铭-v88\backend\data\users,choushiyiguai,F:\脚本测试\一战晟铭-v88\backend\data\users\choushiyiguai\api-config.json,object,stacky,stacky,保持,

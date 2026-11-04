@@ -41,6 +41,17 @@ func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, 
 	}
 	content = stripLegacyComicStyle(content)
 	parts := make([]string, 0, 8)
+	// residual collects every fixed segment this compiler injects. It is used to
+	// strip a previously compiled prompt before rebuilding it, so compiling the
+	// same source N times always yields the same prompt (no stacking style locks).
+	residual := make([]string, 0, 10)
+	appendFixed := func(value string) {
+		if value = strings.TrimSpace(value); value == "" {
+			return
+		}
+		parts = append(parts, value)
+		residual = append(residual, value)
+	}
 	global := config.GlobalReferenceImage
 	legacySceneReference := strings.HasPrefix(strings.TrimSpace(global.AssetID), "scene:") || global.Source == "scene-library" || global.Source == "builtin" || strings.TrimSpace(global.Scene.ID) != ""
 	globalReferenceURL := strings.TrimSpace(global.URL)
@@ -49,40 +60,43 @@ func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, 
 	}
 	useGlobalReference := global.Enabled && globalReferenceURL != "" && ((purpose == ComicImagePurposeAsset && strings.TrimSpace(assetKind) == "character" && global.ApplyToAssets) || (purpose == ComicImagePurposePage && global.ApplyToPages))
 	if useGlobalReference && !legacySceneReference {
-		if scenePrompt := strings.TrimSpace(global.Scene.Body); scenePrompt != "" {
-			parts = append(parts, scenePrompt)
-		}
+		appendFixed(global.Scene.Body)
 	}
 	if styleName := strings.TrimSpace(config.Style.Name); styleName != "" {
-		parts = append(parts, "画风名称："+styleName)
+		appendFixed("画风名称：" + styleName)
 	}
-	parts = append(parts, style)
+	appendFixed(style)
 	if useGlobalReference {
-		parts = append(parts, "参考图使用规则：第1张参考图是画风库参考图，只用于锁定线条、上色、人物比例和整体画风；其余人物资产参考图只用于锁定角色身份、脸型、发型和服装，不得覆盖第1张画风。")
+		appendFixed("参考图使用规则：第1张参考图是画风库参考图，只用于锁定线条、上色、人物比例和整体画风；其余人物资产参考图只用于锁定角色身份、脸型、发型和服装，不得覆盖第1张画风。")
 	}
 	if prefix := strings.TrimSpace(config.ImagePromptPrefix); prefix != "" {
-		parts = append(parts, prefix)
+		appendFixed(prefix)
 	}
 	if purpose == ComicImagePurposePage {
-		parts = append(parts, comicPromptTextForAspect(comicPageStructureLock, EffectiveImageAspectRatio(settings)))
+		appendFixed(comicPromptTextForAspect(comicPageStructureLock, EffectiveImageAspectRatio(settings)))
 	} else {
-		parts = append(parts, "保留资产参考图中的身份、脸型、发型、服装、配饰或物体结构；忽略原始参考图的摄影、渲染和画风，最终画风严格遵循本书画风预设。")
+		appendFixed("保留资产参考图中的身份、脸型、发型、服装、配饰或物体结构；忽略原始参考图的摄影、渲染和画风，最终画风严格遵循本书画风预设。")
 	}
-	if content = strings.TrimSpace(content); content != "" {
-		parts = append(parts, content)
-	}
+	// Trailing fixed segments are appended after the content, but they still have
+	// to be known when stripping a already-compiled input.
+	trailing := make([]string, 0, 4)
 	if suffix := strings.TrimSpace(config.ImagePromptSuffix); suffix != "" {
-		parts = append(parts, suffix)
+		trailing = append(trailing, suffix)
 	}
 	if purpose == ComicImagePurposePage {
 		for _, selection := range config.Constraints {
 			if constraintCategory(selection) == comicNegativeConstraint {
 				if body := strings.TrimSpace(stripLegacyComicStyle(selection.Body)); body != "" {
-					parts = append(parts, body)
+					trailing = append(trailing, body)
 				}
 			}
 		}
 	}
+	residual = append(residual, trailing...)
+	if content = stripCompiledComicPrompt(content, residual); content != "" {
+		parts = append(parts, content)
+	}
+	parts = append(parts, trailing...)
 	styleLock := []string{"【最终画风锁定】"}
 	if styleName := strings.TrimSpace(config.Style.Name); styleName != "" {
 		styleLock = append(styleLock, "画风名称："+styleName)
@@ -136,6 +150,90 @@ func appendUniqueComicReferences(target []string, values ...string) []string {
 		target = append(target, value)
 	}
 	return target
+}
+
+const comicStyleLockMarker = "【最终画风锁定】"
+
+// compiledComicOnlyPrefixes are paragraph prefixes this compiler generates.
+// They are dropped whenever an already compiled prompt is recompiled.
+var compiledComicOnlyPrefixes = []string{
+	"画风名称：",
+	"参考图使用规则：",
+	"【漫画页面结构约束】",
+	"保留资产参考图中的身份",
+}
+
+func isCompiledComicOnlyParagraph(value string) bool {
+	for _, prefix := range compiledComicOnlyPrefixes {
+		if strings.HasPrefix(value, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// stripCompiledComicPrompt removes the style lock block and every fixed segment
+// previously injected by BuildComicImageContract, leaving only the caller's
+// original content. This is what makes repeated compilation idempotent.
+func stripCompiledComicPrompt(value string, residual []string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if index := strings.Index(value, comicStyleLockMarker); index >= 0 {
+		value = strings.TrimSpace(value[:index])
+	}
+	known := make(map[string]bool, len(residual))
+	for _, item := range residual {
+		if item = strings.TrimSpace(item); item != "" {
+			known[item] = true
+		}
+	}
+	chunks := strings.Split(value, "\n\n")
+	kept := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" || known[chunk] || isCompiledComicOnlyParagraph(chunk) {
+			continue
+		}
+		kept = append(kept, chunk)
+	}
+	return strings.TrimSpace(strings.Join(kept, "\n\n"))
+}
+
+// StripCompiledComicImagePrompt reduces a stored (possibly already compiled)
+// prompt back to the user's original content. Callers must persist the returned
+// value, never the compiled BuildComicImageContract output.
+func StripCompiledComicImagePrompt(settings SettingsPatch, purpose ComicImagePurpose, content string) string {
+	config := aiReasoningPromptConfig(settings).Comic
+	style := strings.TrimSpace(config.Style.Body)
+	if style == "" {
+		return strings.TrimSpace(stripLegacyComicStyle(content))
+	}
+	residual := make([]string, 0, 8)
+	if styleName := strings.TrimSpace(config.Style.Name); styleName != "" {
+		residual = append(residual, "画风名称："+styleName)
+	}
+	residual = append(residual, style)
+	if scenePrompt := strings.TrimSpace(config.GlobalReferenceImage.Scene.Body); scenePrompt != "" {
+		residual = append(residual, scenePrompt)
+	}
+	if prefix := strings.TrimSpace(config.ImagePromptPrefix); prefix != "" {
+		residual = append(residual, prefix)
+	}
+	if suffix := strings.TrimSpace(config.ImagePromptSuffix); suffix != "" {
+		residual = append(residual, suffix)
+	}
+	if purpose == ComicImagePurposePage {
+		for _, selection := range config.Constraints {
+			if constraintCategory(selection) == comicNegativeConstraint {
+				if body := strings.TrimSpace(stripLegacyComicStyle(selection.Body)); body != "" {
+					residual = append(residual, body)
+				}
+			}
+		}
+	}
+	return stripCompiledComicPrompt(stripLegacyComicStyle(content), residual)
 }
 
 func stripLegacyComicStyle(value string) string {

@@ -3,7 +3,9 @@ package batchfactoryv11
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 type recordingProductionAdapter struct {
@@ -344,5 +346,170 @@ func TestRemoveBookProductionCandidateKeepsMainVersion(t *testing.T) {
 	}
 	if len(status.Jobs) != 2 || len(status.Jobs[1].Tasks) != 0 || len(status.Jobs[0].Tasks) != 1 || status.Jobs[0].Tasks[0].ID != first.Tasks[0].ID {
 		t.Fatalf("removed candidate was still exposed: %+v", status.Jobs)
+	}
+}
+
+// The error_message column is VARCHAR(255); truncation must stay byte-bounded
+// for storage safety but never split a multibyte rune, otherwise the UI shows
+// broken characters and MySQL can reject the insert.
+func TestProductionErrorTruncatesOnRuneBoundary(t *testing.T) {
+	// Byte 200 falls inside the first "中" (bytes 199-201 of the string).
+	message := strings.Repeat("a", 199) + strings.Repeat("中", 2)
+	if len(message) <= 200 || utf8.ValidString(message[:200]) {
+		t.Fatalf("fixture must exceed 200 bytes and split a rune at byte 200: %d", len(message))
+	}
+	got := productionError(errors.New(message))
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncated message is invalid UTF-8: %q", got)
+	}
+	if !strings.HasSuffix(got, "...") {
+		t.Fatalf("truncated message must keep the ellipsis suffix: %q", got)
+	}
+	if len(got) > 200+len("...") {
+		t.Fatalf("truncated message exceeds the byte budget: %d", len(got))
+	}
+	if strings.ContainsRune(got, utf8.RuneError) {
+		t.Fatalf("truncated message contains a replacement rune: %q", got)
+	}
+}
+
+// recordingVideoProviderRegistry captures which provider the executor asks for
+// and refuses to resolve it, so the test never reaches a real provider host.
+type recordingVideoProviderRegistry struct {
+	requested []string
+}
+
+func (r *recordingVideoProviderRegistry) Put(context.Context, string, VideoProviderConfig) error {
+	return nil
+}
+
+func (r *recordingVideoProviderRegistry) Resolve(_ context.Context, _ string, provider string) (VideoProviderConfig, error) {
+	r.requested = append(r.requested, provider)
+	return VideoProviderConfig{}, ErrUnavailable
+}
+
+func (r *recordingVideoProviderRegistry) View(context.Context, string, string) (VideoProviderConfigView, error) {
+	return VideoProviderConfigView{}, ErrUnavailable
+}
+
+// Live incident (batch_0a9b163b83c04cf6da460439c6912fc3): the batch unified
+// configuration was AutoDL H3 while the book card displayed
+// seedance-2-0-official, and the retry submitted through AutoDL H3. The
+// automation still passes the batch engine as its provider argument, so
+// SubmitBookProductionWithOptions must derive the provider from the book's
+// effective settings at submission time instead of trusting the caller.
+func TestVideoSubmitHonorsTheBookOverrideInsteadOfTheBatchEngine(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book, _ := seedCompiledVideo(t)
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"videoProvider": raw(VideoProviderAutoDLH3),
+			"videoModelId":  raw(AutoDLH3Model),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"videoProvider": raw("yfai"),
+			"videoModelId":  raw("seedance-2-0-official"),
+		},
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	latestBook := latest.Books[0]
+	effective := ResolveSettings(latest.SettingsState.Patch, latestBook.SettingsState.Patch)
+	if got := rawString(effective, "videoModelId", ""); got != "seedance-2-0-official" {
+		t.Fatalf("fixture must resolve the book model, got %q", got)
+	}
+
+	registry := &recordingVideoProviderRegistry{}
+	service := &ProductionService{
+		Store: store, Compiler: &PromptCompilerService{Store: store},
+		ProviderRegistry: registry, Enabled: true,
+		Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15},
+	}
+	// Exactly what the automation path passes: the batch engine value.
+	_, _ = service.SubmitBookProductionWithOptions(ctx, "alice", latest.ID, latestBook.ID, "book-override-video", VideoProviderAutoDLH3, ProductionOptions{})
+
+	if len(registry.requested) != 1 {
+		t.Fatalf("resolved providers=%v, want exactly one resolution", registry.requested)
+	}
+	if registry.requested[0] != VideoProviderYFAISeedance {
+		t.Fatalf("submission used provider %q, want the book override %q (batch value was %q)",
+			registry.requested[0], VideoProviderYFAISeedance, VideoProviderAutoDLH3)
+	}
+}
+
+// Live incident follow-up: the retry reused the SAME automation request id, and
+// FindProductionJob returned the previous failed job (stored AutoDL provider and
+// stored error) without submitting again. A reopened run now uses a retry-scoped
+// video request id, which must resolve the book's current engine.
+func TestRetriedVideoUsesTheBookEngineInsteadOfTheStoredProvider(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book, video := seedCompiledVideo(t)
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"videoProvider": raw(VideoProviderAutoDLH3),
+			"videoModelId":  raw(AutoDLH3Model),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBook, BatchID: batch.ID, BookID: book.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"videoProvider": raw("yfai"),
+			"videoModelId":  raw("seedance-2-0-official"),
+		},
+		ExpectedRevision: book.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	oldRequestID := "run-1-video-" + book.ID
+	old, err := store.CreateProductionJob(ctx, ProductionJob{
+		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: oldRequestID,
+		DirectorRevisionID: book.DirectorRevision.ID,
+		Tasks: []ProductionTask{{
+			VideoID: video.ID, Provider: VideoProviderAutoDLH3, Status: ProductionFailed,
+			ErrorMessage: "AutoDL H3 rejected submission: code=RequestParameterIsWrong message=缺少必填参数：ref_image_0 request_id=6dc434c43ebac55aec5cc247756c8c57",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	registry := &recordingVideoProviderRegistry{}
+	service := &ProductionService{
+		Store: store, Compiler: &PromptCompilerService{Store: store},
+		ProviderRegistry: registry, Enabled: true,
+		Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15},
+	}
+
+	// The old request id replays the stored failed job and never resolves a
+	// provider: this is the root cause the retry-scoped id fixes.
+	stale, err := service.SubmitBookProductionWithOptions(ctx, "alice", batch.ID, book.ID, oldRequestID, VideoProviderAutoDLH3, ProductionOptions{})
+	if err != nil || stale.ID != old.ID {
+		t.Fatalf("stale request id must replay the failed job, got id=%q err=%v", stale.ID, err)
+	}
+	if len(registry.requested) != 0 {
+		t.Fatalf("stale request id resolved %v, want no provider resolution", registry.requested)
+	}
+
+	// A reopened run (Retry sets retryAttempt) submits under a new request id and
+	// must switch from the stored AutoDL task to the book's YFAI Seedance engine.
+	_, _ = service.SubmitBookProductionWithOptions(ctx, "alice", batch.ID, book.ID, oldRequestID+"-r1", VideoProviderAutoDLH3, ProductionOptions{})
+	if len(registry.requested) != 1 {
+		t.Fatalf("retry resolved providers=%v, want exactly one", registry.requested)
+	}
+	if registry.requested[0] != VideoProviderYFAISeedance {
+		t.Fatalf("retry submitted through %q, want the book engine %q (stored provider was %q)",
+			registry.requested[0], VideoProviderYFAISeedance, VideoProviderAutoDLH3)
 	}
 }

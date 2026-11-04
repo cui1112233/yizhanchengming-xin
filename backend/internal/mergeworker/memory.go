@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("merge worker job not found")
+	ErrNotFound   = errors.New("merge worker job not found")
 	ErrQueueEmpty = errors.New("merge worker queue empty")
 )
 

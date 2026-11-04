@@ -501,6 +501,12 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if strings.TrimSpace(input.ImagePrompt) == "" {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: %s 缺少独立的图片提示词", batchfactoryv11.ErrConflict, selectedPage.Label)
 	}
+	// 库里只保存原始提示词。历史数据可能已经把编译结果写回（表现为
+	// 【最终画风锁定】段重复叠加），这里先还原成原文，避免再次编译时继续加长。
+	input.ImagePrompt = batchfactoryv11.StripCompiledComicImagePrompt(effective, batchfactoryv11.ComicImagePurposePage, input.ImagePrompt)
+	if strings.TrimSpace(input.ImagePrompt) == "" {
+		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, fmt.Errorf("%w: %s 缺少独立的图片提示词", batchfactoryv11.ErrConflict, selectedPage.Label)
+	}
 	input.AspectRatio = batchfactoryv11.EffectiveImageAspectRatio(effective)
 	assetMatchContent := comicPagePromptContent(input.ComicPrompt, input.ImagePrompt)
 	assetImageURLs, err := comicPageAssetReferenceURLsForPage(ctx, g.store, owner, batch.ID, selectedBook.ID, *selectedPage, assetMatchContent)
@@ -512,7 +518,8 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicPage{}, batchfactoryv11.ComicPageImage{}, err
 	}
-	input.ImagePrompt = contract.Prompt
+	// 编译结果只用于本次出图请求，绝不写回 comic_pages；写库的仍是原始提示词。
+	// SnapshotHash 记录本次实际使用的画风/参考图快照，用于判断配置是否过期。
 	input.SnapshotHash = contract.SnapshotHash
 	input.Status = "generating"
 	// 申领页级租约时按读到的 revision 做条件更新：如果另一个 worker 已经
@@ -552,7 +559,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 	generationCtx = withShuihuoImageStage(withShuihuoImageConcurrency(generationCtx, comicSettingInt(effective, "imageConcurrency", shuihuoImageConcurrencyDefault)), shuihuoImageStagePage)
 	// 把批次生效设置注入上下文，让出图保存前读取水印配置。
 	generationCtx = withShuihuoEffectiveSettings(generationCtx, comicSettingsToMap(effective))
-	generationPrompt := createdPage.ImagePrompt
+	generationPrompt := contract.Prompt
 	repairKey := comicPageRepairKey(batchID, bookID, videoID)
 	if cached, ok := shuihuoRepairedPrompts.Load(repairKey); ok {
 		if repaired, textOK := cached.(string); textOK && strings.TrimSpace(repaired) != "" {
@@ -1073,6 +1080,24 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
+		if indexStore, ok := store.(batchfactoryv11.ComicSourceIndexStore); ok {
+			// Only the requested book's source text and segment digests are needed
+			// for the stale check. Loading the full batch here made every book row
+			// refetch the whole batch when the comic library rendered.
+			index, found, idxErr := indexStore.GetBookComicSourceIndex(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"))
+			if idxErr != nil {
+				writeStoreError(w, idxErr)
+				return
+			}
+			for pageIndex := range result {
+				result[pageIndex].ConfigStale = comicPageConfigStaleFromIndex(found, index, result[pageIndex])
+			}
+			writeJSON(w, http.StatusOK, map[string]any{
+				"pages":     comicPageResponses(result),
+				"readiness": buildComicReadiness(nil, result, comicPageGenerationLimit),
+			})
+			return
+		}
 		batch, batchErr := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
 		if batchErr != nil {
 			writeStoreError(w, batchErr)
@@ -1081,7 +1106,10 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		for index := range result {
 			result[index].ConfigStale = comicPageConfigStale(r.Context(), store, presetCatalog, owner, batch, r.PathValue("bookId"), result[index])
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"pages": comicPageResponses(result)})
+		writeJSON(w, http.StatusOK, map[string]any{
+			"pages":     comicPageResponses(result),
+			"readiness": buildComicReadiness(nil, result, comicPageGenerationLimit),
+		})
 	})
 	mux.HandleFunc("GET "+promptZip, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -1817,6 +1845,23 @@ func comicPageConfigStale(ctx context.Context, store batchfactoryv11.Store, pres
 	return video.ComicSourceSegment.SourceDigest != fmt.Sprintf("%x", digest)
 }
 
+// comicPageConfigStaleFromIndex mirrors comicPageConfigStale using the
+// lightweight per-book source index instead of a hydrated batch.
+func comicPageConfigStaleFromIndex(bookFound bool, index batchfactoryv11.ComicSourceIndex, page batchfactoryv11.ComicPage) bool {
+	if !bookFound {
+		return false
+	}
+	digest, ok := index.VideoDigests[page.VideoID]
+	if !ok {
+		return true
+	}
+	if strings.TrimSpace(digest) == "" {
+		return false
+	}
+	sum := sha256.Sum256([]byte(index.SourceText))
+	return digest != fmt.Sprintf("%x", sum)
+}
+
 func comicPageImageResponse(image batchfactoryv11.ComicPageImage) batchfactoryv11.ComicPageImage {
 	if image.StorageRef != "" {
 		image.URL = "/api/batch-factory/v12/batches/" + image.BatchID + "/books/" + image.BookID + "/comic-pages/" + image.ComicPageID + "/images/" + image.ID + "/content"
@@ -2022,6 +2067,8 @@ func comicPageResponse(page batchfactoryv11.ComicPage) batchfactoryv11.ComicPage
 		page.Images[index].BookID = page.BookID
 		page.Images[index] = comicPageImageResponse(page.Images[index])
 	}
+	hasPrimary, hasAny := comicPageImageFlags(page)
+	page.PromptStatus, page.ImageStatus, page.GenerationState, page.PrimaryFallback = deriveComicPageStatus(page, hasPrimary, hasAny)
 	return page
 }
 

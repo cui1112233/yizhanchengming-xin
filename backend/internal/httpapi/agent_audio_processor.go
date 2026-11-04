@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
 	"qiantie/backend/internal/agentworkspace"
+	"qiantie/backend/internal/ffmpegbin"
 )
 
 type FFmpegAgentAudioProcessor struct {
@@ -140,17 +140,5 @@ func formatAudioSeconds(value float64) string {
 }
 
 func runAgentFFmpeg(ctx context.Context, binary string, args ...string) error {
-	command := exec.CommandContext(ctx, binary, args...)
-	output, err := command.CombinedOutput()
-	if err == nil {
-		return nil
-	}
-	message := strings.TrimSpace(string(output))
-	if len(message) > 500 {
-		message = message[:500]
-	}
-	if message == "" {
-		return fmt.Errorf("ffmpeg audio processing failed: %w", err)
-	}
-	return fmt.Errorf("ffmpeg audio processing failed: %s", message)
+	return ffmpegbin.Run(ctx, binary, args...)
 }

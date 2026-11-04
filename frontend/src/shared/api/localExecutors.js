@@ -33,14 +33,16 @@ export function getExecutorStatus(options = {}) {
   });
 }
 
-export function mergeExecutorState(group, pairing) {
+// 执行器状态只读合并：优先采用后端 state；没有设备时，后端返回的
+// 未过期待配对记录（pairing）会恢复 "needs_pairing"，刷新后不再丢失。
+// 待配对信息由状态接口持久化返回，前端不再叠加本地配对码状态。
+export function mergeExecutorState(group) {
   const devices = Array.isArray(group?.devices) ? group.devices : [];
-  const paired = devices.length;
-  // 刚生成配对码但设备还没上线时，本地配对状态优先于后端快照。
-  if (paired === 0 && pairing?.code) return 'needs_pairing';
+  const pairing = group?.pairing && group.pairing.expired !== true ? group.pairing : null;
+  if (devices.length === 0 && pairing) return 'needs_pairing';
   const state = String(group?.state || '').trim();
   if (state) return state;
-  if (paired === 0) return 'not_installed';
+  if (devices.length === 0) return 'not_installed';
   return devices.some(item => item?.online) ? 'online' : 'offline';
 }
 

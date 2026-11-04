@@ -1,3 +1,5 @@
+import { IMAGE_ASPECT_RATIOS } from '../../shared/imageAspectRatios.js';
+
 export const IMAGE_NODE_SETTINGS_DEFAULTS = Object.freeze({
   ratio: '16:9',
   quality: 'standard',
@@ -5,14 +7,14 @@ export const IMAGE_NODE_SETTINGS_DEFAULTS = Object.freeze({
   count: 1
 });
 
-const RATIOS = new Set(['16:9', '9:16', '1:1']);
+const RATIOS = new Set(IMAGE_ASPECT_RATIOS);
 const QUALITIES = new Set(['standard', 'high']);
 const RESOLUTIONS = new Set(['1K', '2K', '4K']);
 
 const SIZE_BY_RESOLUTION = {
-  '1K': { '16:9': '1024x576', '9:16': '576x1024', '1:1': '1024x1024' },
-  '2K': { '16:9': '2048x1152', '9:16': '1152x2048', '1:1': '2048x2048' },
-  '4K': { '16:9': '4096x2304', '9:16': '2304x4096', '1:1': '4096x4096' }
+  '1K': { '16:9': '1024x576', '9:16': '576x1024', '1:1': '1024x1024', '3:4': '768x1024', '4:3': '1024x768', '2:3': '768x1152', '3:2': '1152x768' },
+  '2K': { '16:9': '2048x1152', '9:16': '1152x2048', '1:1': '2048x2048', '3:4': '1536x2048', '4:3': '2048x1536', '2:3': '1536x2304', '3:2': '2304x1536' },
+  '4K': { '16:9': '4096x2304', '9:16': '2304x4096', '1:1': '4096x4096', '3:4': '3072x4096', '4:3': '4096x3072', '2:3': '3072x4608', '3:2': '4608x3072' }
 };
 
 export function normalizeImageNodeSettings(config = {}) {

@@ -46,7 +46,7 @@ func TestPrepareBatchFetchedSourcePersistsSensitiveReplacementDetails(t *testing
 		t.Fatal(err)
 	}
 	result := novelfetchworkshop.FetchAndProcessResult{ProcessedText: "含敏感词正文", OriginalRaw: "含敏感词正文", OriginalRawChars: 6, ProcessedChars: 6}
-	_, metadata, err := prepareBatchFetchedSource(context.Background(), store, "alice", "book-1", result, batchFetchClassification{})
+	_, metadata, err := prepareBatchFetchedSource(context.Background(), store, "alice", "book-1", result, batchFetchClassification{}, defaultBatchSensitiveConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

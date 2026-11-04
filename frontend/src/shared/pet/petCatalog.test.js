@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getPetDefinition, getPetOptions, petAnimationDelay, previewPetSelection } from './petCatalog.js';
+import { DEFAULT_PET_ID, getPetDefinition, getPetOptions, petAnimationDelay, previewPetSelection } from './petCatalog.js';
 
 test('offers Little Companion as the default first selectable pet', () => {
+  assert.equal(DEFAULT_PET_ID, 'little-companion');
   assert.deepEqual(getPetOptions(), [
-    { label: '小家伙', value: 'little-companion' },
+    { label: '小家伙（默认）', value: 'little-companion' },
     { label: 'CM', value: 'stacky' },
     { label: '貔貅', value: 'pixiu' }
   ]);
@@ -20,6 +21,19 @@ test('offers Little Companion as the default first selectable pet', () => {
       previewPose: 'idle'
     }
   );
+});
+
+test('falls back to Little Companion only when no valid pet was chosen', () => {
+  assert.equal(getPetDefinition(undefined).id, 'little-companion');
+  assert.equal(getPetDefinition(null).id, 'little-companion');
+  assert.equal(getPetDefinition('').id, 'little-companion');
+  assert.equal(getPetDefinition('legacy-unknown-pet').id, 'little-companion');
+  assert.equal(getPetDefinition({ id: 'unknown' }).id, 'little-companion');
+});
+
+test('keeps an explicit saved pet choice instead of applying the default', () => {
+  assert.equal(getPetDefinition('stacky').id, 'stacky');
+  assert.equal(getPetDefinition({ id: 'pixiu' }).id, 'pixiu');
 });
 
 test('previews a selected pet immediately through the companion event', () => {

@@ -1,9 +1,13 @@
-import { Button, Form, Input, InputNumber, Select, Slider, Space, message } from 'antd';
+import { ConfigProvider, Form, Input, InputNumber, Select, Slider, Space, Spin, message } from 'antd';
 import { AudioLines, Download, FileUp, Plus, Save, Trash2, WandSparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { textToSpeech } from '../../shared/api/tts';
 import { getConfig, saveConfig } from '../../shared/api/config';
+import { V88Button } from '../../shared/components/V88Button';
+import { V88EmptyState } from '../../shared/components/V88EmptyState';
+import { createV88AntTheme } from '../../shared/styles/theme';
 import { dispatchPetContext, dispatchPetState } from '../../shared/pet/stacky';
+import './tts-workbench.css';
 
 const voices = [
   { label: '晓晓（女声·温柔）', value: 'zh-CN-XiaoxiaoNeural' },
@@ -31,6 +35,7 @@ function createCard(text = '') {
     speed: 1.8,
     pitch: 10,
     loading: false,
+    startedAt: 0,
     audioUrl: '',
     audioBlob: null
   };
@@ -46,9 +51,16 @@ function NumberSlider({ ariaLabel, min, max, step, value, onChange }) {
   );
 }
 
-export function TtsPage() {
+export function TtsPage({ theme = 'dark' }) {
   const [cards, setCards] = useState([]);
   const [defaults, setDefaults] = useState({ voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 });
+  const [configLoading, setConfigLoading] = useState(true);
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [readingFile, setReadingFile] = useState(false);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  // 只用于让「已等待 Ns」随真实时间刷新，不参与业务判断。
+  const [nowMs, setNowMs] = useState(0);
   const audioUrlsRef = useRef(new Set());
   const cardRequestRef = useRef(new Map());
   const cardsRef = useRef([]);
@@ -57,6 +69,8 @@ export function TtsPage() {
   useEffect(() => {
     cardsRef.current = cards;
   }, [cards]);
+
+  const antTheme = useMemo(() => createV88AntTheme(theme), [theme]);
 
   function nextCardRequest(id) {
     const requestId = (cardRequestRef.current.get(id) || 0) + 1;
@@ -80,12 +94,34 @@ export function TtsPage() {
   }, []);
 
   useEffect(() => {
-    getConfig().then(config => {
-      if (config.tts) setDefaults(config.tts);
-    }).catch(error => message.error(error.message || '读取默认配音失败'));
+    let active = true;
+    setConfigLoading(true);
+    getConfig()
+      .then(config => {
+        if (active && config.tts) setDefaults(config.tts);
+      })
+      .catch(error => message.error(error.message || '读取默认配音失败'))
+      .finally(() => {
+        if (active) setConfigLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const hasCards = cards.length > 0;
+  const hasLoadingCard = cards.some(card => card.loading);
+  const anyWaiting = hasLoadingCard || bulkGenerating || configLoading || savingDefaults || readingFile;
+
+  useEffect(() => {
+    if (!anyWaiting) {
+      setNowMs(0);
+      return undefined;
+    }
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [anyWaiting]);
 
   useEffect(() => {
     const generatedCount = cards.filter(card => Boolean(card.audioUrl || card.audioBlob)).length;
@@ -109,16 +145,19 @@ export function TtsPage() {
   }
 
   function addCard(text) {
-    setCards(current => [...current, { ...createCard(text), ...defaults }]);
+    setCards(current => [...current, { ...createCard(text), ...defaults, loading: false, startedAt: 0 }]);
   }
 
   async function saveDefaults() {
+    setSavingDefaults(true);
     try {
       const config = await getConfig();
       await saveConfig({ ...config, apiKey: '', tts: defaults });
       message.success('默认配音已保存');
     } catch (error) {
       message.error(error.message || '保存默认配音失败');
+    } finally {
+      setSavingDefaults(false);
     }
   }
 
@@ -143,7 +182,7 @@ export function TtsPage() {
     }
 
     const requestId = nextCardRequest(id);
-    updateCard(id, { loading: true });
+    updateCard(id, { loading: true, startedAt: Date.now() });
     dispatchPetState('working', { title: '配音正在生成' });
     try {
       const blob = await textToSpeech(card);
@@ -163,13 +202,14 @@ export function TtsPage() {
       updateCard(id, {
         audioUrl: nextAudioUrl,
         audioBlob: blob,
-        loading: false
+        loading: false,
+        startedAt: 0
       });
       message.success('语音生成成功');
       dispatchPetState('success', { title: '配音生成完成', detail: '音频已经可以播放和下载。' });
     } catch (error) {
       if (!isCurrentCardRequest(id, requestId) || !cardStillExists(id)) return;
-      updateCard(id, { loading: false, audioUrl: '', audioBlob: null });
+      updateCard(id, { loading: false, startedAt: 0, audioUrl: '', audioBlob: null });
       message.error(error.message || '生成失败');
       dispatchPetState('error', { title: '配音生成失败', detail: error.message || '请检查配音模型配置后重试。' });
     }
@@ -180,8 +220,21 @@ export function TtsPage() {
       message.warning('先添加卡片再生成');
       return;
     }
-    for (const card of cards) {
-      if (card.input.trim()) await generateCard(card.id);
+    const targets = cards.filter(card => card.input.trim());
+    if (!targets.length) {
+      message.warning('没有可生成的文本');
+      return;
+    }
+    setBulkGenerating(true);
+    setBulkProgress({ done: 0, total: targets.length });
+    try {
+      for (const card of targets) {
+        await generateCard(card.id);
+        setBulkProgress(progress => ({ ...progress, done: progress.done + 1 }));
+      }
+    } finally {
+      setBulkGenerating(false);
+      setBulkProgress({ done: 0, total: 0 });
     }
   }
 
@@ -196,67 +249,105 @@ export function TtsPage() {
   function uploadNovel(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    setReadingFile(true);
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || '').trim().slice(0, 1800);
       addCard(text);
       event.target.value = '';
+      setReadingFile(false);
+    };
+    reader.onerror = () => {
+      message.error('读取文件失败');
+      setReadingFile(false);
     };
     reader.readAsText(file);
   }
 
   return (
-    <div className="tts-workbench utility-workbench">
-      <div className="tts-toolbar">
-        <Button type="primary" icon={<Plus size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => addCard()}>添加卡片</Button>
-        <Select style={{ width: 190 }} value={defaults.voice} options={voices} onChange={voice => setDefaults(current => ({ ...current, voice }))} />
-        <Select style={{ width: 110 }} value={defaults.style} options={styles} onChange={style => setDefaults(current => ({ ...current, style }))} />
-        <div className="tts-default-slider" title="默认语速">
-          <span>语速</span>
-          <NumberSlider ariaLabel="默认语速" min={0.5} max={2} step={0.1} value={defaults.speed} onChange={speed => setDefaults(current => ({ ...current, speed }))} />
-        </div>
-        <div className="tts-default-slider" title="默认音调">
-          <span>音调</span>
-          <NumberSlider ariaLabel="默认音调" min={-50} max={50} step={1} value={defaults.pitch} onChange={pitch => setDefaults(current => ({ ...current, pitch }))} />
-        </div>
-        <Button icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={saveDefaults}>保存为默认配音</Button>
-        <Button icon={<FileUp size={16} strokeWidth={1.8} aria-hidden="true" />}>
-          <label style={{ cursor: 'pointer' }}>
-            上传小说
-            <input type="file" accept=".txt" hidden onChange={uploadNovel} />
-          </label>
-        </Button>
-        <Button type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={generateAll}>全部生成</Button>
-      </div>
-
-      <div className="tts-card-grid">
-        {!hasCards && (
-          <div className="tts-empty">
-            <div className="tts-empty-icon"><AudioLines size={28} strokeWidth={1.6} aria-hidden="true" /></div>
-            <div>还没有配音卡片</div>
-            <div>点击“添加卡片”输入文本，或上传小说自动填入开篇。</div>
+    <ConfigProvider theme={antTheme}>
+      <div className="tts-workbench utility-workbench">
+        <div className="tts-page-head">
+          <div>
+            <h1 className="tts-page-title">配音</h1>
+            <p className="tts-page-subtitle">逐段输入文本，选好音色与风格后生成语音；全部生成会按卡片顺序依次排队。</p>
           </div>
-        )}
+          {bulkGenerating ? (
+            <span className="tts-bulk-progress" role="status" aria-live="polite">
+              <Spin size="small" />
+              正在批量生成 {bulkProgress.done}/{bulkProgress.total} 张…
+            </span>
+          ) : null}
+        </div>
 
-        {cards.map((card, index) => (
-          <TtsCard
-            key={card.id}
-            card={card}
-            index={index}
-            onChange={patch => updateCard(card.id, patch)}
-            onGenerate={() => generateCard(card.id)}
-            onDownload={() => downloadCard(card)}
-            onRemove={() => removeCard(card.id)}
-          />
-        ))}
+        <div className="tts-toolbar">
+          <div className="tts-toolbar-group">
+            <V88Button variant="primary" icon={<Plus size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => addCard()}>添加卡片</V88Button>
+            <V88Button variant="secondary" icon={<FileUp size={16} strokeWidth={1.8} aria-hidden="true" />} loading={readingFile}>
+              <label style={{ cursor: 'pointer' }}>
+                上传小说
+                <input type="file" accept=".txt" hidden onChange={uploadNovel} />
+              </label>
+            </V88Button>
+          </div>
+
+          <div className="tts-toolbar-group">
+            <Select style={{ width: 190 }} value={defaults.voice} options={voices} onChange={voice => setDefaults(current => ({ ...current, voice }))} />
+            <Select style={{ width: 110 }} value={defaults.style} options={styles} onChange={style => setDefaults(current => ({ ...current, style }))} />
+          </div>
+
+          <div className="tts-toolbar-group">
+            <div className="tts-default-slider" title="默认语速">
+              <span>语速</span>
+              <NumberSlider ariaLabel="默认语速" min={0.5} max={2} step={0.1} value={defaults.speed} onChange={speed => setDefaults(current => ({ ...current, speed }))} />
+            </div>
+            <div className="tts-default-slider" title="默认音调">
+              <span>音调</span>
+              <NumberSlider ariaLabel="默认音调" min={-50} max={50} step={1} value={defaults.pitch} onChange={pitch => setDefaults(current => ({ ...current, pitch }))} />
+            </div>
+          </div>
+
+          <div className="tts-toolbar-spacer" />
+
+          <div className="tts-toolbar-group">
+            <V88Button variant="secondary" icon={<Save size={16} strokeWidth={1.8} aria-hidden="true" />} loading={savingDefaults} onClick={saveDefaults}>保存为默认配音</V88Button>
+            <V88Button variant="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} loading={bulkGenerating} onClick={generateAll}>全部生成</V88Button>
+          </div>
+
+          {configLoading ? <span className="tts-config-hint"><Spin size="small" />正在读取默认配音…</span> : null}
+        </div>
+
+        <div className="tts-card-grid">
+          {!hasCards && (
+            <V88EmptyState
+              icon={<AudioLines size={24} strokeWidth={1.6} aria-hidden="true" />}
+              title="还没有配音卡片"
+              description="点击「添加卡片」输入文本，或上传 .txt 小说自动填入开篇（最多 1800 字）。"
+              action={<V88Button variant="primary" icon={<Plus size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => addCard()}>添加卡片</V88Button>}
+            />
+          )}
+
+          {cards.map((card, index) => (
+            <TtsCard
+              key={card.id}
+              card={card}
+              index={index}
+              nowMs={nowMs}
+              onChange={patch => updateCard(card.id, patch)}
+              onGenerate={() => generateCard(card.id)}
+              onDownload={() => downloadCard(card)}
+              onRemove={() => removeCard(card.id)}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    </ConfigProvider>
   );
 }
 
 export default TtsPage;
 
-function TtsCard({ card, index, onChange, onGenerate, onDownload, onRemove }) {
+function TtsCard({ card, index, nowMs, onChange, onGenerate, onDownload, onRemove }) {
   const stat = useMemo(() => {
     const text = card.input || '';
     return {
@@ -266,11 +357,24 @@ function TtsCard({ card, index, onChange, onGenerate, onDownload, onRemove }) {
     };
   }, [card.input]);
 
+  // 超过 2s 才显示已等待秒数，避免一闪而过的等待文案干扰。
+  const waitedSeconds = card.loading && card.startedAt && nowMs
+    ? Math.max(0, Math.floor((nowMs - card.startedAt) / 1000))
+    : 0;
+
   return (
     <div className="tts-card legacy-panel-card">
       <div className="tts-card-header">
         <strong>配音卡片 {index + 1}</strong>
-        <Button size="small" danger icon={<Trash2 size={15} strokeWidth={1.8} aria-hidden="true" />} onClick={onRemove}>删除</Button>
+        <V88Button
+          variant="danger"
+          size="small"
+          icon={<Trash2 size={15} strokeWidth={1.8} aria-hidden="true" />}
+          disabled={card.loading}
+          onClick={onRemove}
+        >
+          删除
+        </V88Button>
       </div>
       <div className="tts-card-body">
         <Input.TextArea
@@ -300,8 +404,28 @@ function TtsCard({ card, index, onChange, onGenerate, onDownload, onRemove }) {
         {card.audioUrl && <audio controls src={card.audioUrl} style={{ width: '100%' }} />}
       </div>
       <div className="tts-card-footer">
-        <Button type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} loading={card.loading} onClick={onGenerate}>生成语音</Button>
-        <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} disabled={!card.audioBlob} onClick={onDownload}>下载</Button>
+        <V88Button
+          variant="primary"
+          icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />}
+          loading={card.loading}
+          onClick={onGenerate}
+        >
+          生成语音
+        </V88Button>
+        {card.loading ? (
+          <span className="tts-wait-note" role="status" aria-live="polite">
+            <Spin size="small" />
+            {waitedSeconds >= 2 ? `正在合成音频…已等待 ${waitedSeconds}s` : '正在合成音频…'}
+          </span>
+        ) : null}
+        <V88Button
+          variant="secondary"
+          icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />}
+          disabled={!card.audioBlob || card.loading}
+          onClick={onDownload}
+        >
+          下载
+        </V88Button>
       </div>
     </div>
   );

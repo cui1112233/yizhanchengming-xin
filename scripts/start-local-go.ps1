@@ -2,6 +2,8 @@
   [switch]$CheckOnly,
   # 临时验证/排障用：复用现有二进制直接启动，不重建前端与 Go。
   [switch]$SkipBuild,
+  # 版本纪律：要求本次启动的二进制必须对应 docs/releases 下已存档的构建。
+  [switch]$RequireArchivedRelease,
   [string]$ListenAddr = $(if ($env:QIANTIE_GO_LISTEN_ADDR) { $env:QIANTIE_GO_LISTEN_ADDR } else { ':4001' })
 )
 
@@ -63,18 +65,23 @@ function Test-FrontendBuildRequired {
 
 $repo = Split-Path -Parent $PSScriptRoot
 
-# Slice 是 V12 批次路由的注册门槛：代码默认值是 0，Slice<1 时
-# registerV12IntakeRoutes 不会执行，/api/batch-factory/v12/batches/summary
+# Slice 是 V12 批次路由的注册门槛：代码默认值是 3（config.FromEnv），
+# Slice<1 时 registerV12IntakeRoutes 不会执行，/api/batch-factory/v12/batches/summary
 # 会变成裸 404，前端表现就是“作品全没了”。注意 PowerShell 里字符串 "0"
 # 是非空值，`if (-not $env:...)` 不会把它当成“未设置”，所以必须显式校验。
 $sliceValue = 0
 $rawSlice = [string]$env:QIANTIE_BATCH_FACTORY_V11_SLICE
 if (-not [int]::TryParse($rawSlice, [ref]$sliceValue) -or $sliceValue -lt 1) {
   if (-not [string]::IsNullOrWhiteSpace($rawSlice)) {
-    Write-Warning "QIANTIE_BATCH_FACTORY_V11_SLICE='$rawSlice' 会关闭 V12 批次路由（summary 返回 404）；本地启动已强制提升为 3。"
+    Write-Warning "QIANTIE_BATCH_FACTORY_V11_SLICE='$rawSlice' 会关闭 V12 批次路由（summary 返回 404）；本地启动已强制提升为 5。"
   }
-  $sliceValue = 3
-  $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '3'
+  $sliceValue = 5
+  $env:QIANTIE_BATCH_FACTORY_V11_SLICE = '5'
+  # config.FromEnv 对 Slice>=4/5 强制要求生产与合并开关，这里一并补齐，
+  # 否则强制提升后二进制会因缺少开关直接启动失败。
+  $env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED = '1'
+  $env:QIANTIE_BATCH_FACTORY_V11_MERGE_ENABLED = '1'
+  $env:QIANTIE_BATCH_FACTORY_V11_LOCAL_MERGE_ENABLED = '1'
 }
 # Slice 不足 4 时视频生产路由不会注册，此时 PRODUCTION_ENABLED=1 只是空转。
 if ($sliceValue -lt 4 -and $env:QIANTIE_BATCH_FACTORY_V11_PRODUCTION_ENABLED -eq '1') {
@@ -172,6 +179,43 @@ if ($needsBuild -and -not $SkipBuild) {
   if (-not (Test-Path -LiteralPath $binaryPath) -or -not (Test-Path -LiteralPath $runtimeManifestPath)) {
     throw 'Local Go build did not produce the required binary and runtime manifest; refusing to start an existing binary.'
   }
+}
+
+# 版本纪律：可选地要求当前二进制对应 docs/releases 下已存档的构建。
+# 默认不校验，避免打断日常本地开发；-RequireArchivedRelease 用于正式验证环境。
+$currentReleasePath = Join-Path $repo 'backend/current-release.json'
+if (Test-Path -LiteralPath $currentReleasePath) {
+  try {
+    $currentRelease = Get-Content -LiteralPath $currentReleasePath -Raw -Encoding UTF8 | ConvertFrom-Json
+  } catch {
+    throw "无法解析 backend/current-release.json：$($_.Exception.Message)"
+  }
+  $releaseBuildId = [string]$currentRelease.buildId
+  if ($releaseBuildId -notmatch '^[0-9]{8}-[0-9]{2}-[0-9a-fA-F]{8}$') {
+    throw "backend/current-release.json 的 buildId 非法：$releaseBuildId"
+  }
+  $releaseArchive = Join-Path $repo (Join-Path 'docs/releases' $releaseBuildId)
+  if (-not (Test-Path -LiteralPath (Join-Path $releaseArchive 'build-info.json'))) {
+    throw "backend/current-release.json 指向的存档不存在或不完整：$releaseArchive"
+  }
+  if ($RequireArchivedRelease) {
+    if ($needsBuild) {
+      # needsBuild=true 表示本次启动会重新构建，产物不属于任何已存档构建。
+      throw '当前源码需要重新构建，但重建产物不是任何已存档构建；请先运行 scripts/release-v88.ps1 生成存档。'
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$currentRelease.localBinarySha256)) {
+      throw 'backend/current-release.json 缺少 localBinarySha256，无法校验二进制。'
+    }
+    $actualHash = (Get-FileHash -LiteralPath $binaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne ([string]$currentRelease.localBinarySha256).ToLowerInvariant()) {
+      throw "二进制 SHA256 与存档不一致（当前 $actualHash，存档 $($currentRelease.localBinarySha256)）。"
+    }
+    Write-Output "发布批次校验通过：buildId=$releaseBuildId"
+  } else {
+    Write-Output "当前发布批次：$releaseBuildId（未启用 -RequireArchivedRelease 校验）"
+  }
+} elseif ($RequireArchivedRelease) {
+  throw '未找到 backend/current-release.json；请先运行 scripts/release-v88.ps1。'
 }
 
 Push-Location (Join-Path $repo 'backend')

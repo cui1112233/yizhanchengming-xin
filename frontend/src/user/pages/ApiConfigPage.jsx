@@ -6,6 +6,7 @@ import { createManagedModel, deleteManagedModel, getManagedModelQuotas, listMana
 import { createCustomModelId } from '../../shared/modelCatalog/customModelId';
 import { isTextModelVerified, textModelVerificationKey } from '../../shared/modelCatalog/textModelVerification';
 import { getMemberCenter } from '../../shared/api/member';
+import { FANKE_VIDEO_MODELS } from './shuihuo/providerModelBinding';
 import { PageHeader, Panel, RoleBadge } from './accountCenterShared';
 import { getPresetCardState } from './api-config-preset-state';
 
@@ -17,14 +18,6 @@ const MODEL_KINDS = [
 ];
 
 const DEFAULT_H3_WORKFLOW_ID = 'minimax_h3_image_audio_to_video_v2_15s';
-const FANKE_VIDEO_MODELS = [
-  { value: 'ft-video-v1-77e8ee7a636f15dac27b2ce6d6fcd746', label: 'MiniMax H3-768p' },
-  { value: 'ft-video-v1-dd97afc97a7c3cba8e78a6e429933597', label: 'Seedance 2.0 Mini 720p' },
-  { value: 'ft-video-v1-20205b9fbcec3a1094671e1c08ab7f93', label: 'Seedance 2.0 Fast 720p' },
-  { value: 'ft-video-v1-d40a056d0fc20901a8b7e33d737fef51', label: 'Seedance 2.0 满血 720p' },
-  { value: 'ft-video-v1-451adae35b0c4a3d275c2c46394abc98', label: 'Seedance 2.5 满血 720p' },
-  { value: 'ft-video-v1-7ac9cee104fdf0f39dcf2402e3fb1a10', label: 'Wan 3.0 Prime 720p' }
-];
 
 const PLATFORM_PRESETS = [
   { id: 'yd2-mini-video', displayName: 'YD2.0 Mini（图生）', description: '平台已维护视频适配器；只需填写 API Key。', credentialMode: 'apiKey' },

@@ -16,6 +16,14 @@ const (
 	ErrorCodeTargetCredentialIncomplete = "TARGET_CREDENTIAL_INCOMPLETE"
 	ErrorCodeTargetSessionExpired       = "TARGET_SESSION_EXPIRED"
 	ErrorCodeTargetConnectorUnavailable = "TARGET_CONNECTOR_UNAVAILABLE"
+
+	// N8 漫画发布依赖的作品/音频目录读取失败。这类错误是上游不可用，
+	// 统一返回 503 而不是 500，便于前端区分“配置缺失”与“服务异常”。
+	ErrorCodeN8DirectoryRejected = "N8_DIRECTORY_REJECTED"
+
+	// 能力由 Slice 门控时，未注册路由仍返回 404，但响应体改为本码，便于
+	// 前端和日志区分“能力未开启”与“路径写错”。
+	ErrorCodeCapabilityNotEnabled = "CAPABILITY_NOT_ENABLED"
 )
 
 // 与 frontend/src/shared/apiErrorCodes.json 完全一致的文案镜像，仅用于契约

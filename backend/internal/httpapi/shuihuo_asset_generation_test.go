@@ -419,6 +419,15 @@ func TestShuihuoGPTImageRequestCompatibility(t *testing.T) {
 	if got := shuihuoImageSizeForModel("seedream-4.5", "9:16"); got != "1024x1792" {
 		t.Fatalf("seedream portrait size = %q, want legacy 1024x1792", got)
 	}
+	if got := shuihuoImageSizeForModel("[off]gpt-image-2.5", "2:3"); got != "1024x1536" {
+		t.Fatalf("gpt-image 2:3 size = %q, want 1024x1536", got)
+	}
+	if got := shuihuoImageSizeForModel("[off]gpt-image-2.5", "4:3"); got != "1536x1024" {
+		t.Fatalf("gpt-image 4:3 size = %q, want 1536x1024", got)
+	}
+	if got := shuihuoImageSizeForModel("[off]gpt-image-2.5", "3:2"); got != "1536x1024" {
+		t.Fatalf("gpt-image 3:2 size = %q, want 1536x1024", got)
+	}
 }
 
 func TestResolveComicReferenceImageDataReadsManualAndBookAssetImages(t *testing.T) {

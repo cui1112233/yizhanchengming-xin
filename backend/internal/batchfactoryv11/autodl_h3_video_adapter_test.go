@@ -24,10 +24,10 @@ func TestAutoDLH3VideoAdapterUsesConfiguredWorkflowWhenNoReferenceImages(t *test
 	if !strings.Contains(gotPath, workflowID) { t.Fatalf("workflow path=%q", gotPath) }
 }
 
-func TestAutoDLH3VideoAdapterUsesTextWorkflowWhenNoReferenceImages(t *testing.T) {
+func TestAutoDLH3VideoAdapterAlwaysIncludesFallbackReferenceImage(t *testing.T) {
 	var received map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/comfyui/comfyui_workflow/minimax_h3_lightx2v_no_pic" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/comfyui/comfyui_workflow/minimax_h3_lightx2v_v5_15s" {
 			t.Fatalf("request=%s %s", r.Method, r.URL.Path)
 		}
 		if r.Header.Get("Authorization") != "autodl-secret" {
@@ -69,10 +69,10 @@ func TestAutoDLH3VideoAdapterUsesTextWorkflowWhenNoReferenceImages(t *testing.T)
 	if received["prompt"] != prompt.CompiledPrompt || received["duration"] != float64(15) || received["resolution"] != "480p竖" {
 		t.Fatalf("payload=%+v", received)
 	}
-	for key := range received {
-		if strings.HasPrefix(key, "ref_image_") {
-			t.Fatalf("text workflow unexpectedly received reference image: %+v", received)
-		}
+	// Acceptance: even a book with zero reference images must submit a usable
+	// ref_image_0, otherwise the provider answers 缺少必填参数：ref_image_0.
+	if received["ref_image_0"] != "https://yzcm.site/assets/empty-1x1.png" {
+		t.Fatalf("ref_image_0=%v payload=%+v", received["ref_image_0"], received)
 	}
 }
 
@@ -214,5 +214,126 @@ func TestAutoDLH3VideoProviderNormalizesAndKeepsKeyOutOfView(t *testing.T) {
 	}
 	if view.Provider != VideoProviderAutoDLH3 || view.Model != AutoDLH3Model || !view.Configured {
 		t.Fatalf("view=%+v", view)
+	}
+}
+
+func TestAutoDLH3VideoAdapterUpgradesConfiguredTextWorkflowForFallbackImage(t *testing.T) {
+	var received map[string]any
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(`{"id":"task-1"}`))
+	}))
+	defer server.Close()
+
+	adapter := &AutoDLH3VideoAdapter{
+		CreateURL: server.URL + "/{workflow}", TasksURL: server.URL + "/result/{id}",
+		APIKey: "fake-key", Model: AutoDLH3Model,
+		WorkflowID:                AutoDLH3NoImageWorkflow,
+		FallbackReferenceImageURL: "https://yzcm.site/assets/empty-1x1.png",
+		ValidateURL:               func(raw string) (*url.URL, error) { return url.Parse(raw) },
+	}
+	if _, err := adapter.Submit(context.Background(), FrozenVideoModel{ID: AutoDLH3Model, MaxDuration: 15}, FinalPrompt{CompiledPrompt: "prompt"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotPath, AutoDLH3ReferenceWorkflow) {
+		t.Fatalf("workflow path=%q", gotPath)
+	}
+	if received["ref_image_0"] != "https://yzcm.site/assets/empty-1x1.png" {
+		t.Fatalf("text workflow must still submit the fallback image: %+v", received)
+	}
+}
+
+func TestAutoDLH3VideoAdapterInjectsFallbackImageForReferenceWorkflow(t *testing.T) {
+	const fallback = "https://yzcm.site/assets/empty-1x1.png"
+	var received map[string]any
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(`{"id":"task-1"}`))
+	}))
+	defer server.Close()
+
+	adapter := &AutoDLH3VideoAdapter{
+		CreateURL: server.URL + "/{workflow}", TasksURL: server.URL + "/result/{id}",
+		APIKey: "fake-key", Model: AutoDLH3Model,
+		WorkflowID:                AutoDLH3ReferenceWorkflow,
+		FallbackReferenceImageURL: fallback,
+		ValidateURL:               func(raw string) (*url.URL, error) { return url.Parse(raw) },
+	}
+	if _, err := adapter.Submit(context.Background(), FrozenVideoModel{ID: AutoDLH3Model, MaxDuration: 15}, FinalPrompt{CompiledPrompt: "prompt"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotPath, AutoDLH3ReferenceWorkflow) {
+		t.Fatalf("workflow path=%q", gotPath)
+	}
+	if received["ref_image_0"] != fallback {
+		t.Fatalf("reference workflow must receive the fallback image, payload=%+v", received)
+	}
+}
+
+func TestAutoDLH3VideoAdapterKeepsProvidedReferenceImages(t *testing.T) {
+	var received map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(`{"id":"task-1"}`))
+	}))
+	defer server.Close()
+
+	adapter := &AutoDLH3VideoAdapter{
+		CreateURL: server.URL + "/{workflow}", TasksURL: server.URL + "/result/{id}",
+		APIKey: "fake-key", Model: AutoDLH3Model,
+		WorkflowID:                AutoDLH3ReferenceWorkflow,
+		FallbackReferenceImageURL: "https://yzcm.site/assets/empty-1x1.png",
+		ValidateURL:               func(raw string) (*url.URL, error) { return url.Parse(raw) },
+	}
+	prompt := FinalPrompt{CompiledPrompt: "prompt", ReferenceImageURLs: []string{"https://cdn.example.com/hero.png"}}
+	if _, err := adapter.Submit(context.Background(), FrozenVideoModel{ID: AutoDLH3Model, MaxDuration: 15}, prompt); err != nil {
+		t.Fatal(err)
+	}
+	if received["ref_image_0"] != "https://cdn.example.com/hero.png" {
+		t.Fatalf("provided reference image must win over the fallback, payload=%+v", received)
+	}
+}
+
+// Reference images that arrive through settings (not ReferenceImageURLs) must
+// still be mapped to ref_image_0; otherwise the provider rejects the payload
+// with "缺少必填参数: ref_image_0".
+func TestAutoDLH3VideoAdapterMapsSettingsImagesToRefImage0(t *testing.T) {
+	var received map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(`{"id":"task-1"}`))
+	}))
+	defer server.Close()
+
+	adapter := &AutoDLH3VideoAdapter{
+		CreateURL: server.URL + "/{workflow}", TasksURL: server.URL + "/result/{id}",
+		APIKey: "fake-key", Model: AutoDLH3Model,
+		WorkflowID:                AutoDLH3ReferenceWorkflow,
+		FallbackReferenceImageURL: "https://yzcm.site/assets/empty-1x1.png",
+		ValidateURL:               func(raw string) (*url.URL, error) { return url.Parse(raw) },
+	}
+	prompt := FinalPrompt{
+		CompiledPrompt: "prompt",
+		EffectiveSettings: EffectiveSettings{Values: SettingsPatch{
+			"imageUrls": json.RawMessage(`["https://cdn.example.com/settings-hero.png"]`),
+		}},
+	}
+	if _, err := adapter.Submit(context.Background(), FrozenVideoModel{ID: AutoDLH3Model, MaxDuration: 15}, prompt); err != nil {
+		t.Fatal(err)
+	}
+	if received["ref_image_0"] != "https://cdn.example.com/settings-hero.png" {
+		t.Fatalf("settings imageUrls must map to ref_image_0, payload=%+v", received)
 	}
 }

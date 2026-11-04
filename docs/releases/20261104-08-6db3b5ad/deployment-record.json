@@ -1,0 +1,69 @@
+{
+  "buildId": "20261104-08-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "previousBuildId": "20261104-07-6db3b5ad",
+  "frontendEntry": "/assets/user-yp8TBcng.js",
+  "frontendEntryBytes": 136740,
+  "frontendEntrySha256": "7a62e4fdb5f4dbcd9a08dc343210cbcb3dc78401b8721ebe24e2c89f42b6ff08",
+  "linuxBinary": {
+    "path": ".release/v88/20261104-08-6db3b5ad/qiantie-server-linux-amd64",
+    "bytes": 70647970,
+    "sha256": "ba7e8ed25fc1e2f6c451d45c338cd7c1d40a302b646515d817e555d913555a2c"
+  },
+  "windowsBinary": {
+    "path": ".release/v88/20261104-08-6db3b5ad/qiantie-local.exe",
+    "bytes": 77571072,
+    "sha256": "3de9439a2c1343eb1b7ecd781a1eed8c2e273e0fe6e389993caea37de0580024"
+  },
+  "dataPackage": {
+    "path": ".release/v88/20261104-08-6db3b5ad/20261104-08-6db3b5ad-data.zip",
+    "bytes": 12262944,
+    "sha256": "4b7e228ad62c61c1c363c9c9a663064aa3804dd80786f0ab22732f8e601fa1b2",
+    "uploaded": false
+  },
+  "binaryMarkerCounts": {
+    "user-yp8TBcng.js": { "windows": 23, "linux": 23 },
+    "seedance-2-0-official": { "windows": 11, "linux": 11 },
+    "fanke-video-api": { "windows": 17, "linux": 17 },
+    "yfai_seedance": { "windows": 13, "linux": 13 }
+  },
+  "deployment": {
+    "target": "115.190.156.223",
+    "path": "/opt/www/qiantie/qiantie",
+    "method": "cp to sibling temp file then atomic mv -f, then systemctl restart qiantie.service",
+    "deployedAt": "2026-11-04T20:26:13+08:00",
+    "newMainPid": 4133032,
+    "previousMainPid": 4131779,
+    "runtimeReleaseJson": "/opt/www/qiantie/runtime-release.json"
+  },
+  "backups": [
+    { "file": "/root/backup-20261104/qiantie.prev-20261104-2024", "bytes": 70647970, "sha256": "20e0abfe119f21930802ed65be1e12f2268f6c16cb738d4ed915bc52b69905be" },
+    { "file": "/root/backup-20261104/qiantie.service-20261104-2024.txt", "bytes": 397, "sha256": "4f6634e8a1362191fa39d20875025570ab65291fb90b598e542df9ccf81ec257" },
+    { "file": "/root/backup-20261104/qiantie-db-pre-20261104-2024.sql.gz", "bytes": 60084906, "sha256": "fc6fb55687a27d9857d025ae0e5937430a3c5d799e619406860ee4c2687547ab" },
+    { "file": "/root/backup-20261104/qiantie-data-pre-20261104-2024.tgz", "bytes": 164560701, "sha256": "ce77d19963c5bd9e39d2341bd2bb63977f0dcf3bca3c1f183865ec7b911d915f" }
+  ],
+  "baselineBefore": {
+    "health": 200,
+    "frontendEntry": "/assets/user-BjQlfAO6.js",
+    "frontendEntryBytes": 136686,
+    "mainPid": 4131779,
+    "runtimeBuildId": "20261104-07-6db3b5ad",
+    "binarySha256": "20e0abfe119f21930802ed65be1e12f2268f6c16cb738d4ed915bc52b69905be"
+  },
+  "verificationAfter": {
+    "health": 200,
+    "newEntryCode": 200,
+    "newEntryBytes": 136740,
+    "newEntrySha256": "7a62e4fdb5f4dbcd9a08dc343210cbcb3dc78401b8721ebe24e2c89f42b6ff08",
+    "previousEntryCode": 404,
+    "pages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "panicCount": 0,
+    "batchProbe": { "path": "/api/batch-factory/v12/batches/batch_0a9b163b83c04cf6da460439c6912fc3", "code": 401 },
+    "sliceEnv": "QIANTIE_BATCH_FACTORY_V11_SLICE=5"
+  },
+  "notes": [
+    "Direct cp over the running binary failed with 'Text file busy'; the binary was replaced atomically via a sibling temp file plus mv -f, which is the documented rollback procedure.",
+    "Local 4001 was intentionally not touched (PID 35836, still the 06 binary) per this batch's red line.",
+    "No git commit or push was performed."
+  ]
+}

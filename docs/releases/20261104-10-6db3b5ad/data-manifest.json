@@ -1,0 +1,67 @@
+{
+    "buildId":  "20261104-10-6db3b5ad",
+    "createdAt":  "2026-11-04T15:30:17.8127921Z",
+    "package":  ".release/v88/20261104-10-6db3b5ad/20261104-10-6db3b5ad-data.zip",
+    "packageBytes":  19533371,
+    "packageSha256":  "a9904dddd176cca251c62f0c44d941327efad23cbb70ebee5f57b05bbe28b42f",
+    "files":  [
+                  {
+                      "path":  "data/system/presets.json",
+                      "bytes":  571515,
+                      "sha256":  "7bee47aaecb56db42fac98bbebb51e4569ed5d28ae9ad1619101e299ab79cccd",
+                      "kind":  "preset-library"
+                  },
+                  {
+                      "path":  "data/local-executor-artifacts/lea_Wp2F1-sS0poTbBwG.png",
+                      "bytes":  1381782,
+                      "sha256":  "1973c7dd1a583b3fab25e5f1b6cac6bdd5dcbd021e38ca7cc4037eda2c993178",
+                      "kind":  "preset-preview"
+                  },
+                  {
+                      "path":  "data/local-executor-artifacts/lea_DZg-36rwlduBI_aM.png",
+                      "bytes":  2419391,
+                      "sha256":  "185c1547b5984427a60917c7e43e7bd71ceeb8255345345a0588393dc74f1751",
+                      "kind":  "preset-preview"
+                  },
+                  {
+                      "path":  "data/local-executor-artifacts/lea_BKKggo8utzN1PwIe.png",
+                      "bytes":  2488445,
+                      "sha256":  "dedc8d1339267fc085013c0043ec1fdc288b320d7dc2b327ce778cb365556b87",
+                      "kind":  "preset-preview"
+                  },
+                  {
+                      "path":  "data/local-executor-artifacts/lea_60sljNPSgUfP7ECq.png",
+                      "bytes":  2856088,
+                      "sha256":  "330d7ac172445aab9e84efae8c8b4a99b3227d6f5f749571d310b6bbc8a89458",
+                      "kind":  "preset-preview"
+                  },
+                  {
+                      "path":  "data/local-executor-artifacts/lea_ZWy4UqgNh16SmVwx.png",
+                      "bytes":  2953263,
+                      "sha256":  "152947c905d7f4835272edfa9623429d07f0011a62ce80840c5a93d1ca73bcec",
+                      "kind":  "preset-preview"
+                  },
+                  {
+                      "path":  "data/local-executor-artifacts/lea_4mqxE3QJfGweRtVX.png",
+                      "bytes":  7268371,
+                      "sha256":  "e01570441d4ed7eb624e45fb039686877d05838b31ed02592ea6289ec9b17ff7",
+                      "kind":  "preset-preview"
+                  }
+              ],
+    "referencedPreviewIds":  [
+                                 "lea_Wp2F1-sS0poTbBwG",
+                                 "lea_DZg-36rwlduBI_aM",
+                                 "lea_BKKggo8utzN1PwIe",
+                                 "lea_60sljNPSgUfP7ECq",
+                                 "lea_ZWy4UqgNh16SmVwx",
+                                 "lea_4mqxE3QJfGweRtVX"
+                             ],
+    "missingPreviewIds":  [
+
+                          ],
+    "excludedSensitiveFiles":  [
+                                   "data/users/choushiyiguai/api-config.json",
+                                   "data/users/choushiyiguai/upload-target.json",
+                                   "data/users/choushiyiguai/novel-fetch-workshop/121-credentials.json"
+                               ]
+}

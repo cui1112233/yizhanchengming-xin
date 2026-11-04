@@ -201,10 +201,17 @@ export function batchFactorySourceStatus(book = {}) {
 
 export function resultData(result, key) { return result?.[key] || result || {}; }
 
-export async function waitForComicPageResult(batchId, bookId, videoId) {
+export async function waitForComicPageResult(batchId, bookId, videoId, options = {}) {
   const deadline = Date.now() + COMIC_PAGE_RESULT_TIMEOUT;
+  const signal = options.signal;
   let lastReadError = null;
   while (Date.now() < deadline) {
+    if (signal?.aborted) {
+      // 用户主动停止本批：抛出一个可识别的中断错误，未完成的页保持可重试。
+      const stopped = new Error('已停止等待漫画页结果');
+      stopped.comicStopped = true;
+      throw stopped;
+    }
     try {
       const response = await listComicPages(batchId, bookId, { silent: true, suppressGlobalError: true });
       const pages = resultData(response, 'pages') || [];
@@ -491,7 +498,10 @@ export function effectiveBookSettings(batch, book) {
     comicPublishSettings: { ...(batchPatch.comicPublishSettings || {}), ...(bookPatch.comicPublishSettings || {}) }
   };
   const comic = effective?.aiPromptConfig?.comic || {};
-  if (!['comic', 'video'].includes(effective.productionMode) && comic.enabled === true && String(comic.body || '').trim()) effective.productionMode = 'comic';
+  // 批次级 productionMode 是整批唯一的模式开关；单书里遗留的值不得覆盖它，
+  // 否则列表按视频渲染、自动化却可能按漫画执行漫画阶段。
+  if (['comic', 'video'].includes(batchPatch.productionMode)) effective.productionMode = batchPatch.productionMode;
+  else if (!['comic', 'video'].includes(effective.productionMode) && comic.enabled === true && String(comic.body || '').trim()) effective.productionMode = 'comic';
   return normalizeAudioSourceSettings(effective);
 }
 
@@ -1012,6 +1022,10 @@ export function batchFactoryRatioText(width, height, fallbackRatio = 9 / 16) {
   if (Math.abs(ratio - 16 / 9) < 0.04) return '16:9';
   if (Math.abs(ratio - 9 / 16) < 0.04) return '9:16';
   if (Math.abs(ratio - 1) < 0.04) return '1:1';
+  if (Math.abs(ratio - 2 / 3) < 0.04) return '2:3';
+  if (Math.abs(ratio - 3 / 4) < 0.04) return '3:4';
+  if (Math.abs(ratio - 4 / 3) < 0.04) return '4:3';
+  if (Math.abs(ratio - 3 / 2) < 0.04) return '3:2';
   return ratio > 1 ? `${Math.round(ratio * 100)}:100` : `100:${Math.round(100 / ratio)}`;
 }
 

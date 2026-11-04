@@ -1,0 +1,11 @@
+buildId=20261104-08-6db3b5ad
+builtAt=2026-11-04T12:21:52.2239233Z
+gitSha=6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8
+worktreeDirty=True
+frontendEntry=/assets/user-yp8TBcng.js
+windowsBinary=.release/v88/20261104-08-6db3b5ad/qiantie-local.exe
+windowsSha256=3de9439a2c1343eb1b7ecd781a1eed8c2e273e0fe6e389993caea37de0580024
+linuxBinary=.release/v88/20261104-08-6db3b5ad/qiantie-server-linux-amd64
+linuxSha256=ba7e8ed25fc1e2f6c451d45c338cd7c1d40a302b646515d817e555d913555a2c
+dataPackage=.release/v88/20261104-08-6db3b5ad/20261104-08-6db3b5ad-data.zip
+dataPackageSha256=4b7e228ad62c61c1c363c9c9a663064aa3804dd80786f0ab22732f8e601fa1b2

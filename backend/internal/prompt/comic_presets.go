@@ -27,10 +27,19 @@ var comicStylePreviews embed.FS
 //go:embed defaults/comic_reference_scenes/*.jpg
 var comicReferenceScenes embed.FS
 
+// Administrator-authored presets that must exist in every deployment. They are
+// seeded by id+version so local administrator edits can still take precedence.
+//
+//go:embed defaults/admin_presets.json
+var adminPresetDefaults []byte
+
+//go:embed defaults/admin_previews/*.jpg
+var adminPresetPreviews embed.FS
+
 // EnsureComicPresets adds missing built-in comic presets to the durable
 // system catalog. It also performs narrowly scoped upgrades for recognized
 // legacy CM records while preserving newer administrator-authored versions.
-func EnsureComicPresets(path string) error {
+func EnsureComicPresets(path string, artifactDirs ...string) error {
 	path = filepath.Clean(path)
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -50,6 +59,7 @@ func EnsureComicPresets(path string) error {
 		filtered = append(filtered, record)
 	}
 	records = filtered
+	records, removedDuplicates := dedupePresetVersions(records)
 	var defaults []map[string]any
 	if err := json.Unmarshal(comicPresetDefaults, &defaults); err != nil {
 		return fmt.Errorf("read built-in comic presets: %w", err)
@@ -86,7 +96,7 @@ func EnsureComicPresets(path string) error {
 			publishedIndex[id] = index
 		}
 	}
-	changed := removedRetired
+	changed := removedRetired || removedDuplicates
 	for _, record := range defaults {
 		id := stringValue(record["id"])
 		version := intValue(record["version"])
@@ -112,6 +122,60 @@ func EnsureComicPresets(path string) error {
 		latestVersion[id] = version
 		changed = true
 	}
+	var adminSeeds []map[string]any
+	if err := json.Unmarshal(adminPresetDefaults, &adminSeeds); err != nil {
+		return fmt.Errorf("read built-in administrator presets: %w", err)
+	}
+	// Rebuild the version indexes after the built-in merge so administrator
+	// seeds upgrade against the current catalog state.
+	existingVersions = make(map[string]bool, len(records)+len(adminSeeds))
+	latestVersion = make(map[string]int, len(records)+len(adminSeeds))
+	for _, record := range records {
+		id := stringValue(record["id"])
+		version := intValue(record["version"])
+		if id == "" {
+			continue
+		}
+		existingVersions[presetVersionKey(id, version)] = true
+		if version > latestVersion[id] {
+			latestVersion[id] = version
+		}
+	}
+	for _, seed := range adminSeeds {
+		id := stringValue(seed["id"])
+		version := intValue(seed["version"])
+		if id == "" || version < 1 || existingVersions[presetVersionKey(id, version)] {
+			continue
+		}
+		// An equal or higher local version belongs to the administrator and
+		// must never be downgraded by the embedded seed.
+		if latestVersion[id] >= version {
+			continue
+		}
+		for _, record := range records {
+			if stringValue(record["id"]) != id || intValue(record["version"]) >= version {
+				continue
+			}
+			if stringValue(record["status"]) == "published" {
+				record["status"] = "archived"
+			}
+		}
+		seed["status"] = "published"
+		if stringValue(seed["createdBy"]) == "" {
+			seed["createdBy"] = "system"
+		}
+		if stringValue(seed["publishedBy"]) == "" {
+			seed["publishedBy"] = "system"
+		}
+		if stringValue(seed["publishedAt"]) == "" {
+			seed["publishedAt"] = "2026-11-04T00:00:00Z"
+		}
+		records = append(records, seed)
+		existingVersions[presetVersionKey(id, version)] = true
+		latestVersion[id] = version
+		changed = true
+	}
+	ensureAdminPresetPreviews(adminSeeds, presetArtifactDir(path, artifactDirs))
 	if !changed {
 		return nil
 	}
@@ -148,6 +212,100 @@ var cmForcedLegacyPageUpgradeIDs = map[string]struct{}{
 
 func presetVersionKey(id string, version int) string {
 	return fmt.Sprintf("%s\x00%d", id, version)
+}
+
+// dedupePresetVersions collapses exact id+version duplicates that may have
+// accumulated in older catalogs. It keeps the most useful record instead of
+// dropping rows that only differ by status or revision.
+func dedupePresetVersions(records []map[string]any) ([]map[string]any, bool) {
+	if len(records) < 2 {
+		return records, false
+	}
+	indices := make(map[string]int, len(records))
+	result := records[:0]
+	changed := false
+	for _, record := range records {
+		id := stringValue(record["id"])
+		if id == "" {
+			result = append(result, record)
+			continue
+		}
+		key := presetVersionKey(id, intValue(record["version"]))
+		index, found := indices[key]
+		if !found {
+			indices[key] = len(result)
+			result = append(result, record)
+			continue
+		}
+		changed = true
+		if preferPresetRecord(record, result[index]) {
+			result[index] = record
+		}
+	}
+	return result, changed
+}
+
+func preferPresetRecord(candidate, current map[string]any) bool {
+	candidatePublished := stringValue(candidate["status"]) == "published"
+	currentPublished := stringValue(current["status"]) == "published"
+	if candidatePublished != currentPublished {
+		return candidatePublished
+	}
+	return intValue(candidate["revision"]) > intValue(current["revision"])
+}
+
+func presetArtifactDir(path string, override []string) string {
+	for _, dir := range override {
+		if value := strings.TrimSpace(dir); value != "" {
+			return value
+		}
+	}
+	return filepath.Join(filepath.Dir(filepath.Dir(path)), "local-executor-artifacts")
+}
+
+// ensureAdminPresetPreviews materializes the embedded style previews into the
+// local artifact store used by /api/presets/comic-material/{id}/preview. It
+// never overwrites an existing artifact, so administrator uploads stay intact.
+func ensureAdminPresetPreviews(seeds []map[string]any, artifactDir string) {
+	if strings.TrimSpace(artifactDir) == "" {
+		return
+	}
+	for _, seed := range seeds {
+		assetID := strings.TrimSpace(stringValue(seed["previewAssetId"]))
+		if assetID == "" || filepath.Base(assetID) != assetID {
+			continue
+		}
+		existing := false
+		for _, extension := range []string{".png", ".jpg", ".jpeg", ".webp"} {
+			if _, err := os.Stat(filepath.Join(artifactDir, assetID+extension)); err == nil {
+				existing = true
+				break
+			}
+		}
+		if existing {
+			continue
+		}
+		payload, err := adminPresetPreviews.ReadFile("defaults/admin_previews/" + assetID + ".jpg")
+		if err != nil {
+			continue
+		}
+		if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+			continue
+		}
+		temporary, err := os.CreateTemp(artifactDir, ".admin-preview-*.tmp")
+		if err != nil {
+			continue
+		}
+		_, writeErr := temporary.Write(payload)
+		closeErr := temporary.Close()
+		if writeErr != nil || closeErr != nil {
+			_ = os.Remove(temporary.Name())
+			continue
+		}
+		if err := os.Rename(temporary.Name(), filepath.Join(artifactDir, assetID+".jpg")); err != nil {
+			_ = os.Remove(temporary.Name())
+		}
+	}
 }
 
 // OpenComicStylePreview returns the embedded image paired with a built-in

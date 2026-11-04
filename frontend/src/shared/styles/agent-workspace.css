@@ -1740,3 +1740,45 @@
   .agent-page .agent-director-desk-fullscreen__assets article { min-width: 150px; margin: 0; }
   .agent-page .agent-director-desk-fullscreen__actions { grid-row: 3; }
 }
+
+/* V88 视觉统一 · Agent 工作区
+ * 只做令牌映射与过渡统一：不改画布结构、不改业务逻辑、不改后端状态字段。
+ * 主色由珊瑚切到青绿，珊瑚仍保留在 --agent-edge-coral 作为连线强调色。
+ * 容器本身就是全宽全高的画布，内部滚动已由 .agent-canvas-workspace 承担，
+ * 因此不额外加页面内边距（加了会把画布挤出屏幕）。 */
+.agent-page.utility-workbench {
+  --agent-accent: var(--v88-color-primary);
+  --agent-accent-hover: var(--v88-color-primary-hover);
+  --agent-accent-soft: var(--v88-color-primary-soft);
+  --agent-success: var(--v88-color-success);
+  --agent-border: var(--v88-color-border);
+  --agent-border-strong: var(--v88-color-border-strong);
+  --agent-text: var(--v88-color-text-1);
+  --agent-secondary: var(--v88-color-text-2);
+  --agent-muted: var(--v88-color-text-3);
+}
+
+.agent-page .agent-task-row,
+.agent-page .agent-canvas-node-card,
+.agent-page .agent-canvas-toolbar-button,
+.agent-page .agent-storyboard-section,
+.agent-page .agent-image-card {
+  transition: border-color var(--v88-motion-base) var(--v88-ease),
+              background-color var(--v88-motion-base) var(--v88-ease),
+              box-shadow var(--v88-motion-base) var(--v88-ease);
+}
+
+.agent-page .agent-workbench-empty {
+  border-radius: var(--v88-radius-lg);
+  color: var(--v88-color-text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-page .agent-task-row,
+  .agent-page .agent-canvas-node-card,
+  .agent-page .agent-canvas-toolbar-button,
+  .agent-page .agent-storyboard-section,
+  .agent-page .agent-image-card {
+    transition: none;
+  }
+}

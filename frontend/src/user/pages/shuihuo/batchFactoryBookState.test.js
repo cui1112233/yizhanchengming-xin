@@ -1,6 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldAutoClassifyBook, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState.js';
+import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState.js';
+
+test('other batches legacy failure never renders on this book card', () => {
+  const status = {
+    batchId: 'batch-old',
+    state: 'failed',
+    books: [{ bookId: 'book-1', status: 'failed', stage: 'audio_planning', error: 'TTS 时长测量失败：exec: "ffprobe"' }]
+  };
+  assert.equal(automationBookForCard(status, 'batch-current', 'book-1'), null);
+});
+
+test('same-batch failure older than threshold is marked as history, not current state', () => {
+  const status = {
+    batchId: 'batch-current',
+    books: [{ bookId: 'book-1', status: 'failed', stage: 'audio_planning', updatedAt: '2026-10-14T11:16:45Z' }]
+  };
+  const book = automationBookForCard(status, 'batch-current', 'book-1', Date.parse('2026-11-04T12:00:00Z'));
+  assert.equal(book.stale, true);
+  const fresh = automationBookForCard(status, 'batch-current', 'book-1', Date.parse('2026-10-15T12:00:00Z'));
+  assert.equal(fresh.stale, false);
+  const otherBook = automationBookForCard(status, 'batch-current', 'book-2', Date.parse('2026-10-15T12:00:00Z'));
+  assert.equal(otherBook, null);
+});
 
 test('does not block a failed book behind a stale running automation job', () => {
   const status = { state: 'running', books: [{ bookId: 'book-1', status: 'failed', stage: 'comic_images' }] };
@@ -12,6 +34,25 @@ test('keeps an actually running book protected from manual duplicate retries', (
   const status = { state: 'running', books: [{ bookId: 'book-1', status: 'running', stage: 'comic_images' }] };
   assert.equal(automationBookIsActive(status, 'book-1'), true);
   assert.equal(automationBookNeedsRetry(status, 'book-1'), null);
+});
+
+test('surfaces an automation failure from a stage outside the timeline instead of showing 待开始', () => {
+  const book = { id: 'book-1', sourceText: '正文', sourceMetadata: {} };
+  assert.equal(batchFactoryBookState(book).label, '待开始');
+  const state = batchFactoryBookState(book, {
+    automationBook: {
+      bookId: 'book-1',
+      status: 'failed',
+      stage: 'audio_planning',
+      message: '配音与逐行时长失败',
+      error: 'TTS 时长测量失败：invalid input: audio probe failed: exec: "ffprobe": executable file not found in $PATH'
+    }
+  });
+  assert.equal(state.label, '异常');
+  assert.equal(state.tone, 'red');
+  assert.match(state.detail, /配音与逐行时长失败/);
+  assert.match(state.detail, /ffprobe/);
+  assert.equal(state.failedStage.stage, 'audio_planning');
 });
 
 test('allows a queued retry to restart a failed automation run after service recovery', () => {

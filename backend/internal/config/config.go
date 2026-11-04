@@ -152,7 +152,9 @@ func FromEnv() (Config, error) {
 	if cfg.BridgeSecret == "" {
 		return Config{}, fmt.Errorf("QIANTIE_BRIDGE_SECRET is required")
 	}
-	rawSlice := envOr("QIANTIE_BATCH_FACTORY_V11_SLICE", "0")
+	// 默认 3：V12 批次路由在 slice>=1 才注册，默认 0 会让直接运行二进制的
+	// 部署出现“作品全没了”。需要更低档位时必须显式设置环境变量。
+	rawSlice := envOr("QIANTIE_BATCH_FACTORY_V11_SLICE", "3")
 	slice, err := strconv.Atoi(rawSlice)
 	if err != nil || slice < 0 || slice > 6 {
 		return Config{}, fmt.Errorf("invalid QIANTIE_BATCH_FACTORY_V11_SLICE")

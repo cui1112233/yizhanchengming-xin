@@ -14,6 +14,11 @@ import (
 // frontend caller or V12 test depended on it, so it was a dead parallel entry.
 var v12V11AliasPatterns = []string{
 	"GET /api/batch-factory/v12/batches/{batchId}",
+	// The workbench create modal posts {title, books[], initialBatchSettings,
+	// giantAutomationPlan} directly to the batch collection. V11 has owned that
+	// contract since the slice-1 store; V12 only exposed GET here and answered
+	// 405 to the browser. Forward instead of duplicating the handler.
+	"POST /api/batch-factory/v12/batches",
 	"POST /api/batch-factory/v12/intakes/{intakeId}/batches",
 	"POST /api/batch-factory/v12/intakes/manual",
 	"POST /api/batch-factory/v12/private-comic/tasks",
@@ -93,6 +98,15 @@ func v12AliasHandler(v11 *http.ServeMux) http.Handler {
 		urlCopy.Path = strings.Replace(urlCopy.Path, "/api/batch-factory/v12/", "/api/batch-factory/v11/", 1)
 		urlCopy.RawPath = ""
 		clone.URL = &urlCopy
-		v11.ServeHTTP(w, clone)
+		// The alias pattern is registered unconditionally; if the V11 source
+		// route for this slice is absent, turn the 404 into the structured
+		// "capability not enabled" body while keeping the 404 status. Registered
+		// V11 handlers keep their own 404/409/503 semantics untouched.
+		if _, pattern := v11.Handler(clone); pattern != "" {
+			v11.ServeHTTP(w, clone)
+			return
+		}
+		writer := &capabilityNotFoundWriter{ResponseWriter: w, path: req.URL.Path}
+		v11.ServeHTTP(writer, clone)
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -19,7 +20,23 @@ const (
 	DefaultAutoDLH3CreateURL   = "https://autodl.art/api/v1/comfyui/comfyui_workflow/{workflow}"
 	DefaultAutoDLH3TasksURL    = "https://autodl.art/api/v1/comfyui/comfyui_workflow/result/{id}"
 	MaxAutoDLH3ReferenceImages = 9
+	// The reference workflow requires a ref_image_0 entry. When a retry loses
+	// its reference images this transparent 1×1 PNG keeps the workflow/payload
+	// consistent. It is served by this application, never by an external CDN.
+	AutoDLH3FallbackImagePath = "/assets/empty-1x1.png"
+	// QIANTIE_AUTODL_H3_FALLBACK_REFERENCE_IMAGE overrides the absolute URL.
+	AutoDLH3FallbackImageEnv = "QIANTIE_AUTODL_H3_FALLBACK_REFERENCE_IMAGE"
 )
+
+// AutoDLH3FallbackImageURL resolves the absolute URL sent to the provider. The
+// default points at this application's public origin because AutoDL fetches the
+// image from its own network.
+func AutoDLH3FallbackImageURL() string {
+	if value := strings.TrimSpace(os.Getenv(AutoDLH3FallbackImageEnv)); value != "" {
+		return value
+	}
+	return "https://yzcm.site" + AutoDLH3FallbackImagePath
+}
 
 // AutoDLH3VideoAdapter implements the two-step ComfyUI workflow API. The
 // provider token stays server-side and is deliberately sent as the raw
@@ -32,6 +49,9 @@ type AutoDLH3VideoAdapter struct {
 	WorkflowID  string
 	Client      *http.Client
 	ValidateURL func(string) (*url.URL, error)
+	// FallbackReferenceImageURL is injected only when the chosen workflow is a
+	// reference workflow but the task carries no reference images.
+	FallbackReferenceImageURL string
 }
 
 var _ ProductionAdapter = (*AutoDLH3VideoAdapter)(nil)
@@ -126,6 +146,25 @@ func (a *AutoDLH3VideoAdapter) Submit(ctx context.Context, model FrozenVideoMode
 	if workflow == "" {
 		workflow = AutoDLH3NoImageWorkflow
 		if len(images) > 0 {
+			workflow = AutoDLH3ReferenceWorkflow
+		}
+	}
+	// The provider rejects a submission whose payload carries no ref_image_0,
+	// even when the named no-image workflow is called (live evidence:
+	// "缺少必填参数：ref_image_0"). A book with zero reference images therefore
+	// still submits one self-hosted transparent PNG, and the workflow moves to
+	// the reference variant so the payload and workflow agree.
+	if len(images) == 0 {
+		fallback := strings.TrimSpace(a.FallbackReferenceImageURL)
+		if fallback == "" {
+			fallback = AutoDLH3FallbackImageURL()
+		}
+		parsed, err := a.validatedURL(fallback)
+		if err != nil {
+			return ProviderTaskRef{}, fmt.Errorf("invalid AutoDL H3 fallback reference image: %w", err)
+		}
+		images = []string{parsed.String()}
+		if workflow == AutoDLH3NoImageWorkflow {
 			workflow = AutoDLH3ReferenceWorkflow
 		}
 	}

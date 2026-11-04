@@ -133,6 +133,8 @@ test('comic page client uses book-owned V12 routes', async t => {
 
   await batchFactoryV11.listComicPages('batch 1', 'book/1');
   await batchFactoryV11.generateComicPage('batch 1', 'book/1', 'video?1', { imagePrompt: '完整漫画页' });
+  // 出图由调用方统一展示错误（含 409 在途），不能让全局顶栏再弹一次。
+  assert.equal(calls[calls.length - 1].options.suppressGlobalError, true);
   await batchFactoryV11.generateComicBook('batch 1', 'book/1');
   await batchFactoryV11.setPrimaryComicPageImage('batch 1', 'book/1', 'page#1', 'image/1');
 	await batchFactoryV11.setComicPageReferenceImages('batch 1', 'book/1', 'video?1', ['ref-a']);
@@ -482,6 +484,30 @@ test('book asset image blob helper refuses external URLs so the app bearer token
     () => batchFactoryV11.getBookAssetImageBlob('https://media.example/private.png'),
     /book asset image/i
   );
+});
+
+test('comic page image blob retries transient network and 5xx failures but not 404', async t => {
+  const originalLocalStorage = globalThis.localStorage;
+  const originalFetch = globalThis.fetch;
+  globalThis.localStorage = { getItem(key) { return key === 'auth_token' ? 'contract-test-token' : ''; }, setItem() {}, removeItem() {} };
+  const path = '/api/batch-factory/v12/batches/batch_1/books/book_1/comic-pages/comic-page_1/images/comic-image_1/content';
+
+  const responses = [new TypeError('Failed to fetch'), new Response('busy', { status: 503 }), new Response(new Blob(['png'], { type: 'image/png' }), { status: 200, headers: { 'content-type': 'image/png' } })];
+  const calls = [];
+  globalThis.fetch = async (requestPath, options = {}) => {
+    calls.push({ requestPath, options });
+    const next = responses.shift();
+    if (next instanceof Error) throw next;
+    return next;
+  };
+  t.after(() => { globalThis.localStorage = originalLocalStorage; globalThis.fetch = originalFetch; });
+
+  const blob = await batchFactoryV11.getComicPageImageBlob(path);
+  assert.equal(blob.type, 'image/png');
+  assert.equal(calls.length, 3);
+
+  globalThis.fetch = async () => new Response('missing', { status: 404 });
+  await assert.rejects(() => batchFactoryV11.getComicPageImageBlob(path));
 });
 
 test('production media blob helper refuses external URLs so the app bearer token is never forwarded off-origin', async () => {

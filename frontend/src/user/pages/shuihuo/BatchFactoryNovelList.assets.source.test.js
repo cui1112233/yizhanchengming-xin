@@ -93,11 +93,12 @@ test('asset generation settings use a compact hierarchy instead of three plain f
   assert.match(css, /\.batch-factory-asset-editor-config-field > span \{ color: #8fa8c4; font-size: 11px; \}/);
 });
 
-test('asset settings use a 16:9 default while keeping explicit per-asset overrides', () => {
-  assert.match(source, /const imageAspectRatio = '16:9'/);
-  assert.match(source, /资产画幅未单独选择时固定为 16:9/);
-  assert.match(source, /placeholder="默认 16:9"/);
-  assert.match(source, /imageAspectRatio: imageAspectRatio \|\| '16:9'/);
+test('asset settings use the shared aspect-ratio default while keeping explicit per-asset overrides', () => {
+  assert.match(source, /import \{ IMAGE_ASPECT_RATIO_OPTIONS, normalizeImageAspectRatio \} from '\.\.\/\.\.\/\.\.\/shared\/imageAspectRatios';/);
+  assert.match(source, /const imageAspectRatio = normalizeImageAspectRatio\(''\);/);
+  assert.doesNotMatch(source, /imageAspectRatio \|\| '16:9'/);
+  assert.match(source, /placeholder=\{`默认 \$\{imageAspectRatio\}`\}/);
+  assert.match(source, /options=\{IMAGE_ASPECT_RATIO_OPTIONS\}/);
   assert.match(source, /图片模型<\/span><Select allowClear value=\{editing\?\.imageModelId \|\| imageModelId \|\| undefined\}/);
   assert.match(source, /图片画幅<\/span><Select allowClear value=\{editing\?\.imageAspectRatio \|\| imageAspectRatio \|\| undefined\}/);
   assert.match(source, /imageModelId: editing\.imageModelId \|\| ''/);

@@ -1105,12 +1105,7 @@ func validBookAssetKind(kind string) bool {
 }
 
 func validBookAssetImageAspectRatio(ratio string) bool {
-	switch ratio {
-	case "", "16:9", "9:16", "1:1":
-		return true
-	default:
-		return false
-	}
+	return strings.TrimSpace(ratio) == "" || IsSupportedImageAspectRatio(ratio)
 }
 
 func normalizeBookAssetInput(input CreateBookAssetInput) (CreateBookAssetInput, error) {

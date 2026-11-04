@@ -718,6 +718,32 @@ func (s *MySQLStore) ListBatchSummaryIndex(ctx context.Context, owner string) ([
 	return batches, nil
 }
 
+// ListShuihuoProjectBatchIDs returns the batches whose batch-scope settings
+// mark them as Shuihuo projects. The V12 batch list used to call GetBatch for
+// every batch only to read this single flag, which hydrated settings, drafts,
+// assets and videos N times. One patch query keeps the JSON contract unchanged.
+func (s *MySQLStore) ListShuihuoProjectBatchIDs(ctx context.Context, owner string) (map[string]bool, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT batch_id,patch_json FROM batch_factory_v12_settings_patches WHERE owner_username=? AND scope_type='batch'`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	flags := map[string]bool{}
+	for rows.Next() {
+		var batchID, patchJSON string
+		if err := rows.Scan(&batchID, &patchJSON); err != nil {
+			return nil, err
+		}
+		var patch struct {
+			ShuihuoProject json.RawMessage `json:"shuihuoProject"`
+		}
+		if json.Unmarshal([]byte(patchJSON), &patch) == nil && strings.TrimSpace(string(patch.ShuihuoProject)) == "true" {
+			flags[batchID] = true
+		}
+	}
+	return flags, rows.Err()
+}
+
 func projectCoverComicPageImageURL(batchID, bookID, comicPageID, imageID string) string {
 	return "/api/batch-factory/v12/batches/" + url.PathEscape(batchID) + "/books/" + url.PathEscape(bookID) + "/comic-pages/" + url.PathEscape(comicPageID) + "/images/" + url.PathEscape(imageID) + "/content"
 }
@@ -766,17 +792,18 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 			return Batch{}, err
 		}
 		book.BatchID = batch.ID
-		videoRows, err := s.db.QueryContext(ctx, `SELECT id FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, id, book.ID, owner)
+		videoRows, err := s.db.QueryContext(ctx, `SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, id, book.ID, owner)
 		if err != nil {
 			return Batch{}, err
 		}
 		for videoRows.Next() {
 			var videoID string
-			if err := videoRows.Scan(&videoID); err != nil {
+			var ordinal int
+			if err := videoRows.Scan(&videoID, &ordinal); err != nil {
 				videoRows.Close()
 				return Batch{}, err
 			}
-			book.Videos = append(book.Videos, Video{ID: videoID, BatchID: batch.ID, BookID: book.ID})
+			book.Videos = append(book.Videos, Video{ID: videoID, BatchID: batch.ID, BookID: book.ID, Ordinal: ordinal, CompatibilityState: "active"})
 		}
 		if err := videoRows.Err(); err != nil {
 			videoRows.Close()
@@ -785,6 +812,25 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 		if err := videoRows.Close(); err != nil {
 			return Batch{}, err
 		}
+		// 轮询同样需要历史 ordinal，否则前端在状态刷新后会丢掉「上一版」的挂载点。
+		historyRows, err := s.db.QueryContext(ctx, `SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state<>'active' ORDER BY ordinal,updated_at DESC,id`, id, book.ID, owner)
+		if err != nil {
+			return Batch{}, err
+		}
+		for historyRows.Next() {
+			var videoID, state string
+			var ordinal int
+			if err := historyRows.Scan(&videoID, &ordinal, &state); err != nil {
+				historyRows.Close()
+				return Batch{}, err
+			}
+			book.VideoHistory = append(book.VideoHistory, Video{ID: videoID, BatchID: batch.ID, BookID: book.ID, Ordinal: ordinal, CompatibilityState: state})
+		}
+		if err := historyRows.Err(); err != nil {
+			historyRows.Close()
+			return Batch{}, err
+		}
+		historyRows.Close()
 		batch.Books = append(batch.Books, book)
 	}
 	if err := rows.Err(); err != nil {
@@ -797,12 +843,29 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 // giant-material recovery sweep. In particular it does not hydrate videos,
 // director revisions or assets for every historical batch on every sweep.
 func (s *MySQLStore) ListBatchRecoveryIndex(ctx context.Context, owner string) ([]Batch, error) {
-	const query = `SELECT ba.id,ba.revision,ba.created_at,ba.updated_at,COALESCE(bsp.patch_json,JSON_OBJECT()),b.id,b.revision,COALESCE(r.source_text,''),r.source_metadata_json,COALESCE(d.content,''),COALESCE(ksp.patch_json,JSON_OBJECT()) FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username LEFT JOIN batch_factory_v12_settings_patches bsp ON bsp.scope_type='batch' AND bsp.scope_id=ba.id AND bsp.owner_username=ba.owner_username LEFT JOIN batch_factory_v12_settings_patches ksp ON ksp.scope_type='book' AND ksp.scope_id=b.id AND ksp.owner_username=b.owner_username LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=ba.id WHERE b.owner_username=? AND JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.sourceMode'))='giant_material' ORDER BY ba.created_at DESC,ba.id DESC,b.ordinal,b.id`
-	rows, err := s.db.QueryContext(ctx, query, owner)
+	// 两步查询：source_text / 草稿正文可能是整本小说，直接参与 ORDER BY 的
+	// filesort 会撑爆 sort_buffer_size（MySQL ERROR 1038）。先只对 book id
+	// 排序，再按 id 分批读取负载，顺序仍是 createdAt DESC, id DESC, ordinal, id。
+	const idQuery = `SELECT b.id,b.batch_id FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username WHERE b.owner_username=? AND JSON_UNQUOTE(JSON_EXTRACT(r.source_metadata_json,'$.sourceMode'))='giant_material' ORDER BY ba.created_at DESC,ba.id DESC,b.ordinal,b.id`
+	idRows, err := s.db.QueryContext(ctx, idQuery, owner)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	type recoveryKey struct{ bookID, batchID string }
+	keys := []recoveryKey{}
+	for idRows.Next() {
+		var key recoveryKey
+		if err := idRows.Scan(&key.bookID, &key.batchID); err != nil {
+			idRows.Close()
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	if err := idRows.Err(); err != nil {
+		idRows.Close()
+		return nil, err
+	}
+	idRows.Close()
 
 	out := []Batch{}
 	batchIndexes := map[string]int{}
@@ -816,39 +879,75 @@ func (s *MySQLStore) ListBatchRecoveryIndex(ctx context.Context, owner string) (
 		}
 		return normalizeLegacyNestedPatch(patch), nil
 	}
-	for rows.Next() {
-		var batchID, bookID, sourceText, workingContent string
-		var batchRevision, bookRevision int64
-		var createdAt, updatedAt time.Time
-		var batchPatchRaw, metadataRaw, bookPatchRaw []byte
-		if err := rows.Scan(&batchID, &batchRevision, &createdAt, &updatedAt, &batchPatchRaw, &bookID, &bookRevision, &sourceText, &metadataRaw, &workingContent, &bookPatchRaw); err != nil {
-			return nil, err
+	type recoveryRow struct {
+		batchID                     string
+		batchRevision, bookRevision int64
+		createdAt, updatedAt        time.Time
+		batchPatchRaw, metadataRaw  []byte
+		bookPatchRaw                []byte
+		bookID, sourceText, working string
+	}
+	const recoveryPageSize = 200
+	const payloadQuery = `SELECT ba.id,ba.revision,ba.created_at,ba.updated_at,COALESCE(bsp.patch_json,JSON_OBJECT()),b.id,b.revision,COALESCE(r.source_text,''),r.source_metadata_json,COALESCE(d.content,''),COALESCE(ksp.patch_json,JSON_OBJECT()) FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id JOIN batch_factory_v12_batches ba ON ba.id=b.batch_id AND ba.owner_username=b.owner_username LEFT JOIN batch_factory_v12_settings_patches bsp ON bsp.scope_type='batch' AND bsp.scope_id=ba.id AND bsp.owner_username=ba.owner_username LEFT JOIN batch_factory_v12_settings_patches ksp ON ksp.scope_type='book' AND ksp.scope_id=b.id AND ksp.owner_username=b.owner_username LEFT JOIN batch_factory_v12_drafts d ON d.owner_username=b.owner_username AND d.draft_key=CONCAT('working-front:',b.id) AND d.kind='working-front-content' AND d.scope=ba.id WHERE b.owner_username=? AND b.id IN (`
+	for start := 0; start < len(keys); start += recoveryPageSize {
+		end := start + recoveryPageSize
+		if end > len(keys) {
+			end = len(keys)
 		}
-		index, ok := batchIndexes[batchID]
-		if !ok {
-			batchPatch, err := decodePatch(batchPatchRaw)
-			if err != nil {
-				return nil, err
-			}
-			index = len(out)
-			batchIndexes[batchID] = index
-			out = append(out, Batch{
-				ID: batchID, Revision: batchRevision, CreatedAt: createdAt, UpdatedAt: updatedAt,
-				SettingsState: SettingsState{Patch: batchPatch, Revision: batchRevision}, Books: []Book{},
-			})
+		page := keys[start:end]
+		placeholders := make([]string, 0, len(page))
+		args := make([]any, 0, len(page)+1)
+		args = append(args, owner)
+		for _, key := range page {
+			placeholders = append(placeholders, "?")
+			args = append(args, key.bookID)
 		}
-		bookPatch, err := decodePatch(bookPatchRaw)
+		rows, err := s.db.QueryContext(ctx, payloadQuery+strings.Join(placeholders, ",")+")", args...)
 		if err != nil {
 			return nil, err
 		}
-		out[index].Books = append(out[index].Books, Book{
-			ID: bookID, BatchID: batchID, Revision: bookRevision, SourceText: sourceText,
-			WorkingFrontContent: workingContent, SourceMetadata: decodeSourceMetadata(metadataRaw),
-			SettingsState: SettingsState{Patch: bookPatch, Revision: bookRevision},
-		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+		rowsByBook := make(map[string]recoveryRow, len(page))
+		for rows.Next() {
+			var row recoveryRow
+			if err := rows.Scan(&row.batchID, &row.batchRevision, &row.createdAt, &row.updatedAt, &row.batchPatchRaw, &row.bookID, &row.bookRevision, &row.sourceText, &row.metadataRaw, &row.working, &row.bookPatchRaw); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			rowsByBook[row.bookID] = row
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+		for _, key := range page {
+			row, ok := rowsByBook[key.bookID]
+			if !ok {
+				continue
+			}
+			index, ok := batchIndexes[row.batchID]
+			if !ok {
+				batchPatch, err := decodePatch(row.batchPatchRaw)
+				if err != nil {
+					return nil, err
+				}
+				index = len(out)
+				batchIndexes[row.batchID] = index
+				out = append(out, Batch{
+					ID: row.batchID, Revision: row.batchRevision, CreatedAt: row.createdAt, UpdatedAt: row.updatedAt,
+					SettingsState: SettingsState{Patch: batchPatch, Revision: row.batchRevision}, Books: []Book{},
+				})
+			}
+			bookPatch, err := decodePatch(row.bookPatchRaw)
+			if err != nil {
+				return nil, err
+			}
+			out[index].Books = append(out[index].Books, Book{
+				ID: row.bookID, BatchID: row.batchID, Revision: row.bookRevision, SourceText: row.sourceText,
+				WorkingFrontContent: row.working, SourceMetadata: decodeSourceMetadata(row.metadataRaw),
+				SettingsState: SettingsState{Patch: bookPatch, Revision: row.bookRevision},
+			})
+		}
 	}
 	return out, nil
 }
@@ -1038,30 +1137,71 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 		return Batch{}, err
 	}
 	b.Books = []Book{}
-	rows, err := q.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_text,''),COALESCE(r.source_book_id,''),COALESCE(r.source_task_id,''),COALESCE(r.platform,''),COALESCE(r.txt_text,''),COALESCE(r.txt_file_name,''),r.source_metadata_json,b.revision FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? ORDER BY b.ordinal,b.id`, b.ID, owner)
+	// 两步查询：source_text/txt_text 存整本小说，参与 ORDER BY 的 filesort 会
+	// 触发 MySQL ERROR 1038。先只排序 book id，再按 id 分批读取正文并保持顺序。
+	idRows, err := q.QueryContext(ctx, `SELECT id FROM batch_factory_v12_books WHERE batch_id=? AND owner_username=? ORDER BY ordinal,id`, b.ID, owner)
 	if err != nil {
 		return Batch{}, err
 	}
-	for rows.Next() {
-		var book Book
-		var metadata []byte
-		if err := rows.Scan(&book.ID, &book.Title, &book.SourceText, &book.BookID, &book.SourceTaskID, &book.Platform, &book.TxtText, &book.TxtFileName, &metadata, &book.Revision); err != nil {
+	bookIDs := []string{}
+	for idRows.Next() {
+		var bookID string
+		if err := idRows.Scan(&bookID); err != nil {
+			idRows.Close()
+			return Batch{}, err
+		}
+		bookIDs = append(bookIDs, bookID)
+	}
+	if err := idRows.Err(); err != nil {
+		idRows.Close()
+		return Batch{}, err
+	}
+	idRows.Close()
+	const bookPageSize = 200
+	for start := 0; start < len(bookIDs); start += bookPageSize {
+		end := start + bookPageSize
+		if end > len(bookIDs) {
+			end = len(bookIDs)
+		}
+		page := bookIDs[start:end]
+		placeholders := make([]string, 0, len(page))
+		args := make([]any, 0, len(page)+2)
+		args = append(args, b.ID, owner)
+		for _, bookID := range page {
+			placeholders = append(placeholders, "?")
+			args = append(args, bookID)
+		}
+		rows, err := q.QueryContext(ctx, `SELECT b.id,r.title,COALESCE(r.source_text,''),COALESCE(r.source_book_id,''),COALESCE(r.source_task_id,''),COALESCE(r.platform,''),COALESCE(r.txt_text,''),COALESCE(r.txt_file_name,''),r.source_metadata_json,b.revision FROM batch_factory_v12_books b JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.batch_id=? AND b.owner_username=? AND b.id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+		if err != nil {
+			return Batch{}, err
+		}
+		booksByID := make(map[string]Book, len(page))
+		for rows.Next() {
+			var book Book
+			var metadata []byte
+			if err := rows.Scan(&book.ID, &book.Title, &book.SourceText, &book.BookID, &book.SourceTaskID, &book.Platform, &book.TxtText, &book.TxtFileName, &metadata, &book.Revision); err != nil {
+				rows.Close()
+				return Batch{}, err
+			}
+			book.SourceMetadata = decodeSourceMetadata(metadata)
+			if book.BookID == "" {
+				book.BookID = book.ID
+			}
+			book.BatchID = b.ID
+			book.Videos = []Video{}
+			booksByID[book.ID] = book
+		}
+		if err := rows.Err(); err != nil {
 			rows.Close()
 			return Batch{}, err
 		}
-		book.SourceMetadata = decodeSourceMetadata(metadata)
-		if book.BookID == "" {
-			book.BookID = book.ID
-		}
-		book.BatchID = b.ID
-		book.Videos = []Video{}
-		b.Books = append(b.Books, book)
-	}
-	if err := rows.Err(); err != nil {
 		rows.Close()
-		return Batch{}, err
+		for _, bookID := range page {
+			if book, ok := booksByID[bookID]; ok {
+				b.Books = append(b.Books, book)
+			}
+		}
 	}
-	rows.Close()
 	// Release the book-list connection before loading per-book drafts. If many
 	// clients open the same batch together, holding one rows cursor per request
 	// while each request asks the pool for another connection can exhaust the
@@ -1077,13 +1217,13 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 		}
 	}
 	for i := range b.Books {
-		vrows, err := q.QueryContext(ctx, `SELECT v.id,r.label,COALESCE(r.video_prompt,''),COALESCE(r.visual_prompt,''),COALESCE(r.duration_seconds,0),v.compatibility_state,v.revision FROM batch_factory_v12_videos v JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, b.ID, b.Books[i].ID, owner)
+		vrows, err := q.QueryContext(ctx, `SELECT v.id,r.label,COALESCE(r.video_prompt,''),COALESCE(r.visual_prompt,''),COALESCE(r.duration_seconds,0),v.ordinal,v.compatibility_state,v.revision FROM batch_factory_v12_videos v JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, b.ID, b.Books[i].ID, owner)
 		if err != nil {
 			return Batch{}, err
 		}
 		for vrows.Next() {
 			var v Video
-			if err := vrows.Scan(&v.ID, &v.Label, &v.VideoPrompt, &v.VisualPrompt, &v.DurationSeconds, &v.CompatibilityState, &v.Revision); err != nil {
+			if err := vrows.Scan(&v.ID, &v.Label, &v.VideoPrompt, &v.VisualPrompt, &v.DurationSeconds, &v.Ordinal, &v.CompatibilityState, &v.Revision); err != nil {
 				vrows.Close()
 				return Batch{}, err
 			}
@@ -1096,6 +1236,27 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 			return Batch{}, err
 		}
 		vrows.Close()
+		// 轮换会把上一轮视频改成 orphaned，但行和媒体都还在。这里单独取一份轻量历史记录，
+		// 让前端能把旧的成功视频继续列为「上一版」，而不是随 active 过滤一起消失。
+		hrows, err := q.QueryContext(ctx, `SELECT v.id,COALESCE(r.label,''),v.ordinal,v.compatibility_state,v.revision FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state<>'active' ORDER BY v.ordinal,v.updated_at DESC, v.id`, b.ID, b.Books[i].ID, owner)
+		if err != nil {
+			return Batch{}, err
+		}
+		for hrows.Next() {
+			var v Video
+			if err := hrows.Scan(&v.ID, &v.Label, &v.Ordinal, &v.CompatibilityState, &v.Revision); err != nil {
+				hrows.Close()
+				return Batch{}, err
+			}
+			v.BatchID = b.ID
+			v.BookID = b.Books[i].ID
+			b.Books[i].VideoHistory = append(b.Books[i].VideoHistory, v)
+		}
+		if err := hrows.Err(); err != nil {
+			hrows.Close()
+			return Batch{}, err
+		}
+		hrows.Close()
 	}
 	return b, nil
 }

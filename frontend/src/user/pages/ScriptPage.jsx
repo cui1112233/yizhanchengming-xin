@@ -1,5 +1,5 @@
-import { Button, Form, Input, Modal, Popconfirm, Select, Segmented, Space, Switch, Typography, message } from 'antd';
-import { AudioLines, Clapperboard, Copy, Download, FileText, History, Pencil, Plus, RefreshCw, Settings2, Star, WandSparkles } from 'lucide-react';
+import { Button, Dropdown, Form, Input, Modal, Popconfirm, Select, Segmented, Space, Switch, Tooltip, Typography, message } from 'antd';
+import { AudioLines, Clapperboard, Copy, Download, FileText, Info, MoreHorizontal, Pencil, Plus, RefreshCw, Settings2, Star, WandSparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { deleteScriptConstraintPrompt, extractCharactersAndScenes, generateScript, getConstraintPresetTexts, listScriptConstraintPrompts, listScriptPresetCatalog, saveScriptConstraintPrompt, updateScriptConstraintPrompt } from '../../shared/api/generation';
 import { listHistory, saveHistory, updateHistoryVideoTasks } from '../../shared/api/history';
@@ -10,9 +10,10 @@ import { getCurrentUsername } from '../../shared/api/auth';
 import { getMemberCenter } from '../../shared/api/member';
 import { apiRequest } from '../../shared/api/client';
 import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus.js';
+import { IMAGE_ASPECT_RATIOS, isSupportedImageAspectRatio } from '../../shared/imageAspectRatios.js';
 import { PET_APPLY_EVENT, PET_PREVIEW_EVENT, dispatchPetContext, dispatchPetState } from '../../shared/pet/stacky';
 import { dispatchCmSelection } from '../../shared/pet/cmBridge';
-import { getScriptDraftTabId, loadScriptDraft, saveScriptDraft } from './scriptDraftStorage';
+import { getScriptDraftTabId, loadScriptDraft, saveScriptDraft, storageFailureReason } from './scriptDraftStorage';
 import { DEFAULT_SCRIPT_CONSTRAINTS, constraintsForFormat, constraintsForNextGeneration, normalizeScriptConstraints } from './scriptConstraints';
 import { normalizeAudioDurationSeconds, readAudioDurationFromUrl } from './scriptGenerationRules';
 import { filterExtractionPresets, selectAvailableExtractionPreset } from './scriptExtractionPresets';
@@ -33,14 +34,28 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
-import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, generateComicPage, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listAutomationPresets, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, startBatchAutomation, updateComicPage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
+import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listAutomationPresets, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, startBatchAutomation, updateComicPage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 import PrivateComicWorkspace from './PrivateComicWorkspace';
+import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
+import { PrivateStudioAssetEditor } from './private-studio/PrivateStudioAssetEditor';
+import { PrivateStudioConstraintsModal } from './private-studio/PrivateStudioConstraintsModal';
+import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
+import { PrivateStudioNote } from './private-studio/PrivateStudioNote';
+import { PrivateStudioSteps } from './private-studio/PrivateStudioSteps';
 import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTaskSnapshot, privateComicTitle } from './privateCustomizationComic';
-import { comicPageGenerationPayload } from './shuihuo/batchFactoryComicMode';
+import { comicPageErrorMessage, comicPageGenerationPayload, generateComicPageWithConflict } from './shuihuo/batchFactoryComicMode';
 import './shuihuo-production.css';
 import './private-customization.css';
+import './private-studio/private-studio-workbench.css';
+import './private-studio/private-studio-asset-editor.css';
+
+function formatDraftSavedTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
 
 function privateComicOperationId() {
   try {
@@ -69,7 +84,7 @@ function normalizeScriptUnifiedConfig(value = {}) {
   return {
     ...DEFAULT_SCRIPT_UNIFIED_CONFIG,
     ...value,
-    imageAspectRatio: ['16:9', '9:16', '1:1'].includes(value?.imageAspectRatio) ? value.imageAspectRatio : '9:16',
+    imageAspectRatio: isSupportedImageAspectRatio(value?.imageAspectRatio) ? value.imageAspectRatio : '9:16',
     videoAspectRatio: ['16:9', '9:16'].includes(value?.videoAspectRatio) ? value.videoAspectRatio : '9:16',
     videoResolution: ['480p', '720p', '1080p'].includes(value?.videoResolution) ? value.videoResolution : '720p'
   };
@@ -148,6 +163,8 @@ export function ScriptPage() {
   const [form] = Form.useForm();
   const { status: localExecutorStatus } = useLocalExecutorStatus({ enabled: true, intervalMs: 30000 });
   const [extracting, setExtracting] = useState(false);
+  const [draftSaveState, setDraftSaveState] = useState({ status: 'idle', savedAt: null, reason: '' });
+  const [privateComicSaveState, setPrivateComicSaveState] = useState({ status: 'idle', savedAt: null, reason: '' });
   const [generating, setGenerating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState(60);
@@ -268,6 +285,8 @@ export function ScriptPage() {
   const [privateComicAssetImages, setPrivateComicAssetImages] = useState({});
   const [privateComicAssetImageFailures, setPrivateComicAssetImageFailures] = useState([]);
   const [privateComicPages, setPrivateComicPages] = useState([]);
+  // 后端 listComicPages 返回的书级权威就绪度；前端只渲染，不再自行重算口径。
+  const [privateComicReadiness, setPrivateComicReadiness] = useState(null);
   const [privateComicAction, setPrivateComicAction] = useState('');
   const [privateComicActionKey, setPrivateComicActionKey] = useState('');
   const privateComicPollRequestRef = useRef(0);
@@ -396,8 +415,12 @@ export function ScriptPage() {
   useEffect(() => {
     try {
       window.localStorage.setItem(privateComicScopedKey(privateComicDraftKey), JSON.stringify({ ...privateComicDraft, comic: { ...privateComicDraft.comic } }));
-    } catch {
-      // Local storage is only a convenience; generation must still work when it is unavailable.
+      setPrivateComicSaveState({ status: 'saved', savedAt: new Date(), reason: '' });
+    } catch (error) {
+      // 配额满 / 隐私模式与剧本草稿同一条失败链路：不抛异常，界面给出可读原因。
+      const reason = storageFailureReason(error);
+      setPrivateComicSaveState({ status: 'failed', savedAt: null, reason });
+      console.error('[私人定制] 漫画草稿保存失败：', reason);
     }
   }, [privateComicDraft]);
   useEffect(() => {
@@ -422,6 +445,58 @@ export function ScriptPage() {
     index,
     duration: selectedDuration
   })), [rawShotCards, extractInfo, constraints, selectedFormat, selectedDuration]);
+  const scriptSourceTitle = String(novelText || '').trim().split(/\r?\n/).map(line => line.trim()).find(Boolean) || '';
+  const scriptHeaderTitle = scriptSourceTitle ? `《${scriptSourceTitle.replace(/^《|》$/g, '').slice(0, 24)}》` : '未命名剧本';
+  const scriptHeaderShotCount = shotCards.length;
+  // TODO(总时长)：后端未提供整篇总时长字段。当前优先累加分镜原文里的“总时长：Ns”，
+  // 解析不到时按“实际分镜条数 × 当前单卡上限（10s/15s）”估算；两者都拿不到就不显示。
+  // 后端补总时长字段后，这里改为直接读取，不再前端估算。
+  const scriptCardDurations = shotCards.map(card => Number(String(card || '').match(/总时长[：:]\s*(\d+)s/)?.[1] || 0));
+  const scriptHeaderDurationSeconds = shotCards.length
+    ? (scriptCardDurations.every(value => value > 0)
+      ? scriptCardDurations.reduce((sum, value) => sum + value, 0)
+      : shotCards.length * (selectedDuration === '15s' ? 15 : 10))
+    : 0;
+  const scriptHeaderDurationText = scriptHeaderDurationSeconds
+    ? scriptHeaderDurationSeconds >= 60
+      ? `预计 ${Math.round(scriptHeaderDurationSeconds / 60)} 分钟`
+      : `预计 ${scriptHeaderDurationSeconds} 秒`
+    : '';
+  const scriptHeaderMeta = novelText.trim()
+    ? ['一段内容', `${scriptHeaderShotCount} 个镜头`, scriptHeaderDurationText].filter(Boolean).join(' · ')
+    : '等待输入内容';
+  const scriptHeaderStatus = generationStage === 'extracting'
+    ? '提取中'
+    : generationStage === 'generating'
+      ? '生成中'
+      : generationStage === 'extracted' || generationStage === 'complete'
+        ? '准备生成'
+        : '待输入';
+  const scriptReadCharCount = Array.from(String(novelText || '')).length;
+  const scriptEntityCount = extractInfo.characters.length + extractInfo.scenes.length;
+  // 步骤态必须由真实字段派生：空正文不得显示“已读取/当前”，否则 0 字也会宣称已读取。
+  const hasScriptText = Boolean(novelText.trim());
+  const hasScriptOutput = Boolean(output);
+  const hasScriptAssets = scriptEntityCount > 0;
+  const scriptSteps = [
+    { key: 'read', label: hasScriptText || hasScriptOutput ? '内容已读取' : '待读取', state: hasScriptText || hasScriptOutput ? 'done' : 'pending' },
+    { key: 'entities', label: '确认人物与场景', state: hasScriptOutput || hasScriptAssets ? 'done' : hasScriptText ? 'active' : 'pending' },
+    { key: 'output', label: '生成创作结果', state: hasScriptOutput ? 'done' : hasScriptAssets ? 'active' : 'pending' }
+  ];
+  const draftSaveLabel = draftSaveState.status === 'saving'
+    ? '保存中…'
+    : draftSaveState.status === 'saved'
+      ? `已保存 · ${formatDraftSavedTime(draftSaveState.savedAt) || '—'}`
+      : draftSaveState.status === 'failed'
+        ? '保存失败'
+        : '尚未保存';
+  const scriptAssetChips = [
+    ...extractInfo.characters.map(item => ({ key: `character-${item.id}`, label: entityName(item) || '未命名', suffix: '人物', title: `点击编辑：${entityName(item) || '未命名'}（人物）`, onClick: () => openEntityEditor('characters', item.id) })),
+    ...extractInfo.scenes.map(item => ({ key: `scene-${item.id}`, label: entityName(item) || '未命名', suffix: '场景', title: `点击编辑：${entityName(item) || '未命名'}（场景）`, onClick: () => openEntityEditor('scenes', item.id) })),
+    ...extractInfo.scenes
+      .filter(item => String(item.data?.['氛围'] || '').trim())
+      .map(item => ({ key: `atmosphere-${item.id}`, label: String(item.data['氛围']).trim(), suffix: '氛围', title: `点击编辑：${String(item.data['氛围']).trim()}（氛围，所属场景）`, onClick: () => openEntityEditor('scenes', item.id) }))
+  ];
   const shotCardStarts = useMemo(() => getShotCardStarts(output, rawShotCards), [output, rawShotCards]);
   const selectedShotMatches = useMemo(
     () => getSelectedShotMatches(output, rawShotCards, selectedShotIndexes, shotFindText),
@@ -434,6 +509,7 @@ export function ScriptPage() {
   const isShotCardView = shotCards.length > 0 && !editingOutput;
   const workbenchRef = useRef(null);
   const draftReadyRef = useRef(false);
+  const draftSaveTimerRef = useRef(null);
   const draftUsernameRef = useRef(getCurrentUsername());
   const draftTabIdRef = useRef(getScriptDraftTabId(window.sessionStorage));
   const requestGenerationRef = useRef({ workflow: 0, narrate: 0 });
@@ -501,12 +577,28 @@ export function ScriptPage() {
     };
   }
 
-  function persistDraft(values, overrides = {}) {
+  function persistDraft(values, overrides = {}, options = {}) {
     if (!draftReadyRef.current) return;
-    saveScriptDraft(window.localStorage, draftUsernameRef.current, draftTabIdRef.current, {
-      ...snapshotDraft(values),
-      ...overrides
-    });
+    const write = () => {
+      const result = saveScriptDraft(window.localStorage, draftUsernameRef.current, draftTabIdRef.current, {
+        ...snapshotDraft(values),
+        ...overrides
+      });
+      if (result.ok) {
+        setDraftSaveState({ status: 'saved', savedAt: result.savedAt, reason: '' });
+        return;
+      }
+      setDraftSaveState({ status: 'failed', savedAt: null, reason: result.reason });
+      console.error('[私人定制] 草稿保存失败：', result.reason);
+    };
+    if (draftSaveTimerRef.current) window.clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = null;
+    if (options.immediate) {
+      write();
+      return;
+    }
+    setDraftSaveState(current => current.status === 'saving' ? current : { status: 'saving', savedAt: current.savedAt, reason: '' });
+    draftSaveTimerRef.current = window.setTimeout(write, 300);
   }
 
   function updateOutputDraft(nextOutput, preserveSelectedShots = false) {
@@ -814,7 +906,11 @@ export function ScriptPage() {
     const readyTimer = window.setTimeout(() => {
       draftReadyRef.current = true;
       if (restoredDraft) {
-        saveScriptDraft(window.localStorage, draftUsernameRef.current, draftTabIdRef.current, restoredDraft);
+        const result = saveScriptDraft(window.localStorage, draftUsernameRef.current, draftTabIdRef.current, restoredDraft);
+        setDraftSaveState(result.ok
+          ? { status: 'saved', savedAt: result.savedAt, reason: '' }
+          : { status: 'failed', savedAt: null, reason: result.reason });
+        if (!result.ok) console.error('[私人定制] 草稿保存失败：', result.reason);
       } else {
         persistDraft();
       }
@@ -894,7 +990,7 @@ export function ScriptPage() {
       setScriptVideoAspectRatio(defaults.videoAspectRatio);
       setScriptVideoResolution(defaults.videoResolution);
       setScriptConfigOpen(false);
-      message.success('剧本生成统一配置已保存');
+      message.success('剧本创作统一配置已保存');
     } catch (error) {
       message.error(error?.message || '保存统一配置失败');
     } finally { setSavingScriptConfig(false); }
@@ -925,9 +1021,12 @@ export function ScriptPage() {
   }, [form]);
 
   useEffect(() => {
-    const saveBeforeLeave = () => persistDraft();
+    const saveBeforeLeave = () => persistDraft(undefined, {}, { immediate: true });
     window.addEventListener('pagehide', saveBeforeLeave);
-    return () => window.removeEventListener('pagehide', saveBeforeLeave);
+    return () => {
+      window.removeEventListener('pagehide', saveBeforeLeave);
+      if (draftSaveTimerRef.current) window.clearTimeout(draftSaveTimerRef.current);
+    };
   }, [extractInfo, output, editingOutput, generationStage]);
 
   function syncPetContext(novelText = form.getFieldValue('novelText')) {
@@ -1204,15 +1303,15 @@ export function ScriptPage() {
       message.success('生成完成');
       playTaskSound('success', soundEnabled, soundVolume);
       dispatchPetState('success', {
-        title: '剧本生成完成',
+        title: '剧本已生成',
         detail: historySaved ? '结果已保存到当前工作台和生成历史。' : '结果已保存到当前工作台，但生成历史保存失败。'
       });
     } catch (error) {
       if (!isCurrentRequest(requestId)) return;
       setGenerationStage('error');
-      message.error(error.message || '剧本生成失败');
+      message.error(error.message || '生成剧本失败');
       playTaskSound('warning', soundEnabled, soundVolume);
-      dispatchPetState('error', { title: '剧本生成失败', detail: error.message || '请检查模型配置后重试。' });
+      dispatchPetState('error', { title: '生成剧本失败', detail: error.message || '请检查模型配置后重试。' });
     } finally {
       if (isCurrentRequest(requestId)) setGenerating(false);
     }
@@ -1559,6 +1658,7 @@ export function ScriptPage() {
       const pages = Array.isArray(pageResult?.pages) ? pageResult.pages : [];
       setPrivateComicAssets(assets);
       setPrivateComicPages(pages);
+      setPrivateComicReadiness(pageResult?.readiness || null);
       const imageEntries = await Promise.all(assets.map(async asset => {
         try {
           const result = await listBookAssetImages(batchId, bookId, asset.id, { suppressGlobalError: true });
@@ -1748,11 +1848,11 @@ export function ScriptPage() {
     try {
       for (const page of runnable) {
         try {
-          await generateComicPage(batchId, bookId, page.videoId, privateComicPagePayload(page));
-          submitted.push(page.videoId);
+          const outcome = await generateComicPageWithConflict(batchId, bookId, page.videoId, privateComicPagePayload(page));
+          if (outcome.conflict) conflicts.push(page);
+          else submitted.push(page.videoId);
         } catch (error) {
-          if (Number(error?.status) === 409) conflicts.push(page);
-          else failures.push({ page, error });
+          failures.push({ page, error });
         }
       }
       if (conflicts.length) {
@@ -1762,7 +1862,7 @@ export function ScriptPage() {
       const completed = await waitForPrivateComicPageImages(batchId, bookId, pendingIds);
       if (pendingIds.length && !completed) message.info('分镜生图仍在进行，可稍后点刷新查看结果');
       if (failures.length) {
-        setPrivateComicError(`${failures.length} 页分镜生图失败：${failures[0].error?.message || '请稍后重试'}`);
+        setPrivateComicError(`${failures.length} 页分镜生图失败：${comicPageErrorMessage(failures[0].error, '分镜生图')}`);
       }
       if (!videoId && missingPromptPages.length) {
         message.warning(`另有 ${missingPromptPages.length} 页缺少图片提示词，未参与本次出图`);
@@ -1975,26 +2075,43 @@ export function ScriptPage() {
         }
       }}
     >
-      <div className="private-customization-workspaces" role="tablist" aria-label="私人定制工作区">
-        <button type="button" role="tab" id="private-customization-tab-script" aria-controls="private-customization-panel-script" aria-selected={customizationWorkspace === 'script'} className={customizationWorkspace === 'script' ? 'is-active' : ''} onClick={() => setCustomizationWorkspace('script')}>剧本创作</button>
-        <button type="button" role="tab" id="private-customization-tab-comic" aria-controls="private-customization-panel-comic" aria-selected={customizationWorkspace === 'comic'} className={customizationWorkspace === 'comic' ? 'is-active' : ''} onClick={() => setCustomizationWorkspace('comic')}>漫画生成</button>
-      </div>
       <div
         ref={workbenchRef}
         id="private-customization-panel-script"
         role="tabpanel"
         aria-labelledby="private-customization-tab-script"
-        className="script-workbench utility-workbench"
+        className="script-workbench utility-workbench private-studio-workbench private-studio-resizable"
         style={customizationWorkspace === 'script'
           ? (leftPanelWidth ? { gridTemplateColumns: `${leftPanelWidth}px 8px minmax(460px, 1fr)` } : undefined)
           : { display: 'none' }}
       >
-        <div className="script-left">
+        <div className="script-left private-studio-side">
         <div className="script-left-scroll">
+        <div className="private-studio-left-fixed">
+          <div className="private-customization-brand-row">
+            <div className="private-customization-brand"><span className="private-customization-brand-mark">私</span><strong>私人定制</strong></div>
+            <span
+              className={`private-customization-save-state is-${draftSaveState.status}`}
+              role="status"
+              aria-live="polite"
+              title={draftSaveState.status === 'failed' ? `草稿保存失败：${draftSaveState.reason}` : undefined}
+            ><i />{draftSaveLabel}</span>
+          </div>
+          <div className="private-customization-workspaces" role="tablist" aria-label="私人定制工作区">
+            <button type="button" role="tab" id="private-customization-tab-script" aria-controls="private-customization-panel-script" aria-selected={customizationWorkspace === 'script'} className={customizationWorkspace === 'script' ? 'is-active' : ''} onClick={() => setCustomizationWorkspace('script')}>剧本创作</button>
+            <button type="button" role="tab" id="private-customization-tab-comic" aria-controls="private-customization-panel-comic" aria-selected={customizationWorkspace === 'comic'} className={customizationWorkspace === 'comic' ? 'is-active' : ''} onClick={() => setCustomizationWorkspace('comic')}>漫画生成</button>
+          </div>
+          <div className="private-customization-panel-heading">
+            <div>
+              <span className="private-customization-eyebrow">01 · 粘贴你的内容</span>
+              <h2>输入内容</h2>
+            </div>
+            <span className="private-customization-save-state">支持 TXT / 长文本</span>
+          </div>
           <div className="script-chat-shell">
             <div className="script-source-input">
               <Form.Item name="novelText" rules={[{ required: true, message: '请先粘贴小说原文' }]}>
-                <Input.TextArea className="script-chat-textarea" rows={10} placeholder="粘贴小说原文，开始构思... ✦" />
+                <Input.TextArea className="script-chat-textarea" autoSize={{ minRows: 4, maxRows: 10 }} placeholder="粘贴小说原文，开始构思... ✦" />
               </Form.Item>
               {novelText ? (
                 <button
@@ -2018,14 +2135,39 @@ export function ScriptPage() {
                 }} disabled={extractionUnavailable}><Plus size={17} strokeWidth={1.8} aria-hidden="true" /></button>
                 <button type="button" aria-label="配音原文" title="按当前配音预设生成原文配音" onClick={narrateSource} disabled={narrating}><AudioLines size={17} strokeWidth={1.8} aria-hidden="true" /></button>
                 <button type="button" aria-label="匹配音频" title="设置生成剧本时是否匹配当前配音时长" onClick={openAudioMatchSettings}><Clapperboard size={17} strokeWidth={1.8} aria-hidden="true" /></button>
+                <Button
+                  className="private-studio-extract"
+                  type="primary"
+                  htmlType="submit"
+                  loading={extracting}
+                  disabled={generating || extractionUnavailable || !hasScriptText}
+                  aria-label="提取人物与场景"
+                  title={hasScriptText ? '提取人物与场景；生成剧本请用右侧「开始生成」' : '先粘贴或输入内容'}
+                  icon={<WandSparkles size={14} strokeWidth={1.8} aria-hidden="true" />}
+                >{extracting ? '提取中…' : '提取'}</Button>
               </div>
-              <Button className="script-chat-submit" type="primary" htmlType="submit" loading={extracting} disabled={generating || extractionUnavailable} aria-label="提取人物与场景" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />}>
-                <span>{generationStage === 'extracting' ? '提取中...' : '提取'}</span>
-              </Button>
             </div>
           </div>
+          <div className="private-studio-count-row">
+            <span>{hasScriptText ? `已读取 ${scriptReadCharCount} 字` : '尚未读取'}</span>
+            <span>自动保存</span>
+          </div>
+          {draftSaveState.status === 'failed' ? (
+            <div className="private-studio-draft-error" role="alert">
+              草稿保存失败，内容仍在页面上，请勿关闭（{draftSaveState.reason}）
+            </div>
+          ) : null}
+          <PrivateStudioSteps steps={scriptSteps} />
+        </div>
+        <div className="private-studio-left-scroll-body">
+          <PrivateStudioChips
+            title="已识别素材"
+            actionLabel="可编辑"
+            items={scriptAssetChips}
+            onAdd={() => addEntity('characters')}
+          />
 
-          <div className="script-instruction-status">当前提取指令：{extractionPresetName}</div>
+      <div className="script-instruction-status">提取：{extractionPresetName}</div>
           {(sourceAudioUrl || narrating || sourceAudioError) ? (
             <div className="script-source-audio-card" role="status" aria-live="polite">
               <div className="script-source-audio-header">
@@ -2043,6 +2185,7 @@ export function ScriptPage() {
           <EntitySection title="人物" type="characters" count={extractInfo.characters.length} items={extractInfo.characters} protagonistIds={extractInfo.protagonistIds} onAdd={() => addEntity('characters')} onEdit={id => openEntityEditor('characters', id)} onToggleProtagonist={toggleProtagonist} onRegenerate={regenerateEntities} regenerating={regeneratingEntities} />
           <EntitySection title="场景" type="scenes" count={extractInfo.scenes.length} items={extractInfo.scenes} onAdd={() => addEntity('scenes')} onEdit={id => openEntityEditor('scenes', id)} onRegenerate={regenerateEntities} regenerating={regeneratingEntities} />
         </div>
+        </div>
       </div>
         <div
           className="script-resize-handle"
@@ -2051,10 +2194,25 @@ export function ScriptPage() {
           aria-orientation="vertical"
           onPointerDown={handleResizeStart}
         />
-        <div className="script-right">
+        <div className="script-right private-studio-main">
+        <div className="private-customization-canvas-heading">
+          <div>
+            <span className="private-customization-eyebrow">创作画布</span>
+            <div className="private-customization-title-line"><h2>{scriptHeaderTitle}</h2><span className="private-customization-ready-badge"><i />{scriptHeaderStatus}</span></div>
+            <p className="private-customization-work-meta">{scriptHeaderMeta}</p>
+          </div>
+          <div className="private-studio-head-right">
+            <span className="private-customization-status-dot">剧本创作</span>
+            <PrivateStudioHeaderActions
+              onHistory={openScriptHistory}
+              historyTitle="剧本创作历史版本"
+              onSettings={openScriptUnifiedConfig}
+            />
+          </div>
+        </div>
         <div className="script-tabs">
           <Typography.Text strong>剧本创作</Typography.Text>
-          <Button type="text" icon={<Settings2 size={16} aria-hidden="true" />} onClick={openScriptUnifiedConfig} title="剧本创作统一配置">统一配置</Button>
+
           <Form.Item name="mode" noStyle>
             <Segmented
               options={[
@@ -2068,11 +2226,14 @@ export function ScriptPage() {
           <Form.Item name="duration" noStyle>
             <Segmented options={['10s', '15s']} />
           </Form.Item>
-          <Button type="text" icon={<History size={16} aria-hidden="true" />} onClick={openScriptHistory}>历史</Button>
         </div>
-        <div className="script-toolbar">
+        <div className="script-toolbar private-studio-toolbar">
+          <div className="private-studio-toolbar-left">
+          <div className="private-studio-tool-pill">
+            <span className="private-studio-tool-label">输出</span>
           <Form.Item name="format" noStyle>
             <Select
+              className="private-studio-tool-select"
               style={{ width: 140 }}
               options={[
                 { label: '画布模式', value: 'storyboard' },
@@ -2083,32 +2244,47 @@ export function ScriptPage() {
               ]}
             />
           </Form.Item>
+          </div>
+          </div>
+          <div className="private-studio-toolbar-right">
           <Button
-            className="script-constraint-button"
+            className="script-constraint-button private-studio-tool-pill-button"
             icon={<Settings2 size={16} strokeWidth={1.8} aria-hidden="true" />}
             onClick={openConstraints}
             title="约束设置"
-          >约束设置</Button>
+          >约束条件</Button>
           <Space>
-            <Button type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={generateOutput} loading={generating} disabled={extracting || !canGenerateScript || (!extractInfo.characters.length && !extractInfo.scenes.length)}>生成剧本</Button>
-            <Button icon={<Copy size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={() => copyText(isShotCardView ? shotCards.join('\n\n') : output)} disabled={!output}>复制</Button>
-            <Button disabled={!isShotCardView || !selectedShotIndexes.size} onClick={() => setShotReplaceOpen(true)}>查找替换</Button>
-            <Button icon={<Pencil size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={toggleOutputEditor} disabled={!output}>{editingOutput ? '完成编辑' : '编辑'}</Button>
-            <Button onClick={undoLastRevision} disabled={!previousOutput}>撤销本次修改</Button>
-            <Button
-              aria-label="重新生成剧本"
-              title="重新生成剧本"
-              icon={<RefreshCw size={16} strokeWidth={1.8} aria-hidden="true" />}
-              onClick={regenerateOutput}
-              loading={regeneratingOutput}
-              disabled={!output || !canGenerateScript}
-            />
-            <Button icon={<Download size={16} strokeWidth={1.8} aria-hidden="true" />} disabled={!output}>导出</Button>
+            <Button className="private-studio-tool-primary" type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} onClick={generateOutput} loading={generating} disabled={extracting || !canGenerateScript || (!extractInfo.characters.length && !extractInfo.scenes.length)}>开始生成</Button>
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'copy', label: '复制', icon: <Copy size={14} />, disabled: !output },
+                  { key: 'replace', label: '查找替换', disabled: !isShotCardView || !selectedShotIndexes.size },
+                  { key: 'edit', label: editingOutput ? '完成编辑' : '编辑', icon: <Pencil size={14} />, disabled: !output },
+                  { key: 'undo', label: '撤销', disabled: !previousOutput },
+                  { key: 'regenerate', label: '重新生成', icon: <RefreshCw size={14} />, disabled: !output || !canGenerateScript },
+                  { key: 'export', label: '导出', icon: <Download size={14} />, disabled: !output }
+                ],
+                onClick: ({ key }) => {
+                  if (key === 'copy') copyText(isShotCardView ? shotCards.join('\n\n') : output);
+                  if (key === 'replace') setShotReplaceOpen(true);
+                  if (key === 'edit') toggleOutputEditor();
+                  if (key === 'undo') undoLastRevision();
+                  if (key === 'regenerate') regenerateOutput();
+                }
+              }}
+            >
+              <Button aria-label="更多操作" title="更多操作" icon={<MoreHorizontal size={17} strokeWidth={1.8} />} />
+            </Dropdown>
           </Space>
         </div>
+          </div>
+        <div className="private-studio-content">
+        <div className="private-studio-center">
         <div className="script-output">
           {output ? (
-            isShotCardView ? <ShotOutputCards
+            isShotCardView ? <><div className="private-studio-canvas-head"><b>分镜草稿</b><span>{shotCards.length} 个镜头</span></div><ShotOutputCards
               cards={shotCards}
               duration={form.getFieldValue('duration')}
               selectedIndexes={selectedShotIndexes}
@@ -2143,7 +2319,7 @@ export function ScriptPage() {
               output={output}
               activeMatch={shotReplaceOpen ? activeShotMatch : null}
               cardStarts={shotCardStarts}
-            /> : <div style={{ position: 'relative' }}>
+            /></> : <div style={{ position: 'relative' }}>
               <ScriptMentionEditor
                 value={output}
                 candidates={mentionCandidates}
@@ -2173,7 +2349,7 @@ export function ScriptPage() {
                 <span className="script-empty-line script-empty-line--bottom" aria-hidden="true" />
               </div>
               <div className="script-empty-title">准备创作</div>
-              <div className="script-empty-copy">先提取人物与场景，确认后再生成剧本</div>
+              <div className="script-empty-copy">{hasScriptText ? (hasScriptAssets ? '素材已就绪，点击右侧「开始生成」' : '提取素材后开始生成') : '先粘贴正文，再提取素材'}</div>
             </div>
           )}
           <Modal title="编辑分镜提示词" open={editingShot.index >= 0} onCancel={closeShotEditor} onOk={() => {
@@ -2203,6 +2379,11 @@ export function ScriptPage() {
           </Modal>
         </div>
         </div>
+        <aside className="private-studio-side-preview">
+          <PrivateStudioNote mode="script" />
+        </aside>
+        </div>
+        </div>
       </div>
       {customizationWorkspace === 'comic' ? (
         <PrivateComicWorkspace
@@ -2210,12 +2391,14 @@ export function ScriptPage() {
           modelOptions={privateComicModelOptions}
           draft={privateComicDraft}
           onDraftChange={setPrivateComicDraft}
+          draftSaveState={privateComicSaveState}
           onSubmit={submitPrivateComic}
           task={privateComicTask}
           comicAssets={privateComicAssets}
           comicAssetImages={privateComicAssetImages}
           comicAssetImageFailures={privateComicAssetImageFailures}
           comicPages={privateComicPages}
+          readiness={privateComicReadiness}
           action={privateComicAction}
           actionKey={privateComicActionKey}
           onExtractAssets={() => void runPrivateComicAssets()}
@@ -2235,6 +2418,8 @@ export function ScriptPage() {
           onOpenUnifiedConfig={openScriptUnifiedConfig}
           onReloadCatalog={reloadPrivateComicCatalog}
           onOpenBatchFactory={() => window.location.assign(`/batch-factory?batchId=${encodeURIComponent(privateComicTask?.batchId || '')}`)}
+          customizationWorkspace={customizationWorkspace}
+          onWorkspaceChange={setCustomizationWorkspace}
         />
       ) : null}
       <Modal title="生成的视频" open={Boolean(previewVideoTask?.videoUrl)} footer={null} onCancel={() => setPreviewVideoTask(null)} width={520}>
@@ -2401,13 +2586,11 @@ export function ScriptPage() {
           {selectedExtractionPreset?.description || extractionPresetError || '管理员发布后可在此选择提取指令。'}
         </Typography.Paragraph>
       </Modal>
-      <Modal
-        title="约束设置"
+      <PrivateStudioConstraintsModal
         open={constraintModalOpen}
         onCancel={() => setConstraintModalOpen(false)}
         onOk={saveConstraints}
-        okText="保存本次设置"
-        width={720}
+        footerNote="子开关始终作用于本次生成。打开“后续剧本输出约束”才会把当前选择保存并自动用于下次生成。"
       >
         <div className="script-constraint-section">
           <Space align="center">
@@ -2460,10 +2643,7 @@ export function ScriptPage() {
             onDeletePersonal={id => deletePersonalConstraint(category, id)}
           />
         ))}
-        <Typography.Paragraph className="script-constraint-help" type="secondary">
-          子开关始终作用于本次生成。打开“后续剧本输出约束”才会把当前选择保存并自动用于下次生成。
-        </Typography.Paragraph>
-      </Modal>
+      </PrivateStudioConstraintsModal>
       <Modal
         title={editingPersonalPromptId ? '编辑我的提示词' : '保存为我的提示词'}
         open={personalPromptNameModal.open}
@@ -2502,11 +2682,11 @@ export function ScriptPage() {
           <Form.Item label="图片模型" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.imageModelId || undefined} placeholder="选择当前通道的图片模型" options={modelOptionsForProvider(scriptModels.image, 'image', scriptConfigDraft.imageProvider)} onChange={imageModelId => setScriptConfigDraft(current => ({ ...current, imageModelId }))} /></Form.Item>
           <Form.Item label="视频生成通道" style={{ marginBottom: 0 }}><Select value={scriptConfigDraft.videoProvider || 'personal_api'} options={scriptVideoProviderOptions} onChange={videoProvider => setScriptConfigDraft(current => ({ ...current, videoProvider, videoModelKey: reconcileProviderModel({ models: scriptVideoModels, kind: 'video', provider: videoProvider, modelId: current.videoModelKey }).modelId }))} /></Form.Item>
           <Form.Item label="视频模型" style={{ marginBottom: 0 }}><Select loading={loadingScriptVideoModels} value={scriptConfigDraft.videoModelKey} options={modelOptionsForProvider(scriptVideoModels, 'video', scriptConfigDraft.videoProvider)} onChange={videoModelKey => setScriptConfigDraft(current => ({ ...current, videoModelKey }))} /></Form.Item>
-          <Form.Item label="图片画幅" style={{ marginBottom: 0 }}><Segmented block options={['16:9', '9:16', '1:1']} value={scriptConfigDraft.imageAspectRatio} onChange={imageAspectRatio => setScriptConfigDraft(current => ({ ...current, imageAspectRatio }))} /></Form.Item>
+          <Form.Item label="图片画幅" style={{ marginBottom: 0 }}><Segmented block options={IMAGE_ASPECT_RATIOS} value={scriptConfigDraft.imageAspectRatio} onChange={imageAspectRatio => setScriptConfigDraft(current => ({ ...current, imageAspectRatio }))} /></Form.Item>
           <Form.Item label="视频画幅" style={{ marginBottom: 0 }}><Segmented block options={['16:9', '9:16']} value={scriptConfigDraft.videoAspectRatio} onChange={videoAspectRatio => setScriptConfigDraft(current => ({ ...current, videoAspectRatio }))} /></Form.Item>
           <Form.Item label="视频分辨率" style={{ marginBottom: 0 }}><Segmented block options={['480p', '720p', '1080p']} value={scriptConfigDraft.videoResolution} onChange={videoResolution => setScriptConfigDraft(current => ({ ...current, videoResolution }))} /></Form.Item>
           {scriptConfigDraft.videoModelKey === 'minimax-h3-video' ? <Typography.Text type="secondary">H3 会保持所选横竖画幅；720p 与 1080p 会按 H3 的 768p 档提交。</Typography.Text> : null}
-          <Typography.Text type="secondary">保存后会成为当前账号后续剧本生成的默认值；仍可随时在这里更换。</Typography.Text>
+          <Typography.Text type="secondary">保存后会成为当前账号后续剧本创作的默认值；仍可随时在这里更换。</Typography.Text>
         </Space>
       </Modal>
       <EntityEditor
@@ -2643,8 +2823,11 @@ function CmLoader() {
 function EntitySection({ title, type, count, items, protagonistIds = [], onAdd, onEdit, onToggleProtagonist, onRegenerate, regenerating }) {
   const isCharacter = type === 'characters';
   const protagonistIdSet = new Set(protagonistIds);
+  const [allOpen, setAllOpen] = useState(false);
+  const hint = `可手动添加${title}，或提取后显示${title}信息`;
+  const recentItems = items.slice(0, 3);
   return (
-    <div className="entity-section legacy-panel-card">
+    <div className={`entity-section legacy-panel-card${items.length ? '' : ' is-empty'}`}>
       <div className="entity-section-header">
         <Typography.Text strong>{title}</Typography.Text>
         <Space size={8}>
@@ -2659,18 +2842,27 @@ function EntitySection({ title, type, count, items, protagonistIds = [], onAdd, 
             loading={regenerating}
             onClick={onRegenerate}
           />
+          <Tooltip title={hint} trigger={['click', 'focus']}>
+            <button type="button" className="entity-section-info" aria-label={hint}>
+              <Info size={14} strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </Space>
       </div>
-      <div className="entity-list">
-        {items.length === 0 ? (
-          <div className="entity-card">可手动添加{title}，或提取后显示{title}信息</div>
-        ) : (
-          items.map(item => {
+      {recentItems.length ? (
+        <div className="entity-section-summary">
+          {recentItems.map(item => <button type="button" key={item.id} className="entity-section-name" onClick={() => onEdit(item.id)} title={`编辑${formatEntity(item)}`}>{formatEntity(item)}</button>)}
+          <Button size="small" type="text" className="entity-section-more" onClick={() => setAllOpen(true)}>查看全部</Button>
+        </div>
+      ) : null}
+      <Modal title={`${title} · ${count}`} open={allOpen} onCancel={() => setAllOpen(false)} footer={null} width={520}>
+        <div className="entity-list">
+          {items.map(item => {
             const isProtagonist = protagonistIdSet.has(item.id);
             const mainImageUrl = getEntityMedia(item).mainImageUrl;
             const imageCount = getEntityMedia(item).imageUrls.length;
             return <div className="entity-card-row" key={item.id}>
-              <button className="entity-card entity-card-button entity-card-main" type="button" onClick={() => onEdit(item.id)}>
+              <button className="entity-card entity-card-button entity-card-main" type="button" onClick={() => { setAllOpen(false); onEdit(item.id); }}>
                 <span>{formatEntity(item)}</span>
                 <small className="entity-media-status">{mainImageUrl ? '主图已选择' : '未选择主图'}{imageCount ? ` · 图片 ${imageCount} 张` : ''}</small>
               </button>
@@ -2683,9 +2875,9 @@ function EntitySection({ title, type, count, items, protagonistIds = [], onAdd, 
                 onClick={() => onToggleProtagonist(item.id)}
               />}
             </div>;
-          })
-        )}
-      </div>
+          })}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -2745,52 +2937,58 @@ function EntityEditor({ entity, type, assetId, editorSessionId, isNew, open, ful
     }
   }
 
+  const basicFields = fieldsToRender.filter(field => ['名称', 'name', '角色名称', '场景名称', 'scene'].includes(field.key));
+  const settingFields = fieldsToRender.filter(field => !basicFields.includes(field));
+  // 剧本侧的「外形」与漫画侧的「人物外形」是两个独立字段，这里显式改名，避免被误认为同一个输入框。
+  const fieldLabel = field => type === 'characters' && ['外形', 'appearance', '外观描述'].includes(field.key) ? '外形（剧本）' : field.label;
+  const renderField = field => <Form.Item key={field.key} label={fieldLabel(field)}>
+    <Input.TextArea value={fields[field.key] || ''} autoSize={{ minRows: 1, maxRows: 6 }} onChange={event => setFields(current => ({ ...current, [field.key]: event.target.value }))} />
+  </Form.Item>;
+
   return (
-    <Modal
+    <PrivateStudioAssetEditor
       open={open}
-      rootClassName="entity-editor-modal"
-      title={title}
-      width={fullscreen ? '100vw' : 920}
-      style={fullscreen ? { top: 0, paddingBottom: 0 } : undefined}
-      onCancel={onClose}
-      footer={<Space><Button onClick={onToggleFullscreen}>{fullscreen ? '退出全屏' : '全屏编辑'}</Button>{!isNew && <Popconfirm title={`确认${deleteLabel}？`} onConfirm={onDelete}><Button danger className="entity-editor-danger">{deleteLabel}</Button></Popconfirm>}<Button type="primary" onClick={() => { onChange(fields, { imageUrls, mainImageUrl }); onClose(); }}>完成</Button></Space>}
-    >
-      <div className="entity-editor-layout">
-        <div>
-          <div className="entity-editor-fields">
-            {fieldsToRender.map(field => (
-              <Form.Item key={field.key} label={field.label}>
-                <Input.TextArea value={fields[field.key] || ''} autoSize={{ minRows: 1, maxRows: 6 }} onChange={event => setFields(current => ({ ...current, [field.key]: event.target.value }))} />
-              </Form.Item>
-            ))}
-          </div>
-          <Space wrap style={{ marginTop: 8 }}>
-            <Button onClick={enrich} loading={enriching} disabled={!canEnrich}>根据小说智能补全</Button>
-            {!String(novelText || '').trim() ? <Typography.Text type="secondary">请先输入小说原文</Typography.Text> : null}
-          </Space>
-          {enrichmentError ? <Typography.Paragraph type="danger" style={{ marginTop: 12, marginBottom: 0 }}>{enrichmentError}</Typography.Paragraph> : null}
-          {enrichment ? <div className="entity-enrichment-result">
-            {enrichment.evidence.length ? <EnrichmentList title="原文依据" items={enrichment.evidence} /> : null}
-            {enrichment.suggestions.length ? <EnrichmentList title="AI 建议" items={enrichment.suggestions} /> : null}
-            {enrichment.uncertainties.length ? <EnrichmentList title="不确定项" items={enrichment.uncertainties} /> : null}
-          </div> : null}
-        </div>
-        <EntityImagePanel
-          key={imageRequestKey}
-          assetType={type === 'characters' ? 'character' : 'scene'}
-          assetId={assetId}
-          generationPayload={{ ...buildReferenceAssetGenerationPayload({ type, entity, fields, novelText, extractionPreset }), asset_id: assetId }}
-          imageModelId={imageModelId}
-          imageProvider={imageProvider}
-          imageAspectRatio={imageAspectRatio}
-          imageUrls={imageUrls}
-          mainImageUrl={mainImageUrl}
-          requestKey={imageRequestKey}
-          onChange={updateImages}
-          disabled={!assetId}
-        />
-      </div>
-    </Modal>
+      title={isNew ? title : `编辑资产 · ${entityName(fields) || formatEntity(entity) || '未命名'}`}
+      onClose={onClose}
+      width={920}
+      fullscreen={fullscreen}
+      basic={<>
+        <div className="private-studio-asset-editor-kind">资产分类<b>{type === 'characters' ? '人物' : '场景'}</b></div>
+        {basicFields.length ? basicFields.map(renderField) : null}
+      </>}
+      settings={settingFields.length ? <>
+        {type === 'characters' ? <Typography.Text type="secondary">「外形（剧本）」与漫画侧资产里的「人物外形」是两个独立字段，分开保存，互不覆盖。</Typography.Text> : null}
+        {settingFields.map(renderField)}
+      </> : <Typography.Text type="secondary">该类型没有独立设定字段。</Typography.Text>}
+      prompts={<>
+        <Typography.Text type="secondary">剧本侧的图片生成提示词由「设定」与原文在生成时自动拼装，这里不单独保存提示词。</Typography.Text>
+        <Space wrap>
+          <Button onClick={enrich} loading={enriching} disabled={!canEnrich}>根据小说智能补全</Button>
+          {!String(novelText || '').trim() ? <Typography.Text type="secondary">请先输入小说原文</Typography.Text> : null}
+        </Space>
+        {enrichmentError ? <Typography.Paragraph type="danger" style={{ margin: 0 }}>{enrichmentError}</Typography.Paragraph> : null}
+        {enrichment ? <div className="entity-enrichment-result">
+          {enrichment.evidence.length ? <EnrichmentList title="原文依据" items={enrichment.evidence} /> : null}
+          {enrichment.suggestions.length ? <EnrichmentList title="AI 建议" items={enrichment.suggestions} /> : null}
+          {enrichment.uncertainties.length ? <EnrichmentList title="不确定项" items={enrichment.uncertainties} /> : null}
+        </div> : null}
+      </>}
+      aside={<EntityImagePanel
+        key={imageRequestKey}
+        assetType={type === 'characters' ? 'character' : 'scene'}
+        assetId={assetId}
+        generationPayload={{ ...buildReferenceAssetGenerationPayload({ type, entity, fields, novelText, extractionPreset }), asset_id: assetId }}
+        imageModelId={imageModelId}
+        imageProvider={imageProvider}
+        imageAspectRatio={imageAspectRatio}
+        imageUrls={imageUrls}
+        mainImageUrl={mainImageUrl}
+        requestKey={imageRequestKey}
+        onChange={updateImages}
+        disabled={!assetId}
+      />}
+      footer={<Space><Button onClick={onToggleFullscreen}>{fullscreen ? '退出全屏' : '全屏编辑'}</Button>{!isNew && <Popconfirm title={`确认${deleteLabel}？`} onConfirm={onDelete}><Button danger className="entity-editor-danger">{deleteLabel}</Button></Popconfirm>}<Button onClick={onClose}>取消</Button><Button type="primary" onClick={() => { onChange(fields, { imageUrls, mainImageUrl }); onClose(); }}>保存</Button></Space>}
+    />
   );
 }
 

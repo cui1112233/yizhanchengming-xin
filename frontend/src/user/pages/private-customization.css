@@ -309,3 +309,704 @@
   border-radius: 10px;
 }
 
+/* 统一创作工作台：方案 A（输入与素材 / 配置与结果）。业务结构不变，只重排视觉层级。 */
+.script-workbench-form {
+  --pc-surface: color-mix(in srgb, var(--surface-panel) 90%, #07101f);
+  --pc-surface-strong: color-mix(in srgb, var(--surface-input) 92%, #07101f);
+  --pc-border: color-mix(in srgb, var(--border-default) 76%, #8093c7);
+  --pc-border-soft: color-mix(in srgb, var(--border-default) 58%, transparent);
+  --pc-accent: #9aa5ff;
+  --pc-accent-soft: rgba(154, 165, 255, 0.13);
+  --pc-mint: #67dfcb;
+  --pc-shadow: 0 22px 60px rgba(0, 0, 0, 0.24);
+  padding: 0 18px 18px;
+  background:
+    radial-gradient(720px 360px at 4% -12%, rgba(112, 126, 255, 0.14), transparent 65%),
+    radial-gradient(620px 340px at 98% 0%, rgba(60, 204, 186, 0.08), transparent 68%),
+    var(--surface-base);
+}
+
+.script-workbench-form .private-customization-workspaces {
+  width: fit-content;
+  margin: 0 0 12px;
+  padding: 14px 4px 0;
+  gap: 4px;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.script-workbench-form .private-customization-workspaces button {
+  min-width: 108px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  transition: color .2s ease, background .2s ease, border-color .2s ease, transform .2s ease;
+}
+
+.script-workbench-form .private-customization-workspaces button:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-panel) 70%, transparent);
+  transform: translateY(-1px);
+}
+
+.script-workbench-form .private-customization-workspaces button.is-active {
+  border-color: color-mix(in srgb, var(--pc-accent) 50%, var(--pc-border-soft));
+  color: var(--text-primary);
+  background: var(--pc-accent-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+.script-workbench-form > .script-workbench,
+.script-workbench-form > .private-comic-workbench {
+  overflow: hidden;
+  border: 1px solid var(--pc-border);
+  border-radius: 17px;
+  background: var(--pc-surface);
+  box-shadow: var(--pc-shadow);
+}
+
+/* 样稿的左栏是固定窄栏，不随桌面宽度按百分比放大。 */
+.script-workbench-form > .script-workbench {
+  grid-template-columns: 304px 8px minmax(0, 1fr);
+}
+
+.script-workbench-form > .private-comic-workbench {
+  grid-template-columns: 304px minmax(0, 1fr);
+}
+
+.script-workbench-form .script-left {
+  border-right-color: var(--pc-border-soft);
+  background: color-mix(in srgb, var(--surface-panel) 92%, #080f1c);
+}
+
+.script-workbench-form .script-left-scroll {
+  padding: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--pc-accent) 35%, transparent) transparent;
+}
+
+.script-workbench-form .script-resize-handle {
+  width: 8px;
+  border-left-color: var(--pc-border-soft);
+  border-right-color: var(--pc-border-soft);
+  background: color-mix(in srgb, var(--surface-panel) 82%, transparent);
+}
+
+.script-workbench-form .script-resize-handle:hover {
+  background: var(--pc-accent-soft);
+}
+
+.script-workbench-form .script-chat-shell {
+  margin-bottom: 15px;
+  border: 1px solid color-mix(in srgb, var(--pc-border) 86%, #a5b7ed);
+  border-radius: 14px;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--surface-input) 95%, #25365b), var(--pc-surface-strong));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .16), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+.script-workbench-form .script-chat-textarea {
+  min-height: 154px;
+  padding: 14px 42px 10px 14px !important;
+  border-radius: 13px 13px 0 0 !important;
+  background: color-mix(in srgb, var(--surface-input) 90%, #050b17) !important;
+  color: var(--text-primary) !important;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.script-workbench-form .script-chat-textarea::placeholder {
+  color: var(--text-tertiary) !important;
+}
+
+.script-workbench-form .script-chat-options {
+  min-height: 52px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--pc-border-soft);
+  background: color-mix(in srgb, var(--surface-panel) 88%, #050b16);
+}
+
+.script-workbench-form .script-chat-tools {
+  gap: 5px;
+}
+
+.script-workbench-form .script-chat-tools button,
+.script-workbench-form .script-file-button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+}
+
+.script-workbench-form .script-chat-tools button:hover,
+.script-workbench-form .script-file-button:hover {
+  border-color: var(--pc-border-soft);
+  color: var(--text-primary);
+  background: var(--pc-accent-soft);
+  transform: none;
+}
+
+.script-workbench-form .script-chat-submit,
+.script-workbench-form .script-toolbar .ant-btn-primary {
+  border: 0 !important;
+  border-radius: 9px !important;
+  color: #11172a !important;
+  background: linear-gradient(135deg, #aab3ff, #67dfcb) !important;
+  box-shadow: 0 8px 20px rgba(103, 223, 203, .12) !important;
+  font-weight: 700;
+  text-shadow: none;
+}
+
+.script-workbench-form .script-chat-submit:hover,
+.script-workbench-form .script-toolbar .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #bbc2ff, #7ce8d8) !important;
+  transform: translateY(-1px);
+}
+
+.script-workbench-form .script-instruction-status {
+  display: flex;
+  align-items: center;
+  min-height: 29px;
+  margin: -3px 2px 10px;
+  padding: 6px 9px;
+  border: 1px solid var(--pc-border-soft);
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--surface-panel) 66%, transparent);
+  font-size: 11px;
+}
+
+.script-workbench-form .script-generation-stage {
+  margin: -3px 2px 12px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--pc-accent) 30%, var(--pc-border-soft));
+  border-radius: 9px;
+  color: var(--pc-accent);
+  background: var(--pc-accent-soft);
+}
+
+.script-workbench-form .entity-section {
+  margin: 12px 0 0;
+  padding: 13px;
+  border: 1px solid var(--pc-border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-panel) 76%, transparent);
+  box-shadow: none;
+}
+
+.script-workbench-form .entity-section-header {
+  margin-bottom: 9px;
+  padding-bottom: 9px;
+  border-bottom-color: var(--pc-border-soft);
+}
+
+.script-workbench-form .entity-card,
+.script-workbench-form .entity-card-row {
+  border-color: var(--pc-border-soft);
+  background: color-mix(in srgb, var(--surface-input) 62%, transparent);
+}
+
+.script-workbench-form .entity-card:hover {
+  border-color: color-mix(in srgb, var(--pc-accent) 55%, var(--pc-border-soft));
+  background: var(--pc-accent-soft);
+}
+
+.script-workbench-form .script-right {
+  background: color-mix(in srgb, var(--surface-base) 92%, #071020);
+}
+
+.script-workbench-form .script-tabs,
+.script-workbench-form .script-toolbar {
+  min-height: 58px;
+  padding: 10px 17px;
+  border-bottom-color: var(--pc-border-soft);
+  background: color-mix(in srgb, var(--surface-panel) 84%, transparent);
+}
+
+.script-workbench-form .script-tabs {
+  gap: 8px;
+}
+
+.script-workbench-form .script-tabs > .ant-typography {
+  margin-right: 5px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.script-workbench-form .script-tabs .ant-btn-text,
+.script-workbench-form .script-toolbar .ant-btn:not(.ant-btn-primary) {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.script-workbench-form .script-tabs .ant-btn-text:hover,
+.script-workbench-form .script-toolbar .ant-btn:not(.ant-btn-primary):hover {
+  border-color: var(--pc-border-soft);
+  color: var(--text-primary);
+  background: var(--pc-accent-soft);
+}
+
+.script-workbench-form .script-tabs .ant-segmented {
+  border: 1px solid var(--pc-border-soft);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-input) 65%, transparent);
+}
+
+.script-workbench-form .script-tabs .ant-segmented-item-selected {
+  color: var(--text-primary);
+  background: var(--pc-accent-soft);
+  box-shadow: none;
+}
+
+.script-workbench-form .script-toolbar {
+  min-height: 62px;
+  gap: 9px;
+}
+
+.script-workbench-form .script-toolbar .ant-select-selector,
+.script-workbench-form .script-toolbar .ant-btn {
+  min-height: 34px;
+  border-radius: 9px !important;
+}
+
+.script-workbench-form .script-toolbar .ant-select-selector {
+  border-color: var(--pc-border-soft) !important;
+  background: color-mix(in srgb, var(--surface-input) 68%, transparent) !important;
+}
+
+.script-workbench-form .script-toolbar .ant-space {
+  gap: 7px !important;
+}
+
+.script-workbench-form .script-output {
+  padding: 17px;
+  gap: 12px;
+  background: color-mix(in srgb, var(--surface-base) 92%, #071020);
+}
+
+.script-workbench-form .script-output .shot-output-toolbar {
+  border-color: var(--pc-border-soft);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-panel) 72%, transparent);
+}
+
+.script-workbench-form .script-output .shot-output-card {
+  border-color: var(--pc-border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-input) 58%, transparent);
+  box-shadow: none;
+}
+
+.script-workbench-form .script-output .shot-output-card:hover {
+  border-color: color-mix(in srgb, var(--pc-accent) 44%, var(--pc-border-soft));
+}
+
+.script-workbench-form .script-empty {
+  min-height: 300px;
+  justify-content: center;
+  border: 1px dashed var(--pc-border);
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 28%, var(--pc-accent-soft), transparent 52%), color-mix(in srgb, var(--surface-panel) 62%, transparent);
+  box-shadow: none;
+}
+
+.script-workbench-form .script-empty-title {
+  margin-top: 15px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.script-workbench-form .script-empty-copy {
+  margin-top: 5px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* 漫画工作区沿用同一层级：左侧正文 / 资产，右侧任务 / 页面结果。 */
+.script-workbench-form .private-comic-workbench {
+  grid-template-columns: minmax(320px, 37%) minmax(460px, 1fr);
+}
+
+.script-workbench-form .private-comic-workbench .private-comic-chat-shell {
+  margin-bottom: 15px;
+}
+
+.script-workbench-form .private-comic-title-input {
+  padding: 12px 42px 12px 14px !important;
+  border-bottom-color: var(--pc-border-soft) !important;
+  background: color-mix(in srgb, var(--surface-input) 90%, #050b17) !important;
+  color: var(--text-primary) !important;
+  font-size: 14px;
+}
+
+.script-workbench-form .private-comic-source-count {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.script-workbench-form .private-comic-instruction {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.script-workbench-form .private-comic-instruction-label {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.script-workbench-form .private-comic-pipeline {
+  width: 100%;
+  gap: 6px;
+}
+
+.script-workbench-form .private-comic-pipeline-step {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 8px;
+  border-color: var(--pc-border-soft);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-panel) 68%, transparent);
+}
+
+.script-workbench-form .private-comic-pipeline-step b {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-workbench-form .private-comic-pipeline-step small {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-workbench-form .private-comic-pipeline-step.is-done {
+  border-color: color-mix(in srgb, var(--pc-mint) 48%, var(--pc-border-soft));
+  background: rgba(103, 223, 203, .07);
+}
+
+.script-workbench-form .private-comic-pipeline-step.is-done b {
+  color: var(--pc-mint);
+}
+
+.script-workbench-form .private-comic-pipeline-step.is-active {
+  border-color: color-mix(in srgb, var(--pc-accent) 62%, var(--pc-border-soft));
+  background: var(--pc-accent-soft);
+}
+
+.script-workbench-form .private-comic-asset-card {
+  border-color: var(--pc-border-soft);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-input) 58%, transparent);
+}
+
+.script-workbench-form .private-comic-asset-group + .private-comic-asset-group {
+  border-top-color: var(--pc-border-soft);
+}
+
+.script-workbench-form .private-comic-no-publish,
+.script-workbench-form .private-customization-comic-no-publish {
+  border-color: color-mix(in srgb, var(--pc-mint) 45%, var(--pc-border-soft));
+  border-radius: 999px;
+  color: var(--pc-mint);
+  background: rgba(103, 223, 203, .06);
+}
+
+.script-workbench-form .private-comic-result-card {
+  margin: 0;
+  padding: 14px;
+  border-color: var(--pc-border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-panel) 75%, transparent);
+  box-shadow: none;
+}
+
+.script-workbench-form .private-comic-result-heading b {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.script-workbench-form .private-comic-result-heading span,
+.script-workbench-form .private-comic-task-meta {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+@media (max-width: 1100px) {
+  .script-workbench-form { padding: 0 12px 12px; }
+  .script-workbench-form .script-toolbar { align-items: flex-start; flex-direction: column; }
+  .script-workbench-form .script-toolbar > .ant-space { width: 100%; }
+}
+
+@media (max-width: 900px) {
+  .script-workbench-form .private-customization-workspaces { width: 100%; }
+  .script-workbench-form .private-customization-workspaces button { flex: 1 1 0; }
+  .script-workbench-form > .script-workbench,
+  .script-workbench-form > .private-comic-workbench { border-radius: 14px; }
+  .script-workbench-form > .script-workbench { grid-template-columns: 1fr; }
+  .script-workbench-form > .private-comic-workbench { grid-template-columns: 1fr; }
+  .script-workbench-form .script-resize-handle { display: none; }
+  .script-workbench-form .private-comic-pipeline-step { flex-basis: calc(50% - 6px); }
+}
+
+@media (max-width: 680px) {
+  .script-workbench-form { padding: 0 8px 8px; }
+  .script-workbench-form .script-left-scroll,
+  .script-workbench-form .script-output { padding: 12px; }
+  .script-workbench-form .private-comic-pipeline-step { flex-basis: 100%; }
+}
+
+/* 结构层：让真实页面拥有样稿里的“区块标题 → 工作内容 → 结果画布”层级。 */
+.script-workbench-form .private-customization-panel-heading,
+.script-workbench-form .private-customization-canvas-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.script-workbench-form .private-customization-panel-heading {
+  margin: 1px 2px 16px;
+}
+
+.script-workbench-form .private-customization-canvas-heading {
+  flex: 0 0 auto;
+  padding: 19px 18px 15px;
+  border-bottom: 1px solid var(--pc-border-soft);
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+}
+
+.script-workbench-form .private-customization-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--pc-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.script-workbench-form .private-customization-panel-heading h2,
+.script-workbench-form .private-customization-canvas-heading h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.25;
+}
+
+.script-workbench-form .private-customization-panel-heading p,
+.script-workbench-form .private-customization-canvas-heading p {
+  max-width: 360px;
+  margin: 5px 0 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 参考私人定制样稿：品牌、模式切换和画布状态都收进对应栏位，避免再占一整行。 */
+.script-workbench-form .private-customization-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 15px;
+}
+
+.script-workbench-form .private-customization-brand {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.script-workbench-form .private-customization-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 10px;
+  color: #11172a;
+  background: linear-gradient(135deg, #aab3ff, #67dfcb);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(103, 223, 203, .12);
+}
+
+.script-workbench-form .private-customization-brand-row .private-customization-save-state {
+  padding: 5px 8px;
+  color: var(--pc-mint);
+  border-color: color-mix(in srgb, var(--pc-mint) 42%, var(--pc-border-soft));
+  background: rgba(103, 223, 203, .06);
+}
+
+.script-workbench-form .private-customization-save-state i,
+.script-workbench-form .private-customization-ready-badge i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.script-workbench-form .script-left .private-customization-workspaces {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin: 0 0 18px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--pc-border-soft);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-input) 60%, transparent);
+}
+
+.script-workbench-form .script-left .private-customization-workspaces button {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 8px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  background: transparent;
+  font-size: 11px;
+}
+
+.script-workbench-form .script-left .private-customization-workspaces button:hover {
+  transform: none;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-panel) 78%, transparent);
+}
+
+.script-workbench-form .script-left .private-customization-workspaces button.is-active {
+  border: 0;
+  color: var(--text-primary);
+  background: var(--pc-accent-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+.script-workbench-form .private-customization-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.script-workbench-form .private-customization-ready-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--pc-mint) 48%, var(--pc-border-soft));
+  border-radius: 999px;
+  color: var(--pc-mint);
+  background: rgba(103, 223, 203, .06);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.script-workbench-form .private-customization-work-meta {
+  margin: 6px 0 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* 两个工作区共用一套窄栏，避免漫画页切换后列宽又变宽。 */
+.script-workbench-form > .private-comic-workbench {
+  grid-template-columns: 304px minmax(0, 1fr);
+}
+
+.script-workbench-form .private-customization-save-state,
+.script-workbench-form .private-customization-status-dot {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pc-border-soft);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--surface-input) 46%, transparent);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.script-workbench-form .private-customization-status-dot {
+  border-color: color-mix(in srgb, var(--pc-mint) 42%, var(--pc-border-soft));
+  color: var(--pc-mint);
+  background: rgba(103, 223, 203, .06);
+}
+
+.script-workbench-form .private-customization-status-dot i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pc-mint);
+  box-shadow: 0 0 0 3px rgba(103, 223, 203, .12);
+}
+
+.script-workbench-form .script-right > .script-tabs {
+  min-height: 50px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 68%, transparent);
+}
+
+.script-workbench-form .script-right > .script-tabs > .ant-typography {
+  display: none;
+}
+
+.script-workbench-form .script-right > .script-tabs > .ant-btn-text:first-of-type {
+  margin-left: auto;
+}
+
+.script-workbench-form .script-right > .script-tabs > .ant-btn-text:last-child {
+  margin-left: 0;
+}
+
+.script-workbench-form .script-right > .script-toolbar {
+  background: color-mix(in srgb, var(--surface-panel) 78%, transparent);
+}
+
+@media (max-width: 680px) {
+  .script-workbench-form .private-customization-panel-heading,
+  .script-workbench-form .private-customization-canvas-heading {
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .script-workbench-form .private-customization-canvas-heading {
+    padding: 14px 12px 12px;
+  }
+
+  .script-workbench-form .private-customization-panel-heading p,
+  .script-workbench-form .private-customization-canvas-heading p {
+    max-width: none;
+  }
+}
+

@@ -48,6 +48,61 @@ func TestBuildComicImageContractCompilesStyleAndExplicitReferences(t *testing.T)
 	}
 }
 
+func TestBuildComicImageContractIsIdempotentAcrossRepeatedCompiles(t *testing.T) {
+	settings := SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+			"enabled":              true,
+			"style":                map[string]any{"presetId": "batch-comic-style-16", "presetName": "精致火柴2DQ版漫风", "body": "精致头部，极简火柴四肢，细长黑线腿部"},
+			"imagePromptPrefix":    "用户全局前缀",
+			"imagePromptSuffix":    "用户全局后缀",
+			"globalReferenceImage": map[string]any{"enabled": true, "url": "https://example.com/style.jpg", "applyToAssets": true, "applyToPages": true},
+			"constraints":          []any{map[string]any{"constraintCategory": "comic_negative", "body": "不要水印"}},
+		}}),
+	}
+	assetImages := []string{"https://example.com/hero.jpg"}
+	pageReferences := []string{"https://example.com/page.jpg"}
+	first, err := BuildComicImageContract(settings, ComicImagePurposePage, "", "原始漫画页内容", assetImages, pageReferences)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := BuildComicImageContract(settings, ComicImagePurposePage, "", first.Prompt, assetImages, pageReferences)
+	if err != nil {
+		t.Fatal(err)
+	}
+	third, err := BuildComicImageContract(settings, ComicImagePurposePage, "", second.Prompt, assetImages, pageReferences)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, contract := range []ComicImageContract{second, third} {
+		if contract.Prompt != first.Prompt {
+			t.Fatalf("compile %d changed the prompt:\nfirst:  %s\nactual: %s", index+2, first.Prompt, contract.Prompt)
+		}
+		if contract.SnapshotHash != first.SnapshotHash {
+			t.Fatalf("compile %d changed the snapshot hash: %s != %s", index+2, contract.SnapshotHash, first.SnapshotHash)
+		}
+	}
+	if count := strings.Count(first.Prompt, comicStyleLockMarker); count != 1 {
+		t.Fatalf("style lock block count = %d, want 1: %s", count, first.Prompt)
+	}
+	if !strings.Contains(first.Prompt, "原始漫画页内容") {
+		t.Fatalf("original content was dropped: %s", first.Prompt)
+	}
+}
+
+func TestStripCompiledComicImagePromptRemovesStackedStyleLocks(t *testing.T) {
+	settings := SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+			"style": map[string]any{"presetId": "batch-comic-style-16", "presetName": "精致火柴2DQ版漫风", "body": "精致头部，极简火柴四肢，细长黑线腿部"},
+		}}),
+	}
+	dirty := "原始漫画页内容\n\n画风名称：精致火柴2DQ版漫风\n\n精致头部，极简火柴四肢，细长黑线腿部\n\n【最终画风锁定】\n画风名称：精致火柴2DQ版漫风\n精致头部，极简火柴四肢，细长黑线腿部\n最高优先级：必须遵循上述画风。\n\n【最终画风锁定】\n画风名称：精致火柴2DQ版漫风\n精致头部，极简火柴四肢，细长黑线腿部\n最高优先级：必须遵循上述画风。"
+	if got := StripCompiledComicImagePrompt(settings, ComicImagePurposePage, dirty); got != "原始漫画页内容" {
+		t.Fatalf("stripped prompt = %q", got)
+	}
+}
+
 func TestBuildComicImageContractScopesGlobalReferenceAndRejectsVideoMode(t *testing.T) {
 	comicSettings := SettingsPatch{
 		"productionMode": rawSetting(t, "comic"),

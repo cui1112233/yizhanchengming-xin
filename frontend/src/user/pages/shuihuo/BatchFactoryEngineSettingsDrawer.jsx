@@ -3,16 +3,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { listAvailableModels } from '../../../shared/api/modelCatalog';
 import { getConfig } from '../../../shared/api/config';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, saveWebSubmitConfig, syncWebSubmitConfigs, syncWebSubmitStyles, testWebSubmitVisible } from '../../../shared/api/novelFetch';
+import { apiErrorMessage } from '../../../shared/apiErrors';
 import { selectedModelState } from './modelSelectionState';
 import { modelOptionsForProvider, providerForCatalogModel, providerModelSettingsPatch, providerOptionsForModels } from './providerModelBinding';
 import { normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { listLocalExecutors } from '../../../shared/api/batchFactory';
+import { IMAGE_ASPECT_RATIOS } from '../../../shared/imageAspectRatios';
 
 const TARGET_ADMIN_URL = 'http://two.121w.com/tttadmin/index.php';
 const N8_MATERIAL_ALBUM_URL = 'https://n8-view.hnqingyuwen.top/#/material/album';
 // The shared novel-fetch verification service predates the VMS UI label.  It
 // still returns the original check name, so accept both names at this boundary.
-const SESSION_CHECK_NAMES = ['视频管理系统登录会话', '121 后台登录会话'];
+const SESSION_CHECK_NAMES = ['视频管理系统登录会话', '121 后台登录会话', '目标站登录会话'];
 
 const DEFAULT_TTS = { voice: 'zh-CN-XiaoxiaoNeural', style: 'general', speed: 1.8, pitch: 10 };
 const AUDIO_SOURCE_OPTIONS = [{ value: 'tts', label: 'TTS（系统配音）' }, { value: 'original', label: '原声（视频自带声音）' }];
@@ -114,7 +116,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   const imageProviderOptions = useMemo(() => providerOptionsForModels(models, 'image'), [models]);
   const videoProviderOptions = useMemo(() => providerOptionsForModels(models, 'video'), [models]);
   const imageModelOptions = modelOptionsForProvider(models, 'image', form.imageProvider);
-  const videoModelOptions = modelOptionsForProvider(models, 'video', form.videoProvider);
+  const videoModelOptions = modelOptionsForProvider(models, 'video', form.videoProvider, form.videoModelId, { expandFanKeModels: true });
   const selectedTextModel = selectedModelState(models.filter(model => model.kind === 'text'), form.textModelId);
   function modelPlaceholder(kind, label) {
     if (modelsLoading) return '正在读取个人中心模型…';
@@ -135,6 +137,16 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
   }
   function has121Session(environment) {
     return Boolean(environment?.ok && (environment?.checks || []).find(check => SESSION_CHECK_NAMES.includes(check.name))?.ok);
+  }
+  // 状态与同步都读后端同一个凭证解析结果，文案按凭证状态区分。
+  function credentialLabel(environment) {
+    const state = String(environment?.credential?.state || '').trim();
+    if (state === 'verified') return '已登录并验证';
+    if (state === 'expired') return '登录已过期';
+    if (state === 'incomplete') return '凭证不全';
+    if (state === 'not_logged_in') return '未登录';
+    if (state === 'unavailable') return '状态暂不可用';
+    return has121Session(environment) ? '已登录并验证' : account?.username ? '待重新验证' : '未登录';
   }
   function check121Detail(environment, name) {
     return String((environment?.checks || []).find(check => check.name === name)?.detail || '').trim();
@@ -192,6 +204,8 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
       const result = await syncWebSubmitConfigs({ persist: false });
       const profiles = Array.isArray(result?.groups) ? result.groups : [];
       patch({ publishSettings: { ...(form.publishSettings || {}), websiteProfiles: profiles } });
+    } catch (error) {
+      message.error(apiErrorMessage(error, '同步网站配置档失败'));
     } finally { setSyncing(''); }
   }
   async function syncStyles() {
@@ -201,6 +215,8 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
       const result = await syncWebSubmitStyles({ persist: true });
       const styles = Array.isArray(result?.settings?.style_catalog) ? result.settings.style_catalog : (Array.isArray(result?.styles) ? result.styles : []);
       patch({ publishSettings: { ...(form.publishSettings || {}), websiteStyleCatalog: styles } });
+    } catch (error) {
+      message.error(apiErrorMessage(error, '同步风格目录失败'));
     } finally { setSyncing(''); }
   }
   const publish = form.publishSettings || {};
@@ -228,10 +244,10 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
           <Alert type="info" showIcon message="当前批次统一生产参数" description="这里统一设置当前批次所有小说；之后仍可进入任意单书单独修改，不会影响其它小说。" />
           <EngineCard title="核心视频引擎" description="当前设置应用到本批次全部小说；之后可单独修改任意一本。">
             <div className="batch-factory-engine-grid">
-              <Field label="视频引擎" note="生成通道"><Select value={form.videoProvider || 'personal_api'} options={videoProviderOptions} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId }))} /></Field>
+              <Field label="视频引擎" note="生成通道"><Select value={form.videoProvider || 'personal_api'} options={videoProviderOptions} onChange={videoProvider => patch(providerModelSettingsPatch({ models, kind: 'video', provider: videoProvider, modelId: form.videoModelId, expandFanKeModels: true }))} /></Field>
               <Field label="视频模型" note="选择后自动匹配生成通道"><Select allowClear loading={form.videoProvider === 'doubao_local_executor' ? false : modelsLoading} value={form.videoModelId || undefined} options={videoModelOptions} placeholder={modelPlaceholder('video', '视频')} onChange={videoModelId => patch({ videoModelId: videoModelId || '', ...(videoModelId ? { videoProvider: providerForCatalogModel(models.find(model => model.id === videoModelId), form.videoProvider) } : {}) })} /></Field>
               <Field label="分镜时长" note="单个 VIDEO 的目标上限"><Segmented value={storyboardDuration(form.storyboardDurationLimit)} options={[{ value: 10, label: '10s' }, { value: 15, label: '15s' }]} onChange={storyboardDurationLimit => patch({ storyboardDurationLimit, maxVideoDuration: storyboardDurationLimit })} /></Field>
-              <Field label="图片画幅" note="漫画成图与视频参考图；资产图默认 16:9"><Segmented value={form.imageAspectRatio || form.aspectRatio || '9:16'} options={['16:9', '9:16', '1:1']} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></Field>
+              <Field label="图片画幅" note="漫画成图与视频参考图；资产图默认 16:9"><Segmented value={form.imageAspectRatio || form.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIOS} onChange={imageAspectRatio => patch({ imageAspectRatio })} /></Field>
               <Field label="视频画幅" note="只影响视频输出"><Segmented value={form.videoAspectRatio || (form.aspectRatio === '16:9' ? '16:9' : '9:16')} options={['16:9', '9:16']} onChange={videoAspectRatio => patch({ videoAspectRatio })} /></Field>
               <Field label="视频分辨率" note="随视频任务提交"><Segmented value={form.videoResolution || '720p'} options={['480p', '720p', '1080p']} onChange={videoResolution => patch({ videoResolution })} /></Field>
             </div>
@@ -284,7 +300,7 @@ export function BatchFactoryEngineSettingsDrawer({ open, batch, onClose, onSave 
             <div className="batch-factory-vms-main">
               <div className="batch-factory-vms-icon" aria-hidden="true">▣</div>
               <div className="batch-factory-vms-copy">
-                <div className="batch-factory-vms-title-row"><b>视频管理系统</b><Tag color={publishSessionReady ? 'green' : 'default'}>{publishSessionReady ? '已登录并验证' : account?.username ? '待重新验证' : '未登录'}</Tag></div>
+                <div className="batch-factory-vms-title-row"><b>视频管理系统</b><Tag color={publishSessionReady ? 'green' : 'default'}>{credentialLabel(publishSession?.environment)}</Tag></div>
                 <div className="batch-factory-vms-meta"><span>当前账号</span><strong>{account?.username || '尚未登录'}</strong></div>
                 <div className="batch-factory-vms-meta"><span>后台地址</span><a href={TARGET_ADMIN_URL} target="_blank" rel="noreferrer">two.121w.com/tttadmin</a></div><div className="batch-factory-vms-meta"><span>素材相册</span><a href={N8_MATERIAL_ALBUM_URL} target="_blank" rel="noreferrer">打开 N8 素材相册</a></div>
               </div>

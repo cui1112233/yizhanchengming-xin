@@ -103,7 +103,11 @@ func LocalExecutorMigrations() []Migration {
 	return []Migration{
 		{Version: 7801001, SQL: LocalExecutorStatements(), CallbackChecksum: "v78-local-executor-control-plane-v1"},
 		{Version: 7801002, SQL: LocalExecutorJobStatements(), CallbackChecksum: "v78-local-executor-job-leasing-v1"},
-		{Version: 7801003, SQL: LocalExecutorJobSourceTaskIDStatements(), CallbackChecksum: "v78-local-executor-source-task-id-v2"},
+		// The live database was created by the previous released binary, which
+		// recorded the historical checksum before the callback label was
+		// normalized. Accept that exact ledger value so a Go cutover does not
+		// rerun the ALTER or require editing application data.
+		{Version: 7801003, SQL: LocalExecutorJobSourceTaskIDStatements(), CallbackChecksum: "v78-local-executor-source-task-id-v2", LegacyChecksums: []string{"e2b97af4dcf7d240f2d9f41b457724507d55071d02c1287a7db52e544a8088ad"}},
 		{Version: 7801004, SQL: LocalExecutorMultipleArtifactStatements(), CallbackChecksum: "v88-local-executor-multiple-artifacts-v1"},
 	}
 }
@@ -115,5 +119,6 @@ func AppMigrations() []Migration {
 	out = append(out, GiantMaterialExecutorMigrations()...)
 	out = append(out, AuthMigrations()...)
 	out = append(out, AgentWorkspaceMigrations()...)
+	out = append(out, AutomationMigrations()...)
 	return out
 }

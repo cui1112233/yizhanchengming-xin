@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"qiantie/backend/internal/batchfactoryv11"
 )
 
 type PublicDurationCapabilities struct {
@@ -34,7 +36,7 @@ func publicModelCapabilities(model map[string]any) PublicModelCapabilities {
 	switch kind {
 	case "image":
 		return PublicModelCapabilities{
-			Ratios: []string{"16:9", "9:16", "1:1"}, Resolutions: []string{"1K", "2K", "4K"},
+			Ratios: batchfactoryv11.SupportedImageAspectRatios, Resolutions: []string{"1K", "2K", "4K"},
 			QualityLevels: []string{"low", "standard", "high"}, MaxOutputCount: 4,
 			ReferenceKinds: []string{"image"}, GenerationModes: []string{"text_to_image", "image_to_image"},
 			AcceptsTextPrompt: true, AcceptsImageReferences: true, MaxReferenceAssets: 10,

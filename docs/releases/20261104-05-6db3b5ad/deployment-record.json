@@ -1,0 +1,83 @@
+{
+  "buildId": "20261104-05-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "worktreeDirty": true,
+  "changedPathCount": 174,
+  "untrackedPathCount": 50,
+  "frontendSnapshot": {
+    "dir": "%TEMP%\\v88-dist-snapshot-20261104-1615",
+    "indexHtmlSha256": "1a58197746a5c2266b3c614f9daaf02a09515c2a1f87c3a08c519ae33d78b9da",
+    "indexHtmlMtimeLocal": "2026-11-04T16:06:51+08:00",
+    "fileCount": 126
+  },
+  "frontendEntry": "/assets/user-BdLg_lUI.js",
+  "binaries": {
+    "windows": {
+      "path": ".release/v88/20261104-05-6db3b5ad/qiantie-local.exe",
+      "bytes": 77434368,
+      "sha256": "e0a82f13c93dbe6bc1bf1f0453bfed5f4f30c69e0e48848044593537db6c1e48"
+    },
+    "linux": {
+      "path": ".release/v88/20261104-05-6db3b5ad/qiantie-server-linux-amd64",
+      "bytes": 70541474,
+      "sha256": "2fbea42470ca1e8d1148c6489d33e4f5f10676245f93d979071cd2a6d373f663"
+    }
+  },
+  "local4001": {
+    "previousPid": 5612,
+    "previousStartTime": "2026-11-04T14:46:33+08:00",
+    "previousSha256": "f8ef9dd2d5672d3ea152aacf4b8dca953a4c8d9ce0b832d676f3f958d8655a52",
+    "newPid": 25300,
+    "newStartTime": "2026-11-04T16:17:19+08:00",
+    "newSha256": "e0a82f13c93dbe6bc1bf1f0453bfed5f4f30c69e0e48848044593537db6c1e48",
+    "launcher": "scripts/start-local-go-review.ps1 -SkipBuild -> scripts/start-local-go.ps1 (slice=5)",
+    "runtimeManifestUpdated": ".local-review/runtime-manifest.json",
+    "panicConcurrentMapFatalLines": 0,
+    "error1038Lines": 1,
+    "capabilitiesLine": "batch-factory capabilities slice=5 enabled=13 disabled=[publish.yadi]"
+  },
+  "production": {
+    "host": "115.190.156.223",
+    "service": "qiantie.service",
+    "binaryPath": "/opt/www/qiantie/qiantie",
+    "previousSha256": "316ac2fa4e8b13ed8cbff0f345716d0a1dbfcb6711d92e7080d351dd51830974",
+    "previousFrontendEntry": "/assets/user-M4kZML8e.js",
+    "newSha256": "2fbea42470ca1e8d1148c6489d33e4f5f10676245f93d979071cd2a6d373f663",
+    "newFrontendEntry": "/assets/user-BdLg_lUI.js",
+    "backupBinary": "/root/backup-20261104/qiantie.pre-20261104-161931",
+    "backupRuntimeManifest": "/root/backup-20261104/runtime-release.pre-20261104-161931.json",
+    "dataUploaded": false,
+    "dataNote": "线上 presets 数据比本地新（线上 batch-factory 87 条 / published 70；本地 82 / 60），本批未上传 presets，避免覆盖线上新数据。",
+    "panicConcurrentMapFatalLines": 0,
+    "capabilitiesLine": "batch-factory capabilities slice=5 enabled=13 disabled=[publish.yadi]"
+  },
+  "consistency": {
+    "frontendEntryIdentical": true,
+    "servedAssetSha256": {
+      "/assets/user-BdLg_lUI.js": "5e008e38c514ac007693f8c682d37d76e99b76f765d8d0e51425645514060985",
+      "/assets/user-BGt2r7ux.css": "6f9b88473f995b09099432d1a269aeaccd44daabeb946c85d07a90e2fb471420",
+      "/assets/createLucideIcon-Dij8BbqA.js": "6f96decee11e94f389ce746b316600513f808f821785e097a239ae385b5b9559",
+      "/assets/createLucideIcon-DBptg6Cj.css": "32ebb39c907ffd1350813ab89c91a119e0c32961c57a859a8bf39e96fb102f29"
+    },
+    "note": "Windows 与 linux 二进制因平台不同 SHA 不同；两端前端产物逐文件 SHA 完全相同。"
+  },
+  "verified": {
+    "localPages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "productionPages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "localAssets": "4/4 200",
+    "productionAssets": "4/4 200",
+    "oldEntry404": true,
+    "localPresets": { "batchFactory": 82, "published": 60, "batchComicStyle13": "v2 published" },
+    "productionPresets": { "batchFactory": 87, "published": 70, "batchComicStyle13": "v2 published" },
+    "sevenAspectRatios": "7/7 (ShuihuoProductionPage + providerModelBinding)",
+    "binaryStrings": [ "yfai", "YFAI", "seedance-2-0-official", "is_final", "/v1/skills/balance", "/api/config/models/quotas", "有敏感词未处理，已保留原文，需人工确认后上传", "处敏感词未处理" ]
+  },
+  "unverified": [
+    "线上 /api/models?kind=video 未登录返回 401，无法确认返回条数与 YFAI 分组（需登录态）",
+    "鉴权类接口（batch-factory 书籍/页面下载、模型列表）只验到 401/404 边界"
+  ],
+  "staleTests": [
+    "BatchFactoryBookSettingsModal.source.test.js: 3 条断言按旧字符串/旧三元链判断，源码为等价重构（见报告说明）"
+  ],
+  "deployedAt": "2026-11-04T16:22:00+08:00"
+}

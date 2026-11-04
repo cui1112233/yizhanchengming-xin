@@ -1,0 +1,170 @@
+/* 配音页 /tts 样板改造（第一批视觉统一）
+   仅作用于 .tts-workbench 内，不改 global.css 既有规则；颜色取 v88 令牌。 */
+
+.tts-workbench {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--v88-space-4);
+  padding: var(--v88-space-page);
+  overflow: hidden;
+  background: var(--v88-color-bg);
+}
+
+.tts-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--v88-space-4);
+  flex: 0 0 auto;
+}
+
+.tts-page-title {
+  margin: 0;
+  color: var(--v88-color-text-1);
+  font-size: var(--v88-font-page-title);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tts-page-subtitle {
+  margin: var(--v88-space-1) 0 0;
+  color: var(--v88-color-text-3);
+  font-size: var(--v88-font-body);
+}
+
+.tts-bulk-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v88-space-2);
+  color: var(--v88-color-info);
+  font-size: var(--v88-font-caption);
+}
+
+.tts-workbench .tts-toolbar {
+  flex: 0 0 auto;
+  height: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v88-space-2) var(--v88-space-3);
+  padding: var(--v88-space-3) var(--v88-space-4);
+  border: 1px solid var(--v88-color-border);
+  border-radius: var(--v88-radius-lg);
+  background: var(--v88-color-surface);
+  transition: border-color var(--v88-motion-base) var(--v88-ease);
+}
+
+.tts-workbench .tts-toolbar:focus-within {
+  border-color: var(--v88-color-border-strong);
+}
+
+.tts-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--v88-space-2);
+  min-width: 0;
+}
+
+.tts-toolbar-group + .tts-toolbar-group {
+  padding-left: var(--v88-space-3);
+  border-left: 1px solid var(--v88-color-border);
+}
+
+.tts-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.tts-workbench .tts-default-slider,
+.tts-workbench .tts-stat {
+  color: var(--v88-color-text-3);
+}
+
+.tts-workbench .tts-card-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--v88-space-4);
+  align-content: start;
+}
+
+.tts-workbench .tts-card-grid > .v88-empty {
+  grid-column: 1 / -1;
+  min-height: 300px;
+}
+
+.tts-workbench .tts-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--v88-color-border);
+  border-radius: var(--v88-radius-lg);
+  background: var(--v88-color-surface);
+  transition:
+    border-color var(--v88-motion-base) var(--v88-ease),
+    box-shadow var(--v88-motion-base) var(--v88-ease);
+}
+
+.tts-workbench .tts-card:hover {
+  border-color: var(--v88-color-border-strong);
+  box-shadow: var(--v88-shadow-card);
+}
+
+.tts-workbench .tts-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v88-space-2);
+  padding: var(--v88-space-3) var(--v88-space-4);
+  border-bottom: 1px solid var(--v88-color-border);
+  background: transparent;
+  color: var(--v88-color-text-1);
+}
+
+.tts-workbench .tts-card-body {
+  padding: var(--v88-space-4);
+}
+
+.tts-workbench .tts-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v88-space-2);
+  padding: var(--v88-space-3) var(--v88-space-4);
+  border-top: 1px solid var(--v88-color-border);
+}
+
+.tts-wait-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v88-space-2);
+  color: var(--v88-color-info);
+  font-size: var(--v88-font-caption);
+}
+
+.tts-config-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v88-space-2);
+  color: var(--v88-color-text-3);
+  font-size: var(--v88-font-caption);
+}
+
+@media (max-width: 1280px) {
+  .tts-workbench .tts-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tts-workbench .tts-toolbar,
+  .tts-workbench .tts-card {
+    transition: none;
+  }
+}

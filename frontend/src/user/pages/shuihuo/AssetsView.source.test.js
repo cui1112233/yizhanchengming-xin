@@ -12,7 +12,8 @@ test('asset editor gives non-voice assets image model and aspect-ratio overrides
   assert.match(source, /图片模型<Select allowClear value=\{editing\?\.imageModelId \?\? undefined\}/);
   assert.match(source, /placeholder="使用项目默认" options=\{imageModels\.map\(model => \(\{ value: model\.id, label: model\.name \}\)\)\}/);
   assert.match(source, /图片画幅<Select allowClear value=\{editing\?\.imageAspectRatio \?\? undefined\}/);
-  assert.match(source, /\{ value: '16:9', label: '16:9' \}, \{ value: '9:16', label: '9:16' \}, \{ value: '1:1', label: '1:1' \}/);
+  assert.match(source, /import \{ IMAGE_ASPECT_RATIO_OPTIONS \} from '..\/..\/..\/shared\/imageAspectRatios'/);
+  assert.match(source, /图片画幅<Select allowClear value=\{editing\?\.imageAspectRatio \?\? undefined\} placeholder="使用项目默认" options=\{IMAGE_ASPECT_RATIO_OPTIONS\}/);
   assert.match(source, /imageModelId: imageModelId \?\? null/);
   assert.match(source, /imageAspectRatio: imageAspectRatio \?\? null/);
 });

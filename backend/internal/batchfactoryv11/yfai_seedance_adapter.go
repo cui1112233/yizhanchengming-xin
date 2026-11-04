@@ -79,7 +79,11 @@ func (a *YFAISeedanceAdapter) Submit(ctx context.Context, model FrozenVideoModel
 	}
 	taskID := firstVideoValue(reply, "task_id", "taskId")
 	if taskID == "" {
-		return ProviderTaskRef{}, fmt.Errorf("YFAI Seedance did not create a task: %s", yadiProviderFailureReason(reply))
+		reason := yadiProviderFailureReason(reply)
+		if reason == "" {
+			reason = firstVideoValue(reply, "error", "errorMessage", "error_message")
+		}
+		return ProviderTaskRef{}, fmt.Errorf("YFAI Seedance did not create a task: %s", reason)
 	}
 	return ProviderTaskRef{ProviderTaskID: taskID, State: ProductionQueued, RequestedDurationSeconds: float64(duration)}, nil
 }
@@ -94,18 +98,27 @@ func (a *YFAISeedanceAdapter) Poll(ctx context.Context, _ FrozenVideoModel, task
 		return ProviderTaskRef{}, err
 	}
 	state := strings.ToLower(firstVideoValue(reply, "status", "state"))
+	isFinal := firstVideoBool(reply, "is_final", "isFinal", "final")
 	result := ProviderTaskRef{ProviderTaskID: task.ProviderTaskID, State: ProductionRunning}
 	if state == "failed" || state == "error" || state == "cancelled" || state == "canceled" {
 		result.State = ProductionFailed
 		result.ErrorMessage = firstVideoValue(reply, "error", "errorMessage", "error_message", "message", "msg")
 		return result, nil
 	}
-	if state == "completed" || state == "succeeded" || state == "success" || state == "done" {
+	// Upstream asks callers to close the loop on is_final first and to accept
+	// status=completed/failed as a fallback. A completed task without an
+	// output_url is not a result yet (output may still be copied to the CDN).
+	if isFinal || state == "completed" || state == "succeeded" || state == "success" || state == "done" {
 		media := firstVideoValue(reply, "output_url", "url", "result_url")
-		if media == "" {
+		if media != "" {
+			result.State, result.MediaURL = ProductionSucceeded, media
 			return result, nil
 		}
-		result.State, result.MediaURL = ProductionSucceeded, media
+	}
+	// A non-terminal task that carries an error is a failure; do not keep
+	// polling it forever.
+	if message := firstVideoValue(reply, "error", "errorMessage", "error_message"); message != "" {
+		result.State, result.ErrorMessage = ProductionFailed, message
 	}
 	return result, nil
 }
@@ -141,7 +154,82 @@ func (a *YFAISeedanceAdapter) do(ctx context.Context, method, endpoint string, p
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("YFAI Seedance returned HTTP %d", resp.StatusCode)
+		return nil, newYFAIUpstreamError(resp.StatusCode, resp.Header.Get("Retry-After"))
 	}
 	return data, nil
+}
+
+// YFAIUpstreamError keeps the upstream HTTP status visible to callers so the
+// UI can tell an invalid key (401), missing balance (402) and rate limiting
+// (429) apart instead of collapsing everything into "unknown error".
+type YFAIUpstreamError struct {
+	StatusCode int
+	RetryAfter time.Duration
+	Message    string
+}
+
+func (e *YFAIUpstreamError) Error() string { return e.Message }
+
+const yfaiDefaultRetryAfter = 30 * time.Second
+
+func newYFAIUpstreamError(statusCode int, retryAfterHeader string) *YFAIUpstreamError {
+	err := &YFAIUpstreamError{StatusCode: statusCode}
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		err.Message = "YFAI Seedance returned HTTP 401（密钥无效或无权限，请检查 API Key）"
+		if statusCode == http.StatusForbidden {
+			err.Message = "YFAI Seedance returned HTTP 403（密钥无权限，请检查 API Key）"
+		}
+	case http.StatusPaymentRequired:
+		err.Message = "YFAI Seedance returned HTTP 402（账户余额不足，请充值）"
+	case http.StatusTooManyRequests:
+		err.RetryAfter = parseYFAIRetryAfter(retryAfterHeader)
+		err.Message = fmt.Sprintf("YFAI Seedance returned HTTP 429（接口限流，请 %.0f 秒后重试）", err.RetryAfter.Seconds())
+	default:
+		err.Message = fmt.Sprintf("YFAI Seedance returned HTTP %d", statusCode)
+	}
+	return err
+}
+
+// parseYFAIRetryAfter accepts both the delta-seconds and HTTP-date forms of
+// Retry-After and falls back to a conservative default so an upstream 429 can
+// still be backed off when the header is missing or malformed.
+func parseYFAIRetryAfter(header string) time.Duration {
+	value := strings.TrimSpace(header)
+	if value == "" {
+		return yfaiDefaultRetryAfter
+	}
+	if seconds, err := strconv.Atoi(value); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	if at, err := http.ParseTime(value); err == nil {
+		if wait := time.Until(at); wait > 0 {
+			return wait
+		}
+		return yfaiDefaultRetryAfter
+	}
+	return yfaiDefaultRetryAfter
+}
+
+func firstVideoBool(raw []byte, keys ...string) bool {
+	var payload any
+	if json.Unmarshal(raw, &payload) != nil {
+		return false
+	}
+	for _, object := range videoObjects(payload) {
+		for _, key := range keys {
+			switch typed := object[key].(type) {
+			case bool:
+				return typed
+			case string:
+				switch strings.ToLower(strings.TrimSpace(typed)) {
+				case "true", "1", "yes":
+					return true
+				}
+			case float64:
+				return typed != 0
+			}
+		}
+	}
+	return false
 }

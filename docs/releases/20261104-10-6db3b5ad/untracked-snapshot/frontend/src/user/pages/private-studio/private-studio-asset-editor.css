@@ -1,0 +1,112 @@
+/* 「编辑资产」统一外壳：剧本创作与水货生产共用。仅作用于 private-studio 作用域。 */
+.private-studio-asset-editor-modal .ant-modal-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.private-studio-asset-editor-modal .ant-modal {
+  max-width: 100vw;
+}
+
+.private-studio-asset-editor {
+  display: flex;
+  flex-direction: column;
+  max-height: 86vh;
+}
+
+.private-studio-asset-editor-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.private-studio-asset-editor-heading {
+  font-size: 15px;
+}
+
+.private-studio-asset-editor-close {
+  color: var(--text-secondary);
+}
+
+.private-studio-asset-editor-body {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  min-height: 0;
+  padding: 16px 18px;
+  overflow-y: auto;
+}
+
+.private-studio-asset-editor-main {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+
+.private-studio-asset-editor-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 146, 196, .22);
+  border-radius: 12px;
+  background: rgba(16, 24, 39, .5);
+}
+
+.private-studio-asset-editor-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.private-studio-asset-editor-section-desc {
+  font-size: 12px;
+}
+
+.private-studio-asset-editor-section-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.private-studio-asset-editor-aside {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+}
+
+.private-studio-asset-editor-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.private-studio-asset-editor-footer {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.private-studio-asset-editor-kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 860px) {
+  .private-studio-asset-editor-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

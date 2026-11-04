@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Spin, message } from 'antd';
+import { ConfigProvider, Modal, Spin, message } from 'antd';
 import { CommentaryWorkbench } from './shuihuo/CommentaryWorkbench';
 import { BatchFactoryNovelList } from './shuihuo/BatchFactoryNovelList';
 import { batchFactoryBatchFromResponse, batchFactoryProjectsFrom, isBatchFactoryV11Project } from './shuihuo/batchFactoryProjects';
@@ -11,7 +11,9 @@ import { appendNovelFetchIntake, classifyFetchedBatchMetadata, createBatchFromIn
 import { BATCH_FACTORY_ACTIVE_BATCH_STORAGE_KEY, novelFetchIntakeBooks, pendingNovelFetchIntakeId } from './shuihuo/batchFactoryNovelFetchHandoff';
 import { useLocalExecutorStatus } from '../../shared/hooks/useLocalExecutorStatus';
 import { batchExecutorKinds } from './shuihuo/batchFactoryLocalExecutor';
+import { createV88AntTheme } from '../../shared/styles/theme';
 import './shuihuo-production.css';
+import './shuihuo-production-v88.css';
 
 const modelNames = { text: '文本模型', image: '图片模型', video: '视频模型', audio: '配音模型' };
 function readinessItems(health, executorKinds = [], executorOnline = false) {
@@ -328,7 +330,9 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     try { setActiveProject(await getProject(activeProject.project.id)); } catch (error) { message.error(error.message || '刷新项目失败'); }
   }
 
-  return <div className={`shuihuo-production ${view === 'studio' || view === 'batch-novels' ? 'is-workbench' : ''}`}>
+  const antTheme = useMemo(() => createV88AntTheme('dark'), []);
+
+  return <ConfigProvider theme={antTheme}><div className={`shuihuo-production ${view === 'studio' || view === 'batch-novels' ? 'is-workbench' : ''}`}>
     {view !== 'projects' && health ? <div className="shuihuo-readiness-strip" role="status" aria-live="polite"><strong className="shuihuo-readiness-title">运行依赖</strong>{readinessItems(health, activeBatchExecutorKinds, localExecutorStatus.online).map(([name, dependency]) => <span className={`${dependency?.ready ? 'ready' : 'missing'}${dependency?.executor ? ' is-local-executor' : ''}`} key={name} title={dependency?.reason || `${name}已配置`}>{dependency?.executor ? <><i aria-hidden="true" />{name}：一战晟铭执行器{dependency.ready ? '在线' : '离线'}</> : <>{name}：{dependency?.ready ? '已配置' : '未配置'}{dependency?.ready || !dependency?.reason ? '' : `（${dependency.reason}）`}</>}</span>)}</div> : null}
     {view === 'studio' && healthError ? <div className="shuihuo-readiness-strip" role="status" aria-live="polite"><span className="missing">状态读取失败：{healthError}</span></div> : null}
     {loading && view === 'projects' ? <div className="shuihuo-loading"><Spin /></div> : null}
@@ -338,7 +342,7 @@ export function ShuihuoProductionPage({ openBatchOnLoad = false }) {
     <Modal title="人物场景预设" open={assetsOpen} onCancel={() => setAssetsOpen(false)} footer={null} width="min(1360px, calc(100vw - 48px))" className="shuihuo-assets-modal" destroyOnClose={false}>
       {activeProject ? <AssetsView data={activeProject} onRefresh={refreshActive} embedded /> : null}
     </Modal>
-  </div>;
+  </div></ConfigProvider>;
 }
 
 export default ShuihuoProductionPage;

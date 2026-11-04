@@ -290,3 +290,44 @@ func TestRunOpeningVariantsKeepsStoredSuccessesWhenReplyIsInvalid(t *testing.T) 
 		t.Fatalf("stored success variant 2 must survive a failed rerun, got %#v", saved[1])
 	}
 }
+
+func TestRunOpeningVariantsRetriesOnceAfterTruncatedOutput(t *testing.T) {
+	store, batch, book := seedOpeningBook(t, true, 4, []DirectorVideo{
+		{DurationSec: 10, FinalPrompt: "原分镜一：新娘低头抚平嫁衣袖口。"},
+		{DurationSec: 10, FinalPrompt: "分镜二：陆沉推门而入。"},
+	})
+	reply := strings.Join([]string{
+		"===VARIANT 1===", "时长：10秒", "变体一：茶盏砸落大理石地面碎裂。", "",
+		"===VARIANT 2===", "时长：10秒", "变体二：雨夜推门而入。", "",
+		"===VARIANT 3===", "时长：10秒", "变体三：庭院灯影摇晃，她攥紧婚书。",
+	}, "\n")
+	provider := &truncatingDirectorProvider{values: []string{"truncated", reply}}
+	variants, err := (&DirectorService{Store: store, Provider: provider}).RunOpeningVariants(context.Background(), "alice", batch.ID, book.ID, PresetSnapshot{})
+	if err != nil {
+		t.Fatalf("opening variants should recover from one truncated response: %v", err)
+	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("provider calls = %d, want exactly one retry", len(provider.calls))
+	}
+	if !strings.Contains(provider.calls[1].SystemPrompt, "更紧凑") {
+		t.Fatalf("retry must ask for compact output: %q", provider.calls[1].SystemPrompt)
+	}
+	if len(variants) != 3 || variants[2].Status != "success" || !strings.Contains(variants[2].Prompt, "庭院灯影") {
+		t.Fatalf("variants = %#v", variants)
+	}
+}
+
+func TestRunOpeningVariantsFailsAfterSecondTruncation(t *testing.T) {
+	store, batch, book := seedOpeningBook(t, true, 4, []DirectorVideo{
+		{DurationSec: 10, FinalPrompt: "原分镜一：新娘低头抚平嫁衣袖口。"},
+		{DurationSec: 10, FinalPrompt: "分镜二：陆沉推门而入。"},
+	})
+	provider := &alwaysTruncatingDirectorProvider{}
+	_, err := (&DirectorService{Store: store, Provider: provider}).RunOpeningVariants(context.Background(), "alice", batch.ID, book.ID, PresetSnapshot{})
+	if err == nil || !strings.Contains(err.Error(), "finish_reason=length") {
+		t.Fatalf("err=%v, want the provider truncation reason preserved", err)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("provider calls = %d, want the retry to stay bounded at 2 attempts", provider.calls)
+	}
+}

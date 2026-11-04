@@ -389,13 +389,23 @@ func TestWebSubmitBlocksUnclassifiedStyleAndPersistsFailureLog(t *testing.T) {
 		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
 	}
 	var payload struct {
-		Results []map[string]any `json:"results"`
+		OK            bool             `json:"ok"`
+		Result        string           `json:"result"`
+		SuccessGroups int              `json:"success_groups"`
+		FailedGroups  int              `json:"failed_groups"`
+		Results       []map[string]any `json:"results"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
+	if payload.OK || payload.Result != "all_failed" || payload.SuccessGroups != 0 || payload.FailedGroups != 1 {
+		t.Fatalf("failure must not be reported as success: %s", res.Body.String())
+	}
 	if len(payload.Results) != 1 || payload.Results[0]["error"] != webSubmitUnclassifiedStyleError {
 		t.Fatalf("payload=%s", res.Body.String())
+	}
+	if payload.Results[0]["code"] != "WEB_SUBMIT_FAILED" || strings.TrimSpace(toString(payload.Results[0]["message"])) == "" {
+		t.Fatalf("failure item missing actionable code/message: %s", res.Body.String())
 	}
 	doc, err := store.GetDocument(context.Background(), "tester", "book-submit")
 	if err != nil {
@@ -407,6 +417,43 @@ func TestWebSubmitBlocksUnclassifiedStyleAndPersistsFailureLog(t *testing.T) {
 	log := doc.Logs[0].(map[string]any)
 	if log["event"] != "site_submit" || log["version"] != "ai1" || log["status"] != "failed" || log["error"] != webSubmitUnclassifiedStyleError || log["externalRequested"] != false || log["time"] == "" {
 		t.Fatalf("log=%#v", log)
+	}
+}
+
+func TestWebSubmitOverallResultLabels(t *testing.T) {
+	cases := []struct {
+		success int
+		failed  int
+		want    string
+	}{
+		{success: 2, failed: 0, want: "all_ok"},
+		{success: 1, failed: 1, want: "partial"},
+		{success: 0, failed: 2, want: "all_failed"},
+	}
+	for _, tc := range cases {
+		if got := webSubmitOverallResult(tc.success, tc.failed); got != tc.want {
+			t.Fatalf("success=%d failed=%d got=%s want=%s", tc.success, tc.failed, got, tc.want)
+		}
+	}
+}
+
+func TestDecorateWebSubmitResultsAddsFailureCodes(t *testing.T) {
+	items := []any{
+		map[string]any{"bookId": "ok", "status": "submitted"},
+		map[string]any{"bookId": "bad", "status": "error", "error": "正文不足"},
+		map[string]any{"bookId": "pending", "status": "pending_confirmation"},
+	}
+	decorated := decorateWebSubmitResults(items)
+	if len(decorated) != 3 {
+		t.Fatalf("decorated=%#v", decorated)
+	}
+	bad := decorated[1].(map[string]any)
+	if bad["code"] != "WEB_SUBMIT_FAILED" || bad["message"] != "正文不足" {
+		t.Fatalf("bad=%#v", bad)
+	}
+	pending := decorated[2].(map[string]any)
+	if pending["code"] != "WEB_SUBMIT_PENDING_CONFIRMATION" || strings.TrimSpace(toString(pending["message"])) == "" {
+		t.Fatalf("pending=%#v", pending)
 	}
 }
 

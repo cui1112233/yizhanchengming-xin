@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,19 @@ type MySQLStore struct {
 	DB              *sql.DB
 	LegacyConfigDir string
 	ObjectBodies    *BodyObjectStore
+
+	// The legacy api-config.json can be several megabytes. Parsing it on every
+	// settings read costs hundreds of milliseconds and used to dominate the
+	// batch runtime summary, which recomputes availability per book. Cache the
+	// decoded document and validate it against the file's size/mtime.
+	legacyMu    sync.RWMutex
+	legacyCache map[string]legacyConfigCacheEntry
+}
+
+type legacyConfigCacheEntry struct {
+	modTime time.Time
+	size    int64
+	config  map[string]any
 }
 
 func NewMySQLStore(db *sql.DB) *MySQLStore { return &MySQLStore{DB: db} }
@@ -60,32 +74,86 @@ func (s *MySQLStore) PutDocument(ctx context.Context, owner string, document Doc
 }
 
 func (s *MySQLStore) ListDocuments(ctx context.Context, owner string) ([]Document, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT book_id, document_json, updated_at FROM novel_fetch_workshop_documents WHERE owner_username=? ORDER BY updated_at DESC, book_id ASC`, owner)
+	// 两步查询：document_json 存整本小说正文，直接参与 ORDER BY 的 filesort
+	// 会撑爆 sort_buffer_size 并返回 MySQL ERROR 1038。先只对 book_id 排序，
+	// 再按 id 分批读取正文，顺序保持 updated_at DESC, book_id ASC。
+	idRows, err := s.DB.QueryContext(ctx, `SELECT book_id FROM novel_fetch_workshop_documents WHERE owner_username=? ORDER BY updated_at DESC, book_id ASC`, owner)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	result := []Document{}
-	for rows.Next() {
+	bookIDs := []string{}
+	for idRows.Next() {
 		var bookID string
-		var raw []byte
-		var updated time.Time
-		if err := rows.Scan(&bookID, &raw, &updated); err != nil {
+		if err := idRows.Scan(&bookID); err != nil {
+			idRows.Close()
 			return nil, err
 		}
-		var document Document
-		if err := json.Unmarshal(raw, &document); err != nil {
-			return nil, fmt.Errorf("decode novel fetch document %s: %w", bookID, err)
-		}
-		document = normalizeDocument(document)
-		document.BookID = bookID
-		if hasLegacyDocumentBodies(document) {
-			document = lightweightLegacyDocument(document, legacyBodyRecords(document))
-		}
-		document.UpdatedAt = updated.UTC().Format(time.RFC3339Nano)
-		result = append(result, document)
+		bookIDs = append(bookIDs, bookID)
 	}
-	return result, rows.Err()
+	if err := idRows.Err(); err != nil {
+		idRows.Close()
+		return nil, err
+	}
+	idRows.Close()
+
+	result := []Document{}
+	const pageSize = 200
+	for start := 0; start < len(bookIDs); start += pageSize {
+		end := start + pageSize
+		if end > len(bookIDs) {
+			end = len(bookIDs)
+		}
+		page := bookIDs[start:end]
+		placeholders := make([]string, 0, len(page))
+		args := make([]any, 0, len(page)+1)
+		args = append(args, owner)
+		for _, bookID := range page {
+			placeholders = append(placeholders, "?")
+			args = append(args, bookID)
+		}
+		rows, err := s.DB.QueryContext(ctx, `SELECT book_id, document_json, updated_at FROM novel_fetch_workshop_documents WHERE owner_username=? AND book_id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+		if err != nil {
+			return nil, err
+		}
+		type documentRow struct {
+			raw     []byte
+			updated time.Time
+		}
+		entries := make(map[string]documentRow, len(page))
+		for rows.Next() {
+			var bookID string
+			var raw []byte
+			var updated time.Time
+			if err := rows.Scan(&bookID, &raw, &updated); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			entries[bookID] = documentRow{raw: raw, updated: updated}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+		for _, bookID := range page {
+			entry, ok := entries[bookID]
+			if !ok {
+				continue
+			}
+			var document Document
+			if err := json.Unmarshal(entry.raw, &document); err != nil {
+				return nil, fmt.Errorf("decode novel fetch document %s: %w", bookID, err)
+			}
+			document = normalizeDocument(document)
+			document.BookID = bookID
+			if hasLegacyDocumentBodies(document) {
+				document = lightweightLegacyDocument(document, legacyBodyRecords(document))
+			}
+			document.UpdatedAt = entry.updated.UTC().Format(time.RFC3339Nano)
+			result = append(result, document)
+		}
+	}
+	return result, nil
 }
 
 func (s *MySQLStore) DeleteDocuments(ctx context.Context, owner string, ids []string) (DeleteResult, error) {
@@ -130,18 +198,12 @@ func (s *MySQLStore) GetConfig(ctx context.Context, owner string) (map[string]an
 		// user saves the settings through the Go frontend. Secrets stay local and
 		// are never committed to the repository.
 		settings := map[string]any{}
-		if strings.TrimSpace(s.LegacyConfigDir) != "" {
-			raw, readErr := os.ReadFile(filepath.Join(s.LegacyConfigDir, owner, "api-config.json"))
-			if readErr == nil {
-				var legacy map[string]any
-				if json.Unmarshal(raw, &legacy) == nil {
-					if catalog, ok := legacy["modelCatalog"]; ok {
-						settings["modelCatalog"] = catalog
-					}
-					if version, ok := legacy["modelCatalogVersion"]; ok {
-						settings["modelCatalogVersion"] = version
-					}
-				}
+		if legacy := s.readLegacyConfigFile(owner); legacy != nil {
+			if catalog, ok := legacy["modelCatalog"]; ok {
+				settings["modelCatalog"] = catalog
+			}
+			if version, ok := legacy["modelCatalogVersion"]; ok {
+				settings["modelCatalogVersion"] = version
 			}
 		}
 		return EnsureWorkshopDefaults(settings), nil
@@ -209,19 +271,49 @@ func runtimeModelFieldEmpty(value any) bool {
 }
 
 func (s *MySQLStore) readLegacyModelCatalog(owner string) []any {
-	if s == nil || strings.TrimSpace(s.LegacyConfigDir) == "" {
-		return nil
-	}
-	raw, err := os.ReadFile(filepath.Join(s.LegacyConfigDir, owner, "api-config.json"))
-	if err != nil {
-		return nil
-	}
-	var legacy map[string]any
-	if json.Unmarshal(raw, &legacy) != nil {
+	legacy := s.readLegacyConfigFile(owner)
+	if legacy == nil {
 		return nil
 	}
 	catalog, _ := legacy["modelCatalog"].([]any)
 	return catalog
+}
+
+// readLegacyConfigFile returns the decoded legacy api-config.json, reusing the
+// cached document while the file's size and modification time are unchanged.
+// The cache keeps the per-owner settings read cheap: the legacy file is a
+// several-megabyte JSON blob and the batch runtime summary used to parse it
+// dozens of times per request.
+func (s *MySQLStore) readLegacyConfigFile(owner string) map[string]any {
+	if s == nil || strings.TrimSpace(s.LegacyConfigDir) == "" {
+		return nil
+	}
+	path := filepath.Join(s.LegacyConfigDir, owner, "api-config.json")
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	s.legacyMu.RLock()
+	entry, cached := s.legacyCache[owner]
+	s.legacyMu.RUnlock()
+	if cached && entry.size == info.Size() && entry.modTime.Equal(info.ModTime()) {
+		return entry.config
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var config map[string]any
+	if json.Unmarshal(raw, &config) != nil {
+		return nil
+	}
+	s.legacyMu.Lock()
+	if s.legacyCache == nil {
+		s.legacyCache = map[string]legacyConfigCacheEntry{}
+	}
+	s.legacyCache[owner] = legacyConfigCacheEntry{modTime: info.ModTime(), size: info.Size(), config: config}
+	s.legacyMu.Unlock()
+	return config
 }
 
 func (s *MySQLStore) PutConfig(ctx context.Context, owner string, settings map[string]any) error {

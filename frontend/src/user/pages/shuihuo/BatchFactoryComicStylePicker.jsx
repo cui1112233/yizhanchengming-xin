@@ -48,7 +48,7 @@ function AuthenticatedPreview({ src, alt }) {
   return displayURL ? <img src={displayURL} alt={alt} loading="lazy" /> : <span className="batch-factory-comic-preview-loading"><ImagePlus size={22} /></span>;
 }
 
-export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange, inherited = false, disabled = false }) {
+export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange, onReferenceDataUrl, inherited = false, disabled = false }) {
   const [uploading, setUploading] = useState(false);
   const [localReferencePreview, setLocalReferencePreview] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -66,13 +66,20 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
   const patch = next => onChange?.({ ...comic, ...next, enabled: true });
   const selectStyle = preset => {
     setLocalReferencePreview('');
+    onReferenceDataUrl?.('');
     patch({ style: comicStyleSelection(preset), globalReferenceImage: comicReferenceForSelectedStyle(comic.globalReferenceImage, preset) });
   };
   const uploadReference = async file => {
-    if (!batchId) return false;
     setUploading(true);
     try {
       const dataUrl = await fileAsDataURL(file);
+      if (!batchId) {
+        if (!onReferenceDataUrl) return false;
+        setLocalReferencePreview(dataUrl);
+        onReferenceDataUrl(dataUrl);
+        message.success('自定义参考图已准备，会在提交时上传');
+        return false;
+      }
       const result = await uploadComicGlobalReference(batchId, dataUrl);
       setLocalReferencePreview(dataUrl);
       patch({ globalReferenceImage: normalizeComicReference({ ...result?.reference, source: 'manual-upload' }) });
@@ -184,8 +191,8 @@ export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange
       <div className="batch-factory-comic-reference-controls">
         <div className="batch-factory-comic-reference-title"><b>漫画全局参考图</b><small>默认使用当前画风库图片，也可以手动上传替换。</small></div>
         <div className="batch-factory-comic-reference-actions">
-          <AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadReference} disabled={disabled || uploading || !batchId}><Button icon={<Upload size={15} />} loading={uploading} title={!batchId ? '提交漫画任务后才能上传自定义参考图' : '上传参考图'}>上传参考图</Button></AntUpload>
-          {reference.source === 'manual-upload' ? <Button aria-label="恢复画风库参考图" icon={<Trash2 size={15} />} disabled={disabled} onClick={() => { setLocalReferencePreview(''); patch({ globalReferenceImage: comicReferenceForSelectedStyle(null, selectedPreset) }); }} /> : null}
+          <AntUpload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={uploadReference} disabled={disabled || uploading || (!batchId && !onReferenceDataUrl)}><Button icon={<Upload size={15} />} loading={uploading} title={!batchId && !onReferenceDataUrl ? '提交漫画任务后才能上传自定义参考图' : '上传参考图'}>上传参考图</Button></AntUpload>
+          {reference.source === 'manual-upload' ? <Button aria-label="恢复画风库参考图" icon={<Trash2 size={15} />} disabled={disabled} onClick={() => { setLocalReferencePreview(''); onReferenceDataUrl?.(''); patch({ globalReferenceImage: comicReferenceForSelectedStyle(null, selectedPreset) }); }} /> : null}
         </div>
         <div className="batch-factory-comic-reference-switches">
           <label><span>启用参考图</span><Switch size="small" checked={reference.enabled && Boolean(reference.assetId)} disabled={disabled || !reference.assetId} onChange={enabled => patch({ globalReferenceImage: { ...reference, enabled } })} /></label>

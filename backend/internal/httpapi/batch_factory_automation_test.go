@@ -634,8 +634,9 @@ func TestResumeInterruptedAutomationJobOnlyReopensServiceRestart(t *testing.T) {
 	}
 	books, _ := restartJob["books"].(map[string]any)
 	book, _ := books["book-1"].(map[string]any)
-	if book["status"] != "running" || book["stage"] != "assets" {
-		t.Fatalf("reopened book = %#v", book)
+	// 书级恢复必须等逐书预检通过后才发生，这里只允许任务级重开。
+	if book["status"] != "stopped" || book["stage"] != "stopped" {
+		t.Fatalf("book must stay untouched before preflight, got %#v", book)
 	}
 
 	manualStop := map[string]any{"state": "stopped", "lastError": "", "books": map[string]any{}}
@@ -659,11 +660,170 @@ func TestResumeInterruptedAutomationJobKeepsCompletedComicCollectionForPublish(t
 		t.Fatal("service-restart job should be resumed")
 	}
 	book := job["books"].(map[string]any)["book-1"].(map[string]any)
-	if book["status"] != "running" || book["stage"] != "comic_publish" {
-		t.Fatalf("publish-ready book must resume at comic_publish, got %#v", book)
+	// 阶段不能被重置：恢复入口只重开任务，书级 stage 与已完成产物保持原样。
+	if book["stage"] != "comic_publish" {
+		t.Fatalf("publish-ready book stage must be preserved, got %#v", book)
 	}
 	if book["comicCollectionId"] != "collection-existing" {
 		t.Fatalf("existing collection must be retained, got %#v", book)
+	}
+}
+
+func TestApplyResumePreflightKeepsCompletedComicStage(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := batchfactoryv11.SettingsPatch{
+		"textModelId": json.RawMessage(`"text-1"`),
+	}
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: settings, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	batch, err = store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	coordinator := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, func() time.Time { return time.Unix(1700000000, 0) })
+	entry := map[string]any{
+		"bookId": batch.Books[0].ID, "status": "stopped", "stage": "comic_images",
+		"promptReady": true, "comicImageIDs": []any{"page-1"},
+	}
+	job := map[string]any{"id": "job-1", "owner": "alice", "batchId": batch.ID, "runMode": "storyboard_only", "books": map[string]any{batch.Books[0].ID: entry}}
+
+	coordinator.applyResumePreflight(ctx, "alice", batch, job, time.Unix(1700000000, 0))
+
+	if entry["status"] != "running" || entry["stage"] != "comic_images" {
+		t.Fatalf("resumed entry = %#v, want running at the preserved comic_images stage", entry)
+	}
+	if entry["promptReady"] != true {
+		t.Fatalf("completed prompt state must be kept: %#v", entry)
+	}
+}
+
+func TestResumeInterruptedJobsBlocksBooksThatFailPreflight(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-1": {
+			"id": "job-1", "owner": "alice", "batchId": batch.ID, "state": "stopped", "runMode": "storyboard_only",
+			"lastError": automationServiceRestartMessage,
+			"books":     map[string]any{batch.Books[0].ID: map[string]any{"bookId": batch.Books[0].ID, "status": "stopped", "stage": "stopped"}},
+		},
+	}}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stages := &batchfactoryv11.BookStageService{Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: &comicAutomationTextProvider{}}}
+	coordinator := NewBatchAutomationCoordinator(store, nil, stages, nil, nil, nil, nil, NewFileAutomationStatusReader(path), func() time.Time { return time.Unix(1700000000, 0) })
+
+	if err := coordinator.ResumeInterruptedJobs(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// 恢复后会异步 launchRun；等它收尾再断言，避免临时目录清理时的写入竞态。
+	job := waitForTerminalAutomationJob(t, coordinator, "alice", batch.ID)
+	entry, _ := job["books"].(map[string]any)[batch.Books[0].ID].(map[string]any)
+	if entry["status"] != "blocked" {
+		t.Fatalf("book missing text model must be blocked, got %#v", entry)
+	}
+	if reason := automationStringValue(entry["message"], ""); !strings.Contains(reason, "文本模型") {
+		t.Fatalf("blocked reason = %q", reason)
+	}
+}
+
+func TestAutomationResumeOnBootIsDisabledByDefault(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "批次", Books: []batchfactoryv11.CreateBookInput{{Title: "书"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-1": {
+			"id": "job-1", "owner": "alice", "batchId": batch.ID, "state": "stopped", "runMode": "full_submit",
+			"lastError": automationServiceRestartMessage,
+			"books":     map[string]any{batch.Books[0].ID: map[string]any{"bookId": batch.Books[0].ID, "status": "stopped", "stage": "stopped"}},
+		},
+	}}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	newCoordinator := func() *BatchAutomationCoordinator {
+		return NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, NewFileAutomationStatusReader(path), func() time.Time { return time.Unix(1700000000, 0) })
+	}
+
+	t.Setenv("QIANTIE_AUTOMATION_RESUME_ON_BOOT", "")
+	disabled := newCoordinator()
+	resumeAutomationOnBoot(disabled)
+	job := disabled.loadJobForTest(t, "alice", batch.ID)
+	if job["state"] != "stopped" {
+		t.Fatalf("boot resume must be off by default, got job state %#v", job["state"])
+	}
+
+	// 打开开关且缺少执行器时，resume 会走全局预检并把任务落成 failed，
+	// 而不是把书重新置为 running。
+	t.Setenv("QIANTIE_AUTOMATION_RESUME_ON_BOOT", "1")
+	enabled := newCoordinator()
+	resumeAutomationOnBoot(enabled)
+	job = enabled.loadJobForTest(t, "alice", batch.ID)
+	if job["state"] != "failed" || automationStringValue(job["lastError"], "") == "" {
+		t.Fatalf("resume without executors must fail the job, got %#v", job)
+	}
+	entry, _ := job["books"].(map[string]any)[batch.Books[0].ID].(map[string]any)
+	if entry["status"] != "stopped" {
+		t.Fatalf("preflight-failed job must not reopen books, got %#v", entry)
+	}
+}
+
+func (c *BatchAutomationCoordinator) loadJobForTest(t *testing.T, owner, batchID string) map[string]any {
+	t.Helper()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	state, err := c.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, job := range state.Jobs {
+		if automationStringValue(job["owner"], "") == owner && automationStringValue(job["batchId"], "") == batchID {
+			return job
+		}
+	}
+	t.Fatalf("job not found for owner=%s batch=%s", owner, batchID)
+	return nil
+}
+
+func waitForTerminalAutomationJob(t *testing.T, c *BatchAutomationCoordinator, owner, batchID string) map[string]any {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		job := c.loadJobForTest(t, owner, batchID)
+		switch automationStringValue(job["state"], "") {
+		case "completed", "failed":
+			return job
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("job did not reach a terminal state: %#v", job)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
@@ -1063,6 +1223,87 @@ func TestEnsureAutomationSourceReturnsOriginalConflictWhenLatestBookStillHasNoBo
 	}
 }
 
+func TestEnsureAutomationSourceRecoversFromStaleRevisionAfterFetchFailureBookkeeping(t *testing.T) {
+	// 线上链路：第一轮抓取失败 -> persistBatchFetchFailure 写失败元数据(revision+1)
+	// -> 回补轮次仍拿着入队时的旧快照 -> 第二轮抓取成功却用旧 revision 写入，报
+	// "保存自动获取正文失败：revision conflict"。
+	memoryStore := batchfactoryv11.NewMemoryStore()
+	batch, err := memoryStore.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "book", ID: "source-1", Platform: "15"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleBook := batch.Books[0]
+	if _, err := memoryStore.UpdateBookMetadata(context.Background(), "alice", batch.ID, staleBook.ID, batchfactoryv11.UpdateBookMetadataInput{
+		Metadata:         map[string]any{"fetchError": "upstream timeout", "queueStage": "original"},
+		ExpectedRevision: staleBook.Revision,
+	}); err != nil {
+		t.Fatalf("simulate failure bookkeeping: %v", err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"data":"回补成功保存的正文","bookinfo":{}}`))
+	}))
+	defer server.Close()
+	coordinator := NewBatchAutomationCoordinator(memoryStore, nil, nil, nil, nil, nil, nil, nil, nil)
+	coordinator.SetSourceFetcher(&novelfetchworkshop.UpstreamFetcher{Client: server.Client(), Endpoint: server.URL})
+
+	updated, err := coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, staleBook)
+
+	if err != nil {
+		t.Fatalf("stale queued snapshot must not surface revision conflict: %v", err)
+	}
+	if len(productionLines(updated)) != 1 || updated.SourceText != "回补成功保存的正文" {
+		t.Fatalf("updated source = %+v; want fetched text persisted", updated)
+	}
+}
+
+type bumpOnceBeforeCaptureStore struct {
+	batchfactoryv11.Store
+	batchID string
+	once    sync.Once
+}
+
+func (s *bumpOnceBeforeCaptureStore) CaptureBookSource(ctx context.Context, owner, batchID, bookID string, input batchfactoryv11.CaptureBookSourceInput) (batchfactoryv11.Book, error) {
+	s.once.Do(func() {
+		batch, err := s.Store.GetBatch(ctx, owner, s.batchID)
+		if err != nil {
+			return
+		}
+		for _, book := range batch.Books {
+			if book.ID != bookID {
+				continue
+			}
+			// 模拟别的写路径在读取与写入之间递增 revision。
+			_, _ = s.Store.UpdateBookMetadata(ctx, owner, s.batchID, bookID, batchfactoryv11.UpdateBookMetadataInput{Metadata: map[string]any{"concurrentWriter": true}, ExpectedRevision: book.Revision})
+			return
+		}
+	})
+	return s.Store.CaptureBookSource(ctx, owner, batchID, bookID, input)
+}
+
+func TestEnsureAutomationSourceRetriesCaptureAfterConcurrentRevisionBump(t *testing.T) {
+	memoryStore := batchfactoryv11.NewMemoryStore()
+	batch, err := memoryStore.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{Title: "book", ID: "source-1", Platform: "15"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &bumpOnceBeforeCaptureStore{Store: memoryStore, batchID: batch.ID}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":200,"data":"并发后写入成功","bookinfo":{}}`))
+	}))
+	defer server.Close()
+	coordinator := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, nil)
+	coordinator.SetSourceFetcher(&novelfetchworkshop.UpstreamFetcher{Client: server.Client(), Endpoint: server.URL})
+
+	updated, err := coordinator.ensureAutomationSource(context.Background(), "alice", batch.ID, batch.Books[0])
+
+	if err != nil {
+		t.Fatalf("conflict must be retried with a fresh revision, got %v", err)
+	}
+	if len(productionLines(updated)) != 1 {
+		t.Fatalf("source lines = %d, want 1", len(productionLines(updated)))
+	}
+}
+
 func TestEnsureAutomationSourceDirectFirstFailureDoesNotRefetch(t *testing.T) {
 	memoryStore := batchfactoryv11.NewMemoryStore()
 	batch, err := memoryStore.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "batch", Books: []batchfactoryv11.CreateBookInput{{
@@ -1398,5 +1639,71 @@ func TestReusableAutomationProductionRequiresCurrentDirectorAndCompletedMedia(t 
 
 	if !ok || got.ID != "reusable" {
 		t.Fatalf("reusableAutomationProduction() = %#v, %v; want reusable current-director job", got, ok)
+	}
+}
+
+func TestMergeAutomationPresetConfigKeepsUnifiedConfigurationOverPresetDefaults(t *testing.T) {
+	current := map[string]any{
+		"videoProvider": "yfai",
+		"videoModelId":  "seedance-2",
+		"publishSettings": map[string]any{"websiteProfileId": "unified-profile"},
+	}
+	config := map[string]any{
+		"videoProvider": "autodl_h3",
+		"videoModelId":  "minimax-h3",
+		"textModelId":   "gemini",
+		"publishSettings": map[string]any{
+			"websiteProfileId": "preset-profile",
+			"organization":     "preset-org",
+		},
+	}
+
+	merged := mergeAutomationPresetConfig(current, config)
+
+	if merged["videoProvider"] != "yfai" || merged["videoModelId"] != "seedance-2" {
+		t.Fatalf("批次统一配置应优先于预设默认，got provider=%v model=%v", merged["videoProvider"], merged["videoModelId"])
+	}
+	if merged["textModelId"] != "gemini" {
+		t.Fatalf("批次未设置的键应由预设填充，got textModelId=%v", merged["textModelId"])
+	}
+	publish, _ := merged["publishSettings"].(map[string]any)
+	if publish["websiteProfileId"] != "unified-profile" {
+		t.Fatalf("批次统一 publishSettings 应优先，got %v", publish["websiteProfileId"])
+	}
+	if publish["organization"] != "preset-org" {
+		t.Fatalf("批次未设置的嵌套字段应由预设填充，got %v", publish["organization"])
+	}
+}
+
+func TestMergeAutomationPresetConfigUsesPresetWhenBatchSettingsAreEmpty(t *testing.T) {
+	merged := mergeAutomationPresetConfig(nil, map[string]any{"videoProvider": "autodl_h3", "videoModelId": "minimax-h3"})
+	if merged["videoProvider"] != "autodl_h3" || merged["videoModelId"] != "minimax-h3" {
+		t.Fatalf("批次没有统一配置时应直接使用预设，got %#v", merged)
+	}
+}
+
+// 线上事故：重试重新打开了同一条终端 job，视频阶段沿用 jobID+"-video-"+bookID
+// 这一重复 requestID，SubmitBookProductionWithOptions 按幂等直接返回旧的失败任务
+// （连同旧 provider 与旧错误），从未真正重交。重试必须使用不同的 requestID。
+func TestAutomationRetryScopesTheVideoRequestID(t *testing.T) {
+	const jobID, bookID = "job_0a9b", "book_411df5a5"
+	first := automationVideoRequestID(jobID, bookID, 0, 0)
+	if first != jobID+"-video-"+bookID {
+		t.Fatalf("首次运行 requestID=%q", first)
+	}
+	// In-run batch backfill round (batchRetryCount=1) must not replay round 1.
+	backfill := automationVideoRequestID(jobID, bookID, 0, 1)
+	if backfill != jobID+"-video-"+bookID+"-r0b1" {
+		t.Fatalf("回补轮 requestID=%q", backfill)
+	}
+	// Manual retry after a terminal run reopens the same job id.
+	retried := automationVideoRequestID(jobID, bookID, 2, 0)
+	if retried != jobID+"-video-"+bookID+"-r2b0" {
+		t.Fatalf("重试 requestID=%q", retried)
+	}
+	for _, other := range []string{backfill, retried} {
+		if other == first {
+			t.Fatal("重试/回补 requestID 必须与首次运行不同，否则会命中旧失败任务")
+		}
 	}
 }

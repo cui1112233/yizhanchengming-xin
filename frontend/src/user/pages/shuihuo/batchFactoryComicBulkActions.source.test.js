@@ -30,14 +30,26 @@ test('comic upload toolbar opens comic publishing instead of the 121 video uploa
 });
 
 test('per-book comic actions use whole-book preparation and generation', () => {
-  assert.match(source, /runBookStageAction\(book, 'comic', 'bootstrap'\)/);
+  assert.match(source, /runBookStageAction\(book, ['"]comic['"], ['"]bootstrap['"]\)/);
   assert.match(source, /listComicPages\(batch\.id, book\.id/);
-  assert.match(source, /const videos = book\.videos \|\| \[\];[\s\S]*?for \(const video of videos\)/);
-  assert.match(source, /generateComicPage\(batch\.id, book\.id, video\.id/);
+  assert.match(source, /const videos = allVideos\.slice\(0, COMIC_PAGE_GENERATION_LIMIT\)/);
+  assert.match(source, /runComicPagePool\(targets, \{/);
+  assert.match(source, /generateComicPageWithConflict\(batch\.id, book\.id, video\.id/);
   assert.match(source, /await refreshBatch\(\)/);
   assert.doesNotMatch(source, /await generateComicBook\(batch\.id, book\.id\)/);
   assert.match(source, /function clearLocalExecutorSubmittingToast\(\)/);
-  assert.match(source, /finally \{ clearLocalExecutorSubmittingToast\(\); setActionBusy\('\'\); \}/);
+  assert.match(source, /finally \{ comicGenerationInFlightRef\.current\.delete\(requestKey\); clearLocalExecutorSubmittingToast\(\); markComicTask\(busyKey, false\); \}/);
   assert.match(source, /重新生成本页/);
   assert.match(source, /generateBookComicPage/);
+});
+
+test('whole-book comic generation is cancellable and scoped per book', () => {
+  assert.match(source, /const COMIC_PAGE_CONCURRENCY = 4;/);
+  assert.match(source, /AbortController\(\)/);
+  assert.match(source, /停止本批/);
+  assert.match(source, /signal: controller\.signal/);
+  assert.match(source, /展开失败页清单/);
+  assert.match(source, /isComicTaskBusy\(`comic-book-\$\{book\.id\}`\)/);
+  assert.match(source, /message\.info\(\{ key: busyKey, content: '有 1 页正在生成中，已启动轮询…（1 页）', duration: 0 \}\)/);
+  assert.match(source, /message\.info\(\{ key: `comic-inflight-\$\{book\.id\}`, content: `有 \$\{conflictCount\} 页正在生成中，已启动轮询…/);
 });

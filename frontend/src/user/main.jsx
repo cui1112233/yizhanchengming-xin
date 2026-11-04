@@ -2,6 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import 'antd/dist/reset.css';
 import '../shared/styles/global.css';
+// V88 设计令牌：只新增 --v88-* 变量与按钮/空态基类，后续页面按批次接入。
+import '../shared/styles/v88-tokens.css';
+import '../shared/styles/v88-ui.css';
 import '../shared/styles/agent-workspace.css';
 import '../shared/styles/member-center.css';
 import '../shared/styles/team-governance.css';

@@ -72,6 +72,8 @@ $env:QIANTIE_REDIS_URL = "redis://127.0.0.1:6379"
 | `QIANTIE_REDIS_URL` | 推荐 | 空 | 为空时队列不可用，API 仍可启动 |
 | `QIANTIE_RELEASE_SHA` | 选填 | 空 | 本地脚本会自动写入当前 Git SHA |
 | `QIANTIE_LOCAL_FFMPEG_DIR` | 选填 | `.tools\ffmpeg` | review 脚本用它找 `ffmpeg.exe` |
+| `QIANTIE_FFPROBE_PATH` | 选填 | 空 | 媒体时长探针的兜底外部 `ffprobe` 绝对路径；不设置时先尝试内置解析（WAV/MP3/M4A/MP4/FLAC/AAC-ADTS），仍失败再按 PATH 查找 |
+| `QIANTIE_FFMPEG_PATH` | 选填 | 空 | 没有 `ffprobe` 时用 `ffmpeg -i` 读 Duration 行作为兜底；同样支持绝对路径 |
 | `QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER` | Slice 2+ 需要 | `0` | 设为 `1` 时从个人中心模型目录读取文本模型；否则还要配 `..._TEXT_ENDPOINT`、`..._TEXT_API_KEY`、`..._TEXT_MODEL` |
 
 本地的两个启动脚本会自动把 Slice 设为 `3`，并自动设置 `QIANTIE_BATCH_FACTORY_V11_DYNAMIC_TEXT_PROVIDER=1`。如果你直接运行 Go 二进制并手动把 Slice 调到 2 以上，必须自己补文本模型配置，否则配置校验会让服务启动失败。

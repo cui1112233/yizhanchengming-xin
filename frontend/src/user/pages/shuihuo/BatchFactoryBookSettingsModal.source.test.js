@@ -97,7 +97,7 @@ test('single-book local Doubao provider exposes its supported video models', () 
     assert.match(source, /providerModelSettingsPatch/);
     assert.match(source, /modelOptionsForProvider/);
   }
-  assert.match(source, /modelOptionsForProvider\(models, 'video', effectiveVideoProvider\)/);
+  assert.match(source, /modelOptionsForProvider\(models, 'video', effectiveVideoProvider, effectiveVideoModelId\)/);
   assert.match(source, /providerModelSettingsPatch\(\{ models, kind: 'video'/);
 });
 

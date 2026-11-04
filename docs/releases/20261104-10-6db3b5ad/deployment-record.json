@@ -1,0 +1,117 @@
+{
+  "buildId": "20261104-10-6db3b5ad",
+  "gitSha": "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+  "archiveDir": "docs/releases/20261104-10-6db3b5ad",
+  "releaseDir": ".release/v88/20261104-10-6db3b5ad",
+  "target": "prod 115.190.156.223:/opt/www/qiantie",
+  "deployedAt": "2026-11-04T23:34:01+08:00",
+  "scope": "只含提交视频重试/参考图兜底之外的本批两项：n8comic status 契约拆分 + 前端四分支文案；其余工作区改动随 HEAD+diff 一并打包",
+  "frontendEntry": "/assets/user-BNWHWnad.js",
+  "frontendEntryBytes": 136740,
+  "frontendEntrySha256": "ba75c2aabe57bc9e1309570634f322b2c63e87e0e073422c7e2f65a292e6d91d",
+  "indexHtmlSha256": "0faf7c8b75f08967c5261055c2e3964e1d9c53b602425dcabaf64da422151e60",
+  "linuxBinary": { "path": "qiantie-server-linux-amd64", "bytes": 70668450, "sha256": "5b76f27dee1938eb7ed3ea3232788547f2bef96c514fcaac085e62c83a92b6cb" },
+  "windowsBinary": { "path": "qiantie-local.exe", "bytes": 77594112, "sha256": "193bcf0f4770835530ce720e6191ca0f1f0ed7233c7e45061bacf5bd13969f0e" },
+  "dataPackage": { "path": "20261104-10-6db3b5ad-data.zip", "bytes": 19533371, "sha256": "a9904dddd176cca251c62f0c44d941327efad23cbb70ebee5f57b05bbe28b42f", "uploaded": false },
+  "previous": {
+    "buildId": "20261104-09-6db3b5ad",
+    "frontendEntry": "/assets/user-DmXbWs5q.js",
+    "binarySha256": "0785707cff093c20ac7e77ec49625ab7357e3133652587ed0949d7b0e1827e61",
+    "binaryBytes": 70668450,
+    "mainPid": 4137338
+  },
+  "newMainPid": 4139644,
+  "tests": {
+    "npmTest": "228 passed / 0 failed",
+    "goTest": "httpapi ok, n8catalog ok, batchfactoryv11 ok (1.645s)"
+  },
+  "backups": [
+    { "file": "/root/backup-20261104/qiantie.prev-20261104-2332", "bytes": 70668450, "sha256": "0785707cff093c20ac7e77ec49625ab7357e3133652587ed0949d7b0e1827e61" },
+    { "file": "/root/backup-20261104/qiantie.service-20261104-2332.txt", "bytes": 397, "sha256": "4f6634e8a1362191fa39d20875025570ab65291fb90b598e542df9ccf81ec257" },
+    { "file": "/root/backup-20261104/qiantie-db-pre-20261104-2332.sql.gz", "bytes": 69762622, "sha256": "1225033d83de7e2bf64152bbe1cdfe8c238776be6ff7ab431f1bf60b303224e8" },
+    { "file": "/root/backup-20261104/qiantie-data-pre-20261104-2332.tgz", "bytes": 164560835, "sha256": "ff2a5f26a8e35af103e19985e1d67cd4166b0782009a64aecd5c64450dd8a855" }
+  ],
+  "verification": {
+    "health": 200,
+    "runtimeBuildId": "20261104-10-6db3b5ad",
+    "runtimeEntry": "/assets/user-BNWHWnad.js",
+    "runtimeBinarySha256": "5b76f27dee1938eb7ed3ea3232788547f2bef96c514fcaac085e62c83a92b6cb",
+    "newEntryHttp": 200,
+    "newEntryBytes": 136740,
+    "previousEntryHttp": 404,
+    "pages": { "/": 200, "/script": 200, "/tts": 200, "/batch-factory": 200 },
+    "panicFatalLines": 0,
+    "comicStatusSigned": {
+      "http": 200,
+      "directoryAvailable": true,
+      "publishKeyConfigured": false,
+      "publishKeyHint": "QIANTIE_N8_COMIC_OPEN_API_KEY",
+      "configured": false,
+      "organizations": 12,
+      "audioCategories": 5,
+      "producerAccounts": 71,
+      "organizationsWarning": "",
+      "audioCategoriesWarning": ""
+    },
+    "comicStatusSignedAfterKey": {
+      "checkedAt": "2026-11-05T00:39:00+08:00",
+      "http": 200,
+      "directoryAvailable": true,
+      "publishKeyConfigured": true,
+      "publishKeyHint": "QIANTIE_N8_COMIC_OPEN_API_KEY",
+      "configured": true,
+      "organizations": 12,
+      "audioCategories": 5,
+      "producerAccounts": 71,
+      "warnings": []
+    },
+    "n8ImageReadProbe": {
+      "http": 200,
+      "code": "IMAGE_NOT_READY",
+      "note": "线上出口签名鉴权通过，未命中 IP 限制；未调用任何上传/建合集接口"
+    },
+    "logs": {
+      "n8ProducerDirectoryReturned": 2,
+      "audioCategoryDirectoryReturned": 1,
+      "serviceRejectedOrUnLogin": 0
+    }
+  },
+  "envNote": "部署时未新增 env 键，publishKeyConfigured=false；2026-11-05 00:37 经用户授权补写 QIANTIE_N8_COMIC_OPEN_API_KEY（见 envChanges），补写后 publishKeyConfigured=true。",
+  "envChanges": [
+    {
+      "at": "2026-11-05T00:36:00+08:00",
+      "change": "追加 QIANTIE_N8_COMIC_OPEN_API_KEY",
+      "keyName": "QIANTIE_N8_COMIC_OPEN_API_KEY",
+      "valueRecorded": false,
+      "valueLength": 32,
+      "sourceNote": "取自本机 .env.v88-review 的已验证发布密钥；明文未落盘、未入日志、未入 Git",
+      "backup": {
+        "file": "/root/backup-20261104/qiantie.env-20261105-0036",
+        "bytes": 3508,
+        "mode": 600,
+        "sha256": "2327dea5110b59d1baec012c7dfdf65f08bde9b517cc3414032f51d9cd61d4fa"
+      },
+      "envFileAfter": {
+        "path": "/opt/www/qiantie/qiantie.env",
+        "bytes": 3571,
+        "mode": 600,
+        "sha256": "8f6e9bbfcfca0f1a66b8baefa383e9e02a08346cfae09101668c8f2142af53ef",
+        "occurrences": 1
+      },
+      "restart": {
+        "service": "qiantie.service",
+        "mainPid": 4142560,
+        "activeEnterTimestamp": "2026-11-05T00:37:50+08:00",
+        "health": 200
+      },
+      "verification": {
+        "processEnvironKeyPresent": 1,
+        "processEnvironValueLength": 32,
+        "panicFatalLines": 0,
+        "serviceRejectedOrUnLogin": 0
+      },
+      "rollback": "还原备份文件到 /opt/www/qiantie/qiantie.env（权限 600）后 systemctl restart qiantie.service"
+    }
+  ],
+  "localNote": "本机 4001 未更新（PID 28076），本批只部署线上。"
+}

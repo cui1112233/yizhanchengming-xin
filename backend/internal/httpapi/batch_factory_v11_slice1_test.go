@@ -141,6 +141,35 @@ func TestSaveSettingsReturnsConflictForStaleRevisionAndPreservesFalsyValues(t *t
 	}
 }
 
+func TestWriteStoreErrorKeepsMissingConfigAndRevisionConflictApart(t *testing.T) {
+	cases := []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{"missing comic asset prompt", batchfactoryv11.NewConfigRequiredError("请在资产设置中选择漫画资产提示词"), "请在资产设置中选择漫画资产提示词"},
+		{"bare revision conflict", batchfactoryv11.ErrConflict, "数据版本冲突，请重试"},
+		// 历史记录里业务校验被 ErrConflict 包住时，返回原因本身，不再带前缀。
+		{"legacy wrapped business reason", fmt.Errorf("%w: 请在资产设置中选择漫画资产提示词", batchfactoryv11.ErrConflict), "请在资产设置中选择漫画资产提示词"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			writeStoreError(rec, tc.err)
+			if rec.Code != http.StatusConflict {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			body := decodeBody[map[string]string](t, rec)
+			if body["error"] != tc.message {
+				t.Fatalf("error=%q, want %q", body["error"], tc.message)
+			}
+			if strings.Contains(body["error"], batchfactoryv11.ErrConflict.Error()) {
+				t.Fatalf("user-facing error must not contain the raw conflict prefix: %q", body["error"])
+			}
+		})
+	}
+}
+
 func TestCreateBatchFromOtherOwnersIntakeReturnsNotFound(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()

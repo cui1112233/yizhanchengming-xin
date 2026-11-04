@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, 'PrivateComicWorkspace.jsx'), 'utf8');
 const pickerSource = fs.readFileSync(path.join(here, 'shuihuo', 'BatchFactoryComicStylePicker.jsx'), 'utf8');
+const constraintsSource = fs.readFileSync(path.join(here, 'private-studio', 'PrivateStudioConstraintsModal.jsx'), 'utf8');
 
 test('private comic workspace accepts pasted text and exposes the comic actions', () => {
   assert.match(source, /name="sourceText"/);
@@ -22,9 +23,10 @@ test('private comic workspace reuses the published style library and comic promp
   assert.match(source, /onReferenceDataUrl=\{onPendingReferenceChange\}/);
   assert.match(source, /batch\.comic-page/);
   assert.match(source, /batch\.comic-image-derivation/);
-  assert.match(source, /comic_quality/);
-  assert.match(source, /comic_restriction/);
-  assert.match(source, /comic_negative/);
+  assert.match(source, /PRIVATE_STUDIO_CONSTRAINT_FIELDS\.comic\.map/);
+  assert.match(constraintsSource, /key: 'comic_quality'/);
+  assert.match(constraintsSource, /key: 'comic_restriction'/);
+  assert.match(constraintsSource, /key: 'comic_negative'/);
   assert.match(source, /private-customization-reference-note/);
 });
 
@@ -35,4 +37,11 @@ test('private comic workspace blocks submit without pasted source', () => {
 
 test('changing the style clears a pre-submit custom reference', () => {
   assert.match(pickerSource, /onReferenceDataUrl\?\.\('\'\)/);
+});
+
+test('clearing pasted comic text asks for confirmation first', () => {
+  assert.match(source, /<Popconfirm/);
+  assert.match(source, /清空已粘贴的 \$\{sourceLength\} 字正文？/);
+  assert.match(source, /该操作不可撤销。/);
+  assert.match(source, /onConfirm=\{\(\) => patchDraft\(\{ sourceText: '' \}\)\}/);
 });

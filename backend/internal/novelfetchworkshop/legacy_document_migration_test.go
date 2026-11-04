@@ -155,8 +155,12 @@ func TestMySQLStoreListDocumentsNeverReturnsLegacyFullText(t *testing.T) {
 		Logs:        []any{},
 	}
 	raw, _ := json.Marshal(document)
-	listSQL := regexp.QuoteMeta(`SELECT book_id, document_json, updated_at FROM novel_fetch_workshop_documents WHERE owner_username=? ORDER BY updated_at DESC, book_id ASC`)
-	mock.ExpectQuery(listSQL).WithArgs("alice").WillReturnRows(sqlmock.NewRows([]string{"book_id", "document_json", "updated_at"}).AddRow("123", raw, updated))
+	// ListDocuments 改为两步查询：先只取排好序的 book_id，再按 id 批量取正文，
+	// 避免 document_json 参与 filesort（MySQL ERROR 1038）。
+	idSQL := regexp.QuoteMeta(`SELECT book_id FROM novel_fetch_workshop_documents WHERE owner_username=? ORDER BY updated_at DESC, book_id ASC`)
+	mock.ExpectQuery(idSQL).WithArgs("alice").WillReturnRows(sqlmock.NewRows([]string{"book_id"}).AddRow("123"))
+	listSQL := regexp.QuoteMeta(`SELECT book_id, document_json, updated_at FROM novel_fetch_workshop_documents WHERE owner_username=? AND book_id IN (?)`)
+	mock.ExpectQuery(listSQL).WithArgs("alice", "123").WillReturnRows(sqlmock.NewRows([]string{"book_id", "document_json", "updated_at"}).AddRow("123", raw, updated))
 
 	got, err := store.ListDocuments(context.Background(), "alice")
 	if err != nil {

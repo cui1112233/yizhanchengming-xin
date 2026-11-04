@@ -267,6 +267,38 @@ func comicReferenceURLsJSON(urls []string) string {
 	return string(payload)
 }
 
+// GetBookComicSourceIndex reads only the book source text and the per-video
+// segmentation digests. The comic-pages read path used to call GetBatch here,
+// which hydrated every book, video and draft in the batch just to compare one
+// book's digests; with many books that dominated the "enter batch" latency.
+func (s *MySQLStore) GetBookComicSourceIndex(ctx context.Context, owner, batchID, bookID string) (ComicSourceIndex, bool, error) {
+	var sourceText string
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(r.source_text,'') FROM batch_factory_v12_books b LEFT JOIN batch_factory_v12_book_records r ON r.book_id=b.id WHERE b.id=? AND b.batch_id=? AND b.owner_username=?`, bookID, batchID, owner).Scan(&sourceText)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ComicSourceIndex{}, false, nil
+	}
+	if err != nil {
+		return ComicSourceIndex{}, false, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT s.video_id,s.source_digest FROM batch_factory_v12_comic_source_segments s JOIN batch_factory_v12_videos v ON v.id=s.video_id AND v.owner_username=s.owner_username WHERE s.owner_username=? AND s.batch_id=? AND s.book_id=? AND v.compatibility_state='active'`, owner, batchID, bookID)
+	if err != nil {
+		return ComicSourceIndex{}, false, err
+	}
+	defer rows.Close()
+	digests := map[string]string{}
+	for rows.Next() {
+		var videoID, digest string
+		if err := rows.Scan(&videoID, &digest); err != nil {
+			return ComicSourceIndex{}, false, err
+		}
+		digests[videoID] = digest
+	}
+	if err := rows.Err(); err != nil {
+		return ComicSourceIndex{}, false, err
+	}
+	return ComicSourceIndex{SourceText: sourceText, VideoDigests: digests}, true, nil
+}
+
 func (s *MySQLStore) SetComicPageReferenceImages(ctx context.Context, owner, batchID, bookID, videoID string, urls []string) (ComicPage, error) {
 	if err := ensureBookOwnership(ctx, s.db, owner, batchID, bookID); err != nil {
 		return ComicPage{}, err

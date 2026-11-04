@@ -14,7 +14,8 @@ const maxVideoDurationProbeBytes = 512 << 20
 const videoDurationProbeAttempts = 3
 
 // HTTPVideoDurationProbe downloads a completed HTTPS video to a bounded
-// stream, then uses ffprobe to inspect the real container duration.
+// stream, then measures the real container duration with the built-in
+// MP4/WAV/MP3/FLAC/ADTS parser or an external ffprobe when available.
 type HTTPVideoDurationProbe struct {
 	Client     *http.Client
 	RetryDelay func(attempt int) time.Duration
@@ -75,7 +76,7 @@ func (p HTTPVideoDurationProbe) durationSecondsOnce(ctx context.Context, rawURL 
 	if len(video) == 0 || len(video) > maxVideoDurationProbeBytes {
 		return 0, fmt.Errorf("media duration probe requires 1-%d bytes", maxVideoDurationProbeBytes)
 	}
-	durationMS, err := (FFprobeH3AudioDuration{}).DurationMS(ctx, video)
+	durationMS, err := (FFprobeH3AudioDuration{}).DurationMSExact(ctx, video)
 	if err != nil {
 		return 0, err
 	}

@@ -1,0 +1,43 @@
+{
+    "buildId":  "20261104-09-6db3b5ad",
+    "builtAt":  "2026-11-04T14:33:02.1903116Z",
+    "gitSha":  "6db3b5ad6a8d3ebc6b0350ac459725a75a9457f8",
+    "gitShort":  "6db3b5ad",
+    "worktreeDirty":  true,
+    "changedPathCount":  237,
+    "untrackedPathCount":  67,
+    "frontendEntry":  "/assets/user-DmXbWs5q.js",
+    "frontendDistSource":  "F:\\脚本测试\\一战晟铭-v88\\frontend\\dist",
+    "frontendBuildSeconds":  0,
+    "goBuildSeconds":  5.9,
+    "binaries":  {
+                     "windows":  {
+                                     "path":  ".release/v88/20261104-09-6db3b5ad/qiantie-local.exe",
+                                     "bytes":  77593088,
+                                     "sha256":  "f155f3c59e5ad5395bddb7d0148d5e7c6b10b3a22d07000d5104a0ee849900a1"
+                                 },
+                     "linux":  {
+                                   "path":  ".release/v88/20261104-09-6db3b5ad/qiantie-server-linux-amd64",
+                                   "bytes":  70668450,
+                                   "sha256":  "0785707cff093c20ac7e77ec49625ab7357e3133652587ed0949d7b0e1827e61"
+                               }
+                 },
+    "dataPackage":  {
+                        "path":  ".release/v88/20261104-09-6db3b5ad/20261104-09-6db3b5ad-data.zip",
+                        "bytes":  12262944,
+                        "sha256":  "4b7e228ad62c61c1c363c9c9a663064aa3804dd80786f0ab22732f8e601fa1b2",
+                        "fileCount":  6
+                    },
+    "envRequired":  [
+                        "QIANTIE_MYSQL_DSN",
+                        "QIANTIE_BRIDGE_SECRET",
+                        "QIANTIE_BATCH_FACTORY_V11_SLICE",
+                        "QINGYU_N8_ADMIN_TOKEN"
+                    ],
+    "envMissing":  [
+                       "QIANTIE_MYSQL_DSN",
+                       "QIANTIE_BRIDGE_SECRET",
+                       "QIANTIE_BATCH_FACTORY_V11_SLICE"
+                   ],
+    "deployTarget":  "local-only"
+}

@@ -3,9 +3,11 @@ package prompt
 import (
 	"encoding/json"
 	"errors"
+	"hash/fnv"
 	"os"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // Catalog reads the published prompt catalog written by the existing system
@@ -13,6 +15,15 @@ import (
 // and read fallback for installations that have not moved to MySQL yet.
 type Catalog struct {
 	path string
+
+	// The published presets file is several hundred kilobytes and every
+	// /api/presets request used to unmarshal it again. Keep the decoded records
+	// keyed by the file content hash so an administrator write is picked up on
+	// the next read even when the rewrite has the same size and mtime.
+	cacheMu     sync.RWMutex
+	cache       []presetRecord
+	cacheDigest uint64
+	cacheValid  bool
 }
 
 type presetRecord struct {
@@ -86,11 +97,50 @@ func (c *Catalog) load() ([]presetRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	var records []presetRecord
-	if err := json.Unmarshal(raw, &records); err != nil {
+	// 每次读取原始字节并比对内容哈希：mtime 在某些文件系统上的精度不足以
+	// 区分同尺寸的快速重写（管理员保存后立即再读），仅凭 size+mtime 会
+	// 返回过期缓存。读取几百 KB 很便宜，真正昂贵的是重复 json.Unmarshal，
+	// 所以缓存以内容哈希为键，命中时跳过解码。
+	sum := fnv.New64a()
+	_, _ = sum.Write(raw)
+	digest := sum.Sum64()
+	c.cacheMu.RLock()
+	if c.cacheValid && c.cacheDigest == digest {
+		records := c.cache
+		c.cacheMu.RUnlock()
+		return clonePresetRecords(records), nil
+	}
+	c.cacheMu.RUnlock()
+	var loaded []presetRecord
+	if err := json.Unmarshal(raw, &loaded); err != nil {
 		return nil, err
 	}
-	return records, nil
+	c.cacheMu.Lock()
+	c.cache = loaded
+	c.cacheDigest = digest
+	c.cacheValid = true
+	c.cacheMu.Unlock()
+	return clonePresetRecords(loaded), nil
+}
+
+// clonePresetRecords returns a deep copy of the mutable record fields so a
+// caller cannot mutate the shared cache. The structs themselves are small and
+// are copied by value; only the slice fields need their own backing arrays.
+func clonePresetRecords(records []presetRecord) []presetRecord {
+	if records == nil {
+		return nil
+	}
+	out := make([]presetRecord, len(records))
+	copy(out, records)
+	for i := range out {
+		if records[i].CompatibleBaseIDs != nil {
+			out[i].CompatibleBaseIDs = append([]string(nil), records[i].CompatibleBaseIDs...)
+		}
+		if records[i].Categories != nil {
+			out[i].Categories = append([]string(nil), records[i].Categories...)
+		}
+	}
+	return out
 }
 
 func publicPreset(record presetRecord) PublicPreset {

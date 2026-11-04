@@ -18,13 +18,13 @@ import { LittleCompanionSprite } from '../../shared/pet/LittleCompanionSprite';
 
 const petOptions = getPetOptions();
 
-// 两种执行器共用一套状态说法：未安装 / 需配对 / 离线 / 在线。state 来自
-// 统一状态接口；pairing 是刚生成、尚未被设备消费的本地配对码。
-function executorStatusText(devices = [], pairing = null, state = '') {
-  const paired = Array.isArray(devices) ? devices.length : 0;
+// 两种执行器共用一套状态说法：未安装 / 需配对 / 离线 / 在线。state 与待配对
+// 信息都来自统一状态接口；本地不再用刚生成的配对码叠加状态。
+function executorStatusText(group) {
+  const devices = Array.isArray(group?.devices) ? group.devices : [];
+  const paired = devices.length;
   const online = paired ? devices.filter(item => item?.online).length : 0;
-  // 统一状态接口给出 state；未加载时用设备列表本地推导，配对码优先。
-  const effective = mergeExecutorState({ state, devices }, pairing);
+  const effective = mergeExecutorState(group);
   if (effective === 'not_installed') return '未安装：下载客户端后生成配对码';
   if (effective === 'needs_pairing') return '需配对：在客户端输入配对码完成绑定';
   if (effective === 'online') return `在线：${online} 台在线 / 共 ${paired} 台已配对`;
@@ -92,6 +92,11 @@ export function SettingsPage() {
     } finally { setLoadingGiantMaterialExecutors(false); }
   }
 
+  // 生成配对码后立即刷新统一状态接口，让"需配对"在 30 秒轮询之前就生效。
+  async function refreshExecutorOverview() {
+    try { setExecutorOverview(await getExecutorStatus()); } catch (_) { /* 保留上一份快照 */ }
+  }
+
   useEffect(() => {
     let alive = true;
     const load = () => getExecutorStatus().then(value => { if (alive) setExecutorOverview(value); }).catch(() => {});
@@ -121,6 +126,7 @@ export function SettingsPage() {
     try {
       const result = await createGiantMaterialPairing();
       setGiantPairing(result);
+      await refreshExecutorOverview();
       message.success('巨量素材配对码已生成，请在 Windows 执行器首次启动时输入');
     } catch (error) {
       message.error(error.message || '生成巨量素材配对码失败');
@@ -131,6 +137,7 @@ export function SettingsPage() {
     try {
       const result = await createDoubaoExecutorPairing();
       setPairing(result);
+      await refreshExecutorOverview();
       await refreshLocalExecutors();
       message.success('配对码已生成，请在本地执行器中输入');
     } catch (error) { message.error(error.message || '生成配对码失败'); }
@@ -327,7 +334,7 @@ export function SettingsPage() {
           <Form.Item label="提示音" name="soundEnabled" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Typography.Paragraph type="secondary">用于在剧本人物/场景提取完成、剧本生成完成时提醒；提取或生成失败（如网络、404、鉴权错误）时播放警示音。</Typography.Paragraph>
+          <Typography.Paragraph type="secondary">用于在剧本人物/场景提取完成、剧本创作完成时提醒；提取或生成失败（如网络、404、鉴权错误）时播放警示音。</Typography.Paragraph>
           <Form.Item label="提示音音量">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Form.Item name="soundVolume" noStyle>
@@ -374,7 +381,7 @@ export function SettingsPage() {
             <div style={{ marginTop: 16 }}>
               <Typography.Text strong>恢复报告</Typography.Text>
               <ul style={{ margin: '8px 0 0', paddingLeft: 20, color: 'var(--legacy-muted)', fontSize: 13, lineHeight: 1.7 }}>
-                <li>剧本生成：找到 {restoreReport.scriptResults?.found ?? 0} 个，新并入历史 {restoreReport.scriptResults?.added ?? 0} 条</li>
+                <li>私人定制：找到 {restoreReport.scriptResults?.found ?? 0} 个，新并入历史 {restoreReport.scriptResults?.added ?? 0} 条</li>
                 <li>小说获取：{restoreReport.novelFetch?.found ?? 0} 个文件</li>
                 <li>改编小说：{restoreReport.novelAdapt?.found ?? 0} 个文件</li>
                 <li>制作工程：{restoreReport.projects?.found ?? 0} 个项目</li>
@@ -391,7 +398,7 @@ export function SettingsPage() {
                 size="small"
                 style={{ marginTop: 8 }}
                 dataSource={[
-                  { key: 'scriptResults', title: '剧本生成', files: fileList.scriptResults || [] },
+                  { key: 'scriptResults', title: '私人定制', files: fileList.scriptResults || [] },
                   { key: 'novelFetch', title: '小说获取', files: fileList.novelFetch || [] },
                   { key: 'novelAdapt', title: '改编小说', files: fileList.novelAdapt || [] },
                   { key: 'projects', title: '制作工程', projects: fileList.projects || [] }
@@ -432,14 +439,14 @@ export function SettingsPage() {
                 <div className="settings-executor-icon"><Video size={20} /></div>
                 <div>
                   <strong>豆包（图片/视频）</strong>
-                  <span>{executorStatusText(executorOverview?.local?.devices ?? localExecutors, pairing, executorOverview?.local?.state)}</span>
+                  <span>{executorStatusText({ devices: executorOverview?.local?.devices ?? localExecutors, state: executorOverview?.local?.state, pairing: executorOverview?.local?.pairing })}</span>
                 </div>
               </div>
               <div className="settings-executor-status">
                 <div className="settings-executor-icon"><Video size={20} /></div>
                 <div>
                   <strong>巨量素材（OCR）</strong>
-                  <span>{executorStatusText(executorOverview?.giant?.devices ?? giantMaterialExecutors, giantPairing, executorOverview?.giant?.state)}</span>
+                  <span>{executorStatusText({ devices: executorOverview?.giant?.devices ?? giantMaterialExecutors, state: executorOverview?.giant?.state, pairing: executorOverview?.giant?.pairing })}</span>
                 </div>
               </div>
             </div>

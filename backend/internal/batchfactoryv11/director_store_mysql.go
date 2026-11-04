@@ -130,6 +130,18 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	if err != nil {
 		return DirectorRevision{}, err
 	}
+	// 关键守卫：分镜输入（原文 digest + 冻结配置 + 模式 + Hook）完全没变时，
+	// 不能产生新修订，更不能把当前 active 视频槽位全部标成 orphaned。
+	// 旧逻辑每次修订都无条件轮换槽位，自动化重试「先 director 再 video」会把
+	// 已经生成成功、仍然可播的视频整批废掉。
+	if reused, ok, err := s.reusableDirectorRevision(ctx, tx, owner, book, snapshot, digest, hookID, string(snapshotJSON)); err != nil {
+		return DirectorRevision{}, err
+	} else if ok {
+		if err := tx.Commit(); err != nil {
+			return DirectorRevision{}, err
+		}
+		return reused, nil
+	}
 	now := time.Now().UTC()
 	if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_config_snapshots(id,owner_username,batch_id,book_id,video_id,effective_json,created_at) VALUES(?,?,?,?,NULL,?,?)`, snapshotID, owner, book.BatchID, book.ID, string(snapshotJSON), now); err != nil {
 		return DirectorRevision{}, err
@@ -296,4 +308,79 @@ func loadLatestDirectorRevision(ctx context.Context, q batchQueryer, owner, batc
 		return DirectorRevision{}, err
 	}
 	return value, nil
+}
+
+// reusableDirectorRevision returns the latest revision when every director
+// input is unchanged. The check compares digest, mode, Hook and the frozen
+// effective settings; digest alone only covers the source text, so a settings
+// change without a text change must still create a new revision.
+func (s *MySQLStore) reusableDirectorRevision(ctx context.Context, q batchQueryer, owner string, book Book, snapshot DirectorSnapshot, digest, hookID, snapshotJSON string) (DirectorRevision, bool, error) {
+	latest, err := loadLatestDirectorRevision(ctx, q, owner, book.BatchID, book.ID)
+	if errors.Is(err, ErrNotFound) {
+		return DirectorRevision{}, false, nil
+	}
+	if err != nil {
+		return DirectorRevision{}, false, err
+	}
+	if latest.SourceDigest != digest || latest.Mode != snapshot.Mode || latest.HookRevisionID != hookID {
+		return DirectorRevision{}, false, nil
+	}
+	var storedEffective string
+	err = q.QueryRowContext(ctx, `SELECT effective_json FROM batch_factory_v12_config_snapshots WHERE id=? AND owner_username=? AND batch_id=? AND book_id=?`, latest.SnapshotID, owner, book.BatchID, book.ID).Scan(&storedEffective)
+	if errors.Is(err, sql.ErrNoRows) {
+		return DirectorRevision{}, false, nil
+	}
+	if err != nil {
+		return DirectorRevision{}, false, err
+	}
+	if !canonicalJSONEqual(storedEffective, snapshotJSON) {
+		return DirectorRevision{}, false, nil
+	}
+	videos, err := loadActiveDirectorVideos(ctx, q, owner, book)
+	if err != nil {
+		return DirectorRevision{}, false, err
+	}
+	latest.Videos = videos
+	latest.BatchID, latest.BookID = book.BatchID, book.ID
+	return latest, true, nil
+}
+
+func loadActiveDirectorVideos(ctx context.Context, q batchQueryer, owner string, book Book) ([]Video, error) {
+	rows, err := q.QueryContext(ctx, `SELECT v.id,COALESCE(r.label,''),COALESCE(r.video_prompt,''),COALESCE(r.visual_prompt,''),COALESCE(r.duration_seconds,0),v.ordinal,COALESCE(v.revision,1) FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, book.BatchID, book.ID, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	videos := []Video{}
+	for rows.Next() {
+		var video Video
+		if err := rows.Scan(&video.ID, &video.Label, &video.VideoPrompt, &video.VisualPrompt, &video.DurationSeconds, &video.Ordinal, &video.Revision); err != nil {
+			return nil, err
+		}
+		video.BatchID, video.BookID, video.CompatibilityState = book.BatchID, book.ID, "active"
+		videos = append(videos, video)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return videos, nil
+}
+
+// canonicalJSONEqual compares two JSON documents after normalizing key order
+// and number formatting, so a stored snapshot can be compared with a freshly
+// marshalled one.
+func canonicalJSONEqual(left, right string) bool {
+	var leftValue, rightValue any
+	if json.Unmarshal([]byte(left), &leftValue) != nil || json.Unmarshal([]byte(right), &rightValue) != nil {
+		return false
+	}
+	leftBytes, err := json.Marshal(leftValue)
+	if err != nil {
+		return false
+	}
+	rightBytes, err := json.Marshal(rightValue)
+	if err != nil {
+		return false
+	}
+	return string(leftBytes) == string(rightBytes)
 }

@@ -106,6 +106,42 @@ func TestV12BatchListUsesGoBatchStore(t *testing.T) {
 	}
 }
 
+type v12BulkShuihuoStore struct {
+	*batchfactoryv11.MemoryStore
+	hidden map[string]bool
+	calls  int
+}
+
+func (s *v12BulkShuihuoStore) ListShuihuoProjectBatchIDs(_ context.Context, _ string) (map[string]bool, error) {
+	s.calls++
+	return s.hidden, nil
+}
+
+func TestV12BatchListUsesBulkShuihuoFlagLookup(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	memory := batchfactoryv11.NewMemoryStore()
+	hidden, err := memory.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "水货项目"})
+	if err != nil {
+		t.Fatalf("create hidden batch: %v", err)
+	}
+	if _, err := memory.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{Title: "正常项目"}); err != nil {
+		t.Fatalf("create visible batch: %v", err)
+	}
+	store := &v12BulkShuihuoStore{MemoryStore: memory, hidden: map[string]bool{hidden.ID: true}}
+	api := NewRouter(RouterOptions{BridgeSecret: "secret", Now: func() time.Time { return now }, Slice: 1, Store: store})
+	rec := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches", nil)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, body)
+	}
+	if store.calls != 1 {
+		t.Fatalf("bulk flag lookups=%d, want 1", store.calls)
+	}
+	if strings.Contains(body, "水货项目") || !strings.Contains(body, "正常项目") {
+		t.Fatalf("unexpected batch list body=%s", body)
+	}
+}
+
 func TestV12BatchSummaryOmitsSourceText(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	store := batchfactoryv11.NewMemoryStore()

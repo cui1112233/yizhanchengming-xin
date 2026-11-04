@@ -36,6 +36,14 @@ test('设置页通过共享豆包执行器状态读取设备和生成配对码',
   assert.doesNotMatch(settingsSource, /apiRequest\('\/api\/shuihuo-production\/local-executors'/);
 });
 
+test('设置页的需配对状态消费后端状态接口字段，不再叠加本地配对码', () => {
+  assert.match(settingsSource, /mergeExecutorState\(group\)/);
+  assert.match(settingsSource, /executorOverview\?\.local\?\.pairing/);
+  assert.match(settingsSource, /executorOverview\?\.giant\?\.pairing/);
+  assert.match(settingsSource, /refreshExecutorOverview/);
+  assert.doesNotMatch(settingsSource, /executorStatusText\(executorOverview\?\.local\?\.devices/);
+});
+
 test('设置页可以测试图片和视频并展示执行器返回结果', () => {
   assert.match(settingsSource, /测试图片生成/);
   assert.match(settingsSource, /测试视频生成/);

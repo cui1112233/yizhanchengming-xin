@@ -1,0 +1,60 @@
+/* V88 视觉统一 · 首页（/）
+   只覆盖首页作用域；global.css 既有规则一条不动。 */
+
+/* 1. 容器：横向留白直接取自 V88 页面间距令牌（24px），与其它一级页面一致 */
+.home-page {
+  --app-page-gutter: var(--v88-space-page);
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .home-page { --app-page-gutter: var(--v88-space-5); }
+}
+
+/* 2. 卡片：统一圆角与过渡；悬停只做轻微抬升，不做大幅位移 */
+.home-page .quick-action-card {
+  border-radius: var(--v88-radius-lg);
+  border-color: var(--v88-color-border);
+  transition: transform var(--v88-motion-base) var(--v88-ease),
+              border-color var(--v88-motion-base) var(--v88-ease),
+              box-shadow var(--v88-motion-base) var(--v88-ease);
+}
+.home-page .quick-action-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--v88-color-border-strong);
+  box-shadow: var(--v88-shadow-raised);
+}
+.home-page .quick-action-card .card-arrow {
+  transition: transform var(--v88-motion-base) var(--v88-ease),
+              color var(--v88-motion-fast) var(--v88-ease);
+}
+.home-page .quick-action-card:hover .card-arrow { transform: translateX(2px); }
+
+/* 3. 联系卡片：与其它页面同一套表面色与边框 */
+[data-theme='dark'] .home-page .home-contact-section {
+  border: 1px solid var(--v88-color-border);
+  border-radius: var(--v88-radius-lg);
+  background: var(--v88-color-surface);
+  box-shadow: var(--v88-shadow-card);
+}
+
+/* 4. 品牌渐变按钮：统一过渡时长，保留原有渐变视觉 */
+.home-page .gradient-btn {
+  transition: transform var(--v88-motion-base) var(--v88-ease),
+              filter var(--v88-motion-base) var(--v88-ease);
+}
+.home-page .gradient-btn:hover { transform: translateY(-1px); }
+.home-page .home-hero-links a { transition: color var(--v88-motion-fast) var(--v88-ease); }
+
+/* 5. 减少动态：去掉位移与过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .home-page .quick-action-card,
+  .home-page .quick-action-card .card-arrow,
+  .home-page .gradient-btn,
+  .home-page .home-hero-links a {
+    transition: none;
+  }
+  .home-page .quick-action-card:hover,
+  .home-page .quick-action-card:hover .card-arrow,
+  .home-page .gradient-btn:hover { transform: none; }
+}

@@ -70,14 +70,37 @@ func comicPromptConcurrencyFromContext(ctx context.Context) int {
 
 // comicPageStructureLock owns layout and text safety only. Art direction is
 // supplied by the selected comic style and must never be fixed here.
-const comicPageStructureLock = "【漫画页面结构约束】成图为{{image_aspect_ratio}}画幅中文漫画页：保留清楚外留边和等宽格间距，格线清晰；根据剧情选择合适格数，阅读顺序固定为从上到下、同一行从左到右。旁白使用矩形框，对白使用圆形或椭圆气泡，简体中文短句不得遮挡脸部、手部或关键道具。具体线稿、上色、材质、人物比例和渲染方式只听所选画风预设，不得固定为其他画风。禁止水印、乱码、倾斜分格、无序拼贴、单张海报或后期拼图。"
+const comicPageStructureLock = "【漫画页面结构约束】成图为{{image_aspect_ratio}}{{image_orientation}}的中文漫画页：保留清楚外留边和等宽格间距，格线清晰；根据剧情选择合适格数，阅读顺序固定为从上到下、同一行从左到右。旁白使用矩形框，对白使用圆形或椭圆气泡，简体中文短句不得遮挡脸部、手部或关键道具。具体线稿、上色、材质、人物比例和渲染方式只听所选画风预设，不得固定为其他画风。禁止水印、乱码、倾斜分格、无序拼贴、单张海报或后期拼图。"
 
 func comicPromptTextForAspect(value, aspectRatio string) string {
+	orientation := ImageAspectRatioOrientation(aspectRatio)
 	value = strings.ReplaceAll(value, "1440×1920 或等比例 3:4", "与 "+aspectRatio+" 画幅匹配的高清分辨率")
-	value = strings.ReplaceAll(value, "3:4 竖版", aspectRatio+" 画幅")
-	value = strings.ReplaceAll(value, "3:4竖版", aspectRatio+"画幅")
+	value = strings.ReplaceAll(value, "3:4 竖版", aspectRatio+orientation)
+	value = strings.ReplaceAll(value, "3:4竖版", aspectRatio+orientation)
+	value = strings.ReplaceAll(value, "{{image_orientation}}", orientation)
 	value = strings.ReplaceAll(value, "{{image_aspect_ratio}}", aspectRatio)
-	return strings.ReplaceAll(value, "3:4", aspectRatio)
+	value = strings.ReplaceAll(value, "3:4", aspectRatio)
+	// Preset bodies are authored for portrait pages. Landscape and square
+	// canvases must not keep portrait-only wording.
+	switch {
+	case IsPortraitImageAspectRatio(aspectRatio):
+		return value
+	case aspectRatio == "1:1":
+		return strings.NewReplacer(
+			"竖版", "方形",
+			"竖幅", "方形",
+			"竖屏", "方形",
+			"条漫", "漫画",
+		).Replace(value)
+	default:
+		return strings.NewReplacer(
+			"竖版长条", "横幅",
+			"竖版", "横幅",
+			"竖幅", "横幅",
+			"竖屏", "横屏",
+			"条漫", "漫画",
+		).Replace(value)
+	}
 }
 
 // BuildComicPromptContract remains available for previews of one selected page.
@@ -102,7 +125,7 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 		"你是 Batch Factory 的漫画页面导演。只输出合法 JSON，不要输出 Markdown、标题或解释。",
 		`JSON 必须包含 screen_prompt、image_prompt、roles、scene_presets。screen_prompt 是本页导演说明；image_prompt 是可直接交给图片模型的最终中文提示词；roles 只列本页画面真实出现的人物；scene_presets 只列本页实际使用的场景。`,
 		comicAssetIdentityRule,
-		"本页必须生成一张完整" + aspectRatio + "画幅条漫页，直接包含分格、角色、场景、动作、表情、旁白框、对话气泡及必须出现的中文文案。禁止后期拼图或另行叠字。",
+		"本页必须生成一张完整" + aspectRatio + ImageAspectRatioOrientation(aspectRatio) + "漫画页，直接包含分格、角色、场景、动作、表情、旁白框、对话气泡及必须出现的中文文案。禁止后期拼图或另行叠字。",
 		"不得包含视频时长、运镜、镜头推进、音频、配音或视频生成指令。",
 	}
 	if style := strings.TrimSpace(config.Comic.Style.Body); style != "" {

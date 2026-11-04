@@ -1,0 +1,124 @@
+/* V88 按钮体系与空态（第一批：配音页 /tts 启用）
+   颜色由 antd ConfigProvider 的 theme.token 统一，本文件只管尺寸、过渡、焦点环和图标位。
+   不写 !important 覆盖 antd 既有规则。 */
+
+.v88-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v88-space-2);
+  height: 36px;
+  border-radius: var(--v88-radius-md);
+  font-size: var(--v88-font-body);
+  transition:
+    background-color var(--v88-motion-base) var(--v88-ease),
+    border-color var(--v88-motion-base) var(--v88-ease),
+    color var(--v88-motion-base) var(--v88-ease),
+    box-shadow var(--v88-motion-base) var(--v88-ease);
+}
+
+.v88-btn:focus-visible {
+  outline: 2px solid var(--v88-color-primary);
+  outline-offset: 2px;
+}
+
+.v88-btn.ant-btn-loading,
+.v88-btn:disabled {
+  cursor: progress;
+}
+
+.v88-btn--secondary.ant-btn {
+  border-color: var(--v88-color-border);
+}
+
+.v88-btn--secondary.ant-btn:not(:disabled):hover {
+  border-color: var(--v88-color-border-strong);
+  background: var(--v88-color-surface-2);
+}
+
+.v88-btn--ghost.ant-btn {
+  color: var(--v88-color-text-2);
+}
+
+.v88-btn--ghost.ant-btn:not(:disabled):hover {
+  background: var(--v88-color-primary-soft);
+  color: var(--v88-color-text-1);
+}
+
+.v88-btn--danger.ant-btn {
+  color: var(--v88-color-danger);
+  border-color: transparent;
+  background: var(--v88-color-danger-soft);
+}
+
+.v88-btn--danger.ant-btn:not(:disabled):hover {
+  color: var(--v88-color-danger);
+  border-color: var(--v88-color-danger);
+  background: transparent;
+}
+
+.v88-btn--icon.ant-btn {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+.v88-btn--icon.ant-btn.v88-btn--sm {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+}
+
+/* 统一空态：图标 + 一句主文案 + 一句说明 + 一个主操作 */
+.v88-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v88-space-2);
+  min-height: 240px;
+  padding: var(--v88-space-6);
+  border: 1px dashed var(--v88-color-border-strong);
+  border-radius: var(--v88-radius-lg);
+  background: var(--v88-color-surface);
+  color: var(--v88-color-text-3);
+  text-align: center;
+  transition: border-color var(--v88-motion-base) var(--v88-ease);
+}
+
+.v88-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--v88-space-1);
+  border-radius: var(--v88-radius-pill);
+  background: var(--v88-color-primary-soft);
+  color: var(--v88-color-primary);
+}
+
+.v88-empty-title {
+  margin: 0;
+  color: var(--v88-color-text-1);
+  font-size: var(--v88-font-section-title);
+  font-weight: 600;
+}
+
+.v88-empty-description {
+  max-width: 420px;
+  margin: 0;
+  color: var(--v88-color-text-3);
+  font-size: var(--v88-font-body);
+  line-height: 1.6;
+}
+
+.v88-empty-action {
+  margin-top: var(--v88-space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v88-btn,
+  .v88-empty {
+    transition: none;
+  }
+}

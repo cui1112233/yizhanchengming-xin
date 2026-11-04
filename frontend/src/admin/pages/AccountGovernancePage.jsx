@@ -21,7 +21,7 @@ const capabilityOptions = [
 
 const scopeOptions = [
   { value: '*', label: '全部模块' },
-  { value: 'script', label: '剧本生成' }
+  { value: 'script', label: '私人定制' }
 ];
 
 function errorMessage(error) {

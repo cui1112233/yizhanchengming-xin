@@ -127,9 +127,18 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicPublishAudio(ctx context.Cont
 	return categoryID, audios[0].ID, nil
 }
 
+// n8DirectoryError 把 N8 目录读取失败归类为上游不可用，并附带稳定错误码，
+// 避免这类本可解释的失败在统一出口退化成 500 internal error。
+func n8DirectoryError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return withErrorCode(fmt.Errorf("%w: %s", batchfactoryv11.ErrUpstream, err.Error()), ErrorCodeN8DirectoryRejected)
+}
+
 func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, owner, batchID, bookID string) ([]int64, error) {
 	if p == nil || p.Store == nil || p.WorksDirectory == nil || !p.WorksDirectory.Configured() {
-		return nil, fmt.Errorf("漫画后台作品目录未配置，无法按书名自动匹配作品 ID")
+		return nil, n8DirectoryError(errors.New("漫画后台作品目录未配置，无法按书名自动匹配作品 ID"))
 	}
 	batch, err := p.Store.GetBatch(ctx, owner, batchID)
 	if err != nil {
@@ -153,7 +162,7 @@ func (p *BatchFactoryN8ComicPublisher) resolveComicWorkIDs(ctx context.Context, 
 	}
 	works, err := p.WorksDirectory.SearchWorks(ctx, bookTitle)
 	if err != nil {
-		return nil, fmt.Errorf("按书名查询漫画后台作品失败：%w", err)
+		return nil, n8DirectoryError(fmt.Errorf("按书名查询漫画后台作品失败：%w", err))
 	}
 	matched := make([]int64, 0, 1)
 	for _, work := range works {
@@ -267,11 +276,13 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 		// 偶尔会慢到 20 秒以上；串行读取会让音频分类也跟着一直转圈。
 		// 并行读取后，最慢的那一路不会再阻塞其它下拉框。
 		var (
-			audioCategories       []n8catalog.AudioCategory
-			source, warning       string
-			producerOrganizations map[string][]string
-			accountNames          []string
-			organizationItems     []n8catalog.Organization
+			audioCategories        []n8catalog.AudioCategory
+			audioCategoriesWarning string
+			source, warning        string
+			producerOrganizations  map[string][]string
+			accountNames           []string
+			organizationItems      []n8catalog.Organization
+			organizationsWarning   string
 		)
 		var directoryWG sync.WaitGroup
 		directoryWG.Add(4)
@@ -281,7 +292,7 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 		}()
 		go func() {
 			defer directoryWG.Done()
-			organizationItems = publisher.organizations(r.Context())
+			organizationItems, organizationsWarning = publisher.organizationsWithWarning(r.Context())
 		}()
 		go func() {
 			defer directoryWG.Done()
@@ -289,21 +300,34 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 		}()
 		go func() {
 			defer directoryWG.Done()
-			audioCategories = publisher.audioCategories(r.Context())
+			audioCategories, audioCategoriesWarning = publisher.audioCategoriesWithWarning(r.Context())
 		}()
 		directoryWG.Wait()
+		publishKeyConfigured := publisher.Client != nil && publisher.Client.Configured()
+		// directoryAvailable 表示“目录现在真的能读到数据”，而不是“配置开关打开”。
+		// 只有令牌存在且三路目录都没有报错时才为 true；缺发布密钥不会影响它。
+		directoryAvailable := publisher.ProducerDirectory != nil && publisher.ProducerDirectory.Configured() &&
+			organizationsWarning == "" && audioCategoriesWarning == "" && warning == ""
 		writeJSON(w, http.StatusOK, map[string]any{
-			"configured":                   publisher.Client != nil && publisher.Client.Configured(),
+			// configured 保持原含义：N8 漫画发布客户端（open api key）是否可用。
+			// 它与目录可用性不是同一个开关，前端不得再用它判断目录告警。
+			"configured":                   publishKeyConfigured,
+			"directoryAvailable":           directoryAvailable,
+			"publishKeyConfigured":         publishKeyConfigured,
+			"publishKeyHint":               "QIANTIE_N8_COMIC_OPEN_API_KEY",
 			"producerAccounts":             accountNames,
 			"producerAccountsSource":       source,
 			"producerAccountsWarning":      warning,
 			"organizations":                organizationItems,
+			"organizationsWarning":         organizationsWarning,
 			"producerAccountOrganizations": producerOrganizations,
 			"audioCategories":              audioCategories,
+			"audioCategoriesWarning":       audioCategoriesWarning,
 		})
 	})
 	mux.HandleFunc("GET /api/batch-factory/v12/comic-publish/audio-categories", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"audioCategories": publisher.audioCategories(r.Context())})
+		items, warning := publisher.audioCategoriesWithWarning(r.Context())
+		writeJSON(w, http.StatusOK, map[string]any{"audioCategories": items, "audioCategoriesWarning": warning})
 	})
 	mux.HandleFunc("GET /api/batch-factory/v12/comic-publish/audios", func(w http.ResponseWriter, r *http.Request) {
 		categoryID, organizationID := strings.TrimSpace(r.URL.Query().Get("audioCategoryId")), strings.TrimSpace(r.URL.Query().Get("organizationId"))
@@ -313,7 +337,11 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 		}
 		items, err := publisher.audios(r.Context(), categoryID, organizationID)
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+			if errors.Is(err, batchfactoryv11.ErrUpstream) {
+				writeStoreError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": n8DirectoryWarning("音频目录", err)})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"audios": items})
@@ -347,6 +375,10 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 		}
 		record, err := publisher.Publish(r.Context(), owner, r.PathValue("batchId"), r.PathValue("bookId"), r.PathValue("collectionId"), input)
 		if err != nil {
+			if errors.Is(err, batchfactoryv11.ErrUpstream) {
+				writeStoreError(w, err)
+				return
+			}
 			if err == batchfactoryv11.ErrNotFound || err == batchfactoryv11.ErrInvalid {
 				writeStoreError(w, err)
 				return
@@ -378,11 +410,11 @@ func registerN8ComicPublishRoutes(mux *http.ServeMux, publisher *BatchFactoryN8C
 func (p *BatchFactoryN8ComicPublisher) audios(ctx context.Context, categoryID, organizationID string) ([]n8catalog.Audio, error) {
 	directory, ok := p.ProducerDirectory.(N8ComicAudioDirectory)
 	if !ok || directory == nil || !directory.Configured() {
-		return nil, fmt.Errorf("N8 音频目录尚未配置")
+		return nil, n8DirectoryError(errors.New("N8 音频目录尚未配置"))
 	}
 	items, err := directory.ListAudio(ctx, strings.TrimSpace(organizationID))
 	if err != nil {
-		return nil, err
+		return nil, n8DirectoryError(err)
 	}
 	wanted, _ := strconv.ParseInt(strings.TrimSpace(categoryID), 10, 64)
 	filtered := make([]n8catalog.Audio, 0, len(items))
@@ -425,19 +457,64 @@ func containsInt64(values []int64, target int64) bool {
 	return false
 }
 
+// n8DirectoryFailureDetail 把上游错误压成一段可展示的诊断。HTTP 状态与
+// 上游业务 code 必须保留，否则“令牌失效”会被前端误判成“目录本来就是空的”。
+// 这里只使用状态码、业务 code/message，不包含令牌等敏感值。
+func n8DirectoryFailureDetail(err error) string {
+	var failure *n8catalog.DirectoryError
+	if !errors.As(err, &failure) {
+		return ""
+	}
+	if failure.Status != 0 {
+		return fmt.Sprintf("HTTP %d", failure.Status)
+	}
+	if code := strings.TrimSpace(failure.Code); code != "" {
+		detail := "上游 code=" + code
+		if message := strings.TrimSpace(failure.Message); message != "" {
+			runes := []rune(message)
+			if len(runes) > 60 {
+				message = string(runes[:60])
+			}
+			detail += "：" + message
+		}
+		return detail
+	}
+	switch failure.Kind {
+	case "connection":
+		return "无法连接上游"
+	case "invalid_response":
+		return "上游返回格式无法解析"
+	}
+	return ""
+}
+
+func n8DirectoryWarning(label string, err error) string {
+	if detail := n8DirectoryFailureDetail(err); detail != "" {
+		return fmt.Sprintf("N8 %s读取失败（%s），请更新后台登录令牌后重试。", label, detail)
+	}
+	return fmt.Sprintf("N8 %s读取失败，请更新后台登录令牌后重试。", label)
+}
+
 func (p *BatchFactoryN8ComicPublisher) audioCategories(ctx context.Context) []n8catalog.AudioCategory {
+	items, _ := p.audioCategoriesWithWarning(ctx)
+	return items
+}
+
+// audioCategoriesWithWarning 在读取失败时同时返回可展示的原因，避免前端把
+// 令牌失效误判成“这个组织本来就没有音频分类”。
+func (p *BatchFactoryN8ComicPublisher) audioCategoriesWithWarning(ctx context.Context) ([]n8catalog.AudioCategory, string) {
 	directory, ok := p.ProducerDirectory.(N8ComicAudioCategoryDirectory)
 	if !ok || directory == nil || !directory.Configured() {
 		log.Printf("N8 audio category directory unavailable: not configured")
-		return nil
+		return nil, ""
 	}
 	items, err := directory.ListAudioCategories(ctx)
 	if err != nil {
 		log.Printf("N8 audio category directory unavailable: %v", err)
-		return nil
+		return nil, n8DirectoryWarning("音频分类目录", err)
 	}
 	log.Printf("N8 audio category directory returned %d enabled categories", len(items))
-	return items
+	return items, ""
 }
 
 func (p *BatchFactoryN8ComicPublisher) producerOrganizations(ctx context.Context) map[string][]string {
@@ -461,6 +538,13 @@ func (p *BatchFactoryN8ComicPublisher) producerOrganizations(ctx context.Context
 }
 
 func (p *BatchFactoryN8ComicPublisher) organizations(ctx context.Context) []n8catalog.Organization {
+	items, _ := p.organizationsWithWarning(ctx)
+	return items
+}
+
+// organizationsWithWarning 在读取失败时同时返回可展示的原因，避免前端把
+// 令牌失效误判成“当前组织没有账号”。
+func (p *BatchFactoryN8ComicPublisher) organizationsWithWarning(ctx context.Context) ([]n8catalog.Organization, string) {
 	directory := p.OrganizationDirectory
 	if directory == nil {
 		if candidate, ok := p.ProducerDirectory.(N8ComicOrganizationDirectory); ok {
@@ -468,14 +552,14 @@ func (p *BatchFactoryN8ComicPublisher) organizations(ctx context.Context) []n8ca
 		}
 	}
 	if directory == nil || !directory.Configured() {
-		return nil
+		return nil, ""
 	}
 	organizations, err := directory.ListOrganizations(ctx)
 	if err != nil {
 		log.Printf("N8 organization directory unavailable: %v", err)
-		return nil
+		return nil, n8DirectoryWarning("组织目录", err)
 	}
-	return organizations
+	return organizations, ""
 }
 
 func (p *BatchFactoryN8ComicPublisher) producerAccounts(ctx context.Context) ([]string, string, string) {
@@ -498,10 +582,14 @@ func (p *BatchFactoryN8ComicPublisher) producerAccounts(ctx context.Context) ([]
 		log.Print("N8 producer directory returned no accounts")
 	}
 	if len(fallback) > 0 {
-		return fallback, "cache", "N8 制作者目录实时同步暂不可用，当前使用最近同步的账号。"
+		warning := "N8 制作者目录实时同步暂不可用，当前使用最近同步的账号。"
+		if detail := n8DirectoryFailureDetail(err); detail != "" {
+			warning = "N8 制作者目录实时同步暂不可用（" + detail + "），当前使用最近同步的账号。"
+		}
+		return fallback, "cache", warning
 	}
 	if err != nil {
-		return nil, "unavailable", "N8 制作者目录读取失败，请更新后台登录令牌后重试。"
+		return nil, "unavailable", n8DirectoryWarning("制作者目录", err)
 	}
 	return nil, "unavailable", "N8 没有返回启用中的制作者账号。"
 }

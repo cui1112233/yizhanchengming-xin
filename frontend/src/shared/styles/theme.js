@@ -37,3 +37,35 @@ const light = {
 export function createAntTheme(mode) {
   return { token: { ...common, ...(mode === 'light' ? light : dark) } };
 }
+
+// V88 视觉统一：主色改为青绿，珊瑚降级为强调/警示，靛蓝只给信息与链接。
+// 只在启用页面（第一批 /tts）通过 ConfigProvider 局部生效，不改变全站默认主题。
+export const v88Palette = {
+  primary: '#63dfc0',
+  primaryHover: '#7de8cf',
+  primaryActive: '#4fcbb0',
+  emphasis: '#f07167',
+  danger: '#ff9b9d',
+  success: '#75ddb4',
+  warning: '#ffd08a',
+  info: '#9da8ff'
+};
+
+export function createV88AntTheme(mode = 'dark') {
+  const base = createAntTheme(mode);
+  return {
+    ...base,
+    token: {
+      ...base.token,
+      colorPrimary: v88Palette.primary,
+      colorPrimaryHover: v88Palette.primaryHover,
+      colorPrimaryActive: v88Palette.primaryActive,
+      colorError: v88Palette.danger,
+      colorLink: v88Palette.info,
+      colorSuccess: v88Palette.success,
+      colorWarning: v88Palette.warning,
+      borderRadius: 9,
+      controlHeight: 36
+    }
+  };
+}
