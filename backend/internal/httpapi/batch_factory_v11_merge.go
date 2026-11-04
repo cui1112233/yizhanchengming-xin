@@ -155,14 +155,12 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, batchfactoryv11.ErrNotFound)
 			return
 		}
-		var file interface {
-			Read([]byte) (int, error)
-			Close() error
-		}
+		var file io.ReadCloser
+		var localFile *os.File
 		if files != nil {
-			localFile, localErr := files.Open(artifactID + ".mp4")
+			opened, localErr := files.Open(artifactID + ".mp4")
 			if localErr == nil {
-				file = localFile
+				localFile, file = opened, opened
 			} else if !errors.Is(localErr, localartifact.ErrInvalidID) && !errors.Is(localErr, os.ErrNotExist) {
 				writeStoreError(w, batchfactoryv11.ErrUnavailable)
 				return
@@ -178,6 +176,19 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 		defer file.Close()
 		w.Header().Set("Content-Type", "video/mp4")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		// 浏览器播放器会先发 Range 请求。这里必须走 ServeContent 才能返回 206、
+		// Accept-Ranges 与 Content-Length；直接 io.Copy 会退化成 200 + chunked，
+		// 播放器无法起播，停在 0:00 黑屏并反复整包重下。
+		if seeker, ok := file.(io.ReadSeeker); ok {
+			modTime := time.Time{}
+			if localFile != nil {
+				if info, statErr := localFile.Stat(); statErr == nil {
+					modTime = info.ModTime()
+				}
+			}
+			http.ServeContent(w, r, artifactID+".mp4", modTime, seeker)
+			return
+		}
 		_, _ = io.Copy(w, file)
 	})
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/merge-cover/{artifactId}", func(w http.ResponseWriter, r *http.Request) {
