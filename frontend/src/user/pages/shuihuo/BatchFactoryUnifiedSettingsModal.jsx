@@ -153,7 +153,7 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
     {!modelsLoading && !modelsError && !models.length ? <Alert type="warning" showIcon message="个人中心没有已启用模型" description={<Space direction="vertical"><span>请先在个人中心按文本、图片、视频类型新增并启用模型，再返回当前批量作品选择。</span><Button type="link" href="/api-config">前往个人中心配置模型</Button></Space>} /> : null}
     </> : null}
     {sections.includes('sensitive') ? <section className="batch-factory-engine-card"><header><b>敏感词处理</b><HelpTip title="敏感词处理">批量工厂自己的开关：关闭后只走规则脱敏；AI 修复失败会自动降级到规则替换/打码，并在卡片上等待人工确认，不再把整本小说判成失败。</HelpTip></header><div className="batch-factory-engine-card-body batch-factory-engine-grid">
-      <label className="batch-factory-engine-field"><span><b>AI 修复</b><HelpTip title="AI 修复">默认开启，沿用小说获取页的全局设置；这里可单独按批次关闭。</HelpTip></span><Switch checked={value.sensitiveAIEnabled !== false} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} /></label>
+      <label className="batch-factory-engine-field"><span><b>AI 修复</b><HelpTip title="AI 修复">默认关闭；只有显式开启后才会调用 AI 修复，关闭时只走规则脱敏/打码，不影响后续阶段。</HelpTip></span><Switch checked={value.sensitiveAIEnabled === true} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} /></label>
       {/* 这里不能用 label 包住字段：同一 label 内的“？”帮助按钮是 label 的受控元素，
           浏览器会把点击下拉当成激活帮助按钮，导致弹层打开后立即失焦收回（闪回）。 */}
       <div className="batch-factory-engine-field"><span><b>修复模型</b><HelpTip title="修复模型">可多选，按顺序逐个尝试；留空表示继承小说获取页的全局修复模型。</HelpTip></span><Select mode="multiple" allowClear loading={modelsLoading} value={Array.isArray(value.sensitiveAIModels) ? value.sensitiveAIModels : []} options={modelOptions.text} placeholder="默认继承全局修复模型" onChange={sensitiveAIModels => patch({ sensitiveAIModels })} /></div>

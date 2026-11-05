@@ -700,8 +700,8 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIO_OPTIONS} loading={false} explicit={Object.hasOwn(bookPatch, 'imageAspectRatio')} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
             <InheritedSwitchField label="生成资产图片" value={form.assetImagesEnabled} inherited={inherited.assetImagesEnabled !== false} explicit={Object.hasOwn(bookPatch, 'assetImagesEnabled')} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} />
           </div></ConfigCard>
-          <ConfigCard title="敏感词处理" description="默认继承统一配置；这里可单独覆盖当前书。AI 修复失败会降级到规则/打码并等待人工确认。">
-            <InheritedSwitchField label="AI 修复" value={form.sensitiveAIEnabled} inherited={inherited.sensitiveAIEnabled !== false} explicit={Object.hasOwn(bookPatch, 'sensitiveAIEnabled')} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} />
+          <ConfigCard title="敏感词处理" description="AI 修复默认关闭；只有显式开启后才会调用。关闭时只走规则/打码并标记待确认，不影响后续阶段。">
+            <InheritedSwitchField label="AI 修复" value={form.sensitiveAIEnabled} inherited={inherited.sensitiveAIEnabled === true} explicit={Object.hasOwn(bookPatch, 'sensitiveAIEnabled')} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} />
             <InheritedMultiField label="修复模型" value={form.sensitiveAIModels} inherited={inherited.sensitiveAIModels} options={modelOptions.text} loading={loading} explicit={Object.hasOwn(bookPatch, 'sensitiveAIModels')} onChange={sensitiveAIModels => patch({ sensitiveAIModels })} />
             <label className="batch-factory-engine-field"><span><b>失败时策略</b></span><Segmented block value={form.sensitiveAIOnFailure || inherited.sensitiveAIOnFailure || 'review'} options={[{ value: 'review', label: '保留原文待确认' }, { value: 'fail', label: '判为失败' }]} onChange={sensitiveAIOnFailure => patch({ sensitiveAIOnFailure })} /></label>
           </ConfigCard>

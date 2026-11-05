@@ -432,10 +432,15 @@ func TestV12SingleFetchDegradesToMasksAndReviewFlagInsteadOfDiscardingText(t *te
 }
 
 func TestResolveBatchSensitiveConfigDefaultsAndBookOverride(t *testing.T) {
-	// 旧批次没有任何新字段时必须保持原行为：AI 修复开、失败保留原文待确认。
+	// 未显式设置时 AI 修复默认关闭，只走规则/打码，失败保留原文待确认。
 	cfg := resolveBatchSensitiveConfig(nil, nil)
-	if !cfg.Enabled || cfg.OnFailure != batchSensitiveOnFailureReview || len(cfg.Models) != 0 {
-		t.Fatalf("legacy defaults changed: %#v", cfg)
+	if cfg.Enabled || cfg.OnFailure != batchSensitiveOnFailureReview || len(cfg.Models) != 0 {
+		t.Fatalf("default sensitive config must be off: %#v", cfg)
+	}
+	// 老数据里显式打开 AI 修复的批次保持 true，不被新默认值覆盖。
+	cfg = resolveBatchSensitiveConfig(batchfactoryv11.SettingsPatch{"sensitiveAIEnabled": json.RawMessage(`true`)}, nil)
+	if !cfg.Enabled {
+		t.Fatalf("explicit legacy enable was overwritten by the new default: %#v", cfg)
 	}
 	batchPatch := batchfactoryv11.SettingsPatch{
 		"sensitiveAIEnabled":   json.RawMessage(`false`),
@@ -513,6 +518,52 @@ func TestProcessBatchConfiguredTextUsesRulesWhenAISwitchOff(t *testing.T) {
 	}
 	if outcome.ReviewRequired || strings.Contains(text, "敏感") {
 		t.Fatalf("rule-only path did not finish safely: text=%q outcome=%#v", text, outcome)
+	}
+}
+
+func TestProcessBatchConfiguredTextDefaultsToNoAIWithoutBlocking(t *testing.T) {
+	store := novelfetchworkshop.NewMemoryStore()
+	settings := map[string]any{
+		"appConfig": map[string]any{"layout": map[string]any{"apply_to_original": true, "apply_sensitive": true}},
+		"knowledgeLibraries": map[string]any{"layout_rules": map[string]any{
+			// 规则替换结果仍含命中词，模拟规则无法完全脱敏的普通失败场景。
+			"sensitive_rules": []any{map[string]any{"enabled": true, "find": "敏感", "replace": "敏感残留", "apply_to_original": true}},
+		}},
+		"sensitive_ai": map[string]any{"enabled": true, "model": "global-model"},
+	}
+	if err := store.PutConfig(context.Background(), "alice", settings); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	provider := rewriteProviderFunc(func(_ context.Context, _ novelfetchworkshop.RewriteRequest) (string, error) {
+		calls++
+		return "他关系越界了", nil
+	})
+	// 没有任何显式设置时走新默认：AI 修复关闭。
+	cfg := defaultBatchSensitiveConfig()
+	if cfg.Enabled {
+		t.Fatalf("default batch sensitive config must be off: %#v", cfg)
+	}
+	text, trace, items, outcome, err := processBatchConfiguredText(context.Background(), store, "alice", "book-1", "他说他敏感了", "original", cfg, provider)
+	if err != nil {
+		t.Fatalf("默认关闭 AI 修复必须继续后续阶段，而不是报错阻断: %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("AI provider was called with the default off switch: %d", calls)
+	}
+	for _, stage := range trace {
+		if stage["stage"] == "sensitive_ai" {
+			t.Fatalf("sensitive_ai stage must be absent when the switch is off: %#v", trace)
+		}
+	}
+	if !outcome.ReviewRequired || outcome.ReviewCount < 1 {
+		t.Fatalf("unresolved hit must be flagged for review, not silently skipped: %#v", outcome)
+	}
+	if strings.Contains(text, "敏感") {
+		t.Fatalf("unresolved hit must stay masked, got %q", text)
+	}
+	if len(items) == 0 || items[0]["masked"] != true {
+		t.Fatalf("hit item must record masked=true: %#v", items)
 	}
 }
 

@@ -15,7 +15,8 @@ import (
 )
 
 // 批量工厂自己的敏感词处理配置：批次级设置为主，单书设置按现有继承体系覆盖。
-// 旧批次没有这三个字段时按默认值读取（开启 AI 修复、继承全局模型、失败保留原文待确认）。
+// 旧批次没有这三个字段时按默认值读取（关闭 AI 修复、继承全局模型、失败保留原文待确认）。
+// 显式写入 sensitiveAIEnabled=true 的老批次仍保持开启，默认值只作用于未设置的情况。
 type batchSensitiveConfig struct {
 	Enabled   bool
 	Models    []string
@@ -28,7 +29,7 @@ const (
 )
 
 func defaultBatchSensitiveConfig() batchSensitiveConfig {
-	return batchSensitiveConfig{Enabled: true, OnFailure: batchSensitiveOnFailureReview}
+	return batchSensitiveConfig{Enabled: false, OnFailure: batchSensitiveOnFailureReview}
 }
 
 func resolveBatchSensitiveConfig(layers ...batchfactoryv11.SettingsPatch) batchSensitiveConfig {

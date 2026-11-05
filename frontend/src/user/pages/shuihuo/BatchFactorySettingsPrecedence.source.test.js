@@ -68,6 +68,19 @@ test('the asset image switch defaults to on, is pushed batch-wide and only badge
   assert.match(bookModal, /<InheritedSwitchField label="生成资产图片"[\s\S]{0,220}explicit=\{Object\.hasOwn\(bookPatch, 'assetImagesEnabled'\)\}/);
 });
 
+test('the batch AI repair switch defaults to off and only an explicit true turns it on', () => {
+  // 统一配置弹窗：未设置时不再默认开启，只有显式 true 才打开。
+  assert.match(unifiedModal, /<b>AI 修复<\/b>/);
+  assert.match(unifiedModal, /checked=\{value\.sensitiveAIEnabled === true\}/);
+  assert.match(unifiedModal, /默认关闭；只有显式开启后才会调用 AI 修复/);
+  // 单书继承值同样默认关闭，偏离批次时才出现“自定义”。
+  assert.match(bookModal, /<InheritedSwitchField label="AI 修复"[\s\S]{0,260}inherited=\{inherited\.sensitiveAIEnabled === true\}/);
+  assert.match(bookModal, /<InheritedSwitchField label="AI 修复"[\s\S]{0,260}explicit=\{Object\.hasOwn\(bookPatch, 'sensitiveAIEnabled'\)\}/);
+  // 仍纳入统一配置写透集合，保证批次级开关能按现有继承链下发。
+  const keys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
+  assert.match(keys, /'sensitiveAIEnabled'/, 'sensitiveAIEnabled must stay in UNIFIED_CONFIGURATION_KEYS');
+});
+
 test('unified configuration only writes configuration and never pushes generated content', () => {
   const configBlock = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
   const contentBlock = novelList.match(/const GENERATED_CONTENT_SETTINGS_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
