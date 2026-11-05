@@ -3,6 +3,7 @@ package batchfactoryv11
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -352,9 +353,9 @@ func TestBuildComicPromptContractCarriesStableComicAssetIdentity(t *testing.T) {
 	}
 	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页"}})
 	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-identity", Label: "漫画页 01", VideoPrompt: "沈晚看向陆夫人。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
-		"productionMode":      rawSetting(t, "comic"),
+		"productionMode":     rawSetting(t, "comic"),
 		"assetImagesEnabled": rawSetting(t, false),
-		"aiPromptConfig":      settings,
+		"aiPromptConfig":     settings,
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -798,9 +799,9 @@ func TestBuildComicPromptContractWithAssetImagesDisabledCarriesFullAssetDescript
 	}
 	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页\n角色：{roles_str}"}})
 	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-text", Label: "漫画页 01", VideoPrompt: "沈晚看向陆夫人。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
-		"productionMode":      rawSetting(t, "comic"),
+		"productionMode":     rawSetting(t, "comic"),
 		"assetImagesEnabled": rawSetting(t, false),
-		"aiPromptConfig":      settings,
+		"aiPromptConfig":     settings,
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -820,9 +821,9 @@ func TestBuildComicPromptContractWithAssetImagesDisabledAllowsNoComicAssets(t *t
 	book := Book{ID: "book-empty", Title: "无资产", SourceText: "林晚走进办公室。"}
 	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页"}})
 	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-empty", Label: "漫画页 01", VideoPrompt: "林晚走进办公室。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
-		"productionMode":      rawSetting(t, "comic"),
+		"productionMode":     rawSetting(t, "comic"),
 		"assetImagesEnabled": rawSetting(t, false),
-		"aiPromptConfig":      settings,
+		"aiPromptConfig":     settings,
 	}})
 	if err != nil {
 		t.Fatalf("disabled switch without comic assets must not block: %v", err)
@@ -882,5 +883,79 @@ func TestRunComicBootstrapWithAssetImagesDisabledDoesNotRequireAssetStage(t *tes
 	}
 	if len(latest.Books[0].Videos) != 1 || latest.Books[0].Videos[0].ComicPrompt != "单页漫画导演说明" {
 		t.Fatalf("comic page prompt was not saved without assets: %+v", latest.Books[0].Videos)
+	}
+}
+
+func TestParseComicBookPromptResultsAcceptsMatchingPageFromWholeBookEnvelope(t *testing.T) {
+	videos := []Video{{ID: "video-1", Label: "漫画页 01"}}
+	completion := `{"pages":[
+		{"video_id":"video-2","screen_prompt":"第二页导演说明","image_prompt":"第二页图片词"},
+		{"video_id":"video-1","screen_prompt":"第一页导演说明","image_prompt":"第一页图片词"},
+		{"video_id":"video-3","screen_prompt":"第三页导演说明","image_prompt":"第三页图片词"}
+	]}`
+	results, err := parseComicBookPromptResults(completion, videos, DirectorSnapshot{})
+	if err != nil {
+		t.Fatalf("single-page request must accept its matching page from a whole-book envelope: %v", err)
+	}
+	page, ok := results["video-1"]
+	if !ok || len(results) != 1 {
+		t.Fatalf("results=%+v", results)
+	}
+	if page.ScreenPrompt != "第一页导演说明" || page.ImagePrompt != "第一页图片词" {
+		t.Fatalf("matched page=%+v", page)
+	}
+}
+
+func TestParseComicBookPromptResultsAutoFillsMissingVideoIDForSinglePage(t *testing.T) {
+	videos := []Video{{ID: "video-1", Label: "漫画页 01"}}
+	completion := `{"pages":[{"screen_prompt":"当前页导演说明","image_prompt":"当前页图片词"}]}`
+	results, err := parseComicBookPromptResults(completion, videos, DirectorSnapshot{})
+	if err != nil {
+		t.Fatalf("missing video_id on a single-page request must be auto-filled: %v", err)
+	}
+	page, ok := results["video-1"]
+	if !ok || page.ScreenPrompt != "当前页导演说明" || page.ImagePrompt != "当前页图片词" {
+		t.Fatalf("results=%+v", results)
+	}
+}
+
+func TestParseComicBookPromptResultsAcceptsAlignedPagesAndIgnoresExtras(t *testing.T) {
+	videos := []Video{{ID: "video-1", Label: "漫画页 01"}, {ID: "video-2", Label: "漫画页 02"}}
+	completion := `{"pages":[
+		{"video_id":"video-1","screen_prompt":"第一页导演说明","image_prompt":"第一页图片词"},
+		{"video_id":"video-2","screen_prompt":"第二页导演说明","image_prompt":"第二页图片词"},
+		{"video_id":"video-9","screen_prompt":"多余页导演说明","image_prompt":"多余页图片词"}
+	]}`
+	results, err := parseComicBookPromptResults(completion, videos, DirectorSnapshot{})
+	if err != nil {
+		t.Fatalf("aligned expected pages must be accepted even with extra pages: %v", err)
+	}
+	if len(results) != 2 || results["video-1"].ScreenPrompt == "" || results["video-2"].ScreenPrompt == "" {
+		t.Fatalf("results=%+v", results)
+	}
+}
+
+func TestParseComicBookPromptResultsReportsMissingPagesWithDetails(t *testing.T) {
+	videos := []Video{{ID: "video-1", Label: "漫画页 01"}, {ID: "video-2", Label: "漫画页 02"}}
+	completion := `{"pages":[{"video_id":"video-1","screen_prompt":"第一页导演说明","image_prompt":"第一页图片词"}]}`
+	_, err := parseComicBookPromptResults(completion, videos, DirectorSnapshot{})
+	if err == nil {
+		t.Fatal("missing page must fail")
+	}
+	if !errors.Is(err, ErrInvalid) {
+		t.Fatalf("mismatch must remain invalid input: %v", err)
+	}
+	var countErr *comicPageCountError
+	if !errors.As(err, &countErr) {
+		t.Fatalf("mismatch must expose a page-count detail error: %v", err)
+	}
+	if countErr.Expected != 2 || countErr.Actual != 1 {
+		t.Fatalf("count detail=%+v", countErr)
+	}
+	message := err.Error()
+	for _, part := range []string{"期望 2 页", "实际 1 页", "缺失：漫画页 02(video-2)"} {
+		if !strings.Contains(message, part) {
+			t.Fatalf("mismatch message misses %q: %s", part, message)
+		}
 	}
 }

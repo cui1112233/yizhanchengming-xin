@@ -622,15 +622,8 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 			envelope.Pages = []comicPromptResult{legacy}
 		}
 	}
-	if len(envelope.Pages) != len(videos) {
-		return nil, fmt.Errorf("%w: 漫画页数量与分页不一致", ErrInvalid)
-	}
 	light := aiReasoningPromptConfig(snapshot.Effective).Comic.ID == "batch-comic-page-light"
-	wanted := make(map[string]struct{}, len(videos))
-	for _, video := range videos {
-		wanted[video.ID] = struct{}{}
-	}
-	results := make(map[string]comicPromptResult, len(videos))
+	normalizedPages := make([]comicPromptResult, 0, len(envelope.Pages))
 	for _, page := range envelope.Pages {
 		page.VideoID = strings.TrimSpace(page.VideoID)
 		page.ScreenPrompt = strings.TrimSpace(page.ScreenPrompt)
@@ -638,15 +631,125 @@ func parseComicBookPromptResults(completion string, videos []Video, snapshot Dir
 		page.Roles = normalizedStringList(page.Roles)
 		page.ScenePresets = normalizedStringList(page.ScenePresets)
 		page.RoleStage = normalizedStringMap(page.RoleStage)
-		if _, ok := wanted[page.VideoID]; !ok || results[page.VideoID].VideoID != "" {
-			return nil, fmt.Errorf("%w: 漫画页 video_id 无效或重复", ErrInvalid)
+		normalizedPages = append(normalizedPages, page)
+	}
+	// 单页请求时，模型可能按整书信封返回多条 pages，或漏写 video_id。视频只有
+	// 一页时按该页归属即可，不能把信封形态误判成整书数量不一致。
+	if len(videos) == 1 {
+		targetID := videos[0].ID
+		var matched *comicPromptResult
+		for index := range normalizedPages {
+			if matched == nil && normalizedPages[index].VideoID == targetID {
+				matched = &normalizedPages[index]
+			}
 		}
-		if page.ScreenPrompt == "" || (!light && page.ImagePrompt == "") {
+		if matched == nil && len(normalizedPages) == 1 {
+			normalizedPages[0].VideoID = targetID
+			matched = &normalizedPages[0]
+		}
+		if matched == nil {
+			return nil, newComicPageCountError(videos, normalizedPages)
+		}
+		if matched.ScreenPrompt == "" || (!light && matched.ImagePrompt == "") {
 			return nil, fmt.Errorf("%w: 漫画提示词为空", ErrInvalid)
 		}
-		results[page.VideoID] = page
+		return map[string]comicPromptResult{targetID: *matched}, nil
 	}
-	return results, nil
+	if len(videos) > 1 {
+		wanted := make(map[string]struct{}, len(videos))
+		for _, video := range videos {
+			wanted[video.ID] = struct{}{}
+		}
+		results := make(map[string]comicPromptResult, len(videos))
+		for _, page := range normalizedPages {
+			// 多余的页不阻断：只要期望页都齐，多余结果可以忽略；缺页才报错。
+			if _, ok := wanted[page.VideoID]; !ok {
+				continue
+			}
+			if results[page.VideoID].VideoID != "" {
+				return nil, fmt.Errorf("%w: 漫画页 video_id 重复（video_id=%q，期望：%s）", ErrInvalid, page.VideoID, comicExpectedPageLabels(videos))
+			}
+			if page.ScreenPrompt == "" || (!light && page.ImagePrompt == "") {
+				return nil, fmt.Errorf("%w: 漫画提示词为空", ErrInvalid)
+			}
+			results[page.VideoID] = page
+		}
+		if len(results) != len(videos) {
+			return nil, newComicPageCountError(videos, normalizedPages)
+		}
+		return results, nil
+	}
+	return nil, newComicPageCountError(videos, normalizedPages)
+}
+
+// comicPageCountError 保留期望/实际/缺失/多出的明细，让日志和界面可以直接
+// 解释“哪几页对不上”，而不是只看到一个数量不一致。
+type comicPageCountError struct {
+	Expected int
+	Actual   int
+	Missing  []string
+	Extra    []string
+}
+
+func (e *comicPageCountError) Error() string {
+	missing, extra := "无", "无"
+	if len(e.Missing) > 0 {
+		missing = strings.Join(e.Missing, "、")
+	}
+	if len(e.Extra) > 0 {
+		extra = strings.Join(e.Extra, "、")
+	}
+	return fmt.Sprintf("%v: 漫画页数量与分页不一致（期望 %d 页，实际 %d 页；缺失：%s；多出：%s）", ErrInvalid, e.Expected, e.Actual, missing, extra)
+}
+
+func (e *comicPageCountError) Unwrap() error { return ErrInvalid }
+
+func newComicPageCountError(videos []Video, pages []comicPromptResult) *comicPageCountError {
+	expected := make(map[string]struct{}, len(videos))
+	missing := make([]string, 0, len(videos))
+	for _, video := range videos {
+		id := strings.TrimSpace(video.ID)
+		expected[id] = struct{}{}
+		found := false
+		for _, page := range pages {
+			if strings.TrimSpace(page.VideoID) == id {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		label := strings.TrimSpace(video.Label)
+		if label == "" {
+			label = "未命名页"
+		}
+		missing = append(missing, fmt.Sprintf("%s(%s)", label, id))
+	}
+	extra := make([]string, 0)
+	for _, page := range pages {
+		id := strings.TrimSpace(page.VideoID)
+		if _, ok := expected[id]; ok && id != "" {
+			continue
+		}
+		if id == "" {
+			id = "<空 video_id>"
+		}
+		extra = append(extra, id)
+	}
+	return &comicPageCountError{Expected: len(videos), Actual: len(pages), Missing: missing, Extra: extra}
+}
+
+func comicExpectedPageLabels(videos []Video) string {
+	labels := make([]string, 0, len(videos))
+	for _, video := range videos {
+		label := strings.TrimSpace(video.Label)
+		if label == "" {
+			label = video.ID
+		}
+		labels = append(labels, label)
+	}
+	return strings.Join(labels, "、")
 }
 
 func parseComicPromptResult(completion string) comicPromptResult {
