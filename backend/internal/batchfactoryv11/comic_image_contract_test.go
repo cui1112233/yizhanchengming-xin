@@ -1,6 +1,7 @@
 package batchfactoryv11
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -257,5 +258,83 @@ func TestBuildComicImageContractLocksSelectedStyleAfterConflictingPageDescriptio
 	}
 	if !strings.Contains(contract.Prompt[styleLockIndex:], "最高优先级") {
 		t.Fatalf("末尾画风锁定没有明确优先级: %s", contract.Prompt)
+	}
+}
+
+func comicPageLiteralTestSettings(t *testing.T, presetID string) SettingsPatch {
+	t.Helper()
+	return SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": rawSetting(t, map[string]any{"comic": map[string]any{
+			"presetId": presetID,
+			"style": map[string]any{
+				"presetId": "batch-comic-style-08",
+				"body":     "韩漫条漫画风",
+			},
+		}}),
+	}
+}
+
+func TestComicPageIllustratedTextPresetGatesOnlyIllustratedText(t *testing.T) {
+	if !ComicPageIllustratedTextPreset(comicPageLiteralTestSettings(t, ComicPageIllustratedTextPresetID)) {
+		t.Fatal("CM·文字插画版必须开启原文注入")
+	}
+	for _, presetID := range []string{
+		"batch-comic-page",
+		"batch-comic-page-fusion-bw",
+		"batch-comic-page-light",
+		"batch-comic-page-premium-strip",
+	} {
+		if ComicPageIllustratedTextPreset(comicPageLiteralTestSettings(t, presetID)) {
+			t.Fatalf("预设 %s 不应开启原文注入", presetID)
+		}
+	}
+}
+
+func TestAppendComicPageLiteralTextKeepsSourceVerbatim(t *testing.T) {
+	source := "夜色压低了整条街。\n「你迟到了。」陆淮安把外套递过来，声音很轻。"
+	got, appended := AppendComicPageLiteralText("画面上方文字区，下方插画区。", source)
+	if !appended {
+		t.Fatal("原文应被追加")
+	}
+	if !strings.Contains(got, source) {
+		t.Fatalf("最终 prompt 必须逐字包含原文（含换行）:\n%s", got)
+	}
+	if !strings.Contains(got, comicPageLiteralTextHeader) {
+		t.Fatalf("最终 prompt 必须包含硬约束标题:\n%s", got)
+	}
+	if strings.Count(got, source) != 1 {
+		t.Fatalf("原文只应出现一次:\n%s", got)
+	}
+	payload, err := json.Marshal(map[string]string{"prompt": got})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]string
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded["prompt"] != got {
+		t.Fatal("JSON 往返后 prompt 必须保持不变（引号与换行安全转义）")
+	}
+}
+
+func TestAppendComicPageLiteralTextDedupesExistingSource(t *testing.T) {
+	source := "我推开门。\n「你来了。」"
+	prompt := "版式说明\n\n" + source
+	got, appended := AppendComicPageLiteralText(prompt, source)
+	if appended {
+		t.Fatal("已带原文时不得重复拼接")
+	}
+	if strings.Count(got, source) != 1 {
+		t.Fatalf("原文只应保留一份:\n%s", got)
+	}
+}
+
+func TestAppendComicPageLiteralTextSkipsEmptySource(t *testing.T) {
+	prompt := "版式说明"
+	got, appended := AppendComicPageLiteralText(prompt, " \n ")
+	if appended || got != prompt {
+		t.Fatalf("空原文时不得改动 prompt: %q", got)
 	}
 }

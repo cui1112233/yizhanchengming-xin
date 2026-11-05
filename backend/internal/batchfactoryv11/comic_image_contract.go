@@ -27,6 +27,41 @@ func ComicImageStyleConfigured(settings SettingsPatch) bool {
 	return normalizeProductionMode(settings) == "comic" && strings.TrimSpace(aiReasoningPromptConfig(settings).Comic.Style.Body) != ""
 }
 
+// ComicPageIllustratedTextPresetID is the only comic page preset whose image
+// prompt must carry the page's source text verbatim.
+const ComicPageIllustratedTextPresetID = "batch-comic-page-illustrated-text"
+
+const comicPageLiteralTextHeader = "【文字区必须逐字排版，禁止改写/压缩/增删/翻译/合并句意】"
+
+// ComicPageIllustratedTextPreset reports whether the selected comic page preset
+// is CM·文字插画版. Other presets keep their existing image prompt untouched.
+func ComicPageIllustratedTextPreset(settings SettingsPatch) bool {
+	return strings.TrimSpace(aiReasoningPromptConfig(settings).Comic.ID) == ComicPageIllustratedTextPresetID
+}
+
+// AppendComicPageLiteralText appends the page's current_page source text to the
+// final image prompt so the image model receives the literal characters instead
+// of a text-model paraphrase. Quotes and newlines stay in the Go string; the
+// provider payload is produced by encoding/json, which escapes them safely.
+// It returns false when the source is empty or the prompt already contains it,
+// which keeps repeated generation from stacking duplicate source blocks.
+func AppendComicPageLiteralText(prompt, sourceText string) (string, bool) {
+	if strings.TrimSpace(sourceText) == "" {
+		return prompt, false
+	}
+	if strings.Contains(prompt, sourceText) {
+		return prompt, false
+	}
+	return prompt + ComicPageLiteralTextBlock(sourceText), true
+}
+
+// ComicPageLiteralTextBlock renders the hard-constraint block appended to the
+// final image prompt. Keeping it in one place lets the audit log print exactly
+// what was appended without duplicating the header text.
+func ComicPageLiteralTextBlock(sourceText string) string {
+	return "\n\n" + comicPageLiteralTextHeader + "\n" + sourceText
+}
+
 func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, assetKind, content string, assetImageURLs, pageReferenceURLs []string) (ComicImageContract, error) {
 	if normalizeProductionMode(settings) != "comic" {
 		return ComicImageContract{}, NewConfigRequiredError("当前书不是漫画生成模式")

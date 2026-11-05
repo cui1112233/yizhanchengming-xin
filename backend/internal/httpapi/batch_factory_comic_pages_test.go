@@ -1036,3 +1036,78 @@ func TestClassifyComicPageShortageSeparatesInFlightStaleAndFailed(t *testing.T) 
 		t.Fatalf("shortage message=%q", message)
 	}
 }
+
+func comicPageLiteralTestSettings(t *testing.T, presetID string) batchfactoryv11.SettingsPatch {
+	t.Helper()
+	return batchfactoryv11.SettingsPatch{
+		"productionMode": comicTestRaw(t, "comic"),
+		"aiPromptConfig": comicTestRaw(t, map[string]any{"comic": map[string]any{
+			"presetId": presetID,
+			"style":    map[string]any{"presetId": "batch-comic-style-08", "body": "韩漫条漫画风"},
+		}}),
+	}
+}
+
+func comicPageLiteralTestPage(source string) batchfactoryv11.Video {
+	return batchfactoryv11.Video{ID: "video-1", ComicSourceSegment: &batchfactoryv11.ComicSourceSegment{SourceText: source}}
+}
+
+func TestComicPageFinalImagePromptInjectsLiteralSourceOnlyForIllustratedText(t *testing.T) {
+	source := "夜色压低了整条街。\n「你迟到了。」陆淮安把外套递过来，声音很轻。"
+	page := comicPageLiteralTestPage(source)
+	for _, presetID := range []string{
+		"batch-comic-page",
+		"batch-comic-page-fusion-bw",
+		"batch-comic-page-light",
+		"batch-comic-page-premium-strip",
+	} {
+		settings := comicPageLiteralTestSettings(t, presetID)
+		contract, err := batchfactoryv11.BuildComicImageContract(settings, batchfactoryv11.ComicImagePurposePage, "", "画面上方文字区，下方插画区。", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, appended := comicPageFinalImagePrompt(contract.Prompt, settings, page)
+		if appended || got != contract.Prompt {
+			t.Fatalf("%s 不得注入原文块", presetID)
+		}
+		if strings.Contains(got, source) || strings.Contains(got, "【文字区必须逐字排版") {
+			t.Fatalf("%s 的出图 prompt 不得包含原文块:\n%s", presetID, got)
+		}
+	}
+	settings := comicPageLiteralTestSettings(t, batchfactoryv11.ComicPageIllustratedTextPresetID)
+	contract, err := batchfactoryv11.BuildComicImageContract(settings, batchfactoryv11.ComicImagePurposePage, "", "画面上方文字区，下方插画区。", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, appended := comicPageFinalImagePrompt(contract.Prompt, settings, page)
+	if !appended {
+		t.Fatal("CM·文字插画版必须注入原文块")
+	}
+	if !strings.Contains(got, source) {
+		t.Fatalf("最终出图 prompt 必须逐字包含 current_page 原文:\n%s", got)
+	}
+	if strings.Count(got, source) != 1 {
+		t.Fatalf("原文只应出现一次:\n%s", got)
+	}
+	again, appendedAgain := comicPageFinalImagePrompt(got, settings, page)
+	if appendedAgain || again != got {
+		t.Fatal("重复注入必须被去重")
+	}
+}
+
+func TestComicPageFinalImagePromptSkipsEmptySourceWithoutError(t *testing.T) {
+	settings := comicPageLiteralTestSettings(t, batchfactoryv11.ComicPageIllustratedTextPresetID)
+	contract, err := batchfactoryv11.BuildComicImageContract(settings, batchfactoryv11.ComicImagePurposePage, "", "画面上方文字区，下方插画区。", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, page := range []batchfactoryv11.Video{
+		{ID: "video-1"},
+		comicPageLiteralTestPage(" \n "),
+	} {
+		got, appended := comicPageFinalImagePrompt(contract.Prompt, settings, page)
+		if appended || got != contract.Prompt {
+			t.Fatal("空 current_page 时不得追加约束块")
+		}
+	}
+}

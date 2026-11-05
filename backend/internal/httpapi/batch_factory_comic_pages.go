@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -567,6 +568,24 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			log.Printf("comic page reuse repaired prompt batch=%s book=%s video=%s", batchID, bookID, videoID)
 		}
 	}
+	// CM·文字插画版：把本页 current_page 原文逐字拼进最终出图 prompt，不依赖
+	// 文本模型转述。其它预设原样放行。
+	generationPrompt, literalTextInjected := comicPageFinalImagePrompt(generationPrompt, effective, *selectedPage)
+	if batchfactoryv11.ComicPageIllustratedTextPreset(effective) {
+		switch {
+		case selectedPage.ComicSourceSegment == nil || strings.TrimSpace(selectedPage.ComicSourceSegment.SourceText) == "":
+			log.Printf("comic page literal text skipped batch=%s book=%s video=%s reason=no_current_page", batchID, bookID, videoID)
+		case literalTextInjected:
+			log.Printf("comic page literal text injected batch=%s book=%s video=%s chars=%d", batchID, bookID, videoID, len(selectedPage.ComicSourceSegment.SourceText))
+			// 默认关闭；只在显式审计时打印实际写入出图 prompt 的约束块，便于逐字核对。
+			if os.Getenv("QIANTIE_COMIC_LITERAL_TEXT_AUDIT_LOG") == "1" {
+				block := batchfactoryv11.ComicPageLiteralTextBlock(selectedPage.ComicSourceSegment.SourceText)
+				log.Printf("comic page literal text audit batch=%s book=%s video=%s prompt_chars=%d block_offset=%d block=%q", batchID, bookID, videoID, len(generationPrompt), strings.LastIndex(generationPrompt, block), block)
+			}
+		case strings.Contains(generationPrompt, selectedPage.ComicSourceSegment.SourceText):
+			log.Printf("comic page literal text deduped batch=%s book=%s video=%s", batchID, bookID, videoID)
+		}
+	}
 	mediaType, storageRef, source, err := generateShuihuoAssetImageArtifactWithRetry(generationCtx, g.store, g.files, g.presetCatalog, owner, target, generationPrompt, contract.ReferenceImageURLs, g.localExecutors)
 	if errors.Is(err, errShuihuoImageContentPolicy) {
 		// 两次降级仍被审核拒绝后，不要拿原提示词反复重试，而是先用文本模型
@@ -576,6 +595,7 @@ func (g comicPageGenerator) generatePage(ctx context.Context, owner, batchID, bo
 			progress("comic_images", fmt.Sprintf("%s 被内容审核拒绝，正在自动改写该页提示词为合规版本", selectedPage.Label))
 		}
 		repaired := g.repairComicPageImagePrompt(generationCtx, owner, generationPrompt, err.Error())
+		repaired, _ = comicPageFinalImagePrompt(repaired, effective, *selectedPage)
 		if repaired != "" && repaired != generationPrompt {
 			shuihuoRepairedPrompts.Store(repairKey, repaired)
 			if progress := comicGenerationProgressFromContext(ctx); progress != nil {
@@ -996,6 +1016,20 @@ func comicPageHasPrimary(pages []batchfactoryv11.ComicPage, videoID string) bool
 		return false
 	}
 	return false
+}
+
+// comicPageFinalImagePrompt injects the page's current_page source text verbatim
+// into the final image prompt for CM·文字插画版 only. It returns whether the
+// block was appended; empty source leaves the prompt untouched so generation
+// still proceeds.
+func comicPageFinalImagePrompt(prompt string, settings batchfactoryv11.SettingsPatch, page batchfactoryv11.Video) (string, bool) {
+	if !batchfactoryv11.ComicPageIllustratedTextPreset(settings) {
+		return prompt, false
+	}
+	if page.ComicSourceSegment == nil || strings.TrimSpace(page.ComicSourceSegment.SourceText) == "" {
+		return prompt, false
+	}
+	return batchfactoryv11.AppendComicPageLiteralText(prompt, page.ComicSourceSegment.SourceText)
 }
 
 func comicSettingString(settings batchfactoryv11.SettingsPatch, key, fallback string) string {
