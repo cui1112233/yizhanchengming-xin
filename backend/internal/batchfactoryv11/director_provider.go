@@ -22,6 +22,8 @@ type OpenAICompatibleProvider struct {
 	APIKey   string
 	Model    string
 	Client   *http.Client
+	// retryClient 用于协议不匹配时的一次性 HTTP/2 重试；生产为 nil，按 Endpoint 自动构造。
+	retryClient *http.Client
 }
 
 // Director planning is intentionally granted more time than a short asset or
@@ -75,7 +77,26 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		// 服务端按 HTTP/2 回帧、客户端按 HTTP/1.1 解析时会产生 malformed HTTP
+		// response。这里只切换协议重发一次；重试仍失败则保留原始错误。
+		if !directorProtocolMismatchError(err) {
+			return "", err
+		}
+		retryClient := p.retryClient
+		if retryClient == nil {
+			retryClient = openAICompatibleHTTP2Client(p.Endpoint)
+		}
+		retryReq, retryReqErr := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
+		if retryReqErr != nil {
+			return "", err
+		}
+		retryReq.Header.Set("Content-Type", "application/json")
+		retryReq.Header.Set("Authorization", "Bearer "+p.APIKey)
+		retryResp, retryErr := retryClient.Do(retryReq)
+		if retryErr != nil {
+			return "", err
+		}
+		resp = retryResp
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
@@ -115,19 +136,58 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	return content, nil
 }
 
+// openAICompatibleLegacyHTTP1Hosts 是已知会重置长连接的旧网关反向例外表。
+// 默认所有 https 端点都走 HTTP/2；只有列在这里的 host 继续强制 HTTP/1.1。
+var openAICompatibleLegacyHTTP1Hosts = map[string]struct{}{}
+
 func openAICompatibleHTTPClient(endpoint string) *http.Client {
+	return openAICompatibleHTTPClientForHosts(endpoint, openAICompatibleLegacyHTTP1Hosts)
+}
+
+func openAICompatibleHTTPClientForHosts(endpoint string, legacyHTTP1 map[string]struct{}) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	parsed, err := url.Parse(strings.TrimSpace(endpoint))
 	host := ""
 	if err == nil {
 		host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."))
 	}
-	if host == "api.vveai.com" || host == "ggwk1.online" || host == "www.ggwk1.online" {
-		transport.ForceAttemptHTTP2 = true
-		transport.TLSNextProto = nil
-	} else {
+	if openAICompatibleHostPrefersHTTP1(host, legacyHTTP1) {
 		transport.ForceAttemptHTTP2 = false
 		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	} else {
+		transport.ForceAttemptHTTP2 = true
+		transport.TLSNextProto = nil
 	}
 	return &http.Client{Timeout: directorProviderRequestTimeout, Transport: transport}
+}
+
+// openAICompatibleHostPrefersHTTP1 只对反向例外表内的旧网关返回 true。
+// Tencent Zeabur preview 域名可能只提供 HTTP/2，明确保留在允许 h2 的范围。
+func openAICompatibleHostPrefersHTTP1(host string, legacyHTTP1 map[string]struct{}) bool {
+	if host == "" {
+		return false
+	}
+	if host == "nvewvip.preview.tencent-zeabur.cn" || strings.HasSuffix(host, ".preview.tencent-zeabur.cn") {
+		return false
+	}
+	_, ok := legacyHTTP1[host]
+	return ok
+}
+
+// openAICompatibleHTTP2Client 强制 HTTP/2，用于协议不匹配时的一次性重试。
+func openAICompatibleHTTP2Client(endpoint string) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ForceAttemptHTTP2 = true
+	transport.TLSNextProto = nil
+	return &http.Client{Timeout: directorProviderRequestTimeout, Transport: transport}
+}
+
+// directorProtocolMismatchError 识别“服务端按 HTTP/2 回帧、客户端却按 H1 解析”
+// 的错误。这类错误只允许一次协议切换重试。
+func directorProtocolMismatchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "malformed HTTP response") || strings.Contains(message, "\x00\x00\x1e\x04")
 }

@@ -3,6 +3,8 @@ package batchfactoryv11
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +16,88 @@ func TestOpenAICompatibleHTTPClientUsesHTTP2ForGGWKEndpoint(t *testing.T) {
 	transport, ok := client.Transport.(*http.Transport)
 	if !ok || !transport.ForceAttemptHTTP2 || transport.TLSNextProto != nil {
 		t.Fatalf("transport=%#v, want HTTP/2-capable transport", client.Transport)
+	}
+}
+
+func TestOpenAICompatibleHTTPClientDefaultsToHTTP2(t *testing.T) {
+	for _, endpoint := range []string{
+		"https://nvewvip.preview.tencent-zeabur.cn/v1/chat/completions",
+		"https://abc.preview.tencent-zeabur.cn/v1/chat/completions",
+		"https://text.example.test/v1/chat/completions",
+	} {
+		client := openAICompatibleHTTPClient(endpoint)
+		transport, ok := client.Transport.(*http.Transport)
+		if !ok || !transport.ForceAttemptHTTP2 || transport.TLSNextProto != nil {
+			t.Fatalf("endpoint %s transport=%#v, want HTTP/2-capable transport", endpoint, client.Transport)
+		}
+	}
+}
+
+func TestOpenAICompatibleHTTPClientKeepsLegacyGatewayOnHTTP1(t *testing.T) {
+	legacy := map[string]struct{}{"legacy.example.test": {}}
+	client := openAICompatibleHTTPClientForHosts("https://legacy.example.test/v1/chat/completions", legacy)
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport.ForceAttemptHTTP2 || transport.TLSNextProto == nil {
+		t.Fatalf("transport=%#v, want HTTP/1.1-only transport for the legacy exception host", client.Transport)
+	}
+}
+
+type directorStubTransport struct {
+	calls int
+	fail  bool
+	body  string
+}
+
+func (s *directorStubTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	s.calls++
+	if s.fail {
+		return nil, fmt.Errorf("net/http: HTTP/1.x transport connection broken: malformed HTTP response \"\\x00\\x00\\x1e\\x04\"")
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(s.body)),
+	}, nil
+}
+
+func TestOpenAICompatibleProviderRetriesOnceWithHTTP2OnProtocolMismatch(t *testing.T) {
+	first := &directorStubTransport{fail: true}
+	second := &directorStubTransport{body: `{"choices":[{"message":{"content":"{}"}}]}`}
+	provider := OpenAICompatibleProvider{
+		Endpoint:    "https://nvewvip.preview.tencent-zeabur.cn/v1/chat/completions",
+		APIKey:      "test-key",
+		Model:       "test-model",
+		Client:      &http.Client{Transport: first},
+		retryClient: &http.Client{Transport: second},
+	}
+	content, err := provider.Complete(context.Background(), TextCompletionRequest{})
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if content != "{}" {
+		t.Fatalf("content=%q, want {}", content)
+	}
+	if first.calls != 1 || second.calls != 1 {
+		t.Fatalf("calls first=%d second=%d, want one attempt plus exactly one HTTP/2 retry", first.calls, second.calls)
+	}
+}
+
+func TestOpenAICompatibleProviderReportsOriginalErrorWhenHTTP2RetryFails(t *testing.T) {
+	first := &directorStubTransport{fail: true}
+	second := &directorStubTransport{fail: true}
+	provider := OpenAICompatibleProvider{
+		Endpoint:    "https://nvewvip.preview.tencent-zeabur.cn/v1/chat/completions",
+		APIKey:      "test-key",
+		Model:       "test-model",
+		Client:      &http.Client{Transport: first},
+		retryClient: &http.Client{Transport: second},
+	}
+	_, err := provider.Complete(context.Background(), TextCompletionRequest{})
+	if err == nil || !strings.Contains(err.Error(), "malformed HTTP response") {
+		t.Fatalf("error=%v, want the original malformed-response error", err)
+	}
+	if first.calls != 1 || second.calls != 1 {
+		t.Fatalf("calls first=%d second=%d, want exactly one retry", first.calls, second.calls)
 	}
 }
 

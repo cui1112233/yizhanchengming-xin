@@ -3675,27 +3675,35 @@ func shuihuoLongRunningImageHTTPClient() *http.Client {
 	return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
 }
 
-// Existing image gateways that reset long HTTP/2 generation streams remain on
-// HTTP/1.1; VVEAI advertises HTTP/2 and sends HTTP/2 frames when called as H1.
+// 默认所有 https 出图端点都走 HTTP/2；只有已知会重置长流的旧网关保留
+// HTTP/1.1 反向例外（shuihuoImageGenerationLegacyHTTP1Hosts）。
 func shuihuoImageGenerationHTTPClient(endpoint string) *http.Client {
 	parsed, err := url.Parse(strings.TrimSpace(endpoint))
-	if err == nil && shuihuoHTTP2ImageGatewayHost(parsed.Hostname()) {
-		return shuihuoLongRunningImageHTTPClient()
+	host := ""
+	if err == nil {
+		host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."))
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.ForceAttemptHTTP2 = false
-	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-	return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+	if shuihuoImageGenerationLegacyHTTP1Host(host) {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.ForceAttemptHTTP2 = false
+		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+		return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+	}
+	return shuihuoLongRunningImageHTTPClient()
 }
 
-func shuihuoHTTP2ImageGatewayHost(host string) bool {
-	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
-	switch host {
-	case "api.vveai.com", "ggwk1.online", "www.ggwk1.online":
-		return true
-	default:
+var shuihuoImageGenerationLegacyHTTP1Hosts = map[string]struct{}{}
+
+func shuihuoImageGenerationLegacyHTTP1Host(host string) bool {
+	if host == "" {
 		return false
 	}
+	// Tencent Zeabur preview 域名可能只提供 HTTP/2，明确保留在允许 h2 的范围。
+	if host == "nvewvip.preview.tencent-zeabur.cn" || strings.HasSuffix(host, ".preview.tencent-zeabur.cn") {
+		return false
+	}
+	_, ok := shuihuoImageGenerationLegacyHTTP1Hosts[host]
+	return ok
 }
 
 func shuihuoImageDownloadHTTPClient() *http.Client {

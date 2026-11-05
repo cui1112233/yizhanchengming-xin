@@ -184,22 +184,28 @@ func TestShuihuoLongRunningImageHTTPClientNegotiatesHTTP2(t *testing.T) {
 }
 
 func TestShuihuoImageGenerationHTTPClientSelectsProtocolByEndpoint(t *testing.T) {
-	vveai := shuihuoImageGenerationHTTPClient("https://api.vveai.com/v1/images/generations")
-	vveaiTransport := vveai.Transport.(*http.Transport)
-	if !vveaiTransport.ForceAttemptHTTP2 || vveaiTransport.TLSNextProto != nil {
-		t.Fatal("VVEAI endpoint must use the HTTP/2-capable transport")
+	for _, endpoint := range []string{
+		"https://api.vveai.com/v1/images/generations",
+		"https://www.ggwk1.online/v1/images/generations",
+		"https://nvewvip.preview.tencent-zeabur.cn/v1/images/generations",
+		"https://abc.preview.tencent-zeabur.cn/v1/images/generations",
+		"https://images.example.test/v1/images/generations",
+	} {
+		client := shuihuoImageGenerationHTTPClient(endpoint)
+		transport := client.Transport.(*http.Transport)
+		if !transport.ForceAttemptHTTP2 || transport.TLSNextProto != nil {
+			t.Fatalf("endpoint %s must use the HTTP/2-capable transport", endpoint)
+		}
 	}
+}
 
-	ggwk := shuihuoImageGenerationHTTPClient("https://www.ggwk1.online/v1/images/generations")
-	ggwkTransport := ggwk.Transport.(*http.Transport)
-	if !ggwkTransport.ForceAttemptHTTP2 || ggwkTransport.TLSNextProto != nil {
-		t.Fatal("GGWK endpoint must use the HTTP/2-capable transport")
-	}
-
-	other := shuihuoImageGenerationHTTPClient("https://images.example.test/v1/images/generations")
-	otherTransport := other.Transport.(*http.Transport)
-	if otherTransport.ForceAttemptHTTP2 || otherTransport.TLSNextProto == nil {
-		t.Fatal("other image gateways must retain the HTTP/1.1 transport")
+func TestShuihuoImageGenerationHTTPClientKeepsLegacyGatewayOnHTTP1(t *testing.T) {
+	shuihuoImageGenerationLegacyHTTP1Hosts["legacy-images.example.test"] = struct{}{}
+	defer delete(shuihuoImageGenerationLegacyHTTP1Hosts, "legacy-images.example.test")
+	client := shuihuoImageGenerationHTTPClient("https://legacy-images.example.test/v1/images/generations")
+	transport := client.Transport.(*http.Transport)
+	if transport.ForceAttemptHTTP2 || transport.TLSNextProto == nil {
+		t.Fatal("legacy exception gateway must retain the HTTP/1.1 transport")
 	}
 }
 
