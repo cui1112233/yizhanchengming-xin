@@ -3420,10 +3420,20 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     if (!batch?.id || !promptBook?.id || actionBusy !== stageActionKey('comic', promptBook.id)) return undefined;
     let active = true;
     let polling = false;
+    let lastComicRunStamp = '';
     const pollComicPromptBook = async () => {
       if (!active || polling) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
       polling = true;
       try {
+        // 整批 getBatch 单次约 6MB。生成期间每 1.5 秒拉一次会把主线程和服务器
+        // 都拖死；先用轻量 runtime-summary 判断该书的 comic run 是否变化，
+        // 只有状态/时间戳变化时才拉整批数据。
+        const summary = await getBatchRuntimeSummary(batch.id, { silent: true, suppressGlobalError: true });
+        const comicRun = (summary?.stageSummaries?.[promptBook.id]?.runs || []).find(run => run.stage === 'comic');
+        const stamp = comicRun ? `${comicRun.status}|${comicRun.updatedAt || comicRun.createdAt || ''}` : '';
+        if (!stamp || stamp === lastComicRunStamp) return;
+        lastComicRunStamp = stamp;
         const response = await getBatch(batch.id, { silent: true, suppressGlobalError: true });
         const latestBatch = response?.batch || response;
         const latestBook = (latestBatch?.books || []).find(item => item?.id === promptBook.id);
@@ -3438,7 +3448,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       }
     };
     pollComicPromptBook();
-    const timer = setInterval(pollComicPromptBook, 1500);
+    const timer = setInterval(pollComicPromptBook, 4000);
     return () => {
       active = false;
       clearInterval(timer);
