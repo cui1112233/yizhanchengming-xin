@@ -53,9 +53,13 @@ type BatchAutomationCoordinator struct {
 	controlMu             sync.Mutex
 	startMu               sync.Mutex
 	runCancels            map[string]context.CancelFunc
-	dispatchNextCheck     time.Time
-	dispatchNextCheckSet  bool
-	dispatcherOnce        sync.Once
+	// runEpochs 记录每个 job 当前有效的执行轮次。重试会在同一 jobID 上启动
+	// 新 run 并取消旧 run；旧 run 只能看到自己的 epoch，不能再写 job 终态、
+	// counts 或把书标成失败/停止，避免两轮 run 互相覆盖。
+	runEpochs            map[string]int64
+	dispatchNextCheck    time.Time
+	dispatchNextCheckSet bool
+	dispatcherOnce       sync.Once
 }
 
 type comicGenerationProgressFunc func(stage, message string)
@@ -1398,6 +1402,11 @@ func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job
 	if previous := c.runCancels[jobID]; previous != nil {
 		previous()
 	}
+	if c.runEpochs == nil {
+		c.runEpochs = map[string]int64{}
+	}
+	c.runEpochs[jobID]++
+	epoch := c.runEpochs[jobID]
 	c.runCancels[jobID] = cancel
 	c.controlMu.Unlock()
 	go func() {
@@ -1406,12 +1415,27 @@ func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				log.Printf("batch automation job %s panicked: %v", jobID, recovered)
+				if !c.isCurrentRun(jobID, epoch) {
+					return
+				}
 				job["state"], job["lastError"], job["updatedAt"] = "failed", fmt.Sprintf("panic: %v", recovered), c.now()
 				_ = c.setJob(owner, batchID, jobID, job)
 			}
 		}()
-		c.run(automationCtx, owner, batchID, jobID, job, batch)
+		c.run(automationCtx, epoch, owner, batchID, jobID, job, batch)
 	}()
+}
+
+func (c *BatchAutomationCoordinator) isCurrentRun(jobID string, epoch int64) bool {
+	c.controlMu.Lock()
+	defer c.controlMu.Unlock()
+	return c.runEpochs[jobID] == epoch
+}
+
+func (c *BatchAutomationCoordinator) runSuperseded(jobID string, epoch int64) bool {
+	c.controlMu.Lock()
+	defer c.controlMu.Unlock()
+	return c.runEpochs[jobID] > epoch
 }
 
 func (c *BatchAutomationCoordinator) cancelRun(jobID string) {
@@ -2303,7 +2327,7 @@ func (c *BatchAutomationCoordinator) GenerateBookAudioPlan(ctx context.Context, 
 	return nil, batchfactoryv11.ErrNotFound
 }
 
-func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
+func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
 	// Each external stage must have a bounded lifetime.  The UI should receive a
 	// failed state instead of leaving a book stuck at "running" when an upstream
 	// model endpoint stops responding.
@@ -2380,6 +2404,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		jobMu.Unlock()
 		persist := func() {
 			jobMu.Lock()
+			// 本轮 run 一旦被同一 job 的新一轮接管，旧 worker 不得再写书状态与
+			// job 计数，否则会覆盖新 run 的进度。
+			if !c.isCurrentRun(jobID, epoch) {
+				jobMu.Unlock()
+				return
+			}
 			clear(initialEntry)
 			for key, value := range entry {
 				initialEntry[key] = value
@@ -2446,6 +2476,14 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 							persist()
 							return
 						}
+						// ctx 被取消但控制态不是暂停/停止，说明本轮已被同一 job 的
+						// 新一轮执行接管。被取代的书不能写成 failed/stopped，保持
+						// 新一轮写入的状态即可。
+						if c.runSuperseded(jobID, epoch) {
+							markAutomationEntrySuperseded(entry, c.now())
+							persist()
+							return
+						}
 					}
 					// 余额不足/鉴权/参数校验这类确定性错误重试也只会再烧一次付费任务，
 					// 必须立即终态失败，跳过整书回补与重新入队。
@@ -2495,6 +2533,14 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					}
 				}
 				if ctx.Err() != nil {
+					// 旧 run 被同一 job 的新一轮重试接管时，不能把书标成
+					// "测试任务已停止"：这会被用户误读成主动停止，而且新一轮
+					// 仍会重新调度这些书。保留原状态并标注接管原因即可。
+					if c.runSuperseded(jobID, epoch) {
+						markAutomationEntrySuperseded(entry, c.now())
+						persist()
+						continue
+					}
 					entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "stopped", "stopped", "测试任务已停止", c.now()
 					persist()
 					continue
@@ -3049,6 +3095,19 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	if control, _, controlErr := c.currentJobControl(owner, batchID, jobID); controlErr == nil && (control == "paused" || control == "stopped") {
 		return
 	}
+	// 同一个 jobID 上可能已经启动了新一轮 run（重试/续跑）。旧 run 只有在自己的
+	// epoch 仍然有效、并且本次调度的书都已到终态时才允许写 job 终态与 counts，
+	// 否则会把新 run 的状态覆盖成 failed/completed（线上表现为 job 提前 failed
+	// 而同一 job 仍有 3 本书在跑）。
+	if !c.isCurrentRun(jobID, epoch) {
+		return
+	}
+	for _, book := range batch.Books {
+		entry, _ := books[book.ID].(map[string]any)
+		if !automationEntryTerminal(entry) {
+			return
+		}
+	}
 	// Recount from persisted entries rather than only this goroutine's local
 	// failures. A retry run intentionally skips unrelated terminal books; those
 	// books must remain failed in the aggregate instead of being reported ready.
@@ -3070,9 +3129,12 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 			autoRetryPending = true
 		}
 	}
+	// counts.total 必须按 job 跟踪的全部书计算：重试只调度未成功的书，
+	// batch.Books 已收窄为本次要跑的子集，用 len(batch.Books) 会让总数变少。
+	totalBooks := len(books)
 	if autoRetryPending {
 		job["state"], job["updatedAt"] = "running", c.now()
-		job["counts"] = automationCounts(len(batch.Books), 0, failedCount, readyCount)
+		job["counts"] = automationCounts(totalBooks, 0, failedCount, readyCount)
 		_ = c.setJob(owner, batchID, jobID, job)
 		return
 	}
@@ -3085,13 +3147,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 	}
 	if failedCount == 0 && pendingCount > 0 {
 		job["state"], job["updatedAt"] = "scheduled", c.now()
-		job["counts"] = automationCountsWithPending(len(batch.Books), pendingCount)
+		job["counts"] = automationCountsWithPending(totalBooks, pendingCount)
 		_ = c.setJob(owner, batchID, jobID, job)
 		return
 	}
 	job["state"] = "completed"
 	job["completedAt"], job["updatedAt"] = c.now(), c.now()
-	job["counts"] = automationCounts(len(batch.Books), 0, failedCount, readyCount)
+	job["counts"] = automationCounts(totalBooks, 0, failedCount, readyCount)
 	if failedCount > 0 {
 		job["state"] = "failed"
 	}
@@ -3104,6 +3166,69 @@ func cloneAutomationEntry(entry map[string]any) map[string]any {
 		cloned[key] = value
 	}
 	return cloned
+}
+
+// automationEntryTerminal 判断单本书是否已经落到终态或明确的等待态。
+// running/queued 说明本书仍在本轮（或新一轮）执行中，run() 不能在这种时候
+// 写 job 终态，否则会出现“job 已 failed、但还有书在跑”的假状态。
+func automationEntryTerminal(entry map[string]any) bool {
+	if entry == nil {
+		return true
+	}
+	switch automationStringValue(entry["status"], "") {
+	case "completed", "failed", "blocked", "stopped", "paused", "scheduled", "pending_confirmation":
+		return true
+	}
+	return false
+}
+
+// automationBookRetryable 判断重试是否应该重新调度这本书。已完成（含已发布）
+// 与正在执行的书必须排除，否则重试会把它们再跑一遍；其余未成功状态
+// （failed/blocked/stopped/paused/queued/等待中/从未执行）都属于可重试范围。
+func automationBookRetryable(entry map[string]any) bool {
+	if entry == nil {
+		return false
+	}
+	if automationStringValue(entry["stage"], "") == "published" {
+		return false
+	}
+	switch automationStringValue(entry["status"], "") {
+	case "completed", "running":
+		return false
+	}
+	return true
+}
+
+// selectRetryableAutomationBooks 返回本次重试真正要调度的书。
+// requested 为空表示“重试全部未成功的书”；非空时先与 job 实际跟踪的书取交集。
+func selectRetryableAutomationBooks(books map[string]any, requested map[string]bool) map[string]bool {
+	selected := make(map[string]bool, len(books))
+	for id, raw := range books {
+		if len(requested) > 0 && !requested[id] {
+			continue
+		}
+		entry, _ := raw.(map[string]any)
+		if !automationBookRetryable(entry) {
+			continue
+		}
+		selected[id] = true
+	}
+	return selected
+}
+
+// markAutomationEntrySuperseded 用于旧 run 被同一 job 的新一轮执行接管时：
+// 保留书在新一轮中的状态，只标注接管原因，不能再写 stopped/“测试任务已停止”
+// 把重试副作用显示成用户主动停止。
+func markAutomationEntrySuperseded(entry map[string]any, now time.Time) {
+	if entry == nil {
+		return
+	}
+	entry["supersededByRun"] = true
+	if automationStringValue(entry["message"], "") == "" {
+		entry["message"] = "已被新一轮任务接管，等待重新执行"
+	}
+	entry["updatedAt"] = now
+	appendAutomationBookLog(entry, now, automationStringValue(entry["stage"], ""), "旧执行轮次已被新一轮接管")
 }
 
 // automationBookLogLimit 限制单本书保留的执行日志条数，避免状态文件无限增长。
@@ -3584,6 +3709,22 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 没有可控制的自动化任务", batchfactoryv11.ErrNotFound)
 	}
+	// 主修：running 表示任务正在执行，重试绝不能在同一 jobID 上再起一轮 run。
+	// 旧实现会先取消当前 run 的 ctx 再 launchRun，旧 run 的 worker 随后在
+	// ctx.Err() 分支把书改写成 stopped（“测试任务已停止”），用户却以为自己
+	// 只是点了重试。
+	if automationStringValue(target["state"], "") == "running" {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("%w: 任务正在执行，完成后再重试", batchfactoryv11.ErrConflict)
+	}
+	books, _ := target["books"].(map[string]any)
+	// 重试只调度未成功的书：已完成/已发布、正在执行、等待定时提交或等待人工
+	// 确认的书都不进入新一轮 run。显式传了 bookIds 时先与 job 跟踪的书取交集。
+	selected := selectRetryableAutomationBooks(books, set)
+	if len(selected) == 0 {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("%w: 没有需要重试的书，已完成或正在执行的书不会重复执行", batchfactoryv11.ErrConflict)
+	}
 	target["state"], target["updatedAt"] = "running", c.now()
 	if reopened {
 		// Terminal markers must not make the status reader expose the reopened
@@ -3598,12 +3739,7 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		// counter scopes the video request id to this retry.
 		target["retryAttempt"] = automationNumberValue(target["retryAttempt"], 0) + 1
 	}
-	books, _ := target["books"].(map[string]any)
-	tracked := make(map[string]bool, len(books))
-	for id := range books {
-		tracked[id] = true
-	}
-	resetRetryableAutomationBooks(books, set, c.now())
+	resetRetryableAutomationBooks(books, selected, c.now())
 	if reopened {
 		var running, failed, ready int
 		for _, raw := range books {
@@ -3634,14 +3770,17 @@ func (c *BatchAutomationCoordinator) Retry(ctx context.Context, owner, batchID s
 		}
 	}
 	// run() indexes one job entry per batch book and would panic on books this
-	// job never tracked (a batch run can cover a subset). Relaunch against the
-	// tracked set only; completed entries are skipped inside run().
+	// job never tracked (a batch run can cover a subset). Relaunch only the
+	// selected (not-yet-successful) books; completed entries stay out of this run.
 	scoped := batch
-	scoped.Books = make([]batchfactoryv11.Book, 0, len(tracked))
+	scoped.Books = make([]batchfactoryv11.Book, 0, len(selected))
 	for _, book := range batch.Books {
-		if tracked[book.ID] {
+		if selected[book.ID] {
 			scoped.Books = append(scoped.Books, book)
 		}
+	}
+	if len(scoped.Books) == 0 {
+		return nil, fmt.Errorf("%w: 没有需要重试的书，已完成或正在执行的书不会重复执行", batchfactoryv11.ErrConflict)
 	}
 	c.launchRun(owner, batchID, automationStringValue(target["id"], ""), target, scoped)
 	return publicAutomationJob(target), nil
@@ -3730,6 +3869,12 @@ func (c *BatchAutomationCoordinator) control(owner, batchID, nextState string, a
 	if target == nil {
 		c.mu.Unlock()
 		return nil, fmt.Errorf("%w: 没有可控制的自动化任务", batchfactoryv11.ErrNotFound)
+	}
+	// 与 Retry 一致：任务正在执行时不能再起第二个 run。旧实现会把 state 写回
+	// running 并 launchRun，取消旧 run 的 ctx，造成两轮 run 并存。
+	if nextState == "running" && automationStringValue(target["state"], "") == "running" {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("%w: 任务正在执行，完成后再继续", batchfactoryv11.ErrConflict)
 	}
 	target["state"], target["updatedAt"] = nextState, c.now()
 	if err := c.saveLocked(state); err != nil {
