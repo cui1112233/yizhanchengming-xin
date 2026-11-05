@@ -378,7 +378,7 @@ func TestComicAutomationStopsAfterWholeBookCollectionWithoutAudioOrVideo(t *test
 	entry := map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
 	job := map[string]any{"id": "job-comic", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": map[string]any{book.ID: entry}}
 
-	coordinator.run(ctx, "alice", batch.ID, "job-comic", job, batch)
+	coordinator.run(ctx, 0, "alice", batch.ID, "job-comic", job, batch)
 
 	if !generated || provider.calls != 3 {
 		t.Fatalf("generated=%v AI calls=%d entry=%#v, want separate comic asset, segmentation and prompt calls", generated, provider.calls, entry)
@@ -430,7 +430,7 @@ func TestComicAutomationHonorsBookConcurrency(t *testing.T) {
 	}
 	job := map[string]any{"id": "job-concurrent", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "storyboard_only", "concurrency": 2, "books": entries}
 
-	coordinator.run(ctx, "alice", batch.ID, "job-concurrent", job, batch)
+	coordinator.run(ctx, 0, "alice", batch.ID, "job-concurrent", job, batch)
 
 	provider.mu.Lock()
 	maxActive := provider.max
@@ -498,7 +498,7 @@ func TestAutomationRunSkipsBlockedBook(t *testing.T) {
 	}
 	job := map[string]any{"id": "job-blocked", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": entries}
 
-	coordinator.run(ctx, "alice", batch.ID, "job-blocked", job, batch)
+	coordinator.run(ctx, 0, "alice", batch.ID, "job-blocked", job, batch)
 
 	blockedEntry := entries[blocked.ID].(map[string]any)
 	if blockedEntry["status"] != "blocked" || blockedEntry["stage"] != "preflight" || !strings.Contains(fmt.Sprint(blockedEntry["message"]), "文本模型") {
@@ -1311,7 +1311,7 @@ func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 			entry := map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
 			job := map[string]any{"id": "job-assets-toggle", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "storyboard_only", "books": map[string]any{book.ID: entry}}
 
-			coordinator.run(ctx, "alice", batch.ID, "job-assets-toggle", job, batch)
+			coordinator.run(ctx, 0, "alice", batch.ID, "job-assets-toggle", job, batch)
 
 			if entry["status"] != "completed" || entry["stage"] != "ready_for_video" || automationStringValue(entry["error"], "") != "" {
 				t.Fatalf("entry=%#v, want a completed storyboard stage without errors", entry)
@@ -1392,7 +1392,7 @@ func TestComicAutomationWithAssetImagesDisabledStillRunsTheComicStages(t *testin
 	entry := map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
 	job := map[string]any{"id": "job-comic-assets-off", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": map[string]any{book.ID: entry}}
 
-	coordinator.run(ctx, "alice", batch.ID, "job-comic-assets-off", job, batch)
+	coordinator.run(ctx, 0, "alice", batch.ID, "job-comic-assets-off", job, batch)
 
 	// 关闭资产图片：不重新提炼资产，也不出图；漫画仍按正文分页并生成页提示词。
 	if !generated || provider.calls != 2 {
@@ -2036,5 +2036,227 @@ func TestAutomationRetryScopesTheVideoRequestID(t *testing.T) {
 		if other == first {
 			t.Fatal("重试/回补 requestID 必须与首次运行不同，否则会命中旧失败任务")
 		}
+	}
+}
+
+// 线上事故：任务 running 时点重试，Retry 会在同一 jobID 上再起一轮 run，
+// 旧 run 的 worker 随后把书写成 stopped（“测试任务已停止”）。running 必须直接 409。
+func TestRetryRefusesRunningJobWithoutLaunchingAnotherRun(t *testing.T) {
+	now := time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "automation.json")
+	coordinator := &BatchAutomationCoordinator{path: path, now: func() time.Time { return now }}
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-running": {
+			"id": "job-running", "owner": "alice", "batchId": "batch-1", "state": "running",
+			"books": map[string]any{
+				"book-failed":  map[string]any{"status": "failed", "stage": "comic_images"},
+				"book-running": map[string]any{"status": "running", "stage": "comic_images"},
+			},
+		},
+	}}
+	if err := coordinator.saveLocked(state); err != nil {
+		t.Fatal(err)
+	}
+	result, err := coordinator.Retry(context.Background(), "alice", "batch-1", nil)
+	if !errors.Is(err, batchfactoryv11.ErrConflict) || !strings.Contains(err.Error(), "任务正在执行，完成后再重试") {
+		t.Fatalf("Retry err=%v result=%#v, want 409 任务正在执行", err, result)
+	}
+	coordinator.controlMu.Lock()
+	epochs := len(coordinator.runEpochs)
+	coordinator.controlMu.Unlock()
+	if epochs != 0 {
+		t.Fatalf("running 时重试不得启动新 run，runEpochs=%#v", coordinator.runEpochs)
+	}
+	reloaded, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	books := reloaded.Jobs["job-running"]["books"].(map[string]any)
+	if books["book-failed"].(map[string]any)["status"] != "failed" {
+		t.Fatalf("被拒绝的重试不得改动书状态: %#v", books["book-failed"])
+	}
+}
+
+// 与 Retry 一致：running 时 Resume 也必须 409，不能再起第二个 run。
+func TestResumeRefusesRunningJobWithoutLaunchingAnotherRun(t *testing.T) {
+	now := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "automation.json")
+	coordinator := &BatchAutomationCoordinator{path: path, now: func() time.Time { return now }}
+	counts := map[string]any{"total": float64(2), "running": float64(1), "failed": float64(1), "ready": float64(0)}
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-running": {
+			"id": "job-running", "owner": "alice", "batchId": "batch-1", "state": "running", "counts": counts,
+			"books": map[string]any{
+				"book-failed":  map[string]any{"status": "failed", "stage": "comic_images"},
+				"book-running": map[string]any{"status": "running", "stage": "comic_images"},
+			},
+		},
+	}}
+	if err := coordinator.saveLocked(state); err != nil {
+		t.Fatal(err)
+	}
+	result, err := coordinator.Resume(context.Background(), "alice", "batch-1")
+	if !errors.Is(err, batchfactoryv11.ErrConflict) || !strings.Contains(err.Error(), "任务正在执行，完成后再继续") {
+		t.Fatalf("Resume err=%v result=%#v, want 409 任务正在执行", err, result)
+	}
+	coordinator.controlMu.Lock()
+	epochs := len(coordinator.runEpochs)
+	coordinator.controlMu.Unlock()
+	if epochs != 0 {
+		t.Fatalf("running 时 Resume 不得启动新 run，runEpochs=%#v", coordinator.runEpochs)
+	}
+	reloaded, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := reloaded.Jobs["job-running"]
+	if automationStringValue(job["state"], "") != "running" {
+		t.Fatalf("被拒绝的 Resume 不得改动 job 状态: %#v", job["state"])
+	}
+	before, _ := json.Marshal(counts)
+	after, _ := json.Marshal(job["counts"])
+	if string(before) != string(after) {
+		t.Fatalf("被拒绝的 Resume 不得改动 counts: before=%s after=%s", before, after)
+	}
+	books := job["books"].(map[string]any)
+	if books["book-failed"].(map[string]any)["status"] != "failed" || books["book-running"].(map[string]any)["status"] != "running" {
+		t.Fatalf("被拒绝的 Resume 不得改动书状态: %#v", books)
+	}
+}
+
+// 重试只挑未成功的书；已完成/已发布、正在执行的书不进新一轮 run。
+func TestSelectRetryableAutomationBooksSkipsSucceededAndRunning(t *testing.T) {
+	books := map[string]any{
+		"ready":      map[string]any{"status": "completed", "stage": "completed"},
+		"published":  map[string]any{"status": "completed", "stage": "published"},
+		"running":    map[string]any{"status": "running", "stage": "comic_images"},
+		"queued":     map[string]any{"status": "queued", "stage": "assets"},
+		"failed":     map[string]any{"status": "failed", "stage": "comic_images"},
+		"stopped":    map[string]any{"status": "stopped", "stage": "comic_publish"},
+		"blocked":    map[string]any{"status": "blocked", "stage": "preflight"},
+		"waiting":    map[string]any{"status": "scheduled", "stage": "waiting_submit"},
+		"confirming": map[string]any{"status": "pending_confirmation", "stage": "sensitive_review"},
+		"never-ran":  map[string]any{},
+	}
+
+	selected := selectRetryableAutomationBooks(books, nil)
+	for _, id := range []string{"ready", "published", "running"} {
+		if selected[id] {
+			t.Fatalf("%s must not be retried: %#v", id, selected)
+		}
+	}
+	for _, id := range []string{"failed", "stopped", "blocked", "queued", "waiting", "confirming", "never-ran"} {
+		if !selected[id] {
+			t.Fatalf("%s must be retried: %#v", id, selected)
+		}
+	}
+
+	// 显式 bookIds 只是收窄范围，不能把已成功的书拉回来重跑。
+	requested := selectRetryableAutomationBooks(books, map[string]bool{"ready": true, "failed": true, "not-tracked": true})
+	if len(requested) != 1 || !requested["failed"] {
+		t.Fatalf("explicit selection = %#v, want only failed", requested)
+	}
+}
+
+// 全部书都已成功时重试必须明确报错，不能静默启动一个空 run。
+func TestRetryWithoutUnfinishedBooksReturnsConflict(t *testing.T) {
+	now := time.Date(2026, 11, 5, 9, 30, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "automation.json")
+	coordinator := &BatchAutomationCoordinator{path: path, now: func() time.Time { return now }}
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-done": {
+			"id": "job-done", "owner": "alice", "batchId": "batch-1", "state": "completed",
+			"books": map[string]any{
+				"book-1": map[string]any{"status": "completed", "stage": "published"},
+				"book-2": map[string]any{"status": "completed", "stage": "completed"},
+			},
+		},
+	}}
+	if err := coordinator.saveLocked(state); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := coordinator.Retry(context.Background(), "alice", "batch-1", nil); !errors.Is(err, batchfactoryv11.ErrConflict) || !strings.Contains(err.Error(), "没有需要重试的书") {
+		t.Fatalf("Retry err=%v, want 没有需要重试的书", err)
+	}
+	if _, err := coordinator.Retry(context.Background(), "alice", "batch-1", []string{"book-1"}); !errors.Is(err, batchfactoryv11.ErrConflict) || !strings.Contains(err.Error(), "没有需要重试的书") {
+		t.Fatalf("显式指定已成功的书时 err=%v, want 没有需要重试的书", err)
+	}
+	coordinator.controlMu.Lock()
+	epochs := len(coordinator.runEpochs)
+	coordinator.controlMu.Unlock()
+	if epochs != 0 {
+		t.Fatalf("空集合不得启动 run，runEpochs=%#v", coordinator.runEpochs)
+	}
+}
+
+// 旧 run 只能看到自己的 epoch：新一轮启动后，旧 run 既不能写 job 终态，
+// 也不能把仍有书在跑的书目统计成 failed。
+func TestOldRunEpochCannotOverwriteNewRunTerminalState(t *testing.T) {
+	coordinator := &BatchAutomationCoordinator{runEpochs: map[string]int64{"job-1": 2}}
+	if coordinator.isCurrentRun("job-1", 1) {
+		t.Fatal("旧 epoch 不能被当作当前 run")
+	}
+	if !coordinator.runSuperseded("job-1", 1) {
+		t.Fatal("旧 epoch 必须被识别为已被新一轮取代")
+	}
+	if !coordinator.isCurrentRun("job-1", 2) {
+		t.Fatal("最新 epoch 才是当前 run")
+	}
+	if coordinator.runSuperseded("job-1", 2) {
+		t.Fatal("当前 run 不应被标记为被取代")
+	}
+
+	runningEntry := map[string]any{"status": "running"}
+	if automationEntryTerminal(runningEntry) {
+		t.Fatal("running 的书不是终态，run() 不能写 job 终态")
+	}
+	for _, status := range []string{"completed", "failed", "blocked", "stopped", "scheduled", "pending_confirmation", "paused"} {
+		if !automationEntryTerminal(map[string]any{"status": status}) {
+			t.Fatalf("%s 应视为终态/等待态", status)
+		}
+	}
+}
+
+// ctx 被新一轮取代时，书不能写成 stopped/“测试任务已停止”，应保留原状态并标注接管。
+func TestSupersededAutomationEntryKeepsStatusInsteadOfStopped(t *testing.T) {
+	now := time.Date(2026, 11, 5, 8, 48, 3, 0, time.UTC)
+	entry := map[string]any{"status": "running", "stage": "comic_images", "message": "正在生成第 12/35 页"}
+	markAutomationEntrySuperseded(entry, now)
+	if automationStringValue(entry["status"], "") != "running" {
+		t.Fatalf("status=%#v, want running kept", entry["status"])
+	}
+	if !automationBoolValue(entry["supersededByRun"]) {
+		t.Fatalf("entry=%#v, want supersededByRun marker", entry)
+	}
+	if automationStringValue(entry["message"], "") != "正在生成第 12/35 页" {
+		t.Fatalf("message=%#v, must keep the real progress message", entry["message"])
+	}
+	if strings.Contains(automationStringValue(entry["message"], ""), "测试任务已停止") {
+		t.Fatal("被取代的书不能显示成用户主动停止")
+	}
+	logs, _ := entry["logs"].([]any)
+	if len(logs) == 0 || !strings.Contains(automationStringValue(logs[len(logs)-1].(map[string]any)["message"], ""), "新一轮接管") {
+		t.Fatalf("logs=%#v, want 接管记录", entry["logs"])
+	}
+}
+
+// 旧 epoch 的 run 结束后不能把新 run 的 job 终态覆盖成 failed/completed。
+func TestRunWithStaleEpochDoesNotWriteTerminalJobState(t *testing.T) {
+	now := time.Date(2026, 11, 5, 9, 45, 0, 0, time.UTC)
+	coordinator := &BatchAutomationCoordinator{
+		now:       func() time.Time { return now },
+		runEpochs: map[string]int64{"job-stale": 2},
+	}
+	entry := map[string]any{"status": "completed", "stage": "published"}
+	job := map[string]any{"id": "job-stale", "owner": "alice", "batchId": "batch-1", "state": "running", "books": map[string]any{"book-1": entry}}
+	batch := batchfactoryv11.Batch{ID: "batch-1", Books: []batchfactoryv11.Book{{ID: "book-1"}}}
+
+	coordinator.run(context.Background(), 1, "alice", "batch-1", "job-stale", job, batch)
+
+	if automationStringValue(job["state"], "") != "running" {
+		t.Fatalf("stale run 覆盖了 job 终态: %#v", job["state"])
+	}
+	if _, ok := job["completedAt"]; ok {
+		t.Fatalf("stale run 不得写入 completedAt: %#v", job)
 	}
 }
