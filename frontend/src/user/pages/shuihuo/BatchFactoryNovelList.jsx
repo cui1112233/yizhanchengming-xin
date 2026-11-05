@@ -154,7 +154,7 @@ import { batchFactoryShouldPrepareAudio, batchFactoryShouldRecompileVideoPrompts
 import { ComicSourceContent } from './ComicSourceContent.jsx';
 import { batchMediaCounts as runtimeBatchMediaCounts, batchFactoryNovelCopyText, bookVideoVersions, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { downloadProductionContent } from './batchFactoryContentDownload.js';
-import { realVideoDurationSeconds } from './batchFactoryVideoMeta';
+import { realVideoDurationSeconds, formatDurationSeconds } from './batchFactoryVideoMeta';
 import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
 import { ProductionMediaBoundary } from '../batch-factory-v11/ProductionMediaBoundary';
 import { checkWebSubmitEnvironment, getWebSubmitConfig, testWebSubmitVisible } from '../../../shared/api/novelFetch';
@@ -2732,7 +2732,7 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
         {current.status === 'succeeded' && String(current.outputUrl || '').trim()
           ? renderThumb(current, currentInfo, `合成成片 ${batchFactoryStableMediaLabel('M', current.id)}`)
           : <PassiveMediaPoster className="batch-factory-media-pickstation-thumb is-landscape" label="等待成片" detail={current.status === 'failed' ? '合成失败' : '处理中'} />}
-        <span><b>{current.openingLabel || '原开头'} · {batchFactoryStableMediaLabel('M', current.id)}</b><small>{currentInfo.duration > 0 ? `${currentInfo.duration.toFixed(1)}s · ` : ''}{mergeJobSpeed(current).toFixed(1)}x · {currentInfo.ratioText}</small><em>{mergeJobsNewest.length > 1 ? '上传组成' : selectedMerge?.id === current.id ? '当前上传来源' : '合成成片'}</em></span>
+        <span><b>{current.openingLabel || '原开头'} · {batchFactoryStableMediaLabel('M', current.id)}</b><small>{formatDurationSeconds(currentInfo.duration)} · {mergeJobSpeed(current).toFixed(1)}x · {currentInfo.ratioText}</small><em>{mergeJobsNewest.length > 1 ? '上传组成' : selectedMerge?.id === current.id ? '当前上传来源' : '合成成片'}</em></span>
       </button> : <div className="batch-factory-media-pickstation-empty">全部分镜选定主版本后，可在底部发起合成。</div>}
       <div className="batch-factory-media-pickstation-versions">
         {mergeJobsNewest.map(job => {
@@ -2773,7 +2773,7 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
       </header>
       {main?.mediaUrl ? <button type="button" className="batch-factory-media-pickstation-main" onClick={() => selectVideoPreview(video, main)}>
         {renderThumb(main, info, `${label(video)} 主版本`)}
-        <span><b>{batchFactoryStableMediaLabel('V', main.id)} · {info.ratioText}</b><small>{main.actualDurationSeconds ? `${Number(main.actualDurationSeconds).toFixed(1)}s · ` : ''}{state.list.length} 个版本</small><em>{uploadMain ? '上传来源' : '合成主版本'}</em></span>
+        <span><b>{batchFactoryStableMediaLabel('V', main.id)} · {info.ratioText}</b><small>{formatDurationSeconds(main.actualDurationSeconds)} · {state.list.length} 个版本</small><em>{uploadMain ? '上传来源' : '合成主版本'}</em></span>
       </button> : <button type="button" className="batch-factory-media-pickstation-main is-empty" onClick={() => selectVideoPreview(video, null, false)}>
         <PassiveMediaPoster className="batch-factory-media-pickstation-thumb is-landscape" label={`分镜 ${index + 1}`} detail={state.active ? '生成中' : state.failed ? '生成失败' : '暂无视频'} />
         <span><b>{state.progress?.message || '暂无可用主版本'}</b><small>{state.active ? '任务会自动刷新' : '生成成功后显示版本'}</small></span>
@@ -2823,18 +2823,20 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
     ? (viewerMerge ? `合成成片 ${batchFactoryStableMediaLabel('M', viewerMerge.id)}` : '合成成片')
     : (viewerVideo ? label(viewerVideo) : '分镜');
   const viewerMeta = viewerKind === 'merge'
-    ? (viewerMerge ? `${viewerInfo.duration > 0 ? `${viewerInfo.duration.toFixed(1)}s · ` : ''}${mergeJobSpeed(viewerMerge).toFixed(1)}x · ${viewerInfo.ratioText}` : '—')
+    ? (viewerMerge ? `${formatDurationSeconds(viewerInfo.duration)} · ${mergeJobSpeed(viewerMerge).toFixed(1)}x · ${viewerInfo.ratioText}` : '—')
     : (viewerVersion ? `${batchFactoryStableMediaLabel('V', viewerVersion.id)} · ${viewerInfo.ratioText}` : '—');
 
   const primaryVideoDurationRows = videos.map(video => {
     const main = videoState(video).main;
-    if (!main) return { seconds: 0, exact: false };
+    if (!main) return { actualSeconds: 0, plannedSeconds: 0, exact: false };
     const actual = Number(main.actualDurationSeconds || mediaMetrics[String(main.id || '')]?.duration || 0);
-    if (actual > 0) return { seconds: actual, exact: true };
-    return { seconds: Number(main.requestedDurationSeconds || video.durationSeconds || 0), exact: false };
+    if (actual > 0) return { actualSeconds: actual, plannedSeconds: actual, exact: true };
+    return { actualSeconds: 0, plannedSeconds: Number(main.requestedDurationSeconds || video.durationSeconds || 0), exact: false };
   });
-  const videoTotalSeconds = primaryVideoDurationRows.reduce((sum, item) => sum + (Number.isFinite(item.seconds) ? item.seconds : 0), 0);
-  const videoTotalIsExact = primaryVideoDurationRows.length > 0 && primaryVideoDurationRows.every(item => item.exact && item.seconds > 0);
+  const videoTotalSeconds = primaryVideoDurationRows.reduce((sum, item) => sum + (Number.isFinite(item.plannedSeconds) ? item.plannedSeconds : 0), 0);
+  const videoTotalIsExact = primaryVideoDurationRows.length > 0 && primaryVideoDurationRows.every(item => item.exact && item.actualSeconds > 0);
+  // 只有全部主版本都读到真实时长才显示合计；否则显示「未知」，不拿计划值凑数。
+  const videoTotalDisplay = videoTotalIsExact ? `${videoTotalSeconds.toFixed(1)}s` : '未知';
   const autoMergeRateRaw = Number(audioDurationSeconds || 0) > 0 && videoTotalSeconds > 0 ? videoTotalSeconds / Number(audioDurationSeconds) : 0;
   const autoMergeRate = autoMergeRateRaw > 0 ? Math.min(4, Math.max(0.5, autoMergeRateRaw)) : 0;
   const estimatedFinalSeconds = autoMergeRate > 0 ? videoTotalSeconds / autoMergeRate : 0;
@@ -2983,7 +2985,7 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
             <h3>合成控制</h3>
             <div className="batch-factory-media-bottom-sheet-row"><span>本次倍率</span>{followAudio ? <b>{autoMergeRate > 0 ? `自动 · ${autoMergeRate.toFixed(3)}x` : '自动计算'}</b> : <InputNumber min={0.5} max={4} step={0.1} value={mergeSpeed} onChange={value => onMergeSpeedChange?.(Number(value || 1))} addonAfter="x" />}</div>
             <div className="batch-factory-media-bottom-sheet-row"><span>合并跟随配音</span><div className="batch-factory-follow-audio-control"><Switch checked={followAudio} loading={audioBusy} onChange={toggleFollowAudio} /><small>可事后开启并自动读取当前书配音时长</small></div></div>
-            {followAudio ? <><div className="batch-factory-media-bottom-sheet-row"><span>配音目标</span><div className="batch-factory-audio-duration-edit"><InputNumber min={0.1} step={0.01} value={audioDurationSeconds || undefined} onChange={value => setAudioDurationSeconds(Number(value || 0))} onBlur={persistManualAudioDuration} addonAfter="s" /><Button size="small" loading={audioBusy} onClick={() => measureMergeAudioDuration({ force: true })}>重新读取</Button></div></div><div className="batch-factory-media-bottom-sheet-row"><span>主视频总时长</span><b>{videoTotalSeconds > 0 ? `${videoTotalIsExact ? '' : '≈ '}${videoTotalSeconds.toFixed(2)}s` : '等待读取'}</b></div><div className="batch-factory-media-bottom-sheet-row"><span>自动倍率</span><b>{autoMergeRate > 0 ? `${autoMergeRate.toFixed(3)}x` : '—'}</b></div><div className="batch-factory-media-bottom-sheet-row"><span>预计成片</span><b>{estimatedFinalSeconds > 0 ? `${estimatedFinalSeconds.toFixed(2)}s` : '—'}</b></div></> : null}
+            {followAudio ? <><div className="batch-factory-media-bottom-sheet-row"><span>配音目标</span><div className="batch-factory-audio-duration-edit"><InputNumber min={0.1} step={0.01} value={audioDurationSeconds || undefined} onChange={value => setAudioDurationSeconds(Number(value || 0))} onBlur={persistManualAudioDuration} addonAfter="s" /><Button size="small" loading={audioBusy} onClick={() => measureMergeAudioDuration({ force: true })}>重新读取</Button></div></div><div className="batch-factory-media-bottom-sheet-row"><span>主视频总时长</span><b>{videoTotalDisplay}</b></div><div className="batch-factory-media-bottom-sheet-row"><span>自动倍率</span><b>{autoMergeRate > 0 ? `${autoMergeRate.toFixed(3)}x` : '—'}</b></div><div className="batch-factory-media-bottom-sheet-row"><span>预计成片</span><b>{estimatedFinalSeconds > 0 ? `${estimatedFinalSeconds.toFixed(2)}s` : '—'}</b></div></> : null}
             <div className="batch-factory-media-bottom-sheet-actions"><Tooltip title={mergeTooltip}><Button type="primary" loading={merging || audioBusy} disabled={!mergeAvailable || merging || !mergeReady} onClick={runCurrentMerge}>{mergeJob?.status === 'succeeded' ? '重新合成' : '合成当前书'}</Button></Tooltip></div>
           </section>
 
