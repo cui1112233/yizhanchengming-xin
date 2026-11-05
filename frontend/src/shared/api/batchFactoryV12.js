@@ -7,7 +7,7 @@ const LOCAL_EXECUTOR_ARTIFACT_PREFIX = '/api/shuihuo-production/local-executor-a
 const LOCAL_MERGE_MEDIA_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/merge-media\/[^/]+$/;
 const LOCAL_MERGE_COVER_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/merge-cover\/[^/]+$/;
 const BOOK_ASSET_IMAGE_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/[^/]+\/books\/[^/]+\/assets\/[^/]+\/images\/[^/]+\/content$/;
-const COMIC_PAGE_IMAGE_PATTERN = /^\/api\/batch-factory\/v12\/batches\/[^/]+\/books\/[^/]+\/comic-pages\/[^/]+\/images\/[^/]+\/content$/;
+const COMIC_PAGE_IMAGE_PATTERN = /^\/api\/batch-factory\/v12\/batches\/[^/]+\/books\/[^/]+\/comic-pages\/[^/]+\/images\/[^/]+\/(?:content|thumbnail)$/;
 const COMIC_STYLE_PREVIEW_PATTERN = /^\/api\/presets\/comic-style\/[^/]+\/preview$/;
 const COMIC_REFERENCE_SCENE_PREVIEW_PATTERN = /^\/api\/presets\/comic-reference-scene\/[^/]+\/preview$/;
 const COMIC_MATERIAL_PREVIEW_PATTERN = /^\/api\/presets\/comic-material\/[^/?]+\/preview(?:\?[^#]*)?$/;
@@ -520,7 +520,11 @@ function comicCollectionsPath(batchId, bookId, suffix = '') {
 }
 
 export function listComicPages(batchId, bookId, options = {}) {
-  return apiRequest(comicPagesPath(batchId, bookId), options);
+  // view=lite 只返回列表行需要的状态与图片地址，去掉提示词正文（单本约 300KB）。
+  // 漫画页编辑弹窗需要完整提示词，保持默认全量。
+  const { view, ...requestOptions } = options;
+  const path = comicPagesPath(batchId, bookId);
+  return apiRequest(view ? `${path}?view=${encodeURIComponent(view)}` : path, requestOptions);
 }
 
 function comicSourceSegmentsPath(batchId, bookId, suffix = '') {

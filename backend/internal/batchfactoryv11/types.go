@@ -375,7 +375,9 @@ type ComicPageImage struct {
 	BookID      string    `json:"-"`
 	ComicPageID string    `json:"comicPageId"`
 	URL         string    `json:"url,omitempty"`
-	StorageRef  string    `json:"-"`
+	// ThumbnailURL 只给列表行/缩略图格用；详情和下载仍走 URL 的原图。
+	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
+	StorageRef   string `json:"-"`
 	MediaType   string    `json:"mediaType"`
 	Source      string    `json:"source"`
 	IsPrimary   bool      `json:"isPrimary"`

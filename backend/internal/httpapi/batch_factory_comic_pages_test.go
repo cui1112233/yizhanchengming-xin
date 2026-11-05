@@ -157,6 +157,23 @@ func TestComicPageRoutesKeepCandidatesSeparateFromBookAssets(t *testing.T) {
 	if pages[0].Images[0].URL == "" {
 		t.Fatalf("stored candidate must expose owned content URL: %+v", pages[0].Images)
 	}
+	// 列表行用 lite 视图：保留状态与图片地址，剥离提示词正文。
+	liteListed := signedJSONRequest(t, api, now, "alice", http.MethodGet, pagesPath+"?view=lite", nil)
+	if liteListed.Code != http.StatusOK {
+		t.Fatalf("lite list status=%d body=%s", liteListed.Code, liteListed.Body.String())
+	}
+	litePages := decodeBody[struct {
+		Pages []batchfactoryv11.ComicPage `json:"pages"`
+	}](t, liteListed).Pages
+	if len(litePages) != 1 || len(litePages[0].Images) != 2 {
+		t.Fatalf("lite pages=%+v", litePages)
+	}
+	if litePages[0].ComicPrompt != "" || litePages[0].ImagePrompt != "" || len(litePages[0].ReferenceImageURLs) != 0 {
+		t.Fatalf("lite view must strip prompt text: %+v", litePages[0])
+	}
+	if litePages[0].GenerationState == "" || litePages[0].PromptStatus == "" || litePages[0].ImageStatus == "" {
+		t.Fatalf("lite view must keep page state: %+v", litePages[0])
+	}
 	assets, err := store.ListBookAssets(context.Background(), "alice", batch.ID, book.ID)
 	if err != nil {
 		t.Fatal(err)

@@ -1120,6 +1120,9 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			writeStoreError(w, err)
 			return
 		}
+		// view=lite 供列表行缩略图与状态渲染使用；提示词正文单本约 300KB，
+		// 列表行完全不用，只有编辑弹窗需要全量视图。
+		liteView := r.URL.Query().Get("view") == "lite"
 		if indexStore, ok := store.(batchfactoryv11.ComicSourceIndexStore); ok {
 			// Only the requested book's source text and segment digests are needed
 			// for the stale check. Loading the full batch here made every book row
@@ -1132,9 +1135,10 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 			for pageIndex := range result {
 				result[pageIndex].ConfigStale = comicPageConfigStaleFromIndex(found, index, result[pageIndex])
 			}
+			readiness := buildComicReadiness(nil, result, comicPageGenerationLimit)
 			writeJSON(w, http.StatusOK, map[string]any{
-				"pages":     comicPageResponses(result),
-				"readiness": buildComicReadiness(nil, result, comicPageGenerationLimit),
+				"pages":     comicPageResponsesLite(comicPageResponses(result), liteView),
+				"readiness": readiness,
 			})
 			return
 		}
@@ -1146,9 +1150,10 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		for index := range result {
 			result[index].ConfigStale = comicPageConfigStale(r.Context(), store, presetCatalog, owner, batch, r.PathValue("bookId"), result[index])
 		}
+		readiness := buildComicReadiness(nil, result, comicPageGenerationLimit)
 		writeJSON(w, http.StatusOK, map[string]any{
-			"pages":     comicPageResponses(result),
-			"readiness": buildComicReadiness(nil, result, comicPageGenerationLimit),
+			"pages":     comicPageResponsesLite(comicPageResponses(result), liteView),
+			"readiness": readiness,
 		})
 	})
 	mux.HandleFunc("GET "+promptZip, func(w http.ResponseWriter, r *http.Request) {
@@ -1560,6 +1565,7 @@ func registerComicPageRoutes(mux *http.ServeMux, store batchfactoryv11.Store, fi
 		}
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "image not found"})
 	})
+	mux.HandleFunc("GET "+image+"/thumbnail", handleComicPageThumbnail(comicStore, files))
 	mux.HandleFunc("POST "+collections, func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
@@ -1905,6 +1911,7 @@ func comicPageConfigStaleFromIndex(bookFound bool, index batchfactoryv11.ComicSo
 func comicPageImageResponse(image batchfactoryv11.ComicPageImage) batchfactoryv11.ComicPageImage {
 	if image.StorageRef != "" {
 		image.URL = "/api/batch-factory/v12/batches/" + image.BatchID + "/books/" + image.BookID + "/comic-pages/" + image.ComicPageID + "/images/" + image.ID + "/content"
+		image.ThumbnailURL = comicThumbnailURL(image)
 	}
 	return image
 }
@@ -2115,6 +2122,20 @@ func comicPageResponse(page batchfactoryv11.ComicPage) batchfactoryv11.ComicPage
 func comicPageResponses(pages []batchfactoryv11.ComicPage) []batchfactoryv11.ComicPage {
 	for index := range pages {
 		pages[index] = comicPageResponse(pages[index])
+	}
+	return pages
+}
+
+// comicPageResponsesLite 剥离列表行不需要的提示词正文与参考图。派生状态已经
+// 在 comicPageResponses 阶段算好，这里只做输出裁剪，避免影响 readiness 统计。
+func comicPageResponsesLite(pages []batchfactoryv11.ComicPage, lite bool) []batchfactoryv11.ComicPage {
+	if !lite {
+		return pages
+	}
+	for index := range pages {
+		pages[index].ComicPrompt = ""
+		pages[index].ImagePrompt = ""
+		pages[index].ReferenceImageURLs = nil
 	}
 	return pages
 }
