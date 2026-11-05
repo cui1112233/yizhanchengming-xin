@@ -98,6 +98,7 @@ import {
   getBatchRuntimeSummary,
   getBatchAutomationStatus,
   listAutomationPresets,
+  upgradeBatchAutomationPreset,
   startBatchAutomation,
   pauseBatchAutomation,
   resumeBatchAutomation,
@@ -3323,6 +3324,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [automationStartOpen, setAutomationStartOpen] = useState(false);
   const automationAutoOpenedRef = useRef(false);
   const [automationPresets, setAutomationPresets] = useState([]);
+  const [presetUpgradeBusy, setPresetUpgradeBusy] = useState(false);
   const [automationPresetID, setAutomationPresetID] = useState('');
   const [automationRunMode, setAutomationRunMode] = useState('full_submit');
   const [automationForceRegenerate, setAutomationForceRegenerate] = useState(false);
@@ -4657,6 +4659,29 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     setAutomationPresets(values);
     return values;
   }
+  // 批次钉版：批次设置里冻结的 automationPresetSnapshot 落后于预设 HEAD 时，
+  // 在批次页顶部提示升级。升级是用户确认动作，走 upgrade-preset 端点按新
+  // 版本配置重钉；配置变化的槽位在下次分镜时按 digest 精确重置。
+  const pinnedPresetSnapshot = batch?.settingsState?.patch?.automationPresetSnapshot || null;
+  const pinnedPresetHead = pinnedPresetSnapshot?.id ? (automationPresets || []).find(item => item.id === pinnedPresetSnapshot.id) : null;
+  const presetUpgradeAvailable = Boolean(pinnedPresetSnapshot && pinnedPresetHead && Number(pinnedPresetHead.version || 0) > Number(pinnedPresetSnapshot.version || 0));
+  useEffect(() => {
+    if (!batch?.id || !batch?.settingsState?.patch?.automationPresetSnapshot?.id) return;
+    loadAutomationPresets().catch(() => {});
+  }, [batch?.id, batch?.settingsState?.patch?.automationPresetSnapshot?.id, batch?.settingsState?.revision]);
+  async function upgradePinnedPreset() {
+    if (!batch?.id || presetUpgradeBusy) return;
+    setPresetUpgradeBusy(true);
+    try {
+      await upgradeBatchAutomationPreset(batch.id, {});
+      message.success(`已升级到 v${pinnedPresetHead?.version}：预设管理的配置按新版本生效，变化的槽位将在下次分镜时精确重排，未变化槽位保留已生成内容。`);
+      await refreshBatch();
+    } catch (error) {
+      message.error(error?.message || '升级自动化预设失败');
+    } finally {
+      setPresetUpgradeBusy(false);
+    }
+  }
   async function openAutomationStart() {
     try {
       const firstBook = books[0];
@@ -5196,6 +5221,16 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       <div className="shuihuo-workbench-export"><Button type="text" icon={<BarsOutlined />} onClick={() => { setLogsOpen(true); loadRuntimeStatus(); }} loading={logsLoading}>任务/日志</Button><Dropdown menu={{ items: uploadMenuItems, onClick: ({ key }) => batchProductionMode === 'comic' ? openComicBatchPublish(key) : setUploadMode(key) }}><Button icon={<UploadOutlined />}>{batchProductionMode === 'comic' ? '发布漫画' : '上传网络'}</Button></Dropdown></div>
       <div className="shuihuo-project-stats"><span><b>{books.length}</b> 本小说</span>{hasComicBooks ? <><span className="is-uploaded"><b>{comicStats.imageReady}/{comicStats.imageTotal}</b> 漫画图片</span><span><b>{comicStats.collections}</b> 漫画合集（{comicStats.collectionPages} 页）</span><span className={comicStats.published > 0 ? 'is-uploaded' : 'is-disabled'}><b>{comicStats.published}</b> 已发布合集</span></> : <><span className="is-uploaded"><b>{batchProgress.uploaded}</b> 上传成功</span>{batchProgress.failed ? <span className="is-failed"><b>{batchProgress.failed}</b> 异常</span> : null}{batchProgress.running ? <span className="is-running"><b>{batchProgress.running}</b> 执行中</span> : null}{batchProgress.awaitingUpload ? <span className="is-awaiting-upload"><b>{batchProgress.awaitingUpload}</b> 待上传</span> : null}{batchProgress.pending ? <span><b>{batchProgress.pending}</b> 待开始</span> : null}</>}{automationState !== 'idle' ? <span className={automationState === 'needs_attention' ? 'is-failed' : automationActive ? 'is-running' : 'is-awaiting-upload'}><b>{automationCounts.ready || 0}/{automationCounts.total || books.length}</b> 自动就绪</span> : null}{!hasComicBooks ? <><span><b>{mediaCounts.storyboards}</b> 分镜</span>{productionCapability.available ? <span className="is-running"><b>{mediaCounts.playable}</b> 可播放</span> : <span className="is-disabled">视频模块未启用</span>}{mergeCapability.available ? <span className="is-uploaded"><b>{mediaCounts.merges}</b> 成片</span> : <span className="is-disabled">合并模块未启用</span>}</> : null}</div>
     </header>
+    {presetUpgradeAvailable ? (
+      <Alert
+        type="info"
+        showIcon
+        style={{ margin: '0 0 8px' }}
+        message={`自动化预设《${pinnedPresetHead.name || pinnedPresetSnapshot.name || '未命名'}》已更新到 v${pinnedPresetHead.version}（本批次使用 v${pinnedPresetSnapshot.version}）`}
+        description="升级后预设管理的配置按新版本生效；配置变化的槽位会重新分镜，未变化槽位保留已生成内容。"
+        action={<Button size="small" type="primary" loading={presetUpgradeBusy} onClick={upgradePinnedPreset}>升级到 v{pinnedPresetHead.version}</Button>}
+      />
+    ) : null}
     {
       novelListOpen ? (
         <section

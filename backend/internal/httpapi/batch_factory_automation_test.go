@@ -1071,6 +1071,66 @@ func TestSelectedAutomationBooks_WithUnknownBook_RejectsCrossBatchDispatch(t *te
 	}
 }
 
+// 批次钉版升级：预设发布新版本后，用户确认的升级动作用新配置覆盖预设管理的
+// 键，批次其余自定义键保留，并重钉 automationPresetSnapshot 版本。
+func TestUpgradePresetAppliesNewRevisionAndPinsBatch(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "升级批次", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
+		Patch: batchfactoryv11.SettingsPatch{
+			"videoModelId":             json.RawMessage(`"model-old"`),
+			"customNote":               json.RawMessage(`"保留我"`),
+			"automationPresetSnapshot": json.RawMessage(`{"id":"preset-1","name":"升级预设","version":1}`),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	presetStore, err := NewFileAutomationPresetStore(filepath.Join(t.TempDir(), "presets.json"), func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	preset, err := presetStore.Create("alice", "升级预设", map[string]any{"videoModelId": "model-a", "concurrency": float64(2)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := presetStore.Update("alice", preset.ID, 1, "升级预设", map[string]any{"videoModelId": "model-b", "concurrency": float64(4)}); err != nil {
+		t.Fatal(err)
+	}
+	coordinator := NewBatchAutomationCoordinator(store, presetStore, &batchfactoryv11.BookStageService{Store: store}, nil, nil, nil, nil, nil, func() time.Time { return now })
+
+	result, err := coordinator.UpgradeAutomationPreset(ctx, "alice", batch.ID, map[string]any{"presetId": preset.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["upgraded"] != true {
+		t.Fatalf("result=%#v, want upgraded", result)
+	}
+	updated, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var model, note string
+	var snapshot struct {
+		ID      string `json:"id"`
+		Version int    `json:"version"`
+	}
+	if err := json.Unmarshal(updated.SettingsState.Patch["videoModelId"], &model); err != nil || model != "model-b" {
+		t.Fatalf("videoModelId=%q err=%v, want the new preset revision value", model, err)
+	}
+	if err := json.Unmarshal(updated.SettingsState.Patch["customNote"], &note); err != nil || note != "保留我" {
+		t.Fatalf("customNote=%q err=%v, batch-only keys must survive the upgrade", note, err)
+	}
+	if err := json.Unmarshal(updated.SettingsState.Patch["automationPresetSnapshot"], &snapshot); err != nil || snapshot.ID != preset.ID || snapshot.Version != 2 {
+		t.Fatalf("snapshot=%+v err=%v, want the batch pinned to revision 2", snapshot, err)
+	}
+}
+
 func TestApplyPresetKeepsRequestedComicProductionMode(t *testing.T) {
 	ctx := context.Background()
 	store := batchfactoryv11.NewMemoryStore()

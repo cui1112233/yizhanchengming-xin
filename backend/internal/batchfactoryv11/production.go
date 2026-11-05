@@ -447,24 +447,38 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 	resubmittedVideos := map[string]bool{}
 	supersededTasks := make([]supersededProductionTask, 0)
 	now := time.Now().UTC()
+	// 槽位级保留之后，未变化槽位的 video 身份跨修订保持不变，它的成功任务
+	// 挂在旧修订的 job 上。去重因此按「当前 active 槽位」过滤而不是按修订号
+	// 过滤：保留槽位的历史成功任务继续阻止重复投递，被轮换槽位的旧任务因为
+	// video 已不在 active 集合中而自然失效。
+	activeVideoIDs := map[string]bool{}
+	for _, video := range book.Videos {
+		activeVideoIDs[video.ID] = true
+	}
 	// Pass 1: the marker is durable evidence that this video already consumed
 	// its single no-receipt re-submission, even when the marker sits on a task
 	// from an older job.
 	for _, prior := range priorJobs {
-		if prior.BookID != bookID || prior.DirectorRevisionID != book.DirectorRevision.ID {
+		if prior.BookID != bookID {
 			continue
 		}
 		for _, task := range prior.Tasks {
+			if !activeVideoIDs[task.VideoID] {
+				continue
+			}
 			if task.ErrorMessage == SupersededWithoutReceiptMarker {
 				resubmittedVideos[task.VideoID] = true
 			}
 		}
 	}
 	for _, prior := range priorJobs {
-		if prior.BookID != bookID || prior.DirectorRevisionID != book.DirectorRevision.ID {
+		if prior.BookID != bookID {
 			continue
 		}
 		for _, task := range prior.Tasks {
+			if !activeVideoIDs[task.VideoID] {
+				continue
+			}
 			if options.Force {
 				continue
 			}

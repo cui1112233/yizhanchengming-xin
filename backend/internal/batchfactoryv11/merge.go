@@ -611,13 +611,23 @@ func productionTaskSelectionsAllRevisions(jobs []ProductionJob, bookID string) m
 // latest success remains the default when the user has not pinned a version.
 func storyboardTaskCandidates(video Video, book Book, current, all map[string][]productionTaskSelection) []productionTaskSelection {
 	candidates := append([]productionTaskSelection{}, current[video.ID]...)
-	if len(book.VideoHistory) == 0 {
-		sortProductionTaskSelections(candidates)
-		return candidates
-	}
 	seen := map[string]bool{}
 	for _, candidate := range candidates {
 		seen[candidate.Task.ID] = true
+	}
+	// 槽位级保留：未变化槽位沿用旧 video 身份，它的成功任务挂在旧修订的
+	// job 上，按修订过滤的 current 查不到；同 ID 的全修订候选必须并入，
+	// 否则合成阶段会认为保留槽位「没有已生成媒体」。
+	for _, candidate := range all[video.ID] {
+		if seen[candidate.Task.ID] {
+			continue
+		}
+		seen[candidate.Task.ID] = true
+		candidates = append(candidates, candidate)
+	}
+	if len(book.VideoHistory) == 0 {
+		sortProductionTaskSelections(candidates)
+		return candidates
 	}
 	for _, history := range book.VideoHistory {
 		if history.Ordinal != video.Ordinal {

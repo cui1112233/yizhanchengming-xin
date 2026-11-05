@@ -128,6 +128,118 @@ func TestCanonicalJSONEqualIgnoresFormatting(t *testing.T) {
 	}
 }
 
+func TestDirectorSlotDigestIgnoresProviderAssignedIDs(t *testing.T) {
+	base := DirectorVideo{ID: "video-1", SceneID: "scene-1", DurationSec: 9, Characters: []string{"林晚"}, Scene: "客厅", FinalPrompt: "分镜内容", Shots: []DirectorShot{{StartSec: 0, EndSec: 3, ShotType: "wide_shot", Camera: "static", Description: "远景"}}}
+	renamed := base
+	renamed.ID, renamed.SceneID = "video-999", "scene-999"
+	if directorSlotDigest("original", "", `{"mode":"original"}`, base) != directorSlotDigest("original", "", `{"mode":"original"}`, renamed) {
+		t.Fatal("provider-assigned ID/SceneID must not affect the slot digest")
+	}
+	changed := base
+	changed.FinalPrompt = "改动后的分镜"
+	if directorSlotDigest("original", "", `{"mode":"original"}`, base) == directorSlotDigest("original", "", `{"mode":"original"}`, changed) {
+		t.Fatal("a storyboard content change must change the slot digest")
+	}
+	if directorSlotDigest("original", "", `{"mode":"original"}`, base) == directorSlotDigest("original", "", `{"mode":"viral"}`, base) {
+		t.Fatal("a frozen settings change must change the slot digest")
+	}
+}
+
+// 局部修订：只有 digest 变化的槽位被轮换，未变化槽位连同 video 身份一起保留。
+func TestPersistDirectorRevisionKeepsUnchangedSlots(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store := NewMySQLStore(db)
+	book := Book{ID: "book-1", BatchID: "batch-1"}
+	snapshot := DirectorSnapshot{Mode: "original", Effective: originalModePatch()}
+	keptDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "保持不变的分镜"}
+	oldDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "旧版分镜二"}
+	newDraft := DirectorVideo{DurationSec: 9, FinalPrompt: "新版分镜二"}
+	keptDigest := directorSlotDigest("original", "", `{"mode":"original"}`, keptDraft)
+	oldDigest := directorSlotDigest("original", "", `{"mode":"original"}`, oldDraft)
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT revision FROM batch_factory_v12_books`).
+		WithArgs("book-1", "batch-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(3))
+	mock.ExpectQuery(`SELECT id,revision,snapshot_id,mode,source_digest,hook_revision_id,output_json,created_at FROM batch_factory_v12_director_revisions`).
+		WithArgs("batch-1", "book-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "revision", "snapshot_id", "mode", "source_digest", "hook_revision_id", "output_json", "created_at"}).
+			AddRow("director-old", 1, "snapshot-old", "original", "digest-old", nil, `{"storyboard":[]}`, time.Now()))
+	mock.ExpectExec(`INSERT INTO batch_factory_v12_config_snapshots`).
+		WithArgs(sqlmock.AnyArg(), "alice", "batch-1", "book-1", string(`{"mode":"original"}`), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT COALESCE\(MAX\(revision\),0\) FROM batch_factory_v12_director_revisions`).
+		WithArgs("batch-1", "book-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"revision"}).AddRow(1))
+	mock.ExpectExec(`INSERT INTO batch_factory_v12_director_revisions`).
+		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice", sqlmock.AnyArg(), sqlmock.AnyArg(), "original", "digest-new", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT l.video_id,COALESCE\(l.slot_digest,''\) FROM batch_factory_v12_director_video_links`).
+		WithArgs("batch-1", "book-1", "alice", int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"video_id", "slot_digest"}).
+			AddRow("video-a", keptDigest).
+			AddRow("video-b", oldDigest))
+	mock.ExpectQuery(`SELECT v.id,v.ordinal,COALESCE`).
+		WithArgs("batch-1", "book-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "label", "video_prompt", "visual_prompt", "duration_seconds", "revision"}).
+			AddRow("video-a", 0, "VIDEO 01", "保持不变的分镜", "", 9, 1).
+			AddRow("video-b", 1, "VIDEO 02", "旧版分镜二", "", 9, 1))
+	// 只有变化槽位 video-b 读取补丁并 orphan；保留槽位 video-a 完全不碰。
+	mock.ExpectQuery(`SELECT patch_json FROM batch_factory_v12_settings_patches`).
+		WithArgs("video", "video-b", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"patch_json"}))
+	mock.ExpectExec(`UPDATE batch_factory_v12_videos SET compatibility_state='orphaned'`).
+		WithArgs(sqlmock.AnyArg(), "video-b", "alice").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	// 保留槽位只补一条指向新修订的 link。
+	mock.ExpectExec(`INSERT INTO batch_factory_v12_director_video_links`).
+		WithArgs(sqlmock.AnyArg(), "video-a", 0, keptDigest).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	// 变化槽位重建。
+	mock.ExpectExec(`INSERT INTO batch_factory_v12_videos`).
+		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice", 1, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`INSERT INTO batch_factory_v12_video_records`).
+		WithArgs(sqlmock.AnyArg(), "VIDEO 02", sqlmock.AnyArg(), sqlmock.AnyArg(), 9).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`INSERT INTO batch_factory_v12_director_video_links`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), 1, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT id,kind,name FROM batch_factory_v12_book_assets`).
+		WithArgs("batch-1", "book-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "kind", "name"}))
+	mock.ExpectExec(`UPDATE batch_factory_v12_books SET revision=`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), "book-1", "batch-1", "alice").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	output := DirectorResult{Storyboard: []DirectorVideo{keptDraft, newDraft}}
+	revision, err := store.PersistDirectorRevision(context.Background(), "alice", book, snapshot, "digest-new", "", output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(revision.Videos) != 2 {
+		t.Fatalf("videos = %+v, want 2 slots", revision.Videos)
+	}
+	if revision.Videos[0].ID != "video-a" {
+		t.Fatalf("slot 0 = %+v, want the unchanged slot to keep its video identity", revision.Videos[0])
+	}
+	if revision.Videos[1].ID == "video-b" || revision.Videos[1].ID == "" {
+		t.Fatalf("slot 1 = %+v, want the changed slot to rotate to a fresh video", revision.Videos[1])
+	}
+	if len(revision.OrphanedOverrides) != 0 {
+		t.Fatalf("orphaned overrides = %+v, both slots had empty patches", revision.OrphanedOverrides)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("partial retention SQL flow mismatch: %v", err)
+	}
+}
+
+
 // 输入 digest 变化时必须走原有轮换：旧槽位 orphaned，新槽位重建。
 func TestPersistDirectorRevisionRotatesSlotsWhenDigestChanges(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -156,15 +268,19 @@ func TestPersistDirectorRevisionRotatesSlotsWhenDigestChanges(t *testing.T) {
 	mock.ExpectExec(`INSERT INTO batch_factory_v12_director_revisions`).
 		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice", sqlmock.AnyArg(), sqlmock.AnyArg(), "original", "digest-new", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`SELECT id,ordinal FROM batch_factory_v12_videos`).
+	// 上一修订的槽位 digest 全部为空（迁移前旧数据），保留永不命中，整本轮换。
+	mock.ExpectQuery(`SELECT l.video_id,COALESCE\(l.slot_digest,''\) FROM batch_factory_v12_director_video_links`).
+		WithArgs("batch-1", "book-1", "alice", int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"video_id", "slot_digest"}))
+	mock.ExpectQuery(`SELECT v.id,v.ordinal,COALESCE`).
 		WithArgs("batch-1", "book-1", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal"}).
-			AddRow("video-old", 0))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "label", "video_prompt", "visual_prompt", "duration_seconds", "revision"}).
+			AddRow("video-old", 0, "VIDEO 01", "旧提示词", "旧视觉", 9, 1))
 	mock.ExpectQuery(`SELECT patch_json FROM batch_factory_v12_settings_patches`).
 		WithArgs("video", "video-old", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"patch_json"}))
 	mock.ExpectExec(`UPDATE batch_factory_v12_videos SET compatibility_state='orphaned'`).
-		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice").
+		WithArgs(sqlmock.AnyArg(), "video-old", "alice").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`INSERT INTO batch_factory_v12_videos`).
 		WithArgs(sqlmock.AnyArg(), "batch-1", "book-1", "alice", 0, sqlmock.AnyArg(), sqlmock.AnyArg()).
@@ -173,7 +289,7 @@ func TestPersistDirectorRevisionRotatesSlotsWhenDigestChanges(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), "VIDEO 01", sqlmock.AnyArg(), sqlmock.AnyArg(), 9).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`INSERT INTO batch_factory_v12_director_video_links`).
-		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), 0).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), 0, sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT id,kind,name FROM batch_factory_v12_book_assets`).
 		WithArgs("batch-1", "book-1", "alice").

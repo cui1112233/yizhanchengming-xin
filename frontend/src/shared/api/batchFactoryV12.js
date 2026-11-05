@@ -785,6 +785,10 @@ export function saveBatchAutomationPreset(batchId, name) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/automation-presets`), { method: 'POST', body: body({ name }) });
 }
 
+export function upgradeBatchAutomationPreset(batchId, payload = {}) {
+  return apiRequest(bf11Path(`batches/${id(batchId)}/automation/upgrade-preset`), { method: 'POST', body: body(payload) });
+}
+
 export function startBatchAutomation(batchId, payload = {}) {
   return apiRequest(bf11Path(`batches/${id(batchId)}/automation/start`), { method: 'POST', body: body(payload) });
 }

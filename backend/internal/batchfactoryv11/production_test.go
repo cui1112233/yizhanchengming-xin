@@ -553,3 +553,38 @@ func TestRetriedVideoUsesTheBookEngineInsteadOfTheStoredProvider(t *testing.T) {
 			registry.requested[0], VideoProviderYFAISeedance, VideoProviderAutoDLH3)
 	}
 }
+
+// 槽位级保留之后，未变化槽位沿用旧 video 身份，它的成功任务挂在旧修订的
+// job 上。投递去重按当前 active 槽位过滤而不是按修订号过滤：保留槽位的历史
+// 成功任务必须继续阻止重复投递，只有真正轮换的槽位才会重新生成。
+func TestProductionBlocksSucceededTasksFromPreviousRevisionForKeptSlots(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book := seedOpeningBook(t, false, 2, []DirectorVideo{
+		{DurationSec: 10, FinalPrompt: "保留分镜"},
+		{DurationSec: 10, FinalPrompt: "新分镜"},
+	})
+	keptVideo := book.Videos[0]
+	rotatedVideo := book.Videos[1]
+	if _, err := store.CreateProductionJob(ctx, ProductionJob{
+		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "old-revision-job",
+		DirectorRevisionID: "director-old-revision",
+		Tasks: []ProductionTask{{
+			VideoID: keptVideo.ID, Status: ProductionSucceeded, Attempt: 1,
+			FinalPromptHash: "old-hash", CompiledPrompt: "old", MediaURL: "https://media.example/kept.mp4",
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	adapter := &recordingProductionAdapter{ref: ProviderTaskRef{State: ProductionSucceeded}}
+	service := &ProductionService{Store: store, Compiler: &PromptCompilerService{Store: store}, Adapter: adapter, Enabled: true, Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15}}
+	job, err := service.SubmitBookProduction(ctx, "alice", batch.ID, book.ID, "request-retention")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(job.Tasks) != 1 || job.Tasks[0].VideoID != rotatedVideo.ID {
+		t.Fatalf("tasks=%+v, want only the rotated slot to be submitted", job.Tasks)
+	}
+	if adapter.calls != 1 {
+		t.Fatalf("adapter calls=%d, want 1: the kept slot's old-revision success must keep blocking", adapter.calls)
+	}
+}

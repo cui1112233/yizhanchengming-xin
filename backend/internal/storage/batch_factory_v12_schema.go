@@ -108,6 +108,46 @@ func V12H3KernelStatements() []string {
 	return append(statements, V12H3ProductionTraceStatements()...)
 }
 
+// V12SlotDigestStatements adds the per-slot configuration hash used by the
+// Director rotation guard. Each storyboard slot records the digest of the
+// frozen inputs that produced it, so a later revision only orphans the slots
+// whose inputs actually changed instead of rotating the whole book.
+func V12SlotDigestStatements() []string {
+	return []string{
+		`ALTER TABLE batch_factory_v12_director_video_links ADD COLUMN slot_digest CHAR(64) NOT NULL DEFAULT '' AFTER ordinal`,
+		`ALTER TABLE batch_factory_v12_director_video_links ADD KEY idx_bfv12_links_revision_ordinal (director_revision_id, ordinal)`,
+	}
+}
+
+// V12AutomationPresetStatements versions the Batch Factory automation presets.
+// Each update writes an immutable revision row and moves the head pointer, so
+// a batch pinned to (preset_id, preset_revision) keeps an auditable config
+// snapshot instead of silently following the latest overwrite.
+func V12AutomationPresetStatements() []string {
+	return []string{
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_automation_presets (
+			id VARCHAR(64) NOT NULL,
+			owner_username VARCHAR(255) NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			current_revision INT NOT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY (id),
+			KEY idx_bfv12_presets_owner (owner_username)
+		)`,
+		`CREATE TABLE IF NOT EXISTS batch_factory_v12_automation_preset_revisions (
+			preset_id VARCHAR(64) NOT NULL,
+			owner_username VARCHAR(255) NOT NULL,
+			revision INT NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			config_json JSON NOT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY (preset_id, revision),
+			KEY idx_bfv12_preset_revisions_owner (owner_username)
+		)`,
+	}
+}
+
 func V12Migrations() []Migration {
 	// 1200001-1200003 belong to Novel Fetch Workshop in the shared migration
 	// ledger. V12 must have its own unused number or a Batch Factory startup
@@ -118,6 +158,8 @@ func V12Migrations() []Migration {
 		{Version: 1200103, SQL: V12H3ProductionTraceStatements(), CallbackChecksum: "batch-factory-v12-h3-production-trace-v1"},
 		{Version: 1200104, SQL: []string{`ALTER TABLE batch_factory_v12_audio_measurements ADD COLUMN measurement_json JSON NULL`}, CallbackChecksum: "batch-factory-v12-line-audio-v1"},
 		{Version: 1200105, SQL: V12CanonicalTableRenameStatements(), CallbackChecksum: "batch-factory-v12-canonical-tables-v1", Adopt: adoptV12CanonicalTableRename},
+		{Version: 1200106, SQL: V12SlotDigestStatements(), CallbackChecksum: "batch-factory-v12-slot-digest-v1"},
+		{Version: 1200107, SQL: V12AutomationPresetStatements(), CallbackChecksum: "batch-factory-v12-automation-presets-v1"},
 	}
 }
 
