@@ -128,6 +128,14 @@ test('inherited engine selects are not wrapped by a label that re-triggers optio
   assert.doesNotMatch(field, /return <label className="batch-factory-engine-field"/);
 });
 
+test('publish rule selects are not wrapped by a label that hijacks option clicks', () => {
+  // label 内先出现“？”按钮时，点击下拉会被 label 转发给按钮，弹层闪回。
+  assert.doesNotMatch(source, /<label className="batch-factory-engine-field"><span><b>(?:上传视频类型|素材使用|水平翻转)<\/b><HelpTip/);
+  assert.match(source, /<div className="batch-factory-engine-field"><span><b>上传视频类型<\/b><HelpTip/);
+  assert.match(source, /<div className="batch-factory-engine-field"><span><b>素材使用<\/b><HelpTip/);
+  assert.match(source, /<div className="batch-factory-engine-field"><span><b>水平翻转<\/b><HelpTip/);
+});
+
 test('single-book configuration opens and saves one explicit region at a time', () => {
   assert.match(source, /activeRegion/);
   assert.match(source, /buildBookRegionUpdate/);
