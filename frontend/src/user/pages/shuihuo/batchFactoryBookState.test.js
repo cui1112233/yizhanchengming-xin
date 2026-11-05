@@ -1,6 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState.js';
+import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError, bookFailureIsHistorical } from './batchFactoryBookState.js';
+
+test('a recovered failure is historical and must not show a retry action', () => {
+  const lastFailed = { stage: 'video', updatedAt: '2026-11-04T10:00:00Z', errorMessage: '视频生成失败' };
+  const runs = [
+    { stage: 'video', status: 'succeeded', updatedAt: '2026-11-04T10:30:00Z' }
+  ];
+  assert.equal(bookFailureIsHistorical({ lastFailed, runs }), true);
+  assert.equal(bookFailureIsHistorical({ lastFailed, runs: [{ stage: 'video', status: 'succeeded', updatedAt: '2026-11-04T09:00:00Z' }] }), false);
+  assert.equal(bookFailureIsHistorical({ lastFailed, runs: [{ stage: 'merge', status: 'succeeded', updatedAt: '2026-11-04T11:00:00Z' }] }), false);
+  assert.equal(bookFailureIsHistorical({ automationBook: { status: 'completed' }, lastFailed }), true);
+  assert.equal(bookFailureIsHistorical({ automationBook: { status: 'failed', stage: 'video' }, lastFailed, runs }), false);
+  assert.equal(bookFailureIsHistorical({}), false);
+});
 
 test('other batches legacy failure never renders on this book card', () => {
   const status = {

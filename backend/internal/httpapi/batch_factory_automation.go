@@ -1237,11 +1237,22 @@ func (c *BatchAutomationCoordinator) automationBookPreflightReason(ctx context.C
 		return "视频模型未配置；" + setupHintVideoModel
 	}
 	if runMode == "full_submit" {
+		// 漫画发布与视频发布使用的是两套配置键：漫画走 comicPublishSettings
+		// （组织/音频分类/制作者），视频走 publishSettings。之前统一只查
+		// publishSettings，导致漫画批次哪怕预设里已经配好组织，也会被判
+		// “发布配置未绑定网站或组织”，整批书在派发前全部 blocked。
+		publishKey := "publishSettings"
+		if productionMode == "comic" {
+			publishKey = "comicPublishSettings"
+		}
 		var publish map[string]any
-		if raw := effective["publishSettings"]; len(raw) > 0 {
+		if raw := effective[publishKey]; len(raw) > 0 {
 			_ = json.Unmarshal(raw, &publish)
 		}
 		if publish == nil || !hasAutomationPublishProfile(publish) {
+			if productionMode == "comic" {
+				return "漫画发布设置未绑定网站或组织"
+			}
 			return "发布配置未绑定网站或组织"
 		}
 		// N8 目录查询属于发布阶段依赖（音频分类/音频文件列表），
@@ -1316,6 +1327,23 @@ func (c *BatchAutomationCoordinator) applyPreset(ctx context.Context, owner stri
 		mode := strings.TrimSpace(requestedProductionMode[0])
 		if mode == "comic" || mode == "video" {
 			merged["productionMode"] = mode
+		}
+	}
+	// 预设里存的是提示词 ID（presetId/slot），正文 body 存在系统预设库里。
+	// 之前只有「保存统一配置」的 settings 接口会冻结正文，直接点“立即执行”
+	// 走预设合并时不会冻结，导致漫画资产提示词 body 为空，资产阶段直接报
+	// “请在资产设置中选择漫画资产提示词”。这里在落库前统一补一次冻结。
+	if c.promptCatalog != nil {
+		if value, ok := merged["aiPromptConfig"]; ok && value != nil {
+			raw, marshalErr := json.Marshal(value)
+			if marshalErr != nil {
+				return batchfactoryv11.Batch{}, marshalErr
+			}
+			hydrated, hydrateErr := hydrateBatchFactoryPromptConfig(c.promptCatalog, raw)
+			if hydrateErr != nil {
+				return batchfactoryv11.Batch{}, hydrateErr
+			}
+			merged["aiPromptConfig"] = hydrated
 		}
 	}
 	patch := batchfactoryv11.SettingsPatch{}
@@ -2761,57 +2789,84 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 				}
 				production := batchfactoryv11.ProductionJob{}
 				reusedProduction := false
-				// 回补续跑点：resumeStage 是失败阶段，它之前的阶段不再重跑。
-				resumeStage := automationStringValue(entry["resumeStage"], "")
-				if !automationBoolValue(job["forceRegenerate"]) && automationStringValue(job["runMode"], "full_submit") != "storyboard_only" {
+				forceRegenerate := automationBoolValue(job["forceRegenerate"])
+				// 视频阶段完成口径按 ordinal 统计，允许复用 orphaned 历史成片：
+				// 只要每个分镜都已有 succeeded + mediaUrl，就不再提交新一轮视频任务。
+				if !forceRegenerate && automationStringValue(job["runMode"], "full_submit") != "storyboard_only" {
 					status, statusErr := c.stages.Production.GetBatchStatus(ctx, owner, batchID)
 					if statusErr != nil {
 						fail("video", statusErr, "读取已生成视频失败")
 						continue
 					}
-					production, reusedProduction = reusableAutomationProduction(status.Jobs, book)
+					production, reusedProduction = automationSucceededProduction(status.Jobs, batch, book)
 				}
 				delete(entry, "retryRequested")
 				if reusedProduction {
-					entry["stage"], entry["message"], entry["updatedAt"] = "video", "复用已完成视频，继续合成", c.now()
+					entry["stage"], entry["message"], entry["updatedAt"] = "video", "视频已全部生成，跳过生成，继续合成", c.now()
+					appendAutomationBookLog(entry, c.now(), "video", "视频已全部生成，跳过生成，继续合成")
 					persist()
 				} else {
-					stageMode := batchfactoryv11.StageModeForce
-					if resumeStage != "" {
-						// 回补续跑用 Missing：已经完成的资产/分镜/开头/视频直接复用，
-						// 不再强制重建，避免把已生成的视频记录轮换成孤儿。
-						stageMode = batchfactoryv11.StageModeMissing
+					// 默认 Missing：已完成的阶段一律跳过，只补未完成的。
+					// 只有用户在界面上显式勾选“重新生成”时才允许 force；
+					// 重试/回补路径由各阶段的完成判定决定，不会再自动升级为 force。
+					stageMode := batchfactoryv11.StageModeMissing
+					if forceRegenerate {
+						stageMode = batchfactoryv11.StageModeForce
 					}
-					if resumeStage == "" || resumeStage == "assets" {
-						entry["stage"] = "assets"
-						entry["message"] = "正在提取资产"
-						entry["updatedAt"] = c.now()
-						stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
-						_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageAssets, stageMode, jobID+"-assets-"+book.ID, "")
-						cancel()
-						if stageErr != nil {
-							fail("assets", stageErr, "资产提取失败")
-							continue
+					if batchfactoryv11.AssetImagesEnabled(effective) {
+						if automationAssetsComplete(book, effective) && !forceRegenerate {
+							const skipMessage = "资产已生成，跳过资产提取"
+							entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
+							appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
+							persist()
+						} else {
+							entry["stage"] = "assets"
+							entry["message"] = "正在提取资产"
+							entry["updatedAt"] = c.now()
+							stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
+							_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageAssets, stageMode, jobID+"-assets-"+book.ID, "")
+							cancel()
+							if stageErr != nil {
+								fail("assets", stageErr, "资产提取失败")
+								continue
+							}
 						}
+					} else {
+						// 显式跳过，不能静默：日志里写清原因，后续分镜/视频/合成照常推进。
+						const skipMessage = "因资产图片开关关闭，已跳过资产生成阶段"
+						entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
+						appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
+						persist()
 					}
-					if resumeStage == "" || resumeStage == "assets" || resumeStage == "director" {
+					if forceRegenerate || !automationDirectorComplete(book) {
 						entry["stage"], entry["message"] = "director", "正在生成分镜提示词"
 						entry["updatedAt"] = c.now()
 						persist()
+						directorMode := stageMode
+						if !forceRegenerate && book.DirectorRevision != nil {
+							// 正文/设置已变化：旧分镜不算完成，必须重建；Missing 会因为
+							// 已存在 revision 直接跳过，所以这里只能显式 Force。
+							directorMode = batchfactoryv11.StageModeForce
+						}
 						stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
-						_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageDirector, stageMode, jobID+"-director-"+book.ID, "")
+						_, stageErr = c.stages.Run(stageCtx, owner, batchID, book.ID, batchfactoryv11.BookStageDirector, directorMode, jobID+"-director-"+book.ID, "")
 						cancel()
 						if stageErr != nil {
 							fail("director", stageErr, "分镜提示词生成失败")
 							continue
 						}
+					} else {
+						const skipMessage = "分镜提示词已完成且正文未变，跳过分镜生成"
+						entry["stage"], entry["message"], entry["updatedAt"] = "director", skipMessage, c.now()
+						appendAutomationBookLog(entry, c.now(), "director", skipMessage)
+						persist()
 					}
 					if automationStringValue(job["runMode"], "full_submit") == "storyboard_only" {
 						entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "ready_for_video", "已完成资产与分镜提示词", c.now()
 						persist()
 						continue
 					}
-					if automationOpeningEnabled(batch, book) && resumeStage != "video" {
+					if automationOpeningEnabled(batch, book) && (forceRegenerate || !batchfactoryv11.OpeningStageComplete(batch, book)) {
 						entry["stage"], entry["message"], entry["updatedAt"] = "opening", "正在基于分镜提示词生成换开头", c.now()
 						persist()
 						stageCtx, cancel = context.WithTimeout(ctx, stageTimeout)
@@ -2864,21 +2919,30 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					fail("merge", fmt.Errorf("合成服务未启用"), "最终合成失败")
 					continue
 				}
-				entry["stage"], entry["message"], entry["updatedAt"] = "merge", "正在合成最终视频", c.now()
-				persist()
-				mergeCtx, mergeCancel := context.WithTimeout(ctx, stageTimeout)
-				audioSource := "tts"
-				if raw, ok := book.SettingsState.Patch["audioSource"]; ok {
-					_ = json.Unmarshal(raw, &audioSource)
-				}
-				mergeJobs, mergeErr := c.merge.SubmitBookMerge(mergeCtx, owner, batchID, book.ID, jobID+"-merge-"+book.ID, batchfactoryv11.MergeOptions{TimingMode: "audio", AudioSource: strings.ToLower(strings.TrimSpace(audioSource)), AudioArtifactID: ttsArtifactID, AudioDurationSeconds: audioDurationSeconds})
-				if mergeErr == nil {
-					_, mergeErr = c.waitMerge(mergeCtx, owner, batchID, book.ID, mergeJobs)
-				}
-				mergeCancel()
-				if mergeErr != nil {
-					fail("merge", mergeErr, "最终合成失败")
-					continue
+				// 本轮视频全部复用已完成成片时，已有成功合成就直接跳过；
+				// 只要本轮提交过新视频，就必须重新合成，避免复用带旧视频的合成结果。
+				if reusedProduction && c.automationMergeComplete(ctx, owner, batchID, batch, book) {
+					const skipMessage = "合成成片已存在，跳过合成"
+					entry["stage"], entry["message"], entry["updatedAt"] = "merge", skipMessage, c.now()
+					appendAutomationBookLog(entry, c.now(), "merge", skipMessage)
+					persist()
+				} else {
+					entry["stage"], entry["message"], entry["updatedAt"] = "merge", "正在合成最终视频", c.now()
+					persist()
+					mergeCtx, mergeCancel := context.WithTimeout(ctx, stageTimeout)
+					audioSource := "tts"
+					if raw, ok := book.SettingsState.Patch["audioSource"]; ok {
+						_ = json.Unmarshal(raw, &audioSource)
+					}
+					mergeJobs, mergeErr := c.merge.SubmitBookMerge(mergeCtx, owner, batchID, book.ID, jobID+"-merge-"+book.ID, batchfactoryv11.MergeOptions{TimingMode: "audio", AudioSource: strings.ToLower(strings.TrimSpace(audioSource)), AudioArtifactID: ttsArtifactID, AudioDurationSeconds: audioDurationSeconds})
+					if mergeErr == nil {
+						_, mergeErr = c.waitMerge(mergeCtx, owner, batchID, book.ID, mergeJobs)
+					}
+					mergeCancel()
+					if mergeErr != nil {
+						fail("merge", mergeErr, "最终合成失败")
+						continue
+					}
 				}
 				if automationBoolValue(job["autoPublish"]) {
 					if c.automationSubmitDeferred(job) {
@@ -2886,27 +2950,34 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						persist()
 						continue
 					}
-					entry["stage"], entry["message"], entry["updatedAt"] = "upload", "正在上传视频管理系统", c.now()
-					persist()
-					publishCtx, publishCancel := context.WithTimeout(ctx, stageTimeout)
-					publishErr := c.publishVideo(publishCtx, owner, batchID, book.ID)
-					publishCancel()
-					if publishErr != nil {
-						if errors.Is(publishErr, errSensitiveReviewPending) {
-							entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "pending_confirmation", "sensitive_review", "", publishErr.Error()+"，请先在卡片上确认", c.now()
-							appendAutomationBookLog(entry, c.now(), "sensitive_review", publishErr.Error())
-							persist()
+					if automationBookUploaded(book) {
+						const skipMessage = "已上传完成，跳过重复上传"
+						entry["stage"], entry["message"], entry["updatedAt"] = "upload", skipMessage, c.now()
+						appendAutomationBookLog(entry, c.now(), "upload", skipMessage)
+						persist()
+					} else {
+						entry["stage"], entry["message"], entry["updatedAt"] = "upload", "正在上传视频管理系统", c.now()
+						persist()
+						publishCtx, publishCancel := context.WithTimeout(ctx, stageTimeout)
+						publishErr := c.publishVideo(publishCtx, owner, batchID, book.ID)
+						publishCancel()
+						if publishErr != nil {
+							if errors.Is(publishErr, errSensitiveReviewPending) {
+								entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "pending_confirmation", "sensitive_review", "", publishErr.Error()+"，请先在卡片上确认", c.now()
+								appendAutomationBookLog(entry, c.now(), "sensitive_review", publishErr.Error())
+								persist()
+								continue
+							}
+							if errors.Is(publishErr, errPublishUnconfirmed) {
+								entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "upload_confirm", publishErr.Error(), "已上传待确认：回读失败，重试时将优先回读", c.now()
+								appendAutomationBookLog(entry, c.now(), "upload_confirm", "已上传待确认：回读失败，重试时将优先回读")
+								failed.Add(1)
+								persist()
+								continue
+							}
+							fail("upload", publishErr, "上传失败")
 							continue
 						}
-						if errors.Is(publishErr, errPublishUnconfirmed) {
-							entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", "upload_confirm", publishErr.Error(), "已上传待确认：回读失败，重试时将优先回读", c.now()
-							appendAutomationBookLog(entry, c.now(), "upload_confirm", "已上传待确认：回读失败，重试时将优先回读")
-							failed.Add(1)
-							persist()
-							continue
-						}
-						fail("upload", publishErr, "上传失败")
-						continue
 					}
 				}
 				entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "completed", "completed", "已完成视频生成、合成与上传", c.now()
@@ -3213,6 +3284,119 @@ func productionJobError(job batchfactoryv11.ProductionJob) string {
 		}
 	}
 	return "视频模型未返回成片"
+}
+
+// automationAssetsComplete 资产阶段完成口径：开关关闭视为完成；开关打开时
+// 只要书里已有可用的资产条目就视为完成，不再重复调用模型提取。
+func automationAssetsComplete(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) bool {
+	if !batchfactoryv11.AssetImagesEnabled(effective) {
+		return true
+	}
+	for _, asset := range book.AssetRecords {
+		if strings.TrimSpace(asset.Prompt) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// automationDirectorComplete 分镜阶段完成口径：存在分镜，且其输入摘要与
+// 当前正文一致。摘要变化说明正文被改过，必须重新生成，不能拿旧分镜硬跑。
+func automationDirectorComplete(book batchfactoryv11.Book) bool {
+	revision := book.DirectorRevision
+	if revision == nil || strings.TrimSpace(revision.ID) == "" || len(book.Videos) == 0 {
+		return false
+	}
+	return revision.SourceDigest == batchfactoryv11.SourceInputDigest(book.SourceText)
+}
+
+// automationSucceededProduction 汇总本书所有分镜的成功成片（含 orphaned 历史
+// 槽位），并按 ordinal 判断视频阶段是否已经完成。返回的任务集合用于后续统计，
+// 避免“只做了两轮、没有一条 job 全部成功”时又把整轮视频重新提交一遍。
+//
+// 完成口径：每个 active 分镜 ordinal 至少有 1 条 succeeded + 可访问 mediaUrl；
+// 换开头开启时，VIDEO01 的每个成功变体也要有对应成片。
+func automationSucceededProduction(jobs []batchfactoryv11.ProductionJob, batch batchfactoryv11.Batch, book batchfactoryv11.Book) (batchfactoryv11.ProductionJob, bool) {
+	if len(book.Videos) == 0 {
+		return batchfactoryv11.ProductionJob{}, false
+	}
+	ordinalByVideo := make(map[string]int, len(book.Videos)+len(book.VideoHistory))
+	for _, video := range book.Videos {
+		ordinalByVideo[video.ID] = video.Ordinal
+	}
+	for _, history := range book.VideoHistory {
+		ordinalByVideo[history.ID] = history.Ordinal
+	}
+	done := map[[2]int]bool{}
+	production := batchfactoryv11.ProductionJob{BookID: book.ID}
+	for _, job := range jobs {
+		if job.BookID != book.ID {
+			continue
+		}
+		if production.ID == "" && len(job.Tasks) > 0 {
+			production.ID, production.DirectorRevisionID = job.ID, job.DirectorRevisionID
+		}
+		for _, task := range job.Tasks {
+			if task.Status != batchfactoryv11.ProductionSucceeded || strings.TrimSpace(task.MediaURL) == "" {
+				continue
+			}
+			ordinal, ok := ordinalByVideo[task.VideoID]
+			if !ok {
+				continue
+			}
+			done[[2]int{ordinal, task.OpeningVariantIndex}] = true
+			production.Tasks = append(production.Tasks, task)
+		}
+	}
+	for _, video := range book.Videos {
+		if !done[[2]int{video.Ordinal, 0}] {
+			return production, false
+		}
+	}
+	for _, index := range batchfactoryv11.RequiredOpeningVariantIndices(batch, book) {
+		if index == 0 {
+			continue
+		}
+		if !done[[2]int{book.Videos[0].Ordinal, index}] {
+			return production, false
+		}
+	}
+	return production, len(production.Tasks) > 0
+}
+
+// automationMergeComplete 合成阶段完成口径：本书当前需要的每个开头版本
+// 都已有 succeeded 且有成片地址的合成任务。
+func (c *BatchAutomationCoordinator) automationMergeComplete(ctx context.Context, owner, batchID string, batch batchfactoryv11.Batch, book batchfactoryv11.Book) bool {
+	if c.merge == nil || !c.merge.Enabled {
+		return false
+	}
+	jobs, err := c.merge.GetBatchStatus(ctx, owner, batchID)
+	if err != nil {
+		return false
+	}
+	done := map[int]bool{}
+	for _, job := range jobs {
+		if job.BookID != book.ID || job.Status != batchfactoryv11.MergeSucceeded || strings.TrimSpace(job.OutputURL) == "" {
+			continue
+		}
+		done[job.OpeningVariantIndex] = true
+	}
+	for _, index := range batchfactoryv11.OpeningMergeIndices(batch, book) {
+		if !done[index] {
+			return false
+		}
+	}
+	return true
+}
+
+// automationBookUploaded 判断上传阶段是否已有服务端回执。已上传的书不再进入
+// 上传流程：目标站登录态失效时也不会被误判成上传失败。
+func automationBookUploaded(book batchfactoryv11.Book) bool {
+	status := strings.ToLower(strings.TrimSpace(automationStringValue(book.SourceMetadata["websiteSubmitStatus"], "")))
+	if status == "" {
+		status = strings.ToLower(strings.TrimSpace(automationStringValue(book.SourceMetadata["publishStatus"], "")))
+	}
+	return status == "uploaded"
 }
 
 func (c *BatchAutomationCoordinator) waitMerge(ctx context.Context, owner, batchID, bookID string, submitted []batchfactoryv11.MergeJob) ([]batchfactoryv11.MergeJob, error) {

@@ -7,7 +7,8 @@ import {
   privateComicDraftKey,
   privateComicTaskKey,
   privateComicTaskSnapshot,
-  privateComicTitle
+  privateComicTitle,
+  shouldReusePrivateComicTask
 } from './privateCustomizationComic.js';
 
 test('uses the first non-empty source line as the editable comic title fallback', () => {
@@ -54,6 +55,15 @@ test('stores only the private comic task identity needed to restore progress', (
     bookId: 'book-1',
     status: 'created'
   });
+});
+
+test('reuses an existing comic task instead of creating duplicate batches', () => {
+  const task = { batchId: 'batch-1', bookId: 'book-1', sourceText: '第一段正文' };
+  assert.equal(shouldReusePrivateComicTask(task, '第一段正文'), true);
+  assert.equal(shouldReusePrivateComicTask(task, '  第一段正文  '), true);
+  assert.equal(shouldReusePrivateComicTask(task, '完全不同的正文'), false);
+  assert.equal(shouldReusePrivateComicTask({ batchId: 'batch-1', bookId: 'book-1' }, ''), true);
+  assert.equal(shouldReusePrivateComicTask({ batchId: '', bookId: '' }, '第一段正文'), false);
 });
 
 test('merges an uploaded reference into the first automation settings without losing user flags', () => {

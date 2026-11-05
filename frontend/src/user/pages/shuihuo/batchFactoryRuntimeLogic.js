@@ -125,7 +125,8 @@ export function bookVideoVersions(book, status) {
         merged.push({ ...item, isHistory: true, historyVideoId });
       }
     }
-    merged.sort((left, right) => String(left?.updatedAt || left?.createdAt || '').localeCompare(String(right?.updatedAt || right?.createdAt || '')));
+    // 所有成功版本按生成时间倒序展示（最新在前），不折叠、不截断。
+    merged.sort((left, right) => String(right?.updatedAt || right?.createdAt || '').localeCompare(String(left?.updatedAt || left?.createdAt || '')));
     result.set(String(video?.id || ''), merged);
   });
   return result;

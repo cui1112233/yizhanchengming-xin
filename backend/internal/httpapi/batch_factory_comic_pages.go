@@ -714,7 +714,13 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicCollection{}, err
 	}
-	if len(missingAssetIDs) > 0 {
+	if !batchfactoryv11.AssetImagesEnabled(effective) {
+		if len(missingAssetIDs) > 0 {
+			if report := comicGenerationProgressFromContext(ctx); report != nil {
+				report("comic_asset_images", fmt.Sprintf("因资产图片开关关闭，已跳过 %d 个漫画资产参考图生成", len(missingAssetIDs)))
+			}
+		}
+	} else if len(missingAssetIDs) > 0 {
 		if report := comicGenerationProgressFromContext(ctx); report != nil {
 			report("comic_asset_images", fmt.Sprintf("正在生成 %d 个漫画资产参考图", len(missingAssetIDs)))
 		}

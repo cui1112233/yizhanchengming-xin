@@ -106,7 +106,7 @@ func comicPromptTextForAspect(value, aspectRatio string) string {
 // BuildComicPromptContract remains available for previews of one selected page.
 func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot DirectorSnapshot) (PromptContract, error) {
 	if normalizeProductionMode(snapshot.Effective) != "comic" {
-		return PromptContract{}, fmt.Errorf("%w: 请先打开漫画生成", ErrConflict)
+		return PromptContract{}, NewConfigRequiredError("请先打开漫画生成")
 	}
 	if pageIndex < 0 || pageIndex >= len(videos) {
 		return PromptContract{}, fmt.Errorf("%w: 漫画页不存在", ErrInvalid)
@@ -114,11 +114,11 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 	video := videos[pageIndex]
 	config := aiReasoningPromptConfig(snapshot.Effective)
 	if !config.Comic.appliesTo(book) {
-		return PromptContract{}, fmt.Errorf("%w: 请先在 AI 推理中选择漫画提示词", ErrConflict)
+		return PromptContract{}, NewConfigRequiredError("请先在 AI 推理中选择漫画提示词")
 	}
 	assets := comicAssets(book.AssetRecords)
 	if len(assets) == 0 {
-		return PromptContract{}, fmt.Errorf("%w: 请先提取漫画资产", ErrConflict)
+		return PromptContract{}, NewConfigRequiredError("请先提取漫画资产")
 	}
 	aspectRatio := EffectiveImageAspectRatio(snapshot.Effective)
 	parts := []string{

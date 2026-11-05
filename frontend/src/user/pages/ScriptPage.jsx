@@ -34,7 +34,7 @@ import { ShotOutputCards } from '../components/ShotOutputCards';
 import EntityImagePanel from '../components/EntityImagePanel';
 import ScriptMentionEditor from '../components/ScriptMentionEditor';
 import { createScriptVideo, getScriptVideoTask } from '../../shared/api/scriptVideo';
-import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listAutomationPresets, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, startBatchAutomation, updateComicPage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
+import { createPrivateComicTask, downloadComicPromptZip, generateBookAssetImages, getBatch, getBatchRuntimeSummary, getBookAssetImageGenerationTask, listAutomationPresets, listBookAssetImages, listBookAssets, listComicPages, listSystemPresetCatalog, runBookStage, saveBatchSettings, startBatchAutomation, updateComicPage, uploadComicGlobalReference } from '../../shared/api/batchFactory';
 import { defaultEnabledModelSelection, loadScriptModelSelection, reconcileScriptModelSelection, saveScriptModelSelection } from './scriptModelSelection';
 import { modelOptionsForProvider, providerOptionsForModels, reconcileProviderModel } from './shuihuo/providerModelBinding';
 import PrivateComicWorkspace from './PrivateComicWorkspace';
@@ -44,7 +44,7 @@ import { PrivateStudioConstraintsModal } from './private-studio/PrivateStudioCon
 import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
 import { PrivateStudioNote } from './private-studio/PrivateStudioNote';
 import { PrivateStudioSteps } from './private-studio/PrivateStudioSteps';
-import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTaskSnapshot, privateComicTitle } from './privateCustomizationComic';
+import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTaskSnapshot, privateComicTitle, shouldReusePrivateComicTask } from './privateCustomizationComic';
 import { comicPageErrorMessage, comicPageGenerationPayload, generateComicPageWithConflict } from './shuihuo/batchFactoryComicMode';
 import './shuihuo-production.css';
 import './private-customization.css';
@@ -706,6 +706,23 @@ export function ScriptPage() {
     } catch {
       message.error('复制失败，请检查浏览器权限');
     }
+  }
+
+  function exportOutput() {
+    const content = String((isShotCardView ? shotCards.join('\n\n') : output) || '').trim();
+    if (!content) return message.warning('没有可导出的内容');
+    const title = String(scriptHeaderTitle || '剧本').trim() || '剧本';
+    const filename = `${title.replace(/[\\/:*?"<>|]/g, '_')}.txt`;
+    const blob = new Blob([`${title}\n\n${content}`], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    message.success('剧本已导出为 TXT 文件');
   }
 
   async function generateVideoForShot(card, index, { withoutReferences = false } = {}) {
@@ -1812,7 +1829,9 @@ export function ScriptPage() {
         await refreshPrivateComicTask(batchId);
         return true;
       }
-      const stillRunning = pages.some(page => wanted.has(page?.videoId) && ['generating', 'processing', 'running', 'queued'].includes(String(page?.status || '').trim().toLowerCase()));
+      const activeStates = ['generating', 'processing', 'running', 'queued'];
+      const stillRunning = pages.some(page => wanted.has(page?.videoId) && [page?.status, page?.generationState]
+        .some(state => activeStates.includes(String(state || '').trim().toLowerCase())));
       if (!stillRunning && withImages.length) break;
     }
     await refreshPrivateComicTask(batchId);
@@ -1972,14 +1991,21 @@ export function ScriptPage() {
       let settingsForStart = initialBatchSettings;
       const preset = await loadPrivateComicAutomationPreset();
       if (!preset?.id) throw new Error('请先在批量工厂保存一个自动化预设，再开始生成漫画');
-      const created = await createPrivateComicTask({
-        title: privateComicTitle(privateComicDraft.sourceText, privateComicDraft.title),
-        sourceText: privateComicDraft.sourceText,
-        initialBatchSettings
-      });
-      const snapshot = privateComicTaskSnapshot(created);
-      if (!snapshot.batchId) throw new Error('漫画任务已创建，但没有返回任务编号');
-      setPrivateComicTask(snapshot);
+      const reuseExisting = shouldReusePrivateComicTask(privateComicTask, privateComicDraft.sourceText);
+      let snapshot;
+      if (reuseExisting) {
+        snapshot = { ...privateComicTask, status: 'running' };
+        message.info('已沿用当前漫画任务，按最新约束重新启动生成');
+      } else {
+        const created = await createPrivateComicTask({
+          title: privateComicTitle(privateComicDraft.sourceText, privateComicDraft.title),
+          sourceText: privateComicDraft.sourceText,
+          initialBatchSettings
+        });
+        snapshot = privateComicTaskSnapshot(created, privateComicDraft.sourceText);
+        if (!snapshot.batchId) throw new Error('漫画任务已创建，但没有返回任务编号');
+        setPrivateComicTask(snapshot);
+      }
       if (privateComicPendingReference) {
         const uploaded = await uploadComicGlobalReference(snapshot.batchId, privateComicPendingReference);
         const uploadedReference = uploaded?.reference || {};
@@ -2036,6 +2062,43 @@ export function ScriptPage() {
     } finally {
       setPrivateComicBusy(false);
     }
+  }
+
+  async function persistPrivateComicComicSettings() {
+    const batchId = privateComicTask?.batchId;
+    if (!batchId) return;
+    let settingsPatch = buildPrivateComicSettings({
+      sourceText: privateComicDraft.sourceText,
+      comic: privateComicDraft.comic,
+      textModelId: privateComicDraft.textModelId,
+      imageModelId: privateComicDraft.imageModelId,
+      imageProvider: privateComicDraft.imageProvider || scriptImageProvider
+    });
+    if (privateComicPendingReference) {
+      const uploaded = await uploadComicGlobalReference(batchId, privateComicPendingReference);
+      settingsPatch = mergePrivateComicReference(settingsPatch, uploaded?.reference || {});
+      setPrivateComicDraft(current => ({
+        ...current,
+        comic: {
+          ...(current.comic || {}),
+          globalReferenceImage: settingsPatch.aiPromptConfig.comic.globalReferenceImage
+        }
+      }));
+      setPrivateComicPendingReference('');
+    }
+    const before = privateComicBatchValue(await getBatch(batchId, { cache: 'no-store' }));
+    const expectedRevision = Number(before?.revision || 0);
+    const saved = await saveBatchSettings(batchId, { expectedRevision, patch: settingsPatch });
+    const savedRevision = Number(saved?.revision || 0);
+    const after = privateComicBatchValue(await getBatch(batchId, { cache: 'no-store' }));
+    const afterRevision = Number(after?.revision || savedRevision || 0);
+    if (!(afterRevision > expectedRevision)) throw new Error('漫画约束保存后服务端版本号未更新，请重试');
+    const savedComic = after?.settingsState?.patch?.aiPromptConfig?.comic;
+    if (savedComic && String(savedComic.presetId || '').trim() !== String(privateComicDraft.comic?.presetId || '').trim()) {
+      throw new Error('漫画约束保存后回读不一致，请重试');
+    }
+    setPrivateComicTask(current => current ? { ...current, revision: afterRevision } : current);
+    message.success('漫画约束已保存到当前任务');
   }
 
   useEffect(() => {
@@ -2272,6 +2335,7 @@ export function ScriptPage() {
                   if (key === 'edit') toggleOutputEditor();
                   if (key === 'undo') undoLastRevision();
                   if (key === 'regenerate') regenerateOutput();
+                  if (key === 'export') exportOutput();
                 }
               }}
             >
@@ -2415,6 +2479,7 @@ export function ScriptPage() {
           onRefresh={() => void refreshPrivateComicTask()}
           onRetry={() => void retryPrivateComic()}
           onPendingReferenceChange={setPrivateComicPendingReference}
+          onPersistSettings={persistPrivateComicComicSettings}
           onOpenUnifiedConfig={openScriptUnifiedConfig}
           onReloadCatalog={reloadPrivateComicCatalog}
           onOpenBatchFactory={() => window.location.assign(`/batch-factory?batchId=${encodeURIComponent(privateComicTask?.batchId || '')}`)}

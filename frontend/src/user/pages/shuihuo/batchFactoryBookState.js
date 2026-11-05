@@ -60,6 +60,24 @@ export function automationBookIsActive(status, bookId) {
   return !terminalAutomationBookStates.has(String(book.status || '').trim().toLowerCase());
 }
 
+// 行内错误提示只代表“当前这一轮”的失败。满足任一条件即视为历史失败：
+// 1) 该书自动化已经 completed；2) 同一阶段后续已有 succeeded 记录，
+// 且时间晚于这次失败。历史失败只做折叠展示，不再提供“重试”入口。
+export function bookFailureIsHistorical({ automationBook = null, lastFailed = null, runs = [] } = {}) {
+  const state = String(automationBook?.status || '').trim().toLowerCase();
+  if (state === 'completed') return true;
+  if (state === 'failed' || state === 'blocked') return false;
+  const stage = String(lastFailed?.stage || '').trim();
+  if (!stage) return false;
+  const failedAt = Date.parse(String(lastFailed?.updatedAt || lastFailed?.createdAt || lastFailed?.finishedAt || ''));
+  return (Array.isArray(runs) ? runs : []).some(run => {
+    if (String(run?.stage || '').trim() !== stage) return false;
+    if (String(run?.status || '').trim().toLowerCase() !== 'succeeded') return false;
+    const stamp = Date.parse(String(run?.updatedAt || run?.createdAt || run?.finishedAt || ''));
+    return !Number.isFinite(failedAt) || !Number.isFinite(stamp) || stamp > failedAt;
+  });
+}
+
 export function batchFactoryAutomationRetryAction(status) {
   const queued = (Array.isArray(status?.books) ? status.books : []).filter(book => book?.retryRequested === true && taskState(book) !== 'completed').length;
   const failed = Number(status?.counts?.failed || 0) + Number(status?.counts?.blocked || 0);

@@ -229,9 +229,11 @@ func (s *MergeService) validateOpeningVariantMedia(ctx context.Context, owner, b
 		return err
 	}
 	tasks := productionTaskSelections(productionJobs, book.ID, book.DirectorRevision.ID)
+	allTasks := productionTaskSelectionsAllRevisions(productionJobs, book.ID)
 	firstVideo := book.Videos[0]
 	for _, variantIndex := range indices {
-		if _, selectable := selectedProductionTask(firstVideo, openingVariantTasks(tasks[firstVideo.ID], variantIndex)); !selectable {
+		candidates := openingVariantTasks(storyboardTaskCandidates(firstVideo, book, tasks, allTasks), variantIndex)
+		if _, selectable := selectedProductionTask(firstVideo, candidates); !selectable {
 			return fmt.Errorf("%w: book %s has VIDEOs without completed media", ErrConflict, book.ID)
 		}
 	}
@@ -304,7 +306,10 @@ func (s *MergeService) mergeVersion(ctx context.Context, repository MergeReposit
 		if !sameMergeVersion(job, candidate) {
 			continue
 		}
-		if job.Status == MergeSucceeded || job.Status == MergeQueued || job.Status == MergeRunning {
+		if job.Status == MergeSucceeded && strings.TrimSpace(job.OutputURL) != "" {
+			return job, true, nil
+		}
+		if job.Status == MergeQueued || job.Status == MergeRunning {
 			return job, true, nil
 		}
 		if job.Status == MergeFailed {

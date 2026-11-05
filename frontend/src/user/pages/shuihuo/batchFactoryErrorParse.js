@@ -24,6 +24,12 @@ export function splitBatchFactoryError(error) {
   const requestId = (raw.match(/request_id\s*=\s*([A-Za-z0-9_\-]+)/i) || [])[1] || '';
   const upstreamRejected = looksLikeUpstreamRejection(raw);
   const capabilityGate = !upstreamRejected && /capability unavailable|CAPABILITY_NOT_ENABLED|Slice 门控/i.test(raw);
+  // capability unavailable 后面经常跟的是真实业务原因（例如“文本模型请求失败：
+  // 请在资产设置中选择漫画资产提示词”），只有裸的 Slice 门控才是“能力未开通”。
+  // 之前统一渲染成“能力尚未开通”，把可自助修复的原因吞掉了。
+  const capabilityReason = capabilityGate
+    ? (raw.match(/capability unavailable\s*[:：]\s*([\s\S]+)$/i) || [])[1]?.trim() || ''
+    : '';
   // 后端历史记录可能把业务校验包在 ErrConflict 里，渲染成
   // “revision conflict: 请在资产设置中选择漫画资产提示词”。
   // 这里拆开：真正的版本冲突给重试动作，其它业务原因只显示原因本身。
@@ -39,7 +45,15 @@ export function splitBatchFactoryError(error) {
     else if (messageText) summary = `上游拒绝了本次提交：${messageText}`;
     else summary = '上游拒绝了本次提交，请查看下方原始信息。';
   } else if (capabilityGate) {
-    summary = '该能力尚未开通：请管理员启用对应能力（Slice 门控）后重试。';
+    // 漫画资产提示词没选时，后端会包一层 “文本模型请求失败：请在资产设置中选择
+    // 漫画资产提示词”。这类问题用户自己能修，不能再显示“能力未开通”。
+    if (/请在资产设置中选择漫画资产提示词|漫画资产提示词/.test(raw)) {
+      summary = '漫画资产提示词未选择，请在资产设置中选择。';
+    } else if (capabilityReason && !/CAPABILITY_NOT_ENABLED|Slice 门控/i.test(capabilityReason)) {
+      summary = capabilityReason;
+    } else {
+      summary = '该能力尚未开通：请管理员启用对应能力（Slice 门控）后重试。';
+    }
   } else {
     summary = batchFactoryVisibleError(raw) || '自动化任务执行失败，可重试失败小说。';
   }

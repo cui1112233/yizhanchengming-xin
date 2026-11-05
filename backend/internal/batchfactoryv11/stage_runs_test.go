@@ -579,6 +579,98 @@ func TestBookStageOpeningSkipsSingleStoryboardBook(t *testing.T) {
 	}
 }
 
+func TestBookStageUsesSelectedTextModelProvider(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{
+		"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"presetId": "batch-comic-assets", "body": "提取漫画资产"},
+	}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode": rawSetting(t, "comic"),
+			"aiPromptConfig": comicConfig,
+			"textModelId":    rawSetting(t, "model-selected"),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defaultProvider := &queuedDirectorProvider{}
+	selectedProvider := &queuedDirectorProvider{values: []string{`{"characters":[{"name":"林晚","prompt":"黑发女性"}],"scenes":[],"props":[]}`}}
+	var resolvedOwner, resolvedModel string
+	service := &BookStageService{
+		Store:    store,
+		Director: &DirectorService{Store: store, Provider: defaultProvider},
+		TextProviderResolver: func(_ context.Context, owner, modelID string) (DirectorProvider, error) {
+			resolvedOwner, resolvedModel = owner, modelID
+			if modelID != "model-selected" {
+				return nil, ErrConfigRequired
+			}
+			return selectedProvider, nil
+		},
+	}
+
+	summary, err := service.Run(ctx, "alice", batch.ID, batch.Books[0].ID, BookStageAssets, StageModeMissing, "assets-selected-model", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedOwner != "alice" || resolvedModel != "model-selected" {
+		t.Fatalf("resolver got owner=%q model=%q, want alice/model-selected", resolvedOwner, resolvedModel)
+	}
+	if len(defaultProvider.calls) != 0 {
+		t.Fatalf("account default provider was used %d times despite an explicit textModelId", len(defaultProvider.calls))
+	}
+	if len(selectedProvider.calls) != 1 {
+		t.Fatalf("selected provider calls=%d, want 1", len(selectedProvider.calls))
+	}
+	if len(summary.Runs) != 1 || summary.Runs[0].Status != ProductionSucceeded {
+		t.Fatalf("stage run was not recorded as succeeded: %+v", summary.Runs)
+	}
+}
+
+func TestBookStageFailsExplicitlyWhenSelectedTextModelIsUnavailable(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "漫画批次", Books: []CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig := rawSetting(t, map[string]any{"comic": map[string]any{
+		"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"presetId": "batch-comic-assets", "body": "提取漫画资产"},
+	}})
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode": rawSetting(t, "comic"),
+			"aiPromptConfig": comicConfig,
+			"textModelId":    rawSetting(t, "model-missing"),
+		},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defaultProvider := &queuedDirectorProvider{}
+	service := &BookStageService{
+		Store:                store,
+		Director:             &DirectorService{Store: store, Provider: defaultProvider},
+		TextProviderResolver: func(context.Context, string, string) (DirectorProvider, error) { return nil, nil },
+	}
+
+	summary, err := service.Run(ctx, "alice", batch.ID, batch.Books[0].ID, BookStageAssets, StageModeMissing, "assets-missing-model", "")
+	if !errors.Is(err, ErrConfigRequired) {
+		t.Fatalf("unavailable textModelId must fail as config-required, got %v", err)
+	}
+	if len(defaultProvider.calls) != 0 {
+		t.Fatalf("account default provider silently replaced the missing selection: %d calls", len(defaultProvider.calls))
+	}
+	if summary.LastFailed == nil || summary.LastFailed.Stage != BookStageAssets || !strings.Contains(summary.LastFailed.ErrorMessage, "选择的文本模型不可用") {
+		t.Fatalf("failed run does not explain the missing text model: %#v", summary.LastFailed)
+	}
+}
+
 func TestBookStageOpeningPersistsDirectorRevisionAsInputRevision(t *testing.T) {
 	sdResponse := `===VIDEO 01===
 时长：10秒

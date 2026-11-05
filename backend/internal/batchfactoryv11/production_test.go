@@ -398,6 +398,46 @@ func (r *recordingVideoProviderRegistry) View(context.Context, string, string) (
 // automation still passes the batch engine as its provider argument, so
 // SubmitBookProductionWithOptions must derive the provider from the book's
 // effective settings at submission time instead of trusting the caller.
+// 自动化再次触发时走的是 Missing 语义：已经有 succeeded 成片的分镜直接复用，
+// 不得重新提交任务，也不得轮换成新的 orphaned 槽位。
+func TestBookProductionMissingModeNeverResubmitsSucceededVideos(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book, _ := seedCompiledVideo(t)
+	tasks := make([]ProductionTask, 0, len(book.Videos))
+	for _, video := range book.Videos {
+		tasks = append(tasks, ProductionTask{
+			VideoID: video.ID, OpeningVariantIndex: 0, Status: ProductionSucceeded, Attempt: 1,
+			FinalPromptHash: "hash", CompiledPrompt: "prompt", MediaURL: "https://media.example/" + video.ID + ".mp4",
+		})
+	}
+	if _, err := store.CreateProductionJob(ctx, ProductionJob{
+		Owner: "alice", BatchID: batch.ID, BookID: book.ID, RequestID: "already-done",
+		DirectorRevisionID: book.DirectorRevision.ID, Tasks: tasks,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.ListProductionJobs(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &ProductionService{
+		Store: store, Compiler: &PromptCompilerService{Store: store},
+		LocalExecutor: NewLocalExecutorVideoAdapter(&recordingLocalRetryClient{}, ""),
+		Enabled:       true,
+		Model:         FrozenVideoModel{MaxDuration: 15},
+	}
+	if _, err := service.SubmitBookProductionWithOptions(ctx, "alice", batch.ID, book.ID, "again", VideoProviderDoubaoLocal, ProductionOptions{}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("missing mode must stop with a conflict instead of resubmitting: %v", err)
+	}
+	after, err := store.ListProductionJobs(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != len(before) {
+		t.Fatalf("production jobs grew from %d to %d; completed videos must never be resubmitted", len(before), len(after))
+	}
+}
+
 func TestVideoSubmitHonorsTheBookOverrideInsteadOfTheBatchEngine(t *testing.T) {
 	ctx := context.Background()
 	store, batch, book, _ := seedCompiledVideo(t)

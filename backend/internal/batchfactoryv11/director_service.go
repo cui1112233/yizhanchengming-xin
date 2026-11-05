@@ -39,6 +39,13 @@ func sourceDigest(source string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// SourceInputDigest 暴露导演输入摘要，让自动化在触发前就能判断
+// “现有分镜是否由当前正文生成”。摘要一致时分镜阶段可以直接跳过，
+// 不再把已完成的分镜重新生成一遍。
+func SourceInputDigest(source string) string {
+	return sourceDigest(source)
+}
+
 func rawString(patch SettingsPatch, key, fallback string) string {
 	raw, ok := patch[key]
 	if !ok {

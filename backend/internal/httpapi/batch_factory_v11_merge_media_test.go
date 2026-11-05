@@ -60,6 +60,28 @@ func TestSliceFiveMergeMediaSupportsRangeRequests(t *testing.T) {
 		t.Fatalf("range bytes=%d body=%q", rec.Body.Len(), rec.Body.String())
 	}
 
+	// 越界范围必须明确返回 416，并给出总长度，不能让播放器拿到整包。
+	beyond := httptest.NewRequest(http.MethodGet, output, nil)
+	beyond.Header.Set("Range", "bytes=2000-3000")
+	SignBridgeRequest(beyond, "alice", false, now, "secret")
+	over := httptest.NewRecorder()
+	api.ServeHTTP(over, beyond)
+	if over.Code != http.StatusRequestedRangeNotSatisfiable {
+		t.Fatalf("out-of-range status=%d", over.Code)
+	}
+	if got, want := over.Header().Get("Content-Range"), "bytes */"+strconv.Itoa(len(payload)); got != want {
+		t.Fatalf("out-of-range Content-Range=%q want %q", got, want)
+	}
+
+	// HEAD 只返回头部，长度与普通 GET 一致。
+	head := signedJSONRequest(t, api, now, "alice", http.MethodHead, output, nil)
+	if head.Code != http.StatusOK || head.Body.Len() != 0 {
+		t.Fatalf("head status=%d bytes=%d", head.Code, head.Body.Len())
+	}
+	if got := head.Header().Get("Content-Length"); got != strconv.Itoa(len(payload)) {
+		t.Fatalf("head Content-Length=%q want %d", got, len(payload))
+	}
+
 	missing := signedJSONRequest(t, api, now, "alice", http.MethodGet, "/api/batch-factory/v12/batches/"+batch.ID+"/merge-media/merge_missing_1", nil)
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing status=%d", missing.Code)

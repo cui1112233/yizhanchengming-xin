@@ -124,6 +124,14 @@ func EffectiveProductionMode(batchPatch, bookPatch SettingsPatch) string {
 	return normalizeProductionMode(ResolveSettings(batchPatch, bookPatch))
 }
 
+// AssetImagesEnabled reports whether automation should generate asset
+// reference images. Defaults to true so existing batches keep their current
+// behavior; an explicit false in the batch or book patch turns the assets stage
+// off without blocking the storyboard, video or comic stages.
+func AssetImagesEnabled(patch SettingsPatch) bool {
+	return rawBool(patch, "assetImagesEnabled", true)
+}
+
 func ChangedKeys(update SettingsUpdate) []string {
 	set := map[string]struct{}{}
 	for k := range update.Patch {

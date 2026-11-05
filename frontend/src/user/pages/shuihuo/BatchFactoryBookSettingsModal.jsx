@@ -14,7 +14,7 @@ import { BatchFactoryComicPublishSettingsForm } from './BatchFactoryUnifiedSetti
 import { batchFactoryProductionModeVisibility } from './batchFactoryProductionMode';
 import { IMAGE_ASPECT_RATIO_OPTIONS } from '../../../shared/imageAspectRatios';
 
-const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts', 'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure'];
+const ENGINE_MODEL_OVERRIDE_FIELDS = ['textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'assetImagesEnabled', 'storyboardDurationLimit', 'maxVideoDuration', 'audioSource', 'audioPlanningEnabled', 'audioMergeEnabled', 'audioDurationSeconds', 'audioDurationFingerprint', 'tts', 'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure'];
 const ENGINE_PUBLISH_OVERRIDE_FIELDS = ['publishRewriteEnabled', 'publishSettings', 'comicPublishSettings'];
 const ENGINE_OVERRIDE_FIELDS = [...ENGINE_MODEL_OVERRIDE_FIELDS, ...ENGINE_PUBLISH_OVERRIDE_FIELDS];
 const BOOK_OVERRIDE_FIELDS = [...ENGINE_OVERRIDE_FIELDS, 'starredCharacterNames', 'openingEnabled', 'openingCount', 'aiPromptConfig'];
@@ -698,6 +698,7 @@ export function BatchFactoryBookSettingsModal({ open, batch, book, activeRegion 
             <InheritedField label="图片模型" field="imageModelId" value={form.imageModelId} inherited={inherited.imageModelId} options={imageModelOptions} loading={effectiveImageProvider === 'doubao_local_executor' ? false : loading} explicit={Object.hasOwn(bookPatch, 'imageModelId')} onChange={imageModelId => patch({ imageModelId, ...(imageModelId ? { imageProvider: providerForCatalogModel(models.find(model => model.id === imageModelId), effectiveImageProvider) } : {}) })} />
             <InheritedField label="文本模型" field="textModelId" value={form.textModelId} inherited={inherited.textModelId} options={modelOptions.text} loading={loading} explicit={Object.hasOwn(bookPatch, 'textModelId')} onChange={textModelId => patch({ textModelId })} />
             <InheritedField label="图片画幅" field="imageAspectRatio" value={form.imageAspectRatio || form.aspectRatio || '9:16'} inherited={inherited.imageAspectRatio || inherited.aspectRatio || '9:16'} options={IMAGE_ASPECT_RATIO_OPTIONS} loading={false} explicit={Object.hasOwn(bookPatch, 'imageAspectRatio')} onChange={imageAspectRatio => patch({ imageAspectRatio })} />
+            <InheritedSwitchField label="生成资产图片" value={form.assetImagesEnabled} inherited={inherited.assetImagesEnabled !== false} explicit={Object.hasOwn(bookPatch, 'assetImagesEnabled')} onChange={assetImagesEnabled => patch({ assetImagesEnabled })} />
           </div></ConfigCard>
           <ConfigCard title="敏感词处理" description="默认继承统一配置；这里可单独覆盖当前书。AI 修复失败会降级到规则/打码并等待人工确认。">
             <InheritedSwitchField label="AI 修复" value={form.sensitiveAIEnabled} inherited={inherited.sensitiveAIEnabled !== false} explicit={Object.hasOwn(bookPatch, 'sensitiveAIEnabled')} onChange={sensitiveAIEnabled => patch({ sensitiveAIEnabled })} />

@@ -113,7 +113,37 @@ test('the active version and the previous version are listed together', () => {
     ] }
   ] };
   const versions = bookVideoVersions(book, status).get('v-active');
-  assert.deepEqual(versions.map(version => version.id), ['old', 'new']);
-  assert.equal(versions[0].isHistory, true);
-  assert.equal(versions[1].isHistory, false);
+  // 版本按生成时间倒序：最新一条在前，历史版本跟在后面，但不会被隐藏。
+  assert.deepEqual(versions.map(version => version.id), ['new', 'old']);
+  assert.equal(versions[0].isHistory, false);
+  assert.equal(versions[1].isHistory, true);
+});
+
+test('every succeeded video of one storyboard stays visible, newest first', () => {
+  // 同一分镜 5 条历史成功成片（跨 active 与 orphaned 记录）必须全部列出、可被选为主版本。
+  const book = {
+    id: 'book-5',
+    videos: [{ id: 'v-active', ordinal: 0 }],
+    videoHistory: [
+      { id: 'v-old-1', ordinal: 0, compatibilityState: 'orphaned' },
+      { id: 'v-old-2', ordinal: 0, compatibilityState: 'orphaned' },
+      { id: 'v-old-3', ordinal: 0, compatibilityState: 'orphaned' },
+      { id: 'v-old-4', ordinal: 0, compatibilityState: 'orphaned' }
+    ]
+  };
+  const status = { jobs: [{ id: 'job-1', tasks: [
+    { id: 'v1', videoId: 'v-old-1', status: 'succeeded', mediaUrl: 'https://video/1.mp4', updatedAt: '2026-11-04T10:00:00Z' },
+    { id: 'v2', videoId: 'v-old-2', status: 'succeeded', mediaUrl: 'https://video/2.mp4', updatedAt: '2026-11-04T11:00:00Z' },
+    { id: 'v3', videoId: 'v-old-3', status: 'succeeded', mediaUrl: 'https://video/3.mp4', updatedAt: '2026-11-04T12:00:00Z' },
+    { id: 'v4', videoId: 'v-old-4', status: 'succeeded', mediaUrl: 'https://video/4.mp4', updatedAt: '2026-11-04T13:00:00Z' },
+    { id: 'v5', videoId: 'v-active', status: 'succeeded', mediaUrl: 'https://video/5.mp4', updatedAt: '2026-11-04T14:00:00Z' },
+    { id: 'failed', videoId: 'v-active', status: 'failed', mediaUrl: '' }
+  ] }] };
+  const versions = bookVideoVersions(book, status).get('v-active');
+  assert.equal(versions.length, 5);
+  assert.deepEqual(versions.map(version => version.id), ['v5', 'v4', 'v3', 'v2', 'v1']);
+  assert.equal(versions[0].isHistory, false);
+  assert.deepEqual(versions.slice(1).map(version => version.isHistory), [true, true, true, true]);
+  // 失败记录没有 mediaUrl，不得占用版本位。
+  assert.equal(versions.some(version => version.id === 'failed'), false);
 });

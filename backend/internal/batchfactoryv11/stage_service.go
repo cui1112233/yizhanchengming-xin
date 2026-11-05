@@ -55,12 +55,16 @@ type BookStageService struct {
 	ImageReady func(context.Context, string) (bool, string)
 	// VideoReady is supplied by the host application so availability reflects
 	// the account's selected video model, not only the global production flag.
-	VideoReady        func(context.Context, string) (bool, string)
-	ImageGenerator    func(context.Context, string, string, string) error
-	SmartUnifiedStyle string
-	OpeningMeta       PresetSnapshot
-	H3Director        bool
-	ProviderOverride  string
+	VideoReady     func(context.Context, string) (bool, string)
+	ImageGenerator func(context.Context, string, string, string) error
+	// TextProviderResolver resolves the owner-scoped text provider for an
+	// explicit textModelId stored in the effective settings. When nil, the
+	// account-level Director.Provider stays in charge.
+	TextProviderResolver func(context.Context, string, string) (DirectorProvider, error)
+	SmartUnifiedStyle    string
+	OpeningMeta          PresetSnapshot
+	H3Director           bool
+	ProviderOverride     string
 }
 
 func (s *BookStageService) RunComicBootstrap(ctx context.Context, owner, batchID, bookID string) (ComicBootstrapResult, error) {
@@ -198,10 +202,45 @@ func normalizeStageExecutionError(stage BookStage, err error) error {
 	if err == nil || (stage != BookStageAssets && stage != BookStageDirector && stage != BookStageVisual && stage != BookStageComic && stage != BookStageOpening) {
 		return err
 	}
-	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrConflict) || errors.Is(err, ErrInvalid) || errors.Is(err, ErrUnavailable) {
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrConflict) || errors.Is(err, ErrInvalid) || errors.Is(err, ErrUnavailable) || errors.Is(err, ErrConfigRequired) {
 		return err
 	}
 	return fmt.Errorf("%w: 文本模型请求失败：%v", ErrUnavailable, err)
+}
+
+func isTextDrivenStage(stage BookStage) bool {
+	switch stage {
+	case BookStageAssets, BookStageDirector, BookStageVisual, BookStageComic, BookStageOpening:
+		return true
+	default:
+		return false
+	}
+}
+
+// directorForTextModel keeps the account-level director as the default while
+// honouring an explicit textModelId saved in the batch/book settings. A shallow
+// clone is enough because DirectorService only carries read-only dependencies.
+func (s *BookStageService) directorForTextModel(ctx context.Context, owner string, settings SettingsPatch) (*DirectorService, error) {
+	if s == nil || s.Director == nil {
+		return nil, fmt.Errorf("%w: 文本模型未配置", ErrUnavailable)
+	}
+	modelID := rawString(settings, "textModelId", "")
+	if modelID == "" {
+		return s.Director, nil
+	}
+	provider, err := s.TextProviderResolver(ctx, owner, modelID)
+	if err != nil {
+		if errors.Is(err, ErrConfigRequired) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%w: 选择的文本模型不可用：%v", ErrUnavailable, err)
+	}
+	if provider == nil {
+		return nil, fmt.Errorf("%w: 选择的文本模型不可用：%s", ErrConfigRequired, modelID)
+	}
+	clone := *s.Director
+	clone.Provider = provider
+	return &clone, nil
 }
 
 // immediateVideoProviderFailure turns a provider-side rejection that was
@@ -244,7 +283,8 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	if err != nil {
 		return BookStageSummary{}, err
 	}
-	effectiveMode := normalizeProductionMode(ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch))
+	effectiveSettings := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	effectiveMode := normalizeProductionMode(effectiveSettings)
 	if mode == StageModeMissing && effectiveMode == "comic" {
 		if stage == BookStageDirector {
 			if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {
@@ -275,7 +315,7 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		return BookStageSummary{}, fmt.Errorf("%w: 漫画生成已开启，不能生成视频", ErrConflict)
 	}
 	if stage == BookStageComic && effectiveMode != "comic" {
-		return BookStageSummary{}, fmt.Errorf("%w: 请先打开漫画生成", ErrConflict)
+		return BookStageSummary{}, NewConfigRequiredError("请先打开漫画生成")
 	}
 	// Missing-mode automation is idempotent: once a director revision exists,
 	// do not create another stage run or ask the provider for the same book
@@ -298,31 +338,40 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 		summary, _ := s.Summary(ctx, owner, batchID, bookID)
 		return summary, err
 	}
+	director := s.Director
+	if isTextDrivenStage(stage) && s.TextProviderResolver != nil {
+		director, err = s.directorForTextModel(ctx, owner, effectiveSettings)
+		if err != nil {
+			_ = s.finish(ctx, owner, run, err)
+			summary, _ := s.Summary(ctx, owner, batchID, bookID)
+			return summary, err
+		}
+	}
 	switch stage {
 	case BookStageAssets:
 		if effectiveMode == "comic" {
-			_, err = s.Director.RunComicAssetExtraction(ctx, owner, batchID, bookID)
+			_, err = director.RunComicAssetExtraction(ctx, owner, batchID, bookID)
 		} else {
-			_, err = s.Director.RunAssetExtraction(ctx, owner, batchID, bookID)
+			_, err = director.RunAssetExtraction(ctx, owner, batchID, bookID)
 		}
 	case BookStageOpening:
-		_, err = s.Director.RunOpeningVariants(ctx, owner, batchID, bookID, s.OpeningMeta)
+		_, err = director.RunOpeningVariants(ctx, owner, batchID, bookID, s.OpeningMeta)
 		if err == nil && book.DirectorRevision != nil {
 			// 换开头绑定当前导演分镜版本：重新生成导演分镜后旧 revision 的成功
 			// 记录不再满足编排器门禁，变体会随新 revision 重新生成。
 			run.InputRevision = book.DirectorRevision.ID
 		}
 	case BookStageVisual:
-		_, err = s.Director.RunVisualPromptExtraction(ctx, owner, batchID, bookID)
+		_, err = director.RunVisualPromptExtraction(ctx, owner, batchID, bookID)
 	case BookStageComic:
 		if mode == StageModeBootstrap {
-			_, err = s.Director.RunComicBootstrap(ctx, owner, batchID, bookID)
+			_, err = director.RunComicBootstrap(ctx, owner, batchID, bookID)
 			break
 		}
 		if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {
 			segmentation, segmentErr := segmentStore.GetComicSourceSegmentation(ctx, owner, batchID, bookID)
 			if errors.Is(segmentErr, ErrNotFound) || (segmentErr == nil && segmentation.Stale) {
-				_, segmentErr = s.Director.RunComicSourceSegmentation(ctx, owner, batchID, bookID)
+				_, segmentErr = director.RunComicSourceSegmentation(ctx, owner, batchID, bookID)
 			}
 			if segmentErr != nil {
 				err = segmentErr
@@ -334,9 +383,9 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 			// page prompts and avoid requiring a second asset-extraction pass.
 			err = nil
 		} else if mode == StageModeMissing {
-			_, err = s.Director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
+			_, err = director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
 		} else {
-			_, err = s.Director.RunComicPromptExtraction(ctx, owner, batchID, bookID)
+			_, err = director.RunComicPromptExtraction(ctx, owner, batchID, bookID)
 		}
 	case BookStageImage:
 		if s.ImageGenerator == nil {
@@ -347,7 +396,7 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	case BookStageDirector:
 		if effectiveMode == "comic" {
 			var segmentation ComicSourceSegmentation
-			segmentation, err = s.Director.RunComicSourceSegmentation(ctx, owner, batchID, bookID)
+			segmentation, err = director.RunComicSourceSegmentation(ctx, owner, batchID, bookID)
 			if err == nil {
 				run.InputRevision = fmt.Sprintf("comic-source-v%d", segmentation.Version)
 			}
@@ -359,11 +408,11 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 				// H3 video prompt presets use the structured director document and
 				// its duration/compilation trace. The caller selects this explicitly;
 				// SD presets use the SD text contract below instead.
-				revision, err = s.Director.RunConfiguredH3Director(ctx, owner, batchID, bookID, s.SmartUnifiedStyle)
+				revision, err = director.RunConfiguredH3Director(ctx, owner, batchID, bookID, s.SmartUnifiedStyle)
 			} else {
 				// SD is the default video prompt contract. Historical records without
 				// a saved selection remain readable through this same compatible path.
-				revision, err = s.Director.RunDirectorWithSmartUnifiedStyle(ctx, owner, batchID, bookID, s.SmartUnifiedStyle)
+				revision, err = director.RunDirectorWithSmartUnifiedStyle(ctx, owner, batchID, bookID, s.SmartUnifiedStyle)
 			}
 			if err == nil {
 				run.InputRevision = revision.ID

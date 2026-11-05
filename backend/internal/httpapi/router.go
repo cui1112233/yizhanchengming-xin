@@ -84,19 +84,23 @@ type RouterOptions struct {
 	UserDataDir                     string
 	UserConfigStore                 *UserConfigStore
 	TextProvider                    batchfactoryv11.DirectorProvider
-	AgentTextModelResolver          AgentTextModelResolver
-	AgentWorkspace                  agentworkspace.Store
-	AgentAssets                     agentworkspace.AssetStore
-	AgentAssetObjects               agentworkspace.AssetObjectStore
-	RedisURL                        string
-	LocalExecutors                  *localexecutor.Service
-	GiantMaterialExecutor           *giantmaterialexecutor.Service
-	GiantMaterialResolver           GiantMaterialResolver
-	LocalArtifacts                  *localartifact.Store
-	LocalExecutorDownloadsDir       string
-	MergeOutput                     mergeworker.ObjectStore
-	VideoManagementConnector        videomanagementconnector.Service
-	N8ComicPublisher                *BatchFactoryN8ComicPublisher
+	// TextProviderResolver resolves the owner-scoped provider for an explicit
+	// textModelId saved in batch/book settings. Batch stages use it so the
+	// workbench text-model selector is honoured instead of ignored.
+	TextProviderResolver      func(context.Context, string, string) (batchfactoryv11.DirectorProvider, error)
+	AgentTextModelResolver    AgentTextModelResolver
+	AgentWorkspace            agentworkspace.Store
+	AgentAssets               agentworkspace.AssetStore
+	AgentAssetObjects         agentworkspace.AssetObjectStore
+	RedisURL                  string
+	LocalExecutors            *localexecutor.Service
+	GiantMaterialExecutor     *giantmaterialexecutor.Service
+	GiantMaterialResolver     GiantMaterialResolver
+	LocalArtifacts            *localartifact.Store
+	LocalExecutorDownloadsDir string
+	MergeOutput               mergeworker.ObjectStore
+	VideoManagementConnector  videomanagementconnector.Service
+	N8ComicPublisher          *BatchFactoryN8ComicPublisher
 }
 
 func NewRouter(options RouterOptions) http.Handler {
@@ -118,8 +122,9 @@ func NewRouter(options RouterOptions) http.Handler {
 		}
 		automationStages := &batchfactoryv11.BookStageService{
 			Store: options.Store, Director: options.Director, Production: options.Production,
-			ImageReady: shuihuoImageReadyChecker(options.Store, options.NovelFetchStore),
-			VideoReady: shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production),
+			ImageReady:           shuihuoImageReadyChecker(options.Store, options.NovelFetchStore),
+			VideoReady:           shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production),
+			TextProviderResolver: options.TextProviderResolver,
 		}
 		options.AutomationCoordinator = NewBatchAutomationCoordinator(options.Store, options.AutomationPresetStore, automationStages, options.Merge, options.External, options.NovelFetchStore, options.H3AudioProbe, options.AutomationStatusReader, options.Now, providerSync)
 		options.AutomationCoordinator.SetLocalFiles(options.LocalArtifacts)
@@ -205,7 +210,7 @@ func NewRouter(options RouterOptions) http.Handler {
 	}
 	if options.Store != nil && options.Director != nil && options.Slice >= 2 {
 		registerDirectorRoutes(v11, options.Director, options.Store)
-		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production}
+		stageService := &batchfactoryv11.BookStageService{Store: options.Store, Director: options.Director, Production: options.Production, TextProviderResolver: options.TextProviderResolver}
 		if options.LocalArtifacts != nil {
 			stageService.ImageReady = shuihuoImageReadyChecker(options.Store, options.NovelFetchStore)
 			stageService.VideoReady = shuihuoVideoReadyChecker(options.Store, options.NovelFetchStore, options.Production)

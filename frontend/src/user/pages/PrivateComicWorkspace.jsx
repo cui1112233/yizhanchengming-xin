@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Dropdown, Input, Modal, Popconfirm, Progress, Select, Space, Typography } from 'antd';
+import { Alert, Button, Dropdown, Input, Modal, Popconfirm, Progress, Select, Space, Typography, message } from 'antd';
 import { Download, ExternalLink, MoreHorizontal, Pencil, RefreshCw, Settings2, WandSparkles } from 'lucide-react';
 
 import { getComicPageImageBlob } from '../../shared/api/batchFactory';
@@ -63,6 +63,7 @@ function taskLabel(task) {
   if (task.status === 'succeeded' || task.status === 'completed') return '漫画生成完成';
   if (task.status === 'failed') return '漫画生成失败';
   if (task.status === 'created') return '已创建，准备启动';
+  if (task.status === 'idle') return '已就绪，可手动执行或重试';
   return '漫画生成中';
 }
 
@@ -226,10 +227,12 @@ export function PrivateComicWorkspace({
   onReloadCatalog,
   onRetry,
   onPendingReferenceChange,
+  onPersistSettings,
   customizationWorkspace = 'comic',
   onWorkspaceChange
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(null);
   const [assetPreview, setAssetPreview] = useState(null);
   const workbenchRef = useRef(null);
@@ -255,6 +258,24 @@ export function PrivateComicWorkspace({
   }
   const patchDraft = patch => onDraftChange?.({ ...draft, ...patch });
   const patchComic = patch => patchDraft({ comic: { ...comic, ...patch, enabled: true } });
+  // 约束弹窗点「完成」时，已有服务端任务的书必须先真正写回设置并回读通过再关闭；
+  // 还没有任务时只保存本地草稿，等「开始生成漫画」时随创建任务一起提交。
+  async function saveSettings() {
+    if (savingSettings) return;
+    if (!task?.batchId) {
+      setSettingsOpen(false);
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      await onPersistSettings?.();
+      setSettingsOpen(false);
+    } catch (error) {
+      message.error(error?.message || '漫画约束保存失败');
+    } finally {
+      setSavingSettings(false);
+    }
+  }
   const pageOptions = optionsFor(catalog, 'batch.comic-page');
   const derivationOptions = optionsFor(catalog, 'batch.comic-image-derivation');
   const promptName = text(comic.presetName) || text(pageOptions.find(option => option.value === comic.presetId)?.item?.name);
@@ -625,9 +646,10 @@ export function PrivateComicWorkspace({
     <PrivateStudioConstraintsModal
       open={settingsOpen}
       onCancel={() => setSettingsOpen(false)}
-      onOk={() => setSettingsOpen(false)}
-      okText="完成"
-      footerNote="漫画约束只作用于本书的漫画生成，不会改动批量工厂的预设。未出图的页仍会写入打包下载里的提示词文件。"
+      onOk={() => void saveSettings()}
+      okText={task?.batchId ? '保存到任务' : '完成'}
+      okButtonProps={{ loading: savingSettings }}
+      footerNote="漫画约束只作用于本书的漫画生成，不会改动批量工厂的预设。已有任务时点「保存到任务」会立即写回服务端并回读校验；未出图的页仍会写入打包下载里的提示词文件。"
     >
       <div className="private-customization-comic-settings">
         <PrivateStudioConstraintSection

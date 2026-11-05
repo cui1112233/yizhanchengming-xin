@@ -106,6 +106,11 @@ func TestReadbackMySQLStoreHydratesComicSourceSegments(t *testing.T) {
 	mock.ExpectQuery("SELECT patch_json FROM batch_factory_v12_settings_patches").
 		WithArgs(string(ScopeVideo), "video-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"patch_json"}).AddRow(`{"comicPrompt":"第一页","comicImagePrompt":"第一页图片"}`))
+	// 非 active 的历史槽位必须一并下发，供媒体库展示历史成片、供自动化判断跳过。
+	mock.ExpectQuery("SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos").
+		WithArgs("batch-1", "book-1", "alice").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state"}).
+			AddRow("video-old", 0, "orphaned"))
 
 	digest := sourceDigest("第一段。")
 	mock.ExpectQuery("SELECT COALESCE\\(NULLIF\\(d.content,''\\),r.source_text,''\\)").
@@ -128,6 +133,9 @@ func TestReadbackMySQLStoreHydratesComicSourceSegments(t *testing.T) {
 	segment := got.Books[0].Videos[0].ComicSourceSegment
 	if segment == nil || segment.SourceText != "第一段。" || segment.VideoID != "video-1" {
 		t.Fatalf("comic source segment = %#v", segment)
+	}
+	if len(got.Books[0].VideoHistory) != 1 || got.Books[0].VideoHistory[0].ID != "video-old" || got.Books[0].VideoHistory[0].Ordinal != 0 {
+		t.Fatalf("video history = %#v", got.Books[0].VideoHistory)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

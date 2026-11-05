@@ -30,6 +30,16 @@ test('private comic workspace reuses the published style library and comic promp
   assert.match(source, /private-customization-reference-note/);
 });
 
+test('comic constraints are persisted to the server task with a readback check', () => {
+  assert.match(source, /onPersistSettings/);
+  assert.match(source, /async function saveSettings\(\)/);
+  assert.match(source, /await onPersistSettings\?\.\(\)/);
+  assert.match(source, /message\.error\(error\?\.message \|\| '漫画约束保存失败'\)/);
+  assert.match(source, /onOk=\{\(\) => void saveSettings\(\)\}/);
+  assert.match(source, /okButtonProps=\{\{ loading: savingSettings \}\}/);
+  assert.match(source, /okText=\{task\?\.batchId \? '保存到任务' : '完成'\}/);
+});
+
 test('private comic workspace blocks submit without pasted source', () => {
   assert.match(source, /const sourceReady = sourceLength >= privateComicMinSourceLength/);
   assert.match(source, /disabled=\{busy \|\| !sourceReady\}/);

@@ -63,10 +63,20 @@ export function mergePrivateComicReference(settings = {}, reference = {}) {
   };
 }
 
-export function privateComicTaskSnapshot(result = {}) {
-  return {
+export function shouldReusePrivateComicTask(task, sourceText) {
+  if (!task?.batchId || !task?.bookId) return false;
+  const previous = text(task?.sourceText);
+  if (!previous) return true;
+  return previous === text(sourceText);
+}
+
+export function privateComicTaskSnapshot(result = {}, sourceText = '') {
+  const snapshot = {
     batchId: text(result?.batch?.id || result?.batchId),
     bookId: text(result?.book?.id || result?.bookId),
     status: 'created'
   };
+  const source = text(sourceText);
+  if (source) snapshot.sourceText = source;
+  return snapshot;
 }

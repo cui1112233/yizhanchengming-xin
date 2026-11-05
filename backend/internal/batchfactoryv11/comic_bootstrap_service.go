@@ -18,11 +18,11 @@ func BuildComicBootstrapContract(book Book, snapshot DirectorSnapshot) (PromptCo
 		return PromptContract{}, fmt.Errorf("%w: source text is required", ErrInvalid)
 	}
 	if normalizeProductionMode(snapshot.Effective) != "comic" {
-		return PromptContract{}, fmt.Errorf("%w: 请先打开漫画生成", ErrConflict)
+		return PromptContract{}, NewConfigRequiredError("请先打开漫画生成")
 	}
 	config := aiReasoningPromptConfig(snapshot.Effective).Comic
 	if strings.TrimSpace(config.Assets.Body) == "" || strings.TrimSpace(config.Body) == "" {
-		return PromptContract{}, fmt.Errorf("%w: 请先选择漫画资产提示词和漫画分镜提示词", ErrConflict)
+		return PromptContract{}, NewConfigRequiredError("请先选择漫画资产提示词和漫画分镜提示词")
 	}
 
 	sections := []string{

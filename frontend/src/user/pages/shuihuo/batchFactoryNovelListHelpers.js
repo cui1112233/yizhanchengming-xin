@@ -668,7 +668,8 @@ export function completedMediaVersions(status) {
 
 export function primaryMediaVersion(video, versions) {
 	const primaryID = video?.settingsState?.patch?.primaryMediaTaskId;
-	return versions.find(item => item.id === primaryID) || versions.at(-1) || null;
+	// 版本列表按生成时间倒序（最新在前），没有手动指定主版本时取最新一条。
+	return versions.find(item => item.id === primaryID) || versions[0] || null;
 }
 
 export function storyboardVideoLabel(video, index) {

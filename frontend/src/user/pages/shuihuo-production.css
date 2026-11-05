@@ -4850,6 +4850,14 @@ body.shuihuo-reference-shell
 .batch-factory-error-notice.is-line.is-expanded { padding-bottom: 8px; }
 .batch-factory-error-notice.is-line.is-expanded .batch-factory-error-notice-line { min-height: 24px; }
 .batch-factory-error-notice.is-line.is-expanded .batch-factory-error-notice-line-text { line-height: 24px; }
+/* 历史失败：已经恢复的旧记录降级为灰色细线，只保留“详情”，不再像当前错误一样醒目。 */
+.batch-factory-error-notice.is-line.is-historical {
+  border-left-color: var(--sh-muted, #8391a4);
+  opacity: 0.72;
+}
+.batch-factory-error-notice.is-line.is-historical .batch-factory-error-notice-line-text {
+  color: var(--sh-muted, #8391a4);
+}
 
 /* 统一配置面板：高度不超视口，内容区内部滚动，底部保存按钮固定。 */
 .ant-modal.batch-factory-unified-settings-modal {

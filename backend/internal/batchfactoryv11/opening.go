@@ -120,6 +120,64 @@ func successfulOpeningVariants(video Video) []OpeningVariant {
 	return out
 }
 
+// OpeningStageComplete 判断「换开头」阶段是否已经做完：开关关闭、只有一个
+// 分镜，或所需变体全部成功时视为完成。自动化每次触发都先查它，避免为了
+// 补齐一个变体而把整轮开头重新生成。
+func OpeningStageComplete(batch Batch, book Book) bool {
+	if len(book.Videos) < 2 {
+		return true
+	}
+	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	if !rawBool(effective, "openingEnabled", false) {
+		return true
+	}
+	count := rawInt(effective, "openingCount", 4)
+	if count < 1 || count > 8 {
+		return false
+	}
+	return len(successfulOpeningVariants(book.Videos[0])) >= count-1
+}
+
+// RequiredOpeningVariantIndices 返回「换开头」设置要求的全部版本编号
+// （0 为原开头）。自动化用它判断视频阶段是否真的补齐了全部开头条数，
+// 而不是只看已经成功的变体。
+func RequiredOpeningVariantIndices(batch Batch, book Book) []int {
+	indices := []int{0}
+	if len(book.Videos) < 2 {
+		return indices
+	}
+	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	if !rawBool(effective, "openingEnabled", false) {
+		return indices
+	}
+	count := rawInt(effective, "openingCount", 4)
+	if count < 1 || count > 8 {
+		return indices
+	}
+	for index := 1; index < count; index++ {
+		indices = append(indices, index)
+	}
+	return indices
+}
+
+// OpeningMergeIndices 返回合成阶段应产出的开头版本编号：0 表示原开头，
+// 其余是已成功生成的换开头变体。自动化据此判断历史合成是否已经覆盖
+// 当前需要的全部版本。
+func OpeningMergeIndices(batch Batch, book Book) []int {
+	indices := []int{0}
+	if len(book.Videos) < 2 {
+		return indices
+	}
+	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	if !rawBool(effective, "openingEnabled", false) {
+		return indices
+	}
+	for _, variant := range successfulOpeningVariants(book.Videos[0]) {
+		indices = append(indices, variant.Index)
+	}
+	return indices
+}
+
 func openingVariants(video Video) []OpeningVariant {
 	raw, ok := video.SettingsState.Patch["openingVariants"]
 	if !ok {

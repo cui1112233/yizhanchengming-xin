@@ -140,7 +140,7 @@ import '../private-studio/private-studio-asset-editor.css';
 import { BatchFactoryBookSettingsModal } from './BatchFactoryBookSettingsModal';
 import { audioPlanningRequired, normalizeAudioSource, normalizeAudioSourceSettings } from './batchFactoryAudioSource';
 import { BatchFactoryGiantMaterialPendingProgress } from './BatchFactoryGiantMaterialPendingProgress';
-import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError } from './batchFactoryBookState';
+import { shouldAutoClassifyBook, automationBookForCard, automationBookIsActive, automationBookNeedsRetry, batchFactoryAutomationRetryAction, batchFactoryBatchProgress, batchFactoryBookState, batchFactoryBookTimeline, batchFactoryNovelTableRow, batchFactoryVideoProgress, batchFactoryVisibleError, bookFailureIsHistorical } from './batchFactoryBookState';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, comicAnalysisCharactersForBook, batchFactoryProductionText, batchFactorySourceText, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange';
 import { assetsForProductionMode } from './batchFactoryAssetMode';
 import { comicPageErrorMessage, comicPageGenerationPayload, comicPromptForImageAspect, generateComicPageWithConflict, runComicPagePool } from './batchFactoryComicMode';
@@ -181,7 +181,7 @@ const GENERATED_CONTENT_SETTINGS_KEYS = [
 ];
 
 const UNIFIED_CONFIGURATION_KEYS = [
-  'textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'imageConcurrency',
+  'textModelId', 'imageModelId', 'imageProvider', 'videoModelId', 'videoProvider', 'aspectRatio', 'imageAspectRatio', 'videoAspectRatio', 'videoResolution', 'productionMode', 'imageConcurrency', 'assetImagesEnabled',
 	'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure',
   'storyboardDurationLimit', 'maxVideoDuration', 'audioPlanningEnabled',
 	'audioSource', 'audioMergeEnabled', 'tts', 'publishRewriteEnabled', 'publishSettings', 'comicPublishSettings', 'aiPromptConfig', 'openingEnabled', 'openingCount',
@@ -1658,7 +1658,7 @@ function InlineMediaLibrary({ book, productionStatus, mergeJob, aspectRatio = '1
   const primary = primaryMediaVersion(video, versions);
   const currentProgress = video ? videoProgress.byVideo.get(String(video.id || '')) : null;
   const mediaFrameLayout = batchFactoryMediaOrientation(batchFactoryParseMediaRatio(video?.settingsState?.patch?.aspectRatio || video?.aspectRatio || aspectRatio, 16 / 9));
-  const candidates = versions.filter(version => version.id !== primary?.id).slice(-4).reverse();
+  const candidates = versions.filter(version => version.id !== primary?.id).slice(0, 4);
   useEffect(() => { if (!controlledSelectedVideoId) setLocalSelectedVideoId(book?.videos?.[0]?.id || ''); }, [book?.id]);
   useEffect(() => { if (!videos.some(item => item.id === selectedVideoId) && videos[0]?.id) selectVideo(videos[0].id); }, [videos.map(item => item.id).join('|')]);
   function move(direction) { const next = videos[selectedIndex + direction]; if (next) selectVideo(next.id); }
@@ -2212,7 +2212,7 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
   const selectedVideoState = selectedVideo ? videoState(selectedVideo) : { list: [], main: null };
   const selectedVersion = selectedVideoState.list.find(version => version.id === selectedVersionId)
     || selectedVideoState.main
-    || selectedVideoState.list.at(-1)
+    || selectedVideoState.list[0]
     || null;
   // Do not let a stale selected history item become the visible current
   // output after refresh.  History is only available from the task/log view;
@@ -2677,7 +2677,7 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
               title={isPrimary ? '当前合成主版本' : `切换到 ${batchFactoryStableMediaLabel('V', version.id)} 并作为合成主版本`}
             >
               <PassiveMediaPreview media={version} className="batch-factory-media-pickstation-version-media" label={batchFactoryStableMediaLabel('V', version.id)} onLoadedMetadata={event => rememberMediaMetrics(String(version.id), event)} />
-              <span>{batchFactoryStableMediaLabel('V', version.id)}{version.isHistory ? ' · 上一版' : ''}</span>
+              <span>{batchFactoryStableMediaLabel('V', version.id)}{version.isHistory ? ' · 上一版' : ''}{!isPrimary && !version.isHistory ? ' · 其它版本' : ''}</span>
               {isUpload ? <i>传</i> : null}
             </button>
             {!isPrimary && !isUpload && !version.isHistory ? <Popconfirm title="移除候选版本？" description="只移除当前书片段库引用，不删除远端媒体或历史合成记录。" okText="移除" cancelText="取消" onConfirm={() => removeCandidate(video, version)}>
@@ -3234,6 +3234,8 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const resizeActiveRef = useRef(false);
   const resizeStateRef = useRef(null);
   const runtimeStatusRequestRef = useRef(null);
+  // 在途状态请求只属于发起它的批次；切批次后旧请求既不能复用，也不能回写。
+  const runtimeStatusBatchRef = useRef('');
   // 状态接口连续失败次数：503 时据此退避轮询（5s → 15s → 30s 封顶）。
   const runtimeStatusFailureRef = useRef(0);
   const localExecutorTaskStatusesRef = useRef(new Map());
@@ -3785,6 +3787,13 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   }
   async function loadRuntimeStatus({ quiet = false, runtimeCapabilities = capabilities } = {}) {
     if (!batch?.id) return;
+    const requestBatchID = batch.id;
+    // 切批次时丢弃上一个批次的在途请求，避免把旧批次的 automation.counts
+    // 写进当前批次（表现为「自动就绪」等数字串批次）。
+    if (runtimeStatusBatchRef.current !== requestBatchID) {
+      runtimeStatusBatchRef.current = requestBatchID;
+      runtimeStatusRequestRef.current = null;
+    }
     // 自动化轮询、生产抽屉和首次加载可能在同一时刻触发；复用同一个请求，
     // 让浏览器也始终只有一条批量运行状态读取在飞行。
     if (runtimeStatusRequestRef.current) return runtimeStatusRequestRef.current;
@@ -3793,7 +3802,9 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       try {
         // 一个批量摘要替代“状态 + 合并 + 每本阶段”的浏览器 N+2 次请求。
         // 服务端合并读取并短缓存，页面只消费同一时刻的快照。
-        const runtime = await getBatchRuntimeSummary(batch.id, { suppressGlobalError: true });
+        const runtime = await getBatchRuntimeSummary(requestBatchID, { suppressGlobalError: true });
+        // 请求返回时批次已经切走：丢弃结果，不写入当前批次的状态。
+        if (runtimeStatusBatchRef.current !== requestBatchID) return null;
         setProductionStatus(runtime?.production || { jobs: [] });
         setMergeStatus(runtime?.merge || { jobs: [] });
         setStageSummaries(runtime?.stageSummaries || {});
@@ -3803,6 +3814,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         runtimeStatusFailureRef.current = 0;
         return runtime;
       } catch (error) {
+        if (runtimeStatusBatchRef.current !== requestBatchID) return null;
         const endpoint = String(error?.source || '').trim();
         const httpStatus = Number(error?.status);
         const status = Number.isInteger(httpStatus) ? `HTTP ${httpStatus}` : '';
@@ -5646,6 +5658,11 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                   const automationBook = automationBookForCard(automationStatus, batch.id, book.id);
                   const failed = automationBook && String(automationBook.status || '').toLowerCase() === 'failed' ? automationBook : null;
                   if (!failed && !lastFailedStage) return null;
+                  const historical = Boolean(failed?.stale) || bookFailureIsHistorical({
+                    automationBook,
+                    lastFailed: lastFailedStage,
+                    runs: stageSummary?.runs || []
+                  });
                   const stage = String(failed?.stage || lastFailedStage?.stage || '').trim();
                   const stageText = ({
                     audio_planning: '配音与逐行时长',
@@ -5657,16 +5674,19 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
                   })[stage] || stage || '自动生产';
                   return (
                     // 自动化失败提示挪到整行底部通栏，不再塞进“编辑内容”单元格。
+                    // 历史失败只作为折叠记录展示，标注「历史 · 已恢复」，不再混进当前状态。
                     <div className="batch-factory-book-row-error-strip">
                       <BatchFactoryErrorNotice
                         lineMode
                         anchorId={`batch-factory-book-error-${book.id}`}
-                        focusKey={errorNoticeFocus[book.id] || ''}
-                        title={failed?.stale ? '历史自动生产失败' : '自动生产失败'}
+                        focusKey={historical ? '' : (errorNoticeFocus[book.id] || '')}
+                        title={historical ? '历史自动生产失败' : '自动生产失败'}
                         stageText={stageText}
                         error={failed?.error || failed?.message || lastFailedStage?.errorMessage || ''}
-                        stale={Boolean(failed?.stale)}
-                        actions={(
+                        stale={historical}
+                        staleText="历史 · 已恢复，不再影响当前进度"
+                        className={historical ? 'is-historical' : ''}
+                        actions={historical ? null : (
                           <Space size={4} wrap>
                             <Button size="small" loading={actionBusy === stageActionKey('retry', book.id)} disabled={Boolean(actionBusy) && actionBusy !== stageActionKey('retry', book.id)} onClick={(event) => { event.stopPropagation(); retryLastFailedStage(book); }}>重试失败小说</Button>
                           </Space>

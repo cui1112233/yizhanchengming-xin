@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,7 +16,9 @@ import (
 	"time"
 
 	"qiantie/backend/internal/batchfactoryv11"
+	"qiantie/backend/internal/localartifact"
 	"qiantie/backend/internal/novelfetchworkshop"
+	"qiantie/backend/internal/prompt"
 )
 
 func TestComicGenerationFailureStageSeparatesAssetImageFailures(t *testing.T) {
@@ -906,7 +909,7 @@ func TestAutomationBookPreflightSkipsComicPublishPreflight(t *testing.T) {
 	}
 	batch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
 		"productionMode":       json.RawMessage(`"comic"`),
-		"comicPublishSettings": json.RawMessage(`{"producerAdminName":"制作者","workIds":[9001]}`),
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","organizationName":"博量","producerAdminName":"制作者","workIds":[9001]}`),
 	}}}
 	book := batchfactoryv11.Book{ID: "book-1", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
 		"textModelId":     json.RawMessage(`"text-1"`),
@@ -919,6 +922,37 @@ func TestAutomationBookPreflightSkipsComicPublishPreflight(t *testing.T) {
 	}
 	if preflightCalled {
 		t.Fatal("comicPublishPreflight must not be called during preflight anymore")
+	}
+
+	// 漫画批次保存的是 comicPublishSettings（组织/音频分类/制作者），
+	// 没有 publishSettings。之前统一只查 publishSettings，导致漫画批次
+	// 在派发前被判“发布配置未绑定网站或组织”，整批一本书都跑不起来。
+	comicBatch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+		"productionMode":       json.RawMessage(`"comic"`),
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1","organizationName":"博量","audioCategoryId":"12","producerAdminName":"制作者"}`),
+	}}}
+	comicBook := batchfactoryv11.Book{ID: "book-2", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+		"textModelId":  json.RawMessage(`"text-1"`),
+		"imageModelId": json.RawMessage(`"image-1"`),
+	}}}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", comicBatch, comicBook, "full_submit"); reason != "" {
+		t.Fatalf("reason=%q, want empty: comic mode should bind comicPublishSettings", reason)
+	}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", comicBatch, comicBook, "full_submit"); strings.Contains(reason, "发布配置未绑定") {
+		t.Fatalf("reason=%q, must not report missing publish profile", reason)
+	}
+
+	// 视频批次仍然只认 publishSettings：带了 comicPublishSettings 也不能放行。
+	videoBatch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+		"productionMode":       json.RawMessage(`"video"`),
+		"comicPublishSettings": json.RawMessage(`{"organizationId":"1"}`),
+	}}}
+	videoBook := batchfactoryv11.Book{ID: "book-3", SettingsState: batchfactoryv11.SettingsState{Patch: batchfactoryv11.SettingsPatch{
+		"textModelId":  json.RawMessage(`"text-1"`),
+		"videoModelId": json.RawMessage(`"video-1"`),
+	}}}
+	if reason := coordinator.automationBookPreflightReason(context.Background(), "alice", videoBatch, videoBook, "full_submit"); !strings.Contains(reason, "发布配置未绑定") {
+		t.Fatalf("reason=%q, want missing publish profile for video mode", reason)
 	}
 }
 
@@ -1056,6 +1090,50 @@ func TestApplyPresetKeepsRequestedComicProductionMode(t *testing.T) {
 	}
 }
 
+func TestApplyPresetHydratesComicPromptBodies(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "presets.json")
+	data := `[
+		{"id":"batch-comic-assets","module":"batch-factory","name":"漫画资产提示词","kind":"base","version":1,"revision":1,"status":"published","body":"漫画资产正文","protocolLock":{"format":"json","slot":"batch.comic-assets"}},
+		{"id":"batch-comic-page","module":"batch-factory","name":"漫画提示词","kind":"base","version":1,"revision":1,"status":"published","body":"漫画页面正文","protocolLock":{"format":"json","slot":"batch.comic-page"}}
+	]`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "第一本"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	coordinator := NewBatchAutomationCoordinator(store, nil, nil, nil, nil, nil, nil, nil, nil)
+	coordinator.promptCatalog = prompt.NewCatalog(path)
+	// 预设里只有提示词 ID（浏览器保存的紧凑形态），正文由系统预设库冻结补齐。
+	preset := &AutomationPreset{Config: map[string]any{
+		"productionMode": "comic",
+		"aiPromptConfig": map[string]any{"comic": map[string]any{
+			"presetId": "batch-comic-page",
+			"assets":   map[string]any{"presetId": "batch-comic-assets"},
+		}},
+	}}
+
+	updated, err := coordinator.applyPreset(ctx, "alice", batch, preset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config map[string]any
+	if err := json.Unmarshal(updated.SettingsState.Patch["aiPromptConfig"], &config); err != nil {
+		t.Fatal(err)
+	}
+	comic, _ := config["comic"].(map[string]any)
+	if body, _ := comic["body"].(string); body != "漫画页面正文" {
+		t.Fatalf("comic page body=%q, want 漫画页面正文", body)
+	}
+	assets, _ := comic["assets"].(map[string]any)
+	if body, _ := assets["body"].(string); body != "漫画资产正文" {
+		t.Fatalf("comic assets body=%q, want 漫画资产正文", body)
+	}
+}
+
 func TestPickAutomationControlJobReopensLatestTerminalJob(t *testing.T) {
 	state := automationStateFile{Jobs: map[string]map[string]any{
 		"completed-run": {"id": "completed-run", "owner": "bob", "batchId": "batch-1", "state": "completed", "updatedAt": "2026-10-16T10:00:00Z"},
@@ -1161,6 +1239,162 @@ func TestAutomationRequiresOpeningStageWhenEnabled(t *testing.T) {
 	book := batchfactoryv11.Book{}
 	if !automationOpeningEnabled(batch, book) {
 		t.Fatal("opening-enabled batch must run the opening stage after director")
+	}
+}
+
+func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
+	cases := []struct {
+		name          string
+		setting       json.RawMessage
+		precreateBook bool
+		wantCalls     int
+		wantSkipLog   bool
+	}{
+		{name: "default keeps the assets stage", setting: nil, wantCalls: 2},
+		{name: "explicit false skips the assets stage", setting: json.RawMessage("false"), wantCalls: 1, wantSkipLog: true},
+		{name: "disabled keeps existing assets", setting: json.RawMessage("false"), precreateBook: true, wantCalls: 1, wantSkipLog: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			store := batchfactoryv11.NewMemoryStore()
+			batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "视频批次", Books: []batchfactoryv11.CreateBookInput{{Title: "视频书", SourceText: "林晚推门进入客厅。"}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var existingAssetID string
+			if tc.precreateBook {
+				asset, err := store.CreateBookAsset(ctx, "alice", batch.ID, batch.Books[0].ID, batchfactoryv11.CreateBookAssetInput{Kind: "character", Source: "manual", Name: "手工角色", Prompt: "人物"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				existingAssetID = asset.ID
+			}
+			textModel, _ := json.Marshal("text-1")
+			patch := batchfactoryv11.SettingsPatch{"textModelId": textModel}
+			if tc.setting != nil {
+				patch["assetImagesEnabled"] = tc.setting
+			}
+			if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: patch, ExpectedRevision: batch.Revision}); err != nil {
+				t.Fatal(err)
+			}
+			batch, err = store.GetBatch(ctx, "alice", batch.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// 预置可复用的配音计划，测试只关心资产开关对阶段编排的影响。
+			book := batch.Books[0]
+			audioPlan := batchfactoryv11.SettingsPatch{
+				"audioPlanningEnabled": json.RawMessage("true"),
+				"audioLineDurations":   json.RawMessage("[9.0]"),
+				"audioDurationSeconds": json.RawMessage("9.0"),
+				"ttsAudioArtifactId":   json.RawMessage(`"tts-test"`),
+			}
+			if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: batch.ID, BookID: book.ID}, batchfactoryv11.SettingsUpdate{Patch: audioPlan, ExpectedRevision: book.Revision}); err != nil {
+				t.Fatal(err)
+			}
+			batch, err = store.GetBatch(ctx, "alice", batch.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files := localartifact.NewStore(t.TempDir(), 20<<20)
+			if _, err := files.SaveMedia("tts-test", "audio/mpeg", "mp3", bytes.NewReader([]byte("ID3"))); err != nil {
+				t.Fatal(err)
+			}
+			provider := &directorHTTPProvider{output: directorHTTPJSON}
+			coordinator := NewBatchAutomationCoordinator(store, nil, &batchfactoryv11.BookStageService{
+				Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: provider},
+			}, nil, nil, novelfetchworkshop.NewMemoryStore(), nil, nil, func() time.Time { return time.Unix(1700000000, 0) })
+			coordinator.SetLocalFiles(files)
+			book = batch.Books[0]
+			entry := map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
+			job := map[string]any{"id": "job-assets-toggle", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "storyboard_only", "books": map[string]any{book.ID: entry}}
+
+			coordinator.run(ctx, "alice", batch.ID, "job-assets-toggle", job, batch)
+
+			if entry["status"] != "completed" || entry["stage"] != "ready_for_video" || automationStringValue(entry["error"], "") != "" {
+				t.Fatalf("entry=%#v, want a completed storyboard stage without errors", entry)
+			}
+			if provider.calls != tc.wantCalls {
+				t.Fatalf("provider calls=%d want %d", provider.calls, tc.wantCalls)
+			}
+			latest, err := store.GetBatch(ctx, "alice", batch.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.setting == nil && len(latest.Books[0].AssetRecords) == 0 {
+				t.Fatalf("default switch must still generate assets: %+v", latest.Books[0])
+			}
+			if tc.precreateBook {
+				found := false
+				for _, asset := range latest.Books[0].AssetRecords {
+					if asset.ID == existingAssetID {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("existing asset %s was dropped when the switch was off: %+v", existingAssetID, latest.Books[0].AssetRecords)
+				}
+				for _, asset := range latest.Books[0].AssetRecords {
+					images, err := store.ListBookAssetImages(ctx, "alice", batch.ID, book.ID, asset.ID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(images) != 0 {
+						t.Fatalf("asset %s got images while the switch was off: %+v", asset.ID, images)
+					}
+				}
+			}
+			if tc.wantSkipLog && !strings.Contains(fmt.Sprint(entry["logs"]), "因资产图片开关关闭，已跳过资产生成阶段") {
+				t.Fatalf("logs=%v, want the explicit skip reason", entry["logs"])
+			}
+		})
+	}
+}
+
+func TestComicAutomationWithAssetImagesDisabledStillRunsTheComicStages(t *testing.T) {
+	ctx := context.Background()
+	store := batchfactoryv11.NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", batchfactoryv11.CreateBatchInput{Title: "漫画批次", Books: []batchfactoryv11.CreateBookInput{{Title: "漫画书", SourceText: "林晚走进办公室，陆沉抬头看向她。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	comicConfig, _ := json.Marshal(map[string]any{"comic": map[string]any{
+		"enabled": true, "body": "完整中文漫画页", "assets": map[string]any{"id": "batch-comic-assets", "body": "提取漫画人物、场景和道具"},
+		"imageDerivation": map[string]any{"body": "整理成可直接出图的提示词"},
+	}})
+	mode, _ := json.Marshal("comic")
+	if _, err := store.SaveSettings(ctx, "alice", batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{
+		Patch: batchfactoryv11.SettingsPatch{"productionMode": mode, "aiPromptConfig": comicConfig, "textModelId": json.RawMessage(`"text-1"`), "imageModelId": json.RawMessage(`"image-1"`), "assetImagesEnabled": json.RawMessage("false")}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(ctx, "alice", batch.ID)
+	book := batch.Books[0]
+	provider := &comicAutomationTextProvider{}
+	coordinator := NewBatchAutomationCoordinator(store, nil, &batchfactoryv11.BookStageService{
+		Store: store, Director: &batchfactoryv11.DirectorService{Store: store, Provider: provider},
+	}, nil, nil, nil, nil, nil, func() time.Time { return time.Unix(1700000000, 0) })
+	generated := false
+	coordinator.SetComicBookGenerator(func(_ context.Context, owner, batchID, bookID string) (batchfactoryv11.ComicCollection, error) {
+		generated = owner == "alice" && batchID == batch.ID && bookID == book.ID
+		latest, getErr := store.GetBatch(ctx, owner, batchID)
+		if getErr != nil {
+			return batchfactoryv11.ComicCollection{}, getErr
+		}
+		return batchfactoryv11.ComicCollection{ID: "collection-off", Items: []batchfactoryv11.ComicCollectionItem{{VideoID: latest.Books[0].Videos[0].ID}}}, nil
+	})
+	entry := map[string]any{"bookId": book.ID, "status": "running", "stage": "assets"}
+	job := map[string]any{"id": "job-comic-assets-off", "owner": "alice", "batchId": batch.ID, "state": "running", "runMode": "video_no_submit", "books": map[string]any{book.ID: entry}}
+
+	coordinator.run(ctx, "alice", batch.ID, "job-comic-assets-off", job, batch)
+
+	// 漫画资产文本仍是分页提示词的必需前置，关闭开关只跳过资产图生成，不能把整条漫画链路打断。
+	if !generated || provider.calls != 3 {
+		t.Fatalf("generated=%v AI calls=%d entry=%#v, want comic preparation and generation to keep running", generated, provider.calls, entry)
+	}
+	if entry["status"] != "completed" || entry["stage"] != "ready_for_upload" || automationStringValue(entry["error"], "") != "" {
+		t.Fatalf("entry=%#v, want a completed comic run without failures", entry)
 	}
 }
 

@@ -29,7 +29,7 @@ func ComicImageStyleConfigured(settings SettingsPatch) bool {
 
 func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, assetKind, content string, assetImageURLs, pageReferenceURLs []string) (ComicImageContract, error) {
 	if normalizeProductionMode(settings) != "comic" {
-		return ComicImageContract{}, fmt.Errorf("%w: 当前书不是漫画生成模式", ErrConflict)
+		return ComicImageContract{}, NewConfigRequiredError("当前书不是漫画生成模式")
 	}
 	if purpose != ComicImagePurposeAsset && purpose != ComicImagePurposePage {
 		return ComicImageContract{}, fmt.Errorf("%w: 漫画图片用途无效", ErrInvalid)
@@ -37,7 +37,7 @@ func BuildComicImageContract(settings SettingsPatch, purpose ComicImagePurpose, 
 	config := aiReasoningPromptConfig(settings).Comic
 	style := strings.TrimSpace(config.Style.Body)
 	if style == "" {
-		return ComicImageContract{}, fmt.Errorf("%w: 请先选择画风", ErrConflict)
+		return ComicImageContract{}, NewConfigRequiredError("请先选择画风")
 	}
 	content = stripLegacyComicStyle(content)
 	parts := make([]string, 0, 8)

@@ -30,7 +30,7 @@ func BuildComicAssetExtractionContract(book Book, snapshot DirectorSnapshot) (Pr
 		return PromptContract{}, fmt.Errorf("%w: source text is required", ErrInvalid)
 	}
 	if normalizeProductionMode(snapshot.Effective) != "comic" {
-		return PromptContract{}, fmt.Errorf("%w: 请先打开漫画生成", ErrConflict)
+		return PromptContract{}, NewConfigRequiredError("请先打开漫画生成")
 	}
 	preset := aiReasoningPromptConfig(snapshot.Effective).Comic.Assets
 	if strings.TrimSpace(preset.Body) == "" {

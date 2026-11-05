@@ -35,3 +35,17 @@ test('真正的能力门控才使用“未开通”文案', () => {
   assert.equal(parts.upstreamRejected, false);
   assert.match(parts.summary, /尚未开通/);
 });
+
+test('capability unavailable 里的缺配置原因不再显示为“未开通”', () => {
+  const parts = splitBatchFactoryError(
+    'capability unavailable: 文本模型请求失败：请在资产设置中选择漫画资产提示词'
+  );
+  assert.equal(parts.capabilityGate, true);
+  assert.equal(parts.summary, '漫画资产提示词未选择，请在资产设置中选择。');
+  assert.doesNotMatch(parts.summary, /尚未开通|Slice 门控/);
+});
+
+test('其它 capability unavailable 业务原因优先展示原因本身', () => {
+  const parts = splitBatchFactoryError('capability unavailable: 文本模型请求失败：未配置可用文本模型');
+  assert.equal(parts.summary, '文本模型请求失败：未配置可用文本模型');
+});

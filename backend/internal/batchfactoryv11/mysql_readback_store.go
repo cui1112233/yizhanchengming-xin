@@ -75,6 +75,13 @@ func (s *ReadbackMySQLStore) hydrateSettingsState(ctx context.Context, owner str
 				video.VideoPrompt = storyboardVideoPrompt(book.DirectorRevision.Output.Storyboard[videoIndex])
 			}
 		}
+		// 非 active（orphaned）的历史视频记录也要下发：自动化据此判断“这个分镜
+		// 已有成功成片、不必再次生成”，媒体库也据此展示所有历史版本。
+		history, err := s.loadVideoHistory(ctx, owner, batch.ID, book.ID)
+		if err != nil {
+			return Batch{}, err
+		}
+		book.VideoHistory = history
 		segmentation, err := s.GetComicSourceSegmentation(ctx, owner, batch.ID, book.ID)
 		if err == nil {
 			segmentsByVideo := make(map[string]ComicSourceSegment, len(segmentation.Segments))
@@ -99,6 +106,26 @@ func (s *ReadbackMySQLStore) GetBatch(ctx context.Context, owner, id string) (Ba
 		return Batch{}, err
 	}
 	return s.hydrateSettingsState(ctx, owner, batch)
+}
+
+// loadVideoHistory 读取本书所有非 active（被轮换成 orphaned）的视频槽位。
+// 只取轻量字段：前端要把历史成功成片挂回同一个分镜，自动化要用它判断
+// 该分镜是否已经有成功成片、从而跳过重复生成。
+func (s *ReadbackMySQLStore) loadVideoHistory(ctx context.Context, owner, batchID, bookID string) ([]Video, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state<>'active' ORDER BY ordinal,updated_at DESC,id`, batchID, bookID, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var videos []Video
+	for rows.Next() {
+		var video Video
+		if err := rows.Scan(&video.ID, &video.Ordinal, &video.CompatibilityState); err != nil {
+			return nil, err
+		}
+		videos = append(videos, video)
+	}
+	return videos, rows.Err()
 }
 
 func (s *ReadbackMySQLStore) ListBatches(ctx context.Context, owner string) ([]Batch, error) {

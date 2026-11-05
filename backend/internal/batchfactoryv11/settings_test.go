@@ -19,6 +19,25 @@ func TestSparsePatchPreservesFalseEmptyZero(t *testing.T) {
 	}
 }
 
+func TestAssetImagesEnabledDefaultsToTrueAndHonorsExplicitFalse(t *testing.T) {
+	if !AssetImagesEnabled(SettingsPatch{}) {
+		t.Fatal("asset image generation must default to enabled for existing batches")
+	}
+	if AssetImagesEnabled(SettingsPatch{"assetImagesEnabled": raw(false)}) {
+		t.Fatal("explicit false must skip the asset stage")
+	}
+	if !AssetImagesEnabled(SettingsPatch{"assetImagesEnabled": raw(true)}) {
+		t.Fatal("explicit true must keep the asset stage")
+	}
+	// 单书显式值优先于批次统一配置，沿用 ResolveSettings 的既有优先级。
+	if !AssetImagesEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{"assetImagesEnabled": raw(true)})) {
+		t.Fatal("book override must win over the batch value")
+	}
+	if AssetImagesEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{})) {
+		t.Fatal("batch false must apply when the book inherits")
+	}
+}
+
 func TestNormalizeProductionModeDefaultsToVideo(t *testing.T) {
 	if got := normalizeProductionMode(SettingsPatch{}); got != "video" {
 		t.Fatalf("got %q want video", got)

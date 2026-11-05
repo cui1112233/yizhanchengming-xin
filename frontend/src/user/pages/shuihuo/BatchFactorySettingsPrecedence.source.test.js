@@ -43,6 +43,7 @@ test('unified configuration covers engine, model, media, opening and publish fie
   const keys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
   for (const key of [
     'videoProvider', 'videoModelId', 'textModelId', 'imageModelId', 'imageProvider',
+    'assetImagesEnabled',
     'sensitiveAIEnabled', 'sensitiveAIModels', 'sensitiveAIOnFailure',
     'publishSettings', 'publishRewriteEnabled', 'comicPublishSettings',
     'maxVideoDuration', 'videoAspectRatio', 'videoResolution', 'storyboardDurationLimit',
@@ -50,6 +51,21 @@ test('unified configuration covers engine, model, media, opening and publish fie
   ]) {
     assert.match(keys, new RegExp(`'${key}'`), `missing ${key}`);
   }
+});
+
+test('the asset image switch defaults to on, is pushed batch-wide and only badges single-book deviations', () => {
+  // 统一配置弹窗里的开关：默认开（只有显式 false 才关闭），文案说明跳过资产不影响后续流程。
+  assert.match(unifiedModal, /<b>生成资产图片<\/b>/);
+  assert.match(unifiedModal, /checked=\{value\.assetImagesEnabled !== false\}/);
+  assert.match(unifiedModal, /关闭后跳过自动化的资产生成阶段/);
+  assert.match(unifiedModal, /不影响分镜、视频与漫画流程/);
+  assert.match(unifiedModal, /已有资产图片仍会照常使用/);
+  // 保存统一配置时纳入写透集合，逐本下发，单书可覆盖。
+  const keys = novelList.match(/const UNIFIED_CONFIGURATION_KEYS = \[[\s\S]*?\n\];/)?.[0] || '';
+  assert.match(keys, /'assetImagesEnabled'/, 'assetImagesEnabled must be part of UNIFIED_CONFIGURATION_KEYS');
+  assert.match(bookModal, /ENGINE_MODEL_OVERRIDE_FIELDS = \[[\s\S]*?'assetImagesEnabled'[\s\S]*?\];/);
+  // 单书沿用统一 FieldSource 规则：只有偏离批次并显式保存时才出现“自定义”。
+  assert.match(bookModal, /<InheritedSwitchField label="生成资产图片"[\s\S]{0,220}explicit=\{Object\.hasOwn\(bookPatch, 'assetImagesEnabled'\)\}/);
 });
 
 test('unified configuration only writes configuration and never pushes generated content', () => {

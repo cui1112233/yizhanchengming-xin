@@ -242,19 +242,25 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 		}
 		novelFetchRewrite = novelFetchRewriteAdapter{provider: textProvider}
 	}
-	resolveCatalogTextProvider := func(ctx context.Context, owner string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
+	resolveCatalogTextProviderWithSelection := func(ctx context.Context, owner, selection string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
 		settings, err := novelFetchStore.GetConfig(ctx, owner)
 		if err != nil {
 			return nil, err
 		}
-		provider, providerErr := configuredTextProvider(settings, selectedTextModelID(settings))
+		selectedModel := strings.TrimSpace(selection)
+		if selectedModel == "" {
+			selectedModel = selectedTextModelID(settings)
+		}
+		provider, providerErr := configuredTextProvider(settings, selectedModel)
 		if providerErr != nil {
 			return nil, providerErr
 		}
 		// Keep the Go runtime aligned with the visible API Config page even
 		// when MySQL contains an older redacted/empty catalog row. The legacy
 		// file is local runtime configuration, not a second request path.
-		if provider == nil && strings.TrimSpace(cfg.ScriptHistoryDir) != "" {
+		// Explicit per-task selections must never be swapped for the legacy
+		// account model: a bad selection has to fail visibly instead.
+		if provider == nil && strings.TrimSpace(selection) == "" && strings.TrimSpace(cfg.ScriptHistoryDir) != "" {
 			raw, readErr := os.ReadFile(filepath.Join(cfg.ScriptHistoryDir, owner, "api-config.json"))
 			if readErr == nil {
 				var legacy map[string]any
@@ -274,6 +280,26 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 					}
 				}
 			}
+		}
+		return provider, nil
+	}
+	resolveCatalogTextProvider := func(ctx context.Context, owner string) (*batchfactoryv11.OpenAICompatibleProvider, error) {
+		return resolveCatalogTextProviderWithSelection(ctx, owner, "")
+	}
+	// textProviderForModel honours an explicit textModelId saved on a batch or
+	// book. The workbench selector used to be dropped by the stage service and
+	// silently fell back to the account default.
+	textProviderForModel := func(ctx context.Context, owner, modelID string) (batchfactoryv11.DirectorProvider, error) {
+		modelID = strings.TrimSpace(modelID)
+		if modelID == "" {
+			return nil, nil
+		}
+		provider, err := resolveCatalogTextProviderWithSelection(ctx, owner, modelID)
+		if err != nil {
+			return nil, err
+		}
+		if provider == nil {
+			return nil, batchfactoryv11.NewConfigRequiredError("选择的文本模型不可用：" + modelID)
 		}
 		return provider, nil
 	}
@@ -429,7 +455,7 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	n8ComicClient := n8comic.NewClient(n8comic.Config{BaseURL: cfg.N8ComicBaseURL, APIKey: cfg.N8ComicOpenAPIKey})
 	n8ProducerDirectory := n8catalog.NewClient(nil, cfg.N8AdminBaseURL, cfg.QingyuN8AdminToken)
 	n8ComicWorks := n8catalog.NewWorksClientWithPath(nil, cfg.N8ComicBaseURL, cfg.QingyuN8AdminToken, os.Getenv("QIANTIE_N8_WORKS_PATH"))
-	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), AutomationStateStore: httpapi.NewMySQLAutomationStateStore(db), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts, WorkTitleMapPath: os.Getenv("QIANTIE_N8_WORK_TITLE_MAP_PATH")}}), nil
+	return httpapi.NewRouter(httpapi.RouterOptions{AgentVideoWorkerContext: context.Background(), AgentScriptSplitWorkerContext: context.Background(), AgentImageWorkerContext: context.Background(), AgentAudioWorkerContext: context.Background(), BridgeSecret: cfg.BridgeSecret, ReleaseSHA: cfg.ReleaseSHA, RuntimeManifestPath: os.Getenv("QIANTIE_RUNTIME_MANIFEST_PATH"), Health: databaseHealth(db), Users: storage.BridgeUsers{DB: db}, AuthStore: authStore, SessionResolver: nil, Slice: cfg.Slice, Store: store, Director: director, Compiler: compiler, Production: production, Merge: merge, MergeOutput: mergeOutput, External: externalPublish, NovelFetchStore: novelFetchStore, NovelFetchQueue: novelFetchQueue, NovelFetchAIGenderJudge: novelFetchAIGenderJudge, NovelFetchAIGenderJudgeResolver: novelFetchAIGenderJudgeResolver, NovelFetchFetcher: &novelfetchworkshop.UpstreamFetcher{Endpoint: cfg.NovelFetch121Endpoint, Client: &http.Client{Timeout: cfg.NovelFetch121Timeout}}, NovelFetchRewrite: novelFetchRewrite, NovelFetchRewriteResolver: novelFetchRewriteResolver, LocalExecutors: localExecutorService, GiantMaterialExecutor: giantMaterialExecutorService, GiantMaterialResolver: giantMaterialResolver, LocalArtifacts: artifactStore, LocalExecutorDownloadsDir: cfg.LocalExecutorDownloadsDir, PresetCatalog: prompt.NewCatalog(cfg.PresetPath), AutomationPresetStore: automationPresetStore, AutomationStatusReader: httpapi.NewFileAutomationStatusReader(cfg.AutomationStatePath), AutomationStateStore: httpapi.NewMySQLAutomationStateStore(db), PersonalPromptStore: prompt.NewPersonalStore(cfg.PersonalPromptPath), ScriptHistoryStore: httpapi.NewScriptHistoryStore(cfg.ScriptHistoryDir), MemberProfileStore: httpapi.NewMemberProfileStore(cfg.MemberSystemDir), MemberAvatarDir: cfg.MemberAvatarDir, UserDataDir: cfg.ScriptHistoryDir, UserConfigStore: httpapi.NewUserConfigStore(cfg.ScriptHistoryDir), TextProvider: effectiveTextProvider, TextProviderResolver: textProviderForModel, AgentWorkspace: agentWorkspaceStore, AgentAssets: agentAssetStore, AgentAssetObjects: agentAssetObjects, RedisURL: cfg.RedisURL, RegisterV11: register, VideoManagementConnector: &videomanagementconnector.TargetHTTPService{BaseURL: targetBaseURL}, N8ComicPublisher: &httpapi.BatchFactoryN8ComicPublisher{Store: store, LocalFiles: artifactStore, Client: n8ComicClient, ProducerDirectory: n8ProducerDirectory, WorksDirectory: n8ComicWorks, ProducerAccounts: cfg.N8ComicProducerAccounts, WorkTitleMapPath: os.Getenv("QIANTIE_N8_WORK_TITLE_MAP_PATH")}}), nil
 }
 
 func shouldStartLocalArtifactPurger(cfg config.Config) bool {

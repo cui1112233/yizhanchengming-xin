@@ -31,13 +31,14 @@ export function PrivateStudioConstraintSection({ title, description, control, ch
   </div>;
 }
 
-export function PrivateStudioConstraintsModal({ open, onCancel, onOk, okText = '保存本次设置', title = '约束条件', footerNote = '', children }) {
+export function PrivateStudioConstraintsModal({ open, onCancel, onOk, okText = '保存本次设置', okButtonProps, title = '约束条件', footerNote = '', children }) {
   return <Modal
     title={title}
     open={open}
     onCancel={onCancel}
     onOk={onOk}
     okText={okText}
+    okButtonProps={okButtonProps}
     width={720}
     destroyOnClose
     rootClassName="private-studio-constraints-modal"
