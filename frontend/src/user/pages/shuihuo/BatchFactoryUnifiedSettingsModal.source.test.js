@@ -108,6 +108,15 @@ test('unified configuration loads every typed model without passing Array map in
   assert.doesNotMatch(source, /\.map\(listAvailableModels\)/);
 });
 
+test('clears the model spinner and shows an actionable error when the directory request never settles', () => {
+  // fetch 没有超时；任一请求挂死会卡住 Promise.all，必须由本地定时器清加载态。
+  assert.match(source, /const MODELS_LOAD_TIMEOUT_MS = 15000;/);
+  assert.match(source, /const timeoutId = setTimeout\(\(\) => \{[\s\S]*?setModelsError\('读取模型超时，请点击“重试读取模型”'\);[\s\S]*?setModelsLoading\(false\);[\s\S]*?\}, MODELS_LOAD_TIMEOUT_MS\);/);
+  assert.match(source, /\.finally\(\(\) => \{\s*clearTimeout\(timeoutId\);[\s\S]*?setModelsLoading\(false\);[\s\S]*?\}\);/);
+  assert.match(source, /return \(\) => \{ alive = false; clearTimeout\(timeoutId\); \};/);
+  assert.match(source, /if \(!alive \|\| timedOut\) return;/);
+});
+
 test('automation preset manager changes the unified draft only after confirmation', () => {
   assert.match(source, /自动化预设/);
   assert.match(source, /保存为新预设/);

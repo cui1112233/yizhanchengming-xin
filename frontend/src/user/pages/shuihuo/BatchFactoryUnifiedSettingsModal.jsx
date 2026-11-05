@@ -80,6 +80,8 @@ const websiteProfileOrganization = profile => {
 // 误判为未登录。
 const SESSION_CHECK_NAMES = ['视频管理系统登录会话', '121 后台登录会话', '目标站登录会话'];
 
+const MODELS_LOAD_TIMEOUT_MS = 15000;
+
 function HelpTip({ title, children }) {
   return <Tooltip title={children}><button type="button" className="batch-factory-help-button" aria-label={`查看${title}说明`}>?</button></Tooltip>;
 }
@@ -110,20 +112,33 @@ export function BatchFactoryEngineSettingsForm({ value, onChange, sections = ['m
   useEffect(() => {
     if (!active || !modelSettingsEnabled) return undefined;
     let alive = true;
+    // fetch 本身没有超时：任一模型目录请求挂死时，Promise.all 永远不结束，
+    // 加载态会一直转圈。这里用本地超时兜底，超时后清加载态并给出可见提示。
+    let timedOut = false;
     setModelsLoading(true);
     setModelsError('');
+    const timeoutId = setTimeout(() => {
+      if (!alive) return;
+      timedOut = true;
+      setModelsError('读取模型超时，请点击“重试读取模型”');
+      setModelsLoading(false);
+    }, MODELS_LOAD_TIMEOUT_MS);
     Promise.all([
       listAvailableModels('text'),
       listAvailableModels('image'),
       listAvailableModels('video')
     ]).then(groups => {
-      if (alive) setModels(groups.flat());
+      if (!alive || timedOut) return;
+      setModels(groups.flat());
     }).catch(error => {
-      if (!alive) return;
+      if (!alive || timedOut) return;
       setModels([]);
       setModelsError(error?.message || '未能读取个人中心已启用模型');
-    }).finally(() => { if (alive) setModelsLoading(false); });
-    return () => { alive = false; };
+    }).finally(() => {
+      clearTimeout(timeoutId);
+      if (alive && !timedOut) setModelsLoading(false);
+    });
+    return () => { alive = false; clearTimeout(timeoutId); };
   }, [active, modelSettingsEnabled, modelReloadKey]);
   const publish = value.publishSettings || {};
   return <Space direction="vertical" size={16} style={{ width: '100%' }}>
