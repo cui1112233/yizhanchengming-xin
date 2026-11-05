@@ -144,7 +144,7 @@ test('the automation failure notice lives outside the editable-content cell and 
   assert.doesNotMatch(contentCell, /BatchFactoryErrorNotice/);
   assert.doesNotMatch(contentCell, /自动生产失败/);
   assert.match(novelList, /<div className="batch-factory-book-row-error-strip">/);
-  assert.ok(novelList.includes("failed?.stale ? '历史自动生产失败' : '自动生产失败'"), 'missing stage failure title');
+  assert.ok(novelList.includes("historical ? '历史自动生产失败' : '自动生产失败'"), 'missing stage failure title');
   const strip = novelList.match(/<div className="batch-factory-book-row-error-strip">[\s\S]*?<\/div>/)?.[0] || '';
   assert.match(strip, /<BatchFactoryErrorNotice/);
   const sensitiveCount = (novelList.match(/batch-factory-sensitive-review/g) || []).length;
