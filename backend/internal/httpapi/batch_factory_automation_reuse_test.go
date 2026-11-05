@@ -92,11 +92,13 @@ func TestAutomationSucceededProductionRequiresEveryOrdinal(t *testing.T) {
 	}
 }
 
-func TestAutomationSucceededProductionRequiresOpeningVariants(t *testing.T) {
+// 缺换开头变体只是可重试的单步缺口，不能把整本视频阶段锁死；但只要某个变体
+// 确实生成成功，就必须为它补一条成片，否则视频阶段继续显示未完成。
+func TestAutomationSucceededProductionRequiresOnlyGeneratedOpeningVariants(t *testing.T) {
 	batch := batchfactoryv11.Batch{ID: "batch-1", SettingsState: batchfactoryv11.SettingsState{Patch: automationSettings(map[string]any{"openingEnabled": true, "openingCount": 2})}}
 	book := batchfactoryv11.Book{
-		ID:      "book-1",
-		Videos:  []batchfactoryv11.Video{{ID: "video-0", Ordinal: 0}, {ID: "video-1", Ordinal: 1}},
+		ID:           "book-1",
+		Videos:       []batchfactoryv11.Video{{ID: "video-0", Ordinal: 0}, {ID: "video-1", Ordinal: 1}},
 		VideoHistory: []batchfactoryv11.Video{{ID: "video-old-0", Ordinal: 0, CompatibilityState: "orphaned"}},
 	}
 	jobs := []batchfactoryv11.ProductionJob{
@@ -105,12 +107,20 @@ func TestAutomationSucceededProductionRequiresOpeningVariants(t *testing.T) {
 			automationTask("task-1", "video-1", 0, batchfactoryv11.ProductionSucceeded, "https://media.example/1.mp4", time.Unix(20, 0)),
 		}},
 	}
+	if _, complete := automationSucceededProduction(jobs, batch, book); !complete {
+		t.Fatal("a missing opening variant is retryable and must not lock the video stage")
+	}
+	variants, err := json.Marshal([]batchfactoryv11.OpeningVariant{{Index: 1, Label: "换开头1", Status: "success", Prompt: "雨夜推门而入。"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	book.Videos[0].SettingsState.Patch = batchfactoryv11.SettingsPatch{"openingVariants": variants}
 	if _, complete := automationSucceededProduction(jobs, batch, book); complete {
-		t.Fatal("opening variant 1 is missing, the video stage must stay incomplete")
+		t.Fatal("a generated opening variant without a video must keep the video stage incomplete")
 	}
 	jobs[0].Tasks = append(jobs[0].Tasks, automationTask("task-opening-1", "video-old-0", 1, batchfactoryv11.ProductionSucceeded, "https://media.example/opening-1.mp4", time.Unix(30, 0)))
 	if _, complete := automationSucceededProduction(jobs, batch, book); !complete {
-		t.Fatal("an succeeded opening variant must satisfy the opening requirement")
+		t.Fatal("a generated opening variant with a succeeded video must complete the video stage")
 	}
 }
 

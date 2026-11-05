@@ -1,6 +1,8 @@
 package batchfactoryv11
 
 import (
+	"context"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -98,5 +100,78 @@ func TestParseOpeningVariantsInheritsOriginalDurationWhenModelOmitsDurationLine(
 	}
 	if !strings.Contains(variants[0].Prompt, "茶盏砸落") {
 		t.Fatalf("variant prompt = %q", variants[0].Prompt)
+	}
+}
+
+func TestParseOpeningVariantsAcceptsChineseNumeralMarkers(t *testing.T) {
+	raw := strings.Join([]string{
+		"【变体一】",
+		"时长：10秒",
+		"茶盏砸落大理石地面碎裂。",
+		"",
+		"换开头二：",
+		"雨夜推门而入，两人对视沉默。",
+	}, "\n")
+	variants := parseOpeningVariants(raw, 15, 10, 2)
+	for index, variant := range variants {
+		if variant.Status != "success" {
+			t.Fatalf("variant[%d] = %#v, want success", index, variant)
+		}
+	}
+	if !strings.Contains(variants[1].Prompt, "雨夜推门而入") {
+		t.Fatalf("variant[1].prompt = %q", variants[1].Prompt)
+	}
+}
+
+func TestParseOpeningVariantsAcceptsJSONReply(t *testing.T) {
+	raw := "```json\n{\"variants\":[{\"index\":1,\"prompt\":\"茶盏砸落\"},{\"index\":2,\"content\":\"雨夜推门而入\"}]}\n```"
+	variants := parseOpeningVariants(raw, 15, 10, 2)
+	if len(variants) != 2 || variants[0].Status != "success" || variants[1].Status != "success" {
+		t.Fatalf("variants = %#v", variants)
+	}
+	if !strings.Contains(variants[0].Prompt, "茶盏砸落") || !strings.Contains(variants[1].Prompt, "雨夜推门而入") {
+		t.Fatalf("variants = %#v", variants)
+	}
+}
+
+func TestParseOpeningVariantsAcceptsMarkerlessSingleVariant(t *testing.T) {
+	raw := "时长：10秒\n茶盏砸落大理石地面碎裂，争吵爆发。"
+	variants := parseOpeningVariants(raw, 15, 10, 1)
+	if len(variants) != 1 || variants[0].Status != "success" {
+		t.Fatalf("variants = %#v", variants)
+	}
+	if variants[0].Prompt != "茶盏砸落大理石地面碎裂，争吵爆发。" {
+		t.Fatalf("variant prompt = %q", variants[0].Prompt)
+	}
+}
+
+// 视频阶段的完成口径只能要求“已成功生成的变体”，不能按配置的
+// openingCount 硬算 1..N：否则缺一个变体就会让整本永远停在“等待生成视频”。
+func TestRequiredOpeningVariantIndicesUsesSuccessfullyGeneratedVariants(t *testing.T) {
+	ctx := context.Background()
+	store, batch, book := seedOpeningBook(t, true, 4, []DirectorVideo{
+		{DurationSec: 10, FinalPrompt: "原开场"},
+		{DurationSec: 10, FinalPrompt: "分镜二"},
+	})
+	if len(book.Videos) < 2 {
+		t.Fatalf("videos = %d, want 2", len(book.Videos))
+	}
+	video := book.Videos[0]
+	variants := []OpeningVariant{
+		{Index: 1, Label: "换开头1", Status: "success", Prompt: "茶盏砸落大理石地面碎裂。"},
+		{Index: 2, Label: "换开头2", Status: "failed", FailureReason: "模型未输出该变体分段"},
+		{Index: 3, Label: "换开头3", Status: "success", Prompt: "雨夜推门而入。"},
+	}
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{"openingVariants": rawSetting(t, variants)}, ExpectedRevision: video.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	batch, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	book = batch.Books[0]
+	indices := RequiredOpeningVariantIndices(batch, book)
+	if want := []int{0, 1, 3}; !slices.Equal(indices, want) {
+		t.Fatalf("indices = %v, want %v (failed 换开头2 must not block the video stage)", indices, want)
 	}
 }

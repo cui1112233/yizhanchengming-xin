@@ -210,10 +210,13 @@ func TestRunOpeningVariantsFailsWhenARequiredVariantIsMissing(t *testing.T) {
 		{DurationSec: 10, FinalPrompt: "原分镜一：新娘低头抚平嫁衣袖口。"},
 		{DurationSec: 10, FinalPrompt: "分镜二：陆沉推门而入。"},
 	})
-	provider := &queuedDirectorProvider{values: []string{strings.Join([]string{
-		"===VARIANT 1===", "时长：10秒", "变体一：茶盏砸落大理石地面碎裂。", "",
-		"===VARIANT 2===", "时长：10秒", "变体二：雨夜推门而入。",
-	}, "\n")}}
+	provider := &queuedDirectorProvider{values: []string{
+		strings.Join([]string{
+			"===VARIANT 1===", "时长：10秒", "变体一：茶盏砸落大理石地面碎裂。", "",
+			"===VARIANT 2===", "时长：10秒", "变体二：雨夜推门而入。",
+		}, "\n"),
+		"这一轮只返回我自己的说明，没有变体标记。",
+	}}
 	variants, err := (&DirectorService{Store: store, Provider: provider}).RunOpeningVariants(context.Background(), "alice", batch.ID, book.ID, PresetSnapshot{})
 	if err == nil {
 		t.Fatal("missing required variant must fail the opening stage")
@@ -221,12 +224,48 @@ func TestRunOpeningVariantsFailsWhenARequiredVariantIsMissing(t *testing.T) {
 	if !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("missing model variant must be retryable, got %v", err)
 	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("provider calls = %d, want one correction retry", len(provider.calls))
+	}
 	if len(variants) != 3 || variants[2].Status != "failed" || variants[2].FailureReason == "" {
 		t.Fatalf("variants = %#v", variants)
 	}
 	saved := openingVariantsFromPatch(t, store, batch.ID, book.ID, book.Videos[0].ID)
 	if len(saved) != 3 || saved[2].Status != "failed" || saved[2].FailureReason == "" {
 		t.Fatalf("saved variants = %#v", saved)
+	}
+}
+
+func TestRunOpeningVariantsMergesPartialResultsAcrossCorrectionRetry(t *testing.T) {
+	store, batch, book := seedOpeningBook(t, true, 4, []DirectorVideo{
+		{DurationSec: 10, FinalPrompt: "原分镜一：新娘低头抚平嫁衣袖口。"},
+		{DurationSec: 10, FinalPrompt: "分镜二：陆沉推门而入。"},
+	})
+	firstReply := strings.Join([]string{
+		"===VARIANT 1===", "时长：10秒", "变体一：茶盏砸落大理石地面碎裂。",
+	}, "\n")
+	correctionReply := strings.Join([]string{
+		"===换开头 3 ===", "时长：10秒", "变体三：庭院灯影摇晃，她攥紧婚书。",
+	}, "\n")
+	provider := &queuedDirectorProvider{values: []string{firstReply, correctionReply}}
+	variants, err := (&DirectorService{Store: store, Provider: provider}).RunOpeningVariants(context.Background(), "alice", batch.ID, book.ID, PresetSnapshot{})
+	if err == nil {
+		t.Fatal("the still-missing variant 2 must keep the stage retryable")
+	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("provider calls = %d, want one correction retry", len(provider.calls))
+	}
+	if len(variants) != 3 {
+		t.Fatalf("variants = %#v", variants)
+	}
+	if variants[0].Status != "success" || !strings.Contains(variants[0].Prompt, "茶盏砸落") {
+		t.Fatalf("variant 1 must survive the retry, got %#v", variants[0])
+	}
+	if variants[1].Status != "failed" || variants[1].FailureReason == "" {
+		t.Fatalf("variant 2 must stay failed with a reason, got %#v", variants[1])
+	}
+	if variants[2].Status != "success" || !strings.Contains(variants[2].Prompt, "庭院灯影") {
+		t.Fatalf("variant 3 from the correction reply must be merged, got %#v", variants[2])
 	}
 }
 

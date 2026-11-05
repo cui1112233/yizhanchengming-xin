@@ -3,6 +3,7 @@ package batchfactoryv11
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -85,24 +86,49 @@ func TestProductionOpeningVariants(t *testing.T) {
 		}
 	})
 
-	t.Run("blocks video submission until every required opening variant succeeds", func(t *testing.T) {
-		store, batch, book, _ := seedCompiledSDOpening(t, []OpeningVariant{
-			{Index: 1, Label: "分镜一 | 换开头1", Status: "failed", FailureReason: "模型未输出该变体分段"},
+	t.Run("submits available variants when some opening variants are missing", func(t *testing.T) {
+		store, batch, book, video := seedCompiledSDOpening(t, []OpeningVariant{
+			{Index: 1, Label: "分镜一 | 换开头1", Prompt: "变体一开场", Status: "success"},
+			{Index: 2, Label: "分镜一 | 换开头2", Status: "failed", FailureReason: "模型未输出该变体分段"},
 		})
 		adapter := &recordingProductionAdapter{ref: ProviderTaskRef{State: ProductionSucceeded}}
 		service := &ProductionService{Store: store, Compiler: &PromptCompilerService{Store: store}, Adapter: adapter, Enabled: true, Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15}}
-		if _, err := service.SubmitBookProduction(context.Background(), "alice", batch.ID, book.ID, "request-opening-missing"); !errors.Is(err, ErrConflict) {
-			t.Fatalf("expected opening prerequisite conflict, got %v", err)
-		}
-		if adapter.calls != 0 {
-			t.Fatalf("provider must not be called while opening is incomplete, calls=%d", adapter.calls)
-		}
-		jobs, err := store.ListProductionJobs(context.Background(), "alice", batch.ID)
+		job, err := service.SubmitBookProduction(context.Background(), "alice", batch.ID, book.ID, "request-opening-missing")
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("a missing opening variant must not block video submission: %v", err)
 		}
-		if len(jobs) != 0 {
-			t.Fatalf("blocked submission must not persist a job, jobs=%+v", jobs)
+		if len(job.Tasks) != 3 {
+			t.Fatalf("tasks=%d, want 3 (video01 original + variant1 + video02): %+v", len(job.Tasks), job.Tasks)
+		}
+		if job.Tasks[0].OpeningVariantIndex != 0 || job.Tasks[1].OpeningVariantIndex != 1 || job.Tasks[2].OpeningVariantIndex != 0 {
+			t.Fatalf("unexpected variant indices: %+v", job.Tasks)
+		}
+		if adapter.calls != 3 {
+			t.Fatalf("adapter calls=%d, want 3", adapter.calls)
+		}
+		if job.Tasks[0].VideoID != video.ID {
+			t.Fatalf("primary task must target VIDEO01, got %+v", job.Tasks[0])
+		}
+	})
+
+	t.Run("submits the original opening when no variants were generated", func(t *testing.T) {
+		store, batch, book, _ := seedCompiledSDOpening(t, nil)
+		adapter := &recordingProductionAdapter{ref: ProviderTaskRef{State: ProductionSucceeded}}
+		service := &ProductionService{Store: store, Compiler: &PromptCompilerService{Store: store}, Adapter: adapter, Enabled: true, Model: FrozenVideoModel{ID: "video-model-a", MaxDuration: 15}}
+		job, err := service.SubmitBookProduction(context.Background(), "alice", batch.ID, book.ID, "request-opening-never-generated")
+		if err != nil {
+			t.Fatalf("missing openingVariants must not abort video submission: %v", err)
+		}
+		if len(job.Tasks) != 2 {
+			t.Fatalf("tasks=%d, want 2 (one per video): %+v", len(job.Tasks), job.Tasks)
+		}
+		for _, task := range job.Tasks {
+			if task.OpeningVariantIndex != 0 {
+				t.Fatalf("only the original opening may be submitted, got %+v", task)
+			}
+		}
+		if adapter.calls != 2 {
+			t.Fatalf("adapter calls=%d, want 2", adapter.calls)
 		}
 	})
 
@@ -127,4 +153,23 @@ func TestProductionOpeningVariants(t *testing.T) {
 			t.Fatalf("a failed submission must not persist a partial job, jobs=%+v", jobs)
 		}
 	})
+}
+
+func TestProductionErrorStripsInternalSentinelPrefixes(t *testing.T) {
+	cases := []error{
+		fmt.Errorf("%w: 请先重试失败的换开头步骤（%v）", ErrConflict, errors.New("换开头变体未全部生成")),
+		fmt.Errorf("%w: 换开头变体未全部生成", ErrUnavailable),
+		fmt.Errorf("%w: 模型配置缺失", ErrConfigRequired),
+	}
+	for _, err := range cases {
+		message := productionError(err)
+		for _, prefix := range []string{"revision conflict:", "capability unavailable:", "configuration required:"} {
+			if strings.HasPrefix(message, prefix) {
+				t.Fatalf("stage error still carries internal prefix %q: %s", prefix, message)
+			}
+		}
+	}
+	if message := productionError(fmt.Errorf("%w: 换开头变体未全部生成", ErrConflict)); !strings.Contains(message, "换开头变体未全部生成") {
+		t.Fatalf("real reason must survive prefix stripping, got %q", message)
+	}
 }

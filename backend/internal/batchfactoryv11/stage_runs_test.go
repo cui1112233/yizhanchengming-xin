@@ -114,11 +114,11 @@ func TestLatestFailedBookStageRunIgnoresFailureResolvedByLaterAttempt(t *testing
 
 func TestLatestFailedBookStageRunIgnoresDuplicateDirectorRevisionConflict(t *testing.T) {
 	duplicate := BookStageRun{
-		ID: "director-duplicate",
-		Stage: BookStageDirector,
-		Status: ProductionFailed,
+		ID:           "director-duplicate",
+		Stage:        BookStageDirector,
+		Status:       ProductionFailed,
 		ErrorMessage: "revision conflict: 导演分镜已存在；请使用重新生成导演分镜",
-		UpdatedAt: time.Unix(30, 0),
+		UpdatedAt:    time.Unix(30, 0),
 	}
 	if latest := LatestFailedBookStageRun([]BookStageRun{duplicate}); latest != nil {
 		t.Fatalf("duplicate director revision conflict must not remain retryable: %#v", latest)
@@ -544,7 +544,10 @@ func TestBookStageOpeningFailsAndRecordsReasonWhenARequiredVariantIsMissing(t *t
 [场景 1] 总时长：10.000秒
 [镜头 1] 近景，林晚握紧玻璃杯。`
 	_, batch, book, service := seedOpeningStageBook(t, sdResponse)
-	service.Director.Provider = &queuedDirectorProvider{values: []string{"===VARIANT 1===\n时长：10秒\n画面故事脚本：雨夜推门而入的开场。"}}
+	service.Director.Provider = &queuedDirectorProvider{values: []string{
+		"===VARIANT 1===\n时长：10秒\n画面故事脚本：雨夜推门而入的开场。",
+		"这一轮没有返回任何变体标记，只有说明文字。",
+	}}
 	summary, err := service.Run(context.Background(), "alice", batch.ID, book.ID, BookStageOpening, StageModeForce, "opening-missing", "")
 	if err == nil {
 		t.Fatal("missing opening variants must fail the stage")

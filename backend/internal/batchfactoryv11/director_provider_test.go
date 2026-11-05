@@ -3,11 +3,13 @@ package batchfactoryv11
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -163,5 +165,81 @@ func TestOpenAICompatibleProviderReportsTruncatedStructuredOutput(t *testing.T) 
 	_, err := provider.Complete(context.Background(), TextCompletionRequest{})
 	if err == nil || !strings.Contains(err.Error(), "finish_reason=length") {
 		t.Fatalf("error=%v, want explicit truncation diagnostic", err)
+	}
+}
+
+func TestOpenAICompatibleProviderRetainsUpstreamBodyAndClassifies400(t *testing.T) {
+	var calls int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"model not found: [anti-2]gemini-3.8-flash","type":"invalid_request_error"}}`))
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatibleProvider{Endpoint: server.URL, APIKey: "test-key", Model: "[anti-2]gemini-3.8-flash", Client: server.Client()}
+	_, err := provider.Complete(context.Background(), TextCompletionRequest{})
+	if err == nil {
+		t.Fatal("a 400 must fail the request")
+	}
+	if !strings.Contains(err.Error(), "model not found") || !strings.Contains(err.Error(), "HTTP 400") {
+		t.Fatalf("error must retain the upstream body, got %v", err)
+	}
+	if !errors.Is(err, ErrConfigRequired) {
+		t.Fatalf("400 is a model/config error, got %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("400 calls=%d, want exactly 1 (no retry)", got)
+	}
+}
+
+func TestOpenAICompatibleProviderRetriesRateLimitOnce(t *testing.T) {
+	var calls int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempt := atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "application/json")
+		if attempt == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":"rate limited"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{}"}}]}`))
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatibleProvider{Endpoint: server.URL, APIKey: "test-key", Model: "test-model", Client: server.Client()}
+	content, err := provider.Complete(context.Background(), TextCompletionRequest{})
+	if err != nil {
+		t.Fatalf("a 429 must be retried, got %v", err)
+	}
+	if content != "{}" {
+		t.Fatalf("content=%q, want {}", content)
+	}
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Fatalf("429 calls=%d, want one retry", got)
+	}
+}
+
+func TestOpenAICompatibleProviderStopsAfterBoundedServerErrorRetries(t *testing.T) {
+	var calls int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"upstream exploded"}`))
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatibleProvider{Endpoint: server.URL, APIKey: "test-key", Model: "test-model", Client: server.Client()}
+	_, err := provider.Complete(context.Background(), TextCompletionRequest{})
+	if err == nil || !strings.Contains(err.Error(), "upstream exploded") {
+		t.Fatalf("error must retain the upstream body, got %v", err)
+	}
+	if !errors.Is(err, ErrUpstream) {
+		t.Fatalf("5xx must remain a retryable upstream error, got %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Fatalf("5xx calls=%d, want exactly 3 attempts", got)
 	}
 }

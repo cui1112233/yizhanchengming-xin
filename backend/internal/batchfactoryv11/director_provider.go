@@ -5,13 +5,96 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
+
+// DirectorHTTPError keeps the upstream response body so a 400/403 is never
+// reduced to a bare status code again. The body is what tells operators
+// whether the model rejected the request shape, the model name, or the API key.
+type DirectorHTTPError struct {
+	StatusCode int
+	Model      string
+	Body       string
+}
+
+func (e *DirectorHTTPError) Error() string {
+	body := directorHTTPBodySnippet([]byte(e.Body), 400)
+	model := strings.TrimSpace(e.Model)
+	if body == "" {
+		body = http.StatusText(e.StatusCode)
+	}
+	if model != "" {
+		return fmt.Sprintf("文本模型请求失败（%s，HTTP %d，model=%s）：%s", directorHTTPFailureKind(e.StatusCode, e.Body), e.StatusCode, model, body)
+	}
+	return fmt.Sprintf("文本模型请求失败（%s，HTTP %d）：%s", directorHTTPFailureKind(e.StatusCode, e.Body), e.StatusCode, body)
+}
+
+// directorHTTPFailureKind turns the upstream body into a human category so a
+// 400 is not reported as a generic outage. The raw body is still appended by
+// Error(), which keeps the exact model-side wording available for diagnosis.
+func directorHTTPFailureKind(status int, body string) string {
+	lower := strings.ToLower(body)
+	switch {
+	case status == http.StatusTooManyRequests:
+		return "上游限流"
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return "鉴权失败"
+	case status == http.StatusRequestEntityTooLarge ||
+		strings.Contains(lower, "context length") || strings.Contains(lower, "context_length") ||
+		strings.Contains(lower, "maximum context") || strings.Contains(lower, "max_tokens") ||
+		strings.Contains(lower, "token limit") || strings.Contains(lower, "too long") ||
+		strings.Contains(lower, "超长") || strings.Contains(lower, "过长"):
+		return "请求超长"
+	case strings.Contains(lower, "content_policy") || strings.Contains(lower, "content policy") ||
+		strings.Contains(lower, "content filter") || strings.Contains(lower, "moderation") ||
+		strings.Contains(lower, "safety") || strings.Contains(lower, "审核") || strings.Contains(lower, "违规"):
+		return "内容审核拒绝"
+	case status == http.StatusNotFound || strings.Contains(lower, "model not found") ||
+		strings.Contains(lower, "unknown model") || strings.Contains(lower, "invalid model"):
+		return "模型不存在或不支持"
+	case status >= 500:
+		return "上游通道错误"
+	default:
+		return "参数或请求格式不合法"
+	}
+}
+
+// Unwrap separates retryable channel failures from user-fixable model/key
+// configuration problems. 400/401/403/404/422 must not be advertised as a
+// transient "capability unavailable" outage.
+func (e *DirectorHTTPError) Unwrap() error {
+	if directorProviderRetryableStatus(e.StatusCode) {
+		return ErrUpstream
+	}
+	return ErrConfigRequired
+}
+
+func directorProviderRetryableStatus(status int) bool {
+	switch status {
+	case http.StatusRequestTimeout, http.StatusTooEarly, http.StatusTooManyRequests:
+		return true
+	}
+	return status >= 500
+}
+
+func directorHTTPBodySnippet(raw []byte, limit int) string {
+	message := strings.Join(strings.Fields(string(raw)), " ")
+	if message == "" {
+		return ""
+	}
+	runes := []rune(message)
+	if len(runes) > limit {
+		return string(runes[:limit]) + "..."
+	}
+	return message
+}
 
 type DirectorProvider interface {
 	Complete(context.Context, TextCompletionRequest) (string, error)
@@ -65,46 +148,50 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+p.APIKey)
-	client := p.Client
-	if client == nil {
-		client = openAICompatibleHTTPClient(p.Endpoint)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		// 服务端按 HTTP/2 回帧、客户端按 HTTP/1.1 解析时会产生 malformed HTTP
-		// response。这里只切换协议重发一次；重试仍失败则保留原始错误。
-		if !directorProtocolMismatchError(err) {
-			return "", err
+	// A 429/5xx is a channel hiccup, not a broken book. Retry a bounded number
+	// of times; a 400/401/403/404/422 is a configuration/model problem and is
+	// returned immediately with the upstream body so it can be diagnosed.
+	const maxAttempts = 3
+	var raw []byte
+	var statusCode int
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		resp, reqErr := p.do(ctx, body)
+		if reqErr != nil {
+			if !directorProviderRetryableTransportError(reqErr) || attempt == maxAttempts {
+				return "", reqErr
+			}
+			if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
+				return "", reqErr
+			}
+			continue
 		}
-		retryClient := p.retryClient
-		if retryClient == nil {
-			retryClient = openAICompatibleHTTP2Client(p.Endpoint)
+		raw, err = io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+		resp.Body.Close()
+		statusCode = resp.StatusCode
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || attempt == maxAttempts {
+				return "", err
+			}
+			if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
+				return "", err
+			}
+			continue
 		}
-		retryReq, retryReqErr := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
-		if retryReqErr != nil {
-			return "", err
+		if statusCode >= 200 && statusCode < 300 {
+			break
 		}
-		retryReq.Header.Set("Content-Type", "application/json")
-		retryReq.Header.Set("Authorization", "Bearer "+p.APIKey)
-		retryResp, retryErr := retryClient.Do(retryReq)
-		if retryErr != nil {
-			return "", err
+		httpErr := &DirectorHTTPError{StatusCode: statusCode, Model: strings.TrimSpace(p.Model), Body: string(raw)}
+		log.Printf("director provider error model=%s status=%d endpoint=%s body=%s", p.Model, statusCode, directorProviderEndpointHost(p.Endpoint), directorHTTPBodySnippet(raw, 400))
+		if !directorProviderRetryableStatus(statusCode) || attempt == maxAttempts {
+			return "", httpErr
 		}
-		resp = retryResp
+		if waitErr := directorProviderWaitRetry(ctx, attempt); waitErr != nil {
+			return "", httpErr
+		}
 	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("director provider returned HTTP %d", resp.StatusCode)
+	if statusCode < 200 || statusCode >= 300 {
+		// Defensive: the loop only exits with a 2xx status or an explicit return.
+		return "", &DirectorHTTPError{StatusCode: statusCode, Model: strings.TrimSpace(p.Model), Body: string(raw)}
 	}
 	var decoded struct {
 		Choices []struct {
@@ -134,6 +221,79 @@ func (p *OpenAICompatibleProvider) Complete(ctx context.Context, input TextCompl
 		return "", fmt.Errorf("director provider returned empty content")
 	}
 	return content, nil
+}
+
+// do sends one logical request. It keeps the HTTP/2 protocol-mismatch retry
+// exactly once, separate from the bounded 429/5xx attempt loop.
+func (p *OpenAICompatibleProvider) do(ctx context.Context, body []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	client := p.Client
+	if client == nil {
+		client = openAICompatibleHTTPClient(p.Endpoint)
+	}
+	resp, err := client.Do(req)
+	if err == nil {
+		return resp, nil
+	}
+	// 服务端按 HTTP/2 回帧、客户端按 HTTP/1.1 解析时会产生 malformed HTTP
+	// response。这里只切换协议重发一次；重试仍失败则保留原始错误。
+	if !directorProtocolMismatchError(err) {
+		return nil, err
+	}
+	retryClient := p.retryClient
+	if retryClient == nil {
+		retryClient = openAICompatibleHTTP2Client(p.Endpoint)
+	}
+	retryReq, retryReqErr := http.NewRequestWithContext(ctx, http.MethodPost, p.Endpoint, bytes.NewReader(body))
+	if retryReqErr != nil {
+		return nil, err
+	}
+	retryReq.Header.Set("Content-Type", "application/json")
+	retryReq.Header.Set("Authorization", "Bearer "+p.APIKey)
+	retryResp, retryErr := retryClient.Do(retryReq)
+	if retryErr != nil {
+		return nil, err
+	}
+	return retryResp, nil
+}
+
+func directorProviderRetryableTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	// The protocol switch already retried once; do not multiply it.
+	return !directorProtocolMismatchError(err)
+}
+
+func directorProviderWaitRetry(ctx context.Context, attempt int) error {
+	delay := time.Duration(attempt) * 200 * time.Millisecond
+	if attempt > 1 {
+		delay = 500 * time.Millisecond
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func directorProviderEndpointHost(endpoint string) string {
+	parsed, err := url.Parse(strings.TrimSpace(endpoint))
+	if err != nil {
+		return ""
+	}
+	return parsed.Host
 }
 
 // openAICompatibleLegacyHTTP1Hosts 是已知会重置长连接的旧网关反向例外表。

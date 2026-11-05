@@ -271,7 +271,7 @@ func productionError(err error) string {
 	if err == nil {
 		return ""
 	}
-	message := strings.TrimSpace(err.Error())
+	message := stripProductionErrorPrefixes(strings.TrimSpace(err.Error()))
 	// The column is VARCHAR(255). Truncate well below the byte limit so UTF-8
 	// multibyte characters never exceed it and the INSERT never fails with
 	// Error 1406 (Data too long), which used to cause an infinite retry loop.
@@ -286,6 +286,34 @@ func productionError(err error) string {
 		return message[:limit] + "..."
 	}
 	return message
+}
+
+// stripProductionErrorPrefixes removes internal sentinel text before a stage
+// error reaches the UI. The stage panel must show the real reason ("换开头变体
+// 未全部生成") instead of a fake "revision conflict" wrapper; the API layer
+// already does the same for JSON responses.
+func stripProductionErrorPrefixes(message string) string {
+	prefixes := []string{
+		ErrConflict.Error() + ": ",
+		ErrConflict.Error() + ":",
+		ErrUnavailable.Error() + ": ",
+		ErrConfigRequired.Error() + ": ",
+		ErrInvalid.Error() + ": ",
+		ErrUpstream.Error() + ": ",
+		ErrNotFound.Error() + ": ",
+	}
+	for {
+		trimmed := false
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(message, prefix) {
+				message = strings.TrimSpace(strings.TrimPrefix(message, prefix))
+				trimmed = true
+			}
+		}
+		if !trimmed {
+			return message
+		}
+	}
 }
 
 func normalizeProductionState(value ProductionState) ProductionState {
@@ -475,8 +503,13 @@ func (s *ProductionService) SubmitBookProductionWithOptions(ctx context.Context,
 		if count < 1 || count > 8 {
 			return ProductionJob{}, fmt.Errorf("%w: openingCount must be between 1 and 8", ErrInvalid)
 		}
-		if err := requireSuccessfulOpeningVariants(openingVariants(book.Videos[0]), count-1); err != nil {
-			return ProductionJob{}, fmt.Errorf("%w: 请先重试失败的换开头步骤（%v）", ErrConflict, err)
+		// Missing opening variants are a retryable per-step gap, not a reason to
+		// reject the whole book. The task loop below already submits exactly the
+		// successful variants; when none exist it falls back to the original
+		// opening, so a manual "generate video" action can still produce VIDEO01.
+		available := successfulOpeningVariants(book.Videos[0])
+		if expected := count - 1; len(available) < expected {
+			log.Printf("production: opening variants incomplete book=%s available=%d expected=%d; submitting available variants only", bookID, len(available), expected)
 		}
 	}
 	pendingVideos := make([]Video, 0, len(mediaVideos))

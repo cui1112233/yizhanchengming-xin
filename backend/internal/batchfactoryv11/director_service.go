@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -940,25 +941,45 @@ func (s *DirectorService) RunOpeningVariants(ctx context.Context, owner, batchID
 		return nil, err
 	}
 	contract := BuildOpeningVariantsContract(book, first, followUps, meta, variantCount, snapshot.MaxVideoDuration)
-	// Truncated model output is retried exactly once with a compact-output
-	// instruction. A second truncation fails the stage instead of looping: the
-	// failure keeps the provider reason so the operator can see the cause.
+	// Attempt 1 asks for the full set. Attempt 2 is a single corrective retry:
+	// truncation gets the compact-output instruction, a format/parse miss gets
+	// an explicit missing-index + marker instruction. Partial successes from
+	// either attempt are merged by index, so a model that only fixes 换开头2 on
+	// the retry does not lose the already valid 换开头1.
 	const maxOpeningVariantAttempts = 2
-	var variants []OpeningVariant
+	// Start from the variants already persisted on VIDEO01. A rerun triggered only
+	// to fill a missing slot must not discard slots that are already successful.
+	variants := openingVariants(book.Videos[0])
+	if len(variants) == 0 {
+		variants = nil
+	}
+	truncatedRetry := false
 	for attempt := 1; attempt <= maxOpeningVariantAttempts; attempt++ {
 		request := TextCompletionRequest{SystemPrompt: contract.SystemPrompt, UserPrompt: contract.UserPrompt, Temperature: contract.Temperature, MaxTokens: contract.MaxTokens, DisableJSONResponse: true}
 		if attempt > 1 {
-			request.SystemPrompt += fmt.Sprintf("\n上一轮输出因长度截断。请更紧凑地输出全部 %d 个变体，保留完整结尾，不要解释，不要 Markdown。", variantCount)
+			if truncatedRetry {
+				request.SystemPrompt += fmt.Sprintf("\n上一轮输出因长度截断。请更紧凑地输出全部 %d 个变体，保留完整结尾，不要解释，不要 Markdown。", variantCount)
+			} else {
+				request.SystemPrompt += openingVariantCorrection(variants, variantCount)
+			}
 		}
 		text, completionErr := s.Provider.Complete(ctx, request)
 		if completionErr != nil {
 			if isTruncatedDirectorOutput(completionErr) && attempt < maxOpeningVariantAttempts {
+				truncatedRetry = true
 				continue
 			}
 			return nil, completionErr
 		}
-		variants = parseOpeningVariants(text, snapshot.MaxVideoDuration, first.DurationSec, variantCount)
-		break
+		parsed := parseOpeningVariants(text, snapshot.MaxVideoDuration, first.DurationSec, variantCount)
+		variants = mergeOpeningVariants(variants, parsed, variantCount)
+		if err := requireSuccessfulOpeningVariants(variants, variantCount); err == nil {
+			break
+		}
+		if attempt < maxOpeningVariantAttempts {
+			missing := missingOpeningVariantIndices(variants, variantCount)
+			log.Printf("opening variants incomplete attempt=%d missing=%v raw=%s", attempt, missing, directorHTTPBodySnippet([]byte(text), 400))
+		}
 	}
 	merged, err := s.saveOpeningVariants(ctx, owner, batchID, bookID, book.Videos[0].ID, variants)
 	if err != nil {
@@ -968,6 +989,59 @@ func (s *DirectorService) RunOpeningVariants(ctx context.Context, owner, batchID
 		return merged, err
 	}
 	return merged, nil
+}
+
+func mergeOpeningVariants(base, next []OpeningVariant, variantCount int) []OpeningVariant {
+	baseByIndex := make(map[int]OpeningVariant, len(base))
+	for _, variant := range base {
+		baseByIndex[variant.Index] = variant
+	}
+	nextByIndex := make(map[int]OpeningVariant, len(next))
+	for _, variant := range next {
+		nextByIndex[variant.Index] = variant
+	}
+	out := make([]OpeningVariant, 0, variantCount)
+	for index := 1; index <= variantCount; index++ {
+		if previous, ok := baseByIndex[index]; ok && previous.Status == "success" && strings.TrimSpace(previous.Prompt) != "" {
+			out = append(out, previous)
+			continue
+		}
+		if candidate, ok := nextByIndex[index]; ok {
+			out = append(out, candidate)
+			continue
+		}
+		if previous, ok := baseByIndex[index]; ok {
+			out = append(out, previous)
+			continue
+		}
+		out = append(out, OpeningVariant{Index: index, Label: openingVariantLabel(index), Status: "failed", FailureReason: "模型未输出该变体分段"})
+	}
+	return out
+}
+
+func missingOpeningVariantIndices(variants []OpeningVariant, variantCount int) []int {
+	byIndex := make(map[int]OpeningVariant, len(variants))
+	for _, variant := range variants {
+		byIndex[variant.Index] = variant
+	}
+	missing := make([]int, 0, variantCount)
+	for index := 1; index <= variantCount; index++ {
+		variant, ok := byIndex[index]
+		if ok && variant.Status == "success" && strings.TrimSpace(variant.Prompt) != "" {
+			continue
+		}
+		missing = append(missing, index)
+	}
+	return missing
+}
+
+func openingVariantCorrection(variants []OpeningVariant, variantCount int) string {
+	missing := missingOpeningVariantIndices(variants, variantCount)
+	labels := make([]string, 0, len(missing))
+	for _, index := range missing {
+		labels = append(labels, fmt.Sprintf("换开头%d", index))
+	}
+	return fmt.Sprintf("\n上一轮输出缺少 %s。请只重新输出这些缺失变体：每个变体必须单独一行写 ===换开头N===，下一行写 时长：X秒，再写完整分镜正文；不要解释，不要 Markdown，不要输出已成功的变体。", strings.Join(labels, "、"))
 }
 
 func requireSuccessfulOpeningVariants(variants []OpeningVariant, variantCount int) error {
