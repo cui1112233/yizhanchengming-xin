@@ -3342,21 +3342,28 @@ const cmCharacterThreeViewPresetID = "batch-comic-character-three-view-cm"
 // connection before returning its result. Retrying only transport-level
 // failures keeps ordinary provider/configuration errors visible immediately.
 func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batchfactoryv11.Store, files *localartifact.Store, presetCatalog *prompt.Catalog, owner string, target shuihuoAssetImageTarget, imagePrompt string, referenceImageURLs []string, localExecutors *localexecutor.Service) (string, string, string, error) {
-	// Keep the provider attempt budget consistent with the user-visible retry
-	// policy: three attempts total, then the asset is terminally failed.
-	const maxAttempts = 3
+	// 默认 3 次总尝试（首轮 + 2 次重试），可用 QIANTIE_IMAGE_PROVIDER_MAX_ATTEMPTS
+	// 覆盖；上限 6 次，避免配置写出无限重试。重试只发生在页面记录/并发槽之外，
+	// 不会重复写页，也不会覆盖已成功的图。
+	maxAttempts := shuihuoImageProviderMaxAttempts()
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		mediaType, storageRef, source, err := generateShuihuoImageArtifact(ctx, store, files, presetCatalog, owner, target, imagePrompt, referenceImageURLs, localExecutors)
-		if err == nil || !retryableShuihuoAssetImageTransportError(err) || attempt == maxAttempts {
+		if err == nil || !retryableShuihuoAssetImageError(err) || attempt == maxAttempts {
 			return mediaType, storageRef, source, err
 		}
 		lastErr = err
-		log.Printf("shuihuo image provider connection interrupted; retrying attempt=%d/%d model=%s: %v", attempt+1, maxAttempts, target.ModelID, err)
+		delay := shuihuoImageProviderRetryDelay(attempt)
+		var chatErr shuihuoImageChatChannelError
+		if errors.As(err, &chatErr) {
+			log.Printf("shuihuo image provider returned a chat reply instead of image data; retrying attempt=%d/%d after=%s status=%d body=%q model=%s", attempt+1, maxAttempts, delay, chatErr.StatusCode, chatErr.BodySummary, target.ModelID)
+		} else {
+			log.Printf("shuihuo image provider connection interrupted; retrying attempt=%d/%d after=%s model=%s: %v", attempt+1, maxAttempts, delay, target.ModelID, err)
+		}
 		select {
 		case <-ctx.Done():
 			return "", "", "", ctx.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(delay):
 		}
 	}
 	return "", "", "", lastErr
@@ -3377,6 +3384,56 @@ func retryableShuihuoAssetImageTransportError(err error) bool {
 		strings.Contains(message, "context deadline exceeded") ||
 		strings.Contains(message, "tls handshake timeout") ||
 		strings.Contains(message, "temporary network")
+}
+
+// retryableShuihuoAssetImageError 在传输抖动之外，把“生图请求被当成聊天请求”
+// 的上游 400 也视为可重试的通道错误。
+func retryableShuihuoAssetImageError(err error) bool {
+	return retryableShuihuoAssetImageTransportError(err) || errors.Is(err, errShuihuoImageChatChannel)
+}
+
+// shuihuoImageProviderMaxAttempts 返回单页/单资产请求图片上游的最大尝试次数。
+// 默认 3 次（首轮 + 2 次重试）；环境变量可配置，上限 6 次。
+func shuihuoImageProviderMaxAttempts() int {
+	const defaultAttempts = 3
+	raw := strings.TrimSpace(os.Getenv("QIANTIE_IMAGE_PROVIDER_MAX_ATTEMPTS"))
+	if raw == "" {
+		return defaultAttempts
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return defaultAttempts
+	}
+	if value > 6 {
+		return 6
+	}
+	return value
+}
+
+// shuihuoImageProviderRetryDelay 返回第 attempt 次失败后的退避时间：
+// 2s、4s、8s…，上限 10s。QIANTIE_IMAGE_RETRY_BASE_DELAY_MS 可调整基准值，
+// 测试中设为 0 可跳过等待。
+func shuihuoImageProviderRetryDelay(attempt int) time.Duration {
+	base := 2 * time.Second
+	if raw := strings.TrimSpace(os.Getenv("QIANTIE_IMAGE_RETRY_BASE_DELAY_MS")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value >= 0 && value <= 60000 {
+			base = time.Duration(value) * time.Millisecond
+		}
+	}
+	if attempt < 1 {
+		attempt = 1
+	}
+	delay := base
+	for step := 1; step < attempt; step++ {
+		delay *= 2
+		if delay > 10*time.Second {
+			return 10 * time.Second
+		}
+	}
+	if delay > 10*time.Second {
+		delay = 10 * time.Second
+	}
+	return delay
 }
 
 func compileShuihuoAssetImagePrompt(asset batchfactoryv11.BookAsset, settings batchfactoryv11.SettingsPatch, presetCatalog *prompt.Catalog, useThreeView bool) (string, []string, error) {
@@ -3606,6 +3663,11 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 				log.Printf("shuihuo image gateway rejected response_format; retrying without it model=%s", target.ModelID)
 				continue
 			}
+			// 先把“生图请求被当成聊天请求”识别成可重试的通道错误，避免被下面
+			// 的内容审核关键词（“无法完成”“重新发送”）误判成永久拒绝。
+			if shuihuoImageProviderChatChannelResponse(response.StatusCode, raw) {
+				return "", "", shuihuoImageChatChannelError{StatusCode: response.StatusCode, BodySummary: shuihuoImageChatChannelBodySummary(raw)}
+			}
 			if shuihuoImageResponseContentRejected(response.StatusCode, raw) {
 				return "", "", fmt.Errorf("%w: %s", errShuihuoImageContentPolicy, shuihuoImageProviderErrorDetail(raw))
 			}
@@ -3727,6 +3789,27 @@ var errShuihuoImageReferenceUnusable = fmt.Errorf("image provider cannot read re
 // errShuihuoImageDownloadUnusable 表示图已经生成成功，但返回的 CDN 地址
 // 下载不下来。调用方可以改用 base64 响应重发一次，绕开这个不稳定的 CDN。
 var errShuihuoImageDownloadUnusable = fmt.Errorf("generated image could not be downloaded")
+
+// errShuihuoImageChatChannel 表示上游把生图请求当成聊天请求，返回 400 +
+// 聊天式自然语言（不是图像通道 JSON）。这是可重试的通道错误，不应把页面
+// 永久标失败；调用方应在有限次数内退避重试。
+var errShuihuoImageChatChannel = fmt.Errorf("image provider returned a chat reply instead of image data")
+
+// shuihuoImageChatChannelError 保留上游状态码与原文摘要，使重试日志和最终
+// 失败信息都能看出是哪一次重试、上游回了什么。
+type shuihuoImageChatChannelError struct {
+	StatusCode  int
+	BodySummary string
+}
+
+func (e shuihuoImageChatChannelError) Error() string {
+	if e.BodySummary == "" {
+		return fmt.Sprintf("%v: HTTP %d", errShuihuoImageChatChannel, e.StatusCode)
+	}
+	return fmt.Sprintf("%v: HTTP %d: %s", errShuihuoImageChatChannel, e.StatusCode, e.BodySummary)
+}
+
+func (e shuihuoImageChatChannelError) Unwrap() error { return errShuihuoImageChatChannel }
 
 var shuihuoImagePromptSofteningRules = []struct {
 	from string
@@ -4016,6 +4099,37 @@ func shuihuoImageResponseContentRejected(statusCode int, raw []byte) bool {
 		}
 	}
 	return false
+}
+
+// shuihuoImageProviderChatChannelResponse 识别“生图请求被上游当成聊天请求”的
+// 400：响应体不是图像通道 JSON，而是聊天式自然语言。该错误可重试，不能当作
+// 页面永久失败。
+func shuihuoImageProviderChatChannelResponse(statusCode int, raw []byte) bool {
+	if statusCode != http.StatusBadRequest {
+		return false
+	}
+	body := strings.TrimSpace(string(raw))
+	if body == "" || json.Valid([]byte(body)) {
+		return false
+	}
+	detail := strings.ToLower(body)
+	for _, keyword := range []string{
+		"在这个聊天", "在此聊天", "聊天中直接生成", "聊天窗口", "聊天里",
+		"in this chat", "this chat", "chat interface", "chat window",
+	} {
+		if strings.Contains(detail, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func shuihuoImageChatChannelBodySummary(raw []byte) string {
+	message := strings.Join(strings.Fields(strings.TrimSpace(string(raw))), " ")
+	if runes := []rune(message); len(runes) > 200 {
+		message = string(runes[:200]) + "..."
+	}
+	return message
 }
 
 // shuihuoImageProviderRejectedReferences reports whether a 4xx response means
