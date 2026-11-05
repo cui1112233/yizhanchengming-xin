@@ -1269,42 +1269,16 @@ func (c *BatchAutomationCoordinator) activeAutomationJob(owner, batchID string) 
 // 缺失或不可用。任意单书的配置缺陷不再整批拒绝，改由 automationBookPreflightReason
 // 在 run() 里逐书跳过。
 func (c *BatchAutomationCoordinator) validateAutomationGlobalPreflight(ctx context.Context, owner string, batch batchfactoryv11.Batch, runMode string) error {
-	reasons := make([]string, 0)
-	if c.stages == nil || c.stages.Director == nil || c.stages.Director.Provider == nil {
-		reasons = append(reasons, "文本模型执行器未配置")
-	}
-	productionMode := comicSettingString(batch.SettingsState.Patch, "productionMode", "video")
-	if productionMode == "comic" && runMode != "storyboard_only" {
-		if c.stages == nil || c.stages.ImageReady == nil {
-			reasons = append(reasons, "图片生成执行器未配置")
-		} else if ready, reason := c.stages.ImageReady(ctx, owner); !ready {
-			reasons = append(reasons, reasonOrDefault(reason, "图片生成执行器不可用"))
-		}
-	}
-	if productionMode != "comic" && runMode != "storyboard_only" {
-		if c.stages == nil || c.stages.VideoReady == nil {
-			reasons = append(reasons, "视频生成执行器未配置")
-		} else if ready, reason := c.stages.VideoReady(ctx, owner); !ready {
-			reasons = append(reasons, reasonOrDefault(reason, "视频生成执行器不可用"))
-		}
-	}
-	if runMode == "full_submit" {
-		if productionMode == "comic" && c.comicPublish == nil {
-			reasons = append(reasons, "漫画发布执行器未配置")
-		}
-		if productionMode != "comic" && c.publish121 == nil && c.external == nil {
-			reasons = append(reasons, "视频发布执行器未配置")
-		}
-	}
-	if len(reasons) == 0 {
+	issues := c.automationGlobalPreflightIssues(ctx, owner, batch, runMode)
+	if len(issues) == 0 {
 		return nil
 	}
-	unique := make([]string, 0, len(reasons))
+	unique := make([]string, 0, len(issues))
 	seen := map[string]bool{}
-	for _, reason := range reasons {
-		if reason != "" && !seen[reason] {
-			seen[reason] = true
-			unique = append(unique, reason)
+	for _, issue := range issues {
+		if issue.Message != "" && !seen[issue.Message] {
+			seen[issue.Message] = true
+			unique = append(unique, issue.Message)
 		}
 	}
 	return fmt.Errorf("%w: 自动生产前检查失败：%s", batchfactoryv11.ErrInvalid, strings.Join(unique, "；"))
@@ -1313,53 +1287,8 @@ func (c *BatchAutomationCoordinator) validateAutomationGlobalPreflight(ctx conte
 // automationBookPreflightReason 逐书预检，返回空串表示该书可执行。定时任务与
 // 立即任务都走 run()，因此同一套逐书预检对两种启动方式一致生效。
 func (c *BatchAutomationCoordinator) automationBookPreflightReason(ctx context.Context, owner string, batch batchfactoryv11.Batch, book batchfactoryv11.Book, runMode string) string {
-	if isDirectFirstSourceBlocked(book) {
-		title := strings.TrimSpace(book.Title)
-		if title == "" {
-			title = "未命名作品"
-		}
-		return fmt.Sprintf("《%s》书城原文获取失败，等待人工处理", title)
-	}
-	effective := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-	if comicSettingString(effective, "textModelId", "") == "" {
-		return "文本模型未配置"
-	}
-	if runMode == "storyboard_only" {
-		return ""
-	}
-	productionMode := batchfactoryv11.EffectiveProductionMode(batch.SettingsState.Patch, book.SettingsState.Patch)
-	if productionMode == "comic" {
-		if comicSettingString(effective, "imageModelId", "") == "" {
-			return "图片模型未配置；" + setupHintImage
-		}
-	} else if comicSettingString(effective, "videoModelId", "") == "" {
-		return "视频模型未配置；" + setupHintVideoModel
-	}
-	if runMode == "full_submit" {
-		// 漫画发布与视频发布使用的是两套配置键：漫画走 comicPublishSettings
-		// （组织/音频分类/制作者），视频走 publishSettings。之前统一只查
-		// publishSettings，导致漫画批次哪怕预设里已经配好组织，也会被判
-		// “发布配置未绑定网站或组织”，整批书在派发前全部 blocked。
-		publishKey := "publishSettings"
-		if productionMode == "comic" {
-			publishKey = "comicPublishSettings"
-		}
-		var publish map[string]any
-		if raw := effective[publishKey]; len(raw) > 0 {
-			_ = json.Unmarshal(raw, &publish)
-		}
-		if publish == nil || !hasAutomationPublishProfile(publish) {
-			if productionMode == "comic" {
-				return "漫画发布设置未绑定网站或组织"
-			}
-			return "发布配置未绑定网站或组织"
-		}
-		// N8 目录查询属于发布阶段依赖（音频分类/音频文件列表），
-		// 漫画出图阶段完全不碰它。这里之前在 preflight 里统一调
-		// comicPublishPreflight，一旦 N8 后台改了路径/挂了就把整批
-		// 书在派发最开头全部 blocked，连一张图都出不来。
-		// 改为挪到 run() 里进入 publish 阶段时再查，让出图流水线
-		// 先跑起来，发布依赖单独失败不拖累其它书。
+	if issues := c.automationBookPreflightIssues(ctx, owner, batch, book, runMode, false); len(issues) > 0 {
+		return issues[0].Message
 	}
 	return ""
 }
@@ -3823,6 +3752,7 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 	if mux == nil || coordinator == nil {
 		return
 	}
+	registerBatchAutomationPreflightRoute(mux, auth, coordinator, version)
 	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/start", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
 		if !ok {
