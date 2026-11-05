@@ -193,7 +193,10 @@ func TestShuihuoImageGenerationHTTPClientSelectsProtocolByEndpoint(t *testing.T)
 	} {
 		client := shuihuoImageGenerationHTTPClient(endpoint)
 		transport := client.Transport.(*http.Transport)
-		if !transport.ForceAttemptHTTP2 || transport.TLSNextProto != nil {
+		// 共享 Transport 首次被使用后，net/http 会自动填充 TLSNextProto，
+		// 因此这里不能再以 TLSNextProto 判断协议能力，改用 ForceAttemptHTTP2
+		// 并排除显式 HTTP/1.1 变体。
+		if !transport.ForceAttemptHTTP2 || client == shuihuoImageSharedHTTP1Client() {
 			t.Fatalf("endpoint %s must use the HTTP/2-capable transport", endpoint)
 		}
 	}

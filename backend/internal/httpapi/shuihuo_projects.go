@@ -3348,7 +3348,9 @@ func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batch
 	maxAttempts := shuihuoImageProviderMaxAttempts()
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		mediaType, storageRef, source, err := generateShuihuoImageArtifact(ctx, store, files, presetCatalog, owner, target, imagePrompt, referenceImageURLs, localExecutors)
+		// 把「第几次外层重试」带进上下文，供出图请求的结构化日志对账使用。
+		attemptCtx := withShuihuoImageOuterAttempt(ctx, attempt)
+		mediaType, storageRef, source, err := generateShuihuoImageArtifact(attemptCtx, store, files, presetCatalog, owner, target, imagePrompt, referenceImageURLs, localExecutors)
 		if err == nil || !retryableShuihuoAssetImageError(err) || attempt == maxAttempts {
 			return mediaType, storageRef, source, err
 		}
@@ -3371,6 +3373,12 @@ func generateShuihuoAssetImageArtifactWithRetry(ctx context.Context, store batch
 
 func retryableShuihuoAssetImageTransportError(err error) bool {
 	if err == nil {
+		return false
+	}
+	// 上游已按「请求成功」计费的读失败不再自动重发，详见
+	// shuihuoImageBilledReadFailure 的注释。
+	var billed *shuihuoImageBilledReadFailure
+	if errors.As(err, &billed) {
 		return false
 	}
 	message := strings.ToLower(err.Error())
@@ -3625,28 +3633,40 @@ func shuihuoImageResponseRejectsResponseFormat(raw []byte) bool {
 func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store, target shuihuoAssetImageTarget, model map[string]any, endpoint, credential, imagePrompt string, referenceImageURLs []string) (string, string, error) {
 	size := shuihuoImageSizeForModel(target.ModelID, target.AspectRatio)
 	useEdits := len(referenceImageURLs) > 0 && shuihuoImageModelSupportsEdits(model, target.ModelID)
+	outerAttempt := shuihuoImageOuterAttemptFromContext(ctx)
 	for attempt := 0; attempt < 3; attempt++ {
+		attemptStart := time.Now()
 		// 默认走 URL 模式：小响应在网关上更不容易被截断。只有 URL 下载失败时才
 		// 改用 base64 重发一次，绕开不稳定的 CDN；若网关不接受 response_format，
 		// 再去掉该字段退回 URL 模式。
 		withResponseFormat := attempt == 1
 		req, err := newShuihuoProviderImageRequest(ctx, endpoint, target.ModelID, imagePrompt, target.AspectRatio, referenceImageURLs, model, withResponseFormat)
 		if err != nil {
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, errorKind: "other", model: target.ModelID, detail: err.Error()})
 			return "", "", err
 		}
 		log.Printf("shuihuo image request provider=%s model=%s endpoint=%s refs=%d size=%s b64=%t edits=%t", target.Provider, target.ModelID, endpoint, len(referenceImageURLs), size, withResponseFormat, useEdits)
 		req.Header.Set("Authorization", "Bearer "+credential)
+		queueStart := time.Now()
 		releaseImageSlot, err := acquireShuihuoGPTImageGenerationSlot(ctx, target.ModelID)
+		queued := time.Since(queueStart)
 		if err != nil {
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, queued: queued, errorKind: shuihuoImageAttemptKindOfError(err, 0), model: target.ModelID, detail: err.Error()})
 			return "", "", fmt.Errorf("%w: 等待图片模型请求失败: %v", batchfactoryv11.ErrUpstream, err)
 		}
-		client := shuihuoImageGenerationHTTPClient(endpoint)
-		response, err := client.Do(req)
+		response, err := shuihuoImageGenerationHTTPClient(endpoint).Do(req)
 		if err != nil {
 			releaseImageSlot()
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, queued: queued, errorKind: shuihuoImageAttemptKindOfError(err, 0), model: target.ModelID, detail: err.Error()})
 			return "", "", fmt.Errorf("%w: image provider request failed: %v", batchfactoryv11.ErrUpstream, err)
 		}
-		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+		bodyMode := "url"
+		bodyTimeout := shuihuoImageBodyReadTimeoutURL
+		if withResponseFormat {
+			bodyMode = "base64"
+			bodyTimeout = shuihuoImageBodyReadTimeoutBase64
+		}
+		raw, readErr := readShuihuoImageResponseBody(response, bodyMode, bodyTimeout)
 		response.Body.Close()
 		// Serialize only the provider generation call; a slow CDN download must not
 		// block the next GPT image request.
@@ -3655,10 +3675,21 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 			// 上游很可能已经出图，只是响应体在传输中断（网关截断/连接重置）。
 			// 必须把读错误带进错误文本，否则重试判定匹配不到，已生成的图会被丢弃。
 			log.Printf("shuihuo image response body read failed provider=%s model=%s status=%d refs=%d: %v", target.Provider, target.ModelID, response.StatusCode, len(referenceImageURLs), readErr)
-			return "", "", fmt.Errorf("%w: image provider response body read failed status=%d refs=%d: %v", batchfactoryv11.ErrUpstream, response.StatusCode, len(referenceImageURLs), readErr)
+			wrapped := fmt.Errorf("%w: image provider response body read failed status=%d refs=%d: %v", batchfactoryv11.ErrUpstream, response.StatusCode, len(referenceImageURLs), readErr)
+			errorKind := shuihuoImageAttemptKindOfError(readErr, response.StatusCode)
+			if errorKind == "other" {
+				errorKind = "body_read_failed"
+			}
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, errorKind: errorKind, model: target.ModelID, detail: wrapped.Error()})
+			if response.StatusCode == http.StatusOK && shuihuoImageDedupeBilledRetry() {
+				// 200 说明对面已经按成功计费，重发同一页会重复扣费，交给上层决定。
+				return "", "", &shuihuoImageBilledReadFailure{message: wrapped.Error()}
+			}
+			return "", "", wrapped
 		}
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
 			log.Printf("shuihuo image response provider=%s model=%s status=%d detail=%s", target.Provider, target.ModelID, response.StatusCode, shuihuoImageProviderErrorDetail(raw))
+			logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, errorKind: shuihuoImageAttemptKindOfStatus(response.StatusCode), model: target.ModelID, detail: shuihuoImageProviderErrorDetail(raw)})
 			if withResponseFormat && !useEdits && shuihuoImageResponseRejectsResponseFormat(raw) {
 				log.Printf("shuihuo image gateway rejected response_format; retrying without it model=%s", target.ModelID)
 				continue
@@ -3709,8 +3740,10 @@ func requestShuihuoProviderImage(ctx context.Context, files *localartifact.Store
 		if err != nil {
 			return "", "", err
 		}
+		logImageAttempt(shuihuoImageAttemptLog{elapsed: time.Since(attemptStart), attempt: outerAttempt, inner: attempt + 1, status: response.StatusCode, queued: queued, errorKind: "ok", model: target.ModelID})
 		return mediaType, saved.StorageRef, nil
 	}
+	logImageAttempt(shuihuoImageAttemptLog{attempt: outerAttempt, inner: 3, errorKind: "other", model: target.ModelID, detail: "image provider rejected response_format"})
 	return "", "", fmt.Errorf("%w: image provider rejected response_format", batchfactoryv11.ErrUpstream)
 }
 
@@ -3729,12 +3762,176 @@ func applyShuihuoImageWatermark(ctx context.Context, imageBytes []byte, mediaTyp
 	return watermark.Apply(imageBytes, mediaType, watermark.Options{Enabled: true, Text: strings.TrimSpace(text)})
 }
 
-// shuihuoLongRunningImageHTTPClient uses HTTP/2 for providers that require it.
-func shuihuoLongRunningImageHTTPClient() *http.Client {
+// shuihuoImageResponseHeaderTimeout 是 header 阶段的硬上限。此前为 0（无限），
+// 网关扣住响应头时只能等到整请求 900s；60s 足够覆盖正常排队，又能尽早暴露卡死。
+// shuihuoImageBodyReadTimeoutURL/Base64 是 body 阶段的分层上限：URL 模式只有
+// 一个几百字节的 JSON，45s 读不完说明 body 被扣住；b64 模式是大响应，给 120s。
+// 三个值都是变量，测试可临时覆盖。
+var (
+	shuihuoImageResponseHeaderTimeout = 60 * time.Second
+	shuihuoImageBodyReadTimeoutURL    = 45 * time.Second
+	shuihuoImageBodyReadTimeoutBase64 = 120 * time.Second
+)
+
+// newShuihuoImageTransport 构造出图请求的 Transport。出图链路按协议变体
+// 各复用一个实例（见下方的包级共享 client）。
+func newShuihuoImageTransport(forceHTTP2 bool) *http.Transport {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.ForceAttemptHTTP2 = true
-	transport.TLSNextProto = nil
-	return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+	transport.ResponseHeaderTimeout = shuihuoImageResponseHeaderTimeout
+	transport.IdleConnTimeout = 90 * time.Second
+	transport.MaxIdleConns = 100
+	transport.MaxIdleConnsPerHost = 32
+	if forceHTTP2 {
+		transport.ForceAttemptHTTP2 = true
+		transport.TLSNextProto = nil
+	} else {
+		transport.ForceAttemptHTTP2 = false
+		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	}
+	return transport
+}
+
+// shuihuoLongRunningImageHTTPClient 构造一个新的 HTTP/2 client（测试用构造器；
+// 生产路径走下面的共享实例）。
+func shuihuoLongRunningImageHTTPClient() *http.Client {
+	return &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(true)}
+}
+
+// 生产路径复用的包级 client。此前每次请求都新建 Transport，等于每次重新
+// TLS 握手、不复用连接，会放大网关的连接级重置与限流暴露面；900s 整体超时
+// 保持不变，中间关卡由 ResponseHeaderTimeout 与 body 分层计时负责。
+var (
+	shuihuoImageSharedHTTP2Client = sync.OnceValue(func() *http.Client {
+		return &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(true)}
+	})
+	shuihuoImageSharedHTTP1Client = sync.OnceValue(func() *http.Client {
+		return &http.Client{Timeout: 15 * time.Minute, Transport: newShuihuoImageTransport(false)}
+	})
+)
+
+// readShuihuoImageResponseBody 在独立计时器下读取响应体：到点即关闭 body，
+// 让后台读协程退出并让半截响应不回到连接池，返回可识别的超时错误。
+func readShuihuoImageResponseBody(response *http.Response, mode string, timeout time.Duration) ([]byte, error) {
+	type readResult struct {
+		payload []byte
+		err     error
+	}
+	results := make(chan readResult, 1)
+	go func() {
+		payload, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
+		results <- readResult{payload: payload, err: err}
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case result := <-results:
+		return result.payload, result.err
+	case <-timer.C:
+		_ = response.Body.Close()
+		return nil, fmt.Errorf("response body read timeout after=%s mode=%s", timeout, mode)
+	}
+}
+
+// shuihuoImageBilledReadFailure 表示上游已按「请求成功」计费（HTTP 200 已返回），
+// 但响应体在传输中断。它对上层仍是一条可恢复错误，但默认不再自动重发同一页：
+// 对面按成功计费 ¥0.03/次，重发会重复扣费。可用
+// QIANTIE_IMAGE_DEDUPE_BILLED_RETRY=0 关闭去重，退回旧的自动重试行为。
+type shuihuoImageBilledReadFailure struct {
+	message string
+}
+
+func (err *shuihuoImageBilledReadFailure) Error() string { return err.message }
+
+// Unwrap 保留 ErrUpstream 语义，上层的错误分类不受影响。
+func (err *shuihuoImageBilledReadFailure) Unwrap() error { return batchfactoryv11.ErrUpstream }
+
+func shuihuoImageDedupeBilledRetry() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("QIANTIE_IMAGE_DEDUPE_BILLED_RETRY"))) {
+	case "0", "false", "off", "no":
+		return false
+	}
+	return true
+}
+
+type shuihuoImageOuterAttemptContextKey struct{}
+
+// withShuihuoImageOuterAttempt 记录外层重试序号，仅用于结构化日志。
+func withShuihuoImageOuterAttempt(ctx context.Context, attempt int) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, shuihuoImageOuterAttemptContextKey{}, attempt)
+}
+
+func shuihuoImageOuterAttemptFromContext(ctx context.Context) int {
+	if ctx == nil {
+		return 1
+	}
+	if attempt, ok := ctx.Value(shuihuoImageOuterAttemptContextKey{}).(int); ok && attempt > 0 {
+		return attempt
+	}
+	return 1
+}
+
+// 出图请求的结构化日志字段顺序固定：elapsed_ms → attempt → inner_attempt →
+// http_status → queued_ms → error_kind → model → detail，单行便于 grep 与
+// 和上游仪表盘逐条对账。
+type shuihuoImageAttemptLog struct {
+	elapsed   time.Duration
+	attempt   int
+	inner     int
+	status    int
+	queued    time.Duration
+	errorKind string
+	model     string
+	detail    string
+}
+
+func logImageAttempt(entry shuihuoImageAttemptLog) {
+	log.Printf("shuihuo image attempt elapsed_ms=%d attempt=%d inner_attempt=%d http_status=%d queued_ms=%d error_kind=%s model=%s detail=%q",
+		entry.elapsed.Milliseconds(), entry.attempt, entry.inner, entry.status,
+		entry.queued.Milliseconds(), entry.errorKind, entry.model, entry.detail)
+}
+
+func shuihuoImageAttemptKindOfError(err error, status int) string {
+	if err != nil {
+		message := strings.ToLower(err.Error())
+		switch {
+		case strings.Contains(message, "client.timeout"):
+			return "client_timeout"
+		case strings.Contains(message, "context canceled"):
+			return "ctx_canceled"
+		case strings.Contains(message, "context deadline exceeded"):
+			return "ctx_deadline"
+		case strings.Contains(message, "connection reset"),
+			strings.Contains(message, "forcibly closed"),
+			strings.Contains(message, "wsarecv"):
+			return "reset"
+		case strings.Contains(message, "unexpected eof"):
+			return "unexpected_eof"
+		case strings.Contains(message, "tls handshake timeout"):
+			return "tls_timeout"
+		case strings.Contains(message, "response body read failed"),
+			strings.Contains(message, "body read timeout"):
+			return "body_read_failed"
+		}
+		return "other"
+	}
+	return shuihuoImageAttemptKindOfStatus(status)
+}
+
+func shuihuoImageAttemptKindOfStatus(status int) string {
+	switch {
+	case status == 0:
+		return "other"
+	case status >= 200 && status < 300:
+		return "ok"
+	case status >= 400 && status < 500:
+		return "http_4xx"
+	case status >= 500:
+		return "http_5xx"
+	}
+	return "other"
 }
 
 // 默认所有 https 出图端点都走 HTTP/2；只有已知会重置长流的旧网关保留
@@ -3746,12 +3943,9 @@ func shuihuoImageGenerationHTTPClient(endpoint string) *http.Client {
 		host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(parsed.Hostname()), "."))
 	}
 	if shuihuoImageGenerationLegacyHTTP1Host(host) {
-		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.ForceAttemptHTTP2 = false
-		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-		return &http.Client{Timeout: 15 * time.Minute, Transport: transport}
+		return shuihuoImageSharedHTTP1Client()
 	}
-	return shuihuoLongRunningImageHTTPClient()
+	return shuihuoImageSharedHTTP2Client()
 }
 
 var shuihuoImageGenerationLegacyHTTP1Hosts = map[string]struct{}{}
