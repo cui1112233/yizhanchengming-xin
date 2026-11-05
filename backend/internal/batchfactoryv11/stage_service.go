@@ -74,9 +74,9 @@ func (s *BookStageService) RunComicBootstrap(ctx context.Context, owner, batchID
 	return s.Director.RunComicBootstrap(ctx, owner, batchID, bookID)
 }
 
-func (s *BookStageService) RunMissingComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) ([]Video, error) {
+func (s *BookStageService) RunMissingComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) (ComicPromptExtractionResult, error) {
 	if s == nil || s.Director == nil {
-		return nil, fmt.Errorf("%w: 漫画缺页提示词恢复服务未配置", ErrUnavailable)
+		return ComicPromptExtractionResult{Updated: []Video{}}, fmt.Errorf("%w: 漫画缺页提示词恢复服务未配置", ErrUnavailable)
 	}
 	return s.Director.RunMissingComicPromptExtraction(ctx, owner, batchID, bookID)
 }

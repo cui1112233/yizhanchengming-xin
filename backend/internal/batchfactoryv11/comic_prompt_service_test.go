@@ -624,11 +624,12 @@ func TestRunComicPromptExtractionRetriesOneTruncatedPageWithCompactOutput(t *tes
 		`{"screen_prompt":"紧凑的三格导演说明","image_prompt":"紧凑的三格图片提示词","roles":["女主"],"scene_presets":[]}`,
 	}}
 
-	updated, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
 
 	if err != nil {
 		t.Fatalf("one truncated comic page should retry with compact output: %v", err)
 	}
+	updated := result.Updated
 	if len(updated) != 1 || updated[0].ComicImagePrompt != "紧凑的三格图片提示词" {
 		t.Fatalf("compact retry did not persist the completed page: %+v", updated)
 	}
@@ -661,10 +662,11 @@ func TestRunComicPromptExtractionCallsTextProviderOncePerPage(t *testing.T) {
 		`{"screen_prompt":"第二页导演说明","image_prompt":"第二页图片词","roles":["女主"],"role_stage":{"女主":"女主"},"scene_presets":[]}`,
 	}}
 
-	updated, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	updated := result.Updated
 	if len(provider.calls) != len(book.Videos) {
 		t.Fatalf("comic prompt extraction calls = %d, want %d", len(provider.calls), len(book.Videos))
 	}
@@ -698,10 +700,11 @@ func TestRunMissingComicPromptExtractionPreservesCompletedPages(t *testing.T) {
 	secondID := book.Videos[1].ID
 	provider := &queuedDirectorProvider{values: []string{`{"pages":[{"video_id":"` + secondID + `","role_stage":{"女主":"女主"},"scene_presets":[],"screen_prompt":"补跑第二页","image_prompt":"补跑第二页图片词","roles":["女主"]}]}`}}
 
-	updated, err := (&DirectorService{Store: store, Provider: provider}).RunMissingComicPromptExtraction(ctx, "alice", batch.ID, book.ID)
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunMissingComicPromptExtraction(ctx, "alice", batch.ID, book.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	updated := result.Updated
 	if len(provider.calls) != 1 || len(updated) != 1 || updated[0].ID != secondID {
 		t.Fatalf("missing-page retry result=%+v calls=%d", updated, len(provider.calls))
 	}
@@ -728,10 +731,11 @@ func TestRunComicPromptExtractionAllowsLightPresetEmptyImagePrompt(t *testing.T)
 	store.mu.Unlock()
 	provider := &queuedDirectorProvider{values: []string{`{"pages":[{"video_id":"` + book.Videos[0].ID + `","role_stage":{},"scene_presets":[],"screen_prompt":"轻量版导演说明","image_prompt":"","roles":["女主"]}]}`}}
 
-	updated, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
+	result, err := (&DirectorService{Store: store, Provider: provider}).RunComicPromptExtraction(context.Background(), "alice", batch.ID, book.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	updated := result.Updated
 	if updated[0].ComicPrompt != "轻量版导演说明" || updated[0].ComicImagePrompt != "" {
 		t.Fatalf("light preset result changed unexpectedly: %+v", updated[0])
 	}

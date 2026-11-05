@@ -60,6 +60,7 @@ type BatchAutomationCoordinator struct {
 	dispatchNextCheck    time.Time
 	dispatchNextCheckSet bool
 	dispatcherOnce       sync.Once
+	reaperOnce           sync.Once
 }
 
 type comicGenerationProgressFunc func(stage, message string)
@@ -175,10 +176,78 @@ func (c *BatchAutomationCoordinator) StartScheduledDispatcher() {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
 			for range ticker.C {
-				_ = c.DispatchDueJobs(context.Background())
+				func() {
+					defer func() {
+						if recovered := recover(); recovered != nil {
+							log.Printf("batch automation dispatcher panic recovered: %v", recovered)
+						}
+					}()
+					_ = c.DispatchDueJobs(context.Background())
+				}()
 			}
 		}()
 	})
+	c.StartAutomationReaper()
+}
+
+// StartAutomationReaper 启动独立的僵尸回收循环。它不读 dispatchNextCheck，
+// 因此不会被任何远期 scheduledAt/retryAt 饿死。
+func (c *BatchAutomationCoordinator) StartAutomationReaper() {
+	if c == nil {
+		return
+	}
+	c.reaperOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(10 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				func() {
+					defer func() {
+						if recovered := recover(); recovered != nil {
+							log.Printf("batch automation reaper panic recovered: %v", recovered)
+						}
+					}()
+					if err := c.ReapZombieJobs(context.Background()); err != nil {
+						log.Printf("batch automation reaper failed: %v", err)
+					}
+				}()
+			}
+		}()
+	})
+}
+
+// ReapZombieJobs 独立回收僵尸 running job。判定不依赖 dispatcher 调度门禁，
+// 也不依赖是否存在排队书籍。
+func (c *BatchAutomationCoordinator) ReapZombieJobs(ctx context.Context) error {
+	if c == nil || c.store == nil {
+		return nil
+	}
+	now := c.now()
+	c.mu.Lock()
+	state, err := c.loadLocked()
+	if err != nil {
+		c.mu.Unlock()
+		return err
+	}
+	reclaimed := make([]string, 0)
+	for jobID, job := range state.Jobs {
+		if reclaimAutomationZombieRunningJob(job, jobID, now) {
+			reclaimed = append(reclaimed, jobID)
+		}
+	}
+	if len(reclaimed) == 0 {
+		c.mu.Unlock()
+		return nil
+	}
+	if err := c.saveLocked(state); err != nil {
+		c.mu.Unlock()
+		return err
+	}
+	c.mu.Unlock()
+	for _, jobID := range reclaimed {
+		c.cancelRun(jobID)
+	}
+	return nil
 }
 
 // DispatchDueJobs promotes persisted scheduled jobs to running and starts
@@ -1716,9 +1785,11 @@ const (
 	comicGenerationPerPageBudget = 20 * time.Minute
 	comicGenerationMinBudget     = 60 * time.Minute
 	comicGenerationCushion       = 30 * time.Minute
-	comicGenerationIdleExtend    = 20 * time.Minute
-	comicGenerationHardCap       = 6 * time.Hour
-	comicPublishStageTimeout     = 45 * time.Minute
+	// 与 A 批停滞阈值对齐：连续 10 分钟没有任何进度心跳即判失效，
+	// 不允许无限期挂 running。
+	comicGenerationIdleExtend = automationStallTimeout
+	comicGenerationHardCap    = 6 * time.Hour
+	comicPublishStageTimeout  = 45 * time.Minute
 )
 
 // comicGenerationBudget 按“页数 / 有效并发”估算一本漫画的初始时间预算。
@@ -2566,6 +2637,34 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							return
 						}
 					}
+					disposition := classifyAutomationFailure(err, stage)
+					entry["errorCode"], entry["failureClass"] = disposition.Code, disposition.Class
+					outcome := recordAutomationPageLedger(entry, err, stage, c.now())
+					if disposition.needsManual() || outcome.NeedsManual {
+						entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", stage, err.Error(), c.now()
+						entry["message"] = fmt.Sprintf("%s；需人工处理（%s）", message, disposition.Code)
+						entry["needsManual"] = true
+						delete(entry, "retryRequested")
+						delete(entry, "retryAt")
+						appendAutomationBookLog(entry, c.now(), stage, message)
+						failed.Add(1)
+						persist()
+						return
+					}
+					// 页级失败但未达升级阈值：只跳过、不原地重试，安排一次带
+					// 退避的续跑。失败累计到 3 次才进入整书重试队列。
+					if outcome.HasFailures && !outcome.RetryQueued {
+						backoff := automationContinuationBackoff(outcome.MaxAttempts)
+						entry["status"], entry["stage"], entry["error"], entry["updatedAt"] = "failed", stage, err.Error(), c.now()
+						entry["message"] = fmt.Sprintf("%s；已跳过本次，%d 秒后续跑未完成项（失败 %d/%d 次）",
+							message, int(backoff.Seconds()), outcome.MaxAttempts, automationRetryEscalationThreshold)
+						entry["retryRequested"] = true
+						entry["retryAt"] = c.now().Add(backoff)
+						appendAutomationBookLog(entry, c.now(), stage, message)
+						failed.Add(1)
+						persist()
+						return
+					}
 					// 余额不足/鉴权/参数校验这类确定性错误重试也只会再烧一次付费任务，
 					// 必须立即终态失败，跳过整书回补与重新入队。
 					if markDeterministicAutomationFailure(entry, stage, err, message, c.now()) {
@@ -2805,6 +2904,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							fail("comic_bootstrap", bootstrapErr, "漫画原文分页与提示词提取失败")
 							continue
 						}
+						// 阶段成功即清零当前账期；后续新故障按新的第 1 次重新累计。
+						if resetAutomationPageLedgerNode(entry, "comic_bootstrap", c.now()) {
+							persist()
+						}
 						if identityRecovery {
 							entry["stage"], entry["message"], entry["updatedAt"] = "comic_prompt_recovery", "人物身份已修复，正在重新生成全部漫画页提示词", c.now()
 							persist()
@@ -2815,6 +2918,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 							if promptErr != nil {
 								fail("comic_prompt_recovery", promptErr, "漫画身份修复后的提示词重新生成失败")
 								continue
+							}
+							if resetAutomationPageLedgerNode(entry, "comic_prompt_recovery", c.now()) {
+								persist()
 							}
 						}
 					case comicPreparationMissingPrompts:
@@ -2839,6 +2945,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						if recoveryErr != nil {
 							fail("comic_prompt_recovery", recoveryErr, "漫画缺页提示词补齐失败")
 							continue
+						}
+						if resetAutomationPageLedgerNode(entry, "comic_prompt_recovery", c.now()) {
+							persist()
 						}
 					case comicPreparationReady:
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_resume", "已复用完整漫画资产和分页，继续补齐图片", c.now()
@@ -2899,6 +3008,10 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, epoch int64, owner
 						fail(failureStage, generateErr, failureDetail)
 						continue
 					}
+					// 整本出图成功说明所有页都已落地：清零当前账期，
+					// 下一轮新故障从第 1 次重新累计。
+					resetAutomationPageLedgerNode(entry, "comic_images", c.now())
+					resetAutomationPageLedgerNode(entry, "comic_asset_images", c.now())
 					confirmCtx, cancelConfirm := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 					confirmedCollection, confirmErr := c.confirmComicCollection(confirmCtx, owner, batchID, book.ID, collection)
 					cancelConfirm()

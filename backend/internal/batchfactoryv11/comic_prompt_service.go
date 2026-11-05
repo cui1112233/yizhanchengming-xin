@@ -3,6 +3,7 @@ package batchfactoryv11
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -357,35 +358,92 @@ func comicAssets(records []BookAsset) []map[string]string {
 	return assets
 }
 
+// ComicPromptExtractionFailure 描述某一页提示词生成失败。失败页只影响自身，
+// 不阻止其它页继续生成，也不阻止已成功页落库。
+type ComicPromptExtractionFailure struct {
+	VideoID string `json:"videoId"`
+	Label   string `json:"label,omitempty"`
+	Code    string `json:"errorCode"`
+	Message string `json:"message"`
+}
+
+// ComicPromptExtractionResult 同时返回已成功落库的页与失败明细。
+type ComicPromptExtractionResult struct {
+	Updated []Video                       `json:"updated"`
+	Failed  []ComicPromptExtractionFailure `json:"failed,omitempty"`
+}
+
+// ComicPromptPartialError 表示部分页成功、部分页失败。调用方可errors.As
+// 取出 Result 记录页级账本，而不是把整批成功结果丢掉。
+type ComicPromptPartialError struct {
+	Result ComicPromptExtractionResult
+	Cause  error
+}
+
+func (e *ComicPromptPartialError) Error() string {
+	if e == nil {
+		return ""
+	}
+	total := len(e.Result.Updated) + len(e.Result.Failed)
+	if e.Cause != nil {
+		return fmt.Sprintf("漫画页提示词 %d/%d 张失败：%v", len(e.Result.Failed), total, e.Cause)
+	}
+	return fmt.Sprintf("漫画页提示词 %d/%d 张失败", len(e.Result.Failed), total)
+}
+
+func (e *ComicPromptPartialError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+func comicPromptFailureCode(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrNotFound):
+		return "page_not_found"
+	case errors.Is(err, ErrConflict):
+		return "page_conflict"
+	case errors.Is(err, ErrInvalid):
+		return "invalid_prompt_result"
+	default:
+		return "prompt_generation_failed"
+	}
+}
+
 // RunComicPromptExtraction regenerates complete-page comic prompts one page at
 // a time so each accepted result can be persisted and displayed immediately.
 // The existing director revision and video prompts are deliberately untouched.
-func (s *DirectorService) RunComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) ([]Video, error) {
+func (s *DirectorService) RunComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) (ComicPromptExtractionResult, error) {
 	return s.runComicPromptExtraction(ctx, owner, batchID, bookID, false)
 }
 
 // RunMissingComicPromptExtraction fills only pages that do not already have a
 // complete prompt pair. It is used by automatic recovery so accepted edits on
-// completed pages are never replaced.
-func (s *DirectorService) RunMissingComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) ([]Video, error) {
+// completed pages are never replaced. A single failing page is reported in
+// Failed and never cancels its siblings.
+func (s *DirectorService) RunMissingComicPromptExtraction(ctx context.Context, owner, batchID, bookID string) (ComicPromptExtractionResult, error) {
 	return s.runComicPromptExtraction(ctx, owner, batchID, bookID, true)
 }
 
-func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, batchID, bookID string, onlyMissing bool) ([]Video, error) {
+func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, batchID, bookID string, onlyMissing bool) (ComicPromptExtractionResult, error) {
+	empty := ComicPromptExtractionResult{Updated: []Video{}}
 	if err := s.validate(); err != nil {
-		return nil, err
+		return empty, err
 	}
 	batch, err := s.Store.GetBatch(ctx, owner, batchID)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	book, err := bookFromBatch(batch, bookID)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	book, err = s.comicProductionBook(ctx, owner, batchID, book)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {
 		if segmentation, segmentErr := segmentStore.GetComicSourceSegmentation(ctx, owner, batchID, bookID); segmentErr == nil {
@@ -402,23 +460,23 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 		}
 	}
 	if len(book.Videos) == 0 {
-		return nil, fmt.Errorf("%w: 请先生成漫画分页", ErrConflict)
+		return empty, fmt.Errorf("%w: 请先生成漫画分页", ErrConflict)
 	}
 	// 漫画分页和漫画画面提示词不依赖配音时长。音频时长只在视频
 	// 分镜/视频生产阶段用于时间轴规划；这里如果复用 snapshotForBook，
 	// 开启音频规划但尚未生成配音时会把整条漫画批量流程错误拦住。
 	snapshot, err := snapshotForAssetExtraction(batch, book)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	if normalizeProductionMode(snapshot.Effective) != "comic" {
-		return nil, fmt.Errorf("%w: 当前书为视频生成模式", ErrConflict)
+		return empty, fmt.Errorf("%w: 当前书为视频生成模式", ErrConflict)
 	}
 	targets := book.Videos
 	if onlyMissing {
 		targets = missingComicPromptVideos(book.Videos, snapshot)
 		if len(targets) == 0 {
-			return []Video{}, nil
+			return empty, nil
 		}
 	}
 	// Book-level concurrency does not help when a batch contains one book.
@@ -436,7 +494,21 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 	var completed atomic.Int32
 	var resultMu sync.Mutex
 	updated := make([]Video, 0, len(targets))
+	failures := make([]ComicPromptExtractionFailure, 0)
 	var firstErr error
+	recordFailure := func(target Video, err error) {
+		resultMu.Lock()
+		failures = append(failures, ComicPromptExtractionFailure{
+			VideoID: target.ID,
+			Label:   target.Label,
+			Code:    comicPromptFailureCode(err),
+			Message: err.Error(),
+		})
+		if firstErr == nil {
+			firstErr = err
+		}
+		resultMu.Unlock()
+	}
 	process := func(target Video) {
 		pageIndex := -1
 		for index, page := range book.Videos {
@@ -446,12 +518,8 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 			}
 		}
 		if pageIndex < 0 {
-			resultMu.Lock()
-			if firstErr == nil {
-				firstErr = fmt.Errorf("%w: 漫画页不存在", ErrNotFound)
-				cancel()
-			}
-			resultMu.Unlock()
+			// 单页丢失只登记该页，不再 cancel 全部兄弟页。
+			recordFailure(target, fmt.Errorf("%w: 漫画页不存在", ErrNotFound))
 			return
 		}
 		contract, err := BuildComicPromptContract(book, book.Videos, pageIndex, snapshot)
@@ -482,12 +550,7 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 			}
 		}
 		if err != nil {
-			resultMu.Lock()
-			if firstErr == nil {
-				firstErr = err
-				cancel()
-			}
-			resultMu.Unlock()
+			recordFailure(target, err)
 			return
 		}
 		finished := int(completed.Add(1))
@@ -525,12 +588,10 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 	close(jobs)
 	workers.Wait()
 	resultMu.Lock()
-	err = firstErr
 	result := append([]Video(nil), updated...)
+	failed := append([]ComicPromptExtractionFailure(nil), failures...)
+	cause := firstErr
 	resultMu.Unlock()
-	if err != nil {
-		return nil, err
-	}
 	sort.SliceStable(result, func(i, j int) bool {
 		left, right := len(book.Videos), len(book.Videos)
 		for index, page := range book.Videos {
@@ -543,7 +604,17 @@ func (s *DirectorService) runComicPromptExtraction(ctx context.Context, owner, b
 		}
 		return left < right
 	})
-	return result, nil
+	out := ComicPromptExtractionResult{Updated: result, Failed: failed}
+	if len(failed) > 0 {
+		if cause == nil {
+			cause = errors.New("漫画页提示词部分失败")
+		}
+		return out, &ComicPromptPartialError{Result: out, Cause: cause}
+	}
+	if err := ctx.Err(); err != nil {
+		return out, err
+	}
+	return out, nil
 }
 
 func missingComicPromptVideos(videos []Video, snapshot DirectorSnapshot) []Video {

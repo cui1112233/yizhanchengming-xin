@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,16 +46,64 @@ type comicPageWorkItem struct {
 	page  batchfactoryv11.Video
 }
 
+// comicPageFailure 是单页失败的账本条目。失败只影响该页，不影响兄弟页，
+// 也不中止整本。
+type comicPageFailure struct {
+	VideoID string
+	Label   string
+	Code    string
+	Err     error
+}
+
+func (f comicPageFailure) Message() string {
+	if f.Err == nil {
+		return ""
+	}
+	return f.Err.Error()
+}
+
+// comicPageWorkError 聚合本轮所有页级失败。调用方据此写 pageLedger，
+// 而不是只看第一条错误。
+type comicPageWorkError struct {
+	Failures []comicPageFailure
+}
+
+func (e *comicPageWorkError) Error() string {
+	if e == nil || len(e.Failures) == 0 {
+		return ""
+	}
+	if len(e.Failures) == 1 {
+		return fmt.Sprintf("%s 生成失败: %v", e.Failures[0].Label, e.Failures[0].Err)
+	}
+	return fmt.Sprintf("%d 个漫画页生成失败（首个：%s: %v）",
+		len(e.Failures), e.Failures[0].Label, e.Failures[0].Err)
+}
+
+func (e *comicPageWorkError) Unwrap() error {
+	if e == nil || len(e.Failures) == 0 {
+		return nil
+	}
+	return e.Failures[0].Err
+}
+
+func (e *comicPageWorkError) videoIDs() map[string]struct{} {
+	ids := make(map[string]struct{}, len(e.Failures))
+	for _, failure := range e.Failures {
+		ids[failure.VideoID] = struct{}{}
+	}
+	return ids
+}
+
+// runComicPageWork 快速失败 + 跳过继续：任一页失败只记账，不阻塞兄弟页，
+// 也不 cancel 队列。失败页由调用方写入页级账本，下一轮只补未完成的页。
 func runComicPageWork(ctx context.Context, work []comicPageWorkItem, concurrency int, generate func(context.Context, comicPageWorkItem) error) error {
 	if concurrency < 1 {
 		concurrency = 1
 	}
-	queueCtx, stopQueue := context.WithCancel(ctx)
-	defer stopQueue()
 	sem := make(chan struct{}, concurrency)
 	var workers sync.WaitGroup
 	var resultMu sync.Mutex
-	var firstErr error
+	failures := make([]comicPageFailure, 0)
 	for _, item := range work {
 		item := item
 		workers.Add(1)
@@ -62,32 +111,33 @@ func runComicPageWork(ctx context.Context, work []comicPageWorkItem, concurrency
 			defer workers.Done()
 			select {
 			case sem <- struct{}{}:
-			case <-queueCtx.Done():
+			case <-ctx.Done():
 				return
 			}
 			defer func() { <-sem }()
-			if queueCtx.Err() != nil {
+			if ctx.Err() != nil {
 				return
 			}
 			if err := generate(ctx, item); err != nil {
+				disposition := classifyAutomationFailure(err, "comic_images")
 				resultMu.Lock()
-				// 内容审核拒绝和“该页仍在生成中”都不属于永久失败：前者已由
-				// 调用方跳过，后者是上一轮 detached worker 还没释放页面锁。
-				// 中止整本会让这些在途任务变成下一轮的 revision conflict，
-				// 所以这里继续跑完其它页，最后再由合集校验决定是否补页。
-				if !errors.Is(err, errShuihuoImageContentPolicy) && !comicPageGenerationInFlightError(err) && firstErr == nil {
-					firstErr = err
-					stopQueue()
-				}
+				failures = append(failures, comicPageFailure{
+					VideoID: item.page.ID,
+					Label:   item.page.Label,
+					Code:    disposition.Code,
+					Err:     err,
+				})
 				resultMu.Unlock()
 			}
 		}()
 	}
 	workers.Wait()
 	resultMu.Lock()
-	err := firstErr
-	resultMu.Unlock()
-	return err
+	defer resultMu.Unlock()
+	if len(failures) == 0 {
+		return nil
+	}
+	return &comicPageWorkError{Failures: append([]comicPageFailure(nil), failures...)}
 }
 
 // A single-page generation can legitimately take longer than an HTTP request
@@ -776,18 +826,46 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 			completedPages++
 		}
 	}
-	work := make([]comicPageWorkItem, 0, len(generationVideos))
-	for pageIndex, page := range generationVideos {
-		if comicPageHasPrimary(existingPages, page.ID) {
+	// 已完成的页直接移出工作集：重试是续跑，不是重来。
+	continuation := buildComicPageContinuation(generationVideos, existingPages)
+	indexByVideoID := make(map[string]int, len(generationVideos))
+	for index, page := range generationVideos {
+		indexByVideoID[page.ID] = index
+	}
+	failedPageIDs := make(map[string]struct{})
+	failures := make([]comicPageFailure, 0)
+	collectPageFailures := func(err error) bool {
+		var workErr *comicPageWorkError
+		if !errors.As(err, &workErr) {
+			return false
+		}
+		for _, failure := range workErr.Failures {
+			if _, exists := failedPageIDs[failure.VideoID]; exists {
+				continue
+			}
+			failedPageIDs[failure.VideoID] = struct{}{}
+			failures = append(failures, failure)
+		}
+		return true
+	}
+	work := make([]comicPageWorkItem, 0, len(continuation.Pending))
+	for _, page := range continuation.Pending {
+		// 缺提示词的页只登记该页，不再中止整本；其余页照常出图。
+		if strings.TrimSpace(page.ComicPrompt) == "" || strings.TrimSpace(page.ComicImagePrompt) == "" {
+			message := fmt.Sprintf("%s 还没有漫画提示词", page.Label)
+			if strings.TrimSpace(page.ComicPrompt) != "" {
+				message = fmt.Sprintf("%s 缺少独立的图片提示词", page.Label)
+			}
+			failures = append(failures, comicPageFailure{
+				VideoID: page.ID,
+				Label:   page.Label,
+				Code:    automationCodePromptMissing,
+				Err:     fmt.Errorf("%w: %s", batchfactoryv11.ErrConflict, message),
+			})
+			failedPageIDs[page.ID] = struct{}{}
 			continue
 		}
-		if strings.TrimSpace(page.ComicPrompt) == "" {
-			return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: %s 还没有漫画提示词", batchfactoryv11.ErrConflict, page.Label)
-		}
-		if strings.TrimSpace(page.ComicImagePrompt) == "" {
-			return batchfactoryv11.ComicCollection{}, fmt.Errorf("%w: %s 缺少独立的图片提示词", batchfactoryv11.ErrConflict, page.Label)
-		}
-		work = append(work, comicPageWorkItem{index: pageIndex, page: page})
+		work = append(work, comicPageWorkItem{index: indexByVideoID[page.ID], page: page})
 	}
 	// A single book used to generate every page serially, which made the
 	// "立即执行" flow look stuck even though the provider was working. Keep
@@ -835,7 +913,7 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 			return nil
 		})
 	}
-	if err = runPages(work); err != nil {
+	if err = runPages(work); err != nil && !collectPageFailures(err) {
 		return batchfactoryv11.ComicCollection{}, err
 	}
 	// Re-read after concurrent writes so collection creation sees every page
@@ -844,9 +922,10 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 	if err != nil {
 		return batchfactoryv11.ComicCollection{}, err
 	}
-	// 补图轮：首轮被在途页锁跳过的页面，等待在途 worker 释放锁后只补缺页，
-	// 避免单页锁冲突直接把整本打成缺页失败。
-	if missingWork := missingComicPageWorkItems(generationVideos, existingPages); len(missingWork) > 0 {
+	// 补图轮：只补因在途页锁跳过的页。本轮已经真实失败的页不再原地重试，
+	// 它们只记账，等下一轮续跑或达到阈值后进入重试队列。
+	missingWork := filterFailedComicPageWork(missingComicPageWorkItems(generationVideos, existingPages), failedPageIDs)
+	if len(missingWork) > 0 {
 		if progress != nil {
 			progress("comic_images", fmt.Sprintf("有 %d 页因在途锁暂未生成，等待后自动补齐缺失页", len(missingWork)))
 		}
@@ -869,10 +948,10 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 			if existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID); err != nil {
 				return batchfactoryv11.ComicCollection{}, err
 			}
-			missingWork = missingComicPageWorkItems(generationVideos, existingPages)
+			missingWork = filterFailedComicPageWork(missingComicPageWorkItems(generationVideos, existingPages), failedPageIDs)
 		}
 		if len(missingWork) > 0 {
-			if err = runPages(missingWork); err != nil {
+			if err = runPages(missingWork); err != nil && !collectPageFailures(err) {
 				return batchfactoryv11.ComicCollection{}, err
 			}
 			if existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID); err != nil {
@@ -886,14 +965,21 @@ func (g comicPageGenerator) generateBook(ctx context.Context, owner, batchID, bo
 		if err != nil {
 			return batchfactoryv11.ComicCollection{}, err
 		}
-		if missingWork := missingComicPageWorkItems(generationVideos, existingPages); len(missingWork) > 0 {
-			if err = runPages(missingWork); err != nil {
+		missingWork = filterFailedComicPageWork(missingComicPageWorkItems(generationVideos, existingPages), failedPageIDs)
+		if len(missingWork) > 0 {
+			if err = runPages(missingWork); err != nil && !collectPageFailures(err) {
 				return batchfactoryv11.ComicCollection{}, err
 			}
 			if existingPages, err = comicStore.ListComicPages(ctx, owner, batchID, bookID); err != nil {
 				return batchfactoryv11.ComicCollection{}, err
 			}
 		}
+	}
+	// 本轮有真实页级失败：返回聚合错误让调用方写 pageLedger，而不是把它
+	// 伪装成“缺图成功”或只保留第一条错误。
+	if len(failures) > 0 {
+		sort.SliceStable(failures, func(i, j int) bool { return failures[i].VideoID < failures[j].VideoID })
+		return batchfactoryv11.ComicCollection{}, &comicPageWorkError{Failures: failures}
 	}
 	if progress != nil {
 		progress("comic_images", fmt.Sprintf("图片已全部生成（%d/%d），正在整理漫画合集", completedPages, totalPages))

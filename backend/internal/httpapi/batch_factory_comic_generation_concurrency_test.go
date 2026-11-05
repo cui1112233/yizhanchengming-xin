@@ -15,7 +15,8 @@ func TestShuihuoImageGenerationConcurrencyDefaultsToTwo(t *testing.T) {
 	}
 }
 
-func TestRunComicPageWorkKeepsInFlightPageWhenAnotherPageFails(t *testing.T) {
+// 页级隔离：一页失败后，排队页必须继续执行，不能被 stopQueue 掐断。
+func TestRunComicPageWorkContinuesQueuedPagesAfterFailure(t *testing.T) {
 	work := []comicPageWorkItem{{index: 0}, {index: 1}, {index: 2}}
 	startedTwo := make(chan struct{})
 	releaseFirst := make(chan struct{})
@@ -47,15 +48,19 @@ func TestRunComicPageWorkKeepsInFlightPageWhenAnotherPageFails(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("two pages did not start")
 	}
-	time.Sleep(20 * time.Millisecond)
-	if got := calls.Load(); got != 2 {
-		t.Fatalf("started pages=%d, want queued page to remain stopped after failure", got)
+	deadline := time.Now().Add(time.Second)
+	for calls.Load() != 3 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Fatalf("started pages=%d, want queued page to keep running after failure", got)
 	}
 	close(releaseFirst)
 	select {
 	case err := <-result:
-		if err == nil || err.Error() != "provider failed" {
-			t.Fatalf("result error=%v, want provider failure", err)
+		var pageErr *comicPageWorkError
+		if !errors.As(err, &pageErr) || len(pageErr.Failures) != 1 || pageErr.Failures[0].Err.Error() != "provider failed" {
+			t.Fatalf("result error=%v, want aggregated provider failure", err)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("in-flight page did not finish")
@@ -75,8 +80,12 @@ func TestRunComicPageWorkContinuesAfterContentPolicyRejection(t *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("content policy should skip one page and continue: %v", err)
+	var pageErr *comicPageWorkError
+	if !errors.As(err, &pageErr) || len(pageErr.Failures) != 1 {
+		t.Fatalf("content policy should be recorded as one page failure, got %v", err)
+	}
+	if pageErr.Failures[0].Code != automationCodeContentPolicy {
+		t.Fatalf("failure code=%s, want %s", pageErr.Failures[0].Code, automationCodeContentPolicy)
 	}
 	if got := calls.Load(); got != 2 {
 		t.Fatalf("generated pages=%d, want both pages attempted", got)
