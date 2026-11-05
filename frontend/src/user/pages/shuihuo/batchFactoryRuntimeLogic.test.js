@@ -94,6 +94,25 @@ test('a previous version stays selectable when the active record has no media', 
   assert.equal(versions[0].mediaUrl, 'https://video/old.mp4');
 });
 
+test('videoHistory media fields keep an orphaned version playable when production status is missing it', () => {
+  const book = {
+    id: 'book-history-media',
+    videos: [{ id: 'v-active', ordinal: 0 }],
+    videoHistory: [{
+      id: 'v-old', ordinal: 0, compatibilityState: 'orphaned',
+      productionTaskId: 'task-old', mediaUrl: 'https://cdn.example/v-old.mp4',
+      provider: 'doubao', succeeded: true, generatedAt: '2026-11-04T09:00:00Z'
+    }]
+  };
+  const versions = bookVideoVersions(book, { jobs: [] }).get('v-active');
+  assert.equal(versions.length, 1);
+  // 合成版本必须使用生产任务 id，saveVideoOverride 的 primaryMediaTaskId 才能落库。
+  assert.equal(versions[0].id, 'task-old');
+  assert.equal(versions[0].videoId, 'v-old');
+  assert.equal(versions[0].mediaUrl, 'https://cdn.example/v-old.mp4');
+  assert.equal(versions[0].isHistory, true);
+});
+
 test('the active version and the previous version are listed together', () => {
   const book = {
     id: 'book-1',

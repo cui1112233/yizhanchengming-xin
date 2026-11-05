@@ -284,6 +284,8 @@ func NewRouter(options RouterOptions) http.Handler {
 			mergeReader = candidate
 		}
 		registerMergeRoutes(v11, mergeStatus, options.LocalArtifacts, options.MergeOutput, mergeReader, options.Merge != nil && options.Slice >= 5)
+		registerMergeMediaTokenRoute(v11, "v11", mergeStatus, options.BridgeSecret, options.Now)
+		registerMergeMediaTokenRoute(v12, "v12", mergeStatus, options.BridgeSecret, options.Now)
 	}
 	if options.External != nil && options.Slice >= 6 {
 		registerExternalRoutes(v11, options.External)
@@ -519,10 +521,21 @@ func NewRouter(options RouterOptions) http.Handler {
 		registerChatRoute(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
 		registerScriptDirectorPipelineCompat(root, auth, options.TextProvider, options.PresetCatalog, options.PersonalPromptStore)
 	}
+	v11Root := auth.Middleware(capabilityNotFoundHandler(v11))
+	v12Root := auth.Middleware(capabilityNotFoundHandler(v12))
 	if legacyV11Public() {
-		root.Handle("/api/batch-factory/v11/", auth.Middleware(capabilityNotFoundHandler(v11)))
+		root.Handle("/api/batch-factory/v11/", v11Root)
 	}
-	root.Handle("/api/batch-factory/v12/", auth.Middleware(capabilityNotFoundHandler(v12)))
+	root.Handle("/api/batch-factory/v12/", v12Root)
+	// A native <video> element cannot attach the Authorization header, so the
+	// signed-token playback path is registered as an exact root route. Requests
+	// without a token keep falling through to the normal authenticated handler.
+	if mergeStatus != nil {
+		registerMergeMediaPublicRoute(root, "v12", v12Root, mergeStatus, options.LocalArtifacts, mergeReader, options.BridgeSecret, options.Now)
+		if legacyV11Public() {
+			registerMergeMediaPublicRoute(root, "v11", v11Root, mergeStatus, options.LocalArtifacts, mergeReader, options.BridgeSecret, options.Now)
+		}
+	}
 	if options.NovelFetchStore != nil {
 		RegisterShuihuoAccountAIConfigCompat(root, auth, options.NovelFetchStore)
 	}

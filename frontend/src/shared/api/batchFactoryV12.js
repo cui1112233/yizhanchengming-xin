@@ -125,6 +125,42 @@ export function getProductionMediaBlob(mediaUrl) {
   return apiRequest(path, { responseType: 'blob' });
 }
 
+const MERGE_MEDIA_PARTS_PATTERN = /^\/api\/batch-factory\/v1[12]\/batches\/([^/]+)\/merge-media\/([^/]+)$/;
+
+function mergeMediaParts(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'http://qiantie.local';
+  try {
+    const parsed = new URL(raw, origin);
+    if (typeof window !== 'undefined' && window.location?.origin && parsed.origin !== window.location.origin) return null;
+    const match = parsed.pathname.match(MERGE_MEDIA_PARTS_PATTERN);
+    return match ? { batchId: match[1], artifactId: match[2] } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export function isMergeMediaURL(value) {
+  return Boolean(mergeMediaParts(value));
+}
+
+// Native <video> elements cannot attach the Authorization header. Mint a
+// short-lived signed URL so the browser can stream the merge artifact with
+// Range requests instead of downloading the whole file into a Blob first.
+export async function getMergeMediaPlaybackURL(mediaUrl) {
+  const parts = mergeMediaParts(mediaUrl);
+  if (!parts) throw new Error('合成成片地址无效');
+  const payload = await apiRequest(`/api/batch-factory/v12/batches/${id(parts.batchId)}/merge-media/${id(parts.artifactId)}/token`, {
+    method: 'POST',
+    silent: true,
+    suppressGlobalError: true
+  });
+  const playbackUrl = String(payload?.url || '').trim();
+  if (!playbackUrl) throw new Error('服务端未返回可播放的合成成片地址');
+  return playbackUrl;
+}
+
 export function isBatchFactoryMergeCoverURL(value) {
   return Boolean(mergeCoverRequestPath(value));
 }

@@ -83,22 +83,29 @@ type Video struct {
 	// VideoPrompt is the Director/video-motion instruction compiled for the
 	// video model. VisualPrompt is deliberately separate and only drives the
 	// optional still-image generation chain.
-	VideoPrompt           string              `json:"videoPrompt,omitempty"`
-	AIOriginalVideoPrompt string              `json:"aiOriginalVideoPrompt,omitempty"`
-	VisualPrompt          string              `json:"visualPrompt,omitempty"`
-	ComicPrompt           string              `json:"comicPrompt,omitempty"`
-	ComicImagePrompt      string              `json:"comicImagePrompt,omitempty"`
-	ComicRoles            []string            `json:"comicRoles,omitempty"`
-	ComicRoleStage        map[string]string   `json:"comicRoleStage,omitempty"`
-	ComicScenePresets     []string            `json:"comicScenePresets,omitempty"`
-	DurationSeconds       float64             `json:"durationSeconds,omitempty"`
+	VideoPrompt           string            `json:"videoPrompt,omitempty"`
+	AIOriginalVideoPrompt string            `json:"aiOriginalVideoPrompt,omitempty"`
+	VisualPrompt          string            `json:"visualPrompt,omitempty"`
+	ComicPrompt           string            `json:"comicPrompt,omitempty"`
+	ComicImagePrompt      string            `json:"comicImagePrompt,omitempty"`
+	ComicRoles            []string          `json:"comicRoles,omitempty"`
+	ComicRoleStage        map[string]string `json:"comicRoleStage,omitempty"`
+	ComicScenePresets     []string          `json:"comicScenePresets,omitempty"`
+	DurationSeconds       float64           `json:"durationSeconds,omitempty"`
 	// Ordinal 是这个分镜在书内的顺序。历史轮次（orphaned）记录也带 ordinal，
 	// 前端据此把上一轮已生成成功的视频挂回同一个分镜。
-	Ordinal               int                 `json:"ordinal"`
-	CompatibilityState    string              `json:"compatibilityState"`
-	Revision              int64               `json:"revision"`
-	SettingsState         SettingsState       `json:"settingsState"`
-	ComicSourceSegment    *ComicSourceSegment `json:"comicSourceSegment,omitempty"`
+	Ordinal            int    `json:"ordinal"`
+	CompatibilityState string `json:"compatibilityState"`
+	// 历史槽位（orphaned）补齐可播放信息：前端无需再依赖生产任务列表就能
+	// 预览、播放并把该任务设为主版本。active 槽位不填这些字段。
+	MediaURL           string              `json:"mediaUrl,omitempty"`
+	ProductionTaskID   string              `json:"productionTaskId,omitempty"`
+	Provider           string              `json:"provider,omitempty"`
+	Succeeded          bool                `json:"succeeded"`
+	GeneratedAt        time.Time           `json:"generatedAt,omitempty"`
+	Revision           int64               `json:"revision"`
+	SettingsState      SettingsState       `json:"settingsState"`
+	ComicSourceSegment *ComicSourceSegment `json:"comicSourceSegment,omitempty"`
 }
 type Book struct {
 	ID                  string            `json:"id"`

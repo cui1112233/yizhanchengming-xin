@@ -224,24 +224,11 @@ func n8ImagesAlreadyUploadedError(text string) bool {
 }
 
 func normalizeAutomationJobCounts(job map[string]any, books map[string]any) {
-	failed, running, ready, pending := 0, 0, 0, 0
-	for _, raw := range books {
-		entry, _ := raw.(map[string]any)
-		if entry == nil {
-			continue
-		}
-		switch automationStringValue(entry["status"], "") {
-		case "completed":
-			ready++
-		case "running":
-			running++
-		case "scheduled":
-			pending++
-		case "failed", "blocked", "stopped":
-			failed++
-		}
-	}
-	job["counts"] = map[string]any{"total": len(books), "ready": ready, "running": running, "pending": pending, "failed": failed, "blocked": 0}
+	counts := automationCountsFromBooks(books)
+	job["counts"] = counts
+	failed := automationNumberValue(counts["failed"], 0)
+	running := automationNumberValue(counts["running"], 0) + automationNumberValue(counts["queued"], 0)
+	pending := automationNumberValue(counts["pending"], 0)
 	if failed > 0 {
 		job["state"] = "failed"
 	} else if running > 0 {
@@ -316,6 +303,11 @@ func publicAutomationJob(job map[string]any) map[string]any {
 	}
 	if strings.TrimSpace(toString(result["runMode"])) == "" {
 		result["runMode"] = "video_no_submit"
+	}
+	if rawBooks, ok := job["books"].(map[string]any); ok && len(rawBooks) > 0 && strings.TrimSpace(toString(job["state"])) != "stopped" {
+		// 旧 job 的 counts 可能停留在启动快照；这里按 books 的实际状态重新派生，
+		// 保证一本书失败/完成后状态接口立即反映。
+		result["counts"] = automationCountsFromBooks(rawBooks)
 	}
 	if result["counts"] == nil {
 		result["counts"] = idleAutomationCounts()

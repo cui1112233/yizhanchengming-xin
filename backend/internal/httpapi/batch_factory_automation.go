@@ -433,6 +433,76 @@ func automationRetryResumeStage(stage string) string {
 	}
 }
 
+// deterministicAutomationFailure 识别同一请求重试也不会成功的上游错误：
+// 401/402/403/400/404/422、余额不足/欠费文案、参数或配置错误。超时、429
+// 和 5xx 仍是瞬时错误，必须继续保留回补能力。
+func deterministicAutomationFailure(err error) bool {
+	if err == nil || errors.Is(err, errProductionInFlight) || errors.Is(err, batchfactoryv11.ErrConflict) {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	for _, token := range []string{
+		"余额不足", "insufficient balance", "balance pre-deduction insufficient",
+		"payment required", "http 401", "http 402", "http 403",
+	} {
+		if strings.Contains(message, token) {
+			return true
+		}
+	}
+	// retryableComicAutomationError 已把 400/401/402/403/404/422、ErrInvalid、
+	// ErrNotFound、ErrUnavailable 判为永久错误，把 408/429/5xx 判为可重试。
+	return !retryableComicAutomationError(err)
+}
+
+// markDeterministicAutomationFailure 把确定性错误立即落为终态失败，并清掉
+// 回补标记。返回 true 时调用方必须跳过 scheduleAutomationBatchEndRetry /
+// enqueueBatchRetry，避免整书重跑再次提交付费任务。
+func markDeterministicAutomationFailure(entry map[string]any, stage string, err error, message string, now time.Time) bool {
+	if entry == nil || !deterministicAutomationFailure(err) {
+		return false
+	}
+	entry["status"], entry["stage"], entry["error"], entry["message"], entry["updatedAt"] = "failed", stage, err.Error(), message+"：确定性失败，跳过回补", now
+	delete(entry, "batchRetryPending")
+	delete(entry, "retryAt")
+	delete(entry, "retryRequested")
+	appendAutomationBookLog(entry, now, stage, "确定性失败，跳过回补")
+	return true
+}
+
+// markAutomationBookQueued 把等待并发槽位的书切换为真实排队态。回补书只改
+// status/message，保留失败阶段与 batchRetryCount，供拿到槽位后 resumeStage
+// 从失败阶段续跑。
+func markAutomationBookQueued(entry map[string]any, now time.Time) bool {
+	if entry == nil {
+		return false
+	}
+	if automationStringValue(entry["status"], "") == "running" {
+		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "queued", "queued", "排队中，等待并发槽位", now
+		return true
+	}
+	if automationBoolValue(entry["batchRetryPending"]) {
+		entry["status"], entry["message"], entry["updatedAt"] = "queued", "排队中，等待并发槽位后回补", now
+		return true
+	}
+	return false
+}
+
+// markAutomationBookStarted 在真正拿到并发槽位后把书切回运行态。回补书走
+// prepareAutomationBookRetry，保证从失败阶段续跑而不是从头重做。
+func markAutomationBookStarted(entry map[string]any, now time.Time) bool {
+	if entry == nil {
+		return false
+	}
+	if automationBoolValue(entry["batchRetryPending"]) {
+		return prepareAutomationBookRetry(entry, automationNumberValue(entry["batchRetryCount"], 0), now)
+	}
+	if automationStringValue(entry["status"], "") == "queued" {
+		entry["status"], entry["stage"], entry["message"], entry["updatedAt"] = "running", "assets", "并发槽位已获得，开始执行", now
+		return true
+	}
+	return false
+}
+
 // scheduleAutomationBatchEndRetry 把本书登记为“已跳过，等待批次末尾回补”。
 // 返回 false 表示回补预算已用完，调用方应把本书置为终态失败。
 func scheduleAutomationBatchEndRetry(entry map[string]any, stage string, err error, message string, round int, now time.Time) bool {
@@ -971,7 +1041,34 @@ func (c *BatchAutomationCoordinator) ResumeInterruptedJobs(ctx context.Context) 
 }
 
 func automationCounts(total, running, failed, ready int) map[string]any {
-	return map[string]any{"total": total, "ready": ready, "running": running, "pending": 0, "failed": failed, "blocked": 0}
+	return map[string]any{"total": total, "ready": ready, "running": running, "queued": 0, "pending": 0, "failed": failed, "blocked": 0}
+}
+
+// automationCountsFromBooks 按持久化的书籍条目实时统计汇总数字。运行中的
+// 任务不能用启动时的快照，否则一本失败后仍会显示 failed:0。
+func automationCountsFromBooks(books map[string]any) map[string]any {
+	counts := map[string]any{"total": len(books), "ready": 0, "running": 0, "queued": 0, "pending": 0, "failed": 0, "blocked": 0}
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "completed":
+			counts["ready"] = counts["ready"].(int) + 1
+		case "running":
+			counts["running"] = counts["running"].(int) + 1
+		case "queued":
+			counts["queued"] = counts["queued"].(int) + 1
+		case "scheduled", "pending_confirmation":
+			counts["pending"] = counts["pending"].(int) + 1
+		case "blocked":
+			counts["blocked"] = counts["blocked"].(int) + 1
+		case "failed", "stopped":
+			counts["failed"] = counts["failed"].(int) + 1
+		}
+	}
+	return counts
 }
 
 // selectedAutomationBooks 让后续“添加书籍”只创建新增书的任务。若重新启动
@@ -1126,7 +1223,9 @@ func (c *BatchAutomationCoordinator) Start(ctx context.Context, owner, batchID s
 	}
 	books := job["books"].(map[string]any)
 	for _, book := range targetBooks {
-		status, stage, message := "running", "assets", "Go 自动化已接管"
+		// 还没有拿到并发槽位的书必须如实写 queued；前端只在 status=queued
+		// 时显示“排队中”。真正开始执行时由队列循环迁移到 running/assets。
+		status, stage, message := "queued", "queued", "排队中，等待并发槽位"
 		if initialState == "scheduled" {
 			status, stage, message = "scheduled", "scheduled", "等待北京时间到点后开始生产"
 		}
@@ -2223,12 +2322,12 @@ func (c *BatchAutomationCoordinator) ensureAudioPlan(ctx context.Context, owner,
 		estimatedRaw, _ := json.Marshal(estimated)
 		_, err = c.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBook, BatchID: batchID, BookID: book.ID}, batchfactoryv11.SettingsUpdate{
 			Patch: batchfactoryv11.SettingsPatch{
-				"audioPlanningEnabled": enabledRaw,
-				"audioDurationSeconds": totalRaw,
+				"audioPlanningEnabled":   enabledRaw,
+				"audioDurationSeconds":   totalRaw,
 				"audioDurationEstimated": estimatedRaw,
-				"audioLineDurations":   lineRaw,
-				"ttsFingerprint":       json.RawMessage(fmt.Sprintf("%q", func() string { digest := hash.Sum(nil); return fmt.Sprintf("tts-%x", digest[:12]) }())),
-				"ttsAudioArtifactId":   json.RawMessage(fmt.Sprintf("%q", artifactID)),
+				"audioLineDurations":     lineRaw,
+				"ttsFingerprint":         json.RawMessage(fmt.Sprintf("%q", func() string { digest := hash.Sum(nil); return fmt.Sprintf("tts-%x", digest[:12]) }())),
+				"ttsAudioArtifactId":     json.RawMessage(fmt.Sprintf("%q", artifactID)),
 			},
 			ExpectedRevision: candidate.Revision,
 		})
@@ -2348,12 +2447,37 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 		}
 		entry := cloneAutomationEntry(initialEntry)
 		jobMu.Unlock()
-		if automationBoolValue(entry["batchRetryPending"]) {
-			// 回补的书在入队时仍是 failed；真正开始执行时再切回 running。
-			prepareAutomationBookRetry(entry, automationNumberValue(entry["batchRetryCount"], 0), c.now())
+		persist := func() {
+			jobMu.Lock()
+			clear(initialEntry)
+			for key, value := range entry {
+				initialEntry[key] = value
+			}
+			books[book.ID] = initialEntry
+			job["counts"] = automationCountsFromBooks(books)
+			job["updatedAt"] = c.now()
+			_ = c.setJob(owner, batchID, jobID, job)
+			jobMu.Unlock()
+		}
+		// 并发槽位还没拿到时如实写 queued，前端才会显示“排队中”。
+		// 回补书保留原 stage/retryAt/batchRetryCount，拿到槽位后仍能续跑。
+		if markAutomationBookQueued(entry, c.now()) {
+			persist()
 		}
 		workers.Add(1)
 		semaphore <- struct{}{}
+		// 等待期间用户可能已暂停/停止；拿到槽位后以持久化状态为准，
+		// 避免用阻塞前的旧快照覆盖控制态。
+		jobMu.Lock()
+		if latest, _ := books[book.ID].(map[string]any); latest != nil {
+			if status := automationStringValue(latest["status"], ""); status == "paused" || status == "stopped" {
+				entry = cloneAutomationEntry(latest)
+			}
+		}
+		jobMu.Unlock()
+		if markAutomationBookStarted(entry, c.now()) {
+			persist()
+		}
 		go func(book batchfactoryv11.Book) {
 			defer workers.Done()
 			defer func() {
@@ -2366,16 +2490,6 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 			// The one-item loop lets every existing stage exit its own book with
 			// continue while the other book workers keep running.
 			for range [1]struct{}{} {
-				persist := func() {
-					jobMu.Lock()
-					clear(initialEntry)
-					for key, value := range entry {
-						initialEntry[key] = value
-					}
-					books[book.ID] = initialEntry
-					_ = c.setJob(owner, batchID, jobID, job)
-					jobMu.Unlock()
-				}
 				// 单本书的执行日志供前端展开查看；并发出图时多个 goroutine 会
 				// 同时上报阶段与去敏、审核拒绝、降级重试事件，因此单独加锁，
 				// 保证日志追加与持久化不并发写同一个 entry。
@@ -2401,6 +2515,13 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 							persist()
 							return
 						}
+					}
+					// 余额不足/鉴权/参数校验这类确定性错误重试也只会再烧一次付费任务，
+					// 必须立即终态失败，跳过整书回补与重新入队。
+					if markDeterministicAutomationFailure(entry, stage, err, message, c.now()) {
+						failed.Add(1)
+						persist()
+						return
 					}
 					// 还有回补预算时把本书重新入队；并发槽位一空出就立即回补，
 					// 不再等本批其余书全部跑完。

@@ -228,3 +228,20 @@ func mustJSON(value any) []byte {
 	encoded, _ := json.Marshal(value)
 	return encoded
 }
+
+func TestPublicAutomationJobDerivesCountsFromBooks(t *testing.T) {
+	job := map[string]any{
+		"id": "job-1", "batchId": "batch-1", "state": "running",
+		"counts": map[string]any{"total": 3, "ready": 0, "running": 3, "failed": 0, "blocked": 0},
+		"books": map[string]any{
+			"a": map[string]any{"status": "completed"},
+			"b": map[string]any{"status": "failed"},
+			"c": map[string]any{"status": "queued"},
+		},
+	}
+	public := publicAutomationJob(job)
+	counts, _ := public["counts"].(map[string]any)
+	if counts["ready"] != 1 || counts["failed"] != 1 || counts["queued"] != 1 || counts["running"] != 0 {
+		t.Fatalf("derived counts = %#v, want ready=1 failed=1 queued=1 running=0", counts)
+	}
+}

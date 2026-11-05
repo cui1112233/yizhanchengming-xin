@@ -988,7 +988,7 @@ export function batchFactoryPassiveMediaUrl(media) {
 }
 
 export function batchFactoryPassivePosterUrl(media) {
-  return String(
+  const explicit = String(
     media?.posterUrl
     || media?.thumbnailUrl
     || media?.coverUrl
@@ -996,6 +996,16 @@ export function batchFactoryPassivePosterUrl(media) {
     || media?.firstFrameUrl
     || ''
   ).trim();
+  if (explicit) return explicit;
+  // 合成成片优先复用 merge-cover 缩略图，避免列表把整段 mp4 当缩略图下载。
+  const mediaUrl = batchFactoryPassiveMediaUrl(media);
+  const match = mediaUrl.match(/^\/api\/batch-factory\/(v1[12])\/batches\/([^/]+)\/merge-media\/([^/?#]+)$/);
+  return match ? `/api/batch-factory/${match[1]}/batches/${match[2]}/merge-cover/${match[3]}` : '';
+}
+
+export function batchFactoryIsMergeMedia(media) {
+  const value = String(media?.outputUrl || media?.mediaUrl || '').trim();
+  return /^\/api\/batch-factory\/v1[12]\/batches\/([^/]+)\/merge-media\/([^/?#]+)$/.test(value);
 }
 
 export function batchFactoryParseMediaRatio(value, fallback = 9 / 16) {

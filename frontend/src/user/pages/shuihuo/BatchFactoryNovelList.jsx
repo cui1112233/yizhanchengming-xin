@@ -11,6 +11,7 @@ import {
   BarsOutlined,
   CloudUploadOutlined,
   CloseOutlined,
+	CopyOutlined,
 	DownloadOutlined,
   FileTextOutlined,
   LoadingOutlined,
@@ -127,7 +128,9 @@ import {
   submitBatchProduction,
   submitBookTo121,
   classifyBookPublishMetadata,
-  get121OrganizationOptions
+  get121OrganizationOptions,
+  getBatchFactoryMergeCoverBlob,
+  isBatchFactoryMergeCoverURL
 } from '../../../shared/api/batchFactory';
 import { getConfig } from '../../../shared/api/config';
 import { getCurrentAccount } from '../../../shared/api/auth';
@@ -146,7 +149,7 @@ import { assetsForProductionMode } from './batchFactoryAssetMode';
 import { comicPageErrorMessage, comicPageGenerationPayload, comicPromptForImageAspect, generateComicPageWithConflict, runComicPagePool } from './batchFactoryComicMode';
 import { batchFactoryShouldPrepareAudio, batchFactoryShouldRecompileVideoPrompts } from './batchFactoryProductionMode';
 import { ComicSourceContent } from './ComicSourceContent.jsx';
-import { batchMediaCounts as runtimeBatchMediaCounts, bookVideoVersions, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
+import { batchMediaCounts as runtimeBatchMediaCounts, batchFactoryNovelCopyText, bookVideoVersions, resolveBookEditableContent as runtimeResolveBookEditableContent, resolveBookProductionText as runtimeResolveBookProductionText } from './batchFactoryRuntimeLogic';
 import { downloadProductionContent } from './batchFactoryContentDownload.js';
 import { realVideoDurationSeconds } from './batchFactoryVideoMeta';
 import { getWorkshopPlatforms } from '../../../shared/api/novelFetchWorkshop';
@@ -165,8 +168,9 @@ import { DEFAULT_AUDIO_CATEGORIES, chooseN8Audio, producerAccountOptions, readCo
 import { ComicReferenceChips } from './ComicReferenceChips.jsx';
 import { removablePageReferences } from './comicReferenceMaterials.js';
 import {
-  batchFactoryAudioFingerprint, batchFactoryBookAudioInput, batchFactoryBookTts, generateBatchFactoryBookAudioMeasurement, blobToBase64, saveBookOverrideWithRetry, batchFactoryContentMode, batchFactorySourceVersionLabel, batchFactorySourceVersionClass, batchFactorySourceSummary, batchFactoryWorkbenchConfigRegions, value, bookPlatformName, sensitiveProcessingDetail, batchFactorySourceKind, isBatchFactoryContentReadRunning, batchFactorySourceStatus, resultData, waitForComicPageResult, waitForBookAssetImages, sameSettingsPatch, h3DirectorCards, h3DirectorDocument, formatH3DirectorCardPrompt, finalVideoPromptTemplate, requestID, stageActionKey, capability, assetName, assetDisplayLabel, assetIdentitySummary, assetPrompt, effectiveBookSettings, baseSetupEnabled, h3CompilationStatus, h3ConstraintPreview, storyboardAssetPromptText, composeStoryboardDisplayPrompt, promptPreview, selectedVideoPromptLabel, usesH3VideoPrompt, effectiveBookAssetRules, effectiveBookComicRules, decompressionCountForUpload, isBookUploadedTo121, uploadProgressForBook, completePublishMapping, hasClassificationValues, classificationLabel, classificationDetail, primaryMediaVersion, storyboardVideoLabel, bookMergeJobs, mergeJobSpeed, defaultBookMerge, latestBookMerge, readImageAsDataURL, readStoryboardAssetSelection, loadBookAssetDisplayURL, comicPageReferencePreviewURL, fileAsDataURL, withStoryboardAssetMentions, compactUnifiedAssetDescriptions, separateStoryboardAssetMentions, collapseRepeatedStoryboardAssetMentions, renderStoryboardPromptHTML, contentEditableTextOffset, contentEditablePromptText, setContentEditableTextOffset, batchFactoryPassiveMediaUrl, batchFactoryPassivePosterUrl, batchFactoryParseMediaRatio, batchFactoryMediaOrientation, batchFactoryRatioText, batchFactoryStableMediaLabel, localStartTime, localizeShotKeywords
+  batchFactoryAudioFingerprint, batchFactoryBookAudioInput, batchFactoryBookTts, generateBatchFactoryBookAudioMeasurement, blobToBase64, saveBookOverrideWithRetry, batchFactoryContentMode, batchFactorySourceVersionLabel, batchFactorySourceVersionClass, batchFactorySourceSummary, batchFactoryWorkbenchConfigRegions, value, bookPlatformName, sensitiveProcessingDetail, batchFactorySourceKind, isBatchFactoryContentReadRunning, batchFactorySourceStatus, resultData, waitForComicPageResult, waitForBookAssetImages, sameSettingsPatch, h3DirectorCards, h3DirectorDocument, formatH3DirectorCardPrompt, finalVideoPromptTemplate, requestID, stageActionKey, capability, assetName, assetDisplayLabel, assetIdentitySummary, assetPrompt, effectiveBookSettings, baseSetupEnabled, h3CompilationStatus, h3ConstraintPreview, storyboardAssetPromptText, composeStoryboardDisplayPrompt, promptPreview, selectedVideoPromptLabel, usesH3VideoPrompt, effectiveBookAssetRules, effectiveBookComicRules, decompressionCountForUpload, isBookUploadedTo121, uploadProgressForBook, completePublishMapping, hasClassificationValues, classificationLabel, classificationDetail, primaryMediaVersion, storyboardVideoLabel, bookMergeJobs, mergeJobSpeed, defaultBookMerge, latestBookMerge, readImageAsDataURL, readStoryboardAssetSelection, loadBookAssetDisplayURL, comicPageReferencePreviewURL, fileAsDataURL, withStoryboardAssetMentions, compactUnifiedAssetDescriptions, separateStoryboardAssetMentions, collapseRepeatedStoryboardAssetMentions, renderStoryboardPromptHTML, contentEditableTextOffset, contentEditablePromptText, setContentEditableTextOffset, batchFactoryPassiveMediaUrl, batchFactoryPassivePosterUrl, batchFactoryIsMergeMedia, batchFactoryParseMediaRatio, batchFactoryMediaOrientation, batchFactoryRatioText, batchFactoryStableMediaLabel, localStartTime, localizeShotKeywords
 } from './batchFactoryNovelListHelpers.js';
+import { automationFailureSummaryContent, collectNewAutomationFailures } from './batchFactoryFailureNotice.js';
 
 
 
@@ -218,6 +222,20 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
   const selectedCount = selectedBookIds.length;
   const toggleAll = checked => onSelectionChange(checked ? books.map(book => book.id) : []);
   const pendingContentBooks = books.filter(isBatchFactoryContentReadRunning);
+  const copyAllBooks = async event => {
+    event?.stopPropagation?.();
+    if (!books.length) {
+      message.warning('当前批次没有可复制的小说');
+      return;
+    }
+    const text = batchFactoryNovelCopyText(books, platformNames);
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(`已复制 ${books.length} 本书`);
+    } catch (error) {
+      message.error('复制失败，请检查浏览器剪贴板权限后重试');
+    }
+  };
   return <div className="batch-factory-novel-list batch-factory-novel-fetch-list batch-factory-novel-list-v13" role="table" aria-label="小说列表">
     {pendingContentBooks.length ? <div className="batch-factory-novel-pending-strip is-summary" role="status">
       <span className="batch-factory-novel-pending-count">正在后台读取 {pendingContentBooks.length} 本正文，详细状态和恢复操作请看对应书籍的“入厂内容”。</span>
@@ -231,7 +249,19 @@ function NovelMetadata({ books, createdAt, selectedBookIds, onSelectionChange, o
     </div>
     <div className="batch-factory-novel-list-head" role="row">
       <span className="is-order">#</span>
-      <span>小说</span><span>入厂内容</span><span>风格</span><span>男女频</span><span>状态</span><span>操作</span>
+      <span className="is-novel-head">
+        <span>小说</span>
+        <Tooltip title="复制全部书名 / 书城ID / 书城">
+          <Button
+            type="text"
+            size="small"
+            className="batch-factory-copy-books"
+            aria-label="复制全部书名 / 书城ID / 书城"
+            icon={<CopyOutlined />}
+            onClick={copyAllBooks}
+          />
+        </Tooltip>
+      </span><span>入厂内容</span><span>风格</span><span>男女频</span><span>状态</span><span>操作</span>
     </div>
     {books.map((book, index) => {
       const row = batchFactoryNovelTableRow(book, index, createdAt, { productionStatus, mergeStatus, stageSummary: stageSummaries?.[book.id] });
@@ -1583,7 +1613,39 @@ function PassiveMediaPoster({ className = 'batch-factory-media-poster', label, d
   return <span className={className} role="img" aria-label={label}><PictureOutlined /><b>{label}</b><small>{detail}</small></span>;
 }
 
+// merge-cover 需要鉴权头，<img> 无法直接携带。这里用已鉴权的 API 客户端
+// 取小尺寸封面 blob，并按 URL 模块级缓存，避免列表和版本面板重复请求。
+const mergeCoverCache = new Map();
 
+function loadMergeCoverObjectURL(url) {
+  const cached = mergeCoverCache.get(url);
+  if (cached) return cached;
+  const pending = getBatchFactoryMergeCoverBlob(url).then(blob => {
+    if (typeof URL?.createObjectURL !== 'function') throw new Error('当前浏览器无法创建封面预览地址');
+    if (mergeCoverCache.size >= 64) mergeCoverCache.delete(mergeCoverCache.keys().next().value);
+    return URL.createObjectURL(blob);
+  }).catch(error => {
+    mergeCoverCache.delete(url);
+    throw error;
+  });
+  mergeCoverCache.set(url, pending);
+  return pending;
+}
+
+function MergeCoverThumb({ url, label, alt = '' }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setSrc('');
+    if (!url) return undefined;
+    loadMergeCoverObjectURL(url)
+      .then(objectURL => { if (!cancelled) setSrc(objectURL); })
+      .catch(() => { if (!cancelled) setSrc(''); });
+    return () => { cancelled = true; };
+  }, [url]);
+  if (!src) return <PictureOutlined aria-label={label || '封面加载中'} />;
+  return <img src={src} alt={alt || label || ''} loading="lazy" />;
+}
 
 function PassiveMediaPreview({
   media,
@@ -1594,6 +1656,7 @@ function PassiveMediaPreview({
 }) {
   const mediaUrl = batchFactoryPassiveMediaUrl(media);
   const posterUrl = batchFactoryPassivePosterUrl(media);
+  const mergeMedia = batchFactoryIsMergeMedia(media);
 
   if (!mediaUrl && !posterUrl) {
     return <PassiveMediaPoster className={className} label={label} detail={detail} />;
@@ -1620,18 +1683,23 @@ function PassiveMediaPreview({
 
   return <span className={`${className} has-media`} role="img" aria-label={label}>
     {posterUrl
-      ? <img src={posterUrl} alt="" loading="lazy" />
-      : <ProductionMediaBoundary showDownload={false}><video
-          src={mediaUrl}
-          muted
-          playsInline
-          preload="auto"
-          disablePictureInPicture
-          tabIndex={-1}
-          aria-hidden="true"
-          onLoadedMetadata={primeVideoFrame}
-          onLoadedData={ensureDecodedFrame}
-        /></ProductionMediaBoundary>}
+      ? (isBatchFactoryMergeCoverURL(posterUrl)
+        ? <MergeCoverThumb url={posterUrl} label={label} />
+        : <img src={posterUrl} alt="" loading="lazy" />)
+      : mergeMedia
+        // 合成成片绝不拿整段 mp4 当缩略图；封面不可用时只显示占位。
+        ? <PassiveMediaPoster className={className} label={label} detail={detail} />
+        : <ProductionMediaBoundary showDownload={false}><video
+            src={mediaUrl}
+            muted
+            playsInline
+            preload="metadata"
+            disablePictureInPicture
+            tabIndex={-1}
+            aria-hidden="true"
+            onLoadedMetadata={primeVideoFrame}
+            onLoadedData={ensureDecodedFrame}
+          /></ProductionMediaBoundary>}
   </span>;
 }
 
@@ -2803,11 +2871,15 @@ function MediaVersionPanel({ book, batchId, productionStatus, mergeJob, mergeJob
         </header>
         <div className="batch-factory-media-pickstation-stage">
           <div className={`batch-factory-media-pickstation-frame is-${viewerInfo.orientation}`} style={{ '--bf-media-ratio': viewerInfo.ratio }}>
+            {/* 合成成片等待首帧时先显示同一张 merge-cover，避免黑屏 0:00。 */}
+            {viewerKind === 'merge' && viewerMerge
+              ? <MergeCoverThumb url={batchFactoryPassivePosterUrl(viewerMerge)} label="合成成片封面" alt="" />
+              : null}
             {viewerUrl ? <ProductionMediaBoundary showDownload={false}><video
               key={`${viewerKind}:${viewerMerge?.id || viewerVersion?.id || ''}`}
               src={viewerUrl}
               controls
-              preload="auto"
+              preload="metadata"
               playsInline
               autoPlay={playRequested}
               onLoadedMetadata={event => primeViewerFrame(viewerKind === 'merge' ? viewerInfo.key : String(viewerVersion?.id || ''), event)}
@@ -3195,6 +3267,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   const [errorNoticeFocus, setErrorNoticeFocus] = useState({});
   const notifiedAutomationFailureRef = useRef({});
   const failureToastReadyRef = useRef(false);
+  const failureSummaryRef = useRef({ signature: '', at: 0 });
   const [automationBusy, setAutomationBusy] = useState('');
   const automationBusyAtRef = useRef(0);
   const [automationStartOpen, setAutomationStartOpen] = useState(false);
@@ -3248,55 +3321,45 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
   // 不重复弹。表单里的持久记录由下面的行内 28px 细线承担。
   useEffect(() => {
     const notified = notifiedAutomationFailureRef.current;
-    const firstPass = !failureToastReadyRef.current;
-    books.forEach(book => {
-      const entry = automationBookForCard(automationStatus, batch?.id, book.id);
-      const failed = entry && String(entry.status || '').toLowerCase() === 'failed';
-      const errorText = String(entry?.error || '').trim();
-      if (!failed || !errorText) {
-        delete notified[book.id];
-        return;
-      }
-      const signature = `${String(entry.stage || '')}:${errorText}`;
-      if (notified[book.id] === signature) return;
-      notified[book.id] = signature;
-      if (firstPass) return;
-      const stage = String(entry.stage || '').toLowerCase();
-      const stageLabel = ({
-        audio_planning: '配音与逐行时长',
-        assets: '资产处理',
-        director: '文本提示词',
-        video: '视频生成',
-        merge: '视频合成',
-        comic: '漫画分页与提示词',
-      })[stage] || String(entry.stage || '').trim() || '自动生产';
-      const content = stage === 'video'
-        ? (/ref_image_0/i.test(errorText) ? '视频生成失败 · 参考图缺失' : '视频生成失败')
-        : `${stageLabel}失败`;
-      message.error({
-        key: `batch-factory-failure-${book.id}`,
-        duration: 4.5,
-        content: (
-          <span>
-            {content}
-            <Button
-              type="link"
-              size="small"
-              style={{ marginLeft: 4, padding: 0, height: 'auto', fontSize: 12 }}
-              onClick={() => {
-                setErrorNoticeFocus(current => ({ ...current, [book.id]: signature }));
-                requestAnimationFrame(() => {
-                  document.getElementById(`batch-factory-book-error-${book.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                });
-              }}
-            >
-              查看详情
-            </Button>
-          </span>
-        )
-      });
+    const failedEntries = collectNewAutomationFailures({
+      books,
+      automationStatus,
+      batchId: batch?.id,
+      notified,
+      firstPass: !failureToastReadyRef.current,
+      resolveEntry: automationBookForCard
     });
     failureToastReadyRef.current = true;
+    if (!failedEntries.length) return;
+    const first = failedEntries[0];
+    const content = automationFailureSummaryContent(failedEntries);
+    // 同一批失败只保留一条汇总提示：N 本书失败 = 1 条，不再逐本堆叠遮挡。
+    const summarySignature = `${failedEntries.length}:${failedEntries.map(item => item.signature).join('|')}`;
+    const now = Date.now();
+    if (failureSummaryRef.current.signature === summarySignature && now - failureSummaryRef.current.at < 15000) return;
+    failureSummaryRef.current = { signature: summarySignature, at: now };
+    message.error({
+      key: `batch-factory-failure-summary-${batch?.id || 'batch'}`,
+      duration: 3,
+      content: (
+        <span>
+          {content}
+          <Button
+            type="link"
+            size="small"
+            style={{ marginLeft: 4, padding: 0, height: 'auto', fontSize: 12 }}
+            onClick={() => {
+              setErrorNoticeFocus(current => ({ ...current, [first.book.id]: first.signature }));
+              requestAnimationFrame(() => {
+                document.getElementById(`batch-factory-book-error-${first.book.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              });
+            }}
+          >
+            查看详情
+          </Button>
+        </span>
+      )
+    });
   }, [automationStatus, batch?.id, books]);
   const editingContentProductionMode = editingContentBook && effectiveBookSettings(batch, editingContentBook).productionMode === 'comic' ? 'comic' : 'video';
   useEffect(() => {
@@ -3664,6 +3727,16 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     const failed = results.flatMap((result, index) => result.status === 'rejected'
       ? [`${candidates[index]?.title || candidates[index]?.bookId || '当前小说'}：${result.reason?.message || '同步失败'}`]
       : []);
+    if (pushKeys.includes('publishSettings')) {
+      // PUT 成功不代表书级 patch 真的落下；重新拉取一次，逐本断言
+      // publishSettings 已存在，避免“提示成功但书里没有”。
+      const latestBatch = resultData(await getBatch(currentBatch.id), 'batch');
+      (latestBatch?.books || []).forEach(book => {
+        if (!Object.hasOwn(book?.settingsState?.patch || {}, 'publishSettings')) {
+          failed.push(`${book.title || book.bookId || book.id}：书级 publishSettings 未落库`);
+        }
+      });
+    }
     if (failed.length) throw new Error(`统一配置已保存，但 ${failed.length} 本小说未完成覆盖：${failed.join('；')}`);
   }
   async function saveProductionMode(value) {
@@ -3856,6 +3929,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
     let timer = null;
     // 状态接口 503 时退避：5s → 15s → 30s 封顶，避免面板打开后高频轮询并反复上报错误。
     const BACKOFF_MS = [5000, 15000, 30000];
+    const POLL_MS = 8000;
     const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
     const poll = async () => {
       if (polling) return;
@@ -3864,7 +3938,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
         const runtime = await loadRuntimeStatus({ quiet: true });
         if (!active) return;
         const next = runtime?.automation;
-        setAutomationStatus(next || { state: 'idle', counts: { total: 0, ready: 0, running: 0, pending: 0, failed: 0, blocked: 0 } });
+        setAutomationStatus(next || { state: 'idle', counts: { total: 0, ready: 0, running: 0, queued: 0, pending: 0, failed: 0, blocked: 0 } });
         if (next?.state === 'running') {
           wasRunning = true;
           await onBatchChanged?.();
@@ -3883,7 +3957,7 @@ export function BatchFactoryNovelList({ batch, onBack, onBatchChanged, openAutom
       clearTimer();
       if (document.hidden) return;
       const failures = Number(runtimeStatusFailureRef.current || 0);
-      const delay = failures > 0 ? BACKOFF_MS[Math.min(failures - 1, BACKOFF_MS.length - 1)] : 15000;
+      const delay = failures > 0 ? BACKOFF_MS[Math.min(failures - 1, BACKOFF_MS.length - 1)] : POLL_MS;
       timer = setTimeout(() => { void poll().then(schedule); }, delay);
     };
     void poll().then(schedule);

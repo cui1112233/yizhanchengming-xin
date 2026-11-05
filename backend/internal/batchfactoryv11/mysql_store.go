@@ -812,19 +812,32 @@ func (s *MySQLStore) GetBatchRuntimeIndex(ctx context.Context, owner, id string)
 		if err := videoRows.Close(); err != nil {
 			return Batch{}, err
 		}
-		// 轮询同样需要历史 ordinal，否则前端在状态刷新后会丢掉「上一版」的挂载点。
-		historyRows, err := s.db.QueryContext(ctx, `SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state<>'active' ORDER BY ordinal,updated_at DESC,id`, id, book.ID, owner)
+		// 轮询同样需要历史 ordinal 与可播信息，否则前端在状态刷新后会丢掉
+		// 「上一版」的挂载点，或只能列出槽位却无法播放。
+		historyRows, err := s.db.QueryContext(ctx, `SELECT v.id,v.ordinal,v.compatibility_state,COALESCE(t.id,''),COALESCE(t.media_url,''),COALESCE(t.provider,''),COALESCE(t.status,''),t.created_at FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_production_tasks t ON t.video_id=v.id AND t.owner_username=v.owner_username AND t.status='succeeded' AND COALESCE(t.media_url,'')<>'' AND NOT EXISTS (SELECT 1 FROM batch_factory_v12_hidden_production_tasks h WHERE h.task_id=t.id AND h.owner_username=t.owner_username) WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state<>'active' ORDER BY v.ordinal,v.updated_at DESC,v.id,t.updated_at DESC,t.created_at DESC,t.id`, id, book.ID, owner)
 		if err != nil {
 			return Batch{}, err
 		}
+		historySeen := map[string]bool{}
 		for historyRows.Next() {
-			var videoID, state string
-			var ordinal int
-			if err := historyRows.Scan(&videoID, &ordinal, &state); err != nil {
+			var video Video
+			var taskID, mediaURL, provider, taskStatus string
+			var generatedAt sql.NullTime
+			if err := historyRows.Scan(&video.ID, &video.Ordinal, &video.CompatibilityState, &taskID, &mediaURL, &provider, &taskStatus, &generatedAt); err != nil {
 				historyRows.Close()
 				return Batch{}, err
 			}
-			book.VideoHistory = append(book.VideoHistory, Video{ID: videoID, BatchID: batch.ID, BookID: book.ID, Ordinal: ordinal, CompatibilityState: state})
+			if historySeen[video.ID] {
+				continue
+			}
+			historySeen[video.ID] = true
+			video.BatchID, video.BookID = batch.ID, book.ID
+			video.ProductionTaskID, video.MediaURL, video.Provider = taskID, mediaURL, provider
+			video.Succeeded = taskStatus == string(ProductionSucceeded)
+			if generatedAt.Valid {
+				video.GeneratedAt = generatedAt.Time
+			}
+			book.VideoHistory = append(book.VideoHistory, video)
 		}
 		if err := historyRows.Err(); err != nil {
 			historyRows.Close()
@@ -1236,20 +1249,33 @@ func loadBatch(ctx context.Context, q batchQueryer, owner, id string) (Batch, er
 			return Batch{}, err
 		}
 		vrows.Close()
-		// 轮换会把上一轮视频改成 orphaned，但行和媒体都还在。这里单独取一份轻量历史记录，
-		// 让前端能把旧的成功视频继续列为「上一版」，而不是随 active 过滤一起消失。
-		hrows, err := q.QueryContext(ctx, `SELECT v.id,COALESCE(r.label,''),v.ordinal,v.compatibility_state,v.revision FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state<>'active' ORDER BY v.ordinal,v.updated_at DESC, v.id`, b.ID, b.Books[i].ID, owner)
+		// 轮换会把上一轮视频改成 orphaned，但行和媒体都还在。这里单独取一份
+		// 历史记录（含最近成功任务的可播地址），让前端能把旧的成功视频继续
+		// 列为「上一版」并直接预览/播放。
+		hrows, err := q.QueryContext(ctx, `SELECT v.id,COALESCE(r.label,''),v.ordinal,v.compatibility_state,v.revision,COALESCE(t.id,''),COALESCE(t.media_url,''),COALESCE(t.provider,''),COALESCE(t.status,''),t.created_at FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_video_records r ON r.video_id=v.id LEFT JOIN batch_factory_v12_production_tasks t ON t.video_id=v.id AND t.owner_username=v.owner_username AND t.status='succeeded' AND COALESCE(t.media_url,'')<>'' AND NOT EXISTS (SELECT 1 FROM batch_factory_v12_hidden_production_tasks h WHERE h.task_id=t.id AND h.owner_username=t.owner_username) WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state<>'active' ORDER BY v.ordinal,v.updated_at DESC,v.id,t.updated_at DESC,t.created_at DESC,t.id`, b.ID, b.Books[i].ID, owner)
 		if err != nil {
 			return Batch{}, err
 		}
+		historySeen := map[string]bool{}
 		for hrows.Next() {
 			var v Video
-			if err := hrows.Scan(&v.ID, &v.Label, &v.Ordinal, &v.CompatibilityState, &v.Revision); err != nil {
+			var taskID, mediaURL, provider, taskStatus string
+			var generatedAt sql.NullTime
+			if err := hrows.Scan(&v.ID, &v.Label, &v.Ordinal, &v.CompatibilityState, &v.Revision, &taskID, &mediaURL, &provider, &taskStatus, &generatedAt); err != nil {
 				hrows.Close()
 				return Batch{}, err
 			}
+			if historySeen[v.ID] {
+				continue
+			}
+			historySeen[v.ID] = true
 			v.BatchID = b.ID
 			v.BookID = b.Books[i].ID
+			v.ProductionTaskID, v.MediaURL, v.Provider = taskID, mediaURL, provider
+			v.Succeeded = taskStatus == string(ProductionSucceeded)
+			if generatedAt.Valid {
+				v.GeneratedAt = generatedAt.Time
+			}
 			b.Books[i].VideoHistory = append(b.Books[i].VideoHistory, v)
 		}
 		if err := hrows.Err(); err != nil {

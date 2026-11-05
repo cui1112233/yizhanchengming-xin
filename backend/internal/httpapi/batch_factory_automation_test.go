@@ -1795,6 +1795,95 @@ func TestEnsureAutomationSourceClassifiesExistingBodyBeforeProduction(t *testing
 	}
 }
 
+func TestAutomationCountsFromBooksReflectsLiveProgress(t *testing.T) {
+	books := map[string]any{
+		"a": map[string]any{"status": "completed"},
+		"b": map[string]any{"status": "failed"},
+		"c": map[string]any{"status": "running"},
+		"d": map[string]any{"status": "queued"},
+		"e": map[string]any{"status": "blocked"},
+		"f": map[string]any{"status": "scheduled"},
+	}
+	counts := automationCountsFromBooks(books)
+	for key, want := range map[string]int{"total": 6, "ready": 1, "failed": 1, "running": 1, "queued": 1, "blocked": 1, "pending": 1} {
+		if got := automationNumberValue(counts[key], -1); got != want {
+			t.Fatalf("counts[%s] = %d, want %d (counts=%#v)", key, got, want, counts)
+		}
+	}
+}
+
+func TestDeterministicAutomationFailureSkipsBatchRetry(t *testing.T) {
+	now := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
+	entry := map[string]any{"status": "running", "stage": "video", "batchRetryCount": 1}
+	err := errors.New("video provider returned HTTP 402（账户余额不足，请充值）")
+	if !markDeterministicAutomationFailure(entry, "video", err, "视频提交失败", now) {
+		t.Fatal("402 must be treated as a deterministic failure")
+	}
+	if automationStringValue(entry["status"], "") != "failed" {
+		t.Fatalf("status = %#v, want failed", entry["status"])
+	}
+	if automationNumberValue(entry["batchRetryCount"], 0) != 1 {
+		t.Fatalf("batchRetryCount = %#v, want unchanged 1", entry["batchRetryCount"])
+	}
+	if automationBoolValue(entry["batchRetryPending"]) {
+		t.Fatal("deterministic failure must not set batchRetryPending")
+	}
+	if _, ok := entry["retryAt"]; ok {
+		t.Fatal("deterministic failure must not keep retryAt")
+	}
+	logs, _ := entry["logs"].([]any)
+	if len(logs) == 0 || !strings.Contains(automationStringValue(logs[len(logs)-1].(map[string]any)["message"], ""), "确定性失败，跳过回补") {
+		t.Fatalf("logs = %#v, want 确定性失败，跳过回补", entry["logs"])
+	}
+
+	for _, transient := range []error{
+		errors.New("request timed out"),
+		errors.New("provider returned HTTP 429"),
+		errors.New("provider returned HTTP 503"),
+	} {
+		if deterministicAutomationFailure(transient) {
+			t.Fatalf("%v must remain retryable", transient)
+		}
+	}
+	if deterministicAutomationFailure(batchfactoryv11.ErrConflict) {
+		t.Fatal("ErrConflict must remain retryable")
+	}
+}
+
+func TestAutomationBookQueueTransitionIsExplicit(t *testing.T) {
+	now := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
+	entry := map[string]any{"status": "running", "stage": "assets", "updatedAt": now}
+	if !markAutomationBookQueued(entry, now) {
+		t.Fatal("running book waiting for a concurrency slot must be marked queued")
+	}
+	if automationStringValue(entry["status"], "") != "queued" || automationStringValue(entry["stage"], "") != "queued" {
+		t.Fatalf("queued entry = %#v", entry)
+	}
+	if !markAutomationBookStarted(entry, now) {
+		t.Fatal("queued book must move to running once the slot is acquired")
+	}
+	if automationStringValue(entry["status"], "") != "running" || automationStringValue(entry["stage"], "") != "assets" {
+		t.Fatalf("started entry = %#v", entry)
+	}
+
+	retry := map[string]any{"status": "failed", "stage": "video", "batchRetryPending": true, "batchRetryCount": 2}
+	if !markAutomationBookQueued(retry, now) {
+		t.Fatal("retry book waiting for a slot must be marked queued")
+	}
+	if automationStringValue(retry["stage"], "") != "video" {
+		t.Fatalf("retry stage = %#v, want preserved video stage", retry["stage"])
+	}
+	if automationNumberValue(retry["batchRetryCount"], 0) != 2 {
+		t.Fatalf("retry count = %#v, want unchanged 2", retry["batchRetryCount"])
+	}
+	if !markAutomationBookStarted(retry, now) {
+		t.Fatal("retry book must resume from its failed stage once the slot is acquired")
+	}
+	if automationStringValue(retry["stage"], "") != "video" || automationBoolValue(retry["batchRetryPending"]) {
+		t.Fatalf("retry start entry = %#v", retry)
+	}
+}
+
 func TestAutomationBooksMissingSourceReturnsOnlyBooksWithoutProductionLines(t *testing.T) {
 	books := []batchfactoryv11.Book{
 		{ID: "ready", SourceText: "第一行\n第二行"},
@@ -1878,8 +1967,8 @@ func TestReusableAutomationProductionRequiresCurrentDirectorAndCompletedMedia(t 
 
 func TestMergeAutomationPresetConfigKeepsUnifiedConfigurationOverPresetDefaults(t *testing.T) {
 	current := map[string]any{
-		"videoProvider": "yfai",
-		"videoModelId":  "seedance-2",
+		"videoProvider":   "yfai",
+		"videoModelId":    "seedance-2",
 		"publishSettings": map[string]any{"websiteProfileId": "unified-profile"},
 	}
 	config := map[string]any{

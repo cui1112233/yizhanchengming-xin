@@ -109,19 +109,33 @@ func (s *ReadbackMySQLStore) GetBatch(ctx context.Context, owner, id string) (Ba
 }
 
 // loadVideoHistory 读取本书所有非 active（被轮换成 orphaned）的视频槽位。
-// 只取轻量字段：前端要把历史成功成片挂回同一个分镜，自动化要用它判断
-// 该分镜是否已经有成功成片、从而跳过重复生成。
+// 每条历史槽位同时带上最近一次成功生产任务的 task id、可播地址、provider
+// 与生成时间，前端可直接预览/播放并设为主版本；自动化也可据此判断该分镜
+// 是否已经有成功成片、从而跳过重复生成。
 func (s *ReadbackMySQLStore) loadVideoHistory(ctx context.Context, owner, batchID, bookID string) ([]Video, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state<>'active' ORDER BY ordinal,updated_at DESC,id`, batchID, bookID, owner)
+	rows, err := s.db.QueryContext(ctx, `SELECT v.id,v.ordinal,v.compatibility_state,COALESCE(t.id,''),COALESCE(t.media_url,''),COALESCE(t.provider,''),COALESCE(t.status,''),t.created_at FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_production_tasks t ON t.video_id=v.id AND t.owner_username=v.owner_username AND t.status='succeeded' AND COALESCE(t.media_url,'')<>'' AND NOT EXISTS (SELECT 1 FROM batch_factory_v12_hidden_production_tasks h WHERE h.task_id=t.id AND h.owner_username=t.owner_username) WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state<>'active' ORDER BY v.ordinal,v.updated_at DESC,v.id,t.updated_at DESC,t.created_at DESC,t.id`, batchID, bookID, owner)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var videos []Video
+	seen := map[string]bool{}
 	for rows.Next() {
 		var video Video
-		if err := rows.Scan(&video.ID, &video.Ordinal, &video.CompatibilityState); err != nil {
+		var taskID, mediaURL, provider, taskStatus string
+		var generatedAt sql.NullTime
+		if err := rows.Scan(&video.ID, &video.Ordinal, &video.CompatibilityState, &taskID, &mediaURL, &provider, &taskStatus, &generatedAt); err != nil {
 			return nil, err
+		}
+		// 一个历史槽位可能对应多次成功任务；按 updated_at 倒序后只保留最新一条。
+		if seen[video.ID] {
+			continue
+		}
+		seen[video.ID] = true
+		video.ProductionTaskID, video.MediaURL, video.Provider = taskID, mediaURL, provider
+		video.Succeeded = taskStatus == string(ProductionSucceeded)
+		if generatedAt.Valid {
+			video.GeneratedAt = generatedAt.Time
 		}
 		videos = append(videos, video)
 	}

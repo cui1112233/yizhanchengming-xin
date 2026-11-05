@@ -521,6 +521,32 @@ func TestBuildComicPromptContractExpandsRecoveredCMPlaceholders(t *testing.T) {
 	}
 }
 
+func TestBuildComicPromptContractExposesCurrentPageForIllustratedTextPreset(t *testing.T) {
+	book := Book{ID: "book-1", Title: "图文卡", SourceText: "上一页原文。\n当前页正文。\n下一页原文。", AssetRecords: []BookAsset{{Kind: "character", Name: "林晚", Prompt: "黑发少女", Source: "comic"}}}
+	videos := []Video{
+		{ID: "page-1", Label: "漫画页 01", VideoPrompt: "上一页原文。"},
+		{ID: "page-2", Label: "漫画页 02", VideoPrompt: "当前页正文。"},
+		{ID: "page-3", Label: "漫画页 03", VideoPrompt: "下一页原文。"},
+	}
+	settings := rawSetting(t, map[string]any{"comic": map[string]any{
+		"enabled": true,
+		"body":    "单页图文卡：按 current_page 原样排版，句末补「（未完见下页）」。",
+	}})
+	contract, err := BuildComicPromptContract(book, videos, 1, DirectorSnapshot{Effective: SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": settings,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(contract.UserPrompt, `"current_page":"当前页正文。"`) {
+		t.Fatalf("user payload 未携带 current_page 当前页正文: %s", contract.UserPrompt)
+	}
+	if !strings.Contains(contract.SystemPrompt, "（未完见下页）") {
+		t.Fatalf("system prompt 未保留图文卡约束: %s", contract.SystemPrompt)
+	}
+}
+
 func TestRunComicPromptExtractionPersistsComicPromptWithoutChangingVideoPrompt(t *testing.T) {
 	store, batch, book := seedDirectorBook(t, "original", false)
 	config := map[string]any{"comic": map[string]any{"enabled": true, "scope": "all", "body": "完整竖版条漫", "constraints": []any{

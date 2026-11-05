@@ -3,11 +3,14 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,8 +19,13 @@ import (
 	"qiantie/backend/internal/batchfactoryv11"
 	"qiantie/backend/internal/ffmpegbin"
 	"qiantie/backend/internal/localartifact"
+	"qiantie/backend/internal/localexecutor"
 	"qiantie/backend/internal/mergeworker"
 )
+
+// mergeMediaTokenTTL bounds the short-lived signed URL used by the browser's
+// native <video> element, which cannot send the Authorization header.
+const mergeMediaTokenTTL = 2 * time.Hour
 
 type mergeSubmitInput struct {
 	RequestID            string  `json:"requestId"`
@@ -138,58 +146,7 @@ func registerMergeRoutes(mux *http.ServeMux, service *batchfactoryv11.MergeServi
 			writeStoreError(w, batchfactoryv11.ErrUnavailable)
 			return
 		}
-		batchID, artifactID := r.PathValue("batchId"), r.PathValue("artifactId")
-		jobs, err := repository.ListMergeJobs(r.Context(), owner, batchID)
-		if err != nil {
-			writeStoreError(w, err)
-			return
-		}
-		found := false
-		for _, job := range jobs {
-			if job.Status == batchfactoryv11.MergeSucceeded && mergeOutputMatchesArtifact(batchID, artifactID, job.OutputURL) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			writeStoreError(w, batchfactoryv11.ErrNotFound)
-			return
-		}
-		var file io.ReadCloser
-		var localFile *os.File
-		if files != nil {
-			opened, localErr := files.Open(artifactID + ".mp4")
-			if localErr == nil {
-				localFile, file = opened, opened
-			} else if !errors.Is(localErr, localartifact.ErrInvalidID) && !errors.Is(localErr, os.ErrNotExist) {
-				writeStoreError(w, batchfactoryv11.ErrUnavailable)
-				return
-			}
-		}
-		if file == nil && remote != nil {
-			file, err = remote.Open(r.Context(), artifactID)
-		}
-		if file == nil || err != nil {
-			writeStoreError(w, batchfactoryv11.ErrNotFound)
-			return
-		}
-		defer file.Close()
-		w.Header().Set("Content-Type", "video/mp4")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		// 浏览器播放器会先发 Range 请求。这里必须走 ServeContent 才能返回 206、
-		// Accept-Ranges 与 Content-Length；直接 io.Copy 会退化成 200 + chunked，
-		// 播放器无法起播，停在 0:00 黑屏并反复整包重下。
-		if seeker, ok := file.(io.ReadSeeker); ok {
-			modTime := time.Time{}
-			if localFile != nil {
-				if info, statErr := localFile.Stat(); statErr == nil {
-					modTime = info.ModTime()
-				}
-			}
-			http.ServeContent(w, r, artifactID+".mp4", modTime, seeker)
-			return
-		}
-		_, _ = io.Copy(w, file)
+		serveMergeMediaArtifact(w, r, owner, r.PathValue("batchId"), r.PathValue("artifactId"), repository, files, remote)
 	})
 	mux.HandleFunc("GET /api/batch-factory/v11/batches/{batchId}/merge-cover/{artifactId}", func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
@@ -254,6 +211,155 @@ func mergeOutputMatchesArtifact(batchID, artifactID, outputURL string) bool {
 		}
 	}
 	return false
+}
+
+func mergeMediaClock(now func() time.Time) time.Time {
+	if now != nil {
+		return now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+func findMergeArtifactJob(ctx context.Context, repository batchfactoryv11.MergeRepository, owner, batchID, artifactID string) (batchfactoryv11.MergeJob, bool, error) {
+	jobs, err := repository.ListMergeJobs(ctx, owner, batchID)
+	if err != nil {
+		return batchfactoryv11.MergeJob{}, false, err
+	}
+	for _, job := range jobs {
+		if job.Status == batchfactoryv11.MergeSucceeded && mergeOutputMatchesArtifact(batchID, artifactID, job.OutputURL) {
+			return job, true, nil
+		}
+	}
+	return batchfactoryv11.MergeJob{}, false, nil
+}
+
+// mergeMediaETag uses the local file's immutable size+mtime when available.
+// Remote merge artifacts keep their job revision, which is stable for a
+// succeeded artifact and cheap to compute on every request.
+func mergeMediaETag(job batchfactoryv11.MergeJob, fileInfo os.FileInfo) string {
+	if fileInfo != nil {
+		return fmt.Sprintf("\"%x-%x\"", fileInfo.Size(), fileInfo.ModTime().UTC().UnixNano())
+	}
+	digest := sha256.Sum256([]byte(job.ID + "|" + job.UpdatedAt.UTC().Format(time.RFC3339Nano)))
+	return "\"" + hex.EncodeToString(digest[:8]) + "\""
+}
+
+func serveMergeMediaArtifact(w http.ResponseWriter, r *http.Request, owner, batchID, artifactID string, repository batchfactoryv11.MergeRepository, files *localartifact.Store, remote mergeworker.ObjectReader) {
+	job, found, err := findMergeArtifactJob(r.Context(), repository, owner, batchID, artifactID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if !found {
+		writeStoreError(w, batchfactoryv11.ErrNotFound)
+		return
+	}
+	var file io.ReadCloser
+	var fileInfo os.FileInfo
+	if files != nil {
+		opened, localErr := files.Open(artifactID + ".mp4")
+		if localErr == nil {
+			file = opened
+			if stat, statErr := opened.Stat(); statErr == nil {
+				fileInfo = stat
+			}
+		} else if !errors.Is(localErr, localartifact.ErrInvalidID) && !errors.Is(localErr, os.ErrNotExist) {
+			writeStoreError(w, batchfactoryv11.ErrUnavailable)
+			return
+		}
+	}
+	if file == nil && remote != nil {
+		file, err = remote.Open(r.Context(), artifactID)
+	}
+	if file == nil || err != nil {
+		writeStoreError(w, batchfactoryv11.ErrNotFound)
+		return
+	}
+	defer file.Close()
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Header().Set("ETag", mergeMediaETag(job, fileInfo))
+	// 浏览器播放器会先发 Range 请求。这里必须走 ServeContent 才能返回 206、
+	// Accept-Ranges 与 Content-Length；直接 io.Copy 会退化成 200 + chunked，
+	// 播放器无法起播，停在 0:00 黑屏并反复整包重下。ETag 也由 ServeContent
+	// 参与 If-None-Match 协商，命中时直接返回 304。
+	if seeker, ok := file.(io.ReadSeeker); ok {
+		modTime := time.Time{}
+		if fileInfo != nil {
+			modTime = fileInfo.ModTime()
+		}
+		http.ServeContent(w, r, artifactID+".mp4", modTime, seeker)
+		return
+	}
+	_, _ = io.Copy(w, file)
+}
+
+// registerMergeMediaTokenRoute mints a short-lived signed playback URL so the
+// browser's native <video> element, which cannot send Authorization headers,
+// can stream merge artifacts directly with Range requests.
+func registerMergeMediaTokenRoute(mux *http.ServeMux, version string, service *batchfactoryv11.MergeService, secret string, now func() time.Time) {
+	if service == nil {
+		return
+	}
+	mux.HandleFunc("POST /api/batch-factory/"+version+"/batches/{batchId}/merge-media/{artifactId}/token", func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		repository, ok := service.Store.(batchfactoryv11.MergeRepository)
+		if !ok {
+			writeStoreError(w, batchfactoryv11.ErrUnavailable)
+			return
+		}
+		batchID, artifactID := r.PathValue("batchId"), r.PathValue("artifactId")
+		if _, found, err := findMergeArtifactJob(r.Context(), repository, owner, batchID, artifactID); err != nil {
+			writeStoreError(w, err)
+			return
+		} else if !found {
+			writeStoreError(w, batchfactoryv11.ErrNotFound)
+			return
+		}
+		expiresAt := mergeMediaClock(now).Add(mergeMediaTokenTTL)
+		token, err := localexecutor.ArtifactPublicToken(secret, owner, artifactID, expiresAt)
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "media playback unavailable"})
+			return
+		}
+		playbackPath := "/api/batch-factory/" + version + "/batches/" + url.PathEscape(batchID) + "/merge-media/" + url.PathEscape(artifactID)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"url":       playbackPath + "?token=" + url.QueryEscape(token),
+			"expiresAt": expiresAt.Format(time.RFC3339),
+		})
+	})
+}
+
+// registerMergeMediaPublicRoute keeps the authenticated merge-media handler as
+// the fallback for normal API clients, but lets token-signed requests from a
+// native player stream the same artifact without the Authorization header.
+func registerMergeMediaPublicRoute(root *http.ServeMux, version string, fallback http.Handler, service *batchfactoryv11.MergeService, files *localartifact.Store, remote mergeworker.ObjectReader, secret string, now func() time.Time) {
+	if root == nil || fallback == nil || service == nil {
+		return
+	}
+	root.HandleFunc("GET /api/batch-factory/"+version+"/batches/{batchId}/merge-media/{artifactId}", func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		if token == "" {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+		owner, err := localexecutor.VerifyArtifactPublicToken(secret, r.PathValue("artifactId"), token, mergeMediaClock(now))
+		if err != nil {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid or expired media token"})
+			return
+		}
+		repository, ok := service.Store.(batchfactoryv11.MergeRepository)
+		if !ok {
+			writeStoreError(w, batchfactoryv11.ErrUnavailable)
+			return
+		}
+		serveMergeMediaArtifact(w, r, owner, r.PathValue("batchId"), r.PathValue("artifactId"), repository, files, remote)
+	})
 }
 
 func registerMergeStatusRoute(mux *http.ServeMux, service *batchfactoryv11.MergeService, version string) {

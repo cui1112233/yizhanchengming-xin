@@ -370,6 +370,140 @@ func TestPublish121PendingConfirmResubmitsWhenMissingRemotely(t *testing.T) {
 	}
 }
 
+func publishFieldsFixture(t *testing.T, publishSettings string) (batchfactoryv11.Batch, batchfactoryv11.Book) {
+	t.Helper()
+	patch := batchfactoryv11.SettingsPatch{}
+	if publishSettings != "" {
+		patch["publishSettings"] = json.RawMessage(publishSettings)
+	}
+	batch := batchfactoryv11.Batch{SettingsState: batchfactoryv11.SettingsState{Patch: patch}}
+	book := batchfactoryv11.Book{
+		ID:       "book-1",
+		BookID:   "123456",
+		Platform: "15",
+		SourceMetadata: map[string]any{
+			"gender": "女",
+			"style":  "现代甜文",
+		},
+	}
+	return batch, book
+}
+
+// Reproduces the production defect: the selected profile is 8 decompress +
+// 0 scroll, but the form used hard-coded 4/4 because the profile was ignored.
+func TestBuildPublishFieldsUsesSelectedWebsiteProfile(t *testing.T) {
+	publish := `{
+		"websiteProfileId": "121-420",
+		"versionProfile": "8个解压",
+		"organization": "1",
+		"materialReuse": true,
+		"horizontalFlip": true,
+		"websiteProfiles": [{
+			"id": "121-420", "name": "8个解压", "config_id": "420",
+			"advanced": {"tl5":0,"ziti":1,"zitidx":36,"biaohong":"","jieyaNum":8,"keywords":"",
+			             "gunpingNum":0,"jieyaPitch":0,"jieyaSpeed":1.7,"jieyaAiHead":0,
+			             "gunpingSpeed":1,"biaohongReuse":"1","fontColorStyles":[1]}
+		}]
+	}`
+	batch, book := publishFieldsFixture(t, publish)
+	fields, err := buildPublishFields(batch, book, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{
+		"jieya_num":                     "8",
+		"gunping_num":                   "0",
+		"jieya_ai_head":                 "0",
+		"jieya_speed":                   "1.7",
+		"zitidx":                        "36",
+		"font_color_styles":             "[1]",
+		"biaohong_reuse":                "1",
+		"jieya_ai_head_horizontal_flip": "1",
+		"organization":                  "1",
+	} {
+		if got := fields[key]; got != want {
+			t.Fatalf("%s = %q, want %q (fields=%v)", key, got, want, fields)
+		}
+	}
+}
+
+// Legacy patches only stored the profile display name. It must resolve to the
+// same profile instead of silently falling back to 4/4 defaults.
+func TestBuildPublishFieldsResolvesLegacyProfileName(t *testing.T) {
+	publish := `{
+		"versionProfile": "8个解压",
+		"organization": 1,
+		"websiteProfiles": [{
+			"id": "121-420", "name": "8个解压", "config_id": "420",
+			"advanced": {"jieyaNum":8,"gunpingNum":0,"biaohongReuse":"1"}
+		}]
+	}`
+	batch, book := publishFieldsFixture(t, publish)
+	fields, err := buildPublishFields(batch, book, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fields["jieya_num"] != "8" || fields["gunping_num"] != "0" {
+		t.Fatalf("legacy name resolution = %v, want jieya_num=8 gunping_num=0", fields)
+	}
+}
+
+// An unknown profile id must fail loudly; it must never produce 4/4 silently.
+func TestBuildPublishFieldsRejectsUnknownWebsiteProfile(t *testing.T) {
+	batch, book := publishFieldsFixture(t, `{"websiteProfileId":"121-999","organization":"1","websiteProfiles":[]}`)
+	_, err := buildPublishFields(batch, book, map[string]any{})
+	if err == nil || !strings.Contains(err.Error(), "网站配置档 121-999") {
+		t.Fatalf("error = %v, want explicit missing profile error", err)
+	}
+}
+
+// Explicit publishSettings values must win over the profile preset.
+func TestBuildPublishFieldsExplicitSettingsOverrideProfile(t *testing.T) {
+	publish := `{
+		"websiteProfileId": "121-420",
+		"jieyaNum": 6,
+		"gunpingNum": 2,
+		"organization": "1",
+		"websiteProfiles": [{
+			"id": "121-420", "name": "8个解压", "config_id": "420",
+			"advanced": {"jieyaNum":8,"gunpingNum":0}
+		}]
+	}`
+	batch, book := publishFieldsFixture(t, publish)
+	fields, err := buildPublishFields(batch, book, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fields["jieya_num"] != "6" || fields["gunping_num"] != "2" {
+		t.Fatalf("explicit override = %v, want 6/2", fields)
+	}
+}
+
+// The hard-coded 4/4 remains only as the documented fallback when no profile
+// is selected at all.
+func TestBuildPublishFieldsFallsBackToDefaultsWithoutProfile(t *testing.T) {
+	batch, book := publishFieldsFixture(t, `{"organization":"1"}`)
+	fields, err := buildPublishFields(batch, book, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fields["jieya_num"] != "4" || fields["gunping_num"] != "4" {
+		t.Fatalf("default = %v, want 4/4", fields)
+	}
+}
+
+func TestPublishOrganizationFallsBackToWebsiteProfile(t *testing.T) {
+	settings := map[string]json.RawMessage{
+		"publishSettings": json.RawMessage(`{
+			"websiteProfileId": "121-420",
+			"websiteProfiles": [{"id":"121-420","name":"8个解压","organization":"1","advanced":{}}]
+		}`),
+	}
+	if got := publishOrganization(map[string]any{}, settings); got != "1" {
+		t.Fatalf("publishOrganization() = %q, want profile-derived 1", got)
+	}
+}
+
 func seedMultiOpening121Publisher(t *testing.T, openingIndexes []int) (*BatchFactory121Publisher, *recording121Connector, *batchfactoryv11.MemoryStore, batchfactoryv11.Batch, batchfactoryv11.Book) {
 	t.Helper()
 	ctx := context.Background()

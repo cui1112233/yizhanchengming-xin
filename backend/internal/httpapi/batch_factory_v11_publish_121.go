@@ -218,38 +218,9 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 			}
 		}
 	}
-	platform := firstText(metadata["platformId"], metadata["platform_id"], book.Platform)
-	if mapped := map[string]string{"黑岩付费": "1", "番茄付费": "2", "七猫付费": "3", "点众付费": "4", "阅文付费": "6", "番茄免费": "7", "知乎付费": "15", "掌阅付费": "20", "卓越付费": "26", "九州书城": "29", "掌文付费": "31"}[platform]; mapped != "" {
-		platform = mapped
-	}
-	gender := strings.TrimSuffix(firstText(metadata["gender"], metadata["gender_name"]), "频")
-	style := firstText(metadata["style"], metadata["styleName"], metadata["style_name"])
-	if platform == "" || gender == "" || style == "" || style == "待判定" || style == "未判定" {
-		return nil, fmt.Errorf("当前小说尚未完成书城、男女频和风格识别")
-	}
-	genderID := map[string]string{"男": "1", "女": "2"}[gender]
-	styleID := map[string]string{"古风虐文": "101", "古风甜文": "102", "古风通用": "103", "年代虐文": "201", "年代甜文": "202", "年代通用": "203", "现代虐文": "301", "现代甜文": "302", "现代悬疑": "303", "现代通用": "304", "男频都市": "305", "现代女主": "306", "玄幻": "307", "历史": "308", "爆款BGM": "309", "家庭奇葩": "310", "家庭伤感": "311", "职场打脸": "312"}[style]
-	if genderID == "" || styleID == "" {
-		return nil, fmt.Errorf("视频管理系统不支持当前男女频或风格：%s/%s", gender, style)
-	}
-	settings := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
-	advanced := map[string]string{"tl5": "0", "ziti": "1", "zitidx": "62", "biaohong": "", "biaohong_reuse": "", "keywords": "", "jieya_num": "4", "jieya_ai_head": "3", "jieya_speed": "1.7", "jieya_pitch": "0", "font_color_styles": "[1]", "gunping_num": "4", "gunping_speed": "1"}
-	if raw, ok := settings["publishSettings"]; ok {
-		var publish map[string]any
-		_ = json.Unmarshal(raw, &publish)
-		for key, targetKey := range map[string]string{"jieyaNum": "jieya_num", "jieyaSpeed": "jieya_speed", "jieyaPitch": "jieya_pitch", "gunpingNum": "gunping_num", "gunpingSpeed": "gunping_speed", "tl5": "tl5", "ziti": "ziti", "zitidx": "zitidx", "jieyaAiHead": "jieya_ai_head"} {
-			if value, ok := publish[key]; ok {
-				advanced[targetKey] = fmt.Sprint(value)
-			}
-		}
-	}
-	organization := publishOrganization(input, settings)
-	if organization == "" {
-		return nil, fmt.Errorf("请选择组织归属")
-	}
-	fields := map[string]string{"platform_id": platform, "organization": organization, "gender": genderID, "style": styleID}
-	for key, value := range advanced {
-		fields[key] = value
+	fields, err := buildPublishFields(batch, book, input)
+	if err != nil {
+		return nil, err
 	}
 	workingFrontContent := book.WorkingFrontContent
 	draft, err := p.Store.GetDraft(ctx, owner, "working-front:"+book.ID, "working-front-content", batchID)
@@ -340,7 +311,9 @@ func (p *BatchFactory121Publisher) Submit(ctx context.Context, owner, batchID, b
 	}
 	fields["jieya_ai_head_video"] = headVideoJSON
 	fields["jieya_ai_head_video_mode"] = "0"
-	fields["jieya_ai_head_horizontal_flip"] = "0"
+	if _, ok := fields["jieya_ai_head_horizontal_flip"]; !ok {
+		fields["jieya_ai_head_horizontal_flip"] = "0"
+	}
 	submission, err := p.Connector.Submit(ctx, targetSession, videomanagementconnector.SubmissionInput{BookID: book.BookID, Filename: book.BookID + ".txt", Content: content, FormFields: fields})
 	if err != nil {
 		return nil, fmt.Errorf("视频管理系统上传失败：%w", err)
@@ -435,20 +408,200 @@ func publishHistory(value any) []any {
 	}
 }
 
+// buildPublishFields resolves the 121 form fields in a fixed priority order:
+// explicit publishSettings keys > selected website profile advanced values >
+// hard-coded defaults. The selected profile may be stored by id
+// (websiteProfileId) or, for legacy patches, only by display name
+// (versionProfile); a non-empty id that cannot be resolved is an error so we
+// never silently fall back to 4/4 defaults.
+func buildPublishFields(batch batchfactoryv11.Batch, book batchfactoryv11.Book, input map[string]any) (map[string]string, error) {
+	metadata := book.SourceMetadata
+	platform := firstText(metadata["platformId"], metadata["platform_id"], book.Platform)
+	if mapped := map[string]string{"黑岩付费": "1", "番茄付费": "2", "七猫付费": "3", "点众付费": "4", "阅文付费": "6", "番茄免费": "7", "知乎付费": "15", "掌阅付费": "20", "卓越付费": "26", "九州书城": "29", "掌文付费": "31"}[platform]; mapped != "" {
+		platform = mapped
+	}
+	gender := strings.TrimSuffix(firstText(metadata["gender"], metadata["gender_name"]), "频")
+	style := firstText(metadata["style"], metadata["styleName"], metadata["style_name"])
+	if platform == "" || gender == "" || style == "" || style == "待判定" || style == "未判定" {
+		return nil, fmt.Errorf("当前小说尚未完成书城、男女频和风格识别")
+	}
+	genderID := map[string]string{"男": "1", "女": "2"}[gender]
+	styleID := map[string]string{"古风虐文": "101", "古风甜文": "102", "古风通用": "103", "年代虐文": "201", "年代甜文": "202", "年代通用": "203", "现代虐文": "301", "现代甜文": "302", "现代悬疑": "303", "现代通用": "304", "男频都市": "305", "现代女主": "306", "玄幻": "307", "历史": "308", "爆款BGM": "309", "家庭奇葩": "310", "家庭伤感": "311", "职场打脸": "312"}[style]
+	if genderID == "" || styleID == "" {
+		return nil, fmt.Errorf("视频管理系统不支持当前男女频或风格：%s/%s", gender, style)
+	}
+	settings := batchfactoryv11.ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	publish := map[string]any{}
+	if raw, ok := settings["publishSettings"]; ok {
+		_ = json.Unmarshal(raw, &publish)
+	}
+	profile := selectedPublishProfile(publish)
+	if profileID := strings.TrimSpace(toString(publish["websiteProfileId"])); profileID != "" && profile == nil {
+		return nil, fmt.Errorf("网站配置档 %s 不存在或已失效，请重新同步并选择", profileID)
+	}
+	advanced := map[string]string{"tl5": "0", "ziti": "1", "zitidx": "62", "biaohong": "", "biaohong_reuse": "", "keywords": "", "jieya_num": "4", "jieya_ai_head": "3", "jieya_speed": "1.7", "jieya_pitch": "0", "font_color_styles": "[1]", "gunping_num": "4", "gunping_speed": "1", "jieya_ai_head_horizontal_flip": "0"}
+	if profile != nil {
+		applyPublishAdvanced(advanced, mapOrEmpty(profile["advanced"]))
+	}
+	applyPublishAdvanced(advanced, publish)
+	if value, ok := publish["materialReuse"]; ok {
+		if enabled, valid := publishBoolValue(value); valid {
+			if enabled {
+				advanced["biaohong_reuse"] = "1"
+			} else {
+				advanced["biaohong_reuse"] = ""
+			}
+		}
+	}
+	if value, ok := publish["horizontalFlip"]; ok {
+		if enabled, valid := publishBoolValue(value); valid {
+			if enabled {
+				advanced["jieya_ai_head_horizontal_flip"] = "1"
+			} else {
+				advanced["jieya_ai_head_horizontal_flip"] = "0"
+			}
+		}
+	}
+	organization := publishOrganization(input, settings)
+	if organization == "" {
+		return nil, fmt.Errorf("请选择组织归属")
+	}
+	fields := map[string]string{"platform_id": platform, "organization": organization, "gender": genderID, "style": styleID}
+	for key, value := range advanced {
+		fields[key] = value
+	}
+	return fields, nil
+}
+
+// selectedPublishProfile finds the selected website profile by id first and
+// then by display name, so id-based patches and legacy name-only patches both
+// resolve to the same profile.
+func selectedPublishProfile(publish map[string]any) map[string]any {
+	if publish == nil {
+		return nil
+	}
+	id := strings.TrimSpace(toString(publish["websiteProfileId"]))
+	name := strings.TrimSpace(toString(publish["versionProfile"]))
+	profiles, _ := publish["websiteProfiles"].([]any)
+	for _, raw := range profiles {
+		profile := mapOrEmpty(raw)
+		if profile == nil {
+			continue
+		}
+		profileID := strings.TrimSpace(toString(profile["id"]))
+		configID := strings.TrimSpace(toString(profile["config_id"]))
+		profileName := strings.TrimSpace(toString(profile["name"]))
+		if id != "" {
+			if id == profileID || id == configID || strings.TrimPrefix(id, "121-") == configID {
+				return profile
+			}
+			continue
+		}
+		if name != "" && name == profileName {
+			return profile
+		}
+	}
+	return nil
+}
+
+var publishAdvancedAliases = map[string]string{
+	"tl5":                           "tl5",
+	"ziti":                          "ziti",
+	"zitidx":                        "zitidx",
+	"biaohong":                      "biaohong",
+	"biaohongReuse":                 "biaohong_reuse",
+	"biaohong_reuse":                "biaohong_reuse",
+	"keywords":                      "keywords",
+	"jieyaNum":                      "jieya_num",
+	"jieya_num":                     "jieya_num",
+	"jieyaAiHead":                   "jieya_ai_head",
+	"jieya_ai_head":                 "jieya_ai_head",
+	"jieyaSpeed":                    "jieya_speed",
+	"jieya_speed":                   "jieya_speed",
+	"jieyaPitch":                    "jieya_pitch",
+	"jieya_pitch":                   "jieya_pitch",
+	"fontColorStyles":               "font_color_styles",
+	"font_color_styles":             "font_color_styles",
+	"gunpingNum":                    "gunping_num",
+	"gunping_num":                   "gunping_num",
+	"gunpingSpeed":                  "gunping_speed",
+	"gunping_speed":                 "gunping_speed",
+	"jieyaAiHeadHorizontalFlip":     "jieya_ai_head_horizontal_flip",
+	"jieya_ai_head_horizontal_flip": "jieya_ai_head_horizontal_flip",
+}
+
+func applyPublishAdvanced(target map[string]string, source map[string]any) {
+	for key, value := range source {
+		targetKey, ok := publishAdvancedAliases[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			if strings.TrimSpace(typed) == "" && targetKey != "biaohong" {
+				continue
+			}
+			target[targetKey] = typed
+		case []any:
+			encoded, err := json.Marshal(typed)
+			if err != nil {
+				continue
+			}
+			target[targetKey] = string(encoded)
+		default:
+			target[targetKey] = fmt.Sprint(value)
+		}
+	}
+}
+
+func publishBoolValue(value any) (bool, bool) {
+	switch typed := value.(type) {
+	case bool:
+		return typed, true
+	case string:
+		switch strings.TrimSpace(strings.ToLower(typed)) {
+		case "1", "true", "yes", "on":
+			return true, true
+		case "0", "false", "no", "off", "":
+			return false, true
+		}
+	}
+	return false, false
+}
+
 func publishOrganization(input map[string]any, settings map[string]json.RawMessage) string {
 	organization := strings.TrimSpace(toString(input["organization"]))
 	if organization != "" {
 		return organization
 	}
+	publish := map[string]any{}
 	if raw, ok := settings["publishSettings"]; ok {
-		var publish map[string]any
-		if json.Unmarshal(raw, &publish) == nil {
-			for _, value := range []any{publish["organization"], publish["organizationId"], publish["organization_id"], publish["orgId"], publish["org_id"]} {
-				if value != nil {
-					organization = strings.TrimSpace(fmt.Sprint(value))
-					if organization != "" {
-						break
-					}
+		_ = json.Unmarshal(raw, &publish)
+	}
+	for _, value := range []any{publish["organization"], publish["organizationId"], publish["organization_id"], publish["orgId"], publish["org_id"]} {
+		if value != nil {
+			organization = strings.TrimSpace(fmt.Sprint(value))
+			if organization != "" {
+				return organization
+			}
+		}
+	}
+	// Older patches did not copy organization into publishSettings; fall back
+	// to the selected website profile so the value is really derived from the
+	// profile instead of relying on a stale batch value.
+	if profile := selectedPublishProfile(publish); profile != nil {
+		for _, value := range []any{profile["organization"], profile["organizationId"], profile["organization_id"]} {
+			if value != nil {
+				if organization = strings.TrimSpace(fmt.Sprint(value)); organization != "" {
+					return organization
+				}
+			}
+		}
+		advanced := mapOrEmpty(profile["advanced"])
+		for _, value := range []any{advanced["organization"], advanced["organizationId"], advanced["organization_id"]} {
+			if value != nil {
+				if organization = strings.TrimSpace(fmt.Sprint(value)); organization != "" {
+					return organization
 				}
 			}
 		}

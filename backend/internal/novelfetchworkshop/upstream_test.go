@@ -197,6 +197,46 @@ func TestUpstreamFetchReturnsTimeoutErrorWithoutBody(t *testing.T) {
 	}
 }
 
+// Reproduces the production "参数不完整" failure: missing bookid/platform must
+// be rejected locally so we never call the upstream with incomplete params.
+func TestUpstreamFetchRejectsMissingParametersWithoutRequest(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		_, _ = w.Write([]byte(`{"code":200,"data":"正文"}`))
+	}))
+	defer server.Close()
+
+	for _, params := range [][2]string{{"", "15"}, {"book-123", ""}, {" ", "15"}} {
+		result, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), params[0], params[1], 4000)
+		if err == nil || !strings.Contains(err.Error(), "参数不完整") || result.OriginalRaw != "" {
+			t.Fatalf("params=%v result=%#v err=%v; want local incomplete-params error", params, result, err)
+		}
+	}
+	if called {
+		t.Fatal("upstream must not be called when bookid/platform is empty")
+	}
+}
+
+// The upstream business error must carry the real request parameters so a
+// "参数不完整" response can be traced back to the book that caused it.
+func TestUpstreamFetchBusinessErrorIncludesRequestParameters(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":400,"msg":"参数不完整"}`))
+	}))
+	defer server.Close()
+
+	_, err := (UpstreamFetcher{Client: server.Client(), Endpoint: server.URL}).Fetch(context.Background(), "book-123", "15", 0)
+	if err == nil {
+		t.Fatal("want business error")
+	}
+	for _, want := range []string{"400", "参数不完整", "bookid=book-123", "platform=15"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %q, want to contain %q", err.Error(), want)
+		}
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {

@@ -66,6 +66,11 @@ func (f UpstreamFetcher) FetchAndProcess(ctx context.Context, bookID, platformID
 }
 
 func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, maxTxt int) (FetchResult, error) {
+	bookID = strings.TrimSpace(bookID)
+	platformID = strings.TrimSpace(platformID)
+	if bookID == "" || platformID == "" {
+		return FetchResult{}, fmt.Errorf("121 upstream 参数不完整：缺少书号或书城 ID（bookid=%q platform=%q）", bookID, platformID)
+	}
 	endpoint := strings.TrimSpace(f.Endpoint)
 	if endpoint == "" {
 		endpoint = DefaultUpstreamEndpoint
@@ -109,7 +114,7 @@ func (f UpstreamFetcher) Fetch(ctx context.Context, bookID, platformID string, m
 		return FetchResult{}, fmt.Errorf("121 upstream returned invalid JSON: %w", err)
 	}
 	if payload.Code != http.StatusOK {
-		return FetchResult{}, fmt.Errorf("121 upstream business error %d: %s", payload.Code, strings.TrimSpace(payload.Message))
+		return FetchResult{}, fmt.Errorf("121 upstream business error %d: %s（bookid=%s platform=%s）", payload.Code, strings.TrimSpace(payload.Message), bookID, platformID)
 	}
 	return FetchResult{Code: payload.Code, Message: payload.Message, OriginalRaw: payload.Data, BookInfo: payload.BookInfo}, nil
 }

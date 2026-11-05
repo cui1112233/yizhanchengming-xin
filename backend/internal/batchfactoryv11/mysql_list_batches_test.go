@@ -79,6 +79,7 @@ func TestReadbackMySQLStoreHydratesComicSourceSegments(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	now := time.Date(2026, 11, 4, 16, 0, 0, 0, time.UTC)
 
 	for _, scope := range []struct {
 		kind ScopeKind
@@ -106,11 +107,12 @@ func TestReadbackMySQLStoreHydratesComicSourceSegments(t *testing.T) {
 	mock.ExpectQuery("SELECT patch_json FROM batch_factory_v12_settings_patches").
 		WithArgs(string(ScopeVideo), "video-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"patch_json"}).AddRow(`{"comicPrompt":"第一页","comicImagePrompt":"第一页图片"}`))
-	// 非 active 的历史槽位必须一并下发，供媒体库展示历史成片、供自动化判断跳过。
-	mock.ExpectQuery("SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos").
+	// 非 active 的历史槽位必须一并下发，并带上最近成功任务的可播地址，
+	// 供媒体库展示历史成片、供自动化判断跳过。
+	mock.ExpectQuery("SELECT v.id,v.ordinal,v.compatibility_state,COALESCE\\(t.id,''\\)").
 		WithArgs("batch-1", "book-1", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state"}).
-			AddRow("video-old", 0, "orphaned"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state", "task_id", "media_url", "provider", "status", "created_at"}).
+			AddRow("video-old", 0, "orphaned", "task-old", "https://cdn.example/video-old.mp4", "doubao", "succeeded", now))
 
 	digest := sourceDigest("第一段。")
 	mock.ExpectQuery("SELECT COALESCE\\(NULLIF\\(d.content,''\\),r.source_text,''\\)").
@@ -136,6 +138,10 @@ func TestReadbackMySQLStoreHydratesComicSourceSegments(t *testing.T) {
 	}
 	if len(got.Books[0].VideoHistory) != 1 || got.Books[0].VideoHistory[0].ID != "video-old" || got.Books[0].VideoHistory[0].Ordinal != 0 {
 		t.Fatalf("video history = %#v", got.Books[0].VideoHistory)
+	}
+	history := got.Books[0].VideoHistory[0]
+	if history.MediaURL != "https://cdn.example/video-old.mp4" || history.ProductionTaskID != "task-old" || history.Provider != "doubao" || !history.Succeeded {
+		t.Fatalf("history media fields = %#v, want playable orphaned slot", history)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

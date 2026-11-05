@@ -2108,6 +2108,7 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
     color-mix(in srgb,var(--sh-bg) 84%,var(--sh-panel));
 }
 .batch-factory-media-pickstation-frame {
+  position:relative;
   width:min(100%,760px);
   max-height:100%;
   aspect-ratio:var(--bf-media-ratio,16/9);
@@ -2116,6 +2117,42 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   border-radius:12px;
   background:var(--sh-panel-strong);
   transition:width .22s ease, aspect-ratio .22s ease;
+}
+/* 合成成片等待首帧时先铺同一张 merge-cover，不出现 0:00 黑屏。 */
+.batch-factory-media-pickstation-frame > img {
+  position:absolute;
+  inset:0;
+  z-index:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:var(--sh-panel-strong);
+}
+.batch-factory-media-pickstation-frame > .anticon {
+  position:absolute;
+  inset:0;
+  z-index:0;
+  display:grid;
+  place-items:center;
+  color:var(--sh-muted);
+}
+/* 受保护媒体的首帧加载遮罩/超时提示。 */
+.batch-factory-media-overlay {
+  position:absolute;
+  inset:0;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:6px;
+  color:#fff;
+  font-size:12px;
+  background:rgba(12,15,20,.45);
+  pointer-events:none;
+}
+.batch-factory-media-overlay small {
+  color:#fff;
+  font-size:12px;
 }
 .batch-factory-media-pickstation-frame.is-portrait {
   width:min(46%,430px);
@@ -2130,6 +2167,8 @@ body.batch-factory-column-resizing, body.batch-factory-column-resizing * { curso
   height:100%;
 }
 .batch-factory-media-pickstation-frame video {
+  position:relative;
+  z-index:1;
   object-fit:contain;
   background:transparent;
 }
@@ -3336,6 +3375,9 @@ body[data-theme='light'].shuihuo-theme-active .batch-factory-action-group.is-pro
 .batch-factory-add-books-modal .ant-input-textarea textarea{min-height:150px!important;padding:12px 13px;line-height:1.7;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
 .batch-factory-add-books-modal .batch-factory-engine-field{gap:7px}
 .batch-factory-novel-list-v13 .is-order{display:flex;align-items:center;gap:8px}.batch-factory-novel-list-v13 .is-order b{font-variant-numeric:tabular-nums}
+.batch-factory-novel-list-v13 .is-novel-head{display:flex;align-items:center;gap:4px}
+.batch-factory-novel-list-v13 .batch-factory-copy-books{height:22px;padding:0 2px;color:var(--sh-muted)}
+.batch-factory-novel-list-v13 .batch-factory-copy-books:hover{color:var(--sh-accent,#58d6b1)}
 .batch-factory-novel-list-v13 .is-book{display:grid;gap:3px}.batch-factory-novel-list-v13 .is-book strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sh-text)}.batch-factory-novel-list-v13 .is-book small{color:var(--sh-muted);font-size:10px}
 .batch-factory-source-kind{display:inline-flex;align-items:center;max-width:120px;padding:2px 6px;border:1px solid var(--sh-line);border-radius:4px;color:var(--sh-muted);font-size:10px;line-height:1.2;white-space:nowrap}
 .batch-factory-source-kind.is-ready{color:#57d38b;border-color:color-mix(in srgb,#57d38b 35%,var(--sh-line))}

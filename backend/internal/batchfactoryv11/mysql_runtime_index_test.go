@@ -26,15 +26,16 @@ func TestGetBatchRuntimeIndexReadsOnlyBatchAndBookIdentities(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`)).
 		WithArgs("batch-1", "book-1", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal"}).AddRow("video-1", 0))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state<>'active' ORDER BY ordinal,updated_at DESC,id`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT v.id,v.ordinal,v.compatibility_state,COALESCE(t.id,''),COALESCE(t.media_url,'')`)).
 		WithArgs("batch-1", "book-1", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state"}).AddRow("video-old-1", 0, "orphaned"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state", "task_id", "media_url", "provider", "status", "created_at"}).
+			AddRow("video-old-1", 0, "orphaned", "task-old-1", "https://cdn.example/video-old-1.mp4", "doubao", "succeeded", now))
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`)).
 		WithArgs("batch-1", "book-2", "alice").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal"}).AddRow("video-2", 0).AddRow("video-3", 1))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id,ordinal,compatibility_state FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state<>'active' ORDER BY ordinal,updated_at DESC,id`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT v.id,v.ordinal,v.compatibility_state,COALESCE(t.id,''),COALESCE(t.media_url,'')`)).
 		WithArgs("batch-1", "book-2", "alice").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "ordinal", "compatibility_state", "task_id", "media_url", "provider", "status", "created_at"}))
 
 	got, err := NewMySQLStore(db).GetBatchRuntimeIndex(context.Background(), "alice", "batch-1")
 	if err != nil {
@@ -45,6 +46,9 @@ func TestGetBatchRuntimeIndexReadsOnlyBatchAndBookIdentities(t *testing.T) {
 	}
 	if len(got.Books[0].VideoHistory) != 1 || got.Books[0].VideoHistory[0].ID != "video-old-1" || got.Books[0].VideoHistory[0].Ordinal != 0 {
 		t.Fatalf("runtime index must expose historical ordinal for the previous version: %#v", got.Books[0].VideoHistory)
+	}
+	if history := got.Books[0].VideoHistory[0]; history.MediaURL != "https://cdn.example/video-old-1.mp4" || history.ProductionTaskID != "task-old-1" || !history.Succeeded {
+		t.Fatalf("runtime index history media fields = %#v", history)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

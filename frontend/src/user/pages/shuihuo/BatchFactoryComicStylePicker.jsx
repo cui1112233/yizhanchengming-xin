@@ -1,5 +1,5 @@
 import { Button, Empty, Input, Switch, Upload as AntUpload, message } from 'antd';
-import { Check, ChevronLeft, ChevronRight, ImagePlus, Trash2, Upload } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, ImageOff, ImagePlus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getComicReferencePreviewBlob, uploadComicGlobalReference } from '../../../shared/api/batchFactory';
@@ -24,13 +24,23 @@ function fileAsDataURL(file) {
   });
 }
 
+// 封面原图失败是常见情况（资源被清理/签名过期）。记住失败源，避免同一张图
+// 反复请求、反复闪烁，也避免把每个失败都当成一次用户可见错误。
+const failedPreviewSources = new Set();
+
 function AuthenticatedPreview({ src, alt }) {
   const [displayURL, setDisplayURL] = useState('');
+  const [failed, setFailed] = useState(() => Boolean(src) && failedPreviewSources.has(String(src)));
   useEffect(() => {
     let alive = true;
     let objectURL = '';
     setDisplayURL('');
     if (!src) return undefined;
+    if (failedPreviewSources.has(String(src))) {
+      setFailed(true);
+      return undefined;
+    }
+    setFailed(false);
     if (String(src).startsWith('data:') || /^https?:\/\//i.test(String(src))) {
       setDisplayURL(src);
       return undefined;
@@ -39,13 +49,19 @@ function AuthenticatedPreview({ src, alt }) {
       if (!alive) return;
       objectURL = URL.createObjectURL(blob);
       setDisplayURL(objectURL);
-    }).catch(() => alive && setDisplayURL(''));
+    }).catch(() => {
+      if (!alive) return;
+      failedPreviewSources.add(String(src));
+      setFailed(true);
+    });
     return () => {
       alive = false;
       if (objectURL) URL.revokeObjectURL(objectURL);
     };
   }, [src]);
-  return displayURL ? <img src={displayURL} alt={alt} loading="lazy" /> : <span className="batch-factory-comic-preview-loading"><ImagePlus size={22} /></span>;
+  return displayURL
+    ? <img src={displayURL} alt={alt} loading="lazy" onError={() => { failedPreviewSources.add(String(src)); setFailed(true); setDisplayURL(''); }} />
+    : <span className="batch-factory-comic-preview-loading" title={failed ? '封面原图加载失败，已显示占位' : undefined}>{failed ? <ImageOff size={22} /> : <ImagePlus size={22} />}</span>;
 }
 
 export function BatchFactoryComicStylePicker({ batchId, catalog, value, onChange, onReferenceDataUrl, inherited = false, disabled = false }) {
