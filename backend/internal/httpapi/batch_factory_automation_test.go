@@ -2260,3 +2260,219 @@ func TestRunWithStaleEpochDoesNotWriteTerminalJobState(t *testing.T) {
 		t.Fatalf("stale run 不得写入 completedAt: %#v", job)
 	}
 }
+
+func writeLegacyAutomationState(t *testing.T, path string, state automationStateFile) {
+	t.Helper()
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newDispatchTestCoordinator(path string, now time.Time) *BatchAutomationCoordinator {
+	return NewBatchAutomationCoordinator(batchfactoryv11.NewMemoryStore(), nil, nil, nil, nil, nil, nil,
+		NewFileAutomationStatusReader(path), func() time.Time { return now })
+}
+
+// 空闲超过阈值且没有任何 running/queued 书的 running job 必须被回收成 failed，
+// 并清掉残留在 stopped 书上的重试标记。
+func TestDispatchDueJobsReclaimsZombieRunningJobWithoutActiveBooks(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	now := time.Date(2026, 11, 5, 10, 30, 0, 0, time.UTC)
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-zombie": {
+			"id": "job-zombie", "owner": "alice", "batchId": "batch-1",
+			"state": "running", "updatedAt": now.Add(-20 * time.Minute),
+			"counts": automationCounts(2, 1, 1, 0),
+			"books": map[string]any{
+				"book-1": map[string]any{"bookId": "book-1", "status": "failed", "stage": "comic_images"},
+				"book-2": map[string]any{
+					"bookId": "book-2", "status": "stopped", "stage": "stopped",
+					"retryRequested": true, "retryAt": now.Add(-30 * time.Minute),
+				},
+			},
+		},
+	}}
+	writeLegacyAutomationState(t, path, state)
+	coordinator := newDispatchTestCoordinator(path, now)
+
+	if err := coordinator.DispatchDueJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := got.Jobs["job-zombie"]
+	if automationStringValue(job["state"], "") != "failed" {
+		t.Fatalf("zombie job state=%#v, want failed", job["state"])
+	}
+	if automationStringValue(job["lastError"], "") != automationZombieRunningMessage {
+		t.Fatalf("lastError=%#v, want %q", job["lastError"], automationZombieRunningMessage)
+	}
+	if _, ok := job["completedAt"]; !ok {
+		t.Fatalf("zombie job 必须有 completedAt: %#v", job)
+	}
+	counts, _ := job["counts"].(map[string]any)
+	asInt := func(value any) int {
+		switch typed := value.(type) {
+		case int:
+			return typed
+		case float64:
+			return int(typed)
+		}
+		return -1
+	}
+	if running := asInt(counts["running"]); running != 0 {
+		t.Fatalf("counts=%#v, running 必须归零", counts)
+	}
+	if failed := asInt(counts["failed"]); failed != 2 {
+		t.Fatalf("counts=%#v, failed 必须是 2", counts)
+	}
+	books, _ := job["books"].(map[string]any)
+	entry, _ := books["book-2"].(map[string]any)
+	if _, ok := entry["retryRequested"]; ok {
+		t.Fatalf("stopped 书的 retryRequested 必须被清除: %#v", entry)
+	}
+	if _, ok := entry["retryAt"]; ok {
+		t.Fatalf("stopped 书的 retryAt 必须被清除: %#v", entry)
+	}
+	logs, _ := job["logs"].([]any)
+	if len(logs) == 0 {
+		t.Fatal("僵尸回收必须写一条 job 日志")
+	}
+	last, _ := logs[len(logs)-1].(map[string]any)
+	if automationStringValue(last["message"], "") != automationZombieRunningMessage {
+		t.Fatalf("job log = %#v, want reclaim message", last)
+	}
+}
+
+// 还有书在 running 时不能回收，即使是同一个长时间没更新的 job。
+func TestDispatchDueJobsKeepsRunningJobWithActiveBook(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	now := time.Date(2026, 11, 5, 10, 30, 0, 0, time.UTC)
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-active": {
+			"id": "job-active", "owner": "alice", "batchId": "batch-1",
+			"state": "running", "updatedAt": now.Add(-30 * time.Minute),
+			"counts": automationCounts(2, 1, 0, 1),
+			"books": map[string]any{
+				"book-1": map[string]any{"bookId": "book-1", "status": "running", "stage": "video"},
+				"book-2": map[string]any{"bookId": "book-2", "status": "completed", "stage": "published"},
+			},
+		},
+	}}
+	writeLegacyAutomationState(t, path, state)
+	coordinator := newDispatchTestCoordinator(path, now)
+
+	if err := coordinator.DispatchDueJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if automationStringValue(got.Jobs["job-active"]["state"], "") != "running" {
+		t.Fatalf("有 running 书时不得回收: %#v", got.Jobs["job-active"]["state"])
+	}
+}
+
+// 刚更新过的 running job 即使书都终态也不能回收，避免误杀刚接管的轮次。
+func TestDispatchDueJobsKeepsRecentlyUpdatedRunningJob(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	now := time.Date(2026, 11, 5, 10, 30, 0, 0, time.UTC)
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-fresh": {
+			"id": "job-fresh", "owner": "alice", "batchId": "batch-1",
+			"state": "running", "updatedAt": now.Add(-time.Minute),
+			"counts": automationCounts(1, 0, 1, 0),
+			"books": map[string]any{
+				"book-1": map[string]any{"bookId": "book-1", "status": "failed", "stage": "comic_images"},
+			},
+		},
+	}}
+	writeLegacyAutomationState(t, path, state)
+	coordinator := newDispatchTestCoordinator(path, now)
+
+	if err := coordinator.DispatchDueJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if automationStringValue(got.Jobs["job-fresh"]["state"], "") != "running" {
+		t.Fatalf("刚更新过的 job 不得回收: %#v", got.Jobs["job-fresh"]["state"])
+	}
+}
+
+// 终态写入清掉 retryRequested/retryAt 后，DispatchDueJobs 不能再把该 job 派发回 running。
+func TestTerminalJobWriteClearsResidualRetryMarks(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "automation.json")
+	now := time.Date(2026, 11, 5, 11, 0, 0, 0, time.UTC)
+	state := automationStateFile{Version: 1, Jobs: map[string]map[string]any{
+		"job-done": {
+			"id": "job-done", "owner": "alice", "batchId": "batch-1",
+			"state": "failed", "updatedAt": now.Add(-time.Minute),
+			"retryRequested": true, "retryAt": now.Add(-time.Minute),
+			"books": map[string]any{
+				"book-1": map[string]any{
+					"bookId": "book-1", "status": "failed", "stage": "comic_images",
+					"retryRequested": true, "retryAt": now.Add(-time.Minute),
+				},
+			},
+		},
+	}}
+	writeLegacyAutomationState(t, path, state)
+	coordinator := newDispatchTestCoordinator(path, now)
+
+	loaded, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := loaded.Jobs["job-done"]
+	if !automationJobHasRetryRequest(job) {
+		t.Fatal("前置条件：job 应带有残留重试标记")
+	}
+	if err := coordinator.setJob("alice", "batch-1", "job-done", job); err != nil {
+		t.Fatal(err)
+	}
+	if automationJobHasRetryRequest(job) {
+		t.Fatalf("终态写入必须清掉任务级重试标记: %#v", job)
+	}
+	books, _ := job["books"].(map[string]any)
+	entry, _ := books["book-1"].(map[string]any)
+	if _, ok := entry["retryRequested"]; ok {
+		t.Fatalf("终态写入必须清掉书上的 retryRequested: %#v", entry)
+	}
+	if _, ok := entry["retryAt"]; ok {
+		t.Fatalf("终态写入必须清掉书上的 retryAt: %#v", entry)
+	}
+	if automationStringValue(entry["status"], "") != "failed" {
+		t.Fatalf("只清标记，不得改业务状态: %#v", entry["status"])
+	}
+
+	if err := coordinator.DispatchDueJobs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := coordinator.loadLocked()
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted := got.Jobs["job-done"]
+	if automationStringValue(persisted["state"], "") != "failed" {
+		t.Fatalf("终态清理后不得被重新派发: %#v", persisted["state"])
+	}
+	persistedBooks, _ := persisted["books"].(map[string]any)
+	persistedEntry, _ := persistedBooks["book-1"].(map[string]any)
+	if _, ok := persistedEntry["retryAt"]; ok {
+		t.Fatalf("派发后仍残留 retryAt: %#v", persistedEntry)
+	}
+}

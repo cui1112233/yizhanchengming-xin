@@ -206,7 +206,13 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 	c.dispatchNextCheckSet = true
 	c.dispatchNextCheck = now.Add(30 * time.Second)
 	changed := false
+	reclaimed := make([]string, 0)
 	for jobID, job := range state.Jobs {
+		if reclaimAutomationZombieRunningJob(job, jobID, now) {
+			reclaimed = append(reclaimed, jobID)
+			changed = true
+			continue
+		}
 		if automationJobRetryDispatchDue(job, now) {
 			books, _ := job["books"].(map[string]any)
 			retryDue := false
@@ -284,6 +290,9 @@ func (c *BatchAutomationCoordinator) DispatchDueJobs(ctx context.Context) error 
 	c.mu.Unlock()
 	if err != nil {
 		return err
+	}
+	for _, jobID := range reclaimed {
+		c.cancelRun(jobID)
 	}
 	for _, item := range due {
 		batch, getErr := c.store.GetBatch(ctx, item.owner, item.batchID)
@@ -409,6 +418,72 @@ func shouldScheduleAutomationTimeoutRetry(stage string) bool {
 // automationBatchRetryRounds 是批次末尾统一回补失败书籍的最大轮次。每一轮都在
 // 整批其余书结束后串行回补，避免失败书一直占着并发槽位。
 const automationBatchRetryRounds = 2
+
+// automationZombieRunningIdleTimeout 是回收“僵尸 running”job 的空闲阈值。
+// 回收必须同时满足三个条件：job 仍标记 running、超过该时长没有任何更新、
+// 且没有任何 running/queued 书。真正等待供应商的慢作业会持续刷新 updatedAt，
+// 因此不会被误杀；阈值调到 10 分钟也是为了避免把刚接管的轮次当成僵尸。
+const automationZombieRunningIdleTimeout = 10 * time.Minute
+
+const automationZombieRunningMessage = "执行轮次已失效（无在途书）"
+
+// automationZombieRunningReclaimable 判断 job 是否是执行轮次中断后残留的
+// “running” 假状态：书已全部终态，且长时间没有任何状态写入。
+func automationZombieRunningReclaimable(job map[string]any, now time.Time) bool {
+	if job == nil || automationStringValue(job["state"], "") != "running" {
+		return false
+	}
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		switch automationStringValue(entry["status"], "") {
+		case "running", "queued":
+			return false
+		}
+	}
+	last := automationStoredJobTime(job["updatedAt"])
+	return !last.IsZero() && now.Sub(last) >= automationZombieRunningIdleTimeout
+}
+
+// reclaimAutomationZombieRunningJob 把僵尸 running 落成 failed 终态，并按终态
+// 语义清掉残留的重试标记，避免 dispatcher 再把一个已经没人执行的 job 重新派发。
+func reclaimAutomationZombieRunningJob(job map[string]any, jobID string, now time.Time) bool {
+	if !automationZombieRunningReclaimable(job, now) {
+		return false
+	}
+	books, _ := job["books"].(map[string]any)
+	job["state"] = "failed"
+	job["lastError"] = automationZombieRunningMessage
+	job["completedAt"], job["updatedAt"] = now, now
+	job["counts"] = automationCountsFromBooks(books)
+	clearAutomationRetryMarks(job)
+	appendAutomationJobLog(job, now, automationZombieRunningMessage)
+	log.Printf("automation: reclaim zombie running job %s owner=%s batch=%s", jobID,
+		automationStringValue(job["owner"], ""), automationStringValue(job["batchId"], ""))
+	return true
+}
+
+// clearAutomationRetryMarks 清掉任务与书上的残留重试标记。终态（stopped/failed）
+// 的任务不应再被 retryAt 自动重新派发；只清标记，不改业务状态与错误信息。
+func clearAutomationRetryMarks(job map[string]any) {
+	if job == nil {
+		return
+	}
+	delete(job, "retryRequested")
+	delete(job, "retryAt")
+	books, _ := job["books"].(map[string]any)
+	for _, raw := range books {
+		entry, _ := raw.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		delete(entry, "retryRequested")
+		delete(entry, "retryAt")
+	}
+}
 
 // 视频供应商实测单批排队 + 生成会超过 10 分钟（本次线上最后一个分镜用了 11 分
 // 09 秒），10 分钟死线会把正常视频误判成失败并触发整书回补。视频等待单独放宽
@@ -767,6 +842,11 @@ func (c *BatchAutomationCoordinator) migrateLegacyLocked(state automationStateFi
 func (c *BatchAutomationCoordinator) setJob(owner, batchID, jobID string, job map[string]any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// 终态任务不再保留自动重试标记：否则残留的 retryRequested/retryAt 会让
+	// DispatchDueJobs 把一个已经结束的 job 重新派发成 running。
+	if state := automationStringValue(job["state"], ""); state == "stopped" || state == "failed" {
+		clearAutomationRetryMarks(job)
+	}
 	if c.automationStore != nil {
 		state, err := c.loadLocked()
 		if err != nil {
@@ -878,6 +958,7 @@ func (c *BatchAutomationCoordinator) RecoverInterruptedJobs() error {
 			}
 		}
 		job["counts"] = automationCounts(len(books), 0, failed+stopped, ready)
+		clearAutomationRetryMarks(job)
 		changed = true
 	}
 	if !changed {
@@ -3267,6 +3348,32 @@ func appendAutomationBookLog(entry map[string]any, at time.Time, stage, message 
 	entry["logs"] = logs
 }
 
+// appendAutomationJobLog 把一条任务级事件追加到 job 日志里（僵尸回收等没有
+// 具体书归属的事件走这里）。
+func appendAutomationJobLog(job map[string]any, at time.Time, message string) {
+	if job == nil {
+		return
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return
+	}
+	logs := make([]any, 0, 8)
+	switch typed := job["logs"].(type) {
+	case []any:
+		logs = append(logs, typed...)
+	case []map[string]any:
+		for _, item := range typed {
+			logs = append(logs, item)
+		}
+	}
+	logs = append(logs, map[string]any{"at": at, "stage": "automation", "message": message})
+	if len(logs) > automationBookLogLimit {
+		logs = logs[len(logs)-automationBookLogLimit:]
+	}
+	job["logs"] = logs
+}
+
 func (c *BatchAutomationCoordinator) currentJobControl(owner, batchID, jobID string) (string, map[string]any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -3652,6 +3759,7 @@ func (c *BatchAutomationCoordinator) Cancel(owner, batchID string) error {
 		job["state"], job["updatedAt"], job["stopAt"] = "stopped", c.now(), c.now()
 		job["lastError"] = "用户停止自动化"
 		job["counts"] = automationCounts(0, 0, 0, 0)
+		clearAutomationRetryMarks(job)
 		state.Jobs[id] = job
 		stoppedIDs = append(stoppedIDs, id)
 	}
