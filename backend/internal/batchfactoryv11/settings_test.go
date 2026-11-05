@@ -38,6 +38,25 @@ func TestAssetImagesEnabledDefaultsToTrueAndHonorsExplicitFalse(t *testing.T) {
 	}
 }
 
+func TestAssetTextFallbackEnabledMirrorsAssetImagesSwitch(t *testing.T) {
+	if AssetTextFallbackEnabled(SettingsPatch{}) {
+		t.Fatal("asset text fallback must stay off when asset images default to enabled")
+	}
+	if !AssetTextFallbackEnabled(SettingsPatch{"assetImagesEnabled": raw(false)}) {
+		t.Fatal("explicit false must enable the text fallback path")
+	}
+	if AssetTextFallbackEnabled(SettingsPatch{"assetImagesEnabled": raw(true)}) {
+		t.Fatal("explicit true must keep the image-first path")
+	}
+	// 单书覆盖批次：关闭时走文字回退，单书显式打开时走图片优先。
+	if !AssetTextFallbackEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{})) {
+		t.Fatal("batch false must apply when the book inherits")
+	}
+	if AssetTextFallbackEnabled(ResolveSettings(SettingsPatch{"assetImagesEnabled": raw(false)}, SettingsPatch{"assetImagesEnabled": raw(true)})) {
+		t.Fatal("book override must win over the batch value")
+	}
+}
+
 func TestNormalizeProductionModeDefaultsToVideo(t *testing.T) {
 	if got := normalizeProductionMode(SettingsPatch{}); got != "video" {
 		t.Fatalf("got %q want video", got)

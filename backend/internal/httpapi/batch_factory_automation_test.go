@@ -1244,14 +1244,15 @@ func TestAutomationRequiresOpeningStageWhenEnabled(t *testing.T) {
 
 func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 	cases := []struct {
-		name          string
-		setting       json.RawMessage
-		precreateBook bool
-		wantCalls     int
-		wantSkipLog   bool
+		name            string
+		setting         json.RawMessage
+		precreateBook   bool
+		wantCalls       int
+		wantSkipLog     bool
+		wantMissingText bool
 	}{
 		{name: "default keeps the assets stage", setting: nil, wantCalls: 2},
-		{name: "explicit false skips the assets stage", setting: json.RawMessage("false"), wantCalls: 1, wantSkipLog: true},
+		{name: "explicit false skips the assets stage", setting: json.RawMessage("false"), wantCalls: 1, wantSkipLog: true, wantMissingText: true},
 		{name: "disabled keeps existing assets", setting: json.RawMessage("false"), precreateBook: true, wantCalls: 1, wantSkipLog: true},
 	}
 	for _, tc := range cases {
@@ -1348,6 +1349,10 @@ func TestVideoAutomationAssetImagesSwitchGatesOnlyTheAssetsStage(t *testing.T) {
 			if tc.wantSkipLog && !strings.Contains(fmt.Sprint(entry["logs"]), "因资产图片开关关闭，已跳过资产生成阶段") {
 				t.Fatalf("logs=%v, want the explicit skip reason", entry["logs"])
 			}
+			merged := strings.Contains(fmt.Sprint(entry["logs"]), "无已存资产描述，已跳过合并")
+			if merged != tc.wantMissingText {
+				t.Fatalf("logs=%v, merged=%v want %v", entry["logs"], merged, tc.wantMissingText)
+			}
 		})
 	}
 }
@@ -1389,12 +1394,15 @@ func TestComicAutomationWithAssetImagesDisabledStillRunsTheComicStages(t *testin
 
 	coordinator.run(ctx, "alice", batch.ID, "job-comic-assets-off", job, batch)
 
-	// 漫画资产文本仍是分页提示词的必需前置，关闭开关只跳过资产图生成，不能把整条漫画链路打断。
-	if !generated || provider.calls != 3 {
+	// 关闭资产图片：不重新提炼资产，也不出图；漫画仍按正文分页并生成页提示词。
+	if !generated || provider.calls != 2 {
 		t.Fatalf("generated=%v AI calls=%d entry=%#v, want comic preparation and generation to keep running", generated, provider.calls, entry)
 	}
 	if entry["status"] != "completed" || entry["stage"] != "ready_for_upload" || automationStringValue(entry["error"], "") != "" {
 		t.Fatalf("entry=%#v, want a completed comic run without failures", entry)
+	}
+	if !strings.Contains(fmt.Sprint(entry["logs"]), "无已存资产描述，已跳过合并") {
+		t.Fatalf("logs=%v, want the asset-text skip explanation", entry["logs"])
 	}
 }
 

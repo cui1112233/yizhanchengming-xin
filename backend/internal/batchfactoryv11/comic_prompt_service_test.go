@@ -318,7 +318,7 @@ func TestBuildComicPromptContractUsesComicAssetsAndConstraints(t *testing.T) {
 		},
 	})
 
-	contract, err := BuildComicPromptContract(book, []Video{video}, 0, DirectorSnapshot{Effective: SettingsPatch{"productionMode": raw("comic"), "imageAspectRatio": raw("9:16"), "aiPromptConfig": settings}, AspectRatio: "9:16"})
+	contract, err := BuildComicPromptContract(book, []Video{video}, 0, DirectorSnapshot{Effective: SettingsPatch{"productionMode": raw("comic"), "imageAspectRatio": raw("9:16"), "assetImagesEnabled": rawSetting(t, false), "aiPromptConfig": settings}, AspectRatio: "9:16"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,8 +352,9 @@ func TestBuildComicPromptContractCarriesStableComicAssetIdentity(t *testing.T) {
 	}
 	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页"}})
 	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-identity", Label: "漫画页 01", VideoPrompt: "沈晚看向陆夫人。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
-		"productionMode": rawSetting(t, "comic"),
-		"aiPromptConfig": settings,
+		"productionMode":      rawSetting(t, "comic"),
+		"assetImagesEnabled": rawSetting(t, false),
+		"aiPromptConfig":      settings,
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -750,5 +751,136 @@ func TestComicPromptTextForAspectSwitchesOrientationWording(t *testing.T) {
 	}
 	if got := comicPromptTextForAspect("成图为{{image_aspect_ratio}}{{image_orientation}}的中文漫画页", "3:2"); !strings.Contains(got, "3:2横幅构图") {
 		t.Fatalf("structure lock did not use landscape orientation: %s", got)
+	}
+}
+
+func TestBuildComicPromptContractWithAssetImagesEnabledCarriesOnlyAssetIdentity(t *testing.T) {
+	book := Book{
+		ID: "book-identity", Title: "身份连续性", SourceText: "沈晚看向陆夫人。",
+		AssetRecords: []BookAsset{
+			{ID: "asset-shen-wan", Kind: "character", Name: "我", FormalName: "沈晚", Facts: "侯府妾室", Appearance: "乌发红衣", Relationships: "与陆夫人为妾室与主母关系", Prompt: "乌发红衣的古装女子", Source: "comic"},
+		},
+	}
+	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页\n角色：{roles_str}"}})
+	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-identity", Label: "漫画页 01", VideoPrompt: "沈晚看向陆夫人。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
+		"productionMode": rawSetting(t, "comic"),
+		"aiPromptConfig": settings,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		ComicAssets []map[string]string `json:"comic_assets"`
+	}
+	if err := json.Unmarshal([]byte(contract.UserPrompt), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.ComicAssets) != 1 {
+		t.Fatalf("comic asset identity table length=%d, want 1: %s", len(payload.ComicAssets), contract.UserPrompt)
+	}
+	if payload.ComicAssets[0]["asset_id"] != "asset-shen-wan" || payload.ComicAssets[0]["formal_name"] != "沈晚" {
+		t.Fatalf("identity fields missing: %+v", payload.ComicAssets[0])
+	}
+	// 开路径：参考图承担视觉细节，提示词不得重复资产描述。
+	for _, omitted := range []string{"乌发红衣的古装女子", "侯府妾室", "乌发红衣", "与陆夫人为妾室与主母关系", "沈晚：乌发红衣的古装女子"} {
+		if strings.Contains(contract.UserPrompt, omitted) || strings.Contains(contract.SystemPrompt, omitted) {
+			t.Fatalf("asset description %q leaked into the image-first comic prompt: system=%s user=%s", omitted, contract.SystemPrompt, contract.UserPrompt)
+		}
+	}
+}
+
+func TestBuildComicPromptContractWithAssetImagesDisabledCarriesFullAssetDescriptions(t *testing.T) {
+	book := Book{
+		ID: "book-text", Title: "文字回退", SourceText: "沈晚看向陆夫人。",
+		AssetRecords: []BookAsset{
+			{ID: "asset-shen-wan", Kind: "character", Name: "我", FormalName: "沈晚", Facts: "侯府妾室", Appearance: "乌发红衣", Prompt: "乌发红衣的古装女子", Source: "comic"},
+		},
+	}
+	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页\n角色：{roles_str}"}})
+	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-text", Label: "漫画页 01", VideoPrompt: "沈晚看向陆夫人。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
+		"productionMode":      rawSetting(t, "comic"),
+		"assetImagesEnabled": rawSetting(t, false),
+		"aiPromptConfig":      settings,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"乌发红衣的古装女子", "侯府妾室", "乌发红衣"} {
+		if !strings.Contains(contract.UserPrompt, expected) {
+			t.Fatalf("stored asset description %q missing from the text fallback prompt: %s", expected, contract.UserPrompt)
+		}
+	}
+	// {roles_str} 展开在系统提示里，关闭时必须带「名称：描述」。
+	if !strings.Contains(contract.SystemPrompt, "沈晚：乌发红衣的古装女子") {
+		t.Fatalf("roles_str must carry the stored description when assets images are disabled: %s", contract.SystemPrompt)
+	}
+}
+
+func TestBuildComicPromptContractWithAssetImagesDisabledAllowsNoComicAssets(t *testing.T) {
+	book := Book{ID: "book-empty", Title: "无资产", SourceText: "林晚走进办公室。"}
+	settings := rawSetting(t, map[string]any{"comic": map[string]any{"enabled": true, "body": "生成完整漫画页"}})
+	contract, err := BuildComicPromptContract(book, []Video{{ID: "page-empty", Label: "漫画页 01", VideoPrompt: "林晚走进办公室。"}}, 0, DirectorSnapshot{Effective: SettingsPatch{
+		"productionMode":      rawSetting(t, "comic"),
+		"assetImagesEnabled": rawSetting(t, false),
+		"aiPromptConfig":      settings,
+	}})
+	if err != nil {
+		t.Fatalf("disabled switch without comic assets must not block: %v", err)
+	}
+	var payload struct {
+		ComicAssets []map[string]string `json:"comic_assets"`
+	}
+	if err := json.Unmarshal([]byte(contract.UserPrompt), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.ComicAssets) != 0 {
+		t.Fatalf("empty book must not synthesize comic assets: %+v", payload.ComicAssets)
+	}
+	if !strings.Contains(contract.UserPrompt, "林晚走进办公室。") {
+		t.Fatalf("comic prompt must continue from the source text: %s", contract.UserPrompt)
+	}
+}
+
+func TestRunComicBootstrapWithAssetImagesDisabledDoesNotRequireAssetStage(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	batch, err := store.CreateBatch(ctx, "alice", CreateBatchInput{Title: "B", Books: []CreateBookInput{{Title: "K", SourceText: "林晚走进办公室。"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := map[string]any{"comic": map[string]any{
+		"enabled": true,
+		"body":    "漫画分页与提示词规则",
+		"assets":  map[string]any{"body": "提取漫画资产"},
+	}}
+	if _, err := store.SaveSettings(ctx, "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{
+			"productionMode":       rawSetting(t, "comic"),
+			"assetImagesEnabled":   rawSetting(t, false),
+			"aiPromptConfig":       rawSetting(t, config),
+			"audioPlanningEnabled": rawSetting(t, true),
+		}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	provider := &queuedDirectorProvider{values: []string{
+		`{"boundaryIds":["b1"]}`,
+		`{"screen_prompt":"单页漫画导演说明","image_prompt":"单页漫画图片提示词","roles":["林晚"],"scene_presets":[]}`,
+	}}
+	if _, err := (&DirectorService{Store: store, Provider: provider}).RunComicBootstrap(ctx, "alice", batch.ID, batch.Books[0].ID); err != nil {
+		t.Fatalf("disabled switch without comic assets must not block bootstrap: %v", err)
+	}
+	if len(provider.calls) != 2 {
+		t.Fatalf("comic bootstrap calls=%d, want segmentation and page prompt only (no asset extraction)", len(provider.calls))
+	}
+	latest, err := store.GetBatch(ctx, "alice", batch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(latest.Books[0].AssetRecords) != 0 {
+		t.Fatalf("disabled switch must not re-extract comic assets: %+v", latest.Books[0].AssetRecords)
+	}
+	if len(latest.Books[0].Videos) != 1 || latest.Books[0].Videos[0].ComicPrompt != "单页漫画导演说明" {
+		t.Fatalf("comic page prompt was not saved without assets: %+v", latest.Books[0].Videos)
 	}
 }

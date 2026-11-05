@@ -28,7 +28,7 @@ func BuildComicBootstrapContract(book Book, snapshot DirectorSnapshot) (PromptCo
 	sections := []string{
 		prompt.ComicBootstrapProtocol,
 		"【当前漫画资产推导规则】\n" + strings.TrimSpace(config.Assets.Body),
-		"【当前漫画分页与页面提示词规则】\n" + expandRecoveredComicPreset(strings.TrimSpace(config.Body), book, strings.TrimSpace(book.SourceText)),
+		"【当前漫画分页与页面提示词规则】\n" + expandRecoveredComicPreset(strings.TrimSpace(config.Body), book, strings.TrimSpace(book.SourceText), !AssetImagesEnabled(snapshot.Effective)),
 		comicPromptTextForAspect(comicPageStructureLock, EffectiveImageAspectRatio(snapshot.Effective)),
 	}
 	if body := strings.TrimSpace(config.ImageDerivation.Body); body != "" {
@@ -100,8 +100,8 @@ func comicAssetStageCanReuse(book Book) bool {
 // comicBootstrapCanReuse keeps the normal comic extraction action idempotent.
 // A complete, current analysis is reused; a missing page, missing segment or
 // changed source falls through to the normal bootstrap request.
-func comicBootstrapCanReuse(book Book) bool {
-	if !comicAssetStageCanReuse(book) || len(book.Videos) == 0 {
+func comicBootstrapCanReuse(book Book, requireAssets bool) bool {
+	if (requireAssets && !comicAssetStageCanReuse(book)) || len(book.Videos) == 0 {
 		return false
 	}
 	for _, video := range book.Videos {
@@ -212,10 +212,12 @@ func (s *DirectorService) RunComicBootstrap(ctx context.Context, owner, batchID,
 	if err != nil {
 		return ComicBootstrapResult{}, err
 	}
-	if !comicAssetStageCanReuse(book) {
+	effective := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
+	assetImages := AssetImagesEnabled(effective)
+	if assetImages && !comicAssetStageCanReuse(book) {
 		return ComicBootstrapResult{}, fmt.Errorf("%w: 请先提取漫画资产", ErrConflict)
 	}
-	if comicBootstrapCanReuse(book) {
+	if comicBootstrapCanReuse(book, assetImages) {
 		revision := DirectorRevision{}
 		if book.DirectorRevision != nil {
 			revision = *book.DirectorRevision

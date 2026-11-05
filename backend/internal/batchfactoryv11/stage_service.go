@@ -285,6 +285,11 @@ func (s *BookStageService) run(ctx context.Context, owner, batchID, bookID strin
 	}
 	effectiveSettings := ResolveSettings(batch.SettingsState.Patch, book.SettingsState.Patch)
 	effectiveMode := normalizeProductionMode(effectiveSettings)
+	if stage == BookStageAssets && !AssetImagesEnabled(effectiveSettings) {
+		// 关闭资产图片：不跑视频/漫画资产提取，直接沿用书里已存描述，
+		// 严禁为了凑齐资产而重新调用文本模型。
+		return s.Summary(ctx, owner, batchID, bookID)
+	}
 	if mode == StageModeMissing && effectiveMode == "comic" {
 		if stage == BookStageDirector {
 			if segmentStore, ok := s.Store.(ComicSourceSegmentStore); ok {

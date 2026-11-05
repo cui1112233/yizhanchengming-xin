@@ -75,9 +75,15 @@ func TestFinalPromptUsesDirectorAssetsAndEffectiveConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"视频提示词：镜头画面：", "00:00-00:03 | 中景｜缓慢推轨 | 林晚进入客厅", "00:03-00:09 | 特写｜固定 | 她握紧玻璃杯", "林晚：18岁中国女性", "林家客厅：现代中式客厅", "玻璃杯：透明厚底玻璃杯", "画面前缀：电影感运镜", "画面约束提示词：高质量商业成片", "负面提示词：不要水印和畸形手指"} {
+	for _, expected := range []string{"视频提示词：镜头画面：", "00:00-00:03 | 中景｜缓慢推轨 | 林晚进入客厅", "00:03-00:09 | 特写｜固定 | 她握紧玻璃杯", "画面前缀：电影感运镜", "画面约束提示词：高质量商业成片", "负面提示词：不要水印和畸形手指"} {
 		if !strings.Contains(value.CompiledPrompt, expected) {
 			t.Fatalf("missing %q in\n%s", expected, value.CompiledPrompt)
+		}
+	}
+	// 开路径：参考图承担视觉信息，不再重复已存资产描述文本。
+	for _, omitted := range []string{"林晚：18岁中国女性", "林家客厅：现代中式客厅", "玻璃杯：透明厚底玻璃杯", "基础设定："} {
+		if strings.Contains(value.CompiledPrompt, omitted) {
+			t.Fatalf("asset text %q leaked into the image-first prompt:\n%s", omitted, value.CompiledPrompt)
 		}
 	}
 	if strings.Contains(value.CompiledPrompt, "画面主体：") {
@@ -133,7 +139,7 @@ func TestInferAssetReferencesFromContentDoesNotUseWholeBookFallback(t *testing.T
 func TestFinalPromptUsesH3VideoRendererWhenTheH3PresetIsSelected(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
-		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false), "aiPromptConfig": rawSetting(t, map[string]any{
 			"video": map[string]any{
 				"enabled":   true,
 				"scope":     "all",
@@ -456,7 +462,7 @@ func TestFinalPromptUsesTheConfirmedVideoInputOrder(t *testing.T) {
 		},
 	}
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
-		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{"constraints": constraints})}, ExpectedRevision: batch.Revision,
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false), "aiPromptConfig": rawSetting(t, map[string]any{"constraints": constraints})}, ExpectedRevision: batch.Revision,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +487,7 @@ func TestFinalPromptUsesTheConfirmedVideoInputOrder(t *testing.T) {
 func TestFinalPromptWithRetiredConstraintMasterFlagStillUsesConfiguredLayers(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
-		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{"constraints": map[string]any{"enabled": false}})}, ExpectedRevision: batch.Revision,
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false), "aiPromptConfig": rawSetting(t, map[string]any{"constraints": map[string]any{"enabled": false}})}, ExpectedRevision: batch.Revision,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -509,6 +515,9 @@ func TestFinalPromptUsesPersistedManualBookAsset(t *testing.T) {
 		t.Fatalf("assets=%+v", book.AssetRecords)
 	}
 	if _, err := store.UpdateBookAsset(context.Background(), "alice", batch.ID, book.ID, character.ID, UpdateBookAssetInput{Name: character.Name, Prompt: "用户手动确认的角色一致性 Prompt", ExpectedRevision: character.Revision}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false)}, ExpectedRevision: batch.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	prompt, err := (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, video.ID)
@@ -602,8 +611,11 @@ func TestExplicitAssetMentionsLimitVideoReferenceImages(t *testing.T) {
 	}
 }
 
-func TestFinalPromptOmitsTextForImageBackedAssets(t *testing.T) {
+func TestFinalPromptWithAssetImagesDisabledSendsTextEvenForImageBackedAssets(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false)}, ExpectedRevision: batch.Revision}); err != nil {
+		t.Fatal(err)
+	}
 	var scene BookAsset
 	for _, asset := range book.AssetRecords {
 		if asset.Kind == "scene" && asset.Name == "林家客厅" {
@@ -620,14 +632,14 @@ func TestFinalPromptOmitsTextForImageBackedAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 有主图的场景：走图片生视频，文字设定不发。
-	if strings.Contains(compiled.CompiledPrompt, "林家客厅：现代中式客厅") {
-		t.Fatalf("image-backed scene text must be omitted:\n%s", compiled.CompiledPrompt)
+	// 关闭资产图片：即使场景已有历史主图，也强制把已存描述合并进提示词。
+	if !strings.Contains(compiled.CompiledPrompt, "林家客厅：现代中式客厅") {
+		t.Fatalf("stored scene text must be merged when asset images are disabled:\n%s", compiled.CompiledPrompt)
 	}
 	if !slices.Contains(compiled.ReferenceImageURLs, "https://images.example/scene-primary.png") {
 		t.Fatalf("scene primary image missing: %+v", compiled.ReferenceImageURLs)
 	}
-	// 没图片的人物：文字照常发，走文生视频。
+	// 没图片的人物同样发文字，保证无参考图也不缺信息。
 	if !strings.Contains(compiled.CompiledPrompt, "林晚：18岁中国女性") {
 		t.Fatalf("text-only character prompt must remain:\n%s", compiled.CompiledPrompt)
 	}
@@ -636,6 +648,9 @@ func TestFinalPromptOmitsTextForImageBackedAssets(t *testing.T) {
 func TestFinalPromptIgnoresLegacyAssetPromptDraftWhenAssetRecordExists(t *testing.T) {
 	store, batch, book, video := seedCompiledVideo(t)
 	if _, err := store.SaveDraft(context.Background(), "alice", Draft{Key: "asset:character:林晚", Kind: "asset-prompt", Scope: batch.ID, Content: "过期草稿"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false)}, ExpectedRevision: batch.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	prompt, err := (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, video.ID)
@@ -832,7 +847,7 @@ func TestSelectedAssetsSuppressesRepeatedNames(t *testing.T) {
 	assets := selectedAssets("prop", []string{"茶杯", "茶杯"}, map[string]compiledAsset{
 		assetKey("prop", "茶杯"): {ID: "prop-1", Kind: "prop", Name: "茶杯", Prompt: "白瓷茶杯"},
 	}, map[string]string{}, nil, false)
-	if got := selectResolvedPrompts(assets, map[string]bool{}); got != "茶杯：白瓷茶杯" {
+	if got := selectResolvedPrompts(assets, map[string]bool{}, true); got != "茶杯：白瓷茶杯" {
 		t.Fatalf("duplicate asset names must only appear once, got %q", got)
 	}
 }
@@ -842,7 +857,7 @@ func TestSelectedAssetsResolvesDirectorAliasesToCurrentAssetRecords(t *testing.T
 		assetKey("character", "我"):  {ID: "character-1", Kind: "character", Name: "我", FormalName: "妾室", Prompt: "妾室外形"},
 		assetKey("character", "夫人"): {ID: "character-2", Kind: "character", Name: "夫人", FormalName: "当家主母", Prompt: "夫人外形"},
 	}, map[string]string{}, nil, false)
-	if got := selectResolvedPrompts(assets, map[string]bool{}); got != "我：妾室外形；夫人：夫人外形" {
+	if got := selectResolvedPrompts(assets, map[string]bool{}, true); got != "我：妾室外形；夫人：夫人外形" {
 		t.Fatalf("director aliases must resolve to current assets, got %q", got)
 	}
 }
@@ -977,7 +992,7 @@ func TestCompiledVideoInputUsesDroppedAssetTextWhenReferenceLimitExceeded(t *tes
 			t.Fatal(err)
 		}
 	}
-	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{"referenceImageLimit": rawSetting(t, 2)}, ExpectedRevision: video.Revision}); err != nil {
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeVideo, BatchID: batch.ID, BookID: book.ID, VideoID: video.ID}, SettingsUpdate{Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false), "referenceImageLimit": rawSetting(t, 2)}, ExpectedRevision: video.Revision}); err != nil {
 		t.Fatal(err)
 	}
 	latest, err := store.GetBatch(context.Background(), "alice", batch.ID)
@@ -1219,4 +1234,101 @@ func seedCompiledSDOpening(t *testing.T, variants []OpeningVariant) (*MemoryStor
 	book = batch.Books[0]
 	video = book.Videos[0]
 	return store, batch, book, video
+}
+
+func TestFinalPromptWithAssetImagesEnabledKeepsH3SubjectIdentityWithoutDefinitions(t *testing.T) {
+	store, batch, book, video := seedCompiledVideo(t)
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"aiPromptConfig": rawSetting(t, map[string]any{
+			"video": map[string]any{
+				"enabled":   true,
+				"scope":     "all",
+				"presetId":  "batch-video-h3-director",
+				"presetKey": "h3-video-normal",
+				"body":      "H3 director output renderer",
+			},
+		})},
+		ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	prompt, err := (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, video.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 开路径：参考图承担视觉信息，不再输出资产描述；<Subject N> 身份锚点保留。
+	for _, omitted := range []string{"【人物定义】", "18岁中国女性", "基础设定："} {
+		if strings.Contains(prompt.CompiledPrompt, omitted) {
+			t.Fatalf("asset text %q leaked into the image-first H3 prompt:\n%s", omitted, prompt.CompiledPrompt)
+		}
+	}
+	for _, expected := range []string{"<Subject 1>", "林晚<Subject 1>进入客厅"} {
+		if !strings.Contains(prompt.CompiledPrompt, expected) {
+			t.Fatalf("H3 identity anchor %q missing in:\n%s", expected, prompt.CompiledPrompt)
+		}
+	}
+}
+
+func TestFinalPromptWithAssetImagesDisabledAndNoStoredAssetsSkipsMergeWithoutError(t *testing.T) {
+	store, batch, book, _ := seedCompiledVideo(t)
+	for _, asset := range book.AssetRecords {
+		if err := store.DeleteBookAsset(context.Background(), "alice", batch.ID, book.ID, asset.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false)}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	prompt, err := (&PromptCompilerService{Store: store}).Compile(context.Background(), "alice", batch.ID, book.ID, book.Videos[0].ID)
+	if err != nil {
+		t.Fatalf("disabled switch without stored assets must not block: %v", err)
+	}
+	for _, omitted := range []string{"基础设定：", "18岁中国女性", "现代中式客厅"} {
+		if strings.Contains(prompt.CompiledPrompt, omitted) {
+			t.Fatalf("prompt must not carry an asset section %q:\n%s", omitted, prompt.CompiledPrompt)
+		}
+	}
+	if !strings.Contains(prompt.CompiledPrompt, "00:00-00:03") {
+		t.Fatalf("storyboard prompt must keep running without assets:\n%s", prompt.CompiledPrompt)
+	}
+}
+
+func TestFinalPromptOpeningVariantFollowsAssetTextSwitch(t *testing.T) {
+	store, batch, book, video := seedCompiledSDOpening(t, []OpeningVariant{
+		{Index: 1, Label: "分镜一 | 换开头1", Prompt: "林晚的开场", Status: "success"},
+	})
+	if _, err := store.CreateBookAsset(context.Background(), "alice", batch.ID, book.ID, CreateBookAssetInput{
+		Kind: "character", Source: "manual", Name: "林晚", Prompt: "18岁中国女性",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	batch, _ = store.GetBatch(context.Background(), "alice", batch.ID)
+	book = batch.Books[0]
+
+	enabled, err := (&PromptCompilerService{Store: store}).CompileForOpeningVariant(context.Background(), "alice", batch.ID, book.ID, video.ID, 1, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(enabled.CompiledPrompt, "林晚：18岁中国女性") {
+		t.Fatalf("image-first opening variant must not merge asset text:\n%s", enabled.CompiledPrompt)
+	}
+
+	if _, err := store.SaveSettings(context.Background(), "alice", ScopeRef{Kind: ScopeBatch, BatchID: batch.ID}, SettingsUpdate{
+		Patch: SettingsPatch{"assetImagesEnabled": rawSetting(t, false)}, ExpectedRevision: batch.Revision,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := (&PromptCompilerService{Store: store}).CompileForOpeningVariant(context.Background(), "alice", batch.ID, book.ID, video.ID, 1, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(disabled.CompiledPrompt, "林晚：18岁中国女性") {
+		t.Fatalf("text fallback must merge stored asset descriptions:\n%s", disabled.CompiledPrompt)
+	}
 }

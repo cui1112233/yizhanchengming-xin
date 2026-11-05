@@ -636,10 +636,10 @@ func allEnabledBookAssets(kind string, records map[string]compiledAsset, exclude
 	return assets
 }
 
-func selectResolvedPrompts(assets []compiledAsset, included map[string]bool) string {
+func selectResolvedPrompts(assets []compiledAsset, included map[string]bool, skipIncluded bool) string {
 	parts := []string{}
 	for _, asset := range assets {
-		if asset.ID != "" && included[asset.ID] {
+		if skipIncluded && asset.ID != "" && included[asset.ID] {
 			// 图片确实作为参考输入发给了视频模型：走图片生视频，
 			// 不再重复发文字设定。图片因上限没发出去时，文字仍兜底保留。
 			continue
@@ -769,6 +769,7 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 		draft.Shots = nil
 	}
 	values := effective.Values
+	assetTextFallback := AssetTextFallbackEnabled(values)
 	characterRefs := rawStrings(values, "characterRefs")
 	if len(characterRefs) == 0 {
 		characterRefs = draft.Characters
@@ -894,26 +895,37 @@ func (s *PromptCompilerService) compile(ctx context.Context, owner, batchID, boo
 	baseSetupActive := baseSetupEnabled(values) && rawBool(values, "injectBaseSettings", true)
 	baseSetupPrompt := ""
 	if baseSetupActive {
+		// 开（assetImagesEnabled=true）：下游只走资产图参考，不再把已存资产
+		// 描述二次拼进视频提示词。关：无条件合并已存描述，即使该资产有历史
+		// 图片也照常注入，保证无参考图时信息不缺失。
+		textIncluded := included
+		skipIncluded := true
+		if assetTextFallback {
+			textIncluded = nil
+			skipIncluded = false
+		}
 		base := []string{}
-		if value := selectResolvedPrompts(characters, included); value != "" {
+		if value := selectResolvedPrompts(characters, textIncluded, skipIncluded); value != "" {
 			base = append(base, "人物："+value)
 		}
-		if value := selectResolvedPrompts(scenes, included); value != "" {
+		if value := selectResolvedPrompts(scenes, textIncluded, skipIncluded); value != "" {
 			base = append(base, "场景："+value)
 		}
 		baseSetupPrompt = strings.Join(base, "\n")
-		if value := selectResolvedPrompts(props, included); value != "" {
+		if value := selectResolvedPrompts(props, textIncluded, skipIncluded); value != "" {
 			base = append(base, "道具："+value)
 		}
 		// 基础设定统一由开关注入，H3 不再跳过。H3 下的人物定义保留 <Subject N>
 		// 格式（供时间轴引用），但作为外层“基础设定”组件按开关注入；非 H3 沿用
-		// 通用“人物/场景/道具”文本。图片真发出去的资产不出文字（图片生视频）。
-		if h3Renderer {
-			if definitions := h3SubjectDefinitions(h3Subjects(assetsWithoutImages(characters, included))); definitions != "" {
-				addComponent(&components, "baseSetup", "基础设定", definitions)
+		// 通用“人物/场景/道具”文本。仅文字回退路径输出该组件。
+		if assetTextFallback {
+			if h3Renderer {
+				if definitions := h3SubjectDefinitions(h3Subjects(assetsWithoutImages(characters, textIncluded))); definitions != "" {
+					addComponent(&components, "baseSetup", "基础设定", definitions)
+				}
+			} else {
+				addComponent(&components, "baseSetup", "基础设定", strings.Join(base, "\n"))
 			}
-		} else {
-			addComponent(&components, "baseSetup", "基础设定", strings.Join(base, "\n"))
 		}
 	}
 	var displayPrompt, videoPrompt, videoLabel string

@@ -1602,8 +1602,8 @@ func (c *BatchAutomationCoordinator) sensitiveReviewPending(ctx context.Context,
 	return 0, false
 }
 
-func comicBootstrapReady(book batchfactoryv11.Book, _ batchfactoryv11.SettingsPatch) bool {
-	if !comicAssetsReady(book) || len(book.Videos) == 0 {
+func comicBootstrapReady(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) bool {
+	if (batchfactoryv11.AssetImagesEnabled(effective) && !comicAssetsReady(book)) || len(book.Videos) == 0 {
 		return false
 	}
 	for _, page := range book.Videos {
@@ -1632,7 +1632,9 @@ const (
 )
 
 func selectComicPreparationAction(book batchfactoryv11.Book, effective batchfactoryv11.SettingsPatch) comicPreparationAction {
-	if !comicAssetsReady(book) || batchfactoryv11.ComicAssetIdentityIssue(book) != "" || len(book.Videos) == 0 {
+	// 关闭资产图片时不重新提炼资产：已有的就用，没有的走正文继续。
+	requireAssets := batchfactoryv11.AssetImagesEnabled(effective)
+	if (requireAssets && (!comicAssetsReady(book) || batchfactoryv11.ComicAssetIdentityIssue(book) != "")) || len(book.Videos) == 0 {
 		return comicPreparationBootstrap
 	}
 	for _, page := range book.Videos {
@@ -2680,7 +2682,8 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 					case comicPreparationBootstrap:
 						identityIssue := batchfactoryv11.ComicAssetIdentityIssue(book)
 						identityRecovery := identityIssue != ""
-						if !comicAssetsReady(book) || identityRecovery {
+						// 关闭资产图片时只复用已存资产描述，不重新提炼。
+						if batchfactoryv11.AssetImagesEnabled(effective) && (!comicAssetsReady(book) || identityRecovery) {
 							message := "正在提取漫画人物、场景和道具资产"
 							assetMode := batchfactoryv11.StageModeMissing
 							if identityRecovery {
@@ -2719,6 +2722,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 									continue
 								}
 							}
+						}
+						if !batchfactoryv11.AssetImagesEnabled(effective) && !comicAssetsReady(book) {
+							appendAutomationBookLog(entry, c.now(), "comic_assets", "无已存资产描述，已跳过合并")
 						}
 						entry["stage"], entry["message"], entry["updatedAt"] = "comic_bootstrap", "正在分析原文、分页并生成每页漫画提示词", c.now()
 						persist()
@@ -2957,6 +2963,9 @@ func (c *BatchAutomationCoordinator) run(ctx context.Context, owner, batchID, jo
 						const skipMessage = "因资产图片开关关闭，已跳过资产生成阶段"
 						entry["stage"], entry["message"], entry["updatedAt"] = "assets", skipMessage, c.now()
 						appendAutomationBookLog(entry, c.now(), "assets", skipMessage)
+						if !bookHasStoredAssetDescription(book) {
+							appendAutomationBookLog(entry, c.now(), "assets", "无已存资产描述，已跳过合并")
+						}
 						persist()
 					}
 					if forceRegenerate || !automationDirectorComplete(book) {
@@ -3405,6 +3414,17 @@ func productionJobError(job batchfactoryv11.ProductionJob) string {
 		}
 	}
 	return "视频模型未返回成片"
+}
+
+// bookHasStoredAssetDescription reports whether the book already carries any
+// stored asset description that the closed switch path can merge into prompts.
+func bookHasStoredAssetDescription(book batchfactoryv11.Book) bool {
+	for _, asset := range book.AssetRecords {
+		if strings.TrimSpace(asset.Prompt) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // automationAssetsComplete 资产阶段完成口径：开关关闭视为完成；开关打开时

@@ -127,9 +127,18 @@ func EffectiveProductionMode(batchPatch, bookPatch SettingsPatch) string {
 // AssetImagesEnabled reports whether automation should generate asset
 // reference images. Defaults to true so existing batches keep their current
 // behavior; an explicit false in the batch or book patch turns the assets stage
-// off without blocking the storyboard, video or comic stages.
+// off without blocking the storyboard, video or comic stages. When enabled,
+// downstream prompts use the reference images and must not repeat the stored
+// asset descriptions as text.
 func AssetImagesEnabled(patch SettingsPatch) bool {
 	return rawBool(patch, "assetImagesEnabled", true)
+}
+
+// AssetTextFallbackEnabled reports whether downstream prompts should merge the
+// stored asset descriptions because asset reference images are disabled. It is
+// the inverse of AssetImagesEnabled: the two paths are mutually exclusive.
+func AssetTextFallbackEnabled(patch SettingsPatch) bool {
+	return !AssetImagesEnabled(patch)
 }
 
 func ChangedKeys(update SettingsUpdate) []string {

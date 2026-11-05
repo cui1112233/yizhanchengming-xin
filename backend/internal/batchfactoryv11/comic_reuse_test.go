@@ -16,12 +16,12 @@ func TestComicBootstrapCanReuseOnlyWhenSourceAndPagesAreComplete(t *testing.T) {
 			},
 		}},
 	}
-	if !comicBootstrapCanReuse(book) {
+	if !comicBootstrapCanReuse(book, true) {
 		t.Fatal("complete comic result should be reusable")
 	}
 
 	book.Videos[0].ComicSourceSegment.SourceDigest = sourceDigest("新正文")
-	if comicBootstrapCanReuse(book) {
+	if comicBootstrapCanReuse(book, true) {
 		t.Fatal("stale comic result must not be reused")
 	}
 }

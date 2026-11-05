@@ -116,8 +116,11 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 	if !config.Comic.appliesTo(book) {
 		return PromptContract{}, NewConfigRequiredError("请先在 AI 推理中选择漫画提示词")
 	}
+	// 开（assetImagesEnabled=true）：参考图承担资产视觉信息，提示词只带身份；
+	// 关：沿用已存资产描述并合并进提示词。关闭时没有已存描述也不阻断。
+	assetImages := AssetImagesEnabled(snapshot.Effective)
 	assets := comicAssets(book.AssetRecords)
-	if len(assets) == 0 {
+	if assetImages && len(assets) == 0 {
 		return PromptContract{}, NewConfigRequiredError("请先提取漫画资产")
 	}
 	aspectRatio := EffectiveImageAspectRatio(snapshot.Effective)
@@ -146,7 +149,7 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 		nextPage = comicPageSourceText(videos[pageIndex+1])
 	}
 	localContext := comicLocalContext(videos, pageIndex)
-	pagePreset = expandRecoveredComicPreset(comicPromptTextForAspect(pagePreset, aspectRatio), book, localContext)
+	pagePreset = expandRecoveredComicPreset(comicPromptTextForAspect(pagePreset, aspectRatio), book, localContext, !assetImages)
 	parts = append(parts,
 		comicPromptTextForAspect(comicPageStructureLock, aspectRatio),
 		"漫画提示词预设：\n"+pagePreset,
@@ -167,6 +170,10 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 			}
 		}
 	}
+	payloadAssets := assets
+	if assetImages {
+		payloadAssets = comicAssetIdentities(book.AssetRecords)
+	}
 	payload, err := json.Marshal(map[string]any{
 		"book_title":    book.Title,
 		"source_text":   localContext,
@@ -174,7 +181,7 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 		"previous_page": previousPage,
 		"current_page":  comicPageSourceText(video),
 		"next_page":     nextPage,
-		"comic_assets":  assets,
+		"comic_assets":  payloadAssets,
 		"aspect_ratio":  aspectRatio,
 	})
 	if err != nil {
@@ -183,7 +190,7 @@ func BuildComicPromptContract(book Book, videos []Video, pageIndex int, snapshot
 	return PromptContract{SystemPrompt: strings.Join(parts, "\n\n"), UserPrompt: string(payload), Temperature: 0.25, MaxTokens: 4800}, nil
 }
 
-func expandRecoveredComicPreset(body string, book Book, localContext string) string {
+func expandRecoveredComicPreset(body string, book Book, localContext string, withDescriptions bool) string {
 	assetLines := make([]string, 0, len(book.AssetRecords))
 	for _, asset := range book.AssetRecords {
 		if strings.TrimSpace(asset.Source) != "comic" {
@@ -193,9 +200,18 @@ func expandRecoveredComicPreset(body string, book Book, localContext string) str
 		if name == "" {
 			name = strings.TrimSpace(asset.Name)
 		}
-		if name != "" {
-			assetLines = append(assetLines, name+"："+strings.TrimSpace(asset.Prompt))
+		if name == "" {
+			continue
 		}
+		if withDescriptions {
+			// 没有已存描述时不拼，也不阻断流程。
+			if description := strings.TrimSpace(asset.Prompt); description != "" {
+				assetLines = append(assetLines, name+"："+description)
+			}
+			continue
+		}
+		// 开路径：参考图承担视觉信息，只保留身份名。
+		assetLines = append(assetLines, name)
 	}
 	replacer := strings.NewReplacer(
 		"{summary}", strings.TrimSpace(localContext),
@@ -257,11 +273,15 @@ func BuildComicBookPromptContract(book Book, videos []Video, snapshot DirectorSn
 			"content":  comicPageSourceText(video),
 		})
 	}
+	payloadAssets := comicAssets(book.AssetRecords)
+	if AssetImagesEnabled(snapshot.Effective) {
+		payloadAssets = comicAssetIdentities(book.AssetRecords)
+	}
 	payload, err := json.Marshal(map[string]any{
 		"book_title":    book.Title,
 		"source_text":   book.SourceText,
 		"ordered_pages": pages,
-		"comic_assets":  comicAssets(book.AssetRecords),
+		"comic_assets":  payloadAssets,
 		"aspect_ratio":  EffectiveImageAspectRatio(snapshot.Effective),
 	})
 	if err != nil {
@@ -280,6 +300,33 @@ func comicPageSourceText(video Video) string {
 		return video.ComicSourceSegment.SourceText
 	}
 	return strings.TrimSpace(video.VideoPrompt)
+}
+
+// comicAssetIdentities keeps only the identity fields used for role mapping.
+// It is the image-first path: visual details come from the reference images,
+// so stored descriptions must not be repeated in the prompt.
+func comicAssetIdentities(records []BookAsset) []map[string]string {
+	assets := make([]map[string]string, 0, len(records))
+	for _, asset := range records {
+		if strings.TrimSpace(asset.Source) != "comic" {
+			continue
+		}
+		name := strings.TrimSpace(asset.Name)
+		if name == "" {
+			continue
+		}
+		assetID := strings.TrimSpace(asset.ID)
+		if assetID == "" {
+			assetID = name
+		}
+		assets = append(assets, map[string]string{
+			"asset_id":    assetID,
+			"kind":        strings.TrimSpace(asset.Kind),
+			"name":        name,
+			"formal_name": strings.TrimSpace(asset.FormalName),
+		})
+	}
+	return assets
 }
 
 func comicAssets(records []BookAsset) []map[string]string {
