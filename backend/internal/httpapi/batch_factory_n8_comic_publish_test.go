@@ -189,7 +189,7 @@ func TestN8ComicAutomaticPublishSelectsDefaultAudioSettings(t *testing.T) {
 	store := batchfactoryv11.NewMemoryStore()
 	batch, err := store.CreateBatch(context.Background(), "alice", batchfactoryv11.CreateBatchInput{
 		Title: "漫画批次",
-		Books: []batchfactoryv11.CreateBookInput{{Title: "自动音频", Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一幕"}}}},
+		Books: []batchfactoryv11.CreateBookInput{{Title: "自动音频", SourceMetadata: map[string]any{"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified"}, Videos: []batchfactoryv11.CreateVideoInput{{Label: "第一幕"}}}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -217,14 +217,15 @@ func TestN8ComicAutomaticPublishSelectsDefaultAudioSettings(t *testing.T) {
 	}
 	client := &fakeN8ComicClient{configured: true}
 	publisher := &BatchFactoryN8ComicPublisher{
-		Store:      store,
-		LocalFiles: files,
-		Client:     client,
+		Store:       store,
+		LocalFiles:  files,
+		Client:      client,
+		RandomIndex: func(int) (int, error) { return 0, nil },
 		ProducerDirectory: fakeN8ComicAudioDirectory{
-			categories: []n8catalog.AudioCategory{{ID: 7, Name: "停用", Status: "DISABLE"}, {ID: 9, Name: "默认", Status: "ENABLE"}},
+			categories: []n8catalog.AudioCategory{{ID: 7, Name: "停用", Status: "DISABLE"}, {ID: 14, Name: "现代悬疑", Status: "ENABLE"}},
 			audios: []n8catalog.Audio{
-				{ID: 201, Name: "旧音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE", UpdatedAt: "2026-11-01 12:00:00"},
-				{ID: 202, Name: "最新音频", OrganizationID: 1, CategoryIDs: []int64{9}, Status: "ENABLE", UpdatedAt: "2026-11-02 12:00:00"},
+				{ID: 201, Name: "旧音频", OrganizationID: 1, CategoryIDs: []int64{14}, Status: "ENABLE", UpdatedAt: "2026-11-01 12:00:00"},
+				{ID: 202, Name: "最新音频", OrganizationID: 1, CategoryIDs: []int64{14}, Status: "ENABLE", UpdatedAt: "2026-11-02 12:00:00"},
 			},
 		},
 	}
@@ -232,23 +233,24 @@ func TestN8ComicAutomaticPublishSelectsDefaultAudioSettings(t *testing.T) {
 	if _, err := publisher.PublishFromSettings(context.Background(), "alice", batch.ID, book.ID, collection, settings); err != nil {
 		t.Fatalf("automatic publish error=%v", err)
 	}
-	if client.request.AudioCategoryID != 9 || client.request.AudioID != 202 {
-		t.Fatalf("publish request used category=%d audio=%d, want category=9 audio=202", client.request.AudioCategoryID, client.request.AudioID)
+	if client.request.AudioCategoryID != 14 || client.request.AudioID != 202 {
+		t.Fatalf("publish request used category=%d audio=%d, want category=14 audio=202", client.request.AudioCategoryID, client.request.AudioID)
 	}
 }
 
 func TestN8ComicAutomaticPublishExplainsWhenNoDefaultAudioIsAvailable(t *testing.T) {
+	store, batch, book := createComicAudioTestBook(t, map[string]any{"style": "现代悬疑", "gender": "女频", "classifyStatus": "classified"})
 	publisher := &BatchFactoryN8ComicPublisher{
-		Store:      batchfactoryv11.NewMemoryStore(),
+		Store:      store,
 		LocalFiles: localartifact.NewStore(t.TempDir(), 1<<20),
 		Client:     &fakeN8ComicClient{configured: true},
 		ProducerDirectory: fakeN8ComicAudioDirectory{
-			categories: []n8catalog.AudioCategory{{ID: 9, Name: "默认", Status: "ENABLE"}},
+			categories: []n8catalog.AudioCategory{{ID: 14, Name: "现代悬疑", Status: "ENABLE"}},
 		},
 	}
-	settings := batchfactoryv11.SettingsPatch{"comicPublishSettings": json.RawMessage(`{"producerAdminName":"制作者","workIds":[9001]}`)}
-	_, err := publisher.PublishFromSettings(context.Background(), "alice", "batch-1", "book-1", batchfactoryv11.ComicCollection{ID: "collection-1"}, settings)
-	if err == nil || !strings.Contains(err.Error(), "没有可用指定音频") {
+	settings := batchfactoryv11.SettingsPatch{"comicPublishSettings": json.RawMessage(`{"producerAdminName":"制作者","organizationId":"1","workIds":[9001]}`)}
+	_, err := publisher.PublishFromSettings(context.Background(), "alice", batch.ID, book.ID, batchfactoryv11.ComicCollection{ID: "collection-1"}, settings)
+	if err == nil || !strings.Contains(err.Error(), "没有可用音频") {
 		t.Fatalf("publish error=%v, want no usable audio explanation", err)
 	}
 }

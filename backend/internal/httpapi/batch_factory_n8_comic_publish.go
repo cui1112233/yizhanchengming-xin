@@ -28,13 +28,17 @@ const n8ComicPublishDraftKind = "n8-comic-publish"
 var errN8ComicCarouselIncomplete = errors.New("N8 漫画图片已上传，但合集尚未创建完成")
 
 type n8ComicPublishSettings struct {
-	ProducerAdminName string  `json:"producerAdminName"`
-	OrganizationID    string  `json:"organizationId"`
-	AudioCategoryID   int64   `json:"audioCategoryId"`
-	AudioID           int64   `json:"audioId"`
-	WorkIDs           []int64 `json:"workIds"`
-	WorkIDsText       string  `json:"workIdsText"`
-	WorkMatchMode     string  `json:"workMatchMode"`
+	ProducerAdminName          string  `json:"producerAdminName"`
+	OrganizationID             string  `json:"organizationId"`
+	AudioCategoryID            int64   `json:"audioCategoryId"`
+	AudioCategoryName          string  `json:"audioCategoryName"`
+	AudioCategorySelectionMode string  `json:"audioCategorySelectionMode"`
+	AudioID                    int64   `json:"audioId"`
+	SpecifiedAudioID           int64   `json:"specifiedAudioId"`
+	SpecifiedAudioName         string  `json:"specifiedAudioName"`
+	WorkIDs                    []int64 `json:"workIds"`
+	WorkIDsText                string  `json:"workIdsText"`
+	WorkMatchMode              string  `json:"workMatchMode"`
 }
 
 type N8ComicClient interface {
@@ -67,14 +71,14 @@ func (p *BatchFactoryN8ComicPublisher) PublishFromSettings(ctx context.Context, 
 			return N8ComicPublishRecord{}, fmt.Errorf("尚未匹配到漫画后台作品 ID，请先在漫画合集里确认关联作品")
 		}
 	}
-	audioCategoryID, audioID, err := p.resolveComicPublishAudio(ctx, config.AudioCategoryID, config.AudioID, config.OrganizationID)
+	selection, err := p.resolveBookComicAudio(ctx, owner, batchID, bookID, config)
 	if err != nil {
 		return N8ComicPublishRecord{}, err
 	}
 	return p.Publish(ctx, owner, batchID, bookID, collection.ID, n8ComicPublishInput{
 		ProducerAdminName: config.ProducerAdminName,
-		AudioCategoryID:   audioCategoryID,
-		AudioID:           audioID,
+		AudioCategoryID:   selection.CategoryID,
+		AudioID:           selection.AudioID,
 		WorkIDs:           config.WorkIDs,
 	})
 }
@@ -98,7 +102,34 @@ func (p *BatchFactoryN8ComicPublisher) ValidateSettings(ctx context.Context, set
 	if err != nil {
 		return err
 	}
-	_, _, err = p.resolveComicPublishAudio(ctx, config.AudioCategoryID, config.AudioID, config.OrganizationID)
+	if strings.TrimSpace(config.OrganizationID) == "" {
+		return fmt.Errorf("漫画发布设置不完整：请选择组织")
+	}
+	manualAudioID := config.AudioID
+	if manualAudioID <= 0 && strings.EqualFold(strings.TrimSpace(config.AudioCategorySelectionMode), "manual") {
+		manualAudioID = config.SpecifiedAudioID
+	}
+	categories, warning := p.audioCategoriesWithWarning(ctx)
+	if warning != "" {
+		return n8DirectoryError(errors.New(warning))
+	}
+	if manualAudioID <= 0 {
+		for _, category := range categories {
+			if category.ID > 0 && strings.EqualFold(strings.TrimSpace(category.Status), "ENABLE") {
+				return nil
+			}
+		}
+		return fmt.Errorf("漫画发布设置不完整：没有可用指定音频分类")
+	}
+	category, err := enabledComicAudioCategory(categories, config.AudioCategoryID, config.AudioCategoryName)
+	if err != nil {
+		return err
+	}
+	audios, err := p.audios(ctx, strconv.FormatInt(category.ID, 10), config.OrganizationID)
+	if err != nil {
+		return err
+	}
+	_, err = enabledComicAudio(audios, manualAudioID)
 	return err
 }
 
@@ -245,11 +276,48 @@ type BatchFactoryN8ComicPublisher struct {
 	WorksDirectory        N8ComicWorkDirectory
 	ProducerAccounts      []string
 	Now                   func() time.Time
+	RandomIndex           func(upper int) (int, error)
 	// WorkTitleMapPath 是本地“书名 -> N8 作品 ID”缓存路径，为空时使用默认路径。
 	WorkTitleMapPath string
 	mu               sync.Mutex
 	titleMapOnce     sync.Once
 	titleMap         *n8WorkTitleMap
+
+	// N8 目录一次读取要 10 秒以上（账号目录要翻页），而统一配置弹窗每次打开
+	// 都会取一遍。这里给成功结果加短 TTL 缓存，避免每次打开都卡在空候选上。
+	directoryCacheMu sync.Mutex
+	directoryCache   map[string]n8DirectoryCacheEntry
+}
+
+const n8DirectoryCacheTTL = 5 * time.Minute
+
+type n8DirectoryCacheEntry struct {
+	value     any
+	expiresAt time.Time
+}
+
+type n8ProducerAccountsCache struct {
+	names  []string
+	source string
+}
+
+func (p *BatchFactoryN8ComicPublisher) cachedDirectory(key string) (any, bool) {
+	p.directoryCacheMu.Lock()
+	defer p.directoryCacheMu.Unlock()
+	entry, ok := p.directoryCache[key]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return nil, false
+	}
+	return entry.value, true
+}
+
+func (p *BatchFactoryN8ComicPublisher) storeDirectory(key string, value any) {
+	p.directoryCacheMu.Lock()
+	defer p.directoryCacheMu.Unlock()
+	if p.directoryCache == nil {
+		p.directoryCache = map[string]n8DirectoryCacheEntry{}
+	}
+	p.directoryCache[key] = n8DirectoryCacheEntry{value: value, expiresAt: time.Now().Add(n8DirectoryCacheTTL)}
 }
 
 // workTitleMap 惰性初始化本地书名映射，避免所有构造点都必须显式赋值。
@@ -503,6 +571,9 @@ func (p *BatchFactoryN8ComicPublisher) audioCategories(ctx context.Context) []n8
 // audioCategoriesWithWarning 在读取失败时同时返回可展示的原因，避免前端把
 // 令牌失效误判成“这个组织本来就没有音频分类”。
 func (p *BatchFactoryN8ComicPublisher) audioCategoriesWithWarning(ctx context.Context) ([]n8catalog.AudioCategory, string) {
+	if cached, ok := p.cachedDirectory("audioCategories"); ok {
+		return cached.([]n8catalog.AudioCategory), ""
+	}
 	directory, ok := p.ProducerDirectory.(N8ComicAudioCategoryDirectory)
 	if !ok || directory == nil || !directory.Configured() {
 		log.Printf("N8 audio category directory unavailable: not configured")
@@ -514,10 +585,14 @@ func (p *BatchFactoryN8ComicPublisher) audioCategoriesWithWarning(ctx context.Co
 		return nil, n8DirectoryWarning("音频分类目录", err)
 	}
 	log.Printf("N8 audio category directory returned %d enabled categories", len(items))
+	p.storeDirectory("audioCategories", items)
 	return items, ""
 }
 
 func (p *BatchFactoryN8ComicPublisher) producerOrganizations(ctx context.Context) map[string][]string {
+	if cached, ok := p.cachedDirectory("producerOrganizations"); ok {
+		return cached.(map[string][]string)
+	}
 	directory, ok := p.ProducerDirectory.(N8ComicProducerAccountDirectory)
 	if !ok || directory == nil || !directory.Configured() {
 		return map[string][]string{}
@@ -534,6 +609,7 @@ func (p *BatchFactoryN8ComicPublisher) producerOrganizations(ctx context.Context
 		}
 		result[name] = append([]string(nil), entry.OrganizationIDs...)
 	}
+	p.storeDirectory("producerOrganizations", result)
 	return result
 }
 
@@ -545,6 +621,9 @@ func (p *BatchFactoryN8ComicPublisher) organizations(ctx context.Context) []n8ca
 // organizationsWithWarning 在读取失败时同时返回可展示的原因，避免前端把
 // 令牌失效误判成“当前组织没有账号”。
 func (p *BatchFactoryN8ComicPublisher) organizationsWithWarning(ctx context.Context) ([]n8catalog.Organization, string) {
+	if cached, ok := p.cachedDirectory("organizations"); ok {
+		return cached.([]n8catalog.Organization), ""
+	}
 	directory := p.OrganizationDirectory
 	if directory == nil {
 		if candidate, ok := p.ProducerDirectory.(N8ComicOrganizationDirectory); ok {
@@ -559,17 +638,24 @@ func (p *BatchFactoryN8ComicPublisher) organizationsWithWarning(ctx context.Cont
 		log.Printf("N8 organization directory unavailable: %v", err)
 		return nil, n8DirectoryWarning("组织目录", err)
 	}
+	p.storeDirectory("organizations", organizations)
 	return organizations, ""
 }
 
 func (p *BatchFactoryN8ComicPublisher) producerAccounts(ctx context.Context) ([]string, string, string) {
+	if cached, ok := p.cachedDirectory("producerAccounts"); ok {
+		entry := cached.(n8ProducerAccountsCache)
+		return entry.names, entry.source, ""
+	}
 	fallback := uniqueProducerAccounts(p.ProducerAccounts)
 	if p.ProducerDirectory == nil || !p.ProducerDirectory.Configured() {
 		return fallback, "cache", ""
 	}
 	accounts, err := p.ProducerDirectory.ListProducerAccounts(ctx)
 	if err == nil && len(accounts) > 0 {
-		return uniqueProducerAccounts(accounts), "n8", ""
+		names := uniqueProducerAccounts(accounts)
+		p.storeDirectory("producerAccounts", n8ProducerAccountsCache{names: names, source: "n8"})
+		return names, "n8", ""
 	}
 	if err != nil {
 		var failure *n8catalog.DirectoryError
