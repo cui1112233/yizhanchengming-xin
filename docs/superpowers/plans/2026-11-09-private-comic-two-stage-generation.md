@@ -53,21 +53,21 @@ Expected: all cases PASS.
 
 **Files:**
 - Modify: `frontend/src/user/pages/PrivateComicWorkspace.jsx`
-- Test: `frontend/src/user/pages/PrivateComicWorkspace.source.test.js`
+- Test: `frontend/src/user/pages/private-studio/privateComicPrimaryAction.test.js`
 
 **Interfaces:**
 - Consumes: `privateComicPrimaryAction(state)` from Task 1.
 - Produces: a primary button that calls `onGeneratePrompts` for `key === 'prompts'`, calls `onGenerateAllPageImages` for `key === 'images'`, and does nothing for `key === 'complete'`.
 
-- [ ] **Step 1: Add the failing workspace contract test**
+- [ ] **Step 1: Extend the failing behavior test for click routing data**
 
-Require the workspace to import and use the resolver, route the two action keys to the two existing callbacks, and remove the primary `onSubmit` / “开始生成” button contract.
+Require every non-complete resolver result to expose the literal action key consumed by the workspace (`prompts` or `images`), while the complete result exposes `complete` and stays disabled.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [ ] **Step 2: Run focused behavior tests and verify RED**
 
-Run: `node --test src/user/pages/PrivateComicWorkspace.source.test.js src/user/pages/private-studio/privateComicPrimaryAction.test.js`
+Run: `node --test src/user/pages/private-studio/privateComicPrimaryAction.test.js`
 
-Expected: FAIL because the workspace still renders “开始生成” and invokes `onSubmit`.
+Expected: FAIL because the resolver does not exist yet.
 
 - [ ] **Step 3: Implement the minimal workspace wiring**
 
@@ -77,11 +77,11 @@ Count prompt-ready pages only when both prompt fields are present. Render `prima
 
 Remove `onSubmit` from `PrivateComicWorkspace` parameters and from the `ScriptPage` JSX call. Keep `submitPrivateComic()` for the existing retry path only.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [ ] **Step 5: Run focused behavior tests and browser wiring acceptance**
 
-Run: `node --test src/user/pages/PrivateComicWorkspace.source.test.js src/user/pages/private-studio/privateComicPrimaryAction.test.js`
+Run: `node --test src/user/pages/private-studio/privateComicPrimaryAction.test.js src/user/pages/PrivateComicWorkspace.source.test.js`
 
-Expected: all cases PASS.
+Expected: all cases PASS. After rebuilding, browser acceptance verifies the real primary button displays the resolver label and the old “开始生成” button is absent. This avoids adding a source-text change detector.
 
 ### Task 3: Verify, commit, rebuild, and visually accept locally
 
