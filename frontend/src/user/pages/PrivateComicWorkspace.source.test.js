@@ -12,7 +12,6 @@ const constraintsSource = fs.readFileSync(path.join(here, 'private-studio', 'Pri
 test('private comic workspace accepts pasted text and exposes the comic actions', () => {
   assert.match(source, /name="sourceText"/);
   assert.match(source, /name="title"/);
-  assert.match(source, /开始生成漫画/);
   assert.match(source, /刷新状态/);
   assert.match(source, /查看漫画详情/);
   assert.match(source, /不自动发布/);
@@ -50,11 +49,6 @@ test('asset images are an optional enhancement and never block the next required
   assert.match(source, /key: 'assetImages', label: '资产图（可选）', optional: true/);
   assert.match(source, /find\(step => !step\.done && !step\.optional\)/);
   assert.match(source, /生成资产图（可选，缺 \$\{missingAssetImages\}）/);
-});
-
-test('private comic workspace blocks submit without pasted source', () => {
-  assert.match(source, /const sourceReady = sourceLength >= privateComicMinSourceLength/);
-  assert.match(source, /disabled=\{busy \|\| !sourceReady\}/);
 });
 
 test('changing the style clears a pre-submit custom reference', () => {

@@ -76,7 +76,7 @@ test('阶段 3：工具行按稿子视觉重排且保留现有入口', () => {
   assert.match(script, />约束条件<\/Button>/);
   assert.match(comic, />约束条件<\/Button>/);
   assert.match(script, /private-studio-tool-primary[\s\S]{0,400}>开始生成<\/Button>/);
-  assert.match(comic, /private-studio-tool-primary[\s\S]{0,400}>开始生成<\/Button>/);
+  assert.match(comic, /private-studio-tool-primary[\s\S]{0,600}>\{primaryAction\.label\}<\/Button>/);
   // P1：漫画「配置」与表头「更多设置…」两者都保留
   assert.match(comic, />配置<\/Button>/);
   assert.match(comic, /<PrivateStudioHeaderActions/);
@@ -109,7 +109,7 @@ test('阶段 3：中栏卡头与工具行样式仍在独立作用域', () => {
 
 test('阶段 1：下一步提示卡按模式逐字显示', () => {
   assert.match(note, /确认人物与场景后，点击右侧“开始生成”。/);
-  assert.match(note, /先粘贴正文，再从左侧提取资产。/);
+  assert.match(note, /先提取资产，再生成漫画提示词，确认后生成漫画图片。/);
   assert.match(script, /<PrivateStudioNote mode="script" \/>/);
   assert.match(comic, /<PrivateStudioNote mode="comic" \/>/);
 });

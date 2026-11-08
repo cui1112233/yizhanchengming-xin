@@ -10,6 +10,7 @@ import { comicEstimatedPageRange } from './shuihuo/batchFactoryContentRange.js';
 import { loadBookAssetDisplayURL } from './shuihuo/batchFactoryNovelListHelpers';
 import { PrivateStudioAssetEditor } from './private-studio/PrivateStudioAssetEditor';
 import { privateComicAssetUseThreeView } from './private-studio/privateComicThreeView.js';
+import { privateComicPrimaryAction } from './private-studio/privateComicPrimaryAction.js';
 import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
 import { PRIVATE_STUDIO_CONSTRAINT_FIELDS, PrivateStudioConstraintSection, PrivateStudioConstraintsModal } from './private-studio/PrivateStudioConstraintsModal';
 import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
@@ -223,7 +224,7 @@ function ComicPageCard({ page, index, taskReady, action, actionKey, onGeneratePa
           icon={<WandSparkles size={15} aria-hidden="true" />}
           loading={generating}
           disabled={!taskReady || !hasPrompt || busyElsewhere || generating}
-          title={!taskReady ? '请先开始生成漫画创建任务' : !hasPrompt ? '该页缺少提示词' : busyElsewhere ? '当前有其他操作进行中' : ''}
+          title={!taskReady ? '请先提取资产创建任务' : !hasPrompt ? '该页缺少提示词' : busyElsewhere ? '当前有其他操作进行中' : ''}
           onClick={() => onGeneratePage?.(page)}
         >{images.length ? '重新生成图' : '生成图'}</Button>
         {sources.original ? <Button size="small" icon={<Download size={15} aria-hidden="true" />} loading={original.loading} onClick={() => void downloadPage()}>下载本页</Button> : null}
@@ -337,7 +338,6 @@ export function PrivateComicWorkspace({
   onSavePagePrompt,
   onDownloadAll,
   onDraftChange,
-  onSubmit,
   task,
   busy = false,
   error = '',
@@ -417,7 +417,7 @@ export function PrivateComicWorkspace({
   const patchDraft = patch => onDraftChange?.({ ...draft, ...patch });
   const patchComic = patch => patchDraft({ comic: { ...comic, ...patch, enabled: true } });
   // 约束弹窗点「完成」时，已有服务端任务的书必须先真正写回设置并回读通过再关闭；
-  // 还没有任务时只保存本地草稿，等「开始生成漫画」时随创建任务一起提交。
+  // 还没有任务时只保存本地草稿，首次提取资产创建任务时一起提交。
   async function saveSettings() {
     if (savingSettings) return;
     if (!task?.batchId) {
@@ -450,7 +450,7 @@ export function PrivateComicWorkspace({
   const assetImageReady = asset => assetImagesFor(asset).length > 0;
   const assetsWithImages = assetList.filter(assetImageReady).length;
   const missingAssetImages = Math.max(0, assetList.length - assetsWithImages);
-  const promptPages = pageList.filter(page => text(page?.comicPrompt) || text(page?.imagePrompt));
+  const promptPages = pageList.filter(page => text(page?.comicPrompt) && text(page?.imagePrompt));
   const imagedPages = pageList.filter(page => (Array.isArray(page?.images) ? page.images : []).length > 0);
   // 书级就绪度以后端 comicReadiness 为准；缺失时只回退到当前已加载页，不另算一套口径。
   const readinessValue = readiness && typeof readiness === 'object' ? readiness : null;
@@ -473,8 +473,8 @@ export function PrivateComicWorkspace({
   const pipelineSteps = [
     { key: 'assets', label: '提取资产', done: assetList.length > 0, detail: assetList.length ? `已完成 ${assetList.length} 项` : '未提取' },
     { key: 'assetImages', label: '资产图（可选）', optional: true, done: assetList.length > 0 && assetsWithImages >= assetList.length, detail: assetList.length ? `可选 · 已生成 ${assetsWithImages}/${assetList.length}` : '可选' },
-    { key: 'prompts', label: '分镜提示词', done: promptReadyCount > 0, detail: pagesTotal ? `已生成 ${promptReadyCount}/${pagesTotal} 页` : (assetList.length ? '待生成' : '待资产') },
-    { key: 'images', label: '分镜生图', done: pagesTotal > 0 && imageReadyCount >= pagesTotal, detail: pagesTotal ? `已出图 ${imageReadyCount}/${pagesTotal}` : '待提示词' }
+    { key: 'prompts', label: '漫画提示词', done: promptReadyCount > 0, detail: pagesTotal ? `已生成 ${promptReadyCount}/${pagesTotal} 页` : (assetList.length ? '待生成' : '待资产') },
+    { key: 'images', label: '漫画图片', done: pagesTotal > 0 && imageReadyCount >= pagesTotal, detail: pagesTotal ? `已出图 ${imageReadyCount}/${pagesTotal}` : '待提示词' }
   ];
   const currentStepKey = pipelineSteps.find(step => !step.done && !step.optional)?.key || '';
   const failureIds = Array.isArray(comicAssetImageFailures) ? comicAssetImageFailures : [];
@@ -490,10 +490,10 @@ export function PrivateComicWorkspace({
   const allPromptsReady = pageList.length > 0 && promptPages.length >= pageList.length;
   const promptButtonLabel = action === 'prompts'
     ? '生成中…'
-    : !assetList.length ? '生成分镜提示词'
-      : allPromptsReady ? '重新生成分镜提示词' : '补齐分镜提示词';
+    : !assetList.length ? '生成漫画提示词'
+      : allPromptsReady ? '重新生成漫画提示词' : '补齐漫画提示词';
   const promptButtonTitle = !taskReady
-    ? '请先开始生成漫画创建任务'
+    ? '请先提取资产创建任务'
     : !assetList.length ? '需先提取资产' : actionBusy ? '当前有其他操作进行中' : '';
   const sourceLength = Array.from(text(draft.sourceText)).length;
   const pageEstimate = comicEstimatedPageRange(sourceLength);
@@ -505,6 +505,20 @@ export function PrivateComicWorkspace({
         ? '保存失败'
         : '尚未保存';
   const sourceReady = sourceLength >= privateComicMinSourceLength;
+  const primaryAction = privateComicPrimaryAction({
+    sourceReady,
+    taskReady,
+    assetCount: assetList.length,
+    pagesTotal,
+    promptReadyCount,
+    imageReadyCount,
+    busy: busy || actionBusy,
+    action
+  });
+  const runPrimaryAction = () => {
+    if (primaryAction.key === 'prompts') onGeneratePrompts?.();
+    if (primaryAction.key === 'images') onGenerateAllPageImages?.();
+  };
   const progress = Number.isFinite(Number(task?.progress)) ? Math.max(0, Math.min(100, Number(task.progress))) : null;
   const comicSourceTitle = text(draft.title) || privateComicTitle(draft.sourceText, '');
   const comicHeaderTitle = comicSourceTitle
@@ -650,7 +664,7 @@ export function PrivateComicWorkspace({
                 className="entity-add-button"
                 loading={action === 'images'}
                 disabled={!canGenerateAssetImages}
-                title={!taskReady ? '请先开始生成漫画创建任务' : !assetList.length ? '需先提取资产' : !missingAssetImages ? '资产图已全部生成' : actionBusy ? '当前有其他操作进行中' : ''}
+                title={!taskReady ? '请先提取资产创建任务' : !assetList.length ? '需先提取资产' : !missingAssetImages ? '资产图已全部生成' : actionBusy ? '当前有其他操作进行中' : ''}
                 onClick={onGenerateMissingAssetImages}
               >{action === 'images' ? '生成中…' : missingAssetImages ? `生成资产图（可选，缺 ${missingAssetImages}）` : '资产图已齐'}</Button>
             </Space>
@@ -733,7 +747,15 @@ export function PrivateComicWorkspace({
           title="约束设置"
         >约束条件</Button>
           <Space>
-            <Button className="private-studio-tool-primary" type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} loading={busy} disabled={busy || !sourceReady} onClick={onSubmit}>开始生成</Button>
+            <Button
+              className="private-studio-tool-primary"
+              type="primary"
+              icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />}
+              loading={action === 'prompts' || action === 'pages'}
+              disabled={primaryAction.disabled}
+              title={!sourceReady ? `漫画正文至少需要 ${privateComicMinSourceLength} 个字` : !taskReady || !assetList.length ? '请先提取资产' : ''}
+              onClick={runPrimaryAction}
+            >{primaryAction.label}</Button>
             <Dropdown
               trigger={['click']}
               menu={{
@@ -782,7 +804,7 @@ export function PrivateComicWorkspace({
           onDownloadAll={onDownloadAll}
         /> : task ? <div className="script-empty legacy-panel-card">
           <div className="script-empty-title">还没有漫画页</div>
-          <div className="script-empty-copy">先在左侧提取资产，再点击「生成分镜提示词」；随后这里会按页显示提示词与图片。</div>
+          <div className="script-empty-copy">先在左侧提取资产，再点击「生成漫画提示词」；确认提示词后再生成漫画图片。</div>
         </div> : <div className="script-empty legacy-panel-card">
           <div className="script-empty-card">
             <span className="script-empty-dot" aria-hidden="true" />
@@ -791,7 +813,7 @@ export function PrivateComicWorkspace({
             <span className="script-empty-line script-empty-line--bottom" aria-hidden="true" />
           </div>
           <div className="script-empty-title">准备生成漫画</div>
-          <div className="script-empty-copy">在左侧粘贴正文，先提取人物、场景与道具，再开始生成漫画。</div>
+          <div className="script-empty-copy">在左侧粘贴正文并提取人物、场景与道具，再依次生成漫画提示词和漫画图片。</div>
         </div>}
       </div>
       </div>
@@ -822,7 +844,7 @@ export function PrivateComicWorkspace({
             onReferenceDataUrl={onPendingReferenceChange}
             onChange={next => patchDraft({ comic: next })}
           />
-          {!task?.batchId ? <Typography.Text type="secondary" className="private-customization-reference-note">提交时会先创建任务并上传自定义参考图，再开始生成。</Typography.Text> : null}
+          {!task?.batchId ? <Typography.Text type="secondary" className="private-customization-reference-note">首次提取资产时会创建任务并上传自定义参考图。</Typography.Text> : null}
         </PrivateStudioConstraintSection>
         <PrivateStudioConstraintSection title="漫画提示词" description="决定分镜文本的组织方式。">
           <Select allowClear value={comic.presetId || undefined} options={pageOptions} placeholder="选择已发布漫画提示词" disabled={busy} onChange={value => patchComic(presetSelection(pageOptions.find(option => option.value === value)?.item))} />

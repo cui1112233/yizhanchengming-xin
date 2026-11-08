@@ -2478,7 +2478,6 @@ export function ScriptPage() {
           draft={privateComicDraft}
           onDraftChange={setPrivateComicDraft}
           draftSaveState={privateComicSaveState}
-          onSubmit={submitPrivateComic}
           task={privateComicTask}
           comicAssets={privateComicAssets}
           comicAssetImages={privateComicAssetImages}
