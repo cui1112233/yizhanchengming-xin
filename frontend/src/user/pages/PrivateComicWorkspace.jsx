@@ -10,6 +10,7 @@ import { PRIVATE_STUDIO_CONSTRAINT_FIELDS, PrivateStudioConstraintSection, Priva
 import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeaderActions';
 import { PrivateStudioNote } from './private-studio/PrivateStudioNote';
 import { privateComicMinSourceLength, privateComicTitle } from './privateCustomizationComic';
+import { canExtractPrivateComicAssets } from './privateComicSingleBookFlow.js';
 
 const COMIC_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
 
@@ -306,7 +307,6 @@ export function PrivateComicWorkspace({
   task,
   busy = false,
   error = '',
-  presetReady = true,
   onRefresh,
   onOpenBatchFactory,
   onOpenUnifiedConfig,
@@ -406,10 +406,11 @@ export function PrivateComicWorkspace({
   const assetImageFailed = asset => failureIds.includes(asset?.id);
   const actionBusy = Boolean(action);
   const taskReady = Boolean(task?.batchId && task?.bookId);
-  const canExtract = taskReady && !actionBusy && !busy;
-  const canGenerateAssetImages = canExtract && missingAssetImages > 0;
-  const canGeneratePrompts = canExtract && assetList.length > 0;
-  const canGeneratePages = canExtract && promptPages.length > 0;
+  const canExtract = canExtractPrivateComicAssets({ sourceText: draft.sourceText, busy, action });
+  const canUseTaskActions = taskReady && !actionBusy && !busy;
+  const canGenerateAssetImages = canUseTaskActions && missingAssetImages > 0;
+  const canGeneratePrompts = canUseTaskActions && assetList.length > 0;
+  const canGeneratePages = canUseTaskActions && promptPages.length > 0;
   const missingImageCount = Math.max(0, pageList.length - imagedPages.length);
   const allPromptsReady = pageList.length > 0 && promptPages.length >= pageList.length;
   const promptButtonLabel = action === 'prompts'
@@ -528,7 +529,7 @@ export function PrivateComicWorkspace({
                 loading={action === 'assets'}
                 aria-label="提取漫画资产"
                 disabled={!canExtract}
-                title={!taskReady ? '请先开始生成漫画创建任务' : actionBusy ? '当前有其他操作进行中' : ''}
+                title={!sourceReady ? `漫画正文至少需要 ${privateComicMinSourceLength} 个字` : actionBusy ? '当前有其他操作进行中' : ''}
                 icon={<WandSparkles size={14} strokeWidth={1.8} aria-hidden="true" />}
                 onClick={onExtractAssets}
               >{action === 'assets' ? '提取中…' : assetList.length ? '重新提取资产' : '提取资产'}</Button>
@@ -594,11 +595,6 @@ export function PrivateComicWorkspace({
           })}
         </div>
         {error ? <Alert type="error" showIcon message={error} /> : null}
-        {!presetReady ? <Alert
-          type="warning"
-          showIcon
-          message={<span>尚未检测到批量工厂的自动化预设，请先创建预设再开始生成漫画。<Button type="link" size="small" href="/batch-factory" target="_self">去批量工厂创建预设</Button></span>}
-        /> : null}
         <Typography.Text type="secondary" className="private-comic-hint">仅处理当前正文</Typography.Text>
         </div>
       </div>
@@ -659,9 +655,7 @@ export function PrivateComicWorkspace({
           title="约束设置"
         >约束条件</Button>
           <Space>
-            {presetReady
-              ? <Button className="private-studio-tool-primary" type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} loading={busy} disabled={busy || !sourceReady} onClick={onSubmit}>开始生成</Button>
-              : <Button className="private-studio-tool-primary" type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} loading={busy} disabled>开始生成</Button>}
+            <Button className="private-studio-tool-primary" type="primary" icon={<WandSparkles size={16} strokeWidth={1.8} aria-hidden="true" />} loading={busy} disabled={busy || !sourceReady} onClick={onSubmit}>开始生成</Button>
             <Dropdown
               trigger={['click']}
               menu={{
@@ -719,7 +713,7 @@ export function PrivateComicWorkspace({
             <span className="script-empty-line script-empty-line--bottom" aria-hidden="true" />
           </div>
           <div className="script-empty-title">准备生成漫画</div>
-          <div className="script-empty-copy">在左侧粘贴正文，点击工具栏「开始生成漫画」</div>
+          <div className="script-empty-copy">在左侧粘贴正文，先提取人物、场景与道具，再开始生成漫画。</div>
         </div>}
       </div>
       </div>
