@@ -37,8 +37,14 @@ test('single-book flow creates one task without requiring an automation preset',
   assert.equal(calls[0].title, '红门帘');
   assert.equal(calls[0].sourceText, singleBookSource);
   assert.equal(calls[0].initialBatchSettings.productionMode, 'comic');
+  assert.equal(calls[0].initialBatchSettings.assetImagesEnabled, false);
   assert.deepEqual(result.task, { batchId: 'batch-1', bookId: 'book-1', status: 'created', sourceText: singleBookSource });
   assert.equal(result.created, true);
+});
+
+test('single-book comic keeps asset images optional and uses text asset prompts as fallback', () => {
+  const settings = buildPrivateComicSettings({ sourceText: singleBookSource });
+  assert.equal(settings.assetImagesEnabled, false);
 });
 
 test('single-book flow reuses the current book when the source has not changed', async () => {

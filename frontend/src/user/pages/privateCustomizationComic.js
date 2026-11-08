@@ -23,6 +23,8 @@ export function buildPrivateComicSettings({ sourceText = '', comic = {}, textMod
   const normalizedComic = comic && typeof comic === 'object' ? { ...comic } : {};
   return {
     productionMode: 'comic',
+    // 单本精致制作始终允许只用资产文字提示词继续；资产图仅作为可选参考图。
+    assetImagesEnabled: false,
     textModelId: text(textModelId),
     imageModelId: text(imageModelId),
     imageProvider: text(imageProvider),

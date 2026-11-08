@@ -469,11 +469,11 @@ export function PrivateComicWorkspace({
     : assetSections.map(section => ({ key: `placeholder-${section.key}`, label: section.label }));
   const pipelineSteps = [
     { key: 'assets', label: '提取资产', done: assetList.length > 0, detail: assetList.length ? `已完成 ${assetList.length} 项` : '未提取' },
-    { key: 'assetImages', label: '资产图', done: assetList.length > 0 && assetsWithImages >= assetList.length, detail: assetList.length ? `已生成 ${assetsWithImages}/${assetList.length}` : '待资产' },
+    { key: 'assetImages', label: '资产图（可选）', optional: true, done: assetList.length > 0 && assetsWithImages >= assetList.length, detail: assetList.length ? `可选 · 已生成 ${assetsWithImages}/${assetList.length}` : '可选' },
     { key: 'prompts', label: '分镜提示词', done: promptReadyCount > 0, detail: pagesTotal ? `已生成 ${promptReadyCount}/${pagesTotal} 页` : (assetList.length ? '待生成' : '待资产') },
     { key: 'images', label: '分镜生图', done: pagesTotal > 0 && imageReadyCount >= pagesTotal, detail: pagesTotal ? `已出图 ${imageReadyCount}/${pagesTotal}` : '待提示词' }
   ];
-  const currentStepKey = pipelineSteps.find(step => !step.done)?.key || '';
+  const currentStepKey = pipelineSteps.find(step => !step.done && !step.optional)?.key || '';
   const failureIds = Array.isArray(comicAssetImageFailures) ? comicAssetImageFailures : [];
   const assetImageFailed = asset => failureIds.includes(asset?.id);
   const actionBusy = Boolean(action);
@@ -648,7 +648,7 @@ export function PrivateComicWorkspace({
                 disabled={!canGenerateAssetImages}
                 title={!taskReady ? '请先开始生成漫画创建任务' : !assetList.length ? '需先提取资产' : !missingAssetImages ? '资产图已全部生成' : actionBusy ? '当前有其他操作进行中' : ''}
                 onClick={onGenerateMissingAssetImages}
-              >{action === 'images' ? '生成中…' : missingAssetImages ? `补齐资产图（缺 ${missingAssetImages}）` : '资产图已齐'}</Button>
+              >{action === 'images' ? '生成中…' : missingAssetImages ? `生成资产图（可选，缺 ${missingAssetImages}）` : '资产图已齐'}</Button>
             </Space>
           </div>
           <PrivateStudioChips items={comicAssetChips} />
