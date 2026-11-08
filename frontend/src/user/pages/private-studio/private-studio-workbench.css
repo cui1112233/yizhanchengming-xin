@@ -402,6 +402,100 @@ span.private-studio-chip:hover {
   box-shadow: none;
 }
 
+/* 漫画提示词与漫画图片各自保留真实进度，刷新后仍可从后端就绪度恢复。 */
+.private-studio-workbench .private-comic-generation-statuses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 18px 12px;
+}
+
+.private-studio-workbench .private-comic-generation-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ps-line);
+  border-radius: 11px;
+  background: rgba(12, 20, 34, .68);
+}
+
+.private-studio-workbench .private-comic-generation-status-icon {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ps-muted-2);
+  box-shadow: 0 0 0 4px rgba(101, 115, 142, .12);
+}
+
+.private-studio-workbench .private-comic-generation-status-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.private-studio-workbench .private-comic-generation-status-copy b {
+  color: var(--ps-text);
+  font-size: 12px;
+}
+
+.private-studio-workbench .private-comic-generation-status-copy small {
+  overflow: hidden;
+  color: var(--ps-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.private-studio-workbench .private-comic-generation-status-retry {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border-color: rgba(157, 168, 255, .26);
+  color: var(--ps-indigo);
+  background: rgba(157, 168, 255, .08);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-running {
+  border-color: rgba(157, 168, 255, .34);
+  background: rgba(157, 168, 255, .08);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-running .private-comic-generation-status-icon {
+  background: var(--ps-indigo);
+  box-shadow: 0 0 0 4px rgba(157, 168, 255, .14);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-complete {
+  border-color: rgba(101, 223, 206, .32);
+  background: rgba(101, 223, 206, .07);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-complete .private-comic-generation-status-icon {
+  background: var(--ps-mint);
+  box-shadow: 0 0 0 4px rgba(101, 223, 206, .13);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-partial {
+  border-color: rgba(245, 190, 91, .3);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-partial .private-comic-generation-status-icon {
+  background: #f5be5b;
+  box-shadow: 0 0 0 4px rgba(245, 190, 91, .12);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-failed {
+  border-color: rgba(255, 111, 132, .34);
+  background: rgba(255, 111, 132, .06);
+}
+
+.private-studio-workbench .private-comic-generation-status.is-failed .private-comic-generation-status-icon {
+  background: #ff6f84;
+  box-shadow: 0 0 0 4px rgba(255, 111, 132, .12);
+}
+
 /* 分镜/漫画页状态标签：只读后端派生字段 */
 .private-studio-shot-status {
   padding: 3px 7px;
@@ -646,6 +740,10 @@ span.private-studio-chip:hover {
 @media (max-width: 560px) {
   .private-studio-content {
     padding: 0;
+  }
+
+  .private-studio-workbench .private-comic-generation-statuses {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

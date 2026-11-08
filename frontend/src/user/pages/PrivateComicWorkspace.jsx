@@ -9,6 +9,7 @@ import { nextComicOutputVisibleCount, resolveComicImageSources } from './shuihuo
 import { comicEstimatedPageRange } from './shuihuo/batchFactoryContentRange.js';
 import { loadBookAssetDisplayURL } from './shuihuo/batchFactoryNovelListHelpers';
 import { PrivateStudioAssetEditor } from './private-studio/PrivateStudioAssetEditor';
+import { privateComicGenerationStatus } from './private-studio/privateComicGenerationStatus.js';
 import { privateComicAssetUseThreeView } from './private-studio/privateComicThreeView.js';
 import { privateComicPrimaryAction } from './private-studio/privateComicPrimaryAction.js';
 import { PrivateStudioChips } from './private-studio/PrivateStudioChips';
@@ -515,6 +516,17 @@ export function PrivateComicWorkspace({
     busy: busy || actionBusy,
     action
   });
+  const generationStatus = privateComicGenerationStatus({
+    assetCount: assetList.length,
+    pagesTotal,
+    promptReadyCount,
+    imageReadyCount,
+    action,
+    taskFailed: task?.status === 'failed',
+    promptFailed: task?.status === 'failed' && promptReadyCount < pagesTotal,
+    imageFailed: pageFailed
+  });
+  const generationStatusItems = [generationStatus.prompts, generationStatus.images];
   const runPrimaryAction = () => {
     if (primaryAction.key === 'prompts') onGeneratePrompts?.();
     if (primaryAction.key === 'images') onGenerateAllPageImages?.();
@@ -782,6 +794,29 @@ export function PrivateComicWorkspace({
           </Space>
       </div>
           </div>
+      <div className="private-comic-generation-statuses" aria-label="漫画生成状态">
+        {generationStatusItems.map(statusItem => (
+          <div
+            key={statusItem.key}
+            className={`private-comic-generation-status is-${statusItem.tone}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="private-comic-generation-status-icon" aria-hidden="true" />
+            <span className="private-comic-generation-status-copy">
+              <b>{statusItem.key === 'prompts' ? '漫画提示词' : '漫画图片'}</b>
+              <small>{statusItem.label} · {statusItem.detail}</small>
+            </span>
+            {statusItem.canRetry ? <Button
+              size="small"
+              className="private-comic-generation-status-retry"
+              disabled={busy || actionBusy || !taskReady}
+              title={statusItem.key === 'prompts' ? '只补齐尚未完成的漫画提示词' : '只生成尚未完成的漫画图片'}
+              onClick={statusItem.key === 'prompts' ? onGeneratePrompts : onGenerateAllPageImages}
+            >重试未完成项</Button> : null}
+          </div>
+        ))}
+      </div>
       <div className="private-studio-content">
       <div className="private-studio-center">
       <div className="script-output">

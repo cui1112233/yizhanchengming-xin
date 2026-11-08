@@ -66,6 +66,9 @@ test('任务失败会归到当前尚未完成的阶段而不覆盖已完成阶�
   assert.equal(promptFailure.prompts.label, '生成失败');
   assert.equal(promptFailure.images.label, '等待提示词');
 
+  const failureWithoutAssets = privateComicGenerationStatus({ taskFailed: true });
+  assert.equal(failureWithoutAssets.prompts.canRetry, false);
+
   const imageFailure = privateComicGenerationStatus({ pagesTotal: 10, promptReadyCount: 10, imageReadyCount: 4, taskFailed: true });
   assert.equal(imageFailure.prompts.label, '已完成');
   assert.equal(imageFailure.images.label, '生成失败');

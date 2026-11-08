@@ -17,6 +17,7 @@ export function privateComicGenerationStatus({
   imageFailed = false
 } = {}) {
   const total = count(pagesTotal);
+  const hasAssets = count(assetCount) > 0;
   const promptsReady = count(promptReadyCount, total);
   const imagesReady = count(imageReadyCount, total);
   const promptsComplete = total > 0 && promptsReady >= total;
@@ -34,7 +35,7 @@ export function privateComicGenerationStatus({
   } else if (promptsRunning) {
     prompts = stage('prompts', '生成中', promptDetail, 'running', { running: true });
   } else if (promptHasFailed) {
-    prompts = stage('prompts', '生成失败', promptDetail, 'failed', { canRetry: true });
+    prompts = stage('prompts', '生成失败', promptDetail, 'failed', { canRetry: hasAssets });
   } else if (promptsReady > 0) {
     prompts = stage('prompts', '部分完成', promptDetail, 'partial', { canRetry: true });
   } else {
