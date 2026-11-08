@@ -94,6 +94,35 @@ func TestProductUpdatesLatestReturnsV27RetryRecoveryNotes(t *testing.T) {
 	}
 }
 
+func TestProductUpdatesLatestReturnsV44PrivateComicEstimateNotes(t *testing.T) {
+	handler := NewRouter(RouterOptions{RuntimeManifestPath: writeReleaseManifest(t, "qiantie-202611090148")})
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/product-updates/latest", nil))
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusOK)
+	}
+	var body struct {
+		ReleaseID string `json:"releaseId"`
+		Version   string `json:"version"`
+		Sections  []struct {
+			Items []struct {
+				Title string `json:"title"`
+			} `json:"items"`
+		} `json:"sections"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.ReleaseID != "qiantie-202611090148" || body.Version != "44" {
+		t.Fatalf("body = %#v, want the v44 private comic estimate release note", body)
+	}
+	if len(body.Sections) != 1 || len(body.Sections[0].Items) != 1 || body.Sections[0].Items[0].Title != "漫画生成前可查看预计张数" {
+		t.Fatalf("sections = %#v, want one private comic estimate entry", body.Sections)
+	}
+}
+
 func TestProductUpdatesLatestStaysSilentForUnknownRelease(t *testing.T) {
 	handler := NewRouter(RouterOptions{RuntimeManifestPath: writeReleaseManifest(t, "qiantie-unknown")})
 	res := httptest.NewRecorder()
