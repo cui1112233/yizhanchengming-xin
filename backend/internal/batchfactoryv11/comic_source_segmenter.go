@@ -11,10 +11,10 @@ const ComicSegmentReasonOverlongUnit = "overlong_indivisible_unit"
 
 const (
 	ComicMaxPageCount      = 35
-	comicPageTextMin       = 45
-	comicPageTextTargetMin = 45
-	comicPageTextTargetMax = 70
-	comicPageTextMax       = 90
+	comicPageTextMin       = 90
+	comicPageTextTargetMin = 90
+	comicPageTextTargetMax = 120
+	comicPageTextMax       = 150
 	comicPageRepairMax     = 150
 )
 

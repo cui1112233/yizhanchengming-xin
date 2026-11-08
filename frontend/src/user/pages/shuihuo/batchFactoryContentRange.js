@@ -13,6 +13,14 @@ function comicAnalysisTargetCharactersForBook(book) {
   return Number.isInteger(value) && value >= 100 && value <= 100000 ? value : 2000;
 }
 
+export function comicEstimatedPageRange(characterCount) {
+  const characters = Math.max(1, Number(characterCount) || 1);
+  return {
+    min: Math.min(35, Math.ceil(characters / 120)),
+    max: Math.min(35, Math.ceil(characters / 90))
+  };
+}
+
 function normalizedSourceLine(value) {
   return String(value || '')
     .replace(/&nbsp;|\u00a0|　/g, ' ')

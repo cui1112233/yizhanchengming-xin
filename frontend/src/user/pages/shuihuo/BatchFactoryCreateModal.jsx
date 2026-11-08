@@ -10,6 +10,7 @@ import { resolveGiantMaterialForBatch } from '../giantMaterialExtractionClient.j
 import { duplicateGiantMaterialBookIndexes, parseGiantMaterialIds } from './batchFactoryGiantMaterialQueue.js';
 import { createGiantMaterialJob, listGiantMaterialExecutors } from '../../../shared/api/giantMaterialExecutorPublic.js';
 import { BatchFactoryGiantMaterialExecutorStatus } from './BatchFactoryGiantMaterialExecutorStatus.jsx';
+import { comicEstimatedPageRange } from './batchFactoryContentRange.js';
 import { BatchFactoryAiReasoningForm, BatchFactoryAutomationPresetManager, BatchFactoryComicPublishSettingsForm, BatchFactoryEngineSettingsForm, BatchFactoryProductionModeControl, BatchFactoryPublishSettingsForm } from './BatchFactoryUnifiedSettingsModal.jsx';
 import {
   availableGiantMaterialBooks,
@@ -793,7 +794,7 @@ export function BatchFactoryCreateModal({ open, onCancel, onCreated, onBatchUpda
     <div className="batch-factory-content-controls">
       <label className="shuihuo-form-label">生产模式<Select value={initialBatchSettings.productionMode || 'video'} onChange={productionMode => setInitialBatchSettings(current => ({ ...current, productionMode }))} options={[{ value: 'video', label: '视频生成' }, { value: 'comic', label: '漫画生成' }]} /></label>
       {isComicProduction
-        ? <label className="shuihuo-form-label">漫画分析<InputNumber min={100} max={100000} step={100} value={comicAnalysisCharacters} onChange={value => setComicAnalysisCharacters(Math.min(100000, Math.max(100, Number(value) || 2000)))} addonAfter="字" /> <small>漫画分页最多 35 张</small></label>
+        ? <label className="shuihuo-form-label">漫画分析<InputNumber min={100} max={100000} step={100} value={comicAnalysisCharacters} onChange={value => setComicAnalysisCharacters(Math.min(100000, Math.max(100, Number(value) || 2000)))} addonAfter="字" /> <small>预计约 {comicEstimatedPageRange(comicAnalysisCharacters).min}-{comicEstimatedPageRange(comicAnalysisCharacters).max} 张 · 最多 35 张</small></label>
         : <label className="shuihuo-form-label">内容范围<InputNumber min={1} max={500} value={contentRangeLines} onChange={value => setContentRangeLines(value || 5)} addonAfter="行" /></label>}
       <label className="shuihuo-form-label">内容截取<Select value={contentCaptureCharacters} onChange={setContentCaptureCharacters} options={[1000, 2000, 4000, 8000, 12000, 20000, 50000, 100000].map(value => ({ value, label: `${value} 字` }))} /></label>
     </div>

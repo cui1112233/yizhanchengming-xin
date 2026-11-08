@@ -64,7 +64,7 @@ test('single-book settings use the shared production-mode visibility model', () 
 test('comic rows explain the separate analysis target', () => {
   assert.match(novelListSource, /productionMode === 'comic' \? `正文总字数 \$\{batchFactoryCleanSourceText\(book\.sourceText\)\.length\} 字 · 漫画分析 \$\{comicAnalysisCharactersForBook\(book\)\} 字` : `生产前 \$\{rangeLines\} 行`/);
   assert.match(novelListSource, /batchProductionMode === 'video' \? <label className="batch-factory-engine-field"><span><b>内容范围<\/b><small>生产使用的正文行数<\/small>/);
-  assert.match(novelListSource, /<b>漫画分析<\/b><small>按完整句子和段落边界取整<\/small>/);
+  assert.match(novelListSource, /<b>漫画分析<\/b><small>按完整句子和段落边界取整 · 预计约 \{comicEstimatedPageRange\(comicAnalysisCharacters\)\.min\}-\{comicEstimatedPageRange\(comicAnalysisCharacters\)\.max\} 张<\/small>/);
   assert.match(novelListSource, /editingContentProductionMode === 'video' \? <label className="shuihuo-form-label"><span>内容范围<small>本次生产使用的正文行数<\/small>/);
   assert.match(novelListSource, /runtimeResolveBookEditableContent\(currentBook, productionMode\)/);
 });

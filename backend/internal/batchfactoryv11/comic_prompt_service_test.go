@@ -84,6 +84,9 @@ func TestBuildComicBootstrapContractUsesContentBoundariesInsteadOfFixedPageCount
 	if !strings.Contains(contract.SystemPrompt, "minimum_page_count") || !strings.Contains(contract.SystemPrompt, "recommended_page_count") {
 		t.Fatalf("bootstrap protocol does not enforce the dynamic page plan: %s", contract.SystemPrompt)
 	}
+	if !strings.Contains(contract.SystemPrompt, "每页目标 90-120 字") {
+		t.Fatalf("bootstrap protocol does not use the shared 90-120 character page target: %s", contract.SystemPrompt)
+	}
 	if !strings.Contains(contract.SystemPrompt, "end_boundary_id") || !strings.Contains(contract.UserPrompt, "b1") {
 		t.Fatalf("bootstrap prompt does not carry safe source boundaries: system=%s user=%s", contract.SystemPrompt, contract.UserPrompt)
 	}

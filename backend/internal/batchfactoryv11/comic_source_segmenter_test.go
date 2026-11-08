@@ -34,7 +34,7 @@ func TestFallbackComicSourceSegmentsTargetsPageRangeAndReconstructsSource(t *tes
 	var rebuilt strings.Builder
 	for index, segment := range segments {
 		rebuilt.WriteString(segment.SourceText)
-		if index < len(segments)-1 && (segment.CharacterCount < 45 || segment.CharacterCount > 90) {
+		if index < len(segments)-1 && (segment.CharacterCount < 90 || segment.CharacterCount > 150) {
 			t.Fatalf("segment %d has unexpected count %d", index, segment.CharacterCount)
 		}
 	}
@@ -43,6 +43,29 @@ func TestFallbackComicSourceSegmentsTargetsPageRangeAndReconstructsSource(t *tes
 	}
 	if err := ValidateComicSourceSegments(source, segments); err != nil {
 		t.Fatalf("expected valid segments: %v", err)
+	}
+}
+
+func TestFallbackComicSourceSegmentsUsesAboutTwentyPagesForTwoThousandCharacters(t *testing.T) {
+	// Each complete sentence is exactly 50 non-space characters. A 2,000
+	// character source therefore has 40 safe sentence endings and should group
+	// two sentences per page under the 90-120 character comic page contract.
+	sentence := strings.Repeat("甲", 49) + "。"
+	source := strings.Repeat(sentence, 40)
+	segments, err := FallbackComicSourceSegments(source, EnumerateComicSourceBoundaries(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(segments) != 20 {
+		t.Fatalf("2,000 characters produced %d pages, want 20", len(segments))
+	}
+	for index, segment := range segments {
+		if segment.CharacterCount < 90 || segment.CharacterCount > 120 {
+			t.Fatalf("segment %d has %d characters, want 90-120", index+1, segment.CharacterCount)
+		}
+	}
+	if err := ValidateComicSourceSegments(source, segments); err != nil {
+		t.Fatalf("expected complete source coverage: %v", err)
 	}
 }
 

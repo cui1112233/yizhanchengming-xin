@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as contentRange from './batchFactoryContentRange.js';
 import { batchFactoryCleanSourceText, batchFactoryPreviewText, batchFactoryProductionText, comicAnalysisCharactersForBook, contentCaptureCharactersForBook, contentRangeLinesForBook, publishContentWithWorkingFront, sourceTextAfterViralAdoption } from './batchFactoryContentRange.js';
 
 test('uses the saved per-book content range as the work-text boundary', () => {
@@ -58,6 +59,11 @@ test('keeps comic analysis target separate from the 4000-character capture limit
   const book = { sourceText: source, sourceMetadata: { comicAnalysisCharacters: 2000, contentCaptureCharacters: 4000 } };
   assert.equal(comicAnalysisCharactersForBook(book), 2000);
   assert.equal(contentCaptureCharactersForBook(book), 4000);
+});
+
+test('comic page estimate uses the same 90-120 character target and keeps 35 as a ceiling', () => {
+  assert.deepEqual(contentRange.comicEstimatedPageRange?.(2000), { min: 17, max: 23 });
+  assert.deepEqual(contentRange.comicEstimatedPageRange?.(100000), { min: 35, max: 35 });
 });
 
 

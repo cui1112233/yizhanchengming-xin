@@ -32,7 +32,7 @@ func TestComicSourceTextUsesAnalysisTargetSeparateFromCaptureLimit(t *testing.T)
 }
 
 func TestLimitComicSourceSegmentsCapsAtThirtyFiveAndKeepsCompleteSource(t *testing.T) {
-	source := strings.Repeat(strings.Repeat("甲", 50)+"。", 70)
+	source := strings.Repeat(strings.Repeat("甲", 50)+"。", 72)
 	boundaries := EnumerateComicSourceBoundaries(source)
 	segments, err := FallbackComicSourceSegments(source, boundaries)
 	if err != nil {
