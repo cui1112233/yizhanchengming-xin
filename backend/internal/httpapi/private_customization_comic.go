@@ -46,8 +46,12 @@ func registerPrivateCustomizationComicRoute(mux *http.ServeMux, store batchfacto
 			settings = batchfactoryv11.SettingsPatch{}
 		}
 		settings["productionMode"] = json.RawMessage(`"comic"`)
-		if raw, ok := settings["aiPromptConfig"]; ok && catalog != nil {
-			hydrated, hydrateErr := hydrateBatchFactoryPromptConfig(catalog, raw)
+		if catalog != nil {
+			raw := settings["aiPromptConfig"]
+			if len(raw) == 0 {
+				raw = json.RawMessage(`{"comic":{"enabled":true}}`)
+			}
+			hydrated, hydrateErr := hydratePrivateCustomizationComicPromptConfig(catalog, raw)
 			if hydrateErr != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": hydrateErr.Error()})
 				return
@@ -78,4 +82,48 @@ func registerPrivateCustomizationComicRoute(mux *http.ServeMux, store batchfacto
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"batch": batch, "book": batch.Books[0]})
 	})
+}
+
+// hydratePrivateCustomizationComicPromptConfig keeps the single-book studio
+// independent from Batch Factory presets while still using the backend-owned
+// published prompts required by the comic asset and page stages.
+func hydratePrivateCustomizationComicPromptConfig(catalog *prompt.Catalog, raw json.RawMessage) (json.RawMessage, error) {
+	if catalog == nil {
+		return raw, nil
+	}
+	var config map[string]any
+	if err := json.Unmarshal(raw, &config); err != nil || config == nil {
+		return nil, fmt.Errorf("漫画提示词配置格式不正确")
+	}
+	comic, ok := config["comic"].(map[string]any)
+	if !ok || comic == nil {
+		comic = map[string]any{}
+		config["comic"] = comic
+	}
+	comic["enabled"] = true
+	if strings.TrimSpace(stringValue(comic["presetId"])) == "" {
+		comic["presetId"] = "batch-comic-page"
+	}
+	assets, ok := comic["assets"].(map[string]any)
+	if !ok || assets == nil {
+		assets = map[string]any{}
+		comic["assets"] = assets
+	}
+	if strings.TrimSpace(stringValue(assets["presetId"])) == "" {
+		assets["presetId"] = "batch-comic-assets"
+	}
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		return nil, fmt.Errorf("保存漫画提示词配置失败")
+	}
+	return hydrateBatchFactoryPromptConfig(catalog, encoded)
+}
+
+func isPrivateCustomizationComicBatch(batch batchfactoryv11.Batch) bool {
+	for _, book := range batch.Books {
+		if strings.TrimSpace(book.Platform) == "private_customization" || strings.TrimSpace(stringValue(book.SourceMetadata["sourceMode"])) == "private_customization" {
+			return true
+		}
+	}
+	return false
 }

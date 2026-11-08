@@ -10,7 +10,7 @@ import {
   privateComicTitle,
   shouldReusePrivateComicTask
 } from './privateCustomizationComic.js';
-import { canExtractPrivateComicAssets, ensurePrivateComicTask } from './privateComicSingleBookFlow.js';
+import { canExtractPrivateComicAssets, ensurePrivateComicTask, preparePrivateComicTaskSettings } from './privateComicSingleBookFlow.js';
 
 const singleBookSource = '赵家堂屋的门帘是新换的，红布面压着一道黄边，屋里没有一个人。';
 
@@ -50,6 +50,20 @@ test('single-book flow reuses the current book when the source has not changed',
   });
   assert.equal(result.task, current);
   assert.equal(result.created, false);
+});
+
+test('single-book flow repairs settings on a reused legacy task before running a stage', async () => {
+  const calls = [];
+  const ensured = {
+    task: { batchId: 'batch-legacy', bookId: 'book-legacy' },
+    created: false,
+    settings: { productionMode: 'comic', aiPromptConfig: { comic: { enabled: true, scope: 'private_customization' } } }
+  };
+  await preparePrivateComicTaskSettings({
+    ensured,
+    saveSettings: async (batchId, settings) => calls.push({ batchId, settings })
+  });
+  assert.deepEqual(calls, [{ batchId: 'batch-legacy', settings: ensured.settings }]);
 });
 
 test('uses the first non-empty source line as the editable comic title fallback', () => {

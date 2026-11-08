@@ -45,7 +45,7 @@ import { PrivateStudioHeaderActions } from './private-studio/PrivateStudioHeader
 import { PrivateStudioNote } from './private-studio/PrivateStudioNote';
 import { PrivateStudioSteps } from './private-studio/PrivateStudioSteps';
 import { buildPrivateComicSettings, mergePrivateComicReference, privateComicDraftKey, privateComicTaskKey, privateComicTitle } from './privateCustomizationComic';
-import { ensurePrivateComicTask } from './privateComicSingleBookFlow.js';
+import { ensurePrivateComicTask, preparePrivateComicTaskSettings } from './privateComicSingleBookFlow.js';
 import { comicPageErrorMessage, comicPageGenerationPayload, generateComicPageWithConflict } from './shuihuo/batchFactoryComicMode';
 import './shuihuo-production.css';
 import './private-customization.css';
@@ -1730,6 +1730,7 @@ export function ScriptPage() {
     setPrivateComicError('');
     try {
       const ensured = await ensureCurrentPrivateComicTask();
+      await preparePrivateComicTaskSettings({ ensured, saveSettings: savePrivateComicSettingsPatch });
       const { batchId, bookId } = ensured.task;
       await runBookStage(batchId, bookId, 'assets', {
         mode: privateComicAssets.length ? 'force' : 'missing',

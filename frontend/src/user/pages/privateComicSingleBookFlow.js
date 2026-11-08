@@ -33,3 +33,12 @@ export async function ensurePrivateComicTask({ task = null, draft = {}, createTa
   if (!snapshot.batchId || !snapshot.bookId) throw new Error('漫画任务已创建，但没有返回完整任务编号');
   return { task: snapshot, created: true, settings: initialBatchSettings };
 }
+
+export async function preparePrivateComicTaskSettings({ ensured, saveSettings } = {}) {
+  if (!ensured?.task?.batchId) throw new Error('漫画任务编号不完整');
+  if (!ensured.created) {
+    if (typeof saveSettings !== 'function') throw new Error('漫画设置保存方法不可用');
+    await saveSettings(ensured.task.batchId, ensured.settings);
+  }
+  return ensured.task;
+}

@@ -559,7 +559,22 @@ func settingsHandler(store batchfactoryv11.Store, catalog *prompt.Catalog, kind 
 			return
 		}
 		if raw, exists := input.Patch["aiPromptConfig"]; exists {
-			hydrated, err := hydrateBatchFactoryPromptConfig(catalog, raw)
+			var hydrated json.RawMessage
+			var err error
+			if kind == batchfactoryv11.ScopeBatch {
+				batch, getErr := store.GetBatch(r.Context(), owner, r.PathValue("batchId"))
+				if getErr != nil {
+					writeStoreError(w, getErr)
+					return
+				}
+				if isPrivateCustomizationComicBatch(batch) {
+					hydrated, err = hydratePrivateCustomizationComicPromptConfig(catalog, raw)
+				} else {
+					hydrated, err = hydrateBatchFactoryPromptConfig(catalog, raw)
+				}
+			} else {
+				hydrated, err = hydrateBatchFactoryPromptConfig(catalog, raw)
+			}
 			if err != nil {
 				writeStoreError(w, fmt.Errorf("%w: %v", batchfactoryv11.ErrInvalid, err))
 				return
