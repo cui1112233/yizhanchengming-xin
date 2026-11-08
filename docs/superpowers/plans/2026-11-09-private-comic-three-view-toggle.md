@@ -24,38 +24,47 @@
 ### Task 1: 接通私人定制三视图选择链路
 
 **Files:**
-- Modify: `frontend/src/user/pages/private-studio/PrivateStudioAssetEditor.source.test.js`
+- Create: `frontend/src/user/pages/private-studio/privateComicThreeView.js`
+- Create: `frontend/src/user/pages/private-studio/privateComicThreeView.test.js`
 - Modify: `frontend/src/user/pages/PrivateComicWorkspace.jsx`
 - Modify: `frontend/src/user/pages/ScriptPage.jsx`
 
 **Interfaces:**
 - Consumes: `onGenerateAssetImage(asset, useThreeView)` 和现有 `generateBookAssetImages(..., { useThreeView })`。
-- Produces: `runPrivateComicAssetImages(assetId = '', useThreeView = true)`，单项生成人物时接收用户选择，批量调用省略第二个参数时默认开启。
+- Produces: `privateComicAssetUseThreeView(assetKind, enabled): boolean` 和 `runPrivateComicAssetImages(assetId = '', useThreeView = true)`；单项生成按资产类型与用户选择决定，批量调用省略第二个参数时默认开启。
 
-- [ ] **Step 1: 写失败源码测试**
+- [ ] **Step 1: 写失败行为测试**
 
-扩展 `PrivateStudioAssetEditor.source.test.js` 的三视图测试，要求：
+新增 `privateComicThreeView.test.js`，用字面值验证人物、场景和道具的生成参数：
 
 ```js
-test('三视图开关在批量工厂和私人定制中都只对人物出现', () => {
-  assert.match(shuihuoEditor, /editing\?\.kind === 'character' \? <Tooltip[\s\S]{0,500}人物三视图/);
-  assert.match(comicPage, /const \[assetImageThreeView, setAssetImageThreeView\] = useState\(true\);/);
-  assert.match(comicPage, /editingAsset\?\.kind === 'character' \? <Tooltip[\s\S]{0,500}人物三视图/);
-  assert.match(comicPage, /onGenerateAssetImage\?\.\(editingAsset, editingAsset\?\.kind === 'character' && assetImageThreeView\)/);
-  assert.match(scriptPage, /async function runPrivateComicAssetImages\(assetId = '', useThreeView = true\)/);
-  assert.match(scriptPage, /useThreeView: Boolean\(useThreeView\)/);
-  assert.match(scriptPage, /onGenerateAssetImage=\{\(asset, useThreeView\) => void runPrivateComicAssetImages\(asset\?\.id \|\| '', useThreeView\)\}/);
-  assert.doesNotMatch(scriptPage, /useThreeView: true/);
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { privateComicAssetUseThreeView } from './privateComicThreeView.js';
+
+test('私人定制只有人物资产按开关使用三视图', () => {
+  assert.equal(privateComicAssetUseThreeView('character', true), true);
+  assert.equal(privateComicAssetUseThreeView('character', false), false);
+  assert.equal(privateComicAssetUseThreeView('scene', true), false);
+  assert.equal(privateComicAssetUseThreeView('prop', true), false);
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认因私人定制缺少开关失败**
+- [ ] **Step 2: 运行测试并确认因行为模块缺失失败**
 
-Run: `node --test src/user/pages/private-studio/PrivateStudioAssetEditor.source.test.js`
+Run: `node --test src/user/pages/private-studio/privateComicThreeView.test.js`
 
-Expected: FAIL，缺少 `assetImageThreeView` 状态、私人定制开关和布尔参数传递。
+Expected: FAIL，找不到 `privateComicThreeView.js`。
 
-- [ ] **Step 3: 在私人定制资产框加入开关**
+- [ ] **Step 3: 实现资产类型判断并在私人定制资产框加入开关**
+
+新增 `privateComicThreeView.js`：
+
+```js
+export function privateComicAssetUseThreeView(assetKind, enabled) {
+  return assetKind === 'character' && enabled === true;
+}
+```
 
 在 `PrivateComicWorkspace.jsx`：
 
@@ -66,7 +75,7 @@ const [assetImageThreeView, setAssetImageThreeView] = useState(true);
 人物资产右侧操作区加入与批量工厂一致的 `Tooltip + Switch + 人物三视图`，并把生成调用改为：
 
 ```jsx
-onGenerateAssetImage?.(editingAsset, editingAsset?.kind === 'character' && assetImageThreeView)
+onGenerateAssetImage?.(editingAsset, privateComicAssetUseThreeView(editingAsset?.kind, assetImageThreeView))
 ```
 
 - [ ] **Step 4: 在 ScriptPage 接通布尔参数**
@@ -94,7 +103,7 @@ onGenerateAssetImage={(asset, useThreeView) => void runPrivateComicAssetImages(a
 - [ ] **Step 5: 运行相关测试和前端构建**
 
 ```powershell
-node --test src/user/pages/private-studio/PrivateStudioAssetEditor.source.test.js src/user/pages/PrivateComicWorkspace.source.test.js
+node --test src/user/pages/private-studio/privateComicThreeView.test.js src/user/pages/private-studio/PrivateStudioAssetEditor.source.test.js src/user/pages/PrivateComicWorkspace.source.test.js
 npm run build
 ```
 
@@ -103,7 +112,7 @@ Expected: 所有测试通过，Vite 构建退出码为 0。
 - [ ] **Step 6: 提交实现**
 
 ```powershell
-git add -- frontend/src/user/pages/private-studio/PrivateStudioAssetEditor.source.test.js frontend/src/user/pages/PrivateComicWorkspace.jsx frontend/src/user/pages/ScriptPage.jsx
+git add -- frontend/src/user/pages/private-studio/privateComicThreeView.js frontend/src/user/pages/private-studio/privateComicThreeView.test.js frontend/src/user/pages/PrivateComicWorkspace.jsx frontend/src/user/pages/ScriptPage.jsx
 git commit -m "feat: add private comic three-view toggle"
 ```
 
