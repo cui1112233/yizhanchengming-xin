@@ -2,7 +2,9 @@ package batchfactoryv11
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -167,36 +169,63 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 	}
 
 	orphaned := []OrphanedOverride{}
-	rows, err := tx.QueryContext(ctx, `SELECT id,ordinal FROM batch_factory_v12_videos WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active' ORDER BY ordinal,id`, book.BatchID, book.ID, owner)
+	// 逐槽位保留：上一修订的每个槽位都记录了自己的输入 digest，本次只有
+	// digest 真正变化的槽位才轮换；未变化槽位连同已成功的生产任务一起保留，
+	// 避免一次局部修订把整本书已生成好的视频全部废掉。
+	previousDigests, err := loadPreviousSlotDigests(ctx, tx, owner, book, currentRevision)
 	if err != nil {
 		return DirectorRevision{}, err
 	}
-	oldIDs := []string{}
-	oldOrdinals := map[string]int{}
+	rows, err := tx.QueryContext(ctx, `SELECT v.id,v.ordinal,COALESCE(r.label,''),COALESCE(r.video_prompt,''),COALESCE(r.visual_prompt,''),COALESCE(r.duration_seconds,0),COALESCE(v.revision,1) FROM batch_factory_v12_videos v LEFT JOIN batch_factory_v12_video_records r ON r.video_id=v.id WHERE v.batch_id=? AND v.book_id=? AND v.owner_username=? AND v.compatibility_state='active' ORDER BY v.ordinal,v.id`, book.BatchID, book.ID, owner)
+	if err != nil {
+		return DirectorRevision{}, err
+	}
+	type activeSlot struct {
+		video   Video
+		ordinal int
+	}
+	oldSlots := []activeSlot{}
+	oldByOrdinal := map[int]activeSlot{}
 	for rows.Next() {
-		var id string
-		var ordinal int
-		if err := rows.Scan(&id, &ordinal); err != nil {
+		var slot activeSlot
+		if err := rows.Scan(&slot.video.ID, &slot.ordinal, &slot.video.Label, &slot.video.VideoPrompt, &slot.video.VisualPrompt, &slot.video.DurationSeconds, &slot.video.Revision); err != nil {
 			rows.Close()
 			return DirectorRevision{}, err
 		}
-		oldIDs = append(oldIDs, id)
-		oldOrdinals[id] = ordinal
+		slot.video.BatchID, slot.video.BookID, slot.video.CompatibilityState = book.BatchID, book.ID, "active"
+		slot.video.Ordinal = slot.ordinal
+		oldSlots = append(oldSlots, slot)
+		oldByOrdinal[slot.ordinal] = slot
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
 		return DirectorRevision{}, err
 	}
 	rows.Close()
+	newDigests := make([]string, len(output.Storyboard))
+	kept := map[int]string{}
+	for ordinal, draft := range output.Storyboard {
+		newDigests[ordinal] = directorSlotDigest(snapshot.Mode, hookID, string(snapshotJSON), draft)
+		previous, exists := oldByOrdinal[ordinal]
+		if exists && newDigests[ordinal] != "" && previousDigests[previous.video.ID] == newDigests[ordinal] {
+			kept[ordinal] = previous.video.ID
+		}
+	}
 	previousSelections := map[int]VideoAssetSelection{}
 	previousSelectionExists := map[int]bool{}
-	for _, videoID := range oldIDs {
+	for _, slot := range oldSlots {
+		if _, isKept := kept[slot.ordinal]; isKept {
+			// 保留槽位的设置补丁原样留在原 video 上，不做 orphan 审计，
+			// 也不需要为素材 reconcile 读取它。
+			continue
+		}
+		videoID := slot.video.ID
 		patch, err := loadPatch(ctx, tx, owner, ScopeRef{Kind: ScopeVideo, BatchID: book.BatchID, BookID: book.ID, VideoID: videoID})
 		if err != nil {
 			return DirectorRevision{}, err
 		}
 		if selection, ok := decodeVideoAssetSelection(patch); ok {
-			previousSelections[oldOrdinals[videoID]], previousSelectionExists[oldOrdinals[videoID]] = selection, true
+			previousSelections[slot.ordinal], previousSelectionExists[slot.ordinal] = selection, true
 		}
 		if len(patch) > 0 {
 			encoded, err := json.Marshal(patch)
@@ -213,13 +242,25 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 			orphaned = append(orphaned, OrphanedOverride{VideoID: videoID, Patch: patch, State: "orphaned"})
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_videos SET compatibility_state='orphaned',updated_at=? WHERE batch_id=? AND book_id=? AND owner_username=? AND compatibility_state='active'`, now, book.BatchID, book.ID, owner); err != nil {
-		return DirectorRevision{}, err
+	for _, slot := range oldSlots {
+		if _, isKept := kept[slot.ordinal]; isKept {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE batch_factory_v12_videos SET compatibility_state='orphaned',updated_at=? WHERE id=? AND owner_username=? AND compatibility_state='active'`, now, slot.video.ID, owner); err != nil {
+			return DirectorRevision{}, err
+		}
 	}
 
 	videos := make([]Video, 0, len(output.Storyboard))
 	comicMode := normalizeProductionMode(snapshot.Effective) == "comic"
 	for ordinal, draft := range output.Storyboard {
+		if keptID, isKept := kept[ordinal]; isKept {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_director_video_links(director_revision_id,video_id,ordinal,slot_digest) VALUES(?,?,?,?)`, revisionID, keptID, ordinal, newDigests[ordinal]); err != nil {
+				return DirectorRevision{}, err
+			}
+			videos = append(videos, oldByOrdinal[ordinal].video)
+			continue
+		}
 		videoID, err := newID("video")
 		if err != nil {
 			return DirectorRevision{}, err
@@ -234,7 +275,7 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_video_records(video_id,label,video_prompt,visual_prompt,duration_seconds) VALUES(?,?,?,?,?)`, videoID, label, storyboardVideoPrompt(draft), nullableString(draft.VisualPrompt), draft.DurationSec); err != nil {
 			return DirectorRevision{}, err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_director_video_links(director_revision_id,video_id,ordinal) VALUES(?,?,?)`, revisionID, videoID, ordinal); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO batch_factory_v12_director_video_links(director_revision_id,video_id,ordinal,slot_digest) VALUES(?,?,?,?)`, revisionID, videoID, ordinal, newDigests[ordinal]); err != nil {
 			return DirectorRevision{}, err
 		}
 		videos = append(videos, Video{ID: videoID, BatchID: book.BatchID, BookID: book.ID, Label: label, VideoPrompt: storyboardVideoPrompt(draft), VisualPrompt: draft.VisualPrompt, DurationSeconds: float64(draft.DurationSec), CompatibilityState: "active", Revision: 1})
@@ -267,6 +308,11 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		addCoreNameLookups(assetIDs, kind, rows)
 	}
 	for ordinal, video := range videos {
+		if _, isKept := kept[ordinal]; isKept {
+			// 保留槽位的 settings_patches 仍挂在原 video 上，重复插入会产生
+			// 同 scope 的重复补丁行。
+			continue
+		}
 		selection := reconcileVideoAssetSelection(previousSelections[ordinal], previousSelectionExists[ordinal], automaticAssetIDsForDirectorVideo(output.Storyboard[ordinal], assetIDs))
 		if selection.effectivelyEmpty() {
 			// 空选择不落库：否则会被当成“用户一个都没选”，把默认资产全过滤掉。
@@ -287,6 +333,78 @@ func (s *MySQLStore) PersistDirectorRevision(ctx context.Context, owner string, 
 		return DirectorRevision{}, err
 	}
 	return DirectorRevision{ID: revisionID, BatchID: book.BatchID, BookID: book.ID, Revision: currentRevision + 1, Mode: snapshot.Mode, SnapshotID: snapshotID, SourceDigest: digest, HookRevisionID: hookID, Output: output, Videos: videos, OrphanedOverrides: orphaned, CreatedAt: now}, nil
+}
+
+// loadPreviousSlotDigests returns the per-slot input digests recorded on the
+// links of the revision that preceded currentRevision. Rows written before the
+// slot_digest column existed read back as "" and therefore never match, which
+// keeps the legacy whole-book rotation as the safe fallback.
+func loadPreviousSlotDigests(ctx context.Context, q batchQueryer, owner string, book Book, previousRevision int64) (map[string]string, error) {
+	digests := map[string]string{}
+	if previousRevision < 1 {
+		return digests, nil
+	}
+	rows, err := q.QueryContext(ctx, `SELECT l.video_id,COALESCE(l.slot_digest,'') FROM batch_factory_v12_director_video_links l JOIN batch_factory_v12_director_revisions d ON d.id=l.director_revision_id WHERE d.batch_id=? AND d.book_id=? AND d.owner_username=? AND d.revision=?`, book.BatchID, book.ID, owner, previousRevision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var videoID, digest string
+		if err := rows.Scan(&videoID, &digest); err != nil {
+			return nil, err
+		}
+		digests[videoID] = digest
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return digests, nil
+}
+
+// directorSlotDigest 哈希一个分镜槽位「会影响产出」的全部冻结输入：模式、
+// Hook、书本级冻结配置以及该槽位的分镜内容。ID/SceneID 是模型每次生成时
+// 随手分配的标识，同一输入重跑也会变，参与 digest 会让保留永远不命中。
+func directorSlotDigest(mode, hookID, snapshotJSON string, draft DirectorVideo) string {
+	type digestDraft struct {
+		DurationSec  int            `json:"duration_sec"`
+		Characters   []string       `json:"characters"`
+		Props        []string       `json:"props"`
+		Scene        string         `json:"scene"`
+		SceneMemory  string         `json:"scene_memory,omitempty"`
+		PrefixKey    string         `json:"prefix_key"`
+		Shots        []DirectorShot `json:"shots"`
+		VideoDesc    string         `json:"video_desc"`
+		VisualPrompt string         `json:"visual_prompt,omitempty"`
+		FinalPrompt  string         `json:"final_prompt,omitempty"`
+	}
+	payload, err := json.Marshal(struct {
+		Mode      string          `json:"mode"`
+		Hook      string          `json:"hook,omitempty"`
+		Effective json.RawMessage `json:"effective"`
+		Draft     digestDraft     `json:"draft"`
+	}{
+		Mode:      mode,
+		Hook:      hookID,
+		Effective: json.RawMessage(snapshotJSON),
+		Draft: digestDraft{
+			DurationSec:  draft.DurationSec,
+			Characters:   draft.Characters,
+			Props:        draft.Props,
+			Scene:        draft.Scene,
+			SceneMemory:  draft.SceneMemory,
+			PrefixKey:    draft.PrefixKey,
+			Shots:        draft.Shots,
+			VideoDesc:    draft.VideoDesc,
+			VisualPrompt: draft.VisualPrompt,
+			FinalPrompt:  draft.FinalPrompt,
+		},
+	})
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:])
 }
 
 func loadLatestDirectorRevision(ctx context.Context, q batchQueryer, owner, batchID, bookID string) (DirectorRevision, error) {

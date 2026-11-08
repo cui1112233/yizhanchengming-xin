@@ -347,7 +347,9 @@ func Build(ctx context.Context, cfg config.Config, db *sql.DB, register func(*ht
 	}
 	giantMaterialResolver := selectGiantMaterialResolver(cfg)
 	artifactStore := localartifact.NewStore(cfg.LocalExecutorArtifactDir, cfg.LocalExecutorArtifactMaxBytes)
-	automationPresetStore, err := httpapi.NewFileAutomationPresetStore(cfg.AutomationPresetPath, time.Now)
+	// 自动化预设走 MySQL 版本化存储（HEAD + 不可变修订），旧的 JSON 文件在
+	// 启动时一次性导入，之后只读 MySQL，避免单机文件与多实例/重部署漂移。
+	automationPresetStore, err := httpapi.NewMySQLAutomationPresetStore(db, cfg.AutomationPresetPath, time.Now)
 	if err != nil {
 		return nil, err
 	}

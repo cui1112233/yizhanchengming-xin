@@ -1542,6 +1542,121 @@ func (c *BatchAutomationCoordinator) applyPreset(ctx context.Context, owner stri
 	return c.store.GetBatch(ctx, owner, batch.ID)
 }
 
+// upgradePreset 把批次显式升级到预设的某个版本（默认当前 HEAD）。与启动时
+// 的 applyPreset「批次已有键优先、预设只补缺口」不同，升级是用户的明确
+// 确认动作：预设管理的键以新版本配置为准，批次其余自定义键保留。升级后
+// 写入新的 automationPresetSnapshot 钉版；配置真正变化的槽位会在下一次
+// Director 修订时按槽位 digest 被精确重置，未变化槽位连同已生成视频保留。
+func (c *BatchAutomationCoordinator) upgradePreset(ctx context.Context, owner string, batch batchfactoryv11.Batch, preset *AutomationPreset, requestedProductionMode string) (batchfactoryv11.Batch, error) {
+	current := map[string]any{}
+	for key, raw := range batch.SettingsState.Patch {
+		var value any
+		if json.Unmarshal(raw, &value) == nil {
+			current[key] = value
+		}
+	}
+	config := preset.Config
+	if len(config) == 0 {
+		return batchfactoryv11.Batch{}, fmt.Errorf("自动化预设没有可用配置")
+	}
+	merged := map[string]any{}
+	for key, value := range current {
+		merged[key] = value
+	}
+	for key, value := range config {
+		merged[key] = value
+	}
+	for _, key := range []string{"aiPromptConfig", "publishSettings"} {
+		left, _ := current[key].(map[string]any)
+		right, _ := config[key].(map[string]any)
+		if left != nil || right != nil {
+			nested := map[string]any{}
+			for k, v := range left {
+				nested[k] = v
+			}
+			for k, v := range right {
+				nested[k] = v
+			}
+			merged[key] = nested
+		}
+	}
+	if mode := strings.TrimSpace(requestedProductionMode); mode == "comic" || mode == "video" {
+		merged["productionMode"] = mode
+	}
+	if c.promptCatalog != nil {
+		if value, ok := merged["aiPromptConfig"]; ok && value != nil {
+			raw, marshalErr := json.Marshal(value)
+			if marshalErr != nil {
+				return batchfactoryv11.Batch{}, marshalErr
+			}
+			hydrated, hydrateErr := hydrateBatchFactoryPromptConfig(c.promptCatalog, raw)
+			if hydrateErr != nil {
+				return batchfactoryv11.Batch{}, hydrateErr
+			}
+			merged["aiPromptConfig"] = hydrated
+		}
+	}
+	merged["automationPresetSnapshot"] = map[string]any{
+		"id":        preset.ID,
+		"name":      preset.Name,
+		"version":   preset.Version,
+		"appliedAt": c.now().UTC().Format(time.RFC3339),
+	}
+	patch := batchfactoryv11.SettingsPatch{}
+	for key, value := range merged {
+		raw, err := json.Marshal(value)
+		if err != nil {
+			return batchfactoryv11.Batch{}, err
+		}
+		patch[key] = raw
+	}
+	if _, err := c.store.SaveSettings(ctx, owner, batchfactoryv11.ScopeRef{Kind: batchfactoryv11.ScopeBatch, BatchID: batch.ID}, batchfactoryv11.SettingsUpdate{Patch: patch, ExpectedRevision: batch.Revision}); err != nil {
+		return batchfactoryv11.Batch{}, err
+	}
+	return c.store.GetBatch(ctx, owner, batch.ID)
+}
+
+// UpgradeAutomationPreset 是「批次页确认升级预设」的 HTTP 入口：批次钉住的
+// automationPresetSnapshot 落后于预设 HEAD 时，用户确认后调用，返回升级
+// 后的批次与新的钉版信息。
+func (c *BatchAutomationCoordinator) UpgradeAutomationPreset(ctx context.Context, owner, batchID string, input map[string]any) (map[string]any, error) {
+	if c.presets == nil {
+		return nil, fmt.Errorf("%w: 自动化预设服务未配置", batchfactoryv11.ErrUnavailable)
+	}
+	batch, err := c.store.GetBatch(ctx, owner, batchID)
+	if err != nil {
+		return nil, err
+	}
+	presetID := automationStringValue(input["presetId"], "")
+	if presetID == "" {
+		// 未显式指定时沿用批次当前钉住的预设。
+		if raw, ok := batch.SettingsState.Patch["automationPresetSnapshot"]; ok {
+			var snapshot struct {
+				ID string `json:"id"`
+			}
+			if json.Unmarshal(raw, &snapshot) == nil {
+				presetID = strings.TrimSpace(snapshot.ID)
+			}
+		}
+	}
+	if presetID == "" {
+		return nil, fmt.Errorf("%w: 批次没有钉住任何自动化预设，无法升级", batchfactoryv11.ErrInvalid)
+	}
+	preset, err := c.presets.Get(owner, presetID)
+	if err != nil || preset == nil {
+		return nil, fmt.Errorf("自动化预设不存在或不属于当前账号")
+	}
+	updated, err := c.upgradePreset(ctx, owner, batch, preset, automationStringValue(input["productionMode"], ""))
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"batch":    updated,
+		"preset":   map[string]any{"id": preset.ID, "name": preset.Name, "version": preset.Version},
+		"upgraded": true,
+	}, nil
+}
+
 func (c *BatchAutomationCoordinator) launchRun(owner, batchID, jobID string, job map[string]any, batch batchfactoryv11.Batch) {
 	baseCtx := context.WithValue(context.Background(), bridgeIdentityKey{}, BridgeIdentity{Username: owner})
 	automationCtx, cancel := context.WithCancel(baseCtx)
@@ -4135,6 +4250,23 @@ func registerBatchAutomationRoutes(mux *http.ServeMux, auth BridgeAuth, coordina
 			return
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"automation": result})
+	})))
+	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/automation/upgrade-preset", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, ok := bridgeOwner(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		var input map[string]any
+		if !decodeJSON(w, r, &input) {
+			return
+		}
+		result, err := coordinator.UpgradeAutomationPreset(r.Context(), owner, r.PathValue("batchId"), input)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	})))
 	mux.Handle("POST /api/batch-factory/"+version+"/batches/{batchId}/books/{bookId}/audio-plan", auth.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		owner, ok := bridgeOwner(r)
